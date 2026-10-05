@@ -71,6 +71,10 @@ public class HandsService
     /// </summary>
     public Action<int>? Carried { get; set; }
 
+    /// <summary>Told when something is taken out of the world here (an emptied bag of belongings), so every
+    /// client is told it has gone. The server wires it to GameServer.BroadcastRemoval.</summary>
+    public Action<string, int>? Removed { get; set; }
+
     /// <summary>What is in a player's hands, right first. The same entity twice means it fills both.</summary>
     public static (Entity? Right, Entity? Left) Holding(World world, Entity player, Dictionary<int, Entity> lookup)
     {
@@ -238,6 +242,7 @@ public class HandsService
             return false;
         var from = world.Get<Transform>(session.Entity).Position;
         if (Nearest(world, from, "", out _, out _, reach: metres) == null) return false;
+        if (world.Has<DeadComponent>(session.Entity)) { message = "You are dead."; return true; }
         Take(session, "", out message);
         return true;
     }
@@ -248,6 +253,7 @@ public class HandsService
         if (!TryGetHolder(session, out var world, out _, out var lookup)) { message = "The map is not loaded."; return false; }
         if (session.Entity == Entity.Null || !world.IsAlive(session.Entity))
         { message = "You are not in the world yet."; return false; }
+        if (world.Has<DeadComponent>(session.Entity)) { message = "You are dead."; return false; }
 
         var from = world.Get<Transform>(session.Entity).Position;
         var item = Nearest(world, from, named, out _, out string name);
@@ -261,12 +267,24 @@ public class HandsService
             return false;
         }
 
+        // A bag of somebody's belongings is gone through, not carried off whole: what is in it comes out
+        // into your hands, onto your back and into your pockets.
+        if (world.Has<BelongingsBag>(item.Value))
+        {
+            message = Rummage(session, world, lookup, item.Value, name) + AnotherWithinReach(world, from);
+            return true;
+        }
+
         if (!PutInHands(world, session.Entity, item.Value, out string why))
         { message = $"{why} {Carrying(world, lookup, world.Get<HandsComponent>(session.Entity))}"; return false; }
 
         _maps.RefreshGrid(session.CurrentMapId);
         Carried?.Invoke(item.Value.Id);
-        message = $"You take the {name} in {WhereItWent(world, session.Entity, item.Value)}{Loaded(world, session.Entity, item.Value)}."
+        // A body goes over the shoulder, and the pace that comes with it is said, because a player who
+        // cannot see themselves bent under it would otherwise only find out by walking.
+        message = (world.Has<Corpse>(item.Value)
+                      ? $"You lift the {name} over your shoulder. It takes both hands, and you can only walk slowly with it."
+                      : $"You take the {name} in {WhereItWent(world, session.Entity, item.Value)}{Loaded(world, session.Entity, item.Value)}.")
                 + AnotherWithinReach(world, from);
         Log.Information("{User} picked up {Item} ({Id}).", session.Username, name, item.Value.Id);
         return true;
@@ -301,6 +319,12 @@ public class HandsService
         {
             float mass = MassOf(world, item);
             float already = CarriedMassKg(world, session.Entity, lookup);
+            if (mass > CarryCapacityKg)
+            {
+                refused = $"The {NameOf(world, item)} is {mass:F0} kilograms, more than the {CarryCapacityKg:F0} you can carry "
+                        + "on your back. It stays in your arms.";
+                continue;
+            }
             if (already + mass > CarryCapacityKg)
             {
                 // Refusing says the arithmetic, because the arithmetic is the rule: a player who is
@@ -340,6 +364,7 @@ public class HandsService
         message = "";
         if (!TryGetHolder(session, out var world, out _, out var lookup)) { message = "The map is not loaded."; return false; }
 
+        if (world.Has<DeadComponent>(session.Entity)) { message = "You are dead."; return false; }
         var carried = Stowed(world, session.Entity, lookup);
         if (carried.Count == 0) { message = "You have nothing on your back."; return false; }
 
@@ -428,7 +453,13 @@ public class HandsService
             t.IsDirty = true;
             Carried?.Invoke(item.Id);
 
-            if (heard != null && world.Has<ItemComponent>(item))
+            if (heard != null && world.Has<Corpse>(item))
+            {
+                // A body is not dropped from the shoulder but set down: the legs and then the trunk, from
+                // a few hand-widths, onto whatever the floor is.
+                heard(item.Id, "a body set down", CombatService.BodyFall(world, grid, landing, lowered: true));
+            }
+            else if (heard != null && world.Has<ItemComponent>(item))
             {
                 // It falls from where it was — a hand, or a back — so it arrives at sqrt(2gh), the
                 // same arithmetic that tells a listener which floor a window was on.
@@ -506,6 +537,137 @@ public class HandsService
         foreach (var item in Stowed(world, player, lookup)) mass += MassOf(world, item);
         return mass;
     }
+
+    /// <summary>
+    /// The fastest a player may go on foot, m/s, or 0 for no limit beyond the walk and the run:
+    /// <see cref="PhysicsConstants.CarryingSpeed"/> while their arms hold something heavier than they
+    /// could sling on their back, which is a body. A thing's weight, not its being a body, is the rule.
+    /// </summary>
+    public static float SpeedLimit(World world, Entity player, Dictionary<int, Entity> lookup)
+    {
+        if (!world.Has<HandsComponent>(player)) return 0f;
+        var hands = world.Get<HandsComponent>(player);
+        foreach (int id in new[] { hands.RightEntityId, hands.LeftEntityId })
+        {
+            var item = Find(world, lookup, id);
+            if (item != null && world.Has<ItemComponent>(item.Value) && MassOf(world, item.Value) > CarryCapacityKg)
+                return PhysicsConstants.CarryingSpeed;
+        }
+        return 0f;
+    }
+
+    /// <summary>
+    /// What a player has hold of, let go where they stand: on the ground under them, nobody's. For
+    /// somebody who is killed: a body they were carrying (<paramref name="bodiesOnly"/>), and then anything
+    /// left that their bag could not take. Returns what was let go, for the caller to re-send.
+    /// </summary>
+    public static List<Entity> LetGo(World world, SpatialGrid<Entity> grid, Entity player, Dictionary<int, Entity> lookup,
+                                     bool bodiesOnly)
+    {
+        var let = new List<Entity>();
+        var at = world.Get<Transform>(player).Position;
+        var holding = new List<Entity>();
+        if (world.Has<HandsComponent>(player))
+        {
+            var hands = world.Get<HandsComponent>(player);
+            foreach (int id in new[] { hands.RightEntityId, hands.LeftEntityId })
+                if (Find(world, lookup, id) is { } held && !holding.Contains(held)) holding.Add(held);
+        }
+        if (world.Has<InventoryComponent>(player)) holding.AddRange(Stowed(world, player, lookup));
+        foreach (var item in holding)
+        {
+            if (bodiesOnly && !world.Has<Corpse>(item)) continue;
+            ClearFromHands(world, player, item.Id);
+            if (world.Has<InventoryComponent>(player)) Bag(world, player).Remove(item.Id);
+            if (world.Has<HeldComponent>(item)) world.Remove<HeldComponent>(item);
+            if (world.Has<ParentComponent>(item)) world.Remove<ParentComponent>(item);
+            ref var t = ref world.Get<Transform>(item);
+            t.Position = Bodies.GroundUnder(world, grid, at, player);
+            t.IsDirty = true;
+            let.Add(item);
+        }
+        return let;
+    }
+
+    /// <summary>
+    /// Takes what is in a bag of somebody's belongings: each thing into a free hand, then onto your back
+    /// while it takes the weight, and the spare rounds into your pockets. What will not go stays in the
+    /// bag, and is said; an emptied bag is gone.
+    /// </summary>
+    private string Rummage(UserSession session, World world, Dictionary<int, Entity> lookup, Entity bag, string bagName)
+    {
+        var player = session.Entity;
+        var at = world.Get<Transform>(player).Position;
+        var contents = world.Get<BelongingsBag>(bag).Contents ?? new Belongings();
+        var took = new List<string>();
+        var left = new List<SavedItem>();
+        var stays = new List<string>();
+        foreach (var saved in contents.Items)
+        {
+            if (!_maps.Prefabs.ContainsKey(saved.Prefab)) { Log.Warning("A {Prefab} in {Bag} cannot be made; it is lost.", saved.Prefab, bagName); continue; }
+            var item = _maps.SpawnPrefab(session.CurrentMapId, saved.Prefab, at);
+            if (item == Entity.Null) { left.Add(saved); continue; }
+            if (saved.Rounds is int rounds)
+                SetOrAdd(world, item, new AmmoComponent { Rounds = rounds, Capacity = saved.Capacity ?? rounds, SpareRounds = saved.SpareRounds ?? 0 });
+            string name = NameOf(world, item);
+            if (PutInHands(world, player, item, out _))
+            {
+                took.Add($"the {name} in {WhereItWent(world, player, item)}");
+                Carried?.Invoke(item.Id);
+            }
+            else if (CarriedMassKg(world, player, lookup) + MassOf(world, item) <= CarryCapacityKg)
+            {
+                if (!world.Has<InventoryComponent>(player)) world.Add(player, new InventoryComponent());
+                Bag(world, player).Add(item.Id);
+                Attach(world, player, item, Back, bothHands: false);
+                took.Add($"the {name} on your back");
+                Carried?.Invoke(item.Id);
+            }
+            else
+            {
+                // Made only to be weighed: back into the bag's list, out of the world before anybody hears of it.
+                _maps.DestroyEntity(session.CurrentMapId, item);
+                left.Add(saved);
+                stays.Add(name);
+            }
+        }
+        foreach (var (ammoId, n) in contents.Spares)
+        {
+            if (n <= 0) continue;
+            Arms.AddReserve(world, player, ammoId, n);
+            took.Add(Ammunition.Get(ammoId) is { } kind ? Ammunition.Count(kind, n) : $"{n} rounds of {ammoId}");
+        }
+        contents.Items = left;
+        contents.Spares = new Dictionary<string, int>();
+        world.Get<BelongingsBag>(bag).Contents = contents;
+        _maps.RefreshGrid(session.CurrentMapId);
+
+        string message = took.Count == 0 ? $"You go through {bagName} and take nothing."
+                       : $"You go through {bagName} and take {Joined(took)}.";
+        if (stays.Count > 0)
+            message += $" The {string.Join(" and the ", stays)} stay{(stays.Count == 1 ? "s" : "")} in it: your hands are full "
+                     + $"and your back will not take the weight.";
+        if (left.Count == 0)
+        {
+            int id = bag.Id;
+            _maps.DestroyEntity(session.CurrentMapId, bag);
+            Removed?.Invoke(session.CurrentMapId, id);
+        }
+        else
+        {
+            float mass = Bodies.BagMassKg;
+            foreach (var saved in left)
+                if (_maps.Prefabs.TryGetValue(saved.Prefab, out var template)) mass += MathF.Max(0.01f, template.ItemWeight ?? 1f);
+            world.Get<ItemComponent>(bag).MassKg = mass;
+        }
+        Log.Information("{User} went through {Bag}: took {Took}; {Left} thing(s) left in it.", session.Username, bagName,
+                        took.Count, left.Count);
+        return message;
+    }
+
+    /// <summary>"a, b and c".</summary>
+    private static string Joined(List<string> parts)
+        => parts.Count == 1 ? parts[0] : string.Join(", ", parts.Take(parts.Count - 1)) + " and " + parts[^1];
 
     // ── Leaving the world with your things, and coming back with them ───────────────────────────
 

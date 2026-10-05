@@ -204,7 +204,7 @@ public static class MovementSystem
                         GroundHeight = groundY,
                         Gravity = mapGravity,
                         JumpForce = JumpPower,
-                        Speed = input.Sprint ? SprintSpeed : WalkSpeed,
+                        Speed = FootSpeed(input.Sprint, HandsService.SpeedLimit(world, e, lookup)),
                         PlayerRadius = PlayerRadius,
                         PlayerHeight = PlayerHeight,
                         StepHeight = StepHeight,

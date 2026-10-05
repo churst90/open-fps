@@ -645,6 +645,8 @@ public partial class CommandHandler
             // Somebody's carried things ride on them: yours are not near you, and another player's are
             // said by saying the player (Cody, 2026-10-04: Shift+P read out every gun Sean had).
             if (world.Has<HeldComponent>(e)) return;
+            // Somebody dead is said by their body, which lies where they fell: "body of sean".
+            if (world.Has<DeadComponent>(e)) return;
             Vector3 size = world.Has<ColliderComponent>(e) ? world.Get<ColliderComponent>(e).Size : Vector3.Zero;
             bool solid = world.Has<ColliderComponent>(e) && world.Get<ColliderComponent>(e).IsSolid && size.X > 0f;
             if (solid && Vector3.Distance(eye, t.Position) < scanRadius + size.Length()) solids.Add((e, t.Position, size, t.Rotation));

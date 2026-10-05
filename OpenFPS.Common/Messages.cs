@@ -396,6 +396,10 @@ public partial class StatsUpdate : IMessage
     /// <summary>The scope on that weapon (a <see cref="OpenFPS.Common.ScopeRegistry"/> id), or empty.
     /// The client needs it for numpad star: only a scoped gun can be raised to the eye.</summary>
     public string HeldScopeId = "";
+    /// <summary>The fastest the player may move on foot, metres per second, or 0 for no limit beyond the
+    /// walk and the run: set while they carry a body (PhysicsConstants.CarryingSpeed). The client's own
+    /// prediction needs it, or it walks ahead of the server and is pulled back every step.</summary>
+    public float SpeedLimit = 0f;
 }
 
 /// <summary>

@@ -1023,6 +1023,7 @@ public sealed partial class ClientGameSession : IDisposable
                 _state.HeldWeaponId = stats.HeldWeaponId ?? "";
                 _state.HeldRounds = stats.HeldRounds;
                 _state.HeldScopeId = stats.HeldScopeId ?? "";
+                _state.SpeedLimit = stats.SpeedLimit;
                 _state.CurrentMaterial = stats.CurrentMaterial;
                 _state.CurrentVariant = stats.CurrentVariant;
                 // CurrentMaterial feeds the reverb bus material calculation via LocalPlayerState: when a

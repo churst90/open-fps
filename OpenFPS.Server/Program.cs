@@ -331,7 +331,7 @@ public class GameServer
         // Now that every sound source exists, size each map's broadcast radius from it.
         _maps.RefreshEarshotRanges();
         _seats = new OccupancyService(_maps, EmitWorldAudio);
-        _hands = new HandsService(_maps) { Carried = SyncAudioComponent };
+        _hands = new HandsService(_maps) { Carried = SyncAudioComponent, Removed = BroadcastRemoval };
         _store = new PlayerStore(_userRepo, _maps, _hands);
         // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
         // why this is a file and not a table.
@@ -339,8 +339,14 @@ public class GameServer
         Roles = new RoleRepository("roles.json");
         // Beside it, and a file for the same reason. See TeamRepository.
         Teams = new TeamRepository("teams.json");
-        // A pedestrian shot dead is taken away after a while and somebody else walks their walk.
-        var combat = new CombatService(_maps, this, _sessions) { ReplaceWalker = _vehicles.ReplaceWalker };
+        // A pedestrian shot dead is taken off the street (their body stays, as an item), and a minute
+        // later somebody else walks their walk.
+        var combat = new CombatService(_maps, this, _sessions)
+        {
+            RetireWalker = _vehicles.RetireWalker,
+            ReplaceWalker = _vehicles.ReplaceWalker,
+            Possessions = _hands,
+        };
         // A flown bullet slows in the map's air and drifts in the server's wind.
         combat.Weather = mapId =>
         {
@@ -1482,6 +1488,8 @@ public class GameServer
                         Health = health, MaxHealth = maxHealth,
                         CurrentMaterial = stats.matType, CurrentVariant = stats.variant,
                         HeldWeaponId = held.WeaponId, HeldRounds = held.Rounds, HeldScopeId = held.ScopeId,
+                        // A body over the shoulder slows you, and the client predicts the same pace.
+                        SpeedLimit = HandsService.SpeedLimit(world, session.Entity, mapEntry.Value.lookup),
                     }, DeliveryMethod.ReliableOrdered);
                     send.Dispose();
                 }

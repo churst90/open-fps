@@ -46,6 +46,9 @@ public static class EntityDefinitionFactory
             var player = world.Get<PlayerComponent>(e);
             def.Identity.BeaconCategory = OpenFPS.Common.Beacons.Player;
             def.Team = player.Team ?? "";
+            // Dead, a player is not a player beacon: their body lies there as an item, which is what
+            // there is to find. The definition goes out again when they die and when they get up.
+            if (world.Has<DeadComponent>(e)) def.Identity.BeaconCategory = "";
         }
         return def;
     }
