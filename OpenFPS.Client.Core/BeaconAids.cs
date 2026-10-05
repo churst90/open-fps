@@ -174,6 +174,11 @@ public sealed class BeaconAids
             at = face;
             if (_acoustics != null) region = _acoustics.GetRegionAt(world, inRoom);
         }
+        // A vehicle's beacon is on the side of its body toward you. From where the vehicle rests, the
+        // middle of its footprint at road level, it was inside its own floor and doors: every path out
+        // read 0.95 blocked, so no vehicle beacon was ever heard (Cody, 2026-10-05: "I'm not sure I
+        // hear vehicle beacons").
+        else if (TryVehicleSide(world, sourceId, listener, out var side)) at = side;
         // Through the same acoustic path every one-off sound takes: blocked by what is in the way,
         // bent round what it can bend round. The door's own leaf does not block its own blip.
         if (!Reaches(world, sourceId, listener, at, out var path)) return;
@@ -221,6 +226,16 @@ public sealed class BeaconAids
     private bool InSight(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at)
     {
         if (_acoustics == null || !world.Entities.TryGetValue(sourceId, out var e)) return false;
+        // A vehicle's blip is already off its body, on your side of it (TryVehicleSide): the sight
+        // line starts there. Stepped off its narrowest face, as a door's is, it would leave from the
+        // car's flank and cut across its bonnet to reach somebody standing in front of it.
+        if (IsVehicle(e))
+        {
+            var ray = listener - at;
+            float len = ray.Length();
+            return len < 0.05f || !_acoustics.Spatial.RaycastMaterial(world, at, ray / len, len - 0.05f,
+                                                                     out _, out _, out _, ignoreEntityId: sourceId);
+        }
         var size = e.Definition.Collider.Size;
         Vector3 axis = size.X <= size.Y && size.X <= size.Z ? Vector3.UnitX
                      : size.Z <= size.Y ? Vector3.UnitZ : Vector3.UnitY;
@@ -256,6 +271,49 @@ public sealed class BeaconAids
         face = new Vector3(centre.X, MathF.Min(bottom + FaceHeightMetres, top - 0.1f), centre.Z) + normal * (thick * 0.5f + 0.05f);
         inRoom = face + normal * 0.5f;
         return true;
+    }
+
+    /// <summary>
+    /// Where a vehicle's blip sounds from: the point on its body nearest you, a little out from it,
+    /// and between its sills and its roof at the height nearest your ears. The body is the box its
+    /// collider gives, resting where the vehicle stands, as VehicleShadow takes it. A line from the
+    /// nearest point of a box to you never passes back through the box, so the vehicle does not
+    /// block its own beacon wherever round it you stand. False for anything that is not a vehicle
+    /// beacon, one with no body, and one you are inside.
+    /// </summary>
+    internal static bool TryVehicleSide(WorldSnapshot world, int sourceId, Vector3 listener, out Vector3 side)
+    {
+        side = default;
+        if (!world.Entities.TryGetValue(sourceId, out var e) || !IsVehicle(e)) return false;
+        var size = e.Definition.Collider.Size;
+        if (size.X <= 0f || size.Z <= 0f || Inside(e, listener)) return false;
+        var rotation = e.Transform.Rotation;
+        var local = Vector3.Transform(listener - e.Transform.Position, Quaternion.Inverse(rotation));
+        float hx = size.X * 0.5f + VehicleClearance, hz = size.Z * 0.5f + VehicleClearance;
+        float roof = MathF.Max(size.Y, 0.4f);
+        float low = MathF.Min(VehicleSillMetres, roof * 0.5f), high = MathF.Max(low, roof - 0.1f);
+        var nearest = new Vector3(Math.Clamp(local.X, -hx, hx), Math.Clamp(local.Y, low, high), Math.Clamp(local.Z, -hz, hz));
+        side = e.Transform.Position + Vector3.Transform(nearest, rotation);
+        return true;
+    }
+
+    /// <summary>How far out from a vehicle's body its blip hangs, metres: clear of its panels and
+    /// mirrors, and still at the vehicle.</summary>
+    private const float VehicleClearance = 0.3f;
+    /// <summary>The lowest a vehicle's blip sounds above where it rests: about its sills.</summary>
+    private const float VehicleSillMetres = 0.5f;
+
+    private static bool IsVehicle(EntitySnapshot e)
+        => string.Equals(e.Definition.Identity.BeaconCategory, Beacons.Vehicle, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether you are inside a vehicle's body, in plan and below its roof: sitting in it.
+    /// A car you are in is not one you are looking for, and does not take a nearer one's place.</summary>
+    internal static bool Inside(EntitySnapshot e, Vector3 listener)
+    {
+        var size = e.Definition.Collider.Size;
+        var local = Vector3.Transform(listener - e.Transform.Position, Quaternion.Inverse(e.Transform.Rotation));
+        return MathF.Abs(local.X) < size.X * 0.5f && MathF.Abs(local.Z) < size.Z * 0.5f
+            && local.Y > -0.5f && local.Y < MathF.Max(size.Y, 0.4f) + 0.5f;
     }
 
     /// <summary>How far off a face to start the sight line: past the half-thickness of any wall on
@@ -295,6 +353,7 @@ public sealed class BeaconAids
             // end of the landing. They are not the way up from here.
             if (floorBeacons != null && (!floorBeacons.Contains(e.Id) || MathF.Abs(at.Y - listener.Y) > StairCues.OtherFloorMetres))
                 return;
+            if (category == Beacons.Vehicle && Inside(e, listener)) return;
             found.Add((e.Id, at, d));
         }
         if (world.StaticGrid != null)

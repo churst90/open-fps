@@ -217,4 +217,116 @@ public class BeaconTests
         Assert.True(doors > 100, $"only {doors} doors carry a door beacon");
         Assert.Equal(4, cars);
     }
+
+    /// <summary>The city with its parked cars placed, as a client is sent it, and the cars.</summary>
+    private static (WorldSnapshot Snap, System.Collections.Generic.List<EntityDefinition> Cars) CityWithParkedCars()
+    {
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        var composites = new CompositeService(maps, prefabs,
+            new CompositeRepository(Path.Combine(Path.GetTempPath(), "openfps-no-composites-" + Guid.NewGuid())));
+        composites.PlaceRecorded(maps);
+        Assert.True(maps.TryGetMap("city", out World world, out _, out _, out _));
+        Assert.True(maps.TryGetMapData("city", out var data));
+        var client = new ClientWorldState();
+        client.Clear(data.Size);
+        var cars = new System.Collections.Generic.List<EntityDefinition>();
+        // Every entity, the moving ones too: a drivable car and its panels carry a Velocity, so they
+        // reach a client by the broadcast rather than the map stream.
+        world.Query(new QueryDescription().WithAll<Transform>(), (Entity e) =>
+        {
+            var def = EntityDefinitionFactory.From(world, e);
+            client.RegisterDefinition(def);
+            if (def.Identity.BeaconCategory == Beacons.Vehicle) cars.Add(def);
+        });
+        Assert.Equal(4, cars.Count);
+        return (client.GetSnapshot(), cars);
+    }
+
+    /// <summary>
+    /// A parked car's beacon is heard from wherever round it you stand. It used to sound from where
+    /// the car rests - the middle of its footprint at road level, inside its own floor and doors - so
+    /// every path out of it read 0.95 blocked and no vehicle beacon was ever played (Cody, 2026-10-05:
+    /// "I'm not sure I hear vehicle beacons"). Now it hangs just off the body on your side.
+    /// </summary>
+    [Fact]
+    public void AParkedCarBlipsFromWhereverYouStand()
+    {
+        var (snap, cars) = CityWithParkedCars();
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+        int tried = 0, silent = 0;
+        foreach (var c in cars)
+        {
+            var p = c.Transform.Position;
+            var fwd = Vector3.Transform(Vector3.UnitZ, c.Transform.Rotation);
+            var right = Vector3.Transform(Vector3.UnitX, c.Transform.Rotation);
+            foreach (var (name, off) in new[] { ("beside, 2 m", right * 2f), ("beside, 4 m", right * 4f), ("other side, 3 m", -right * 3f),
+                                                ("in front, 4 m", fwd * 4f), ("behind, 5 m", -fwd * 5f), ("off a corner", (fwd + right) * 4.2f) })
+            {
+                var ear = p + off + new Vector3(0f, 1.6f, 0f);
+                var mixer = new EmitterRecordingProvider();
+                var audio = new AudioEngineFacade(mixer);
+                audio.InitializeForTest();
+                audio.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
+                var aids = new BeaconAids(audio, BeaconPreferences.InMemory(), acoustics);
+                aids.Ping(snap, c.EntityId, TrackCategory.Vehicles, ear);
+                for (int k = 0; k < 3; k++) audio.PumpForTest();
+                int at = mixer.Played.FindIndex(e => e.SoundId == "SYNTH/beacon_vehicle_hum");
+                tried++;
+                if (at < 0) { silent++; _o.WriteLine($"{c.Identity.Name}, {name}: silent"); continue; }
+                var blip = mixer.Played[at];
+                // From the car: within its own box and a little, in plan, and between its sills and roof.
+                var local = Vector3.Transform(blip.Position - p, Quaternion.Inverse(c.Transform.Rotation));
+                _o.WriteLine($"{c.Identity.Name}, {name}: from {local} in the car's frame, occlusion {blip.Occlusion:F2}");
+                Assert.InRange(MathF.Abs(local.X), 0f, c.Collider.Size.X * 0.5f + 0.31f);
+                Assert.InRange(MathF.Abs(local.Z), 0f, c.Collider.Size.Z * 0.5f + 0.31f);
+                Assert.InRange(local.Y, 0.4f, c.Collider.Size.Y);
+            }
+        }
+        Assert.Equal(24, tried);
+        Assert.Equal(0, silent);
+    }
+
+    /// <summary>
+    /// Standing among the parked cars, the nearest blip on their own beats; and the car you are
+    /// sitting in is not one of them - the next one along takes its place.
+    /// </summary>
+    [Fact]
+    public void TheNearestParkedCarsBlipButNotTheOneYouAreIn()
+    {
+        var (snap, cars) = CityWithParkedCars();
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+        var first = cars.OrderBy(c => c.Transform.Position.Z).First();
+        var right = Vector3.Transform(Vector3.UnitX, first.Transform.Rotation);
+
+        System.Collections.Generic.List<OpenFPS.Client.AudioEngine.Data.SpatialEmitter> Listen(Vector3 ear, bool paths = true)
+        {
+            var mixer = new EmitterRecordingProvider();
+            var audio = new AudioEngineFacade(mixer);
+            audio.InitializeForTest();
+            audio.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
+            var aids = new BeaconAids(audio, BeaconPreferences.InMemory(), paths ? acoustics : null);
+            for (int i = 0; i < 40; i++)
+            {
+                aids.Update(snap, ear, 10.0 + i * 0.1);
+                for (int k = 0; k < 3; k++) audio.PumpForTest();
+            }
+            return mixer.Played.Where(e => e.SoundId == "SYNTH/beacon_vehicle_hum").ToList();
+        }
+        bool From(OpenFPS.Client.AudioEngine.Data.SpatialEmitter e, EntityDefinition car)
+            => Vector2.Distance(new Vector2(e.Position.X, e.Position.Z), new Vector2(car.Transform.Position.X, car.Transform.Position.Z))
+               < car.Collider.Size.Z * 0.5f + 0.5f;
+
+        var beside = Listen(first.Transform.Position + right * 2.5f + new Vector3(0f, 1.6f, 0f));
+        _o.WriteLine($"beside: {beside.Count} blips");
+        Assert.Contains(beside, e => From(e, first));
+
+        // Sitting in it, with nothing asked about paths: the car's own panels shut out the others, as
+        // they should, and that is not what this is about.
+        var inside = Listen(first.Transform.Position + new Vector3(0f, 1.1f, 0f), paths: false);
+        _o.WriteLine($"inside: {inside.Count} blips, from {string.Join(", ", inside.Select(e => e.Position))}");
+        Assert.DoesNotContain(inside, e => From(e, first));
+        Assert.NotEmpty(inside);
+    }
 }

@@ -236,8 +236,41 @@ public class BeaconAidsMutationTests
         Assert.Contains(blips, e => From(e, inside));
         Assert.Contains(blips, e => From(e, edge));
         Assert.DoesNotContain(blips, e => From(e, beyond));
-        Assert.Contains(blips, e => From(e, car));
-        Assert.DoesNotContain(blips, e => From(e, farCar));
+        // A vehicle's blip hangs off its body on your side, up to half its length from its middle.
+        bool FromCar(SpatialEmitter e, Vector3 at) => e.SoundId == "SYNTH/beacon_vehicle_hum"
+            && Vector2.Distance(new Vector2(e.Position.X, e.Position.Z), new Vector2(at.X, at.Z)) < 2.6f;
+        Assert.Contains(blips, e => FromCar(e, car));
+        Assert.DoesNotContain(blips, e => FromCar(e, farCar));
+    }
+
+    /// <summary>
+    /// A vehicle's blip sounds from the side of its body nearest you, just off it and no higher than
+    /// its roof — wherever round it you stand, so its own panels never stand between you and it.
+    /// </summary>
+    [Fact]
+    public void AVehicleBlipsFromTheSideOfItsBodyTowardYou()
+    {
+        var size = new Vector3(1.8f, 1.4f, 4.4f);
+        var turned = Quaternion.CreateFromYawPitchRoll(MathF.PI / 2f, 0f, 0f);   // long side along x
+        var world = Moving(Thing(1, new Vector3(0f, 0f, 0f), size, Beacons.Vehicle, rotation: turned));
+        void Expect(Vector3 ear, Vector3 want)
+        {
+            Assert.True(BeaconAids.TryVehicleSide(world, 1, ear, out var side));
+            Assert.True(Vector3.Distance(side, want) < 1e-3f, $"from {ear}: {side}, wanted {want}");
+        }
+        Expect(new Vector3(0f, 1.6f, 5f), new Vector3(0f, 1.3f, 1.2f));      // beside it: off its flank, below its roof
+        Expect(new Vector3(0f, 1.6f, -5f), new Vector3(0f, 1.3f, -1.2f));    // the other side
+        Expect(new Vector3(9f, 1.6f, 0f), new Vector3(2.5f, 1.3f, 0f));      // off its end
+        Expect(new Vector3(9f, 1.6f, 9f), new Vector3(2.5f, 1.3f, 1.2f));    // off a corner
+        Expect(new Vector3(0f, 0.2f, 5f), new Vector3(0f, 0.5f, 1.2f));      // never lower than its sills
+        Expect(new Vector3(0f, 0.9f, 1.05f), new Vector3(0f, 0.9f, 1.05f));  // close enough to touch: right there
+        // Sitting in it: no side to be on, and not a vehicle to be found.
+        Assert.False(BeaconAids.TryVehicleSide(world, 1, new Vector3(0.5f, 1.1f, 0.3f), out _));
+        Assert.False(BeaconAids.Inside(world.Entities[1], new Vector3(0f, 1.6f, 5f)));
+        Assert.True(BeaconAids.Inside(world.Entities[1], new Vector3(0.5f, 1.1f, 0.3f)));
+        // A door is not a vehicle.
+        var doors = Moving(Thing(2, new Vector3(3f, 1f, 0f), DoorSize, Beacons.Door));
+        Assert.False(BeaconAids.TryVehicleSide(doors, 2, Ear, out _));
     }
 
     /// <summary>
