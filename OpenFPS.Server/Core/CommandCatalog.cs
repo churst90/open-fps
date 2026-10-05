@@ -29,7 +29,9 @@ public static class CommandCatalog
         E("Talking", "motd", "/motd", "read the message of the day"),
         E("Talking", "afk", "/afk", "mark yourself away, or back", "away"),
         E("Moving", "join", "/join [MAP]", "go to another map; on its own, list the maps", "travel"),
-        E("Moving", "tp", "/tp x y z, or /tp NAME", "teleport to a place (x east, y north, z height) or to a player", "move", "goto"),
+        E("Moving", "tp", "/tp PLACE, /tp PLAYER, /tp MAP, or /tp x y z", "with a teleporter in your inventory: go to a named place, a player, a map, or a point (x east, y north, z height)", "goto", "teleport"),
+        E("Moving", "map", "/map [new NAME|public|private|invite PLAYER|uninvite PLAYER]", "maps of your own: make one, open it to everybody or close it, invite people; on its own, the map you are on"),
+        E("Moving", "maps", "/maps [mine]", "the maps you can go to, or the ones you own"),
         E("Moving", "where", "/where [NAME]", "where a player is", "locate"),
         E("Moving", "scan", "/scan", "what is around you"),
         E("Moving", "room", "/room", "the room you are in and what it is made of"),
@@ -65,7 +67,8 @@ public static class CommandCatalog
           "your team: on its own, who is in it"),
         E("Talking", "t", "/t MESSAGE", "talk to your team"),
         E("People", "perms", "/perms [NAME|all]", "what you can use; all lists every permission", "permissions"),
-        E("Building", "spawn", "/spawn Box|Cylinder MATERIAL X Y Z", "make an object"),
+        E("Building", "spawn", "/spawn walker [NAME], /spawn vehicle PRESET, /spawn train PRESET, or /spawn Box|Cylinder MATERIAL X Y Z", "make somebody walking, a parked vehicle, a train on a track already there, or an object"),
+        E("Building", "move", "/move x y z, /move NAME, /move NAME x y z, or /move NAME to OTHER", "move yourself by coordinates; moving somebody else needs move-player"),
         E("Building", "prefabs", "/prefabs", "the things that can be placed"),
         E("Building", "composites", "/composites", "the saved designs"),
         E("Building", "group", "/group NAME [RADIUS] [free]", "gather what is around you into one thing"),
@@ -80,7 +83,7 @@ public static class CommandCatalog
         E("Building", "removeseat", "/removeseat NAME", "remove a seat"),
         E("Building", "drivable", "/drivable PRESET", "make a group a vehicle"),
         E("Building", "savemap", "/savemap", "save the map"),
-        E("Building", "give", "/give [NAME] ITEM [COUNT], or /give [NAME] [ammo] KIND [COUNT]", "give a player an item, or spare rounds (9mm, .45, .357, 5.56, 7.62x39, .308, 12 gauge)"),
+        E("Building", "give", "/give [NAME] ITEM [COUNT], /give [NAME] [ammo] KIND [COUNT], or /give [NAME] vehicle PRESET", "give a player an item, spare rounds (9mm, .45, .357, 5.56, 7.62x39, .308, 12 gauge), or a vehicle parked beside them"),
         E("Sound tools", "set_sound", "/set_sound SOUND [VOLUME]", "change the sound of the object in front of you"),
         E("Sound tools", "set_audio_mode", "/set_audio_mode MODE", "how an object plays its sounds"),
         E("Sound tools", "play_folder", "/play_folder FOLDER", "play a folder of sounds"),
@@ -93,7 +96,7 @@ public static class CommandCatalog
         E("Moderation", "unmute", "/unmute NAME", "let a muted player chat again"),
         E("Administration", "setrole", "/setrole NAME ROLE", "give a player a role: player, moderator, dev, admin, or one you made"),
         E("Administration", "role", "/role list|create|add|remove|show|delete ...", "make roles of your own"),
-        E("Administration", "grant", "/grant NAME PERMISSION", "give a player one command"),
+        E("Administration", "grant", "/grant NAME PERMISSION", "give a player one permission; a developer can grant only what they have, and only to players"),
         E("Administration", "revoke", "/revoke NAME PERMISSION", "take it back"),
         E("Administration", "sessions", "/sessions", "who is connected, from where"),
         E("Administration", "user", "/user NAME", "an account's details", "account"),
@@ -117,8 +120,10 @@ public static class CommandCatalog
 
     public static bool TryFind(string name, out Entry entry) => ByName.TryGetValue(name.TrimStart('/'), out entry!);
 
-    /// <summary>The permission a command needs: its main name through Permissions (tp for move).</summary>
-    private static bool MayUse(UserSession s, Entry e) => s.Can(Permissions.Canonical(e.Name));
+    /// <summary>Whether this player may use a command somewhere: by permission, or on a map of their own
+    /// (everybody may make one, so the building verbs are everybody's there).</summary>
+    private static bool MayUse(UserSession s, Entry e)
+        => s.Can(Permissions.Canonical(e.Name)) || Permissions.OnOwnMap(Permissions.Canonical(e.Name));
 
     /// <summary>/help: the commands this player may use, by group, one line each group.</summary>
     public static string Help(UserSession s)
@@ -137,7 +142,9 @@ public static class CommandCatalog
     {
         if (!TryFind(name, out var e)) return Unknown(s, name);
         string also = e.Aliases.Length > 0 ? $" Also {string.Join(", ", e.Aliases.Select(a => "/" + a))}." : "";
-        string may = MayUse(s, e) ? "" : " You do not have permission to use it.";
+        string perm = Permissions.Canonical(e.Name);
+        string may = s.Can(perm) ? "" : Permissions.OnOwnMap(perm) ? " You can use it on maps you own (/map new NAME makes one)."
+                   : " You do not have permission to use it.";
         return $"{e.Usage}: {e.What}.{also}{may}";
     }
 

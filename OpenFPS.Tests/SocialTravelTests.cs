@@ -105,7 +105,7 @@ public class SocialTravelTests : IDisposable
     }
 
     [Theory]
-    [InlineData(UserRole.Dev)]
+    [InlineData(UserRole.Moderator)]
     [InlineData(UserRole.Admin)]
     public void WhereSaysBearingDistanceMapOrOfflineToStaff(UserRole role)
     {

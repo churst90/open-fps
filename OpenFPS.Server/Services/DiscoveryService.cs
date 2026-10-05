@@ -71,15 +71,17 @@ public class DiscoveryService
     }
 
     /// <summary>
-    /// Whether a session may walk into a loaded map: it is public, or it is theirs, or they are staff.
-    /// The one rule for both the chooser and /join, so a map is never offered and then refused.
+    /// Whether a session may walk into a loaded map: it is public, or it is theirs, or they were
+    /// invited (/map invite), or they may join private maps. The one rule for the chooser, /join and a
+    /// teleport, so a map is never offered and then refused.
     /// </summary>
     public static bool CanEnter(MapManager maps, string mapId, UserSession session)
     {
         if (session.Can(OpenFPS.Server.Core.Permissions.JoinPrivate)) return true;
         if (!maps.TryGetMapData(mapId, out var data)) return true;
         if (data.IsPublic) return true;
-        return (data.OwnerId ?? "").Equals(session.Username, StringComparison.OrdinalIgnoreCase);
+        if ((data.OwnerId ?? "").Equals(session.Username, StringComparison.OrdinalIgnoreCase)) return true;
+        return data.Invited.Any(n => n.Equals(session.Username, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -105,7 +107,7 @@ public class DiscoveryService
             bool mine = owner.Equals(session.Username, StringComparison.OrdinalIgnoreCase);
 
             if (request.Scope == MapListScope.Mine && !mine) continue;
-            if (request.Scope == MapListScope.Server && !isPublic && !mine) continue;
+            if (request.Scope == MapListScope.Server && !CanEnter(_maps, id, session)) continue;
 
             maps.Add(new MapSummary
             {

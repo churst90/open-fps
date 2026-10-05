@@ -127,6 +127,10 @@
       "exclusiveMinimum": 0,
       "description": "What the item weighs, kilograms. Not bookkeeping: it is what you hear when it lands."
     },
+    "Premium": {
+      "type": "boolean",
+      "description": "A premium item, hard to come by: only somebody with the give-premium permission can give one (the teleporter). Only meaningful on an item."
+    },
     "TransmissionLow": {
       "type": "number",
       "minimum": 0,

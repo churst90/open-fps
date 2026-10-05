@@ -9,56 +9,81 @@ There are four roles: Player, Moderator, Dev (developer) and Admin. A new accoun
 an Admin changes a role (`/setrole NAME player|moderator|dev|admin`). The seeded `admin` account is
 an Admin.
 
-- **Player**: the game. None of the commands below.
-- **Moderator**: looks after people, never the world. Announcements, where somebody is, going to
-  them, bringing them, kicking and muting. Cannot build, see addresses or change accounts.
-- **Dev**: builds and tests the world. Placing, grouping, saving maps, seats, sound tools,
-  teleporting, firing any weapon, giving items. No power over other people.
-- **Admin**: everything, and alone changes roles, grants single permissions, moves other players,
-  and sees and changes accounts and addresses.
+- **Player**: the game, and building on maps of their own.
+- **Moderator**: looks after people, never the world. Announcements, where somebody is, bringing
+  them, kicking and muting, joining private maps to answer a report. Cannot build anywhere but their
+  own maps, see addresses or change accounts.
+- **Dev**: builds and tests the world, on any map. Spawning, firing any weapon, giving ordinary
+  items, joining private maps, and granting a player permissions the developer holds. No power over
+  people.
+- **Admin**: everything, and alone changes roles, makes custom roles, grants anything to anybody,
+  gives premium items (the teleporter, vehicles), moves other players, and sees and changes accounts
+  and addresses.
 
-A permission is a command's name (or one of the four powers at the end of the table). Roles are
-sets of permissions, in `OpenFPS.Server/Core/Permissions.cs`.
+A permission is a command's name, or one of the powers at the end of the table. Roles are sets of
+permissions, in `OpenFPS.Server/Core/Permissions.cs`. The agreed table is
+`docs/PLAN_2026-10-05.md` section 1.
+
+**Scope.** Building, `/spawn`, `/move` yourself, `/savemap` and the sound tools are allowed to
+everybody on a map they own. Holding the permission is what allows them on any map. A map owner may
+also change what other people built on it (as `edit-any` does everywhere).
+
+**Maps of your own.** `/map new NAME` makes a private map (flat ground, 100 m square) owned by you
+and takes you there; at most 3 per person, 100 player maps per server. `/map public`, `/map private`,
+`/map invite NAME`, `/map uninvite NAME` act on the map you are on (or name one after). `/maps` lists
+the maps you can go to, `/maps mine` your own. Player maps are files in `maps/players/` (not in git,
+not in the server package); owner, public flag and invitations are in `map_access.json` beside
+`teams.json`. A private map lets in its owner, the people invited, and `join-private`.
 
 **Custom roles.** An Admin can make roles of their own, each a name and a set of permissions on top
-of Player: `/role create builder tp spawn put`, `/role add builder savemap`, `/role remove builder
+of Player: `/role create builder move spawn put`, `/role add builder savemap`, `/role remove builder
 put`, `/role show builder`, `/role list`, `/role delete builder` (its holders become players). Give
 one with `/setrole sean builder`. Custom roles are kept in `roles.json` beside `friends.json`.
 
 Whoever's role changes is told who changed it and what they can now use: "cody made you a builder.
-You can now use: put, spawn, tp."
+You can now use: move, put, spawn."
 
-**Single permissions.** An Admin can give one account one command on top of its role:
-`/grant sean tp`, and take it back with `/revoke sean tp`. Grants are kept with the account. `/perms`
-lists your own, `/perms NAME` (Admin) someone else's, `/perms all` every permission. Roles and
-permissions themselves (`setrole`, `grant`, `revoke`) cannot be granted.
+**Single permissions.** `/grant sean give`, `/revoke sean give`. Grants are kept with the account.
+An Admin (`grant-any`) grants anything to anybody. A Dev grants and revokes only permissions they
+hold, only for players, and never for somebody whose custom role can do something the Dev cannot.
+`grant`, `revoke`, `setrole`, `role` and `grant-any` cannot be granted. `/perms` lists your own,
+`/perms NAME` (`perms-any`) someone else's, `/perms all` every permission.
 
 | Permission | Player | Moderator | Dev | Admin |
 | --- | --- | --- | --- | --- |
 | Moving, looking, chat (`/all`, `/pm`), `/motd`, `/scan`, `/room`, `/prefabs`, `/composites`, `/perms` | yes | yes | yes | yes |
 | Doors, seats, driving, carrying, `/clap`, `/knock`, `/fire` with a weapon in your hands | yes | yes | yes | yes |
-| `/friend`, `/friends`, `/profile`, `/join` to a public map or your own, `/afk`, `/realname` | yes | yes | yes | yes |
-| `announce`, `setmotd` | no | yes | yes | yes |
-| `where` (`/locate`) | no | yes | yes | yes |
-| `tp` (`/move x y z`, `/goto`, `/tp NAME` to go to a player) | no | yes | yes | yes |
-| `join-private`: `/join` somebody else's private map | no | yes | yes | yes |
+| `/friend`, `/friends`, `/profile`, `/join` to a public map, your own or one you are invited to, `/afk`, `/realname` | yes | yes | yes | yes |
+| `/map`, `/maps`: make a map, open or close it, invite people | yes | yes | yes | yes |
+| `/tp` to a place, player, map or point with a teleporter in your hands or on your back | yes | yes | yes | yes |
+| Building, `spawn`, `move`, `savemap`, sound tools on maps you own | yes | yes | yes | yes |
+| `announce`, `setmotd`, `where` (`/locate`) | no | yes | no | yes |
 | `bring` (a player to you), `kick`, `mute` (`/mute NAME [minutes]`, 10 by default), `unmute` | no | yes | no | yes |
-| `give` (`/give [NAME] ITEM [COUNT]`: "You gave sean 1 AKM.", and sean hears "cody gave you 1 AKM.") | no | no | yes | yes |
+| `join-private`: `/join` somebody else's private map | no | yes | yes | yes |
+| `give` ordinary items (`/give [NAME] ITEM [COUNT]`: "You gave sean 1 AKM.", and sean hears "cody gave you 1 AKM.") | no | no | yes | yes |
 | `fire-any`: `/fire <weapon>` with empty hands | no | no | yes | yes |
-| `spawn`, `set_sound`, `set_audio_mode`, `play_folder`, `start_state` | no | no | yes | yes |
-| `group`, `ungroup`, `saveas`, `place`, `addseat`, `removeseat`, `drivable` | no | no | yes | yes |
-| `origin`, `at`, `put`, `undo`, `savemap` | no | no | yes | yes |
+| `spawn` (`/spawn walker`, `vehicle`, `train`, `Box`), `set_sound`, `set_audio_mode`, `play_folder`, `start_state`, on any map | no | no | yes | yes |
+| `group`, `ungroup`, `saveas`, `place`, `addseat`, `removeseat`, `drivable`, on any map | no | no | yes | yes |
+| `origin`, `at`, `put`, `undo`, `savemap`, `move` (`/move x y z`, `/move NAME`), on any map | no | no | yes | yes |
 | `edit-any`: change things other people built | no | no | yes | yes |
+| `grant`, `revoke`: only what you hold, only for players | no | no | yes | yes |
+| `perms-any`: `/perms NAME` | no | no | yes | yes |
+| `give-premium`: give a teleporter, `/give NAME vehicle PRESET` | no | no | no | yes |
+| `tp-free`: `/tp` without a teleporter | no | no | no | yes |
 | `move-player`: `/move NAME x y z`, `/move NAME to OTHER` | no | no | no | yes |
+| `grant-any`: grant and revoke anything for anybody | no | no | no | yes |
+| `protected`: kicked or muted only by somebody who has it too | no | no | no | yes |
+| `maps-any`: `/map public`, `private`, `invite` on a map that is not yours | no | no | no | yes |
 | `sessions`, `user` (`/account`), `throttled` (`/ratelimit`), `unlock` | no | no | no | yes |
-| `setrole`, `grant`, `revoke`, `role` (custom roles) | no | no | no | yes |
+| `setrole`, `role` (custom roles) | no | no | no | yes |
 
-A Moderator cannot kick or mute an Admin. A mute lasts for the session or until it runs out.
+A mute lasts for the session or until it runs out.
 
 `StaffGateTests` runs every gated command as a Player and checks it is refused and changes nothing,
 then as a role that has it and checks it does something. It fails if the permission table and its
 list disagree. It also checks that Moderators cannot build, Devs cannot moderate, grants work for one
-account until revoked, and only an Admin moves another player.
+account until revoked, and only an Admin moves another player. `RolesScopeTests` covers the scope,
+the granting ceiling, maps, the teleporter, premium items and spawning.
 
 `/profile` shows a player's role, the real name they set with `/realname`, whether they are online,
 away (`/afk`) or idle (5 minutes or more without doing anything), and which map they are on. A

@@ -156,9 +156,17 @@ public class MapManager
     /// </summary>
     public string? RequestedMapId { get; set; }
 
+    /// <summary>Who owns each map, whether it is public, and who is invited (map_access.json). Null in a
+    /// test rig that does not keep them; the access then lives in memory only.</summary>
+    public MapAccessRepository? Access { get; set; }
+
     public void Initialize()
     {
-        foreach (var m in _mapRepo.LoadAll()) CreateMapInstance(m);
+        foreach (var m in _mapRepo.LoadAll())
+        {
+            Access?.ApplyTo(m);
+            CreateMapInstance(m);
+        }
 
         // After the maps are in, not before: asking for one that does not exist has to be a named
         // refusal rather than an empty world, and the names are only known once they are loaded.
@@ -745,6 +753,48 @@ public class MapManager
             return true;
         }
         catch (Exception ex) { error = ex.Message; return false; }
+    }
+
+    // ── Maps players make ───────────────────────────────────────────────────────────────────────
+
+    /// <summary>How many maps one person may own.</summary>
+    public const int MaxMapsPerOwner = 3;
+    /// <summary>How many maps players may have made between them, so a server cannot be filled with them.</summary>
+    public const int MaxPlayerMaps = 100;
+
+    /// <summary>Whether a username owns a loaded map.</summary>
+    public bool IsOwner(string mapId, string username)
+        => TryGetMapData(mapId, out var data) && !string.IsNullOrWhiteSpace(data.OwnerId)
+        && data.OwnerId.Equals(username, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The loaded maps a username owns.</summary>
+    public List<string> OwnedBy(string username)
+        => _maps.Where(kv => !string.IsNullOrWhiteSpace(kv.Value.data.OwnerId)
+                          && kv.Value.data.OwnerId.Equals(username, StringComparison.OrdinalIgnoreCase))
+                .Select(kv => kv.Key).OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>
+    /// A new map, from a template: written to the players' map folder, loaded, and recorded with its
+    /// owner, so it is there after a restart. Refused (with the reason in <paramref name="error"/>) for
+    /// an id already used by a map loaded or on disk.
+    /// </summary>
+    public bool CreateMap(MapData map, out string error)
+    {
+        error = "";
+        if (_maps.Keys.Any(k => k.Equals(map.Id, StringComparison.OrdinalIgnoreCase)) || _mapRepo.Exists(map.Id))
+        { error = $"there is already a map called {map.Id}"; return false; }
+        try { _mapRepo.Save(map); }
+        catch (Exception ex) { error = ex.Message; return false; }
+        CreateMapInstance(map);
+        Access?.Record(map);
+        Log.Information("MapManager: made map '{Map}' for {Owner}.", map.Id, map.OwnerId);
+        return true;
+    }
+
+    /// <summary>Keeps a map's owner, public flag and invitations as they now stand (map_access.json).</summary>
+    public void RecordAccess(string mapId)
+    {
+        if (TryGetMapData(mapId, out var data)) Access?.Record(data);
     }
 
     private readonly Dictionary<string, RoadNetwork> _roads = new();

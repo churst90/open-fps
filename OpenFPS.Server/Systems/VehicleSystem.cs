@@ -174,6 +174,21 @@ public sealed partial class VehicleSystem
     /// every vehicle is a bare moving box, as it always was.
     /// </param>
     public void Spawn(MapManager maps, CompositeService? shells = null)
+        => Spawn(maps, shells, null, null);
+
+    /// <summary>
+    /// One more vehicle or walker on a map that is already running (/spawn walker): the same path the
+    /// map's own take, and the entity it made, or Entity.Null with the reason logged.
+    /// </summary>
+    public Entity SpawnOne(MapManager maps, CompositeService? shells, string mapId, VehicleData vd)
+    {
+        int before = _vehicles.Count;
+        Spawn(maps, shells, mapId, new[] { vd });
+        return _vehicles.Count > before ? _vehicles[^1].Entity : Entity.Null;
+    }
+
+    /// <summary>Every map's vehicles, or only <paramref name="only"/> on <paramref name="onlyMap"/>.</summary>
+    private void Spawn(MapManager maps, CompositeService? shells, string? onlyMap, IReadOnlyList<VehicleData>? only)
     {
         _maps = maps;
         foreach (var entry in maps.GetAllMaps())
@@ -181,8 +196,10 @@ public sealed partial class VehicleSystem
             int routeIndex = 0;
             string mapId = entry.Key;
             var data = entry.Value.data;
-            if (data.Vehicles == null) continue;
-            foreach (var vd in data.Vehicles)
+            if (onlyMap != null && !mapId.Equals(onlyMap, StringComparison.OrdinalIgnoreCase)) continue;
+            var list = only ?? data.Vehicles;
+            if (list == null) continue;
+            foreach (var vd in list)
             {
                 // ── A vehicle, or an aircraft ────────────────────────────────────────────────────
                 //
@@ -467,7 +484,8 @@ public sealed partial class VehicleSystem
                     Log.Information("Map {Map}: spawned {Name} (entity {Id}) on the road {A} -> {B}, passes at {Speeds} km/h",
                                     mapId, display, e.Id, vd.RoadStart, vd.RoadEnd, string.Join("/", speeds));
             }
-            BuildCrosswalks(maps, mapId);
+            // The map's crossings are worked out once, from the walkers it starts with.
+            if (only == null) BuildCrosswalks(maps, mapId);
         }
     }
 

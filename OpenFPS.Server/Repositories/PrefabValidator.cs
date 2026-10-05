@@ -99,6 +99,8 @@ public static class PrefabValidator
             r.Errors.Add("Type is 'Item' but IsItem is false. The two disagree about what this is.");
         if (t.ItemWeight.HasValue && !t.IsItem)
             r.Errors.Add("ItemWeight is set but IsItem is false, so the weight applies to nothing.");
+        if (t.Premium && !t.IsItem)
+            r.Errors.Add("Premium is true but IsItem is false. Only an item can be premium.");
         if (t.ItemWeight is <= 0)
             r.Errors.Add($"ItemWeight {t.ItemWeight} must be greater than 0.");
 
