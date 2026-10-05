@@ -2599,6 +2599,14 @@ public class FmodAudioProvider : IAudioProvider
                     // BellVoiceState for why this one cannot be worked out locally.
                     "bell" => new BellVoiceState(OpenFPS.Common.ModelLibrary.Bell(preset),
                                                  mrate, emitter.EntityId * 13 + 5),
+                    // Water, fire and wind in leaves read the wind where they stand, so they are
+                    // given their place. See NatureVoiceState.
+                    "water" => new WaterVoiceState(OpenFPS.Common.WaterFeatureSpec.ByName(preset),
+                                                   mrate, emitter.EntityId * 37 + 11, emitter.Position),
+                    "fire" => new FireVoiceState(OpenFPS.Common.FireSpec.ByName(preset),
+                                                 mrate, emitter.EntityId * 41 + 13, emitter.Position),
+                    "foliage" => new FoliageVoiceState(OpenFPS.Common.FoliageSpec.ByName(preset),
+                                                       mrate, emitter.EntityId * 43 + 17, emitter.Position),
                     // A vehicle's horn, with the rhythm of the hand on it in the key. See Honk.
                     "horn" => OpenFPS.Common.Honk.TryParse(emitter.PhysicalKey, out var hornKey, out var rhythm)
                         ? new HornVoiceState(hornKey, rhythm, mrate, emitter.EntityId * 29 + 1)

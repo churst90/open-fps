@@ -1,0 +1,11 @@
+{
+  "Id": "water_surface",
+  "Name": "Water",
+  "Description": "Open water standing in a basin or a pond: as hard a reflector as the air ever meets.",
+  "Material": "Water",
+  "ColliderSize": { "X": 4, "Y": 0.1, "Z": 4 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "IsItem": false,
+  "HasEmitter": false
+}

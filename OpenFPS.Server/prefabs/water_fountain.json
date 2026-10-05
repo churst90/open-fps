@@ -1,0 +1,17 @@
+{
+  "Id": "water_fountain",
+  "Name": "Fountain",
+  "Description": "The water of a fountain, as a sound: a jet breaking up over a bowl, the bowl overflowing into the basin, rim jets arching in. Not a recording and not a loop: drops striking the pool and the bubbles they trap, each ringing at the note its size gives it (WaterFeatureSpec.ParkFountain, FallingWaterSynth). The basin and the bowl are the boxes round it; this is only where the water is.",
+  "Material": "Water",
+  "ColliderSize": { "X": 0.4, "Y": 0.4, "Z": 0.4 },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "water:park_fountain",
+  "Volume": 1.0,
+  "Range": 160,
+  "MinDistance": 3,
+  "Mode": "LoopOne"
+}

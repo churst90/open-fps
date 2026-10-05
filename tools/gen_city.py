@@ -1440,9 +1440,15 @@ def house(label, cx, cz, facing, two_storey=False):
     # its track into the wall toward the middle of the house.
     door(bdx, 0.04, (back_z0 + back_z1) / 2, hid, -1, facing_z=True, prefab="patio_door", opening=0.9,
          name=f"{label} back door")
+    back_door = entities[-1]
 
     if has_garden:
-        region(f"{label} back garden", cx - PLOT_W / 2 + 1.0, cx + PLOT_W / 2 - 1.0, 0.0, 3.0, g0, g1)
+        garden = region(f"{label} back garden", cx - PLOT_W / 2 + 1.0, cx + PLOT_W / 2 - 1.0, 0.0, 3.0, g0, g1)
+        # The back door opens into the garden, not onto "outdoors": the garden is a place of its own, and
+        # an opening joined to the wrong place is one the routes through doorways cannot use (the path
+        # probe: "its sides are in the house and the garden, not the house and the outdoors"). Set here,
+        # after the garden is made, so no entity's id moves.
+        back_door["RegionBId"] = garden
         # The fence between this garden and the next. Not solid: you can hear a mower through a
         # fence, which is most of the point of putting one there.
         for fx in (cx - PLOT_W / 2, cx + PLOT_W / 2):
@@ -2195,6 +2201,88 @@ for j in JUNCTIONS:
     top = max(here, key=lambda r: (ROAD_RANK[r["Type"]], road_length(r)))
     j["PriorityRoads"] = [top["Id"]]
     j["GiveWaySeconds"] = 2.0
+
+# ══ Elm Park ══════════════════════════════════════════════════════════════════════════════════════
+#
+# The open ground north of the estate, inside the rail loop, which was bare dirt: a lawn with a
+# fountain in the middle and trees round it. Elm Park halt, on the rail loop's west side, was named
+# for a park that was not there. Laid after Southgate so every entity before it keeps its id.
+#
+# Nothing in it is a recording. The fountain is water falling into a basin (FallingWaterSynth), the
+# trees are the wind in their leaves (FoliageSynth), and both read the one wind field, so a gust
+# crosses the park from the west-south-west, through the trees on that side first.
+PARK_X0, PARK_X1 = -400.0, -250.0
+PARK_Z0, PARK_Z1 = 162.0, 292.0
+PARK_CX, PARK_CZ = -325.0, 227.0
+PARK_PATH = 3.0
+box("grass_floor", PARK_X0, PARK_X1, 0.0, 0.09, PARK_Z0, PARK_Z1, name="Elm Park lawn")
+# Paths: north-south through the middle, east-west across it, and the way in from the end of
+# Sycamore Lane. Asphalt, so stepping off the grass onto a path is heard.
+box("asphalt_road", PARK_CX - PARK_PATH / 2, PARK_CX + PARK_PATH / 2, 0.0, 0.1, PARK_Z0, PARK_Z1, name="Elm Park path")
+box("asphalt_road", PARK_X0, PARK_X1, 0.0, 0.1, PARK_CZ - PARK_PATH / 2, PARK_CZ + PARK_PATH / 2, name="Elm Park path")
+lane_x = RES_LANES[0]
+lane_end = RES_STREETS[-1] + RES_WALK + 8.0
+box("asphalt_road", lane_x - PARK_PATH / 2, lane_x + PARK_PATH / 2, 0.0, 0.1, lane_end, PARK_CZ - PARK_PATH / 2,
+    name="Elm Park path from Sycamore Lane")
+region("Elm Park, path from Sycamore Lane", lane_x - PARK_PATH, lane_x + PARK_PATH, 0.0, 6.0, lane_end, PARK_Z0)
+
+# The fountain: a square basin with a stone kerb too high to step over, standing water, a pedestal
+# carrying a bowl, and the water itself as an emitter at the bowl's lip — its jet, the bowl's
+# overflow and the rim jets all fall into this one basin (WaterFeatureSpec.ParkFountain).
+FTN_HALF, FTN_KERB, FTN_KERB_H = 4.0, 0.3, 0.5
+box("brick_floor", PARK_CX - 12.0, PARK_CX + 12.0, 0.0, 0.11, PARK_CZ - 12.0, PARK_CZ + 12.0,
+    name="Elm Park fountain square")
+fx0, fx1, fz0, fz1 = PARK_CX - FTN_HALF, PARK_CX + FTN_HALF, PARK_CZ - FTN_HALF, PARK_CZ + FTN_HALF
+for (x0, x1, z0, z1) in ((fx0, fx1, fz0, fz0 + FTN_KERB), (fx0, fx1, fz1 - FTN_KERB, fz1),
+                         (fx0, fx0 + FTN_KERB, fz0 + FTN_KERB, fz1 - FTN_KERB),
+                         (fx1 - FTN_KERB, fx1, fz0 + FTN_KERB, fz1 - FTN_KERB)):
+    box("concrete_wall", x0, x1, 0.0, FTN_KERB_H, z0, z1, name="Elm Park fountain basin")
+box("water_surface", fx0 + FTN_KERB, fx1 - FTN_KERB, 0.0, 0.35, fz0 + FTN_KERB, fz1 - FTN_KERB,
+    name="Elm Park fountain pool")
+box("concrete_wall", PARK_CX - 0.3, PARK_CX + 0.3, 0.35, 1.1, PARK_CZ - 0.3, PARK_CZ + 0.3, name="Elm Park fountain pedestal")
+box("concrete_floor", PARK_CX - 1.2, PARK_CX + 1.2, 1.1, 1.25, PARK_CZ - 1.2, PARK_CZ + 1.2, name="Elm Park fountain bowl")
+# Not on the pedestal's axis: the pedestal is solid concrete, and a source inside a wall is heard
+# through it. Over the water, between the pedestal and the kerb, under the bowl's lip.
+prop("water_fountain", PARK_CX, 0.7, PARK_CZ + 1.6, name="Elm Park fountain")
+named_place("Elm Park, by the fountain", PARK_CX - 12.0, PARK_CX + 12.0, 0.0, 3.0, PARK_CZ - 12.0, PARK_CZ + 12.0)
+
+# The trees: a trunk you can walk into, a crown that scatters sound, and the wind in it heard from
+# the middle of the crown. Kept five metres or more off every path.
+PARK_TREES = [(-385.0, 180.0), (-355.0, 175.0), (-338.0, 170.0), (-310.0, 190.0), (-268.0, 178.0),
+              (-262.0, 205.0), (-388.0, 210.0), (-372.0, 250.0), (-345.0, 262.0), (-305.0, 258.0),
+              (-275.0, 250.0), (-390.0, 280.0), (-340.0, 286.0), (-265.0, 284.0)]
+for tx, tz in PARK_TREES:
+    box("wood_floor", tx - 0.25, tx + 0.25, 0.0, 3.0, tz - 0.25, tz + 0.25, name="Elm Park tree")
+    box("foliage_hedge", tx - 4.0, tx + 4.0, 3.0, 11.0, tz - 4.0, tz + 4.0, name="Elm Park tree")
+    prop("tree_crown", tx, 7.0, tz, name="Elm Park tree")
+region("Elm Park", PARK_X0, PARK_X1, 0.0, 12.0, PARK_Z0, PARK_Z1)
+
+# ── A fire in a fenced back garden ────────────────────────────────────────────────────────────────
+#
+# 58 Alder Street, the house nearest the park's south gate. Its back garden is fenced in timber
+# inside the hedges, with a gate in the back fence onto the strip of ground before the park, and
+# there is a brick fire pit in it with a fire going (FireSpec.GardenFirePit). From the park you hear
+# it over the fence, louder through the gate, and from the garden the fence is the near wall.
+FIRE_HOUSE_CX = -325.0
+fire_garden = next(e for e in entities if e.get("Name") == "58 Alder Street back garden"
+                   and e["PrefabId"] == "grass_floor")
+fg_z0 = fire_garden["Position"]["Z"] - fire_garden["Scale"]["Z"] * BASE["grass_floor"][2] / 2
+fg_z1 = fire_garden["Position"]["Z"] + fire_garden["Scale"]["Z"] * BASE["grass_floor"][2] / 2
+fg_x0, fg_x1 = FIRE_HOUSE_CX - PLOT_W / 2 + 1.0, FIRE_HOUSE_CX + PLOT_W / 2 - 1.0
+FENCE_T, FENCE_H, GATE_W, GATE_X = 0.05, 1.8, 1.2, FIRE_HOUSE_CX - 5.0
+box("fence_timber", fg_x0, fg_x0 + FENCE_T, 0.0, FENCE_H, fg_z0, fg_z1, name="58 Alder Street garden fence")
+box("fence_timber", fg_x1 - FENCE_T, fg_x1, 0.0, FENCE_H, fg_z0, fg_z1, name="58 Alder Street garden fence")
+box("fence_timber", fg_x0, GATE_X - GATE_W / 2, 0.0, FENCE_H, fg_z1 - FENCE_T, fg_z1, name="58 Alder Street garden fence")
+box("fence_timber", GATE_X + GATE_W / 2, fg_x1, 0.0, FENCE_H, fg_z1 - FENCE_T, fg_z1, name="58 Alder Street garden fence")
+named_place("58 Alder Street garden gate", GATE_X - GATE_W / 2, GATE_X + GATE_W / 2, 0.0, 2.5, fg_z1 - 1.0, fg_z1 + 1.0)
+FIRE_X, FIRE_Z = FIRE_HOUSE_CX + 4.0, (fg_z0 + fg_z1) / 2 + 1.0
+box("brick_floor", FIRE_X - 1.5, FIRE_X + 1.5, 0.0, 0.1, FIRE_Z - 1.5, FIRE_Z + 1.5, name="58 Alder Street fire pit hearth")
+for (x0, x1, z0, z1) in ((FIRE_X - 0.7, FIRE_X + 0.7, FIRE_Z - 0.7, FIRE_Z - 0.5), (FIRE_X - 0.7, FIRE_X + 0.7, FIRE_Z + 0.5, FIRE_Z + 0.7),
+                         (FIRE_X - 0.7, FIRE_X - 0.5, FIRE_Z - 0.5, FIRE_Z + 0.5), (FIRE_X + 0.5, FIRE_X + 0.7, FIRE_Z - 0.5, FIRE_Z + 0.5)):
+    box("brick_wall", x0, x1, 0.0, 0.45, z0, z1, name="58 Alder Street fire pit")
+# The flames, above the ring: at the ring's height the brick would stand between them and anyone
+# sitting round it.
+prop("fire_pit", FIRE_X, 0.6, FIRE_Z, name="58 Alder Street fire pit")
 
 # The named places last, so that adding one moved no other part's id.
 for _name, *_span in named_places:
