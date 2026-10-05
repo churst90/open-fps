@@ -49,6 +49,13 @@ public static class ModelLibrary
         /// A city is full of them and every one is a parts list, so a map should be able to write
         /// its own without touching C#.</summary>
         public const string SmallMachine = "small_machine";
+
+        /// <summary>Water falling into water: a fountain, a cascade, a weir.</summary>
+        public const string Water = "water";
+        /// <summary>A wood fire.</summary>
+        public const string Fire = "fire";
+        /// <summary>A tree or a hedge with the wind in it.</summary>
+        public const string Foliage = "foliage";
     }
 
     private sealed class ModelFile
@@ -87,6 +94,9 @@ public static class ModelLibrary
         [Kinds.Bell] = StruckBellSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Air] = AirSystemSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.SmallMachine] = SmallMachineSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
+        [Kinds.Water] = WaterFeatureSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
+        [Kinds.Fire] = FireSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
+        [Kinds.Foliage] = FoliageSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.RailVehicle] = new(StringComparer.OrdinalIgnoreCase)
         {
             ["genesis_p42"] = () => TrainProfile.GenesisP42,
@@ -119,6 +129,9 @@ public static class ModelLibrary
         [Kinds.Bell] = typeof(StruckBellSpec),
         [Kinds.Air] = typeof(AirSystemSpec),
         [Kinds.SmallMachine] = typeof(SmallMachineSpec),
+        [Kinds.Water] = typeof(WaterFeatureSpec),
+        [Kinds.Fire] = typeof(FireSpec),
+        [Kinds.Foliage] = typeof(FoliageSpec),
     };
 
     // ── Loading ─────────────────────────────────────────────────────────────────────────────────
@@ -239,6 +252,9 @@ public static class ModelLibrary
     public static StruckBellSpec Bell(string id) => Get<StruckBellSpec>(Kinds.Bell, id);
     public static AirSystemSpec Air(string id) => Get<AirSystemSpec>(Kinds.Air, id);
     public static SmallMachineSpec SmallMachine(string id) => Get<SmallMachineSpec>(Kinds.SmallMachine, id);
+    public static WaterFeatureSpec Water(string id) => Get<WaterFeatureSpec>(Kinds.Water, id);
+    public static FireSpec Fire(string id) => Get<FireSpec>(Kinds.Fire, id);
+    public static FoliageSpec Foliage(string id) => Get<FoliageSpec>(Kinds.Foliage, id);
 
     // ── Writing ─────────────────────────────────────────────────────────────────────────────────
 

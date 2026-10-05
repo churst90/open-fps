@@ -1,0 +1,17 @@
+{
+  "Id": "fire_pit",
+  "Name": "Fire",
+  "Description": "A wood fire burning in a garden fire pit. The flames puff at the rate their width sets and roar harder in a gust; the wood crackles as the water and resin in its cells burst, the big ones throwing an ember onto the brick; steam hisses out of the log ends; now and then a log gives way (FireSpec.GardenFirePit, FireSynth). The ring of brick round it is separate boxes.",
+  "Material": "None",
+  "ColliderSize": { "X": 0.6, "Y": 0.6, "Z": 0.6 },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "fire:fire_pit",
+  "Volume": 1.0,
+  "Range": 120,
+  "MinDistance": 1,
+  "Mode": "LoopOne"
+}

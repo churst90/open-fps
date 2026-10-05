@@ -101,7 +101,39 @@ public partial struct TransientSound
     /// <summary>Where on the body, metres, in the body's frame: x right, y up from the feet, z forward.</summary>
     public Vector3 BodyOffset { get; set; }
 
+    /// <summary>
+    /// Where the sound has got to by the end of <see cref="MoveSeconds"/>: a sliding door's run is one
+    /// sound, and the handle it comes from travels the width of the doorway while it plays. The listener
+    /// moves it from <see cref="Position"/> to here, at an even speed, as the leaf goes.
+    /// </summary>
+    public Vector3 MovesTo { get; set; }
+    /// <summary>How long it takes to get to <see cref="MovesTo"/>, seconds. Zero: it stays where it is.</summary>
+    public float MoveSeconds { get; set; }
+
+    /// <summary>
+    /// A sound made in a panel that radiates from both its faces — a door leaf — given as the panel's
+    /// normal, as long as the distance its sound is placed off the panel. Zero: not one.
+    ///
+    /// Each listener hears it from the face on their own side, <see cref="FaceNormal"/> off the panel
+    /// toward them. Placed on the panel itself it was inside the leaf and the jamb it lapped, and the
+    /// acoustics heard it through both: a front door from three metres in plain view came through at
+    /// −46 dB in the middle of the band.
+    /// </summary>
+    public Vector3 FaceNormal { get; set; }
+
     public TransientSound() { }
+
+    /// <summary>Where a <see cref="FaceNormal"/> sound is for a listener: off the panel on their side.
+    /// Anything else stays where it is.</summary>
+    public static Vector3 FacingListener(Vector3 onPanel, Vector3 faceNormal, Vector3 listener)
+    {
+        if (faceNormal == Vector3.Zero) return onPanel;
+        return Vector3.Dot(listener - onPanel, faceNormal) >= 0f ? onPanel + faceNormal : onPanel - faceNormal;
+    }
+
+    /// <summary>Where a moving sound is, <paramref name="seconds"/> after it started.</summary>
+    public static Vector3 Along(Vector3 from, Vector3 to, float moveSeconds, float seconds)
+        => moveSeconds <= 0f ? from : Vector3.Lerp(from, to, Math.Clamp(seconds / moveSeconds, 0f, 1f));
 }
 
 }

@@ -79,6 +79,7 @@ string[] usage =
     "  --machine-levels [id ...] [kmh=]              how loud a machine is at a cruise, and what reaches you",
     "  --machine-pass [id] [kmh=] [side=]            a machine driving past, as one voice and as two",
     "  --yard [preset ...] [levels] [pass]           mowers and air conditioners, measured and walked past",
+    "  --nature [levels|render out=DIR] [preset ...] water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
     "  --models [export=DIR]                         the model library's ids, or each as JSON",
     "  --aircraft / --landing / --spool [preset]     flyovers, arrivals, and an engine against its lever",
     "  --train / --crossing / --airbrake / --signals trains, a level crossing, air brakes, horns and bells",
@@ -463,6 +464,13 @@ if (args.Contains("--yard"))
     int yardCode = OpenFPS.Client.Core.AudioEngine.Fmod.YardSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(yardCode);
+}
+
+if (args.Contains("--nature"))
+{
+    // --nature [levels|render out=DIR|compare=FILE.wav] [preset ...] [sec= wind=]: water, fire and
+    // the wind in leaves, rendered from their models and measured against recordings.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.NatureSpike.Run(args));
 }
 
 if (args.Contains("--earshot"))

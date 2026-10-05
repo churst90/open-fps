@@ -1085,6 +1085,28 @@ public class ClientAudioSystem
         return true;
     }
 
+    /// <summary>The headroom a physical voice renders with, dB: its spec's own for water, fire and
+    /// foliage, the shared one for everything else. Memoised for the same reason the level is.</summary>
+    private readonly Dictionary<string, float> _physicalHeadroom = new(StringComparer.OrdinalIgnoreCase);
+
+    private float PhysicalHeadroom(string soundId)
+    {
+        if (_physicalHeadroom.TryGetValue(soundId, out float h)) return h;
+        h = OpenFPS.Common.VehicleProfile.PeakHeadroomDb;
+        try
+        {
+            if (soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
+                h = OpenFPS.Common.WaterFeatureSpec.ByName(soundId[6..]).PeakHeadroomDb;
+            else if (soundId.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
+                h = OpenFPS.Common.FireSpec.ByName(soundId[5..]).PeakHeadroomDb;
+            else if (soundId.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
+                h = OpenFPS.Common.FoliageSpec.ByName(soundId[8..]).PeakHeadroomDb;
+        }
+        catch (Exception) { }
+        _physicalHeadroom[soundId] = h;
+        return h;
+    }
+
     private static (float LevelDb, float Extent)? LookUpPhysicalLevel(string soundId)
     {
         try
@@ -1118,6 +1140,24 @@ public class ClientAudioSystem
                 // and there is no sense in which you can stand inside one.
                 var bell = OpenFPS.Common.ModelLibrary.Bell(soundId[5..]);
                 return (bell.ReferenceDb, MathF.Max(0.5f, bell.DiameterMetres));
+            }
+            // Water, fire and the wind in a tree: nobody made them, and they are placed like a
+            // machine all the same, at their declared level and their own size. A fountain's size
+            // is its basin, a fire's its hearth, a tree's its crown.
+            if (soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
+            {
+                var water = OpenFPS.Common.WaterFeatureSpec.ByName(soundId[6..]);
+                return (water.SourceLevelDb, water.ExtentMetres);
+            }
+            if (soundId.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
+            {
+                var fire = OpenFPS.Common.FireSpec.ByName(soundId[5..]);
+                return (fire.SourceLevelDb, fire.ExtentMetres);
+            }
+            if (soundId.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
+            {
+                var tree = OpenFPS.Common.FoliageSpec.ByName(soundId[8..]);
+                return (tree.SourceLevelDb, tree.ExtentMetres);
             }
             if (soundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
             {
@@ -2263,7 +2303,10 @@ public class ClientAudioSystem
                 // the far field is unchanged. See Loudness.Widen — widening without paying is how
                 // the engine once handed every quiet vehicle eight decibels it had not earned.
                 var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
-                engineVolume = gain * def.SoundEmitter.Volume;
+                // A voice that renders with more room than the shared headroom — a fire's crackles —
+                // gets the difference back here, so it is placed by its level and not its peaks.
+                engineVolume = gain * def.SoundEmitter.Volume
+                             * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));

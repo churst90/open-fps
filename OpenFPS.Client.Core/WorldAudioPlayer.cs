@@ -397,6 +397,15 @@ public sealed class WorldAudioPlayer
                 onBody.Position = feet + Vector3.Transform(onBody.BodyOffset, facing);
                 item = item with { Sound = onBody };
             }
+            // A door's sound comes off the face of the leaf on this listener's side (TransientSound.FaceNormal):
+            // on the leaf itself it was inside the leaf and the jamb, and heard through both.
+            var movingFrom = item.Sound.Position;
+            if (!item.IsReflection && item.Sound.FaceNormal != Vector3.Zero)
+            {
+                var faced = item.Sound;
+                faced.Position = TransientSound.FacingListener(faced.Position, faced.FaceNormal, listenerPosition);
+                item = item with { Sound = faced };
+            }
 
             if (_trace)
                 Serilog.Log.Information("[WAUDIO] play {Id}{Echo} {Db:F0} dB at {Dist:F1} m, {Late:F2}s after it was due "
@@ -558,6 +567,21 @@ public sealed class WorldAudioPlayer
                     StartedAt = now,
                 });
 
+            // A sliding door's run comes from its handle, which crosses the doorway while the run plays.
+            if (!item.IsReflection && item.Sound.MoveSeconds > 0f && !follow && !inCabin)
+                _following.Add(new Following
+                {
+                    Emitter = emitter,
+                    SourceEntityId = item.SourceEntityId,
+                    Moving = true,
+                    From = movingFrom,
+                    To = item.Sound.MovesTo,
+                    MoveSeconds = item.Sound.MoveSeconds,
+                    Face = item.Sound.FaceNormal,
+                    Until = now + Math.Max(0f, item.Sound.DecaySeconds - 0.1f),
+                    StartedAt = now,
+                });
+
             // Somebody talking while they walk carries their voice with them. A two-second line left
             // where it started is three metres behind the footsteps by the end of it.
             // A line said by somebody who says where on them it comes from (a mouth, a driver's window)
@@ -658,6 +682,11 @@ public sealed class WorldAudioPlayer
         public bool BodyFrame;
         public double Until;
         public double StartedAt;
+        /// <summary>Not on a body at all: a sound travelling from <see cref="From"/> to <see cref="To"/>
+        /// over <see cref="MoveSeconds"/>, off a panel facing <see cref="Face"/> (a sliding door's run).</summary>
+        public bool Moving;
+        public Vector3 From, To, Face;
+        public float MoveSeconds;
     }
 
     /// <summary>Every vehicle's windows as this client has them. Without it a cabin's windows are taken
@@ -699,13 +728,16 @@ public sealed class WorldAudioPlayer
         for (int i = _following.Count - 1; i >= 0; i--)
         {
             var f = _following[i];
-            if (now >= f.Until || !world.Entities.TryGetValue(f.SourceEntityId, out var speaker)
+            EntitySnapshot speaker = default;
+            if (now >= f.Until || (!f.Moving && !world.Entities.TryGetValue(f.SourceEntityId, out speaker))
                 || (now - f.StartedAt > StartGraceSeconds && !_audio.IsPlaying(f.Emitter.EntityId)))
             {
                 _following.RemoveAt(i);
                 continue;
             }
-            var at = f.InCabin ? speaker.Transform.Position + Vector3.Transform(f.Offset, speaker.Transform.Rotation)
+            var at = f.Moving ? TransientSound.FacingListener(
+                                    TransientSound.Along(f.From, f.To, f.MoveSeconds, (float)(now - f.StartedAt)), f.Face, listenerPosition)
+                   : f.InCabin ? speaker.Transform.Position + Vector3.Transform(f.Offset, speaker.Transform.Rotation)
                    : f.BodyFrame ? speaker.Transform.Position + Vector3.Transform(f.Offset, Yaw(speaker.Transform.Rotation))
                    : speaker.Transform.Position + f.Offset;
             // The simulator's answer for the speaker, as for any other source; the hand-rolled tracer
@@ -715,7 +747,9 @@ public sealed class WorldAudioPlayer
                 path = _acoustics.CalculateAcousticPath(world, f.SourceEntityId, listenerPosition, at);
             var e = f.Emitter;
             e.Position = at;
-            e.Velocity = speaker.Velocity;
+            e.Velocity = f.Moving
+                ? (now - f.StartedAt < f.MoveSeconds ? (f.To - f.From) / MathF.Max(0.01f, f.MoveSeconds) : Vector3.Zero)
+                : speaker.Velocity;
             e.ApparentPosition = path.ApparentPosition;
             e.EffectiveDistance = path.EffectiveDistance;
             e.Occlusion = path.Occlusion;
@@ -732,7 +766,7 @@ public sealed class WorldAudioPlayer
                 if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(speaker) is { } vehicle)
                     ThroughCabin(ref e, speaker, vehicle, now);
             }
-            else Facing(ref e, speaker.Transform.Rotation, listenerPosition);
+            else if (!f.Moving) Facing(ref e, speaker.Transform.Rotation, listenerPosition);
             _audio.Submit(e);
         }
     }

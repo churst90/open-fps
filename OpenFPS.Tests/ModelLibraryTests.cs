@@ -41,6 +41,9 @@ public class ModelLibraryTests : IDisposable
                     ModelLibrary.Kinds.Bell => ModelLibrary.Bell(id),
                     ModelLibrary.Kinds.Air => ModelLibrary.Air(id),
                     ModelLibrary.Kinds.SmallMachine => ModelLibrary.SmallMachine(id),
+                    ModelLibrary.Kinds.Water => ModelLibrary.Water(id),
+                    ModelLibrary.Kinds.Fire => ModelLibrary.Fire(id),
+                    ModelLibrary.Kinds.Foliage => ModelLibrary.Foliage(id),
                     _ => throw new InvalidOperationException($"no accessor for kind '{kind}'"),
                 };
                 bool ok = ModelLibrary.RoundTrips(kind, spec, out string before, out string after);

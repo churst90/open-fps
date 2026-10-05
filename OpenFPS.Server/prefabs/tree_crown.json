@@ -1,0 +1,17 @@
+{
+  "Id": "tree_crown",
+  "Name": "Tree",
+  "Description": "Where the wind in a tree is heard from: the middle of its crown. The leaves flutter and strike each other, the boughs swing on their own frequencies and carry their leaves through the air faster as they do, and the air sheds vortices off the twigs (FoliageSpec.ParkTree, FoliageSynth). It reads the map's one wind field at its own place, so a gust reaches the trees upwind of you first. The foliage that scatters sound is a separate box.",
+  "Material": "Foliage",
+  "ColliderSize": { "X": 0.5, "Y": 0.5, "Z": 0.5 },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "foliage:park_tree",
+  "Volume": 1.0,
+  "Range": 90,
+  "MinDistance": 4,
+  "Mode": "LoopOne"
+}

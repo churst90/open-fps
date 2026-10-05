@@ -9,6 +9,38 @@ Recent work, newest first. `git log` has the rest.
   `/levels` now says "the default" when you are on it.
 - `/give akm 100` said it gave 100 and made 50 (the most one `/give` makes); it now says 50.
 - `/tp` with a bad number said "Usage: /move".
+- Doors are heard again. Every door's sound was placed on the edge of its leaf, which overlaps the
+  wall by 5 cm, so it was inside the brick and inside the leaf: a front door from 3 m away in plain
+  view came through at -46 dB. Door sounds now come from the handle (7 cm in from the edge), 25 cm off
+  the leaf on whichever side you are on: 0 dB from the same spot.
+- A sliding door's sound moves with its handle across the doorway as the leaf slides, from where it
+  starts to where it stops. It used to play the whole run from the middle of the glass where it
+  started.
+- Each house's patio door is joined to its back garden; it was joined to "outdoors", which is not where
+  it opens.
+- Water, fire and wind in trees, as physical models (unheard). Nothing is a recording.
+  - Water: drops striking a pool and the bubbles they trap, each ringing at the note its size gives
+    it (3.26 / radius), rising as it goes; coherent water plunging and making bubbles of every size.
+    Drop sizes, speeds and which drops trap a bubble follow Medwin (1992) and Atlas (1973). Fitted
+    to a recording of a fountain (octaves 500 Hz-16 kHz within 2 dB) and to Watts (2009) for level.
+  - Fire: flames that roar and puff at 1.5 / √width per second; crackles from steam and resin pockets
+    bursting, sizes on a power law measured from recordings, in clusters; big ones throw an ember that
+    ticks on the brick; steam hissing and sometimes whistling from log ends; a log settling every
+    minute or two with a rattle of charcoal and a flare. Its crackles stand 45 dB over its mean, and
+    the voice renders with that much room, so they are not clipped.
+  - Wind in trees: leaves on twigs flutter and strike each other in short episodes, boughs sway on
+    their own frequencies, and air sheds vortices off the twigs (a pine sighs rather than rustles).
+    The level rises about 10 dB when the wind doubles, as Fégeant (1999) measured.
+  - One wind field for the whole map: gusts travel downwind at the wind speed, so a gust reaches the
+    trees upwind of you first. The fire roars harder and the fountain's spray drifts in a gust.
+- Elm Park, north of the housing estate (the open ground inside the rail loop): a lawn with paths, a
+  tiered fountain in a square basin in the middle, and fourteen trees. A path leads in from the north
+  end of Sycamore Lane.
+- 58 Alder Street's back garden is fenced in timber with a gate onto the strip before the park, and
+  has a brick fire pit with a fire burning.
+- AudioLab `--nature`: levels, renders and texture statistics for each model; `compare=FILE.wav` for
+  a recording; `live` plays each through the real FMOD voice path and checks its level against the
+  loudness law.
 
 ## 2026-10-04
 

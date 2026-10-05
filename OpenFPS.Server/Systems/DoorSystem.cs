@@ -474,6 +474,94 @@ public sealed class DoorSystem
         return _people;
     }
 
+    // ── Where a door's sound comes from ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// How far in from the leaf's free edge its handle and latch are, metres: a lockset's backset, 60
+    /// or 70 mm. It is also what keeps a door's sound out of the wall — a leaf laps each jamb by 50 mm,
+    /// and a sound placed on the leaf's edge was inside the brick.
+    /// </summary>
+    public const float HandleBacksetMetres = 0.07f;
+
+    /// <summary>
+    /// How far off the leaf a door's sound is placed, on the listener's side, beyond the leaf's own
+    /// half-thickness: clear of the reveal of a wall up to 30 cm thick and of the 10 cm sphere the
+    /// occlusion probe tests, so the doorway is heard as the open air either side of the leaf is and
+    /// not through the leaf and the jamb.
+    /// </summary>
+    public const float FaceStandoffMetres = 0.25f;
+
+    /// <summary>Where the leaf is, centre and turn, at an opening between 0 and 1: what Place puts it at,
+    /// in the world.</summary>
+    private static (Vector3 Centre, Quaternion Rotation) LeafAt(World world, Entity entity, in DoorComponent door, float openness)
+    {
+        Doorway(world, entity, out var shutCentre, out var shutRotation);
+        float halfWidth = HalfWidth(world, entity, door);
+        if (door.Slides)
+            return (shutCentre + Vector3.Transform(new Vector3(openness * 2f * halfWidth * door.HingeSide, 0f, 0f), shutRotation),
+                    shutRotation);
+        var turn = Quaternion.CreateFromYawPitchRoll(openness * door.SwingRadians * -door.HingeSide, 0f, 0f);
+        var hinge = shutCentre + Vector3.Transform(new Vector3(halfWidth * door.HingeSide, 0f, 0f), shutRotation);
+        var rotation = Quaternion.Normalize(turn * shutRotation);
+        return (hinge - Vector3.Transform(new Vector3(halfWidth * door.HingeSide, 0f, 0f), rotation), rotation);
+    }
+
+    /// <summary>The handle, at an opening: the backset in from the edge away from the hinge (for a slider,
+    /// the edge that trails, which stays in the doorway all the way across).</summary>
+    private static Vector3 HandleAt(World world, Entity entity, in DoorComponent door, float openness)
+    {
+        var (centre, rotation) = LeafAt(world, entity, door, openness);
+        float halfWidth = HalfWidth(world, entity, door);
+        float across = MathF.Max(0f, halfWidth - HandleBacksetMetres) * -door.HingeSide;
+        return centre + Vector3.Transform(new Vector3(across, 0f, 0f), rotation);
+    }
+
+    /// <summary>The leaf's normal, as long as its sound stands off it (see TransientSound.FaceNormal).</summary>
+    private static Vector3 FaceAt(World world, Entity entity, in DoorComponent door, float openness)
+    {
+        var (_, rotation) = LeafAt(world, entity, door, openness);
+        float half = world.Has<ColliderComponent>(entity) ? world.Get<ColliderComponent>(entity).Size.Z * 0.5f : 0.03f;
+        return Vector3.Normalize(Vector3.Transform(Vector3.UnitZ, rotation)) * (half + FaceStandoffMetres);
+    }
+
+    /// <summary>
+    /// A door's sounds, placed in its doorway: each kept inside the opening by the handle's backset (a
+    /// latch is never in the jamb), in the plane of the shut leaf, and given the leaf's faces to be heard
+    /// from. Every door sound goes out through here.
+    ///
+    /// The SHUT doorway, not the leaf as it is. A hinged door's sounds are its latch letting go and
+    /// meeting the strike, both with the leaf shut — but the leaf has already moved a tick when its
+    /// opening is announced, and its sound was placed on a leaf three degrees open. A slider's leaf ends
+    /// its run with its edge flush to the far jamb, and the handle, set back from that edge, behind it:
+    /// in the wall again.
+    /// </summary>
+    private static IReadOnlyList<TransientSound> OnTheLeaf(World world, Entity entity, in DoorComponent door,
+                                                           IReadOnlyList<TransientSound> sounds)
+    {
+        if (sounds.Count == 0) return sounds;
+        var (centre, rotation) = LeafAt(world, entity, door, 0f);
+        var inverse = Quaternion.Inverse(rotation);
+        float reach = MathF.Max(0f, HalfWidth(world, entity, door) - HandleBacksetMetres);
+        var face = FaceAt(world, entity, door, 0f);
+        Vector3 InTheDoorway(Vector3 p)
+        {
+            var local = Vector3.Transform(p - centre, inverse);
+            local.X = Math.Clamp(local.X, -reach, reach);
+            local.Z = 0f;
+            return centre + Vector3.Transform(local, rotation);
+        }
+        var placed = new TransientSound[sounds.Count];
+        for (int i = 0; i < sounds.Count; i++)
+        {
+            var s = sounds[i];
+            s.Position = InTheDoorway(s.Position);
+            if (s.MoveSeconds > 0f) s.MovesTo = InTheDoorway(s.MovesTo);
+            s.FaceNormal = face;
+            placed[i] = s;
+        }
+        return placed;
+    }
+
     // ── What it sounds like ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -484,10 +572,10 @@ public sealed class DoorSystem
     /// somebody else invented is audible the first time it shuts, with nobody having recorded anything.
     /// </summary>
     private static IReadOnlyList<TransientSound> Opening(World world, Entity entity, in DoorComponent door)
-        => Sounds(world, entity, door, opening: true, edgeSpeed: 0f);
+        => OnTheLeaf(world, entity, door, Sounds(world, entity, door, opening: true, edgeSpeed: 0f));
 
     private static IReadOnlyList<TransientSound> Closing(World world, Entity entity, in DoorComponent door, float edgeSpeed)
-        => Sounds(world, entity, door, opening: false, edgeSpeed);
+        => OnTheLeaf(world, entity, door, Sounds(world, entity, door, opening: false, edgeSpeed));
 
     private static List<TransientSound> Sounds(World world, Entity entity, in DoorComponent door, bool opening, float edgeSpeed)
     {
@@ -557,20 +645,17 @@ public sealed class DoorSystem
         var size = world.Has<ColliderComponent>(entity)
             ? world.Get<ColliderComponent>(entity).Size
             : new Vector3(1.0f, 2.1f, 0.08f);
-        var transform = world.Get<Transform>(entity);
-        var latchEdge = transform.Position
-                      + Vector3.Transform(new Vector3(size.X * 0.5f * -door.HingeSide, 0f, 0f), transform.Rotation);
         int variant = entity.Id;
-        return new[]
+        return OnTheLeaf(world, entity, door, new[]
         {
             new TransientSound
             {
-                Character = SoundCharacter.Knock, Position = latchEdge, Hz = 300f, Noisiness = 1f,
+                Character = SoundCharacter.Knock, Position = HandleAt(world, entity, door, 0f), Hz = 300f, Noisiness = 1f,
                 LevelDb = closing ? PushBarDoor.CloseLevelDb(variant) : PushBarDoor.OpenLevelDb(variant),
                 DecaySeconds = 1.8f,
                 SynthKey = PushBarDoor.Key(closing, variant, door.SwingSeconds, size.X, size.Y),
             },
-        };
+        });
     }
 
     /// <summary>The patio and automatic doors as physical models (<see cref="SlidingDoor"/>): each sound is
@@ -581,19 +666,23 @@ public sealed class DoorSystem
         var size = world.Has<ColliderComponent>(entity)
             ? world.Get<ColliderComponent>(entity).Size
             : new Vector3(kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f, 0.02f);
-        var transform = world.Get<Transform>(entity);
         float travel = closing && door.CloseSeconds > 0f ? door.CloseSeconds : door.SwingSeconds;
         int variant = entity.Id;
-        return new[]
+        // The run is one sound, and the leaf goes the width of the doorway while it plays: it comes from
+        // the handle, which travels with the leaf from where it is now to where it is going.
+        float to = closing ? 0f : 1f;
+        return OnTheLeaf(world, entity, door, new[]
         {
             new TransientSound
             {
-                Character = SoundCharacter.Knock, Position = transform.Position, Hz = 300f, Noisiness = 1f,
+                Character = SoundCharacter.Knock, Position = HandleAt(world, entity, door, door.Openness), Hz = 300f, Noisiness = 1f,
                 LevelDb = closing ? SlidingDoor.CloseLevelDb(kind, variant) : SlidingDoor.OpenLevelDb(kind, variant),
                 DecaySeconds = SlidingDoor.Seconds(kind, closing, travel),
                 SynthKey = SlidingDoor.Key(kind, closing, variant, travel, size.X, size.Y),
+                MovesTo = HandleAt(world, entity, door, to),
+                MoveSeconds = travel * MathF.Abs(to - door.Openness),
             },
-        };
+        });
     }
 
     private static IReadOnlyList<TransientSound> KnobDoorSound(World world, Entity entity, in DoorComponent door, bool closing)
@@ -601,9 +690,6 @@ public sealed class DoorSystem
         var size = world.Has<ColliderComponent>(entity)
             ? world.Get<ColliderComponent>(entity).Size
             : new Vector3(0.9f, 2.1f, 0.05f);
-        var transform = world.Get<Transform>(entity);
-        var latchEdge = transform.Position
-                      + Vector3.Transform(new Vector3(size.X * 0.5f * -door.HingeSide, 0f, 0f), transform.Rotation);
         // Wooden knob doors are interior doors, and interior doors are hollow-core.
         // People shut a door differently each time: mostly guided in, sometimes eased, sometimes pushed.
         var how = !closing ? KnobDoor.Shut.Normal : _shutDice.NextDouble() switch
@@ -613,16 +699,16 @@ public sealed class DoorSystem
             _ => KnobDoor.Shut.Hard,
         };
         string key = KnobDoor.Key(closing, KnobDoor.Construction.HollowCore, entity.Id, door.SwingSeconds, how, size.X, size.Y);
-        return new[]
+        return OnTheLeaf(world, entity, door, new[]
         {
             new TransientSound
             {
-                Character = SoundCharacter.Knock, Position = latchEdge, Hz = 500f, Noisiness = 1f,
+                Character = SoundCharacter.Knock, Position = HandleAt(world, entity, door, 0f), Hz = 500f, Noisiness = 1f,
                 LevelDb = closing ? KnobDoor.CloseLevelDb(how) : KnobDoor.OpenLevelDb,
                 DecaySeconds = closing ? 1.6f : door.SwingSeconds + 0.85f,
                 SynthKey = key,
             },
-        };
+        });
     }
 
     /// <summary>What fills a hollow door between its skins, kg/m^3: kraft honeycomb or mineral core,

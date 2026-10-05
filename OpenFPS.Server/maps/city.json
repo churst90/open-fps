@@ -97245,7 +97245,7 @@
     "W": 1.0
    },
    "RegionAId": 6420,
-   "RegionBId": -1,
+   "RegionBId": 6423,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -97711,7 +97711,7 @@
     "W": 1.0
    },
    "RegionAId": 6450,
-   "RegionBId": -1,
+   "RegionBId": 6453,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -98177,7 +98177,7 @@
     "W": 1.0
    },
    "RegionAId": 6480,
-   "RegionBId": -1,
+   "RegionBId": 6483,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -98643,7 +98643,7 @@
     "W": 1.0
    },
    "RegionAId": 6510,
-   "RegionBId": -1,
+   "RegionBId": 6513,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -99109,7 +99109,7 @@
     "W": 1.0
    },
    "RegionAId": 6540,
-   "RegionBId": -1,
+   "RegionBId": 6543,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -99575,7 +99575,7 @@
     "W": 1.0
    },
    "RegionAId": 6570,
-   "RegionBId": -1,
+   "RegionBId": 6573,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -100041,7 +100041,7 @@
     "W": 1.0
    },
    "RegionAId": 6600,
-   "RegionBId": -1,
+   "RegionBId": 6603,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -100507,7 +100507,7 @@
     "W": 1.0
    },
    "RegionAId": 6630,
-   "RegionBId": -1,
+   "RegionBId": 6633,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -100973,7 +100973,7 @@
     "W": 1.0
    },
    "RegionAId": 6660,
-   "RegionBId": -1,
+   "RegionBId": 6663,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -101439,7 +101439,7 @@
     "W": 1.0
    },
    "RegionAId": 6690,
-   "RegionBId": -1,
+   "RegionBId": 6693,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -101905,7 +101905,7 @@
     "W": 1.0
    },
    "RegionAId": 6720,
-   "RegionBId": -1,
+   "RegionBId": 6723,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -102371,7 +102371,7 @@
     "W": 1.0
    },
    "RegionAId": 6750,
-   "RegionBId": -1,
+   "RegionBId": 6753,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -102837,7 +102837,7 @@
     "W": 1.0
    },
    "RegionAId": 6780,
-   "RegionBId": -1,
+   "RegionBId": 6783,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -103303,7 +103303,7 @@
     "W": 1.0
    },
    "RegionAId": 6810,
-   "RegionBId": -1,
+   "RegionBId": 6813,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -103769,7 +103769,7 @@
     "W": 1.0
    },
    "RegionAId": 6840,
-   "RegionBId": -1,
+   "RegionBId": 6843,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -104235,7 +104235,7 @@
     "W": 1.0
    },
    "RegionAId": 6870,
-   "RegionBId": -1,
+   "RegionBId": 6873,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -104761,7 +104761,7 @@
     "W": 1.0
    },
    "RegionAId": 6904,
-   "RegionBId": -1,
+   "RegionBId": 6907,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -105633,7 +105633,7 @@
     "W": 1.0
    },
    "RegionAId": 6960,
-   "RegionBId": -1,
+   "RegionBId": 6963,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -106505,7 +106505,7 @@
     "W": 1.0
    },
    "RegionAId": 7016,
-   "RegionBId": -1,
+   "RegionBId": 7019,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -107377,7 +107377,7 @@
     "W": 1.0
    },
    "RegionAId": 7072,
-   "RegionBId": -1,
+   "RegionBId": 7075,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -108249,7 +108249,7 @@
     "W": 1.0
    },
    "RegionAId": 7128,
-   "RegionBId": -1,
+   "RegionBId": 7131,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -109121,7 +109121,7 @@
     "W": 1.0
    },
    "RegionAId": 7184,
-   "RegionBId": -1,
+   "RegionBId": 7187,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -109993,7 +109993,7 @@
     "W": 1.0
    },
    "RegionAId": 7240,
-   "RegionBId": -1,
+   "RegionBId": 7243,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -110865,7 +110865,7 @@
     "W": 1.0
    },
    "RegionAId": 7296,
-   "RegionBId": -1,
+   "RegionBId": 7299,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -111797,7 +111797,7 @@
     "W": 1.0
    },
    "RegionAId": 7356,
-   "RegionBId": -1,
+   "RegionBId": 7359,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -112263,7 +112263,7 @@
     "W": 1.0
    },
    "RegionAId": 7386,
-   "RegionBId": -1,
+   "RegionBId": 7389,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -112729,7 +112729,7 @@
     "W": 1.0
    },
    "RegionAId": 7416,
-   "RegionBId": -1,
+   "RegionBId": 7419,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -113195,7 +113195,7 @@
     "W": 1.0
    },
    "RegionAId": 7446,
-   "RegionBId": -1,
+   "RegionBId": 7449,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -113661,7 +113661,7 @@
     "W": 1.0
    },
    "RegionAId": 7476,
-   "RegionBId": -1,
+   "RegionBId": 7479,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -114127,7 +114127,7 @@
     "W": 1.0
    },
    "RegionAId": 7506,
-   "RegionBId": -1,
+   "RegionBId": 7509,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -114593,7 +114593,7 @@
     "W": 1.0
    },
    "RegionAId": 7536,
-   "RegionBId": -1,
+   "RegionBId": 7539,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -115059,7 +115059,7 @@
     "W": 1.0
    },
    "RegionAId": 7566,
-   "RegionBId": -1,
+   "RegionBId": 7569,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -115525,7 +115525,7 @@
     "W": 1.0
    },
    "RegionAId": 7596,
-   "RegionBId": -1,
+   "RegionBId": 7599,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -115991,7 +115991,7 @@
     "W": 1.0
    },
    "RegionAId": 7626,
-   "RegionBId": -1,
+   "RegionBId": 7629,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -116457,7 +116457,7 @@
     "W": 1.0
    },
    "RegionAId": 7656,
-   "RegionBId": -1,
+   "RegionBId": 7659,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -116923,7 +116923,7 @@
     "W": 1.0
    },
    "RegionAId": 7686,
-   "RegionBId": -1,
+   "RegionBId": 7689,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -117389,7 +117389,7 @@
     "W": 1.0
    },
    "RegionAId": 7716,
-   "RegionBId": -1,
+   "RegionBId": 7719,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -117855,7 +117855,7 @@
     "W": 1.0
    },
    "RegionAId": 7746,
-   "RegionBId": -1,
+   "RegionBId": 7749,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -118321,7 +118321,7 @@
     "W": 1.0
    },
    "RegionAId": 7776,
-   "RegionBId": -1,
+   "RegionBId": 7779,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -118787,7 +118787,7 @@
     "W": 1.0
    },
    "RegionAId": 7806,
-   "RegionBId": -1,
+   "RegionBId": 7809,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -119313,7 +119313,7 @@
     "W": 1.0
    },
    "RegionAId": 7840,
-   "RegionBId": -1,
+   "RegionBId": 7843,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -119779,7 +119779,7 @@
     "W": 1.0
    },
    "RegionAId": 7870,
-   "RegionBId": -1,
+   "RegionBId": 7873,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -120245,7 +120245,7 @@
     "W": 1.0
    },
    "RegionAId": 7900,
-   "RegionBId": -1,
+   "RegionBId": 7903,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -120711,7 +120711,7 @@
     "W": 1.0
    },
    "RegionAId": 7930,
-   "RegionBId": -1,
+   "RegionBId": 7933,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -121177,7 +121177,7 @@
     "W": 1.0
    },
    "RegionAId": 7960,
-   "RegionBId": -1,
+   "RegionBId": 7963,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -121643,7 +121643,7 @@
     "W": 1.0
    },
    "RegionAId": 7990,
-   "RegionBId": -1,
+   "RegionBId": 7993,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -122109,7 +122109,7 @@
     "W": 1.0
    },
    "RegionAId": 8020,
-   "RegionBId": -1,
+   "RegionBId": 8023,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -122575,7 +122575,7 @@
     "W": 1.0
    },
    "RegionAId": 8050,
-   "RegionBId": -1,
+   "RegionBId": 8053,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -123041,7 +123041,7 @@
     "W": 1.0
    },
    "RegionAId": 8080,
-   "RegionBId": -1,
+   "RegionBId": 8083,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -123507,7 +123507,7 @@
     "W": 1.0
    },
    "RegionAId": 8110,
-   "RegionBId": -1,
+   "RegionBId": 8113,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -123973,7 +123973,7 @@
     "W": 1.0
    },
    "RegionAId": 8140,
-   "RegionBId": -1,
+   "RegionBId": 8143,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -124439,7 +124439,7 @@
     "W": 1.0
    },
    "RegionAId": 8170,
-   "RegionBId": -1,
+   "RegionBId": 8173,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -124905,7 +124905,7 @@
     "W": 1.0
    },
    "RegionAId": 8200,
-   "RegionBId": -1,
+   "RegionBId": 8203,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -125371,7 +125371,7 @@
     "W": 1.0
    },
    "RegionAId": 8230,
-   "RegionBId": -1,
+   "RegionBId": 8233,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -125837,7 +125837,7 @@
     "W": 1.0
    },
    "RegionAId": 8260,
-   "RegionBId": -1,
+   "RegionBId": 8263,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -126303,7 +126303,7 @@
     "W": 1.0
    },
    "RegionAId": 8290,
-   "RegionBId": -1,
+   "RegionBId": 8293,
    "Scale": {
     "X": 1.1111,
     "Y": 1,
@@ -131998,6 +131998,1011 @@
   },
   {
    "EntityId": 8673,
+   "PrefabId": "grass_floor",
+   "Position": {
+    "X": -325.0,
+    "Y": 0.045,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 15.0,
+    "Y": 0.9,
+    "Z": 13.0
+   },
+   "Name": "Elm Park lawn"
+  },
+  {
+   "EntityId": 8674,
+   "PrefabId": "asphalt_road",
+   "Position": {
+    "X": -325.0,
+    "Y": 0.05,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 0.3,
+    "Y": 1.0,
+    "Z": 13.0
+   },
+   "Name": "Elm Park path"
+  },
+  {
+   "EntityId": 8675,
+   "PrefabId": "asphalt_road",
+   "Position": {
+    "X": -325.0,
+    "Y": 0.05,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 15.0,
+    "Y": 1.0,
+    "Z": 0.3
+   },
+   "Name": "Elm Park path"
+  },
+  {
+   "EntityId": 8676,
+   "PrefabId": "asphalt_road",
+   "Position": {
+    "X": -296.0,
+    "Y": 0.05,
+    "Z": 179.4
+   },
+   "Scale": {
+    "X": 0.3,
+    "Y": 1.0,
+    "Z": 9.22
+   },
+   "Name": "Elm Park path from Sycamore Lane"
+  },
+  {
+   "EntityId": 8677,
+   "PrefabId": "acoustic_region",
+   "Position": {
+    "X": -296.0,
+    "Y": 3.0,
+    "Z": 147.65
+   },
+   "Scale": {
+    "X": 0.6,
+    "Y": 1.2,
+    "Z": 2.87
+   },
+   "Name": "Elm Park, path from Sycamore Lane"
+  },
+  {
+   "EntityId": 8678,
+   "PrefabId": "brick_floor",
+   "Position": {
+    "X": -325.0,
+    "Y": 0.055,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 2.4,
+    "Y": 1.1,
+    "Z": 2.4
+   },
+   "Name": "Elm Park fountain square"
+  },
+  {
+   "EntityId": 8679,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -325.0,
+    "Y": 0.25,
+    "Z": 223.15
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 0.1667,
+    "Z": 0.6
+   },
+   "Name": "Elm Park fountain basin"
+  },
+  {
+   "EntityId": 8680,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -325.0,
+    "Y": 0.25,
+    "Z": 230.85
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 0.1667,
+    "Z": 0.6
+   },
+   "Name": "Elm Park fountain basin"
+  },
+  {
+   "EntityId": 8681,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -328.85,
+    "Y": 0.25,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 0.15,
+    "Y": 0.1667,
+    "Z": 14.8
+   },
+   "Name": "Elm Park fountain basin"
+  },
+  {
+   "EntityId": 8682,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -321.15,
+    "Y": 0.25,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 0.15,
+    "Y": 0.1667,
+    "Z": 14.8
+   },
+   "Name": "Elm Park fountain basin"
+  },
+  {
+   "EntityId": 8683,
+   "PrefabId": "water_surface",
+   "Position": {
+    "X": -325.0,
+    "Y": 0.175,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 1.85,
+    "Y": 3.5,
+    "Z": 1.85
+   },
+   "Name": "Elm Park fountain pool"
+  },
+  {
+   "EntityId": 8684,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -325.0,
+    "Y": 0.725,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 0.3,
+    "Y": 0.25,
+    "Z": 1.2
+   },
+   "Name": "Elm Park fountain pedestal"
+  },
+  {
+   "EntityId": 8685,
+   "PrefabId": "concrete_floor",
+   "Position": {
+    "X": -325.0,
+    "Y": 1.175,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 0.24,
+    "Y": 1.5,
+    "Z": 0.24
+   },
+   "Name": "Elm Park fountain bowl"
+  },
+  {
+   "EntityId": 8686,
+   "PrefabId": "water_fountain",
+   "Position": {
+    "X": -325.0,
+    "Y": 0.7,
+    "Z": 228.6
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park fountain"
+  },
+  {
+   "EntityId": 8687,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -385.0,
+    "Y": 1.5,
+    "Z": 180.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8688,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -385.0,
+    "Y": 7.0,
+    "Z": 180.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8689,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -385.0,
+    "Y": 7.0,
+    "Z": 180.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8690,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -355.0,
+    "Y": 1.5,
+    "Z": 175.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8691,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -355.0,
+    "Y": 7.0,
+    "Z": 175.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8692,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -355.0,
+    "Y": 7.0,
+    "Z": 175.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8693,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -338.0,
+    "Y": 1.5,
+    "Z": 170.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8694,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -338.0,
+    "Y": 7.0,
+    "Z": 170.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8695,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -338.0,
+    "Y": 7.0,
+    "Z": 170.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8696,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -310.0,
+    "Y": 1.5,
+    "Z": 190.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8697,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -310.0,
+    "Y": 7.0,
+    "Z": 190.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8698,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -310.0,
+    "Y": 7.0,
+    "Z": 190.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8699,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -268.0,
+    "Y": 1.5,
+    "Z": 178.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8700,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -268.0,
+    "Y": 7.0,
+    "Z": 178.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8701,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -268.0,
+    "Y": 7.0,
+    "Z": 178.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8702,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -262.0,
+    "Y": 1.5,
+    "Z": 205.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8703,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -262.0,
+    "Y": 7.0,
+    "Z": 205.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8704,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -262.0,
+    "Y": 7.0,
+    "Z": 205.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8705,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -388.0,
+    "Y": 1.5,
+    "Z": 210.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8706,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -388.0,
+    "Y": 7.0,
+    "Z": 210.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8707,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -388.0,
+    "Y": 7.0,
+    "Z": 210.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8708,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -372.0,
+    "Y": 1.5,
+    "Z": 250.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8709,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -372.0,
+    "Y": 7.0,
+    "Z": 250.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8710,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -372.0,
+    "Y": 7.0,
+    "Z": 250.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8711,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -345.0,
+    "Y": 1.5,
+    "Z": 262.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8712,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -345.0,
+    "Y": 7.0,
+    "Z": 262.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8713,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -345.0,
+    "Y": 7.0,
+    "Z": 262.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8714,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -305.0,
+    "Y": 1.5,
+    "Z": 258.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8715,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -305.0,
+    "Y": 7.0,
+    "Z": 258.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8716,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -305.0,
+    "Y": 7.0,
+    "Z": 258.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8717,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -275.0,
+    "Y": 1.5,
+    "Z": 250.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8718,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -275.0,
+    "Y": 7.0,
+    "Z": 250.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8719,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -275.0,
+    "Y": 7.0,
+    "Z": 250.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8720,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -390.0,
+    "Y": 1.5,
+    "Z": 280.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8721,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -390.0,
+    "Y": 7.0,
+    "Z": 280.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8722,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -390.0,
+    "Y": 7.0,
+    "Z": 280.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8723,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -340.0,
+    "Y": 1.5,
+    "Z": 286.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8724,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -340.0,
+    "Y": 7.0,
+    "Z": 286.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8725,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -340.0,
+    "Y": 7.0,
+    "Z": 286.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8726,
+   "PrefabId": "wood_floor",
+   "Position": {
+    "X": -265.0,
+    "Y": 1.5,
+    "Z": 284.0
+   },
+   "Scale": {
+    "X": 0.05,
+    "Y": 30.0,
+    "Z": 0.05
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8727,
+   "PrefabId": "foliage_hedge",
+   "Position": {
+    "X": -265.0,
+    "Y": 7.0,
+    "Z": 284.0
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.6667,
+    "Z": 6.6667
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8728,
+   "PrefabId": "tree_crown",
+   "Position": {
+    "X": -265.0,
+    "Y": 7.0,
+    "Z": 284.0
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Elm Park tree"
+  },
+  {
+   "EntityId": 8729,
+   "PrefabId": "acoustic_region",
+   "Position": {
+    "X": -325.0,
+    "Y": 6.0,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 15.0,
+    "Y": 2.4,
+    "Z": 13.0
+   },
+   "Name": "Elm Park"
+  },
+  {
+   "EntityId": 8730,
+   "PrefabId": "fence_timber",
+   "Position": {
+    "X": -334.975,
+    "Y": 0.9,
+    "Z": 141.8
+   },
+   "Scale": {
+    "X": 0.025,
+    "Y": 1.0,
+    "Z": 280.0
+   },
+   "Name": "58 Alder Street garden fence"
+  },
+  {
+   "EntityId": 8731,
+   "PrefabId": "fence_timber",
+   "Position": {
+    "X": -315.025,
+    "Y": 0.9,
+    "Z": 141.8
+   },
+   "Scale": {
+    "X": 0.025,
+    "Y": 1.0,
+    "Z": 280.0
+   },
+   "Name": "58 Alder Street garden fence"
+  },
+  {
+   "EntityId": 8732,
+   "PrefabId": "fence_timber",
+   "Position": {
+    "X": -332.8,
+    "Y": 0.9,
+    "Z": 148.775
+   },
+   "Scale": {
+    "X": 2.2,
+    "Y": 1.0,
+    "Z": 1.0
+   },
+   "Name": "58 Alder Street garden fence"
+  },
+  {
+   "EntityId": 8733,
+   "PrefabId": "fence_timber",
+   "Position": {
+    "X": -322.2,
+    "Y": 0.9,
+    "Z": 148.775
+   },
+   "Scale": {
+    "X": 7.2,
+    "Y": 1.0,
+    "Z": 1.0
+   },
+   "Name": "58 Alder Street garden fence"
+  },
+  {
+   "EntityId": 8734,
+   "PrefabId": "brick_floor",
+   "Position": {
+    "X": -321.0,
+    "Y": 0.05,
+    "Z": 142.8
+   },
+   "Scale": {
+    "X": 0.3,
+    "Y": 1.0,
+    "Z": 0.3
+   },
+   "Name": "58 Alder Street fire pit hearth"
+  },
+  {
+   "EntityId": 8735,
+   "PrefabId": "brick_wall",
+   "Position": {
+    "X": -321.0,
+    "Y": 0.225,
+    "Z": 142.2
+   },
+   "Scale": {
+    "X": 0.7,
+    "Y": 0.15,
+    "Z": 0.5714
+   },
+   "Name": "58 Alder Street fire pit"
+  },
+  {
+   "EntityId": 8736,
+   "PrefabId": "brick_wall",
+   "Position": {
+    "X": -321.0,
+    "Y": 0.225,
+    "Z": 143.4
+   },
+   "Scale": {
+    "X": 0.7,
+    "Y": 0.15,
+    "Z": 0.5714
+   },
+   "Name": "58 Alder Street fire pit"
+  },
+  {
+   "EntityId": 8737,
+   "PrefabId": "brick_wall",
+   "Position": {
+    "X": -321.6,
+    "Y": 0.225,
+    "Z": 142.8
+   },
+   "Scale": {
+    "X": 0.1,
+    "Y": 0.15,
+    "Z": 2.8571
+   },
+   "Name": "58 Alder Street fire pit"
+  },
+  {
+   "EntityId": 8738,
+   "PrefabId": "brick_wall",
+   "Position": {
+    "X": -320.4,
+    "Y": 0.225,
+    "Z": 142.8
+   },
+   "Scale": {
+    "X": 0.1,
+    "Y": 0.15,
+    "Z": 2.8571
+   },
+   "Name": "58 Alder Street fire pit"
+  },
+  {
+   "EntityId": 8739,
+   "PrefabId": "fire_pit",
+   "Position": {
+    "X": -321.0,
+    "Y": 0.6,
+    "Z": 142.8
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "58 Alder Street fire pit"
+  },
+  {
+   "EntityId": 8740,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -132012,7 +133017,7 @@
    "Name": "Marlow Tower stairs, floor 0 to 1"
   },
   {
-   "EntityId": 8674,
+   "EntityId": 8741,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132027,7 +133032,7 @@
    "Name": "Marlow Tower landing, floor 0"
   },
   {
-   "EntityId": 8675,
+   "EntityId": 8742,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -132042,7 +133047,7 @@
    "Name": "Marlow Tower stairs, floor 1 to 2"
   },
   {
-   "EntityId": 8676,
+   "EntityId": 8743,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132057,7 +133062,7 @@
    "Name": "Marlow Tower landing, floor 1"
   },
   {
-   "EntityId": 8677,
+   "EntityId": 8744,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -132072,7 +133077,7 @@
    "Name": "Marlow Tower stairs, floor 2 to 3"
   },
   {
-   "EntityId": 8678,
+   "EntityId": 8745,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132087,7 +133092,7 @@
    "Name": "Marlow Tower landing, floor 2"
   },
   {
-   "EntityId": 8679,
+   "EntityId": 8746,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -132102,7 +133107,7 @@
    "Name": "Marlow Tower stairs, floor 3 to 4"
   },
   {
-   "EntityId": 8680,
+   "EntityId": 8747,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132117,7 +133122,7 @@
    "Name": "Marlow Tower landing, floor 3"
   },
   {
-   "EntityId": 8681,
+   "EntityId": 8748,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -132132,7 +133137,7 @@
    "Name": "Marlow Tower stairs, floor 4 to 5"
   },
   {
-   "EntityId": 8682,
+   "EntityId": 8749,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132147,7 +133152,7 @@
    "Name": "Marlow Tower landing, floor 4"
   },
   {
-   "EntityId": 8683,
+   "EntityId": 8750,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -132162,7 +133167,7 @@
    "Name": "Marlow Tower stairs, floor 5 to 6"
   },
   {
-   "EntityId": 8684,
+   "EntityId": 8751,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132177,7 +133182,7 @@
    "Name": "Marlow Tower landing, floor 5"
   },
   {
-   "EntityId": 8685,
+   "EntityId": 8752,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -132192,7 +133197,7 @@
    "Name": "Marlow Tower stairs, floor 6 to 7"
   },
   {
-   "EntityId": 8686,
+   "EntityId": 8753,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132207,7 +133212,7 @@
    "Name": "Marlow Tower landing, floor 6"
   },
   {
-   "EntityId": 8687,
+   "EntityId": 8754,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -132222,7 +133227,7 @@
    "Name": "Marlow Tower stairs, floor 7 to the roof"
   },
   {
-   "EntityId": 8688,
+   "EntityId": 8755,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132237,7 +133242,7 @@
    "Name": "Marlow Tower landing, floor 7"
   },
   {
-   "EntityId": 8689,
+   "EntityId": 8756,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -132252,7 +133257,7 @@
    "Name": "Kestrel House stairs, floor 0 to 1"
   },
   {
-   "EntityId": 8690,
+   "EntityId": 8757,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132267,7 +133272,7 @@
    "Name": "Kestrel House landing, floor 0"
   },
   {
-   "EntityId": 8691,
+   "EntityId": 8758,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -132282,7 +133287,7 @@
    "Name": "Kestrel House stairs, floor 1 to 2"
   },
   {
-   "EntityId": 8692,
+   "EntityId": 8759,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132297,7 +133302,7 @@
    "Name": "Kestrel House landing, floor 1"
   },
   {
-   "EntityId": 8693,
+   "EntityId": 8760,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -132312,7 +133317,7 @@
    "Name": "Kestrel House stairs, floor 2 to 3"
   },
   {
-   "EntityId": 8694,
+   "EntityId": 8761,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132327,7 +133332,7 @@
    "Name": "Kestrel House landing, floor 2"
   },
   {
-   "EntityId": 8695,
+   "EntityId": 8762,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -132342,7 +133347,7 @@
    "Name": "Kestrel House stairs, floor 3 to 4"
   },
   {
-   "EntityId": 8696,
+   "EntityId": 8763,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132357,7 +133362,7 @@
    "Name": "Kestrel House landing, floor 3"
   },
   {
-   "EntityId": 8697,
+   "EntityId": 8764,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -132372,7 +133377,7 @@
    "Name": "Kestrel House stairs, floor 4 to 5"
   },
   {
-   "EntityId": 8698,
+   "EntityId": 8765,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132387,7 +133392,7 @@
    "Name": "Kestrel House landing, floor 4"
   },
   {
-   "EntityId": 8699,
+   "EntityId": 8766,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -132402,7 +133407,7 @@
    "Name": "Kestrel House stairs, floor 5 to the roof"
   },
   {
-   "EntityId": 8700,
+   "EntityId": 8767,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132417,7 +133422,7 @@
    "Name": "Kestrel House landing, floor 5"
   },
   {
-   "EntityId": 8701,
+   "EntityId": 8768,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -132432,7 +133437,7 @@
    "Name": "Union Building stairs, floor 0 to 1"
   },
   {
-   "EntityId": 8702,
+   "EntityId": 8769,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132447,7 +133452,7 @@
    "Name": "Union Building landing, floor 0"
   },
   {
-   "EntityId": 8703,
+   "EntityId": 8770,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -132462,7 +133467,7 @@
    "Name": "Union Building stairs, floor 1 to 2"
   },
   {
-   "EntityId": 8704,
+   "EntityId": 8771,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132477,7 +133482,7 @@
    "Name": "Union Building landing, floor 1"
   },
   {
-   "EntityId": 8705,
+   "EntityId": 8772,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -132492,7 +133497,7 @@
    "Name": "Union Building stairs, floor 2 to 3"
   },
   {
-   "EntityId": 8706,
+   "EntityId": 8773,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132507,7 +133512,7 @@
    "Name": "Union Building landing, floor 2"
   },
   {
-   "EntityId": 8707,
+   "EntityId": 8774,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -132522,7 +133527,7 @@
    "Name": "Union Building stairs, floor 3 to 4"
   },
   {
-   "EntityId": 8708,
+   "EntityId": 8775,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132537,7 +133542,7 @@
    "Name": "Union Building landing, floor 3"
   },
   {
-   "EntityId": 8709,
+   "EntityId": 8776,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -132552,7 +133557,7 @@
    "Name": "Union Building stairs, floor 4 to 5"
   },
   {
-   "EntityId": 8710,
+   "EntityId": 8777,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132567,7 +133572,7 @@
    "Name": "Union Building landing, floor 4"
   },
   {
-   "EntityId": 8711,
+   "EntityId": 8778,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -132582,7 +133587,7 @@
    "Name": "Union Building stairs, floor 5 to 6"
   },
   {
-   "EntityId": 8712,
+   "EntityId": 8779,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132597,7 +133602,7 @@
    "Name": "Union Building landing, floor 5"
   },
   {
-   "EntityId": 8713,
+   "EntityId": 8780,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -132612,7 +133617,7 @@
    "Name": "Union Building stairs, floor 6 to 7"
   },
   {
-   "EntityId": 8714,
+   "EntityId": 8781,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132627,7 +133632,7 @@
    "Name": "Union Building landing, floor 6"
   },
   {
-   "EntityId": 8715,
+   "EntityId": 8782,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -132642,7 +133647,7 @@
    "Name": "Union Building stairs, floor 7 to 8"
   },
   {
-   "EntityId": 8716,
+   "EntityId": 8783,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132657,7 +133662,7 @@
    "Name": "Union Building landing, floor 7"
   },
   {
-   "EntityId": 8717,
+   "EntityId": 8784,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -132672,7 +133677,7 @@
    "Name": "Union Building stairs, floor 8 to 9"
   },
   {
-   "EntityId": 8718,
+   "EntityId": 8785,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132687,7 +133692,7 @@
    "Name": "Union Building landing, floor 8"
   },
   {
-   "EntityId": 8719,
+   "EntityId": 8786,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -132702,7 +133707,7 @@
    "Name": "Union Building stairs, floor 9 to the roof"
   },
   {
-   "EntityId": 8720,
+   "EntityId": 8787,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132717,7 +133722,7 @@
    "Name": "Union Building landing, floor 9"
   },
   {
-   "EntityId": 8721,
+   "EntityId": 8788,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -132732,7 +133737,7 @@
    "Name": "Brandt Court stairs, floor 0 to 1"
   },
   {
-   "EntityId": 8722,
+   "EntityId": 8789,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132747,7 +133752,7 @@
    "Name": "Brandt Court landing, floor 0"
   },
   {
-   "EntityId": 8723,
+   "EntityId": 8790,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -132762,7 +133767,7 @@
    "Name": "Brandt Court stairs, floor 1 to 2"
   },
   {
-   "EntityId": 8724,
+   "EntityId": 8791,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132777,7 +133782,7 @@
    "Name": "Brandt Court landing, floor 1"
   },
   {
-   "EntityId": 8725,
+   "EntityId": 8792,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -132792,7 +133797,7 @@
    "Name": "Brandt Court stairs, floor 2 to 3"
   },
   {
-   "EntityId": 8726,
+   "EntityId": 8793,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132807,7 +133812,7 @@
    "Name": "Brandt Court landing, floor 2"
   },
   {
-   "EntityId": 8727,
+   "EntityId": 8794,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -132822,7 +133827,7 @@
    "Name": "Brandt Court stairs, floor 3 to 4"
   },
   {
-   "EntityId": 8728,
+   "EntityId": 8795,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132837,7 +133842,7 @@
    "Name": "Brandt Court landing, floor 3"
   },
   {
-   "EntityId": 8729,
+   "EntityId": 8796,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -132852,7 +133857,7 @@
    "Name": "Brandt Court stairs, floor 4 to 5"
   },
   {
-   "EntityId": 8730,
+   "EntityId": 8797,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132867,7 +133872,7 @@
    "Name": "Brandt Court landing, floor 4"
   },
   {
-   "EntityId": 8731,
+   "EntityId": 8798,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -132882,7 +133887,7 @@
    "Name": "Brandt Court stairs, floor 5 to the roof"
   },
   {
-   "EntityId": 8732,
+   "EntityId": 8799,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -132897,7 +133902,7 @@
    "Name": "Brandt Court landing, floor 5"
   },
   {
-   "EntityId": 8733,
+   "EntityId": 8800,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -132912,7 +133917,7 @@
    "Name": "Selby House stairs, floor 0 to 1"
   },
   {
-   "EntityId": 8734,
+   "EntityId": 8801,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132927,7 +133932,7 @@
    "Name": "Selby House landing, floor 0"
   },
   {
-   "EntityId": 8735,
+   "EntityId": 8802,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -132942,7 +133947,7 @@
    "Name": "Selby House stairs, floor 1 to 2"
   },
   {
-   "EntityId": 8736,
+   "EntityId": 8803,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132957,7 +133962,7 @@
    "Name": "Selby House landing, floor 1"
   },
   {
-   "EntityId": 8737,
+   "EntityId": 8804,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -132972,7 +133977,7 @@
    "Name": "Selby House stairs, floor 2 to 3"
   },
   {
-   "EntityId": 8738,
+   "EntityId": 8805,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -132987,7 +133992,7 @@
    "Name": "Selby House landing, floor 2"
   },
   {
-   "EntityId": 8739,
+   "EntityId": 8806,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -133002,7 +134007,7 @@
    "Name": "Selby House stairs, floor 3 to 4"
   },
   {
-   "EntityId": 8740,
+   "EntityId": 8807,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133017,7 +134022,7 @@
    "Name": "Selby House landing, floor 3"
   },
   {
-   "EntityId": 8741,
+   "EntityId": 8808,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -133032,7 +134037,7 @@
    "Name": "Selby House stairs, floor 4 to 5"
   },
   {
-   "EntityId": 8742,
+   "EntityId": 8809,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133047,7 +134052,7 @@
    "Name": "Selby House landing, floor 4"
   },
   {
-   "EntityId": 8743,
+   "EntityId": 8810,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -133062,7 +134067,7 @@
    "Name": "Selby House stairs, floor 5 to 6"
   },
   {
-   "EntityId": 8744,
+   "EntityId": 8811,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133077,7 +134082,7 @@
    "Name": "Selby House landing, floor 5"
   },
   {
-   "EntityId": 8745,
+   "EntityId": 8812,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -133092,7 +134097,7 @@
    "Name": "Selby House stairs, floor 6 to the roof"
   },
   {
-   "EntityId": 8746,
+   "EntityId": 8813,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133105,6 +134110,36 @@
     "Z": 2.0
    },
    "Name": "Selby House landing, floor 6"
+  },
+  {
+   "EntityId": 8814,
+   "PrefabId": "named_place",
+   "Position": {
+    "X": -325.0,
+    "Y": 1.5,
+    "Z": 227.0
+   },
+   "Scale": {
+    "X": 24.0,
+    "Y": 3.0,
+    "Z": 24.0
+   },
+   "Name": "Elm Park, by the fountain"
+  },
+  {
+   "EntityId": 8815,
+   "PrefabId": "named_place",
+   "Position": {
+    "X": -330.0,
+    "Y": 1.25,
+    "Z": 148.8
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 2.5,
+    "Z": 2.0
+   },
+   "Name": "58 Alder Street garden gate"
   }
  ],
  "Crossings": [

@@ -1,0 +1,9 @@
+{
+  "Id": "fence_timber",
+  "Name": "Timber Fence",
+  "Description": "A close-boarded garden fence: overlapping softwood boards on two rails, 1.8 m high. Unlike a palisade there is no gap to see or hear through, so it is a light wooden panel to the acoustics: it takes the top off what is behind it and lets the bottom through.",
+  "Material": "Wood",
+  "ColliderSize": { "X": 2, "Y": 1.8, "Z": 0.05 },
+  "Type": "StaticObject",
+  "IsSolid": true
+}

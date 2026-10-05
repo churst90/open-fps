@@ -212,6 +212,18 @@ public class MachineVoiceTests
                     Assert.True(AircraftProfile.Presets.ContainsKey(preset),
                         $"{Path.GetFileName(file)} names aircraft '{preset}', which is not a preset");
                     break;
+                case "water":
+                    Assert.True(WaterFeatureSpec.Presets.ContainsKey(preset),
+                        $"{Path.GetFileName(file)} names water '{preset}', which is not a preset");
+                    break;
+                case "fire":
+                    Assert.True(FireSpec.Presets.ContainsKey(preset),
+                        $"{Path.GetFileName(file)} names fire '{preset}', which is not a preset");
+                    break;
+                case "foliage":
+                    Assert.True(FoliageSpec.Presets.ContainsKey(preset),
+                        $"{Path.GetFileName(file)} names foliage '{preset}', which is not a preset");
+                    break;
                 default:
                     Assert.Fail($"{Path.GetFileName(file)} names '{id}', and '{kind}:' is not a model kind "
                               + "this client knows — it will be silent.");

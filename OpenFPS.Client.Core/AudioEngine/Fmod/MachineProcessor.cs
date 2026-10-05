@@ -137,12 +137,25 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
     private volatile bool _listenerKnown;
 
     protected PhysicalVoiceState(float sourceLevelDb, float sampleRate)
+        : this(sourceLevelDb, sampleRate, VehicleProfile.PeakHeadroomDb) { }
+
+    /// <summary>
+    /// A voice whose peaks stand further over its level than the fleet's shared headroom allows: a
+    /// fire, whose loud crackles are 40 dB over its mean. It renders with that much room, so its
+    /// peaks are not squared off on the soft ceiling, and the mixer gives the difference back as gain
+    /// (<see cref="HeadroomGain"/>), so it is still PLACED by its level — declaring it by its peaks
+    /// instead would have the loudness law play it fourteen decibels under what it is.
+    /// </summary>
+    protected PhysicalVoiceState(float sourceLevelDb, float sampleRate, float headroomDb)
     {
         SampleRate = sampleRate;
         Ground = new OpenFPS.Client.AudioEngine.Acoustics.GroundReflection(sampleRate);
-        PascalsAtFullScale =
-            20e-6f * MathF.Pow(10f, (sourceLevelDb + VehicleProfile.PeakHeadroomDb) / 20f);
+        PascalsAtFullScale = 20e-6f * MathF.Pow(10f, (sourceLevelDb + headroomDb) / 20f);
     }
+
+    /// <summary>The channel gain that gives back a voice's extra headroom over the shared one.</summary>
+    public static float HeadroomGain(float headroomDb)
+        => MathF.Pow(10f, (MathF.Max(VehicleProfile.PeakHeadroomDb, headroomDb) - VehicleProfile.PeakHeadroomDb) / 20f);
 
     /// <summary>Tells the model where the listener is, in its own frame, so a cabinet with a fan on
     /// top and a grille down one side — or a jet that radiates aft and a fan that radiates forward —
