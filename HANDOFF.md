@@ -1,22 +1,16 @@
-HANDOFF (admin-gun branch, agent work in progress)
+HANDOFF (admin-gun branch): DONE, awaiting Cody's ear
 
-Task: fire selector (X / Shift+X), admin gun (modes kill/vaporize/freeze/inspect, calibre Y / /calibre,
-unlimited ammo, admin only), its designed sounds, teleporter sounds, hand-over (give:PREFAB) sounds,
-AudioLab --admin-gun renders to inbox/admin-gun-2026-10-05, client keys, tests, catalogue.
+Built: fire selector (X / Shift+X, server holds it, safe, auto held on Enter with "cease" on release),
+admin gun (admin_gun prefab, admin-gun permission, modes kill/vaporize/freeze/inspect, /calibre and Y,
+/admingun report N, unlimited rounds), FrozenComponent honoured by MovementSystem, VehicleSystem and
+DrivingSystem, designed sounds (AdminGun.cs, TeleporterSounds.cs, HandOverSounds.cs) rendered by the
+client through AdminGunSynth, AudioLab --admin-gun.
 
-Done:
-- Common: Weapons.cs FireMode + FireSelector + per-weapon Selector; WeaponHandling selector:/action: keys;
-  DesignedSoundKit.cs, AdminGun.cs, TeleporterSounds.cs, HandOverSounds.cs.
-- Client.Core: AudioEngine/Core/AdminGunSynth.cs, routed from WorldAudioPlayer.RenderOne.
-- AudioLab: Spikes/AdminGunSpike.cs, --admin-gun (renders to scratch with out=DIR).
+Renders: inbox/admin-gun-2026-10-05 (00-tour.wav, README.txt).
 
-Next:
-- Server: admin-gun permission, admin_gun prefab, CombatService partials (selector, safe, auto + cease,
-  admin gun fire and effects), FrozenComponent checks in MovementSystem and VehicleSystem, commands
-  selector/calibre/admingun/cease + CommandCatalog, Held() reports "admingun", refuse non-admin take/give.
-- Client: X/Shift+X selector, Y/Shift+Y calibre, Enter release sends cease, HoldsGun accepts admingun, KeyHelp.
-- Tests (new file AdminGunTests.cs), render final set into inbox, README.
+Open: Cody picks a report variant (default 1, AdminGun.DefaultReport); roles-scope must emit
+TeleporterSounds.Sound(kind, pos) and HandOverSounds.Sound(prefab, feet) for its events.
 
-Build/test: DOTNET_CLI_USE_MSBUILD_SERVER=0 nice ~/.dotnet/dotnet build OpenFPS.Tests/OpenFPS.Tests.csproj
-  --artifacts-path ~/.cache/openfps-agent-admingun -nodeReuse:false -p:UseSharedCompilation=false
-Renders: cd ~/.cache/openfps-agent-admingun/bin/OpenFPS.AudioLab/debug && ./OpenFPS.AudioLab --admin-gun
+Tests: dotnet test ... --filter "FullyQualifiedName~AdminGunTests|FullyQualifiedName~StaffGate|FullyQualifiedName~Weapons|FullyQualifiedName~CommandCatalog"
+(build: DOTNET_CLI_USE_MSBUILD_SERVER=0 nice ~/.dotnet/dotnet build OpenFPS.Tests/OpenFPS.Tests.csproj
+ --artifacts-path ~/.cache/openfps-agent-admingun -nodeReuse:false -p:UseSharedCompilation=false)
