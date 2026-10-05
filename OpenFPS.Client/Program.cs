@@ -42,6 +42,9 @@ public static class Program
         if (fmodArmed != null) Log.Information("{Line}", fmodArmed);
 
         ProcessLifeLog.Install(StartedUtc);
+        // A 1 ms timer for as long as the game runs. Without it every short sleep in the client is a
+        // 15.6 ms sleep, and the 250 Hz audio thread and the game loop both ran at about 60 Hz.
+        using var timer = OpenFPS.Client.Core.Platform.TimerResolution.Raise();
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) => Log.Error(e.Exception, "Exception on the UI thread.");
 
