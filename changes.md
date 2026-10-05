@@ -27,6 +27,13 @@ Recent work, newest first. `git log` has the rest.
   fits into your hands, back and pockets; the rest stays in it. Pedestrians are replaced a minute
   later, out of sight. Bodies and bags nobody carries go after half an hour, at most 30 of each on a
   map. A driver shot beside their parked car no longer breaks the car: somebody comes back for it.
+- Standing still beside someone no longer moves you. Movement tipped a player's collision body over
+  with where they were looking, so a player looking down swept through whoever stood next to them; on
+  Kestrel House's roof that pushed Sean into and out of the parapet every other tick until he came
+  out of its far side and fell to the ground. People stand upright for movement now, and a push that
+  would leave you deeper inside something is not taken.
+- Bumping into a person says who: their name, or "someone". People are made of skin, not of the floor
+  under them (movement used to write the floor's material into the player).
 - The Linux client's log starts fresh each run (the previous one kept as `.prev`). It had stopped at
   1 GB on 2026-10-04 and logged nothing since.
 - A test holds the city's 21 vehicles to their approved voices. Checked after "too reverby, all the
