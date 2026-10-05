@@ -25,7 +25,9 @@ Branch net-trim off main 4da80029. Wire change: client AND server must both be r
   0.005 deg. Send-path CPU per player per tick: old 2.26 ms, new 2.45 ms (debug build, loaded box).
 - Live, 1 walking bot: baseline 5.48 Mbit/s 582 datagrams/s; new 1.51 Mbit/s 151 datagrams/s.
   StatsUpdate 28.5/s -> 0.1/s. Server tick times unusable: box at load 70-130 from another session.
-- Still to do: 3-bot live A/B.
+- Live, 3 walking bots, per player: baseline 5.81 Mbit/s 673 datagrams/s; new 1.75 Mbit/s 176 datagrams/s.
+  Offline send-path CPU at lower load: old 0.179 ms, new 0.175 ms per player per tick (filter 0.086).
+  Live tick times noisy (load 25-130): 3 bots baseline 8.8-9.6 ms, new 10.7-11.4 ms, unchanged gather also up.
 
 ## Tools (not in repo)
 - ~/.cache/openfps-agent-net/run.sh VARIANT BOTS WARMUP MEASURE [REC] [walk]; ab.sh BOTS VARIANT...
@@ -34,4 +36,4 @@ Branch net-trim off main 4da80029. Wire change: client AND server must both be r
 
 ## Tests
 DOTNET_CLI_USE_MSBUILD_SERVER=0 nice ~/.dotnet/dotnet test OpenFPS.Tests --artifacts-path ~/.cache/openfps-agent-net -nodeReuse:false -p:UseSharedCompilation=false --filter "FullyQualifiedName~NetworkTrimTests|FullyQualifiedName~StateSplitTests"
-(14 pass). Full suite not yet run.
+(14 pass). Targeted run of the 40 classes touching broadcast/session/interpolation: 659 passed, 0 failed. Never the full suite (coordinator runs it).
