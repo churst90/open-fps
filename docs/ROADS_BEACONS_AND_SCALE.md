@@ -4,6 +4,12 @@ Answers to Cody's list of 2026-09-22, written down before any of it is built. Ea
 exists today, what is missing, and the shape the missing part should take. Nothing here is
 implemented yet; where a claim is about the current code it names the file it was checked in.
 
+**Status (2026-10-05).** Built since: the driving line (section 1, 2026-09-22); roads as data
+(`OpenFPS.Common/Roads.cs`, see `NEXT_BODIES_WHEELS_ROADS.md` stage 1); car doors (`CarDoor.cs`);
+keyed building doors (`LockCylinder`, `DoorComponent.KeySeconds`); beacons (section 3, 2026-09-23);
+coordinates (section 6). Not built: vehicle locks, key fob, car alarms, placement commands for
+roads, the survey fix for angled buildings.
+
 ---
 
 ## 1. The driving line

@@ -4,6 +4,11 @@ Cody's description of 2026-09-28, with what each part needs. Nothing here is bui
 bodies plan ([NEXT_BODIES_WHEELS_ROADS.md](NEXT_BODIES_WHEELS_ROADS.md)) comes first: this city is
 made of its roads, junctions, crossings and signals.
 
+**Status (2026-10-05).** Still not built; the city is still about one square kilometre. Pieces done
+since: Elm Park with a fountain and trees (`docs/THE_CITY.md`), a lift door model with no lift yet
+(`docs/DOOR_TYPES_EVENTS.md`), and private player maps made in game (`/map new`, an empty flat
+100 m square built on with the existing building commands; `docs/SERVER_SECURITY.md`).
+
 ## The layout
 
 The city is 10 km on a side. Main Street runs north-south through the middle and splits it into a

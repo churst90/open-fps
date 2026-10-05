@@ -10,7 +10,8 @@ versions of `OpenFPS.Common` misread each other with no error. The build hashes 
 refuses a mismatch by name: "This client does not match the server. Your build is X, the
 server's is Y."
 
-The hash covers `OpenFPS.Common` only. A change to the client or the server alone does not
+The hash is made at build time by an MSBuild task in `OpenFPS.Common.csproj` (generated file
+`WireContract.g.cs`). It covers `OpenFPS.Common` only. A change to the client or the server alone does not
 change it; a change to anything in Common does. Both publish scripts put the hash in their file
 names and in `BUILD.txt`.
 
@@ -47,7 +48,9 @@ What the Windows client has, against the GTK client:
   of 8 s writes `openfps-hang.<pid>.dmp` beside them; read it with `dotnet-dump analyze`.
   A native crash leaves no closing line, the same as on Linux.
 
-It is compile-checked from Linux (`EnableWindowsTargeting`) and has not been run here.
+It is compile-checked from Linux (`EnableWindowsTargeting`) and has never been run here. It is
+played on Windows with NVDA against the VPS; that player's logs (Settings, Open log folder) are the
+only record of how it behaves.
 
 ## The server on a VPS
 
@@ -56,8 +59,10 @@ It is compile-checked from Linux (`EnableWindowsTargeting`) and has not been run
 ```
 
 Self-contained, with `maps/`, `prefabs/`, `composites/`, `machines/` and `motd.txt`. It does not
-carry `openfps.db` or `friends.json`: the VPS keeps its own accounts, and unpacking an update
-over the old folder leaves them alone.
+carry the server's own state: `openfps.db` (accounts, roles, grants), `friends.json`,
+`teams.json`, `roles.json`, `map_access.json` and `maps/players/` (maps players made with
+`/map new`; the script deletes the local ones from the package). Unpacking an update over the old
+folder leaves them alone.
 
 On the VPS:
 
@@ -116,3 +121,28 @@ After the first start you can take `OPENFPS_ADMIN_PASSWORD` out; the password st
 2. Copy the tarball up, `sudo systemctl stop openfps`, unpack over the old folder,
    `sudo systemctl start openfps`.
 3. If the build in the name changed, send the new zip. Old clients are refused until they update.
+
+What needs what:
+
+- A change in `OpenFPS.Common`: a new build hash, so a server update AND a new zip.
+- A server-only change (`OpenFPS.Server`, maps, prefabs, composites, machines): a server update.
+  Same hash, so the zip still connects.
+- A client-only change (`OpenFPS.Client.Core`, `OpenFPS.Client`): a new zip only. Same hash, so an
+  old zip still connects and simply lacks the fix.
+
+### Cody's VPS
+
+- `ssh debian@codyhurst.com` (key, passwordless sudo). `cody@` and `root@` do not work.
+- Service `openfps` (systemd), folder `/opt/openfps-server`, owned by user `openfps`. The admin
+  password is in `/etc/openfps/admin.env`.
+- Update:
+  1. `scp` the tarball to `~debian` and unpack it there.
+  2. Back up the running folder:
+     `sudo tar -czf ~/openfps-server-backup-<old build>.tar.gz -C /opt openfps-server`.
+  3. `sudo systemctl stop openfps`.
+  4. `sudo cp -a openfps-server/. /opt/openfps-server/`, then
+     `sudo chown -R openfps: /opt/openfps-server`.
+  5. `sudo systemctl start openfps`.
+  6. Check `/opt/openfps-server/BUILD.txt` and `journalctl -u openfps`.
+- The copy in step 4 adds and replaces files only, so the accounts, `maps/players/` and
+  `map_access.json` on the server stay.

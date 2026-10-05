@@ -9,6 +9,13 @@ and 4), which was written on 2026-09-22 and never built. Each stage below says w
 what it adds, and how it is checked. Numbers marked *to confirm* are taken from their source before
 they go in the code.
 
+**Status (2026-10-05).** Stage 1 (roads as data, following, junctions, crossings) built. Stage 3
+(per-wheel physics) built and merged 2026-10-01. Stage 4 partly built: squeal per wheel, rolling noise
+still per axle. Stage 2 (physical bodies for traffic and people) and stage 5 (traffic lights and
+accessible pedestrian signals) not started. The bodies left when somebody is killed
+(`OpenFPS.Server/Core/Bodies.cs`) are a different thing, an item, not stage 2. "What exists today"
+below is as of 2026-09-27.
+
 ## What exists today
 
 - **Roads** are geometry only: `asphalt_road` boxes 5 cm tall and `concrete_floor` footways, laid by
@@ -35,7 +42,7 @@ they go in the code.
 
 ## Hard-coded physical values to move into data
 
-From the survey of 2026-09-27. Each becomes a field on the preset or the map, with today's value as
+From the survey of 2026-09-27 (line numbers as of then). Each becomes a field on the preset or the map, with today's value as
 the default so nothing changes until a preset says otherwise.
 
 | Where | Value | Becomes |
@@ -49,7 +56,7 @@ the default so nothing changes until a preset says otherwise.
 | `VehicleSystem.cs:196-197, 300, 308` | default accel/brake, speeds, turn time | preset or map fields |
 | `VehicleSystem.Parking.cs:69, 323` | walk speed 1.35 m/s, driver body 0.5 x 1.75 x 0.35 | one person definition |
 | `VehicleShell.cs`, `VehicleCabin.cs` | seat pitch, skin, belt line, overhang split | preset fields |
-| `Drivers.cs:26-41` | driver's window offset, in-the-way width | preset and person fields |
+| `VehicleSystem.Drivers.cs:26-41` | driver's window offset, in-the-way width | preset and person fields |
 | `gen_city.py:1288-1315` | grip and brake/accel shares per class | the preset (tyre and brakes) |
 | "walker" string check (`VehicleSystem.cs:162`) | | a person preset |
 
