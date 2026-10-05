@@ -8,11 +8,11 @@ the same thing, you hear a copy: the same sound twice, a few milliseconds apart.
 
 | Part | Rendered by | Notes |
 |---|---|---|
-| Direct sound (level, direction, occlusion, air) | The source's own voice | Every source. |
-| Ground reflection | The source's own voice: `GroundReflection` inside synthesised voices (engines, machines, horns, sirens) and in the binaural stage for recorded sounds (speech, doors, shots) | Not for a recorded sound made within 15 cm of the ground (footsteps, impacts): the recording has it already. Not for echo copies, or sources with a size. The echo system's own ground arrival is under 12 ms and never gets a voice (`ImageSource.MinDelaySeconds`). |
-| Discrete echoes off walls and facades | Per-source: `EngineReflections`, one-off echoes and flutter (`WorldAudioPlayer`), `TracedEchoes` for the loudest engines | Not for speech, which moves while it plays. |
-| Late field (the place's tail) | The traced reverb (`TracedReverb`) | Traced from the listener's head, so it is only valid as a tail. |
-| Near-field walls round the head | Boundary probes | |
+| Direct sound (level, direction, occlusion, air) | The source's own voice | Every source except your own voice, which you never hear dry (`OwnVoice`). |
+| Ground reflection | The source's own voice: `GroundReflection` inside synthesised voices (engines, machines, horns, sirens) and in the binaural stage (`SteamAudioDsp`) for short one-off impulses (a shot, a clap, a knock, an impact) | Impulses only: knock character, decay up to 1 s, extent up to 1 m (`WorldAudioPlayer.HearsTheGround`). Not for speech. Not for a recorded sound made within 15 cm of the ground (`RecordedGroundMinHeight`): footsteps and drops have it already. Not for echo copies. The echo system's own ground arrival is under 12 ms and never gets a voice (`ImageSource.MinDelaySeconds`). |
+| Discrete echoes off walls and facades | Per-source: `EngineReflections`, one-off echoes and flutter (`WorldAudioPlayer`), `TracedEchoes` for the loudest few running sources | Not for speech, which moves while it plays. Not for a sound made inside a vehicle cabin. |
+| Late field (the place's tail) | The traced reverb (`TracedReverb`), with each source's own late energy and direction from `LateField` | The tail is traced from the listener's head, so it is only valid as a tail. |
+| Near-field walls round the head | Boundary probes (`BoundaryModel`, `BoundaryProximityProcessor`) | |
 
 ## The rule for the traced reverb
 

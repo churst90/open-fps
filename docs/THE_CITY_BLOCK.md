@@ -1,5 +1,10 @@
 # The city block, and rooms that measure themselves (2026-09-19)
 
+> **Status 2026-10-05.** A record of the first city map. The one block it describes was replaced
+> by a whole city (`docs/THE_CITY.md`, "The map now"). The survey rules, the four materials
+> and the step-down fix below still hold. Of the order at the end: roads, rail and aircraft were
+> built, and the yard machines are on the map.
+
 Step 1 of the city plan: *"two apartment blocks with interiors, a street between, a tunnel
 at one end, a garage, a bus shelter, a metro platform with overhang, zones under all of it."* Static —
 no traffic, no pedestrians, no rail, no aircraft. Each of those needs something this map is the test

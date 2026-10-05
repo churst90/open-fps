@@ -1,6 +1,40 @@
 # The city, the footsteps, and a voice for everything that is not a car
 
 Session 17, 2026-09-19. What changed, what it measures, and the one thing that is not finished.
+Sections 1 to 7 are that session's record. The section below says what the map is now.
+
+## The map now (2026-10-05)
+
+`tools/gen_city.py` writes `OpenFPS.Server/maps/city.json`; never edit the JSON by hand. Run with
+`./run-server.sh city`. Coordinates below are `/tp` order: east, north, height.
+
+- **Size.** 7,814 entities: 724 regions, 76 named places, 477 doors, 114 machines. Walkable ground
+  is x −520..520, north −360..560 (`PlayMin` / `PlayMax`).
+- **Spawn.** The Foundry Street pavement, `60 122 0.15`, facing north.
+- **Traffic.** On roads as data: 17 roads, 27 junctions, two bus stops. 34 vehicles drive routes over
+  the roads. Three shuttle back and forth (a truck and a car through the tunnel, an apron tug), seven
+  mowers work the gardens and verge, and 352 walkers are on the pavements. Street life: horns, hard stops,
+  parking, car alarms, and gunfire from a walker about every 20 s.
+- **Aircraft.** None since 2026-09-25 (Cody asked for them off). The airport is still built.
+- **Rail.** Two light rail sets on the 2.5 km loop. They stop at two platforms for 26 s. The bells
+  ring at the two Southgate level crossings (Mill Road and Tanner Road); the Main Street crossing is
+  geometry only.
+- **Towers.** Five: Marlow Tower (8 storeys), Kestrel House (6), Union Building (10), Brandt Court (6),
+  Selby House (7). Stairs are built to IBC 2021 (a dog-leg with an open, guarded well). Each flight
+  and landing is a named place. The top flight comes up into a brick stair housing with a steel door
+  onto the roof; the roof has a parapet and is outdoors. Each tower has a glass front door
+  (`glass_front_door`): keyed and pulled from the street, pushed by its bar from inside.
+- **Door swings (2026-10-05).** Room doors are pushed from the corridor and swing into the room.
+  Exit doors and front entrances swing out. Before this, half the flats' doors swung into the corridor
+  and every entrance swung in.
+- **Elm Park.** The open ground north of the estate, x −400..−250, north 162..292. A lawn, asphalt
+  paths, a fountain in a brick square at `-325 227` (`water_fountain` over a `water_surface` pool), and
+  fourteen trees (`tree_crown` in a `foliage_hedge` crown). Path in from the end of Sycamore Lane.
+- **58 Alder Street.** The house nearest the park's south side. Its back garden is fenced in timber
+  (`fence_timber`) with a gate at `-330 148.8`, and a brick fire pit with a fire going at `-321 142.8`.
+- **No lift.** The towers have no lift door; `elevator_door` is not placed on any map.
+
+Spots to listen from: `docs/LISTENING_SPOTS.md`.
 
 ---
 
@@ -290,13 +324,12 @@ took 74 ms" is not a number anybody can act on.
 `OpenFPS.Tests/EnclosureTests.cs` now holds the pair the plan demanded before any fourth attempt:
 
 * `AStreetShelterIsNotACathedral` — shelter, road and both facades at city.json's real distances and
-  materials. Asserts open > 15 %, surface < 150 m², mid decay < 0.8 s. **Fails at the first
-  assertion (1 % open)** and is marked `[Fact(Skip = ...)]` with the reason, following the
-  convention in `FootstepTests.cs`.
+  materials. Asserts open > 15 %, surface < 150 m², mid decay < 0.8 s. It failed at the first
+  assertion (1 % open) and was skipped. **It passes since 2026-09-23** on the openness boundary below.
 * `AFlatGarageStillRings` — 21 × 28 × 2.5, sealed. **Passes**, and is the guard: median-keyed
   shrinking put this at 0.7 s last time.
 
-The fix specified but not attempted: **a boundary is where the openness changes.** For each ray that
+The fix, built on 2026-09-23 (`Enclosure.Look`): **a boundary is where the openness changes.** For each ray that
 finds a surface, sample a point along its path and compare that point's openness with the listener's
 own. A jump means the ray crossed out. Checked against every place on the map — it fires on the
 shelter's front cone (listener 0 % open, the road 32 %), leaves the garage alone (1 % against 1 %),
@@ -315,7 +348,7 @@ laid along, so the two cannot drift apart. **Two light rail sets run it since 20
 lap apart, the second of the two answers below: the server places one entity per sound source
 (`RailSystem`, `TrainLayout`) at `head − along` round the loop, and the client runs one `TrainSynth`
 per set with a voice per source (`RailVoice.cs`). They slow for the corners on the loop's own
-curvature and do not stop at the stations yet. The rest of this section is the reasoning as it stood
+curvature, and since then stop at two platforms. The rest of this section is the reasoning as it stood
 before that, kept because it is still the reason it was done this way.
 
 A train is the one approved model that is NOT one pressure at one point: it is a line of bogies, ten
@@ -338,20 +371,5 @@ approved model:
 
 ## What to listen to first
 
-```
-./run-server.sh city
-
-/tp 0 -40 0.1        Main Street, the spawn — traffic both ways, towers either side
-/tp 9 -60 0.1        the bus shelter — the fault, still there
-/tp 20 -60 0.1       a flat in Kestrel House, carpet and furniture
-/tp -20 60 0.1       the garage, level 0
-/tp 0 -250 0.1       the tunnel — a truck goes through it every minute or so
-/tp 0 -180 0.1       the level crossing
-/tp -300 -96 0.1     the estate — mowers, and one slow car
-/tp -325 -106 0.1    inside a house — plaster, carpet, a sofa and a bed
-/tp 380 0 0.1        the runway — nothing to reflect off, the control
-/tp 250 190 0.1      inside the hangar
-```
-
-Aircraft: the overhead airliner comes round about every two minutes, the turboprop and the light
-single work the airfield, and the helicopter crosses the city at rooftop height once a cycle.
+See `docs/LISTENING_SPOTS.md` for the current list. `/tp` needs a teleporter (an admin has `tp-free`).
+The aircraft this section once listed were taken off the map on 2026-09-25.

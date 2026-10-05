@@ -68,7 +68,8 @@ hold, only for players, and never for somebody whose custom role can do somethin
 | `edit-any`: change things other people built | no | no | yes | yes |
 | `grant`, `revoke`: only what you hold, only for players | no | no | yes | yes |
 | `perms-any`: `/perms NAME` | no | no | yes | yes |
-| `give-premium`: give a teleporter, `/give NAME vehicle PRESET` | no | no | no | yes |
+| `give-premium`: give a premium item (a prefab with `"Premium": true`, today the teleporter), `/give NAME vehicle PRESET` | no | no | no | yes |
+| `admin-gun`: hold, fire and set the admin gun (`/admingun`, `/calibre`); nobody without it can be given it or pick it up | no | no | no | yes |
 | `tp-free`: `/tp` without a teleporter | no | no | no | yes |
 | `move-player`: `/move NAME x y z`, `/move NAME to OTHER` | no | no | no | yes |
 | `grant-any`: grant and revoke anything for anybody | no | no | no | yes |
@@ -163,7 +164,8 @@ default). The same lines go to the console, which is `journalctl -u openfps` und
   rate limit or a lock, and each lock as it starts.
 - Accounts created, with the address. Registrations refused for the new-account limit.
 - Sessions closed by the server: taken over by a new login, or no login within 2 minutes.
-- Admin actions: `/unlock` and `/setrole`.
+- Admin actions: `/unlock`, `/setrole`, `/grant`, `/revoke`, `/role create`, admin gun mode changes.
+- Moderation: `/kick` (with the reason) and `/mute` (with the minutes).
 - Chat sent with `/all` or typed on a map, with the sender's name. Private messages are not logged.
 
 Passwords are never logged. A MUD login line that causes an error is logged as
@@ -200,8 +202,8 @@ Lost on restart:
   that are locked, with the time left.
 - `/unlock <name>`: lifts a name's lock and forgets its failures. `/unlock <address>` gives an
   address its limits back.
-- `/setrole <name> player|dev|admin`: changes a role. An online player gets the new role at once.
-  You cannot change your own.
+- `/setrole <name> player|moderator|dev|admin|<custom role>`: changes a role. An online player gets
+  the new role at once. You cannot change your own.
 
 ## Upgrading an older accounts database
 
@@ -215,7 +217,7 @@ Nothing else is needed. Delete the copy once the server is running normally.
 ## Not done yet
 
 - No command to change a password; `OPENFPS_ADMIN_PASSWORD` resets only `admin`.
-- No kick or ban.
+- No ban. `/kick` disconnects, but the player can log straight back in.
 - The MUD port has no encryption.
 - LiteNetLib puts a fragmented message back together before the 16 KB check sees it, so one
   connection can still make the server hold a large message for a moment. The per-address

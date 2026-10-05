@@ -2,9 +2,13 @@
 
 _Specified and first built 2026-09-18. `OpenFPS.Common/Aircraft.cs` (profiles, four presets),
 `OpenFPS.Client.Core/AudioEngine/Core/Aircraft/AircraftSynth.cs` (the synthesis),
-`--aircraft` in the AudioLab (flyovers to WAV). Not yet wired into the game: nothing on a map
-flies, and there is no `aircraft:<preset>` emitter. This document is the spec that the code
-follows and the list of what it does not do yet._
+`--aircraft` in the AudioLab (flyovers to WAV)._
+
+_In the game: a map's `Vehicles` entry whose `Preset` is an aircraft preset is flown by
+`VehicleSystem` as a 3-D shuttle and named `aircraft:<preset>`; the client renders it with
+`AircraftVoiceState` (`AudioEngine/Fmod/MachineProcessor.cs`) and reads the power lever off the
+climb angle (`ClientAudioSystem.FlightPower`). The city carries no aircraft since 2026-09-25 (Cody's
+call); the airport is still there._
 
 ## The rule, as for engines
 
@@ -99,6 +103,11 @@ one thing from the ground.
 | `airliner` | high-bypass turbofan | fan 24 × 1.55 m, N1 1,200–5,200: BPF 2,080 Hz, tip Mach 1.24; core 0.6 m 480 m/s (133 dB anchored), bypass 1.45 m 300 m/s (123 dB) |
 | `helicopter` | light turbine helicopter | main 2 × 10.16 m at 394 rpm: 13 Hz; tail 2 × 1.65 m at 2,550: 85 Hz; BVI 0.55 |
 
+Each profile also carries `Engines` (several engines beat against each other; their jets add as
+power), `WingspanMetres`, `ApproachSpeedMps`, and a `LandingGearSpec` (`Wheels`, wheel radius and mass,
+`WeightOnWheelsAtTouchdown`): the wheels spin up on touchdown, and their tyres render at the voice's
+own sample rate (2026-10-04).
+
 ## The flyover renderer (`--aircraft`)
 
 The machine is integrated in ITS time, and every sample is deposited at the moment it ARRIVES —
@@ -118,15 +127,10 @@ dotnet OpenFPS.AudioLab.dll --aircraft [preset ...] [alt=m] [speed=m/s] [offset=
 
 1. ~~**Ear-validation.**~~ Done 2026-09-18: *"the jets and planes sound really really good."* That
    render is the baseline. Its jet balance sat 16 dB (core) and 21 dB (bypass) under Lighthill with
-   K = 1e-4 and is pinned as `CoreJetTrimDb` / `BypassJetTrimDb`; the WAVs are kept in
-   `inbox/aircraft-demo-2026-09-18/`. Change the mechanisms, not that balance, unless a listening
+   K = 1e-4 and is pinned as `CoreJetTrimDb` / `BypassJetTrimDb`. Change the mechanisms, not that balance, unless a listening
    test says so.
-2. **Into the game as a machine.** `MachineDefinition` parts `rotor`, `jet`, `core` alongside
-   `engine`; an `AircraftVoiceState` on the render pool like `EngineVoiceState`, with
-   `SetListener` for the directivities exactly as the exhaust has it; a server-side flight path
-   (`AircraftSystem`: a route of waypoints with altitude, the way `VehicleSystem` follows a racing
-   line). The renderer's arrival-time deposit is what the mixer already does with distance delay
-   and Doppler, so nothing in the flyover code is needed in the game.
+2. ~~**Into the game.**~~ Done: `AircraftVoiceState` with `SetListener` for the directivities;
+   flight paths are `VehicleSystem` shuttles in three dimensions, not a separate system.
 3. **Distance is the aircraft's whole character.** Air absorption strips the fan tone and the
    whine over a few kilometres and leaves the jet's low roar — "a faint roar with no whine" falls
    out of the mechanisms already in `AudioPhysics`. The rotor's 13 Hz and its first harmonics are
@@ -137,5 +141,5 @@ dotnet OpenFPS.AudioLab.dll --aircraft [preset ...] [alt=m] [speed=m/s] [offset=
    not have); propeller–fuselage and rotor–tail interaction tones; the piston engine's exhaust
    directivity under a cowl; the turboprop's exhaust stacks as two sources like the F1's pipes.
 5. **Levels are anchors and were set from certification-style figures, not measured against
-   recordings.** When clips arrive, `--engine-match`-style fitting per octave, the way the
-   footsteps were done — measure before playing.
+   recordings.** When clips arrive, fit per octave the way the footsteps were done — measure
+   before playing.

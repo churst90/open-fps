@@ -9,14 +9,40 @@ muzzle, behind it, downrange of the bullet, indoors and outdoors.
 
 ## What the game does now
 
-- The muzzle blast is fully synthetic (`WeaponSynth.MuzzleBlast`): a damped gas-bubble pulse plus filtered
-  noise, about 0.1 s long. The world's reflections and reverb are added by the normal sound path.
-- There is no supersonic crack yet: a shot is heard as its report only. `Ballistics` has the
-  geometry (when the crack arrives, how long its N-wave lasts, whether a round cracks at all). The
-  placeholder crack and the synthesised action clicks were removed on 2026-10-02; see "The crack"
-  below for how the crack is to be built.
-- Handling, casing and reload recordings are in `OpenFPS.Client/ASSETS/SOUNDS/WEAPONS`. Nothing plays
-  them yet.
+- The muzzle blast is fully synthetic (`WeaponSynth.MuzzleBlast`, client): a damped gas-bubble pulse
+  plus filtered noise, about 0.1 s long. The world's reflections and reverb are added by the normal
+  sound path.
+- Every round is flown (`BulletFlyby`, `Ricochet` in `OpenFPS.Common`). A supersonic round passing a
+  listener makes a crack (Whitham N-wave) placed at the Mach-cone emission point; a subsonic one makes
+  a wake whizz. Rounds can ricochet.
+- Where a round lands it strikes (`BulletImpact`): a physical event per material class (brittle,
+  metal, soil, water, wood, panel, soft). Glass breaks (`GlassFracture`).
+- Handling is synthesised, not played from recordings (`WeaponHandling`): reload routines, dry fire,
+  a bolt worked by hand, the selector click. The routine's length is also the reload's length on the
+  server. The drinkingwindgames recordings were the spec (`--reload-spec`).
+- Fire selector: each gun's settings are on the weapon (`WeaponDefinition.Selector`, `FireMode`
+  Safe, Semi, Auto). X steps on, Shift+X back (`/selector`); a step past the end wraps round. A gun
+  nobody has moved sits on Semi. Auto fires at the cyclic rate while Enter is held; the client sends
+  `/cease` when Enter comes up.
+- Death leaves a body (`OpenFPS.Server/Core/Bodies.cs`): an item named "body of NAME", 70 kg (both
+  arms, slows the carrier), with a bag of what they carried beside it. At most 30 per map;
+  an uncarried body goes after 30 minutes.
+- The admin gun: see below.
+
+## The admin gun
+
+`OpenFPS.Common/AdminGun.cs` (sounds and modes), `OpenFPS.Server/Core/CombatService.AdminGun.cs`
+(firing). Prefab `admin_gun`, weapon id `admingun`. Holding, firing, setting and being given it all
+need the `admin-gun` permission (Admin only).
+
+- Modes: kill, vaporize (removes the thing hit; a player is killed instead), freeze (10 s), inspect
+  (says what was hit). X and Shift+X step through them; `/admingun MODE` sets one.
+- Calibre: it fires any registry weapon's ballistics and report. Y and Shift+Y, or `/calibre`. Starts
+  on `ar15`. It never runs dry.
+- Its sounds are designed, not modelled, since it is not a real object: the calibre's own report
+  with a marking layer (ring, drop, zap or flam; 5 variants, `/admingun` lists them), a mode-switch
+  click and note, and a hit effect per mode. `--admin-gun` in the AudioLab renders them
+  (`Spikes/AdminGunSpike.cs`).
 
 ## Reference recordings
 
@@ -103,6 +129,9 @@ gap level is the lab demo's guess; the recordings show no separate early zero cr
 
 ## Plan
 
+Status 2026-10-05: steps 1-4 done for the report; the crack, strikes, ricochets and handling are in
+the game. Still open from step 5: the shotgun has no reference, casings do not land.
+
 1. An offline renderer: weapon, listener angle and distance in, what that listener hears out. Dry
    blast source, directivity, distance and air absorption, the ground reflection, and the crack
    from the Mach cone geometry with a slowing bullet.
@@ -115,6 +144,8 @@ gap level is the lab demo's guess; the recordings show no separate early zero cr
    bounce where they fall, and a proper fire message in the protocol.
 
 ## The crack
+
+Built (`BulletFlyby`), as below. Kept as the design note.
 
 A supersonic round drags a Mach cone. Downrange, a listener near the path hears the crack before
 the report: a sharp N-wave that arrives from the point on the trajectory where the cone met them,

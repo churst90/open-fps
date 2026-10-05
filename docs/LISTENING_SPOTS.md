@@ -3,6 +3,29 @@
 Places to check rooms, reflections and the outdoors quickly. Type `/tp` and the three numbers: east,
 north, height (the same order C reads out). Heights are just above the floor; you land on it.
 
+`/tp` needs a teleporter in your hands or on your back. An admin has `tp-free` and needs none. The
+teleporter charges for two seconds before it moves you. `/tp` also takes a place name, for example
+`/tp Elm Park`.
+
+The city spawn is on the Foundry Street pavement, `/tp 60 122 0.15`, facing north.
+
+## To hear now (unheard work)
+
+| Where | /tp | Listen for |
+|---|---|---|
+| Elm Park, by the fountain | `/tp -325 219 0.2` | Water falling into the basin; the trees round the park |
+| Elm Park, among the trees | `/tp -375 195 0.2` | Wind in the leaves; a gust reaches the west trees first |
+| 58 Alder Street back garden, by the fire | `/tp -325 141 0.2` | The fire pit: flames, crackle, hiss; the timber fence as the near wall |
+| 58 Alder Street garden gate | `/tp -330 148.8 0.2` | The fire through the open gate, against the fence beside it |
+| Marlow Tower front entrance, outside | `/tp -7 -103 0.5` | The glass front door: keyed from the street, pulled open, swings out |
+| Marlow Tower front entrance, inside | `/tp -12 -103 0.5` | The same door from the stairwell: push bar, swings out |
+| Union Building roof | `/tp 12 29 30.3` | Open air ten storeys up; the roof access door (steel, push bar) a few steps away |
+| Union Building stairwell, floor 1 | `/tp 12 30 3.3` | The stairs: a flight up, a flight down, the open well |
+
+There is no lift door on any map yet: the `elevator_door` prefab exists but nothing places it.
+The level crossing bells ring at the two Southgate crossings, on Mill Road (`/tp -160 -175 0.5`) and
+Tanner Road (`/tp -40 -175 0.5`); the Main Street crossing has no bell.
+
 ## Indoors
 
 | Where | /tp | Listen for |
@@ -29,7 +52,7 @@ north, height (the same order C reads out). Heights are just above the floor; yo
 | Calder Avenue pavement | `/tp 122 50 0.5` | A wide avenue with lawns, little to reflect |
 | Alder Street, on the pavement | `/tp -296 124.5 0.5` | A quiet residential street |
 | 49 Alder Street, back garden | `/tp -413 98 0.5` | A garden behind a house, hedges either side |
-| The level crossing | `/tp 0 -180 0.5` | Open, the railway and the road |
+| The Main Street level crossing | `/tp 0 -180 0.5` | Open, the railway and the road |
 | The apron | `/tp 258 59 0.5` | Wide open tarmac beside the terminal |
 
 A clap (T) and a knock (Shift+E, beside a door) are the quickest way to hear a place.

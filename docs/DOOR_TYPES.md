@@ -1,7 +1,16 @@
 # Door types
 
-A measured spec for synthesising doors by mechanism. Written 2026-10-02. Nothing in the game uses
-it yet.
+A measured spec for door sounds, from 27 recordings. Written 2026-10-02.
+
+**Status 2026-10-05.** The per-event recipes below (a contact into a bank of modes, fitted to the
+recordings) were rendered on 2026-10-03 and rejected by Cody: "are we modeling the doors or modeling
+the sound?" The round was reverted (88fe0de7). The game now uses a physical model of each door
+instead: `KnobDoor`, `PushBarDoor`, `SlidingDoor`, `GlassDoor`, `ElevatorDoor` and `LockCylinder` in
+`OpenFPS.Common`. Which model plays which event is in docs/DOOR_TYPES_EVENTS.md.
+
+What is still current here: the recordings, the measurements and the "Test numbers" sections. They
+are the yardstick the models are checked against (AudioLab `--door-models refs`, `--pushbar-vs-ref`,
+`--patio-vs-ref`). The "Recipe" sections and "Order of work" are not current: do not build from them.
 
 Seven door types: an interior hinged door, a steel fire door with a push bar, a glass storefront
 door with a push bar and a lock, a pull-open glass box-store door, automatic sliding doors, a
@@ -14,7 +23,7 @@ manual patio slider, and elevator doors.
 - Solid parts are contact plus modes: a force pulse of a set length strikes a body, and the body
   rings at its own modes. Material comes from the modes (frequencies, Q, how many), never from a
   filter on noise. The house door fitted as octave-band noise was rejected on 2026-10-01: "too
-  scratchy, grainy; wood and steel both sound the same" (branch `archive/house-door-fit-rejected`).
+  scratchy, grainy; wood and steel both sound the same".
 - The opposite failure is known too. The first car door model, a few resonators, was rejected as
   "sounds like an instrument, too tonal" (`inbox/door sounds/synth-2026-09-28 rejected, too
   tonal`). So a leaf needs many modes at the measured prominence, not a handful of loud ones. Only
@@ -62,6 +71,9 @@ Two cautions about the numbers:
   recording where possible.
 
 ## Physics used for the recipes
+
+The recipes are not current (see the status at the top). The physics below still holds and the
+models use it.
 
 - A force pulse of length tau (raised cosine) has a flat spectrum up to about 0.5/tau and falls
   steeply above about 2/tau. So tau sets the brightness of a hit. Metal on metal: 0.05-0.15 ms.
@@ -600,6 +612,8 @@ Dry enough for decay: `1-interior-kyles-light-wood-knob-latch` (to 130 ms),
 `3-storefront-fossarts-thumbturn-deadbolt`.
 
 ## Order of work
+
+Not current: the plan for the rejected recipes. The physical models replaced it.
 
 1. One modal impact engine (contact of length tau into a bank of modes per body), with banks made
    from the material table and the part's size, not tuned per door.
