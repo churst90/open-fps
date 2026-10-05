@@ -71,10 +71,10 @@ public static class ElevatorDoor
     private static (double RailMicron, double WheelMicron, double FlatMicron, double ShoeDrag, double AstragalK) Character(int variant)
         => (((variant % Variants) + Variants) % Variants) switch
         {
-            0 => (0.5, 2, 5, 3, 1.5e5),
-            1 => (1.0, 4, 15, 4, 2e5),
-            2 => (2.0, 6, 40, 6, 3e5),
-            _ => (3.0, 8, 80, 8, 5e5),
+            0 => (0.5, 2, 5, 3, 1.2e6),
+            1 => (1.0, 4, 15, 4, 1.8e6),
+            2 => (2.0, 6, 40, 6, 2.5e6),
+            _ => (3.0, 8, 80, 8, 4e6),
         };
 
     public static float[] RenderOpen(Door door, int sampleRate, double travelSeconds = 1.8, Report? report = null)
@@ -158,12 +158,16 @@ public static class ElevatorDoor
     /// <summary>The motor: 4 poles, 36 rotor slots, about 1400 rpm at the run's 0.5 m/s; a 2 % torque ripple.
     /// Its cast housing's walls from about 1.1 kHz, lossy (0.06).</summary>
     private const double MotorRevPerMetre = 1400.0 / 60 / 0.5, RotorSlots = 36, Ripple = 0.02;
-    /// <summary>Astragal: two hollow rubber sections in series, 2 m long; the open bumper rubber.</summary>
-    private const double AstragalLambda = 1.5, BumperK = 2e6, BumperLambda = 1.2;
+    /// <summary>Astragal: two hollow rubber sections in series, 2 m long, about 100 N a millimetre between them
+    /// at 2 mm (Hertz form by character), 4 mm proud; squashed flat, solid rubber. The open bumper rubber.</summary>
+    private const double AstragalLambda = 1.5, AstragalProud = 0.004, FlatK = 5e8, BumperK = 2e6, BumperLambda = 1.2;
+    /// <summary>Upthrust rollers under the track, 0.5 mm clear of it: a leaf rocked on its hangers lifts a roller
+    /// into one, polyurethane on steel.</summary>
+    private const double Upthrust = 0.0005;
     /// <summary>The coupler's vane closing on the landing rollers: 0.25 kg of vane at 0.15 m/s onto rubber
     /// tyres; the landing lock's hook, 40 g, lifted 6 mm and dropped back onto its steel keeper.</summary>
     private const double VaneKg = 0.25, VaneSpeed = 0.15, RollerK = 3e7, RollerLambda = 1.0, HookKg = 0.04, HookDrop = 0.006;
-    private const double HookK = 4e9, HookLambda = 0.3;
+    private const double HookK = 4e9, HookLambda = 0.3, HookLower = 0.1;
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -332,7 +336,7 @@ public static class ElevatorDoor
                     if ((opening && motorX >= to - 0.002) || (!opening && motorX <= to + 0.001))
                     {
                         arrived = true; arrivedAt = time; motorV = 0; motorA = 0;
-                        Log($"{time * 1000:F0} ms  the operator at its end ({(time - start):F2} s of travel)");
+                        Log($"{time * 1000:F0} ms  the operator at its end ({(time - start):F2} s of travel), leaf edge {x * 1000:F1} mm, {v:F3} m/s");
                         end = time + (opening ? 0.6 : 1.4);
                         // Shut: the operator leans on the leaves with about 60 N through its belt, and a moment later
                         // the vane opens and the landing lock's hook falls into its keeper.
@@ -387,7 +391,7 @@ public static class ElevatorDoor
             panel.Push(panelAtFoot, -flutter * 0.3);
 
             // The astragal at the middle (shut) and the bumper at the open end.
-            double fA = Contact(ch.AstragalK, AstragalLambda, 0.004 - x, -v);
+            double fA = Contact(ch.AstragalK, AstragalLambda, AstragalProud - x, -v) + Contact(FlatK, AstragalLambda, -x, -v);
             double fB = Contact(BumperK, BumperLambda, x - (width + 0.001), v);
             fx += fA - fB;
             Note("astragal", fA); Note("open-bumper", fB);
@@ -395,6 +399,9 @@ public static class ElevatorDoor
             faceField.Modes.Push(faceAtEdge, edgeDrive);
             panel.Push(panelAtEdge, edgeHost * 0.2 + fB * 0.1);
 
+            // A blow along the track at the leaf's edge (the astragal, the bumper) is at mid-height, a metre under the
+            // hangers: it rocks the leaf on its two rollers, loading one and lifting the other.
+            double rock = (fA - fB) * (height / 2) / (wArm[1] - wArm[0]);
             // The rollers on the track: Hertz under the panel's weight, over the track's and the tyre's roughness.
             double heaveForce = -mass * G;
             for (int i = 0; i < 2; i++)
@@ -407,13 +414,19 @@ public static class ElevatorDoor
                 double depth = sink0 + rough + trackPort[i].X - wz[i];
                 double rateD = trackPort[i].V - wv[i] + (Lookup(railRough, railStep, s + v * dt) - Lookup(railRough, railStep, s)) / dt;
                 double fc = Contact(TyreK, TyreLambda, depth, rateD);
+                // Lifted, the wheel's top meets its upthrust roller.
+                double up = Contact(TyreK, TyreLambda, -depth - Upthrust, -rateD);
+                fc -= up;
+                Note("upthrust", up);
                 double bracket = BracketK * (heave - wz[i]) + 2 * BracketZeta * Math.Sqrt(BracketK * WheelKg) * (heaveRate - wv[i]);
-                double wa = (bracket + fc) / WheelKg - G;
+                double share = i == 0 ? rock : -rock;
+                double wa = (bracket + fc - share) / WheelKg - G;
                 wv[i] += wa * dt; wz[i] += wv[i] * dt;
                 headerField.Modes.Push(i == 0 ? headerHit0 : headerHit1, trackPort[i].Step(-fc + WheelKg * G + mass * G / 2, dt, out _));
                 heaveForce -= bracket;
                 double fluct = bracket + mass * G / 2;
-                panel.Push(panelAtWheel[i], fluct);
+                // The hanger stands 30 mm off the panel's face: a tenth of what it carries bends the panel.
+                panel.Push(panelAtWheel[i], fluct + 0.1 * share);
                 faceField.Modes.Push(faceAtWheel[i], fluct * 0.1);
                 Note("tyre-off", fc <= 0 ? 1 : 0);
             }
@@ -438,9 +451,13 @@ public static class ElevatorDoor
             }
             if (hookFalling)
             {
+                // The hook comes down on the coupler's roller as the vane opens, no faster than the vane lets it
+                // (about 0.1 m/s), and lands on its keeper.
                 double fk = ContactRestitution(HookK, 0.35, -hook, -hookRate, ref hookApproach);
                 double ha = -G * 3 + fk / HookKg;     // a spring helps gravity
-                hookRate += ha * dt; hook += hookRate * dt;
+                hookRate += ha * dt;
+                if (hook > 0 && hookRate < -HookLower) hookRate = -HookLower;
+                hook += hookRate * dt;
                 headerField.Modes.Push(keeperHit, keeperPort.Step(fk, dt, out _));
                 pLock += hookNoise.Pressure(ha);
                 Note("hook-drop", fk);
