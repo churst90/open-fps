@@ -1,0 +1,11 @@
+{
+  "Id": "admin_gun",
+  "Name": "admin gun",
+  "Description": "The admin's gun. It fires any calibre and never runs dry, and what it does to what it hits is its mode: kill, vaporize, freeze or inspect. X changes the mode, Y the calibre.",
+  "Material": "Metal",
+  "Type": "Item",
+  "IsItem": true,
+  "ItemWeight": 3.0,
+  "Hands": 2,
+  "WeaponId": "admingun"
+}

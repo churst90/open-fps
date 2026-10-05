@@ -32,6 +32,8 @@ public static class Permissions
     public const string EditAny = "edit-any";
     /// <summary>Moving another player: /move sean 10 20 0, /move sean to cody.</summary>
     public const string MovePlayer = "move-player";
+    /// <summary>Holding and firing the admin gun, and setting it: /calibre, /admingun. The admin's alone.</summary>
+    public const string AdminGun = "admin-gun";
 
     private static readonly UserRole[] Mod = { UserRole.Moderator }, Dev = { UserRole.Dev },
         ModDev = { UserRole.Moderator, UserRole.Dev }, AdminOnly = Array.Empty<UserRole>();
@@ -69,6 +71,7 @@ public static class Permissions
         ["savemap"] = (Dev, "save the map"),
         [EditAny] = (Dev, "change things other people built"),
         [MovePlayer] = (AdminOnly, "move another player to a place or to another player"),
+        [AdminGun] = (AdminOnly, "hold, fire and set the admin gun"),
         ["sessions"] = (AdminOnly, "list connections and addresses"),
         ["user"] = (AdminOnly, "read an account"),
         ["throttled"] = (AdminOnly, "list addresses being held back"),
@@ -87,6 +90,7 @@ public static class Permissions
         "goto" => "tp",
         "account" => "user",
         "ratelimit" => "throttled",
+        "calibre" or "caliber" or "admingun" => AdminGun,
         _ => command,
     };
 
