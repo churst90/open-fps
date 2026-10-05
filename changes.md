@@ -2,6 +2,12 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-05
+
+- `/levels real` is gone. 100 percent is still there as a number, but it is literal source levels,
+  which on headphones lost footsteps and idling cars; the default, 45 percent, is the setting to use.
+  `/levels` now says "the default" when you are on it.
+
 ## 2026-10-04
 
 - Your gunshots come from you where you are when they are heard, not from where the server had you,

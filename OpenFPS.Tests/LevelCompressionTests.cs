@@ -76,13 +76,14 @@ public class LevelCompressionTests
         try
         {
             Assert.Contains("percent", ClientGameSession.LevelsCommand(Array.Empty<string>(), Save));
-            ClientGameSession.LevelsCommand(new[] { "real" }, Save);
+            Assert.Contains("not a level", ClientGameSession.LevelsCommand(new[] { "real" }, Save));
+            ClientGameSession.LevelsCommand(new[] { "100" }, Save);
             Assert.Equal(1f, Loudness.DynamicRangeCompression);
             ClientGameSession.LevelsCommand(new[] { "70" }, Save);
             Assert.Equal(0.7f, Loudness.DynamicRangeCompression, 4);
             ClientGameSession.LevelsCommand(new[] { "0.6" }, Save);
             Assert.Equal(0.6f, Loudness.DynamicRangeCompression, 4);
-            ClientGameSession.LevelsCommand(new[] { "default" }, Save);
+            Assert.Contains("the default", ClientGameSession.LevelsCommand(new[] { "default" }, Save));
             Assert.Equal(Loudness.DefaultCompression, Loudness.DynamicRangeCompression);
             ClientGameSession.LevelsCommand(new[] { "5" }, Save);
             Assert.Equal(Loudness.MinCompression, Loudness.DynamicRangeCompression);

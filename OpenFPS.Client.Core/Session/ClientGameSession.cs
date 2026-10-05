@@ -438,23 +438,29 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// /levels, /levels real, /levels default, /levels 0.7 (or 70): how much of the real difference in
-    /// loudness between sounds reaches the mix. Everything is placed by it — how far a thing carries,
-    /// how much louder a hot rod is than a hatchback, how much a car rises when it is floored.
+    /// /levels, /levels default, /levels 0.7 (or 70): how much of the real difference in loudness
+    /// between sounds reaches the mix. Everything is placed by it — how far a thing carries, how much
+    /// louder a hot rod is than a hatchback, how much a car rises when it is floored.
+    /// There is no "real" any more (Cody, 2026-10-05): 100 percent is literal source levels, which on
+    /// headphones made a parked car's idle inaudible and footsteps vanish; the word invited it.
     /// </summary>
     internal static string LevelsCommand(string[] args, Action? save = null)
     {
-        string Now() => $"{MathF.Round(OpenFPS.Common.Loudness.DynamicRangeCompression * 100f)} percent";
+        string Now()
+        {
+            float c = OpenFPS.Common.Loudness.DynamicRangeCompression;
+            string tag = MathF.Abs(c - OpenFPS.Common.Loudness.DefaultCompression) < 0.005f ? ", the default" : "";
+            return $"{MathF.Round(c * 100f)} percent{tag}";
+        }
         if (args.Length == 0)
-            return $"{Now()} of real loudness differences. Say slash levels and a number from "
-                 + $"{OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, real, or default.";
+            return $"Levels {Now()}: how much of the real loudness differences you hear. Say slash levels and a number from "
+                 + $"{OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, or default.";
         float value;
         string a = args[0].Trim().TrimEnd('%');
-        if (a.Equals("real", StringComparison.OrdinalIgnoreCase)) value = 1f;
-        else if (a.Equals("default", StringComparison.OrdinalIgnoreCase)) value = OpenFPS.Common.Loudness.DefaultCompression;
+        if (a.Equals("default", StringComparison.OrdinalIgnoreCase)) value = OpenFPS.Common.Loudness.DefaultCompression;
         else if (float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
             value = v > 1f ? v / 100f : v;
-        else return $"{args[0]} is not a level. Say a number from {OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, real, or default.";
+        else return $"{args[0]} is not a level. Say a number from {OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, or default.";
         OpenFPS.Common.Loudness.DynamicRangeCompression = value;
         (save ?? (() => ClientSettings.Load().Save()))();
         string note = OpenFPS.Common.Loudness.CompressionFromEnvironment ? " For this run only: the environment sets it." : "";
