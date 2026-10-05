@@ -251,6 +251,72 @@ public class WallBumpAndNarrationTests
         Assert.True(glancing[0].LevelDb < sounds[0].LevelDb);
     }
 
+    // ── Bumping into somebody ───────────────────────────────────────────────────────────────────
+    //
+    // "When I bump into someone it says 'something' and am I made of concrete too?" (Cody, 2026-10-05).
+    // A player's definition carried no name, so the bump fell through to "something"; and their
+    // material was "Generic" — five gigapascals, ringing — or, once they had moved, the floor under them.
+
+    /// <summary>Somebody as the server now sends them: their name, a body's material, upright, and
+    /// looking wherever they happen to be looking.</summary>
+    private static EntitySnapshot Person(int id, Vector3 feet, string name, EntityType type = EntityType.Player,
+                                         string material = PhysicsConstants.PersonMaterial)
+        => new()
+        {
+            Id = id,
+            Definition = new EntityDefinition
+            {
+                EntityId = id,
+                Type = type,
+                Collider = new ColliderComponent { Shape = ColliderShape.Cylinder, Size = PhysicsConstants.PlayerSize, IsSolid = true },
+                Identity = new IdentityComponent { Name = name },
+                Material = new MaterialComponent { Material = material },
+                Moves = true,
+            },
+            Transform = new Transform { Position = feet, Rotation = Quaternion.CreateFromYawPitchRoll(2.5f, 0.6f, 0f), Scale = Vector3.One },
+        };
+
+    [Fact]
+    public void WalkingIntoSomebodySaysWhoTheyAre()
+    {
+        var world = World(Floor(), Person(50, new Vector3(0, 0, 2f), "seanterry01"));
+        var w = new Walker(world, Vector3.Zero);
+        w.Walk(Forward, 30);
+        var bump = Assert.Single(w.Bumps);
+        Assert.Equal((50, "seanterry01"), bump);
+    }
+
+    [Fact]
+    public void APersonIsSomebodyNotSomething()
+    {
+        Assert.Equal("Pedestrian", Sightline.NameOf(Person(51, Vector3.Zero, "Pedestrian, Main Street, west side 14", EntityType.NPC)));
+        Assert.Equal("someone", Sightline.NameOf(Person(52, Vector3.Zero, "", EntityType.NPC)));
+        Assert.Equal("someone", Sightline.NameOf(Person(53, Vector3.Zero, "")));
+        // ...and an unnamed wall is still a thing made of something.
+        Assert.Equal("something brick", Sightline.NameOf(Box(54, Vector3.Zero, new Vector3(2, 3, 0.2f), "", "Brick")));
+    }
+
+    /// <summary>A body against a body: one soft, low thud with nothing ringing after it. (The knock
+    /// was soft before as well — the hand is the softer of the two and decides it — so what made Sean
+    /// "concrete" was the client calling him "something concrete", his definition having carried the
+    /// floor he stood on as his material.)</summary>
+    [Fact]
+    public void BumpingIntoSomebodyIsASoftBodyContact()
+    {
+        var c = new BodyContact(50, new Vector3(0, 0, -1), PhysicsConstants.WalkSpeed, PhysicsConstants.WalkSpeed, new Vector3(0, 0, 1.4f));
+        var sean = Person(50, new Vector3(0, 0, 2f), "seanterry01");
+        var where = WallBumps.TouchPoint(sean, c);
+        var body = WallBumps.Sound(sean, c, where, running: false);
+        _o.WriteLine(string.Join("; ", body.Select(s => $"{s.Character} {s.Hz:F0} Hz {s.LevelDb:F1} dB {s.DecaySeconds:F2} s")));
+        var knock = Assert.Single(body);
+        Assert.Equal(SoundCharacter.Knock, knock.Character);
+        Assert.InRange(knock.Hz, 40f, 200f);
+        Assert.InRange(knock.DecaySeconds, 0.1f, 0.6f);
+        Assert.InRange(knock.LevelDb, 55f, 85f);
+        // Unnamed and made of the floor, as the old definition had him, he was "something concrete".
+        Assert.Equal("someone", Sightline.NameOf(Person(50, Vector3.Zero, "", material: "Concrete")));
+    }
+
     /// <summary>The real city: Brandt Court's ground-floor corridor, walked across into its wall.</summary>
     [Fact]
     public void BrandtCourtCorridorWallBumpsOnce()

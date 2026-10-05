@@ -124,7 +124,7 @@ public static class PhysicsUtils
             bool hit = false;
             foreach (var p in probes)
             {
-                if (GeometryUtils.IsPointInOBB(p, t.Position, new Vector3(c.Size.X, 40000f, c.Size.Z), t.Rotation))
+                if (GeometryUtils.IsPointInOBB(p, t.Position, new Vector3(c.Size.X, 40000f, c.Size.Z), SharedMovementEngine.StandingRotation(c.Shape, t.Rotation)))
                 {
                     hit = true;
                     break;
@@ -202,7 +202,7 @@ public static class PhysicsUtils
             bool hit = false;
             foreach (var p in probes)
             {
-                if (GeometryUtils.IsPointInOBB(p, entity.Transform.Position, new Vector3(def.Collider.Size.X, 40000f, def.Collider.Size.Z), entity.Transform.Rotation))
+                if (GeometryUtils.IsPointInOBB(p, entity.Transform.Position, new Vector3(def.Collider.Size.X, 40000f, def.Collider.Size.Z), SharedMovementEngine.StandingRotation(def.Collider.Shape, entity.Transform.Rotation)))
                 {
                     hit = true;
                     break;

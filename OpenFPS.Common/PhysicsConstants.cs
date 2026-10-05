@@ -7,6 +7,19 @@ public static class PhysicsConstants
     public static readonly Vector3 PlayerSize = new(0.6f, 1.8f, 0.6f);
     public const float PlayerRadius = 0.3f;
     public const float PlayerHeight = 1.8f;
+
+    /// <summary>
+    /// What a person is made of, to anything that meets one: a body, soft and lossy (AcousticRegistry
+    /// "Skin"), as a dead one already was. A player used to be "Generic" — five gigapascals and
+    /// ringing, the knock of a stone pillar — and then took on whatever floor they stood on, because
+    /// movement wrote the floor under them into their own material: bumping into somebody on a
+    /// concrete roof was bumping into concrete (Cody, 2026-10-05: "am I made of concrete too?").
+    /// </summary>
+    public const string PersonMaterial = "Skin";
+
+    /// <summary>A person's mass, kilograms: an adult, what a body over your shoulder weighs.</summary>
+    public const float PersonMassKg = 70f;
+
     public const float WalkSpeed = 4.5f;
 
     /// <summary>

@@ -1196,7 +1196,8 @@ public class GameServer
             world.Add(session.Entity, new NameComponent { Name = session.Username });
             world.Add(session.Entity, new InventoryComponent { ItemEntityIds = new List<int>() });
             world.Add(session.Entity, new HealthComponent { Current = 100, Max = 100 });
-            world.Add(session.Entity, new MaterialComponent { Material = "Generic" });
+            // What they are made of, for whatever meets them: a body, not the floor they stand on.
+            world.Add(session.Entity, new MaterialComponent { Material = PhysicsConstants.PersonMaterial });
             world.Add(session.Entity, new ColliderComponent { Shape = ColliderShape.Cylinder, Size = new Vector3(PlayerRadius * 2, PlayerHeight, PlayerRadius * 2), IsSolid = true });
 
             // The one registration path: lookup, spatial index, dirty flag.

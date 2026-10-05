@@ -469,6 +469,8 @@ public class StreetBodiesTests
         Assert.NotEqual(Entity.Null, walker);
         string name = world.Get<NameComponent>(walker).Name;
         string voice = world.Get<Pedestrian>(walker).Voice;
+        // A person is a body to whatever meets them, not "Generic" (2026-10-05).
+        Assert.Equal(PhysicsConstants.PersonMaterial, world.Get<MaterialComponent>(walker).Material);
         world.Add(walker, new DeadComponent());
 
         Assert.True(vehicles.RetireWalker("city", world, walker));
@@ -482,6 +484,7 @@ public class StreetBodiesTests
         Assert.True(world.IsAlive(fresh));
         Assert.Equal(name, world.Get<NameComponent>(fresh).Name);
         Assert.Equal(voice, world.Get<Pedestrian>(fresh).Voice);
+        Assert.Equal(PhysicsConstants.PersonMaterial, world.Get<MaterialComponent>(fresh).Material);
         Assert.False(world.Has<DeadComponent>(fresh));
         Assert.False(vehicles.IsRetiredForTest(walker.Id));
         Assert.Equal(Entity.Null, vehicles.ReplaceWalker("city", world, walker.Id));   // once only

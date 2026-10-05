@@ -120,7 +120,7 @@ public class ClientPhysicsSystem
                 colliderArray[colliderCount++] = new SharedMovementEngine.Collider {
                     Position = entity.Transform.Position,
                     Size = def.Collider.Size,
-                    Rotation = entity.Transform.Rotation,
+                    Rotation = SharedMovementEngine.StandingRotation(def.Collider.Shape, entity.Transform.Rotation),
                     Material = def.Material.Material
                 };
             }

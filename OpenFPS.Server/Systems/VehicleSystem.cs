@@ -359,6 +359,7 @@ public sealed partial class VehicleSystem
                     new ColliderComponent { Shape = ColliderShape.Box, Size = hull, IsSolid = false },
                     new NameComponent { Name = vd.Name ?? displayKind },
                     new IdentityComponent { Name = vd.Name ?? displayKind, Description = description },
+                    new MaterialComponent { Material = PhysicsConstants.PersonMaterial },
                     new Pedestrian
                     {
                         Voice = string.IsNullOrEmpty(vd.Pair) ? PedestrianSpeech.NextVoice(mapId)
