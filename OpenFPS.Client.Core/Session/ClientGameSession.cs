@@ -1557,12 +1557,13 @@ public sealed partial class ClientGameSession : IDisposable
 
     /// <summary>
     /// What you can do with a person: all of it is a command the server answers aloud. "Where is" is
-    /// for staff only (the server refuses /where to a player), so a player is not offered it.
+    /// for moderators and the administrator (the server refuses /where to anyone else, developers
+    /// included since the roles of 2026-10-05), so nobody else is offered it.
     /// </summary>
     private ListMenu PersonMenu(string name, bool isFriend)
     {
         var items = new List<MenuItem> { new("Private message", () => _shell.OpenCommandConsole($"/pm {name} ")) };
-        if (_role is UserRole.Dev or UserRole.Admin or UserRole.Moderator) items.Add(new("Where is", () => Command("where", name)));
+        if (_role is UserRole.Admin or UserRole.Moderator) items.Add(new("Where is", () => Command("where", name)));
         items.Add(new("View profile", () => Command("profile", name)));
         items.Add(isFriend ? new("Remove friend", () => Command("friend", "remove", name))
                            : new("Add friend", () => Command("friend", "add", name)));
@@ -1646,7 +1647,7 @@ public sealed partial class ClientGameSession : IDisposable
                 && parts[1].Equals("settings", StringComparison.OrdinalIgnoreCase))
             {
                 Say("Your own settings: /levels, how much of the real loudness differences you hear, or /levels default. "
-                  + "/beacons, which beacons you hear. /reverb traced or room. /echoes on or off. "
+                  + "/beacons, which beacons you hear. /reverb, how the traced reverberation is doing. /echoes on or off. "
                   + "/tail and /copies, the reflections' level in decibels, zero is physical. /cabin, the inside of a vehicle. "
                   + "/narrate on or off, saying what is ahead as you turn and move and what passes in front, also N. /bumps on or off, the knock and name when you walk into something. "
                   + "/aimassist on or off, a shot from the hip near somebody in plain view turned onto them. "

@@ -30,7 +30,7 @@ Recent work, newest first. `git log` has the rest.
 - A key unlocking a door no longer sounds like a coin dropped afterwards. The spare keys hanging on the
   ring (two, four or six of them) struck each other as the key went home and rang on through the
   whole unlock; every keyring now has one spare key, as the worn one Cody picked did
-  (inbox/door-keys-2026-10-05).
+  (inbox/door-keys-2026-10-05). Approved by Cody: "excellent".
 - The glass front door, the glass shop door and the lift door are physical models now, like the knob,
   push-bar and sliding doors: an aluminium frame round a toughened pane with its seal, latch, bar,
   pull handle, closer and sweep; a lift leaf on its rollers, run by its operator, with the coupler,

@@ -12,8 +12,6 @@ Built, rendered or measured, but not heard in the game. Each needs Cody's ear be
 Restart the server and update the client first.
 - Doors: push and pull sides, the tower front doors locked from the street (key, then pull), and
   nothing shutting on a person.
-- The key in the lock, with one spare key on the ring as in the worn variant Cody picked
-  (inbox/door-keys-2026-10-05).
 - The glass front door, the glass shop door and the lift door models (inbox/door-models-2026-10-05).
 - The teleporter: the charge, the thump where you leave, the pop where you arrive.
 - Hand-over sounds when something is given.
@@ -34,7 +32,6 @@ Restart the server and update the client first.
 
 ### 3. Door models: gaps
 - The lift's close is soft: no bump and no rebounds.
-- The key's turn is thin below 1 kHz.
 - The glass front door's bar push is about 5 dB over the steel door's.
 - The knob door's push is about 9 dB over its pull. From round 4: turn clicks about 30 dB under the
   release, soft knocks after a close, the hard close 17-20 dB over the normal one.
