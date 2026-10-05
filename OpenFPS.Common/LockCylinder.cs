@@ -172,9 +172,9 @@ public static class LockCylinder
     private const double CamPlay = 35 * Math.PI / 180, CamDraw = 70 * Math.PI / 180, CamArm = 0.010, HubKg = 0.008;
     private const double LatchThrow = 0.0127, LatchPreload = 6, LatchRate = 400, LatchFriction = 1.5;
     private const double CamContactK = 4e9, CamContactLambda = 0.15;
-    /// <summary>The fingers on the bow: a 22 mm bow, turned through the pads' give (about 0.4 N m/rad), damped
+    /// <summary>The fingers on the bow: a 22 mm bow, turned through the pads' give (about 0.8 N m/rad), damped
     /// near half critical. The plug and key turn as about 2e-6 kg m2.</summary>
-    private const double TurnStiffness = 0.4, TurnDamping = 0.0012, PlugInertia = 2e-6;
+    private const double TurnStiffness = 0.8, TurnDamping = 0.0017, PlugInertia = 2e-6;
 
     private sealed class Sim
     {
@@ -190,7 +190,7 @@ public static class LockCylinder
 
         // The hand and its ring: the ring's point, x across the face, y up, z away from the face.
         private double hx, hy, hz, hvx, hvy, hvz, hax, hay, haz;
-        private readonly double[] kx, kz, kvx, kvz;    // each hanging key's offset from below the ring
+        private readonly double[] kx, kz, kvx, kvz, hang;    // each hanging key's offset from below the ring
         private readonly Modes[] keyModes;
         private readonly Modes ring;
         private readonly double[] keyApproach;
@@ -233,7 +233,7 @@ public static class LockCylinder
             wear = wearMm / 1000;
 
             // The hanging keys: each a free plate, its bending modes along its length and one across.
-            kx = new double[keys]; kz = new double[keys]; kvx = new double[keys]; kvz = new double[keys];
+            kx = new double[keys]; kz = new double[keys]; hang = new double[keys]; kvx = new double[keys]; kvz = new double[keys];
             keyModes = new Modes[keys];
             keyApproach = new double[keys]; doorApproach = new double[keys];
             for (int i = 0; i < keys; i++)
@@ -245,7 +245,10 @@ public static class LockCylinder
                 // Across the bow: a 22 mm free plate, a third of the way along its first bending mode.
                 AddFreeMode(hzs, l, m, g, Beam(KeyWide, t, KeyRho, KeyE, 4.730), len * KeyWide);
                 keyModes[i] = new Modes(hzs, l, m, g, dt);
-                kx[i] = (i - (keys - 1) / 2.0) * KeyT * 1.1;
+                // Keys sit round the ring, not stacked flat: about 1.5 mm between neighbours' faces, each hanging
+                // its own length, so each swings at its own rate and they meet as they drift apart in phase.
+                kx[i] = (i - (keys - 1) / 2.0) * (KeyT + 0.0015);
+                hang[i] = HangLength * (0.75 + 0.5 * rng.NextDouble());
             }
             // The ring: its bending modes n = 2-4.
             {
@@ -368,7 +371,7 @@ public static class LockCylinder
                 {
                     // 4. Turned until it will go no further; the ring goes round with the bow.
                     double tu = Math.Clamp((time - turnAt) / TurnTime, 0, 1);
-                    turnAim = MinJerk(tu) * (CamPlay + CamDraw + 0.3);
+                    turnAim = MinJerk(tu) * (CamPlay + CamDraw + 0.6);
                     double r = 0.02;
                     MoveHand(r * Math.Sin(turn) * 0.5, -r * (1 - Math.Cos(turn)) * 0.5, 0);
                     if (drawn && end > time + 0.45) end = time + 0.45;
@@ -399,7 +402,7 @@ public static class LockCylinder
             double hostForce = 0, faceForce = 0, ringForce = 0;
 
             // The hanging keys: pendulums on the ring, driven by its acceleration, against each other and the face.
-            double w0 = Math.Sqrt(G / HangLength);
+
             var fx = new double[keys]; var fz = new double[keys];
             Array.Clear(fx); Array.Clear(fz);
             double keySum = 0;
@@ -424,6 +427,7 @@ public static class LockCylinder
             double doorSum = 0;
             for (int i = 0; i < keys; i++)
             {
+                double w0 = Math.Sqrt(G / hang[i]);
                 // The face is at z = -OffFace from where the key hangs at rest when the hand is at the lock.
                 double zAbs = hz + kz[i] + keyModes[i].At(keyPoint), zRate = hvz + kvz[i] + keyModes[i].RateAt(keyPoint);
                 double f = Contact(KeyContactK * 0.5, KeyContactLambda * 2, -(zAbs + OffFace), -zRate);

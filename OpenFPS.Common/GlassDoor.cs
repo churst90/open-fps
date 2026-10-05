@@ -807,7 +807,8 @@ public static class GlassDoor
                 double fStop = Contact(MetalContactK, BoltStopLambda, bolt - Throw - stopAt, boltRate - stopRate);
                 double fBack = Contact(MetalContactK, BoltStopLambda, -(bolt - RetractedAt * 0.5) + stopAt, -(boltRate - stopRate));
                 boltForce += fBack - fStop;
-                frameField.Modes.Push(rimHit, rimStop.Step(fStop - fBack, dt, out double rimHost));
+                // The blow is along the bolt, in the stile's plane: a tenth of it bends the stile's walls.
+                frameField.Modes.Push(rimHit, LatchBending * rimStop.Step(fStop - fBack, dt, out double rimHost));
                 lockBody.F += rimHost;
                 lockCase.Push(lockCaseHit, fStop + fBack);
                 Note("bolt-stop", fStop); Note("bolt-back", fBack);

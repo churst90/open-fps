@@ -55,6 +55,20 @@ public static class DoorModelsSpike
             list.Add(new($"glass-pull-close-{chars[v]}", $"glass shop door, {chars[v]}, shut by its closer",
                 r => Run<GlassDoor.Report>(r, rep => GlassDoor.RenderClose(door, 48000, rep)), GlassDoor.PascalsAtFullScale));
         }
+        // The lift door: each character's opening and closing run, as the prefab's leaf at its 1.8 and 2.5 s.
+        for (int v = 0; v < ElevatorDoor.Variants; v++)
+        {
+            var door = new ElevatorDoor.Door { Variant = v, Seed = 1 + v };
+            list.Add(new($"lift-open-{chars[v]}", $"lift door, {chars[v]}, the operator opening it: coupler, rollers, stop",
+                r => Run<ElevatorDoor.Report>(r, rep => ElevatorDoor.RenderOpen(door, 48000, 1.8, rep)), ElevatorDoor.PascalsAtFullScale));
+            list.Add(new($"lift-close-{chars[v]}", $"lift door, {chars[v]}, the operator closing it: rollers, the creep, the leaves meeting, the lock",
+                r => Run<ElevatorDoor.Report>(r, rep => ElevatorDoor.RenderClose(door, 48000, 2.5, rep)), ElevatorDoor.PascalsAtFullScale));
+        }
+        {
+            var leaf = new ElevatorDoor.Door { Variant = 1, Seed = 2, Operator = false };
+            list.Add(new("lift-close-standard-other-leaf", "lift door, standard, the other leaf of the pair closing, without the operator",
+                r => Run<ElevatorDoor.Report>(r, rep => ElevatorDoor.RenderClose(leaf, 48000, 2.5, rep)), ElevatorDoor.PascalsAtFullScale));
+        }
         // The key in the lock, in each kind of door it is set in, each character.
         foreach (var host in new[] { LockCylinder.Host.AluminiumStile, LockCylinder.Host.SteelDoor, LockCylinder.Host.WoodDoor })
             for (int v = 0; v < LockCylinder.Variants; v++)
@@ -82,6 +96,7 @@ public static class DoorModelsSpike
         string? outDir = Arg(args, "out");
         GlassDoor.StemFolder = Arg(args, "stems");
         LockCylinder.StemFolder = GlassDoor.StemFolder;
+        ElevatorDoor.StemFolder = GlassDoor.StemFolder;
         var renders = All().Where(r => only == null || r.Name.Contains(only, StringComparison.Ordinal)).ToList();
         var made = new (Render R, float[] Pcm, string Log)[renders.Count];
         System.Threading.Tasks.Parallel.For(0, renders.Count, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = GlassDoor.StemFolder != null ? 1 : 6 }, i =>
