@@ -89,7 +89,7 @@ public static class LockCylinder
         };
 
     /// <summary>The script's pace: the last 30 mm found slowly, a pause with the key home, the turn.</summary>
-    private const double Aim = 0.18, Pause = 0.1, TurnTime = 0.3;
+    private const double Aim = 0.18, Pause = 0.1, TurnTime = 0.5;
 
     /// <summary>The unlock: the ring brought up, the key in, turned, the latch drawn and held.</summary>
     public static float[] RenderUnlock(Host host, int variant, int sampleRate, Report? report = null)
@@ -310,8 +310,8 @@ public static class LockCylinder
             facePort = new Port(hostField.PatchMass, 2e7, hostField.Impedance);
             hostHit = hostField.Point(); faceHit = hostField.Point();
 
-            // The hand starts 30 cm below and 20 cm out from the lock, the bunch at rest under the ring.
-            hx = 0.05; hy = -0.3; hz = 0.2;
+            // The hand starts 20 cm below and 10 cm out from the lock, the keys already in it, the bunch at rest.
+            hx = 0.03; hy = -0.2; hz = 0.1;
         }
 
         private static void AddFreeMode(List<double> hz, List<double> l, List<double> m, List<double> g, double f, double area)
@@ -368,7 +368,7 @@ public static class LockCylinder
                 {
                     // 4. Turned until it will go no further; the ring goes round with the bow.
                     double tu = Math.Clamp((time - turnAt) / TurnTime, 0, 1);
-                    turnAim = MinJerk(tu) * (CamPlay + CamDraw + 0.7);
+                    turnAim = MinJerk(tu) * (CamPlay + CamDraw + 0.3);
                     double r = 0.02;
                     MoveHand(r * Math.Sin(turn) * 0.5, -r * (1 - Math.Cos(turn)) * 0.5, 0);
                     if (drawn && end > time + 0.45) end = time + 0.45;
@@ -405,13 +405,17 @@ public static class LockCylinder
             double keySum = 0;
             for (int i = 0; i + 1 < keys; i++)
             {
-                double gap = kx[i + 1] - kx[i] - KeyT;
-                double f = ContactRestitution(KeyContactK, 0.7, -gap, -(kvx[i + 1] - kvx[i]), ref keyApproach[i]);
+                // Where they touch, each key's face is where its body is plus how far it has bent there: the blow
+                // bends them as it pushes them apart, and gives the bending back (fed one way, a 6 g key struck at
+                // half a metre a second rang with nine times the energy it came in with).
+                double gap = kx[i + 1] + keyModes[i + 1].At(keyPoint) - kx[i] - keyModes[i].At(keyPoint) - KeyT;
+                double gapRate = kvx[i + 1] + keyModes[i + 1].RateAt(keyPoint) - kvx[i] - keyModes[i].RateAt(keyPoint);
+                double f = ContactRestitution(KeyContactK, 0.7, -gap, -gapRate, ref keyApproach[i]);
                 if (f > 0)
                 {
                     fx[i] -= f; fx[i + 1] += f;
-                    keyModes[i].Push(PushAt(keyModes[i].N), f);
-                    keyModes[i + 1].Push(PushAt(keyModes[i + 1].N), f);
+                    keyModes[i].Push(keyPoint, -f);
+                    keyModes[i + 1].Push(keyPoint, f);
                     ringForce += f * 0.2;
                 }
                 keySum += f;
@@ -421,9 +425,9 @@ public static class LockCylinder
             for (int i = 0; i < keys; i++)
             {
                 // The face is at z = -OffFace from where the key hangs at rest when the hand is at the lock.
-                double zAbs = hz + kz[i];
-                double f = ContactRestitution(KeyContactK * 0.5, 0.5, -(zAbs + OffFace), -(hvz + kvz[i]), ref doorApproach[i]);
-                if (f > 0) { fz[i] += f; keyModes[i].Push(PushAt(keyModes[i].N), f); faceForce -= f; doorSum += f; }
+                double zAbs = hz + kz[i] + keyModes[i].At(keyPoint), zRate = hvz + kvz[i] + keyModes[i].RateAt(keyPoint);
+                double f = ContactRestitution(KeyContactK * 0.5, 0.5, -(zAbs + OffFace), -zRate, ref doorApproach[i]);
+                if (f > 0) { fz[i] += f; keyModes[i].Push(keyPoint, f); faceForce -= f; doorSum += f; }
                 double ax = -w0 * w0 * kx[i] - 2 * SwingZeta * w0 * kvx[i] - hax + fx[i] / KeyKg;
                 double az = -w0 * w0 * kz[i] - 2 * SwingZeta * w0 * kvz[i] - haz + fz[i] / KeyKg;
                 // The ring's lift jerks the bunch up and down too: that tugs the keys on the ring.
@@ -479,13 +483,13 @@ public static class LockCylinder
                 tq = TurnStiffness * (turnAim - turn) - TurnDamping * turnRate;
                 double camAt = (turn - CamPlay) * CamArm;          // the cam's reach along the hub's travel
                 double drawDepth = camAt - hub;
-                double fc = ContactRestitution(CamContactK, 0.5, drawDepth, turnRate * CamArm - hubRate, ref camApproach);
+                double fc = Contact(CamContactK, CamContactLambda, drawDepth, turnRate * CamArm - hubRate);
                 tq -= fc * CamArm;
                 hubForce += fc;
                 Note("cam", fc);
                 double latch = LatchPreload + LatchRate * hub + LatchFriction * Math.Tanh(hubRate / 0.005);
                 hubForce -= hub > 0 || fc > 0 ? latch : 0;
-                double fs = ContactRestitution(CamContactK, 0.4, hub - LatchThrow, hubRate, ref stopApproach);
+                double fs = Contact(CamContactK, CamContactLambda * 2, hub - LatchThrow, hubRate);
                 hubForce -= fs;
                 Note("hub-stop", fs);
                 if (fs > 0 && !drawn) { drawn = true; drawnAt = time; Log($"{time * 1000:F0} ms  the latch drawn: the hub on its stop"); }
@@ -527,7 +531,6 @@ public static class LockCylinder
         private bool shoulderDone;
         private double shoulderLeft, shoulderForce;
         private readonly double[] one3 = { 1, 1, 1, 1 };
-        private double[] PushAt(int n) => n == 4 ? keyPoint : one3;
         private readonly double[] keyPoint = { 1, -0.8, 0.6, 0.5 };
 
         /// <summary>
