@@ -4,10 +4,12 @@ Cody's decision, 2026-10-02. Each door has a kind. The kind decides how it is op
 moves, what it does by itself, and which mechanical events it sends. Push and pull sides, the key
 sequence and obstruction were added 2026-10-05.
 
-Every kind has a physical sound model: `KnobDoor`, `PushBarDoor`, `SlidingDoor` (patio, automatic),
-`GlassDoor` (glass-pushbar, glass-pull), `ElevatorDoor`, and `LockCylinder` for a key in any keyed door
-(branch door-models-glass, 2026-10-05, unheard). Events with no sound yet are still
-sent (see the table below).
+Every kind has a physical sound model in `OpenFPS.Common`: `KnobDoor`, `PushBarDoor`, `SlidingDoor`
+(patio, automatic), `GlassDoor` (glass-pushbar, glass-pull), `ElevatorDoor`, and `LockCylinder` for a
+key in any keyed hinged door. The knob, push-bar and sliding doors went through listening rounds on
+2026-10-03. The glass doors, the lift door, the key, the knob door's push opening and the push-bar
+door's pull opening were merged on 2026-10-05 (ee03b6ed) and are unheard. Events with no sound of
+their own are still sent (see the table below).
 
 ## The kinds
 
@@ -20,6 +22,8 @@ sent (see the table below).
 | `auto-slide` | `auto_sliding_door` | slides its width at its controller's speeds (0.7 m/s open, 0.3 m/s shut, a creep into each end: about 3.3 s and 5.3 s for the city's 1.15 m leaves; `SlidingDoor.AutomaticSeconds`) | anyone within 2.5 m in front, either side | shuts 2 s after clear; reverses for anyone in the doorway |
 | `patio-slide` | `patio_door` | slides its width, 1.4 s | hand | nothing |
 | `elevator` | `elevator_door` | slides its width, 1.8 s | the lift (`DoorSystem.Set`), never by hand | shuts 4 s after clear, over 2.5 s; reverses for anyone in the doorway |
+
+No lift is built and no map places an `elevator_door` yet.
 
 - A bi-parting door is two leaves, the second turned half a turn so it slides the other way.
   `tools/gen_city.py` `bi_parting()` places a pair.
@@ -54,6 +58,8 @@ and the tower entrances, roof doors, the terminal's road door and the hangar's b
 The side someone opens a door from is where they stand (`DoorSystem.Set`'s `by`, or the position of
 `who`). If nobody is known, it is the push side. The side used last is kept in
 `DoorComponent.OpenedFrom`: +1 pushed, -1 pulled, 0 not by hand (a slider, the lift, a sensor).
+Whose hand is moving the leaf is `DoorComponent.HandId` (entity id plus one, 0 for nobody); it is
+cleared when the leaf arrives.
 
 A map entity can override `KeyedSide` and `PushSide` for one door, for example to key a fire exit
 from outside on one map only.
@@ -64,13 +70,14 @@ from outside on one map only.
 neither. The glass front door is keyed on its +Z face, the street.
 
 From the keyed side a shut door is locked. Opening it takes `DoorSystem.KeySequenceSeconds` (1 s)
-before the leaf moves:
+before the leaf moves. `DoorComponent.KeySeconds` counts down the time left, and `KeyTurned` says the
+last opening used the key:
 
 | Time | Event |
 |---|---|
-| 0 s | `key-insert` |
-| 0.45 s (`KeyTurnSeconds`) | `key-turn` |
-| 0.7 s (`UnlockSeconds`) | `unlock`: the latch drawn back. Carries that kind's pull-side latch sound for now (none on a knob door) |
+| 0 s | `key-insert`: carries the whole `LockCylinder` render, timed to the two events below |
+| 0.45 s (`KeyTurnSeconds`) | `key-turn` (silent; in the key's render) |
+| 0.7 s (`UnlockSeconds`) | `unlock`: the latch drawn back (silent; in the key's render) |
 | 1.0 s | the leaf starts to move: `pull` (or `push` when the keyed side is the push side). A knob door sends `latch-retract` first, because its knob is still turned after the key |
 
 When it shuts again it is locked again. A door that is not fully shut is not locked. Shutting it
@@ -143,7 +150,7 @@ still fired (the server drops it before sending, as it does any empty sound).
 | `door:glass-pull:swing` | it starts moving shut by hand | none |
 | `door:glass-pull:closer` | the closer starts to shut it | none |
 | `door:glass-pull:latch` | it arrives shut | `GlassDoor`, the closer onto the seal (`glassdoor:pull:close:...`) |
-| `door:KIND:key-insert`, `key-turn`, `unlock` | any kind opened from a keyed side | `LockCylinder` at `key-insert` (aluminium stile, steel door or wooden door by kind); `key-turn` and `unlock` none |
+| `door:KIND:key-insert`, `key-turn`, `unlock` | any kind opened from a keyed side | `LockCylinder` at `key-insert` (aluminium stile on glass doors, steel on the push-bar door, wood otherwise; none on a sliding door); `key-turn` and `unlock` none |
 | `door:auto-slide:motor-start` | the motor starts, opening or closing | the whole run, `SlidingDoor` (`slidingdoor:auto:...`) |
 | `door:auto-slide:rollers` | the leaf starts travelling (lasts the travel) | none |
 | `door:auto-slide:stop` | it arrives fully open | none |
@@ -172,19 +179,19 @@ Order for one open and shut (tested in `DoorTypeTests.EachKindNamesItsEvents` an
 
 A bi-parting pair sends each event from each leaf.
 
-## For the synthesis session
+## Where it lives
 
-- The keys are built by `DoorEvents.Of(kind, event)` in `OpenFPS.Common/Doors.cs`, and the
-  sounds for each are chosen in `DoorSystem.Events`, `DoorSystem.OpenStart` and
-  `DoorSystem.TurnTheKey`.
-- Push or pull: `DoorSystem.KnobDoorSound` and `DoorSystem.PushBarSound` take `pulled` (true from
-  the pull side). They do not pass it on yet; to give the models a push and a pull opening, pass it
-  into `KnobDoor.Key` / `PushBarDoor.Key`. The same fact is `DoorComponent.OpenedFrom` (-1 pulled).
-- The key's sounds: send `key-insert`, `key-turn` and `unlock` with a `SynthKey` in
-  `DoorSystem.TurnTheKey`. Their times are `KeyTurnSeconds`, `UnlockSeconds` and
-  `KeySequenceSeconds`; change those if the recorded sequence is longer or shorter.
-- To give an event its own model, send it with a `SynthKey` (as `CarDoor` does) and route that
-  key in `WorldAudioPlayer.RenderOne`. A `SynthKey` is cached as one buffer per seed, so it
-  must name one fixed sound, not a family.
-- What each leaf is made of, its size and the speed it arrives at are known where the event is
-  fired (`DoorSystem.Sounds`). Every door sound goes out through `DoorSystem.OnTheLeaf`.
+- The keys are built by `DoorEvents.Of(kind, event)` in `OpenFPS.Common/Doors.cs`. The events are
+  fired in `DoorSystem.Events`, `DoorSystem.OpenStart` and `DoorSystem.TurnTheKey`.
+- Each model's sound is made by one helper in `DoorSystem`: `KnobDoorSound`, `PushBarSound`,
+  `GlassDoorSound`, `SlidingSound`, `ElevatorSound` and `KeySound`. Each sends a `TransientSound`
+  with a `SynthKey` (`knobdoor:`, `pushbardoor:`, `glassdoor:`, `slidingdoor:`, `elevatordoor:`,
+  `lockcylinder:`). Push or pull is in the key (`:push` on a knob door, `:pull` on a push-bar door,
+  `push|pull|key` on a glass door).
+- The client renders those keys in `WorldAudioPlayer.RenderDoorKey`, one buffer per key, and plays
+  each at its own render's peak.
+- Every door sound goes out through `DoorSystem.OnTheLeaf`: placed at the handle of the shut leaf,
+  25 cm off the face on the listener's side.
+- A kind with no model of its own falls back to `DoorAcoustics` (`DoorSystem.Sounds`). Every kind
+  in the table has a model now.
+- AudioLab: `--knob-door`, `--pushbar-door`, `--sliding-door` and `--door-models` render each model.
