@@ -23,6 +23,13 @@ public class UserSession
     public HashSet<string> RolePermissions { get; set; } = new();
     public bool Can(string permission) => Permissions.Has(Role, Grants, permission) || RolePermissions.Contains(permission);
     public string CurrentMapId { get; set; } = "default";
+
+    /// <summary>
+    /// Where this player's next body on a map is to stand, instead of where they last were on it: a
+    /// teleport to another map (CommandHandler's /tp) sets it before the map change, and the spawn takes
+    /// it once. <c>Teleported</c> says the arrival is a teleporter's, so its arrival is heard.
+    /// </summary>
+    public (string MapId, Vector3 At, bool Teleported)? ArriveAt { get; set; }
     public Entity Entity { get; set; } = Entity.Null;
     public long LastProcessedSequenceId { get; set; } = -1;
 

@@ -98,6 +98,10 @@ public class PrefabTemplate
     /// holding can be fired without anything here knowing what a weapon is.</summary>
     public string? WeaponId { get; set; }
 
+    /// <summary>A premium item: hard to come by, so only somebody with the give-premium permission can
+    /// give one (the teleporter). Ordinary items are given by developers. Only meaningful on an item.</summary>
+    public bool Premium { get; set; }
+
     // --- Acoustics (AcousticComponent) -------------------------------------------------------------
 
     /// <summary>Fraction of low/mid/high-band energy that passes THROUGH this surface, 0..1.

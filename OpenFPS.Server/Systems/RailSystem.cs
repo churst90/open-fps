@@ -72,15 +72,32 @@ public sealed class RailSystem
 
     private readonly List<Consist> _trains = new();
 
-    public void Spawn(MapManager maps)
+    public void Spawn(MapManager maps) => Spawn(maps, null, null);
+
+    /// <summary>The trains running on a map.</summary>
+    public int CountOn(string mapId) => _trains.Count(t => t.MapId.Equals(mapId, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>One more train on a map that is already running (/spawn train), on a track it names.
+    /// False when it could not be made; the reason is logged.</summary>
+    public bool SpawnOne(MapManager maps, string mapId, TrainData td)
+    {
+        int before = _trains.Count;
+        Spawn(maps, mapId, new[] { td });
+        return _trains.Count > before;
+    }
+
+    /// <summary>Every map's trains, or only <paramref name="only"/> on <paramref name="onlyMap"/>.</summary>
+    private void Spawn(MapManager maps, string? onlyMap, IReadOnlyList<TrainData>? only)
     {
         foreach (var entry in maps.GetAllMaps())
         {
             string mapId = entry.Key;
             var data = entry.Value.data;
-            if (data.Trains == null) continue;
+            if (onlyMap != null && !mapId.Equals(onlyMap, StringComparison.OrdinalIgnoreCase)) continue;
+            var list = only ?? data.Trains;
+            if (list == null) continue;
             int n = 0;
-            foreach (var td in data.Trains)
+            foreach (var td in list)
             {
                 TrainProfile profile;
                 try { profile = TrainProfile.ByName(td.Preset); }

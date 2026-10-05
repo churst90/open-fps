@@ -52,9 +52,7 @@ public class StaffGateTests : IDisposable
         { "kick", new[] { "other" }, UserRole.Moderator },
         { "mute", new[] { "other", "5" }, UserRole.Moderator },
         { "unmute", new[] { "other" }, UserRole.Moderator },
-        { "tp", new[] { "150", "150", "6" }, UserRole.Dev },
         { "move", new[] { "150", "150", "6" }, UserRole.Dev },
-        { "goto", new[] { "other" }, UserRole.Dev },
         { "give", new[] { "torch" }, UserRole.Dev },
         { "spawn", new[] { "Box", "Metal", "1", "1", "1" }, UserRole.Dev },
         { "set_sound", new[] { "BEACONS/low_osc", "1" }, UserRole.Dev },
@@ -80,8 +78,8 @@ public class StaffGateTests : IDisposable
         { "ratelimit", Array.Empty<string>(), UserRole.Admin },
         { "unlock", new[] { "other" }, UserRole.Admin },
         { "setrole", new[] { "other", "dev" }, UserRole.Admin },
-        { "grant", new[] { "other", "tp" }, UserRole.Admin },
-        { "revoke", new[] { "other", "where" }, UserRole.Admin },
+        { "grant", new[] { "other", "give" }, UserRole.Dev },
+        { "revoke", new[] { "other", "give" }, UserRole.Dev },
         { "role", new[] { "create", "builder", "tp" }, UserRole.Admin },
     };
 
@@ -124,7 +122,7 @@ public class StaffGateTests : IDisposable
     [InlineData("throttled", UserRole.Dev)]
     [InlineData("unlock", UserRole.Dev)]
     [InlineData("setrole", UserRole.Dev)]
-    [InlineData("grant", UserRole.Dev)]
+    [InlineData("role", UserRole.Dev)]
     [InlineData("sessions", UserRole.Moderator)]
     [InlineData("user", UserRole.Moderator)]
     [InlineData("setrole", UserRole.Moderator)]
@@ -161,12 +159,12 @@ public class StaffGateTests : IDisposable
     [Fact]
     public void AGrantedCommandWorksForThatPlayerAloneUntilRevoked()
     {
-        var rig = new Rig(_dir, UserRole.Player, "tp");
-        rig.Grant("tp");
-        Assert.NotEqual(Denied, rig.Run("tp", "150", "150", "6"));
+        var rig = new Rig(_dir, UserRole.Player, "move");
+        rig.Grant("move");
+        Assert.NotEqual(Denied, rig.Run("move", "150", "150", "6"));
         Assert.Equal(Denied, rig.Run("spawn", "Box", "Metal", "1", "1", "1"));
-        rig.Revoke("tp");
-        Assert.Equal(Denied, rig.Run("tp", "150", "150", "6"));
+        rig.Revoke("move");
+        Assert.Equal(Denied, rig.Run("move", "150", "150", "6"));
     }
 
     /// <summary>
@@ -177,14 +175,14 @@ public class StaffGateTests : IDisposable
     public void ACustomRoleIsAnnouncedAndAllowsItsCommandsOnly()
     {
         var rig = new Rig(_dir, UserRole.Admin, "role");
-        Assert.StartsWith("Made the role builder", rig.Run("role", "create", "builder", "tp", "spawn"));
+        Assert.StartsWith("Made the role builder", rig.Run("role", "create", "builder", "move", "spawn"));
         Assert.Equal("other is now a builder.", rig.Run("setrole", "other", "builder"));
         var told = rig.SentTo("other").OfType<TextEvent>().Select(t => t.Text).ToList();
-        Assert.Contains(told, t => t.StartsWith("tester made you a builder.") && t.Contains("spawn") && t.Contains("tp"));
-        Assert.True(rig.Other.Can("tp"));
+        Assert.Contains(told, t => t.StartsWith("tester made you a builder.") && t.Contains("spawn") && t.Contains("move"));
+        Assert.True(rig.Other.Can("move"));
         Assert.False(rig.Other.Can("kick"));
         rig.Run("role", "delete", "builder");
-        Assert.False(rig.Other.Can("tp"));
+        Assert.False(rig.Other.Can("move"));
     }
 
     /// <summary>The words Cody asked for: "You gave sean 1 AKM." and "cody gave you 1 AKM."</summary>
@@ -198,7 +196,7 @@ public class StaffGateTests : IDisposable
         Assert.StartsWith("You gave other 1 ", rig.Run("give", "other", "torch"));
     }
 
-    /// <summary>Moving somebody else is an administrator's: a developer may teleport, not move people.</summary>
+    /// <summary>Moving somebody else is an administrator's: a developer may move themselves, not people.</summary>
     [Fact]
     public void MovingAnotherPlayerIsAdminsAlone()
     {
@@ -242,13 +240,12 @@ public class StaffGateTests : IDisposable
     /// Every gated permission that is a command is listed here, and everything listed here is gated:
     /// a permission added to the table without a case here fails, and so does a case here that the
     /// table does not gate. The powers that are part of a command (fire-any, join-private, edit-any,
-    /// move-player) have tests of their own.
+    /// move-player, give-premium, tp-free and the rest of Permissions.Powers) have tests of their own.
     /// </summary>
     [Fact]
     public void EveryGatedCommandIsListedHere()
     {
-        var powers = new[] { Permissions.FireAny, Permissions.JoinPrivate, Permissions.EditAny, Permissions.MovePlayer };
-        var gated = Permissions.All.Except(powers).ToHashSet();
+        var gated = Permissions.All.Except(Permissions.Powers).ToHashSet();
         var listed = GatedCommands.Select(row => Permissions.Canonical((string)row[0])).ToHashSet();
         Assert.Empty(gated.Except(listed));
         Assert.Empty(listed.Except(gated));
@@ -398,7 +395,7 @@ public class StaffGateTests : IDisposable
                     _other.MutedUntilUtc = DateTime.UtcNow.AddMinutes(5);
                     break;
                 case "revoke":
-                    _users.SetGrants("other", "where");
+                    _users.SetGrants("other", "give");
                     break;
                 case "unlock":
                     // A name with a lock to lift.

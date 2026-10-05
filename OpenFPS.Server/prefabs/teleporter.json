@@ -1,0 +1,11 @@
+{
+  "Id": "teleporter",
+  "Name": "Teleporter",
+  "Description": "A handheld teleporter, about the size of a phone. Type /tp and a place, a player or coordinates. It charges for two seconds, then takes you there.",
+  "Material": "Plastic",
+  "Type": "Item",
+  "IsItem": true,
+  "ItemWeight": 0.5,
+  "Hands": 1,
+  "Premium": true
+}

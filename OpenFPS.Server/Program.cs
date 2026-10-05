@@ -95,6 +95,35 @@ public class GameServer
 
     public void EnqueueCommand(Action action) => _commandBuffer.Enqueue(action);
 
+    /// <summary>Things to do on the tick thread a while from now (a teleporter's charge), by when.</summary>
+    private readonly List<(DateTime DueUtc, Action Run)> _later = new();
+
+    /// <summary>Runs <paramref name="action"/> on the tick thread once <paramref name="delay"/> has passed:
+    /// at the first command drain after it. A zero delay runs it in the drain that is running now.</summary>
+    public void After(TimeSpan delay, Action action)
+    {
+        lock (_later) _later.Add((DateTime.UtcNow + delay, action));
+    }
+
+    /// <summary>The traffic, walkers and parked aircraft: what /spawn and /give add to.</summary>
+    public VehicleSystem Vehicles => _vehicles;
+    /// <summary>The trains: what /spawn train adds to.</summary>
+    public RailSystem Rail => _rail;
+
+    /// <summary>Takes out the delayed actions that are due, in the order they were asked for.</summary>
+    private List<Action> TakeDue()
+    {
+        var due = new List<Action>();
+        lock (_later)
+        {
+            if (_later.Count == 0) return due;
+            var now = DateTime.UtcNow;
+            for (int i = 0; i < _later.Count; i++)
+                if (_later[i].DueUtc <= now) { due.Add(_later[i].Run); _later.RemoveAt(i--); }
+        }
+        return due;
+    }
+
     /// <summary>
     /// Gives an UNSTARTED server the maps and sessions a test built, so the paths that need the
     /// world — <see cref="MoveToMap"/>, spawning — can run without a socket. Start() builds its own.
@@ -116,11 +145,24 @@ public class GameServer
     public int DrainCommandBuffer()
     {
         int ran = 0;
-        while (_commandBuffer.TryDequeue(out var cmd))
+        // The queue, then whatever is due (which may queue more), until both are empty: a few rounds
+        // at most, so a delayed action that queues a change of map has it done in the same drain.
+        for (int round = 0; round < 4; round++)
         {
-            ran++;
-            try { cmd(); }
-            catch (Exception ex) { Log.Error(ex, "Buffered command threw."); }
+            while (_commandBuffer.TryDequeue(out var cmd))
+            {
+                ran++;
+                try { cmd(); }
+                catch (Exception ex) { Log.Error(ex, "Buffered command threw."); }
+            }
+            var due = TakeDue();
+            if (due.Count == 0) break;
+            foreach (var action in due)
+            {
+                ran++;
+                try { action(); }
+                catch (Exception ex) { Log.Error(ex, "Delayed command threw."); }
+            }
         }
         return ran;
     }
@@ -260,7 +302,13 @@ public class GameServer
         OpenFPS.Common.ModelLibrary.EnsureLoaded();
         var prefabRepo = new PrefabRepository("prefabs");
         _mapRepo = new MapRepository("maps");
-        _maps = new MapManager(_mapRepo, prefabRepo) { RequestedMapId = RequestedMapId };
+        // Who owns each map, whether it is public and who is invited: beside teams.json, and laid over
+        // each map's own file as it loads (MapAccessRepository).
+        _maps = new MapManager(_mapRepo, prefabRepo)
+        {
+            RequestedMapId = RequestedMapId,
+            Access = new MapAccessRepository("map_access.json"),
+        };
         _maps.Initialize();
         // Composites BEFORE vehicles and before the earshot pass: a placed building is geometry that
         // the acoustic scene, the spatial grid and the broadcast radius all have to account for.
@@ -1029,6 +1077,8 @@ public class GameServer
             manifest.OcclusionFloor = mapData.OcclusionFloor;
             manifest.SpawnPoint = new Transform { Position = mapData.SpawnPoint.Position, Rotation = mapData.SpawnPoint.Rotation };
             manifest.MinimumY = mapData.MinimumY;
+            manifest.OwnerId = mapData.OwnerId ?? "";
+            manifest.IsPublic = mapData.IsPublic;
             manifest.MapMin = mapData.MinBound;
             manifest.MapMax = mapData.MaxBound;
             manifest.PlayMin = mapData.WalkMin;
@@ -1108,6 +1158,15 @@ public class GameServer
             var (spawnPoint, spawnYaw) = _store != null
                 ? _store.Arrival(mapId, session.Saved, out remembered)
                 : (_maps.GetSpawnPoint(mapId), 0f);
+            // Sent here by a teleporter (or anything else that names the spot): there, once.
+            bool teleported = false;
+            if (session.ArriveAt is { } arrive && arrive.MapId.Equals(mapId, StringComparison.OrdinalIgnoreCase))
+            {
+                spawnPoint.Position = arrive.At;
+                teleported = arrive.Teleported;
+                remembered = false;
+            }
+            session.ArriveAt = null;
             while (session.InputQueue.TryDequeue(out _)) { }
             session.GroundProbe.Invalidate();
             session.Entity = world.Create();
@@ -1137,6 +1196,7 @@ public class GameServer
 
             var t = world.Get<Transform>(session.Entity);
             SendToSession(session, new PlayerSpawned { EntityId = session.Entity.Id, SpawnTransform = t });
+            if (teleported) EmitWorldAudio(mapId, session.Entity.Id, Teleporter.Arrive, Teleporter.Sound(Teleporter.Arrive, t.Position));
             // Once per session: a change of map spawns you again, and the MOTD is a greeting.
             if (!session.Welcomed && ReadMotd() is { Length: > 0 } motd)
                 SendToSession(session, new ChatMessage { Sender = "Server", Text = motd, Channel = ChatChannel.Server });

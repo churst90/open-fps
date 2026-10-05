@@ -20,7 +20,7 @@ namespace OpenFPS.Server.Core;
 /// race the simulation — the old peer-null guard prevented that race only by dropping every MUD command
 /// on the floor, silently.
 /// </summary>
-public class CommandHandler
+public partial class CommandHandler
 {
     private readonly SessionManager _sessions;
     private readonly MapManager _maps;
@@ -83,8 +83,9 @@ public class CommandHandler
     {
         // Who may run what is Permissions: a role is a set of commands and an account can be granted
         // single ones. docs/SERVER_SECURITY.md has the table; keep it in step. One check, here, for
-        // every gated command, so a new case cannot forget its own.
-        if (!session.Can(Permissions.Canonical(commandName))) { DenyCommand(reply); return; }
+        // every gated command, so a new case cannot forget its own. Building, spawning, moving
+        // yourself, saving and the sound tools are everybody's on a map they own (the scope half).
+        if (!MayHere(session, Permissions.Canonical(commandName))) { DenyCommand(reply); return; }
         switch (commandName)
         {
             case "scan": HandleScan(session, reply); break;
@@ -104,10 +105,22 @@ public class CommandHandler
                 if (args.Length == 0) { Say(reply, "Usage: /announce [message]"); break; }
                 _server.Announce(string.Join(" ", args), fromStaff: true);
                 break;
+            // Moving yourself by coordinates is a building tool (yours on your own maps, staff's on
+            // any); /tp is the teleporter's, an item you carry.
             case "move":
+                HandleMove(session, args, reply);
+                break;
             case "tp":
             case "goto":
-                HandleMove(session, args, reply);
+            case "teleport":
+                HandleTeleport(session, args, reply);
+                break;
+            // ── Maps of your own ────────────────────────────────────────────────────────────
+            case "map":
+                HandleMap(session, args, reply);
+                break;
+            case "maps":
+                HandleMaps(session, args, reply);
                 break;
             case "spawn":
                 HandleSpawn(session, args, reply);
@@ -343,6 +356,7 @@ public class CommandHandler
                 PlaceBeside(brought, session, session, reply);
                 break;
             case "give":
+                if (TryGiveVehicle(session, args, reply)) break;
                 if (TryGiveAmmo(session, args, reply)) break;
                 if (args.Length < 1 || _hands == null)
                 {
@@ -361,10 +375,16 @@ public class CommandHandler
                         receiver = named; rest.RemoveAt(0);
                     }
                     if (count < 1) { Say(reply, "Give at least one."); break; }
+                    // A premium item (the teleporter) is the administrator's to give.
+                    string prefab = _hands.ResolveItem(rest[0]) ?? rest[0].ToLowerInvariant();
+                    if (_maps.Prefabs.TryGetValue(prefab, out var premium) && premium.Premium && !session.Can(Permissions.GivePremium))
+                    { Say(reply, $"{premium.Name} is a premium item; giving one needs {Permissions.GivePremium}."); break; }
                     // Give makes at most MaxGive; the message said the number asked for (/give akm 100 made 50).
                     count = Math.Min(count, HandsService.MaxGive);
                     if (!_hands.Give(receiver, rest[0].ToLowerInvariant(), count, out string item, out string placed, out string why)) { Say(reply, why); break; }
                     string what = $"{count} {(count == 1 ? item : Plural(item))}";
+                    // The receiver hears it handed over: the item's own sound, which the client makes.
+                    SendGiveEvent(receiver, prefab);
                     if (receiver != session)
                     {
                         _server.SendToSession(receiver, new TextEvent { Text = $"{session.Username} gave you {what}. {Capital(placed)}." });
@@ -377,7 +397,7 @@ public class CommandHandler
                 if (args.Length < 1) { Say(reply, "Usage: /kick NAME [reason]"); break; }
                 if (OnlineSession(args[0]) is not { } kicked) { Say(reply, $"{args[0]} is not online."); break; }
                 if (kicked == session) { Say(reply, "You cannot kick yourself."); break; }
-                if (kicked.Role == UserRole.Admin && session.Role != UserRole.Admin) { Say(reply, "Only an administrator can kick an administrator."); break; }
+                if (kicked.Can(Permissions.Protected) && !session.Can(Permissions.Protected)) { Say(reply, $"You cannot kick {kicked.Username}."); break; }
                 {
                     string why = args.Length > 1 ? string.Join(" ", args.Skip(1)) : "";
                     Log.Information("Moderation: {By} kicked {User}. {Why}", session.Username, kicked.Username, why);
@@ -388,7 +408,7 @@ public class CommandHandler
             case "mute":
                 if (args.Length < 1) { Say(reply, "Usage: /mute NAME [minutes, 10 if not given]"); break; }
                 if (OnlineSession(args[0]) is not { } muted) { Say(reply, $"{args[0]} is not online."); break; }
-                if (muted.Role == UserRole.Admin && session.Role != UserRole.Admin) { Say(reply, "Only an administrator can mute an administrator."); break; }
+                if (muted.Can(Permissions.Protected) && !session.Can(Permissions.Protected)) { Say(reply, $"You cannot mute {muted.Username}."); break; }
                 {
                     int minutes = args.Length > 1 && int.TryParse(args[1], out int m) ? Math.Clamp(m, 1, 24 * 60) : 10;
                     muted.MutedUntilUtc = DateTime.UtcNow.AddMinutes(minutes);
@@ -540,11 +560,11 @@ public class CommandHandler
         return nearest;
     }
 
-    private void HandleSpawn(UserSession session, string[] args, Action<IMessage> reply)
+    private void HandleSpawnShape(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (args.Length < 5)
         {
-            Say(reply, "Usage: /spawn [Box|Cylinder] [Material] [sizeX] [sizeY] [sizeZ]");
+            Say(reply, SpawnUsage);
             return;
         }
 
@@ -770,6 +790,9 @@ public class CommandHandler
 
         int root = svc.NearestRoot(session.CurrentMapId, position, CompositeReachRadius);
         if (root < 0) { Say(reply, $"No composite within {CompositeReachRadius:F0} m. Use /group first."); return; }
+        // Designs are everybody's: saving one on your own map may add a design, not replace one.
+        if (!session.Can("saveas") && svc.Templates.TryGet(args[0], out _))
+        { Say(reply, $"There is already a design called '{args[0]}'. Choose another name."); return; }
         if (!svc.SaveAsTemplate(session.CurrentMapId, root, args[0], session.Username, Elevated(session),
                                 out int parts, out string error))
         { Say(reply, $"Could not save: {error}."); return; }
@@ -793,7 +816,9 @@ public class CommandHandler
                  + "It will be gone after a restart until you /savemap.");
     }
 
-    private static bool Elevated(UserSession session) => session.Can(Permissions.EditAny);
+    /// <summary>Whether somebody may change what other people built here: anywhere with edit-any, and
+    /// on a map of their own.</summary>
+    private bool Elevated(UserSession session) => session.Can(Permissions.EditAny) || OwnsHere(session);
 
     private OccupancyService? Seats(Action<IMessage> reply)
     {
@@ -1517,9 +1542,10 @@ public class CommandHandler
 
     private void HandleMove(UserSession session, string[] args, Action<IMessage> reply)
     {
-        // /tp NAME: go to a player.
+        // /move NAME: go to a player. Staff's on any map; on your own map /move is for coordinates.
         if (args.Length == 1)
         {
+            if (!session.Can("move")) { DenyCommand(reply); return; }
             if (OnlineSession(args[0]) is not { } other) { Say(reply, $"{args[0]} is not online."); return; }
             if (other == session) { Say(reply, "You are already where you are."); return; }
             PlaceBeside(session, other, session, reply);
@@ -1551,13 +1577,13 @@ public class CommandHandler
         }
         if (args.Length < 3)
         {
-            Say(reply, "Usage: /tp x y z (x east, y north, z height), or /tp NAME to go to a player.");
+            Say(reply, "Usage: /move x y z (x east, y north, z height), or /move NAME to go to a player.");
             return;
         }
 
         if (!float.TryParse(args[0], out float x) || !float.TryParse(args[1], out float y) || !float.TryParse(args[2], out float z))
         {
-            Say(reply, "Usage: /tp x y z — x east, y north, z height");
+            Say(reply, "Usage: /move x y z — x east, y north, z height");
             return;
         }
 
@@ -2167,8 +2193,10 @@ public class CommandHandler
         if (args.Length < 2) { Say(reply, $"Usage: /{verb} NAME PERMISSION. /perms lists the permissions."); return; }
         string perm = Permissions.Canonical(args[1].TrimStart('/').ToLowerInvariant());
         if (!Permissions.IsGated(perm)) { Say(reply, $"'{args[1]}' is not a permission. /perms lists them."); return; }
-        if (!Grantable(perm)) { Say(reply, "Roles and permissions stay with administrators: make them an administrator instead."); return; }
+        if (!Permissions.Grantable(perm)) { Say(reply, "Roles and permissions stay with administrators: make them an administrator instead."); return; }
         if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
+        // Without grant-any, a developer's: only to a player, and only what the developer can do.
+        if (!session.Can(Permissions.GrantAny) && GrantCeiling(session, record, perm) is { } refused) { Say(reply, refused); return; }
         var grants = Permissions.Parse(record.Permissions);
         bool changed = give ? grants.Add(perm) : grants.Remove(perm);
         if (!changed)
@@ -2204,7 +2232,7 @@ public class CommandHandler
         string who = "You are";
         if (args.Length > 0 && !args[0].Equals(session.Username, StringComparison.OrdinalIgnoreCase))
         {
-            if (session.Role != UserRole.Admin) { DenyCommand(reply); return; }
+            if (!session.Can(Permissions.PermsAny)) { DenyCommand(reply); return; }
             if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
             role = record.Role; grants = Permissions.Parse(record.Permissions); who = $"{record.Username} is";
             custom = record.CustomRole is { } c && _server.Roles.Exists(c) ? c : "";
@@ -2405,9 +2433,7 @@ public class CommandHandler
         }
     }
 
-    /// <summary>What a custom role or a /grant may carry: any permission but the ones that hand out
-    /// permissions. Those stay with administrators.</summary>
-    private static bool Grantable(string perm) => Permissions.IsGated(perm) && perm is not ("grant" or "revoke" or "setrole" or "role");
+    private static bool Grantable(string perm) => Permissions.Grantable(perm);
 
     private static string Describe(HashSet<string> perms) => perms.Count == 0 ? "no permissions yet" : string.Join(", ", perms.OrderBy(p => p));
 

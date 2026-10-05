@@ -15,7 +15,10 @@ public class CommandCatalogTests
         string player = CommandCatalog.Help(As(UserRole.Player));
         Assert.Contains("/take", player);
         Assert.DoesNotContain("/kick", player);
-        Assert.DoesNotContain("/spawn", player);
+        Assert.DoesNotContain("/give", player);
+        // Everybody builds on a map of their own, so the building verbs are listed for everybody.
+        Assert.Contains("/spawn", player);
+        Assert.Contains("/map", player);
         Assert.Contains("/kick", CommandCatalog.Help(As(UserRole.Moderator)));
         Assert.Contains("/setrole", CommandCatalog.Help(As(UserRole.Admin)));
     }
@@ -27,6 +30,13 @@ public class CommandCatalogTests
     [InlineData("tak", "/take")]
     public void ATypoIsAnsweredWithTheCommandMeant(string typed, string meant)
         => Assert.Contains(meant, CommandCatalog.Unknown(As(UserRole.Admin), typed));
+
+    [Fact]
+    public void HelpForABuildingVerbSaysItIsYoursOnYourOwnMaps()
+    {
+        Assert.Contains("on maps you own", CommandCatalog.HelpFor(As(UserRole.Player), "spawn"));
+        Assert.DoesNotContain("maps you own", CommandCatalog.HelpFor(As(UserRole.Dev), "spawn"));
+    }
 
     [Fact]
     public void ATypoNeverSuggestsACommandThePlayerCannotUse()

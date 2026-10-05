@@ -124,6 +124,11 @@ public class MapData
     /// <summary>Whether anybody may walk into it. Defaults to true, so that a map authored before
     /// there was such a question does not vanish from the list by having said nothing.</summary>
     public bool IsPublic { get; set; } = true;
+
+    /// <summary>Who the owner has let into a private map (/map invite), by username. Kept, with the
+    /// owner and the public flag, in map_access.json (MapAccessRepository) rather than in the map file,
+    /// so changing who may come in never rewrites the map.</summary>
+    [JsonIgnore] public List<string> Invited { get; set; } = new();
 }
 
 /// <summary>
@@ -461,7 +466,11 @@ public class MapRepository
         var maps = new List<MapData>();
         var options = JsonOptions;
 
-        foreach (var file in Directory.GetFiles(_directory, "*.json"))
+        // The maps that ship with the server, then the ones players made (/map new), which live in a
+        // folder of their own so that a checkout of the repository never carries anybody's map.
+        var files = Directory.GetFiles(_directory, "*.json").ToList();
+        if (Directory.Exists(PlayerDirectory)) files.AddRange(Directory.GetFiles(PlayerDirectory, "*.json"));
+        foreach (var file in files)
         {
             try
             {
@@ -595,9 +604,28 @@ public class MapRepository
     private static readonly HashSet<string> EntityFields = new(
         typeof(EntityData).GetProperties().Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Where the maps players make are kept: a folder of their own beside the shipped maps.</summary>
+    public string PlayerDirectory => Path.Combine(_directory, "players");
+
+    /// <summary>The file a map is in, or would be written to: a player's map in <see cref="PlayerDirectory"/>
+    /// (one already there, or a new one with an owner), every other map beside the shipped ones.</summary>
+    public string PathFor(MapData map)
+    {
+        string shipped = Path.Combine(_directory, $"{map.Id}.json");
+        string players = Path.Combine(PlayerDirectory, $"{map.Id}.json");
+        if (File.Exists(players)) return players;
+        if (!File.Exists(shipped) && !string.IsNullOrWhiteSpace(map.OwnerId)) return players;
+        return shipped;
+    }
+
+    /// <summary>Whether a map of this id has a file, shipped or a player's.</summary>
+    public bool Exists(string mapId)
+        => File.Exists(Path.Combine(_directory, $"{mapId}.json")) || File.Exists(Path.Combine(PlayerDirectory, $"{mapId}.json"));
+
     public string GetMapChecksum(string mapId)
     {
         string filePath = Path.Combine(_directory, $"{mapId}.json");
+        if (!File.Exists(filePath)) filePath = Path.Combine(PlayerDirectory, $"{mapId}.json");
         if (!File.Exists(filePath)) return "";
         
         using var sha256 = SHA256.Create();
@@ -615,7 +643,8 @@ public class MapRepository
     /// </summary>
     public void Save(MapData map)
     {
-        string filePath = Path.Combine(_directory, $"{map.Id}.json");
+        string filePath = PathFor(map);
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
         string json = JsonSerializer.Serialize(map, new JsonSerializerOptions { 
             WriteIndented = true, 
             Converters = { 

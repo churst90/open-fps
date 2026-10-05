@@ -166,7 +166,7 @@ public class AdminCommandTests : IDisposable
         Assert.Contains(_sent, s => s.To == friend && s.What is TextEvent t && t.Text.StartsWith("cody made you a developer."));
 
         // And it is a real role: the developer can now do what a developer does.
-        Assert.DoesNotContain("permission", string.Join(" ", Run(friend, "where", "cody")));
+        Assert.DoesNotContain("permission", string.Join(" ", Run(friend, "origin")));
 
         Assert.Equal("You cannot change your own role.", Assert.Single(Run(admin, "setrole", "cody", "player")));
         Assert.Equal(UserRole.Admin, _users.GetUser("cody")!.Role);
