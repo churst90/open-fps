@@ -66,7 +66,7 @@ public static class RestingStates
         bool fresh = !sent.TryGetValue(id, out var last);
         if (fresh) sent[id] = last = new SentState();
 
-        if (fresh || !last!.Transform.Equals(state.Transform) || last.Velocity != velocity || last.TyreDemand != state.TyreDemand)
+        if (fresh || !Same(last!.Transform, state.Transform) || last.Velocity != velocity || last.TyreDemand != state.TyreDemand)
         {
             last!.Transform = state.Transform;
             last.Velocity = velocity;
@@ -84,4 +84,8 @@ public static class RestingStates
         if (!wheels) state.Wheels = null;
         return fresh || force || keepAlive || wheels || tick - last.ChangedAt <= RepeatTicks;
     }
+
+    /// <summary>Field by field: the struct's own Equals boxes, five hundred times a tick a player.</summary>
+    private static bool Same(in QuantizedTransform a, in QuantizedTransform b)
+        => a.X == b.X && a.Y == b.Y && a.Z == b.Z && a.QX == b.QX && a.QY == b.QY && a.QZ == b.QZ && a.QW == b.QW;
 }
