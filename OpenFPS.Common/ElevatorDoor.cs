@@ -195,7 +195,9 @@ public static class ElevatorDoor
         private readonly Port edgePort, sillPort;
         private double shoeNoise, shoeLow;
         private readonly AccelerationNoise hookNoise;
-        private double hook, hookRate;
+        private double hook, hookRate, hookApproach;
+        private readonly Port keeperPort, pulleyPort;
+        private readonly double[] keeperHit;
         private bool hookFalling;
         private double vaneX, vaneV;
         private bool vaneOn;
@@ -238,6 +240,9 @@ public static class ElevatorDoor
             edgePort = new Port(faceField.PatchMass, 2e7, faceField.Impedance);
             sillPort = new Port(sillField.PatchMass, 2e7, sillField.Impedance);
             hookNoise = new AccelerationNoise(HookKg / 7850, dt);
+            keeperPort = new Port(headerField.PatchMass, 2e7, headerField.Impedance);
+            pulleyPort = new Port(headerField.PatchMass, 2e7, headerField.Impedance);
+            keeperHit = headerField.Point();
 
             // The motor's housing: a cast box's walls, from 1.1 kHz.
             var hz = new List<double>(); var l = new List<double>(); var m = new List<double>(); var g = new List<double>();
@@ -324,17 +329,21 @@ public static class ElevatorDoor
                     profU = Math.Max(0, profU + profA * dt);
                     motorV = dir * profU; motorA = dir * profA;
                     motorX += motorV * dt;
-                    if ((opening && motorX >= to - 0.002) || (!opening && motorX <= to + 0.004))
+                    if ((opening && motorX >= to - 0.002) || (!opening && motorX <= to + 0.001))
                     {
                         arrived = true; arrivedAt = time; motorV = 0; motorA = 0;
                         Log($"{time * 1000:F0} ms  the operator at its end ({(time - start):F2} s of travel)");
                         end = time + (opening ? 0.6 : 1.4);
-                        if (!opening) { hookFalling = true; hook = HookDrop; }
+                        // Shut: the operator leans on the leaves with about 60 N through its belt, and a moment later
+                        // the vane opens and the landing lock's hook falls into its keeper.
+                        if (!opening) { motorX = -60 / BeltK; hookAt = time + 0.3; }
                     }
                 }
+                if (hookAt > 0 && time >= hookAt) { hookAt = -1; hookFalling = true; hook = HookDrop; Log($"{time * 1000:F0} ms  the hook falls"); }
                 Tick(opening, motorV);
             }
         }
+        private double hookAt = -1;
 
         private static double ProfileSeconds(bool opening, double travel, double vRun)
         {
@@ -419,7 +428,7 @@ public static class ElevatorDoor
                 vaneV += ((vaneX > 0 ? 20 : 0) - fv) / VaneKg * dt;
                 vaneX += vaneV * dt;
                 panel.Push(panelAtWheel[1], fv);
-                headerField.Modes.Push(pulleyHit, fv * 0.2);
+                headerField.Modes.Push(keeperHit, keeperPort.Step(fv * 0.2, dt, out _));
                 Note("vane", fv);
                 if (vaneX > 0.0005 && hook == 0) { hook = 1e-9; hookRate = 0.05; Log($"{time * 1000:F0} ms  the hook lifts"); }
             }
@@ -429,10 +438,10 @@ public static class ElevatorDoor
             }
             if (hookFalling)
             {
-                double fk = Contact(HookK, HookLambda, -hook, -hookRate);
+                double fk = ContactRestitution(HookK, 0.35, -hook, -hookRate, ref hookApproach);
                 double ha = -G * 3 + fk / HookKg;     // a spring helps gravity
                 hookRate += ha * dt; hook += hookRate * dt;
-                headerField.Modes.Push(pulleyHit, fk);
+                headerField.Modes.Push(keeperHit, keeperPort.Step(fk, dt, out _));
                 pLock += hookNoise.Pressure(ha);
                 Note("hook-drop", fk);
             }
@@ -457,7 +466,7 @@ public static class ElevatorDoor
                 if (toothLeft > 0)
                 {
                     double f = toothForce * Math.Sin(Math.PI * (1 - toothLeft / 1.5e-4));
-                    headerField.Modes.Push(pulleyHit, f);
+                    headerField.Modes.Push(pulleyHit, pulleyPort.Step(f, dt, out _));
                     toothLeft -= dt;
                 }
                 pOp = motorHousing.Step();

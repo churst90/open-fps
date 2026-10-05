@@ -267,6 +267,8 @@ public static class GlassDoor
     /// <summary>A key turned and held draws the bolt to 1.5 mm out, through the lock's hub: as stiff as the
     /// knob door's cam.</summary>
     private const double KeyHoldStiffness = 2e6, KeyHoldDamping = 40;
+    /// <summary>The key turned back by the hand to take it out, as the latch's travel: about 0.15 m/s.</summary>
+    private const double KeyBackSpeed = 0.15;
 
     // The touchbar (as the steel door's, on an aluminium case).
     private const double BarMass = 0.15, BarTravel = 0.016, BarPlay = 0.004, BarPreload = 8, BarRate = 600;
@@ -347,6 +349,7 @@ public static class GlassDoor
         private readonly Modes lockCase;
         private readonly double[] lockCaseHit;
         private bool keyHeld, dogged;
+        private double keyReturn;
 
         // The bar.
         private readonly DenseField? caseField, padField;
@@ -677,7 +680,7 @@ public static class GlassDoor
                 if (away < 0 && time > 1.5) { Log($"{time * 1000:F0} ms  the leaf never left its stop"); break; }
                 if (keyHeld && edge > 0.02 && keyGone < 0)
                 {
-                    keyGone = time; keyHeld = false;
+                    keyGone = time; keyHeld = false; keyReturn = 1e-9;
                     Log($"{time * 1000:F0} ms  key let go: the latch springs out");
                 }
                 Tick(opening: true);
@@ -791,9 +794,12 @@ public static class GlassDoor
                 else if (boltInStrike) { Note("keeper", 0); boltInStrike = false; Log($"{time * 1000:F1} ms  bolt in"); }
 
                 // The key, or the dogging, holding the bolt in.
-                if (keyHeld || dogged)
+                if (keyHeld || dogged || keyReturn > 0)
                 {
-                    double depth = bolt - RetractedAt;
+                    // Let go, the key is turned back by the hand to come out: the hold goes back out at the hand's
+                    // pace and the latch spring follows it to its stop.
+                    if (!keyHeld && !dogged) keyReturn = Math.Min(Throw + 0.002, keyReturn + KeyBackSpeed * dt);
+                    double depth = bolt - (RetractedAt + (keyHeld || dogged ? 0 : keyReturn));
                     if (depth > 0) boltForce -= Math.Max(0, KeyHoldStiffness * depth + KeyHoldDamping * boltRate);
                 }
 

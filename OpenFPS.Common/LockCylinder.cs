@@ -72,7 +72,7 @@ public static class LockCylinder
     /// When, in a render, the latch is drawn and the key held: the door can be opened from here. The server
     /// sends the door's opening this long after the key.
     /// </summary>
-    public const float UnlockSeconds = 1.15f;
+    public const float UnlockSeconds = 1.25f;
 
     /// <summary>
     /// Each character: how many keys hang on the ring besides the one in the lock, how long the hand takes to
@@ -201,7 +201,7 @@ public static class LockCylinder
         private readonly double[] pinY, pinV, pinApproach;
         private readonly double[] pinAt;
         private readonly Modes keyInLock;
-        private readonly Mount plug;
+        private readonly Mount plug, lockBody;
         private readonly AccelerationNoise plugNoise, hubNoise;
         private readonly AccelerationNoise[] pinNoise;
 
@@ -282,6 +282,7 @@ public static class LockCylinder
             pinNoise = new AccelerationNoise[Pins];
             for (int k = 0; k < Pins; k++) { pinAt[k] = FirstCut + k * CutSpacing; pinNoise[k] = new AccelerationNoise(PinKg / 8500, dt); }
             plug = new Mount(PlugKg, PlugMountK, PlugMountZeta);
+            lockBody = new Mount(0.35, 3e7, 0.15);
             plugNoise = new AccelerationNoise(PlugVolume, dt);
             hubNoise = new AccelerationNoise(HubKg / 7850, dt);
 
@@ -506,9 +507,13 @@ public static class LockCylinder
             }
 
             // The cylinder in its door: the plug's shell on its set screw passes its blows to the door's patch.
+            // The cylinder is held in the lock's body (a 0.35 kg steel case), and the body on its screws in the
+            // door: the blows reach the door through both.
             plug.F += plugForce;
             plug.Step(dt);
-            hostForce += plug.Reaction;
+            lockBody.F += plug.Reaction;
+            lockBody.Step(dt);
+            hostForce += lockBody.Reaction;
             hostField.Modes.Push(hostHit, hostPort.Step(hostForce, dt, out double toLeaf));
             hostField.Modes.Push(faceHit, facePort.Step(faceForce, dt, out double toLeaf2));
             hostLeaf.Push(leafAtLock, toLeaf); hostLeaf.Push(leafBelow, toLeaf2);
