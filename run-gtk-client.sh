@@ -197,6 +197,10 @@ fi
 #   $CLIENTLOG  the client's own log, written by the CLIENT. Survives the terminal going away,
 #               which is the point: closing the console does not lose the client's log.
 CLIENTLOG="${LOG%.log}-client.log"
+# One run per file, the run before kept beside it. The client APPENDS, and Serilog stops writing a
+# file at 1 GB without a word: /tmp/openfps-sa-on-client.log reached that on 2026-10-04 at 19:36
+# and every run after it, the 2026-10-05 session included, logged nothing at all.
+if [ -e "$CLIENTLOG" ]; then mv -f "$CLIENTLOG" "${CLIENTLOG%.log}.prev.log"; fi
 export OPENFPS_LOG="$CLIENTLOG"
 echo "(logging to $LOG; the client also writes its own to $CLIENTLOG)"
 START_EPOCH=$(date +%s)
