@@ -2801,11 +2801,16 @@ public class ClientAudioSystem
     private const float FootstepRange = 15f;
 
     /// <summary>Somebody else's step: a sound at a place in the world, left there as they walk on.
-    /// Only one close enough to hear is made at all.</summary>
+    /// Only one close enough to hear is made at all. <paramref name="bodyId"/> is whose foot it was:
+    /// their own body is not a wall between their foot and you (see CarryThePath).</summary>
     public void OnPlayerFootstep(Vector3 pos, string mat, string var, StepSlope slope = StepSlope.Level)
+        => OnPlayerFootstep(pos, mat, var, slope, bodyId: -1);
+
+    public void OnPlayerFootstep(Vector3 pos, string mat, string var, StepSlope slope, int bodyId)
     {
         if (Vector3.Distance(pos, _state.VisualPosition) > FootstepRange) return;
-        SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero, boostDb: 0f, slope: slope);
+        SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero, boostDb: 0f, slope: slope,
+                       bodyId: bodyId);
     }
 
     /// <summary>
@@ -2850,7 +2855,7 @@ public class ClientAudioSystem
     internal (StepSlope Slope, float Db, float Pitch) LastStepGait { get; private set; }
 
     private void SubmitFootstep(Vector3 nudgePos, string mat, bool follows, Vector3 offset, float boostDb,
-                                StepSlope slope = StepSlope.Level)
+                                StepSlope slope = StepSlope.Level, int bodyId = -1)
     {
         // Your own feet ride with you (follows); anybody else's stay where they fell.
         bool own = follows;
@@ -2899,7 +2904,7 @@ public class ClientAudioSystem
             // The room the body is standing in, so its reverberation is THAT room's.
             TargetRegionId = _listenerRegion,
         };
-        if (!own) CarryThePath(ref footstep, nudgePos);
+        if (!own) CarryThePath(ref footstep, nudgePos, bodyId);
         _audio.Submit(footstep);
 
         // The walls answering YOUR footfalls. Other people's steps have none: their pool is yours.
@@ -2918,12 +2923,20 @@ public class ClientAudioSystem
     /// simulator's result for the nearest source it heard a moment ago (their voice, their last step),
     /// moved to this one; failing that, the hand-rolled tracer. And the step reverberates in the room
     /// the FOOT is in, not the room you are in.
+    ///
+    /// The tracer is told whose foot it is, so that it leaves their body out. A player's body is a
+    /// solid cylinder (it is what you bump into), and the foot is inside it: the rays from your ear
+    /// ended in it, three of the five went through a body-sized chord of whatever floor that player
+    /// was last standing on (MovementSystem writes it to the body's material), and every step of
+    /// every other player came out 8 dB down with occlusion 0.6, at four metres as at nine — lost
+    /// under a city street (Cody and Sean, 2026-10-05: "I cannot hear his footsteps while he's walking, only his
+    /// beacon"). The people walking the city are not solid, which is why theirs were heard.
     /// </summary>
-    private void CarryThePath(ref SpatialEmitter step, Vector3 at)
+    private void CarryThePath(ref SpatialEmitter step, Vector3 at, int bodyId = -1)
     {
         if (_groundWorld is not { } world) return;
         Vector3 ear = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
-        var path = _acoustics.CalculateAcousticPath(world, step.EntityId, ear, at);
+        var path = _acoustics.CalculateAcousticPath(world, bodyId >= 0 ? bodyId : step.EntityId, ear, at);
         if (_acousticWorker.TryGetNearby(ear, at, out var near))
         {
             Vector3 moved = at - near.SourcePosition;

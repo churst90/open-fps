@@ -79,7 +79,7 @@ public class OtherBodiesTests
         string soundId = "")
     {
         var steps = new List<(Vector3, string)>();
-        others.OnStepTriggered += (p, m, _, _) => steps.Add((p, m));
+        others.OnStepTriggered += (p, m, _, _, _) => steps.Add((p, m));
 
         // A body that is walking has the velocity to show for it; one that is being moved does not.
         var velocity = underItsOwnPower ? new Vector3(0, 0, metresPerUpdate * 10f) : Vector3.Zero;
@@ -225,7 +225,7 @@ public class OtherBodiesTests
         var others = new OtherBodies();
         int landings = 0, steps = 0;
         others.OnLandTriggered += (_, _, _) => landings++;
-        others.OnStepTriggered += (_, _, _, _) => steps++;
+        others.OnStepTriggered += (_, _, _, _, _) => steps++;
 
         var at = new Vector3(0, 2f, 0);
 

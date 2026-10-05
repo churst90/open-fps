@@ -1411,6 +1411,13 @@ public class GameServer
                         // only once: KnownEntities is what makes it once rather than every tick.
                         bool isNew = session.KnownEntities.Add(e.Id);
                         bool defined = isNew || _dirtyAudioBuffer.Contains(e.Id);
+                        // Somebody getting into or out of a seat: the definition says which, and it is
+                        // the only thing that tells a client a body moving at a car's speed is not
+                        // running (EntityDefinition.RidingEntityId). Noticed here rather than at each
+                        // way in and out of a seat, of which there are many.
+                        int seatedIn = isDynamic && world.Has<OccupantComponent>(e) ? world.Get<OccupantComponent>(e).RootEntityId : -1;
+                        if (isDynamic && !defined && session.SentStates.TryGetValue(e.Id, out var told) && told.Riding != seatedIn)
+                            defined = true;
                         if (defined)
                             Deliver(peer, session, CreateDefinition(world, e), DeliveryMethod.ReliableOrdered);
 
@@ -1448,6 +1455,7 @@ public class GameServer
                             if (RestingStates.ShouldSend(session.SentStates, ref state, tick, force: defined || e == session.Entity))
                                 _reusableBroadcast.States.Add(state);
                             else PerfProbe.Count("server.broadcast.resting");
+                            session.SentStates[e.Id].Riding = seatedIn;
                         }
                         else _reliableBroadcast.States.Add(state);
                     }
