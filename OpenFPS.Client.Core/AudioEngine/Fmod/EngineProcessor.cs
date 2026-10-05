@@ -1107,17 +1107,17 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                 {
                     float demand = _wheelDemand[k] + (_wheelDriven[k] ? _tyreChirp : 0f);
                     float sq = VehicleSynth.WheelSqueal(Vehicle.Tyres, demand, _wheelSlipVelocity[k], _wheelLoad[k], _squealSlipVelocity,
-                                                         _wheelSqueal.Length, _rng, ref _wheelSqueal[k], _wheelStickSlip[k]) * _wheelGain[k];
+                                                         _wheelSqueal.Length, _rng, ref _wheelSqueal[k], _wheelStickSlip[k], SampleRate) * _wheelGain[k];
                     if (_wheelFront[k]) frontSliding += sq; else rearSliding += sq;
                 }
-                tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _tyre, _rollingRearPa, _rearRadius, rearSliding);
-                tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _tyreFront, _rollingFrontPa, _frontRadius, frontSliding);
+                tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _tyre, _rollingRearPa, _rearRadius, rearSliding, SampleRate);
+                tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _tyreFront, _rollingFrontPa, _frontRadius, frontSliding, SampleRate);
             }
             else
             {
                 AxleSlip(RoadSlip, wheels, out float frontSlip, out float rearSlip);
-                tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, rearSlip + _tyreChirp, _rng, ref _tyre, _rollingRearPa, _rearRadius);
-                tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, frontSlip + _tyreChirp, _rng, ref _tyreFront, _rollingFrontPa, _frontRadius);
+                tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, rearSlip + _tyreChirp, _rng, ref _tyre, _rollingRearPa, _rearRadius, sampleRate: SampleRate);
+                tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, frontSlip + _tyreChirp, _rng, ref _tyreFront, _rollingFrontPa, _frontRadius, sampleRate: SampleRate);
             }
             float rearTyre = tyreRear * PerAxle * TyreMix;
             float frontTyre = tyreFront * PerAxle * TyreMix;

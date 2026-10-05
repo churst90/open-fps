@@ -225,6 +225,8 @@ public static class VehicleSynth
         public float RollHp;
         /// <summary>And its second lowpass pole.</summary>
         public float RollLp;
+        /// <summary>The rolling path's filters at the rate this voice runs at, found on its first sample.</summary>
+        internal RollingFilters? Rolling;
     }
 
     /// <summary>
@@ -242,9 +244,9 @@ public static class VehicleSynth
     /// twice and the high-pass, over the input's. Integrated from the two filters' responses rather than
     /// assumed, so the declared level is the level the roar really makes wherever the lowpass is.
     /// </summary>
-    internal static float RollingBandGain(float a)
+    internal static float RollingBandGain(float a, float rate = SampleRate)
     {
-        float b = 1f - MathF.Exp(-2f * MathF.PI * RollingHighPassHz / SampleRate);
+        float b = 1f - MathF.Exp(-2f * MathF.PI * RollingHighPassHz / rate);
         const int N = 512;
         double sum = 0;
         for (int k = 0; k < N; k++)
@@ -259,23 +261,35 @@ public static class VehicleSynth
         return (float)(sum / N);
     }
 
-    /// <summary>The gains of <see cref="RollingBandGain"/> over the lowpass's range, filled once.</summary>
-    private static readonly float[] RollingBandTable = BuildRollingTable();
     private const float RollA0 = 0.06f, RollA1 = 0.34f;
 
-    private static float[] BuildRollingTable()
+    /// <summary>
+    /// The anchored rolling path's high-pass at one sample rate, and the gains of
+    /// <see cref="RollingBandGain"/> over the lowpass's range at that rate. Made once per rate: the
+    /// mixer runs at whatever the device does, and 400 Hz is 400 Hz at 48 kHz too.
+    /// </summary>
+    internal sealed class RollingFilters
     {
-        var t = new float[65];
-        for (int i = 0; i < t.Length; i++) t[i] = RollingBandGain(RollA0 + (RollA1 - RollA0) * i / (t.Length - 1));
-        return t;
-    }
+        public readonly float Rate, HpAlpha;
+        private readonly float[] _table = new float[65];
 
-    private static float RollingBand(float a)
-    {
-        float x = Math.Clamp((a - RollA0) / (RollA1 - RollA0), 0f, 1f) * (RollingBandTable.Length - 1);
-        int i = Math.Min((int)x, RollingBandTable.Length - 2);
-        float f = x - i;
-        return RollingBandTable[i] + (RollingBandTable[i + 1] - RollingBandTable[i]) * f;
+        private RollingFilters(float rate)
+        {
+            Rate = rate;
+            HpAlpha = 1f - MathF.Exp(-2f * MathF.PI * RollingHighPassHz / rate);
+            for (int i = 0; i < _table.Length; i++) _table[i] = RollingBandGain(RollA0 + (RollA1 - RollA0) * i / (_table.Length - 1), rate);
+        }
+
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<float, RollingFilters> _byRate = new();
+        public static RollingFilters At(float rate) => _byRate.GetOrAdd(rate, static r => new RollingFilters(r));
+
+        public float Band(float a)
+        {
+            float x = Math.Clamp((a - RollA0) / (RollA1 - RollA0), 0f, 1f) * (_table.Length - 1);
+            int i = Math.Min((int)x, _table.Length - 2);
+            float f = x - i;
+            return _table[i] + (_table[i + 1] - _table[i]) * f;
+        }
     }
 
     /// <summary>
@@ -309,8 +323,10 @@ public static class VehicleSynth
     /// <param name="sliding">Squeal made elsewhere, wheel by wheel (<see cref="WheelSqueal"/>), to go
     /// out through this voice's output stage with its rolling noise. A caller that passes it passes
     /// no <paramref name="slip"/> of its own, so the sliding is not made twice.</param>
+    /// <param name="sampleRate">The rate the caller runs at, which sets the tread tone, the rolling
+    /// high-pass and the squeal's resonators in hertz.</param>
     public static float Tyre(TyreProfile t, float speed, float slip, Random rng, ref TyreVoice v, float rollingPa = 0f,
-                             float rollingRadius = 0.337f, float sliding = 0f)
+                             float rollingRadius = 0.337f, float sliding = 0f, float sampleRate = SampleRate)
     {
         // The demand is smoothed, and asymmetrically: a tyre lets go quickly and settles slowly, so
         // a squeal starts on the instant and dies away over a couple of hundred milliseconds. Stepping
@@ -333,7 +349,7 @@ public static class VehicleSynth
         if (t.TreadBlocks > 0)
         {
             float blockHz = speed / (2f * MathF.PI * MathF.Max(0.05f, rollingRadius)) * t.TreadBlocks;
-            v.TreadPhase += 2.0 * Math.PI * blockHz / SampleRate;
+            v.TreadPhase += 2.0 * Math.PI * blockHz / sampleRate;
             if (v.TreadPhase > 2.0 * Math.PI) v.TreadPhase -= 2.0 * Math.PI;
             tone = (float)(Math.Sin(v.TreadPhase) * 0.34 + Math.Sin(v.TreadPhase * 2) * 0.16);
             tone *= 1f - t.SurfaceRoughness * 0.55f;
@@ -346,10 +362,12 @@ public static class VehicleSynth
             // them at 20 m/s so the character of each tyre is unchanged. What comes out is the
             // declared pressure times the speed law, divided by the output stage's small-signal gain
             // (see the return) so that it is the level that leaves this function.
+            var rolling = v.Rolling;
+            if (rolling == null || rolling.Rate != sampleRate) v.Rolling = rolling = RollingFilters.At(sampleRate);
             v.RollLp += cutoff * (roar - v.RollLp);
-            v.RollHp += RollHpAlpha * (v.RollLp - v.RollHp);
+            v.RollHp += rolling.HpAlpha * (v.RollLp - v.RollHp);
             float band = v.RollLp - v.RollHp;
-            float bandRms = MathF.Sqrt(RollingBand(cutoff) / 3f) * (0.55f + 0.45f * t.SurfaceRoughness);
+            float bandRms = MathF.Sqrt(rolling.Band(cutoff) / 3f) * (0.55f + 0.45f * t.SurfaceRoughness);
             float roarW = 1.4f * (0.55f + 0.45f * t.SurfaceRoughness) * 0.19f;
             float toneW = t.TreadBlocks > 0 ? 0.2657f * (1f - t.SurfaceRoughness * 0.55f) : 0f;
             float norm = MathF.Sqrt(roarW * roarW + toneW * toneW);
@@ -378,8 +396,8 @@ public static class VehicleSynth
                 // Two poles at the fundamental and one at the second harmonic. Real squeal is rich —
                 // the release is a snap, not a sine — and the octave is most of what makes it read as
                 // rubber rather than as a test tone.
-                float sq = Resonate(ref v.R1, ref v.R2, noise, hz, t.SquealQ)
-                         + Resonate(ref v.R1b, ref v.R2b, noise, hz * 2f, t.SquealQ * 0.7f) * 0.45f;
+                float sq = Resonate(ref v.R1, ref v.R2, noise, hz, t.SquealQ, sampleRate)
+                         + Resonate(ref v.R1b, ref v.R2b, noise, hz * 2f, t.SquealQ * 0.7f, sampleRate) * 0.45f;
                 mix += sq * amp;
             }
 
@@ -412,8 +430,6 @@ public static class VehicleSynth
 
     /// <summary>The output stage's gain for small signals: tanh(0.05 y) x 26.</summary>
     private const float OutputGain = 0.05f * 26f;
-
-    private static readonly float RollHpAlpha = 1f - MathF.Exp(-2f * MathF.PI * RollingHighPassHz / SampleRate);
 
     /// <summary>
     /// How much louder a squeal is rendered than its sound pressure alone would suggest.
@@ -479,9 +495,11 @@ public static class VehicleSynth
     /// <see cref="TyreProfile.SquealDb"/>'s share for one wheel.</param>
     /// <param name="wheels">How many wheels the vehicle has: <see cref="TyreProfile.SquealDb"/> is the
     /// level the two axle voices together made at the limit, so each of n wheels gets 2/n of its power.</param>
+    /// <param name="sampleRate">The rate the caller runs at, which sets the resonators in hertz.</param>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public static float WheelSqueal(TyreProfile t, float demand, float slipVelocity, float loadShare, float referenceSlipVelocity,
-                                    int wheels, Random rng, ref WheelSquealVoice v, float stickSlip = 1f)
+                                    int wheels, Random rng, ref WheelSquealVoice v, float stickSlip = 1f,
+                                    float sampleRate = SampleRate)
     {
         // Smoothed as the axle voice smooths its demand: a tyre lets go on the instant and settles
         // over a couple of hundred milliseconds.
@@ -503,8 +521,8 @@ public static class VehicleSynth
             if ((v.Tick++ & 63) == 0)
             {
                 float hz = t.SquealHz * TyreFriction.SquealPitch(d);
-                Coefficients(hz, t.SquealQ, out v.C1, out v.C2, out v.G);
-                Coefficients(hz * 2f, t.SquealQ * 0.7f, out v.C1b, out v.C2b, out v.Gb);
+                Coefficients(hz, t.SquealQ, sampleRate, out v.C1, out v.C2, out v.G);
+                Coefficients(hz * 2f, t.SquealQ * 0.7f, sampleRate, out v.C1b, out v.C2b, out v.Gb);
             }
             float y1 = noise * v.G + v.C1 * v.R1 - v.C2 * v.R2;
             v.R2 = v.R1; v.R1 = y1;
@@ -521,9 +539,9 @@ public static class VehicleSynth
     }
 
     /// <summary>The coefficients <see cref="Resonate"/> computes each sample, computed once.</summary>
-    private static void Coefficients(float hz, float q, out float c1, out float c2, out float g)
+    private static void Coefficients(float hz, float q, float rate, out float c1, out float c2, out float g)
     {
-        float w = 2f * MathF.PI * Math.Clamp(hz, 40f, SampleRate * 0.45f) / SampleRate;
+        float w = 2f * MathF.PI * Math.Clamp(hz, 40f, rate * 0.45f) / rate;
         float r = MathF.Exp(-w / (2f * MathF.Max(0.5f, q)));
         c1 = 2f * r * MathF.Cos(w);
         c2 = r * r;
@@ -539,9 +557,9 @@ public static class VehicleSynth
     /// entire point: a squeal is a resonance being excited, not a filtered hiss.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static float Resonate(ref float z1, ref float z2, float x, float hz, float q)
+    private static float Resonate(ref float z1, ref float z2, float x, float hz, float q, float rate)
     {
-        float w = 2f * MathF.PI * Math.Clamp(hz, 40f, SampleRate * 0.45f) / SampleRate;
+        float w = 2f * MathF.PI * Math.Clamp(hz, 40f, rate * 0.45f) / rate;
         float r = MathF.Exp(-w / (2f * MathF.Max(0.5f, q)));
         float y = x * (1f - r) + 2f * r * MathF.Cos(w) * z1 - r * r * z2;
         z2 = z1; z1 = y;

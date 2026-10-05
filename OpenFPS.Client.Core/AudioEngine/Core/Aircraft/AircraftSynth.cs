@@ -326,7 +326,7 @@ public sealed class AircraftSynth
             float slip = _groundSpeed > 0.5f ? (_groundSpeed - _wheelSpeed) / _groundSpeed : 0f;
             // The model works in one tyre; there are several, side by side, and they are not in
             // step with one another, so they add as power.
-            gear = VehicleSynth.Tyre(g.Tyre, _groundSpeed, slip, _gearRng, ref _gearVoice)
+            gear = VehicleSynth.Tyre(g.Tyre, _groundSpeed, slip, _gearRng, ref _gearVoice, sampleRate: _rate)
                  * MathF.Sqrt(MathF.Max(1, g.Wheels));
         }
 

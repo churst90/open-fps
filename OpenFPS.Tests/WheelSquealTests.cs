@@ -60,6 +60,76 @@ public class WheelSquealTests
         Assert.True(harder > baseline);
     }
 
+    /// <summary>Where a signal's averaged spectrum peaks between two frequencies, Hz: eight
+    /// half-overlapping windows of 8192, a bin every 2 Hz.</summary>
+    private static double PeakHz(float[] x, float rate, double lo, double hi)
+    {
+        const int N = 8192;
+        var hann = new double[N];
+        for (int i = 0; i < N; i++) hann[i] = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / N);
+        double best = 0, at = lo;
+        for (double f = lo; f <= hi; f += 2)
+        {
+            double w = 2 * Math.PI * f / rate, c = 2 * Math.Cos(w), e = 0;
+            for (int start = 0; start + N <= x.Length && start < 8 * N / 2; start += N / 2)
+            {
+                double s1 = 0, s2 = 0;
+                for (int i = 0; i < N; i++) { double s0 = x[start + i] * hann[i] + c * s1 - s2; s2 = s1; s1 = s0; }
+                e += s1 * s1 + s2 * s2 - c * s1 * s2;
+            }
+            if (e > best) { best = e; at = f; }
+        }
+        return at;
+    }
+
+    /// <summary>
+    /// A tyre is in hertz whatever rate the device runs at. The mixer runs at the device's rate, often
+    /// 48 kHz, and the tread tone, the rolling high-pass and the squeal's resonators were worked out at
+    /// 44.1 kHz whatever it was, so at 48 kHz every one of them came out 9 % sharp.
+    /// </summary>
+    [Fact]
+    public void A_tyre_is_in_hertz_at_any_device_rate()
+    {
+        var tyre = TyreProfile.SportsOnAsphalt;
+        var slick = tyre with { TreadBlocks = 0 };
+        foreach (float rate in new[] { 44100f, 48000f })
+        {
+            int n = (int)(rate * 1.2f);
+            float[] Run(Func<Random, float> step)
+            {
+                var rng = new Random(9);
+                var y = new float[n];
+                for (int i = 0; i < n; i++) y[i] = step(rng);
+                return y[(int)(rate * 0.2f)..];
+            }
+
+            // The tread blocks at 20 m/s on a 0.337 m tyre: speed over the circumference, times the blocks.
+            double blockHz = 20.0 / (2 * Math.PI * 0.337) * tyre.TreadBlocks;
+            var rolling = new VehicleSynth.TyreVoice();
+            double tone = PeakHz(Run(r => VehicleSynth.Tyre(tyre, 20f, 0f, r, ref rolling, 0.1f, sampleRate: rate)), rate,
+                                 blockHz * 0.8, blockHz * 1.2);
+
+            // The squeal, from the axle voice and from one wheel: a note at its pitch for the demand.
+            double squealHz = tyre.SquealHz * TyreFriction.SquealPitch(0.95f);
+            var axle = new VehicleSynth.TyreVoice { SlipSmooth = 0.95f };
+            double axleNote = PeakHz(Run(r => VehicleSynth.Tyre(slick, 20f, 0.95f, r, ref axle, sampleRate: rate)), rate,
+                                     squealHz * 0.8, squealHz * 1.25);
+            var wheel = new VehicleSynth.WheelSquealVoice { Demand = 0.95f, SlipVelocity = 1.4f };
+            double wheelNote = PeakHz(Run(r => VehicleSynth.WheelSqueal(tyre, 0.95f, 1.4f, 1f, 1.4f, 4, r, ref wheel, sampleRate: rate)),
+                                      rate, squealHz * 0.8, squealHz * 1.25);
+
+            // The rolling roar's high-pass, from its coefficient at this rate.
+            double cornerHz = -Math.Log(1 - VehicleSynth.RollingFilters.At(rate).HpAlpha) * rate / (2 * Math.PI);
+
+            _o.WriteLine($"{rate:F0} Hz: tread {tone:F0} Hz (blocks {blockHz:F0}), squeal axle {axleNote:F0} and wheel {wheelNote:F0} Hz "
+                       + $"(pitch {squealHz:F0}), high-pass {cornerHz:F0} Hz");
+            Assert.InRange(tone, blockHz - 3, blockHz + 3);
+            Assert.InRange(axleNote, squealHz * 0.97, squealHz * 1.03);
+            Assert.InRange(wheelNote, squealHz * 0.97, squealHz * 1.03);
+            Assert.InRange(cornerHz, VehicleSynth.RollingHighPassHz * 0.99, VehicleSynth.RollingHighPassHz * 1.01);
+        }
+    }
+
     /// <summary>The wheels as the server would send them for a car with only its right-hand tyres
     /// starting to squeal, at 15 m/s: a light squeal, so the voice is nowhere near its ceiling and
     /// the levels compare.</summary>
