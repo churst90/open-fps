@@ -185,6 +185,22 @@ public class CommandHandler
             case "reload":
                 _combat.Reload(session, reply);
                 break;
+            // The fire selector, X and Shift+X; on the admin gun, its mode.
+            case "selector":
+                _combat.Selector(session, args, reply);
+                break;
+            // The trigger let go: automatic fire stops. Sent by the client when Enter comes up.
+            case "cease":
+                _combat.Cease(session);
+                break;
+            // The admin gun's calibre (Y and Shift+Y) and its settings; gated by admin-gun (Permissions).
+            case "calibre":
+            case "caliber":
+                _combat.Calibre(session, args, reply);
+                break;
+            case "admingun":
+                _combat.AdminGunCommand(session, args, reply);
+                break;
             case "ammo":
                 Say(reply, _combat.AmmoReadout(session));
                 break;

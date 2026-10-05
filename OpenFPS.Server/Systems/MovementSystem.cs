@@ -111,6 +111,12 @@ public static class MovementSystem
                     velocity.Linear = Vector3.Zero;
                     continue;
                 }
+                // FROZEN by the admin gun: held where they stand, as the dead are, until it wears off.
+                if (world.Has<OpenFPS.Server.Core.FrozenComponent>(e))
+                {
+                    velocity.Linear = Vector3.Zero;
+                    continue;
+                }
                 if (world.Has<OccupantComponent>(e))
                 {
                     if (input.LookDelta != Vector2.Zero)

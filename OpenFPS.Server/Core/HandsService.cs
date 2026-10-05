@@ -162,6 +162,8 @@ public class HandsService
         prefabId = ResolveItem(prefabId) ?? prefabId;
         if (!_maps.Prefabs.TryGetValue(prefabId, out var template) || !(template.IsItem || template.Type == EntityType.Item))
         { message = $"There is no item called {prefabId}. Items: {string.Join(", ", GivableItems())}."; return false; }
+        if (string.Equals(template.WeaponId, AdminGun.WeaponId, StringComparison.OrdinalIgnoreCase) && !to.Can(Permissions.AdminGun))
+        { message = $"The admin gun is the admin's alone; {to.Username} cannot have it."; return false; }
         if (!TryGetHolder(to, out var world, out _, out var lookup) || to.Entity == Entity.Null || !world.IsAlive(to.Entity))
         { message = $"{to.Username} is not in the world just now."; return false; }
 
@@ -260,6 +262,9 @@ public class HandsService
                                               : $"There is no {named} near you.";
             return false;
         }
+
+        if (CombatService.IsAdminGun(world, item.Value) && !session.Can(Permissions.AdminGun))
+        { message = "The admin gun is the admin's alone. You leave it where it is."; return false; }
 
         if (!PutInHands(world, session.Entity, item.Value, out string why))
         { message = $"{why} {Carrying(world, lookup, world.Get<HandsComponent>(session.Entity))}"; return false; }

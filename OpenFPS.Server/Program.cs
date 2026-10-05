@@ -292,7 +292,13 @@ public class GameServer
         // Beside it, and a file for the same reason. See TeamRepository.
         Teams = new TeamRepository("teams.json");
         // A pedestrian shot dead is taken away after a while and somebody else walks their walk.
-        var combat = new CombatService(_maps, this, _sessions) { ReplaceWalker = _vehicles.ReplaceWalker };
+        var combat = new CombatService(_maps, this, _sessions)
+        {
+            ReplaceWalker = _vehicles.ReplaceWalker,
+            // The admin gun freezes what the traffic moves, and forgets a vehicle before vaporizing it.
+            MovedByTraffic = _vehicles.Moves,
+            ForgetVehicle = _vehicles.Forget,
+        };
         // A flown bullet slows in the map's air and drifts in the server's wind.
         combat.Weather = mapId =>
         {

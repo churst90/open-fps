@@ -323,6 +323,13 @@ public sealed partial class ClientGameSession : IDisposable
         // player reaching for a door with empty hands must not be told they have nothing to fire.
         _bindings.Bind(InputContext.Gameplay, GameKey.Enter, () => { if (EnterFires(_state)) Fire(); else Interact(); });
 
+        // X: the fire selector, a detent on; Shift+X back. The server holds where it sits and says it.
+        // On the admin gun the selector is its mode. Y and Shift+Y: the admin gun's calibre.
+        _bindings.Bind(InputContext.Gameplay, GameKey.X, () => SelectorKey(1));
+        _bindings.Bind(InputContext.Gameplay, GameKey.X, KeyModifiers.Shift, () => SelectorKey(-1));
+        _bindings.Bind(InputContext.Gameplay, GameKey.Y, () => CalibreKey(1));
+        _bindings.Bind(InputContext.Gameplay, GameKey.Y, KeyModifiers.Shift, () => CalibreKey(-1));
+
         // Social / discovery. The plain key is the wider question and shift narrows it to here —
         // the same relationship on both, so there is one thing to remember rather than two.
         _bindings.Bind(GameKey.F5, () => _network.Send(new PlayerListRequest { Scope = PlayerListScope.Server }));
@@ -377,7 +384,37 @@ public sealed partial class ClientGameSession : IDisposable
     internal static bool EnterFires(LocalPlayerState state) => HoldsGun(state);
 
     private static bool HoldsGun(LocalPlayerState state)
-        => !string.IsNullOrEmpty(state.HeldWeaponId) && OpenFPS.Common.WeaponRegistry.TryGet(state.HeldWeaponId, out _);
+        => !string.IsNullOrEmpty(state.HeldWeaponId)
+           && (OpenFPS.Common.WeaponRegistry.TryGet(state.HeldWeaponId, out _) || HoldsAdminGun(state));
+
+    private static bool HoldsAdminGun(LocalPlayerState state)
+        => string.Equals(state.HeldWeaponId, OpenFPS.Common.AdminGun.WeaponId, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>X and Shift+X: a gun in your hands has its selector moved; anything else is told why not.</summary>
+    private void SelectorKey(int direction)
+    {
+        if (!HoldsGun(_state)) { Say("You are not holding a gun."); return; }
+        _network.Send(new TextCommand { Command = "selector", Args = new[] { direction < 0 ? "back" : "next" } });
+    }
+
+    /// <summary>Y and Shift+Y: the admin gun's calibre, on and back.</summary>
+    private void CalibreKey(int direction)
+    {
+        if (!HoldsAdminGun(_state)) { Say("Y changes the admin gun's calibre."); return; }
+        _network.Send(new TextCommand { Command = "calibre", Args = new[] { direction < 0 ? "back" : "next" } });
+    }
+
+    /// <summary>Whether the trigger is held down: Enter fired a gun and has not come up yet. When it
+    /// does, "cease" lets go of the trigger, which stops a gun on automatic (the server holds the
+    /// selector and fires at the gun's rate meanwhile).</summary>
+    private bool _triggerDown;
+
+    private void ReleaseTrigger(HashSet<GameKey> held)
+    {
+        if (!_triggerDown || held.Contains(GameKey.Enter)) return;
+        _triggerDown = false;
+        _network.Send(new TextCommand { Command = "cease" });
+    }
 
     /// <summary>Runs a gameplay key as if pressed, for tests.</summary>
     internal bool Press(GameKey key, KeyModifiers modifiers = KeyModifiers.None)
@@ -386,7 +423,8 @@ public sealed partial class ClientGameSession : IDisposable
     /// <summary>The keys, as the in-game window shows them. One text for both heads.</summary>
     public static readonly string KeyHelp = string.Join(Environment.NewLine,
         "In game. W A S D to move, J / L turn, O / K look up and down, Space jump.",
-        "Enter fires the gun in your hands; with no gun it interacts, like E.",
+        "Enter fires the gun in your hands; with no gun it interacts, like E. X moves the fire selector, Shift X back; held Enter on auto keeps firing.",
+        "Admin gun: X changes its mode (kill, vaporize, freeze, inspect), Y and Shift Y its calibre.",
         "C coordinates, F facing, H health, Z area, P look ahead, Shift P scan, E interact or pick up, I inventory list, Shift I what you carry.",
         "Comma and period step through the nearest things of one kind, nearest first; Shift comma and Shift period change the kind:",
         "doors, entrances, stairs, items, people, vehicles, places.",
@@ -496,6 +534,7 @@ public sealed partial class ClientGameSession : IDisposable
             if (menuOpen && key is not (GameKey.F5 or GameKey.F6 or GameKey.F8)) { _menus.HandleKey(key); continue; }
             _bindings.Execute(context, key, modifiers);
         }
+        ReleaseTrigger(held);
         if (menuOpen) gameplayActive = false;   // stand still while choosing
 
         _simTime += dt;
@@ -1317,7 +1356,12 @@ public sealed partial class ClientGameSession : IDisposable
     {
         // Through a scope the shot carries its own aim and is flown; see FireScoped.
         if (_scope.Raised) FireScoped();
-        else _network.Send(new TextCommand { Command = "fire" });
+        else
+        {
+            _network.Send(new TextCommand { Command = "fire" });
+            // Only a gun that can fire on automatic needs to hear the trigger let go.
+            _triggerDown = OpenFPS.Common.WeaponRegistry.TryGet(_state.HeldWeaponId, out var w) && OpenFPS.Common.FireSelector.HasAuto(w);
+        }
     }
 
     /// <summary>How hard you have been working, in words rather than a number.</summary>

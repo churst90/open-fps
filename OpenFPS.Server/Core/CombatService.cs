@@ -836,7 +836,7 @@ public sealed partial class CombatService
         // hits; a freezing round goes through glass as any round does.
         if (f.Admin is { } mode && mode != AdminGunMode.Kill
             && !(mode == AdminGunMode.Freeze && !hitBody && IsGlass(world, hitEntity)))
-            return AdminStrike(f, mode, world, lookup, hitEntity, hitBody, at, metres);
+            return AdminStrike(f, mode, world, grid, lookup, hitEntity, hitBody, at, metres);
         if (hitBody)
         {
             bool head = bodyHeight >= ExternalBallistics.HeadFrom;
@@ -1186,6 +1186,7 @@ public sealed partial class CombatService
     {
         if (!TryGetBody(session, reply, out var world, out _, out var lookup, out var position)) return;
         if (world.Has<DeadComponent>(session.Entity)) { Say(reply, "You are dead."); return; }
+        if (HoldsAdminGun(world, session.Entity, lookup, out _)) { Say(reply, "The admin gun never runs dry."); return; }
         if (!HandsService.TryGetHeldWeapon(world, session.Entity, lookup, out var weapon, out var item))
         { Say(reply, "You are not holding anything to reload."); return; }
 
@@ -1328,6 +1329,8 @@ public sealed partial class CombatService
     public void Update(string mapId, World world)
     {
         FlyBullets(mapId);
+        UpdateAutomatic(mapId, world);
+        Thaw(mapId, world);
         double now = Clock();
         if (_reloads.Count > 0)
             foreach (var (session, r) in _reloads.Where(kv => kv.Value.MapId == mapId && now >= kv.Value.DoneAt).ToList())
@@ -1425,6 +1428,7 @@ public sealed partial class CombatService
     {
         _reloads.Remove(session);
         _lastShot.Remove(session);
+        _automatic.Remove(session);
         _flights.RemoveAll(f => f.Shooter == session);
     }
 
@@ -1433,5 +1437,6 @@ public sealed partial class CombatService
     public static (string WeaponId, int Rounds, string ScopeId) Held(World world, Entity player, Dictionary<int, Entity> lookup)
         => HandsService.TryGetHeldWeapon(world, player, lookup, out var weapon, out var item)
             ? (weapon.Id, Arms.Ammo(world, item, weapon).Rounds, ScopeOf(weapon))
+            : HoldsAdminGun(world, player, lookup, out _) ? (AdminGun.WeaponId, AdminGunRounds, "")
             : ("", -1, "");
 }
