@@ -65,13 +65,17 @@ shape of it.
 | Identity | `Id`, `Name`, `Description`, `Announce`, `Type`, `Material` | `NameComponent`, `IdentityComponent`, `EntityType`, `MaterialComponent` |
 | Collider | `ColliderSize`, `Shape`, `IsSolid` | `ColliderComponent` |
 | Health | `MaxHealth` | `HealthComponent` |
+| Crowd | `CrowdPeople`, `CrowdReactRadiusMetres` | `CrowdComponent` |
+| Item | `IsItem`, `ItemWeight`, `Hands`, `WeaponId`, `Premium` | `ItemComponent` |
 | Acoustics | `Transmission{Low,Mid,High}`, `Absorption`, `Scattering`, `ShellThickness`, `LeafMetres`, `StudSpacingMetres`, `FaceMask` / `MissingFaces` | `AcousticComponent` |
 | Physics | `Mass`, `Friction`, `Restitution`, `Drag` | `PhysicsPropertyComponent` |
-| Emitter | `HasEmitter` + `SoundId`, `StartSoundId`, `StopSoundId`, `Volume`, `Range`, `MinDistance`, `Mode`, `EmitterDirection`, `Cone*` | `SoundEmitterComponent` |
+| Emitter | `HasEmitter` + `SoundId`, `StartSoundId`, `StopSoundId`, `Volume`, `Range`, `MinDistance`, `Mode`, `EmitterDirection`, `EmitterOffset`, `Cone*`, `RepeatIntervalSeconds` | `SoundEmitterComponent` |
 | Granular | `IsGranular`, `Granular*` | (same component) |
 | Synth | `IsSynth`, `Synth*` | (same component) |
 | Region | `IsIndoor`, `RoomSize`, `AmbienceId`, `ReverbScale`, `RoomMaterials` | `RegionComponent` |
 | Portal | `RegionAId`, `RegionBId`, `ApertureSize` | `PortalComponent` |
+| Door | `IsDoor`, `DoorKind`, `HingeSide`, `PushSide`, `KeyedSide`, `SwingSeconds`, `SwingDegrees`, `DoorSkinMetres`, `Slides`, `Powered`, `SensorMetres`, `CloseAfterSeconds`, `CloseSeconds` | `DoorComponent` (and a `PortalComponent`) |
+| Beacon | `BeaconCategory` | (see Beacons below) |
 
 `ColliderSize` is **full extents in metres**, multiplied by the map instance's `Scale`. So a
 `concrete_wall` sized `2 × 3 × 0.5` placed with `"Scale": { "X": 5, "Y": 1.333, "Z": 1 }` is a 10 m wall,
@@ -99,9 +103,14 @@ walks back into range.
 
 ### Materials
 
-`Material` and `RoomMaterials` take material **names** known to `AcousticRegistry`:
+`Material` and `RoomMaterials` take material **names** known to `AcousticRegistry`
+(`OpenFPS.Common/AcousticRegistry.cs`):
 
-`Generic`, `Wood`, `Metal`, `Concrete`, `Marble`, `Carpet`, `Glass`, `None`, `Plastic`, `Grass`, `Dirt`
+`AcousticTile`, `Asphalt`, `Audience`, `BootRubber`, `Brick`, `Carpet`, `Concrete`, `Dirt`, `Fence`,
+`Foliage`, `Generic`, `Glass`, `Grass`, `Gravel`, `Leather`, `Marble`, `Metal`, `None`, `Plaster`,
+`Plastic`, `Rubber`, `Skin`, `Tile`, `Water`, `Wood`
+
+Steel is `Metal`. The validator's error message lists the current names if this list falls behind.
 
 A name outside that list is rejected at load. (At runtime an unknown material silently becomes `Generic`,
 which is right for robustness and wrong for authoring — hence the check.)
@@ -124,6 +133,10 @@ rejected, because the loader would otherwise attach no emitter and the object wo
 - `Mode` is `Single`, `LoopOne`, `LoopFolder`, `Sequential` or `StateMachine`.
 - `IsSynth` generates the signal (no `SoundId` needed); `IsGranular` cuts grains from `SoundId`. They are
   mutually exclusive, and synth/granular parameters without their flag are rejected.
+- **Physical models.** An `IsSynth` emitter whose `SoundId` has a model prefix is rendered by that
+  model on the client, not by the `Synth*` oscillator: `machine:` (`ac_window`, `ac_condenser`,
+  `mower_push`, `mower_riding`), `water:` (`park_fountain`), `fire:` (`fire_pit`), `foliage:`
+  (`park_tree`, `pine`) and `bell:`. The part after the colon is a preset name in the model library.
 
 ### Regions and portals
 
@@ -176,19 +189,28 @@ the client's raycasts, and *not heard* as an obstruction. Loading one logs a war
 }
 ```
 
-**Map fields:** `Id`, `Size`, `MinBound`, `MaxBound`, `SpawnPoint`, `MinimumY`, `Description`,
-`VoxelResolution`, `OcclusionFloor`, `Gravity`, `Temperature`, `Humidity`, `AirPressure`,
-`AirAbsorptionMultiplier`, `Entities`.
+**Map fields:** `Id`, `Description`, `IsDefault`, `Size`, `MinBound`, `MaxBound`, `PlayMin`, `PlayMax`,
+`SpawnPoint`, `MinimumY`, `VoxelResolution`, `OcclusionFloor`, `Gravity`, `Temperature`, `Humidity`,
+`AirPressure`, `AirAbsorptionMultiplier`, `AmbienceId`, `BeaconPolicy`, `Entities`, `Composites`,
+and for traffic and rail: `Roads`, `Junctions`, `RoadStops`, `Tracks`, `Vehicles`, `Trains`,
+`Crossings`, `StreetLife`. `OwnerId` and `IsPublic` are read too, but the server's
+`map_access.json` overrides them for any map it lists.
 
-- `MinBound` / `MaxBound` are hard walls: `SharedMovementEngine` clamps position *and* velocity against
-  them, so the edge of the map is a surface, not a cliff.
+- `MinBound` / `MaxBound` are the acoustic grid's bounds. `PlayMin` / `PlayMax` are where a player and
+  anything they drive can go; left out, they are the bounds. `SharedMovementEngine` clamps position
+  *and* velocity against them, so the edge of the map is a surface, not a cliff.
+- `IsDefault` marks the map players land on at login. Exactly one map should set it (the speedway).
 - `MinimumY` is computed at load (20 m below the lowest floor surface) — anything below it has fallen out
   of the world.
 - `VoxelResolution` is the acoustic grid's cell size in metres; `OcclusionFloor` is the floor on occlusion
   (sounds never drop below it through a wall). Both are streamed to the client in the map manifest.
 
-**Entity fields:** `EntityId`, `PrefabId`, `Position`, `Rotation`, `Scale`, and the per-instance overrides
-`IsIndoor`, `RoomMaterials` (or `Materials`), `RegionAId`, `RegionBId`, `ApertureSize`.
+**Entity fields:** `EntityId`, `PrefabId`, `Position`, `Rotation`, `Scale`, `Name`, and the per-instance
+overrides `IsIndoor`, `RoomMaterials` (or `Materials`), `RegionAId`, `RegionBId`, `ApertureSize`, and on a
+door `PushSide` and `KeyedSide`.
+
+`Name` is what a player hears: on a region or named place, as they walk into it; on a wall or door,
+when they bump into or scan it ("Brandt Court front entrance").
 
 A map entity does **not** list components. It names a prefab and places it; the overrides above are the only
 things an instance may change, because they are the only things that are properties of *where it is* rather
@@ -203,6 +225,9 @@ conventional ranges:
 | 100–499 | static geometry and rooms |
 | 500–999 | beacons and interactables |
 | 1000+ | assigned by the server at runtime (players, NPCs) |
+
+These ranges are a convention for hand-written maps. The generated maps number their entities from
+1001 upward.
 
 If no entity sits at the origin with the `concrete_floor` prefab, the loader injects an auto-scaled
 foundation so the map has a floor; it logs when it does. The spawn point is then dropped onto whatever floor
@@ -229,6 +254,70 @@ From `maps/default.json` — a concrete room with a doorway and a siren inside i
 Walls are geometry; the region is the acoustics; the portal is the hole. All three are separate entities on
 purpose — the walls are what Steam Audio traces against, the region is what supplies the reverb, and the
 portal is what tells the engine the two rooms are coupled and where the sound comes through.
+
+## Doors
+
+A door prefab sets `IsDoor`. It is solid while shut and is always a portal: the map entity names the
+two places it joins with `RegionAId` / `RegionBId`. `DoorKind` picks the hardware and so the sound
+model (`docs/DOOR_TYPES_EVENTS.md`).
+
+| Prefab | `DoorKind` | Opens | `PushSide` | `KeyedSide` |
+|---|---|---|---|---|
+| `door` | `knob` | swings | +1 | — |
+| `steel_door` | `pushbar` | swings | −1 | — |
+| `glass_front_door` | `glass-pushbar` | swings, closer | −1 | +1 |
+| `glass_pull_door` | `glass-pull` | swings, closer | −1 | — |
+| `auto_sliding_door` | `auto-slide` | slides, powered, sensor | — | — |
+| `patio_door` | `patio-slide` | slides | — | — |
+| `elevator_door` | `elevator` | slides, powered | — | — |
+
+**Which way it swings.** A leaf's own +Z face is its outside. `PushSide` +1 means it is pushed from
+the +Z face and swings away from it; −1 means it is pushed from the other face. A room door is pushed
+from the corridor and swings into the room (+1). An exit door is pushed from inside by its bar and
+swings out (−1). `HingeSide` (−1 left, +1 right) says which edge it swings on, or which way it slides.
+
+**Keyed side.** `KeyedSide` +1 or −1 is the face that needs a key; from that face a shut door is
+locked, and opening it is key, then hand. 0 or absent is never locked.
+
+A map entity may override `PushSide` and `KeyedSide` for one door. Turn the leaf with `Rotation` so
+its +Z face points the right way; `tools/gen_city.py` does this for every hinged door from the room it
+belongs to.
+
+## Named places
+
+`named_place` is a non-solid box with a `Name` and nothing else. Walking into it changes the place name
+you hear; it does not make a room, so the reverb and openings stay those of the region round it. Use it
+for a flight of stairs, a landing, a garden gate. Where named places overlap, the smallest wins.
+`/tp` accepts a named place or a region by name.
+
+## Nature, water and fences
+
+| Prefab | What it is |
+|---|---|
+| `water_fountain` | the sound of a fountain: `water:park_fountain`, not solid. Put it over the water, not inside the pedestal |
+| `water_surface` | standing water: a solid box of material `Water`, a hard reflector |
+| `fire_pit` | a wood fire: `fire:fire_pit`, not solid. Put it above the ring of brick round it |
+| `tree_crown` | the wind in a tree, heard from the middle of the crown: `foliage:park_tree`. Pair it with a `foliage_hedge` box for the crown and a trunk box |
+| `fence_timber` | a close-boarded wooden fence, 1.8 m, solid, `Wood` |
+| `fence_palisade` | a steel palisade, solid, `Fence` (porous: sound passes the gaps) |
+
+None of these is a recording. Elm Park and 58 Alder Street on the city map are the worked example.
+
+## Items
+
+An item sets `IsItem` and `"Type": "Item"`. `Hands` is 1 or 2. `WeaponId` makes it a weapon.
+
+- `Premium: true` marks an item only someone with `give-premium` may give (an admin). `teleporter` is
+  one: carrying it is what lets a player use `/tp`.
+- `admin_gun` has `WeaponId` `admingun`. Only a player with the `admin-gun` permission may hold or
+  fire it.
+
+## Generated maps
+
+`city.json` and `speedway.json` are written by `tools/gen_city.py` and `tools/gen_speedway.py`. Do not
+edit them by hand: change the generator and run it again from the repository root
+(`python3 tools/gen_city.py`). `RoadNetworkTests.The_generator_reproduces_the_shipped_city` fails if
+`city.json` differs from the generator's output.
 
 ## Beacons
 
