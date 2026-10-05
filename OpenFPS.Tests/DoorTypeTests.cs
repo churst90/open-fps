@@ -265,7 +265,7 @@ public class DoorTypeTests : IDisposable
     // A sliding door's sound is its whole run, sent as the run starts, both ways.
     [InlineData("patio_door", "latch-retract+ rollers stop | rollers+ latch")]
     [InlineData("auto_sliding_door", "motor-start+ rollers stop | motor-start+ rollers shut")]
-    [InlineData("elevator_door", "motor-start rollers stop | motor-start rollers shut+")]
+    [InlineData("elevator_door", "motor-start+ rollers stop | motor-start+ rollers shut")]
     public void EachKindNamesItsEvents(string prefab, string expected)
     {
         var e = Door(prefab);
