@@ -14,7 +14,8 @@ Cody approves by ear.
 - AudioLab `--door-models [out=] [only=] [stems=] [refs]`; OpenFPS.Tests/DoorModelTests.cs.
 
 ## Next
-- Final renders + README into /home/cody/external-rescue/Github/open-fps/inbox/door-models-2026-10-05/.
+- Renders + README are in inbox/door-models-2026-10-05 (57 files + 00-tour.wav). Waiting on Cody's ear.
+- Known gaps are listed in that README (lift meeting bump soft, key turn thin and keys tonal).
 
 ## Build / run
 DOTNET_CLI_USE_MSBUILD_SERVER=0 nice ~/.dotnet/dotnet build OpenFPS.AudioLab/OpenFPS.AudioLab.csproj --artifacts-path ~/.cache/openfps-agent-doormodels -nodeReuse:false -p:UseSharedCompilation=false
