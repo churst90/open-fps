@@ -134,7 +134,7 @@ public class ClientPhysicsSystem
                 GroundHeight = groundY,
                 Gravity = Gravity,
                 JumpForce = JumpPower,
-                Speed = input.Sprint ? SprintSpeed : WalkSpeed,
+                Speed = PhysicsConstants.FootSpeed(input.Sprint, _state.SpeedLimit),
                 PlayerRadius = PlayerRadius,
                 PlayerHeight = PlayerHeight,
                 StepHeight = StepHeight,

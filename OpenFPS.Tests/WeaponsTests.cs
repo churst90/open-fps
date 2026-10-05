@@ -181,7 +181,7 @@ public class WeaponsTests : IDisposable
     }
 
     [Fact]
-    public void AKillIsConfirmedOnceAndTheBodyIsTakenAway()
+    public void AKillIsConfirmedOnceAndTheBodyIsLeft()
     {
         var r = new Range(_dir);
         r.Arm(r.Shooter, "akm");
@@ -193,12 +193,12 @@ public class WeaponsTests : IDisposable
         Assert.Equal(3, confirms.Count);           // 45 a hit: 55, 10, dead; then nothing to hit
         Assert.Single(confirms, c => c.Killed);
         Assert.True(confirms[^1].Killed);
-        Assert.True(r.World.Has<DeadComponent>(walker));
         Assert.Contains(r.Events, e => e.Label == "a body falling");
 
-        r.Now += CombatService.BodySeconds + 0.1;
-        r.Combat.Update(r.MapId, r.World);
+        // The person is taken off the street at once (the ticks flown since did it); what lies there is
+        // their body, an item.
         Assert.False(r.World.IsAlive(walker));
+        Assert.Single(r.Bodies());
     }
 
     [Fact]
@@ -210,7 +210,7 @@ public class WeaponsTests : IDisposable
 
         for (int i = 0; i < 3; i++) { r.Run(r.Shooter, "fire"); r.Fly(1); }
 
-        Assert.Contains(r.SentTo(r.Other).OfType<TextEvent>(), t => t.Text == "You died.");
+        Assert.Contains(r.SentTo(r.Other).OfType<TextEvent>(), t => t.Text == "You are dead. You come back in 60 seconds.");
         Assert.Contains(r.SentTo(r.Other).OfType<TextEvent>(), t => t.Text.StartsWith("You are hit."));
         Assert.True(r.World.Has<DeadComponent>(r.Other.Entity));
         Assert.Equal("You are dead.", r.Run(r.Other, "fire"));
@@ -425,7 +425,7 @@ public class WeaponsTests : IDisposable
     /// clock in the test's hand, a shooter facing north in an empty corner and somebody else
     /// standing off to the side.
     /// </summary>
-    private sealed class Range
+    internal sealed class Range
     {
         public readonly MapManager Maps;
         public readonly HandsService Hands;
@@ -457,7 +457,8 @@ public class WeaponsTests : IDisposable
             Server.Attach(Maps, Sessions, new OccupancyService(Maps), Hands);
             Server.Sent = (to, m) => ServerSent.Add((to, m));
             // Aimed exactly: the scatter of a shot from the hip is its own test.
-            Combat = new CombatService(Maps, Server, Sessions) { Clock = () => Now, HipDispersionRadians = 0f };
+            Combat = new CombatService(Maps, Server, Sessions) { Clock = () => Now, HipDispersionRadians = 0f, Possessions = Hands };
+            Hands.Removed = Server.BroadcastRemoval;
             Commands = new CommandHandler(Sessions, Maps, Server, hands: Hands, combat: Combat);
             Shooter = Player("shooter", Feet);
             Other = Player("other", Feet + new Vector3(6, 0, 0));
@@ -567,6 +568,20 @@ public class WeaponsTests : IDisposable
         public List<TransientSound> Heard() => SentTo(Shooter).OfType<WorldAudioEvent>().SelectMany(e => e.Sounds).ToList();
 
         public void ClearHeard() => ServerSent.RemoveAll(s => s.Message is WorldAudioEvent);
+
+        /// <summary>Every body on the map.</summary>
+        public List<Entity> Bodies()
+        {
+            var found = new List<Entity>();
+            World.Query(new QueryDescription().WithAll<Corpse>(), (Entity e) => found.Add(e));
+            return found;
+        }
+
+        /// <summary>Kills somebody outright, as a round from the shooter's rifle that took the last of them.</summary>
+        public void Kill(Entity whom)
+        {
+            Assert.True(Combat.Wound(Shooter, World, Grid, whom, 1000, WeaponRegistry.Akm, _ => { }), "the wound did not kill");
+        }
     }
 
     private sealed class NoUsers : IUserRepository

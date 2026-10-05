@@ -663,7 +663,14 @@ public class MapManager
     public void DestroyEntity(string mapId, Entity entity)
     {
         if (!_maps.TryGetValue(mapId, out var data)) return;
-        if (!data.world.IsAlive(entity)) { data.lookup.Remove(entity.Id); return; }
+        // Already gone: forget the id only if it is still THIS entity's. Arch hands a destroyed entity's id
+        // to the next one made, and a stale handle (a parked car's driver who had been shot and taken away)
+        // used to take the new entity's id out of the lookup with it.
+        if (!data.world.IsAlive(entity))
+        {
+            if (data.lookup.TryGetValue(entity.Id, out var known) && known == entity) data.lookup.Remove(entity.Id);
+            return;
+        }
 
         bool wasStatic = !data.world.Has<Velocity>(entity) && !data.world.Has<PlayerComponent>(entity)
                          && data.world.Has<ColliderComponent>(entity);

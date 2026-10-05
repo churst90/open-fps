@@ -108,6 +108,9 @@ public sealed partial class VehicleSystem
         public bool OnStreet;
         /// <summary>Somebody on foot.</summary>
         public bool IsWalker;
+        /// <summary>A walker who was killed and has not been replaced yet: nobody is on this walk, so
+        /// it is in nobody's lane (RetireWalker, ReplaceWalker).</summary>
+        public bool Gone;
 
         /// <summary>Standing on the brakes: seconds left, the speed being braked to, and how hard.</summary>
         public float HardBrakeLeft;
@@ -495,7 +498,7 @@ public sealed partial class VehicleSystem
         foreach (var v in _vehicles)
         {
             if (v.MapId != mapId || !world.IsAlive(v.Entity)) continue;
-            // Somebody shot dead lies where they fell until they are taken away (ReplaceWalker).
+            // Somebody shot dead stops where they fell until they are taken off the street (RetireWalker).
             if (world.Has<DeadComponent>(v.Entity))
             {
                 v.Speed = 0f;

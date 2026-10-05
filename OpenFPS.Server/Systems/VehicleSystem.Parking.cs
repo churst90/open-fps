@@ -312,6 +312,8 @@ public sealed partial class VehicleSystem
     private static bool Walk(World world, ParkState pk, float dt)
     {
         if (pk.Driver == Entity.Null || !world.IsAlive(pk.Driver)) return true;
+        // Shot dead: they lie where they fell, and are not walked anywhere (RetireWalker takes them).
+        if (world.Has<DeadComponent>(pk.Driver)) { world.Get<Velocity>(pk.Driver).Linear = Vector3.Zero; return false; }
         ref var t = ref world.Get<Transform>(pk.Driver);
         ref var vel = ref world.Get<Velocity>(pk.Driver);
         while (pk.Leg < pk.Route.Length)

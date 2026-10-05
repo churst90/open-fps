@@ -42,7 +42,7 @@ public sealed partial class VehicleSystem
     }
 
     /// <summary>Whether it occupies its lane: not parked at the kerb.</summary>
-    private static bool InLane(DemoVehicle v) => v.Park is not { Phase: ParkPhase.Parked };
+    private static bool InLane(DemoVehicle v) => v.Park is not { Phase: ParkPhase.Parked } && !v.Gone;
 
     /// <summary>The vehicle ahead in the same lane, and the gap to its tail, metres.</summary>
     private (DemoVehicle Lead, float Gap)? Ahead(DemoVehicle v)

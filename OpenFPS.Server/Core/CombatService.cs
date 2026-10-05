@@ -22,9 +22,10 @@ namespace OpenFPS.Server.Core;
 ///
 /// A shot that lands on a person takes health, and the shooter alone is told, by a
 /// <see cref="HitConfirm"/> that their client plays as a chime. A person at no health dies: they fall,
-/// which everyone near hears; a player gets up again at the spawn after
-/// <see cref="PlayerRespawnSeconds"/>, and a person in the street lies there for
-/// <see cref="BodySeconds"/> and is then taken away, and somebody else comes walking along instead.
+/// which everyone near hears, and their body stays where they fell, as something that can be picked up
+/// (<see cref="Bodies"/>). A player gets up again at the spawn after <see cref="PlayerRespawnSeconds"/>;
+/// a person in the street is taken off it, and after <see cref="WalkerRespawnSeconds"/> somebody else
+/// comes walking along the same way, out of sight of where the body lies.
 /// </summary>
 public sealed class CombatService
 {
@@ -35,12 +36,39 @@ public sealed class CombatService
     /// <summary>Seconds, monotonic. A test sets its own.</summary>
     public Func<double> Clock { get; set; } = () => AudioClock.Now;
 
-    /// <summary>Puts somebody new walking in a dead pedestrian's place, and returns them; null where
-    /// nobody walks (a test, a map without traffic). The server hands this to the vehicle system.</summary>
-    public Func<string, World, Entity, Entity>? ReplaceWalker { get; set; }
+    /// <summary>Takes a dead pedestrian off the street, if they are one of the map's walkers (or a driver
+    /// out of a parked car): true when somebody is to walk the same way again later, by
+    /// <see cref="ReplaceWalker"/> with the dead one's id. Null where nobody walks (a test, a map without
+    /// traffic). The server hands this to the vehicle system.</summary>
+    public Func<string, World, Entity, bool>? RetireWalker { get; set; }
 
-    public const double PlayerRespawnSeconds = 5;
-    public const double BodySeconds = 10;
+    /// <summary>Puts somebody new walking where a retired walker walked, given the dead one's id, and
+    /// returns them (<see cref="Entity.Null"/> if that id was not retired).</summary>
+    public Func<string, World, int, Entity>? ReplaceWalker { get; set; }
+
+    /// <summary>The hands, to put what somebody killed was carrying into a bag beside their body. Without
+    /// them (a test that does not need it), the dead keep what they carried.</summary>
+    public HandsService? Possessions { get; set; }
+
+    /// <summary>
+    /// Seconds a killed player waits before getting up again at the spawn. Cody (2026-10-05): "they
+    /// shouldn't repopulate right away, they should wait like a minute or so before respawning again".
+    /// </summary>
+    public const double PlayerRespawnSeconds = 60;
+
+    /// <summary>
+    /// Seconds before somebody new walks where a killed pedestrian walked. Cody (2026-10-05): "they
+    /// shouldn't repopulate right away, they should wait like a minute or so before respawning again".
+    /// </summary>
+    public const double WalkerRespawnSeconds = 60;
+
+    /// <summary>A dead player is told once more how long is left, at this many seconds.</summary>
+    public const double RespawnReminderSeconds = 10;
+
+    /// <summary>Walkers taken off the street, and when somebody walks their way again.</summary>
+    private readonly List<(string MapId, int DeadId, double DueAt)> _comingBack = new();
+    /// <summary>Dead players already told the last ten seconds, by entity id.</summary>
+    private readonly HashSet<int> _reminded = new();
 
     /// <summary>Where a gun is held, in the body's frame: a reload is heard from the hands.</summary>
     private static readonly Vector3 Hands = new(0f, 1.25f, 0.35f);
@@ -1098,15 +1126,39 @@ public sealed class CombatService
 
     private void Kill(string mapId, World world, SpatialGrid<Entity> grid, Entity target, UserSession? victim)
     {
-        world.Add(target, new DeadComponent { DiedAt = Clock() });
+        double now = Clock();
+        world.Add(target, new DeadComponent { DiedAt = now });
         if (world.Has<Velocity>(target)) world.Get<Velocity>(target).Linear = Vector3.Zero;
+        var body = Bodies.Lay(_maps, mapId, world, grid, target, now);
+        // What they carried stays where they fell, beside the body: a body they had over their shoulder
+        // let go of, and everything else in a bag of their belongings (Bodies.LeaveBelongings), so they
+        // get up again with nothing. What the bag cannot hold is put down on the ground there.
+        if (_maps.TryGetMap(mapId, out _, out _, out _, out var lookup))
+        {
+            foreach (var let in HandsService.LetGo(world, grid, target, lookup, bodiesOnly: true))
+                _server.SyncAudioComponent(let.Id);
+            if (Possessions != null)
+            {
+                Bodies.LeaveBelongings(_maps, Possessions, mapId, world, grid, lookup, target, now, out var gone);
+                foreach (int id in gone) _server.BroadcastRemoval(mapId, id);
+                foreach (var let in HandsService.LetGo(world, grid, target, lookup, bodiesOnly: false))
+                    _server.SyncAudioComponent(let.Id);
+            }
+        }
         if (victim != null)
         {
             _reloads.Remove(victim);
-            _server.SendToSession(victim, new TextEvent { Text = "You died." });
+            _server.SendToSession(victim, new TextEvent
+            {
+                Text = $"You are dead. You come back in {PlayerRespawnSeconds:0} seconds.",
+            });
+            // Their own beacon goes quiet while they are dead (EntityDefinitionFactory): the body is
+            // what lies there now.
+            _server.SyncAudioComponent(target.Id);
         }
         Log.Information("{Target} ({Id}) died.", NameOf(world, target), target.Id);
-        _server.EmitWorldAudio(mapId, target.Id, "a body falling", BodyFall(world, grid, world.Get<Transform>(target).Position));
+        _server.EmitWorldAudio(mapId, body != Entity.Null ? body.Id : target.Id, "a body falling",
+                               BodyFall(world, grid, world.Get<Transform>(target).Position));
     }
 
     /// <summary>
@@ -1115,8 +1167,11 @@ public sealed class CombatService
     /// that every dropped thing uses, with a body's softness and mass, so a fall on a wooden floor and
     /// one on wet grass are as different as they should be.
     /// </summary>
-    public static List<TransientSound> BodyFall(World world, SpatialGrid<Entity> grid, Vector3 at)
+    /// <param name="lowered">Set down from somebody's shoulder rather than collapsing: the same two
+    /// contacts, legs then trunk, from a fifth of the height.</param>
+    public static List<TransientSound> BodyFall(World world, SpatialGrid<Entity> grid, Vector3 at, bool lowered = false)
     {
+        float legs = lowered ? 0.1f : 0.5f, trunk = lowered ? 0.2f : 1.0f;
         float ground = PhysicsUtils.GetGroundHeight(world, grid, at + new Vector3(0, 0.5f, 0), out string floor);
         // No floor found under them (the probe says so with a height far below the world): they
         // fall where they stand.
@@ -1125,10 +1180,10 @@ public sealed class CombatService
         var body = AcousticRegistry.GetProperties("Skin");
         var under = AcousticRegistry.GetProperties(string.IsNullOrEmpty(floor) ? "Generic" : floor);
         var sounds = new List<TransientSound>();
-        sounds.AddRange(ImpactAcoustics.Between(body, under, where, MathF.Sqrt(2f * PhysicsConstants.Gravity * 0.5f),
+        sounds.AddRange(ImpactAcoustics.Between(body, under, where, MathF.Sqrt(2f * PhysicsConstants.Gravity * legs),
                                                 35f, 5000f, 2f, 2f, 0.2f));
         foreach (var s in ImpactAcoustics.Between(body, under, where + new Vector3(0, 0, 0.6f),
-                                                  MathF.Sqrt(2f * PhysicsConstants.Gravity * 1.0f), 40f, 5000f, 2f, 2f, 0.2f))
+                                                  MathF.Sqrt(2f * PhysicsConstants.Gravity * trunk), 40f, 5000f, 2f, 2f, 0.2f))
         {
             var later = s;
             later.DelaySeconds += 0.45f;
@@ -1298,25 +1353,59 @@ public sealed class CombatService
             foreach (var (session, r) in _reloads.Where(kv => kv.Value.MapId == mapId && now >= kv.Value.DoneAt).ToList())
                 FinishReload(session, r, null);
 
-        List<Entity>? due = null;
+        List<Entity>? due = null, remind = null;
         world.Query(new QueryDescription().WithAll<DeadComponent>(), (Entity e, ref DeadComponent dead) =>
         {
-            double wait = world.Has<PlayerComponent>(e) ? PlayerRespawnSeconds : BodySeconds;
-            if (now - dead.DiedAt >= wait) (due ??= new List<Entity>()).Add(e);
+            // Anybody but a player is taken off at once: their body is already lying there as a body.
+            if (!world.Has<PlayerComponent>(e)) { (due ??= new List<Entity>()).Add(e); return; }
+            double left = dead.DiedAt + PlayerRespawnSeconds - now;
+            if (left <= 0) (due ??= new List<Entity>()).Add(e);
+            else if (left <= RespawnReminderSeconds && !_reminded.Contains(e.Id)) (remind ??= new List<Entity>()).Add(e);
         });
-        if (due == null) return;
-        foreach (var e in due)
+        if (remind != null)
+            foreach (var e in remind)
+            {
+                _reminded.Add(e.Id);
+                if (SessionOf(world, e) is { } s)
+                    _server.SendToSession(s, new TextEvent { Text = $"You come back in {RespawnReminderSeconds:0} seconds." });
+            }
+        if (due != null)
+            foreach (var e in due)
+            {
+                if (!world.IsAlive(e)) continue;
+                if (world.Has<PlayerComponent>(e)) Respawn(mapId, world, e);
+                else TakeAway(mapId, world, e, world.Get<DeadComponent>(e).DiedAt);
+            }
+
+        // Somebody new walking where a walker was killed, a minute on.
+        for (int i = _comingBack.Count - 1; i >= 0; i--)
         {
-            if (!world.IsAlive(e)) continue;
-            if (world.Has<PlayerComponent>(e)) Respawn(mapId, world, e);
-            else TakeAway(mapId, world, e);
+            var (map, deadId, dueAt) = _comingBack[i];
+            if (map != mapId || now < dueAt) continue;
+            _comingBack.RemoveAt(i);
+            ReplaceWalker?.Invoke(mapId, world, deadId);
+        }
+
+        // Bodies left too long, or too many.
+        foreach (var body in Bodies.Due(world, now))
+        {
+            Log.Information("Map {Map}: the {Name} ({Id}) is taken away.", mapId, NameOf(world, body), body.Id);
+            int id = body.Id;
+            _maps.DestroyEntity(mapId, body);
+            _server.BroadcastRemoval(mapId, id);
         }
     }
+
+    /// <summary>For tests: how many walkers are waiting to be replaced.</summary>
+    internal int WalkersComingBack => _comingBack.Count;
 
     /// <summary>A dead player up again at the spawn, whole.</summary>
     private void Respawn(string mapId, World world, Entity e)
     {
         world.Remove<DeadComponent>(e);
+        _reminded.Remove(e.Id);
+        // A player beacon again (EntityDefinitionFactory).
+        _server.SyncAudioComponent(e.Id);
         if (world.Has<HealthComponent>(e))
         {
             ref var h = ref world.Get<HealthComponent>(e);
@@ -1333,16 +1422,19 @@ public sealed class CombatService
         Log.Information("{User} respawned.", session.Username);
     }
 
-    /// <summary>A dead pedestrian taken away, and somebody else walking in their place.</summary>
-    private void TakeAway(string mapId, World world, Entity e)
+    /// <summary>
+    /// A dead pedestrian taken off the street (their body is already lying there as a body), and, when
+    /// they were one of the map's walkers, somebody else walking their way <see cref="WalkerRespawnSeconds"/>
+    /// after they died.
+    /// </summary>
+    private void TakeAway(string mapId, World world, Entity e, double diedAt)
     {
-        if (ReplaceWalker != null && world.Has<Pedestrian>(e))
-        {
-            ReplaceWalker(mapId, world, e);
-            return;
-        }
+        int id = e.Id;
+        if (RetireWalker != null && world.Has<Pedestrian>(e) && RetireWalker(mapId, world, e))
+            _comingBack.Add((mapId, id, diedAt + WalkerRespawnSeconds));
+        if (!world.IsAlive(e)) return;
         _maps.DestroyEntity(mapId, e);
-        _server.BroadcastRemoval(mapId, e.Id);
+        _server.BroadcastRemoval(mapId, id);
     }
 
     private UserSession? SessionOf(World world, Entity e)

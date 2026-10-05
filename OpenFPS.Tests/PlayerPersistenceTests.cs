@@ -333,7 +333,38 @@ public class PlayerPersistenceTests : IDisposable
         Assert.Equal(rig.Maps.GetSpawnPoint("default").Position, world.Get<Transform>(back.Entity).Position);
         Assert.Equal(100, world.Get<HealthComponent>(back.Entity).Current);
         Assert.False(world.Has<DeadComponent>(back.Entity));
-        Assert.NotNull(HandsService.Holding(world, back.Entity, rig.Lookup(back)).Right);   // the dead keep their things
+        // Given while dead, after the bag was left (staff can): kept like anything else carried.
+        Assert.NotNull(HandsService.Holding(world, back.Entity, rig.Lookup(back)).Right);
+    }
+
+    /// <summary>
+    /// Killed, a player's things go into a bag beside their body (Cody, 2026-10-05), so logging out dead
+    /// stores nothing: they do not come back with what is lying in the bag.
+    /// </summary>
+    [Fact]
+    public async Task APlayerKilledDoesNotGetTheirThingsBackByLeaving()
+    {
+        var rig = NewRig();
+        int akmsBefore = rig.Made("default", "akm_rifle").Count;
+        var alice = await rig.Arrive("alice");
+        var bob = await rig.Arrive("bob");
+        var world = rig.World(alice);
+        Assert.True(rig.Hands.Give(alice, "akm_rifle", 1, out _, out _, out string m), m);
+        var combat = new CombatService(rig.Maps, rig.Server, rig.Sessions) { Possessions = rig.Hands };
+        Assert.True(rig.Maps.TryGetMap("default", out _, out _, out var grid, out _));
+        Assert.True(combat.Wound(bob, world, grid, alice.Entity, 1000, WeaponRegistry.Akm, _ => { }));
+
+        rig.LogOut(alice);
+        Assert.Null(rig.Repo.GetUser("alice")!.Belongings);
+        var back = await rig.Arrive("alice");
+        world = rig.World(back);
+        Assert.Null(HandsService.Holding(world, back.Entity, rig.Lookup(back)).Right);
+        Assert.Equal(0, Arms.Reserve(world, back.Entity, "7.62x39"));
+        // The rifle is in the bag by the body, as a line in its list, and nowhere in the world.
+        Assert.Equal(akmsBefore, rig.Made("default", "akm_rifle").Count);
+        var bags = new List<Entity>();
+        world.Query(new QueryDescription().WithAll<BelongingsBag>(), (Entity e) => bags.Add(e));
+        Assert.Equal("akm_rifle", Assert.Single(world.Get<BelongingsBag>(Assert.Single(bags)).Contents.Items).Prefab);
     }
 
     [Fact]

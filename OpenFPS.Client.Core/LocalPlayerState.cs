@@ -60,6 +60,9 @@ public class LocalPlayerState
     public int HeldRounds { get; set; } = -1;
     /// <summary>The scope on it (a ScopeRegistry id), or empty: what numpad star raises.</summary>
     public string HeldScopeId { get; set; } = "";
+    /// <summary>The fastest you may move on foot, m/s, or 0 for none: set while you carry a body. From the
+    /// server's StatsUpdate.</summary>
+    public float SpeedLimit { get; set; }
     public string CurrentMaterial { get; set; } = "Generic";
     public string CurrentVariant { get; set; } = "0";
     public const string UnknownArea = "Unknown Area";

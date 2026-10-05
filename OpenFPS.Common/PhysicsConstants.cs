@@ -24,6 +24,29 @@ public static class PhysicsConstants
     public const float SprintSpeed = WalkSpeed * SprintMultiplier;
 
     /// <summary>
+    /// Metres per second at most with a person over your shoulder (anything in your arms heavier than
+    /// you could sling on your back: HandsService.CarryCapacityKg). Walking and running are the same
+    /// pace with one: nobody runs carrying a body.
+    ///
+    /// 1.0 m/s is about three quarters of an unloaded person's own walking pace (1.3 to 1.4 m/s; the
+    /// people walking the city go at 1.35), which is where self-selected speed falls under a load that
+    /// heavy: an adult casualty is about the carrier's own weight, beyond any pack in the load-carriage
+    /// studies, which already show the pace dropping as the load grows. An estimate, not a measurement.
+    /// </summary>
+    public const float CarryingSpeed = 1.0f;
+
+    /// <summary>
+    /// How fast a body moves on foot this step: the walk or the run, held under <paramref name="limit"/>
+    /// when there is one (more than zero). The client and the server both ask this, so a player carrying
+    /// a body predicts the same pace the server allows and is not pulled back every step.
+    /// </summary>
+    public static float FootSpeed(bool sprint, float limit)
+    {
+        float speed = sprint ? SprintSpeed : WalkSpeed;
+        return limit > 0f && limit < speed ? limit : speed;
+    }
+
+    /// <summary>
     /// Metres per second straight up at the moment a standing jump leaves the ground: sqrt(2 g h)
     /// for a rise of half a metre, about what a person manages from a standstill. It was 5.0, which
     /// under the old gravity of 15 rose 0.83 m.
