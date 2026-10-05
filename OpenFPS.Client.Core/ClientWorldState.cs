@@ -92,6 +92,18 @@ public class ClientWorldState
     // object so a reader can never see a new version stamped on an old copy.
     private sealed record CachedSnapshot(long Version, WorldSnapshot Snapshot);
     private readonly Dictionary<int, EntityState> _interpolationFrom = new();
+
+    /// <summary>Each moving thing's latest state at or before the snapshot playback is reading from, and
+    /// that snapshot's tick: what it is doing while the server is not mentioning it. See HoldThrough.
+    /// Guarded by the snapshot buffer's lock.</summary>
+    private readonly Dictionary<int, (long Tick, EntityState State)> _held = new();
+    private long _heldThrough = long.MinValue;
+    private readonly List<int> _folded = new();
+    private readonly HashSet<int> _inTo = new();
+
+    /// <summary>Below this (m/s, squared) a held state is resting: the server only stops sending a thing
+    /// whose velocity is zero on the wire, which is under a millimetre a second.</summary>
+    private const float RestingSpeedSquared = 1e-6f;
     private readonly object _snapshotLock = new();
     private volatile CachedSnapshot? _cached;
     private long _version;
@@ -170,6 +182,7 @@ public class ClientWorldState
         _audioEntityIds.Clear();
         _regionEntityIds.Clear();
         _markerEntityIds.Clear();
+        lock (_snapshotBuffer) _held.Clear();
 
         lock (_metaLock)
         {
@@ -366,6 +379,7 @@ public class ClientWorldState
             _audioEntityIds.TryRemove(id, out _);
             _regionEntityIds.TryRemove(id, out _);
             _markerEntityIds.TryRemove(id, out _);
+            lock (_snapshotBuffer) _held.Remove(id);
             if (known) removed.Add(id);
         }
 
@@ -499,28 +513,49 @@ public class ClientWorldState
                 _interpolationFrom.Clear();
                 foreach (var stateFrom in from.States) _interpolationFrom[stateFrom.EntityId] = stateFrom;
 
+                if (from.Tick != _heldThrough) moved |= HoldThrough(from, to, localPlayerId);
+
                 // 3. Perform Linear Interpolation for all dynamic entities
                 foreach (var stateTo in to.States)
                 {
                     if (stateTo.EntityId == localPlayerId) continue; // Skip ourselves (handled by CSP)
                     moved = true;
 
-                    if (_interpolationFrom.TryGetValue(stateTo.EntityId, out var stateFrom) && stateFrom.EntityId != 0)
+                    // Where it was at 'from'. Not in that snapshot is not the same as unknown: the server
+                    // leaves out anything that has not moved (RestingStates), so a car pulling away from
+                    // the kerb is in 'to' and was last mentioned some ticks ago, resting where it still
+                    // was at 'from'. Snapping it to 'to' would move it a tick early, every time anything
+                    // set off.
+                    double fromTime = t0;
+                    bool haveFrom = _interpolationFrom.TryGetValue(stateTo.EntityId, out var stateFrom) && stateFrom.EntityId != 0;
+                    if (!haveFrom && _held.TryGetValue(stateTo.EntityId, out var held))
                     {
+                        stateFrom = held.State;
+                        haveFrom = true;
+                        // Something that was moving when it was last heard of, though, is missing from
+                        // 'from' because that packet was lost, not because it stopped: it has been
+                        // travelling since, so it goes from where it was then.
+                        if (held.State.LinearVelocity.LengthSquared() > RestingSpeedSquared)
+                            fromTime = held.Tick * PhysicsConstants.FixedDeltaTime;
+                    }
+
+                    if (haveFrom)
+                    {
+                        float a = fromTime == t0 ? alpha : (float)((_clientInterpolationTime - fromTime) / (t1 - fromTime));
                         var transFrom = stateFrom.Transform.ToTransform();
                         var transTo = stateTo.Transform.ToTransform();
 
-                        var lerpedPos = Vector3.Lerp(transFrom.Position, transTo.Position, alpha);
-                        var lerpedRot = Quaternion.Slerp(transFrom.Rotation, transTo.Rotation, alpha);
+                        var lerpedPos = Vector3.Lerp(transFrom.Position, transTo.Position, a);
+                        var lerpedRot = Quaternion.Slerp(transFrom.Rotation, transTo.Rotation, a);
 
                         _serverTransforms[stateTo.EntityId] = new Transform { Position = lerpedPos, Rotation = lerpedRot };
-                        _serverVelocities[stateTo.EntityId] = Vector3.Lerp(stateFrom.LinearVelocity, stateTo.LinearVelocity, alpha);
+                        _serverVelocities[stateTo.EntityId] = Vector3.Lerp(stateFrom.LinearVelocity, stateTo.LinearVelocity, a);
                         _serverTyreDemand[stateTo.EntityId] = stateTo.TyreDemandFraction;
                         if (stateTo.Wheels != null) _serverWheels[stateTo.EntityId] = stateTo.Wheels;
                     }
                     else
                     {
-                        // Fallback if entity is missing from 'from' snapshot
+                        // Never heard of before: it starts where it is.
                         _serverTransforms[stateTo.EntityId] = stateTo.Transform.ToTransform();
                         _serverVelocities[stateTo.EntityId] = stateTo.LinearVelocity;
                         _serverTyreDemand[stateTo.EntityId] = stateTo.TyreDemandFraction;
@@ -542,6 +577,52 @@ public class ClientWorldState
             _positionsSampledAt = OpenFPS.Common.AudioClock.Now;
             Touch();
         }
+    }
+
+    /// <summary>
+    /// Brings the held states up to the 'from' snapshot, and puts down exactly where it rests anything
+    /// that is not in 'to'. Run once each time playback moves into a new pair of snapshots.
+    ///
+    /// The server sends a moving thing every tick and a resting one hardly at all: a few repeats as it
+    /// stops, then once a second (RestingStates). So a snapshot no longer lists the whole world, and
+    /// what a snapshot does not mention has to stay where it was last put — not freeze wherever the
+    /// interpolation happened to have got to between two ticks, a few centimetres short of where it
+    /// stopped. Every snapshot played through is folded in, including any a slow frame skipped over, so
+    /// a resting state is never missed because the frame that would have read it never came.
+    /// </summary>
+    private bool HoldThrough(ServerStateUpdate from, ServerStateUpdate to, int localPlayerId)
+    {
+        // Playback went backwards (the clock was resynchronised): fold again from the start of what is held.
+        if (from.Tick < _heldThrough) _heldThrough = long.MinValue;
+
+        _folded.Clear();
+        foreach (var snapshot in _snapshotBuffer)
+        {
+            if (snapshot.Tick <= _heldThrough) continue;
+            if (snapshot.Tick > from.Tick) break;
+            foreach (var s in snapshot.States)
+            {
+                _held[s.EntityId] = (snapshot.Tick, s);
+                _folded.Add(s.EntityId);
+                // Wheels are not interpolated; a state without them means "as they were".
+                if (s.Wheels != null && s.EntityId != localPlayerId) _serverWheels[s.EntityId] = s.Wheels;
+            }
+        }
+        _heldThrough = from.Tick;
+
+        _inTo.Clear();
+        foreach (var s in to.States) _inTo.Add(s.EntityId);
+        bool any = false;
+        foreach (int id in _folded)
+        {
+            if (id == localPlayerId || _inTo.Contains(id)) continue;
+            var state = _held[id].State;
+            _serverTransforms[id] = state.Transform.ToTransform();
+            _serverVelocities[id] = state.LinearVelocity;
+            _serverTyreDemand[id] = state.TyreDemandFraction;
+            any = true;
+        }
+        return any;
     }
 
     public void SyncState(IEnumerable<EntityState> states)

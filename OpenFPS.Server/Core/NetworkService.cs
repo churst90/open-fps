@@ -100,39 +100,24 @@ public class NetworkService : INetEventListener
     /// whichever cars happened to be moving. Heard exactly as reported: some of the cars, not all of
     /// them, stopping for about a second in front of you and then carrying on.
     ///
-    /// Split by halving rather than by a size constant per entity: the serializer decides how big a
-    /// state is, the peer decides how big a packet may be, and neither of those is ours to predict.
-    /// Every chunk keeps the same Tick, so the client reassembles them into one snapshot.
+    /// The states go packed (<see cref="StatePacking"/>), and a tick that does not fit one packet is cut
+    /// at state boundaries into packets filled as far as the peer allows. It used to be halved until each
+    /// half fitted, which left packets anywhere between half full and full: more packets than the bytes
+    /// needed, each with its own header. Every piece keeps the same Tick, so the client reassembles them
+    /// into one snapshot.
     /// </summary>
     public void SendStateUpdate(NetPeer peer, ServerStateUpdate update, DeliveryMethod deliveryMethod)
     {
         try
         {
-            byte[] data = MemoryPackSerializer.Serialize<IMessage>(update);
-            if (data.Length <= peer.GetMaxSinglePacketSize(deliveryMethod))
+            int max = peer.GetMaxSinglePacketSize(deliveryMethod);
+            foreach (var piece in Pieces(update, max))
             {
+                byte[] data = MemoryPackSerializer.Serialize<IMessage>(piece);
                 PerfProbe.Count("net.state-bytes", data.Length);
                 PerfProbe.Count("net.state-packets");
                 peer.Send(data, deliveryMethod);
-                return;
             }
-            if (update.States.Count <= 1)
-            {
-                // One entity that will not fit is not a splitting problem; say so rather than
-                // recursing for ever.
-                Log.Warning("A single entity state is larger than the peer's packet limit ({Max} bytes); dropped.",
-                            peer.GetMaxSinglePacketSize(deliveryMethod));
-                return;
-            }
-            // Each half is a whole update, with everything the client is told about ITSELF — not just
-            // the entity states. The halves used to be rebuilt from three fields, so RidingEntityId
-            // arrived as its default of -1 in every split update: on a map big enough to split every
-            // tick, which the city is, a player in a driving seat was told every tick that they were
-            // standing in the road. They heard their own footsteps, their own car from outside, no
-            // cabin and no lane lines, and the client walked their ears away from the seat.
-            int half = update.States.Count / 2;
-            SendStateUpdate(peer, Half(update, 0, half), deliveryMethod);
-            SendStateUpdate(peer, Half(update, half, update.States.Count - half), deliveryMethod);
         }
         catch (Exception ex)
         {
@@ -140,13 +125,59 @@ public class NetworkService : INetEventListener
         }
     }
 
-    public static ServerStateUpdate Half(ServerStateUpdate whole, int from, int count) => new()
+    private static readonly List<EntityState> NoStates = new();
+
+    /// <summary>
+    /// A tick's update as the packets it goes in, each no bigger than <paramref name="maxBytes"/>
+    /// serialised. Public for the tests.
+    /// </summary>
+    public static List<ServerStateUpdate> Pieces(ServerStateUpdate update, int maxBytes)
+    {
+        var offsets = new List<int>();
+        var packed = StatePacking.Pack(update.States, 0, update.States.Count, offsets);
+        // What a piece costs besides its states: the message's own fields, and room for the length of
+        // the packed array to grow by a few bytes.
+        int budget = maxBytes - MemoryPackSerializer.Serialize<IMessage>(Piece(update, Array.Empty<byte>())).Length - 8;
+        var pieces = new List<ServerStateUpdate>();
+        int first = 0, count = update.States.Count;
+        while (first < count)
+        {
+            int last = first + 1;
+            while (last < count && offsets[last + 1] - offsets[first] <= budget) last++;
+            if (offsets[last] - offsets[first] > budget)
+            {
+                // Only ever one state on its own: one entity that will not fit is not a splitting
+                // problem. Say so rather than loop for ever.
+                Log.Warning("A single entity state is larger than the packet limit ({Max} bytes); dropped.", maxBytes);
+                first = last;
+                continue;
+            }
+            pieces.Add(Piece(update, packed.AsSpan(offsets[first], offsets[last] - offsets[first]).ToArray()));
+            first = last;
+        }
+        // A tick with no states still says what the client is riding in and which input it has had.
+        if (count == 0) pieces.Add(Piece(update, Array.Empty<byte>()));
+        return pieces;
+    }
+
+    /// <summary>
+    /// One packet of a tick: everything the client is told about ITSELF, and some of the states,
+    /// packed.
+    ///
+    /// Each piece is a whole update, not just the states. The pieces used to be rebuilt from three
+    /// fields, so RidingEntityId arrived as its default of -1 in every split update: on a map big enough
+    /// to split every tick, which the city is, a player in a driving seat was told every tick that they
+    /// were standing in the road. They heard their own footsteps, their own car from outside, no cabin
+    /// and no lane lines, and the client walked their ears away from the seat.
+    /// </summary>
+    public static ServerStateUpdate Piece(ServerStateUpdate whole, byte[] packed) => new()
     {
         Tick = whole.Tick,
         LastProcessedSequenceId = whole.LastProcessedSequenceId,
-        States = whole.States.GetRange(from, count),
+        States = NoStates,
         RidingEntityId = whole.RidingEntityId,
         RidingControls = whole.RidingControls,
+        Packed = packed,
     };
 
     public NetPeer? GetPeer(int id) => _netManager?.GetPeerById(id);
