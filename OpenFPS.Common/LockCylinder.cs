@@ -82,13 +82,17 @@ public static class LockCylinder
     /// bring it up (s), how fast it pushes the key in (m/s), the lock's wear (how rounded a worn key's crests
     /// are, mm), and the key's bitting.
     /// </summary>
+    /// <remarks>One key hangs on every ring. With two, four and six, the bunch struck itself as the key went
+    /// home and the free keys rang on at 63-82 dB through the whole unlock: Cody, 2026-10-05, "a key being
+    /// inserted then like a coin dropping on the ground". The worn character's single key, which strikes
+    /// nothing, was the one he wanted for every door.</remarks>
     private static (int Keys, double Reach, double Insert, double WearMm, int[] Bitting) Character(int variant)
         => (((variant % Variants) + Variants) % Variants) switch
         {
-            0 => (2, 0.5, 0.15, 0.05, new[] { 3, 6, 2, 5, 4 }),
-            1 => (4, 0.45, 0.18, 0.1, new[] { 5, 2, 7, 3, 6 }),
+            0 => (1, 0.5, 0.15, 0.05, new[] { 3, 6, 2, 5, 4 }),
+            1 => (1, 0.45, 0.18, 0.1, new[] { 5, 2, 7, 3, 6 }),
             2 => (1, 0.55, 0.13, 0.2, new[] { 2, 4, 3, 7, 1 }),
-            _ => (6, 0.4, 0.2, 0.3, new[] { 6, 1, 5, 2, 8 }),
+            _ => (1, 0.4, 0.2, 0.3, new[] { 6, 1, 5, 2, 8 }),
         };
 
     /// <summary>The script's pace: the last 30 mm found slowly (with the approach), the turn.</summary>
