@@ -249,6 +249,16 @@ public partial class EntityDefinition : IMessage
     /// </summary>
     public string Team = "";
 
+    /// <summary>
+    /// For a player, what they are sitting in (its root's entity id), or -1 on their own feet. A seated
+    /// body moves with its seat and is given the seat's velocity, which is the vehicle's, so to a client
+    /// it looks exactly like somebody running down the road: it has to be told, or it hears footsteps
+    /// at the vehicle's speed (Cody, 2026-10-05: "when I'm a passenger in a car and he's driving, I hear
+    /// footsteps like his footsteps"). Getting in and getting out re-send the definition
+    /// (GameServer.BroadcastWorldState). Appended last: the wire format is positional.
+    /// </summary>
+    public int RidingEntityId = -1;
+
     public EntityDefinition()
     {
         Identity.Name = "";

@@ -54,7 +54,10 @@ public sealed class OtherBodies
     private readonly Dictionary<int, Body> _bodies = new();
     private readonly List<int> _departed = new();
 
-    public event Action<Vector3, string, string, StepSlope>? OnStepTriggered; // Position, Material, Variant, up/down
+    /// <summary>A body put a foot down: where, on what, the variant, up or down, and whose body it was —
+    /// the step is heard from inside that body's own collider, which must not stand between it and you
+    /// (ClientAudioSystem.OnPlayerFootstep).</summary>
+    public event Action<Vector3, string, string, StepSlope, int>? OnStepTriggered;
     public event Action<Vector3, string, string>? OnLandTriggered;
 
     /// <summary>A body took a breath: who, from where, and what kind.</summary>
@@ -86,8 +89,8 @@ public sealed class OtherBodies
             // metre — reported from the rooms map as "the car driving by sounds like footsteps are
             // being drug behind it", which at 30 km/h is sixteen footfalls a second trailing the car.
             // Nothing protected against it: a car's own velocity is genuinely its own, which is the
-            // test that keeps passengers and server corrections quiet, and at render rate it moves a
-            // few centimetres an update, which is well inside what a stride explains.
+            // test that keeps server corrections quiet, and at render rate it moves a few centimetres
+            // an update, which is well inside what a stride explains.
             //
             // What actually distinguishes them is not the AI type but the machinery: an entity whose
             // emitter is an engine is a machine, and a machine is heard through its engine, its tyres
@@ -107,6 +110,22 @@ public sealed class OtherBodies
                     || pid.StartsWith("rail:", StringComparison.OrdinalIgnoreCase)
                     || (pid.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)
                         && !pid.Equals("machine:mower_push", StringComparison.OrdinalIgnoreCase)))) continue;
+
+            // ── Nor does somebody sitting in one ───────────────────────────────────────────────
+            //
+            // A passenger was meant to be silent for free: "the server zeroes an occupant's velocity",
+            // so a rider would be a body carried at rest, which the stride rules already refuse. It
+            // does not. OccupancySystem gives an occupant the velocity of what they are in, which is
+            // the truth about where they are going, so a seated body is a body moving at the car's
+            // speed under its own power, as far as anything here can tell. Heard (Cody and Sean, 2026-10-05) as running footsteps from the driver's seat
+            // all the way down the road. The server says who is sitting in what, in the definition;
+            // a body in a seat has no stride, and the one it had is forgotten, so getting out is not
+            // the end of a walk that started where they got in.
+            if (body.Definition.RidingEntityId >= 0)
+            {
+                _bodies.Remove(body.Id);
+                continue;
+            }
 
             if (!_bodies.TryGetValue(body.Id, out var state))
                 _bodies[body.Id] = state = new Body();
@@ -133,7 +152,7 @@ public sealed class OtherBodies
             if (string.IsNullOrEmpty(material) || material == "None") material = "Generic";
 
             if (fall.Landed) OnLandTriggered?.Invoke(body.Transform.Position, material, "0");
-            if (fall.Stepped) OnStepTriggered?.Invoke(fall.StepPosition, material, "0", fall.Slope);
+            if (fall.Stepped) OnStepTriggered?.Invoke(fall.StepPosition, material, "0", fall.Slope, body.Id);
         }
 
         // Somebody who has gone — disconnected, died, or simply walked out of the area of interest —

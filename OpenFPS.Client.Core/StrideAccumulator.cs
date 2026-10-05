@@ -28,12 +28,12 @@ public enum StepSlope { Level, Up, Down }
 /// together nine metres of phantom walking. <see cref="MinStrideSpeed"/> is what tells those apart:
 /// a correction moves you without your legs, so the body's OWN velocity is zero throughout.
 ///
-/// That second rule is also why a passenger is silent for free. The server zeroes an occupant's
-/// velocity and its movement system leaves their body alone — the seat owns where they are — so a
-/// rider is a body being carried at zero velocity, which is the same thing as a body being dragged
-/// by a correction, and it needs no rule of its own. Feeding a vehicle's motion to a stride
-/// generator would otherwise be a footstep every half metre of ROAD: at sixty miles an hour, a
-/// machine gun.
+/// A passenger is NOT silent by that rule, though it was once written that they were. The server
+/// gives an occupant the velocity of what they are in (OccupancySystem), which is where they are
+/// going but not what their legs are doing.
+/// Each caller keeps riders away from here instead: the local player by RidingEntityId, everybody
+/// else by the definition's (OtherBodies). Feeding a vehicle's motion to a stride generator is a
+/// footstep every stride of ROAD: at sixty miles an hour, a machine gun.
 ///
 /// <b>A step is as long as the speed makes it.</b> How far a body goes between footfalls is not a
 /// constant — it is <see cref="StepLength"/>, from the body's leg length and how fast it is moving,

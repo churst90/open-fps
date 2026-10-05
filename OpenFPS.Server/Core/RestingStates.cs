@@ -19,6 +19,9 @@ public sealed class SentState
     public WheelState[]? Wheels;
     /// <summary>The tick the state (or the wheels) last differed from the one before it.</summary>
     public long ChangedAt, WheelsChangedAt;
+    /// <summary>What this client was last told the thing is sitting in (EntityDefinition.RidingEntityId):
+    /// when it differs, the definition goes again.</summary>
+    public int Riding = -1;
 }
 
 /// <summary>

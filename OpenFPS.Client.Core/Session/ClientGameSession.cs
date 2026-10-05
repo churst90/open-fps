@@ -648,10 +648,9 @@ public sealed partial class ClientGameSession : IDisposable
         var snapshot = _world.GetSnapshot();
         FollowRide(snapshot);
 
-        // ...and everybody else, off the same snapshot. A passenger needs no exemption here the way
-        // the local player does above: the server zeroes an occupant's velocity and its movement
-        // system leaves their body to the seat, so a rider is a body at rest being carried, which is
-        // the one thing the stride rules already refuse to call walking.
+        // ...and everybody else, off the same snapshot. A passenger needs the same exemption as the
+        // local player above, and has it there: a seated body carries its vehicle's velocity, and the
+        // definition says it is seated (OtherBodies).
         _others.Update(snapshot, _ownEntityId);
 
         // Internally capped to 60 Hz; the loop this hangs off spins far faster to keep the socket
