@@ -237,8 +237,6 @@ and building a map in the game. Needs the roads and bodies work first.
 - The car starter in the game (inbox/starter-2026-10-02/).
 - The street washing into a lobby through an open door, and two rooms in.
 - Bus air brakes; the airliner's whine.
-- Voice chat at a distance and through a wall; your own voice in your room.
-- The loading tone, the fade-in and the reconnect tick.
 
 ### Load and stuck-voice checks
 Some may already be fixed; confirm before fixing again.
