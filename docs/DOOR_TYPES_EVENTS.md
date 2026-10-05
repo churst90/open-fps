@@ -6,9 +6,11 @@ sequence and obstruction were added 2026-10-05.
 
 Every kind has a physical sound model in `OpenFPS.Common`: `KnobDoor`, `PushBarDoor`, `SlidingDoor`
 (patio, automatic), `GlassDoor` (glass-pushbar, glass-pull), `ElevatorDoor`, and `LockCylinder` for a
-key in any keyed hinged door. The knob, push-bar and sliding doors went through listening rounds on
-2026-10-03. The glass doors, the lift door, the key, the knob door's push opening and the push-bar
-door's pull opening were merged on 2026-10-05 (ee03b6ed) and are unheard. Events with no sound of
+key in any keyed hinged door. Cody approved by ear: the knob door (round 4), the push-bar door
+(round 8), the patio and automatic sliders (round 2), all 2026-10-03 and 2026-10-04, and the key in
+the lock with one spare key on the ring (2026-10-05). The glass doors, the lift door, the knob door's
+push opening and the push-bar door's pull opening were merged on 2026-10-05 (ee03b6ed) and are unheard
+in the game. Events with no sound of
 their own are still sent (see the table below).
 
 ## The kinds
