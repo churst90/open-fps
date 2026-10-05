@@ -6,9 +6,9 @@ Done (committed on `bodies`):
 - Respawn: players 60 s (told at death and at 10 s), walkers retired at once and replaced after 60 s (VehicleSystem.RetireWalker/ReplaceWalker). Dead players are no player beacon.
 - Cleanup: 30 min uncarried, 30 bodies and 30 bags per map.
 - Parked-driver bug fixed (VehicleSystem.Casualties DriverKilled; MapManager.DestroyEntity stale-id guard).
-- Tests: OpenFPS.Tests/BodiesTests.cs (+ StreetBodiesTests), WeaponsTests and PlayerPersistenceTests updated. Targeted run: 76/76 passed.
+- Tests: OpenFPS.Tests/BodiesTests.cs (+ StreetBodiesTests), WeaponsTests and PlayerPersistenceTests updated. Targeted runs pass.
 
 Next:
-- Confirm the full suite passes (it was running at handoff).
+- Full suite not run here (coordinator runs it on merged main). Targeted run: 128/128 passed (Bodies, Weapons, PlayerPersistence, DroppedItem, StreetLife, Hands, Inventory, BulletFlight, CommandCatalog).
 - Final report to the coordinator (changes.md text and MANUAL lines).
 - Delete this file before merging.
