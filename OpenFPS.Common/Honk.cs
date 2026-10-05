@@ -60,7 +60,7 @@ public static class Honk
         {
             return kind.ToLowerInvariant() switch
             {
-                "air" => ChimeHornSpec.ByName(preset).ReferenceDb,
+                "air" => ModelLibrary.Horn(preset).ReferenceDb,
                 "electric" => ElectricHornSpec.ByName(preset).ReferenceDb,
                 _ => 110f,
             };

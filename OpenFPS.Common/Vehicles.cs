@@ -356,7 +356,7 @@ public sealed record VehicleProfile
     public bool DoorChime { get; init; }
 
     /// <summary>
-    /// The horn, as "electric:&lt;ElectricHornSpec&gt;" or "air:&lt;ChimeHornSpec&gt;", or null to
+    /// The horn, as "electric:&lt;ElectricHornSpec&gt;" or "air:&lt;a horn in the ModelLibrary&gt;", or null to
     /// take the one this vehicle would have anyway — see <see cref="HornFor"/>. Declared only where
     /// the body does not say it: a motorcycle and a racing car share an open-wheeled body and only
     /// one of them has a horn button.

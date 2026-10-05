@@ -500,10 +500,11 @@ public sealed class SirenVoiceState : PhysicalVoiceState
 /// A vehicle's horn, blown in the rhythm the server sent — see <see cref="Honk"/>.
 ///
 /// The horn is the model the vehicle carries: an air horn is the approved <see cref="ChimeHorn"/>,
-/// an electric one <see cref="ElectricHorn"/>. The rhythm is played in the voice's own time, so a
-/// tap is exactly as long as the driver's thumb was on the button however the frames fall. The
-/// warm-up the voice discards before it is heard is taken off the front, or it would eat the first
-/// eighty milliseconds of every tap.
+/// found in the <see cref="ModelLibrary"/> as a train's is, so an authored horn is the one that
+/// blows; an electric one is an <see cref="ElectricHorn"/>. The rhythm is played in the voice's own
+/// time, so a tap is exactly as long as the driver's thumb was on the button however the frames
+/// fall. The warm-up the voice discards before it is heard is taken off the front, or it would eat
+/// the first eighty milliseconds of every tap.
 /// </summary>
 public sealed class HornVoiceState : PhysicalVoiceState
 {
@@ -521,7 +522,7 @@ public sealed class HornVoiceState : PhysicalVoiceState
         string kind = colon > 0 ? horn[..colon] : "";
         string preset = colon > 0 ? horn[(colon + 1)..] : horn;
         if (string.Equals(kind, "air", StringComparison.OrdinalIgnoreCase))
-            _air = new ChimeHorn(ChimeHornSpec.ByName(preset), sampleRate, seed);
+            _air = new ChimeHorn(ModelLibrary.Horn(preset), sampleRate, seed);
         else
             _electric = new ElectricHorn(ElectricHornSpec.ByName(preset), sampleRate, seed);
     }

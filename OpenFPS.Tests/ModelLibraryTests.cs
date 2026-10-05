@@ -7,6 +7,7 @@ using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Text.Json;
+using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using Xunit;
 using Xunit.Abstractions;
@@ -120,6 +121,30 @@ public class ModelLibraryTests : IDisposable
         // And it is still listed once, not twice.
         Assert.Single(ModelLibrary.Ids(ModelLibrary.Kinds.Bell).Where(
             i => i.Equals("crossing_gong", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    /// <summary>
+    /// A road vehicle's air horn comes from the library, as a train's does: a horn an author writes
+    /// is the one a bus or a lorry blows, at its own level. Both looked air horns up among the
+    /// built-in presets only, so an authored horn never reached the road: its honk was 110 dB, the
+    /// level for a horn nobody knows, and its voice could not be made at all.
+    /// </summary>
+    [Fact]
+    public void AnAuthoredHornReachesARoadVehicle()
+    {
+        var mine = ChimeHornSpec.BusAirHorn with { Name = "a bus horn somebody wrote", ReferenceDb = 121f };
+        ModelLibrary.Add(ModelLibrary.Kinds.Horn, "authored_bus_horn", mine);
+
+        Assert.Equal(121f, Honk.LevelDb("air:authored_bus_horn"));
+        var voice = new HornVoiceState("air:authored_bus_horn", new[] { 0.3f }, 44100, 1);
+        var stock = new HornVoiceState("air:bus_horn", new[] { 0.3f }, 44100, 1);
+        // Full scale is the horn's level plus the shared headroom, so it shows whose level it took.
+        Assert.Equal(121f - ChimeHornSpec.BusAirHorn.ReferenceDb,
+                     20f * MathF.Log10(voice.PascalsAtFullScale / stock.PascalsAtFullScale), 3);
+        var block = new float[512];
+        double e = 0;
+        for (int i = 0; i < 40; i++) { voice.Render(block); foreach (float x in block) e += x * x; }
+        Assert.True(e > 0, "the authored horn made no sound");
     }
 
     [Fact]
