@@ -1,6 +1,12 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Numerics;
+using System.Reflection;
+using System.Text.Json;
 using OpenFPS.Common;
 using Xunit;
 using Xunit.Abstractions;
@@ -54,11 +60,47 @@ public class ModelLibraryTests : IDisposable
                     _o.WriteLine("after:  " + after);
                 }
                 Assert.True(ok, $"{kind}:{id} did not survive being written out and read back");
+
+                // The text agreeing is not enough: a field the writer skips is missing from both
+                // sides of it. What the model READ BACK reports must be what the library's does,
+                // every property, the ones worked out from the others included.
+                var back = JsonSerializer.Deserialize(before, spec.GetType())!;
+                var lost = Readings(spec).Except(Readings(back)).ToList();
+                foreach (var l in lost) _o.WriteLine($"{kind}:{id} lost {l}");
+                Assert.True(lost.Count == 0, $"{kind}:{id} read back differently: {string.Join("; ", lost.Take(4))}");
                 checked_++;
             }
         }
         _o.WriteLine($"{checked_} models across {ModelLibrary.AllKinds.Count()} kinds");
         Assert.True(checked_ >= 25, $"only {checked_} models — did a family stop being registered?");
+    }
+
+    /// <summary>
+    /// Every public property of a model, as "path=value" lines, down through its records and lists.
+    /// Computed properties too: they are what the synthesis reads, so they are what has to survive.
+    /// </summary>
+    private static IEnumerable<string> Readings(object? o, string path = "", int depth = 0)
+    {
+        if (o == null) { yield return path + "=null"; yield break; }
+        var t = o.GetType();
+        if (t.IsPrimitive || t.IsEnum || o is string || o is decimal || o is Vector3)
+        {
+            yield return path + "=" + Convert.ToString(o, CultureInfo.InvariantCulture);
+            yield break;
+        }
+        if (depth > 8) yield break;
+        if (o is IEnumerable list)
+        {
+            int i = 0;
+            foreach (var e in list)
+                foreach (var r in Readings(e, $"{path}[{i++}]", depth + 1)) yield return r;
+            yield break;
+        }
+        foreach (var p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (p.GetIndexParameters().Length > 0) continue;
+            foreach (var r in Readings(p.GetValue(o), path + "." + p.Name, depth + 1)) yield return r;
+        }
     }
 
     [Fact]

@@ -276,7 +276,6 @@ public sealed record RailVehicleSpec
     /// hitting the same joint a tenth of a second apart.</summary>
     public float BogieWheelbaseMetres { get; init; } = 2.56f;
     public int Bogies { get; init; } = 2;
-    [JsonIgnore]
     public int AxlesPerBogie { get; init; } = 2;
     public required WheelsetSpec Wheels { get; init; }
     public float MassTonnes { get; init; } = 45f;
