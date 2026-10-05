@@ -27,6 +27,13 @@ Recent work, newest first. `git log` has the rest.
   fits into your hands, back and pockets; the rest stays in it. Pedestrians are replaced a minute
   later, out of sight. Bodies and bags nobody carries go after half an hour, at most 30 of each on a
   map. A driver shot beside their parked car no longer breaks the car: somebody comes back for it.
+- The server sends far less: about 1.5 instead of 5.7 megabits a second per player on the city, and
+  about 150 instead of 580 packets a second. Things standing still (parked cars, people waiting, a
+  bus at its stop) are no longer re-sent thirty times a second; they go again the moment they move,
+  and once a second while they wait. Positions are sent in a tighter form that keeps them to the
+  millimetre. Your health and what is under your feet are sent only when they change. Nothing should
+  sound different. Client and server must both be updated together. The next steps, which trade
+  something, are in docs/PLAN_2026-10-05.md.
 - Doors open the way real ones do. Every hinged door is pushed from one side and pulled from the
   other: room doors swing into the room, and exit doors (push-bar doors, the towers' front entrances,
   the roof and terminal doors) swing out. A push bar is only on the inside. From the street a tower's

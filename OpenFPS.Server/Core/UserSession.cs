@@ -48,6 +48,14 @@ public class UserSession
     /// change how the world sounds.
     /// </summary>
     public HashSet<int> VisibleDynamicEntities { get; } = new();
+
+    /// <summary>What this client was last sent about each moving thing, so a thing at rest is not sent
+    /// again every tick (<see cref="RestingStates"/>).</summary>
+    public Dictionary<int, SentState> SentStates { get; } = new();
+
+    /// <summary>The last StatsUpdate this client was sent; another goes only when it would differ.</summary>
+    public StatsUpdate? LastStats { get; set; }
+
     public ClientInputUpdate LastInput { get; set; } = new();
     public System.Collections.Concurrent.ConcurrentQueue<ClientInputUpdate> InputQueue { get; } = new();
 

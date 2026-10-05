@@ -1130,6 +1130,8 @@ public class GameServer
         // logic is driven from.
         session.KnownEntities.Clear();
         session.VisibleDynamicEntities.Clear();
+        session.SentStates.Clear();
+        session.LastStats = null;
 
         // In batches: one reliable message per definition made the load wait on round trips.
         var batch = new EntityDefinitionBatch();
@@ -1256,6 +1258,8 @@ public class GameServer
         session.CurrentMapId = mapId;
         session.KnownEntities.Clear();
         session.VisibleDynamicEntities.Clear();
+        session.SentStates.Clear();
+        session.LastStats = null;
         while (session.InputQueue.TryDequeue(out _)) { }
         session.InputBudget = 0;
         session.GroundProbe.Invalidate();
@@ -1406,7 +1410,8 @@ public class GameServer
                         // remote player, and anything spawned at runtime. Send the definition first, and
                         // only once: KnownEntities is what makes it once rather than every tick.
                         bool isNew = session.KnownEntities.Add(e.Id);
-                        if (isNew || _dirtyAudioBuffer.Contains(e.Id))
+                        bool defined = isNew || _dirtyAudioBuffer.Contains(e.Id);
+                        if (defined)
                             Deliver(peer, session, CreateDefinition(world, e), DeliveryMethod.ReliableOrdered);
 
                         if (!isDynamic && !t.IsDirty && !isNew) continue;
@@ -1435,7 +1440,15 @@ public class GameServer
                         // resend — on the unreliable channel a single dropped packet leaves that client
                         // colliding with a wall that is no longer there. Reliable delivery IS the
                         // acknowledgement; there is no separate ack to wait for.
-                        if (isDynamic) _reusableBroadcast.States.Add(state);
+                        //
+                        // A dynamic entity that has not moved is not sent at all, past a few repeats and
+                        // a keep-alive a second (RestingStates): two thirds of the city, every tick.
+                        if (isDynamic)
+                        {
+                            if (RestingStates.ShouldSend(session.SentStates, ref state, tick, force: defined || e == session.Entity))
+                                _reusableBroadcast.States.Add(state);
+                            else PerfProbe.Count("server.broadcast.resting");
+                        }
                         else _reliableBroadcast.States.Add(state);
                     }
 
@@ -1465,6 +1478,7 @@ public class GameServer
                         {
                             session.VisibleDynamicEntities.Remove(goneId);
                             session.KnownEntities.Remove(goneId);
+                            session.SentStates.Remove(goneId);
                         }
                         Deliver(peer, session, new EntityRemoved { EntityIds = new List<int>(_removedBuffer) },
                             DeliveryMethod.ReliableOrdered);
@@ -1487,13 +1501,21 @@ public class GameServer
                     // The gun in your hands, which the client's keys need: Enter fires only a gun,
                     // and R reloads one.
                     var held = CombatService.Held(world, session.Entity, mapEntry.Value.lookup);
-                    Deliver(peer, session, new StatsUpdate {
+                    // Only when something in it has changed. It went every tick, reliably, to say the
+                    // same health and the same floor thirty times a second; it is reliable, so the one
+                    // that says something new cannot be lost.
+                    var statsNow = new StatsUpdate {
                         Health = health, MaxHealth = maxHealth,
                         CurrentMaterial = stats.matType, CurrentVariant = stats.variant,
                         HeldWeaponId = held.WeaponId, HeldRounds = held.Rounds, HeldScopeId = held.ScopeId,
                         // A body over the shoulder slows you, and the client predicts the same pace.
                         SpeedLimit = HandsService.SpeedLimit(world, session.Entity, mapEntry.Value.lookup),
-                    }, DeliveryMethod.ReliableOrdered);
+                    };
+                    if (!SameStats(session.LastStats, statsNow))
+                    {
+                        Deliver(peer, session, statsNow, DeliveryMethod.ReliableOrdered);
+                        session.LastStats = statsNow;
+                    }
                     send.Dispose();
                 }
                 catch (Exception ex)
@@ -1507,6 +1529,13 @@ public class GameServer
             world.Query(new QueryDescription().WithAll<Transform>(), (ref Transform t) => { t.IsDirty = false; });
         }
     }
+
+    /// <summary>Whether two stats updates say the same thing, field for field.</summary>
+    internal static bool SameStats(StatsUpdate? a, StatsUpdate b)
+        => a != null && a.Health == b.Health && a.MaxHealth == b.MaxHealth
+           && a.CurrentMaterial == b.CurrentMaterial && a.CurrentVariant == b.CurrentVariant
+           && a.HeldWeaponId == b.HeldWeaponId && a.HeldRounds == b.HeldRounds && a.HeldScopeId == b.HeldScopeId
+           && a.SpeedLimit == b.SpeedLimit;
 
     private (string matType, string variant) GetMaterialUnderPlayer(World world, SpatialGrid<Entity> grid, Vector3 pos)
     {
@@ -1616,6 +1645,7 @@ public class GameServer
         foreach (var other in _sessions.GetSessionsInMap(mapId))
         {
             other.VisibleDynamicEntities.Remove(entityId);
+            other.SentStates.Remove(entityId);
             if (!other.KnownEntities.Remove(entityId)) continue;
             SendToSession(other, new EntityRemoved { EntityIds = new List<int> { entityId } });
         }

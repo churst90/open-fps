@@ -481,6 +481,22 @@ public partial class ServerStateUpdate : IMessage
     /// <summary>Whether the seat this client is in drives the thing. A driver hears the lane lines;
     /// a passenger does not need them.</summary>
     public bool RidingControls;
+
+    /// <summary>
+    /// The states, packed by <see cref="StatePacking"/> — how the server sends them, at about half the
+    /// size <see cref="States"/> took. Unpacked onto the end of <see cref="States"/> as the message is
+    /// read, and cleared, so nothing past the socket ever sees this field set.
+    /// </summary>
+    public byte[]? Packed;
+
+    [MemoryPackOnDeserialized]
+    private void UnpackStates()
+    {
+        if (Packed == null) return;
+        States ??= new List<EntityState>();
+        StatePacking.Unpack(Packed, States);
+        Packed = null;
+    }
 }
 
 [MemoryPackable]
