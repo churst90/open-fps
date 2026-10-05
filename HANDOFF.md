@@ -1,27 +1,22 @@
 # Handoff: door-models-glass (2026-10-05)
 
-Branch `door-models-glass`, from da47b2df. Never merge or push; Cody approves by ear.
+Branch `door-models-glass`, from da47b2df, with `doors-behaviour` merged in. Never merge to main or push;
+Cody approves by ear.
 
-## Task
-Physical door models in the style of KnobDoor/PushBarDoor (DoorPhysics): glass front door (glass-pushbar,
-key outside + pull handle, bar inside), glass pull door, lift door, the key in a lock (LockCylinder), and push
-openings for KnobDoor and PushBarDoor. Renders + README into
-/home/cody/external-rescue/Github/open-fps/inbox/door-models-2026-10-05/ with 00-tour.wav.
-
-## Done (WIP, unheard)
-- OpenFPS.Common/GlassDoor.cs: both kinds, openings Push/Pull/Key, close on closer. Seals per character
-  (bulb, bulb set, pile, none). Hand on handle is a mass+palm spring. Settles 0.3 s before an opening.
-- OpenFPS.Common/LockCylinder.cs: keyring pendulums, pins over bitting, shoulder, turn/cam/hub, host leaf.
-- OpenFPS.AudioLab/Spikes/DoorModelsSpike.cs, `--door-models [out=] [only=] [stems=] [refs]`.
+## Done (unheard)
+- OpenFPS.Common/GlassDoor.cs: glass-pushbar and glass-pull, openings Push/Pull/Key, close on the closer.
+- OpenFPS.Common/LockCylinder.cs: key ring, pins over the bitting, shoulder, turn, cam, latch drawn; the
+  game render keeps DoorSystem's key timeline (insert 0, turn 0.45 s, drawn by 0.7 s).
+- OpenFPS.Common/ElevatorDoor.cs: one landing-door leaf's whole run, open or close.
+- KnobDoor push opening (key suffix `:push`), PushBarDoor trim pull (`:pull`); approved keys unchanged.
+- DoorSystem: models wired onto the doors-behaviour events (key-insert, push/pull, bar, motor-start).
+- WorldAudioPlayer: routes glassdoor:/lockcylinder:/elevatordoor:, prewarms glass doors and keys.
+- AudioLab `--door-models [out=] [only=] [stems=] [refs]`; OpenFPS.Tests/DoorModelTests.cs.
 
 ## Next
-1. LockCylinder: cam/hub-stop chatter (switch ContactRestitution -> Contact), make key contacts two-way with
-   the key's modes (energy), start hand nearer. Levels were 20 dB hot (LAF 80-98 at 1 m).
-2. GlassDoor: re-render after the fixes (openings had never left the stop: fixed hand dynamics); check
-   levels (closes were LAF 102-120), remove GD_TRACE hack.
-3. ElevatorDoor.cs (not started), push openings in KnobDoor/PushBarDoor (key field appended, approved keys
-   unchanged), DoorSystem/WorldAudioPlayer wiring + prewarm, tests, README + renders.
+- Final renders + README into /home/cody/external-rescue/Github/open-fps/inbox/door-models-2026-10-05/.
 
 ## Build / run
 DOTNET_CLI_USE_MSBUILD_SERVER=0 nice ~/.dotnet/dotnet build OpenFPS.AudioLab/OpenFPS.AudioLab.csproj --artifacts-path ~/.cache/openfps-agent-doormodels -nodeReuse:false -p:UseSharedCompilation=false
-cd ~/.cache/openfps-agent-doormodels/bin/OpenFPS.AudioLab/debug && ./OpenFPS.AudioLab --door-models only=glass-pull out=DIR
+cd ~/.cache/openfps-agent-doormodels/bin/OpenFPS.AudioLab/debug && ./OpenFPS.AudioLab --door-models out=DIR
+Tests: dotnet test OpenFPS.Tests ... --filter "FullyQualifiedName~DoorModelTests|FullyQualifiedName~DoorTypeTests|FullyQualifiedName~DoorSides"

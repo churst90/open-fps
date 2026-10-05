@@ -330,6 +330,13 @@ public class PrefabTemplate
     /// <summary>How long closing by itself takes from fully open, seconds.</summary>
     public float? CloseSeconds { get; set; }
 
-    /// <summary>Which side needs a key: +1 the leaf's own +Z side, -1 the other, 0 or absent neither.</summary>
+    /// <summary>Which side needs a key: +1 the leaf's own +Z side, -1 the other, 0 or absent neither.
+    /// From that side a shut door is locked: opening it is the key, then the hand.</summary>
     public float? KeyedSide { get; set; }
+
+    /// <summary>Which face of a hinged leaf you push it open from: +1 its own +Z face (the default), -1
+    /// the other. It swings away from that face and is pulled from the other. A door's +Z face is its
+    /// outside: a room door is pushed from outside and swings in (+1); an exit door is pushed from
+    /// inside, where its push bar is, and swings out (-1).</summary>
+    public float? PushSide { get; set; }
 }

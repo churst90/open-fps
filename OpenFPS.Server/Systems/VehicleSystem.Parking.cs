@@ -254,7 +254,7 @@ public sealed partial class VehicleSystem
                 pk.Leg = 0; pk.Step++; break;
             case 3:                                            // round the back of it to the door
                 if (pk.Chirp && pk.Clock >= 5.0f) { pk.Chirp = false; pk.Chirped = true; ChirpLock(world, v); }
-                if (Walk(world, pk, dt)) { pk.FoundOpen = OpenFor(world, pk.Spot.Door, pk.Spot.Outside); pk.Clock = 0f; pk.Step++; }
+                if (Walk(world, pk, dt)) { pk.FoundOpen = OpenFor(world, pk.Spot.Door, pk.Spot.Outside, pk.Driver); pk.Clock = 0f; pk.Step++; }
                 break;
             // Through it, once it is open: a door with a sensor opens as they come up to it, and takes
             // its own time about it.
@@ -268,11 +268,11 @@ public sealed partial class VehicleSystem
                 // door on a person standing in it. A rider once shut Brandt Court's front door on
                 // Cody, who had opened it, and the street went to the shut-door level (2026-10-02).
                 if (!pk.FoundOpen && !ClosesItself(world, pk.Spot.Door) && !SomeoneAt(world, pk.Spot.Door))
-                    DoorSystem.Set(world, pk.Spot.Door, false);
+                    DoorSystem.Set(world, pk.Spot.Door, false, who: pk.Driver);
                 RemovePerson(v, pk);
                 pk.Clock = 0f; pk.Step++; break;
             case 7 when pk.Clock >= pk.Away:                   // and back out
-                pk.FoundOpen = OpenFor(world, pk.Spot.Door, pk.Spot.Inside);
+                pk.FoundOpen = OpenFor(world, pk.Spot.Door, pk.Spot.Inside, pk.Driver);
                 pk.Clock = 0f; pk.Step++; break;
             case 8 when pk.Clock >= 1.3f:
                 pk.Driver = SpawnPerson(v, pk.Spot.Inside, heading);
@@ -283,7 +283,7 @@ public sealed partial class VehicleSystem
                 break;
             case 10 when pk.Clock >= 0.8f:
                 if (!pk.FoundOpen && !ClosesItself(world, pk.Spot.Door) && !SomeoneAt(world, pk.Spot.Door))
-                    DoorSystem.Set(world, pk.Spot.Door, false);
+                    DoorSystem.Set(world, pk.Spot.Door, false, who: pk.Driver);
                 // Unlocked from the pavement as they come back to it: two short chirps.
                 if (pk.Chirped && v.Horn.Length > 0) Honk(v.MapId, world, v, new[] { 0.04f, 0.12f, 0.04f });
                 pk.Route = new[] { kerb, roadBehind, standBy }; pk.Leg = 0; pk.Step++; break;
@@ -393,11 +393,11 @@ public sealed partial class VehicleSystem
     /// sensor, by being there. True when it is not theirs to shut afterwards: somebody had it open
     /// already, or it opens and shuts itself.
     /// </summary>
-    private static bool OpenFor(World world, Entity door, Vector3 at)
+    private static bool OpenFor(World world, Entity door, Vector3 at, Entity who)
     {
         if (!world.IsAlive(door) || !world.Has<DoorComponent>(door)) return true;
         if (!DoorSystem.OpensByHand(world.Get<DoorComponent>(door))) return true;
-        return !DoorSystem.Set(world, door, true, by: at);
+        return !DoorSystem.Set(world, door, true, by: at, who: who);
     }
 
     /// <summary>A door with a closer or a motor shuts itself; nobody pulls it to behind them.</summary>

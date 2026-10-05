@@ -96,6 +96,9 @@ public static class DoorModelsSpike
                 string where = host switch { LockCylinder.Host.SteelDoor => "a steel door", LockCylinder.Host.WoodDoor => "a wooden door", _ => "a glass front door's aluminium stile" };
                 list.Add(new($"key-unlock-{h.ToString().ToLowerInvariant()}-{chars[v]}", $"a key unlocking {where}, {chars[v]} keyring",
                     r => Run<LockCylinder.Report>(r, rep => LockCylinder.RenderUnlock(h, vv, 48000, rep)), LockCylinder.PascalsAtFullScale));
+                if (host == LockCylinder.Host.AluminiumStile && v == 1)
+                    list.Add(new("key-unlock-aluminiumstile-standard-with-approach", "the same key, the ring first brought up to the lock",
+                        r => Run<LockCylinder.Report>(r, rep => LockCylinder.RenderUnlock(h, vv, 48000, rep, approach: true)), LockCylinder.PascalsAtFullScale));
             }
         return list;
     }

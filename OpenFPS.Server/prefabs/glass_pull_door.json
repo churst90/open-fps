@@ -1,7 +1,7 @@
 {
   "Id": "glass_pull_door",
   "Name": "Glass Door",
-  "Description": "A shop's glass door: a 12 mm toughened glass leaf in an aluminium frame, opened by pulling its handle, and shut again by its closer three seconds after the doorway is clear.",
+  "Description": "A shop's glass door: a 12 mm toughened glass leaf in an aluminium frame, pulled open by its handle from outside (its +Z face) and pushed open from inside, so it swings out (PushSide -1), and shut again by its closer three seconds after the doorway is clear.",
   "Material": "Glass",
   "ColliderSize": { "X": 1.0, "Y": 2.1, "Z": 0.012 },
   "IsSolid": true,
@@ -13,6 +13,7 @@
   "SwingSeconds": 1.0,
   "SwingDegrees": 90,
   "HingeSide": 1,
+  "PushSide": -1,
   "TransmissionLow": 0.7,
   "TransmissionMid": 0.5,
   "TransmissionHigh": 0.3

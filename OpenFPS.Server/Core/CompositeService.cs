@@ -217,6 +217,10 @@ public class CompositeService
             door.Travel = 0;
             door.SelfClosing = false;
             door.ClearSeconds = 0f;
+            door.KeySeconds = 0f;
+            door.KeyTurned = false;
+            door.HandId = 0;
+            door.OpenedFrom = 0;
             door.Captured = false;
             if (world.Has<PortalComponent>(e)) world.Get<PortalComponent>(e).ApertureSize = 0f;
         }

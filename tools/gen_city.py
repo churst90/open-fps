@@ -50,6 +50,7 @@ OUT = next((a[len("--out="):] for a in sys.argv[1:] if a.startswith("--out=")), 
 # from the prefab's collider. Hard-coding those sizes here is the standing way for a generated map to
 # drift from the prefabs it is made of.
 BASE = {}
+HINGED = set()                           # door prefabs whose leaf swings rather than slides
 for path in glob.glob(os.path.join(PREFAB_DIR, "*.json")):
     if path.endswith("prefab-schema.json"):
         continue
@@ -58,6 +59,8 @@ for path in glob.glob(os.path.join(PREFAB_DIR, "*.json")):
     c = p.get("ColliderSize")
     if c:
         BASE[p["Id"]] = (c.get("X", 1.0), c.get("Y", 1.0), c.get("Z", 1.0))
+    if p.get("IsDoor") and not p.get("Slides", p.get("DoorKind") in ("auto-slide", "patio-slide", "elevator")):
+        HINGED.add(p["Id"])
 
 
 def v3(x, y, z):
@@ -169,15 +172,29 @@ def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None, turn=0.0, n
     to cover it and lap each jamb by DOOR_LAP: a leaf narrower than its opening leaves a slot you can
     walk round shut, which is what 71 doors on this map did until they were refitted on 2026-09-23.
 
-    `turn` turns the leaf about its own middle, radians: half a turn puts its +Z face (a front door's
-    key side) on the other side of the wall, and sends a sliding leaf the other way.
+    `turn` turns the leaf about its own middle, radians: half a turn sends a sliding leaf the other
+    way. A swinging leaf is turned by where its rooms are instead, and `turn` is not used for it.
+
+    WHICH WAY IT SWINGS. A hinged leaf's +Z face is its outside, and its prefab says which face it is
+    pushed from (PushSide): a room door is pushed from outside and swings into the room, an exit door
+    (a push bar, a building's front entrance) is pushed from inside and swings out, toward the street,
+    as an exit does. So every hinged leaf here is turned with its +Z face AWAY from place `a`, the room
+    it belongs to, which is also where a front door's key side (KeyedSide +1) has to be. Until
+    2026-10-05 half the flats' doors swung into the corridor and every entrance swung inward.
     """
     bx, by, bz = BASE[prefab]
+    base = 0.0 if facing_z else math.pi / 2
+    if prefab in HINGED:
+        room = next((r for r in reversed(entities) if r["EntityId"] == a), None)
+        if room is None:
+            raise SystemExit(f"door {name!r}: place {a} must be made before its door, to know which side is in")
+        to_room = (room["Position"]["X"] - x) * math.sin(base) + (room["Position"]["Z"] - z) * math.cos(base)
+        turn = math.pi if to_room > 0 else 0.0
     e = {
         "EntityId": new_id(),
         "PrefabId": prefab,
         "Position": v3(x, y0 + by / 2, z),
-        "Rotation": yaw((0.0 if facing_z else math.pi / 2) + turn),
+        "Rotation": yaw(base + turn),
         "RegionAId": a, "RegionBId": b,
     }
     if opening is not None:
@@ -832,12 +849,13 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
             # own facade — shut, the doorway was open round it; opened, the leaf swung across it.
             # city.json's doors were re-fitted to their openings on 2026-09-23 (turned and sized).
             # A glass front door with a push bar inside and a key outside (Cody, 2026-10-02: like his
-            # own building's). Its key side is the leaf's +Z face, turned to the street.
+            # own building's). Its key side is the leaf's +Z face, which door() turns to the street,
+            # and it swings out over the pavement: unlocked and pulled from the street, pushed by its
+            # bar from inside (Cody, 2026-10-05).
             # It is the building's front entrance and is called that: the thing a player walking
             # along the facade is looking for.
             door(ex, 0.02, ez, stair_id, -1, facing_z=not vertical, prefab="glass_front_door",
-                 opening=entrance[1] - entrance[0], turn=0.0 if side > 0 else math.pi,
-                 name=f"{label} front entrance")
+                 opening=entrance[1] - entrance[0], name=f"{label} front entrance")
 
         # ── The air conditioners ───────────────────────────────────────────────────────────────
         #

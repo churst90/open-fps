@@ -367,6 +367,7 @@ public class PrefabRepository
                 CloseAfterSeconds = MathF.Max(0f, t.CloseAfterSeconds ?? 0f),
                 CloseSeconds = MathF.Max(0f, t.CloseSeconds ?? 0f),
                 KeyedSide = t.KeyedSide is > 0 ? 1f : t.KeyedSide is < 0 ? -1f : 0f,
+                PushSide = t.PushSide is < 0 ? -1f : 1f,
                 SwingSeconds = t.SwingSeconds ?? 0.9f,
                 SwingRadians = (t.SwingDegrees ?? 90f) * (MathF.PI / 180f),
                 HingeSide = t.HingeSide is < 0 ? -1f : 1f,

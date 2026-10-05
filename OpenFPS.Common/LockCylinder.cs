@@ -72,7 +72,10 @@ public static class LockCylinder
     /// When, in a render, the latch is drawn and the key held: the door can be opened from here. The server
     /// sends the door's opening this long after the key.
     /// </summary>
-    public const float UnlockSeconds = 1.25f;
+    public const float UnlockSeconds = 0.7f;
+
+    /// <summary>When, after the tip meets the keyway, the hand turns the key (DoorSystem.KeyTurnSeconds).</summary>
+    public const float TurnSeconds = 0.45f;
 
     /// <summary>
     /// Each character: how many keys hang on the ring besides the one in the lock, how long the hand takes to
@@ -88,14 +91,17 @@ public static class LockCylinder
             _ => (6, 0.4, 0.2, 0.3, new[] { 6, 1, 5, 2, 8 }),
         };
 
-    /// <summary>The script's pace: the last 30 mm found slowly, a pause with the key home, the turn.</summary>
-    private const double Aim = 0.18, Pause = 0.1, TurnTime = 0.5;
+    /// <summary>The script's pace: the last 30 mm found slowly (with the approach), the turn.</summary>
+    private const double Aim = 0.18, TurnTime = 0.3;
 
     /// <summary>The unlock: the ring brought up, the key in, turned, the latch drawn and held.</summary>
-    public static float[] RenderUnlock(Host host, int variant, int sampleRate, Report? report = null)
+    /// <remarks>The game's render starts with the key's tip at the keyway (the server's key-insert) and keeps
+    /// the server's pace: turned at <see cref="TurnSeconds"/>, the latch drawn by <see cref="UnlockSeconds"/>.
+    /// With <paramref name="approach"/> the ring is first brought up to the lock from 20 cm below (the lab's).</remarks>
+    public static float[] RenderUnlock(Host host, int variant, int sampleRate, Report? report = null, bool approach = false)
     {
         var sim = new Sim(host, variant, sampleRate, report);
-        sim.Script();
+        sim.Script(approach);
         return sim.Output();
     }
 
@@ -328,13 +334,15 @@ public static class LockCylinder
 
         // ── The script ───────────────────────────────────────────────────────────────────────────
 
-        public void Script()
+        public void Script(bool approach)
         {
             // 1. The ring brought up towards the lock, 30 mm short of the keyway: a minimum-jerk reach.
             double t0 = time;
-            var from = (hx, hy, hz);
             const double shortOf = 0.03;
-            double aimAt = -1, insertAt = -1, shoulder = -1, turnAt = -1, end = 3;
+            if (!approach) { hx = 0; hy = 0; hz = KeyInDepth + 0.001; }
+            var from = (hx, hy, hz);
+            double aimAt = approach ? -1 : 0, insertAt = approach ? -1 : 0, shoulder = -1, turnAt = -1, end = 3;
+            if (!approach) Log("0 ms  the tip at the keyway");
             while (time < end)
             {
                 if (aimAt < 0)
@@ -366,7 +374,7 @@ public static class LockCylinder
                 {
                     // The hand stops with the key home: the bunch swings on.
                     MoveHand(0, 0, 0);
-                    if (time > shoulder + Pause) { turnAt = time; turning = true; Log($"{time * 1000:F0} ms  the turn"); }
+                    if (time >= insertAt + TurnSeconds) { turnAt = time; turning = true; Log($"{time * 1000:F0} ms  the turn"); }
                 }
                 else
                 {
@@ -379,7 +387,7 @@ public static class LockCylinder
                 }
                 Tick();
             }
-            if (report != null) report.DrawnAt = drawnAt;
+            if (report != null) report.DrawnAt = drawnAt - Math.Max(0, insertAt);
         }
 
         private double drawnAt = -1;

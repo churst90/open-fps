@@ -456,7 +456,12 @@
     },
     "KeyedSide": {
       "type": "number",
-      "description": "Which side needs a key to open it: 1 the leaf's own +Z side, -1 the other, 0 neither."
+      "description": "Which side needs a key to open it: 1 the leaf's own +Z side, -1 the other, 0 neither. From that side a shut door is locked: the key goes in and turns, then it is pushed or pulled open."
+    },
+    "PushSide": {
+      "type": "number",
+      "enum": [1, -1],
+      "description": "Which face of a hinged leaf you push it open from: 1 its own +Z face (the default), -1 the other. It swings away from that face and is pulled from the other. A door's +Z face is its outside: a room door is pushed from outside and swings into the room (1); an exit door is pushed from inside, where its push bar is, and swings out (-1)."
     },
     "Hands": {
       "type": "integer",
