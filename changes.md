@@ -27,6 +27,12 @@ Recent work, newest first. `git log` has the rest.
   fits into your hands, back and pockets; the rest stays in it. Pedestrians are replaced a minute
   later, out of sight. Bodies and bags nobody carries go after half an hour, at most 30 of each on a
   map. A driver shot beside their parked car no longer breaks the car: somebody comes back for it.
+- Vehicle beacons are heard. Every one sounded from inside its own car's floor, so it read as behind
+  a wall and was never played. It now sounds from the side of the car facing you, and the car you sit
+  in is not counted. Only parked, drivable cars have a beacon; moving traffic is placed by its engine.
+- Windows: the client asks for a 1 ms timer. The audio thread ran at 60 Hz instead of 250 and the game
+  loop at 63 Hz, so pass-bys stepped in pitch and moving sounds lagged about 110 ms; engine rendering
+  workers were slowed by the same tick. The log states the timer resolution at start.
 - Doors are heard the first time you open them. Each door sound is a simulation that takes seconds to
   run, and one not ready within a tenth of a second was dropped; the client rendered only some of them
   at start, nothing was kept between sessions, and the towers' glass front doors were rendered at the

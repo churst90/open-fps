@@ -454,6 +454,9 @@ Commands (all saved):
 Each map decides, for each kind, whether it starts on or off, is always on, or is not allowed.
 Within that, use `/beacons` to choose.
 
+A vehicle's beacon sounds from the side of it facing you. The car you are sitting in has none.
+Only parked cars you can get into have a beacon; moving traffic is heard by its engine.
+
 ## How loud the world is
 
 Real sounds differ a lot in loudness: a hot rod is about 20 dB louder than an economy car, and
