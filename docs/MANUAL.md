@@ -135,8 +135,10 @@ Doors come in kinds, and each works as the real one does.
 - A door with a knob or lever (houses, flats): E opens it and E shuts it. It stays as you leave it.
 - A steel door with a push bar (fire, stair and service doors): E opens it. Its closer shuts it
   3 seconds after the doorway is clear, slowly and then quickly for the latch.
-- A glass front door (the towers' street doors): opened with a key from the street and by its
-  push bar from inside. Everyone has the key for now. A closer shuts it like a steel door.
+- A glass front door (the towers' street doors): locked from the street. E unlocks it with your key
+  and you pull it open ("You unlock the front entrance with your key and pull it open"). From inside
+  you push the bar. It swings out over the pavement. Everyone has the key for now. A closer shuts it
+  like a steel door, and it locks again.
 - A glass door you pull (some shops, none on the city yet): E opens it; a closer shuts it.
 - An automatic sliding door (the airport terminal's entrances): it opens by itself when anyone
   comes within 2.5 m of it, from either side, and shuts 2 seconds after they have gone. E does
@@ -144,8 +146,14 @@ Doors come in kinds, and each works as the real one does.
 - A patio door (each house's garden side): E slides it open and E slides it shut.
 - A lift's doors: opened by the lift. There are no lifts yet.
 
-No door shuts by itself on anyone standing in the doorway. A closer waits; an automatic door
-opens again. People in the street use doors the same way.
+A hinged door is pushed from one side and pulled from the other. Room doors open into the room;
+exit doors (push-bar doors, the towers' front entrances, the roof and terminal doors) open outward.
+A push bar is only on the inside. E says which: "You push the door open", "You pull the door open".
+
+No door moves into a person. A closer waits, an automatic door opens again, and you cannot shut a
+door while someone is in the way of it ("Someone is in the way of the door"); if you are standing
+in the doorway yourself, step out of it first. A door pushed open into someone stops against them.
+People in the street use doors the same way.
 
 ### Lists
 

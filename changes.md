@@ -27,6 +27,13 @@ Recent work, newest first. `git log` has the rest.
   fits into your hands, back and pockets; the rest stays in it. Pedestrians are replaced a minute
   later, out of sight. Bodies and bags nobody carries go after half an hour, at most 30 of each on a
   map. A driver shot beside their parked car no longer breaks the car: somebody comes back for it.
+- Doors open the way real ones do. Every hinged door is pushed from one side and pulled from the
+  other: room doors swing into the room, and exit doors (push-bar doors, the towers' front entrances,
+  the roof and terminal doors) swing out. A push bar is only on the inside. From the street a tower's
+  front door is locked: the key goes in and turns, then you pull the door open. From inside you push
+  the bar. No door moves into a person, whatever moves it: a closer waits, an automatic door reopens,
+  and you cannot shut a door on someone ("Someone is in the way of the door"). A door you push open
+  into someone stops against them. The key's own sounds are coming with the door models.
 - Guns have a fire selector: X moves it on, Shift+X back. The AKM and AR-15 have safe, semi and
   auto; the 1911, pump shotgun and M700 have a safety; the Glock and revolver have none. On safe the
   trigger does nothing. On auto the gun fires for as long as Enter is held.
