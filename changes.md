@@ -19,6 +19,14 @@ Recent work, newest first. `git log` has the rest.
   walkers, parked vehicles, trains on existing track, and parked aircraft (not flyable yet; no
   jets). Moderators no longer build; developers no longer announce or use `/where`. Old single
   grants of "tp" are dropped: tp is no longer a permission.
+- Somebody killed leaves their body where they fell, and you can pick it up: an item with the item
+  beacon, called "body of" and their name. E lifts it over your shoulder; it takes both hands, will
+  not go on your back, and slows you to 1 metre a second, running or not. `/drop` sets it down. A
+  player killed also leaves their things in a bag beside the body ("sean's belongings") and comes
+  back after 60 seconds with nothing, told at once and at 10 seconds. Taking the bag takes out what
+  fits into your hands, back and pockets; the rest stays in it. Pedestrians are replaced a minute
+  later, out of sight. Bodies and bags nobody carries go after half an hour, at most 30 of each on a
+  map. A driver shot beside their parked car no longer breaks the car: somebody comes back for it.
 - Six fixes from the Resonance port (unheard): tyres, their squeal and the rolling roar were 9 % sharp
   on a 48 kHz device; the city bus's air compressor knocks at the back with its engine; trains read
   from a model file keep their third axle; a machine built on another keeps everything its base had

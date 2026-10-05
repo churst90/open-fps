@@ -250,7 +250,8 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/ammo`: what is in your gun and the spare ammunition you carry.
 - After a hit you hear its chime and what you hit and how far: "Hit pedestrian at 17 metres.",
   "Killed sean at 40 metres.", "Hit concrete at 17 metres."
-- A player who is killed gets up at the spawn after 5 seconds.
+- A player who is killed comes back at the spawn after 60 seconds, with nothing; you are told at
+  once and again at 10 seconds. Your things are in a bag beside your body.
 
 ### Stairs
 Walk up and down stairs with W and S; there are no special keys. In a block of flats the stairs are a
@@ -289,6 +290,9 @@ The guidance tone pulses faster and higher as you near someone and holds a note 
 - `/draw [name]` (or `/equip`, `/wield`, `/unsling`): take into your hands.
 - `/hands`, `/inv` (or `/i`, `/inventory`).
 - `/fire` (or `/shoot`): fire the weapon you are holding.
+- E near a body ("body of NAME"): lift it over your shoulder. It takes both hands, will not go on
+  your back, and you walk at 1 metre a second. `/drop` sets it down. A body is an item beacon.
+- E near someone's belongings: take what is in the bag; what will not fit stays in it.
 
 ### People
 - `/friend add name`, `/friend remove name` (or `/unfriend name`), `/friends`.
