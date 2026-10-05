@@ -247,7 +247,8 @@ public class StaffGateTests : IDisposable
     [Fact]
     public void EveryGatedCommandIsListedHere()
     {
-        var powers = new[] { Permissions.FireAny, Permissions.JoinPrivate, Permissions.EditAny, Permissions.MovePlayer };
+        // admin-gun is holding the admin gun; /calibre and /admingun are gated by it (AdminGunTests).
+        var powers = new[] { Permissions.FireAny, Permissions.JoinPrivate, Permissions.EditAny, Permissions.MovePlayer, Permissions.AdminGun };
         var gated = Permissions.All.Except(powers).ToHashSet();
         var listed = GatedCommands.Select(row => Permissions.Canonical((string)row[0])).ToHashSet();
         Assert.Empty(gated.Except(listed));
