@@ -111,7 +111,7 @@ public static class LockCylinder
 
     /// <summary>Declared level, dB at a metre: the render's peak (the client puts each render's own in its
     /// place). Measured with AudioLab --door-models, 2026-10-05.</summary>
-    public static float LevelDb(Host host) => host switch { Host.SteelDoor => 100f, Host.WoodDoor => 96f, _ => 98f };
+    public static float LevelDb(Host host) => host switch { Host.SteelDoor => 102f, Host.WoodDoor => 102f, _ => 102f };
 
     public static string Key(Host host, int variant)
         => FormattableString.Invariant($"{KeyPrefix}unlock:{HostName(host)}:{((variant % Variants) + Variants) % Variants}");
@@ -145,8 +145,8 @@ public static class LockCylinder
     /// its centre of mass.</summary>
     private const double KeyE = 125e9, KeyRho = 8700, KeyLength = 0.055, KeyT = 0.0023, KeyWide = 0.022, KeyKg = 0.006;
     private const double HangLength = 0.04;
-    /// <summary>A key hanging from a ring loses almost nothing: the ring's grip and the air (0.002).</summary>
-    private const double KeyLoss = 0.002;
+    /// <summary>A key hanging from a ring loses little: the ring's grip at its bow hole and the air (0.004).</summary>
+    private const double KeyLoss = 0.004;
     /// <summary>Metal on metal between keys, and a key on the door: brass edges on brass faces, Hertz.</summary>
     private const double KeyContactK = 2e9, KeyContactLambda = 0.15;
     /// <summary>The split ring: 25 mm across, 1.5 mm hardened steel wire.</summary>
@@ -154,8 +154,9 @@ public static class LockCylinder
     /// <summary>How far the hanging keys sit off the door's face (the bow of the key in the lock stands
     /// 25 mm out, and the ring hangs below it), m.</summary>
     private const double OffFace = 0.012;
-    /// <summary>The air and the ring's friction take a swinging key's motion: a tenth of critical.</summary>
-    private const double SwingZeta = 0.1;
+    /// <summary>The ring's friction on the bows and the keys rubbing each other take a swinging key's motion: about
+    /// three tenths of critical (at a tenth they chattered on for a second after the hand stopped).</summary>
+    private const double SwingZeta = 0.3;
 
     // The cylinder: Schlage-type spacing, five pins.
     private const int Pins = 5;

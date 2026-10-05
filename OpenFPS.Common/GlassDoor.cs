@@ -152,14 +152,15 @@ public static class GlassDoor
     /// Measured at the prefab's 1.0 by 2.1 m leaf (AudioLab --door-models, 2026-10-05).</summary>
     public static float OpenLevelDb(Kind kind, Opening how) => (kind, how) switch
     {
-        (Kind.PushBar, Opening.Push) => 118f,
-        (Kind.PushBar, _) => 104f,
-        _ => 96f,
+        (Kind.PushBar, Opening.Push) => 122f,
+        (Kind.PushBar, _) => 96f,
+        (_, Opening.Push) => 100f,
+        _ => 94f,
     };
     public static float CloseLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.PushBar, 0) => 112f, (Kind.PushBar, 1) => 116f, (Kind.PushBar, 2) => 120f, (Kind.PushBar, _) => 126f,
-        (_, 0) => 104f, (_, 1) => 108f, (_, 2) => 112f, _ => 120f,
+        (Kind.PushBar, 0) => 116f, (Kind.PushBar, 1) => 124f, (Kind.PushBar, 2) => 133f, (Kind.PushBar, _) => 140f,
+        (_, 0) => 112f, (_, 1) => 125f, (_, 2) => 132f, _ => 136f,
     };
 
     public static string Key(Kind kind, bool closing, Opening how, Glazing glass, int variant, float swingSeconds, float width, float height)

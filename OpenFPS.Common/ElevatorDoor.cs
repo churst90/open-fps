@@ -100,8 +100,8 @@ public static class ElevatorDoor
 
     /// <summary>Declared levels, dB at a metre: the render's peak (the client puts each render's own in its
     /// place). Measured with AudioLab --door-models, 2026-10-05.</summary>
-    public static float OpenLevelDb(int variant) => 95f;
-    public static float CloseLevelDb(int variant) => 105f;
+    public static float OpenLevelDb(int variant) => 92f;
+    public static float CloseLevelDb(int variant) => 91f;
 
     public static string Key(bool closing, int variant, float travelSeconds, float width, float height, bool drivesOperator)
         => FormattableString.Invariant(
@@ -298,6 +298,12 @@ public static class ElevatorDoor
             double travel = width - 0.01;
             // x is the leading edge's distance from the middle plane: 0 shut, travel open.
             x = opening ? 0.0 : travel; motorX = x; v = 0;
+            if (opening)
+            {
+                // Shut, the operator leans on the leaves with 60 N through the belt and the astragals take it.
+                x = AstragalProud - Math.Pow(60 / ch.AstragalK, 2.0 / 3);
+                motorX = x - 60 / BeltK;
+            }
             // The run speed that makes the profile take travelSeconds, by bisection on the profile itself.
             double lo = 0.05, hi = opening ? OpenRun * 2 : CloseRun * 2;
             for (int it = 0; it < 30; it++)
