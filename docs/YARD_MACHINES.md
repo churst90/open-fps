@@ -89,10 +89,13 @@ plastic — and says nothing about it. Steel is spelled `"Metal"`. Both the deck
 built out of a plastic until the mode series came out wrong (`0.8 x 0.9 m of 0.8 mm` ringing at one
 mode instead of six). `SmallMachineTests.TheMetalPartsAreActuallyMetal` catches the next one.
 
-## Not in the game yet
+## In the game
 
-Same position the aircraft are in. `SmallMachineSpec` is in the `ModelLibrary` under
-`small_machine`, so a map can name one or write its own; what is missing is the client voice path —
-a stationary machine needs the same treatment a vehicle's engine gets in `ClientAudioSystem`
-(a render-pool voice, a place, an extent, a level). That is the next step, and it belongs with the
-city block rather than before it.
+`SmallMachineSpec` is in the `ModelLibrary` under `small_machine`, so a map can name one or write its
+own. The client renders it with `MachineVoiceState` (`AudioEngine/Fmod/MachineProcessor.cs`) under
+the id `machine:<preset>`, placed by its level and extent like any physical voice.
+
+- Air conditioners are prefabs: an entity with `PrefabId` `ac_condenser` or `ac_window`. The city
+  puts them on roofs and walls (`tools/gen_city.py`).
+- Mowers are `Vehicles` entries with `Preset` `mower_push` or `mower_riding`; they read their real
+  ground speed. The city runs six push mowers in gardens and one riding mower on a verge.

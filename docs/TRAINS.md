@@ -2,9 +2,14 @@
 
 _Built 2026-09-18. `OpenFPS.Common/Trains.cs`, `Signals.cs`, `Pneumatics.cs` (the parts lists);
 `AudioEngine/Core/Rail/` and `Core/Signals/` and `Core/Pneumatics/` (the synthesis);
-`--train`, `--signals`, `--airbrake`, `--crossing` in the AudioLab. Not yet wired into the game:
-nothing on a map runs on rails, and there is no `train:` emitter. This is the spec the code follows
-and the list of what it does not do yet._
+`--train`, `--signals`, `--airbrake`, `--crossing` in the AudioLab._
+
+_In the game since session 19: a map's `Trains` and `Crossings` lists (`TrainData`,
+`LevelCrossingData` in `MapRepository.cs`); `OpenFPS.Server/Systems/RailSystem.cs` moves each
+consist round its track and spawns one entity per source, named `rail:<preset>/<train>/<index>`;
+the client runs one `TrainSynth` per train with a tap per source (`TrainVoiceState` and
+`TrainTapState` in `AudioEngine/Fmod/RailVoice.cs`). The city runs two `light_rail` sets on
+`rail_loop`._
 
 ## The rule, again
 
@@ -93,6 +98,15 @@ before the loop gain reaches one. A tram on a 25 m curve squeals; a metro on 250
 | `ElectricDrive` | gears, motor, inverter | mesh at pinion teeth × motor rev/s; motor hum at 2× electrical; and the inverter's **pulse-mode staircase** |
 | `SteamFrontEnd` | cylinders, blast nozzle, chimney | see below |
 
+**The diesel governor** (fixed 2026-10-04, cc1855a8). A diesel-electric is cranked with its
+alternator dead, idles, and then the engine's own governor holds the notch speed on the fuel rack.
+`TrainSynth` sets `EngineSynth.GovernedRpm` to the notch's `NotchRpm` and leaves the pedal up. The
+alternator's load comes in between cranking speed and idle, and its torque goes with engine speed,
+so a bogged engine pulls back up. Every unit in a consist is governed. The 645E3's turbo is geared
+to the crank until the exhaust can carry it, so it blows from the first turn
+(`TurboIdleSpool` 0.45). A test holds each notch within 4 % of `NotchRpm` fifteen seconds from
+cold, on every diesel train.
+
 The inverter staircase is worth calling out because it is emergent. A drive switching at a fixed
 carrier makes a steady tone at a standstill; as the output frequency rises, holding that carrier
 would mean more switchings per cycle and more heat, so the drive locks the carrier to a whole number
@@ -163,9 +177,15 @@ cut-out and a 12 mm hole blowing 2.2 litres down in 140 ms.
 |---|---|---|
 | `TrainProfile.RollingReferenceDb` | 104 dB per axle at 1 m at 100 km/h | set so the rendered PASS-BY reads 82 dB at 7.5 m for a disc-braked train at 80 km/h |
 | `ChimeHornSpec.ReferenceDb` | 139 dB at 1 m on axis (K5LA) | the legal 96–110 dBA at 100 ft |
-| `StruckBellSpec.ReferenceDb` | 86 (gong) / 110 (loco) dB at 1 m, **RMS while ringing** | meter readings of bells in use |
+| `StruckBellSpec.ReferenceDb` | 86 (gong) / 110 (loco) / 95 (tram gong) dB at 1 m, **RMS while ringing** | meter readings of bells in use |
+| `StruckBellSpec.PeakHeadroomDb` | 29 (gong) / 31 (others and default) dB | each bell's loudest blow over its RMS, measured over 20 s of ringing |
 | `AirSystemSpec.JetTrimDb` | −15 dB against Lighthill with K = 1e-4 | the same sign and nearly the same size as the aircraft's jet trims |
 | `SteamLocoSpec` blast | Lighthill straight, no trim | 135 dB at 1 m at full effort, which puts it at ~105 dB at 30 m |
+
+A bell rung as its own voice (`BellVoiceState`: the crossing gong, a loco bell, a tram gong)
+renders with its own `PeakHeadroomDb`, not the shared 16 dB the engines use, and the client gives
+the difference back where it places the voice. Under the shared 16 every blow was squared off by
+10 to 12 dB. A train's own bell, rung inside the train voice, keeps the shared headroom.
 
 The rolling anchor is the one worth reading twice. Setting it by extrapolating a single axle back to
 one metre and forward again to the lineside put it **twelve decibels light**, because a line of
@@ -194,7 +214,7 @@ recompiling anything:
 
 ```
 --models                  list every model, by kind
---models export=DIR       write all 33 as the JSON the loader reads
+--models export=DIR       write every model as the JSON the loader reads
 ```
 
 Put a file in `models/` beside the maps and it OVERRIDES the built-in of the same name — which is
@@ -212,11 +232,18 @@ A horn an author actually writes is three lines, and the note is not one of them
             "ReferenceDb": 134 } }
 ```
 
+Road vehicles take their air horn from the same place: `HornVoiceState` and `Honk.LevelDb` ask
+`ModelLibrary.Horn`, which falls back to the built-in of the same name. An authored `bus_horn`
+changes the buses as well as the trains.
+
 `ModelLibraryTests` holds the claim: every built-in must survive being written out and read back
-with not one number changed. If a spec grows a field the serializer cannot carry — a computed
+with not one number changed, and every model read back must match the built-in in every public
+property, the worked-out ones included. If a spec grows a field the serializer cannot carry — a computed
 property, an interface, a tuple — that is what catches it, for every model at once. (It caught one
 already: a consist was an array of TUPLES, which serialize to a row of empty objects, so a train was
-the one model an author could not write.)
+the one model an author could not write. And `RailVehicleSpec.AxlesPerBogie` was marked
+`[JsonIgnore]` until 2026-10-04, so a train read from a file ran on two axles a bogie: the EMD, the
+steam Northern, its tender and the heavyweight coach have three.)
 
 ## The instruments
 
@@ -229,7 +256,7 @@ the one model an author could not write.)
 
 `--train stems` writes `rolling`, `traction` and `signals` apart, for the same reason the vehicle
 bench writes a block stem: a quiet layer buried under a loud one is indistinguishable from a missing
-one. `--crossing` is binaural, and `--train binaural` will be.
+one. `--crossing` is binaural, and so is `--train binaural`.
 
 **Binaural, and what it is not.** The interaural TIME difference is not applied, it HAPPENS: each
 ear is a different distance from the source, and the renderer already deposits every sample at the
@@ -275,11 +302,9 @@ Each of these was found by an instrument and would not have been found by listen
 1. **Ear-validation of the trains.** The horn, the whistles, the bells and the air brakes have been
    passed by ear (2026-09-18: "sounds great", "perfect in fact, keepers"). The train pass-bys have
    had one listen and the crossing scene one; neither has been iterated on.
-2. **Into the game.** `MachineDefinition` parts `bogie`, `rail`, `traction`, `chime`; a
-   `RailVoiceState` on the render pool with `SetListener` like the exhaust; a server-side
-   `RailSystem` moving a consist along a spline with the crossing circuits as triggers. The
-   arrival-time deposit in the spikes is what the mixer already does with distance delay and
-   Doppler, so none of the renderer code is needed in the game.
+2. **Into the game.** Done (session 19): `RailSystem` on the server, `TrainVoiceState` with one
+   tap per source on the client, level crossings from the map's `Crossings`, platform stops. Only
+   light rail is in a map file; `/spawn train PRESET` puts any preset on the nearest track.
 3. **The track is not in the acoustic map.** A train in a cutting, under a bridge, or in a tunnel
    should get that from the geometry the way everything else does; `TrackSpec.StructureDb` is a
    stand-in and should go.
