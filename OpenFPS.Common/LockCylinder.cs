@@ -410,7 +410,7 @@ public static class LockCylinder
                 // half a metre a second rang with nine times the energy it came in with).
                 double gap = kx[i + 1] + keyModes[i + 1].At(keyPoint) - kx[i] - keyModes[i].At(keyPoint) - KeyT;
                 double gapRate = kvx[i + 1] + keyModes[i + 1].RateAt(keyPoint) - kvx[i] - keyModes[i].RateAt(keyPoint);
-                double f = ContactRestitution(KeyContactK, 0.7, -gap, -gapRate, ref keyApproach[i]);
+                double f = Contact(KeyContactK, KeyContactLambda, -gap, -gapRate);
                 if (f > 0)
                 {
                     fx[i] -= f; fx[i + 1] += f;
@@ -426,7 +426,7 @@ public static class LockCylinder
             {
                 // The face is at z = -OffFace from where the key hangs at rest when the hand is at the lock.
                 double zAbs = hz + kz[i] + keyModes[i].At(keyPoint), zRate = hvz + kvz[i] + keyModes[i].RateAt(keyPoint);
-                double f = ContactRestitution(KeyContactK * 0.5, 0.5, -(zAbs + OffFace), -zRate, ref doorApproach[i]);
+                double f = Contact(KeyContactK * 0.5, KeyContactLambda * 2, -(zAbs + OffFace), -zRate);
                 if (f > 0) { fz[i] += f; keyModes[i].Push(keyPoint, f); faceForce -= f; doorSum += f; }
                 double ax = -w0 * w0 * kx[i] - 2 * SwingZeta * w0 * kvx[i] - hax + fx[i] / KeyKg;
                 double az = -w0 * w0 * kz[i] - 2 * SwingZeta * w0 * kvz[i] - haz + fz[i] / KeyKg;

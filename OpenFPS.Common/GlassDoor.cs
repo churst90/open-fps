@@ -465,6 +465,7 @@ public static class GlassDoor
 
             // Latch, strike, lock body.
             latchShape = plate.Shape(width - 0.02, LatchHeight);
+            rimHit = frameField.Point();
             latchHit = frameField.Point(); strikeHit = jambField.Point(); strikeBeam = JambShape(LatchHeight);
             strike = new Modes(new[] { Beam(0.012, 0.0016, 7900, 195e9, 1.875), Beam(0.06, 0.0016, 7900, 195e9, 4.730) },
                                new[] { 0.03, 0.03 }, new[] { 0.008, 0.02 },
@@ -505,7 +506,7 @@ public static class GlassDoor
                 caseField = new DenseField(0.15, CaseLength, CaseWall, AlE, AlRho, Poisson, f => Math.Max(ThinPanelLoss(f), MechanismLoss),
                                            300, 16000, rng, dt, 15, CaseFaceWidth);
                 padField = new DenseField(0.04, CaseLength - 0.1, 0.003, PadE, PadRho, 0.38, _ => PadLoss, 300, 16000, rng, dt, 15);
-                caseHit = caseField.Point(); padHit = padField.Point(); driveHit = caseField.Point(); rimHit = frameField.Point();
+                caseHit = caseField.Point(); padHit = padField.Point(); driveHit = caseField.Point();
                 padPort = new Port(padField.PatchMass, PortStiffness, padField.Impedance);
                 casePad = new Port(StopTab, PortStiffness, caseField.Impedance);
                 caseDrive = new Port(StopTab, PortStiffness, caseField.Impedance);
@@ -643,7 +644,7 @@ public static class GlassDoor
             const double reach = 0.04;
             bool shove = how == Opening.Push;
             double want = shove ? HandleShove : HandlePull, ramp = shove ? ShoveRamp : PullRamp;
-            double away = -1, keyGone = -1, end = Environment.GetEnvironmentVariable("GD_TRACE") != null ? 0.4 : 10;
+            double away = -1, keyGone = -1, end = 10;
             onHandle = true; gripped = !shove;
             if (shove) { handX = handleY - 0.004; handV = 0; }
             while (time < end)
@@ -670,7 +671,7 @@ public static class GlassDoor
                 {
                     var (a, r) = leafPath!(time);
                     double need = (handK * (a - theta) + handC * (r - omega) + CloserTorque + CloserRate * theta
-                                   + (theta > BackcheckFrom ? Backcheck * Math.Max(0, omega) : 0)) / handleArm;
+                                   + BackcheckShare(theta) * Backcheck * Math.Max(0, omega)) / handleArm;
                     handForce = Math.Clamp(need, shove ? 0 : 5, 250);
                 }
                 if (away < 0 && time > 1.5) { Log($"{time * 1000:F0} ms  the leaf never left its stop"); break; }
@@ -712,7 +713,7 @@ public static class GlassDoor
 
             // The closer: its spring toward shut, its oil against motion.
             double closer = -(CloserTorque + CloserRate * Math.Max(0, theta));
-            if (omega > 0) closer -= (CloserOpening + (theta > BackcheckFrom ? Backcheck : 0)) * omega;
+            if (omega > 0) closer -= (CloserOpening + BackcheckShare(theta) * Backcheck) * omega;
             else if (closerLatchValve) closer -= latchDamping * omega;
             torque += closer;
             leaf.Push(shoeShape, closer / CloserShoeX);
@@ -799,11 +800,15 @@ public static class GlassDoor
                 // The bolt's own stops in the lock body: out at full throw, and in against the body's back.
                 // They are in the lock body, a steel case on its screws in the stile's pocket: the blow moves the
                 // body, and the body's screws pass it to the stile.
-                double stopAt = lockBody.X, stopRate = lockBody.V;
+                // What the bolt meets first is a tab of the body's steel, which passes the blow into the stile's
+                // walls round it. (As a 0.35 kg lump on its screws the body took the highs out of the bolt's 0.1 ms
+                // stop, as the steel door's latch case did before its round 8.)
+                double stopAt = rimStop.X, stopRate = rimStop.V;
                 double fStop = Contact(MetalContactK, BoltStopLambda, bolt - Throw - stopAt, boltRate - stopRate);
                 double fBack = Contact(MetalContactK, BoltStopLambda, -(bolt - RetractedAt * 0.5) + stopAt, -(boltRate - stopRate));
                 boltForce += fBack - fStop;
-                lockBody.F += fStop - fBack;
+                frameField.Modes.Push(rimHit, rimStop.Step(fStop - fBack, dt, out double rimHost));
+                lockBody.F += rimHost;
                 lockCase.Push(lockCaseHit, fStop + fBack);
                 Note("bolt-stop", fStop); Note("bolt-back", fBack);
             }
@@ -889,10 +894,8 @@ public static class GlassDoor
                     handX += handV * dt;
                 }
                 else if (this.onHandle && !gripped) { handX = Math.Min(handX, handleY - 0.004); handV = Math.Min(handV, 0); }
-                else { handX = handleY; handV = handleV; }
+                else if (this.onHandle) { handX = handleY; handV = handleV; }
                 onHandle += palm;
-                if (Environment.GetEnvironmentVariable("GD_TRACE") != null && ((long)(time * rate)) % (rate / 50) == 0)
-                    Log($"TRACE {time:F3} theta {theta:E3} handX {handX:E3} handleY {handleY:E3} palm {palm:F1} F {handForce:F1} at {at:E3}");
                 handleAcc = onHandle / HandleKg;
                 handleV += handleAcc * dt; handleY += handleV * dt;
                 // What the posts take, into the stile.
@@ -990,6 +993,10 @@ public static class GlassDoor
         }
 
         private double pBarNow;
+
+        /// <summary>The backcheck's valve is a port the piston uncovers over its travel: it comes in over about
+        /// ten degrees from 70, not at once (at once, its step of torque rang the leaf at the end of every opening).</summary>
+        private static double BackcheckShare(double theta) => Math.Clamp((theta - BackcheckFrom) / (10 * Math.PI / 180), 0, 1);
         private readonly double[] ones2 = { 1, 1 };
 
         private bool handleHeldState = true;
