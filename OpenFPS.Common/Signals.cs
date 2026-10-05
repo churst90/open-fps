@@ -560,6 +560,14 @@ public sealed record StruckBellSpec
     /// </summary>
     public float ReferenceDb { get; init; } = 86f;
 
+    /// <summary>
+    /// How far its blows stand over <see cref="ReferenceDb"/>, dB: the room its voice renders with.
+    /// Every blow is a peak, so this is the loudest of them over the RMS, measured over twenty
+    /// seconds of ringing and rounded up. The presets measure 28.7 to 30.1; a bell that does not say
+    /// is given the largest of them. Under the fleet's shared 16 every blow was squared off.
+    /// </summary>
+    public float PeakHeadroomDb { get; init; } = 31f;
+
     /// <summary>Longitudinal wave speed in the metal, m/s.</summary>
     [JsonIgnore]
     public float PlateWaveSpeed => MathF.Sqrt(YoungsPa / DensityKgM3);
@@ -579,6 +587,7 @@ public sealed record StruckBellSpec
         YoungsPa = 105e9f, DensityKgM3 = 8800f, LossFactor = 5e-5f,
         StrikeRadiusFraction = 0.94f, ClapperKg = 0.22f, ClapperMps = 2.6f,
         ClapperDamping = 0.05f, StrikesPerSecond = 2.3f, ReferenceDb = 86f,
+        PeakHeadroomDb = 29f,
     };
 
     /// <summary>

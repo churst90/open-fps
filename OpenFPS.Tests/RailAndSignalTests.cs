@@ -289,6 +289,75 @@ public class RailAndSignalTests
         Assert.True(peakDb - rmsDb > 12f, "if the crest were small the distinction would not matter");
     }
 
+    /// <summary>
+    /// A rung bell's voice keeps its blows and its level. Every blow peaks about 30 dB over the
+    /// bell's RMS, and rendered with the shared 16 dB of headroom the voice's soft ceiling took ten to
+    /// twelve decibels off each one and one and a half to three off the level. The voice, rung from
+    /// the same seed as the bell on its own, must match it: its level within a tenth of a decibel and
+    /// its peak within one. And what the mixer gives back (HeadroomGain) must put its level where a
+    /// voice with the shared headroom has it, so it is placed by its level and not by its blows.
+    /// </summary>
+    [Theory]
+    [InlineData("crossing_gong")]
+    [InlineData("loco_bell")]
+    [InlineData("tram_gong")]
+    public void ARungBellArrivesWhole(string id)
+    {
+        var spec = ModelLibrary.Bell(id);
+        var voice = new OpenFPS.Client.AudioEngine.Fmod.BellVoiceState(spec, Sr, 5);
+        var bell = new StruckBell(spec, Sr, 5) { Ringing = true };
+        var block = new float[512];
+        double eVoice = 0, eBell = 0, eUnits = 0;
+        float peakVoice = 0f, peakBell = 0f;
+        int n = 0;
+        for (int b = 0; b < 6 * Sr / 512; b++)
+        {
+            voice.Render(block);
+            for (int i = 0; i < block.Length; i++)
+            {
+                bell.Step();
+                if (b < Sr / 512) continue;                        // past the voice's 60 ms fade-in
+                float heard = block[i] * voice.PascalsAtFullScale;
+                eVoice += heard * (double)heard; eBell += bell.Out * (double)bell.Out; eUnits += block[i] * (double)block[i]; n++;
+                peakVoice = MathF.Max(peakVoice, MathF.Abs(heard)); peakBell = MathF.Max(peakBell, MathF.Abs(bell.Out));
+            }
+        }
+        double level = 10 * Math.Log10(eVoice / eBell), peak = 20 * Math.Log10(peakVoice / peakBell);
+        // Given back, the voice's RMS against where the shared headroom would put this bell's.
+        double placed = 10 * Math.Log10(eUnits / n)
+                      + 20 * Math.Log10(OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(spec.PeakHeadroomDb));
+        double shared = 10 * Math.Log10(eBell / n) - (spec.ReferenceDb + VehicleProfile.PeakHeadroomDb) - 20 * Math.Log10(20e-6);
+        _o.WriteLine($"{id}: headroom {spec.PeakHeadroomDb:F0} dB; the voice against the bell: level {level:F2} dB, "
+                   + $"peak {peak:F1} dB; given back, {placed - shared:F2} dB from where the shared headroom puts it");
+        Assert.InRange(level, -0.1, 0.1);
+        Assert.InRange(peak, -1.0, 0.0);
+        Assert.InRange(placed - shared, -0.1, 0.1);
+    }
+
+    /// <summary>A bell's declared headroom holds its loudest blow over twenty seconds of ringing,
+    /// and is not much more than it needs.</summary>
+    [Theory]
+    [InlineData("crossing_gong")]
+    [InlineData("loco_bell")]
+    [InlineData("tram_gong")]
+    public void ABellsHeadroomIsItsLoudestBlow(string id)
+    {
+        var spec = ModelLibrary.Bell(id);
+        var bell = new StruckBell(spec, Sr, 122) { Ringing = true };
+        double e = 0; float peak = 0f;
+        int n = 20 * Sr;
+        for (int i = 0; i < n; i++)
+        {
+            bell.Step();
+            if (i < Sr) continue;
+            e += bell.Out * (double)bell.Out;
+            peak = MathF.Max(peak, MathF.Abs(bell.Out));
+        }
+        double crest = 20 * Math.Log10(peak / Math.Sqrt(e / (n - Sr)));
+        _o.WriteLine($"{id}: loudest blow {crest:F1} dB over its RMS, headroom {spec.PeakHeadroomDb:F0} dB");
+        Assert.InRange(crest, spec.PeakHeadroomDb - 1.5, spec.PeakHeadroomDb);
+    }
+
     // ── Wheels and track ────────────────────────────────────────────────────────────────────────
 
     [Fact]

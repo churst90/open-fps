@@ -1085,8 +1085,8 @@ public class ClientAudioSystem
         return true;
     }
 
-    /// <summary>The headroom a physical voice renders with, dB: its spec's own for water, fire and
-    /// foliage, the shared one for everything else. Memoised for the same reason the level is.</summary>
+    /// <summary>The headroom a physical voice renders with, dB: its spec's own for water, fire,
+    /// foliage and a struck bell, the shared one for everything else. Memoised for the same reason the level is.</summary>
     private readonly Dictionary<string, float> _physicalHeadroom = new(StringComparer.OrdinalIgnoreCase);
 
     private float PhysicalHeadroom(string soundId)
@@ -1101,6 +1101,8 @@ public class ClientAudioSystem
                 h = OpenFPS.Common.FireSpec.ByName(soundId[5..]).PeakHeadroomDb;
             else if (soundId.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.FoliageSpec.ByName(soundId[8..]).PeakHeadroomDb;
+            else if (soundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase))
+                h = OpenFPS.Common.ModelLibrary.Bell(soundId[5..]).PeakHeadroomDb;
         }
         catch (Exception) { }
         _physicalHeadroom[soundId] = h;

@@ -567,8 +567,12 @@ public sealed class BellVoiceState : PhysicalVoiceState
     public readonly StruckBellSpec Spec;
     public readonly StruckBell Bell;
 
+    /// <summary>Rendered with the bell's own headroom (StruckBellSpec.PeakHeadroomDb): under the
+    /// shared one the soft ceiling took ten to twelve decibels off every blow and one and a half to
+    /// three off the bell's level. An engine's backfire is one transient rounded; a bell is nothing
+    /// but its blows.</summary>
     public BellVoiceState(StruckBellSpec spec, float sampleRate, int seed)
-        : base(spec.ReferenceDb, sampleRate)
+        : base(spec.ReferenceDb, sampleRate, spec.PeakHeadroomDb)
     {
         Spec = spec;
         Bell = new StruckBell(spec, sampleRate, seed);
