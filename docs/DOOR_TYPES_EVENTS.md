@@ -4,8 +4,9 @@ Cody's decision, 2026-10-02. Each door has a kind. The kind decides how it is op
 moves, what it does by itself, and which mechanical events it sends. Push and pull sides, the key
 sequence and obstruction were added 2026-10-05.
 
-The knob, push-bar, patio and automatic doors have physical sound models. The glass doors and the
-lift still use the old latch-and-leaf model (`DoorAcoustics`). Events with no sound yet are still
+Every kind has a physical sound model: `KnobDoor`, `PushBarDoor`, `SlidingDoor` (patio, automatic),
+`GlassDoor` (glass-pushbar, glass-pull), `ElevatorDoor`, and `LockCylinder` for a key in any keyed door
+(branch door-models-glass, 2026-10-05, unheard). Events with no sound yet are still
 sent (see the table below).
 
 ## The kinds
@@ -119,30 +120,30 @@ still fired (the server drops it before sending, as it does any empty sound).
 
 | Key | When it fires | Sound now |
 |---|---|---|
-| `door:knob:latch-retract` | a shut door starts to open, either side | `KnobDoor` model, opening (`knobdoor:open:...`) |
+| `door:knob:latch-retract` | a shut door starts to open, either side | `KnobDoor` model, opening (`knobdoor:open:...`; from the push side `...:push`, turned and pushed) |
 | `door:knob:push` / `door:knob:pull` | the leaf starts moving open by hand, from the push or the pull side | none (in the model's opening) |
 | `door:knob:swing` | it starts moving shut by hand, or open with no side known | none |
 | `door:knob:latch` | it arrives shut | `KnobDoor` model, closing (`knobdoor:close:...`) |
 | `door:pushbar:bar` | a shut door is opened from the push side: the bar pushed in | `PushBarDoor` model, opening (`pushbardoor:open:...`) |
-| `door:pushbar:latch-retract` | a shut door is opened from the pull side: the handle's trim draws the latch | `PushBarDoor` model, opening (it does not take the side yet) |
+| `door:pushbar:latch-retract` | a shut door is opened from the pull side: the handle's trim draws the latch | `PushBarDoor` model, the trim's lever pulled (`pushbardoor:open:...:pull`) |
 | `door:pushbar:push` / `door:pushbar:pull` | the leaf starts moving open by hand | none |
 | `door:pushbar:swing` | it starts moving shut by hand | none |
 | `door:pushbar:closer` | the closer starts to shut it | none |
 | `door:pushbar:latch` | it arrives shut | `PushBarDoor` model, closing (`pushbardoor:close:...`) |
-| `door:glass-pushbar:key-insert` | opened from the keyed side: the key goes in | none |
+| `door:glass-pushbar:key-insert` | opened from the keyed side: the key goes in | `LockCylinder`, the whole key: in, turned at 0.45 s, latch drawn by 0.7 s (`lockcylinder:unlock:aluminium:V`) |
 | `door:glass-pushbar:key-turn` | the key turns, 0.45 s later | none |
-| `door:glass-pushbar:unlock` | the latch is drawn back, 0.7 s after the key went in | the old opening model (`DoorAcoustics.Opening`) |
-| `door:glass-pushbar:bar` | opened from inside, the push side | the old opening model |
-| `door:glass-pushbar:latch-retract` | opened from outside with no key (only if a map unkeys it) | the old opening model |
-| `door:glass-pushbar:push` / `door:glass-pushbar:pull` | the leaf starts moving open by hand | none |
+| `door:glass-pushbar:unlock` | the latch is drawn back, 0.7 s after the key went in | none (in the key's render) |
+| `door:glass-pushbar:bar` | opened from inside, the push side | `GlassDoor`, the bar shoved (`glassdoor:bar:open:push:...`) |
+| `door:glass-pushbar:latch-retract` | opened from outside with no key (only if a map unkeys it) | `GlassDoor`, pulled with the latch held back (`glassdoor:bar:open:pull:...`) |
+| `door:glass-pushbar:push` / `door:glass-pushbar:pull` | the leaf starts moving open by hand | after the key: `GlassDoor`, pulled with the key held, the key let go (`glassdoor:bar:open:key:...`); otherwise none |
 | `door:glass-pushbar:swing` | it starts moving shut by hand | none |
 | `door:glass-pushbar:closer` | the closer starts to shut it | none |
-| `door:glass-pushbar:latch` | it arrives shut | the old closing model (`DoorAcoustics.Closing`) |
-| `door:glass-pull:push` / `door:glass-pull:pull` | a shut door starts to open by hand (no latch: the hand is the first sound) | the old opening model |
+| `door:glass-pushbar:latch` | it arrives shut | `GlassDoor`, the closer into the seal and the latch (`glassdoor:bar:close:...`) |
+| `door:glass-pull:push` / `door:glass-pull:pull` | a shut door starts to open by hand (no latch: the hand is the first sound) | `GlassDoor`, the handle shoved or pulled (`glassdoor:pull:open:push|pull:...`) |
 | `door:glass-pull:swing` | it starts moving shut by hand | none |
 | `door:glass-pull:closer` | the closer starts to shut it | none |
-| `door:glass-pull:latch` | it arrives shut | the old closing model |
-| `door:KIND:key-insert`, `key-turn`, `unlock` | any kind opened from a keyed side | none, except `unlock` as for glass-pushbar (`PushBarDoor` model on a push-bar door, none on a knob door) |
+| `door:glass-pull:latch` | it arrives shut | `GlassDoor`, the closer onto the seal (`glassdoor:pull:close:...`) |
+| `door:KIND:key-insert`, `key-turn`, `unlock` | any kind opened from a keyed side | `LockCylinder` at `key-insert` (aluminium stile, steel door or wooden door by kind); `key-turn` and `unlock` none |
 | `door:auto-slide:motor-start` | the motor starts, opening or closing | the whole run, `SlidingDoor` (`slidingdoor:auto:...`) |
 | `door:auto-slide:rollers` | the leaf starts travelling (lasts the travel) | none |
 | `door:auto-slide:stop` | it arrives fully open | none |
@@ -152,11 +153,11 @@ still fired (the server drops it before sending, as it does any empty sound).
 | `door:patio-slide:rollers` | the leaf starts travelling, either way | shutting: the whole shut, roll to latch, `SlidingDoor` |
 | `door:patio-slide:stop` | it arrives fully open | none |
 | `door:patio-slide:latch` | it arrives shut | none (in the run) |
-| `door:elevator:motor-start` | the motor starts, opening or closing | none |
+| `door:elevator:motor-start` | the motor starts, opening or closing | the whole run, `ElevatorDoor` (`elevatordoor:open|close:...:op|leaf`; the leaf with HingeSide 1 carries the operator) |
 | `door:elevator:rollers` | the leaves start travelling | none |
 | `door:elevator:stop` | it arrives fully open | none |
 | `door:elevator:reopen` | it reverses for someone while closing | none |
-| `door:elevator:shut` | it arrives shut | the old closing model (`DoorAcoustics.Closing`) |
+| `door:elevator:shut` | it arrives shut | none (in the run) |
 
 The old event `key` is gone; `DoorEvents.Key` is kept in code as another name for `KeyTurn`.
 

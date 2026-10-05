@@ -128,12 +128,13 @@ public static class KnobDoor
         }
     }
 
-    /// <summary>Opening: grip, turn, pull, let the knob go, swing to about 85 degrees.</summary>
-    public static float[] RenderOpen(Door door, int sampleRate, double swingSeconds = 0.9, Report? report = null)
+    /// <summary>Opening: grip, turn, pull, let the knob go, swing to about 85 degrees. With
+    /// <paramref name="push"/>, from the stop's side: the hand turns the knob and pushes the leaf away.</summary>
+    public static float[] RenderOpen(Door door, int sampleRate, double swingSeconds = 0.9, Report? report = null, bool push = false)
     {
         var sim = new Sim(door, sampleRate, report);
         sim.StartShut();
-        sim.ScriptOpen(swingSeconds);
+        sim.ScriptOpen(swingSeconds, push);
         return sim.Output();
     }
 
@@ -212,16 +213,22 @@ public static class KnobDoor
     /// A door's sound for the game. Opening is grip, turn, pull, swing over <paramref name="swingSeconds"/>;
     /// closing is a hand close of the kind <paramref name="how"/> names, sent when the leaf arrives.
     /// </summary>
+    /// <remarks>An opening pushed from the stop's side ends ":push"; a pull (the approved one) has no eighth
+    /// field, so its keys are as they were.</remarks>
     public static string Key(bool closing, Construction leaf, int variant, float swingSeconds, Shut how,
-                             float width, float height)
+                             float width, float height, bool push = false)
         => FormattableString.Invariant(
-            $"{KeyPrefix}{(closing ? "close" : "open")}:{(leaf == Construction.SolidWood ? "solid" : "hollow")}:{((variant % Variants) + Variants) % Variants}:{(int)MathF.Round(swingSeconds * 100f)}:{(int)how}:{(int)MathF.Round(width * 100f)}:{(int)MathF.Round(height * 100f)}");
+            $"{KeyPrefix}{(closing ? "close" : "open")}:{(leaf == Construction.SolidWood ? "solid" : "hollow")}:{((variant % Variants) + Variants) % Variants}:{(int)MathF.Round(swingSeconds * 100f)}:{(int)how}:{(int)MathF.Round(width * 100f)}:{(int)MathF.Round(height * 100f)}{(push && !closing ? ":push" : "")}");
 
     public static bool TryParseKey(string? key, out bool closing, out Door door, out float swingSeconds, out Shut how)
+        => TryParseKey(key, out closing, out door, out swingSeconds, out how, out _);
+
+    public static bool TryParseKey(string? key, out bool closing, out Door door, out float swingSeconds, out Shut how, out bool push)
     {
-        closing = false; door = new Door(); swingSeconds = 0.9f; how = Shut.Normal;
+        closing = false; door = new Door(); swingSeconds = 0.9f; how = Shut.Normal; push = false;
         if (key == null || !key.StartsWith(KeyPrefix, StringComparison.Ordinal)) return false;
         var p = key.Substring(KeyPrefix.Length).Split(':');
+        if (p.Length == 8 && p[7] == "push" && p[0] == "open") { push = true; Array.Resize(ref p, 7); }
         if (p.Length != 7 || (p[0] != "open" && p[0] != "close")) return false;
         if (!int.TryParse(p[2], out int variant) || !int.TryParse(p[3], out int swing) || !int.TryParse(p[4], out int from)
             || !int.TryParse(p[5], out int w) || !int.TryParse(p[6], out int h)) return false;
@@ -247,8 +254,8 @@ public static class KnobDoor
     public static float[] RenderKey(string key, int sampleRate, out float fullScaleDb)
     {
         fullScaleDb = 0f;
-        if (!TryParseKey(key, out bool closing, out var door, out float swing, out Shut how)) return new float[16];
-        float[] pcm = closing ? RenderGameClose(door, sampleRate, how) : RenderOpen(door, sampleRate, swing);
+        if (!TryParseKey(key, out bool closing, out var door, out float swing, out Shut how, out bool push)) return new float[16];
+        float[] pcm = closing ? RenderGameClose(door, sampleRate, how) : RenderOpen(door, sampleRate, swing, null, push);
         return PeakToFullScale(pcm, PascalsAtFullScale, out fullScaleDb);
     }
 
@@ -368,6 +375,9 @@ public static class KnobDoor
     /// keeper under this until it clears, and then the door comes away. Round 1 pulled with a sixth of
     /// it and the opening was a faint click.</summary>
     private const double HandPull = 12;
+    /// <summary>A hand pushing a door open from the stop's side leans on the knob as it turns it, harder than a
+    /// pull's tug, and comes up to it a little faster: about 20 N in 0.15 s.</summary>
+    private const double HandPush = 20, PushRamp = 0.15;
     /// <summary>The arm holding a knob is not a force alone: it gives way to the knob's motion like a damper,
     /// about 150 N s/m at the hand (ISO 10068's hand-arm impedance, as the patio door's handle). While a hand
     /// pulls on a knob it is turning, the leaf comes off its stop onto the keeper against it, and the bolt's
@@ -812,7 +822,7 @@ public static class KnobDoor
         }
         private bool thrown;
 
-        public void ScriptOpen(double swingSeconds)
+        public void ScriptOpen(double swingSeconds, bool push = false)
         {
             const double grip = 0.05, turn = 0.20;
             holdingKnob = true;
@@ -823,7 +833,9 @@ public static class KnobDoor
             while (time < end)
             {
                 // The pull comes up as the knob turns, and the arm gives way to the leaf as it pulls.
-                if (time > grip && cleared < 0) pullTorque = Math.Min(1.0, (time - grip) / turn) * HandPull * (width - KnobInset);
+                if (time > grip && cleared < 0)
+                    pullTorque = push ? Math.Min(1.0, (time - grip) / PushRamp) * HandPush * (width - KnobInset)
+                                      : Math.Min(1.0, (time - grip) / turn) * HandPull * (width - KnobInset);
                 if (cleared < 0 && !boltInStrike && time > grip)
                 {
                     cleared = time;

@@ -201,6 +201,23 @@ public sealed class WorldAudioPlayer
                 keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Patio, closing, v, 1.4f, 1.0f, 2.1f));
                 keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Automatic, closing, v, SlidingDoor.AutomaticSeconds(1.15f, !closing), 1.15f, 2.1f));
             }
+        // The glass front door (its bar, its key-side pull, its close) and the glass pull door (its pull and its
+        // close) at the prefab's size, and the key in a glass door's lock. The pushed pull door, the lift's runs and
+        // a knob door's push render when first heard.
+        foreach (bool closing in new[] { false, true })
+            for (int v = 0; v < GlassDoor.Variants; v++)
+            {
+                if (closing)
+                {
+                    keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, true, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.1f, 1.0f, 2.1f));
+                    keys.Add(GlassDoor.Key(GlassDoor.Kind.Pull, true, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.0f, 1.0f, 2.1f));
+                    continue;
+                }
+                keys.Add(LockCylinder.Key(LockCylinder.Host.AluminiumStile, v));
+                keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, false, GlassDoor.Opening.Key, GlassDoor.Glazing.Tempered, v, 1.1f, 1.0f, 2.1f));
+                keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, false, GlassDoor.Opening.Push, GlassDoor.Glazing.Tempered, v, 1.1f, 1.0f, 2.1f));
+                keys.Add(GlassDoor.Key(GlassDoor.Kind.Pull, false, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.0f, 1.0f, 2.1f));
+            }
         // A car's windows, each character, every stroke the window command makes from a window at rest:
         // fully down and up, and to and from half way. A window turned round while it is moving starts
         // from a quarter that is rendered when first heard.
@@ -230,12 +247,27 @@ public sealed class WorldAudioPlayer
     {
         if (key.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)) return CarWindow.RenderKey(key, TransientSynth.SampleRate);
         float[] pcm = key.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal) ? GlassFracture.RenderKey(key, TransientSynth.SampleRate, out float db)
+                    : key.StartsWith(GlassDoor.KeyPrefix, StringComparison.Ordinal) ? GlassDoor.RenderKey(key, TransientSynth.SampleRate, out db)
+                    : key.StartsWith(LockCylinder.KeyPrefix, StringComparison.Ordinal) ? LockCylinder.RenderKey(key, TransientSynth.SampleRate, out db)
+                    : key.StartsWith(ElevatorDoor.KeyPrefix, StringComparison.Ordinal) ? ElevatorDoor.RenderKey(key, TransientSynth.SampleRate, out db)
                     : key.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal) ? PushBarDoor.RenderKey(key, TransientSynth.SampleRate, out db)
                     : key.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal) ? SlidingDoor.RenderKey(key, TransientSynth.SampleRate, out db)
                     : KnobDoor.RenderKey(key, TransientSynth.SampleRate, out db);
         if (db > 0f) fullScaleDb[key] = db;
         return pcm;
     }
+
+    /// <summary>A key one of the simulated models names (doors, the key in a lock, a lift door, a car window,
+    /// breaking glass): rendered by <see cref="RenderDoorKey"/>, one buffer per key.</summary>
+    internal static bool IsDoorModelKey(string? key)
+        => key != null && (key.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal)
+                           || key.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)
+                           || key.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal)
+                           || key.StartsWith(GlassDoor.KeyPrefix, StringComparison.Ordinal)
+                           || key.StartsWith(LockCylinder.KeyPrefix, StringComparison.Ordinal)
+                           || key.StartsWith(ElevatorDoor.KeyPrefix, StringComparison.Ordinal)
+                           || key.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)
+                           || key.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal));
 
     /// <summary>A door model's sound as it plays: placed at its own render's full scale, where the client has
     /// rendered it, instead of the table figure the server sent for the key.</summary>
@@ -1180,12 +1212,8 @@ public sealed class WorldAudioPlayer
             return CarDoor.Render(closing, TransientSynth.SampleRate, seed);
         // The door models (knob, push-bar, sliding), each simulated, its character named in the key; and a
         // car's power window, its motor, worm and glass simulated through the stroke the key names.
-        if (sound.SynthKey != null && (sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal)))
-            return RenderDoorKey(sound.SynthKey, _fullScaleDb);
+        if (IsDoorModelKey(sound.SynthKey))
+            return RenderDoorKey(sound.SynthKey!, _fullScaleDb);
 
         return TransientSynth.Render(sound, seed);
     }
@@ -1314,11 +1342,7 @@ public sealed class WorldAudioPlayer
         // An N-wave is the same wave every time its length is the same.
         if (BulletFlyby.TryParseCrack(sound.SynthKey, out _)) return $"synth:{sound.SynthKey}";
         // A knob door's key already names its door; four seeds of it would be four identical renders.
-        if (sound.SynthKey != null && (sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal)))
+        if (IsDoorModelKey(sound.SynthKey))
             return $"synth:{sound.SynthKey}";
         if (!string.IsNullOrEmpty(sound.SynthKey)) return $"synth:{sound.SynthKey}:{seed & 3}";
         return $"synth:{sound.Character}:{hz}:{level}:{decay}:{noise}:{seed & 3}";

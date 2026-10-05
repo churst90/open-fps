@@ -27,6 +27,16 @@ Recent work, newest first. `git log` has the rest.
   fits into your hands, back and pockets; the rest stays in it. Pedestrians are replaced a minute
   later, out of sight. Bodies and bags nobody carries go after half an hour, at most 30 of each on a
   map. A driver shot beside their parked car no longer breaks the car: somebody comes back for it.
+- The glass front door, the glass shop door and the lift door are physical models now, like the knob,
+  push-bar and sliding doors: an aluminium frame round a toughened pane with its seal, latch, bar,
+  pull handle, closer and sweep; a lift leaf on its rollers, run by its operator, with the coupler,
+  the lock's hook and the rubber edge. A key in a lock is its own model, on any keyed door: the
+  keyring jingling, the pins over the cuts, the turn drawing the latch, timed to the door's key
+  events. The knob door can be pushed open as well as pulled, and the push-bar door pulled from
+  outside by its lever; the approved openings are unchanged. Unheard. Renders and notes in
+  inbox/door-models-2026-10-05. Known gaps: the lift's close is soft, the key's turn is thin below
+  1 kHz, the glass front door's bar push is about 5 dB over the steel door's, and the client renders
+  twenty glass door sounds in the background for about two minutes after it starts.
 - The server sends far less: about 1.5 instead of 5.7 megabits a second per player on the city, and
   about 150 instead of 580 packets a second. Things standing still (parked cars, people waiting, a
   bus at its stop) are no longer re-sent thirty times a second; they go again the moment they move,

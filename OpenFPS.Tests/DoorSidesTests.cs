@@ -203,7 +203,7 @@ public class DoorSidesTests : IDisposable
 
         var keyed = _heard.TakeWhile(h => !h.Key.EndsWith(":closer")).ToList();
         foreach (var h in keyed) _o.WriteLine($"{h.At - start:F2} s  {h.Key}{(h.Sounds > 0 ? " +sound" : "")}");
-        Assert.Equal("key-insert key-turn unlock+ pull", Events().Split(" closer")[0]);
+        Assert.Equal("key-insert+ key-turn unlock pull+", Events().Split(" closer")[0]);
         Assert.InRange(keyed[0].At - start, 0f, 0.01f);
         Assert.InRange(keyed[1].At - start, DoorSystem.KeyTurnSeconds - 0.05f, DoorSystem.KeyTurnSeconds + 0.01f);
         Assert.InRange(keyed[2].At - start, DoorSystem.UnlockSeconds - 0.05f, DoorSystem.UnlockSeconds + 0.01f);
@@ -216,7 +216,7 @@ public class DoorSidesTests : IDisposable
         Assert.True(DoorSystem.Set(_world, e, open: true, by: street));
         Assert.True(D(e).KeyTurned);
         TickSeconds(D(e).CloseAfterSeconds + D(e).CloseSeconds + D(e).SwingSeconds + 2f);
-        Assert.StartsWith("key-insert key-turn unlock+ pull", Events());
+        Assert.StartsWith("key-insert+ key-turn unlock pull+", Events());
         Assert.Equal(0f, D(e).Openness);
 
         // From inside: the bar, and it swings out all the same.
@@ -310,12 +310,12 @@ public class DoorSidesTests : IDisposable
             heard.Clear();
             Assert.True(DoorSystem.Set(world, exit, open: true, by: new Vector3(0f, 1f, 1.2f)));     // outside
             Run(DoorSystem.KeySequenceSeconds + 0.2f);
-            Assert.Equal(new[] { "door:pushbar:key-insert", "door:pushbar:key-turn", "door:pushbar:unlock+", "door:pushbar:pull" }, heard);
+            Assert.Equal(new[] { "door:pushbar:key-insert+", "door:pushbar:key-turn", "door:pushbar:unlock", "door:pushbar:pull" }, heard);
 
             heard.Clear();
             Assert.True(DoorSystem.Set(world, cupboard, open: true, by: new Vector3(6f, 1f, -1.2f)));  // keyed, and the push side
             Run(DoorSystem.KeySequenceSeconds + 0.2f);
-            Assert.Equal(new[] { "door:knob:key-insert", "door:knob:key-turn", "door:knob:unlock", "door:knob:latch-retract+", "door:knob:push" }, heard);
+            Assert.Equal(new[] { "door:knob:key-insert+", "door:knob:key-turn", "door:knob:unlock", "door:knob:latch-retract+", "door:knob:push" }, heard);
             Assert.Equal("You unlock the cupboard with your key and push it open",
                          DoorSystem.OpenedPhrase(world.Get<DoorComponent>(cupboard) with { KeyTurned = true }, "cupboard"));
         }
