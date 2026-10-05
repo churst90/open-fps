@@ -639,6 +639,10 @@ public sealed class DoorSystem
         float halfWidth = HalfWidth(world, entity, door);
         float halfThick = world.Has<ColliderComponent>(entity) ? world.Get<ColliderComponent>(entity).Size.Z * 0.5f : 0.03f;
         float reach = BodyRadiusMetres + halfThick;
+        // Nothing a leaf does reaches further from its doorway's middle than three half-widths (a
+        // hinged leaf's free edge, a slider's far edge) and a body: the street at large is not asked.
+        float far = 3f * halfWidth + reach;
+        if (d.X * d.X + d.Z * d.Z > far * far) return false;
 
         if (door.Slides)
         {
