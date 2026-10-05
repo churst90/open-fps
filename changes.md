@@ -27,6 +27,13 @@ Recent work, newest first. `git log` has the rest.
   fits into your hands, back and pockets; the rest stays in it. Pedestrians are replaced a minute
   later, out of sight. Bodies and bags nobody carries go after half an hour, at most 30 of each on a
   map. A driver shot beside their parked car no longer breaks the car: somebody comes back for it.
+- Doors are heard the first time you open them. Each door sound is a simulation that takes seconds to
+  run, and one not ready within a tenth of a second was dropped; the client rendered only some of them
+  at start, nothing was kept between sessions, and the towers' glass front doors were rendered at the
+  wrong width (1.0 m against 1.9 m) so never matched. Now every sound the city's doors ask for (pushed
+  and pulled openings, gentle, normal and hard closes, every width) is rendered at start, each render
+  is kept on disk for the build, and the Windows zip ships them all ready (164 sounds, about 30 MB).
+  A test checks every door on the city against the list.
 - A key unlocking a door no longer sounds like a coin dropped afterwards. The spare keys hanging on the
   ring (two, four or six of them) struck each other as the key went home and rang on through the
   whole unlock; every keyring now has one spare key, as the worn one Cody picked did

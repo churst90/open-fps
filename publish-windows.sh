@@ -34,6 +34,23 @@ BUILD=$(grep -rho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Common/*/WireContract.g.
 for f in OpenFPS.Client.exe fmod.dll phonon.dll nvdaControllerClient64.dll machines ASSETS/SOUNDS; do
   [ -e "$OUT/$f" ] || { echo "!! $f is missing from the publish output." >&2; exit 1; }
 done
+# Every door model sound the client renders at start, rendered here and shipped: a door's simulation
+# takes seconds (a glass door up to forty), and a first hearing that is not ready is silent. The lab is
+# built from the same OpenFPS.Common, so its renders are this build's (DoorRenderCache checks the name).
+LAB_ART="$ART/lab"
+rm -rf "$LAB_ART/obj/OpenFPS.Common"   # one WireContract.g.cs here too
+DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
+  "$DOTNET" build "$REPO/OpenFPS.AudioLab/OpenFPS.AudioLab.csproj" -c Release \
+  --artifacts-path "$LAB_ART" -nodeReuse:false -p:UseSharedCompilation=false -v minimal
+LAB_BUILD=$(grep -rho '"[0-9a-f]\{12\}"' "$LAB_ART"/obj/OpenFPS.Common/*/WireContract.g.cs | head -1 | tr -d '"')
+[ "$LAB_BUILD" = "$BUILD" ] || { echo "!! the lab is build $LAB_BUILD, the client $BUILD: renders would not be used." >&2; exit 1; }
+CACHES="${OPENFPS_PUBLISH_DIR:-$HOME/.cache/openfps-publish}/rendercache"
+find "$CACHES" -mindepth 1 -maxdepth 1 -type d ! -name "$BUILD" -exec rm -rf {} + 2>/dev/null || true
+CACHE="$CACHES/$BUILD"
+(cd "$LAB_ART/bin/OpenFPS.AudioLab/release" && nice ./OpenFPS.AudioLab --prerender-doors "out=$CACHE")
+mkdir -p "$OUT/ASSETS/rendercache/$BUILD"
+cp "$CACHE"/*.pcm "$OUT/ASSETS/rendercache/$BUILD/"
+
 # The logging builds are for debugging here, not for players.
 rm -f "$OUT/fmodL.dll" "$OUT/fmodstudioL.dll"
 cp "$REPO/docs/WINDOWS_README.txt" "$OUT/README.txt"

@@ -146,3 +146,12 @@ What needs what:
   6. Check `/opt/openfps-server/BUILD.txt` and `journalctl -u openfps`.
 - The copy in step 4 adds and replaces files only, so the accounts, `maps/players/` and
   `map_access.json` on the server stay.
+
+## Door sounds shipped with the client
+
+Door sounds are physical simulations that take seconds each, so `publish-windows.sh` renders every one
+the client renders at start (AudioLab `--prerender-doors`, about two minutes) into
+`ASSETS/rendercache/<build>/`. A client keeps any it renders itself in its own cache
+(`%LOCALAPPDATA%\OpenFPS\rendercache\<build>` on Windows, `~/.local/share/OpenFPS/rendercache/<build>`
+on Linux); folders for other builds are removed. `OPENFPS_RENDER_CACHE=off` turns the cache off, or
+names another folder.

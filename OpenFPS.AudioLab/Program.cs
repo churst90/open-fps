@@ -96,6 +96,7 @@ string[] usage =
     "  --pushbar-door [out=] [only=] [stems=]        the physical push-bar door: each character opening and shutting on its closer",
     "  --sliding-door [out=] [only=] [stems=]        the physical sliding doors: a patio door and an automatic door, each character",
     "  --door-models [out=] [only=] [stems=] [refs]  glass front and pull doors, the lift door, the key in a lock, push openings: every event, measured",
+    "  --prerender-doors out=DIR [threads=N]          every door render the client makes at start, as its disk cache (publish-windows.sh ships it)",
     "  --patio-vs-ref [ref=] [wav=] [only=] [out=]   the patio door measured against the recording of a real one, side by side",
     "  --pushbar-vs-ref [before=] [only=] [out=]     the push-bar door's push, release and slam against recordings, side by side",
     "  --car-window [out=] [only=]                    a car's power window going down, up and half way, each character",
@@ -493,6 +494,11 @@ if (args.Contains("--gun-spec"))
 if (args.Contains("--knob-renders"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.KnobRefSpike.Run(args));
+}
+
+if (args.Contains("--prerender-doors"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.PrerenderDoorsSpike.Run(args));
 }
 
 if (args.Contains("--door-models"))

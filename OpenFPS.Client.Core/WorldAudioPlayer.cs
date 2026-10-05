@@ -177,55 +177,14 @@ public sealed class WorldAudioPlayer
     /// <summary>
     /// A door model is a simulation that takes seconds of a core to render, far longer than a first
     /// hearing waits (<see cref="MaxRenderLateness"/>), so the first door anyone opened would be silent.
-    /// Each knob door character's opening and normal close is rendered at start, in the background, four
-    /// at a time and openings first, for the prefab's width and the two the city scales it to (1.1 and
-    /// 1.4 m); then the push bar's, and the patio and automatic doors' at the city's sizes. A gentle or
-    /// hard close, or a door of another size, renders when first heard.
+    /// Every render the city's doors ask for is made at start, in the background, four at a time, the
+    /// commonest first (<see cref="PrewarmKeys"/>). Each is kept on disk (<see cref="DoorRenderCache"/>):
+    /// a published client ships them, and a client built here renders each once per build.
     /// </summary>
     private void PrewarmDoors()
     {
-        var keys = new List<string>();
-        foreach (bool closing in new[] { false, true })
-            foreach (float width in new[] { 1.1f, 1.4f, 0.9f })
-                for (int v = 0; v < KnobDoor.Variants; v++)
-                    keys.Add(KnobDoor.Key(closing, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, width, 2.1f));
-        // The steel push-bar door at its prefab's size: each character's push and its closer's latch.
-        foreach (bool closing in new[] { false, true })
-            for (int v = 0; v < PushBarDoor.Variants; v++)
-                keys.Add(PushBarDoor.Key(closing, v, 1.4f, 1.0f, 2.1f));
-        // The sliding doors at the sizes the city builds them: a patio leaf 1.0 m wide slid in 1.4 s, an
-        // automatic leaf 1.15 m wide at its controller's own times.
-        foreach (bool closing in new[] { false, true })
-            for (int v = 0; v < SlidingDoor.Variants; v++)
-            {
-                keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Patio, closing, v, 1.4f, 1.0f, 2.1f));
-                keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Automatic, closing, v, SlidingDoor.AutomaticSeconds(1.15f, !closing), 1.15f, 2.1f));
-            }
-        // The glass front door (its bar, its key-side pull, its close) and the glass pull door (its pull and its
-        // close) at the prefab's size, and the key in a glass door's lock. The pushed pull door, the lift's runs and
-        // a knob door's push render when first heard.
-        foreach (bool closing in new[] { false, true })
-            for (int v = 0; v < GlassDoor.Variants; v++)
-            {
-                if (closing)
-                {
-                    keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, true, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.1f, 1.0f, 2.1f));
-                    keys.Add(GlassDoor.Key(GlassDoor.Kind.Pull, true, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.0f, 1.0f, 2.1f));
-                    continue;
-                }
-                keys.Add(LockCylinder.Key(LockCylinder.Host.AluminiumStile, v));
-                keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, false, GlassDoor.Opening.Key, GlassDoor.Glazing.Tempered, v, 1.1f, 1.0f, 2.1f));
-                keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, false, GlassDoor.Opening.Push, GlassDoor.Glazing.Tempered, v, 1.1f, 1.0f, 2.1f));
-                keys.Add(GlassDoor.Key(GlassDoor.Kind.Pull, false, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.0f, 1.0f, 2.1f));
-            }
-        // A car's windows, each character, every stroke the window command makes from a window at rest:
-        // fully down and up, and to and from half way. A window turned round while it is moving starts
-        // from a quarter that is rendered when first heard.
-        for (int v = 0; v < CarWindow.Variants; v++)
-            foreach (var (from, to) in new[] { (0f, 1f), (1f, 0f), (0f, 0.5f), (0.5f, 0f), (0.5f, 1f), (1f, 0.5f) })
-                keys.Add(CarWindow.Key(v, from, to));
         var gate = new System.Threading.SemaphoreSlim(4);
-        foreach (string key in keys)
+        foreach (string key in PrewarmKeys())
         {
             string id = $"synth:{key}";
             if (!_rendering.Add(id)) continue;
@@ -238,6 +197,75 @@ public sealed class WorldAudioPlayer
         }
     }
 
+    /// <summary>
+    /// Every door model render the city's doors and the cars' windows ask for, the commonest first: a knob
+    /// door's opening pulled and pushed and its normal close at the prefab's width and the two the city
+    /// scales it to (1.1 and 1.4 m), the push-bar door's push, pull and close, the sliders at the city's
+    /// sizes, the key in a glass front door, a knob door's gentle and hard closes (45 % of closes), the car
+    /// windows' strokes, and the glass doors last, being the slowest (10-40 s each). Opened from its push
+    /// side a knob door plays its push (2026-10-05), and a gentle or hard close is as likely as a normal
+    /// one: before both were here, the first few doors Cody opened each session were silent.
+    /// The lift door is not here: no map has one yet.
+    /// </summary>
+    public static List<string> PrewarmKeys()
+    {
+        var keys = new List<string>();
+        var widths = new[] { 1.1f, 1.4f, 0.9f };
+        foreach (float width in widths)
+            for (int v = 0; v < KnobDoor.Variants; v++)
+            {
+                keys.Add(KnobDoor.Key(false, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, width, 2.1f));
+                keys.Add(KnobDoor.Key(false, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, width, 2.1f, push: true));
+                keys.Add(KnobDoor.Key(true, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, width, 2.1f));
+            }
+        // The steel push-bar door at the widths the city builds it (1.1 m) and its prefab's (1.0 m): each
+        // character's push, its pull from the lever side, and its closer's latch.
+        foreach (float width in new[] { 1.1f, 1.0f })
+            for (int v = 0; v < PushBarDoor.Variants; v++)
+            {
+                keys.Add(PushBarDoor.Key(false, v, 1.4f, width, 2.1f));
+                keys.Add(PushBarDoor.Key(false, v, 1.4f, width, 2.1f, pull: true));
+                keys.Add(PushBarDoor.Key(true, v, 1.4f, width, 2.1f));
+            }
+        // The sliding doors at the sizes the city builds them: a patio leaf 1.0 m wide slid in 1.4 s, an
+        // automatic leaf 1.15 m wide at its controller's own times.
+        foreach (bool closing in new[] { false, true })
+            for (int v = 0; v < SlidingDoor.Variants; v++)
+            {
+                keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Patio, closing, v, 1.4f, 1.0f, 2.1f));
+                keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Automatic, closing, v, SlidingDoor.AutomaticSeconds(1.15f, !closing), 1.15f, 2.1f));
+            }
+        for (int v = 0; v < LockCylinder.Variants; v++)
+            keys.Add(LockCylinder.Key(LockCylinder.Host.AluminiumStile, v));
+        foreach (var how in new[] { KnobDoor.Shut.Gentle, KnobDoor.Shut.Hard })
+            foreach (float width in widths)
+                for (int v = 0; v < KnobDoor.Variants; v++)
+                    keys.Add(KnobDoor.Key(true, KnobDoor.Construction.HollowCore, v, 0.9f, how, width, 2.1f));
+        // A car's windows, each character, every stroke the window command makes from a window at rest:
+        // fully down and up, and to and from half way. A window turned round while it is moving starts
+        // from a quarter that is rendered when first heard.
+        for (int v = 0; v < CarWindow.Variants; v++)
+            foreach (var (from, to) in new[] { (0f, 1f), (1f, 0f), (0f, 0.5f), (0.5f, 0f), (0.5f, 1f), (1f, 0.5f) })
+                keys.Add(CarWindow.Key(v, from, to));
+        // The glass front door (its bar, its key-side pull, its close) at the towers' 1.9 m (the city scales
+        // the 1.0 m prefab; prewarmed at 1.0 m, no tower door ever matched) and the prefab's size, and the
+        // glass pull door (pulled, pushed, its close) at its prefab's.
+        foreach (float width in new[] { 1.9f, 1.0f })
+            for (int v = 0; v < GlassDoor.Variants; v++)
+            {
+                keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, false, GlassDoor.Opening.Key, GlassDoor.Glazing.Tempered, v, 1.1f, width, 2.1f));
+                keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, false, GlassDoor.Opening.Push, GlassDoor.Glazing.Tempered, v, 1.1f, width, 2.1f));
+                keys.Add(GlassDoor.Key(GlassDoor.Kind.PushBar, true, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.1f, width, 2.1f));
+            }
+        for (int v = 0; v < GlassDoor.Variants; v++)
+        {
+            keys.Add(GlassDoor.Key(GlassDoor.Kind.Pull, false, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.0f, 1.0f, 2.1f));
+            keys.Add(GlassDoor.Key(GlassDoor.Kind.Pull, false, GlassDoor.Opening.Push, GlassDoor.Glazing.Tempered, v, 1.0f, 1.0f, 2.1f));
+            keys.Add(GlassDoor.Key(GlassDoor.Kind.Pull, true, GlassDoor.Opening.Pull, GlassDoor.Glazing.Tempered, v, 1.0f, 1.0f, 2.1f));
+        }
+        return keys;
+    }
+
     /// <summary>A door model's sound by its key's prefix. (Every key went through the knob door's renderer,
     /// which does not know a push bar's key and gave back sixteen samples of silence: the prewarmed push-bar
     /// doors were silent.)
@@ -245,7 +273,18 @@ public sealed class WorldAudioPlayer
     /// <paramref name="fullScaleDb"/>, which is the level the sound is placed at.</summary>
     internal static float[] RenderDoorKey(string key, System.Collections.Concurrent.ConcurrentDictionary<string, float> fullScaleDb)
     {
-        if (key.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)) return CarWindow.RenderKey(key, TransientSynth.SampleRate);
+        // Rendered before, by this build: from disk, in milliseconds (DoorRenderCache).
+        if (DoorRenderCache.TryLoad(key, out var kept, out float keptDb))
+        {
+            if (keptDb > 0f) fullScaleDb[key] = keptDb;
+            return kept;
+        }
+        if (key.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal))
+        {
+            var window = CarWindow.RenderKey(key, TransientSynth.SampleRate);
+            DoorRenderCache.Store(key, window, 0f);
+            return window;
+        }
         float[] pcm = key.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal) ? GlassFracture.RenderKey(key, TransientSynth.SampleRate, out float db)
                     : key.StartsWith(GlassDoor.KeyPrefix, StringComparison.Ordinal) ? GlassDoor.RenderKey(key, TransientSynth.SampleRate, out db)
                     : key.StartsWith(LockCylinder.KeyPrefix, StringComparison.Ordinal) ? LockCylinder.RenderKey(key, TransientSynth.SampleRate, out db)
@@ -254,6 +293,7 @@ public sealed class WorldAudioPlayer
                     : key.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal) ? SlidingDoor.RenderKey(key, TransientSynth.SampleRate, out db)
                     : KnobDoor.RenderKey(key, TransientSynth.SampleRate, out db);
         if (db > 0f) fullScaleDb[key] = db;
+        DoorRenderCache.Store(key, pcm, db);
         return pcm;
     }
 
