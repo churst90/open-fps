@@ -376,8 +376,8 @@ public static class KnobDoor
     /// it and the opening was a faint click.</summary>
     private const double HandPull = 12;
     /// <summary>A hand pushing a door open from the stop's side leans on the knob as it turns it, harder than a
-    /// pull's tug, and comes up to it faster: about 30 N in a tenth of a second.</summary>
-    private const double HandPush = 30, PushRamp = 0.1;
+    /// pull's tug, and comes up to it a little faster: about 20 N in 0.15 s.</summary>
+    private const double HandPush = 20, PushRamp = 0.15;
     /// <summary>The arm holding a knob is not a force alone: it gives way to the knob's motion like a damper,
     /// about 150 N s/m at the hand (ISO 10068's hand-arm impedance, as the patio door's handle). While a hand
     /// pulls on a knob it is turning, the leaf comes off its stop onto the keeper against it, and the bolt's

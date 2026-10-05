@@ -214,7 +214,9 @@ public sealed class DoorSystem
             if (door.Powered)
             {
                 Emit(heard, entity, kind, DoorEvents.MotorStart,
-                     kind == DoorKind.AutoSliding && heard != null ? SlidingSound(world, entity, door, closing: true) : none);
+                     heard == null ? none
+                     : kind == DoorKind.AutoSliding ? SlidingSound(world, entity, door, closing: true)
+                     : kind == DoorKind.Elevator ? ElevatorSound(world, entity, door, closing: true) : none);
                 Emit(heard, entity, kind, DoorEvents.Rollers, none);
             }
             else if (door.Slides)
@@ -236,8 +238,10 @@ public sealed class DoorSystem
                      : kind == DoorKind.Hinged ? KnobDoorSound(world, entity, door, closing: true)
                      // The push-bar door's close is the closer bringing it into its latch.
                      : kind == DoorKind.PushBar ? PushBarSound(world, entity, door, closing: true)
-                     // A sliding door's arrival is already in the run it sent as it set off.
-                     : kind is DoorKind.PatioSliding or DoorKind.AutoSliding ? none
+                     // The glass doors' close is their closer bringing them onto the seal (and the latch).
+                     : kind is DoorKind.GlassPushBar or DoorKind.GlassPull ? GlassDoorSound(world, entity, door, closing: true)
+                     // A sliding door's or a lift's arrival is already in the run it sent as it set off.
+                     : kind is DoorKind.PatioSliding or DoorKind.AutoSliding or DoorKind.Elevator ? none
                      : Closing(world, entity, door, edge));
                 door.SelfClosing = false;
             }
@@ -255,7 +259,9 @@ public sealed class DoorSystem
         if (door.Powered)
         {
             Emit(heard, entity, kind, DoorEvents.MotorStart,
-                 kind == DoorKind.AutoSliding && heard != null ? SlidingSound(world, entity, door, closing: false) : none);
+                 heard == null ? none
+                 : kind == DoorKind.AutoSliding ? SlidingSound(world, entity, door, closing: false)
+                 : kind == DoorKind.Elevator ? ElevatorSound(world, entity, door, closing: false) : none);
             Emit(heard, entity, kind, DoorEvents.Rollers, none);
             return;
         }
@@ -270,14 +276,16 @@ public sealed class DoorSystem
                     Emit(heard, entity, kind, DoorEvents.Bar, PushBarSound(world, entity, door, closing: false));
                     break;
                 case DoorKind.GlassPushBar when door.KeyTurned:
-                    Emit(heard, entity, kind, DoorEvents.Key, none);
-                    Emit(heard, entity, kind, DoorEvents.LatchRetract, opening);
+                    // The key in the lock (LockCylinder), then the pull with the key held, once the latch is drawn.
+                    Emit(heard, entity, kind, DoorEvents.Key, KeySound(world, entity, door));
+                    Emit(heard, entity, kind, DoorEvents.LatchRetract,
+                         GlassDoorSound(world, entity, door, closing: false, GlassDoor.Opening.Key, LockCylinder.UnlockSeconds));
                     break;
                 case DoorKind.GlassPushBar:
-                    Emit(heard, entity, kind, DoorEvents.Bar, opening);
+                    Emit(heard, entity, kind, DoorEvents.Bar, GlassDoorSound(world, entity, door, closing: false, GlassDoor.Opening.Push));
                     break;
                 case DoorKind.GlassPull:
-                    Emit(heard, entity, kind, DoorEvents.Pull, opening);
+                    Emit(heard, entity, kind, DoorEvents.Pull, GlassDoorSound(world, entity, door, closing: false, GlassDoor.Opening.Pull));
                     break;
                 case DoorKind.Hinged:
                     Emit(heard, entity, kind, DoorEvents.LatchRetract, KnobDoorSound(world, entity, door, closing: false));
@@ -679,6 +687,68 @@ public sealed class DoorSystem
                 LevelDb = closing ? SlidingDoor.CloseLevelDb(kind, variant) : SlidingDoor.OpenLevelDb(kind, variant),
                 DecaySeconds = SlidingDoor.Seconds(kind, closing, travel),
                 SynthKey = SlidingDoor.Key(kind, closing, variant, travel, size.X, size.Y),
+                MovesTo = HandleAt(world, entity, door, to),
+                MoveSeconds = travel * MathF.Abs(to - door.Openness),
+            },
+        });
+    }
+
+    /// <summary>The glass front and pull doors as physical models (<see cref="GlassDoor"/>). How it was opened
+    /// (pushed, pulled, pulled with the key held) is the caller's; the door's id picks its character.</summary>
+    private static IReadOnlyList<TransientSound> GlassDoorSound(World world, Entity entity, in DoorComponent door, bool closing,
+                                                                GlassDoor.Opening how = GlassDoor.Opening.Pull, float delaySeconds = 0f)
+    {
+        var size = world.Has<ColliderComponent>(entity) ? world.Get<ColliderComponent>(entity).Size : new Vector3(1.0f, 2.1f, 0.012f);
+        var kind = (DoorKind)door.Kind == DoorKind.GlassPushBar ? GlassDoor.Kind.PushBar : GlassDoor.Kind.Pull;
+        int variant = entity.Id;
+        return OnTheLeaf(world, entity, door, new[]
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock, Position = HandleAt(world, entity, door, 0f), Hz = 300f, Noisiness = 1f,
+                LevelDb = closing ? GlassDoor.CloseLevelDb(kind, variant) : GlassDoor.OpenLevelDb(kind, how),
+                DecaySeconds = closing ? 1.2f : door.SwingSeconds + 0.8f,
+                DelaySeconds = delaySeconds,
+                SynthKey = GlassDoor.Key(kind, closing, how, GlassDoor.Glazing.Tempered, variant, door.SwingSeconds, size.X, size.Y),
+            },
+        });
+    }
+
+    /// <summary>A key unlocking a door from its keyed side (<see cref="LockCylinder"/>), at the lock.</summary>
+    private static IReadOnlyList<TransientSound> KeySound(World world, Entity entity, in DoorComponent door)
+    {
+        var host = (DoorKind)door.Kind switch
+        {
+            DoorKind.GlassPushBar or DoorKind.GlassPull => LockCylinder.Host.AluminiumStile,
+            DoorKind.PushBar => LockCylinder.Host.SteelDoor,
+            _ => LockCylinder.Host.WoodDoor,
+        };
+        return OnTheLeaf(world, entity, door, new[]
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock, Position = HandleAt(world, entity, door, 0f), Hz = 2000f, Noisiness = 1f,
+                LevelDb = LockCylinder.LevelDb(host), DecaySeconds = LockCylinder.UnlockSeconds + 0.5f,
+                SynthKey = LockCylinder.Key(host, entity.Id),
+            },
+        });
+    }
+
+    /// <summary>A lift's landing door leaf as a physical model (<see cref="ElevatorDoor"/>): the whole run, sent
+    /// as it starts. Of a bi-parting pair, the leaf with HingeSide 1 carries the operator's motor.</summary>
+    private static IReadOnlyList<TransientSound> ElevatorSound(World world, Entity entity, in DoorComponent door, bool closing)
+    {
+        var size = world.Has<ColliderComponent>(entity) ? world.Get<ColliderComponent>(entity).Size : new Vector3(0.55f, 2.1f, 0.04f);
+        float travel = closing && door.CloseSeconds > 0f ? door.CloseSeconds : door.SwingSeconds;
+        float to = closing ? 0f : 1f;
+        return OnTheLeaf(world, entity, door, new[]
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock, Position = HandleAt(world, entity, door, door.Openness), Hz = 300f, Noisiness = 1f,
+                LevelDb = closing ? ElevatorDoor.CloseLevelDb(entity.Id) : ElevatorDoor.OpenLevelDb(entity.Id),
+                DecaySeconds = ElevatorDoor.Seconds(closing, travel),
+                SynthKey = ElevatorDoor.Key(closing, entity.Id, travel, size.X, size.Y, door.HingeSide > 0f),
                 MovesTo = HandleAt(world, entity, door, to),
                 MoveSeconds = travel * MathF.Abs(to - door.Openness),
             },
