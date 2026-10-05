@@ -49,11 +49,13 @@ public static class Permissions
     public const string Protected = "protected";
     /// <summary>/map public, private, invite and uninvite on a map that is not yours.</summary>
     public const string MapsAny = "maps-any";
+    /// <summary>Holding and firing the admin gun, and setting it: /calibre, /admingun. The admin's alone.</summary>
+    public const string AdminGun = "admin-gun";
 
     /// <summary>The permissions that are powers within a command rather than commands of their own.</summary>
     public static readonly IReadOnlyList<string> Powers = new[]
     {
-        FireAny, JoinPrivate, EditAny, MovePlayer, GivePremium, TeleportFree, GrantAny, PermsAny, Protected, MapsAny,
+        FireAny, JoinPrivate, EditAny, MovePlayer, GivePremium, TeleportFree, GrantAny, PermsAny, Protected, MapsAny, AdminGun,
     };
 
     private static readonly UserRole[] Mod = { UserRole.Moderator }, Dev = { UserRole.Dev },
@@ -99,6 +101,7 @@ public static class Permissions
         [GrantAny] = (AdminOnly, "grant and revoke any permission, for anybody", false),
         [TeleportFree] = (AdminOnly, "use /tp without a teleporter", false),
         [MovePlayer] = (AdminOnly, "move another player to a place or to another player", false),
+        [AdminGun] = (AdminOnly, "hold, fire and set the admin gun", false),
         [Protected] = (AdminOnly, "cannot be kicked or muted by somebody without this too", false),
         [MapsAny] = (AdminOnly, "make any map public or private, and invite people to it", false),
         ["sessions"] = (AdminOnly, "list connections and addresses", false),
@@ -117,6 +120,7 @@ public static class Permissions
         "teleport" => "tp",
         "account" => "user",
         "ratelimit" => "throttled",
+        "calibre" or "caliber" or "admingun" => AdminGun,
         _ => command,
     };
 

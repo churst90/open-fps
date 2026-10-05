@@ -27,6 +27,18 @@ Recent work, newest first. `git log` has the rest.
   fits into your hands, back and pockets; the rest stays in it. Pedestrians are replaced a minute
   later, out of sight. Bodies and bags nobody carries go after half an hour, at most 30 of each on a
   map. A driver shot beside their parked car no longer breaks the car: somebody comes back for it.
+- Guns have a fire selector: X moves it on, Shift+X back. The AKM and AR-15 have safe, semi and
+  auto; the 1911, pump shotgun and M700 have a safety; the Glock and revolver have none. On safe the
+  trigger does nothing. On auto the gun fires for as long as Enter is held.
+- The admin gun (administrator only) never runs dry and fires any calibre (Y, or `/calibre`). X sets
+  what it does to what it hits: kill, vaporize, freeze for 10 seconds, or inspect (says what it is,
+  whose, its id). Vaporized things come back on restart unless the map is saved; floors and ground
+  cannot be vaporized. Its report is the calibre's own with a marker sound; `/admingun report 1-5`
+  tries the five candidates (renders: inbox/admin-gun-2026-10-05). Unheard.
+- The teleporter is heard: a rising charge on the person holding it, a low thump where they left (the
+  air rushing into the space), a pop where they arrive. Something given plays its own hand-over sound
+  at the receiver with the spoken line: a gun's action, a sword drawn a little, the teleporter's
+  ready tone. Unheard.
 - Six fixes from the Resonance port (unheard): tyres, their squeal and the rolling roar were 9 % sharp
   on a 48 kHz device; the city bus's air compressor knocks at the back with its engine; trains read
   from a model file keep their third axle; a machine built on another keeps everything its base had

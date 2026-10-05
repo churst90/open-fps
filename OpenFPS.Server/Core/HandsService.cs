@@ -166,6 +166,8 @@ public class HandsService
         prefabId = ResolveItem(prefabId) ?? prefabId;
         if (!_maps.Prefabs.TryGetValue(prefabId, out var template) || !(template.IsItem || template.Type == EntityType.Item))
         { message = $"There is no item called {prefabId}. Items: {string.Join(", ", GivableItems())}."; return false; }
+        if (string.Equals(template.WeaponId, AdminGun.WeaponId, StringComparison.OrdinalIgnoreCase) && !to.Can(Permissions.AdminGun))
+        { message = $"The admin gun is the admin's alone; {to.Username} cannot have it."; return false; }
         if (!TryGetHolder(to, out var world, out _, out var lookup) || to.Entity == Entity.Null || !world.IsAlive(to.Entity))
         { message = $"{to.Username} is not in the world just now."; return false; }
 
@@ -267,6 +269,8 @@ public class HandsService
             return false;
         }
 
+        if (CombatService.IsAdminGun(world, item.Value) && !session.Can(Permissions.AdminGun))
+        { message = "The admin gun is the admin's alone. You leave it where it is."; return false; }
         // A bag of somebody's belongings is gone through, not carried off whole: what is in it comes out
         // into your hands, onto your back and into your pockets.
         if (world.Has<BelongingsBag>(item.Value))

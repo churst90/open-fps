@@ -175,6 +175,80 @@ public sealed record WeaponDefinition
     /// On the weapon for now because the one scoped rifle comes scoped; a scope mounted later on an AKM
     /// or an AR-15 is looked up by the same id, so nothing that reads it has to change.</summary>
     public string ScopeId { get; init; } = "";
+
+    /// <summary>
+    /// The fire selector's settings in the order the lever moves through them, or none for a gun that
+    /// has no selector or safety lever (a Glock's safety is in its trigger, a double-action revolver's
+    /// in its long pull). A two-position safety is { Safe, Semi } and its second setting is spoken
+    /// "fire", as it is marked. See <see cref="FireSelector"/>.
+    /// </summary>
+    public FireMode[] Selector { get; init; } = Array.Empty<FireMode>();
+}
+
+/// <summary>Where a fire selector or safety lever can sit.</summary>
+public enum FireMode
+{
+    /// <summary>The trigger is blocked: pressing it does nothing.</summary>
+    Safe,
+    /// <summary>One round for each press of the trigger.</summary>
+    Semi,
+    /// <summary>Rounds at the action's cyclic rate for as long as the trigger is held.</summary>
+    Auto,
+}
+
+/// <summary>
+/// The fire selector: what its settings are called and how a step moves between them. The settings
+/// themselves are on the weapon (<see cref="WeaponDefinition.Selector"/>), as everything about a gun is.
+/// A step past the last setting comes round to the first, so a player never has to know which end the
+/// lever is at to reach the one they want.
+/// </summary>
+public static class FireSelector
+{
+    public const string NoSelector = "This gun has no selector.";
+
+    public static bool Has(WeaponDefinition w) => w.Selector.Length > 0;
+
+    public static bool HasAuto(WeaponDefinition w) => Array.IndexOf(w.Selector, FireMode.Auto) >= 0;
+
+    /// <summary>Where a gun sits that nobody has moved the lever on: ready to fire one at a time, as
+    /// every gun here fired before it had a selector.</summary>
+    public static FireMode Default(WeaponDefinition w) => FireMode.Semi;
+
+    /// <summary>The setting one step on (<paramref name="direction"/> 1) or back (-1) from
+    /// <paramref name="now"/>; a gun with no selector stays where it is.</summary>
+    public static FireMode Step(WeaponDefinition w, FireMode now, int direction)
+    {
+        var s = w.Selector;
+        if (s.Length == 0) return now;
+        int i = Array.IndexOf(s, now);
+        if (i < 0) i = Math.Max(0, Array.IndexOf(s, Default(w)));
+        int n = s.Length;
+        int step = direction < 0 ? -1 : 1;
+        return s[((i + step) % n + n) % n];
+    }
+
+    /// <summary>What the setting is called on this gun: "safe", "semi", "auto", or "fire" for the
+    /// second setting of a two-position safety.</summary>
+    public static string Spoken(WeaponDefinition w, FireMode m) => m switch
+    {
+        FireMode.Safe => "safe",
+        FireMode.Auto => "auto",
+        _ => HasAuto(w) ? "semi" : "fire",
+    };
+
+    /// <summary>A setting this gun has, by the word for it, or false.</summary>
+    public static bool TryParse(WeaponDefinition w, string? word, out FireMode mode)
+    {
+        mode = FireMode.Semi;
+        switch ((word ?? "").Trim().ToLowerInvariant())
+        {
+            case "safe": case "safety": mode = FireMode.Safe; break;
+            case "semi": case "single": case "fire": mode = FireMode.Semi; break;
+            case "auto": case "full": case "automatic": mode = FireMode.Auto; break;
+            default: return false;
+        }
+        return Array.IndexOf(w.Selector, mode) >= 0;
+    }
 }
 
 /// <summary>How a weapon is fed.</summary>
@@ -294,6 +368,9 @@ public static class WeaponRegistry
         BulletDiameterMetres = 0.0079f, BulletLengthMetres = 0.0265f,
         // 123 grain; the AKM's 1 in 240 mm (9.45 in) twist.
         BulletMassKg = 123f * Grain, RiflingTwistMetres = 0.240f,
+        // The lever on the right of the receiver: up is safe (and blocks the charging handle), the
+        // middle detent automatic (AB), the bottom single shots (OD).
+        Selector = new[] { FireMode.Safe, FireMode.Auto, FireMode.Semi },
     };
 
     /// <summary>5.56x45. Faster and much sharper than the AKM: a tighter Mach cone, so the crack is a
@@ -317,6 +394,9 @@ public static class WeaponRegistry
         BulletDiameterMetres = 0.0057f, BulletLengthMetres = 0.0189f,
         // 55 grain; the original AR-15's 1 in 12 in twist, the one M193 was made for.
         BulletMassKg = 55f * Grain, RiflingTwistMetres = 0.3048f,
+        // The M16-pattern selector: safe, semi, auto. A civilian AR-15's stops at semi; the report here
+        // was measured on an M16, and this is its lever.
+        Selector = new[] { FireMode.Safe, FireMode.Semi, FireMode.Auto },
     };
 
     /// <summary>9x19, and only just supersonic — Mach 1.09. The crack is there but it is small and
@@ -360,6 +440,8 @@ public static class WeaponRegistry
         BulletDiameterMetres = 0.0115f, BulletLengthMetres = 0.017f,
         // 230 grain; the 1911's 1 in 16 in.
         BulletMassKg = 230f * Grain, RiflingTwistMetres = 0.4064f,
+        // A 1911 has a thumb safety: up is safe, down is fire.
+        Selector = new[] { FireMode.Safe, FireMode.Semi },
     };
 
     /// <summary>12 gauge buckshot from a pump gun. Nine pellets, marginally supersonic.</summary>
@@ -383,6 +465,8 @@ public static class WeaponRegistry
         BulletDiameterMetres = 0.0084f, BulletLengthMetres = 0.0084f,
         // One 00 pellet, 53.8 grain of lead, from a smooth bore.
         BulletMassKg = 53.8f * Grain,
+        // A pump gun's cross-bolt safety: safe or fire.
+        Selector = new[] { FireMode.Safe, FireMode.Semi },
     };
 
     /// <summary>.357 Magnum from a 6-inch revolver, measured on the NIJ Ruger .357. About 410 m/s
@@ -441,6 +525,8 @@ public static class WeaponRegistry
         BulletDiameterMetres = 0.0078f, BulletLengthMetres = 0.0309f,
         // 168 grain; a 1 in 12 in .308 barrel.
         BulletMassKg = 168f * Grain, RiflingTwistMetres = 0.3048f,
+        // The Model 700's two-position safety beside the bolt: safe or fire.
+        Selector = new[] { FireMode.Safe, FireMode.Semi },
     };
 
     static WeaponRegistry()

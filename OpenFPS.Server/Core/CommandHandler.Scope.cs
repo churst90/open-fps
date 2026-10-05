@@ -49,26 +49,13 @@ public partial class CommandHandler
         if (!_maps.TryGetMap(receiver.CurrentMapId, out var world, out _, out _, out _)
             || receiver.Entity == Entity.Null || !world.IsAlive(receiver.Entity)) return;
         var at = world.Get<Transform>(receiver.Entity).Position;
-        string key = "give:" + what;
+        string key = HandOverSounds.Key(what);
         _server.SendToSession(receiver, new WorldAudioEvent
         {
             SourceEntityId = receiver.Entity.Id,
             Label = key,
             Seed = Random.Shared.Next(),
-            Sounds = new List<TransientSound>
-            {
-                new()
-                {
-                    Character = SoundCharacter.Knock,
-                    Position = at + new Vector3(0.25f, 1.1f, 0.3f),
-                    OnBody = true,
-                    BodyOffset = new Vector3(0.25f, 1.1f, 0.3f),
-                    LevelDb = 60f,
-                    DecaySeconds = 0.2f,
-                    Noisiness = 0.5f,
-                    SynthKey = key,
-                },
-            },
+            Sounds = new List<TransientSound> { HandOverSounds.Sound(what, at) },
         });
     }
 }

@@ -1146,6 +1146,9 @@ public sealed class WorldAudioPlayer
             if (WeaponRegistry.TryGet(id, out var weapon))
                 return WeaponSynth.MuzzleBlast(WeaponProfile.From(weapon), seed);
         }
+        // The admin gun, the teleporter and things handed over: designed sounds, each from its key.
+        if (AdminGunSynth.TryRender(sound.SynthKey, seed, out var designed))
+            return designed;
         // A bullet going by: the N-wave of its shock, or a piece of a subsonic one's whizz, each
         // worked from its key (BulletFlyby). Both are full scale at the level the server declared.
         if (BulletFlyby.TryParseCrack(sound.SynthKey, out float crackSeconds))

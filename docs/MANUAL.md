@@ -244,6 +244,13 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/key on` / `/key off` (or `/ignition`): the engine, from the driver's seat.
 
 ### Guns
+- X moves the fire selector on the gun in your hands; Shift+X moves it back. It says the setting.
+  The AKM and AR-15 have safe, semi and auto; the 1911, pump shotgun and M700 have a safety; the
+  Glock and revolver have none. On safe, Enter does not fire. On auto, hold Enter.
+- The admin gun (administrator only) never runs dry. X sets what it does to what it hits: kill,
+  vaporize (removes it; floors and ground are refused; it comes back on restart unless the map is
+  saved), freeze for 10 seconds, or inspect (says what it is, whose, its id). Y and Shift+Y change
+  the calibre, or `/calibre NAME`. `/admingun report 1` to `5` tries the five candidate reports.
 - R with a gun in your hands reloads it; `/reload` does the same. It takes as long as the real thing
   and you cannot fire until it is done. An empty gun clicks.
 - Enter fires the gun in your hands. With no gun, Enter interacts, like E.

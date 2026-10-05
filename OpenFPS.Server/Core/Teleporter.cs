@@ -27,26 +27,12 @@ public static class Teleporter
     public const string Arrive = "teleporter:arrive";
 
     /// <summary>How long it charges before it takes you, seconds. Tests set it to zero.</summary>
-    public static float ChargeSeconds { get; set; } = 2f;
+    public static float ChargeSeconds { get; set; } = TeleporterSounds.ChargeSeconds;
 
     /// <summary>
-    /// One event's sound: at <paramref name="at"/> (a body's feet), at chest height, its level the
-    /// starting guess for the client's model. The charge rides on the body that carries the device;
-    /// the leaving and arriving are where the air moves, and stay there.
+    /// One event's sound, built by the client's model (TeleporterSounds): the charge rides on the body
+    /// that carries the device; the leaving and arriving are where the air moves, and stay there.
     /// </summary>
-    public static TransientSound[] Sound(string evt, Vector3 at) => new[]
-    {
-        new TransientSound
-        {
-            Character = evt == Charge ? SoundCharacter.Ring : SoundCharacter.Knock,
-            Position = at + new Vector3(0f, 1.1f, 0f),
-            OnBody = evt == Charge,
-            BodyOffset = evt == Charge ? new Vector3(0.25f, 1.1f, 0.2f) : Vector3.Zero,
-            LevelDb = evt == Charge ? 70f : 95f,
-            Hz = evt == Charge ? 4000f : evt == Leave ? 60f : 120f,
-            DecaySeconds = evt == Charge ? ChargeSeconds : 0.3f,
-            Noisiness = evt == Charge ? 0.2f : 0.9f,
-            SynthKey = evt,
-        },
-    };
+    public static TransientSound[] Sound(string evt, Vector3 at)
+        => new[] { TeleporterSounds.Sound(evt[TeleporterSounds.Prefix.Length..], at) };
 }

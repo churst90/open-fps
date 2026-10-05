@@ -517,7 +517,8 @@ public sealed partial class VehicleSystem
         {
             if (v.MapId != mapId || !world.IsAlive(v.Entity)) continue;
             // Somebody shot dead stops where they fell until they are taken off the street (RetireWalker).
-            if (world.Has<DeadComponent>(v.Entity))
+            // Frozen by the admin gun: held still, as the dead are, until it wears off.
+            if (world.Has<DeadComponent>(v.Entity) || world.Has<OpenFPS.Server.Core.FrozenComponent>(v.Entity))
             {
                 v.Speed = 0f;
                 world.Get<Velocity>(v.Entity).Linear = Vector3.Zero;

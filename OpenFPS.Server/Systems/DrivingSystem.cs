@@ -202,6 +202,12 @@ public static class DrivingSystem
     {
         ref var drive = ref world.Get<DriveComponent>(root);
         if (string.IsNullOrEmpty(drive.Preset)) return;
+        // Frozen by the admin gun: it does not move until it wears off.
+        if (world.Has<OpenFPS.Server.Core.FrozenComponent>(root))
+        {
+            world.Get<Velocity>(root).Linear = Vector3.Zero;
+            return;
+        }
         var profile = MachineRegistry.VehicleFor(drive.Preset);
 
         // A driver who has gone quiet. Not an instant cut — that would make ordinary packet loss

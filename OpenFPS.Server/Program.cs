@@ -346,6 +346,9 @@ public class GameServer
             RetireWalker = _vehicles.RetireWalker,
             ReplaceWalker = _vehicles.ReplaceWalker,
             Possessions = _hands,
+            // The admin gun freezes what the traffic moves, and forgets a vehicle before vaporizing it.
+            MovedByTraffic = _vehicles.Moves,
+            ForgetVehicle = _vehicles.Forget,
         };
         // A flown bullet slows in the map's air and drifts in the server's wind.
         combat.Weather = mapId =>

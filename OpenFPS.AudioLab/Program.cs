@@ -104,6 +104,7 @@ string[] usage =
     "  --reload-spec [refs=DIR] [only=]              the gun-handling recordings measured: contacts, falls, bands",
     "  --reload-sounds [out=DIR]                     every reload and dry fire rendered, measured the same way",
     "  --scope-sounds [out=DIR]                      the scope's guidance tone and breath as played, and the M700's sounds",
+    "  --admin-gun [out=DIR]                         admin gun reports, its target effects, selectors, teleporter, hand-overs",
     "  --bullet-pass [out=DIR]                       a round's crack or whizz going by a listener, then its report",
     "  --bullet-round2 [out=DIR]                     the whizz before/after, ricochets, and a round striking each material",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
@@ -506,6 +507,11 @@ if (args.Contains("--pushbar-vs-ref"))
 if (args.Contains("--reload-spec"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.ReloadSpecSpike.Run(args));
+}
+
+if (args.Contains("--admin-gun"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.AdminGunSpike.Run(args));
 }
 
 if (args.Contains("--scope-sounds"))

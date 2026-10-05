@@ -27,7 +27,7 @@ namespace OpenFPS.Server.Core;
 /// a person in the street is taken off it, and after <see cref="WalkerRespawnSeconds"/> somebody else
 /// comes walking along the same way, out of sight of where the body lies.
 /// </summary>
-public sealed class CombatService
+public sealed partial class CombatService
 {
     private readonly MapManager _maps;
     private readonly GameServer _server;
@@ -137,6 +137,14 @@ public sealed class CombatService
         if (!TryGetBody(session, reply, out var world, out var grid, out var lookup, out var position)) return;
         if (world.Has<DeadComponent>(session.Entity)) { Say(reply, "You are dead."); return; }
 
+        // The admin gun is not a registry weapon: it fires whatever calibre it is set to, and what its
+        // round does is its mode's (CombatService.AdminGun.cs). Naming a weapon still fires that one.
+        if (!(canNameAny && args.Length > 0) && HoldsAdminGun(world, session.Entity, lookup, out var adminGun))
+        {
+            FireAdminGun(session, world, grid, adminGun, position, reply);
+            return;
+        }
+
         bool armed = HandsService.TryGetHeldWeapon(world, session.Entity, lookup, out var weapon, out var item);
         bool fromTheAir = false;
 
@@ -169,10 +177,26 @@ public sealed class CombatService
 
         if (!fromTheAir && !SpendRound(session, world, weapon, item, position, forward, reply)) return;
 
+        Shoot(session, world, grid, weapon, position, forward, muzzle, cycle: !fromTheAir);
+        // On automatic the gun goes on firing at its cyclic rate until the trigger is let go
+        // ("cease"), the magazine runs dry, or the hand on it changes (UpdateAutomatic).
+        if (!fromTheAir && !session.IsTextClient && SelectorOf(world, item, weapon) == FireMode.Auto)
+            StartAutomatic(session, item, weapon);
+        if (session.IsTextClient) Say(reply, $"You fire the {weapon.DisplayName}.");
+    }
+
+    /// <summary>
+    /// One round out of the barrel: the report (or <paramref name="reportKey"/>'s, for the admin gun),
+    /// the aim assisted and scattered, and the round flown. Spending it is the caller's.
+    /// </summary>
+    private void Shoot(UserSession session, World world, SpatialGrid<Entity> grid, WeaponDefinition weapon,
+                       Vector3 position, Vector3 forward, Vector3 muzzle, bool cycle,
+                       string? reportKey = null, AdminGunMode? admin = null, bool assist = true, float? dispersion = null)
+    {
         // 1. The shot itself. Named rather than described, because a gunshot is a blast wave, a body
         //    resonance, a brightness sweep and the action working — and a model for that already
         //    exists and is better than four numbers.
-        EmitReport(session, weapon, position, forward, muzzle, cycle: !fromTheAir);
+        EmitReport(session, weapon, position, forward, muzzle, cycle, reportKey);
 
         // 2. The round, flown like every other: along the aim, from the body's own axis at the height
         //    the gun is held, so a wall between you and your muzzle is the first thing it meets. What it
@@ -187,15 +211,14 @@ public sealed class CombatService
         //    flown as ever, so what it does on the way is still the world's to decide.
         Vector3 from = position + new Vector3(0f, HipHeight, 0f);
         Vector3 aim = forward;
-        if (session.AimAssist && Assist(session, world, grid, weapon, from, forward, out var onto, out var whom))
+        if (assist && session.AimAssist && Assist(session, world, grid, weapon, from, forward, out var onto, out var whom))
         {
             aim = onto;
             Log.Information("{User}'s aim assisted onto {Whom} ({Id}), {Degrees:F1} degrees off.", session.Username,
                             NameOf(world, whom), whom.Id, MathF.Acos(Math.Clamp(Vector3.Dot(Vector3.Normalize(forward), onto), -1f, 1f)) * 180f / MathF.PI);
         }
-        aim = Disperse(aim, HipDispersionRadians);
-        Launch(session, world, grid, weapon, from, aim * weapon.MuzzleVelocity, from, forward, targetId: -1);
-        if (session.IsTextClient) Say(reply, $"You fire the {weapon.DisplayName}.");
+        aim = Disperse(aim, dispersion ?? HipDispersionRadians);
+        Launch(session, world, grid, weapon, from, aim * weapon.MuzzleVelocity, from, forward, targetId: -1, admin);
     }
 
     // ── Aim assistance ──────────────────────────────────────────────────────────────────────────
@@ -362,6 +385,8 @@ public sealed class CombatService
                             Vector3 position, Vector3 forward, Action<IMessage> reply)
     {
         double now = Clock();
+        // On safe the trigger does not move: nothing happens, and nothing is heard but the word.
+        if (SelectorOf(world, item, weapon) == FireMode.Safe) { Say(reply, "Safe."); return false; }
         if (_reloads.TryGetValue(session, out var pending))
         {
             if (now < pending.DoneAt) { Say(reply, $"Still reloading the {weapon.DisplayName}."); return false; }
@@ -393,7 +418,8 @@ public sealed class CombatService
     /// The report at the muzzle, and for a gun worked by hand the bolt worked after it: the sound of
     /// the next round going in is part of a bolt gun's shot, and the gap before the next is that long.
     /// </summary>
-    private void EmitReport(UserSession session, WeaponDefinition weapon, Vector3 feet, Vector3 forward, Vector3 muzzle, bool cycle)
+    private void EmitReport(UserSession session, WeaponDefinition weapon, Vector3 feet, Vector3 forward, Vector3 muzzle, bool cycle,
+                            string? reportKey = null)
     {
         var sounds = new List<TransientSound>
         {
@@ -407,8 +433,8 @@ public sealed class CombatService
                 OnBody = true,
                 BodyOffset = new Vector3(0f, 1.5f, 0.5f),
                 LevelDb = Loudness.MuzzleBlastDb(weapon),
-                SynthKey = "weapon:" + weapon.Id,
-                DecaySeconds = 0.6f,
+                SynthKey = reportKey ?? "weapon:" + weapon.Id,
+                DecaySeconds = reportKey == null ? 0.6f : 1.8f,
             },
         };
         if (cycle && WeaponHandling.CyclesByHand(weapon))
@@ -466,6 +492,8 @@ public sealed class CombatService
         public int Seed;
         /// <summary>Its energy at the muzzle, J: what a ricochet's slug is weighed against when it hits.</summary>
         public float MuzzleJoules;
+        /// <summary>A round from the admin gun, and what it does to what it meets; null for any other.</summary>
+        public AdminGunMode? Admin;
     }
 
     /// <summary>How many times one round may ricochet: a slug that has skipped twice has little left.</summary>
@@ -538,7 +566,7 @@ public sealed class CombatService
     /// everybody else near where it is going is sent what they will hear of it go by.
     /// </summary>
     private void Launch(UserSession session, World world, SpatialGrid<Entity> grid, WeaponDefinition weapon,
-                        Vector3 from, Vector3 velocity, Vector3 eye, Vector3 sight, int targetId)
+                        Vector3 from, Vector3 velocity, Vector3 eye, Vector3 sight, int targetId, AdminGunMode? admin = null)
     {
         var flight = new Flight
         {
@@ -554,6 +582,7 @@ public sealed class CombatService
             RideId = world.Has<OccupantComponent>(session.Entity) ? world.Get<OccupantComponent>(session.Entity).RootEntityId : -1,
             Slug = Slug.Of(weapon),
             Seed = Scatter.Next(),
+            Admin = admin,
         };
         flight.MuzzleJoules = 0.5f * flight.Slug.MassKg * velocity.LengthSquared();
         _flights.Add(flight);
@@ -644,7 +673,7 @@ public sealed class CombatService
                 float u = along / MathF.Max(1e-6f, length);
                 var at = new FlightSample(before.Seconds - t0 + u * SegmentSeconds,
                                           Vector3.Lerp(before.Position, state.Position, u), Vector3.Lerp(before.Velocity, state.Velocity, u));
-                if (!body && !IsGlass(world, hit) && TryRicochet(f.Seed, bounces, slug, world, hit, at.Position, at.Velocity, out var o, out var normal, out _))
+                if (!body && !IsGlass(world, hit) && (f.Admin is null or AdminGunMode.Kill) && TryRicochet(f.Seed, bounces, slug, world, hit, at.Position, at.Velocity, out var o, out var normal, out _))
                 {
                     path.Add(at);
                     slug = o.Slug;
@@ -830,11 +859,17 @@ public sealed class CombatService
         Vector3 at = a + dir * nearest;
         float metres = Vector3.Distance(f.Eye, at);
         float seconds = before.Seconds + dt * nearest / length;
+        // The admin gun's round does what its mode says to whatever it meets first: vaporize, freeze or
+        // inspect (CombatService.AdminGun.cs). On kill it is an ordinary round that kills whoever it
+        // hits; a freezing round goes through glass as any round does.
+        if (f.Admin is { } mode && mode != AdminGunMode.Kill
+            && !(mode == AdminGunMode.Freeze && !hitBody && IsGlass(world, hitEntity)))
+            return AdminStrike(f, mode, world, grid, lookup, hitEntity, hitBody, at, metres);
         if (hitBody)
         {
             bool head = bodyHeight >= ExternalBallistics.HeadFrom;
-            int damage = f.Weapon.DamageAt(metres) * (head ? 2 : 1);
-            if (f.Bounces > 0)
+            int damage = f.Admin == AdminGunMode.Kill ? AdminKillDamage : f.Weapon.DamageAt(metres) * (head ? 2 : 1);
+            if (f.Bounces > 0 && f.Admin == null)
             {
                 // A ricochet's slug: flattened, tumbling and slower, it does what its energy does
                 // against the round's at the muzzle, and a deformed, yawing body wounds less than a
@@ -1206,6 +1241,7 @@ public sealed class CombatService
     {
         if (!TryGetBody(session, reply, out var world, out _, out var lookup, out var position)) return;
         if (world.Has<DeadComponent>(session.Entity)) { Say(reply, "You are dead."); return; }
+        if (HoldsAdminGun(world, session.Entity, lookup, out _)) { Say(reply, "The admin gun never runs dry."); return; }
         if (!HandsService.TryGetHeldWeapon(world, session.Entity, lookup, out var weapon, out var item))
         { Say(reply, "You are not holding anything to reload."); return; }
 
@@ -1348,6 +1384,8 @@ public sealed class CombatService
     public void Update(string mapId, World world)
     {
         FlyBullets(mapId);
+        UpdateAutomatic(mapId, world);
+        Thaw(mapId, world);
         double now = Clock();
         if (_reloads.Count > 0)
             foreach (var (session, r) in _reloads.Where(kv => kv.Value.MapId == mapId && now >= kv.Value.DoneAt).ToList())
@@ -1482,6 +1520,7 @@ public sealed class CombatService
     {
         _reloads.Remove(session);
         _lastShot.Remove(session);
+        _automatic.Remove(session);
         _flights.RemoveAll(f => f.Shooter == session);
     }
 
@@ -1490,5 +1529,6 @@ public sealed class CombatService
     public static (string WeaponId, int Rounds, string ScopeId) Held(World world, Entity player, Dictionary<int, Entity> lookup)
         => HandsService.TryGetHeldWeapon(world, player, lookup, out var weapon, out var item)
             ? (weapon.Id, Arms.Ammo(world, item, weapon).Rounds, ScopeOf(weapon))
+            : HoldsAdminGun(world, player, lookup, out _) ? (AdminGun.WeaponId, AdminGunRounds, "")
             : ("", -1, "");
 }
