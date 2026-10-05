@@ -302,8 +302,10 @@ public static class MachineRegistry
     /// Builds the vehicle a parts list describes.
     ///
     /// Every part is an OVERRIDE of what the base machine already had, which is why a definition can
-    /// be three lines. With no base, the parts have to carry an engine between them — the one thing
-    /// a vehicle cannot be assembled without.
+    /// be three lines: the machine starts as the whole base vehicle, and only what the parts name is
+    /// changed. Everything the vocabulary has no part for (the air system, the siren, the fan, where
+    /// the engine is) comes with the base. With no base, the parts have to carry an engine between
+    /// them — the one thing a vehicle cannot be assembled without.
     /// </summary>
     public static VehicleProfile Assemble(MachineDefinition def)
     {
@@ -375,34 +377,40 @@ public static class MachineRegistry
         var chassis = def.Part(MachineModels.Chassis);
         var exhaust = def.Part(MachineModels.Exhaust);
         var intake = def.Part(MachineModels.Intake);
+        // A part written without "at" has no place of its own (see ToJson): the base's stands.
+        Vector3? exhaustAt = exhaust is { At: var ea } && ea != Vector3.Zero ? ea : null;
+        Vector3? intakeAt = intake is { At: var ia } && ia != Vector3.Zero ? ia : null;
 
-        var v = new VehicleProfile
+        // The whole base, or with none a vehicle's defaults; the running gear comes with the base,
+        // its wheels placed where this machine's axles are.
+        var start = b ?? new VehicleProfile { Name = def.Id, Engine = engine, Gearbox = gearbox, Tyres = tyres };
+        return start with
         {
-            Name = def.Name.Length > 0 ? def.Name : b?.Name ?? def.Id,
+            Name = def.Name.Length > 0 ? def.Name : start.Name,
             EngineKey = def.Id,
             Engine = engine,
             Gearbox = gearbox,
             Tyres = tyres,
             Body = body,
-            MassKg = chassis?.Get("massKg", b?.MassKg ?? 1620f) ?? b?.MassKg ?? 1620f,
-            DragArea = chassis?.Get("dragArea", b?.DragArea ?? 0.62f) ?? b?.DragArea ?? 0.62f,
-            RollingResistance = chassis?.Get("rollingResistance", b?.RollingResistance ?? 0.013f)
-                              ?? b?.RollingResistance ?? 0.013f,
-            FrontAxleZ = chassis?.Get("frontAxleZ", b?.FrontAxleZ ?? 1.25f) ?? b?.FrontAxleZ ?? 1.25f,
-            RearAxleZ = chassis?.Get("rearAxleZ", b?.RearAxleZ ?? -1.35f) ?? b?.RearAxleZ ?? -1.35f,
-            LengthMetres = chassis?.Get("lengthMetres", b?.LengthMetres ?? 4.6f) ?? b?.LengthMetres ?? 4.6f,
-            WidthMetres = chassis?.Get("widthMetres", b?.WidthMetres ?? 1.9f) ?? b?.WidthMetres ?? 1.9f,
-            HeightMetres = chassis?.Get("heightMetres", b?.HeightMetres ?? 1.4f) ?? b?.HeightMetres ?? 1.4f,
-            SourceLevelDb = chassis?.Get("sourceLevelDb", b?.SourceLevelDb ?? 116f) ?? b?.SourceLevelDb ?? 116f,
-            TyreCount = (int)MathF.Round(chassis?.Get("tyreCount", b?.TyreCount ?? 4) ?? b?.TyreCount ?? 4),
-            // The running gear comes with the base, its wheels placed where this machine's axles are.
-            Chassis = b?.Chassis,
-            ExhaustOffsetZ = exhaust?.At.Z ?? b?.ExhaustOffsetZ ?? -2.05f,
-            ExhaustHeight = exhaust?.At.Y ?? b?.ExhaustHeight ?? 0.3f,
-            IntakeOffsetZ = intake?.At.Z ?? b?.IntakeOffsetZ ?? 1.35f,
-            IntakeHeight = intake?.At.Y ?? b?.IntakeHeight ?? 0.7f,
+            MassKg = chassis?.Get("massKg", start.MassKg) ?? start.MassKg,
+            DragArea = chassis?.Get("dragArea", start.DragArea) ?? start.DragArea,
+            RollingResistance = chassis?.Get("rollingResistance", start.RollingResistance) ?? start.RollingResistance,
+            FrontAxleZ = chassis?.Get("frontAxleZ", start.FrontAxleZ) ?? start.FrontAxleZ,
+            RearAxleZ = chassis?.Get("rearAxleZ", start.RearAxleZ) ?? start.RearAxleZ,
+            LengthMetres = chassis?.Get("lengthMetres", start.LengthMetres) ?? start.LengthMetres,
+            WidthMetres = chassis?.Get("widthMetres", start.WidthMetres) ?? start.WidthMetres,
+            HeightMetres = chassis?.Get("heightMetres", start.HeightMetres) ?? start.HeightMetres,
+            // The exhaust's own level is the machine's, as Describe writes it; the chassis setting,
+            // where there is one, says so outright.
+            SourceLevelDb = chassis?.Has("sourceLevelDb") == true ? chassis.Get("sourceLevelDb", start.SourceLevelDb)
+                          : exhaust is { LevelDb: > 0f } ? exhaust.LevelDb : start.SourceLevelDb,
+            TyreCount = chassis?.Get("tyreCount", start.TyreCount) ?? start.TyreCount,
+            ExhaustOffsetX = exhaustAt?.X ?? start.ExhaustOffsetX,
+            ExhaustHeight = exhaustAt?.Y ?? start.ExhaustHeight,
+            ExhaustOffsetZ = exhaustAt?.Z ?? start.ExhaustOffsetZ,
+            IntakeHeight = intakeAt?.Y ?? start.IntakeHeight,
+            IntakeOffsetZ = intakeAt?.Z ?? start.IntakeOffsetZ,
         };
-        return v;
     }
 
     /// <summary>
@@ -451,7 +459,7 @@ public static class MachineRegistry
             new()
             {
                 Model = MachineModels.Exhaust,
-                At = new Vector3(0f, v.ExhaustHeight, v.ExhaustOffsetZ),
+                At = v.ExhaustSlot,
                 LevelDb = v.SourceLevelDb,
             },
             new() { Model = MachineModels.Intake, At = new Vector3(0f, v.IntakeHeight, v.IntakeOffsetZ) },

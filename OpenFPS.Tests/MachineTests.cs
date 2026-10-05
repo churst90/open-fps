@@ -155,6 +155,99 @@ public class MachineTests
         Assert.Equal(bus.Tyres, loud.Tyres);
         Assert.Equal(bus.Body!.PanelSpansM, loud.Body!.PanelSpansM);
         Assert.Equal(bus.SourceLevelDb, loud.SourceLevelDb);
+        // ...including what the parts vocabulary has no word for: it is still a bus, on air brakes,
+        // blowing a bus horn and beeping at its door, with its fan, its clutch and its open bay.
+        Assert.Equal(bus.AirSystem, loud.AirSystem);
+        Assert.Equal(VehicleProfile.HornFor(bus), VehicleProfile.HornFor(loud));
+        Assert.Equal(bus.DoorChime, loud.DoorChime);
+        Assert.Equal(bus.CoolingFan, loud.CoolingFan);
+        Assert.Equal(bus.FanClutch, loud.FanClutch);
+        Assert.Equal(bus.EngineBayLeakage, loud.EngineBayLeakage);
+        Assert.Equal(bus.Chassis, loud.Chassis);
+    }
+
+    /// <summary>
+    /// Every preset, taken apart and put back together ON ITSELF, is the same vehicle in every field
+    /// there is: a machine starts as its base and its parts change only what they name. Assembled
+    /// from the parts' fields alone, a machine based on a bus lost its air brakes, its horn, its door
+    /// chime, its fan and where its engine was, and a stock car its side exit.
+    /// </summary>
+    [Fact]
+    public void EveryBuiltInVehicleRebuiltOnItselfIsItself()
+    {
+        foreach (string key in VehicleProfile.Presets.Keys)
+        {
+            var original = VehicleProfile.ByName(key);
+            var rebuilt = MachineRegistry.Assemble(MachineRegistry.Describe(original, key) with { Base = key });
+            // The engine is named by its preset and compared as that; EngineKey is the machine's id.
+            var lost = Readings(original with { Engine = rebuilt.Engine, EngineKey = rebuilt.EngineKey })
+                .Except(Readings(rebuilt)).ToList();
+            Assert.True(lost.Count == 0, $"{key} rebuilt on itself lost: {string.Join("; ", lost.Take(6))}");
+            Assert.Equal(original.Engine.Name, rebuilt.Engine.Name);
+        }
+    }
+
+    /// <summary>
+    /// The side pipes come out of the side. The worked example in the machines folder puts its pipe
+    /// 0.95 m right of the centreline, and that x was read by nothing: the pipe was on the centreline
+    /// and the car as loud on one side as the other.
+    /// </summary>
+    [Fact]
+    public void TheSidePipesComeOutOfTheSide()
+    {
+        var def = MachineRegistry.FromJson(File.ReadAllText(Path.Combine(RepoRoot(), "OpenFPS.Server", "machines", "v8_sidepipes.json")));
+        var v = MachineRegistry.Assemble(def);
+        var muscle = VehicleProfile.ByName("v8_muscle");
+        Assert.Equal(new Vector3(0.95f, 0.35f, -0.6f), v.ExhaustSlot);
+        Assert.True(v.ExhaustOffset.X > 0f, "the single voice is still on the centreline");
+        Assert.Equal(126f, v.SourceLevelDb);
+        Assert.Equal(muscle.ExhaustAxis, v.ExhaustAxis);
+        Assert.Equal(muscle.EngineBayLeakage, v.EngineBayLeakage);
+    }
+
+    /// <summary>An exhaust written with only its level takes that level and keeps the base's place.</summary>
+    [Fact]
+    public void AnExhaustWithOnlyALevelStaysWhereItWas()
+    {
+        var def = MachineRegistry.FromJson("""
+        { "id": "quiet_bus", "base": "school_bus", "parts": [ { "model": "exhaust", "levelDb": 101 } ] }
+        """);
+        var bus = VehicleProfile.ByName("school_bus");
+        var v = MachineRegistry.Assemble(def);
+        Assert.Equal(101f, v.SourceLevelDb);
+        Assert.Equal(bus.ExhaustSlot, v.ExhaustSlot);
+    }
+
+    private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")
+        => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, ".."));
+
+    /// <summary>Every public property of a vehicle as "path=value" lines, down through its parts.</summary>
+    private static IEnumerable<string> Readings(object? o, string path = "", int depth = 0)
+    {
+        if (o == null) { yield return path + "=null"; yield break; }
+        var t = o.GetType();
+        if (t.IsPrimitive || t.IsEnum || o is string || o is decimal || o is Vector3)
+        {
+            yield return path + "=" + Convert.ToString(o, System.Globalization.CultureInfo.InvariantCulture);
+            yield break;
+        }
+        if (depth > 8 || o is Delegate) yield break;
+        if (o is System.Collections.IEnumerable list)
+        {
+            int i = 0;
+            foreach (var e in list)
+                foreach (var r in Readings(e, $"{path}[{i++}]", depth + 1)) yield return r;
+            yield break;
+        }
+        foreach (var p in t.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (p.GetIndexParameters().Length > 0) continue;
+            object? value;
+            // A chassis not yet placed on its vehicle cannot answer everything; that it cannot is a reading too.
+            try { value = p.GetValue(o); }
+            catch (System.Reflection.TargetInvocationException e) { value = "threw " + e.InnerException?.GetType().Name; }
+            foreach (var r in Readings(value, path + "." + p.Name, depth + 1)) yield return r;
+        }
     }
 
     /// <summary>
@@ -209,6 +302,7 @@ public class MachineTests
         Assert.Equal(a.DragArea, b.DragArea);
         Assert.Equal(a.RollingResistance, b.RollingResistance);
         Assert.Equal(a.SourceLevelDb, b.SourceLevelDb);
+        Assert.Equal(a.ExhaustOffsetX, b.ExhaustOffsetX);
         Assert.Equal(a.ExhaustOffsetZ, b.ExhaustOffsetZ);
         Assert.Equal(a.ExhaustHeight, b.ExhaustHeight);
         Assert.Equal(a.IntakeOffsetZ, b.IntakeOffsetZ);

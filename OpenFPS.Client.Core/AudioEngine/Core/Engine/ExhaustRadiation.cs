@@ -59,7 +59,7 @@ public sealed class ExhaustRadiation
         // in front of the bike as if a car stood in the way — "I still think the exhaust is too
         // long on the motor cycles".
         _openFrame = (v.Body?.CabinLengthM ?? 0f) <= 0f;
-        var slot = new Vector3(0f, v.ExhaustHeight, v.ExhaustOffsetZ);
+        var slot = v.ExhaustSlot;
         _exit = _openFrame ? slot + _axis * 0.05f : ExitPoint(slot, _axis, _body);
         float dt = 1f / sampleRate;
         _aLow = 1f - MathF.Exp(-2f * MathF.PI * CrossLowHz * dt);

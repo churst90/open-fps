@@ -1748,8 +1748,7 @@ public class ClientAudioSystem
 
     /// <summary>Where the gas leaves, in the machine's own frame — the TRUE tailpipe, not the
     /// compromise position a single voice sits at (VehicleProfile.ExhaustEmitterBias).</summary>
-    private static Vector3 ExhaustSlot(OpenFPS.Common.VehicleProfile v)
-        => new(0f, v.ExhaustHeight, v.ExhaustOffsetZ);
+    private static Vector3 ExhaustSlot(OpenFPS.Common.VehicleProfile v) => v.ExhaustSlot;
 
     /// <summary>...and the other end: where it breathes, or its nose when the engine is in the back
     /// (VehicleProfile.FrontTapZ).</summary>

@@ -630,7 +630,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         if (placed)
         {
             var rel = new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ));
-            rearTap = SplitVoices ? new Vector3(0f, Vehicle.ExhaustHeight, Vehicle.ExhaustOffsetZ) : Vehicle.ExhaustOffset;
+            rearTap = SplitVoices ? Vehicle.ExhaustSlot : Vehicle.ExhaustOffset;
             frontTap = SplitVoices ? new Vector3(0f, Vehicle.FrontTapHeight, Vehicle.FrontTapZ) : rearTap;
             heard = rel + rearTap;
         }
@@ -1049,7 +1049,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             Engine.SetListener(heard);
             // The listener arrives relative to where this voice is placed: the true tailpipe once the
             // two ends have voices of their own, the compromise point before (VehicleProfile.ExhaustOffset).
-            var placedAt = SplitVoices ? new Vector3(0f, Vehicle.ExhaustHeight, Vehicle.ExhaustOffsetZ) : Vehicle.ExhaustOffset;
+            var placedAt = SplitVoices ? Vehicle.ExhaustSlot : Vehicle.ExhaustOffset;
             _radiation.Aim(heard + placedAt);
         }
         else _radiation.Aim(null);

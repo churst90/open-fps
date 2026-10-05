@@ -97,12 +97,12 @@ public static class MachineSpike
         AcousticRegistry.Initialize();
         var v = MachineRegistry.VehicleFor(id);
         float separation = Vector3.Distance(
-            new Vector3(0f, v.ExhaustHeight, v.ExhaustOffsetZ),
+            v.ExhaustSlot,
             new Vector3(0f, v.IntakeHeight, v.IntakeOffsetZ));
 
         Console.WriteLine($"\n  {v.Name} — {v.Engine.Name}");
         Console.WriteLine($"  Outlets {separation:F2} m apart: the airbox at z {v.IntakeOffsetZ:+0.00;-0.00} and "
-                        + $"{v.IntakeHeight:F2} m up, the tailpipe at z {v.ExhaustOffsetZ:+0.00;-0.00} and {v.ExhaustHeight:F2} m up.");
+                        + $"{v.IntakeHeight:F2} m up, the tailpipe at x {v.ExhaustOffsetX:+0.00;-0.00}, z {v.ExhaustOffsetZ:+0.00;-0.00} and {v.ExhaustHeight:F2} m up.");
         Console.WriteLine($"  They subtend {Localisation.SubtendedDegrees(separation, side):F0} degrees at {side:F0} m, "
                         + $"and merge into one source past {Localisation.MergingDistance(separation):F0} m.\n");
 
@@ -144,8 +144,7 @@ public static class MachineSpike
 
         // Where each outlet is. Heard as one thing, the voice sits between them and nearer the
         // exhaust — VehicleProfile.ExhaustEmitterBias — which is the compromise the split removes.
-        Vector3 Rear(Vector3 p) => p + new Vector3(0f, v.ExhaustHeight,
-            v.ExhaustOffsetZ * (split ? 1f : VehicleProfile.ExhaustEmitterBias));
+        Vector3 Rear(Vector3 p) => p + (split ? v.ExhaustSlot : v.ExhaustOffset);
         Vector3 Front(Vector3 p) => p + new Vector3(0f, v.IntakeHeight, v.IntakeOffsetZ);
 
         SpatialEmitter Exhaust(Vector3 p, Vector3 vel) => new()
@@ -191,7 +190,7 @@ public static class MachineSpike
                 // The TRUE separation, not this pass's voice placement: the question being asked
                 // is what the machine's ends subtend, which does not depend on how it is voiced.
                 float sep = Vector3.Distance(
-                    new Vector3(0f, v.ExhaustHeight, v.ExhaustOffsetZ),
+                    v.ExhaustSlot,
                     new Vector3(0f, v.IntakeHeight, v.IntakeOffsetZ));
                 Console.WriteLine($"     {d,5:F0} m away, outlets {Localisation.SubtendedDegrees(sep, d),4:F0} degrees apart");
             }
@@ -234,7 +233,7 @@ public static class MachineSpike
             // Placed the way the game places it: a machine is as big as the distance between the
             // ends it radiates from, and the gain is paid down as the reference widens.
             float extent = Vector3.Distance(
-                new Vector3(0f, v.ExhaustHeight, v.ExhaustOffsetZ),
+                v.ExhaustSlot,
                 new Vector3(0f, v.IntakeHeight, v.IntakeOffsetZ));
             var (gain, reference) = Loudness.Place(v.SourceLevelDb, extent);
             float range = Loudness.AudibleRange(v.SourceLevelDb);

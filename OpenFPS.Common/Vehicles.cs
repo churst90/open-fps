@@ -249,6 +249,10 @@ public sealed record VehicleProfile
     public float ExhaustOffsetZ { get; init; } = -2.05f;
     public float IntakeOffsetZ { get; init; } = 1.35f;
 
+    /// <summary>How far right of the centreline the tailpipe is, metres. Nearly every one is on it or
+    /// near enough to be heard there; a side pipe ahead of the rear wheel is not.</summary>
+    public float ExhaustOffsetX { get; init; }
+
     /// <summary>How high the tailpipe is above the car's contact patch, metres. Its own field because
     /// a truck's stack and a saloon's tailpipe are not at the same height, and because it is the number
     /// that keeps the occlusion probe out of the road surface.</summary>
@@ -297,7 +301,12 @@ public sealed record VehicleProfile
 
     /// <summary>Where the car's engine voice sits, in the car's own frame. This is the emitter slot:
     /// where the sound comes out, which is what occlusion, distance and direction are all about.</summary>
-    public Vector3 ExhaustOffset => new(0f, ExhaustHeight, ExhaustOffsetZ * ExhaustEmitterBias);
+    public Vector3 ExhaustOffset => new(ExhaustOffsetX * ExhaustEmitterBias, ExhaustHeight, ExhaustOffsetZ * ExhaustEmitterBias);
+
+    /// <summary>Where the gas leaves, in the vehicle's own frame: the true tailpipe, not the
+    /// compromise a single voice sits at.</summary>
+    public Vector3 ExhaustSlot => new(ExhaustOffsetX, ExhaustHeight, ExhaustOffsetZ);
+
     public float FrontAxleZ { get; init; } = 1.25f;
     public float RearAxleZ { get; init; } = -1.35f;
 
