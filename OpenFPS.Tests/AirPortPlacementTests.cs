@@ -27,6 +27,29 @@ public class AirPortPlacementTests
         Assert.False(FrontOf(bus, "service_release"));
     }
 
+    /// <summary>
+    /// The compressor is bolted to the engine, so it is heard from the end the engine is at: the front
+    /// of a school bus, the back of a city bus. The city bus's knocked away at its front door.
+    /// </summary>
+    [Theory]
+    [InlineData("school_bus", true)]
+    [InlineData("transit_bus", false)]
+    public void TheCompressorIsAtTheEndTheEngineIs(string key, bool front)
+    {
+        var v = VehicleProfile.ByName(key);
+        var air = new EngineVoiceState(v, 44100, 7).Air!;
+        // Below cut-in, every port shut and quiet, so the loaded compressor is all there is.
+        air.EngineRpm = 0f;
+        for (int k = 0; k < 40 && air.ReservoirKPa > air.Spec.CutInKPa - 20f; k++) air.Vent("kneel");
+        foreach (var name in air.Ports.Keys) air.Close(name);
+        for (int i = 0; i < 44100 * 2; i++) air.Step();
+        air.EngineRpm = 900f;
+        double all = 0, atFront = 0;
+        for (int i = 0; i < 44100; i++) { float y = air.Step(); all += y * y; atFront += air.FrontOut * air.FrontOut; }
+        Assert.True(air.CompressorLoaded && all > 0, "the compressor made no sound");
+        Assert.Equal(front ? all : 0.0, atFront, 6);
+    }
+
     [Fact]
     public void TheFrontShareIsExactlyTheFrontPorts()
     {

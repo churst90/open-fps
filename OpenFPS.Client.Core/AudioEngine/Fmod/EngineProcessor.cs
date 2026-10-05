@@ -551,9 +551,9 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                 _air = new AirSystem(ModelLibrary.Air(v.AirSystem), sampleRate, seed + 17);
                 // Each valve is where the spec says it is, measured back from the nose; it is heard
                 // from whichever outlet of this vehicle is nearer. The compressor is on the engine,
-                // and the engine is where the intake is.
+                // so it is at the front unless the engine is in the back.
                 float nose = v.LengthMetres * 0.5f;
-                _air.PlaceAtFront(p => NearerFront(v, nose - p.AlongMetres), compressorAtFront: true);
+                _air.PlaceAtFront(p => NearerFront(v, nose - p.AlongMetres), compressorAtFront: !v.EngineAtRear);
                 _chimeAtFront = _air.Ports.TryGetValue("door", out var door)
                     ? NearerFront(v, nose - door.Spec.AlongMetres) : true;
             }
