@@ -1,7 +1,7 @@
 {
   "Id": "steel_door",
   "Name": "Steel Door",
-  "Description": "A hollow metal fire or service door: two skins of 1.2 mm steel over a core, a push bar on the side you leave by, and a closer that shuts it three seconds after the doorway is clear. Heavier than wood, slower on its hinges, and it lets almost nothing through while it is shut.",
+  "Description": "A hollow metal fire or service door: two skins of 1.2 mm steel over a core, a push bar on the side you leave by (its -Z face: it is pushed from inside and swings out, toward its +Z face), a pull handle on the outside, and a closer that shuts it three seconds after the doorway is clear. Heavier than wood, slower on its hinges, and it lets almost nothing through while it is shut.",
   "Material": "Metal",
   "ColliderSize": { "X": 1.0, "Y": 2.1, "Z": 0.08 },
   "DoorSkinMetres": 0.0012,
@@ -14,6 +14,7 @@
   "SwingSeconds": 1.4,
   "SwingDegrees": 90,
   "HingeSide": 1,
+  "PushSide": -1,
   "TransmissionLow": 0.15,
   "TransmissionMid": 0.06,
   "TransmissionHigh": 0.02

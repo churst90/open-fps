@@ -34,8 +34,18 @@ public static class DoorEvents
 {
     public const string LatchRetract = "latch-retract";
     public const string Bar = "bar";
-    public const string Key = "key";
+    /// <summary>The leaf set moving by a hand pushing it, from its push side (<c>DoorComponent.PushSide</c>).</summary>
+    public const string Push = "push";
+    /// <summary>The leaf set moving by a hand pulling it, from the other side.</summary>
     public const string Pull = "pull";
+    /// <summary>The key going into the cylinder, from the keyed side of a shut door.</summary>
+    public const string KeyInsert = "key-insert";
+    /// <summary>The key turning in the cylinder.</summary>
+    public const string KeyTurn = "key-turn";
+    /// <summary>The turned key drawing the latch or bolt back: the door is unlocked.</summary>
+    public const string Unlock = "unlock";
+    /// <summary>Kept for code written before the key had three events: the key turning.</summary>
+    public const string Key = KeyTurn;
     public const string Swing = "swing";
     public const string Closer = "closer";
     public const string Latch = "latch";

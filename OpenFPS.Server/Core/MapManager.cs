@@ -234,6 +234,16 @@ public class MapManager
                 }
 
                 ApplyRoomMaterials(world, entity, entityData, m.Id);
+
+                // Which side of THIS door is locked, and which way it is pushed: where a door is put
+                // decides both, so the map may say, over the prefab.
+                if (world.Has<DoorComponent>(entity) && (entityData.KeyedSide.HasValue || entityData.PushSide.HasValue))
+                {
+                    ref var door = ref world.Get<DoorComponent>(entity);
+                    if (entityData.KeyedSide.HasValue)
+                        door.KeyedSide = entityData.KeyedSide > 0 ? 1f : entityData.KeyedSide < 0 ? -1f : 0f;
+                    if (entityData.PushSide.HasValue) door.PushSide = entityData.PushSide < 0 ? -1f : 1f;
+                }
                 if (entityData.RoomMaterials != null || entityData.Materials != null)
                     materialsAuthored.Add(entity.Id);
 

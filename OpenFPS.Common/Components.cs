@@ -693,11 +693,36 @@ public partial struct DoorComponent
     /// <summary>Running state: the last opening was from the keyed side, so a key was turned.</summary>
     public bool KeyTurned { get; set; }
 
+    // ── Push and pull, the key and who has hold of it (2026-10-05). Appended: components serialise
+    // positionally. See docs/DOOR_TYPES_EVENTS.md.
+
+    /// <summary>
+    /// Which face of a hinged leaf you PUSH it open from: +1 its own +Z face, -1 the other. It swings
+    /// away from that face, so from the other face it is PULLED. 0 (a door saved before sides
+    /// existed) is +1, which is the way every door swung then. A door's +Z face is its outside: a room
+    /// door is pushed from outside and swings into the room (+1); an exit door is pushed from inside
+    /// and swings out toward the street (-1), and its push bar, where it has one, is on that inside face.
+    /// </summary>
+    public float PushSide { get; set; }
+
+    /// <summary>Running state: how the hand that opened it last got it moving: +1 pushed, -1 pulled,
+    /// 0 not by hand or not known (a sliding leaf, the lift).</summary>
+    public int OpenedFrom { get; set; }
+
+    /// <summary>Running state: whose hand is moving it, as the entity id plus one; 0 nobody's (shut,
+    /// still, or on its closer or motor). That person walks with the leaf, so it never stops against them.</summary>
+    public int HandId { get; set; }
+
+    /// <summary>Running state: seconds left of the key going into the lock and turning, during which
+    /// the leaf has not started to move. 0 when no key is being used.</summary>
+    public float KeySeconds { get; set; }
+
     public DoorComponent()
     {
         SwingSeconds = 0.9f;
         SwingRadians = MathF.PI / 2f;
         HingeSide = 1f;
+        PushSide = 1f;
     }
 }
 

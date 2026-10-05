@@ -102,7 +102,7 @@ public class DoorTypeTests : IDisposable
                 Assert.Equal(0f, MathHelper.WrapAngle(yaw), 3);
             }
             else
-                Assert.Equal(-d.Openness * d.SwingRadians * d.HingeSide, MathHelper.WrapAngle(yaw), 2);
+                Assert.Equal(-d.Openness * d.SwingRadians * d.HingeSide * d.PushSide, MathHelper.WrapAngle(yaw), 2);
             if (full < 0 && d.Openness >= 1f) full = i;
         }
         _o.WriteLine($"{prefab}: open after {full * Dt:F2} s (travel {d.SwingSeconds} s)");
@@ -123,7 +123,8 @@ public class DoorTypeTests : IDisposable
     {
         var e = Door(prefab);
         var d = D(e);
-        var player = Player(new Vector3(0.2f, 1.0f, 0.6f));             // in the doorway
+        // In the doorway, on the side it is pushed from: not in the way of it opening.
+        var player = Player(new Vector3(0.2f, 1.0f, 0.6f * d.PushSide));
         DoorSystem.Set(_world, e, open: true);
         TickSeconds(12f);
         Assert.Equal(1f, D(e).Openness, 3);                              // held open by being there
@@ -259,9 +260,10 @@ public class DoorTypeTests : IDisposable
     /// </summary>
     [Theory]
     // The knob door's close is a hand shutting it, sent as the leaf arrives.
-    [InlineData("door", "latch-retract+ swing | swing latch+")]
-    [InlineData("steel_door", "bar+ swing | closer latch+")]
-    [InlineData("glass_pull_door", "pull+ swing | closer latch+")]
+    // Opened from nowhere in particular is opened from the push side (DoorSidesTests has both sides).
+    [InlineData("door", "latch-retract+ push | swing latch+")]
+    [InlineData("steel_door", "bar+ push | closer latch+")]
+    [InlineData("glass_pull_door", "push+ | closer latch+")]
     // A sliding door's sound is its whole run, sent as the run starts, both ways.
     [InlineData("patio_door", "latch-retract+ rollers stop | rollers+ latch")]
     [InlineData("auto_sliding_door", "motor-start+ rollers stop | motor-start+ rollers shut")]
@@ -288,8 +290,8 @@ public class DoorTypeTests : IDisposable
         Assert.Equal(expected, got);
     }
 
-    /// <summary>A glass front door is opened with a key from its keyed side and by its push bar from
-    /// the other; either way it is the same leaf on the same closer.</summary>
+    /// <summary>A glass front door is unlocked with a key and pulled open from its keyed side, and pushed
+    /// open by its bar from the other; either way it is the same leaf on the same closer.</summary>
     [Fact]
     public void AFrontDoorTakesAKeyFromOutsideAndABarFromInside()
     {
@@ -297,8 +299,9 @@ public class DoorTypeTests : IDisposable
         Assert.Equal(1f, D(e).KeyedSide);
         Assert.True(DoorSystem.Set(_world, e, open: true, by: new Vector3(0.2f, 1.6f, 1.5f)));   // outside
         Assert.True(D(e).KeyTurned);
-        Tick();
-        Assert.Equal(new[] { "door:glass-pushbar:key", "door:glass-pushbar:latch-retract", "door:glass-pushbar:swing" },
+        TickSeconds(DoorSystem.KeySequenceSeconds + 0.1f);
+        Assert.Equal(new[] { "door:glass-pushbar:key-insert", "door:glass-pushbar:key-turn", "door:glass-pushbar:unlock",
+                             "door:glass-pushbar:pull" },
                      _heard.Select(h => h.Key));
         DoorSystem.Set(_world, e, open: false);
         TickSeconds(3f);
@@ -307,7 +310,7 @@ public class DoorTypeTests : IDisposable
         Assert.True(DoorSystem.Set(_world, e, open: true, by: new Vector3(0.2f, 1.6f, -1.5f)));  // inside
         Assert.False(D(e).KeyTurned);
         Tick();
-        Assert.Equal(new[] { "door:glass-pushbar:bar", "door:glass-pushbar:swing" }, _heard.Select(h => h.Key));
+        Assert.Equal(new[] { "door:glass-pushbar:bar", "door:glass-pushbar:push" }, _heard.Select(h => h.Key));
     }
 
     // ── The routes see the leaf where it is ─────────────────────────────────────────────────────
