@@ -27,46 +27,63 @@ reverb that comes from the room's actual size and materials.
 ## Features
 
 ### Playing
-- Walk, run and explore by sound. Footsteps change with the ground and your speed.
+- Walk, run and explore by sound. Footsteps change with the ground and your speed. Walking into
+  something knocks and names it, and the game can say what is ahead as you turn and move.
 - Maps: a generated city with streets, traffic, buses, a light rail loop, level crossings, an
-  airport, parks, birds and buildings you can enter; a speedway with a race; and a rooms map for
-  trying doors and materials.
-- Drive: get into a parked car and drive it, with lane tick and edge tones, a guide beep, parking
-  sensor tones and spoken road names. Ride the bus: it stops at bus stops and you can take a seat.
+  airport, houses with gardens, a park with a fountain, birds, and buildings you can enter; a
+  speedway with a race; and a rooms map for trying doors and materials.
+- Doors work as real ones do: knob doors, push-bar doors with closers, keyed glass front doors,
+  automatic sliding doors and patio doors. Each is pushed from one side and pulled from the other,
+  and no door shuts on a person.
+- Find your way: step through the nearest doors, entrances, stairs, items, people, vehicles or
+  places with comma and period; spoken stair cues; spoken coordinates and facing.
+- Drive: get into a parked car and drive it, with lane and kerb tones, a guide beep, turn clicks,
+  lane assist and spoken road names. Ride the bus: it stops at bus stops and you can take a seat.
+- Weapons with real handling: fire selectors, reloads that take the real time, a rifle scope on the
+  keypad, and aim assistance from the hip. A player who dies leaves a body and a bag of their
+  belongings, and comes back after 60 seconds.
 - People: the city's pedestrians greet you, apologise when you bump into them and talk on the
   phone; drivers yell when something goes wrong. Recorded lines, placed in the world like any sound.
-- Beacons: sounds that mark doors, items and vehicles near you (a map can add exits, stairs and
-  waypoints). Choose which kinds you hear. Beacons behind a wall are not played.
-- Chat: map, all, private and server channels, each with its own sound. Voice chat.
-- F-key lists of players, maps and friends, which you can act on. Travel between maps with F6 or
-  `/join`.
-- Saved servers and settings.
+- Beacons: sounds that mark doors, items, vehicles, stairs and other players near you (a map can add
+  exits and waypoints). Choose which kinds you hear. Beacons behind a wall are not played.
+- Chat: map, all, private, team and server channels, each with its own sound. Voice chat, heard from
+  where each player stands and muffled by walls.
+- Teams, friends and profiles. F-key lists of players, maps and friends, which you can act on.
+  Travel between maps with F6 or `/join`, or carry a teleporter.
+- Maps of your own: any player can make a map, build on it, and invite people.
+- Saved servers and settings. When you log out, your place and what you carry are kept.
 
 ### The sound engine
 - Binaural 3D sound (Steam Audio HRTF) mixed by FMOD.
-- Occlusion, diffraction around edges, transmission through walls, and a moving vehicle blocking
-  another vehicle's sound.
-- Early reflections from nearby surfaces, played from the walls they come off.
+- Occlusion, diffraction around edges, transmission through walls and doors, and a moving vehicle
+  blocking another vehicle's sound.
+- Reflections from nearby surfaces, played from the walls they come off.
 - Reverb traced from the real geometry and materials around you, arriving from the directions it
   comes from. Rooms inside rooms work (a bus shelter inside a street, a garage inside a car park).
 - Doppler, air absorption over distance, and horn directivity.
 - Physical synthesis of: petrol and diesel engines with their exhaust and intake systems, turbos,
   tyres, electric and air horns, sirens, trains and their horns and bells, air brakes, aircraft
-  (propellers, jets, helicopters), small machines, doors, footsteps, applause and crowds.
+  (propellers, jets, helicopters), small machines, doors and locks, footsteps, gunfire, water,
+  fire, wind in trees, applause and crowds.
 
 ### Running a server
 - One server can host several maps at once; players travel between them.
 - Maps are JSON files; objects are prefabs. Materials decide how things sound.
-- Accounts, staff roles, admin commands, a message of the day, and a text (MUD) interface for
-  testing a server without a client.
+- Accounts with four roles (player, moderator, developer, administrator), custom roles and single
+  permissions. On a map they own, every player can build.
+- An admin gun for the administrator: kill, vaporize, freeze or inspect what it hits.
+- A message of the day, and a text (MUD) interface for testing a server without a client.
+- The network sends only what changed: things at rest are not sent again. Clients must be built
+  from the same version as the server, and are told so at login if not.
 
 ## Platforms
 
 - **Server:** Linux. It is plain .NET 10, so other platforms should work but are not tested.
 - **Client:** the Linux GTK client and the Windows client share the game, the keys and the main
   menu, including creating an account, voice chat and reconnecting after a dropped connection.
-  The Windows client is built from Linux
-  (`./publish-windows.sh`) and is less tested. See [docs/WINDOWS_AND_SERVER.md](docs/WINDOWS_AND_SERVER.md).
+  The Windows client is built from Linux (`./publish-windows.sh`) and is less tested. See
+  [docs/WINDOWS_AND_SERVER.md](docs/WINDOWS_AND_SERVER.md).
+- `./publish-server.sh` packages the server for a VPS.
 - Speech: speech-dispatcher (Orca, espeak-ng) on Linux; NVDA or SAPI on Windows.
 
 ## Getting started
@@ -86,6 +103,6 @@ reverb that comes from the room's actual size and materials.
   lists them), `OpenFPS.Tests`.
 - Build with `--artifacts-path` pointing off the repository's volume (see the run scripts). Do not
   use `dotnet run`: it writes `obj/` and `bin/` into the repository.
-- Tests: `dotnet test OpenFPS.Tests` (about 35 minutes, about 1,670 tests).
+- Tests: `dotnet test OpenFPS.Tests` (about 1,800 test methods).
 - Map and prefab authoring: [docs/AUTHORING.md](docs/AUTHORING.md).
 - Planned work: [todo.md](todo.md). Recent changes: [changes.md](changes.md).
