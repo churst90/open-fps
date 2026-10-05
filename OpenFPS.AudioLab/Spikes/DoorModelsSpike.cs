@@ -69,6 +69,24 @@ public static class DoorModelsSpike
             list.Add(new("lift-close-standard-other-leaf", "lift door, standard, the other leaf of the pair closing, without the operator",
                 r => Run<ElevatorDoor.Report>(r, rep => ElevatorDoor.RenderClose(leaf, 48000, 2.5, rep)), ElevatorDoor.PascalsAtFullScale));
         }
+        // Push and pull on the approved doors: the knob door pushed from the stop's side beside its pull, and the
+        // push-bar door pulled from the trim side beside its push.
+        for (int v = 0; v < KnobDoor.Variants; v++)
+        {
+            var kd = new KnobDoor.Door { HingeWear = KnobDoor.WearOf(v), Seed = 1 + v };
+            list.Add(new($"knob-push-v{v}", $"knob door, character {v}, turned and pushed open from the stop side",
+                r => Run<KnobDoor.Report>(r, rep => KnobDoor.RenderOpen(kd, 48000, 0.9, rep, push: true)), KnobDoor.PascalsAtFullScale));
+            list.Add(new($"knob-pull-v{v}", $"knob door, character {v}, turned and pulled open, the approved opening",
+                r => Run<KnobDoor.Report>(r, rep => KnobDoor.RenderOpen(kd, 48000, 0.9, rep)), KnobDoor.PascalsAtFullScale));
+        }
+        for (int v = 0; v < PushBarDoor.Variants; v++)
+        {
+            var pd = new PushBarDoor.Door { Variant = v, Seed = 1 + v };
+            list.Add(new($"pushbar-trim-pull-{chars[v]}", $"steel push bar door, {chars[v]}, pulled open from outside by its lever trim",
+                r => Run<PushBarDoor.Report>(r, rep => PushBarDoor.RenderOpen(pd, 48000, 1.4, rep, pull: true)), PushBarDoor.PascalsAtFullScale));
+            list.Add(new($"pushbar-bar-push-{chars[v]}", $"steel push bar door, {chars[v]}, pushed open by its bar, the approved opening",
+                r => Run<PushBarDoor.Report>(r, rep => PushBarDoor.RenderOpen(pd, 48000, 1.4, rep)), PushBarDoor.PascalsAtFullScale));
+        }
         // The key in the lock, in each kind of door it is set in, each character.
         foreach (var host in new[] { LockCylinder.Host.AluminiumStile, LockCylinder.Host.SteelDoor, LockCylinder.Host.WoodDoor })
             for (int v = 0; v < LockCylinder.Variants; v++)

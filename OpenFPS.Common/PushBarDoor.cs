@@ -86,12 +86,14 @@ public static class PushBarDoor
         _ => (0.0, 8e8, 0.1, 0.8, 2.0, 0.5),
     };
 
-    /// <summary>Opening: shove the bar, the bolt draws back, the door goes, the bar is let go at 20 degrees.</summary>
-    public static float[] RenderOpen(Door door, int sampleRate, double swingSeconds = 1.4, Report? report = null)
+    /// <summary>Opening: shove the bar, the bolt draws back, the door goes, the bar is let go at 20 degrees. With
+    /// <paramref name="pull"/>, from the other side: the outside trim's lever turned (it draws the same latch
+    /// through the device), the leaf pulled by it, the lever let go once the leaf is clear.</summary>
+    public static float[] RenderOpen(Door door, int sampleRate, double swingSeconds = 1.4, Report? report = null, bool pull = false)
     {
         var sim = new Sim(door, sampleRate, report);
         sim.StartShut();
-        sim.ScriptOpen(swingSeconds);
+        if (pull) sim.ScriptTrimPull(swingSeconds); else sim.ScriptOpen(swingSeconds);
         return sim.Output();
     }
 
@@ -138,15 +140,21 @@ public static class PushBarDoor
         0 => 97.6f, 1 => 100.0f, 2 => 109.4f, _ => 113.5f,
     };
 
-    public static string Key(bool closing, int variant, float swingSeconds, float width, float height)
+    /// <remarks>An opening pulled from the trim side ends ":pull"; the bar's push (the approved one) has no sixth
+    /// field, so its keys are as they were.</remarks>
+    public static string Key(bool closing, int variant, float swingSeconds, float width, float height, bool pull = false)
         => FormattableString.Invariant(
-            $"{KeyPrefix}{(closing ? "close" : "open")}:{((variant % Variants) + Variants) % Variants}:{(int)MathF.Round(swingSeconds * 100f)}:{(int)MathF.Round(width * 100f)}:{(int)MathF.Round(height * 100f)}");
+            $"{KeyPrefix}{(closing ? "close" : "open")}:{((variant % Variants) + Variants) % Variants}:{(int)MathF.Round(swingSeconds * 100f)}:{(int)MathF.Round(width * 100f)}:{(int)MathF.Round(height * 100f)}{(pull && !closing ? ":pull" : "")}");
 
     public static bool TryParseKey(string? key, out bool closing, out Door door, out float swingSeconds)
+        => TryParseKey(key, out closing, out door, out swingSeconds, out _);
+
+    public static bool TryParseKey(string? key, out bool closing, out Door door, out float swingSeconds, out bool pull)
     {
-        closing = false; door = new Door(); swingSeconds = 1.4f;
+        closing = false; door = new Door(); swingSeconds = 1.4f; pull = false;
         if (key == null || !key.StartsWith(KeyPrefix, StringComparison.Ordinal)) return false;
         var p = key.Substring(KeyPrefix.Length).Split(':');
+        if (p.Length == 6 && p[5] == "pull" && p[0] == "open") { pull = true; Array.Resize(ref p, 5); }
         if (p.Length != 5 || (p[0] != "open" && p[0] != "close")) return false;
         if (!int.TryParse(p[1], out int v) || !int.TryParse(p[2], out int s) || !int.TryParse(p[3], out int w)
             || !int.TryParse(p[4], out int h)) return false;
@@ -163,8 +171,8 @@ public static class PushBarDoor
     public static float[] RenderKey(string key, int sampleRate, out float fullScaleDb)
     {
         fullScaleDb = 0f;
-        if (!TryParseKey(key, out bool closing, out var door, out float swing)) return new float[16];
-        float[] pcm = closing ? RenderClose(door, sampleRate, swing) : RenderOpen(door, sampleRate, swing);
+        if (!TryParseKey(key, out bool closing, out var door, out float swing, out bool pull)) return new float[16];
+        float[] pcm = closing ? RenderClose(door, sampleRate, swing) : RenderOpen(door, sampleRate, swing, null, pull);
         return KnobDoor.PeakToFullScale(pcm, PascalsAtFullScale, out fullScaleDb);
     }
 
@@ -288,6 +296,10 @@ public static class PushBarDoor
     /// <summary>What a hand will put on a bar, N: a door pressed on its latch takes more than the 67 N an
     /// unloaded device is allowed to need.</summary>
     private const double HandPushRamp = 0.05, HandPush = 250, HandHold = 40;
+    /// <summary>The outside trim: a lever 70 mm in from the edge; the hand pulls on it with up to 60 N while it
+    /// turns it (the closer holds the leaf with 35 N m); let go, its spring takes it and the cam back in about
+    /// 25 ms.</summary>
+    private const double TrimPull = 60, TrimInset = 0.07, LeverReturnSpeed = (Throw + 0.002) / 0.025;
     /// <summary>The hand meets the bar through the palm, about 50 N/mm when it shoves, and the arm drives
     /// it at 1.5 m/s, a 19 mm stroke in about 15 ms, until the palm carries what the arm wants: a person
     /// going through a fire door shoves the bar, and its bottoming is a clack.</summary>
@@ -339,6 +351,8 @@ public static class PushBarDoor
         private Func<double, (double Angle, double Rate)>? leafPath;
         private double handK, handC;
         private bool closerLatchValve;
+        private bool trimOn;
+        private double trimDraw, trimTorque;
         private double latchDamping;
         private double time;
 
@@ -552,6 +566,52 @@ public static class PushBarDoor
             }
         }
 
+        /// <summary>
+        /// From the trim side: the lever turned over 0.2 s, its cam drawing the bolt through the device's own
+        /// latch (the pad does not move); the hand pulls on the lever until the bolt is clear, then carries the
+        /// leaf open, and lets the lever go a moment later: the lever's spring takes the cam back and the bolt
+        /// follows it out against its stop. (The lever's own knock on its rose is not modelled.)
+        /// </summary>
+        public void ScriptTrimPull(double swingSeconds)
+        {
+            const double grip = 0.05, turn = 0.2;
+            double cleared = -1, letGo = -1, end = 10;
+            trimOn = true;
+            while (time < end)
+            {
+                trimDraw = letGo < 0 ? MinJerk(Math.Clamp((time - grip) / turn, 0, 1)) * (Throw + 0.002) : trimDraw;
+                if (letGo > 0) trimDraw = Math.Max(0, trimDraw - LeverReturnSpeed * dt);
+                if (cleared < 0)
+                {
+                    trimTorque = Math.Min(1, Math.Max(0, time - grip) / turn) * TrimPull * (width - TrimInset);
+                    if (!boltInStrike && time > grip && bolt < LatchGap)
+                    {
+                        cleared = time;
+                        Log($"{time * 1000:F0} ms  bolt clear; the hand pulls the leaf");
+                        double a0 = theta, w0 = omega, a1 = 85 * Math.PI / 180, t0 = time;
+                        leafPath = t =>
+                        {
+                            double u = Math.Clamp((t - t0) / swingSeconds, 0, 1);
+                            var (pp, vv) = Hermite(u, a0, w0 * swingSeconds, a1, 0);
+                            return (pp, vv / swingSeconds);
+                        };
+                        end = t0 + swingSeconds + 0.6;
+                    }
+                }
+                else
+                {
+                    var (a, r) = leafPath!(time);
+                    trimTorque = handK * (a - theta) + handC * (r - omega);
+                    if (letGo < 0 && time > cleared + 0.15)
+                    {
+                        letGo = time;
+                        Log($"{time * 1000:F0} ms  lever let go");
+                    }
+                }
+                Tick(opening: true);
+            }
+        }
+
         public void ScriptCloserLatch()
         {
             // Fifteen millimetres before the bevel meets the lip, coming in at the latch valve's speed
@@ -695,6 +755,15 @@ public static class PushBarDoor
             double fLink = linkDepth > 0 && driveBar > BarPlay
                 ? Math.Max(0, LinkStiffness * linkDepth + LinkDamping * (boltRate + (drawn < Throw ? driveRate * ratio : 0))) : 0;
             boltForce -= fLink;
+            // The outside trim's cam, drawing the bolt in the device's latch head (the pad stays where it is).
+            if (trimOn)
+            {
+                double trimDepth = bolt - (Throw - trimDraw);
+                double fTrim = trimDepth > 0 ? Math.Max(0, LinkStiffness * trimDepth + LinkDamping * boltRate) : 0;
+                boltForce -= fTrim;
+                latchCase.F += fTrim * 0.5;
+                Note("trim", fTrim);
+            }
             driveForce -= fLink * ratio;
             caseForce += fLink * ratio;
             Note("link", fLink);
@@ -764,6 +833,13 @@ public static class PushBarDoor
 
             // A hand on the leaf only while a script holds a path and the bar is not doing the work.
             // (Opening drives through the bar; closing is the closer's.)
+
+            // The hand on the trim's lever, pulling.
+            if (trimOn)
+            {
+                torque += trimTorque;
+                leaf.Push(latchShape, trimTorque / (width - TrimInset));
+            }
 
             // Air.
             torque -= 0.5 * Rho0 * 1.2 * height * Math.Pow(width, 4) / 4 * omega * Math.Abs(omega);
