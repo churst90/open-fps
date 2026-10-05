@@ -153,6 +153,9 @@ public class HandsService
         return starts.Count == 1 ? starts[0].Key : null;
     }
 
+    /// <summary>The most of one thing a single /give makes.</summary>
+    public const int MaxGive = 50;
+
     public bool Give(UserSession to, string prefabId, int count, out string name, out string placed, out string message)
     {
         name = placed = message = "";
@@ -162,7 +165,7 @@ public class HandsService
         if (!TryGetHolder(to, out var world, out _, out var lookup) || to.Entity == Entity.Null || !world.IsAlive(to.Entity))
         { message = $"{to.Username} is not in the world just now."; return false; }
 
-        count = Math.Clamp(count, 1, 50);
+        count = Math.Clamp(count, 1, MaxGive);
         var at = world.Get<Transform>(to.Entity).Position;
         int inHands = 0, onBack = 0, atFeet = 0;
         string loaded = "";

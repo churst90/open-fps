@@ -7,6 +7,8 @@ Recent work, newest first. `git log` has the rest.
 - `/levels real` is gone. 100 percent is still there as a number, but it is literal source levels,
   which on headphones lost footsteps and idling cars; the default, 45 percent, is the setting to use.
   `/levels` now says "the default" when you are on it.
+- `/give akm 100` said it gave 100 and made 50 (the most one `/give` makes); it now says 50.
+- `/tp` with a bad number said "Usage: /move".
 
 ## 2026-10-04
 

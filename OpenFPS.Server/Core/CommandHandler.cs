@@ -361,6 +361,8 @@ public class CommandHandler
                         receiver = named; rest.RemoveAt(0);
                     }
                     if (count < 1) { Say(reply, "Give at least one."); break; }
+                    // Give makes at most MaxGive; the message said the number asked for (/give akm 100 made 50).
+                    count = Math.Min(count, HandsService.MaxGive);
                     if (!_hands.Give(receiver, rest[0].ToLowerInvariant(), count, out string item, out string placed, out string why)) { Say(reply, why); break; }
                     string what = $"{count} {(count == 1 ? item : Plural(item))}";
                     if (receiver != session)
@@ -1555,7 +1557,7 @@ public class CommandHandler
 
         if (!float.TryParse(args[0], out float x) || !float.TryParse(args[1], out float y) || !float.TryParse(args[2], out float z))
         {
-            Say(reply, "Usage: /move x y z — x east, y north, z height");
+            Say(reply, "Usage: /tp x y z — x east, y north, z height");
             return;
         }
 
