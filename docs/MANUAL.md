@@ -310,7 +310,20 @@ A team holds up to 16 players.
 
 ### Maps
 - `/join map` (or `/travel`): go to another map. With no map named, it lists the maps you can
-  enter. You can enter public maps, your own maps, and, if you are staff, any map.
+  enter. You can enter public maps, your own maps, maps you are invited to, and, if you are staff,
+  any map.
+- `/map`: the map you are on, whose it is, and whether it is public.
+- `/map new NAME`: make a private map, flat ground 100 m square, and go there. Up to 3 each.
+- `/map public`, `/map private`: let anybody in, or only you and the people you invite.
+- `/map invite NAME`, `/map uninvite NAME`.
+- `/maps`: the maps you can go to. `/maps mine`: your own.
+- On a map you own you can use the building commands, `/spawn`, `/move x y z`, `/savemap` and the
+  sound tools (see Staff commands).
+
+### Teleporter
+- `/tp PLACE`, `/tp PLAYER`, `/tp MAP`, `/tp x y z`: needs a teleporter in your hands or on your
+  back. It has unlimited uses. It charges for two seconds, and people hear you leave and arrive.
+  Without one: "You don't have a teleporter."
 
 ### Beacons
 
@@ -613,16 +626,34 @@ Changes take effect straight away.
 
 ## Staff commands
 
-Only Dev and Admin accounts can use these. A player who tries gets "You do not have permission to
-execute this command."
+Roles: moderators look after people, developers build the world, the administrator does
+everything. On a map you own, every player has the building commands below. A player who tries one
+without the permission gets "You do not have permission to execute this command." The full table
+is in docs/SERVER_SECURITY.md.
 
-### Talking to everyone
+### Talking to everyone (moderators)
 - `/announce message`: a message to everyone, from "Server".
 - `/setmotd [text]`.
+- `/where NAME`, `/kick`, `/mute`, `/unmute`, `/bring`.
 
 ### Moving
-- `/tp x y z` (or `/move`): go to a point. x is east, y is north, z is height. It refuses a point
-  inside something solid.
+- `/move x y z`: go to a point. x is east, y is north, z is height. It refuses a point inside
+  something solid. `/move NAME`: go to a player. Developers anywhere; everyone on maps they own.
+- `/move NAME x y z`, `/move NAME to OTHER`: move somebody else (administrator).
+
+### Spawning
+- `/spawn walker [NAME]`: a person who walks back and forth.
+- `/spawn vehicle PRESET` (or `car`), `/spawn helicopter`, `/spawn aircraft PRESET`: parked. Aircraft
+  cannot be flown yet. No airliner.
+- `/spawn train PRESET`: onto the nearest track that already has a train.
+
+### Giving and permissions
+- `/give [NAME] ITEM [COUNT]`: developers give ordinary items; the teleporter needs give-premium
+  (administrator).
+- `/give [NAME] vehicle PRESET`: parks one beside them, theirs (administrator).
+- `/grant NAME PERMISSION`, `/revoke NAME PERMISSION`: developers, only to players and only
+  permissions they have themselves.
+- `/perms NAME`: a player's permissions.
 
 ### Building
 - `/spawn Box|Cylinder Material sx sy sz`: make an object 3 m in front of you.

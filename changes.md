@@ -9,6 +9,21 @@ Recent work, newest first. `git log` has the rest.
   `/levels` now says "the default" when you are on it.
 - `/give akm 100` said it gave 100 and made 50 (the most one `/give` makes); it now says 50.
 - `/tp` with a bad number said "Usage: /move".
+- Roles follow the agreed table (docs/PLAN_2026-10-05.md, docs/SERVER_SECURITY.md). Everybody can
+  make maps of their own with `/map new`, make them public or private, and invite people; on your own
+  map you can build, spawn, move yourself and save, as developers can anywhere. `/tp` needs a
+  teleporter in your inventory, with unlimited uses; it charges for two seconds and is heard leaving
+  and arriving (the sounds come with the admin gun work). `/move` is the tool for moving yourself by
+  coordinates. Developers can give ordinary items and grant players permissions they have
+  themselves; only the administrator gives premium items (the teleporter, vehicles). `/spawn` makes
+  walkers, parked vehicles, trains on existing track, and parked aircraft (not flyable yet; no
+  jets). Moderators no longer build; developers no longer announce or use `/where`. Old single
+  grants of "tp" are dropped: tp is no longer a permission.
+- Six fixes from the Resonance port (unheard): tyres, their squeal and the rolling roar were 9 % sharp
+  on a 48 kHz device; the city bus's air compressor knocks at the back with its engine; trains read
+  from a model file keep their third axle; a machine built on another keeps everything its base had
+  (the side-pipe V8's pipe is on its right side); an air horn written as a model reaches buses and
+  trucks; a bell's blows render with their own headroom instead of being flattened.
 - Doors are heard again. Every door's sound was placed on the edge of its leaf, which overlaps the
   wall by 5 cm, so it was inside the brick and inside the leaf: a front door from 3 m away in plain
   view came through at -46 dB. Door sounds now come from the handle (7 cm in from the edge), 25 cm off
