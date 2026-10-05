@@ -14,11 +14,11 @@ Branch `doors-behaviour`, based on da47b2df. Do not merge to main or push.
 
 ## State
 - Door tests pass (DoorTypeTests, DoorSidesTests, DoorSoundPlacementTests, SteelDoorSoundTests).
-- BusStopTests.TheDoorBeeperSoundsOnlyAtTheStop hung > 5 min in one run: check whether it hangs on
-  da47b2df too before blaming door changes.
+- Coordinator: run ONLY targeted tests, never the full suite (it runs it on merged main).
+- A killed full run showed only EngineSynthTests real-time-budget failing, under load 60 (unrelated).
 
 ## Next
-- Full suite. Final report.
+- Done: targeted run 247/247 passed. Only the report is left.
 
 ## Test command
 DOTNET_CLI_USE_MSBUILD_SERVER=0 nice ~/.dotnet/dotnet test OpenFPS.Tests --artifacts-path ~/.cache/openfps-agent-doors -nodeReuse:false -p:UseSharedCompilation=false --filter "FullyQualifiedName~DoorSidesTests"
