@@ -27,6 +27,11 @@ Recent work, newest first. `git log` has the rest.
   fits into your hands, back and pockets; the rest stays in it. Pedestrians are replaced a minute
   later, out of sight. Bodies and bags nobody carries go after half an hour, at most 30 of each on a
   map. A driver shot beside their parked car no longer breaks the car: somebody comes back for it.
+- Other players' footsteps are heard. Each step was worked out from inside that player's own body,
+  which counted as a wall of whatever floor they stood on, so every step of every other player came
+  through about 8 dB down and muffled. People walking the city were not affected.
+- Somebody driving, or riding in, a car no longer makes footsteps along the road: a seated player was
+  given the car's speed, which read as running. Client and server must both be updated.
 - Vehicle beacons are heard. Every one sounded from inside its own car's floor, so it read as behind
   a wall and was never played. It now sounds from the side of the car facing you, and the car you sit
   in is not counted. Only parked, drivable cars have a beacon; moving traffic is placed by its engine.
