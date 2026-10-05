@@ -265,9 +265,9 @@ public static class PrefabValidator
         bool isDoor = t.IsDoor == true;
 
         if (!isDoor && (t.DoorKind != null || t.Slides.HasValue || t.Powered.HasValue || t.SensorMetres.HasValue
-                        || t.CloseAfterSeconds.HasValue || t.CloseSeconds.HasValue || t.KeyedSide.HasValue))
+                        || t.CloseAfterSeconds.HasValue || t.CloseSeconds.HasValue || t.KeyedSide.HasValue || t.PushSide.HasValue))
             r.Warnings.Add("Door behaviour (DoorKind, Slides, Powered, SensorMetres, CloseAfterSeconds, CloseSeconds, "
-                         + "KeyedSide) is set on something that is not a door (IsDoor); it is ignored.");
+                         + "KeyedSide, PushSide) is set on something that is not a door (IsDoor); it is ignored.");
 
         if (declaresPortal || t.ApertureSize.HasValue || isDoor)
         {

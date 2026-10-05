@@ -57,7 +57,7 @@ public sealed class DoorSystem
     /// <summary>What we last told the client about each door.</summary>
     private readonly Dictionary<int, float> _announced = new();
     private readonly List<Entity> _doors = new();
-    private readonly List<Vector3> _people = new();
+    private readonly List<(Entity Who, Vector3 At)> _people = new();
     private bool _peopleFound;
 
     /// <summary>
@@ -91,25 +91,39 @@ public sealed class DoorSystem
 
         if (!door.Captured) Capture(world, entity, ref door, parented);
 
+        // A key going into the lock and turning: the leaf does not move until it has.
+        bool held = door.KeySeconds > 0f && TurnTheKey(world, entity, ref door, dt, heard);
+
         // What it does by itself: only a door with a sensor, a closer or a motor, and only while it
         // could do something.
-        bool held = false;
-        if (door.SensorMetres > 0f
-            || ((door.CloseAfterSeconds > 0f || door.Powered) && (door.Target > 0f || door.Openness > 0f)))
+        if (!held && (door.SensorMetres > 0f
+            || ((door.CloseAfterSeconds > 0f || door.Powered) && (door.Target > 0f || door.Openness > 0f))))
             held = Behave(world, entity, ref door, dt);
 
         float before = door.Openness;
         int travel = door.Target > door.Openness ? 1 : door.Target < door.Openness ? -1 : 0;
+
+        // Nobody is swept aside, whatever is moving the leaf: it comes up against them and stops there,
+        // and a motor closing on them opens again. Asked of this tick's step, so the leaf goes as far as
+        // the person and no further.
+        if (!held && travel != 0 && FirstInTheWay(world, entity, door, NextOpenness(door, travel, dt), People(world)) != null)
+        {
+            if (door.Powered && travel < 0)
+            {
+                door.Target = 1f;
+                door.SelfClosing = false;
+                travel = 1;
+            }
+            else held = true;
+        }
+
         if (!held)
         {
             float seconds = 0f;
             if (travel != 0)
             {
                 seconds = TravelSeconds(door, travel);
-                float step = seconds > 0f ? dt / seconds : 1f;
-                door.Openness = travel > 0
-                    ? MathF.Min(door.Target, door.Openness + step)
-                    : MathF.Max(door.Target, door.Openness - step);
+                door.Openness = NextOpenness(door, travel, dt);
                 Place(world, entity, door, parented);
             }
             Events(world, entity, ref door, before, travel, seconds, heard);
@@ -142,7 +156,7 @@ public sealed class DoorSystem
         Doorway(world, entity, out var centre, out var rotation);
         float halfWidth = HalfWidth(world, entity, door);
         bool inDoorway = false, sensed = false;
-        foreach (var p in People(world))
+        foreach (var (_, p) in People(world))
         {
             inDoorway |= InDoorway(p, centre, rotation, halfWidth, door.Slides);
             if (door.SensorMetres > 0f) sensed |= InFront(p, centre, rotation, door.SensorMetres);
@@ -154,6 +168,8 @@ public sealed class DoorSystem
         {
             door.Target = 1f;
             door.SelfClosing = false;
+            door.HandId = 0;
+            door.OpenedFrom = 0;
         }
 
         // Closing on somebody. A motor reverses; a closer is held by the person in its way.
@@ -173,9 +189,19 @@ public sealed class DoorSystem
                 door.Target = 0f;
                 door.SelfClosing = true;
                 door.ClearSeconds = 0f;
+                door.HandId = 0;
             }
         }
         return false;
+    }
+
+    /// <summary>Where the leaf will be after this tick's step toward its target.</summary>
+    private static float NextOpenness(in DoorComponent door, int travel, float dt)
+    {
+        float seconds = TravelSeconds(door, travel);
+        float step = seconds > 0f ? dt / seconds : 1f;
+        return travel > 0 ? MathF.Min(door.Target, door.Openness + step)
+                          : MathF.Max(door.Target, door.Openness - step);
     }
 
     /// <summary>How long a whole travel takes at the speed it is going now, seconds.</summary>
@@ -205,7 +231,7 @@ public sealed class DoorSystem
         {
             if (before <= 0f) OpenStart(world, entity, ref door, kind, heard);
             else if (door.Powered) Emit(heard, entity, kind, DoorEvents.Reopen, none);
-            else Emit(heard, entity, kind, door.Slides ? DoorEvents.Rollers : DoorEvents.Swing, none);
+            else Emit(heard, entity, kind, door.Slides ? DoorEvents.Rollers : HandEvent(door), none);
         }
         else if (travel < 0 && door.Travel != -1)
         {
@@ -243,9 +269,19 @@ public sealed class DoorSystem
             }
             else if (door.Openness >= 1f && door.Slides)
                 Emit(heard, entity, kind, DoorEvents.Stop, none);
+            // Arrived: whoever moved it has let go.
+            door.HandId = 0;
         }
         door.Travel = now;
     }
+
+    /// <summary>A hand starting a hinged leaf moving open: "push" from its push side, "pull" from the
+    /// other, "swing" when nobody knows which (a hinged door opened by a sensor).</summary>
+    private static string HandEvent(in DoorComponent door)
+        => door.OpenedFrom > 0 ? DoorEvents.Push : door.OpenedFrom < 0 ? DoorEvents.Pull : DoorEvents.Swing;
+
+    /// <summary>Kinds with a push bar, which is on the push side only.</summary>
+    public static bool HasBar(DoorKind kind) => kind is DoorKind.PushBar or DoorKind.GlassPushBar;
 
     /// <summary>The events of a shut door starting to open, by what is on it.</summary>
     private static void OpenStart(World world, Entity entity, ref DoorComponent door, DoorKind kind,
@@ -259,39 +295,88 @@ public sealed class DoorSystem
             Emit(heard, entity, kind, DoorEvents.Rollers, none);
             return;
         }
-        // Each kind's first sound is its own mechanism letting go of the frame; until each has been
-        // synthesised from its recordings, all of them are the latch-and-leaf model every door had.
+        // Each kind's first sound is its own mechanism letting go of the frame, and which mechanism
+        // that is depends on the side: a push bar is only on the push side, and from the other side a
+        // pull handle's trim draws the same latch. Then the hand: "push" or "pull". From a keyed side
+        // the key has already drawn the latch (TurnTheKey), so only the hand follows, except on a knob
+        // door, whose knob is still turned after the key.
         if (heard != null)
         {
-            var opening = Opening(world, entity, door);
-            switch (kind)
+            bool pulled = door.OpenedFrom < 0;
+            string hand = HandEvent(door);
+            if (door.Slides)
             {
-                case DoorKind.PushBar:
-                    Emit(heard, entity, kind, DoorEvents.Bar, PushBarSound(world, entity, door, closing: false));
-                    break;
-                case DoorKind.GlassPushBar when door.KeyTurned:
-                    Emit(heard, entity, kind, DoorEvents.Key, none);
-                    Emit(heard, entity, kind, DoorEvents.LatchRetract, opening);
-                    break;
-                case DoorKind.GlassPushBar:
-                    Emit(heard, entity, kind, DoorEvents.Bar, opening);
-                    break;
-                case DoorKind.GlassPull:
-                    Emit(heard, entity, kind, DoorEvents.Pull, opening);
-                    break;
-                case DoorKind.Hinged:
-                    Emit(heard, entity, kind, DoorEvents.LatchRetract, KnobDoorSound(world, entity, door, closing: false));
-                    break;
-                case DoorKind.PatioSliding:
-                    Emit(heard, entity, kind, DoorEvents.LatchRetract, SlidingSound(world, entity, door, closing: false));
-                    break;
-                default:
-                    Emit(heard, entity, kind, DoorEvents.LatchRetract, opening);
-                    break;
+                Emit(heard, entity, kind, DoorEvents.LatchRetract,
+                     kind == DoorKind.PatioSliding ? SlidingSound(world, entity, door, closing: false) : Opening(world, entity, door));
+                Emit(heard, entity, kind, DoorEvents.Rollers, none);
             }
-            Emit(heard, entity, kind, door.Slides ? DoorEvents.Rollers : DoorEvents.Swing, none);
+            else if (door.KeyTurned && kind != DoorKind.Hinged)
+                Emit(heard, entity, kind, hand, none);
+            else
+            {
+                switch (kind)
+                {
+                    case DoorKind.Hinged:
+                        Emit(heard, entity, kind, DoorEvents.LatchRetract, KnobDoorSound(world, entity, door, closing: false, pulled));
+                        break;
+                    case DoorKind.PushBar:
+                        Emit(heard, entity, kind, pulled ? DoorEvents.LatchRetract : DoorEvents.Bar,
+                             PushBarSound(world, entity, door, closing: false, pulled));
+                        break;
+                    case DoorKind.GlassPushBar:
+                        Emit(heard, entity, kind, pulled ? DoorEvents.LatchRetract : DoorEvents.Bar, Opening(world, entity, door));
+                        break;
+                    case DoorKind.GlassPull:
+                        // No latch: a shop's door is held by its closer, and the hand is the first sound.
+                        Emit(heard, entity, kind, hand, Opening(world, entity, door));
+                        hand = "";
+                        break;
+                    default:
+                        Emit(heard, entity, kind, DoorEvents.LatchRetract, Opening(world, entity, door));
+                        break;
+                }
+                if (hand.Length > 0) Emit(heard, entity, kind, hand, none);
+            }
         }
         door.KeyTurned = false;
+    }
+
+    // ── The key ─────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>How long the key takes from going in to the leaf starting to move, seconds.</summary>
+    public const float KeySequenceSeconds = 1.0f;
+
+    /// <summary>When, after it goes in, the key turns, seconds.</summary>
+    public const float KeyTurnSeconds = 0.45f;
+
+    /// <summary>When, after it goes in, the turned key has drawn the latch back, seconds.</summary>
+    public const float UnlockSeconds = 0.7f;
+
+    /// <summary>
+    /// One tick of a key in a lock, from the keyed side of a shut door: in, turned, the latch drawn
+    /// back, each sent as its own event at its own moment. True while the key is still being worked,
+    /// so the leaf waits for it. The unlock carries what that kind's latch sounds like being drawn from
+    /// the pull side, so nothing goes quiet while the key's own sounds are being made.
+    /// </summary>
+    private static bool TurnTheKey(World world, Entity entity, ref DoorComponent door, float dt,
+                                   Action<int, string, IReadOnlyList<TransientSound>>? heard)
+    {
+        var kind = (DoorKind)door.Kind;
+        var none = Array.Empty<TransientSound>();
+        float was = KeySequenceSeconds - door.KeySeconds;
+        door.KeySeconds = MathF.Max(0f, door.KeySeconds - dt);
+        float now = KeySequenceSeconds - door.KeySeconds;
+        bool done = door.KeySeconds <= 0f;
+        bool At(float t) => was <= t && (t < now || done);
+
+        if (At(0f)) Emit(heard, entity, kind, DoorEvents.KeyInsert, none);
+        if (At(KeyTurnSeconds)) Emit(heard, entity, kind, DoorEvents.KeyTurn, none);
+        if (At(UnlockSeconds))
+            Emit(heard, entity, kind, DoorEvents.Unlock,
+                 heard == null || kind == DoorKind.Hinged || door.Slides ? none
+                 : kind == DoorKind.PushBar ? PushBarSound(world, entity, door, closing: false, pulled: true)
+                 : Opening(world, entity, door));
+        return !done;
     }
 
     private static void Emit(Action<int, string, IReadOnlyList<TransientSound>>? heard, Entity entity,
@@ -345,6 +430,7 @@ public sealed class DoorSystem
         if (door.SwingSeconds <= 0f) door.SwingSeconds = 0.9f;
         if (door.SwingRadians == 0f) door.SwingRadians = MathF.PI / 2f;
         if (door.HingeSide == 0f) door.HingeSide = 1f;
+        if (door.PushSide == 0f) door.PushSide = 1f;
         // An automatic leaf runs at its controller's speeds, so it moves as long as its sound says it does.
         if ((DoorKind)door.Kind == DoorKind.AutoSliding)
         {
@@ -380,7 +466,7 @@ public sealed class DoorSystem
         }
         else
         {
-            float swung = shut + door.Openness * door.SwingRadians * -door.HingeSide;
+            float swung = shut + door.Openness * door.SwingRadians * SwingSign(door);
 
             // Where the hinged edge is: half a leaf along the shut leaf's own width, on the hinge side.
             var alongShut = Vector3.Transform(new Vector3(halfWidth * door.HingeSide, 0f, 0f),
@@ -408,6 +494,14 @@ public sealed class DoorSystem
             t.IsDirty = true;
         }
     }
+
+    /// <summary>
+    /// Which way the leaf turns as it opens, as the sign of its yaw: hinged on the right (+1) and
+    /// pushed from its +Z face it turns clockwise seen from above, which sends it toward -Z; pushed
+    /// from the other face, the other way, toward +Z.
+    /// </summary>
+    private static float SwingSign(in DoorComponent door)
+        => -door.HingeSide * (door.PushSide < 0f ? -1f : 1f);
 
     private static float HalfWidth(World world, Entity entity, in DoorComponent door)
         => world.Has<ColliderComponent>(entity)
@@ -464,14 +558,120 @@ public sealed class DoorSystem
     }
 
     /// <summary>Everybody on foot: players not sitting in anything, and the people in the street.</summary>
-    private List<Vector3> People(World world)
+    private List<(Entity Who, Vector3 At)> People(World world)
     {
         if (_peopleFound) return _people;
-        _people.Clear();
-        world.Query(new QueryDescription().WithAll<Transform>().WithAny<PlayerComponent, Pedestrian>().WithNone<OccupantComponent, DeadComponent>(),
-                    (ref Transform t) => _people.Add(t.Position));
+        PeopleInto(world, _people);
         _peopleFound = true;
         return _people;
+    }
+
+    private static readonly QueryDescription OnFoot =
+        new QueryDescription().WithAll<Transform>().WithAny<PlayerComponent, Pedestrian>().WithNone<OccupantComponent, DeadComponent>();
+
+    private static void PeopleInto(World world, List<(Entity Who, Vector3 At)> people)
+    {
+        people.Clear();
+        world.Query(OnFoot, (Entity e, ref Transform t) => people.Add((e, t.Position)));
+    }
+
+    // ── Nobody is swept aside ───────────────────────────────────────────────────────────────────
+
+    /// <summary>How much room a person takes up round where they stand, metres: a player's own radius.</summary>
+    public const float BodyRadiusMetres = PhysicsConstants.PlayerRadius;
+
+    /// <summary>
+    /// The first person in the way of the leaf going from where it is now to <paramref name="to"/>
+    /// (0 shut, 1 open), or null. <paramref name="hand"/> is whoever is moving it by hand, who walks
+    /// with it: never in the way of a leaf they are opening (a pulled leaf comes toward the hand, and
+    /// the hand steps back with it), and in the way of one they are shutting only when they stand in
+    /// the doorway it shuts into.
+    /// </summary>
+    public static Entity? InTheWay(World world, Entity entity, float to, Entity? hand = null)
+    {
+        if (!world.IsAlive(entity) || !world.Has<DoorComponent>(entity)) return null;
+        var door = world.Get<DoorComponent>(entity);
+        if (hand is { } h && h != Entity.Null) door.HandId = h.Id + 1;
+        else door.HandId = 0;
+        var people = new List<(Entity, Vector3)>();
+        PeopleInto(world, people);
+        return FirstInTheWay(world, entity, door, to, people);
+    }
+
+    private static Entity? FirstInTheWay(World world, Entity entity, in DoorComponent door, float to,
+                                         List<(Entity Who, Vector3 At)> people)
+    {
+        float from = door.Openness;
+        if (to == from || people.Count == 0) return null;
+        foreach (var (who, at) in people)
+        {
+            bool theHand = door.HandId != 0 && who.Id == door.HandId - 1;
+            if (theHand)
+            {
+                // Walking it shut, they are only in the way standing where it shuts.
+                if (to < from && Sweeps(world, entity, door, from, MathF.Min(to, door.Target), at, onlyTheDoorway: true)) return who;
+                continue;
+            }
+            if (Sweeps(world, entity, door, from, to, at)) return who;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Whether somebody standing at <paramref name="p"/> is in the way of the leaf moving from
+    /// <paramref name="from"/> to <paramref name="to"/>: within a body's radius of the ground it is
+    /// about to sweep, on its own floor.
+    ///
+    /// A hinged leaf sweeps a slice of a disc about its hinge, as wide as the leaf, between the angle it
+    /// is at and the angle it is going to. Only what is AHEAD of it counts: somebody behind an open leaf,
+    /// between it and the wall, is not in the way of it shutting, though somebody in front of it is, and
+    /// so is anybody within a body's radius of where it ends up (the doorway, shutting; the wall,
+    /// opening). A sliding leaf sweeps the strip its leading edge runs along, as thick as the leaf and a
+    /// body either side. <paramref name="onlyTheDoorway"/> asks only about where the leaf ends up.
+    /// </summary>
+    internal static bool Sweeps(World world, Entity entity, in DoorComponent door, float from, float to, Vector3 p,
+                                bool onlyTheDoorway = false)
+    {
+        Doorway(world, entity, out var centre, out var rotation);
+        var d = p - centre;
+        if (MathF.Abs(d.Y) > SameFloorMetres) return false;
+        var local = Vector3.Transform(d, Quaternion.Inverse(rotation));
+        float halfWidth = HalfWidth(world, entity, door);
+        float halfThick = world.Has<ColliderComponent>(entity) ? world.Get<ColliderComponent>(entity).Size.Z * 0.5f : 0.03f;
+        float reach = BodyRadiusMetres + halfThick;
+
+        if (door.Slides)
+        {
+            if (MathF.Abs(local.Z) > reach) return false;
+            float c0 = from * 2f * halfWidth * door.HingeSide, c1 = to * 2f * halfWidth * door.HingeSide;
+            float lead = MathF.Sign(c1 - c0);
+            if (lead == 0f) return false;
+            float e0 = c0 + lead * halfWidth, e1 = c1 + lead * halfWidth;
+            float lo = MathF.Min(e0, e1) - BodyRadiusMetres, hi = MathF.Max(e0, e1) + BodyRadiusMetres;
+            if (onlyTheDoorway) { lo = MathF.Max(lo, -halfWidth); hi = MathF.Min(hi, halfWidth); }
+            return local.X >= lo && local.X <= hi;
+        }
+
+        // Across the shut leaf from its hinge (u), and out on the side it swings toward (v).
+        float width = 2f * halfWidth;
+        float u = (local.X - halfWidth * door.HingeSide) * -door.HingeSide;
+        float v = local.Z * (door.PushSide < 0f ? 1f : -1f);
+        float a0 = from * door.SwingRadians, a1 = to * door.SwingRadians;
+        if (SegmentDistance(u, v, a1, width) <= reach) return true;
+        if (onlyTheDoorway) return false;
+        float r = MathF.Sqrt(u * u + v * v);
+        if (r > width + BodyRadiusMetres) return false;
+        float phi = MathF.Atan2(v, u);
+        return phi >= MathF.Min(a0, a1) && phi <= MathF.Max(a0, a1);
+    }
+
+    /// <summary>How far (u, v) is from the leaf lying at <paramref name="angle"/> from its hinge.</summary>
+    private static float SegmentDistance(float u, float v, float angle, float length)
+    {
+        float cx = MathF.Cos(angle), cy = MathF.Sin(angle);
+        float along = Math.Clamp(u * cx + v * cy, 0f, length);
+        float dx = u - along * cx, dy = v - along * cy;
+        return MathF.Sqrt(dx * dx + dy * dy);
     }
 
     // ── Where a door's sound comes from ─────────────────────────────────────────────────────────
@@ -500,7 +700,7 @@ public sealed class DoorSystem
         if (door.Slides)
             return (shutCentre + Vector3.Transform(new Vector3(openness * 2f * halfWidth * door.HingeSide, 0f, 0f), shutRotation),
                     shutRotation);
-        var turn = Quaternion.CreateFromYawPitchRoll(openness * door.SwingRadians * -door.HingeSide, 0f, 0f);
+        var turn = Quaternion.CreateFromYawPitchRoll(openness * door.SwingRadians * SwingSign(door), 0f, 0f);
         var hinge = shutCentre + Vector3.Transform(new Vector3(halfWidth * door.HingeSide, 0f, 0f), shutRotation);
         var rotation = Quaternion.Normalize(turn * shutRotation);
         return (hinge - Vector3.Transform(new Vector3(halfWidth * door.HingeSide, 0f, 0f), rotation), rotation);
@@ -639,8 +839,11 @@ public sealed class DoorSystem
     private static readonly Random _shutDice = new();
 
     /// <summary>The push-bar door as a physical model (<see cref="PushBarDoor"/>); its id picks its
-    /// character (silencers, bar stops, how its closer is set).</summary>
-    private static IReadOnlyList<TransientSound> PushBarSound(World world, Entity entity, in DoorComponent door, bool closing)
+    /// character (silencers, bar stops, how its closer is set). <paramref name="pulled"/> is an opening
+    /// from the side without the bar: the pull handle's trim drawing the latch, or the key's cam. The
+    /// model renders the bar either way until it takes the side.</summary>
+    private static IReadOnlyList<TransientSound> PushBarSound(World world, Entity entity, in DoorComponent door, bool closing,
+                                                              bool pulled = false)
     {
         var size = world.Has<ColliderComponent>(entity)
             ? world.Get<ColliderComponent>(entity).Size
@@ -685,7 +888,10 @@ public sealed class DoorSystem
         });
     }
 
-    private static IReadOnlyList<TransientSound> KnobDoorSound(World world, Entity entity, in DoorComponent door, bool closing)
+    /// <summary><paramref name="pulled"/>: opened from its pull side, the leaf drawn toward the hand
+    /// rather than pushed away from it. The model renders "grip, turn, pull" either way until it takes the side.</summary>
+    private static IReadOnlyList<TransientSound> KnobDoorSound(World world, Entity entity, in DoorComponent door, bool closing,
+                                                               bool pulled = false)
     {
         var size = world.Has<ColliderComponent>(entity)
             ? world.Get<ColliderComponent>(entity).Size
@@ -718,32 +924,78 @@ public sealed class DoorSystem
     // ── Asking a door to move ───────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Asks a door to open or shut. Returns false if it is already going that way.
+    /// Asks a door to open or shut. Returns false if it is already going that way, or if it is being
+    /// shut and somebody other than <paramref name="who"/> is in the way of the leaf (or
+    /// <paramref name="who"/> is standing in the doorway itself): a hand never sweeps a leaf through
+    /// anybody. <see cref="InTheWay"/> says who.
     ///
-    /// <paramref name="by"/> is where whoever is opening it is standing, when there is somebody: from
-    /// a door's keyed side, opening it means turning a key, which is a sound of its own. Every player
+    /// <paramref name="by"/> is where whoever is moving it is standing, when there is somebody, and
+    /// <paramref name="who"/> is that somebody (their position, if <paramref name="by"/> is not given).
+    /// The side they stand on decides how a hinged door opens: pushed from its push side
+    /// (<see cref="DoorComponent.PushSide"/>), and by its bar if it has one; pulled from the other. Not
+    /// knowing the side is the push side. From a keyed side (<see cref="DoorComponent.KeyedSide"/>) a
+    /// shut door is locked, and opening it is the key going in and turning before the hand: every player
     /// and every resident has the key; a lock that keeps somebody out needs a key to be an item, which
-    /// does not exist yet (docs/DOOR_TYPES_EVENTS.md).
+    /// does not exist yet (docs/DOOR_TYPES_EVENTS.md). Shut again, it is locked again.
     /// </summary>
-    public static bool Set(World world, Entity entity, bool open, Vector3? by = null)
+    public static bool Set(World world, Entity entity, bool open, Vector3? by = null, Entity? who = null)
     {
         if (!world.Has<DoorComponent>(entity)) return false;
+        if (who is { } w && (w == Entity.Null || !world.IsAlive(w))) who = null;
+        if (!by.HasValue && who is { } w2 && world.Has<Transform>(w2)) by = world.Get<Transform>(w2).Position;
+
+        var state = world.Get<DoorComponent>(entity);
+        float target = open ? 1f : 0f;
+        if (state.Target == target) return false;
+        if (!open && state.Openness > 0f && InTheWay(world, entity, 0f, who) != null) return false;
+
+        int side = 1;
         bool keyed = false;
-        if (open && by.HasValue && world.Get<DoorComponent>(entity).KeyedSide != 0f)
+        if (by.HasValue)
         {
             Doorway(world, entity, out var centre, out var rotation);
-            float side = Vector3.Dot(by.Value - centre, Vector3.Transform(Vector3.UnitZ, rotation));
-            keyed = side * world.Get<DoorComponent>(entity).KeyedSide > 0f;
+            float through = Vector3.Dot(by.Value - centre, Vector3.Transform(Vector3.UnitZ, rotation));
+            side = through * (state.PushSide < 0f ? -1f : 1f) < 0f ? -1 : 1;
+            keyed = state.KeyedSide != 0f && through * state.KeyedSide > 0f;
         }
+
         ref var door = ref world.Get<DoorComponent>(entity);
-        float target = open ? 1f : 0f;
-        if (door.Target == target) return false;
         door.Target = target;
         door.SelfClosing = false;
         door.ClearSeconds = 0f;
-        if (open && door.Openness <= 0f) door.KeyTurned = keyed;
+        door.HandId = who is { } hand && OpensByHand(door) ? hand.Id + 1 : 0;
+        door.KeySeconds = 0f;
+        if (open)
+        {
+            door.OpenedFrom = door.Slides || door.Powered ? 0 : side;
+            if (door.Openness <= 0f)
+            {
+                door.KeyTurned = keyed;
+                if (keyed) door.KeySeconds = KeySequenceSeconds;
+            }
+        }
+        else door.KeyTurned = false;
         return true;
     }
+
+    /// <summary>
+    /// What a person opening a door hears said, from how it was opened (after <see cref="Set"/>), with
+    /// no full stop: "You unlock the front entrance with your key and pull it open", "You push the bar
+    /// and the stair door swings open", "You pull the flat 2A door open", "The patio door slides open".
+    /// </summary>
+    public static string OpenedPhrase(in DoorComponent door, string name)
+    {
+        if (door.Slides || door.OpenedFrom == 0) return $"The {name} {Verb(door)} open";
+        string hand = door.OpenedFrom < 0 ? "pull" : "push";
+        if (door.KeyTurned) return $"You unlock the {name} with your key and {hand} it open";
+        if (door.OpenedFrom > 0 && HasBar((DoorKind)door.Kind)) return $"You push the bar and the {name} swings open";
+        return $"You {hand} the {name} open";
+    }
+
+    /// <summary>What a person trying to shut a door is told when somebody is in the way of it.</summary>
+    public static string InTheWayLine(Entity blocker, Entity? who, string name)
+        => who is { } w && blocker == w ? $"You are in the way of the {name}. Step out of the doorway first."
+                                        : $"Someone is in the way of the {name}.";
 
     /// <summary>Whether a person opens and shuts it with their hand. A motor's doors open for you or
     /// for the lift, never by hand.</summary>

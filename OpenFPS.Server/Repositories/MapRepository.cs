@@ -26,6 +26,13 @@ public class EntityData
     public string? Name { get; set; }
     public float? ApertureSize { get; set; }
 
+    /// <summary>On a door, over its prefab: which side is locked, +1 the leaf's own +Z face, -1 the
+    /// other, 0 neither. A fire exit may be keyed outside on one map and not on another.</summary>
+    public float? KeyedSide { get; set; }
+
+    /// <summary>On a door, over its prefab: which face it is pushed open from, +1 or -1 (DoorComponent.PushSide).</summary>
+    public float? PushSide { get; set; }
+
     /// <summary>Per-face materials for an acoustic REGION entity, by MATERIAL NAME, in the order
     /// Floor, Ceiling, North, South, East, West. Exactly six entries. Overrides whatever the prefab set.</summary>
     public string[]? RoomMaterials { get; set; }

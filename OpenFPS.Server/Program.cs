@@ -1584,7 +1584,7 @@ public class GameServer
             // door opens, press it again and you are in; sitting in one, press it once and your door
             // opens, again and you are out. Climbing in through a shut door would be the alternative,
             // and it is not one.
-            if (OpenDoorInReach(world, position, Say)) return;
+            if (OpenDoorInReach(world, position, session.Entity, Say)) return;
 
             if (world.Has<OccupantComponent>(session.Entity))
             {
@@ -1613,7 +1613,7 @@ public class GameServer
             // Nothing to get into, and an open door within reach: shut it. So beside a house, E opens
             // the door and E again shuts it, the way a handle does; beside a car the sequence is still
             // door, then in. Shutting is the loud half of a door, and it was only reachable by typing.
-            if (CloseDoorInReach(world, position, Say)) return;
+            if (CloseDoorInReach(world, position, session.Entity, Say)) return;
 
             if (interact.TargetEntityId.HasValue
                 && _maps.TryGetMap(session.CurrentMapId, out var w, out _, out _, out var lookup)
@@ -1635,7 +1635,7 @@ public class GameServer
     /// toggle that fights you: once the door is open, the key moves on to meaning "get in" or "get
     /// out". Somebody who wants it shut again says so.
     /// </summary>
-    private static bool OpenDoorInReach(World world, Vector3 position, Action<string> say)
+    private static bool OpenDoorInReach(World world, Vector3 position, Entity who, Action<string> say)
     {
         Entity? nearest = null;
         float best = PhysicsConstants.InteractionRange;
@@ -1652,15 +1652,16 @@ public class GameServer
         });
 
         if (nearest == null) return false;
-        if (!DoorSystem.Set(world, nearest.Value, open: true, by: position)) return false;
+        if (!DoorSystem.Set(world, nearest.Value, open: true, by: position, who: who)) return false;
         var opened = world.Get<DoorComponent>(nearest.Value);
-        say(opened.KeyTurned ? $"You unlock the {name} and it {DoorSystem.Verb(opened)} open."
-                             : $"The {name} {DoorSystem.Verb(opened)} open.");
+        say(DoorSystem.OpenedPhrase(opened, name) + "."
+            + (DoorSystem.InTheWay(world, nearest.Value, 1f, who) != null ? " Someone is in the way of it." : ""));
         return true;
     }
 
-    /// <summary>Shuts the nearest open door within arm's length, if there is one.</summary>
-    private static bool CloseDoorInReach(World world, Vector3 position, Action<string> say)
+    /// <summary>Shuts the nearest open door within arm's length, if there is one, unless somebody is in
+    /// the way of the leaf: then says so, and leaves it open.</summary>
+    private static bool CloseDoorInReach(World world, Vector3 position, Entity who, Action<string> say)
     {
         Entity? nearest = null;
         float best = PhysicsConstants.InteractionRange;
@@ -1680,7 +1681,12 @@ public class GameServer
                  ? world.Get<IdentityComponent>(e).Name : "door";
         });
         if (nearest == null) return false;
-        if (!DoorSystem.Set(world, nearest.Value, open: false)) return false;
+        if (DoorSystem.InTheWay(world, nearest.Value, 0f, who) is { } blocker)
+        {
+            say(DoorSystem.InTheWayLine(blocker, who, name));
+            return true;
+        }
+        if (!DoorSystem.Set(world, nearest.Value, open: false, who: who)) return false;
         say($"You {(world.Get<DoorComponent>(nearest.Value).Slides ? "slide" : "shut")} the {name}{(world.Get<DoorComponent>(nearest.Value).Slides ? " shut" : "")}.");
         return true;
     }

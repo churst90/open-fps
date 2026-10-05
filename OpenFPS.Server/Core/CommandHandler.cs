@@ -1376,7 +1376,12 @@ public class CommandHandler
                                                : $"The {name} is moved by its motor, not by hand.");
             return;
         }
-        if (!DoorSystem.Set(world, door.Value, open, by: from))
+        if (!open && DoorSystem.InTheWay(world, door.Value, 0f, session.Entity) is { } blocker)
+        {
+            Say(reply, DoorSystem.InTheWayLine(blocker, session.Entity, name));
+            return;
+        }
+        if (!DoorSystem.Set(world, door.Value, open, by: from, who: session.Entity))
         {
             Say(reply, state.Openness >= 1f ? $"The {name} is already open."
                      : state.Openness <= 0f ? $"The {name} is already shut."
@@ -1384,7 +1389,10 @@ public class CommandHandler
             return;
         }
         var moved = world.Get<DoorComponent>(door.Value);
-        Say(reply, $"{(moved.KeyTurned && open ? "You unlock it. " : "")}The {name} {DoorSystem.Verb(moved)} {(open ? "open" : "shut")}, {distance:F1} metres away.");
+        Say(reply, open
+            ? $"{DoorSystem.OpenedPhrase(moved, name)}, {distance:F1} metres away."
+              + (DoorSystem.InTheWay(world, door.Value, 1f, session.Entity) != null ? " Someone is in the way of it." : "")
+            : $"The {name} {DoorSystem.Verb(moved)} shut, {distance:F1} metres away.");
     }
 
     /// <summary>
