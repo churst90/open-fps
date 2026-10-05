@@ -56,7 +56,7 @@ public static class Bodies
     /// 23's "Reference Man", 70 kg). Nobody in the game has a weight of their own yet; when somebody
     /// does, theirs is used instead.
     /// </summary>
-    public const float MassKg = 70f;
+    public const float MassKg = PhysicsConstants.PersonMassKg;
 
     /// <summary>A body nobody is carrying is taken away after this long, seconds: half an hour.
     /// Long enough to go and come back for it, and short enough that a street does not fill up.</summary>
@@ -117,7 +117,7 @@ public static class Bodies
             new Transform { Position = where, Rotation = rotation, IsDirty = true },
             new NameComponent { Name = name },
             new IdentityComponent { Name = name, Description = "dead", Announce = true, BeaconCategory = Beacons.Item },
-            new MaterialComponent { Material = "Skin" },
+            new MaterialComponent { Material = PhysicsConstants.PersonMaterial },
             // Both arms: a person is carried over the shoulder, never in one hand.
             new ItemComponent { MassKg = MassKg, Hands = 2, WeaponId = "" },
             corpse));

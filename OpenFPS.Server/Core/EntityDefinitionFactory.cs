@@ -45,6 +45,10 @@ public static class EntityDefinitionFactory
         {
             var player = world.Get<PlayerComponent>(e);
             def.Identity.BeaconCategory = OpenFPS.Common.Beacons.Player;
+            // And called by their name, in the definition only, for the same reason: walking into
+            // somebody said "something" (Cody, 2026-10-05), because a player's definition carried no
+            // name at all, and the sight line and a scope had nothing to say either.
+            if (string.IsNullOrWhiteSpace(def.Identity.Name)) def.Identity.Name = player.Username ?? "";
             def.Team = player.Team ?? "";
             // Dead, a player is not a player beacon: their body lies there as an item, which is what
             // there is to find. The definition goes out again when they die and when they get up.

@@ -168,7 +168,10 @@ public sealed class WallBumps
         else { width = size.X; height = size.Z; thickness = size.Y; }
 
         float density = props.DensityKgM3 > 0f ? props.DensityKgM3 : 500f;
-        float massKg = Math.Clamp(size.X * size.Y * size.Z * density, 1f, 1e6f);
+        // A person is not their collision box full of flesh (680 kg): they weigh what a person weighs.
+        float massKg = Sightline.IsPerson(struck)
+            ? PhysicsConstants.PersonMassKg
+            : Math.Clamp(size.X * size.Y * size.Z * density, 1f, 1e6f);
         float closing = (running ? RunningPace : WalkingPace) * Math.Clamp(c.Intent, 0f, 1f);
         closing = MathF.Max(closing, ImpactAcoustics.MinimumSpeed + 0.05f);
 

@@ -146,7 +146,7 @@ public static class WalkSpike
                 if (!cc.IsSolid) continue;
                 string mat = world.Has<MaterialComponent>(e) ? world.Get<MaterialComponent>(e).Material : "Generic";
                 colliders.Add(new SharedMovementEngine.Collider
-                { Position = ct.Position, Size = cc.Size, Rotation = ct.Rotation, Material = mat });
+                { Position = ct.Position, Size = cc.Size, Rotation = SharedMovementEngine.StandingRotation(cc.Shape, ct.Rotation), Material = mat });
             }
 
             var ctx = new SharedMovementEngine.MovementContext

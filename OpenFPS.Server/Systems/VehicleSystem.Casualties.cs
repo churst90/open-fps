@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
+using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using Serilog;
@@ -108,6 +109,7 @@ public sealed partial class VehicleSystem
             new Transform { Position = start, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
             new Velocity { Linear = Vector3.Zero },
             r.Collider, r.Name, r.Identity, r.Person,
+            new MaterialComponent { Material = PhysicsConstants.PersonMaterial },
             new HealthComponent { Current = 100, Max = 100 }));
         if (e == Entity.Null) return Entity.Null;
         v.Entity = e;

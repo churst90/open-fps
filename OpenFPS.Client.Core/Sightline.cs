@@ -88,11 +88,17 @@ public static class Sightline
         string name = e.Definition.Identity.Name;
         if (e.Definition.Type == EntityType.NPC && !string.IsNullOrWhiteSpace(name)) return KindOf(e);
         if (!string.IsNullOrWhiteSpace(name)) return name.Trim();
+        // A person nobody has named is somebody, not "something" or what they are made of.
+        if (IsPerson(e)) return "someone";
         string material = e.Definition.Material.Material;
         if (!string.IsNullOrEmpty(material) && material is not ("Generic" or "None"))
             return $"something {material.ToLowerInvariant()}";
         return "something";
     }
+
+    /// <summary>A player, or a person in the street: somebody, not something (<see cref="ScopeView.Classify"/>).</summary>
+    public static bool IsPerson(in EntitySnapshot e)
+        => e.Definition.Type == EntityType.Player || ScopeView.Classify(e) == SightKind.Person;
 
     /// <summary>
     /// What a moving thing is, for saying it passed: a player by their name; anything else by its name

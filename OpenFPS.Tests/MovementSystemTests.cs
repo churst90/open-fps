@@ -242,13 +242,21 @@ public class MovementSystemTests : IDisposable
         Assert.InRange(sprint / walk, SprintMultiplier * 0.95f, SprintMultiplier * 1.05f);
     }
 
+    /// <summary>
+    /// The floor's material stays the floor's. Movement used to write it into the player's own, so a
+    /// person standing on concrete WAS concrete to anything that met them: a body bumping into them,
+    /// a car hitting them (Cody, 2026-10-05: "am I made of concrete too?").
+    /// </summary>
     [Fact]
-    public void TheFloorsMaterialIsWhatYouAreStandingOn()
+    public void StandingOnConcreteLeavesYouABody()
     {
         var rig = Build(new Vector3(0, 0.05f, 0));
+        rig.World.Get<MaterialComponent>(rig.Player).Material = PersonMaterial;
         rig.Queue(Vector3.Zero);
         rig.Tick();
-        Assert.Equal("Concrete", rig.World.Get<MaterialComponent>(rig.Player).Material);
+        rig.Queue(Forward, count: 10);
+        rig.Tick(10);
+        Assert.Equal(PersonMaterial, rig.World.Get<MaterialComponent>(rig.Player).Material);
     }
 
     // ── Out of the world ──────────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using OpenFPS.Common.Components;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Common;
@@ -159,6 +160,7 @@ public static class SharedMovementEngine
         // into one shoved them BACKWARDS by most of a step every tick and the next tick walked them back
         // in: no net movement, 4.5 m/s of path length, footsteps that never stopped, and an acoustic
         // region that flipped back and forth at half the tick rate wherever that straddled a doorway.
+        bool pushed = false;
         for (int i = 0; i < 3; i++)
         {
             Vector3 nextPos = pos + remainingMove;
@@ -228,6 +230,7 @@ public static class SharedMovementEngine
                 }
             }
 
+            if (!stepped) pushed = true;
             if (!stepped && bestHit.Normal.Y > 0.5f)
             {
                 // A FLOOR the body came down into (see GetCylinderAABBOverlap): out the top, onto it.
@@ -261,6 +264,28 @@ public static class SharedMovementEngine
             }
         }
 
+        // ── A push never ends inside something else ─────────────────────────────────────────────
+        //
+        // The passes above each lift the body out of the DEEPEST thing it is in, and three of them are
+        // not always enough when two things disagree: one pushes the body into the other, the other
+        // pushes it back, and an odd number of passes ends the step inside the second. Sean, standing
+        // still against Kestrel House's north parapet (2026-10-05), was pushed half a metre into it by
+        // the player beside him every other tick and out again on the ticks between, for minutes; and
+        // a push that carries the centre past the middle of a 35 cm wall comes out of its FAR side —
+        // off the roof, eighteen metres onto the dirt.
+        //
+        // So a step whose pushing leaves the body deeper in anything than it began this step is not
+        // taken across the ground: it stays where it stood. Something already inside a wall at the
+        // start (spawned there, or a leaf swung into it) is still let out the way the passes say.
+        if (pushed && (pos.X != ctx.Position.X || pos.Z != ctx.Position.Z)
+            && PushedDeeperIntoAnything(ctx, nearbyColliders, pos, cylinderCenterOffset, collisionHeight))
+        {
+            pos.X = ctx.Position.X;
+            pos.Z = ctx.Position.Z;
+            vel.X = 0f;
+            vel.Z = 0f;
+        }
+
         // --- 4. MAP BOUNDARY CLAMPING ---
         // Treat map edges as solid planes. 
         // We use PlayerRadius to ensure the character's volume doesn't clip out.
@@ -284,4 +309,44 @@ public static class SharedMovementEngine
 
         return (pos, vel, isGrounded);
     }
+
+    /// <summary>How much deeper than it began a step may leave the body in anything, metres: float
+    /// noise and the skin, not a push.</summary>
+    public const float DeeperTolerance = 0.01f;
+
+    /// <summary>
+    /// Whether the body at <paramref name="end"/> is further into any collider than it was where the
+    /// step began (<see cref="MovementContext.Position"/>), by more than <see cref="DeeperTolerance"/>.
+    /// </summary>
+    private static bool PushedDeeperIntoAnything(in MovementContext ctx, ReadOnlySpan<Collider> colliders, Vector3 end,
+                                                 Vector3 cylinderCenterOffset, float collisionHeight)
+    {
+        for (int j = 0; j < colliders.Length; j++)
+        {
+            float there = Depth(colliders[j], end + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight);
+            if (there <= DeeperTolerance) continue;
+            float before = Depth(colliders[j], ctx.Position + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight);
+            if (there > before + DeeperTolerance) return true;
+        }
+        return false;
+    }
+
+    private static float Depth(in Collider col, Vector3 centre, float radius, float height)
+    {
+        var local = Vector3.Transform(centre - col.Position, Quaternion.Inverse(col.Rotation));
+        var hit = GeometryUtils.GetCylinderAABBOverlap(-col.Size / 2f, col.Size / 2f, local, radius, height);
+        return hit.IsColliding ? hit.Penetration : 0f;
+    }
+
+    /// <summary>
+    /// How a collider stands for a walking body to meet. A cylinder — a person — stands upright
+    /// whatever way its owner faces: everything else in the game (rays, bullets, sight) already
+    /// treats it so. Movement used to take a player's whole orientation for their box, LOOK PITCH
+    /// included, so somebody looking down at forty-five degrees tipped a 1.8 m box over sideways and
+    /// swept it through whoever stood beside them, and turning on the spot swung its corners round.
+    /// The one standing still was shoved half a metre a tick with no input of their own (Kestrel
+    /// House roof, 2026-10-05).
+    /// </summary>
+    public static Quaternion StandingRotation(ColliderShape shape, Quaternion rotation)
+        => shape is ColliderShape.Cylinder or ColliderShape.Cone ? Quaternion.Identity : rotation;
 }

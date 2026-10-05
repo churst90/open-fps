@@ -162,8 +162,10 @@ public static class MovementSystem
                     transform.IsDirty = true;
                 }
 
-                float groundY = PhysicsUtils.GetGroundHeight(world, grid, transform.Position, ref session.GroundProbe, out string floorMat);
-                if (floorMat != null) material.Material = floorMat;
+                // The floor's material is the floor's: it used to be written into the player's own
+                // MaterialComponent, so a person on a concrete roof WAS concrete to anything that met
+                // them. Nothing read it as the floor; footsteps probe the ground themselves.
+                float groundY = PhysicsUtils.GetGroundHeight(world, grid, transform.Position, ref session.GroundProbe, out _);
 
                 Vector3 inputDir = Vector3.Zero;
                 if (input.MoveDirection != Vector3.Zero)
@@ -194,7 +196,7 @@ public static class MovementSystem
                         colliderArray[colliderCount++] = new SharedMovementEngine.Collider {
                             Position = t.Position,
                             Size = c.Size,
-                            Rotation = t.Rotation,
+                            Rotation = SharedMovementEngine.StandingRotation(c.Shape, t.Rotation),
                             Material = world.Has<MaterialComponent>(obstacle) ? world.Get<MaterialComponent>(obstacle).Material : "Generic"
                         };
                     }
@@ -255,7 +257,7 @@ public static class MovementSystem
             ref var c = ref world.Get<ColliderComponent>(e);
             if (!c.IsSolid) continue;
 
-            Matrix4x4 worldToLocal = Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(t.Rotation));
+            Matrix4x4 worldToLocal = Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(SharedMovementEngine.StandingRotation(c.Shape, t.Rotation)));
             Vector3 localPos = Vector3.Transform(checkCylCenter - t.Position, worldToLocal);
             
             if (GeometryUtils.AABBIntersectsCylinder(-c.Size/2f, c.Size/2f, localPos, radius, checkHeight))
