@@ -34,6 +34,52 @@ public sealed class Timbre
     /// worth caching, and it carries no cache.</summary>
     public bool Live { get; }
 
+    /// <summary>
+    /// For a recording or a rendered buffer: where the sound sits under its buffer's full scale, dBFS,
+    /// as a gated RMS (the mean square of its 125 ms blocks within 20 dB of the loudest: the sound while
+    /// it sounds, its pauses and its silent tail left out). A world sound declares its level as its
+    /// buffer's full scale at a metre (Speech.LevelDb), so its real level is the declared level plus
+    /// this. NaN for a live voice, whose declared level is its RMS level and which plays it
+    /// <see cref="Loudness.PhysicalRmsDbfs"/> under full scale.
+    /// </summary>
+    public float GatedRmsDbfs { get; private init; } = float.NaN;
+
+    /// <summary>This shape, for a buffer whose gated RMS is <paramref name="gatedRmsDbfs"/>.</summary>
+    public Timbre WithGatedRms(float gatedRmsDbfs) => new(_shape, Name, Live) { GatedRmsDbfs = gatedRmsDbfs };
+
+    /// <summary>How far the real level is over the declared one, dB: the gated RMS for a buffer, 0 for a
+    /// live voice (its declared level is its RMS).</summary>
+    public float RealOffsetDb => float.IsFinite(GatedRmsDbfs) ? GatedRmsDbfs : 0f;
+
+    /// <summary>Where the voice's RMS sits under its digital full scale when played at unit gain, dB.</summary>
+    public float DigitalRmsDb => float.IsFinite(GatedRmsDbfs) ? GatedRmsDbfs : Loudness.PhysicalRmsDbfs;
+
+    /// <summary>
+    /// The gated RMS of a buffer, dBFS: the mean square of its 125 ms blocks within 20 dB of its loudest
+    /// block. NaN for silence.
+    /// </summary>
+    public static float GatedRms(ReadOnlySpan<float> pcm, int sampleRate)
+    {
+        int block = Math.Max(1, sampleRate / 8);
+        int n = pcm.Length / block + (pcm.Length % block > block / 4 ? 1 : 0);
+        if (n == 0) n = 1;
+        Span<double> ms = n <= 4096 ? stackalloc double[n] : new double[n];
+        double loudest = 0;
+        for (int b = 0; b < n; b++)
+        {
+            int from = b * block, to = Math.Min(pcm.Length, from + block);
+            double s = 0;
+            for (int i = from; i < to; i++) s += (double)pcm[i] * pcm[i];
+            ms[b] = to > from ? s / (to - from) : 0;
+            loudest = Math.Max(loudest, ms[b]);
+        }
+        if (!(loudest > 0)) return float.NaN;
+        double gate = loudest * 0.01, sum = 0;
+        int count = 0;
+        foreach (double v in ms) if (v >= gate) { sum += v; count++; }
+        return (float)(10.0 * Math.Log10(sum / Math.Max(1, count)));
+    }
+
     /// <summary>A shape from band powers in any units. Null when there is nothing in it.</summary>
     public static Timbre? FromBandPowers(ReadOnlySpan<double> powers, string name = "", bool live = false)
     {
