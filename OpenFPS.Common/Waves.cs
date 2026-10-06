@@ -281,8 +281,9 @@ public sealed record ShoreSpec
         Sediment = ShoreSediment.Sand,
         BeachSlope = 1f / 12f,
         TrapShare = 0.03f,
-        SourceLevelDb = 50f,
-        PeakHeadroomDb = 18f,
+        // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 66.9 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 18.2 dB over.
+        SourceLevelDb = 67f,
+        PeakHeadroomDb = 18.5f,
         LengthMetres = 20f,
         Places = 5,
         ExtentMetres = 4f,
@@ -303,8 +304,9 @@ public sealed record ShoreSpec
         Sediment = ShoreSediment.Rock,
         StoneMm = 400f,
         TrapShare = 0.5f,
-        SourceLevelDb = 52f,
-        PeakHeadroomDb = 20f,
+        // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 63.9 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 20.1 dB over.
+        SourceLevelDb = 64f,
+        PeakHeadroomDb = 20.5f,
         LengthMetres = 20f,
         Places = 5,
         ExtentMetres = 4f,
@@ -325,8 +327,9 @@ public sealed record ShoreSpec
         Sediment = ShoreSediment.Mud,
         BeachSlope = 0.2f,
         TrapShare = 0.1f,
-        SourceLevelDb = 40f,
-        PeakHeadroomDb = 18f,
+        // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 51.4 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 20.5 dB over.
+        SourceLevelDb = 51.5f,
+        PeakHeadroomDb = 20.5f,
         LengthMetres = 20f,
         Places = 5,
         ExtentMetres = 4f,
@@ -340,7 +343,9 @@ public sealed record ShoreSpec
     {
         Name = "Pond, reedy edge",
         ReedBeltMetres = 3f,
-        SourceLevelDb = 34f,
+        // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 46.2 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 22.0 dB over.
+        SourceLevelDb = 46f,
+        PeakHeadroomDb = 22f,
     };
 
     /// <summary>
@@ -362,8 +367,9 @@ public sealed record ShoreSpec
         Sediment = ShoreSediment.Mud,
         BeachSlope = 0.33f,
         TrapShare = 0.3f,
-        SourceLevelDb = 46f,
-        PeakHeadroomDb = 18f,
+        // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 48.6 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 19.7 dB over.
+        SourceLevelDb = 48.5f,
+        PeakHeadroomDb = 20f,
         LengthMetres = 20f,
         Places = 5,
         ExtentMetres = 4f,
@@ -388,8 +394,9 @@ public sealed record ShoreSpec
         Sediment = ShoreSediment.Sand,
         BeachSlope = 1f / 30f,
         TrapShare = 0.02f,
-        SourceLevelDb = 72f,
-        PeakHeadroomDb = 18f,
+        // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 84.9 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 22.5 dB over.
+        SourceLevelDb = 85f,
+        PeakHeadroomDb = 22.5f,
         LengthMetres = 30f,
         Places = 5,
         BreakRowMetres = 35f,
@@ -414,8 +421,9 @@ public sealed record ShoreSpec
         BeachSlope = 1f / 6f,
         StoneMm = 30f,
         TrapShare = 0.05f,
-        SourceLevelDb = 70f,
-        PeakHeadroomDb = 18f,
+        // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 93.3 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 25.7 dB over.
+        SourceLevelDb = 93.5f,
+        PeakHeadroomDb = 26f,
         LengthMetres = 20f,
         Places = 5,
         ExtentMetres = 6f,
@@ -440,8 +448,9 @@ public sealed record ShoreSpec
         Sediment = ShoreSediment.Rock,
         StoneMm = 600f,
         TrapShare = 0.25f,
-        SourceLevelDb = 58f,
-        PeakHeadroomDb = 20f,
+        // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 64.7 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 22.4 dB over.
+        SourceLevelDb = 64.5f,
+        PeakHeadroomDb = 22.5f,
         LengthMetres = 20f,
         Places = 5,
         ExtentMetres = 4f,
@@ -468,8 +477,9 @@ public sealed record ShoreSpec
             SkinMetres = 0.012f, BayAlongMetres = 0.3f, BayUpMetres = 0.4f,
             MountedLossFactor = 0.03f, WettedShare = 0.4f, Bays = 3,
         },
-        SourceLevelDb = 52f,
-        PeakHeadroomDb = 20f,
+        // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 60.1 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 23.8 dB over.
+        SourceLevelDb = 60f,
+        PeakHeadroomDb = 24f,
         LengthMetres = 4f,
         Places = 3,
         ExtentMetres = 2f,
@@ -486,7 +496,9 @@ public sealed record ShoreSpec
             SkinMetres = 0.002f, BayAlongMetres = 0.4f, BayUpMetres = 0.45f,
             MountedLossFactor = 0.02f, WettedShare = 0.4f, Bays = 3,
         },
-        SourceLevelDb = 54f,
+        // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 60.8 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 22.9 dB over.
+        SourceLevelDb = 61f,
+        PeakHeadroomDb = 23f,
     };
 
     public static IReadOnlyDictionary<string, Func<ShoreSpec>> Presets { get; } =
