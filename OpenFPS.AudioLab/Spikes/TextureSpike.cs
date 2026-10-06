@@ -52,6 +52,15 @@ public static class TextureSpike
             }
             return 0;
         }
+        if (rest.Contains("wave"))
+        {
+            foreach (var f in rest.Where(a => a != "wave" && !a.Contains('=')))
+            {
+                var (k, c) = TextureStatistics.Waveform(ReadMono48k(f));
+                Console.WriteLine($"{Path.GetFileName(f)}: 4-16 kHz in 10 ms: kurtosis {k:F2}, crest median {c:F1} dB");
+            }
+            return 0;
+        }
         if (rest.Contains("compare"))
         {
             var files = rest.Where(a => a != "compare" && !a.Contains('=')).ToList();

@@ -83,6 +83,65 @@ public static class TextureStatistics
     private static double ErbNumber(double f) => 21.4 * Math.Log10(1 + 0.00437 * f);
     private static double ErbToHz(double e) => (Math.Pow(10, e / 21.4) - 1) / 0.00437;
 
+    /// <summary>
+    /// What happens INSIDE 10 ms, which the envelope statistics cannot see (their envelope is
+    /// smoothed to 2.5 ms and compressed): the 4-16 kHz waveform's kurtosis in each 10 ms window,
+    /// averaged, and the median crest, dB. Gaussian noise reads 3 and about 10 dB; a window holding a
+    /// few needle-sharp clicks far more (rain round 1 read 9-10, every rain recording 3.0-4.4). Windows
+    /// 40 dB under the median window are skipped. The band is a fourth-order Butterworth high-pass and
+    /// low-pass (tools/texture_stats.py wave uses scipy's eighth-order band-pass; on the recordings
+    /// they agree within about 0.3).
+    /// </summary>
+    public static (double Kurtosis, double CrestDb) Waveform(ReadOnlySpan<float> x, double loHz = 4000, double hiHz = 16000)
+    {
+        hiHz = Math.Min(hiHz, 0.45 * Rate);
+        var y = new double[x.Length];
+        for (int i = 0; i < x.Length; i++) y[i] = x[i];
+        foreach (double q in new[] { 0.5411961, 1.3065630 })
+        {
+            Section(y, loHz, q, high: true);
+            Section(y, hiHz, q, high: false);
+        }
+        int w = Rate / 100, m = y.Length / w;
+        var m2 = new double[m];
+        for (int k = 0; k < m; k++) { double s = 0; for (int i = k * w; i < (k + 1) * w; i++) s += y[i] * y[i]; m2[k] = s / w; }
+        var sorted = (double[])m2.Clone();
+        Array.Sort(sorted);
+        double floor = sorted.Length > 0 ? sorted[sorted.Length / 2] * 1e-4 : 0;
+        double kurt = 0; int n = 0;
+        var crest = new List<double>();
+        for (int k = 0; k < m; k++)
+        {
+            if (m2[k] <= floor) continue;
+            double s4 = 0, peak = 0;
+            for (int i = k * w; i < (k + 1) * w; i++) { s4 += y[i] * y[i] * y[i] * y[i]; peak = Math.Max(peak, Math.Abs(y[i])); }
+            kurt += s4 / w / (m2[k] * m2[k]);
+            crest.Add(20 * Math.Log10(peak / Math.Sqrt(m2[k])));
+            n++;
+        }
+        crest.Sort();
+        return (n > 0 ? kurt / n : 0, crest.Count > 0 ? crest[crest.Count / 2] : 0);
+    }
+
+    private static void Section(double[] y, double hz, double q, bool high)
+    {
+        double w = 2 * Math.PI * hz / Rate, c = Math.Cos(w), alpha = Math.Sin(w) / (2 * q);
+        double b0 = high ? (1 + c) / 2 : (1 - c) / 2, b1 = high ? -(1 + c) : 1 - c, a0 = 1 + alpha;
+        double x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+        for (int i = 0; i < y.Length; i++)
+        {
+            double xi = y[i];
+            double yi = (b0 * xi + b1 * x1 + b0 * x2 + 2 * c * y1 - (1 - alpha) * y2) / a0;
+            x2 = x1; x1 = xi; y2 = y1; y1 = yi;
+            y[i] = yi;
+        }
+    }
+
+    /// <summary>The 10 ms 4-16 kHz kurtosis of the rain recordings (Waveform, mean over windows):
+    /// streets, gardens, woods, a car roof, a tiled roof, a sheet-metal roof, a window. Measured with
+    /// tools/texture_stats.py wave over each whole file.</summary>
+    public const double RainWaveformKurtosisMin = 3.05, RainWaveformKurtosisMax = 4.36;
+
     /// <summary>The statistics of a 48 kHz signal. Ten seconds or more; a minute is better.</summary>
     public static Result Analyse(ReadOnlySpan<float> x)
     {

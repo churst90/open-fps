@@ -60,6 +60,7 @@ public static class RainSpike
             }
             return 0;
         }
+        _near = args.FirstOrDefault(a => a.StartsWith("near=", StringComparison.Ordinal))?[5..] ?? "on";
         if (args.Contains("physics")) return Physics();
         if (args.Contains("resolve")) return Resolve(Arg(args, "sec=", 10f));
         if (args.Contains("live")) return Live(Arg(args, "sec=", 10f));
@@ -178,7 +179,7 @@ public static class RainSpike
         for (int s = 0; s < survey.Patches.Length; s++)
         {
             var patch = survey.Patches[s];
-            if (patch == null) continue;
+            if (patch == null || _near == "only") continue;
             var synth = new RainSynth(Rate, seed * 31 + s) { Patch = patch, Falling = fall };
             var x = new float[n];
             var sw = Stopwatch.StartNew();
@@ -241,7 +242,7 @@ public static class RainSpike
         {
             var sound = bank.Get(impact, variant++ % DropBank.Variants)!;
             int start = (int)((impact.At - 1.0) * Rate);
-            if (start < 0 || start >= n) continue;
+            if (start < 0 || start >= n || _near == "off") continue;
             r.NearImpacts++;
             float dist = MathF.Max(0.1f, Vector3.Distance(impact.Position, ear));
             float aim = (ear.Y - impact.Position.Y) / dist;
@@ -611,6 +612,10 @@ public static class RainSpike
 
     /// <summary>The entity the scene's listener sits in, or -1.</summary>
     private static int _riding = -1;
+
+    /// <summary>near=off renders the patches alone, near=only the near drops alone: to tell which of
+    /// the two a fault is in.</summary>
+    private static string _near = "on";
 
     /// <summary>What the shell of the car the listener sits in takes off everything outside it, dB per band.</summary>
     private static (float Low, float Mid, float High) _cabinDb;

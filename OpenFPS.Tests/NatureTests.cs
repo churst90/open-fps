@@ -442,6 +442,41 @@ public class NatureTests
         var x = new float[TextureStatistics.Rate * 20];
         for (int i = 0; i < x.Length; i++) x[i] = synth.Next();
         HoldInRange("rain", TextureStatistics.Analyse(x).Summary(), Fitted);
+
+        // And inside 10 ms (texture round 2): a wash like recorded rain, not a few needle-sharp clicks
+        // in each window. Round 1 read 9-10 here (moderate) and Cody heard "low bit rate, crunchy".
+        var (kurtosis, crest) = TextureStatistics.Waveform(x);
+        _o.WriteLine($"  4-16 kHz in 10 ms: kurtosis {kurtosis:F2}, crest {crest:F1} dB; recordings {TextureStatistics.RainWaveformKurtosisMin:F2}-{TextureStatistics.RainWaveformKurtosisMax:F2}");
+        Assert.InRange(kurtosis, 2.8, TextureStatistics.RainWaveformKurtosisMax + 0.3);
+    }
+
+    /// <summary>
+    /// A near drop, played alone where it lands (NearDrops, DropBank), is not a one-sample spike: its
+    /// force rises smoothly over a good part of a tenth of a millisecond, and its top end is the spray
+    /// of its splash over the next milliseconds. Measured as the share of its 8-16 kHz energy in its
+    /// loudest 0.2 ms: a spike puts nearly all of it there, the spray spreads it over 5 ms or more.
+    /// </summary>
+    [Theory]
+    [InlineData("Asphalt")]
+    [InlineData("Concrete")]
+    public void ANearDropIsNotANeedle(string material)
+    {
+        var layer = new RainLayer { Kind = RainSurfaceKind.Hard, Material = material };
+        layer.Add(0, 1f, 1f, 1f);
+        var synth = new RainSynth(Rate, 3);
+        var pcm = synth.RenderOne(layer, PrecipitationKind.Rain, 3f, FallingWaterSynth.TerminalSpeed(1.5e-3f), Rate / 10);
+        var hf = Band(pcm, 8000f, 16000f);
+        double total = hf.Sum(v => (double)v * v);
+        int w = Rate / 5000;
+        double best = 0;
+        for (int s = 0; s + w <= hf.Length; s++)
+        {
+            double e = 0;
+            for (int i = s; i < s + w; i++) e += (double)hf[i] * hf[i];
+            best = Math.Max(best, e);
+        }
+        _o.WriteLine($"{material}: {best / total:P0} of the 8-16 kHz energy in the loudest 0.2 ms");
+        Assert.True(best / total < 0.3, $"the drop's top end is a spike: {best / total:P0} in 0.2 ms");
     }
 
     /// <summary>
