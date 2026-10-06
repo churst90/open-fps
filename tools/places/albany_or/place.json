@@ -7,8 +7,9 @@
  "Spawn": {"Address": "1042 Belmont Avenue Southwest"},
  "CountyFips": ["41043", "41003"],
  "Archive": "~/openfps-scratch-archive/osm-albany-2026-10-05",
+ "Setting": "town",
  "Detail": "medium",
- "FullDetailMetres": 300,
+ "FullDetailMetres": 200,
  "Units": "mph",
  "SpeedMph": {"motorway": 65, "trunk": 55, "primary": 40, "secondary": 35, "tertiary": 30, "unclassified": 25,
               "residential": 25, "living_street": 15, "service": 15, "default": 25},
@@ -18,8 +19,14 @@
  "Trees": {"Species": [["Douglas fir", 0.35], ["Oregon white oak", 0.25], ["Bigleaf maple", 0.2], ["Western redcedar", 0.1], ["Oregon ash", 0.1]],
            "SpacingMedium": 40, "SpacingHigh": 16, "SpacingNear": 14, "CrownEveryMetres": 80,
            "CanopyLow": 4.0, "CanopyHigh": 16.0},
- "Traffic": [],
+ "Traffic": [
+  {"Name": "Car on Pacific Boulevard", "Preset": "i4_midsize", "Road": "Pacific Boulevard Southwest", "Kind": "car", "TopKmh": 75},
+  {"Name": "Pickup on Pacific Boulevard", "Preset": "pickup_v8", "Road": "Pacific Boulevard Southwest", "Kind": "car", "TopKmh": 75, "Direction": -1},
+  {"Name": "Car on Belmont Avenue", "Preset": "i4_compact", "Road": "Belmont Avenue Southwest", "Kind": "car", "TopKmh": 45},
+  {"Name": "Car on 53rd Avenue", "Preset": "v6", "Road": "53rd Avenue Southwest", "Kind": "car", "TopKmh": 60},
+  {"Name": "Van on Ellingson Road", "Preset": "step_van", "Road": "Ellingson Road Southwest", "Kind": "van", "TopKmh": 70}
+ ],
  "StreetLife": {"HornEverySeconds": 120, "HardBrakeEverySeconds": 0, "ParkEverySeconds": 0, "GunfireEverySeconds": 0, "AlarmEverySeconds": 0},
- "Temperature": 42.0,
- "Humidity": 0.4
+ "Temperature": 25.0,
+ "Humidity": 0.6
 }

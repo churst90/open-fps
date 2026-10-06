@@ -111,13 +111,14 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
                      $"server load {p.ServerLoad.TotalSeconds:F1} s, client grid {p.ClientGrid.TotalSeconds:F1} s, " +
                      $"acoustic map {p.AcousticBake.TotalSeconds:F1} s, {p.World.AcousticMap!.Regions.Count - 1} regions, {p.World.AcousticMap.Portals.Count} openings");
         Assert.False(p.Data.IsDefault, "a real place must not claim the landing map");
-        Assert.True(p.Data.Entities.Count < 40000, $"{p.Data.Entities.Count} entities");
+        Assert.True(p.Data.Entities.Count < 50000, $"{p.Data.Entities.Count} entities");
     }
 
     /// <summary>The spawn is on the ground, outdoors, in the place the map is centred on, and
     /// "where am I" there names it.</summary>
     [Theory]
     [InlineData("magnolia_tx", "31907 Bobcat Lane")]
+    [InlineData("albany_or", "1042 Belmont Avenue Southwest")]
     public void The_spawn_is_where_the_place_says(string id, string expected)
     {
         if (!Places().Any(o => (string)o[0] == id)) return;

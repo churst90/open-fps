@@ -26,6 +26,6 @@
   {"Name": "Pickup on Turtle Dove Lane", "Preset": "pickup_v8_flowmaster", "Road": "Turtle Dove Lane", "Kind": "car", "TopKmh": 55, "Direction": -1}
  ],
  "StreetLife": {"HornEverySeconds": 240, "HardBrakeEverySeconds": 0, "ParkEverySeconds": 0, "GunfireEverySeconds": 0, "AlarmEverySeconds": 0},
- "Temperature": 42.0,
- "Humidity": 0.4
+ "Temperature": 30.0,
+ "Humidity": 0.7
 }

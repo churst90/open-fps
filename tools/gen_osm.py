@@ -520,6 +520,9 @@ def clip_line(pts):
             cur.append(p)
     if len(cur) >= 2:
         out.append(cur)
+    # No point twice: a crossing point a hair from the node beyond it is a zero-length segment, and a
+    # zero-length segment has no direction.
+    out = [[p for i, p in enumerate(c) if i == 0 or math.dist(p, c[i - 1]) > 0.05] for c in out]
     return [c for c in out if len(c) >= 2 and plen(c) > 0.5]
 
 
@@ -650,7 +653,8 @@ ways_by_kind = defaultdict(list)
 for w in OSM["ways"]:
     t = w["tags"]
     hw = t.get("highway")
-    if hw in ROAD_CLASS and t.get("service") not in NOT_ROADS and t.get("area") != "yes":
+    if hw in ROAD_CLASS and t.get("service") not in NOT_ROADS and t.get("area") != "yes" \
+            and not (hw == "service" and t.get("oneway") in ("yes", "-1")):
         ways_by_kind["road"].append(w)
     elif hw == "service" or (hw in ROAD_CLASS and t.get("service") in NOT_ROADS):
         ways_by_kind["drive"].append(w)
@@ -917,6 +921,35 @@ def make_junctions():
         JUNCTIONS.append({"Id": jid, "Name": " and ".join(names), "Position": v3(x, 0.08, z),
                           "RadiusMetres": round(r, 2), "Control": control, "PriorityRoads": [top[2]["Id"]],
                           "GiveWaySeconds": 2.0, "Tile": tile_of(x, z), "_roads": gis})
+    # Two junction points a few metres apart (a road that meets another twice, a jog in a mapped
+    # junction) are one junction: the second is dropped and the roads through it simply pass.
+    keep = []
+    for j in JUNCTIONS:
+        p = (j["Position"]["X"], j["Position"]["Z"])
+        twin = next((k for k in keep if math.dist(p, (k["Position"]["X"], k["Position"]["Z"])) < 4.0), None)
+        if twin is None:
+            keep.append(j)
+        elif len(j["_roads"]) > len(twin["_roads"]):
+            keep[keep.index(twin)] = j
+    # A junction where two roads only end on each other at a hairpin is a U-turn and nothing else.
+    def heading(g, x, z):
+        pts = g[1]
+        if math.dist(pts[0], (x, z)) < 0.01:
+            a, b = pts[0], pts[1]
+        elif math.dist(pts[-1], (x, z)) < 0.01:
+            a, b = pts[-1], pts[-2]
+        else:
+            return None
+        L = math.dist(a, b) or 1.0
+        return ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+    JUNCTIONS[:] = []
+    for j in keep:
+        if len(j["_roads"]) == 2:
+            x, z = j["Position"]["X"], j["Position"]["Z"]
+            h = [heading(ROAD_GEOM[i], x, z) for i in j["_roads"]]
+            if all(h) and h[0][0] * h[1][0] + h[0][1] * h[1][1] > 0.7:
+                continue
+        JUNCTIONS.append(j)
     # Two junctions closer along a road than their reaches leave no lane between them: shrink both.
     for gi, g in enumerate(ROAD_GEOM):
         pts = g[1]
@@ -926,18 +959,23 @@ def make_junctions():
                 pr = project(pts, j["Position"]["X"], j["Position"]["Z"])
                 on.append((pr[1], j))
         on.sort(key=lambda t: t[0])
-        marks = [(0.0, None)] + on + [(plen(pts), None)]
-        for (a, ja), (b, jb) in zip(marks, marks[1:]):
+        # Between two junctions: both reaches shrunk until a lane of at least a metre and a bit
+        # is left between them.
+        for (a, ja), (b, jb) in zip(on, on[1:]):
             gap = b - a
-            ra = ja["RadiusMetres"] if ja else 0.0
-            rb = jb["RadiusMetres"] if jb else 0.0
-            if ra + rb + 1.2 > gap and (ja or jb):
-                n = (1 if ja else 0) + (1 if jb else 0)
-                each = max(0.5, (gap - 1.2) / n)
-                if ja:
-                    ja["RadiusMetres"] = round(min(ja["RadiusMetres"], each), 2)
-                if jb:
-                    jb["RadiusMetres"] = round(min(jb["RadiusMetres"], each), 2)
+            if ja["RadiusMetres"] + jb["RadiusMetres"] + 1.2 > gap:
+                each = max(0.5, (gap - 1.2) / 2)
+                ja["RadiusMetres"] = round(min(ja["RadiusMetres"], each), 2)
+                jb["RadiusMetres"] = round(min(jb["RadiusMetres"], each), 2)
+        # Between a junction and the road's own end: a stub shorter than a lane is swallowed by the
+        # junction (the road then starts in it, which the network allows), never left as a sliver.
+        L = plen(pts)
+        for along, j in on[:1]:
+            if j["RadiusMetres"] < along < j["RadiusMetres"] + 1.2:
+                j["RadiusMetres"] = round(along + 0.05, 2)
+        for along, j in on[-1:]:
+            if j["RadiusMetres"] < L - along < j["RadiusMetres"] + 1.2:
+                j["RadiusMetres"] = round(L - along + 0.05, 2)
     for j in JUNCTIONS:
         del j["_roads"]
 
@@ -1253,6 +1291,11 @@ for p in POI:
     if bd is not None and bd.place is None:
         bd.place = p
     p["building"] = bd
+# A building with a name of its own in the footprint data (a college's halls) is that place.
+for bd in BLD:
+    nm = (bd.src.get("name") or "").strip()
+    if nm and bd.place is None:
+        bd.place = {"name": nm, "kind": bd.src.get("class") or "building", "x": bd.cx, "z": bd.cz, "src": "building"}
 
 # ── Buildings to addresses ────────────────────────────────────────────────────────────────────────
 #
@@ -1377,25 +1420,42 @@ for key in sorted(ADDR):
     a.main = main
 
 
+OSM_HOMES = {"house", "detached", "residential", "semidetached_house", "terrace", "bungalow", "apartments",
+             "static_caravan", "cabin", "farm"}
+OSM_SHEDS = {"shed", "carport", "garage", "garages", "roof", "hut"}
+
+
+def urban(bd):
+    """Built-up ground round it, by the satellite: in a town a second big building on a lot is a
+    building (a duplex, a block of flats), in the country it is a barn."""
+    return PLACE.get("Setting") == "town" or landcover_at(bd.cx, bd.cz) == "B"
+
+
 def classify(bd):
+    cls = bd.src.get("class") or ""
     if bd.place is not None:
         k = bd.place["kind"]
         if "worship" in k or k in ("church",):
             return "church"
         return "premises"
-    if bd.addr is not None and bd.addr.main is bd:
+    if bd.addr is not None and bd.addr.main is bd and cls not in OSM_SHEDS:
         narrow = bd.short <= 5.2 and bd.long >= 2.8 * bd.short
-        cls = bd.src.get("class") or ""
-        if narrow or cls in ("static_caravan",):
+        if (narrow and cls not in OSM_HOMES) or cls == "static_caravan":
             return "mobile_home"
         return "house"
-    if bd.area < 30:
+    if bd.area < 30 or cls == "shed":
         return "shed"
+    if cls in ("garage", "garages", "carport"):
+        return "garage"
     if bd.addr is not None:
         m = bd.addr.main
         if m is not None and math.dist((bd.cx, bd.cz), (m.cx, m.cz)) < 30 and bd.area < 100:
             return "garage"
+        if urban(bd) and (bd.area >= 100 or cls in OSM_HOMES):
+            return "building"
         return "workshop" if bd.area < 160 else "barn"
+    if urban(bd) or cls:
+        return "building" if bd.area >= 60 else "outbuilding"
     return "barn" if bd.area >= 160 else "outbuilding"
 
 
@@ -1529,7 +1589,14 @@ def yards(lot):
     return [p for p in (clear_of_rooms(lot, piece) for piece in out) if p is not None]
 
 
-ROOMED = ("house", "mobile_home", "premises", "church")
+ROOMED = ("house", "mobile_home", "premises", "church", "building")
+OUTBUILDINGS = ("garage", "workshop", "barn", "outbuilding")
+
+
+def has_rooms(b):
+    """Whether a building is built with rooms you can go into: a home or premises always; a garage, a
+    workshop or a barn only where the map is built in full (below that it is one solid box)."""
+    return b.kind in ROOMED or (b.kind in OUTBUILDINGS and detail_at(b.cx, b.cz) >= 2)
 
 
 def clear_of_rooms(lot, piece):
@@ -1541,7 +1608,7 @@ def clear_of_rooms(lot, piece):
         x0, x1, z0, z1 = bbox_of(F, u0, u1, v0, v1)
         hit = None
         for b in B_INDEX.near(x0, x1, z0, z1):
-            if b.kind not in ROOMED or b is a.main:
+            if not has_rooms(b) or b is a.main:
                 continue
             e = extents(F, b.ring)
             if e[1] <= u0 or e[0] >= u1 or e[3] <= v0 or e[2] >= v1:
@@ -1812,7 +1879,8 @@ def build(bd):
         wall_h = max(3.0, min((bd.height or 4.5) * 0.85, 9.0))
     mat = {"house": "brick" if h01(label, "walls") < float(PLACE.get("BrickShare", 0.55)) else "siding",
            "mobile_home": "siding", "church": "brick", "premises": "metal" if bd.area > 250 else "brick",
-           "garage": "siding", "workshop": "metal", "barn": "metal", "outbuilding": "metal"}[kind]
+           "garage": "siding", "workshop": "metal", "barn": "metal", "outbuilding": "metal",
+           "building": "brick" if h01(label, "walls") < float(PLACE.get("BrickShare", 0.55)) else "siding"}[kind]
     wall_prefab = WALLS[mat]
     roof_prefab = "metal_wall" if mat == "metal" else "shingle_roof"
 
@@ -1870,7 +1938,7 @@ def build(bd):
     if rooms is None:
         # One room per rectangle, all called the same; the gaps between them are openings.
         suffix = {"house": ", house", "mobile_home": ", house", "premises": "", "church": "",
-                  "garage": "", "workshop": "", "barn": "", "outbuilding": ""}[kind]
+                  "garage": "", "workshop": "", "barn": "", "outbuilding": "", "building": ""}[kind]
         top = CEIL if homes else wall_h - 0.05
         ids = []
         for (ru0, ru1, rv0, rv1) in R:
@@ -2261,7 +2329,7 @@ for lot in LOTS:
             if not suffix or (detail_at(cx, cz) >= 2 and landcover_at(cx, cz) != "T"):
                 obox("grass_floor", F, u0, u1, v0, v1, 0.0, Y_LAWN, name=f"{a.label}{suffix or ', front yard'}", layer="yards")
         named_place(f"{a.label}{suffix}", F, u0, u1, v0, v1, 0.0, ZONE_H)
-        lot["yards"].append((u0, u1, v0, v1))
+        lot["yards"].append((suffix, u0, u1, v0, v1))
 
 # ══ Zones over the roads ══════════════════════════════════════════════════════════════════════════
 #
@@ -2279,7 +2347,22 @@ for g in ROAD_GEOM:
         F = Frame(ax, az, math.atan2(bz - az, bx - ax))
         e0 = half if i > 0 else 0.0
         e1 = half if i < len(sp) - 2 else 0.0
-        named_place(name, F, -e0, L + e1, -half, half, 0.0, ZONE_H)
+        lo, hi = -half, half
+        x0, x1, z0, z1 = bbox_of(F, -e0, L + e1, lo, hi)
+        for b in B_INDEX.near(x0, x1, z0, z1):
+            if not has_rooms(b):
+                continue
+            e = extents(F, b.ring)
+            if e[1] <= -e0 or e[0] >= L + e1 or e[3] <= lo or e[2] >= hi:
+                continue
+            if e[2] >= 0.5:
+                hi = min(hi, e[2] - 0.3)
+            elif e[3] <= -0.5:
+                lo = max(lo, e[3] + 0.3)
+            else:
+                lo = hi = 0.0                 # a building on the road itself: the road is not named here
+        if hi - lo >= 1.0:
+            named_place(name, F, -e0, L + e1, lo, hi, 0.0, ZONE_H)
 
 # ══ The buildings ═════════════════════════════════════════════════════════════════════════════════
 for bd in sorted(BLD, key=lambda b: (round(b.cx, 2), round(b.cz, 2))):
@@ -2440,6 +2523,37 @@ if SPAWN_ADDR is not None and SPAWN_ADDR.lot is not None:
         sv = h[2] - 4.0
         x, z = F.w(su, sv)
         spawn = (x, Y_DRIVE + 0.09, z)
+    # In the yard named by the address: where something stands between the house and the road, the
+    # nearest point of the front yard that is clear of it, a metre in from its edge.
+    # A neighbour's yard may overlap it, and the smaller place is the one you are told, so the point
+    # chosen is the nearest one where the name you hear is this address.
+    def named_at(x, z):
+        best = None
+        for nm, G, u0, u1, v0, v1, y0, y1 in named_places:
+            if abs(G.ox - x) > 400 or abs(G.oz - z) > 400:
+                continue
+            u, v = G.l(x, z)
+            if u0 <= u <= u1 and v0 <= v <= v1 and y0 <= 1.6 <= y1:
+                vol = (u1 - u0) * (v1 - v0) * (y1 - y0)
+                if best is None or vol < best[0]:
+                    best = (vol, nm)
+        return best[1] if best else None
+    if named_at(spawn[0], spawn[2]) != SPAWN_ADDR.label:
+        su, sv = F.l(spawn[0], spawn[2])
+        cands = []
+        for _, u0, u1, v0, v1 in (y for y in lot["yards"] if y[0] == ""):
+            u = u0 + 1.0
+            while u <= u1 - 1.0:
+                v = v0 + 1.0
+                while v <= v1 - 1.0:
+                    cands.append((math.dist((u, v), (su, sv)), u, v))
+                    v += 1.0
+                u += 1.0
+        for _, cu, cv in sorted(cands):
+            x, z = F.w(cu, cv)
+            if named_at(x, z) == SPAWN_ADDR.label and is_clear(x, z, 0.6):
+                spawn = (x, Y_DRIVE + 0.09, z)
+                break
     # Facing the road: the frame's -v, turned to the game's facing (identity looks north, +z).
     dx, dz = F.w(0, -1)
     dx, dz = dx - F.ox, dz - F.oz
@@ -2489,7 +2603,7 @@ regions = by_prefab["acoustic_region"]
 print(f"{OUT}: {len(entities)} entities at detail '{DETAIL}'" + (f" (high within {NEAR_M:.0f} m of the spawn)" if LEVEL == 1 and NEAR_M else ""))
 print(f"  area {XMAX - XMIN:.0f} x {ZMAX - ZMIN:.0f} m; {len(ROADS)} roads, {len(JUNCTIONS)} junctions, {len(ADDR)} addresses "
       f"({INTERPOLATED} interpolated from Census ranges), {len(LOTS)} lots, {len(BLD)} buildings")
-print("  buildings: " + ", ".join(f"{k} {STATS[k]}" for k in ("house", "mobile_home", "premises", "church", "garage", "workshop", "barn", "outbuilding", "shed")))
+print("  buildings: " + ", ".join(f"{k} {STATS[k]}" for k in ("house", "mobile_home", "premises", "church", "building", "garage", "workshop", "barn", "outbuilding", "shed")))
 print(f"  {regions} zones and rooms, {by_prefab['named_place']} named places, {STATS['doors']} outside doors, "
       f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {len(VEHICLES)} vehicles")
 print("  by layer: " + ", ".join(f"{k} {v}" for k, v in sorted(COUNT.items())))
