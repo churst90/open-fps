@@ -506,7 +506,7 @@ public sealed class OpeningRoutes
             if (used >= RoutesPerQuery) break;
             chain.Clear();
             BuildChain(c, lTree, sTree, sNode, chain);
-            if (chain.Count == 0) continue;
+            if (chain.Count == 0 || CrossesTwice(chain)) continue;
             long key = 17;
             foreach (var (o, _) in chain) key = key * 1_000_003 + o;
             if (!seen.Add(key)) continue;
@@ -524,6 +524,20 @@ public sealed class OpeningRoutes
         total = Vector3.Min(total, Vector3.One);       // a route never delivers more than the open field
         answer = new Answer(MathF.Sqrt(total.X), MathF.Sqrt(total.Y), MathF.Sqrt(total.Z), apparent, bestLength, used, via);
         return true;
+    }
+
+    /// <summary>
+    /// Whether a chain goes through one opening twice. A route "by the outdoors" between two rooms of
+    /// one building can leave by the front door and come straight back in by it: no way round at all,
+    /// only the doorway crossed twice, and its crossings line up better than the true route's through
+    /// the doorway between the rooms, so it won, and the next room was heard from the front door.
+    /// </summary>
+    private static bool CrossesTwice(List<(int, int)> chain)
+    {
+        for (int i = 0; i < chain.Count; i++)
+            for (int j = i + 1; j < chain.Count; j++)
+                if (chain[i].Item1 == chain[j].Item1) return true;
+        return false;
     }
 
     /// <summary>
