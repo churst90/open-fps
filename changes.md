@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- After moving to another map, many sounds played the same in both ears: the fountain stayed in
+  front of you however you turned, and about half the speedway's cars had no direction. Each room's
+  reverb borrows a binaural stage from the same pool as everything else and sets it to pass its
+  stereo through; leaving a map gave those stages back still set that way, and the next sounds to
+  borrow them were never placed. A stage taken from the pool is now always fully placed, and a
+  room's stage is only pooled again once it has come off its bus. `AudioLab --map-travel` checks
+  it: 22 of 40 sources on the right were mono after city to speedway, now none.
+- The rooms map (`default.json`) is no longer served. It is a test fixture now, in
+  `OpenFPS.Tests/maps`, and `./run-server.sh rooms` is gone. A player last saved on it lands on the
+  starting map.
 - `/levels real` is gone. 100 percent is still there as a number, but it is literal source levels,
   which on headphones lost footsteps and idling cars; the default, 45 percent, is the setting to use.
   `/levels` now says "the default" when you are on it.

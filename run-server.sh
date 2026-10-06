@@ -6,8 +6,7 @@
 # data (maps/, prefabs/, openfps.db — all resolved relative to cwd).
 #
 # Usage:
-#   ./run-server.sh              speedway — the map claiming IsDefault (UDP 33288; Ctrl-C to stop)
-#   ./run-server.sh rooms        the rooms/doors/material-lab map (maps/default.json)
+#   ./run-server.sh              the map claiming IsDefault (UDP 33288; Ctrl-C to stop)
 #   ./run-server.sh speedway     the speedway, named explicitly
 #   ./run-server.sh <map-id>     any other map id in maps/
 #   ./run-server.sh --port 34288 ... and anything else goes straight to the server
@@ -21,15 +20,11 @@ DOTNET="${DOTNET:-$HOME/.dotnet/dotnet}"
 ART=/tmp/openfps-srv
 OUT="$ART/bin/OpenFPS.Server/debug"
 
-# A bare first word that is not a flag is a map name. "rooms" is spelled out because the map's id is
-# "default", which reads as "the usual one" and is the opposite of what it means now that the speedway
-# is what you land on.
+# A bare first word that is not a flag is a map name. The rooms map (default.json) is a test fixture
+# now, in OpenFPS.Tests/maps, and the server does not serve it.
 MAPARGS=()
 if [ $# -gt 0 ] && [[ "$1" != -* ]]; then
-  case "$1" in
-    rooms|demo) MAPARGS=(--map default) ;;
-    *)          MAPARGS=(--map "$1") ;;
-  esac
+  MAPARGS=(--map "$1")
   shift
 fi
 

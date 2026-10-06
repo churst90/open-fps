@@ -688,6 +688,11 @@ if (args.Contains("--nan-mix"))
     // --nan-mix [from= to= door= seconds=]: the walk into Marlow flat 00B through the whole mixer; what the non-finite guard caught.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NanMixSpike.Run(args));
 }
+if (args.Contains("--map-travel"))
+{
+    // --map-travel [from=city] [to=speedway] [voices=40]: one map's acoustics then another's, as /join does; are sources still placed?
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.MapTravelSpike.Run(args));
+}
 if (args.Contains("--nan-walk"))
 {
     // --nan-walk [map=city] [from=x,y,z] [to=x,y,z] [steps=12]: the listener's trace walked over a real map, every response checked for non-finite values.

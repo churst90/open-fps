@@ -31,8 +31,9 @@ OpenFPS.Server/
   prefabs/prefab-schema.json the schema (skipped by the loader)
 ```
 
-Both loaders accept `//` comments and trailing commas, so a map can be annotated in place — `maps/default.json`
-is, heavily, and is the worked example for everything below.
+Both loaders accept `//` comments and trailing commas, so a map can be annotated in place — the rooms map,
+`OpenFPS.Tests/maps/default.json`, is, heavily, and is the worked example for everything below. It is a test
+fixture: the server does not serve it.
 
 ## 2. Prefabs
 
@@ -127,7 +128,7 @@ rejected, because the loader would otherwise attach no emitter and the object wo
   the beam, almost nothing behind it, and an off-axis timbre change in between.
 - **Aim:** `EmitterDirection` is a **local** direction, rotated into the world by the map instance's
   `Rotation`. Omit it for the default forward `(0, 0, 1)` and aim the entity with `Rotation`, which is what
-  `maps/default.json` does. It has no audible effect on an omnidirectional emitter.
+  the rooms map does. It has no audible effect on an omnidirectional emitter.
 - **Spin-up / spin-down:** `StartSoundId` plays once before the loop starts, `StopSoundId` plays once
   instead of cutting the loop off.
 - `Mode` is `Single`, `LoopOne`, `LoopFolder`, `Sequential` or `StateMachine`.
@@ -235,7 +236,7 @@ is under it, and a spawn point over nothing is reported and parked at Y = 2.
 
 ### A worked room
 
-From `maps/default.json` — a concrete room with a doorway and a siren inside it:
+From the rooms map (`OpenFPS.Tests/maps/default.json`) — a concrete room with a doorway and a siren inside it:
 
 ```jsonc
 // four walls with a 2 m gap at x -8..-6 in the south wall

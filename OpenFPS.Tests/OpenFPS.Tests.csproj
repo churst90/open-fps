@@ -30,6 +30,8 @@
     <None Include="..\OpenFPS.Server\prefabs\*.json" Link="prefabs\%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- The rooms map (doors, portals, the material lab): a fixture only, never served to players. -->
+    <None Update="maps\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

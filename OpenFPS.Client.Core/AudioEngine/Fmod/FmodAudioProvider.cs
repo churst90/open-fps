@@ -1160,6 +1160,10 @@ public class FmodAudioProvider : IAudioProvider
         v.State.Ground?.Reset();
         v.State.GroundDirX = 0f; v.State.GroundDirY = -1f; v.State.GroundDirZ = 0f;
         v.State.DirX = 0f; v.State.DirY = 0f; v.State.DirZ = -1f;
+        // Fully placed. A room's reverb bus holds its stage at blend 0 (its stereo passed through) and
+        // gives it back that way when a map is unloaded; a point source that borrowed it next played
+        // the same signal in both ears. After a /join, half the voices on the new map were mono.
+        v.State.SpatialBlend = 1f;
         v.State.LastRms = v.State.LastRmsL = v.State.LastRmsR = 0f;
         v.State.ProducedAudio = false;
         v.State.GuardName = null; v.State.NonFiniteReported = 0; v.State.NonFiniteInputReported = 0;
@@ -2330,6 +2334,23 @@ public class FmodAudioProvider : IAudioProvider
         return true;
     }
 
+    /// <summary>Lab only: a voice's binaural stage as it last ran — each ear's level and how placed it
+    /// is (1 = fully by the HRTF). False when the voice has no stage.</summary>
+    internal int ReverbBusCountForLab => _reverbBuses.Count;
+    internal string ReverbBlendsForLab => string.Join(" ", _reverbSaVoices.Values.Select(v => v.State.SpatialBlend.ToString("F2")));
+
+    internal bool TryGetBinauralLevels(int entityId, out float rmsL, out float rmsR, out float blend)
+    {
+        rmsL = rmsR = 0f; blend = 0f;
+        lock (_lock)
+        {
+            var s = FindActive(entityId)?.SaState;
+            if (s == null) return false;
+            rmsL = s.LastRmsL; rmsR = s.LastRmsR; blend = s.SpatialBlend;
+            return true;
+        }
+    }
+
     /// <summary>Lab only: every send plugged into a region's unit — who feeds it, and at what mix.</summary>
     internal string ListSends(int regionId)
     {
@@ -2404,8 +2425,13 @@ public class FmodAudioProvider : IAudioProvider
         foreach (var kvp in _reverbSaVoices)
         {
             var v = kvp.Value;
-            if (v.Dsp.hasHandle() && _reverbBuses.TryGetValue(kvp.Key, out var b) && b.hasHandle()) b.removeDSP(v.Dsp);
-            lock (_saPool) { _saPool.Push(v); }
+            // Pooled only once it is off its bus, as Detach insists for a channel: a stage still in
+            // one graph and handed to another is the crash Detach describes.
+            bool off = !v.Dsp.hasHandle()
+                    || (_reverbBuses.TryGetValue(kvp.Key, out var b) && b.hasHandle() && b.removeDSP(v.Dsp) == RESULT.OK)
+                    || v.Dsp.disconnectAll(true, true) == RESULT.OK;
+            if (off) { lock (_saPool) { _saPool.Push(v); } }
+            else _failedDetaches++;
         }
         _reverbSaVoices.Clear();
     }

@@ -607,7 +607,6 @@ Run `./run-server.sh` from the OpenFPS folder. It builds the server and starts i
 
 - `./run-server.sh` lands players on the speedway.
 - `./run-server.sh city` lands players on the city. Any map name works the same way.
-- `./run-server.sh rooms` (or `demo`) lands players on the rooms map (`default.json`).
 
 Every map in the maps folder is loaded either way; the name only chooses where players arrive.
 
