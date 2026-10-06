@@ -80,6 +80,7 @@ string[] usage =
     "  --machine-pass [id] [kmh=] [side=]            a machine driving past, as one voice and as two",
     "  --yard [preset ...] [levels] [pass]           mowers and air conditioners, measured and walked past",
     "  --nature [levels|render out=DIR] [preset ...] water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
+    "  --thunder [out=DIR] [seed=] [city=x,z] [nowav] thunder at 0.1-15 km, ground and cloud flashes, open field and a city street",
     "  --models [export=DIR]                         the model library's ids, or each as JSON",
     "  --aircraft / --landing / --spool [preset]     flyovers, arrivals, and an engine against its lever",
     "  --train / --crossing / --airbrake / --signals trains, a level crossing, air brakes, horns and bells",
@@ -467,6 +468,13 @@ if (args.Contains("--yard"))
     int yardCode = OpenFPS.Client.Core.AudioEngine.Fmod.YardSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(yardCode);
+}
+
+if (args.Contains("--thunder"))
+{
+    // --thunder [out=DIR] [seed=N] [city=x,z] [nowav]: the lightning channel's thunder at six
+    // distances, measured, and written binaurally at the game's level and normalised.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ThunderSpike.Run(args));
 }
 
 if (args.Contains("--nature"))
