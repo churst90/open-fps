@@ -4,6 +4,38 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- The ear model (unheard; docs/EAR_MODEL.md). Sounds are placed by how loud they are to the ear,
+  not by their level in decibels: loudness by ISO 532-1 (Zwicker), from each sound's own spectrum,
+  measured from the sound itself (a recording from its samples the first time it plays, a live voice
+  from its own output, an engine from what it is making now). The law is the same (/levels 45 %, the
+  same pivot): a sound is turned into the speech line just as loud, the old law places the line, and
+  the sound plays as loud as it. Speech is placed exactly as before. A recording's real level is its
+  declared level plus where it sits in its buffer (its 125 ms gated RMS), so a click counts as the
+  ear hears it, not by its peak.
+- The idle lift is that law: an idling engine is mostly bass, so it is lifted more, and the 20 dB cap
+  is gone (kept only with the model off). The lift's level estimate starts from the first block it
+  hears, and below the threshold of hearing the lift holds.
+- Every world voice keeps its tone at the level it plays at: two shelves (200 Hz, 10 kHz) fitted to
+  the ISO 226:2023 contour difference between the level it really has at your ears and the level it
+  plays at, held to the standard's 20-90 phon, moving at most 6 dB a second. First in the voice's
+  chain, so its reverb send gets it too. The wind at your ears as well.
+- Measured in the game's output (inbox/ear-model-2026-10-06): speech, footsteps, the fountain and the
+  air conditioner within about 1 dB; the idling police car 10 dB louder, the idling diesel pickup 6,
+  the hatchback 1 to 2; cars passing slowly 1.5 to 3 dB louder with more bass; thunder at 3 km 2
+  with more rumble; rain 3; the door 2.6 dB quieter with more bass. The wind at your ears is lifted
+  most: +17 dB in a light breeze, +13 at 4.5 m/s, +8 at 7. From the log: bird calls about 8 dB quieter, near rain
+  drops about 12 louder, beacons (sine blips) an estimated 7 to 9 louder.
+- `/listening` tells the game how loud your headphones are: a person talks from one step in front;
+  Up and Down until they sound like a normal voice at arm's length; Enter saves (client.json,
+  ListeningLevelDb, default 62.35 dB: that voice as loud as life). `/listening 58` sets it directly.
+  It changes no volume, only the tone given back. `/ear off|on` switches the whole model for an A/B;
+  OPENFPS_EAR_MODEL=0 starts with it off. An `[EAR]` line in the log every 10 s gives the listening
+  level and the loudest voices' real and played levels, gain and shelves.
+- The voice budget ranks a voice by its loudness once its spectrum is known.
+- AudioLab `--game-levels`: `ear=on|off`, `listening=`, `set=ear` (the sources above, thunder at
+  3 km, moderate rain), `set=wind`. `tools/ear_loudness.py`: an independent ISO 532-1 port (annex B.2,
+  83.296 sone) and the before/after comparison of two captures.
+
 - Texture round 1: the fountain, rain, trees and fire refitted on the statistics listeners recognise
   a texture by (unheard). Renders in inbox/textures-round1-2026-10-06, with a README and a table.
 - The Elm Park fountain is bigger and has rocks: an 11 m basin (was 8), a 2.8 m bowl with a 2 m jet,

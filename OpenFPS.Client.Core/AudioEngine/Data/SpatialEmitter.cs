@@ -108,6 +108,17 @@ public struct SpatialEmitter
     /// <summary>A one-off's declared level at a metre, dB SPL, or 0 when it has none. What the ear
     /// overload is worked out from: see FmodAudioProvider.Overload.</summary>
     public float LevelDb;
+
+    /// <summary>
+    /// For the ear model (docs/EAR_MODEL.md): the declared level at a metre, dB SPL, of the source this
+    /// voice is, the level its placement came from; 0 when it has none, and then the ear model leaves
+    /// the voice alone. A copy (a reflection) carries its SOURCE's level here, because it keeps its
+    /// source's placement, and how far under the source it is in <see cref="EarCopyDb"/>.
+    /// </summary>
+    public float EarLevelDb;
+    /// <summary>A copy's level under its source, dB (20 log10 of what the surface and the path kept); 0
+    /// for a direct sound.</summary>
+    public float EarCopyDb;
     public float ReflectionSpread; // (0-360) How wide the reflection feels in 3D space.
 
     // Granular Synthesis Parameters

@@ -64,6 +64,8 @@ public sealed partial class ClientGameSession : IDisposable
 
     /// <summary>The lists behind F5, F6 and F8: players, maps, friends, and what to do with each.</summary>
     private readonly MenuStack _menus;
+    /// <summary>/listening: telling the game how loud your headphones are (docs/EAR_MODEL.md).</summary>
+    private readonly ListeningCalibration _listening;
 
     /// <summary>The audio engine, for a head's settings (devices, interface sounds).</summary>
     public AudioEngineFacade Audio => _audioEngine;
@@ -159,6 +161,9 @@ public sealed partial class ClientGameSession : IDisposable
         _chat = new ChatManager(_speech);
         Ui = new UiSounds(audioEngine);
         _menus = new MenuStack(_speech, Ui);
+        _listening = new ListeningCalibration(_speech, Ui,
+            (id, gainDb) => _audioSystem.PlayReferenceVoice(id, gainDb), _audioSystem.StopReferenceVoice,
+            () => ClientSettings.Load().Save());
         // Each kind of chat has its own sound, heard before the words: UiSounds.CueFor says which,
         // and that somebody coming or going has its own, which a setting can turn off.
         _chat.Incoming += Ui.PlayChat;
@@ -529,11 +534,16 @@ public sealed partial class ClientGameSession : IDisposable
         var context = gameplayActive ? InputContext.Gameplay : InputContext.UI;
         // An open list has the keyboard, except the F keys, which swap one list for another.
         bool menuOpen = _menus.IsOpen && gameplayActive;
+        // The listening-level calibration has the keyboard while it is open, as a list does.
+        bool calibrating = _listening.IsOpen && gameplayActive;
         foreach (var key in justPressed)
         {
+            if (calibrating) { _listening.HandleKey(key, _shiftHeldThisStep, _simTime); continue; }
             if (menuOpen && key is not (GameKey.F5 or GameKey.F6 or GameKey.F8)) { _menus.HandleKey(key); continue; }
             _bindings.Execute(context, key, modifiers);
         }
+        _listening.Tick(_simTime);
+        if (calibrating) menuOpen = true;   // stand still while listening
         ReleaseTrigger(held);
         if (menuOpen) gameplayActive = false;   // stand still while choosing
 
@@ -1750,6 +1760,19 @@ public sealed partial class ClientGameSession : IDisposable
             if (parts[0].Equals("levels", StringComparison.OrdinalIgnoreCase))
             {
                 Say(LevelsCommand(parts.Skip(1).ToArray()));
+                return;
+            }
+            // ...and how loud your headphones are: set by ear, or by a number. Saved.
+            if (parts[0].Equals("listening", StringComparison.OrdinalIgnoreCase))
+            {
+                if (ListeningCalibration.Command(parts.Skip(1).ToArray(), () => ClientSettings.Load().Save()) is { } said) Say(said);
+                else _listening.Open(_simTime);
+                return;
+            }
+            // The ear model, on and off, to hear what it does. Not saved.
+            if (parts[0].Equals("ear", StringComparison.OrdinalIgnoreCase))
+            {
+                Say(ListeningCalibration.EarCommand(parts.Skip(1).ToArray()));
                 return;
             }
             _network.Send(new TextCommand { Command = parts[0].ToLowerInvariant(), Args = parts.Skip(1).ToArray() });

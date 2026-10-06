@@ -792,6 +792,9 @@ public sealed class WorldAudioPlayer
                 // rather than keeping it queued to fire from a stale position minutes afterwards.
                 IsEvent = true,
                 LevelDb = item.IsReflection ? 0f : item.Sound.LevelDb,
+                // For the ear model: the level it was placed by, and a copy's place under its source.
+                EarLevelDb = item.IsReflection && item.CopyGain > 0f ? item.SourceLevelDb : item.Sound.LevelDb,
+                EarCopyDb = item.IsReflection && item.CopyGain > 0f ? 20f * MathF.Log10(item.CopyGain) : 0f,
                 InsideListenersVehicle = item.SourceEntityId >= 0 && item.SourceEntityId == ListenerVehicleId,
             };
             // Somebody talking faces a way: duller and quieter behind them.
