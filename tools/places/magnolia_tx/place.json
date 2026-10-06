@@ -1,0 +1,31 @@
+{
+ "Id": "magnolia_tx",
+ "Name": "magnolia tx",
+ "Description": "Magnolia, Texas. Real streets and addresses from OpenStreetMap and public records. A 3 km square of the woods and subdivisions south of the town, round Bobcat Lane, Nichols Sawmill Road and Butera Road. Map data (c) OpenStreetMap contributors (ODbL); buildings from Overture Maps (Microsoft ML Buildings, OpenStreetMap, USGS lidar); addresses from the US National Address Database and Census TIGER/Line; tree cover from ESA WorldCover 2021 (CC BY 4.0). Lot lines, rooms and the individual trees are generated. Made by tools/gen_osm.py.",
+ "Area": {"Bbox": [30.110228, -95.756514, 30.137178, -95.725356]},
+ "Origin": [30.123703, -95.740935],
+ "Spawn": {"Address": "31907 Bobcat Lane"},
+ "CountyFips": "48339",
+ "Archive": "~/openfps-scratch-archive/osm-magnolia-2026-10-05",
+ "Detail": "medium",
+ "FullDetailMetres": 300,
+ "Units": "mph",
+ "SpeedMph": {"motorway": 70, "trunk": 60, "primary": 55, "secondary": 45, "tertiary": 40, "unclassified": 30,
+              "residential": 30, "living_street": 20, "service": 15, "default": 30},
+ "VergeMetres": 2.5,
+ "BrickShare": 0.55,
+ "Trees": {"Species": [["Loblolly pine", 0.55], ["Water oak", 0.2], ["Sweetgum", 0.15], ["Post oak", 0.1]],
+           "SpacingMedium": 60, "SpacingHigh": 16, "SpacingNear": 12, "CrownEveryMetres": 80,
+           "CanopyLow": 5.0, "CanopyHigh": 18.0},
+ "Traffic": [
+  {"Name": "Pickup on Nichols Sawmill Road", "Preset": "pickup_v8", "Road": "Nichols Sawmill Road", "Kind": "car", "TopKmh": 75},
+  {"Name": "Car on Grand Pines Drive", "Preset": "i4_midsize", "Road": "Grand Pines Drive", "Kind": "car", "TopKmh": 75},
+  {"Name": "Pickup on Butera Road", "Preset": "diesel_i4", "Road": "Butera Road", "Kind": "van", "TopKmh": 70, "Direction": -1},
+  {"Name": "Car on Walnut Creek Road", "Preset": "v6", "Road": "Walnut Creek Road", "Kind": "car", "TopKmh": 70},
+  {"Name": "Car on Turtle Creek Lane", "Preset": "i4_compact", "Road": "Turtle Creek Lane", "Kind": "car", "TopKmh": 55},
+  {"Name": "Pickup on Turtle Dove Lane", "Preset": "pickup_v8_flowmaster", "Road": "Turtle Dove Lane", "Kind": "car", "TopKmh": 55, "Direction": -1}
+ ],
+ "StreetLife": {"HornEverySeconds": 240, "HardBrakeEverySeconds": 0, "ParkEverySeconds": 0, "GunfireEverySeconds": 0, "AlarmEverySeconds": 0},
+ "Temperature": 42.0,
+ "Humidity": 0.4
+}

@@ -299,6 +299,13 @@ public static class AcousticVolumeGenerator
         int added = 0;
         var nearSolids = new List<FaceOpenings.Box>();
         var nearPlaces = new List<FaceOpenings.Place>();
+        // The walls and the places filed by where they stand, so each room asks about its neighbours
+        // and not the whole map (BoxColumns): the same ones, in the same order, as a scan of all.
+        var solidColumns = new BoxColumns(10f);
+        for (int i = 0; i < solids.Count; i++) solidColumns.Add(i, solids[i].Min, solids[i].Max);
+        var placeColumns = new BoxColumns(10f);
+        for (int i = 0; i < places.Count; i++) placeColumns.Add(i, places[i].Min, places[i].Max);
+        var candidates = new List<int>();
         foreach (var (room, rMin, rMax) in places)
         {
             if (rooms != null && !rooms.Contains(room.Id)) continue;
@@ -307,15 +314,23 @@ public static class AcousticVolumeGenerator
 
             float pad = FaceOpenings.WallReachMetres + 0.01f;
             nearSolids.Clear();
-            foreach (var (box, min, max) in solids)
+            solidColumns.Collect(rMin - new Vector3(pad), rMax + new Vector3(pad), candidates);
+            foreach (int i in candidates)
+            {
+                var (box, min, max) = solids[i];
                 if (Overlaps(min, max, rMin - new Vector3(pad), rMax + new Vector3(pad))) nearSolids.Add(box);
+            }
             // Beyond a face as far as the thickest wall near it and two voxels more.
             float wall = 0f;
             foreach (var b in nearSolids) wall = MathF.Max(wall, MathF.Min(b.Size.X, MathF.Min(b.Size.Y, b.Size.Z)));
             float out_ = MathF.Min(wall, 10f) + FaceOpenings.WallReachMetres + 2f * res + 0.01f;
             nearPlaces.Clear();
-            foreach (var (place, min, max) in places)
+            placeColumns.Collect(rMin - new Vector3(out_), rMax + new Vector3(out_), candidates);
+            foreach (int i in candidates)
+            {
+                var (place, min, max) = places[i];
                 if (Overlaps(min, max, rMin - new Vector3(out_), rMax + new Vector3(out_))) nearPlaces.Add(place);
+            }
 
             foreach (var gap in FaceOpenings.Find(room, region.Materials, nearSolids, nearPlaces, res, map.GlobalEnvironmentId))
             {

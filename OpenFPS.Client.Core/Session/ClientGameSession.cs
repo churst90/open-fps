@@ -1575,13 +1575,15 @@ public sealed partial class ClientGameSession : IDisposable
         foreach (var map in response.Maps)
         {
             string people = map.PlayerCount switch { 0 => "empty", 1 => "1 player", _ => $"{map.PlayerCount} players" };
-            string label = $"{map.Id}, {people}{(map.IsPublic ? "" : ", private")}{(map.IsCurrent ? ", you are here" : "")}";
+            // A map of a real place has a name to say ("magnolia tx"); the join still goes by its id.
+            string spoken = string.IsNullOrWhiteSpace(map.Name) ? map.Id : map.Name;
+            string label = $"{spoken}, {people}{(map.IsPublic ? "" : ", private")}{(map.IsCurrent ? ", you are here" : "")}";
             string id = map.Id;
             bool here = map.IsCurrent;
             items.Add(new MenuItem(label, () =>
             {
-                if (here) { Say($"You are already on {id}."); return; }
-                Say($"Going to {id}.");
+                if (here) { Say($"You are already on {spoken}."); return; }
+                Say($"Going to {spoken}.");
                 Command("join", id);
             }));
         }

@@ -40,11 +40,41 @@ public class EntityData
     /// <summary>The same thing as <see cref="RoomMaterials"/> written as raw resonance indices.
     /// Kept for the maps that already use it; prefer the names, which can be checked at load.</summary>
     public int[]? Materials { get; set; }
+
+    /// <summary>Which tile of a tiled map this stands in ("3,-2": TileMetres squares from the map's
+    /// origin, x then z). Written by tools/gen_osm.py so a map can later be streamed by tile without
+    /// being regenerated; nothing reads it yet.</summary>
+    public string? Tile { get; set; }
+
+    /// <summary>What a generated map's entity is part of ("roads", "zones", "structure", "rooms",
+    /// "interiors", "trees", ...), so a loader can leave a layer out; nothing reads it yet.</summary>
+    public string? Layer { get; set; }
+}
+
+/// <summary>Where a map made from a real place sits on the Earth: its (0, 0) in degrees, WGS84.</summary>
+public class GeoPoint
+{
+    public double Lat { get; set; }
+    public double Lon { get; set; }
 }
 
 public class MapData
 {
     public string Id { get; set; } = string.Empty;
+
+    /// <summary>What the map is called in the maps list, and what /join also answers to ("magnolia tx").
+    /// Empty: the id. The id stays what the server and saved players know it by.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The name to say: <see cref="Name"/>, or the id when there is none.</summary>
+    [JsonIgnore] public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Id : Name;
+
+    /// <summary>On a map of a real place, where its origin is (x east and z north are metres from it).</summary>
+    public GeoPoint? GeoOrigin { get; set; }
+
+    /// <summary>The size of the tiles a generated map's entities are tagged with (EntityData.Tile),
+    /// metres; 0 for a map that is not tiled.</summary>
+    public float TileMetres { get; set; }
     public Vector3 Size { get; set; }
     public Vector3 MinBound { get; set; } = new Vector3(-50, 0, -50);
     public Vector3 MaxBound { get; set; } = new Vector3(50, 20, 50);
@@ -473,9 +503,12 @@ public class MapRepository
         var maps = new List<MapData>();
         var options = JsonOptions;
 
-        // The maps that ship with the server, then the ones players made (/map new), which live in a
-        // folder of their own so that a checkout of the repository never carries anybody's map.
+        // The maps that ship with the server, the real places made by tools/gen_osm.py (a folder of
+        // their own, so the tests that load every shipped map do not load a town each), then the ones
+        // players made (/map new), which live in a folder of their own so that a checkout of the
+        // repository never carries anybody's map.
         var files = Directory.GetFiles(_directory, "*.json").ToList();
+        if (Directory.Exists(PlacesDirectory)) files.AddRange(Directory.GetFiles(PlacesDirectory, "*.json").OrderBy(f => f, StringComparer.Ordinal));
         if (Directory.Exists(PlayerDirectory)) files.AddRange(Directory.GetFiles(PlayerDirectory, "*.json"));
         foreach (var file in files)
         {
@@ -614,24 +647,31 @@ public class MapRepository
     /// <summary>Where the maps players make are kept: a folder of their own beside the shipped maps.</summary>
     public string PlayerDirectory => Path.Combine(_directory, "players");
 
+    /// <summary>Where the maps of real places are kept (tools/gen_osm.py writes them there).</summary>
+    public string PlacesDirectory => Path.Combine(_directory, "places");
+
     /// <summary>The file a map is in, or would be written to: a player's map in <see cref="PlayerDirectory"/>
     /// (one already there, or a new one with an owner), every other map beside the shipped ones.</summary>
     public string PathFor(MapData map)
     {
         string shipped = Path.Combine(_directory, $"{map.Id}.json");
         string players = Path.Combine(PlayerDirectory, $"{map.Id}.json");
+        string place = Path.Combine(PlacesDirectory, $"{map.Id}.json");
         if (File.Exists(players)) return players;
+        if (File.Exists(place)) return place;
         if (!File.Exists(shipped) && !string.IsNullOrWhiteSpace(map.OwnerId)) return players;
         return shipped;
     }
 
     /// <summary>Whether a map of this id has a file, shipped or a player's.</summary>
     public bool Exists(string mapId)
-        => File.Exists(Path.Combine(_directory, $"{mapId}.json")) || File.Exists(Path.Combine(PlayerDirectory, $"{mapId}.json"));
+        => File.Exists(Path.Combine(_directory, $"{mapId}.json")) || File.Exists(Path.Combine(PlayerDirectory, $"{mapId}.json"))
+           || File.Exists(Path.Combine(PlacesDirectory, $"{mapId}.json"));
 
     public string GetMapChecksum(string mapId)
     {
         string filePath = Path.Combine(_directory, $"{mapId}.json");
+        if (!File.Exists(filePath)) filePath = Path.Combine(PlacesDirectory, $"{mapId}.json");
         if (!File.Exists(filePath)) filePath = Path.Combine(PlayerDirectory, $"{mapId}.json");
         if (!File.Exists(filePath)) return "";
         

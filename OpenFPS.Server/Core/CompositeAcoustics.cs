@@ -188,6 +188,26 @@ public static class CompositeAcoustics
         => SurveyBox(Pieces(world, parts, loose: true), centre, size);
 
     /// <summary>
+    /// The same survey of a box that is turned: every part is taken into the box's own frame first, so
+    /// its faces are its own sides. Face names (north, east...) are then the box's own +Z and +X.
+    /// </summary>
+    public static RoomSurvey SurveyBox(World world, List<Entity> parts, Vector3 centre, Vector3 size, Quaternion rotation)
+    {
+        var pieces = Pieces(world, parts, loose: true);
+        var inverse = Quaternion.Inverse(Quaternion.Normalize(rotation));
+        for (int i = 0; i < pieces.Count; i++)
+        {
+            var p = pieces[i];
+            pieces[i] = p with
+            {
+                Position = centre + Vector3.Transform(p.Position - centre, inverse),
+                Rotation = Quaternion.Normalize(inverse * p.Rotation),
+            };
+        }
+        return SurveyBox(pieces, centre, size);
+    }
+
+    /// <summary>
     /// A composite's room when the room is KNOWN rather than found: a box in the composite's own
     /// frame, and only its materials measured from the parts.
     ///

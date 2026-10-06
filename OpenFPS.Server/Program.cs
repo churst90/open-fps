@@ -1250,7 +1250,7 @@ public class GameServer
         string from = session.CurrentMapId;
         if (from.Equals(mapId, StringComparison.OrdinalIgnoreCase) && session.Entity != Entity.Null)
         {
-            Say($"You are already on {mapId}.");
+            Say($"You are already on {_maps.DisplayName(mapId)}.");
             return;
         }
 
@@ -1270,12 +1270,12 @@ public class GameServer
 
         foreach (var other in _sessions.GetSessionsInMap(from))
             if (other.ConnectionId != session.ConnectionId)
-                SendToSession(other, new ChatMessage { Sender = "Server", Text = $"{session.Username} left for {mapId}.", Channel = ChatChannel.Server });
+                SendToSession(other, new ChatMessage { Sender = "Server", Text = $"{session.Username} left for {_maps.DisplayName(mapId)}.", Channel = ChatChannel.Server });
         foreach (var other in _sessions.GetSessionsInMap(mapId))
             if (other.ConnectionId != session.ConnectionId)
-                SendToSession(other, new ChatMessage { Sender = "Server", Text = $"{session.Username} arrived from {from}.", Channel = ChatChannel.Server });
+                SendToSession(other, new ChatMessage { Sender = "Server", Text = $"{session.Username} arrived from {_maps.DisplayName(from)}.", Channel = ChatChannel.Server });
 
-        Say($"Travelling to {mapId}.");
+        Say($"Travelling to {_maps.DisplayName(mapId)}.");
 
         var peer = _network.GetPeer(session.ConnectionId);
         if (peer != null) SendManifest(peer, session);
