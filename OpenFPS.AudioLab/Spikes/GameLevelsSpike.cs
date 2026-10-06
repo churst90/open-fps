@@ -46,6 +46,11 @@ public static class GameLevelsSpike
         string set = Arg(args, "set=") ?? "measure";
         string[] cars = (Arg(args, "cars=") ?? "i4_economy,i4_midsize,police_interceptor").Split(',', StringSplitOptions.RemoveEmptyEntries);
         Directory.CreateDirectory(outDir);
+        if (Arg(args, "calm=") is { } calm)
+        {
+            var c = calm.Split(',').Select(v => float.Parse(v, CultureInfo.InvariantCulture)).ToArray();
+            Calm = WindWeather.Steady(c[0], 250f, c.Length > 1 ? c[1] : 0f);
+        }
         string wav = Path.Combine(outDir, "capture.wav");
         AcousticRegistry.Initialize();
 
@@ -115,6 +120,8 @@ public static class GameLevelsSpike
                 EntityId = id, Type = EntityType.NPC, Moves = true,
                 Transform = new Transform { Position = at, Rotation = rot },
             };
+            // A real component, not default(struct): its initialisers (SynthRunning = true) only run in the constructor.
+            def.SoundEmitter = new SoundEmitterComponent();
             def.SoundEmitter.IsSynth = true;
             def.SoundEmitter.SoundId = "engine:" + preset;
             def.SoundEmitter.Mode = PlaybackMode.LoopOne;
@@ -135,6 +142,8 @@ public static class GameLevelsSpike
                 EntityId = id, Type = EntityType.StaticObject,
                 Transform = new Transform { Position = at, Rotation = Quaternion.Identity, Scale = Vector3.One },
             };
+            // A real component, not default(struct): its initialisers (SynthRunning = true) only run in the constructor.
+            def.SoundEmitter = new SoundEmitterComponent();
             def.SoundEmitter.IsSynth = true;
             def.SoundEmitter.SoundId = soundId;
             def.SoundEmitter.Mode = PlaybackMode.LoopOne;
@@ -157,6 +166,8 @@ public static class GameLevelsSpike
             float half = v.LengthMetres * 0.5f, side = v.WidthMetres * 0.5f;
             Stand(new Vector3(0f, 0f, half + 2f), MathF.PI);
             int id = AddCar(preset, Vector3.Zero, Vector3.Zero);
+            // Kept fresh, as the server's stream keeps a parked car's position fresh.
+            perFrame = _ => Move(id, Vector3.Zero, Quaternion.Identity, Vector3.Zero);
             Pump(5.0);   // started, the idle lift settled
             foreach (var (where, d) in spots)
             {
@@ -170,6 +181,7 @@ public static class GameLevelsSpike
                 Pump(0.8);
                 Record($"idle {preset} {where} {d:0.#}m", seconds);
             }
+            perFrame = null;
             Remove(id);
             Pump(1.5);
         }
@@ -211,7 +223,9 @@ public static class GameLevelsSpike
 
         // A walker's line at normal effort, said facing you from d metres. The first event of a key is
         // rendered and dropped (WorldAudioPlayer), so each is sent once to prime it.
-        var takes = Speech.Takes.Where(t => t.Line.StartsWith("greet", StringComparison.Ordinal)).Take(4).ToList();
+        var takes = Speech.Takes.Where(t => t.Line.StartsWith("greet", StringComparison.Ordinal)
+                                         && File.Exists(LabPaths.Sounds("VOICES", t.Voice, t.Line + ".ogg")))
+                               .GroupBy(t => t.Voice).Select(g => g.First()).Take(4).ToList();
         void Speak(float d, double seconds)
         {
             Stand(new Vector3(-30f, 0f, 30f), 0f);
@@ -282,6 +296,20 @@ public static class GameLevelsSpike
             Pump(1.5);
         }
 
+        // The wind at the ears is a voice of its own (EarWindVoice) and blows on every outdoor listener;
+        // the client's default before the server speaks is a 4.5 m/s breeze. Calm for everything but the
+        // wind's own rows, so each scene is that one source alone.
+        void Wind(float speed, double seconds)
+        {
+            Stand(new Vector3(60f, 0f, 60f), 0f);
+            WindField.Weather = WindWeather.Steady(speed, 250f, 0.25f);
+            Pump(3.0);
+            Record($"ear wind {speed:0.#}ms", seconds);
+            WindField.Weather = Calm;
+            Pump(2.0);
+        }
+        WindField.Weather = Calm;
+
         try
         {
             Pump(2.0);
@@ -293,6 +321,7 @@ public static class GameLevelsSpike
 
             if (set is "measure" or "all")
             {
+                foreach (var w in new[] { 2.2f, 4.5f, 7f }) Wind(w, 5.0);
                 Footsteps(6.0);
                 Speak(2f, 7.0);
                 Steady("fountain park", "water:park_fountain", 5f, 0.6f, 5.0, 160f);
@@ -333,6 +362,9 @@ public static class GameLevelsSpike
         Console.WriteLine($"Wrote {wav} and segments.csv ({segments.Count} segments); compression {Loudness.DynamicRangeCompression:F2}");
         return 0;
     }
+
+    /// <summary>calm=SPEED,TURBULENCE: the air for every scene but the wind's own (default still air).</summary>
+    private static WindWeather Calm = WindWeather.Steady(0f, 250f, 0f);
 
     private static string? Arg(string[] args, string key) => args.FirstOrDefault(x => x.StartsWith(key, StringComparison.Ordinal))?[key.Length..];
 }
