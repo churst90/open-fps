@@ -408,6 +408,16 @@ public sealed class OpeningRoutes
         }
     }
 
+    /// <summary>
+    /// For the parity harness only: the box grid hands its boxes back in the reverse of its walk order,
+    /// so the harness can measure how far the answers depend on the order the boxes are met in (the
+    /// barrier search tries a bounded number of ways round). Never set in the game.
+    /// </summary>
+    public static bool ReverseGridOrderForParity;
+
+    /// <summary>For the parity harness only: told every box the over-the-top search crosses.</summary>
+    public static Action<string>? DebugOverTheTop;
+
     /// <summary>How much bigger than a box its bounds are taken to be when finding the boxes near a
     /// segment, metres: a route is checked against boxes grown by its joint, less than this.</summary>
     private const float IndexMargin = 0.1f;
@@ -1443,15 +1453,28 @@ public sealed class OpeningRoutes
         }
         var included = scratch.Included;
         included.Clear();
-        foreach (var c in crossings)
+        // Swept again until nothing more is held up: two slabs side by side at the same height (two roofs
+        // of one house) hold each other up whichever is met first. A single sweep took the one met second
+        // and left the other out, so which boxes the string went over depended on the order the index
+        // happened to list them in (found by the geometry parity harness, 2026-10-06).
+        for (bool more = true; more;)
         {
-            int k0 = Math.Clamp((int)(c.S0 / run * bins), 0, bins - 1), k1 = Math.Clamp((int)(c.S1 / run * bins), 0, bins - 1);
-            float support = float.MinValue;
-            for (int k = k0; k <= k1; k++) support = MathF.Max(support, held[k]);
-            if (c.Bottom > support + 2f * RouteJointMetres) continue;
-            included.Add(c.Box);
-            for (int k = k0; k <= k1; k++) held[k] = MathF.Max(held[k], c.Top);
+            more = false;
+            foreach (var c in crossings)
+            {
+                if (included.Contains(c.Box)) continue;
+                int k0 = Math.Clamp((int)(c.S0 / run * bins), 0, bins - 1), k1 = Math.Clamp((int)(c.S1 / run * bins), 0, bins - 1);
+                float support = float.MinValue;
+                for (int k = k0; k <= k1; k++) support = MathF.Max(support, held[k]);
+                if (c.Bottom > support + 2f * RouteJointMetres) continue;
+                included.Add(c.Box);
+                for (int k = k0; k <= k1; k++) held[k] = MathF.Max(held[k], c.Top);
+                more = true;
+            }
         }
+        if (DebugOverTheTop != null)
+            foreach (var c in crossings)
+                DebugOverTheTop($"crossing {_solids[c.Box].Center} size {_solids[c.Box].Size} s {c.S0:F3}-{c.S1:F3} y {c.Bottom:F3}-{c.Top:F3} included {included.Contains(c.Box)}");
         if (included.Count == 0) return -1f;
         // Something over an end's own head — a ceiling, a canopy, a balcony — and the string could only
         // leave that end straight up through it. From under a roof the way out is sideways first, which
@@ -1477,7 +1500,9 @@ public sealed class OpeningRoutes
                 pts.Add((MathF.Max(c.S0, 1e-3f), c.Top + RouteJointMetres, c.Box));
                 pts.Add((MathF.Min(c.S1, run - 1e-3f), c.Top + RouteJointMetres, c.Box));
             }
-            pts.Sort((x, y) => x.S.CompareTo(y.S));
+            // By distance along, then height: the monotone chain wants them in that order, and two at the
+            // same distance (two boxes ending at one place) otherwise came in whatever order the index gave.
+            pts.Sort((x, y) => x.S != y.S ? x.S.CompareTo(y.S) : x.Y.CompareTo(y.Y));
             // Upper hull, left to right (Andrew's monotone chain).
             hull.Clear();
             foreach (var p in pts)
@@ -1586,6 +1611,28 @@ public sealed class OpeningRoutes
 
     /// <summary>For the lab: the barrier search spelled out — every box on the line with its shortest way
     /// round, and for the routes tried, which other box (if any) each one ran into.</summary>
+    /// <summary>The boxes a straight leg runs through, with what each lets through (the parity harness's
+    /// look at a leg).</summary>
+    public List<(Solid Box, Vector3 Gains)> LegBoxes(Vector3 a, Vector3 b)
+    {
+        var into = new List<int>();
+        _grid.Along(a, b, into);
+        var list = new List<(Solid, Vector3)>();
+        foreach (int i in into) if (SegmentHits(i, a, b)) list.Add((_solids[i], _solidGains[i]));
+        return list;
+    }
+
+    /// <summary>The boxes the index hands back for the vertical plane between two points (the parity
+    /// harness's look at what over-the-top is given).</summary>
+    public List<Solid> ColumnCandidates(Vector3 a, Vector3 b, float fromY)
+    {
+        var into = new List<int>();
+        _grid.Column(a, b, fromY, into);
+        var list = new List<Solid>();
+        foreach (int i in into) list.Add(_solids[i]);
+        return list;
+    }
+
     public string ExplainBarrier(Vector3 source, Vector3 listener)
     {
         var sb = new System.Text.StringBuilder();
@@ -1920,6 +1967,7 @@ public sealed class OpeningRoutes
             int mark = ++_threadMark;
             if (mark == int.MaxValue) { Array.Clear(_threadStamp); _threadMark = mark = 1; }
             Walk(a, b, _threadStamp, mark, into);
+            if (ReverseGridOrderForParity) into.Reverse();
         }
 
         /// <summary>Every box in the cells over the ground between the two points, from the height
@@ -1942,6 +1990,7 @@ public sealed class OpeningRoutes
                 float y = _origin.Y + (cy + 0.5f) * Cell;
                 Walk(new Vector3(a.X, y, a.Z), new Vector3(b.X, y, b.Z), _threadStamp, mark, into);
             }
+            if (ReverseGridOrderForParity) into.Reverse();
         }
 
         private void Walk(Vector3 a, Vector3 b, int[] stamp, int mark, List<int> into)

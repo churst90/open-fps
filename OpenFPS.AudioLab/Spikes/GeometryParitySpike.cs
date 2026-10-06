@@ -677,7 +677,55 @@ public static class GeometryParitySpike
         Console.WriteLine($"  routes, tile by tile from the store: {tiled.Openings.Count} openings in {newMs:F0} ms (the store itself {storeMs:F0} ms, "
                         + $"shared with the Steam Audio tiles): boxes {t.SolidsMs:F0}, openings derived {t.DeriveMs:F0}, sides checked {t.SidesMs:F0} ms");
 
-        CompareRoutes("Routes through openings (a whole build each way)", old, tiled, world, regionAt, rng, n, show, tallies);
+        if (args.FirstOrDefault(a => a.StartsWith("explainpair=")) is { } pairArg)
+        {
+            var f = pairArg[12..].Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray();
+            var ps = new Vector3(f[0], f[1], f[2]); var pl = new Vector3(f[3], f[4], f[5]);
+            if (f.Length > 6)
+            {
+                // A route's legs: to the opening named, and on from it.
+                var door = old.Openings.First(o => o.Id == (int)f[6]);
+                Console.WriteLine($"  opening {door.Id} at {V(door.Centre)}");
+                foreach (var (x, y) in new[] { (ps, door.Centre), (door.Centre, pl) })
+                {
+                    Console.WriteLine($"  leg {V(x)} -> {V(y)}: old {V(old.LegGains(x, y, door.Contents, Array.Empty<int>()))}, "
+                                    + $"tiled {V(tiled.LegGains(x, y, tiled.Openings.First(o => o.Id == door.Id).Contents, Array.Empty<int>()))}");
+                    OpeningRoutes.ReverseGridOrderForParity = true;
+                    var oldRev = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, regionAt);
+                    Console.WriteLine($"    old, its boxes met in reverse: {V(oldRev.LegGains(x, y, oldRev.Openings.First(o => o.Id == door.Id).Contents, Array.Empty<int>()))}");
+                    OpeningRoutes.ReverseGridOrderForParity = false;
+                    var unit = boxes.Select(b => b with { Rotation = b.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(b.Rotation) }).ToList();
+                    var oldUnit = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, unit, regionAt);
+                    Console.WriteLine($"    old, its turns made unit length: {V(oldUnit.LegGains(x, y, oldUnit.Openings.First(o => o.Id == door.Id).Contents, Array.Empty<int>()))}");
+                    foreach (var (b, g) in old.LegBoxes(x, y)) Console.WriteLine($"    old through {V(b.Center)} {V(b.Size)} {b.Material} leaf {b.IsLeaf} {V(g)}");
+                    foreach (var (b, g) in tiled.LegBoxes(x, y)) Console.WriteLine($"    tiled through {V(b.Center)} {V(b.Size)} {b.Material} leaf {b.IsLeaf} {V(g)}");
+                }
+                return;
+            }
+            OpeningRoutes.DebugOverTheTop = m => Console.WriteLine("      " + m);
+            Console.WriteLine("  OLD:\n" + old.ExplainBarrier(ps, pl));
+            Console.WriteLine("  TILED:\n" + tiled.ExplainBarrier(ps, pl));
+            float fy = MathF.Min(ps.Y, pl.Y) - 1f;
+            var c0 = old.ColumnCandidates(ps, pl, fy); var c1 = tiled.ColumnCandidates(ps, pl, fy);
+            Console.WriteLine($"  column: old {c0.Count} boxes, tiled {c1.Count}");
+            foreach (var b in c0.Where(x => !c1.Any(y => Vector3.Distance(x.Center, y.Center) < 1e-3f)))
+                Console.WriteLine($"    only old: {V(b.Center)} size {V(b.Size)} rot {b.Rotation} {b.Material}");
+            foreach (var b in c1.Where(x => !c0.Any(y => Vector3.Distance(x.Center, y.Center) < 1e-3f)))
+                Console.WriteLine($"    only tiled: {V(b.Center)} size {V(b.Size)} {b.Material}");
+            return;
+        }
+        CompareRoutes("Routes through openings (a whole build each way)", old, tiled, world, regionAt, new Random(5), n, show, tallies);
+        // The map writes a turn in six digits and it is not quite unit length; the box path's corners take
+        // it as it is (scaled by its length squared), the triangles make it unit first. With the box list's
+        // turns made unit, the box grid should answer as the tiles do.
+        var unitBoxes = boxes.Select(b => b with { Rotation = b.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(b.Rotation) }).ToList();
+        var gridUnit = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, unitBoxes, regionAt);
+        CompareRoutes("Box grid, turns made unit, against the tiles", gridUnit, tiled, world, regionAt, new Random(5), n, show, tallies);
+        // For scale: the box grid against itself with its boxes met the other way round.
+        OpeningRoutes.ReverseGridOrderForParity = true;
+        var reversed = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, regionAt);
+        OpeningRoutes.ReverseGridOrderForParity = false;
+        CompareRoutes("Control: the box grid against itself, boxes met in reverse", old, reversed, world, regionAt, new Random(5), n, show, tallies);
 
         // One tile changes, as a door swinging or a tile arriving does: what each way costs, and the
         // answers after it.
@@ -699,11 +747,17 @@ public static class GeometryParitySpike
         clock.Restart();
         OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
         Console.WriteLine($"  nothing changed: tile build {clock.Elapsed.TotalMilliseconds:F0} ms ({cache.Derived} derived, {cache.Kept} kept)");
-        CompareRoutes("Routes through openings (after one tile changed)", oldAfter, tiledAfter, world, regionAt, rng, n, show, tallies);
+        CompareRoutes("Routes through openings (after one tile changed)", oldAfter, tiledAfter, world, regionAt, new Random(6), n, show, tallies);
+        // The point of building tile by tile: kept and rebuilt, it answers as a build from nothing does.
+        // Both unasked: a graph keeps the legs it has worked out, coarsely by place, so one that has
+        // answered other questions first can answer this one from a neighbour's leg.
+        var fresh = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, AcousticGeometry.FromBoxes(changed, data.TileMetres, leaves), null, new OpeningRoutes.TileCache());
+        var kept = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
+        CompareRoutes("Tile build after a change against a tile build from nothing", fresh, kept, world, regionAt, new Random(7), n, show, tallies, exact: true);
     }
 
     private static void CompareRoutes(string name, OpeningRoutes old, OpeningRoutes tiled, WorldSnapshot world, Func<Vector3, int> regionAt,
-                                      Random rng, int n, int show, List<Tally> tallies)
+                                      Random rng, int n, int show, List<Tally> tallies, bool exact = false)
     {
         var openings = new Tally(name + ": openings");
         var routes = new Tally(name + ": Route()");
@@ -747,7 +801,20 @@ public static class GeometryParitySpike
             float diff = MathF.Max(Rel(a0.Low, a1.Low), MathF.Max(Rel(a0.Mid, a1.Mid), Rel(a0.High, a1.High)));
             float lenDiff = MathF.Abs(a0.Length - a1.Length);
             routes.MaxError = Math.Max(routes.MaxError, lenDiff);
-            if (r0 != r1 || (r0 && (diff > 1e-3f || lenDiff > 1e-3f || a0.Routes != a1.Routes)))
+            if (exact)
+            {
+                bool same = r0 == r1 && a0.Low == a1.Low && a0.Mid == a1.Mid && a0.High == a1.High && a0.Length == a1.Length && a0.Via == a1.Via;
+                if (same) routes.Same++; else routes.Differ("bits", $"{V(s)} to {V(l)}: {a0.Mid:R} {a0.Length:R} via {a0.Via} / {a1.Mid:R} {a1.Length:R} via {a1.Via}", show);
+            }
+            else if (r0 == r1 && r0 && a0.Via == a1.Via && lenDiff <= 1e-3f && diff > 1e-3f && diff < 0.035f)
+            {
+                // The same openings and length, the bands within 0.3 dB: the boxes' corners placed from a
+                // unit quaternion a few hundredths of a millimetre from where the box test put them,
+                // through Fresnel integrals deep in a shadow.
+                routes.Ties++; routes.Same++;
+                routes.TiePairs["the same openings, within 0.3 dB"] = routes.TiePairs.GetValueOrDefault("the same openings, within 0.3 dB") + 1;
+            }
+            else if (r0 != r1 || (r0 && (diff > 1e-3f || lenDiff > 1e-3f || a0.Routes != a1.Routes)))
                 routes.Differ(a0.Via == a1.Via && lenDiff <= 1e-3f ? "the same openings, gains apart" : "other openings",
                     $"{V(s)} (region {sr}) to {V(l)} (region {lr}): old {r0} {a0.Low:G4}/{a0.Mid:G4}/{a0.High:G4} {a0.Length:F3} m x{a0.Routes} via {a0.Via}; "
                     + $"tiled {r1} {a1.Low:G4}/{a1.Mid:G4}/{a1.High:G4} {a1.Length:F3} m x{a1.Routes} via {a1.Via} (bands {diff:G3} apart)", show);
