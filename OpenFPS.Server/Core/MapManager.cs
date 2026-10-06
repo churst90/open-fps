@@ -21,6 +21,22 @@ public class MapManager
 
     private readonly Dictionary<string, float> _earshot = new();
 
+    /// <summary>Each map's static geometry as triangles (docs/GEOMETRY.md stage 1), beside its grid.</summary>
+    private readonly Dictionary<string, ServerGeometry> _geometry = new();
+
+    /// <summary>A map's triangle world and its builder, when the triangle path is on.</summary>
+    public bool TryGetGeometry(string mapId, out ServerGeometry geometry) => _geometry.TryGetValue(mapId, out geometry!);
+
+    /// <summary>
+    /// Once a tick, after doors have swung and parts have been placed: door leaves move in the triangle
+    /// world, and statics spawned since the last build are taken in.
+    /// </summary>
+    public void SyncGeometry(string mapId)
+    {
+        if (!_maps.TryGetValue(mapId, out var data) || !_geometry.TryGetValue(mapId, out var geometry)) return;
+        geometry.Sync(data.world, data.grid);
+    }
+
     private readonly Dictionary<string, int> _trackObstructions = new();
 
     /// <summary>
@@ -709,7 +725,15 @@ public class MapManager
         // a durable entry, and only the static half survives the per-tick Clear().
         bool isDynamic = world.Has<Velocity>(entity) || world.Has<PlayerComponent>(entity);
         if (!isDynamic && world.Has<ColliderComponent>(entity))
+        {
             data.grid.AddOverlapping(t.Position, world.Get<ColliderComponent>(entity).Size, t.Rotation, entity, isStatic: true);
+            // Tested the old way until the triangle world takes it in, at the end of this tick.
+            if (_geometry.TryGetValue(mapId, out var geometry))
+            {
+                data.grid.AddUnindexed(entity);
+                geometry.MarkDirty();
+            }
+        }
     }
 
     /// <summary>
@@ -765,6 +789,17 @@ public class MapManager
             data.grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, isStatic: true);
             gridCount++;
         });
+
+        // The same static geometry as triangles: only the tiles whose solids changed are built again.
+        if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled)
+        {
+            if (!_geometry.TryGetValue(mapId, out var geometry))
+                _geometry[mapId] = geometry = new ServerGeometry(data.data.TileMetres > 0f ? data.data.TileMetres : 250f);
+            geometry.Rebuild(data.world, data.grid);
+            if (geometry.LastBuilt > 0)
+                Log.Information("MapManager: '{Id}' as triangles: {Tris:N0} in {Tiles} tile(s), {Built} built in {Ms:F0} ms.",
+                                mapId, geometry.World.TriangleCount, geometry.Builder.TileCount, geometry.LastBuilt, geometry.LastBuildMs);
+        }
 
         if (gridCount == 0)
         {

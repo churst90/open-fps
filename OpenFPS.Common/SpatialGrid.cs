@@ -212,7 +212,7 @@ public class SpatialGrid<T>
     }
 
     /// <summary>
-    /// Clears only the dynamic items from the grid. 
+    /// Clears only the dynamic items from the grid.
     /// Should be called every tick before re-populating if tracking dynamic entities.
     /// </summary>
     public void Clear()
@@ -228,6 +228,69 @@ public class SpatialGrid<T>
         _staticGrid.Clear();
         _dynamicGrid.Clear();
         _oversize.Clear();
+        _unindexed.Clear();
         StaticVersion++;
+    }
+
+    // ── The static geometry as triangles (docs/GEOMETRY.md, stage 1) ───────────────────────────────
+    //
+    // The queries that have moved to the triangle world ask it about static geometry and ask this grid
+    // only about what moves (its dynamic half) and about the few static things the triangle world does
+    // not hold (Unindexed): a shape that is not a box, and anything added since the world was last built.
+
+    private readonly List<T> _unindexed = new();
+
+    /// <summary>The static solid boxes of this grid as a triangle world, or null where nothing has built one
+    /// (every query then answers from the grid, as before).</summary>
+    public OpenFPS.Common.Geometry.TriangleWorld? Geometry { get; private set; }
+
+    /// <summary>Static items <see cref="Geometry"/> does not hold: test them as the grid always did.</summary>
+    public IReadOnlyList<T> Unindexed => _unindexed;
+
+    /// <summary>Puts a newly built triangle world in place, with the static items it does not hold.</summary>
+    public void SetGeometry(OpenFPS.Common.Geometry.TriangleWorld? geometry, IEnumerable<T> unindexed)
+    {
+        _unindexed.Clear();
+        _unindexed.AddRange(unindexed);
+        Geometry = geometry;
+        StaticVersion++;
+    }
+
+    /// <summary>The same geometry with movers in new poses (door leaves): no static item changed.</summary>
+    public void MoveGeometry(OpenFPS.Common.Geometry.TriangleWorld geometry)
+    {
+        if (ReferenceEquals(geometry, Geometry)) return;
+        Geometry = geometry;
+        StaticVersion++;
+    }
+
+    /// <summary>A static item added after <see cref="Geometry"/> was built: tested the old way until the
+    /// next build takes it in.</summary>
+    public void AddUnindexed(T item)
+    {
+        if (Geometry != null) _unindexed.Add(item);
+    }
+
+    /// <summary>
+    /// What the triangle world does not answer for near a point: every item of the dynamic half in the
+    /// cells round it, and every <see cref="Unindexed"/> static item, each once.
+    /// </summary>
+    public void CollectDynamicInRadius(Vector3 pos, float radius, List<T> into, HashSet<T> seen)
+    {
+        into.Clear();
+        seen.Clear();
+        for (int i = 0; i < _unindexed.Count; i++)
+            if (seen.Add(_unindexed[i])) into.Add(_unindexed[i]);
+        int cellRadius = (int)Math.Ceiling(radius / _cellSize);
+        var centerCell = GetCell(pos);
+        for (int x = -cellRadius; x <= cellRadius; x++)
+        {
+            for (int z = -cellRadius; z <= cellRadius; z++)
+            {
+                if (_dynamicGrid.TryGetValue((centerCell.Item1 + x, centerCell.Item2 + z), out var dynamicList))
+                    for (int i = 0; i < dynamicList.Count; i++)
+                        if (seen.Add(dynamicList[i])) into.Add(dynamicList[i]);
+            }
+        }
     }
 }

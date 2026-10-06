@@ -70,6 +70,117 @@ public class SpatialService
         return candidates;
     }
 
+    // ═══ The triangle world (docs/GEOMETRY.md stage 1) ═══════════════════════════════════════════
+    //
+    // When the snapshot carries a triangle world, the static solids are asked of it and only what it does
+    // not hold — everything that moves, and the few statics it has not taken in (Unindexed) — goes through
+    // the per-entity tests below, which are the box path unchanged. The two answer the same question; the
+    // parity harness (AudioLab --geometry-parity) lists where they differ.
+
+    [ThreadStatic] private static List<EntitySnapshot>? _others;
+    [ThreadStatic] private static List<OpenFPS.Common.Geometry.GeometryCrossing>? _crossings;
+    [ThreadStatic] private static List<OpenFPS.Common.Geometry.SolidRef>? _inside;
+    [ThreadStatic] private static Dictionary<OpenFPS.Common.Geometry.SolidRef, int>? _crossed;
+
+    /// <summary>Whether this snapshot's static solids are answered by its triangle world.</summary>
+    public static bool UsesTriangles(WorldSnapshot world) => world.Geometry != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled;
+
+    /// <summary>What the triangle world does not answer for: what moves (unless <paramref name="staticOnly"/>)
+    /// and the statics it does not hold.</summary>
+    private static List<EntitySnapshot> Others(WorldSnapshot world, bool staticOnly)
+    {
+        var list = _others ??= new List<EntitySnapshot>(32);
+        list.Clear();
+        foreach (int id in world.UnindexedStatics)
+            if (world.Entities.TryGetValue(id, out var s)) list.Add(s);
+        if (!staticOnly) list.AddRange(world.DynamicEntities);
+        return list;
+    }
+
+    /// <summary>Counts what the box path counted: not the stale (rebuilding) and not up to two entities.</summary>
+    private struct StaticFilter : OpenFPS.Common.Geometry.IGeometryFilter
+    {
+        public IReadOnlySet<int>? Stale;
+        public int A, B;
+        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
+            => owner != A && owner != B && (Stale == null || !Stale.Contains(owner));
+    }
+
+    /// <summary>The box path's predicates over EntitySnapshots, asked of a triangle's owner.</summary>
+    private struct PredicateFilter : OpenFPS.Common.Geometry.IGeometryFilter
+    {
+        public StaticFilter Base;
+        public WorldSnapshot World;
+        public Func<EntitySnapshot, bool>? Accepts;
+        public Func<EntitySnapshot, bool>? Skips;
+        public bool GlassBlocks;
+        public bool SkipGlass;
+        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
+        {
+            if (!Base.Accept(owner, surface)) return false;
+            if (SkipGlass && !GlassBlocks && surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.Glass)) return false;
+            if (Accepts == null && Skips == null) return true;
+            if (!World.Entities.TryGetValue(owner, out var e)) return false;
+            if (Accepts != null && !Accepts(e)) return false;
+            if (Skips != null && Skips(e)) return false;
+            return true;
+        }
+    }
+
+    private StaticFilter Filter(WorldSnapshot world, int a = int.MinValue, int b = int.MinValue)
+        => new() { Stale = world.GeometryStale, A = a, B = b };
+
+    /// <summary>
+    /// The static solids' share of <see cref="GetOcclusionData"/>: every solid the nudged segment passes
+    /// through (or starts or ends in), each charged its WallTransmission once, or once per wall of a hollow
+    /// shell it actually crosses.
+    /// </summary>
+    private static void StaticOcclusion(WorldSnapshot world, Vector3 nudgedStart, Vector3 nudgedEnd, Vector3 rayDir,
+                                        StaticFilter filter, ref float eqLow, ref float eqMid, ref float eqHigh)
+    {
+        var geo = world.Geometry!;
+        float len = Vector3.Dot(nudgedEnd - nudgedStart, rayDir);
+        if (len <= 0f) return;
+        var crossings = _crossings ??= new List<OpenFPS.Common.Geometry.GeometryCrossing>(16);
+        var inside = _inside ??= new List<OpenFPS.Common.Geometry.SolidRef>(4);
+        var crossed = _crossed ??= new Dictionary<OpenFPS.Common.Geometry.SolidRef, int>();
+        crossed.Clear();
+        geo.All(nudgedStart, rayDir, len, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref filter, crossings);
+        foreach (var c in crossings) crossed.TryAdd(c.Solid, 0);
+        inside.Clear();
+        geo.Containing(nudgedStart, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref filter, inside);
+        foreach (var s in inside) crossed.TryAdd(s, 0);
+        if (crossed.Count == 0) return;
+        foreach (var solid in crossed.Keys)
+        {
+            ref readonly var surface = ref geo.SurfaceOf(solid);
+            var panel = surface.Construction.PanelSize;
+            int layers = 1;
+            if (surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.Hollow))
+            {
+                // A hollow shell is walls of its shell thickness round an empty inside: one wall in and
+                // one out, or one if either end is inside it.
+                float shell = surface.Construction.ShellThickness > 0 ? surface.Construction.ShellThickness : 0.2f;
+                var s = panel;
+                float a = MathF.Max(s.X, MathF.Max(s.Y, s.Z)), b = s.X + s.Y + s.Z - a - MathF.Min(s.X, MathF.Min(s.Y, s.Z));
+                panel = new Vector3(shell, a, b);
+                bool startIn = Contains(geo, solid, nudgedStart), endIn = Contains(geo, solid, nudgedEnd);
+                layers = (startIn ? 0 : 1) + (endIn ? 0 : 1);
+            }
+            var (gl, gm, gh) = WallTransmission.BandGains(surface.Material, panel, surface.Construction.Build);
+            for (int k = 0; k < layers; k++) { eqLow *= gl; eqMid *= gm; eqHigh *= gh; }
+        }
+    }
+
+    private static bool Contains(OpenFPS.Common.Geometry.TriangleWorld geo, OpenFPS.Common.Geometry.SolidRef solid, Vector3 p)
+    {
+        var inside = _inside ??= new List<OpenFPS.Common.Geometry.SolidRef>(4);
+        inside.Clear();
+        var all = new OpenFPS.Common.Geometry.AcceptAll();
+        geo.Containing(p, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref all, inside);
+        return inside.Contains(solid);
+    }
+
     /// <summary>
     /// Calculates the occlusion factor (0.0 to 1.0) between two points.
     /// Also outputs the 'bleed' factor (how much sound passes through materials).
@@ -157,7 +268,14 @@ public class SpatialService
 
         Vector3 center = (start + end) / 2.0f;
         // Search a wider radius to ensure we catch large static objects like foundations
-        var entitiesToTest = GetEntitiesToTest(world, center, (dist / 2.0f) + 10.0f);
+        List<EntitySnapshot> entitiesToTest;
+        if (UsesTriangles(world))
+        {
+            StaticOcclusion(world, nudgedStart, nudgedEnd, rayDir, Filter(world, ignoreEntityId, ignoreEntityId2),
+                            ref eqLow, ref eqMid, ref eqHigh);
+            entitiesToTest = Others(world, staticOnly: false);
+        }
+        else entitiesToTest = GetEntitiesToTest(world, center, (dist / 2.0f) + 10.0f);
 
         foreach (var entitySnap in entitiesToTest)
         {
@@ -270,13 +388,29 @@ public class SpatialService
             materials[i] = "Generic";
         }
 
-        var entitiesToTest = GetEntitiesToTest(world, start, maxDist, staticOnly);
+        List<EntitySnapshot> entitiesToTest;
+        if (UsesTriangles(world))
+        {
+            var geo = world.Geometry!;
+            var filter = Filter(world);
+            for (int i = 0; i < directions.Length; i++)
+            {
+                if (!geo.Enter(start, directions[i], maxDist, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref filter, out var hit)) continue;
+                if (!(hit.T < distances[i])) continue;
+                ref readonly var surface = ref geo.SurfaceOf(hit);
+                distances[i] = hit.T;
+                absorptions[i] = surface.Absorption > 0 ? surface.Absorption : AcousticRegistry.GetProperties(surface.Material).Absorption;
+                materials[i] = string.IsNullOrEmpty(surface.Material) ? "Generic" : surface.Material;
+            }
+            entitiesToTest = Others(world, staticOnly);
+        }
+        else entitiesToTest = GetEntitiesToTest(world, start, maxDist, staticOnly);
 
         foreach (var entitySnap in entitiesToTest)
         {
             var def = entitySnap.Definition;
             if (def.Collider.Size.X <= 0 || !def.Collider.IsSolid) continue;
-            
+
             var transform = entitySnap.Transform;
             var registryProps = AcousticRegistry.GetProperties(def.Material.Material);
             float absorption = (def.Acoustics.Absorption > 0) ? def.Acoustics.Absorption : registryProps.Absorption;
@@ -390,7 +524,21 @@ public class SpatialService
         material = "Generic";
         bool hit = false;
 
-        var entitiesToTest = GetEntitiesToTest(world, start, maxDist);
+        List<EntitySnapshot> entitiesToTest;
+        if (UsesTriangles(world))
+        {
+            var geo = world.Geometry!;
+            var filter = Filter(world, ignoreEntityId, OwnEntityId);
+            if (geo.Enter(start, dir, maxDist, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref filter, out var h) && h.T < distance)
+            {
+                distance = h.T;
+                normal = h.Normal;
+                material = geo.SurfaceOf(h).Material;
+                hit = true;
+            }
+            entitiesToTest = Others(world, staticOnly: false);
+        }
+        else entitiesToTest = GetEntitiesToTest(world, start, maxDist);
 
         foreach (var entitySnap in entitiesToTest)
         {
@@ -536,13 +684,32 @@ public class SpatialService
             return true;
         }
 
-        const float Stretch = 40f;
-        for (float from = 0f; from < maxDist && from < hitDistance; from += Stretch)
+        if (UsesTriangles(world))
         {
-            float to = MathF.Min(maxDist, from + Stretch);
-            var candidates = GetEntitiesToTest(world, start + dir * (0.5f * (from + to)), 0.5f * (to - from) + 2f, staticOnly: true);
-            for (int i = 0; i < candidates.Count; i++)
-                if (Test(candidates[i], ref hitDistance)) { hitEntity = candidates[i]; found = true; }
+            var geo = world.Geometry!;
+            var filter = new PredicateFilter
+            {
+                Base = Filter(world, OwnEntityId), World = world, Skips = skip, GlassBlocks = glassBlocks, SkipGlass = true,
+            };
+            if (geo.Enter(start, dir, maxDist, OpenFPS.Common.Geometry.GeometryLayers.Sight, ref filter, out var h)
+                && h.T < hitDistance && world.Entities.TryGetValue(h.Owner, out var e))
+            {
+                hitDistance = h.T; hitEntity = e; found = true;
+            }
+            var others = Others(world, staticOnly: true);
+            for (int i = 0; i < others.Count; i++)
+                if (Test(others[i], ref hitDistance)) { hitEntity = others[i]; found = true; }
+        }
+        else
+        {
+            const float Stretch = 40f;
+            for (float from = 0f; from < maxDist && from < hitDistance; from += Stretch)
+            {
+                float to = MathF.Min(maxDist, from + Stretch);
+                var candidates = GetEntitiesToTest(world, start + dir * (0.5f * (from + to)), 0.5f * (to - from) + 2f, staticOnly: true);
+                for (int i = 0; i < candidates.Count; i++)
+                    if (Test(candidates[i], ref hitDistance)) { hitEntity = candidates[i]; found = true; }
+            }
         }
         for (int i = 0; i < world.DynamicEntities.Count; i++)
         {
@@ -565,7 +732,19 @@ public class SpatialService
         bool found = false;
 
         Vector3 center = start + (dir * (maxDist / 2.0f));
-        var entitiesToTest = GetEntitiesToTest(world, center, (maxDist / 2.0f) + 1.0f);
+        List<EntitySnapshot> entitiesToTest;
+        if (UsesTriangles(world))
+        {
+            var geo = world.Geometry!;
+            var filter = new PredicateFilter { Base = Filter(world), World = world, Accepts = accept };
+            if (geo.Enter(start, dir, maxDist, OpenFPS.Common.Geometry.GeometryLayers.Physical, ref filter, out var h)
+                && h.T < hitDistance && world.Entities.TryGetValue(h.Owner, out var e))
+            {
+                hitDistance = h.T; hitEntity = e; found = true;
+            }
+            entitiesToTest = Others(world, staticOnly: false);
+        }
+        else entitiesToTest = GetEntitiesToTest(world, center, (maxDist / 2.0f) + 1.0f);
 
         foreach (var entitySnap in entitiesToTest)
         {

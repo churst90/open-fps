@@ -142,6 +142,7 @@ string[] usage =
     "  --tile-scenes [map=magnolia_tx]                Steam Audio scene per tile on Embree against one mesh: cost and answers",
     "  --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium]  a streamed map walked: tile costs, worker gaps",
     "  --geometry [map=magnolia_tx] [terrain=5] [sa=1] the world as triangles: BVH and Steam Audio costs (docs/GEOMETRY.md)",
+    "  --geometry-parity [map=city] [n=4000] [only=rays,ground,...] old box path and triangle world side by side, every difference",
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
     "  --ambisonic                                   ambisonic encode and decode come out of the right ear",
     "  --dsp-order                                   where HEAD and TAIL put a unit in a channel's chain",
@@ -730,6 +731,11 @@ if (args.Contains("--stream-walk"))
 {
     // --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [heading=east]: tiles streamed as you move.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.StreamWalkSpike.Run(args));
+}
+if (args.Contains("--geometry-parity"))
+{
+    // --geometry-parity [map=city] [n=4000] [only=...]: the box path and the triangle world side by side (docs/GEOMETRY.md stage 1).
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GeometryParitySpike.Run(args));
 }
 if (args.Contains("--geometry"))
 {

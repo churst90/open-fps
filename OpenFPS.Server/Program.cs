@@ -864,6 +864,9 @@ public class GameServer
                     _doors.Update(world, dt, SyncAudioComponent,
                                   (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds));
                     ParentSystem.Update(world, lookup);
+                    // Door leaves where they now are in the triangle world, and any static spawned this
+                    // tick taken into it (docs/GEOMETRY.md stage 1).
+                    _maps.SyncGeometry(entry.Key);
                     _occupancy.Update(world, lookup);
                     stage.Dispose();
                 }

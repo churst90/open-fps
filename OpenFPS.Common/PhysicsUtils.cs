@@ -44,6 +44,9 @@ public static class PhysicsUtils
     {
         const float stepHeight = 0.4f;
 
+        if (grid.Geometry != null && Geometry.TriangleGeometry.Enabled)
+            return GroundFromGeometry(world, grid, pos, ignore, stepHeight, out material);
+
         // 1. Optimized Grid Search. CollectInRadius walks the cells ONCE and yields each candidate once;
         //    the old ToList() over the iterator handed a multi-cell floor back as many times as it spanned
         //    cells, and every one of those repeats was then tested against all five probe points.
@@ -68,6 +71,54 @@ public static class PhysicsUtils
 
         return ground;
     }
+
+    /// <summary>Counts every solid but those of the entities in <paramref name="Ignore"/>.</summary>
+    private readonly struct IgnoreEntities : Geometry.IGeometryFilter
+    {
+        private readonly ICollection<Entity>? _ignore;
+        public IgnoreEntities(ICollection<Entity>? ignore) => _ignore = ignore is { Count: > 0 } ? ignore : null;
+        public bool Accept(int owner, in Geometry.Surface surface)
+        {
+            if (_ignore == null) return true;
+            foreach (var e in _ignore) if (e.Id == owner) return false;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// The server ground probe on the triangle world (docs/GEOMETRY.md 3.3): the static solids from it, and
+    /// what moves and what it does not hold the old way; the higher of the two. Five points, the highest
+    /// top no higher than a step above the feet, exactly as <see cref="CalculateHeightFromCandidates"/>.
+    /// </summary>
+    private static float GroundFromGeometry(World world, SpatialGrid<Entity> grid, Vector3 pos, ICollection<Entity>? ignore,
+                                            float stepHeight, out string material)
+    {
+        var filter = new IgnoreEntities(ignore);
+        var geo = grid.Geometry!;
+        float ground = geo.Ground(pos, PhysicsConstants.PlayerRadius, stepHeight, Geometry.GeometryLayers.Ground, ref filter, out var solid, out _);
+        material = ground > -1000f ? GroundMaterial(geo.SurfaceOf(solid).Material) : "Generic";
+
+        var candidates = _entityScratch ??= new List<Entity>(64);
+        var seen = _entitySeen ??= new HashSet<Entity>();
+        grid.CollectDynamicInRadius(pos, 50.0f, candidates, seen);
+        if (ignore != null && ignore.Count > 0) candidates.RemoveAll(ignore.Contains);
+        float other = CalculateHeightFromCandidates(world, candidates, pos, stepHeight, out string otherMaterial);
+        if (other > ground) { ground = other; material = otherMaterial; }
+
+        if (ground < -900f)
+        {
+            // As the box path: nothing found near, so everything is asked (a body far out on a vehicle).
+            var allStatic = new List<Entity>();
+            world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e) => {
+                if (ignore == null || !ignore.Contains(e)) allStatic.Add(e);
+            });
+            ground = CalculateHeightFromCandidates(world, allStatic, pos, stepHeight, out material);
+        }
+        return ground;
+    }
+
+    /// <summary>The material a floor reports: the server's box path read the component as it was.</summary>
+    private static string GroundMaterial(string material) => material;
 
     /// <summary>
     /// The memoized form of the server ground probe: recomputes only when the static geometry has changed,
@@ -150,6 +201,30 @@ public static class PhysicsUtils
     {
         const float stepHeight = 0.4f;
 
+        if (snapshot.Geometry != null && Geometry.TriangleGeometry.Enabled)
+        {
+            // The triangle world for the static solids (docs/GEOMETRY.md 3.3), the old test for the statics
+            // it does not hold; nothing that moves, as the box path counted only the static grid.
+            var filter = new SnapshotGround { Stale = snapshot.GeometryStale, Own = ownEntityId };
+            var geo = snapshot.Geometry;
+            float y = geo.Ground(pos, PhysicsConstants.PlayerRadius, stepHeight, Geometry.GeometryLayers.Ground, ref filter, out var solid, out _);
+            string m = "Generic";
+            if (y > -1000f) { var raw = geo.SurfaceOf(solid).Material; m = string.IsNullOrEmpty(raw) ? "Generic" : raw; }
+            if (snapshot.UnindexedStatics.Count > 0)
+            {
+                var others = _snapshotScratch ??= new List<EntitySnapshot>(64);
+                others.Clear();
+                foreach (int id in snapshot.UnindexedStatics)
+                    if (snapshot.Entities.TryGetValue(id, out var s)) others.Add(s);
+                float o = CalculateHeightFromSnapshots(others, pos, stepHeight, ownEntityId, out string om);
+                if (o > y) { y = o; m = om; }
+            }
+            if (y < -900f && snapshot.Entities.Count > 0)
+                y = CalculateHeightFromSnapshots(snapshot.Entities.Values, pos, stepHeight, ownEntityId, out m);
+            material = m;
+            return y;
+        }
+
         // 1. Optimized Grid Search — one walk of the cells, each candidate once (see the server version).
         var candidates = _snapshotScratch ??= new List<EntitySnapshot>(64);
         candidates.Clear();
@@ -174,6 +249,13 @@ public static class PhysicsUtils
         }
 
         return ground;
+    }
+
+    private struct SnapshotGround : Geometry.IGeometryFilter
+    {
+        public IReadOnlySet<int>? Stale;
+        public int Own;
+        public readonly bool Accept(int owner, in Geometry.Surface surface) => owner != Own && (Stale == null || !Stale.Contains(owner));
     }
 
     private static float CalculateHeightFromSnapshots(IEnumerable<EntitySnapshot> candidates, Vector3 pos, float stepHeight, int ownEntityId, out string material)
