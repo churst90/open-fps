@@ -215,6 +215,8 @@ public class ClientWorldState
         }
         _tiles.Clear();
         _woods = null;
+        _crownIds.Clear();
+        _crownsDirty = false;
         _woodIds.Clear();
         _woodKeys.Clear();
 
@@ -276,6 +278,11 @@ public class ClientWorldState
         if (def.SoundEmitter.RunsOnItsOwn())
             _audioEntityIds[def.EntityId] = 0;
 
+        if (!IsWood(def.EntityId) && def.SoundEmitter.IsSynth
+            && def.SoundEmitter.SoundId?.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            if (_crownIds.TryAdd(def.EntityId, 0)) _crownsDirty = true;
+        }
         if (IsMarker(def)) _markerEntityIds[def.EntityId] = 0;
         else _markerEntityIds.TryRemove(def.EntityId, out _);
 
@@ -430,6 +437,7 @@ public class ClientWorldState
             _audioEntityIds.TryRemove(id, out _);
             _regionEntityIds.TryRemove(id, out _);
             _markerEntityIds.TryRemove(id, out _);
+            if (_crownIds.TryRemove(id, out _)) _crownsDirty = true;
             lock (_snapshotBuffer) _held.Remove(id);
             if (known) removed.Add(id);
         }
@@ -1035,8 +1043,15 @@ public class ClientWorldState
     // made from the crowns held, so the audio system ranks, places and voices it as it does a tree.
 
     private WoodChorus? _woods;
+    /// <summary>The tree crowns held, and whether they changed since the woods were last made.</summary>
+    private readonly ConcurrentDictionary<int, byte> _crownIds = new();
+    private volatile bool _crownsDirty;
     private readonly Dictionary<(int, int, string), int> _woodIds = new();
     private readonly Dictionary<int, (string Key, Vector3 Centre, float Range)> _woodKeys = new();
+
+    /// <summary>What the last making of the woods cost the calling thread, and the most it has, ms.</summary>
+    public double LastWoodsMs { get; private set; }
+    public double WoodsMsMax { get; set; }
 
     /// <summary>Whether an id is one of the client's own wood entities.</summary>
     public static bool IsWood(int entityId) => entityId <= WoodChorus.FirstId && entityId > WoodChorus.FirstId - 1_000_000;
@@ -1048,13 +1063,15 @@ public class ClientWorldState
     /// </summary>
     public List<int> RefreshWoods()
     {
+        if (!_crownsDirty) return new List<int>();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        _crownsDirty = false;
         var crowns = new List<WoodChorus.Crown>();
         EntityDefinition? sample = null;
-        foreach (var (id, def) in _definitions)
+        foreach (int id in _crownIds.Keys)
         {
-            if (IsWood(id)) continue;
-            var sid = def.SoundEmitter.SoundId;
-            if (!def.SoundEmitter.IsSynth || sid == null || !sid.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!_definitions.TryGetValue(id, out var def)) continue;
+            var sid = def.SoundEmitter.SoundId!;
             crowns.Add(new WoodChorus.Crown(id, _serverTransforms.TryGetValue(id, out var t) ? t.Position : def.Transform.Position, sid[8..]));
             sample ??= def;
         }
@@ -1093,6 +1110,8 @@ public class ClientWorldState
         if (gone.Count > 0) RemoveEntities(gone);
         _woods = chorus.Woods.Count > 0 ? chorus : null;
         Touch();
+        LastWoodsMs = clock.Elapsed.TotalMilliseconds;
+        WoodsMsMax = Math.Max(WoodsMsMax, LastWoodsMs);
         return gone;
     }
 
