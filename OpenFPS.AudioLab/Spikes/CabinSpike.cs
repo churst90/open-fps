@@ -55,6 +55,8 @@ public static class CabinSpike
         if (Arg(args, "cabin=") is { } cabinDb) FmodAudioProvider.CabinDb = float.Parse(cabinDb, CultureInfo.InvariantCulture);
         // probe=align: a click in the engine's voice and its negative in the exhaust's tap (EngineVoiceState.LabAlignProbe).
         if (Arg(args, "probe=") is "align") EngineVoiceState.LabAlignProbe = true;
+        // roof=world: the rain on the roof of the vehicle ridden left in the world, as before 2026-10-06.
+        if (Arg(args, "roof=") is "world") RainField.RoofRidesWithHead = false;
         if (args.Contains("model")) return Model(args);
         if (args.Contains("hrtf")) return Hrtf(args);
         return Game(args);

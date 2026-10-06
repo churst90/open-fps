@@ -977,9 +977,13 @@ public sealed class RainField
     /// the survey (the roof is fixed to the car, and so is the head) and moves with the vehicle.
     /// OPENFPS_CABIN_PATHS=0 leaves it in the world, as before 2026-10-06.
     /// </summary>
+    /// <summary>For the lab: false leaves the roof in the world, to tell what riding with the head does.</summary>
+    internal static bool RoofRidesWithHead = true;
+
     private void OnYourRoof(ref SpatialEmitter e, Vector3 at)
     {
-        if (!OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled || _rideVelocity is not { } v || !e.InsideListenersVehicle) return;
+        if (!OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled || !RoofRidesWithHead
+            || _rideVelocity is not { } v || !e.InsideListenersVehicle) return;
         var offset = at - _lastAt;
         e.FollowsListener = true;
         e.ListenerOffset = offset;
