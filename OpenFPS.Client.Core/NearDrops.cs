@@ -195,7 +195,8 @@ public sealed class NearDrops
 
     private void Cell(RainSurvey.NearCell c, ParticleSpectrum s, PrecipitationKind kind, float from, Vector3 ear, double t, float dt, List<Impact> into)
     {
-        float mean = s.PerSquareMetreSecond * s.ShareAbove(from) * c.Area * dt;
+        // Clustered as the patches are (RainSynth.Intermittency): the big drops come in the same swells.
+        float mean = s.PerSquareMetreSecond * s.ShareAbove(from) * c.Area * dt * OpenFPS.Client.AudioEngine.Core.Nature.RainSynth.Intermittency(t);
         int n = Poisson(mean);
         for (int k = 0; k < n; k++)
         {

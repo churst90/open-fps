@@ -146,6 +146,12 @@ public sealed class FoliageSynth
         _rate = sampleRate;
         _sum = new EventSum(sampleRate, seed);
         Vogel = Math.Clamp(spec.VogelExponent, -1.5f, 0f);
+        // The increments carry the same mean energy as the fit of LeafStrikePascals was made with: a
+        // strike's goes as (u e)^(2 · 1.2), an episode's scale as the old 0.4 + 1.2 u's (mean square 1.12).
+        _incrementOrder = IncrementOrder;
+        _incrementNorm = MathF.Sqrt(GammaMoment(_incrementOrder, 2 * StrikeSpeedPower));
+        _episodeOrder = EpisodeOrder;
+        _episodeNorm = MathF.Sqrt(GammaMoment(_episodeOrder, 2 * EpisodePower) / 1.12f);
         float crownArea = MathF.PI * spec.CrownRadiusMetres * spec.CrownRadiusMetres;
         float leafArea = MathF.Max(0.01f, spec.LeafAreaCm2) * 1e-4f;
         _leaves = spec.Leaves == LeafKind.Broadleaf ? spec.LeafAreaIndex * crownArea / leafArea : 0f;
@@ -163,6 +169,59 @@ public sealed class FoliageSynth
         _shedNorm = 0.8f / Resonator.NoiseGain(_shedHz, 0.7f, sampleRate);
         _shedHighNorm = 0.35f / Resonator.NoiseGain(_shedHz * 3f, 0.6f, sampleRate);
         _shedGlide = 1f - MathF.Exp(-1f / (0.005f * sampleRate));
+    }
+
+    /// <summary>
+    /// How hard the air through the crown hits one leaf, or one twig, against the mean: a velocity
+    /// increment across a few centimetres of turbulent air, mean one. Small-scale velocity increments
+    /// in turbulence are not Gaussian: their distribution has exponential tails, fatter the smaller the
+    /// scale (Kailasnath, Sreenivasan and Stolovitzky 1992, Phys. Rev. Lett. 68, 2766; Frisch 1995,
+    /// "Turbulence", ch. 8: intermittency). So most strikes are glancing touches in a slack moment and a
+    /// few are hard knocks in a sharp one, the knocks a recording of leaves has standing out of the
+    /// rustle. A gamma law of order <see cref="IncrementOrder"/>, 1 the exponential. Texture round 1
+    /// (2026-10-06): every strike and episode had been driven by the mean wind alone, so the rustle's
+    /// band envelopes were as steady as noise between gusts (spread 0.075 at 6-12 kHz in a steady wind,
+    /// skew below zero; recordings 0.08-0.20 and 0.35-1.4).
+    /// </summary>
+    private float Increment(int order)
+    {
+        float x = 0f;
+        for (int j = 0; j < order; j++) x -= MathF.Log(MathF.Max(1e-7f, 1f - _sum.Uniform()));
+        return x / order;
+    }
+
+    /// <summary>The order of the increments' gamma law: 1, the exponential tails of the smallest
+    /// scales, which a leaf a few centimetres long is. FITTED 2026-10-06 against the three wind-in-leaves
+    /// recordings in a steady wind: order 2 left the top bands' skew under the recordings', 8 (near
+    /// Gaussian) under zero.</summary>
+    private const int IncrementOrder = 1;
+
+    /// <summary>An episode's loudness goes as the eddy's increment to this power: its strikes go as the
+    /// closing speed to <see cref="StrikeSpeedPower"/> and come as often as its leaves flutter, which goes
+    /// as the speed too, so its power goes as e^(2 · 1.2 + 1) and its amplitude as e^1.7.</summary>
+    private const float EpisodePower = StrikeSpeedPower + 0.5f;
+    private readonly int _incrementOrder, _episodeOrder;
+
+    /// <summary>The order for a twig's eddy, tens of centimetres across: increments over larger
+    /// separations are nearer Gaussian (Kailasnath et al. 1992), so a twig's knock is less often
+    /// extreme than a leaf's. FITTED 2026-10-06 in steady 3 and 4.5 m/s winds: at order 1 a 3 m/s
+    /// rustle's 6-12 kHz kurtosis was 10.5 (recordings 2.4-8.7), at 4 the top bands' skew fell under
+    /// the recordings'.</summary>
+    private const int EpisodeOrder = 2;
+    private readonly float _incrementNorm, _episodeNorm;
+
+    /// <summary>E[x^q] for x the mean-one gamma law of order k, by summing its density.</summary>
+    private static float GammaMoment(int k, double q)
+    {
+        double num = 0, den = 0;
+        for (int i = 1; i <= 6000; i++)
+        {
+            double x = i * 0.005;
+            double w = Math.Pow(x, k - 1) * Math.Exp(-k * x);
+            num += w * Math.Pow(x, q);
+            den += w;
+        }
+        return (float)(num / den);
     }
 
     /// <summary>How long an eddy holds a twig: a tenth to a third of a second, this on average.</summary>
@@ -273,8 +332,9 @@ public sealed class FoliageSynth
                     {
                         Left = length,
                         Rate = episodeRate,
-                        // How hard this eddy hit, and how big this twig's leaves are.
-                        Scale = closing * (0.4f + 1.2f * _sum.Uniform()),
+                        // How hard this eddy hit — a velocity increment across the twig, heavy-tailed
+                        // as the next strike's (see Increment) — and how big this twig's leaves are.
+                        Scale = closing * MathF.Pow(Increment(_episodeOrder), EpisodePower) / _episodeNorm,
                         Tone = 0.6f + 1.0f * _sum.Uniform(),
                     };
                     break;
@@ -310,8 +370,8 @@ public sealed class FoliageSynth
             // physical set, whose loudest strikes were twenty times the faintest and poked out of
             // the rustle as scratches; this has the same mean energy (0.15 + 3u³ squared averages
             // 1.53, and so does 2.28 u^1.2).
-            float u = _sum.Uniform();
-            float p = LeafStrikePascals * _leafScale * scale * weight * StrikeAngleScale * MathF.Pow(u, StrikeSpeedPower) * LeafPart;
+            float u = _sum.Uniform() * Increment(_incrementOrder);
+            float p = LeafStrikePascals * _leafScale * scale * weight * StrikeAngleScale * MathF.Pow(u, StrikeSpeedPower) * LeafPart / _incrementNorm;
             // The tap: a light plate stopped over a few tenths of a millisecond...
             _sum.Pulse(at, 70e-6f * (0.7f + 0.6f * _sum.Uniform()) * _leafScale / tone, p);
             // ...and the leaf's own membrane ringing, damped almost at once, with the scrape of

@@ -213,6 +213,15 @@ public class MachineVoiceTests
                         $"{Path.GetFileName(file)} names aircraft '{preset}', which is not a preset");
                     break;
                 case "water":
+                    // A tap of a feature, "water:<preset>/<feature>/<tap>", names its preset and a tap it has.
+                    if (OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(id, out string waterPreset, out _, out int tap))
+                    {
+                        Assert.True(WaterFeatureSpec.Presets.ContainsKey(waterPreset),
+                            $"{Path.GetFileName(file)} names water '{waterPreset}', which is not a preset");
+                        Assert.True(tap < WaterFeatureSpec.Presets[waterPreset]().Taps.Length,
+                            $"{Path.GetFileName(file)} names tap {tap} of '{waterPreset}', which has {WaterFeatureSpec.Presets[waterPreset]().Taps.Length}");
+                        break;
+                    }
                     Assert.True(WaterFeatureSpec.Presets.ContainsKey(preset),
                         $"{Path.GetFileName(file)} names water '{preset}', which is not a preset");
                     break;

@@ -36,6 +36,35 @@ Recent work, newest first. `git log` has the rest.
   3 km, moderate rain), `set=wind`. `tools/ear_loudness.py`: an independent ISO 532-1 port (annex B.2,
   83.296 sone) and the before/after comparison of two captures.
 
+- Texture round 1: the fountain, rain, trees and fire refitted on the statistics listeners recognise
+  a texture by (unheard). Renders in inbox/textures-round1-2026-10-06, with a README and a table.
+- The Elm Park fountain is bigger and has rocks: an 11 m basin (was 8), a 2.8 m bowl with a 2 m jet,
+  eight boulders round the pedestal that the bowl's overflow falls onto and runs off, and twelve rim
+  jets. Rebuilt in tools/gen_city.py; city.json regenerated. The rocks are a new prefab, rock_boulder,
+  material Concrete (there is no Stone material).
+- The fountain is heard from five places, each its own voice: the bowl and the four sides of the
+  rocks. One synth per fountain feeds all five (WaterFeatureVoice), as one synth feeds a train's
+  bogies. Map emitters are "water:park_fountain/elm_park/0..4" (prefabs elm_fountain_water_0..4).
+  Each is placed by the whole fountain's level, so together they are as loud as one voice would be.
+  A plain "water:park_fountain" still plays the whole fountain from one point.
+- Fountain sound: every lump of water that hits the pool or the stone throws a 2-4 ms splash of
+  spray in its own band, as loud as the lump is big. Lumps are of all sizes. A lump's bubbles come in
+  a burst as its crater closes. Water on stone traps no bubbles and splashes harder. A drop's click
+  into the pool is 13.5 dB quieter; its click on a hard surface is unchanged, so rain on streets and
+  roofs keeps its level. Fountain level 75 dB at a metre (was 72; it moves 3.9 L/s, was 2.6).
+- Rain arrives in swells over seconds (clustered drop counts), the same for every patch round the
+  listener and for the near drops.
+- Trees: each leaf strike and each twig episode is driven by a heavy-tailed small-scale gust, not
+  the mean wind alone, so hard knocks stand out of the rustle. Park tree headroom 22 dB (was 20).
+- Fire: a steady fizz of gas through the char under the crackles; before, the fire was silent
+  between crackles above 2 kHz.
+- Statistics: tools/texture_stats.py, and its C# twin TextureStatistics (AudioLab `--textures stats`,
+  `compare`, `render`). Tests hold the fountain, street rain, a tree in a steady wind and the fire
+  inside the spread of the reference recordings.
+- RainSpike writes float WAVs.
+- Open: a tree in the game's wind field is still gustier than every recording over 20 s; the fire's
+  4-16 Hz movement is a little under the recordings'; fountain renders cost 7.6 % of a core (was
+  4.7 %).
 - New master limiter (unheard). It looks 2 ms ahead, measures true peak (ITU-R BS.1770-4, 4x
   oversampled), puts both ears at one gain, and limits to -1 dBTP.
   - The attack is smooth and spans the look-ahead. The release depends on what is playing: about

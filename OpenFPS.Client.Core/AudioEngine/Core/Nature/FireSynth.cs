@@ -48,6 +48,21 @@ public sealed class FireSynth
     /// <summary>The smallest crackle's peak, Pa at a metre. Sizes run up from it on a power law.</summary>
     public const float SmallestCracklePascals = 0.043f;
 
+    /// <summary>
+    /// The fizz under the crackles, rms Pa at a metre for seasoned wood burning well: the volatiles and
+    /// steam a burning log lets out through the checks in its char all the time, not only through the
+    /// one end-grain jet that sings (the steam jets below). FITTED 2026-10-06 (texture round 1) to the
+    /// three fire recordings' envelope statistics: without it the fire was silent between its pops
+    /// above 2 kHz (envelope spread 0.45-0.59 at 3-12 kHz against the recordings' 0.18-0.30); the
+    /// recordings are a steady fizz with very rare loud cracks over it (kurtosis 21-100). Carrying the
+    /// crackles' power law ten to a hundred times further down instead did not fill it: under a law of
+    /// exponent 2.2 the energy is in the big pops, and the small ones only lowered the kurtosis.
+    /// </summary>
+    public const float FizzPascals = 0.0035f;
+
+    /// <summary>The middle of the fizz's band, Hz: gas through cracks a fraction of a millimetre wide.</summary>
+    private const float FizzHz = 5000f;
+
     // ── The fire's laws ──────────────────────────────────────────────────────────────────────────
 
     /// <summary>The power law of crackle sizes: the chance a crackle is over a is a^−(α−1).</summary>
@@ -99,6 +114,10 @@ public sealed class FireSynth
     }
     private readonly Jet[] _jets = new Jet[3];
 
+    // The fizz: gas and steam let out through the char's checks, steadily, all over the burning wood
+    private Resonator _fizz;
+    private float _fizzNorm, _fizzTarget, _fizzNow;
+
     // Embers in the air, landing later
     private readonly float[] _emberAt = new float[16];
     private readonly float[] _emberSize = new float[16];
@@ -125,6 +144,8 @@ public sealed class FireSynth
         _roarHigh.Tune(_roarHz * 3f, 0.5f, sampleRate);
         _roarGain = 1f;
         _gainGlide = 1f - MathF.Exp(-1f / (0.005f * sampleRate));
+        _fizz.Tune(MathF.Min(FizzHz, 0.4f * sampleRate), 0.5f, sampleRate);
+        _fizzNorm = 1f / Resonator.NoiseGain(MathF.Min(FizzHz, 0.4f * sampleRate), 0.5f, sampleRate);
         // What the two in series pass of unit white noise, measured once rather than guessed.
         {
             var a = new Resonator(); a.Tune(_roarHz, 0.5f, sampleRate);
@@ -169,6 +190,10 @@ public sealed class FireSynth
             _clusterGain = busy ? 2.2f + 1.5f * _sum.Uniform() : 0.25f + 0.3f * _sum.Uniform();
             _clusterClock = busy ? 0.6f + 2f * _sum.Uniform() : 1.5f + 4f * _sum.Uniform();
         }
+
+        // The fizz follows how hard the wood is gassing: the burn, the wetness, and the clusters of
+        // pockets reaching temperature together that the crackles come in.
+        _fizzTarget = FizzPascals * _burn * MathF.Sqrt(Spec.Moisture / 0.2f * _clusterGain);
 
         // The wind at the flames: more air, more burning, more turbulence.
         float gust = 1f + 0.35f * MathF.Max(0f, Wind - 1f);
@@ -256,6 +281,8 @@ public sealed class FireSynth
             }
         }
 
+        _fizzNow += (_fizzTarget - _fizzNow) * _gainGlide;
+        y += _fizz.Process(_sum.Signed() * 1.7320508f) * _fizzNorm * _fizzNow * CracklePart;
         return y + _sum.Next();
     }
 
