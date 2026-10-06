@@ -299,6 +299,66 @@ public sealed class SteamAudioScene : IDisposable
         return mesh;
     }
 
+    /// <summary>
+    /// A tile's solids from the triangle store (docs/GEOMETRY.md stage 1) as one static mesh, added to
+    /// <paramref name="scene"/> (not committed): the solids whose open-ground flag is
+    /// <paramref name="openGround"/>, in the piece's own frame (an instance places it at the tile's
+    /// corner), each solid's corners shared by its triangles, the same materials the boxes made. Zero if
+    /// there are none. The triangles are wound as the box mesh was in Steam Audio's frame.
+    /// </summary>
+    internal static IntPtr AddPieceMesh(IntPtr scene, OpenFPS.Common.Geometry.GeometryPiece piece, bool openGround)
+    {
+        var verts = new List<PV>();
+        var tris = new List<Phonon.IPLTriangle>();
+        var triMat = new List<int>();
+        var materials = new List<Phonon.IPLMaterial>();
+        var matIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        Span<Vector3> corners = stackalloc Vector3[64];
+        for (int s = 0; s < piece.SolidCount; s++)
+        {
+            ref readonly var rec = ref piece.Solid(s);
+            var surface = piece.Surfaces[rec.Surface];
+            if (surface.Is(OpenFPS.Common.Geometry.SurfaceFlags.OpenGround) != openGround) continue;
+            int mi = MaterialIndex(surface.Material, surface.Construction.PanelSize, surface.Construction.Build, materials, matIndexByName);
+            int first = verts.Count, unique = 0;
+            int Corner(Vector3 v, Span<Vector3> seen, ref int n)
+            {
+                for (int k = 0; k < n; k++) if (seen[k] == v) return first + k;
+                if (n < seen.Length) seen[n] = v;
+                verts.Add(Phonon.World(v));
+                return first + n++;
+            }
+            foreach (int t in piece.TrianglesOf(s))
+            {
+                ref readonly var tr = ref piece.Triangle(t);
+                int a = Corner(tr.V0, corners, ref unique), b = Corner(tr.V0 + tr.E1, corners, ref unique), c = Corner(tr.V0 + tr.E2, corners, ref unique);
+                // Outward in the game's frame; Steam Audio's frame is mirrored, and the box mesh was wound
+                // for that frame: the same triangle the other way round.
+                tris.Add(new Phonon.IPLTriangle { i0 = a, i1 = c, i2 = b });
+                triMat.Add(mi);
+            }
+        }
+        if (tris.Count == 0) return IntPtr.Zero;
+        var vArr = verts.ToArray(); var tArr = tris.ToArray(); var miArr = triMat.ToArray(); var mArr = materials.ToArray();
+        var hV = GCHandle.Alloc(vArr, GCHandleType.Pinned);
+        var hT = GCHandle.Alloc(tArr, GCHandleType.Pinned);
+        var hMI = GCHandle.Alloc(miArr, GCHandleType.Pinned);
+        var hM = GCHandle.Alloc(mArr, GCHandleType.Pinned);
+        try
+        {
+            var meshS = new Phonon.IPLStaticMeshSettings
+            {
+                numVertices = vArr.Length, numTriangles = tArr.Length, numMaterials = mArr.Length,
+                vertices = hV.AddrOfPinnedObject(), triangles = hT.AddrOfPinnedObject(),
+                materialIndices = hMI.AddrOfPinnedObject(), materials = hM.AddrOfPinnedObject(),
+            };
+            if (Phonon.iplStaticMeshCreate(scene, ref meshS, out IntPtr mesh) != Phonon.IPL_STATUS_SUCCESS) return IntPtr.Zero;
+            Phonon.iplStaticMeshAdd(mesh, scene);
+            return mesh;
+        }
+        finally { hV.Free(); hT.Free(); hMI.Free(); hM.Free(); }
+    }
+
     /// <summary>Steam Audio's three band centres (phonon.h, IPLMaterial): what its ABSORPTION figures
     /// mean. Its transmission figures are the mixer's bands instead; see <see cref="MaterialIndex"/>.</summary>
     public static readonly (float Low, float Mid, float High) SteamAudioBandsHz = (400f, 2500f, 15000f);
@@ -323,9 +383,12 @@ public sealed class SteamAudioScene : IDisposable
     /// lose (2n + 1)/3 of one each: two walls 5/3 of one (measured), not 2. (open-fps-patches 5.)
     /// </summary>
     private static int MaterialIndex(in Box b, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
+        => MaterialIndex(b.Material, b.Size, b.Build, materials, byName);
+
+    private static int MaterialIndex(string? material, Vector3 size, WallBuild build, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
     {
-        string name = string.IsNullOrEmpty(b.Material) ? "Generic" : b.Material;
-        var (tl, tm, th) = WallTransmission.BandGains(name, b.Size, b.Build);
+        string name = string.IsNullOrEmpty(material) ? "Generic" : material;
+        var (tl, tm, th) = WallTransmission.BandGains(name, size, build);
         // Keyed on what it does, to a hundredth of a decibel: boxes that let the same through share one.
         static string Q(float g) => MathF.Round(20f * MathF.Log10(MathF.Max(1e-9f, g)), 2)
                                         .ToString(System.Globalization.CultureInfo.InvariantCulture);

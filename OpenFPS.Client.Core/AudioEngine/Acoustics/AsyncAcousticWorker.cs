@@ -1143,7 +1143,7 @@ public class AsyncAcousticWorker : IDisposable
     // two scenes take about 120 ms (--scene-cost), and every source's occlusion would stand still for
     // that, several times a swing. Replaced scenes are released a few seconds later, once every
     // simulator has taken the new one.
-    private System.Threading.Tasks.Task<(SteamAudioScene Full, SteamAudioScene Listener, List<SteamAudioScene.Box> Boxes, AcousticMap? Map, OpeningRoutes Routes)>? _doorBuild;
+    private System.Threading.Tasks.Task<(SteamAudioScene Full, SteamAudioScene Listener, List<SteamAudioScene.Box> Boxes, AcousticMap? Map, OpeningRoutes Routes, OpenFPS.Common.Geometry.TriangleWorld? Geometry)>? _doorBuild;
     private readonly List<(SteamAudioScene Scene, long At)> _retiredScenes = new();
 
     // ── Tiles arriving and leaving ─────────────────────────────────────────────────────────────
@@ -1159,6 +1159,12 @@ public class AsyncAcousticWorker : IDisposable
     private bool _embree;
     /// <summary>This map's sub-scenes. Replaced on a new map; the old set is let go once no build uses it.</summary>
     private TileSceneSet? _tileScenes;
+    /// <summary>Without a tile set, this map's acoustic triangle store (a new one each map: a build for the
+    /// last map may still be using the old one).</summary>
+    private AcousticGeometry? _acousticStore;
+    /// <summary>The acoustic scene as triangles, swapped in with <see cref="_barrierBoxes"/>: what the
+    /// enclosure survey casts against.</summary>
+    private OpenFPS.Common.Geometry.TriangleWorld? _enclosureWorld;
     private double _lastScenesMs, _lastRoutesMs;
     private object? _routesPortals;
     private long _routesBuiltTicks;
@@ -1193,6 +1199,19 @@ public class AsyncAcousticWorker : IDisposable
         listener.Build(SteamAudioScene.WithoutOpenGround(boxes));
         return (full, listener);
     }
+
+    /// <summary>
+    /// The acoustic scene as triangles (docs/GEOMETRY.md stage 1), the one the scenes were just made from:
+    /// the tile set's store, or (without Embree) a store of the map's own brought up to the same boxes.
+    /// What the enclosure survey casts its rays against.
+    /// </summary>
+    private static OpenFPS.Common.Geometry.TriangleWorld? GeometryFor(TileSceneSet? set, AcousticGeometry? store,
+                                                                      List<SteamAudioScene.Box> boxes)
+    {
+        if (!OpenFPS.Common.Geometry.TriangleGeometry.Enabled) return null;
+        if (set != null) return set.Geometry;
+        return store?.Update(boxes);
+    }
     private long _buildStartedTicks;
 
     /// <summary>Tile rebuilds swapped in, and how long the last took, milliseconds. Diagnostic.</summary>
@@ -1219,7 +1238,7 @@ public class AsyncAcousticWorker : IDisposable
         if (_doorBuild is not { IsCompleted: true } t || _saSim == null) return;
         _doorBuild = null;
         if (t.Status != System.Threading.Tasks.TaskStatus.RanToCompletion) return;
-        var (full, listener, boxes, map, routes) = t.Result;
+        var (full, listener, boxes, map, routes, geometry) = t.Result;
         if (!ReferenceEquals(map, _saSceneMap) || !full.IsBuilt)
         {
             full.Dispose(); listener.Dispose();        // the map changed meanwhile: it is not this map's
@@ -1232,6 +1251,7 @@ public class AsyncAcousticWorker : IDisposable
         _saSim.SetScene(full);
         OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.ConfigureInBackground(_saContext, full, listener.IsBuilt ? listener : null);
         _barrierBoxes = boxes;
+        _enclosureWorld = geometry;
         _lastSceneBoxes = boxes.Count;
         PublishRoutes(routes);
         SceneBuildMsTotal += (DateTime.UtcNow.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
@@ -1290,17 +1310,19 @@ public class AsyncAcousticWorker : IDisposable
                              || DateTime.UtcNow.Ticks - _routesBuiltTicks > RoutesEverySeconds * TimeSpan.TicksPerSecond;
             var keptRoutes = _routes;
             if (routesDue) { _routesPortals = portals; _routesBuiltTicks = DateTime.UtcNow.Ticks; }
-            Func<(SteamAudioScene, SteamAudioScene, List<SteamAudioScene.Box>, AcousticMap?, OpeningRoutes)> build = () =>
+            var store = _acousticStore;
+            Func<(SteamAudioScene, SteamAudioScene, List<SteamAudioScene.Box>, AcousticMap?, OpeningRoutes, OpenFPS.Common.Geometry.TriangleWorld?)> build = () =>
             {
                 var parts = System.Diagnostics.Stopwatch.StartNew();
                 var (full, listener) = ScenesFor(ctx, set, world, doorBoxes);
+                var geometry = GeometryFor(set, store, doorBoxes);
                 _lastScenesMs = parts.Elapsed.TotalMilliseconds;
                 SceneOnlyMsTotal += _lastScenesMs;
                 parts.Restart();
                 var routes = routesDue || keptRoutes == null ? BuildRoutes(world, doorBoxes, report: false) : keptRoutes;
                 _lastRoutesMs = parts.Elapsed.TotalMilliseconds;
                 RoutesMsTotal += _lastRoutesMs;
-                return (full, listener, doorBoxes, forMap, routes);
+                return (full, listener, doorBoxes, forMap, routes, geometry);
             };
             _doorBuild = tiles ? RunLowered("TileScene", build) : System.Threading.Tasks.Task.Run(build);
             return;
@@ -1330,6 +1352,7 @@ public class AsyncAcousticWorker : IDisposable
             // A new map's own set of tiles; the last map's goes once no build is using it.
             if (_tileScenes != null) _retiredTileSets.Add((_tileScenes, DateTime.UtcNow.Ticks));
             _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres);
+            _acousticStore = _tileScenes == null ? new AcousticGeometry(world.TileMetres) : null;
             var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, world, boxes);
             _saScene.Dispose();
             _saScene = assembledFull;
@@ -1338,7 +1361,12 @@ public class AsyncAcousticWorker : IDisposable
             if (_tileScenes != null)
                 Console.WriteLine($"[AcousticWorker] {_tileScenes.TileCount} tile sub-scene(s) built in {_tileScenes.LastUpdateMs:F0} ms, assembled in {_tileScenes.LastAssembleMs:F1} ms.");
         }
-        else _saScene.Build(boxes);
+        else
+        {
+            _acousticStore = new AcousticGeometry(world.TileMetres);
+            _saScene.Build(boxes);
+        }
+        _enclosureWorld = GeometryFor(_tileScenes, _acousticStore, boxes);
         _saSceneMap = world.AcousticMap;
         if (_saScene.IsBuilt)
         {
@@ -1397,7 +1425,10 @@ public class AsyncAcousticWorker : IDisposable
     {
         if (++_reverbTick % ReverbEveryNTicks != 0) return;
 
-        var survey = Enclosure.Look(listener, EnclosureSolids());
+        var geometry = _enclosureWorld;
+        var survey = geometry != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled
+            ? Enclosure.Look(listener, geometry)
+            : Enclosure.Look(listener, EnclosureSolids());
         var (low, mid, high) = Enclosure.DecaySeconds(survey);
 
         _listenerEnclosure = survey.Enclosure;

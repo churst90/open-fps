@@ -2,15 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
+using OpenFPS.Common.Geometry;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
 /// The Steam Audio geometry as a tile owns it (docs/WORLD_STREAMING.md, docs/GEOMETRY.md 2.4): each tile
-/// is a sub-scene built once and kept while its boxes stay the same, and the scenes the simulators trace
+/// is a sub-scene built once and kept while its solids stay the same, and the scenes the simulators trace
 /// are top scenes of instances of them. Needs Embree: Steam Audio's default tracer walks instances one
 /// by one and traces them twenty times slower (docs/GEOMETRY.md 6.4); without Embree the worker builds
 /// whole scenes as before.
+///
+/// <para>The triangles come from the acoustic triangle store (<see cref="AcousticGeometry"/>, geometry
+/// stage 1): a tile's piece is its sub-scenes' source, in the tile's own frame, and the instance places
+/// it at the tile's corner. The same store is what the enclosure survey casts its rays against, so the
+/// two can never disagree about what stands where. A box wider than a tile (the ground under a whole map)
+/// is a piece of its own at the world's origin.</para>
 ///
 /// <para>Per tile, two sub-scenes: its open ground (thin slabs at ground level with the sky over them)
 /// and everything else. The full scene instances both; the listener's scene, which must not hear the
@@ -34,11 +41,17 @@ internal sealed class TileSceneSet : IDisposable
     private readonly IntPtr _context;
     public float TileMetres { get; }
 
+    /// <summary>The acoustic triangle store the sub-scenes are made from.</summary>
+    public AcousticGeometry Store { get; }
+
+    /// <summary>The store's world as the last <see cref="Update"/> left it.</summary>
+    public TriangleWorld Geometry => Store.World;
+
     /// <summary>One version of one tile's geometry: its sub-scenes, and their instances in each pair.</summary>
     private sealed class Piece
     {
         public TileKey Key;
-        public long Signature, Raw;
+        public ulong Signature;
         public IntPtr Ground, Rest;
         public List<SteamAudioScene.Box> Boxes = new(), RestBoxes = new();
         public readonly IntPtr[] GroundIn = new IntPtr[2], RestIn = new IntPtr[2], ListenerIn = new IntPtr[2];
@@ -58,16 +71,16 @@ internal sealed class TileSceneSet : IDisposable
     public int TileCount => _current.Count;
     public double LastUpdateMs { get; private set; }
     public double LastAssembleMs { get; private set; }
+    /// <summary>Of <see cref="LastUpdateMs"/>, building the triangle store's changed tiles.</summary>
+    public double LastStoreMs { get; private set; }
     /// <summary>True when Embree made both pairs of top scenes.</summary>
     public bool IsValid => _full[0] != IntPtr.Zero && _full[1] != IntPtr.Zero && _listener[0] != IntPtr.Zero && _listener[1] != IntPtr.Zero;
-
-    /// <summary>The cell of the grid of what covers the ground, metres.</summary>
-    private const float CoverCell = 16f;
 
     public TileSceneSet(IntPtr context, float tileMetres)
     {
         _context = context;
         TileMetres = tileMetres > 0f ? tileMetres : 250f;
+        Store = new AcousticGeometry(TileMetres);
         for (int b = 0; b < 2; b++)
         {
             _full[b] = SteamAudioScene.CreateScene(context);
@@ -78,85 +91,30 @@ internal sealed class TileSceneSet : IDisposable
     }
 
     /// <summary>
-    /// Brings the tiles up to <paramref name="boxes"/>: a tile whose boxes changed gets new sub-scenes
-    /// (and their instances, made now while nothing traces them), a tile with no boxes left goes. Nothing
-    /// changes in either pair of top scenes until <see cref="Assemble"/>.
+    /// Brings the tiles up to <paramref name="boxes"/>: the store builds the tiles whose solids changed
+    /// (their open ground included), a tile whose piece is new gets new sub-scenes (and their instances,
+    /// made now while nothing traces them), a tile with nothing left goes. Nothing changes in either pair
+    /// of top scenes until <see cref="Assemble"/>.
     /// </summary>
     public void Update(IReadOnlyList<SteamAudioScene.Box> boxes)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
-
-        var byTile = new Dictionary<TileKey, List<SteamAudioScene.Box>>();
-        foreach (var b in boxes)
-        {
-            if (b.Size.X <= 0 || b.Size.Y <= 0 || b.Size.Z <= 0) continue;
-            var k = TileKey.Of(b.Center, TileMetres);
-            if (!byTile.TryGetValue(k, out var list)) byTile[k] = list = new List<SteamAudioScene.Box>();
-            list.Add(b);
-        }
-
-        // Which tiles changed: their boxes, or (for which of them are open ground) a neighbour's.
-        var raw = new Dictionary<TileKey, long>();
-        foreach (var (k, list) in byTile)
-        {
-            long r = 17;
-            foreach (var b in list) r += Hash(b);   // order-free: boxes come from a dictionary of entities
-            raw[k] = r;
-        }
-        var changed = new HashSet<TileKey>();
-        foreach (var (k, r) in raw)
-            if (!_current.TryGetValue(k, out var p) || p.Raw != r) changed.Add(k);
-        foreach (var k in _current.Keys)
-            if (!raw.ContainsKey(k)) changed.Add(k);
-        var dirty = new HashSet<TileKey>();
-        foreach (var k in changed)
-            for (int dx = -1; dx <= 1; dx++)
-                for (int dz = -1; dz <= 1; dz++)
-                    dirty.Add(new TileKey(k.X + dx, k.Z + dz));
-
-        // What stands over the ground, filed in a grid, so a tile's slabs are not each tested against
-        // every box round them: anything whose underside is a metre and a half up or more.
-        var cover = new Dictionary<(int, int), List<(Vector3 Min, Vector3 Max)>>();
-        foreach (var b in boxes)
-        {
-            if (b.Size.X <= 0 || b.Size.Y <= 0 || b.Size.Z <= 0) continue;
-            var (lo, hi) = SteamAudioScene.WorldExtents(b);
-            if (lo.Y < SteamAudioScene.LowestCover) continue;
-            for (int cx = (int)MathF.Floor(lo.X / CoverCell); cx <= (int)MathF.Floor(hi.X / CoverCell); cx++)
-                for (int cz = (int)MathF.Floor(lo.Z / CoverCell); cz <= (int)MathF.Floor(hi.Z / CoverCell); cz++)
-                {
-                    if (!cover.TryGetValue((cx, cz), out var l)) cover[(cx, cz)] = l = new List<(Vector3, Vector3)>();
-                    l.Add((lo, hi));
-                }
-        }
-        bool CoveredAt(float x, float z, float lowest)
-        {
-            if (!cover.TryGetValue(((int)MathF.Floor(x / CoverCell), (int)MathF.Floor(z / CoverCell)), out var l)) return false;
-            foreach (var (lo, hi) in l)
-                if (lo.Y >= lowest && x >= lo.X && x <= hi.X && z >= lo.Z && z <= hi.Z) return true;
-            return false;
-        }
+        var world = Store.Update(boxes);
+        LastStoreMs = clock.Elapsed.TotalMilliseconds;
 
         int built = 0;
-        foreach (var (k, list) in byTile)
+        var seen = new HashSet<TileKey>();
+        foreach (var inst in world.Instances)
         {
-            if (!dirty.Contains(k)) continue;
-            var ground = new List<SteamAudioScene.Box>();
-            var rest = new List<SteamAudioScene.Box>();
-            long signature = 17;
-            foreach (var b in list)
-            {
-                bool open = SteamAudioScene.IsOpenGround(b, SteamAudioScene.WorldExtents(b), CoveredAt);
-                (open ? ground : rest).Add(b);
-                signature += Hash(b) * (open ? 31 : 1);
-            }
-            if (_current.TryGetValue(k, out var had) && had.Signature == signature) { had.Raw = raw[k]; continue; }
+            var piece = inst.Piece;
+            seen.Add(piece.Key);
+            if (_current.TryGetValue(piece.Key, out var had) && had.Signature == piece.Signature) continue;
             if (had != null) _dead.Add(had);
-            _current[k] = NewPiece(k, signature, raw[k], ground, rest, list);
+            _current[piece.Key] = NewPiece(piece);
             built++;
         }
         foreach (var k in new List<TileKey>(_current.Keys))
-            if (!byTile.ContainsKey(k)) { _dead.Add(_current[k]); _current.Remove(k); }
+            if (!seen.Contains(k)) { _dead.Add(_current[k]); _current.Remove(k); }
 
         LastBuilt = built;
         TotalBuilt += built;
@@ -202,17 +160,26 @@ internal sealed class TileSceneSet : IDisposable
         return (_fullScene[b]!, _listenerScene[b]!);
     }
 
-    private Piece NewPiece(TileKey k, long signature, long raw, List<SteamAudioScene.Box> ground, List<SteamAudioScene.Box> rest,
-                           List<SteamAudioScene.Box> all)
+    private Piece NewPiece(GeometryPiece piece)
     {
-        var p = new Piece { Key = k, Signature = signature, Raw = raw, Boxes = all, RestBoxes = rest,
-                            Ground = SubScene(ground), Rest = SubScene(rest) };
-        var identity = Matrix(Vector3.Zero, Quaternion.Identity);
+        var p = new Piece { Key = piece.Key, Signature = piece.Signature,
+                            Ground = SubScene(piece, openGround: true), Rest = SubScene(piece, openGround: false) };
+        // The boxes the scene holds, for the reflection search and the bounds (SteamAudioScene.SetGeometry).
+        for (int s = 0; s < piece.SolidCount; s++)
+        {
+            ref readonly var rec = ref piece.Solid(s);
+            var surface = piece.Surfaces[rec.Surface];
+            var box = new SteamAudioScene.Box(piece.Origin + rec.BoxCentre, rec.BoxSize, rec.BoxRotation, surface.Material,
+                                              surface.Construction.Build, rec.Owner);
+            p.Boxes.Add(box);
+            if (!surface.Is(SurfaceFlags.OpenGround)) p.RestBoxes.Add(box);
+        }
+        var at = Matrix(piece.Origin, Quaternion.Identity);
         for (int b = 0; b < 2; b++)
         {
-            p.GroundIn[b] = Instance(_full[b], p.Ground, identity);
-            p.RestIn[b] = Instance(_full[b], p.Rest, identity);
-            p.ListenerIn[b] = Instance(_listener[b], p.Rest, identity);
+            p.GroundIn[b] = Instance(_full[b], p.Ground, at);
+            p.RestIn[b] = Instance(_full[b], p.Rest, at);
+            p.ListenerIn[b] = Instance(_listener[b], p.Rest, at);
         }
         return p;
     }
@@ -241,14 +208,15 @@ internal sealed class TileSceneSet : IDisposable
     /// <summary>
     /// A pose in Steam Audio's frame, row-major with the translation in the last column. Steam Audio's z
     /// runs the other way from the game's (Phonon.World), so with F the mirror in z the transform is
-    /// F·R·F for the turn and F·c for the place; a sub-scene's vertices are already mirrored. Every tile
-    /// sits at the identity today; a moving thing (geometry stage 1) will not.
+    /// F·R·F for the turn and F·c for the place; a sub-scene's vertices are already mirrored. A tile sits
+    /// at its corner with no turn.
     /// </summary>
     internal static unsafe Phonon.IPLMatrix4x4 Matrix(Vector3 at, Quaternion rotation)
     {
         if (rotation.LengthSquared() < 1e-6f) rotation = Quaternion.Identity;
         var cols = new[] { Vector3.Transform(Vector3.UnitX, rotation), Vector3.Transform(Vector3.UnitY, rotation), Vector3.Transform(Vector3.UnitZ, rotation) };
-        float[] s = { 1f, 1f, -1f };
+        float mz = Phonon.MirrorZ ? -1f : 1f;
+        float[] s = { 1f, 1f, mz };
         var m = new Phonon.IPLMatrix4x4();
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 3; j++)
@@ -256,31 +224,22 @@ internal sealed class TileSceneSet : IDisposable
                 float r = i switch { 0 => cols[j].X, 1 => cols[j].Y, _ => cols[j].Z };
                 m.elements[i * 4 + j] = s[i] * s[j] * r;
             }
-        m.elements[3] = at.X; m.elements[7] = at.Y; m.elements[11] = -at.Z;
+        var w = Phonon.World(at);
+        m.elements[3] = w.x; m.elements[7] = w.y; m.elements[11] = w.z;
         m.elements[15] = 1f;
         return m;
     }
 
-    private IntPtr SubScene(IReadOnlyList<SteamAudioScene.Box> boxes)
+    private IntPtr SubScene(GeometryPiece piece, bool openGround)
     {
-        if (boxes.Count == 0) return IntPtr.Zero;
         IntPtr sub = SteamAudioScene.CreateScene(_context);
         if (sub == IntPtr.Zero) return IntPtr.Zero;
-        IntPtr mesh = SteamAudioScene.AddMesh(_context, sub, boxes, out _, out _);
+        IntPtr mesh = SteamAudioScene.AddPieceMesh(sub, piece, openGround);
+        if (mesh == IntPtr.Zero) { Phonon.iplSceneRelease(ref sub); return IntPtr.Zero; }
         Phonon.iplSceneCommit(sub);
         // The scene holds the mesh; the handle is not needed past the build.
-        if (mesh != IntPtr.Zero) Phonon.iplStaticMeshRelease(ref mesh);
+        Phonon.iplStaticMeshRelease(ref mesh);
         return sub;
-    }
-
-    private static long Hash(in SteamAudioScene.Box b)
-    {
-        var h = new HashCode();
-        h.Add(MathF.Round(b.Center.X * 100f)); h.Add(MathF.Round(b.Center.Y * 100f)); h.Add(MathF.Round(b.Center.Z * 100f));
-        h.Add(MathF.Round(b.Size.X * 100f)); h.Add(MathF.Round(b.Size.Y * 100f)); h.Add(MathF.Round(b.Size.Z * 100f));
-        h.Add(MathF.Round(b.Rotation.X * 1000f)); h.Add(MathF.Round(b.Rotation.Y * 1000f)); h.Add(MathF.Round(b.Rotation.Z * 1000f)); h.Add(MathF.Round(b.Rotation.W * 1000f));
-        h.Add(b.Material); h.Add(b.Build); h.Add(b.EntityId);
-        return h.ToHashCode();
     }
 
     /// <summary>Lets go of everything. Only once nothing traces either pair.</summary>

@@ -50,7 +50,7 @@ public sealed class ClientGeometry
     public double LastBuildMs { get; private set; }
     public int LastPiecesBuilt { get; private set; }
 
-    public ClientGeometry(float tileMetres) => _builder = new TriangleWorldBuilder(tileMetres);
+    public ClientGeometry(float tileMetres) => _builder = new TriangleWorldBuilder(tileMetres) { Parallel = false };
 
     /// <summary>A new map: everything held goes, and a build for the last map is thrown away when it ends.</summary>
     public void Reset(float tileMetres)
@@ -58,7 +58,7 @@ public sealed class ClientGeometry
         lock (_lock)
         {
             _epoch++;
-            _builder = new TriangleWorldBuilder(tileMetres);
+            _builder = new TriangleWorldBuilder(tileMetres) { Parallel = false };
             _published = null; _posed = null;
             _dirty = new HashSet<int>(); _inFlight = null;
             _running = false; _everStarted = false;
@@ -74,7 +74,7 @@ public sealed class ClientGeometry
         {
             if (_builder.TileMetres == (tileMetres > 0f ? tileMetres : 250f)) return;
             _epoch++;
-            _builder = new TriangleWorldBuilder(tileMetres);
+            _builder = new TriangleWorldBuilder(tileMetres) { Parallel = false };
             _running = false; _everStarted = false;
             if (_inFlight != null) { _dirty.UnionWith(_inFlight); _inFlight = null; }
             _changes++;
@@ -193,6 +193,8 @@ public sealed class ClientGeometry
                     if (role == GeometryRole.Static) statics.Add(EntityGeometry.SpecOf(def, t, role));
                     else if (role == GeometryRole.Mover) movers.Add(EntityGeometry.SpecOf(def, t, role));
                 }
+                // The first build of a map (at join) on every core; after that a tile or two on this niced thread.
+                builder.Parallel = builder.TileCount == 0;
                 built = builder.Build(statics, movers);
             }
             catch (Exception ex) { Serilog.Log.Warning(ex, "ClientGeometry: the triangle world could not be built."); }
