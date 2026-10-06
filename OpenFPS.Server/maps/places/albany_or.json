@@ -17004,7 +17004,7 @@
    "BrakingMps2": 2.92,
    "StartOffsetMetres": 0.0,
    "Route": {
-    "StartRoad": "pacific_boulevard_southwest",
+    "StartRoad": "pacific_boulevard_southwest_2",
     "Direction": 1,
     "Seed": 3000,
     "WanderMetres": 2500.0
@@ -17020,7 +17020,7 @@
    "BrakingMps2": 2.92,
    "StartOffsetMetres": 0.0,
    "Route": {
-    "StartRoad": "pacific_boulevard_southwest",
+    "StartRoad": "pacific_boulevard_southwest_2",
     "Direction": -1,
     "Seed": 3001,
     "WanderMetres": 2500.0
@@ -17036,7 +17036,7 @@
    "BrakingMps2": 2.92,
    "StartOffsetMetres": 0.0,
    "Route": {
-    "StartRoad": "belmont_avenue_southwest",
+    "StartRoad": "belmont_avenue_southwest_3",
     "Direction": 1,
     "Seed": 3002,
     "WanderMetres": 2500.0
@@ -17052,25 +17052,9 @@
    "BrakingMps2": 2.92,
    "StartOffsetMetres": 0.0,
    "Route": {
-    "StartRoad": "53rd_avenue_southwest",
+    "StartRoad": "53rd_avenue_southwest_2",
     "Direction": 1,
     "Seed": 3003,
-    "WanderMetres": 2500.0
-   }
-  },
-  {
-   "Name": "Van on Ellingson Road",
-   "Preset": "step_van",
-   "TopSpeedKmh": 70,
-   "CorneringG": 0.4,
-   "GripG": 0.75,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.58,
-   "StartOffsetMetres": 0.0,
-   "Route": {
-    "StartRoad": "ellingson_road_southwest",
-    "Direction": 1,
-    "Seed": 3004,
     "WanderMetres": 2500.0
    }
   }

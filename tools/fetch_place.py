@@ -206,8 +206,8 @@ def download(place):
         f.write(f"bbox S,W,N,E = {s:.6f},{w:.6f},{n:.6f},{e:.6f}\n")
         f.write(f"written {time.strftime('%Y-%m-%d')} by tools/fetch_place.py; files already present were kept as they were.\n\n")
         f.write("\n".join(SOURCES))
-        f.write("\nNot used: Montgomery Central Appraisal District parcels (gis.mctx.org). Their licence forbids\n"
-                "redistribution without the district's authorisation, so lots are drawn from the address points instead.\n")
+        if place.get("SourcesNote"):
+            f.write("\n" + place["SourcesNote"] + "\n")
 
 
 def counties(place):
@@ -396,6 +396,10 @@ def prepare(place):
                         "line": [ll(x, y) for x, y in pts]})
     rng.sort(key=lambda q: q["tlid"])
     write(out, "addrfeat.json", rng)
+
+    # Where it all came from, beside it: the licences travel with the data.
+    import shutil
+    shutil.copyfile(os.path.join(d, "SOURCES.txt"), os.path.join(out, "SOURCES.txt"))
 
     # The area itself, so the generator knows its edge without the archive.
     write(out, "area.json", {"rings": [[ll(lon, lat) for lon, lat in ring] for ring in rings]})

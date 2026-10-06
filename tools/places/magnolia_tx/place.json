@@ -6,6 +6,7 @@
  "Origin": [30.123703, -95.740935],
  "Spawn": {"Address": "31907 Bobcat Lane"},
  "CountyFips": "48339",
+ "SourcesNote": "Not used: Montgomery Central Appraisal District parcels (gis.mctx.org). Their licence forbids redistribution without the district's authorisation, so lot lines are drawn from the address points instead.",
  "Archive": "~/openfps-scratch-archive/osm-magnolia-2026-10-05",
  "Detail": "medium",
  "FullDetailMetres": 300,
@@ -20,8 +21,6 @@
  "Traffic": [
   {"Name": "Pickup on Nichols Sawmill Road", "Preset": "pickup_v8", "Road": "Nichols Sawmill Road", "Kind": "car", "TopKmh": 75},
   {"Name": "Car on Grand Pines Drive", "Preset": "i4_midsize", "Road": "Grand Pines Drive", "Kind": "car", "TopKmh": 75},
-  {"Name": "Pickup on Butera Road", "Preset": "diesel_i4", "Road": "Butera Road", "Kind": "van", "TopKmh": 70, "Direction": -1},
-  {"Name": "Car on Walnut Creek Road", "Preset": "v6", "Road": "Walnut Creek Road", "Kind": "car", "TopKmh": 70},
   {"Name": "Car on Turtle Creek Lane", "Preset": "i4_compact", "Road": "Turtle Creek Lane", "Kind": "car", "TopKmh": 55},
   {"Name": "Pickup on Turtle Dove Lane", "Preset": "pickup_v8_flowmaster", "Road": "Turtle Dove Lane", "Kind": "car", "TopKmh": 55, "Direction": -1}
  ],

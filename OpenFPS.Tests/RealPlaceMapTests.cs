@@ -232,6 +232,33 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
         finally { File.Delete(outFile); }
     }
 
+    /// <summary>The map equivalent of the unknown-prefab-field rule (PrefabSpecTests): every key the
+    /// generator writes is one the loader reads, so nothing it says is dropped in silence.</summary>
+    [Theory]
+    [MemberData(nameof(Places))]
+    public void It_uses_only_fields_the_loader_reads(string id)
+    {
+        var mapFields = typeof(MapData).GetProperties().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var entityFields = typeof(OpenFPS.Server.Repositories.EntityData).GetProperties().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var roadFields = typeof(RoadData).GetProperties().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var junctionFields = typeof(JunctionData).GetProperties().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "places", id + ".json")));
+        var unknown = new HashSet<string>();
+        foreach (var p in doc.RootElement.EnumerateObject())
+            if (!mapFields.Contains(p.Name)) unknown.Add($"map field '{p.Name}'");
+        void Check(string list, HashSet<string> known)
+        {
+            if (!doc.RootElement.TryGetProperty(list, out var items)) return;
+            foreach (var item in items.EnumerateArray())
+                foreach (var p in item.EnumerateObject())
+                    if (!known.Contains(p.Name)) unknown.Add($"{list} field '{p.Name}'");
+        }
+        Check("Entities", entityFields);
+        Check("Roads", roadFields);
+        Check("Junctions", junctionFields);
+        Assert.True(unknown.Count == 0, string.Join(", ", unknown));
+    }
+
     /// <summary>"/join magnolia tx" finds magnolia_tx: a map answers to its id and to its listed name.</summary>
     [Theory]
     [InlineData("magnolia_tx", "magnolia tx")]

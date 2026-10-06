@@ -6,6 +6,7 @@
  "Origin": [44.590205, -123.113244],
  "Spawn": {"Address": "1042 Belmont Avenue Southwest"},
  "CountyFips": ["41043", "41003"],
+ "SourcesNote": "Not used: Linn and Benton County parcels. Their redistribution terms were not checked, so lot lines are drawn from the address points, as for Magnolia.",
  "Archive": "~/openfps-scratch-archive/osm-albany-2026-10-05",
  "Setting": "town",
  "Detail": "medium",
@@ -23,8 +24,7 @@
   {"Name": "Car on Pacific Boulevard", "Preset": "i4_midsize", "Road": "Pacific Boulevard Southwest", "Kind": "car", "TopKmh": 75},
   {"Name": "Pickup on Pacific Boulevard", "Preset": "pickup_v8", "Road": "Pacific Boulevard Southwest", "Kind": "car", "TopKmh": 75, "Direction": -1},
   {"Name": "Car on Belmont Avenue", "Preset": "i4_compact", "Road": "Belmont Avenue Southwest", "Kind": "car", "TopKmh": 45},
-  {"Name": "Car on 53rd Avenue", "Preset": "v6", "Road": "53rd Avenue Southwest", "Kind": "car", "TopKmh": 60},
-  {"Name": "Van on Ellingson Road", "Preset": "step_van", "Road": "Ellingson Road Southwest", "Kind": "van", "TopKmh": 70}
+  {"Name": "Car on 53rd Avenue", "Preset": "v6", "Road": "53rd Avenue Southwest", "Kind": "car", "TopKmh": 60}
  ],
  "StreetLife": {"HornEverySeconds": 120, "HardBrakeEverySeconds": 0, "ParkEverySeconds": 0, "GunfireEverySeconds": 0, "AlarmEverySeconds": 0},
  "Temperature": 25.0,

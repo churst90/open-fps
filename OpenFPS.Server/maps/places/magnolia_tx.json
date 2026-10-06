@@ -16131,38 +16131,6 @@
    }
   },
   {
-   "Name": "Pickup on Butera Road",
-   "Preset": "diesel_i4",
-   "TopSpeedKmh": 70,
-   "CorneringG": 0.4,
-   "GripG": 0.75,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.58,
-   "StartOffsetMetres": 0.0,
-   "Route": {
-    "StartRoad": "butera_road",
-    "Direction": -1,
-    "Seed": 3002,
-    "WanderMetres": 2500.0
-   }
-  },
-  {
-   "Name": "Car on Walnut Creek Road",
-   "Preset": "v6",
-   "TopSpeedKmh": 70,
-   "CorneringG": 0.4,
-   "GripG": 0.85,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.92,
-   "StartOffsetMetres": 0.0,
-   "Route": {
-    "StartRoad": "walnut_creek_road",
-    "Direction": 1,
-    "Seed": 3003,
-    "WanderMetres": 2500.0
-   }
-  },
-  {
    "Name": "Car on Turtle Creek Lane",
    "Preset": "i4_compact",
    "TopSpeedKmh": 55,
@@ -16174,7 +16142,7 @@
    "Route": {
     "StartRoad": "turtle_creek_lane",
     "Direction": 1,
-    "Seed": 3004,
+    "Seed": 3002,
     "WanderMetres": 2500.0
    }
   },
@@ -16190,7 +16158,7 @@
    "Route": {
     "StartRoad": "turtle_dove_lane",
     "Direction": -1,
-    "Seed": 3005,
+    "Seed": 3003,
     "WanderMetres": 2500.0
    }
   }

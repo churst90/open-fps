@@ -31,11 +31,13 @@ it. The ground is flat: the elevation is kept (elevation.json) for when it is no
 DETAIL. The map is layered so that a later loader can stream it by tile and by layer without
 regenerating it: every entity carries the 250 m tile it stands in ("Tile", from the origin) and what
 layer it belongs to ("Layer"). What is emitted depends on --detail:
-    low      roads, zones, building shells with one room and a front door, the woods as volumes
-    medium   + verges, lawns, driveways, back doors, outbuildings as buildings, trunks and the wind in
-               the woods, fences and gate posts, traffic. Houses near the spawn (FullDetailMetres in
-               place.json) are built as at high.
-    high     + every house's rooms, inner doors, floors and furniture, and denser woods
+    low      roads, zones, building shells with one room and a front door, outbuildings as solid
+               boxes, the woods as volumes
+    medium   + a floor in every house, front lawns, generated driveways, sparse trunks and the wind
+               in the woods, fences and gate posts, traffic. Everything within FullDetailMetres
+               (place.json) of the origin, which is the spawn address, is built as at high.
+    high     + every house's rooms, inner doors, back door and furniture, outbuildings you can go
+               into, verges, back and side lawns, ridged roofs, denser woods
 """
 import json, math, os, re, sys, zlib
 from collections import defaultdict
@@ -2490,9 +2492,11 @@ if LEVEL >= 1:
     GRIP = {"car": 0.85, "van": 0.75, "truck": 0.70, "bus": 0.70, "bike": 0.90}
     fleet = PLACE.get("Traffic", [])
     for k, v in enumerate(fleet):
-        road = next((d for d in ROADS if d["Name"] == v["Road"]), None)
-        if road is None:
+        # The longest stretch of the road of that name: a short piece may be a dead end with no way round.
+        pieces = [d for d in ROADS if d["Name"] == v["Road"]]
+        if not pieces:
             continue
+        road = max(pieces, key=lambda d: (plen([(q["X"], q["Z"]) for q in d["Centreline"]]), d["Id"]))
         g = GRIP[v.get("Kind", "car")]
         VEHICLES.append({"Name": v["Name"], "Preset": v["Preset"], "TopSpeedKmh": v.get("TopKmh", 70.0),
                          "CorneringG": v.get("CorneringG", 0.4), "GripG": g,
