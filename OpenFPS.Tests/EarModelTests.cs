@@ -175,49 +175,95 @@ public class EarModelTests
         });
     }
 
-    /// <summary>At 100 % the law is literal for every sound: no correction, whatever its spectrum.</summary>
-    [Fact]
-    public void AtFullLevelsNothingChanges()
-    {
-        With(1f, () =>
-        {
-            foreach (var t in new[] { Tone(1000f), BassHeavy() })
-                foreach (float l in new[] { 50f, 70f, 85f })
-                    Assert.InRange(Loudness.TimbreCorrectionDb(l, t), -0.1f, 0.1f);
-            return 0;
-        });
-    }
-
     /// <summary>
-    /// The pivot, in loudness: a source as loud at its reference distance as 70 dB of speech plays at
-    /// its own level at any setting, whatever its spectrum.
+    /// The law in loudness: a source exactly as loud as a speech line plays exactly as loud as that
+    /// line does, at any setting, whatever its spectrum and whichever way its level is declared. The
+    /// line at the pivot (70 dB declared at its reference) is the old law's pivot.
     /// </summary>
     [Theory]
-    [InlineData(0.3f)]
-    [InlineData(0.45f)]
-    [InlineData(0.7f)]
-    public void ThePivotIsUnchangedInLoudness(float compression)
+    [InlineData(0.3f, 70f)]
+    [InlineData(0.45f, 70f)]
+    [InlineData(0.45f, 85f)]
+    [InlineData(0.7f, 60f)]
+    [InlineData(1f, 70f)]
+    public void AsLoudAsALineIsPlayedAsLoudAsTheLine(float compression, float lineAtReference)
     {
         With(compression, () =>
         {
             float listening = EarModel.ListeningLevelDb;
-            EarModel.ListeningLevelDb = 70f;
+            EarModel.ListeningLevelDb = EarModel.DefaultListeningLevelDb;
             try
             {
-                foreach (var t in new[] { Timbre.Speech, Tone(1000f), BassHeavy() })
+                float r = Loudness.MinReferenceDistance, toMetre = 20f * MathF.Log10(r);
+                var (lg, lr) = Loudness.Place(lineAtReference + toMetre, Timbre.Speech);
+                float linePlayed = EarModel.PlayedAtEarDb(20f * MathF.Log10(lg * lr), Loudness.ReferenceRmsDbfs, lr, lr, 0f);
+                float lineLoudness = Timbre.Speech.Phons(linePlayed);
+                // Physical voices (their declared level is their RMS) and a recording 20 dB under its full scale.
+                foreach (var t in new[] { Tone(1000f), BassHeavy(), BassHeavy().WithGatedRms(-20f) })
                 {
-                    // The level at 1.2 m (the reference a quiet source gets) as loud as 70 dB of speech.
-                    float atReference = t.LevelForSpeechEquivalent(70f);
-                    float atMetre = atReference + 20f * MathF.Log10(Loudness.MinReferenceDistance);
-                    var (gain, reference) = Loudness.Place(atMetre, t);
-                    Assert.Equal(Loudness.MinReferenceDistance, reference, 2);
-                    float played = EarModel.PlayedAtEarDb(20f * MathF.Log10(gain * reference), reference, reference, 0f);
-                    Assert.InRange(played - atReference, -0.15f, 0.15f);
+                    float realAtReference = t.LevelForPhons(Timbre.Speech.Phons(lineAtReference + Loudness.ReferenceRmsDbfs));
+                    float declared = realAtReference - t.RealOffsetDb + toMetre;
+                    var (gain, reference) = Loudness.Place(declared, t);
+                    Assert.Equal(r, reference, 2);
+                    float played = EarModel.PlayedAtEarDb(20f * MathF.Log10(gain * reference), t.DigitalRmsDb, reference, reference, 0f);
+                    Assert.InRange(t.Phons(played) - lineLoudness, -0.3f, 0.3f);
                 }
             }
             finally { EarModel.ListeningLevelDb = listening; }
             return 0;
         });
+    }
+
+    /// <summary>The designed playback: a normal voice a metre away plays at its own 62.35 dB, at the
+    /// default listening level and the shipped /levels.</summary>
+    [Fact]
+    public void ANormalVoiceAtArmsLengthPlaysAsLoudAsLife()
+    {
+        With(Loudness.DefaultCompression, () =>
+        {
+            float declared = Speech.LevelDb(Speech.NormalDb);
+            var (g, r) = Loudness.Place(declared);
+            float played = EarModel.PlayedAtEarDb(20f * MathF.Log10(g * r), Loudness.ReferenceRmsDbfs, r, 1f, 0f);
+            Assert.Equal(Speech.NormalDb, played, 1);
+            Assert.InRange(Loudness.DesignFullScaleDb, 100f, 101.5f);
+            return 0;
+        });
+    }
+
+    // ── The engine lift ──────────────────────────────────────────────────────────────────────
+
+    /// <summary>The hatchback idles 38 dB under its declared 99.5: the unweighted law wanted 20.9 dB of
+    /// lift and its cap took 0.9 off. With the model there is no cap, and an idle's bass earns more.</summary>
+    [Fact]
+    public void TheLiftIsTheLawWithoutACap()
+    {
+        With(Loudness.DefaultCompression, () =>
+        {
+            float capped = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(61.5f, 99.5f);
+            Assert.Equal(20f, capped, 2);
+            var speechLike = Timbre.FromBandLevels(Timbre.Speech.ShapeDb, "speech-shaped engine");
+            float plain = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(61.5f, speechLike, 99.5f);
+            Assert.InRange(plain, 20.5f, 23f);
+            float bass = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(61.5f, BassHeavy(), 99.5f);
+            Assert.True(bass > plain + 3f, $"an idle's bass: {bass:F1} dB against {plain:F1}");
+            // Silence has no place in the law: the caller holds the lift.
+            Assert.True(float.IsNaN(OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(-30f, BassHeavy(), 99.5f)));
+            // Off is the unweighted lift with its cap, exactly.
+            EarModel.Enabled = false;
+            Assert.Equal(capped, OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(61.5f, BassHeavy(), 99.5f));
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void GatedRmsLeavesOutTheSilence()
+    {
+        const int rate = 48000;
+        var x = new float[rate * 2];
+        // Half a second of a 0.1-amplitude sine (-23 dBFS RMS), then silence.
+        for (int i = 0; i < rate / 2; i++) x[i] = 0.1f * MathF.Sin(2f * MathF.PI * 440f * i / rate);
+        Assert.InRange(Timbre.GatedRms(x, rate), -23.2f, -22.8f);
+        Assert.True(float.IsNaN(Timbre.GatedRms(new float[1000], rate)));
     }
 
     /// <summary>Quieter-sounding things are lifted more: a tone of the same level as speech is placed

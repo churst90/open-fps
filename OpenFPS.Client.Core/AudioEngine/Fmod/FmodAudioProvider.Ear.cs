@@ -172,8 +172,13 @@ public partial class FmodAudioProvider
 
         float distance = Vector3.Distance(listener, active.Position);
         float pathDb = 20f * MathF.Log10(MathF.Max(1e-4f, active.CurrentMid)) + active.AirMidDb;
-        float real = EarModel.RealAtEarDb(levelDb + ear.CopyDb, distance, pathDb);
-        float played = EarModel.PlayedAtEarDb(placedDb + ear.CopyDb, active.MinDistance, distance, pathDb);
+        // Real and played levels in the voice's own convention (Loudness: a recording declares its full
+        // scale, a physical voice its RMS). A recording not measured yet is taken as a speech line.
+        bool physical = engine != null || ear.Live;
+        float realOffset = timbre?.RealOffsetDb ?? (physical ? 0f : Loudness.ReferenceRmsDbfs);
+        float digitalRms = timbre?.DigitalRmsDb ?? (physical ? Loudness.PhysicalRmsDbfs : Loudness.ReferenceRmsDbfs);
+        float real = EarModel.RealAtEarDb(levelDb + realOffset + ear.CopyDb, distance, pathDb);
+        float played = EarModel.PlayedAtEarDb(placedDb + ear.CopyDb, digitalRms, active.MinDistance, distance, pathDb);
         var t = timbre ?? Timbre.Speech;
         float realPhon = t.Phons(real), playedPhon = t.Phons(played);
         var (low, high) = on ? LoudnessCompensation.Shelves(realPhon, playedPhon) : (0f, 0f);
@@ -303,7 +308,7 @@ public partial class FmodAudioProvider
                 _windCorrectionDb = on ? Loudness.TimbreCorrectionDb(declared, _windTimbre) : 0f;
                 // At the ear there is no distance: what the law places is the level itself.
                 float real = MathF.Max(ears.LeftDb, ears.RightDb);
-                float played = EarModel.NominalFullScaleDb + EarModel.PlaybackOffsetDb
+                float played = EarModel.PlaybackFullScaleDb + Loudness.PhysicalRmsDbfs
                              + (declared - Loudness.RenderCeilingDb) * Loudness.DynamicRangeCompression
                              + _windCorrectionDb + (real - declared);
                 var (low, high) = on ? LoudnessCompensation.Shelves(_windTimbre.Phons(real), _windTimbre.Phons(played)) : (0f, 0f);

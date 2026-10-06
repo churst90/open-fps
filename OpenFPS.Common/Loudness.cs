@@ -215,11 +215,39 @@ public static class Loudness
     //
     // The law above works on unweighted level. The ear does not: an idling engine is mostly bass the
     // ear barely hears, and a pure tone is fifteen phon quieter than speech of the same level. So the
-    // law is applied to what a source sounds like: its level is turned into the level of reference
-    // speech that is just as loud (ISO 532-1, from the source's own measured spectrum), the old law
-    // places that, and the result is turned back into the source's own level. Speech is placed exactly
-    // as before; a source as loud as 70 dB of speech plays at its own level at any setting; at 100 %
-    // nothing changes for anything.
+    // law is applied to what a source sounds like: the source is turned into the speech line that is
+    // just as loud (ISO 532-1, from the source's own measured spectrum, at its real level), the old law
+    // places that line, and the source plays as loud as the line plays. Speech is placed exactly as
+    // before, and everything keeps its order of loudness.
+    //
+    // Two conventions for a declared level live side by side, and loudness needs the real one. A
+    // recording or a render declares its buffer's FULL SCALE at a metre (Speech.LevelDb: a line sits
+    // 28 dB under it), so its real level is the declared level plus where the sound sits in its buffer
+    // (Timbre.GatedRmsDbfs, measured). A physical voice (an engine, a machine, rain, the wind at the
+    // ears) declares its RMS level and plays it PeakHeadroomDb under full scale. Timbre.RealOffsetDb and
+    // DigitalRmsDb carry which.
+
+    /// <summary>Where a physical voice's RMS sits under full scale, dB (VehicleProfile.PeakHeadroomDb).</summary>
+    public const float PhysicalRmsDbfs = -VehicleProfile.PeakHeadroomDb;
+
+    /// <summary>Where the reference sound, a speech line, sits under its full scale (Speech.BufferRmsDbfs).</summary>
+    public const float ReferenceRmsDbfs = Speech.BufferRmsDbfs;
+
+    /// <summary>
+    /// The playback the game is designed for, dB SPL at the ear of a 0 dB rendered level: the one at
+    /// which a normal voice a metre away (ANSI S3.5, 62.35 dB) plays as loud as it is, at the shipped
+    /// /levels. About 100.8. The law in loudness units compares sounds at this playback; the player's
+    /// own playback (Hearing.EarModel.ListeningLevelDb) only moves the tone correction.
+    /// </summary>
+    public static readonly float DesignFullScaleDb = DesignFullScale();
+
+    private static float DesignFullScale()
+    {
+        float declared = Speech.LevelDb(Speech.NormalDb);
+        float reference = Math.Clamp(MathF.Pow(10f, (declared - ShippedCeilingDb) / 20f), MinReferenceDistance, MaxReferenceDistance);
+        float rendered = (declared - 20f * MathF.Log10(reference) - ShippedCeilingDb) * DefaultCompression;
+        return Speech.NormalDb - rendered - ReferenceRmsDbfs;
+    }
 
     /// <summary>
     /// Where the law puts a source of this level and this spectrum: gain and reference distance, as
@@ -254,17 +282,23 @@ public static class Loudness
 
     private static (float Gain, float ReferenceDistance) PlaceHeard(float sourceLevelDb, Hearing.Timbre timbre, float compression)
     {
-        float ceiling = PivotDb - PivotRenderedDb / compression;           // the reference sound's ceiling
-        float fullScale = PivotDb - PivotRenderedDb;                       // nominal playback of 0 dB rendered
-        // Where this sound is as loud as the ceiling's worth of speech: the level that reaches full scale.
-        float ceilingHere = timbre.LevelForSpeechEquivalent(ceiling);
+        var speech = Hearing.Timbre.Speech;
+        float ceiling = PivotDb - PivotRenderedDb / compression;           // the old law's ceiling, declared
+        float fullScale = DesignFullScaleDb;
+        float real = timbre.RealOffsetDb, digital = timbre.DigitalRmsDb;
+        // Declared level of this source as loud as a speech line declared at the ceiling: where it
+        // reaches the ceiling, and so its reference distance.
+        float ceilingHere = timbre.LevelForPhons(speech.Phons(ceiling + ReferenceRmsDbfs)) - real;
         float ideal = MathF.Pow(10f, (sourceLevelDb - ceilingHere) / 20f);
         float reference = Math.Clamp(ideal, MinReferenceDistance, MaxReferenceDistance);
         float atReference = sourceLevelDb - 20f * MathF.Log10(MathF.Max(0.01f, reference));
-        float speech = timbre.SpeechEquivalent(atReference);
-        float speechPlayed = fullScale + (speech - ceiling) * compression;
-        float played = timbre.LevelForSpeechEquivalent(speechPlayed);
-        float renderedDb = played - fullScale;
+        // The speech line just as loud, as the line would be declared...
+        float line = speech.LevelForPhons(timbre.Phons(atReference + real)) - ReferenceRmsDbfs;
+        // ...where the old law plays that line (its RMS, at the designed playback)...
+        float linePlayed = fullScale + (line - ceiling) * compression + ReferenceRmsDbfs;
+        // ...and this source as loud as that, back in its own digital units.
+        float played = timbre.LevelForPhons(speech.Phons(linePlayed));
+        float renderedDb = played - fullScale - digital;
         // Not held to 1, as the unweighted law's gain is. There the gain reaches 1 exactly where the
         // source reaches the ceiling and never passes it; here a sound the ear hears less of per
         // decibel (an idling engine, a pure tone) needs more level than speech to be as loud, and at

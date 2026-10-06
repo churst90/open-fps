@@ -133,7 +133,8 @@ public sealed class Timbre
         }
         for (int i = 7; i >= 0; i--) levels[i] = levels[i + 1] - 4f;
         for (int i = 26; i < Bands; i++) levels[i] = levels[i - 1] - 4f;
-        var t = FromBandLevels(levels, "speech (ANSI S3.5 normal)");
+        // A speech line in the game sits 28 dB under its full scale (Speech.BufferRmsDbfs).
+        var t = FromBandLevels(levels, "speech (ANSI S3.5 normal)").WithGatedRms(Loudness.ReferenceRmsDbfs);
         t.BuildTable();
         return t;
     }
@@ -201,14 +202,6 @@ public sealed class Timbre
         }
         return 0.5f * (a + b);
     }
-
-    /// <summary>The level of reference speech as loud as this sound at <paramref name="levelDb"/>.</summary>
-    public float SpeechEquivalent(float levelDb)
-        => IsReference ? levelDb : Speech.LevelForPhons(Phons(levelDb));
-
-    /// <summary>The level of this sound as loud as reference speech at <paramref name="speechDb"/>.</summary>
-    public float LevelForSpeechEquivalent(float speechDb)
-        => IsReference ? speechDb : LevelForPhons(Speech.Phons(speechDb));
 
     // ── A table, for a sound asked about often (the reference) ──────────────────────────────────
 

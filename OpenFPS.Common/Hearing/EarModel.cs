@@ -26,10 +26,11 @@ public static class EarModel
     private static int _enabled = Environment.GetEnvironmentVariable("OPENFPS_EAR_MODEL") is "0" or "off" ? 0 : 1;
 
     /// <summary>
-    /// The level, dB SPL at the player's ears, at which a sound the law places at the pivot reaches
-    /// them: how loud their headphones play the game. 70, the default, is the pivot playing at its own
-    /// level, so a talker at normal effort a metre away plays at about 62 dB, conversational. Set by the
-    /// calibration (/listening) and saved in ClientSettings. Held to 40..100.
+    /// How loud the player's headphones play the game, as the level, dB SPL at their ears, of a normal
+    /// voice a metre away as the game plays it at the shipped /levels. The default, 62.35 (ANSI S3.5
+    /// normal effort at a metre), is that voice as loud as life: conversational, which is where most
+    /// people set headphones for speech in a quiet room. Set by the calibration (/listening) and saved
+    /// in ClientSettings. Held to 40..90. It moves no level in the mix, only the tone correction.
     /// </summary>
     public static float ListeningLevelDb
     {
@@ -38,7 +39,7 @@ public static class EarModel
     }
     private static float _listening = FromEnvironment();
 
-    public const float DefaultListeningLevelDb = 70f, MinListeningLevelDb = 40f, MaxListeningLevelDb = 100f;
+    public const float DefaultListeningLevelDb = Speech.NormalDb, MinListeningLevelDb = 40f, MaxListeningLevelDb = 90f;
 
     private static float FromEnvironment()
         => float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_LISTENING_LEVEL"), NumberStyles.Float, CultureInfo.InvariantCulture, out float v)
@@ -48,26 +49,24 @@ public static class EarModel
     public static bool ListeningFromEnvironment => Environment.GetEnvironmentVariable("OPENFPS_LISTENING_LEVEL") != null;
 
     /// <summary>
-    /// The level, dB SPL, the law means a 0 dB rendered source of the reference sound to play at: the
-    /// level that makes the pivot play at its own level. 70 - c (70 - C), 88.9 dB at 45 %. The law is
-    /// worked out at this nominal playback; the player's real playback only changes the compensation.
+    /// The level, dB SPL at the ear, of a 0 dB rendered level on the player's headphones: the designed
+    /// playback (Loudness.DesignFullScaleDb, about 100.8) moved by how far their listening level is from
+    /// the default.
     /// </summary>
-    public static float NominalFullScaleDb => Loudness.PivotDb - Loudness.PivotRenderedDb;
-
-    /// <summary>How much louder than the law's nominal playback the player's headphones actually play, dB.</summary>
-    public static float PlaybackOffsetDb => ListeningLevelDb - Loudness.PivotDb;
+    public static float PlaybackFullScaleDb => Loudness.DesignFullScaleDb + (ListeningLevelDb - DefaultListeningLevelDb);
 
     /// <summary>
-    /// The level at the ear, dB SPL, of a source placed by the law, at <paramref name="distance"/> metres
-    /// with <paramref name="pathDb"/> taken by the way there: where the voice actually plays. Flat inside
-    /// its reference distance, as the mixer plays it.
+    /// The level at the ear, dB SPL, of a voice placed by the law (<paramref name="placedDb"/>, as
+    /// Loudness.PlacedDb) whose RMS sits <paramref name="digitalRmsDb"/> under its full scale, at
+    /// <paramref name="distance"/> metres with <paramref name="pathDb"/> taken by the way: where the voice
+    /// actually plays. Flat inside its reference distance, as the mixer plays it.
     /// </summary>
-    public static float PlayedAtEarDb(float placedDb, float referenceDistance, float distance, float pathDb)
-        => NominalFullScaleDb + PlaybackOffsetDb + placedDb
+    public static float PlayedAtEarDb(float placedDb, float digitalRmsDb, float referenceDistance, float distance, float pathDb)
+        => PlaybackFullScaleDb + placedDb + digitalRmsDb
            - 20f * MathF.Log10(MathF.Max(MathF.Max(distance, referenceDistance), 0.05f)) + pathDb;
 
-    /// <summary>The level at the ear, dB SPL, of the same source in the real world: its level at a metre
-    /// spread over the distance (from a metre) and through the path.</summary>
-    public static float RealAtEarDb(float sourceLevelDb, float distance, float pathDb)
-        => sourceLevelDb - 20f * MathF.Log10(MathF.Max(1f, distance)) + pathDb;
+    /// <summary>The level at the ear, dB SPL, of the same source in the real world: its real level at a
+    /// metre spread over the distance (from a metre) and through the path.</summary>
+    public static float RealAtEarDb(float realLevelDb, float distance, float pathDb)
+        => realLevelDb - 20f * MathF.Log10(MathF.Max(1f, distance)) + pathDb;
 }

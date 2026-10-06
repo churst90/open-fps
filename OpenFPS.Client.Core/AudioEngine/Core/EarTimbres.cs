@@ -57,7 +57,7 @@ public static class EarTimbres
         {
             try
             {
-                var t = Timbre.FromBandPowers(BandAnalyser.Measure(mono, sampleRate), soundId);
+                var t = Timbre.FromBandPowers(BandAnalyser.Measure(mono, sampleRate), soundId)?.WithGatedRms(Timbre.GatedRms(mono, sampleRate));
                 if (t != null) Set(soundId, t);
             }
             catch (Exception ex)

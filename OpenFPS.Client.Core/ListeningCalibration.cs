@@ -68,7 +68,7 @@ public sealed class ListeningCalibration
     /// normal effort, and the playback is the law's nominal plus the listening level's offset.
     /// </summary>
     public static float ReferenceGainDb(float listeningLevelDb)
-        => Speech.LevelDb(Speech.NormalDb) - (EarModel.NominalFullScaleDb + listeningLevelDb - Loudness.PivotDb);
+        => Speech.LevelDb(Speech.NormalDb) - (Loudness.DesignFullScaleDb + listeningLevelDb - EarModel.DefaultListeningLevelDb);
 
     public void Open(double now)
     {

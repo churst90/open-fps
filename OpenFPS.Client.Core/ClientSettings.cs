@@ -49,9 +49,9 @@ public sealed class ClientSettings
     public float LevelCompression { get; set; } = OpenFPS.Common.Loudness.DefaultCompression;
 
     /// <summary>
-    /// How loud your headphones play the game: the level, dB SPL at your ears, of a sound the mix places
-    /// at its pivot. 70 (the default) is the pivot at its own level, a normal voice at arm's length at a
-    /// conversational 62 dB. Set by ear with `/listening`, or `/listening 65`. It changes no level in the
+    /// How loud your headphones play the game: the level, dB SPL at your ears, of a normal voice at arm's
+    /// length as the game plays it. 62.35 (the default) is that voice as loud as life, conversational.
+    /// Set by ear with `/listening`, or `/listening 58`. It changes no level in the
     /// mix, only how much of a sound's tone the ear model gives back at the level it plays at
     /// (docs/EAR_MODEL.md). The live value is the truth: <see cref="Save"/> records it.
     /// </summary>
