@@ -80,6 +80,8 @@ public sealed class RainSurvey
         public string OverheadMaterial = "";
         public bool OverheadIsVehicle;
         public int Columns, Candidates;
+        /// <summary>The ground and the things within NearDrops.NearRings: where drops are placed one by one.</summary>
+        public readonly List<NearCell> Near = new();
         /// <summary>Every column, when the survey was asked to keep them (the lab's trace).</summary>
         public List<string>? Trace;
         public double Milliseconds;
@@ -100,6 +102,11 @@ public sealed class RainSurvey
             return sb.ToString();
         }
     }
+
+    /// <summary>A cell of the survey near the ear: the sector of a ring a surface fills, how much of it
+    /// (m²), at what height, in which patch, and whether it is heard from below (the roof over you).</summary>
+    public readonly record struct NearCell(RainLayer Surface, float Area, float Inner, float Outer, float Angle,
+                                           float Width, float Top, int Slot, bool FromBelow, int Ring);
 
     public static string SlotName(int slot) => slot switch
     {
@@ -141,7 +148,7 @@ public sealed class RainSurvey
     private readonly List<ColumnRecord> _columns = new();
 
     private readonly record struct ColumnRecord(int Slot, int Ring, int Thing, float Area, float Distance, Vector3 At,
-                                                bool FromBelow, int Under, float UnderTop, bool Seen);
+                                                bool FromBelow, int Under, float UnderTop, bool Seen, float Angle, bool Plain);
     private readonly Vector3[] _wPos = new Vector3[RainFeeds.Slots];
 
     private static Dictionary<string, RainLayer>[] MakeLayerMaps()
@@ -202,7 +209,10 @@ public sealed class RainSurvey
                 result.OverheadEntity = roof;
                 result.OverheadMaterial = roofThing.Material;
                 result.OverheadIsVehicle = roofThing.Vehicle;
-                result.OverheadEq = eq;
+                // Under a car's roof there is its headliner, a lining of foam and fabric.
+                if (roofThing.Vehicle)
+                    result.OverheadEq = (eq.Low * RainSurfaces.HeadlinerGains.Low, eq.Mid * RainSurfaces.HeadlinerGains.Mid, eq.High * RainSurfaces.HeadlinerGains.High);
+                if (!roofThing.Vehicle) result.OverheadEq = eq;
             }
         }
 
@@ -235,7 +245,7 @@ public sealed class RainSurvey
                     (result.Trace ??= new()).Add($"ring {ring} at {angle * 180f / MathF.PI,5:F1}°: {thing.Material} (id {thing.Id}) top {hit.Top:F2} m, {d:F1} m away, " +
                                                  $"{SlotName(slot)}, {(overRoof ? "the roof over the ear" : seen ? $"heard, {10f * MathF.Log10(MathF.Max(1e-9f, through)):F1} dB" : "behind something")}");
                 _columns.Add(new ColumnRecord(slot, ring, hit.Index, seen ? area * through : area, d, at, overRoof,
-                                              hasUnder ? under : -1, hasUnder ? _underTop : 0f, seen));
+                                              hasUnder ? under : -1, hasUnder ? _underTop : 0f, seen, angle, through >= 0.99f));
                 if (seen) _seenAny[slot] = true;
             }
         }
@@ -248,6 +258,11 @@ public sealed class RainSurvey
         {
             if (c.Slot != OverheadSlot && _seenAny[c.Slot] && !c.Seen) continue;
             _underTop = c.UnderTop;
+            // Near enough, and heard straight (or the roof over the ear): its big drops are played one
+            // by one where they land (NearDrops), and the patch keeps the rest.
+            bool near = c.Ring < NearDrops.NearRings && (c.FromBelow || c.Plain);
+            _near = near ? result : null;
+            _nearAngle = c.Angle;
             AddColumn(c.Slot, c.Ring, _things[c.Thing], c.Area, c.Distance, c.At, ear, c.FromBelow,
                       c.Under >= 0 ? c.Under : (int?)null, c.At.Y);
         }
@@ -303,6 +318,7 @@ public sealed class RainSurvey
         float w = area / (d * d);
         // How squarely the surface faces the ear: its normal is up (RainLayer.Aim).
         float aim = (ear.Y - top) / d;
+        bool discrete = _near != null;
         _wSum[slot] += w;
         _wPos[slot] += at * w;
         if (thing.Vehicle && thing.Body != null)
@@ -311,16 +327,20 @@ public sealed class RainSurvey
             float spanA = body.PanelSpansM.Length > 0 ? body.PanelSpansM[0] : 0.35f;
             float spanB = body.PanelSpansM.Length > 1 ? body.PanelSpansM[1] : spanA;
             float glass = RainSurfaces.CarGlassShareOfTop;
-            Layer(slot, new RainLayer
+            var steel = Layer(slot, new RainLayer
             {
-                Kind = RainSurfaceKind.Plate, Material = body.PanelMaterial, FromBelow = fromBelow,
+                Kind = RainSurfaceKind.Plate, Material = body.PanelMaterial, FromBelow = fromBelow, ModulusGPa = 200f,
                 Plate = new RainPlate(body.PanelMaterial, body.PanelThicknessM, spanA, spanB, body.PanelLoss),
-            }).Add(ring, area * (1f - glass), d, aim);
-            Layer(slot, new RainLayer
+            });
+            steel.Add(ring, area * (1f - glass), d, aim, discrete);
+            Near(steel, area * (1f - glass), ring, top, slot, fromBelow);
+            var pane = Layer(slot, new RainLayer
             {
-                Kind = RainSurfaceKind.Plate, Material = "Glass", FromBelow = fromBelow,
+                Kind = RainSurfaceKind.Plate, Material = "Glass", FromBelow = fromBelow, ModulusGPa = 70f,
                 Plate = new RainPlate("Glass", RainSurfaces.CarGlassMetres, 0.9f * thing.Size.X, 0.5f, RainSurfaces.CarGlassLoss),
-            }).Add(ring, area * glass, d, aim);
+            });
+            pane.Add(ring, area * glass, d, aim, discrete);
+            Near(pane, area * glass, ring, top, slot, fromBelow);
             return;
         }
         var layer = new RainLayer { Kind = thing.Kind, Material = thing.Material, ModulusGPa = AcousticRegistry.GetProperties(Known(thing.Material)).YoungsModulusGPa };
@@ -361,7 +381,20 @@ public sealed class RainSurvey
                 break;
             }
         }
-        Layer(slot, layer).Add(ring, area, d, aim);
+        var merged = Layer(slot, layer);
+        merged.Add(ring, area, d, aim, discrete);
+        Near(merged, area, ring, top, slot, fromBelow);
+    }
+
+    private Result? _near;
+    private float _nearAngle;
+
+    private void Near(RainLayer layer, float area, int ring, float top, int slot, bool fromBelow)
+    {
+        if (_near == null || area <= 0f) return;
+        int sectors = ring == 0 ? 4 : 8;
+        _near.Near.Add(new NearCell(layer, area, RingEdges[ring], RingEdges[ring + 1], _nearAngle,
+                                    MathF.Tau / sectors, top, slot, fromBelow, ring));
     }
 
     private RainLayer Layer(int slot, RainLayer proto)
@@ -768,6 +801,8 @@ public sealed class RainField
         }
         if (_last == null) return;
 
+        PlayNear(ear, now, listenerRegion);
+
         // One ring patch's path a frame: the walls and windows between the ear and that patch.
         if (_acoustics != null)
         {
@@ -857,6 +892,77 @@ public sealed class RainField
         return e;
     }
 
+    // ── Near drops, one by one ──────────────────────────────────────────────────────────────────
+
+    private readonly NearDrops _nearDrops = new(Environment.TickCount);
+    private readonly DropBank _bank = new();
+    private readonly List<NearDrops.Impact> _impacts = new();
+    private readonly HashSet<string> _registered = new(StringComparer.Ordinal);
+    private double _plannedTo = double.NaN;
+    private int _nearVoice;
+
+    /// <summary>Near-drop voice ids: a pool below the patches'.</summary>
+    public const int NearVoiceBase = VoiceBase - 1000, NearVoicePool = 48;
+
+    /// <summary>Drop sounds rendered for the first time in one frame, at most: each is a few
+    /// milliseconds of the synthesiser, and a new surface or a new kind asks for a dozen at once.</summary>
+    private const int MakePerFrame = 2;
+
+    /// <summary>The impacts close by in the time since the last frame, each played where it lands
+    /// (NearDrops, DropBank), placed by its own peak through the loudness law as a one-off sound is.</summary>
+    private void PlayNear(Vector3 ear, double now, int listenerRegion)
+    {
+        if (_last == null) return;
+        if (double.IsNaN(_plannedTo) || now - _plannedTo > 0.5) _plannedTo = now;
+        float dt = (float)(now - _plannedTo);
+        if (dt <= 0f) return;
+        _impacts.Clear();
+        _nearDrops.Plan(_last, _falling, ear, _plannedTo, dt, _impacts, _bank);
+        _plannedTo = now;
+        int made = 0;
+        foreach (var impact in _impacts)
+        {
+            int variant = (_nearVoice + (int)(impact.DiameterMm * 97f)) % DropBank.Variants;
+            var sound = _bank.Get(impact, variant, mayMake: made < MakePerFrame);
+            if (sound == null) continue;
+            if (_registered.Add(sound.Id))
+            {
+                made++;
+                if (!_audio.RegisterSynthesisedSound(sound.Id, TransientSynth.ToPcm16(sound.Pcm), DropBank.Rate)) continue;
+            }
+            float dist = MathF.Max(0.3f, Vector3.Distance(impact.Position, ear));
+            float aim = (ear.Y - impact.Position.Y) / dist;
+            float level = DropBank.LevelDb(sound, impact, aim);
+            var (gain, reference) = Loudness.Place(level);
+            var e = new SpatialEmitter
+            {
+                EntityId = NearVoiceBase - (_nearVoice++ % NearVoicePool),
+                SoundId = sound.Id,
+                Mode = PlaybackMode.Single,
+                Type = EmitterType.WorldLocked,
+                Position = impact.Position,
+                ApparentPosition = impact.Position,
+                Volume = gain,
+                MinDistance = reference,
+                Range = MathF.Max(10f, Loudness.AudibleRange(level)),
+                Pitch = 1f,
+                IsEvent = true,
+                CarriesPath = true,
+                ApertureFactor = 1f,
+                EqLow = 1f, EqMid = 1f, EqHigh = 1f,
+                EffectiveDistance = dist,
+                TargetRegionId = listenerRegion,
+                DelayMs = (float)Math.Max(0.0, (impact.At - now) * 1000.0),
+            };
+            if (impact.FromBelow && impact.Slot == RainSurvey.OverheadSlot)
+            {
+                (e.EqLow, e.EqMid, e.EqHigh) = _last.OverheadEq;
+                e.InsideListenersVehicle = _last.OverheadIsVehicle;
+            }
+            _audio.Submit(e);
+        }
+    }
+
     /// <summary>Lets every rain voice go: the rain stopped, or the world was left.</summary>
     public void Stop()
     {
@@ -868,6 +974,7 @@ public sealed class RainField
             _paths[s] = null;
         }
         _last = null;
+        _plannedTo = double.NaN;
         // A survey still running is of the world being left: its answer is not wanted.
         _pending = null;
     }

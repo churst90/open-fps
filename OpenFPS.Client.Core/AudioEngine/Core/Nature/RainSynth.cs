@@ -180,7 +180,7 @@ public sealed class RainSynth
                 {
                     float near = layer.Distance[b];
                     _aim = layer.Aim[b];
-                    _skipFromMm = layer.Discrete[b] ? patch.DiscreteFromMm(_particle) : float.MaxValue;
+                    _skipFromMm = layer.Discrete[b] ? layer.DiscreteFrom(_particle, b) : float.MaxValue;
                     float mean = flux * layer.Area[b] * dt;
                     switch (layer.Kind)
                     {
@@ -268,7 +268,44 @@ public sealed class RainSynth
     /// <summary>The bin being rendered: how squarely it faces the ear, and whether its drops are
     /// striking leaves (which face every way).</summary>
     private float _aim = 1f;
-    private bool _leaf;
+    private bool _leaf, _single;
+
+    /// <summary>
+    /// One particle landing on <paramref name="surface"/> a metre from the ear, square on, rendered
+    /// alone for <paramref name="samples"/> samples: what NearDrops plays one by one, with the same
+    /// physics as the patches render by the thousand. Pressure at a metre, Pa. A hailstone's bounce is
+    /// not in it (NearDrops places the bounce where and when it lands).
+    /// </summary>
+    public float[] RenderOne(RainLayer surface, PrecipitationKind kind, float diameterMm, float speed, int samples)
+    {
+        var layer = surface.Single();
+        Patch = new RainPatch { Layers = new[] { layer }, ReferenceDistance = 1f };
+        Falling = Precipitation.None;
+        var out_ = new float[samples];
+        // Bind the plate, then strike once at the start of the first block.
+        _untilBlock = 0;
+        Bind(Patch);
+        _untilBlock = Block;
+        _blockAt = 0;
+        _single = true;
+        _particle = kind;
+        _modulus = layer.ModulusGPa;
+        _aim = 1f;
+        _leaf = layer.Kind == RainSurfaceKind.Canopy;
+        var plate = _layerPlate[0];
+        var landsOn = layer.Kind switch
+        {
+            RainSurfaceKind.Canopy => RainSurfaceKind.Soft,
+            _ => layer.Kind,
+        };
+        Land(0, diameterMm, speed, 1f, 1f, 1f, landsOn, layer.Stretch, plate, layer.FromBelow);
+        _leaf = false;
+        Array.Clear(_plateOut);
+        for (int i = 0; i < MaxPlates; i++) if (_plates[i].Active) _plates[i].Render(_plateOut, _sum, PlatePart);
+        for (int i = 0; i < samples; i++) out_[i] = Next();
+        _single = false;
+        return out_;
+    }
 
     private void Drops(float mean, float distance, float scale, RainSurfaceKind kind, float stretch,
                        PlateState? plate, bool fromBelow)
@@ -364,7 +401,8 @@ public sealed class RainSynth
             {
                 if (!fromBelow) Click(at, d, v, HardClickGain * law, 1f);
                 if (plate == null) break;
-                Strike(at, plate, RainPlate.Impulse(d, v), RainPlate.BlowSeconds(d, v), weight, atEar);
+                Strike(at, plate, RainPlate.Impulse(d, v), RainPlate.BlowSeconds(d, v), weight, atEar,
+                       0.5f * Hydrometeors.Mass(PrecipitationKind.Rain, d) * v * v);
                 break;
             }
         }
@@ -372,13 +410,28 @@ public sealed class RainSynth
 
     /// <summary>A blow of this momentum (N·s) over this time (s) into a plate: its ringing, and the
     /// struck spot's thud, ρ0 F(t) / (2π m″ r), the shape of the blow itself.</summary>
-    private void Strike(int at, PlateState plate, float impulse, float blow, float weight, float atEar)
+    private void Strike(int at, PlateState plate, float impulse, float blow, float weight, float atEar, float kineticJoules)
     {
-        plate.Inject(at, impulse, blow, weight * weight, _sum.Uniform(), _sum.Uniform());
+        // The infinite plate's mobility hands a sheet more energy than a hard enough blow ever had: a
+        // golf-ball hailstone on 0.7 mm steel would put in forty times its own kinetic energy. What
+        // the stone loses is all there is, and the sheet takes no more than half of it (the rest is
+        // the dent, the heat and the stone's own break-up).
         float peak = impulse / (blow * RainPlate.BlowShapeArea);
+        float energy = plate.Plate.Mobility * peak * peak * blow * RainPlate.BlowShapeEnergy;
+        float cap = MaxPlateShare * kineticJoules;
+        if (energy > cap && energy > 0f)
+        {
+            float k = MathF.Sqrt(cap / energy);
+            impulse *= k;
+            peak *= k;
+        }
+        plate.Inject(at, impulse, blow, weight * weight, _sum.Uniform(), _sum.Uniform());
         float thud = WallTransmission.AirDensity * peak / (2f * MathF.PI * plate.Plate.SurfaceDensity) * weight * atEar * PlatePart;
         _sum.Impact(at, RainPlate.BlowPeakAt * blow, 2f * blow, thud);
     }
+
+    /// <summary>The most of an impact's lost kinetic energy a sheet takes into its ringing.</summary>
+    public const float MaxPlateShare = 0.5f;
 
     /// <summary>The surface's Young's modulus, GPa: what an ice sphere's contact time depends on.</summary>
     private float _modulus = 30f;
@@ -432,9 +485,9 @@ public sealed class RainSynth
             float tauSamples = MathF.Max(ShapeMinSamples, 0.8f * contact * _rate);
             ClickEnergy(at, tauSamples, peak * peak * 0.25f * contact);
         }
-        if (kind == RainSurfaceKind.Plate && plate != null) Strike(at, plate, impulse, contact, weight, atEar);
+        if (kind == RainSurfaceKind.Plate && plate != null) Strike(at, plate, impulse, contact, weight, atEar, 0.5f * mass * v * v * (1f - e * e));
         // The bounce, if it lands inside what can be looked ahead.
-        if (ice && e > 0.2f)
+        if (ice && e > 0.2f && !_single)
         {
             float up = e * v;
             int later = at + (int)(2f * up / 9.81f * _rate);
@@ -446,7 +499,7 @@ public sealed class RainSynth
                               / (4f * MathF.PI * WallTransmission.SoundSpeed * c2 * c2) * weight * atEar;
                 if (!(kind == RainSurfaceKind.Plate && fromBelow))
                     ClickEnergy(later, MathF.Max(ShapeMinSamples, 0.8f * c2 * _rate), peak2 * peak2 * 0.25f * c2);
-                if (kind == RainSurfaceKind.Plate && plate != null && later < Block) Strike(later, plate, mass * rebound * (1f + e), c2, weight, atEar);
+                if (kind == RainSurfaceKind.Plate && plate != null && later < Block) Strike(later, plate, mass * rebound * (1f + e), c2, weight, atEar, 0.5f * mass * rebound * rebound * (1f - e * e));
             }
         }
     }

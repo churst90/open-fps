@@ -51,11 +51,40 @@ public sealed class RainLayer
     public readonly float[] Aim = new float[MaxBins];
 
     /// <summary>The bin is near enough that its biggest drops are played one by one, each where it
-    /// lands (RainPatch.DiscreteFromMm, NearDrops); the patch renders only the rest of it.</summary>
+    /// lands (DiscreteRainFromMm, NearDrops); the patch renders only the rest of it.</summary>
     public readonly bool[] Discrete = new bool[MaxBins];
+
+    /// <summary>From what size (mm) each bin's drops are played one by one (NearDrops), for the rain
+    /// and for hail; infinite where none are.</summary>
+    public readonly float[] DiscreteRainFromMm = Infinite(), DiscreteHailFromMm = Infinite();
+
+    private static float[] Infinite() { var a = new float[MaxBins]; Array.Fill(a, float.MaxValue); return a; }
+
+    public float DiscreteFrom(PrecipitationKind kind, int bin)
+        => kind == PrecipitationKind.Hail ? DiscreteHailFromMm[bin] : DiscreteRainFromMm[bin];
+
+    /// <summary>The bin a ring of the survey went into, or −1.</summary>
+    public int BinOfRing(int ring)
+    {
+        for (int i = 0; i < Bins; i++) if (_ring[i] == ring) return i;
+        return -1;
+    }
 
     /// <summary>The surface's Young's modulus, GPa: how long an ice sphere's contact with it lasts.</summary>
     public float ModulusGPa = 30f;
+
+    /// <summary>The same surface as one square metre a metre away, square on: for rendering one drop.</summary>
+    public RainLayer Single()
+    {
+        var l = new RainLayer
+        {
+            Kind = Kind, Material = Material, Stretch = Stretch, Plate = Plate, FromBelow = FromBelow,
+            LeafAreaIndex = LeafAreaIndex, UnderKind = UnderKind, UnderStretch = UnderStretch,
+            DripFallMetres = DripFallMetres, ModulusGPa = ModulusGPa,
+        };
+        l.Add(0, 1f, 1f, 1f);
+        return l;
+    }
 
     /// <summary>Adds an area at a distance, facing the ear at <paramref name="aim"/> (see
     /// <see cref="Aim"/>): to the bin of that ring, or a new one.</summary>
@@ -132,9 +161,4 @@ public sealed class RainPatch
     /// distance with this extent — so the mixer's law hands back exactly what arrived.</summary>
     public float ReferenceDistance = 1f;
 
-    /// <summary>From what size up (mm) the drops in this patch's near bins (RainLayer.Discrete) are
-    /// played one by one instead, by kind of particle: the rain's, and hail's. Infinite: none are.</summary>
-    public float DiscreteRainFromMm = float.MaxValue, DiscreteHailFromMm = float.MaxValue;
-
-    public float DiscreteFromMm(PrecipitationKind kind) => kind == PrecipitationKind.Hail ? DiscreteHailFromMm : DiscreteRainFromMm;
 }

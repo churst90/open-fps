@@ -64,7 +64,7 @@ public static class RainSpike
         if (args.Contains("live")) return Live(Arg(args, "sec=", 10f));
 
         float sec = Arg(args, "sec=", 20f);
-        var rates = Rates(args.FirstOrDefault(a => a.StartsWith("rate=", StringComparison.Ordinal))?[5..]);
+        var rates = Falls(args);
         string? dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..];
         if (dir != null) Directory.CreateDirectory(dir);
 
@@ -110,13 +110,15 @@ public static class RainSpike
                 }
                 paths[s] = acoustics.CalculateAcousticPath(world, -1, ear, survey.Centres[s] + new Vector3(0f, 0.3f, 0f));
             }
-            foreach (var (label, mmh) in rates)
+            foreach (var (label, fall) in rates)
             {
-                var r = Render(survey, paths, ear, mmh, sec, seed: 11);
+                float mmh = fall.RateMmPerHour;
+                var r = Render(survey, paths, ear, fall, sec, seed: 11);
                 Console.WriteLine();
-                Console.WriteLine($"  -- {name}, {label} rain ({mmh:F1} mm/h, {Rainfall.Category(mmh)}): " +
+                Console.WriteLine($"  -- {name}, {label} ({OpenFPS.Server.Core.CommandHandler.DescribePrecipitation(fall)}): " +
                                   $"{r.Voices} voices, {r.CostPerVoice * 100:F2} % of a core each (worst {r.WorstCost * 100:F2} %)");
                 foreach (var line in r.PatchLines) Console.WriteLine("    " + line);
+                Console.WriteLine("    " + r.NearSummary);
                 NatureSpike.Report($"{name} {label}", r.Mono, Rate, calibrated: true);
                 Console.WriteLine("  " + Grain(r.Mono, Rate));
                 Console.WriteLine("  " + Balance(r.Mono, Rate));
@@ -148,20 +150,27 @@ public static class RainSpike
         public int Voices;
         public double CostPerVoice, WorstCost;
         public List<string> PatchLines = new();
+        public int NearImpacts;
+        public string NearSummary = "";
         public string BandSummary = "";
     }
 
     private static Rendered Render(RainSurvey.Result survey, OpenFPS.Client.AudioEngine.Data.AcousticPathData?[] paths,
-                                   Vector3 ear, float mmh, float sec, int seed)
+                                   Vector3 ear, Precipitation fall, float sec, int seed)
     {
         int n = (int)(sec * Rate);
         var r = new Rendered { Mono = new float[n], Left = new float[n], Right = new float[n], GameLeft = new float[n], GameRight = new float[n] };
         double costSum = 0;
+        // The near drops first: they tell the patches which drops are theirs (NearDrops.Plan).
+        var near = new NearDrops(seed);
+        var impacts = new List<NearDrops.Impact>();
+        var bank = new DropBank();
+        near.Plan(survey, fall, ear, -10.0, 0f, impacts, bank);
         for (int s = 0; s < survey.Patches.Length; s++)
         {
             var patch = survey.Patches[s];
             if (patch == null) continue;
-            var synth = new RainSynth(Rate, seed * 31 + s) { Patch = patch, RainRate = mmh };
+            var synth = new RainSynth(Rate, seed * 31 + s) { Patch = patch, Falling = fall };
             var x = new float[n];
             var sw = Stopwatch.StartNew();
             float inv = 1f / patch.ReferenceDistance;
@@ -205,12 +214,49 @@ public static class RainSpike
             if (s == RainSurvey.OverheadSlot)
             {
                 float p2 = 0f;
-                foreach (var l in patch.Layers) if (l.Kind == RainSurfaceKind.Plate) p2 += l.Plate.MeanSquarePressure(mmh, l.ViewFactor);
+                foreach (var l in patch.Layers) if (l.Kind == RainSurfaceKind.Plate) p2 += l.Plate.MeanSquarePressure(fall.RateMmPerHour, l.ViewFactor);
                 extra = $"; plate law predicts {10 * Math.Log10(Math.Max(1e-20, p2) / 4e-10):F1} dB before the path";
             }
             r.PatchLines.Add($"{RainSurvey.SlotName(s),-10} {db,5:F1} dB at the ear, peaks +{Headroom(x),4:F1} dB, centre {patch.ReferenceDistance,4:F1} m, " +
                              $"path {Db20(eq.lo):F0}/{Db20(eq.mid):F0}/{Db20(eq.hi):F0} dB, cost {cost * 100:F2} %: {layers}{extra}");
         }
+        // The near drops, one by one, where they land, at the level the game places a one-off sound by
+        // its peak, panned as the patches are.
+        impacts.Clear();
+        for (double t = 0; t < sec + 1.0; t += 0.05) near.Plan(survey, fall, ear, t, 0.05f, impacts, bank);
+        int variant = 0;
+        var nearMono = new float[n];
+        foreach (var impact in impacts)
+        {
+            var sound = bank.Get(impact, variant++ % DropBank.Variants)!;
+            int start = (int)((impact.At - 1.0) * Rate);
+            if (start < 0 || start >= n) continue;
+            r.NearImpacts++;
+            float dist = MathF.Max(0.3f, Vector3.Distance(impact.Position, ear));
+            float aim = (ear.Y - impact.Position.Y) / dist;
+            float level = DropBank.LevelDb(sound, impact, aim);
+            float pascalsAtEar = 20e-6f * MathF.Pow(10f, level / 20f) / dist;
+            var (gain, reference) = Loudness.Place(level);
+            float eq = impact.FromBelow && impact.Slot == RainSurvey.OverheadSlot ? survey.OverheadEq.Mid : 1f;
+            float game = gain * MathF.Min(1f, reference / dist) * (float)Math.Pow(10, ProviderDb / 20) * 1.4142135f * eq;
+            var to = impact.Position - ear;
+            float pan = impact.FromBelow ? 0f : MathF.Sin(MathF.Atan2(to.X, to.Z)) * MathF.Min(1f, new Vector2(to.X, to.Z).Length() / MathF.Max(0.1f, dist));
+            float gl = MathF.Cos((pan + 1f) * MathF.PI / 4f), gr = MathF.Sin((pan + 1f) * MathF.PI / 4f);
+            for (int i = 0; i < sound.Pcm.Length && start + i < n; i++)
+            {
+                float x = sound.Pcm[i];
+                r.Mono[start + i] += x * pascalsAtEar * eq;
+                nearMono[start + i] += x * pascalsAtEar * eq;
+                r.Left[start + i] += x * pascalsAtEar * eq * gl;
+                r.Right[start + i] += x * pascalsAtEar * eq * gr;
+                r.GameLeft[start + i] += x * game * gl;
+                r.GameRight[start + i] += x * game * gr;
+            }
+        }
+        double ne = 0; foreach (float v in nearMono) ne += v * (double)v;
+        r.NearSummary = $"near drops: {r.NearImpacts / sec:F1} a second placed one by one (rain from {near.RainFromMm:F2} mm" +
+                        (fall.Kind == PrecipitationKind.Hail ? $", hail from {near.HailFromMm:F1} mm" : "") +
+                        $"), {10 * Math.Log10(Math.Max(1e-20, ne / n) / 4e-10):F1} dB at the ear; {bank.Made.Count()} sounds made";
         r.CostPerVoice = r.Voices > 0 ? costSum / r.Voices : 0;
         double ge = 0;
         for (int i = 0; i < n; i++) ge += 0.5 * (r.GameLeft[i] * (double)r.GameLeft[i] + r.GameRight[i] * (double)r.GameRight[i]);
@@ -700,6 +746,34 @@ public static class RainSpike
     }
 
     // ── Measurement helpers ─────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// What to render falling: fall=KIND[:WORD...] as many times as wanted, the words as /weather takes
+    /// them ("fall=rain:heavy:drops:3", "fall=drizzle", "fall=hail:golf", "fall=snow:heavy",
+    /// "fall=rain:45:dbz"); or rate=light,moderate,... for rain; or the four rain rates.
+    /// </summary>
+    private static List<(string Label, Precipitation Fall)> Falls(string[] args)
+    {
+        var list = new List<(string, Precipitation)>();
+        foreach (var a in args.Where(a => a.StartsWith("fall=", StringComparison.Ordinal)))
+        {
+            var words = a[5..].Split(':');
+            string first = words[0].ToLowerInvariant();
+            var kind = first switch
+            {
+                "sleet" => PrecipitationKind.Sleet, "snow" => PrecipitationKind.Snow, "hail" => PrecipitationKind.Hail,
+                "freezing" => PrecipitationKind.FreezingRain, _ => PrecipitationKind.Rain,
+            };
+            var rest = first == "drizzle" ? words : words.Skip(1).ToArray();
+            if (!OpenFPS.Server.Core.CommandHandler.TryReadPrecipitation(kind, rest, out var p, out string? error))
+                throw new ArgumentException($"{a}: {error}");
+            list.Add((a[5..].Replace(':', '_'), p));
+        }
+        if (list.Count > 0) return list;
+        foreach (var (label, mmh) in Rates(args.FirstOrDefault(a => a.StartsWith("rate=", StringComparison.Ordinal))?[5..]))
+            list.Add((label, new Precipitation(PrecipitationKind.Rain, mmh)));
+        return list;
+    }
 
     private static List<(string Label, float Mmh)> Rates(string? spec)
     {

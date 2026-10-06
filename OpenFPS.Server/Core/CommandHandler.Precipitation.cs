@@ -65,7 +65,7 @@ public partial class CommandHandler
     }
 
     /// <summary>Reads a rate, a class, a reflectivity, a drop size or a hailstone from the words.</summary>
-    internal static bool TryReadPrecipitation(PrecipitationKind kind, ReadOnlySpan<string> args, out Precipitation p, out string? error)
+    public static bool TryReadPrecipitation(PrecipitationKind kind, ReadOnlySpan<string> args, out Precipitation p, out string? error)
     {
         error = null;
         float rate = kind switch
@@ -168,7 +168,7 @@ public partial class CommandHandler
         => float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out n) && float.IsFinite(n);
 
     /// <summary>"Rain, heavy, 25 millimetres an hour, drops 1.8 millimetres, orange on the radar."</summary>
-    internal static string DescribePrecipitation(Precipitation p)
+    public static string DescribePrecipitation(Precipitation p)
     {
         var spectrum = new ParticleSpectrum();
         var rain = p with { Kind = p.Kind == PrecipitationKind.Hail ? PrecipitationKind.Rain : p.Kind };

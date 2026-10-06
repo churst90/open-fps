@@ -155,6 +155,15 @@ public static class RainSurfaces
     /// <summary>A pane of glass in a car is held in a bonded rubber frame: its loss factor in place.</summary>
     public const float CarGlassLoss = 0.05f;
 
+    /// <summary>
+    /// What a car's headliner — the 5-10 mm of foam and fabric bonded under its roof — takes off the
+    /// roof's sound on its way into the cabin, per mixer band as amplitude: nothing in the low band,
+    /// a few dB in the middle, more above 4 kHz, the shape a porous lining that thin has (its
+    /// absorption is small below a quarter wavelength of its own thickness and rises to most of the
+    /// sound by 4-8 kHz). An ASSUMPTION on the figures, flagged as one.
+    /// </summary>
+    public static readonly (float Low, float Mid, float High) HeadlinerGains = (1f, 0.75f, 0.45f);
+
     // ── Built panels ─────────────────────────────────────────────────────────────────────────────
 
     /// <summary>The free span of a built panel between its supports, m: purlins under a roof sheet,

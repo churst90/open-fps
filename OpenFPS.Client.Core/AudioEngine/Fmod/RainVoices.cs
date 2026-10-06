@@ -90,7 +90,7 @@ public sealed class RainVoiceState : PhysicalVoiceState
 
     /// <summary>The room its peaks need over the measured level, dB. MEASURED with --rain levels:
     /// the 99.9th percentile of the 10 ms peaks over the Leq across the lab's scenes and rates.</summary>
-    public const float HeadroomDb = 36f;
+    public const float HeadroomDb = 45f;
 
     /// <summary>How long the level is measured over, s.</summary>
     public const float LevelSeconds = 1.5f;
