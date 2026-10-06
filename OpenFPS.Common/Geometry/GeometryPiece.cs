@@ -52,6 +52,10 @@ public struct SolidRecord
     /// solid is not a box.</summary>
     public Vector3 BoxCentre, BoxSize;
     public Quaternion BoxRotation;
+    /// <summary>Where the solid was placed, in the world, exactly as given: the frame's origin plus
+    /// <see cref="BoxCentre"/> is that to a float's rounding, and code that still reads boxes meets their
+    /// edges exactly where the box test did (a wall ending at x = -11.5 ends there, not a hair past it).</summary>
+    public Vector3 PlacedAt;
 }
 
 /// <summary>A triangle as the ray test wants it: one corner, the two edges from it, and its solid.</summary>
@@ -103,7 +107,7 @@ public sealed class GeometryPiece
     public Vector3 BoundsMax { get; }
     /// <summary>What the piece holds in memory, bytes (arrays only).</summary>
     public long Bytes => (long)Tris.Length * 40 + TriSurface.Length * 2 + (long)TriNodes.Length * 32
-                         + (long)Solids.Length * 112 + SolidTris.Length * 4 + Planes.Length * 16
+                         + (long)Solids.Length * 124 + SolidTris.Length * 4 + Planes.Length * 16
                          + (long)SolidNodes.Length * 32 + SolidOrder.Length * 4;
 
     private GeometryPiece(TileKey key, Vector3 origin, ulong signature, GeometryTriangle[] tris, ushort[] triSurface, BvhNode[] triNodes,
@@ -161,7 +165,7 @@ public sealed class GeometryPiece
             ref var rec = ref records[si];
             rec.Owner = s.Owner; rec.Surface = surface; rec.TriStart = t;
             rec.Closed = s.Mesh?.Closed ?? true; rec.Convex = s.Mesh?.Convex ?? true;
-            rec.BoxCentre = s.Position - origin; rec.BoxRotation = rotation;
+            rec.BoxCentre = s.Position - origin; rec.BoxRotation = rotation; rec.PlacedAt = s.Position;
             rec.BoxSize = s.Mesh == null ? s.BoxSize : Vector3.Zero;
             var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
             if (s.Mesh == null)

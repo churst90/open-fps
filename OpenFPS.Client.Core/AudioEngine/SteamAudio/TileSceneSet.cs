@@ -169,7 +169,7 @@ internal sealed class TileSceneSet : IDisposable
         {
             ref readonly var rec = ref piece.Solid(s);
             var surface = piece.Surfaces[rec.Surface];
-            var box = new SteamAudioScene.Box(piece.Origin + rec.BoxCentre, rec.BoxSize, rec.BoxRotation, surface.Material,
+            var box = new SteamAudioScene.Box(rec.PlacedAt, rec.BoxSize, rec.BoxRotation, surface.Material,
                                               surface.Construction.Build, rec.Owner);
             p.Boxes.Add(box);
             if (!surface.Is(SurfaceFlags.OpenGround)) p.RestBoxes.Add(box);

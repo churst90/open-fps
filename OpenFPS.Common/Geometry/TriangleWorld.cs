@@ -194,7 +194,9 @@ public sealed class TriangleWorld
         ref readonly var inst = ref _instances[s.Instance];
         ref readonly var rec = ref inst.Piece.Solids[s.Solid];
         var rotation = inst.Rotated ? Quaternion.Normalize(inst.Rotation * rec.BoxRotation) : rec.BoxRotation;
-        return (inst.ToWorld(rec.BoxCentre), rec.BoxSize, rotation);
+        // A tile's solid where it was placed, exactly; a mover's where its instance now has it.
+        var centre = !inst.Rotated && inst.Position == inst.Piece.Origin ? rec.PlacedAt : inst.ToWorld(rec.BoxCentre);
+        return (centre, rec.BoxSize, rotation);
     }
 
     /// <summary>A solid's bounds in the world (loose for a turned instance).</summary>
