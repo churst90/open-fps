@@ -11,6 +11,36 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- Two maps of real places, made from open data: "magnolia tx" (magnolia_tx), a 3 km square south
+  of Magnolia, Texas, starting on the drive of 31907 Bobcat Lane, and "albany or" (albany_or), a
+  3 km square of southwest Albany, Oregon, starting in front of 1042 Belmont Avenue Southwest.
+  Neither is the landing map. Roads, names, lanes, surfaces, gates, fences, sidewalks and railways
+  are OpenStreetMap's; buildings are Overture's footprints with their heights; addresses are
+  OpenStreetMap's and the National Address Database's, with Census interpolation for houses they
+  miss; the woods are ESA WorldCover's. Lot lines, rooms, wall materials and individual trees are
+  generated. Each lot is named by its address (the front yard is "31907 Bobcat Lane", then "back
+  yard" and "side yard"); rooms are "31907 Bobcat Lane, kitchen"; roads are named along their
+  length and junctions by their roads. Houses within 300 m of the start (200 m in Albany) have rooms
+  and inner doors; the rest are one room with a front door. A few cars drive the main roads.
+- tools/gen_osm.py makes such a map from any place: the area is a bounding box, a centre and size,
+  an OpenStreetMap boundary or a ZIP code area; `--detail=low|medium|high` chooses the layers; every
+  entity is tagged with its 250 m tile and its layer for a later streaming loader.
+  tools/fetch_place.py downloads and prepares the inputs. How, the sources and their licences:
+  docs/MAPS_FROM_REAL_PLACES.md.
+- A map can have a name for the maps list (MapData.Name, carried as MapSummary.Name). F6, /maps,
+  /join, /where and travel messages say it; /join takes the name or the id, with spaces, underscores
+  or hyphens.
+- Maps in OpenFPS.Server/maps/places load with the others, and are kept out of the test output's
+  maps folder.
+- A turned room is measured in its own frame. The survey that fills in a room's materials and decides
+  whether it is enclosed looked for walls along the map's axes, so a house turned a quarter round
+  was found half open. The city's rooms are all square to the map and are unchanged.
+- Loading a big map: the server's room survey and the client's openings pass ask each room about
+  the boxes near it, not every box on the map (18 s and 16 s on Magnolia before, under a second
+  now), and the road network checks its junctions once per road. Same answers as before.
+- New prefabs: siding_wall (timber-framed wall in lap siding), shingle_roof (asphalt shingles on a
+  deck) and gravel_floor.
+
 - The front of a car is no longer silent. The engine's own noise (valve ticking, diesel clatter, the
   belt, the turbo, the intake) leaves only through the engine bay, and every car let out a flat 0.15
   of it, so an idling hatchback was louder behind than in front. The bay is now its openings (grille,

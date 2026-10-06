@@ -450,6 +450,21 @@ public class MapManager
         var regions = new List<Entity>();
         world.Query(in regionQuery, (Entity e) => regions.Add(e));
 
+        // Each part's extent, and the parts filed by the 10 m column they stand in, so a region asks
+        // about the parts near it and not every part on the map: a town is tens of thousands of boxes
+        // and thousands of regions, and asking each region about every box took 18 s for one. The
+        // answer is the same set in the same order as the scan it replaces.
+        var extents = new (Vector3 Lo, Vector3 Hi)[solids.Count];
+        var columns = new BoxColumns(10f);
+        for (int i = 0; i < solids.Count; i++)
+        {
+            var et = world.Get<Transform>(solids[i]);
+            var half = CompositeAcoustics.AxisAlignedHalfExtents(world.Get<ColliderComponent>(solids[i]).Size * 0.5f, et.Rotation);
+            extents[i] = (et.Position - half, et.Position + half);
+            columns.Add(i, extents[i].Lo, extents[i].Hi);
+        }
+        var candidates = new List<int>();
+
         foreach (var region in regions)
         {
             var t = world.Get<Transform>(region);
@@ -459,22 +474,31 @@ public class MapManager
             if (materialsAuthored.Contains(region.Id)) { skipped++; continue; }
 
             // Only the parts that could be this room's own surfaces: anything overlapping its box
-            // with half a metre of slack, which reaches a wall standing just outside it.
-            var lo = t.Position - r.RoomSize * 0.5f - new Vector3(WallReach);
-            var hi = t.Position + r.RoomSize * 0.5f + new Vector3(WallReach);
+            // with half a metre of slack, which reaches a wall standing just outside it. A region
+            // turned about the vertical (a house on a street that does not run north-south) reaches
+            // as far as its turned box does.
+            bool turned = !IsUpright(t.Rotation);
+            var reach = turned ? CompositeAcoustics.AxisAlignedHalfExtents(r.RoomSize * 0.5f, t.Rotation) : r.RoomSize * 0.5f;
+            var lo = t.Position - reach - new Vector3(WallReach);
+            var hi = t.Position + reach + new Vector3(WallReach);
             var near = new List<Entity>();
-            foreach (var e in solids)
+            columns.Collect(lo, hi, candidates);
+            foreach (int i in candidates)
             {
-                var et = world.Get<Transform>(e);
-                var half = CompositeAcoustics.AxisAlignedHalfExtents(world.Get<ColliderComponent>(e).Size * 0.5f, et.Rotation);
-                if (et.Position.X + half.X < lo.X || et.Position.X - half.X > hi.X) continue;
-                if (et.Position.Y + half.Y < lo.Y || et.Position.Y - half.Y > hi.Y) continue;
-                if (et.Position.Z + half.Z < lo.Z || et.Position.Z - half.Z > hi.Z) continue;
-                near.Add(e);
+                var (eLo, eHi) = extents[i];
+                if (eHi.X < lo.X || eLo.X > hi.X) continue;
+                if (eHi.Y < lo.Y || eLo.Y > hi.Y) continue;
+                if (eHi.Z < lo.Z || eLo.Z > hi.Z) continue;
+                near.Add(solids[i]);
             }
             if (near.Count == 0) continue;
 
-            var survey = CompositeAcoustics.SurveyBox(world, near, t.Position, r.RoomSize);
+            // A turned room is measured in its own frame: its walls are along its own sides, not the
+            // map's. Measured in the map's, a house turned a quarter round had its walls looked for
+            // where its corners are, and was found to be half open.
+            var survey = turned
+                ? CompositeAcoustics.SurveyBox(world, near, t.Position, r.RoomSize, t.Rotation)
+                : CompositeAcoustics.SurveyBox(world, near, t.Position, r.RoomSize);
 
             // FILL IN BLANKS, NEVER OVERRULE. A face the map said nothing about is material 0 —
             // "None" — which the reverb reads as perfectly reflective, so silence there is not
@@ -529,6 +553,9 @@ public class MapManager
             Log.Information("MapManager: '{Map}': {Surveyed} region(s) had blank faces filled in from the geometry, {Skipped} kept an authored list.",
                 m.Id, surveyed, skipped);
     }
+
+    /// <summary>Whether a rotation leaves a box as it is (or is unset).</summary>
+    private static bool IsUpright(Quaternion q) => q.IsIdentity || q == default;
 
     /// <summary>How far outside a region's own box a wall may stand and still be that room's wall,
     /// metres. A region is drawn to the INSIDE of a room; its walls are just beyond that. The same reach
@@ -751,6 +778,28 @@ public class MapManager
     /// </summary>
     /// <summary>Every map currently loaded, by id.</summary>
     public IEnumerable<string> LoadedMapIds => _maps.Keys;
+
+    /// <summary>
+    /// The loaded map a player means, by its id or by the name it is listed under, whatever the case
+    /// and whether the words are joined by spaces, underscores or hyphens: "magnolia tx", "Magnolia_TX"
+    /// and "magnolia-tx" are all magnolia_tx. Null if none.
+    /// </summary>
+    public string? ResolveMapId(string said)
+    {
+        if (string.IsNullOrWhiteSpace(said)) return null;
+        string exact = _maps.Keys.FirstOrDefault(id => id.Equals(said.Trim(), StringComparison.OrdinalIgnoreCase)) ?? "";
+        if (exact.Length > 0) return exact;
+        string want = Loose(said);
+        foreach (var (id, entry) in _maps.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
+            if (Loose(id) == want || Loose(entry.data.Name) == want) return id;
+        return null;
+
+        static string Loose(string? s) => string.Join(" ", (s ?? "").ToLowerInvariant()
+            .Split(new[] { ' ', '_', '-', '\t' }, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    /// <summary>What a loaded map is called aloud: its listed name, or its id.</summary>
+    public string DisplayName(string mapId) => TryGetMapData(mapId, out var d) ? d.DisplayName : mapId;
 
     /// <summary>
     /// Writes a map back to disk exactly as it now stands, including anything built on it since.

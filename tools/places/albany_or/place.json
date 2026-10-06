@@ -1,0 +1,32 @@
+{
+ "Id": "albany_or",
+ "Name": "albany or",
+ "Description": "Albany, Oregon. Real streets and addresses from OpenStreetMap and public records. A 3 km square of southwest Albany round Belmont Avenue Southwest. Map data (c) OpenStreetMap contributors (ODbL); buildings from Overture Maps (OpenStreetMap, Microsoft ML Buildings, USGS lidar); addresses from OpenStreetMap, the US National Address Database and Census TIGER/Line; tree cover from ESA WorldCover 2021 (CC BY 4.0). Lot lines, rooms and the individual trees are generated. Made by tools/gen_osm.py.",
+ "Area": {"Bbox": [44.576730, -123.132165, 44.603680, -123.094323]},
+ "Origin": [44.590205, -123.113244],
+ "Spawn": {"Address": "1042 Belmont Avenue Southwest"},
+ "CountyFips": ["41043", "41003"],
+ "SourcesNote": "Not used: Linn and Benton County parcels. Their redistribution terms were not checked, so lot lines are drawn from the address points, as for Magnolia.",
+ "Archive": "~/openfps-scratch-archive/osm-albany-2026-10-05",
+ "Setting": "town",
+ "Detail": "medium",
+ "FullDetailMetres": 200,
+ "Units": "mph",
+ "SpeedMph": {"motorway": 65, "trunk": 55, "primary": 40, "secondary": 35, "tertiary": 30, "unclassified": 25,
+              "residential": 25, "living_street": 15, "service": 15, "default": 25},
+ "VergeMetres": 2.6,
+ "SidewalkMetres": 1.5,
+ "BrickShare": 0.1,
+ "Trees": {"Species": [["Douglas fir", 0.35], ["Oregon white oak", 0.25], ["Bigleaf maple", 0.2], ["Western redcedar", 0.1], ["Oregon ash", 0.1]],
+           "SpacingMedium": 40, "SpacingHigh": 16, "SpacingNear": 14, "CrownEveryMetres": 80,
+           "CanopyLow": 4.0, "CanopyHigh": 16.0},
+ "Traffic": [
+  {"Name": "Car on Pacific Boulevard", "Preset": "i4_midsize", "Road": "Pacific Boulevard Southwest", "Kind": "car", "TopKmh": 75},
+  {"Name": "Pickup on Pacific Boulevard", "Preset": "pickup_v8", "Road": "Pacific Boulevard Southwest", "Kind": "car", "TopKmh": 75, "Direction": -1},
+  {"Name": "Car on Belmont Avenue", "Preset": "i4_compact", "Road": "Belmont Avenue Southwest", "Kind": "car", "TopKmh": 45},
+  {"Name": "Car on 53rd Avenue", "Preset": "v6", "Road": "53rd Avenue Southwest", "Kind": "car", "TopKmh": 60}
+ ],
+ "StreetLife": {"HornEverySeconds": 120, "HardBrakeEverySeconds": 0, "ParkEverySeconds": 0, "GunfireEverySeconds": 0, "AlarmEverySeconds": 0},
+ "Temperature": 25.0,
+ "Humidity": 0.6
+}

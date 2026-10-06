@@ -1,0 +1,51 @@
+Inputs for the OpenFPS map 'albany_or' (albany or).
+Area: {"Bbox": [44.57673, -123.132165, 44.60368, -123.094323]}
+bbox S,W,N,E = 44.576730,-123.132165,44.603680,-123.094323
+written 2026-10-06 by tools/fetch_place.py; files already present were kept as they were.
+
+osm.json
+  OpenStreetMap: roads, names, lanes, surfaces, gates, points of interest
+  from: Overpass API (overpass-api.de), nwr in the bbox with recursion
+  licence: ODbL 1.0, (c) OpenStreetMap contributors
+
+overture-building.geojson
+  Overture Maps building: building footprints with heights (Microsoft ML Buildings, OpenStreetMap, USGS Lidar)
+  from: overturemaps download (release in the .state file)
+  licence: ODbL 1.0 (Overture buildings theme)
+
+overture-address.geojson
+  Overture Maps address: address points; in the US these are the National Address Database
+  from: overturemaps download (release in the .state file)
+  licence: NAD: public domain (US DOT); Overture addresses theme CDLA-Permissive-2.0
+
+overture-place.geojson
+  Overture Maps place: points of interest (Meta, Microsoft and others via Overture)
+  from: overturemaps download (release in the .state file)
+  licence: CDLA-Permissive-2.0
+
+overture-water.geojson
+  Overture Maps water: rivers, streams, ponds
+  from: overturemaps download (release in the .state file)
+  licence: ODbL 1.0
+
+esa-worldcover-2021-10m.tif
+  ESA WorldCover 2021 v200, 10 m land cover classes, a window of the 3-degree tile(s)
+  from: https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N42W126_Map.tif
+  licence: CC BY 4.0, (c) ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021)
+
+usgs-3dep-dem.tif
+  USGS 3D Elevation Program bare-earth elevation, metres (not used yet: the engine's ground is flat)
+  from: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer
+  licence: public domain (USGS)
+
+tl_2024_41043_addrfeat.zip
+  US Census TIGER/Line 2024 address range features, county 41043
+  from: https://www2.census.gov/geo/tiger/TIGER2024/ADDRFEAT/tl_2024_41043_addrfeat.zip
+  licence: public domain (US Census Bureau)
+
+tl_2024_41003_addrfeat.zip
+  US Census TIGER/Line 2024 address range features, county 41003
+  from: https://www2.census.gov/geo/tiger/TIGER2024/ADDRFEAT/tl_2024_41003_addrfeat.zip
+  licence: public domain (US Census Bureau)
+
+Not used: Linn and Benton County parcels. Their redistribution terms were not checked, so lot lines are drawn from the address points, as for Magnolia.

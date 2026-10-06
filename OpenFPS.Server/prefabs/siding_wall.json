@@ -1,0 +1,12 @@
+{
+  "Id": "siding_wall",
+  "Name": "Siding Wall",
+  "Description": "A timber-framed house wall clad in lap siding: boards or fibre-cement planks over sheathing and studs, with insulation in the cavity. Far lighter than brick, so it lets more of the bottom through, and the overlapping courses scatter like a rough face rather than a smooth one.",
+  "Material": "Wood",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 0.2 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.2,
+  "TransmissionMid": 0.08,
+  "TransmissionHigh": 0.03
+}

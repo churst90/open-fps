@@ -1,0 +1,12 @@
+{
+  "Id": "shingle_roof",
+  "Name": "Shingle Roof",
+  "Description": "A pitched house roof: asphalt shingles on felt and plywood decking over the rafters. The shingles are the same bitumen as a road and soak up the top of the band the way a road does; the deck under them is a light panel that lets rain and traffic through more than a slab would.",
+  "Material": "Asphalt",
+  "ColliderSize": { "X": 10, "Y": 0.2, "Z": 10 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.3,
+  "TransmissionMid": 0.12,
+  "TransmissionHigh": 0.04
+}
