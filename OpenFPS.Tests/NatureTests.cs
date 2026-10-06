@@ -468,6 +468,29 @@ public class NatureTests
         HoldInRange("leaves", TextureStatistics.Analyse(x).Summary(), Fitted);
     }
 
+    /// <summary>
+    /// A fire is a steady fizz with rare loud cracks over it, as the recorded fires are (envelope
+    /// spread 0.18-0.30 above 3 kHz, kurtosis 21-100), not cracks over silence (spread 0.45-0.59
+    /// before the fizz). Not held on its 4-16 Hz modulation, still a little under the recordings'
+    /// (0.23 against 0.28-0.48: the flames' flicker does not reach the fizz yet).
+    /// </summary>
+    [Fact]
+    public void AFireFizzesBetweenItsCracks()
+    {
+        var fire = new FireSynth(FireSpec.ByName("fire_pit"), TextureStatistics.Rate, 7);
+        var x = new float[TextureStatistics.Rate * 20];
+        for (int i = 0; i < x.Length; i++)
+        {
+            if (i % 256 == 0)
+            {
+                fire.Wind = WindField.SpeedAt(0f, 0.8f, 0f, i / (double)TextureStatistics.Rate);
+                fire.Control(256f / TextureStatistics.Rate);
+            }
+            x[i] = fire.Next();
+        }
+        HoldInRange("fire", TextureStatistics.Analyse(x).Summary(), Fitted.Where(k => k != "mod mid"));
+    }
+
     /// <summary>"water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;" is a tap; a plain "water:&lt;preset&gt;" is the whole.</summary>
     [Fact]
     public void AWaterTapKeyNamesItsFeatureAndTap()

@@ -380,9 +380,11 @@ public sealed record FoliageSpec
         // minute is not enough to measure it by — a minute of gusts read 2.3 dB high. Re-measured
         // 2026-10-05 with the boughs reading the wind across the crown and the field's turbulence at
         // 0.25: Leq 47.9 dB, 46.3 dB(A), the gustiest second 6.6 dB over. Round 3 (Vogel −0.9, strikes
-        // by contact angle): 47.8 dB, 46.2 dB(A), the gustiest second 6.7 dB over.
+        // by contact angle): 47.8 dB, 46.2 dB(A), the gustiest second 6.7 dB over. Texture round 1
+        // (2026-10-06: strikes and twig episodes from exponential-tailed turbulent increments), five
+        // minutes: 47.4 dB, 45.7 dB(A), its 10 ms peaks' 99.9th percentile 21.1 dB over, so 22 of room.
         SourceLevelDb = 48f,
-        PeakHeadroomDb = 20f,
+        PeakHeadroomDb = 22f,
         ExtentMetres = 4f,
     };
 
