@@ -4,6 +4,25 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Steam Audio's scenes are built per tile and use Embree. Each tile the client holds has its own
+  sub-scenes, built when its geometry changes; the scenes the simulators trace are made of instances
+  of them, in two pairs used in turn, so a tile arriving or leaving, or a door swinging, rebuilds only
+  that tile and never commits a scene that is being traced. Driving at 15 m/s on Magnolia the scene
+  work went from about 0.5 s to 0.04 s a second, walking from 46 to 4 ms a second; occlusion and
+  transmission are the same as before and reverberation times agree within the tracer's own
+  run-to-run spread (AudioLab `--tile-scenes`). Embree runs on x86 and x64; elsewhere, or with
+  `OPENFPS_EMBREE=0`, the default tracer and whole-scene rebuilds stay.
+- The routes through openings are rebuilt when doorways change and otherwise at most every 3 s
+  while only far walls and roads change.
+- The distant (coarse) layer of a streamed map now holds what sound notices from past 300 m: building
+  shells with their front doors, woods and tree trunks, fences, hedges, garden walls and guard rails,
+  as well as the ground, roads, rail and water. Rooms, house interiors, lawns, drives, posts and the
+  wind in each tree (heard to 90 m) stay full detail only. Joining Magnolia at medium is now 13,590
+  entities and 588 KB (from 12,344 and 530 KB).
+- A doorway and the rooms it joins are sent together, so a door at the edge of full detail opens into
+  its room; a front door held without its room is a shut door, not a doorway into nothing.
+- Stage 2 will key world tiles to the standard UTM grid (docs/WORLD_STREAMING.md).
+
 - Large maps stream (docs/WORLD_STREAMING.md, stage 1). A map with tiles (the real places) is sent
   to each client a radius at a time: everything within 300 m, and the ground, roads and building
   shells out to 800 m (`/detail low|medium|high`: 150/500, 300/800, 500/1,200 m; saved). Tiles load
