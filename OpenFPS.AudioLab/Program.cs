@@ -139,6 +139,7 @@ string[] usage =
     "  --tail-cost [t60=2]                           the late tail's cost per mixer piece: one channel against the field",
     "  --sim-reverbfield                             the simulator's reverb against enclosure across places",
     "  --scene-cost [map=city]                       what rebuilding the Steam Audio scenes costs",
+    "  --tile-scenes [map=magnolia_tx]                Steam Audio scene per tile on Embree against one mesh: cost and answers",
     "  --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium]  a streamed map walked: tile costs, worker gaps",
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
     "  --ambisonic                                   ambisonic encode and decode come out of the right ear",
@@ -711,6 +712,11 @@ if (args.Contains("--path-probe"))
 {
     // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.Run(args));
+}
+if (args.Contains("--tile-scenes"))
+{
+    // --tile-scenes [map=magnolia_tx] [detail=medium] [sources=48]: one mesh or a sub-scene per tile, default or Embree: cost and answers.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.TileScenesSpike.Run(args));
 }
 if (args.Contains("--stream-walk"))
 {

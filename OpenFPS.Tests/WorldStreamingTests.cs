@@ -168,18 +168,71 @@ public class WorldStreamingTests
         Assert.Equal(TileDetail.Coarse, g.Needs);
         Assert.True(g.Tiles.Length >= tiles.Tiles.Count() * 9 / 10, $"the ground is in {g.Tiles.Length} of {tiles.Tiles.Count()} tiles");
 
-        // Rooms and doors need full detail; walls and roads are coarse; named places full.
-        int doors = 0, rooms = 0;
+        // Rooms are full detail; a doorway shares its rooms' tiles, so where one goes the other does.
+        int doors = 0, rooms = 0, crowns = 0;
         foreach (var e in lookup.Values)
         {
             if (!tiles.TryGet(e.Id, out var m)) continue;
-            if (world.Has<DoorComponent>(e)) { doors++; Assert.Equal(TileDetail.Full, m.Needs); }
             if (world.Has<RegionComponent>(e) && world.Get<RegionComponent>(e).RoomSize.X > 0f) { rooms++; Assert.Equal(TileDetail.Full, m.Needs); }
+            if (world.Has<PortalComponent>(e) && world.Get<PortalComponent>(e) is { } p && p.RegionAId != p.RegionBId)
+            {
+                doors++;
+                foreach (int room in new[] { p.RegionAId, p.RegionBId })
+                    if (tiles.TryGet(room, out var r)) Assert.Equal(r.Tiles, m.Tiles);
+            }
+            // A sound that carries less than the full radius is full detail (a tree's wind).
+            if (world.Has<SoundEmitterComponent>(e) && world.Get<SoundEmitterComponent>(e).SoundId.StartsWith("foliage")) { crowns++; Assert.Equal(TileDetail.Full, m.Needs); }
             // An entity is in the tile its centre is in.
             var at = world.Get<Transform>(e).Position;
             Assert.Contains(TileKey.Of(at, tiles.TileMetres), m.Tiles);
         }
         Assert.True(doors > 100 && rooms > 100, $"{doors} doors, {rooms} rooms");
+        _o.WriteLine($"  {crowns} tree crowns full only");
+    }
+
+    /// <summary>What the coarse ring is made of, by what sound would notice: the shells and front doors,
+    /// the woods and trunks, fences, hedges and garden walls; never a room, an inner wall or furniture,
+    /// a lawn, a drive or a post. Reports what it costs a tile.</summary>
+    [Theory]
+    [InlineData("magnolia_tx")]
+    [InlineData("albany_or")]
+    public void The_coarse_ring_keeps_what_sound_notices(string id)
+    {
+        var maps = LoadPlace(id);
+        Assert.True(maps.TryGetTiles(id, out var tiles));
+        Assert.True(maps.TryGetMap(id, out var world, out _, out _, out var lookup));
+        var byKind = new Dictionary<string, (int Coarse, int Full)>();
+        long coarseBytes = 0;
+        foreach (var e in lookup.Values)
+        {
+            if (!tiles.TryGet(e.Id, out var m)) continue;
+            string name = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e).Name : "";
+            string kind = name.Contains("Fence") ? "fence" : name.Contains("Hedge") ? "hedge" : name.EndsWith("wall") && !name.Contains(',') ? "outer wall"
+                        : name.Contains(", ") && world.Has<RegionComponent>(e) ? "room" : name is "Tree" or "Woods" ? name.ToLowerInvariant()
+                        : name == "Trees" ? "tree crown" : name.EndsWith(" post") ? "post" : name.EndsWith("front yard") ? "lawn" : "";
+            if (kind.Length == 0) continue;
+            var (c, f) = byKind.GetValueOrDefault(kind);
+            byKind[kind] = m.Needs == TileDetail.Coarse ? (c + 1, f) : (c, f + 1);
+            if (m.Needs == TileDetail.Coarse && kind is "fence" or "hedge" or "tree" or "woods")
+                coarseBytes += MemoryPackSerializer.Serialize(EntityDefinitionFactory.From(world, e)).Length;
+        }
+        foreach (var (kind, (c, f)) in byKind.OrderBy(kv => kv.Key)) _o.WriteLine($"  {id} {kind}: {c} coarse, {f} full");
+        foreach (var kind in new[] { "fence", "hedge", "tree", "woods", "outer wall" })
+            if (byKind.TryGetValue(kind, out var n)) Assert.Equal(0, n.Full);
+        foreach (var kind in new[] { "room", "tree crown", "post", "lawn" })
+            if (byKind.TryGetValue(kind, out var n)) Assert.Equal(0, n.Coarse);
+
+        // The cost: the join at medium, and the average coarse tile.
+        var interest = new TileInterest();
+        var ids = TileStreamer.Begin(interest, tiles, maps.GetSpawnPoint(id).Position);
+        long bytes = 0;
+        foreach (var chunk in ids.Where(lookup.ContainsKey).Chunk(EntityDefinitionBatch.Size))
+            bytes += MemoryPackSerializer.Serialize<IMessage>(EntityDefinitionPack.Pack(new EntityDefinitionBatch { Definitions = chunk.Select(i => EntityDefinitionFactory.From(world, lookup[i])).ToList() })).Length;
+        int coarseTiles = interest.Levels.Count(kv => kv.Value == TileDetail.Coarse);
+        int perCoarse = interest.Levels.Where(kv => kv.Value == TileDetail.Coarse)
+                                       .Sum(kv => tiles.Members(kv.Key).Count(i => tiles.TryGet(i, out var mm) && mm.Needs == TileDetail.Coarse)) / Math.Max(1, coarseTiles);
+        _o.WriteLine($"  {id} join at medium: {ids.Count} entities, {bytes / 1024} KB packed; {perCoarse} entities a coarse tile; " +
+                     $"trees, woods, fences and hedges now coarse: {coarseBytes / 1024} KB unpacked over the whole map");
     }
 
     // ── The server's per-client sets ─────────────────────────────────────────────────────────────

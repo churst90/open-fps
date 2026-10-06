@@ -18,10 +18,21 @@ namespace OpenFPS.Server.Core;
 /// </summary>
 public sealed class MapTiles
 {
-    /// <summary>The layers a coarse tile is made of: what keeps far buildings in the way of sound and
-    /// the far roads under the traffic. Everything else needs full detail.</summary>
+    /// <summary>The layers a coarse tile is made of: what keeps far buildings in the way of sound, the
+    /// far roads under the traffic, and the woods that scatter it. See <see cref="Needs"/> for the rest.</summary>
     public static readonly IReadOnlySet<string> CoarseLayers =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ground", "roads", "structure", "rail", "water" };
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ground", "roads", "structure", "rail", "water", "trees" };
+
+    /// <summary>The layers sound cannot notice from past the full-detail radius: the inside of houses and
+    /// the names of places.</summary>
+    public static readonly IReadOnlySet<string> FullOnlyLayers =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "rooms", "interiors", "zones" };
+
+    /// <summary>A solid thing on any other layer is in the coarse tile if it stands at least this tall and
+    /// runs at least <see cref="BarrierLengthMetres"/>: a fence, a hedge, a garden wall, a guard rail. Each
+    /// is a barrier to a source near the ground and a face that reflects. A post, a step, a lawn or a
+    /// drive on the ground is not something a sound from 300 m notices.</summary>
+    public const float BarrierHeightMetres = 0.8f, BarrierLengthMetres = 2f;
 
     public readonly record struct Membership(TileKey[] Tiles, TileDetail Needs);
 
@@ -56,12 +67,14 @@ public sealed class MapTiles
                                  IReadOnlyDictionary<int, string?> layers)
     {
         var tiles = new MapTiles(tileMetres, TileKey.Of(minBound, tileMetres), TileKey.Of(maxBound, tileMetres));
+        var pending = new Dictionary<int, (Entity Entity, HashSet<TileKey> Keys, TileDetail Needs)>();
+        var doorways = new List<(int Id, int A, int B)>();
         world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) =>
         {
             if (world.Has<PlayerComponent>(e) || world.Has<Velocity>(e)) return;
             if (!layers.TryGetValue(e.Id, out var layer)) { tiles.AddGlobal(e); return; }
             var (lo, hi) = Footprint(world, e, t);
-            var keys = new List<TileKey>();
+            var keys = new HashSet<TileKey>();
             var a = TileKey.Of(lo, tileMetres);
             var b = TileKey.Of(hi, tileMetres);
             // Clamped to the map: a slab hanging over the edge belongs to the edge tiles.
@@ -70,20 +83,59 @@ public sealed class MapTiles
             for (int x = x0; x <= x1; x++)
                 for (int z = z0; z <= z1; z++)
                     keys.Add(new TileKey(x, z));
-            tiles.Add(e, keys.ToArray(), Needs(world, e, layer));
+            pending[e.Id] = (e, keys, Needs(world, e, layer));
+            if (world.Has<PortalComponent>(e))
+            {
+                var p = world.Get<PortalComponent>(e);
+                if (p.RegionAId != p.RegionBId) doorways.Add((e.Id, p.RegionAId, p.RegionBId));
+            }
         });
+        // A doorway and the rooms it joins go together: a door on the edge of full detail whose room
+        // stands in the next tile would otherwise open onto nothing (43 such on Magnolia). Each is in
+        // the other's tiles, so where one is sent the other is.
+        foreach (var (id, ra, rb) in doorways)
+            foreach (int room in new[] { ra, rb })
+            {
+                if (!pending.TryGetValue(room, out var r) || !pending.TryGetValue(id, out var d)) continue;
+                var both = new HashSet<TileKey>(d.Keys);
+                both.UnionWith(r.Keys);
+                d.Keys.UnionWith(both);
+                r.Keys.UnionWith(both);
+            }
+        foreach (var (e, keys, needs) in pending.Values)
+            tiles.Add(e, keys.OrderBy(k => k.X).ThenBy(k => k.Z).ToArray(), needs);
         return tiles;
     }
 
-    /// <summary>The detail a tile must be at for this entity to be sent with it: coarse for the layers
-    /// a coarse tile is made of, except a door or a doorway (it opens into a room a coarse tile does not
-    /// have) and a room or named place; full for everything else.</summary>
+    /// <summary>
+    /// The detail a tile must be at for this entity to be sent with it, decided by what sound would notice
+    /// from beyond the full-detail radius (docs/WORLD_STREAMING.md, Detail layers):
+    /// <list type="bullet">
+    /// <item>Full only: rooms and named places, the inside of houses (inner walls, inner doors,
+    /// furniture), and a sound source that carries less than the smallest full radius (a tree's wind in
+    /// its crown carries 90 m).</item>
+    /// <item>Coarse: the ground, roads, building shells with their front doors (a shut leaf in the wall;
+    /// its doorway opens only onto a room that is sent), rail, water, the woods and tree trunks, and
+    /// anything else solid that stands as a barrier: fences, hedges, garden walls, guard rails.</item>
+    /// </list>
+    /// </summary>
     internal static TileDetail Needs(World world, Entity e, string? layer)
     {
-        if (string.IsNullOrEmpty(layer) || !CoarseLayers.Contains(layer)) return TileDetail.Full;
-        if (world.Has<DoorComponent>(e) || world.Has<PortalComponent>(e)) return TileDetail.Full;
         if (world.Has<RegionComponent>(e) && world.Get<RegionComponent>(e).RoomSize.X > 0f) return TileDetail.Full;
-        return TileDetail.Coarse;
+        if (!string.IsNullOrEmpty(layer) && FullOnlyLayers.Contains(layer)) return TileDetail.Full;
+        if (world.Has<SoundEmitterComponent>(e))
+        {
+            var s = world.Get<SoundEmitterComponent>(e);
+            if (!string.IsNullOrEmpty(s.SoundId) && s.Range < StreamRadii.MinFullMetres) return TileDetail.Full;
+        }
+        if (!string.IsNullOrEmpty(layer) && CoarseLayers.Contains(layer)) return TileDetail.Coarse;
+        if (world.Has<ColliderComponent>(e))
+        {
+            var c = world.Get<ColliderComponent>(e);
+            if (c.IsSolid && c.Size.Y >= BarrierHeightMetres && MathF.Max(c.Size.X, c.Size.Z) >= BarrierLengthMetres)
+                return TileDetail.Coarse;
+        }
+        return TileDetail.Full;
     }
 
     /// <summary>The square on the ground an entity covers: its collider or its room, turned.</summary>

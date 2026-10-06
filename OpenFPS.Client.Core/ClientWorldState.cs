@@ -262,7 +262,9 @@ public class ClientWorldState
         if (def.Portal.RegionAId != def.Portal.RegionBId)
         {
             if (!deferAcoustics) TrackPortal(def);
-            else _tablesDirty = true;
+            // A front door in a coarse tile, its room not sent: a shut leaf in a wall, nothing for the
+            // tables (the refresh leaves its doorway out). Only a doorway whose rooms are here counts.
+            else if (Holds(def.Portal.RegionAId) && Holds(def.Portal.RegionBId)) _tablesDirty = true;
         }
 
         // Anything that makes sound on its own is processed every frame. See RunsOnItsOwn: this used
@@ -281,6 +283,9 @@ public class ClientWorldState
 
         Touch();
     }
+
+    /// <summary>Whether a doorway's side is somewhere this client has: the outdoors, or a room it holds.</summary>
+    private bool Holds(int region) => region == AcousticConstants.GlobalRegionId || _definitions.ContainsKey(region);
 
     /// <summary>
     /// Puts a runtime region on the acoustic map, or updates one already there.
@@ -724,6 +729,7 @@ public class ClientWorldState
             StaticGrid = gridCopy,
             AcousticMap = AcousticMap,
             GeometryVersion = GeometryVersion,
+            TileMetres = TileMetres,
             PositionsSampledAt = _positionsSampledAt
         };
 

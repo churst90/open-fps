@@ -109,7 +109,7 @@ internal sealed class TracedEchoes : IDisposable
         var s = new Phonon.IPLSimulationSettings
         {
             flags = Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS,
-            sceneType = Phonon.IPL_SCENETYPE_DEFAULT,
+            sceneType = SteamAudioScene.TypeFor(context),
             reflectionType = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION,
             maxNumOcclusionSamples = 16, maxNumRays = Rays, numDiffuseSamples = 32,
             maxDuration = DurationSeconds, maxOrder = Order, maxNumSources = MaxSources * Banks, numThreads = 2,

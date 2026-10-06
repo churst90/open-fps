@@ -157,7 +157,7 @@ public sealed class SteamAudioSimulator : IDisposable
         var s = new Phonon.IPLSimulationSettings
         {
             flags = _flags,
-            sceneType = Phonon.IPL_SCENETYPE_DEFAULT,
+            sceneType = SteamAudioScene.TypeFor(_context),
             reflectionType = enableReflections ? Phonon.IPL_REFLECTIONEFFECTTYPE_PARAMETRIC : Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION,
             maxNumOcclusionSamples = 16, maxNumRays = enableReflections ? 8192 : 4096, numDiffuseSamples = 32,
             maxDuration = enableReflections ? 2.0f : 1.0f,

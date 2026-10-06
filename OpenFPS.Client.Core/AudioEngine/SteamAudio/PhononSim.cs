@@ -15,6 +15,9 @@ internal static partial class Phonon
 {
     // --- enums (as int constants) ---
     public const int IPL_SCENETYPE_DEFAULT = 0;
+    /// <summary>Intel's Embree, built into the shipped Linux and Windows x64 libraries: builds and traces
+    /// faster than the default, and traces instanced sub-scenes properly (docs/GEOMETRY.md 6.4).</summary>
+    public const int IPL_SCENETYPE_EMBREE = 1;
 
     public const int IPL_SIMULATIONFLAGS_DIRECT = 1 << 0;
     public const int IPL_SIMULATIONFLAGS_REFLECTIONS = 1 << 1;
@@ -228,6 +231,18 @@ internal static partial class Phonon
     [DllImport(Lib, CallingConvention = CC)] public static extern int iplStaticMeshCreate(IntPtr scene, ref IPLStaticMeshSettings settings, out IntPtr staticMesh);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplStaticMeshRelease(ref IntPtr staticMesh);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplStaticMeshAdd(IntPtr staticMesh, IntPtr scene);
+
+    // Embree, and instanced sub-scenes (phonon.h 4.8.1).
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IPLEmbreeDeviceSettings { public int reserved; }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IPLInstancedMeshSettings { public IntPtr subScene; public IPLMatrix4x4 transform; }
+    [DllImport(Lib, CallingConvention = CC)] public static extern int iplEmbreeDeviceCreate(IntPtr context, ref IPLEmbreeDeviceSettings settings, out IntPtr device);
+    [DllImport(Lib, CallingConvention = CC)] public static extern void iplEmbreeDeviceRelease(ref IntPtr device);
+    [DllImport(Lib, CallingConvention = CC)] public static extern IntPtr iplSceneRetain(IntPtr scene);
+    [DllImport(Lib, CallingConvention = CC)] public static extern int iplInstancedMeshCreate(IntPtr scene, ref IPLInstancedMeshSettings settings, out IntPtr instancedMesh);
+    [DllImport(Lib, CallingConvention = CC)] public static extern void iplInstancedMeshRelease(ref IntPtr instancedMesh);
+    [DllImport(Lib, CallingConvention = CC)] public static extern void iplInstancedMeshAdd(IntPtr instancedMesh, IntPtr scene);
 
     [DllImport(Lib, CallingConvention = CC)] public static extern int iplSimulatorCreate(IntPtr context, ref IPLSimulationSettings settings, out IntPtr simulator);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSimulatorRelease(ref IntPtr simulator);
