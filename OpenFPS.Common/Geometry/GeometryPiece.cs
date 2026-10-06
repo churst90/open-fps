@@ -45,6 +45,9 @@ public struct SolidRecord
     public int TriStart, TriCount;
     public int PlaneStart, PlaneCount;
     public bool Convex, Closed;
+    /// <summary>How big it is (its box's volume, or its bounds'): of two surfaces in the same place, the
+    /// smaller thing's is the one met (a path laid flush on the ground is the path).</summary>
+    public float Volume;
     /// <summary>The box this solid is, in the piece's frame: centre, size and turn. Size zero when the
     /// solid is not a box.</summary>
     public Vector3 BoxCentre, BoxSize;
@@ -151,7 +154,8 @@ public sealed class GeometryPiece
         for (int si = 0; si < solids.Count; si++)
         {
             var s = solids[si];
-            var rotation = s.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : s.Rotation;
+            var rotation = s.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(s.Rotation);
+            var turn = ShapeLibrary.RotationMatrix(s.Rotation);
             int surface = SurfaceIndex(s.Surface);
             if (surface > ushort.MaxValue) throw new InvalidOperationException("more than 65,536 surfaces in one piece");
             ref var rec = ref records[si];
@@ -164,7 +168,7 @@ public sealed class GeometryPiece
             {
                 for (int c = 0; c < 8; c++)
                 {
-                    corners[c] = ShapeLibrary.BoxCorner(c, s.Position, s.BoxSize, rotation, origin);
+                    corners[c] = ShapeLibrary.BoxCorner(c, s.Position, s.BoxSize, turn, origin);
                     lo = Vector3.Min(lo, corners[c]); hi = Vector3.Max(hi, corners[c]);
                 }
                 var idx = ShapeLibrary.BoxTriangles;
@@ -182,7 +186,7 @@ public sealed class GeometryPiece
                 var verts = new Vector3[m.Vertices.Length];
                 for (int v = 0; v < verts.Length; v++)
                 {
-                    verts[v] = at + Vector3.Transform(m.Vertices[v], rotation);
+                    verts[v] = at + Vector3.TransformNormal(m.Vertices[v], turn);
                     lo = Vector3.Min(lo, verts[v]); hi = Vector3.Max(hi, verts[v]);
                 }
                 for (int k = 0; k < m.Indices.Length; k += 3, t++)
@@ -194,6 +198,8 @@ public sealed class GeometryPiece
             }
             rec.TriCount = t - rec.TriStart;
             rec.Min = lo; rec.Max = hi;
+            var extent = s.Mesh == null ? s.BoxSize : hi - lo;
+            rec.Volume = extent.X * extent.Y * extent.Z;
             rec.PlaneStart = planes.Count;
             if (rec.Convex && rec.Closed) AddPlanes(tris, rec.TriStart, rec.TriCount, planes);
             rec.PlaneCount = planes.Count - rec.PlaneStart;
@@ -276,8 +282,11 @@ public sealed class GeometryPiece
     }
 
     /// <summary>The nearest triangle along a ray, among faces of the given kind, that the layers and the
-    /// filter count. <paramref name="best"/> narrows as hits are found.</summary>
-    internal bool Closest<F>(Vector3 o, Vector3 d, Vector3 inv, float tMin, ref float best, RayFaces faces,
+    /// filter count. <paramref name="best"/> narrows as hits are found. Of two at exactly the same
+    /// distance (two surfaces in the same place) the smaller solid's wins, and of two the same size the
+    /// lower owner's (<see cref="Ties"/>), so a server and a client agree on which one a ray met whatever
+    /// order their trees visit them in.</summary>
+    internal bool Closest<F>(Vector3 o, Vector3 d, Vector3 inv, float tMin, ref float best, ref Ties tie, RayFaces faces,
                              GeometryLayers layers, ref F filter, int ownerOverride, out int triangle, out bool front)
         where F : IGeometryFilter
     {
@@ -298,8 +307,11 @@ public sealed class GeometryPiece
                     if ((faces & (f ? RayFaces.Front : RayFaces.Back)) == 0) continue;
                     ref readonly var surface = ref Surfaces[TriSurface[i]];
                     if ((surface.Layers & layers) == 0) continue;
-                    if (!filter.Accept(ownerOverride >= 0 ? ownerOverride : Solids[Tris[i].Solid].Owner, surface)) continue;
-                    best = t; triangle = i; front = f;
+                    ref readonly var rec = ref Solids[Tris[i].Solid];
+                    int owner = ownerOverride >= 0 ? ownerOverride : rec.Owner;
+                    if (t == best && !tie.Beats(rec.Volume, owner)) continue;
+                    if (!filter.Accept(owner, surface)) continue;
+                    best = t; tie = new Ties(rec.Volume, owner); triangle = i; front = f;
                 }
                 continue;
             }
@@ -476,6 +488,21 @@ public sealed class GeometryPiece
             stack[sp++] = n.LeftFirst + 1; stack[sp++] = n.LeftFirst;
         }
     }
+}
+
+/// <summary>
+/// Which of two surfaces met at exactly the same distance counts: the smaller solid's, then the lower
+/// owner's. Two surfaces in the same place are a thing laid flush on another (a drive on the ground, a
+/// rug on a floor), and the thing laid on is the smaller. The box path took whichever its list had first,
+/// which was not the same on the server and the client.
+/// </summary>
+public readonly struct Ties
+{
+    public readonly float Volume;
+    public readonly int Owner;
+    public Ties(float volume, int owner) { Volume = volume; Owner = owner; }
+    public static Ties None => new(float.MaxValue, int.MaxValue);
+    public bool Beats(float volume, int owner) => volume < Volume || (volume == Volume && owner < Owner);
 }
 
 /// <summary>A solid in a world: which instance (a tile's piece, or a door leaf) and which solid in it.</summary>

@@ -36,6 +36,8 @@ public static class GeometryParitySpike
         public readonly string Name;
         public int Probes, Same, Ties;
         public readonly Dictionary<string, int> Kinds = new();
+        /// <summary>For ties that differ in what they say (a material), which way round and how often.</summary>
+        public readonly Dictionary<string, int> TiePairs = new();
         public readonly List<string> Shown = new();
         public double OldMs, NewMs;
         public double MaxError;
@@ -135,6 +137,15 @@ public static class GeometryParitySpike
         var tallies = new List<Tally>();
         var spatial = new SpatialService();
 
+        // stepdebug=x,y,z,ix,iz: one step on both paths, with every obstacle's answer at the moved and
+        // the stepped-up position.
+        if (args.FirstOrDefault(a => a.StartsWith("stepdebug=")) is { } stepArg)
+        {
+            var f = stepArg[10..].Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray();
+            DebugStep(ecs, grid, serverWorld, serverUnindexed, new Vector3(f[0], f[1], f[2]), Vector3.Normalize(new Vector3(f[3], 0, f[4])), data);
+            return 0;
+        }
+
         // ── Rays ─────────────────────────────────────────────────────────────────────────────────
         if (only.Contains("rays"))
         {
@@ -168,8 +179,20 @@ public static class GeometryParitySpike
                     float tol = 1e-3f + 1e-5f * mt0;
                     float ang = Vector3.Distance(Vector3.Normalize(mn0), Vector3.Normalize(mn1));   // the angle, for small ones
                     material.MaxError = Math.Max(material.MaxError, Math.Abs(mt0 - mt1));
-                    if (MathF.Abs(mt0 - mt1) > tol) material.Differ("distance", $"from {V(o)} along {V(d)}: old {mt0:F4} new {mt1:F4}", show);
-                    else if (mt0 == 0f && mt1 == 0f && ang > 1e-3f) material.Differ("normal when the ray starts inside", $"from {V(o)}: old {V(mn0)} new {V(mn1)}", show);
+                    if (MathF.Abs(mt0 - mt1) > tol && MathF.Abs(mt0 - mt1) * MathF.Abs(Vector3.Dot(Vector3.Normalize(mn1), d)) < 2e-4f)
+                    {
+                        material.Ties++; material.Same++;
+                        material.TiePairs["glancing (the same within 0.2 mm square to the face)"] = material.TiePairs.GetValueOrDefault("glancing (the same within 0.2 mm square to the face)") + 1;
+                    }
+                    else if (MathF.Abs(mt0 - mt1) > tol) material.Differ("distance", $"from {V(o)} along {V(d)}: old {mt0:F4} new {mt1:F4}", show);
+                    else if (mt0 == 0f && mt1 == 0f && ang > 1e-3f)
+                    {
+                        // Inside two solids at once (a slab laid in another): which one it is "in" is a tie.
+                        var inside = new List<SolidRef>(); var everything = new AcceptAll();
+                        newSnap.Geometry!.Containing(o, GeometryLayers.Physical, ref everything, inside);
+                        if (inside.Count > 1) { material.Ties++; material.Same++; }
+                        else material.Differ("normal when the ray starts inside", $"from {V(o)}: old {V(mn0)} new {V(mn1)}", show);
+                    }
                     else if (ang > 1e-3f) material.Differ("normal", $"from {V(o)} along {V(d)} at {mt0:F3}: old {V(mn0)} new {V(mn1)}", show);
                     else if (mm0 != mm1) { material.Ties++; material.Same++; }
                     else material.Same++;
@@ -238,6 +261,13 @@ public static class GeometryParitySpike
                 float c1 = PhysicsUtils.GetGroundHeight(newSnap, p, -1, out string cm1);
                 client.NewMs += c.Elapsed.TotalMilliseconds;
                 CompareGround(client, p, c0, cm0, c1, cm1, show);
+                if ((gm1 != cm1) && args.Contains("tiedebug") && server.Ties < 6)
+                {
+                    var all = new AcceptAll();
+                    serverWorld.Ground(p, 0.3f, 0.4f, GeometryLayers.Ground, ref all, out var ss, out int so);
+                    newSnap.Geometry!.Ground(p, 0.3f, 0.4f, GeometryLayers.Ground, ref all, out var cs, out int co);
+                    Console.WriteLine($"  tie at {V(p)}: server new {gm1} (#{so} '{serverWorld.SurfaceOf(ss).Material}'), client new {cm1} (#{co} '{newSnap.Geometry.SurfaceOf(cs).Material}'); old server {gm0}, old client {cm0}");
+                }
             }
             SetGrid(grid, geoSaved, serverUnindexed);
         }
@@ -269,6 +299,12 @@ public static class GeometryParitySpike
                         var hit1 = SolidContact.CylinderOverlap(serverWorld, s, centre, r, h, down);
                         overlap.NewMs += c.Elapsed.TotalMilliseconds;
                         overlap.Probes++;
+                        if (hit0.IsColliding != hit1.IsColliding && MathF.Max(hit0.Penetration, hit1.Penetration) < 1e-4f)
+                        {
+                            overlap.Ties++; overlap.Same++;
+                            overlap.TiePairs["touching within 0.1 mm"] = overlap.TiePairs.GetValueOrDefault("touching within 0.1 mm") + 1;
+                            continue;
+                        }
                         if (hit0.IsColliding != hit1.IsColliding)
                         {
                             overlap.Differ("touching on one side only", $"body at {V(centre)}, box {V(bc)} size {V(bs)}: old {hit0.IsColliding} ({hit0.Penetration:F5}) new {hit1.IsColliding} ({hit1.Penetration:F5})", show);
@@ -281,7 +317,9 @@ public static class GeometryParitySpike
                         {
                             bool tie = TiedWayOut(centre, bc, bs, br, r);
                             if (tie && MathF.Abs(hit0.Penetration - hit1.Penetration) <= 1e-3f) { overlap.Ties++; overlap.Same++; continue; }
-                            overlap.Differ(tie ? "the way out of the middle of a box (tied)" : "way out", $"body at {V(centre)} (down {down}), box {V(bc)} size {V(bs)}: old {V(hit0.Normal)} {hit0.Penetration:F5}, new {V(hit1.Normal)} {hit1.Penetration:F5}", show);
+                            overlap.Differ(tie ? "the way out of the middle of a box (tied)" : "way out",
+                                $"body at {V(centre)} (down {down}), box {V(bc)} size {V(bs)}: old ({hit0.Normal.X:F5}, {hit0.Normal.Z:F5}) {hit0.Penetration:F6}, "
+                                + $"new ({hit1.Normal.X:F5}, {hit1.Normal.Z:F5}) {hit1.Penetration:F6}", show);
                         }
                         else overlap.Same++;
                     }
@@ -298,6 +336,7 @@ public static class GeometryParitySpike
         // ── Movement steps: one step from the same state, old and new ─────────────────────────────
         if (only.Contains("steps"))
         {
+            int walksControlParted = 0;
             var steps = new Tally("Movement step (server gather, one step from the same state)");
             var walks = new Tally("Walks of 90 steps (2 s at 45 Hz) on the server");
             tallies.Add(steps); tallies.Add(walks);
@@ -333,26 +372,35 @@ public static class GeometryParitySpike
 
                 if (i % 10 == 0)
                 {
-                    // Two bodies walking the same inputs, each on its own path: where do they part?
-                    Vector3 a = p, av = Vector3.Zero, b = p, bv = Vector3.Zero;
+                    // Two bodies walking the same inputs, each on its own path: where do they part? And, for
+                    // scale, a third on the OLD path started a tenth of a millimetre aside: how often does
+                    // the box path part from itself over the same walk?
+                    Vector3 a = p, av = Vector3.Zero, b = p, bv = Vector3.Zero, cc = p + new Vector3(1e-4f, 0, 0), cv = Vector3.Zero;
                     var dirNow = input;
-                    float worst = 0f; int partedAt = -1;
+                    float worst = 0f, worstControl = 0f; int partedAt = -1;
                     for (int k = 0; k < 90; k++)
                     {
                         if (k % 20 == 0) dirNow = Vector3.Normalize(new Vector3((float)(rng.NextDouble() * 2 - 1), 0, (float)(rng.NextDouble() * 2 - 1)));
                         (a, av, _) = StepOnServer(ecs, grid, null, serverUnindexed, a, av, dirNow, sprint, data);
+                        (cc, cv, _) = StepOnServer(ecs, grid, null, serverUnindexed, cc, cv, dirNow, sprint, data);
+                        worstControl = MathF.Max(worstControl, Vector3.Distance(a, cc) - 1e-4f);
                         (b, bv, _) = StepOnServer(ecs, grid, geoSaved, serverUnindexed, b, bv, dirNow, sprint, data);
                         float e = Vector3.Distance(a, b);
+                        if (args.Contains("walkdebug") && e > 1e-5f && e > worst * 1.5f)
+                            Console.WriteLine($"  walk from {V(p)} step {k}: old {V(a)} new {V(b)} apart {e * 1000:F3} mm{WhatTouches(serverWorld, a)}");
                         if (e > worst) worst = e;
                         if (e > 1e-3f && partedAt < 0) partedAt = k;
                     }
                     walks.Probes++;
                     walks.MaxError = Math.Max(walks.MaxError, worst);
-                    if (partedAt >= 0) walks.Differ("parted", $"from {V(p)}: apart by more than 1 mm at step {partedAt}, worst {worst * 1000:F2} mm", show);
+                    if (worstControl > 1e-3f) walksControlParted++;
+                    if (partedAt >= 0) walks.Differ("parted", $"from {V(p)}: apart by more than 1 mm at step {partedAt}, worst {worst * 1000:F2} mm"
+                                                    + $" (the box path from 0.1 mm aside: {worstControl * 1000:F2} mm)", show);
                     else walks.Same++;
                 }
             }
             SetGrid(grid, geoSaved, serverUnindexed);
+            Console.WriteLine($"  walks: the box path started 0.1 mm aside parted from itself by over 1 mm in {walksControlParted} of {walks.Probes}");
         }
 
         // ── Enclosure surveys ────────────────────────────────────────────────────────────────────
@@ -381,7 +429,16 @@ public static class GeometryParitySpike
                 float mfp = Math.Abs(s0.MeanFreePathMetres - s1.MeanFreePathMetres) / Math.Max(0.1f, s0.MeanFreePathMetres);
                 float area = Math.Abs(s0.SurfaceAreaSquareMetres - s1.SurfaceAreaSquareMetres) / Math.Max(1f, s0.SurfaceAreaSquareMetres);
                 survey.MaxError = Math.Max(survey.MaxError, worst);
-                if (worst > 1e-4f || mfp > 1e-4f || area > 1e-4f)
+                bool sameShape = Math.Abs(s0.OpenFraction - s1.OpenFraction) < 1e-6f && mfp < 1e-4f && area < 1e-4f;
+                if ((worst > 1e-4f) && sameShape)
+                {
+                    // Every ray met a surface at the same distance both ways and only what it was made of
+                    // differs: two surfaces in the same place (a lawn laid flush on the ground), of which
+                    // the box path took whichever its list had first and the triangles take the lower id.
+                    survey.Ties++; survey.Same++;
+                    survey.TiePairs["coincident surfaces"] = survey.TiePairs.GetValueOrDefault("coincident surfaces") + 1;
+                }
+                else if (worst > 1e-4f || mfp > 1e-4f || area > 1e-4f)
                     survey.Differ(worst > 0.011f ? "survey (more than two rays' worth)" : "survey (a ray or two)",
                         $"at {V(p)}: enclosure {s0.Enclosure:F4}/{s1.Enclosure:F4}, open {s0.OpenFraction:F4}/{s1.OpenFraction:F4}, "
                         + $"mfp {s0.MeanFreePathMetres:F3}/{s1.MeanFreePathMetres:F3}, abs mid {s0.AbsorptionMid:F4}/{s1.AbsorptionMid:F4}, area {s0.SurfaceAreaSquareMetres:F1}/{s1.SurfaceAreaSquareMetres:F1}", show);
@@ -524,7 +581,12 @@ public static class GeometryParitySpike
                         // A hit on something a coarse tile does not carry is what streaming means, not a difference.
                         bool held = a && streamedSnap.Entities.ContainsKey(ha.Owner);
                         if (a && !held) { stream.Ties++; stream.Same++; }
-                        else stream.Differ("bits", $"from {V(o)} along {V(d)}: server {(a ? $"{ha.T:R} #{ha.Owner}" : "-")} client {(b ? $"{hb.T:R} #{hb.Owner}" : "-")}", show);
+                        else
+                        {
+                            string Who(int id) => streamedSnap.Entities.TryGetValue(id, out var es)
+                                ? $"#{id} {es.Definition.Identity.Name} {EntityGeometry.RoleOf(es.Definition)} size {V(es.Definition.Collider.Size)}" : $"#{id} not held";
+                            stream.Differ("bits", $"from {V(o)} along {V(d)}: server {(a ? $"{ha.T:R} {Who(ha.Owner)}" : "-")} client {(b ? $"{hb.T:R} {Who(hb.Owner)}" : "-")}", show);
+                        }
                     }
                 }
                 Console.WriteLine($"  streamed client: {samePieces} tile piece(s) with the server's own signature, {otherPieces} different (a coarse tile holds less)");
@@ -544,6 +606,12 @@ public static class GeometryParitySpike
             Console.WriteLine();
             Console.WriteLine($"{t.Name}: " + string.Join(", ", t.Kinds.Select(k => $"{k.Value} {k.Key}")));
             foreach (var s in t.Shown) Console.WriteLine("    " + s);
+        }
+        foreach (var t in tallies.Where(t => t.TiePairs.Count > 0))
+        {
+            Console.WriteLine();
+            Console.WriteLine($"{t.Name}, ties (two surfaces at the same place), old material -> new: "
+                              + string.Join(", ", t.TiePairs.OrderByDescending(k => k.Value).Take(10).Select(k => $"{k.Key} x{k.Value}")));
         }
         return 0;
     }
@@ -622,6 +690,19 @@ public static class GeometryParitySpike
         t.MaxError = Math.Max(t.MaxError, Math.Abs(t0 - t1));
         if (MathF.Abs(t0 - t1) > tol)
         {
+            // A ray that meets a face at a glancing angle turns a hair's difference in where the face is
+            // into a long one along the ray: measured square to the face, is it still float rounding?
+            var all = new AcceptAll();
+            if (snap.Geometry != null && snap.Geometry.Enter(o, d, t1 + 1f, GeometryLayers.Physical, ref all, out var h) && !h.Inside)
+            {
+                float cos = MathF.Abs(Vector3.Dot(h.Normal, d));
+                if (MathF.Abs(t0 - t1) * cos < 2e-4f)
+                {
+                    t.Ties++; t.Same++;
+                    t.TiePairs["glancing (the same within 0.2 mm square to the face)"] = t.TiePairs.GetValueOrDefault("glancing (the same within 0.2 mm square to the face)") + 1;
+                    return;
+                }
+            }
             t.Differ("distance", $"from {V(o)} along {V(d)}: old #{e0} {t0:F4}, new #{e1} {t1:F4}{Describe(snap, e0, o + d * t0)}", show);
             return;
         }
@@ -647,7 +728,13 @@ public static class GeometryParitySpike
         t.Probes++;
         t.MaxError = Math.Max(t.MaxError, g0 > -900f && g1 > -900f ? Math.Abs(g0 - g1) : 0);
         if (MathF.Abs(g0 - g1) > 1e-4f) { t.Differ("height", $"at {V(p)}: old {g0:F5} ({m0}) new {g1:F5} ({m1})", show); return; }
-        if (m0 != m1) { t.Ties++; t.Same++; return; }
+        if (m0 != m1)
+        {
+            t.Ties++; t.Same++;
+            string pair = $"{m0} -> {m1}";
+            t.TiePairs[pair] = t.TiePairs.GetValueOrDefault(pair) + 1;
+            return;
+        }
         t.Same++;
     }
 
@@ -659,6 +746,53 @@ public static class GeometryParitySpike
         if (worst > 1e-4f) t.Differ("band gains", $"{V(a)} to {V(b)}: old {o.L:G4}/{o.M:G4}/{o.H:G4} new {n.L:G4}/{n.M:G4}/{n.H:G4}", show);
         else t.Same++;
         static float Rel(float x, float y) => MathF.Abs(x - y) / MathF.Max(1e-6f, MathF.Max(MathF.Abs(x), MathF.Abs(y)));
+    }
+
+    private static void DebugStep(World ecs, SpatialGrid<Entity> grid, TriangleWorld world, List<Entity> unindexed, Vector3 p, Vector3 input, MapData data)
+    {
+        foreach (bool sprint in new[] { false, true })
+        {
+            var (p0, _, g0) = StepOnServer(ecs, grid, null, unindexed, p, Vector3.Zero, input, sprint, data);
+            var (p1, _, g1) = StepOnServer(ecs, grid, world, unindexed, p, Vector3.Zero, input, sprint, data);
+            Console.WriteLine($"sprint {sprint}: old {V(p0)} {g0}, new {V(p1)} {g1}");
+            SetGrid(grid, null, unindexed);
+            float gOld = PhysicsUtils.GetGroundHeight(ecs, grid, p, out string mOld);
+            SetGrid(grid, world, unindexed);
+            float gNew = PhysicsUtils.GetGroundHeight(ecs, grid, p, out string mNew);
+            Console.WriteLine($"  ground old {gOld:R} ({mOld}), new {gNew:R} ({mNew})");
+            var any = new AcceptAll();
+            world.Ground(p, 0.3f, 0.4f, GeometryLayers.Ground, ref any, out var gs, out int go);
+            var (gc, gsz, gr) = world.BoxOf(gs);
+            Console.WriteLine($"  ground solid #{go}: centre {gc.X:R},{gc.Y:R},{gc.Z:R} size {gsz.X:R},{gsz.Y:R},{gsz.Z:R} rot {gr.X:R},{gr.Y:R},{gr.Z:R},{gr.W:R}; "
+                              + $"top by the box {gc.Y + gsz.Y / 2f:R}; instance at {world.Instance(gs.Instance).Position}");
+            for (int k = 0; k < 5; k++)
+            {
+                var off = k switch { 1 => new Vector3(0.3f, 0, 0), 2 => new Vector3(-0.3f, 0, 0), 3 => new Vector3(0, 0, 0.3f), 4 => new Vector3(0, 0, -0.3f), _ => Vector3.Zero };
+                var from = new Vector3(p.X + off.X, p.Y + 0.4f, p.Z + off.Z);
+                if (!world.Closest(from, -Vector3.UnitY, 100f, GeometryLayers.Ground, RayFaces.Front, ref any, out var hh, -1e-5f)) continue;
+                var tr = world.Instance(hh.Solid.Instance).Piece.Triangle(hh.Triangle);
+                Console.WriteLine($"    probe {k}: #{hh.Owner} t {hh.T:R} height {world.HeightOn(hh, from.X, from.Z):R}; V0 {tr.V0.X:R},{tr.V0.Y:R},{tr.V0.Z:R} E1 {tr.E1.X:R},{tr.E1.Y:R},{tr.E1.Z:R} E2 {tr.E2.X:R},{tr.E2.Y:R},{tr.E2.Z:R}");
+            }
+            float speed = PhysicsConstants.FootSpeed(sprint, float.MaxValue);
+            var next = p + input * speed * PhysicsConstants.FixedDeltaTime;
+            float h = PhysicsConstants.PlayerHeight - 0.15f, r = PhysicsConstants.PlayerRadius;
+            var offset = new Vector3(0, 0.15f + h / 2f, 0);
+            foreach (var (label, at) in new[] { ("moved", next + offset), ("stepped up", next + new Vector3(0, PhysicsConstants.StepHeight, 0) + offset) })
+            {
+                var near = new List<SolidRef>(); var all = new AcceptAll();
+                world.Overlapping(at - new Vector3(2, 3, 2), at + new Vector3(2, 3, 2), GeometryLayers.Movement, ref all, near);
+                foreach (var s in near)
+                {
+                    var (bc, bs, br) = world.BoxOf(s);
+                    var lc = Vector3.Transform(at - bc, Quaternion.Inverse(br));
+                    var o = GeometryUtils.GetCylinderAABBOverlap(-bs / 2f, bs / 2f, lc, r, h);
+                    bool oi = GeometryUtils.AABBIntersectsCylinder(-bs / 2f, bs / 2f, lc, r, h);
+                    var t = SolidContact.CylinderOverlap(world, s, at, r, h);
+                    if (!o.IsColliding && !t.IsColliding && !oi) continue;
+                    Console.WriteLine($"  {label}: #{world.OwnerOf(s)} box {V(bc)} size {V(bs)} rot {br}: box {o.IsColliding}/{oi} {V(o.Normal)} {o.Penetration:F6}; triangles {t.IsColliding} {V(t.Normal)} {t.Penetration:F6}");
+                }
+            }
+        }
     }
 
     /// <summary>The solids a body standing at <paramref name="feet"/> overlaps, with the box test's answer and the triangles'.</summary>

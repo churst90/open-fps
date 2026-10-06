@@ -235,6 +235,9 @@ public sealed class TriangleWorld
         return tris.Length;
     }
 
+    /// <summary>How big a solid is (Ties).</summary>
+    public float VolumeOf(SolidRef s) => _instances[s.Instance].Piece.Solids[s.Solid].Volume;
+
     /// <summary>How many triangles a solid has.</summary>
     public int TriangleCountOf(SolidRef s) => _instances[s.Instance].Piece.Solids[s.Solid].TriCount;
 
@@ -278,6 +281,7 @@ public sealed class TriangleWorld
         if (_instances.Length == 0) return false;
         var inv = BvhBuilder.Inverse(d);
         float best = tMax;
+        var tie = Ties.None;
         bool found = false;
         Span<int> stack = stackalloc int[BvhBuilder.MaxDepth + 2];
         int sp = 0;
@@ -295,7 +299,7 @@ public sealed class TriangleWorld
                     ref readonly var inst = ref _instances[ii];
                     Vector3 lo = inst.ToLocal(o), ld = inst.DirectionToLocal(d);
                     var linv = inst.Rotated ? BvhBuilder.Inverse(ld) : inv;
-                    if (inst.Piece.Closest(lo, ld, linv, tMin, ref best, faces, layers, ref filter, inst.Owner, out int tri, out bool front))
+                    if (inst.Piece.Closest(lo, ld, linv, tMin, ref best, ref tie, faces, layers, ref filter, inst.Owner, out int tri, out bool front))
                     {
                         found = true;
                         hit.T = best; hit.Triangle = tri; hit.Front = front;
@@ -329,13 +333,16 @@ public sealed class TriangleWorld
         Containing(o, layers, ref filter, inside);
         if (inside.Count > 0)
         {
-            // Of several, the lowest owner: a rule the server and a client share whatever order they met them in.
+            // Of several, the smaller, then the lower owner (Ties): a rule the server and a client share
+            // whatever order they met them in.
             var pick = inside[0];
             int owner = OwnerOf(pick);
+            var tie = new Ties(VolumeOf(pick), owner);
             for (int i = 1; i < inside.Count; i++)
             {
                 int other = OwnerOf(inside[i]);
-                if (other < owner) { owner = other; pick = inside[i]; }
+                float volume = VolumeOf(inside[i]);
+                if (tie.Beats(volume, other)) { owner = other; pick = inside[i]; tie = new Ties(volume, other); }
             }
             // Its normal is the face the ray came in by, behind where it starts, as a box test reports it:
             // back along the ray, the face it leaves the solid by.
@@ -548,7 +555,7 @@ public sealed class TriangleWorld
                 if (!Closest(from, down, GroundReach, layers, RayFaces.Front, ref filter, out var hit, tFrom)) break;
                 float y = HeightOn(hit, from.X, from.Z);
                 if (y > top) { tFrom = MathF.Max(hit.T, tFrom) + 1e-6f; continue; }
-                if (y > bestY || (y == bestY && hit.Owner < owner))
+                if (y > bestY || (y == bestY && owner >= 0 && new Ties(VolumeOf(solid), owner).Beats(VolumeOf(hit.Solid), hit.Owner)))
                 {
                     bestY = y; solid = hit.Solid; owner = hit.Owner;
                 }

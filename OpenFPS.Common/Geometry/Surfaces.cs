@@ -160,8 +160,28 @@ public static class ShapeLibrary
     /// do it in exactly this order for the server and the client to hold the same bits.
     /// </summary>
     public static Vector3 BoxCorner(int corner, Vector3 centre, Vector3 size, Quaternion rotation, Vector3 origin)
+        => BoxCorner(corner, centre, size, RotationMatrix(rotation), origin);
+
+    /// <summary>The same with the turn already made a matrix (<see cref="RotationMatrix"/>).</summary>
+    public static Vector3 BoxCorner(int corner, Vector3 centre, Vector3 size, in Matrix4x4 turn, Vector3 origin)
     {
         var local = BoxCorners[corner] * (size * 0.5f);
-        return (centre - origin) + Vector3.Transform(local, rotation);
+        return (centre - origin) + Vector3.TransformNormal(local, turn);
+    }
+
+    /// <summary>
+    /// A turn as the matrix every corner is placed with: the quaternion made unit length first (a map
+    /// writes six digits, and 0.707082/0.707131 is not quite unit), then the classical matrix. For a turn
+    /// about the vertical alone its middle row and column are exactly (0, 1, 0), so a box's top is exactly
+    /// its centre plus half its height, as every box test reads it: Vector3.Transform with a quaternion
+    /// that is not unit length scales the height by its length squared, and a gravel strip's top came out
+    /// a float's last bit low, which was enough to step a body up onto a kerb the box path did not.
+    /// </summary>
+    public static Matrix4x4 RotationMatrix(Quaternion rotation)
+    {
+        float len = rotation.LengthSquared();
+        if (len < 1e-6f) return Matrix4x4.Identity;
+        if (len != 1f) rotation = Quaternion.Normalize(rotation);
+        return Matrix4x4.CreateFromQuaternion(rotation);
     }
 }
