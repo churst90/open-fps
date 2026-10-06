@@ -4,6 +4,20 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Rain round 2 (unheard). Renders in inbox/textures-round2-rain-2026-10-06, with a README.
+- Rain no longer crunches. A drop's click on a road, a roof or the ground rises smoothly instead of as
+  a one-sample spike, and its top end is the spray of its splash (2.5-14 kHz noise following every
+  drop, 15 % of its impact energy). Near drops share it. Inside 10 ms the street's 4-16 kHz band now
+  reads 3.0-3.3 (kurtosis), as recorded rain does (3.0-4.4); round 1 read 8-10. Levels and envelope
+  statistics unchanged.
+- Rain on a roof over you follows the rate again. The near drops (the loudest twenty-odd a second,
+  played one by one) are placed in the loudness frame of the rain they belong to, not by their own
+  peaks: under a steel shelter they had sat within 2 dB of the roof's drumming at every rate, so heavy
+  rain sounded like light. Now 8 dB under at light rain, 10-12 dB under at heavy.
+- tools/texture_stats.py `wave` and TextureStatistics.Waveform measure the 10 ms waveform; AudioLab
+  `--textures wave`; `--rain ... near=off|only`.
+- Open: in a car at moderate rain the 10 ms kurtosis is 4.5, just over the recordings; sleet and hail
+  stay sharp ticks (Hertz contact of 10-40 µs; no recording to compare).
 - Texture round 1: the fountain, rain, trees and fire refitted on the statistics listeners recognise
   a texture by (unheard). Renders in inbox/textures-round1-2026-10-06, with a README and a table.
 - The Elm Park fountain is bigger and has rocks: an 11 m basin (was 8), a 2.8 m bowl with a 2 m jet,
