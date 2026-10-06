@@ -53,6 +53,12 @@ public static class GameLevelsSpike
             var c = calm.Split(',').Select(v => float.Parse(v, CultureInfo.InvariantCulture)).ToArray();
             Calm = WindWeather.Steady(c[0], 250f, c.Length > 1 ? c[1] : 0f);
         }
+        // The ear model (docs/EAR_MODEL.md): ear=off is the game before it, for a before/after pair.
+        if (Arg(args, "ear=") is { } ear) OpenFPS.Common.Hearing.EarModel.Enabled = ear is not ("off" or "0");
+        if (Arg(args, "listening=") is { } listening)
+            OpenFPS.Common.Hearing.EarModel.ListeningLevelDb = float.Parse(listening, CultureInfo.InvariantCulture);
+        Console.WriteLine($"Ear model {(OpenFPS.Common.Hearing.EarModel.Enabled ? "on" : "off")}, listening level "
+                        + $"{OpenFPS.Common.Hearing.EarModel.ListeningLevelDb:F2} dB, /levels {Loudness.DynamicRangeCompression:F2}");
         string wav = Path.Combine(outDir, "capture.wav");
         AcousticRegistry.Initialize();
 
@@ -312,6 +318,36 @@ public static class GameLevelsSpike
         }
         WindField.Weather = Calm;
 
+        // Thunder from a ground strike d metres off, as the server sends it: one event whose key rebuilds
+        // the channel. Recorded from the flash, so the record runs past the sound's travel time.
+        void ThunderAt(float d, double seconds)
+        {
+            Stand(new Vector3(-60f, 0f, 60f), 0f);
+            var strike = ThunderSpike.Ground(d, 40f, 7, 3);
+            audio.WorldAudio.Receive(new WorldAudioEvent
+            {
+                SourceEntityId = -1, Label = "thunder", Seed = 7,
+                Sounds = new List<TransientSound> { new TransientSound { SynthKey = strike.Key(), Position = player.Position } },
+            }, AudioClock.Now);
+            Record($"thunder {d / 1000f:0.#}km", seconds);
+            Pump(2.0);
+        }
+
+        // Rain at a rate, on the asphalt round you, as the server's weather would set it.
+        void RainAt(float mmPerHour, string label, double seconds)
+        {
+            Stand(new Vector3(0f, 0f, -80f), 0f);
+            world.UpdateAtmosphere(new WorldStateUpdate
+            {
+                Temperature = 15f, Humidity = 0.8f, AirPressure = 101325f, AirAbsorptionMultiplier = 1f,
+                PrecipitationIntensity = 0.5f, RainRateMmPerHour = mmPerHour,
+            });
+            Pump(4.0);
+            Record($"rain {label}", seconds);
+            world.UpdateAtmosphere(new WorldStateUpdate { Temperature = 15f, Humidity = 0.6f, AirPressure = 101325f, AirAbsorptionMultiplier = 1f });
+            Pump(3.0);
+        }
+
         try
         {
             Pump(2.0);
@@ -343,6 +379,21 @@ public static class GameLevelsSpike
                     IdleCar(c, new[] { ("front", 2f), ("rear", 2f) }, 12.0);
                     PassBy(c, 10f, 2f, 16.0);
                 }
+            }
+            if (set is "ear")
+            {
+                // The sources whose balance Cody approved by ear, for the ear model's before/after
+                // (docs/EAR_MODEL.md): run once with ear=off and once with ear=on.
+                Speak(2f, 7.0);
+                Footsteps(6.0);
+                Steady("fountain park", "water:park_fountain", 5f, 0.6f, 6.0, 160f);
+                Steady("ac_window", "machine:ac_window", 3f, 1.7f, 6.0, 90f);
+                Door(2f, 5.0);
+                foreach (var c in cars) IdleCar(c, new[] { ("front", 2f), ("rear", 2f) }, 6.0);
+                foreach (var c in cars) PassBy(c, 30f, 7.5f, 10.0);
+                ThunderAt(3000f, 24.0);
+                RainAt(Rainfall.ModerateRate, "moderate", 8.0);
+                Wind(4.5f, 6.0);
             }
             if (set is "compare")
             {
