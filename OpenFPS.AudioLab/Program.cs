@@ -68,6 +68,7 @@ string[] usage =
     "  --tap-balance                                 each machine's rear voice against its front voice",
     "  --car-fronts [preset ...] [out= tag= ambient=] the whole voice from in front, behind, and passing at 10 km/h",
     "  --game-levels [out=DIR] [set=measure|render|compare|all] [cars=a,b]  one thing at a time through the real mixer, captured",
+    "  --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]  texture statistics and game-level texture files",
     "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
     "  --intake-ir [preset ...] [thr=] [sec=] [out=] the intake tract alone, thumped once",
     "  --wheel-squeal [out=] [axle] [binaural]       each wheel squealing for itself, and four drives",
@@ -502,6 +503,13 @@ if (args.Contains("--nature"))
     // --nature [levels|render out=DIR|compare=FILE.wav] [preset ...] [sec= wind=]: water, fire and
     // the wind in leaves, rendered from their models and measured against recordings.
     Environment.Exit(OpenFPS.AudioLab.Spikes.NatureSpike.Run(args));
+}
+
+if (args.Contains("--textures"))
+{
+    // --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]: the cochlear
+    // envelope statistics a texture is recognised by, and the texture round's game-level files.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.TextureSpike.Run(args));
 }
 
 if (args.Contains("--rain"))

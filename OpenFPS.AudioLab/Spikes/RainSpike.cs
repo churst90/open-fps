@@ -452,7 +452,7 @@ public static class RainSpike
     private static float Db20(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
 
     /// <summary>A three-band EQ split as FMOD's THREE_EQ is, at 400 Hz and 4 kHz (24 dB/octave).</summary>
-    private static void ThreeEq(float[] x, float low, float mid, float high)
+    internal static void ThreeEq(float[] x, float low, float mid, float high)
     {
         if (MathF.Abs(low - 1f) < 1e-4f && MathF.Abs(mid - 1f) < 1e-4f && MathF.Abs(high - 1f) < 1e-4f) return;
         var lo = (float[])x.Clone();
@@ -1026,16 +1026,18 @@ public static class RainSpike
         return -20.0 * Math.Log10(least);
     }
 
-    private static void WriteStereo(string path, float[] left, float[] right)
+    /// <summary>A stereo WAV in 32-bit float (format 3). Rain at game level is -40 to -70 dBFS, and in
+    /// 16 bits the quietest of it sat 32 dB over the step floor (docs/AUDIO_QUALITY_2026-10-06.md item 5).</summary>
+    internal static void WriteStereo(string path, float[] left, float[] right)
     {
         using var w = new BinaryWriter(File.Create(path));
         int n = left.Length;
-        w.Write("RIFF"u8); w.Write(36 + n * 4); w.Write("WAVEfmt "u8); w.Write(16); w.Write((short)1); w.Write((short)2);
-        w.Write(Rate); w.Write(Rate * 4); w.Write((short)4); w.Write((short)16); w.Write("data"u8); w.Write(n * 4);
+        w.Write("RIFF"u8); w.Write(36 + n * 8); w.Write("WAVEfmt "u8); w.Write(16); w.Write((short)3); w.Write((short)2);
+        w.Write(Rate); w.Write(Rate * 8); w.Write((short)8); w.Write((short)32); w.Write("data"u8); w.Write(n * 8);
         for (int i = 0; i < n; i++)
         {
-            w.Write((short)Math.Clamp(left[i] * 32767f, -32768f, 32767f));
-            w.Write((short)Math.Clamp(right[i] * 32767f, -32768f, 32767f));
+            w.Write(left[i]);
+            w.Write(right[i]);
         }
     }
 

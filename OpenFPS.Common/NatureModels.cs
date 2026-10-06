@@ -161,8 +161,8 @@ public sealed record WaterFeatureSpec
             new WaterTapSpec { Name = "west side of the rocks", ExtentMetres = 1.5f },
         },
         // MEASURED with `--nature levels water sec=60`, 2026-10-06 (texture round 1: the bigger fountain
-        // over rocks, every tap at one point, the field's mean wind): Leq 74.8 dB, 74.6 dB(A) at a
-        // metre; its 10 ms peaks' 99.9th percentile 17.7 dB over that. (The round-3 fountain, 2.6 L/s
+        // over rocks, every tap at one point, the field's mean wind): Leq 74.5 dB, 74.7 dB(A) at a
+        // metre; its 10 ms peaks' 99.9th percentile 17.8 dB over that. (The round-3 fountain, 2.6 L/s
         // into one basin, was 71.9 dB; this one moves 3.9 L/s.)
         SourceLevelDb = 75f,
         PeakHeadroomDb = 22f,

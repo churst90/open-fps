@@ -217,12 +217,15 @@ public sealed class EventSum
     /// <paramref name="rise"/> and decays with time constant <paramref name="decay"/>; its rms at the
     /// top is <paramref name="pascals"/>.
     /// </summary>
-    /// <param name="steep">Two poles at the bottom as well as the top: a band that falls 12 dB an
-    /// octave either side, for a burst that should light its own octave and not the ones below it (a
-    /// splash's spray, whose droplets are of one size; see FallingWaterSynth.SplashCentreHz).</param>
+    /// <param name="steep">A band that is a band: two resonant band-passes (RBJ, 0 dB at the middle)
+    /// between <paramref name="lowHz"/> and <paramref name="highHz"/>, falling 12 dB an octave and more
+    /// outside it, for a burst that should light its own band and not the ones an octave away (a
+    /// splash's spray, whose droplets are of one size; see FallingWaterSynth.SplashCentreHz). The
+    /// one-pole edges of the plain burst are a gentle slope, an octave or two wide whatever the edges.</param>
     public void Burst(int offset, float rise, float decay, float pascals, float lowHz, float highHz, bool steep = false)
     {
         if (pascals <= 0f) return;
+        if (steep) { ResonantBurst(offset, rise, decay, pascals, lowHz, MathF.Min(highHz, 0.45f * _rate)); return; }
         float a1 = MathF.Exp(-MathF.Tau * MathF.Min(highHz, 0.45f * _rate) / _rate);
         float a2 = MathF.Exp(-MathF.Tau * lowHz / _rate);
         // The band's own gain on white noise (two poles at the top, one at the bottom), so the rms
@@ -231,26 +234,48 @@ public sealed class EventSum
         float gain = pascals / MathF.Sqrt(band) * 1.7320508f;
         int length = Math.Min(Horizon - offset, (int)((rise + 6f * decay) * _rate));
         long at = _now + offset;
-        float lp0 = 0f, lp = 0f, hp = 0f, hp2 = 0f;
+        float lp0 = 0f, lp = 0f, hp = 0f;
         float riseSamples = MathF.Max(1f, rise * _rate);
         float down = MathF.Exp(-1f / MathF.Max(1f, decay * _rate));
         float env = 0f;
-        // The second high-pass pole takes a little of the band's own power: give it back.
-        if (steep) gain *= 1.2f;
         for (int i = 0; i < length; i++)
         {
             float x = Signed();
             lp0 = (1f - a1) * x + a1 * lp0;
             lp = (1f - a1) * lp0 + a1 * lp;
             hp = (1f - a2) * lp + a2 * hp;
-            float y = lp - hp;
-            if (steep)
-            {
-                hp2 = (1f - a2) * y + a2 * hp2;
-                y -= hp2;
-            }
             env = i < riseSamples ? i / riseSamples : (i == (int)riseSamples ? 1f : env * down);
-            _ring[(int)((at + i) & Mask)] += gain * env * y;
+            _ring[(int)((at + i) & Mask)] += gain * env * (lp - hp);
+        }
+    }
+
+    private void ResonantBurst(int offset, float rise, float decay, float pascals, float lowHz, float highHz)
+    {
+        if (highHz <= lowHz) return;
+        float fc = MathF.Sqrt(lowHz * highHz);
+        float q = fc / (highHz - lowHz);
+        float w = MathF.Tau * fc / _rate, alpha = MathF.Sin(w) / (2f * q), cw = MathF.Cos(w);
+        float a0 = 1f + alpha;
+        float b0 = alpha / a0, a1 = -2f * cw / a0, a2 = (1f - alpha) / a0;   // b1 = 0, b2 = -b0
+        // White noise of variance 1/3 through two of these: the cascade's noise bandwidth is about
+        // π/4 of the band between the edges, so this scale makes the rms at the top `pascals`.
+        float enbw = MathF.PI / 4f * (highHz - lowHz);
+        float gain = pascals / MathF.Sqrt(enbw * 2f / _rate / 3f);
+        int length = Math.Min(Horizon - offset, (int)((rise + 6f * decay) * _rate));
+        long at = _now + offset;
+        float x1 = 0f, x2 = 0f, y1 = 0f, y2 = 0f, u1 = 0f, u2 = 0f, z1 = 0f, z2 = 0f;
+        float riseSamples = MathF.Max(1f, rise * _rate);
+        float down = MathF.Exp(-1f / MathF.Max(1f, decay * _rate));
+        float env = 0f;
+        for (int i = 0; i < length; i++)
+        {
+            float x = Signed();
+            float y = b0 * (x - x2) - a1 * y1 - a2 * y2;
+            x2 = x1; x1 = x; y2 = y1; y1 = y;
+            float z = b0 * (y - u2) - a1 * z1 - a2 * z2;
+            u2 = u1; u1 = y; z2 = z1; z1 = z;
+            env = i < riseSamples ? i / riseSamples : (i == (int)riseSamples ? 1f : env * down);
+            _ring[(int)((at + i) & Mask)] += gain * env * z;
         }
     }
 

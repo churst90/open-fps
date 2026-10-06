@@ -111,7 +111,7 @@ public sealed class FallingWaterSynth
     /// earlier fit. For scale: a drop's whole impact radiates 10⁻⁶ to 10⁻⁵ of its kinetic energy in
     /// water (Franz 1959; Nystuen 1986), and only a small part of that crosses into air.
     /// </summary>
-    public const float SplashEfficiency = 3.0e-5f;
+    public const float SplashEfficiency = 1.5e-5f;
 
     /// <summary>How fast a drop's impact force arrives, s: the first contact, microseconds.</summary>
     private const float ImpactRise = 16e-6f;
@@ -158,9 +158,10 @@ public sealed class FallingWaterSynth
     private const float SplashCentreReferenceHz = 2700f;
 
     /// <summary>How far one splash's band middle scatters about that, the standard deviation of its
-    /// natural log, and how far its band reaches either side of its middle (a factor; 12 dB an octave
-    /// past it). Fitted: one band of 1-16 kHz for every splash moved the bands an octave apart together
-    /// (envelope correlation 0.35 against the recordings' 0.08-0.24).</summary>
+    /// natural log, and how far its band reaches either side of its middle (a factor; a resonant band,
+    /// EventSum.Burst steep). Fitted: one gentle band of 1-16 kHz for every splash moved the bands an
+    /// octave apart together (envelope correlation 0.35 against the recordings' 0.05-0.18); a band of
+    /// its own an octave wide, 0.13.</summary>
     private const float SplashScatter = 0.7f, SplashBandHalfWidth = 1.6f;
 
     /// <summary>ρ c of air, Pa s/m: the impedance a radiated power meets.</summary>
@@ -529,7 +530,7 @@ public sealed class FallingWaterSynth
             if (f.ClumpClock <= 0f)
             {
                 float g = MathF.Sqrt(-2f * MathF.Log(MathF.Max(1e-6f, rng.Uniform()))) * MathF.Cos(MathF.Tau * rng.Uniform());
-                float sigma = ClumpSigma * f.Spread;
+                float sigma = FitTune.T("clump", ClumpSigma) * f.Spread;
                 f.ClumpFrom = f.Clump;
                 f.ClumpTo = MathF.Exp(sigma * g - 0.5f * sigma * sigma);
                 f.ClumpLength = 0.015f + 0.05f * rng.Uniform();

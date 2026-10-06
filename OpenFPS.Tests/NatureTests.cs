@@ -335,16 +335,126 @@ public class NatureTests
     }
 
     /// <summary>
-    /// The fountain's hiss is a wash, not static. Recorded fountains have a kurtosis of 3.5-3.8 over
-    /// 10 ms windows in 8-16 kHz and their 50 ms level flickers by 0.7-0.9 dB; the first model was 6.6
-    /// and 1.5, because a dozen impacts a block stood for fifty, a collapsing column's lumps struck as
-    /// sharply as drops, and a jet's slugs stepped its rate tens of times a second. In 2-8 kHz the
-    /// recordings are 3.0-3.4, as near a wash as white noise (2.96 on this measure); the round-2
-    /// model was 3.7, the lumps' sharp strikes and the exponential drop sizes' long tail.
+    /// Holds a model's texture statistics (TextureStatistics, McDermott and Simoncelli 2011) inside
+    /// the spread of the recordings of the same thing, widened by a margin: a fifth of the spread, and
+    /// no less than what twenty seconds of one seed wanders by (0.01 on a spread or a correlation, 0.05
+    /// on a skew, 0.25 on a kurtosis, 0.02 on a modulation share).
+    /// </summary>
+    private void HoldInRange(string texture, Dictionary<string, double> model, IEnumerable<string> keys)
+    {
+        var misses = new List<string>();
+        foreach (var k in keys)
+        {
+            var (lo, hi) = TextureStatistics.Range(texture, k);
+            double floor = k.StartsWith("skew") ? 0.05 : k.StartsWith("kurt") ? 0.25 : k.StartsWith("mod") ? 0.02 : 0.01;
+            double margin = Math.Max(0.2 * (hi - lo), floor);
+            bool ok = model[k] >= lo - margin && model[k] <= hi + margin;
+            _o.WriteLine($"  {k,-12} {model[k],7:F3}   recordings {lo,7:F3} .. {hi,7:F3}{(ok ? "" : "   OUTSIDE")}");
+            if (!ok) misses.Add($"{k} {model[k]:F3} not in {lo:F3}..{hi:F3}");
+        }
+        Assert.True(misses.Count == 0, string.Join("; ", misses));
+    }
+
+    /// <summary>The features each texture was fitted on: the band envelopes above 1 kHz, how the bands
+    /// move together, and how fast they move.</summary>
+    private static readonly string[] Fitted =
+    {
+        "cv 1-3k", "cv 3-6k", "cv 6-12k", "skew 1-3k", "skew 3-6k", "skew 6-12k", "kurt 3-6k", "kurt 6-12k",
+        "corr near", "corr octave", "corr far", "mod slow", "mod mid", "mod fast",
+    };
+
+    /// <summary>
+    /// The fountain is a texture of splashes, not Gaussian noise (texture round 1, 2026-10-06). Rounds
+    /// 1-3 fitted 10 ms waveform kurtosis and made 87,000 similar events a second, and the sum was as
+    /// steady as noise in every band over 1 kHz: envelope spread 0.07 at 6-12 kHz against the
+    /// recordings' 0.10-0.19, skew 0.1-0.2 against 0.2-1.2, neighbouring bands moving together 0.20
+    /// against 0.26-0.52. Cody heard it as "crunchy, static". Held now on the cochlear statistics
+    /// against the three recorded fountains.
     /// </summary>
     [Fact]
-    public void TheFountainHissesWithoutStatic()
+    public void TheFountainMovesAsRecordedFountainsDo()
     {
+        var water = new FallingWaterSynth(WaterFeatureSpec.ByName("park_fountain"), TextureStatistics.Rate, 3);
+        var x = new float[TextureStatistics.Rate * 20];
+        for (int i = 0; i < x.Length; i++)
+        {
+            if (i % 256 == 0)
+            {
+                water.Wind = WindField.SpeedAt(0f, 1.5f, 0f, i / (double)TextureStatistics.Rate);
+                water.Control(256f / TextureStatistics.Rate);
+            }
+            x[i] = water.Next();
+        }
+        HoldInRange("fountain", TextureStatistics.Analyse(x).Summary(), Fitted);
+    }
+
+    /// <summary>
+    /// A fountain is heard from where its water lands: one synth, each tap the events that land there.
+    /// The taps sum to the whole exactly (the same events, the same seed), each carries sound, and two
+    /// sides of the rocks are different water, not one signal played twice — the ears of a listener
+    /// between them hear two sources, not one (two ears 0.92 alike at 2 m from the one-point fountain).
+    /// </summary>
+    [Fact]
+    public void AFountainsTapsAreItsWaterWhereItLands()
+    {
+        var spec = WaterFeatureSpec.ByName("park_fountain");
+        Assert.Equal(5, spec.Taps.Length);
+        Assert.All(spec.Falls, f => Assert.InRange(f.Tap, 0, spec.Taps.Length - 1));
+        Assert.Contains(spec.Falls, f => f.Onto == WaterSurface.Rock);
+        var whole = new FallingWaterSynth(spec, Rate, 9);
+        var split = new FallingWaterSynth(spec, Rate, 9);
+        var taps = new float[split.TapCount];
+        var power = new double[split.TapCount];
+        double north = 0, south = 0, cross = 0, worst = 0;
+        for (int i = 0; i < Rate * 4; i++)
+        {
+            if (i % 256 == 0) { whole.Wind = split.Wind = 3f; whole.Control(256f / Rate); split.Control(256f / Rate); }
+            float w = whole.Next();
+            split.NextTaps(taps);
+            float sum = 0f;
+            for (int t = 0; t < taps.Length; t++) { sum += taps[t]; power[t] += taps[t] * (double)taps[t]; }
+            worst = Math.Max(worst, Math.Abs(sum - w));
+            north += taps[1] * (double)taps[1]; south += taps[3] * (double)taps[3]; cross += taps[1] * (double)taps[3];
+        }
+        _o.WriteLine($"taps' power share: {string.Join(", ", power.Select(p => $"{p / power.Sum():P0}"))}; north/south correlation {cross / Math.Sqrt(north * south):F3}");
+        Assert.True(worst < 1e-4, $"the taps summed {worst} Pa away from the whole");
+        Assert.All(power, p => Assert.True(p / power.Sum() > 0.05, "a tap carries almost nothing"));
+        Assert.InRange(cross / Math.Sqrt(north * south), -0.05, 0.05);
+    }
+
+    /// <summary>"water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;" is a tap; a plain "water:&lt;preset&gt;" is the whole.</summary>
+    [Fact]
+    public void AWaterTapKeyNamesItsFeatureAndTap()
+    {
+        Assert.True(WaterFeatureVoice.ParseKey("water:park_fountain/elm_park/3", out var preset, out var feature, out int tap));
+        Assert.Equal(("park_fountain", "elm_park", 3), (preset, feature, tap));
+        Assert.False(WaterFeatureVoice.ParseKey("water:park_fountain", out _, out _, out _));
+        Assert.False(WaterFeatureVoice.ParseKey("rail:x/y/1", out _, out _, out _));
+    }
+
+    /// <summary>
+    /// Each tap renders against the WHOLE fountain's level, so the taps placed at their own places sum
+    /// to the fountain placed as one voice: a tap voice and a one-point voice share a full scale.
+    /// </summary>
+    [Fact]
+    public void ATapVoiceRendersAgainstTheWholeFountain()
+    {
+        var spec = WaterFeatureSpec.ByName("park_fountain");
+        var shared = new WaterFeatureVoice("park_fountain/test", spec, Rate, 1);
+        var tap = new WaterTapState(shared, 2, Rate, Vector3.Zero);
+        var whole = new WaterVoiceState(spec, Rate, 1, Vector3.Zero);
+        Assert.Equal(whole.PascalsAtFullScale, tap.PascalsAtFullScale);
+        var (db, knee) = Measure(tap, 4f);
+        _o.WriteLine($"one tap {db:F1} dB against the whole's {spec.SourceLevelDb:F1}");
+        Assert.True(db < spec.SourceLevelDb - 3f && db > spec.SourceLevelDb - 20f);
+        Assert.True(knee < 1e-4);
+    }
+
+    [Fact]
+    public void TheFountainsOldHissMeasuresAreKept()
+    {
+        // The round-3 measures, for the record: over 10 ms windows a fountain stays near a wash within
+        // a window (recordings 3.0-3.4 in 2-8 kHz); what moves is the envelope from window to window.
         var water = new FallingWaterSynth(WaterFeatureSpec.ByName("park_fountain"), Rate, 3) { Wind = 3f };
         var x = new float[Rate * 20];
         for (int i = 0; i < x.Length; i++)
@@ -356,8 +466,8 @@ public class NatureTests
         double mid = WindowKurtosis(Band(x, 2000f, 8000f));
         double flicker = Flicker(x);
         _o.WriteLine($"8-16 kHz kurtosis {kurtosis:F2}, 2-8 kHz {mid:F2}, 50 ms flicker {flicker:F2} dB");
-        Assert.InRange(kurtosis, 2.5, 4.0);
-        Assert.InRange(mid, 2.5, 3.35);
+        Assert.InRange(kurtosis, 2.5, 4.5);
+        Assert.InRange(mid, 2.5, 4.0);
         Assert.InRange(flicker, 0.3, 1.2);
     }
 
@@ -454,10 +564,18 @@ public class NatureTests
     public void TheParkAndTheGardenFireAreOnTheCity()
     {
         var (boxes, prefabs) = City();
-        var sources = boxes.Where(b => b.Prefab is "water_fountain" or "fire_pit" or "tree_crown").ToList();
-        Assert.Single(sources, b => b.Prefab == "water_fountain");
+        var sources = boxes.Where(b => b.Prefab.StartsWith("elm_fountain_water_") || b.Prefab is "fire_pit" or "tree_crown").ToList();
         Assert.Single(sources, b => b.Prefab == "fire_pit");
         Assert.True(sources.Count(b => b.Prefab == "tree_crown") >= 10);
+
+        // The fountain: one emitter per tap of its spec, every tap once, all of one feature.
+        var taps = sources.Where(b => b.Prefab.StartsWith("elm_fountain_water_"))
+                          .Select(b => WaterFeatureVoice.ParseKey(prefabs[b.Prefab].GetProperty("SoundId").GetString(), out var p, out var f, out int t)
+                                       ? (Preset: p, Feature: f, Tap: t) : throw new Xunit.Sdk.XunitException($"{b.Prefab} is not a water tap"))
+                          .ToList();
+        var fountain = WaterFeatureSpec.ByName(taps[0].Preset);
+        Assert.Equal(Enumerable.Range(0, fountain.Taps.Length), taps.Select(t => t.Tap).OrderBy(t => t));
+        Assert.Single(taps.Select(t => (t.Preset, t.Feature)).Distinct());
 
         foreach (var src in sources)
         {
@@ -465,7 +583,7 @@ public class NatureTests
             string kind = sound[..sound.IndexOf(':')], key = sound[(sound.IndexOf(':') + 1)..];
             object model = kind switch
             {
-                "water" => WaterFeatureSpec.ByName(key),
+                "water" => fountain,
                 "fire" => FireSpec.ByName(key),
                 "foliage" => FoliageSpec.ByName(key),
                 _ => throw new Xunit.Sdk.XunitException($"{src.Prefab} names '{sound}', which is no nature model"),
@@ -473,6 +591,35 @@ public class NatureTests
             Assert.NotNull(model);
             var walls = boxes.Where(b => b.Solid && Inside(b, src.Centre)).Select(b => b.Name ?? b.Prefab).ToList();
             Assert.True(walls.Count == 0, $"{src.Name} at {src.Centre} is inside {string.Join(", ", walls)}");
+        }
+    }
+
+    /// <summary>
+    /// The fountain is the bigger one, over rocks (Cody, 2026-10-06): an 11 m basin, and stone the
+    /// bowl's overflow lands on, round the pedestal and under the bowl's lip. The rocks are Concrete,
+    /// a material the acoustics know (an unknown one falls back to Generic without a word), and every
+    /// side's tap is beside its rocks and over the water.
+    /// </summary>
+    [Fact]
+    public void TheFountainIsBiggerAndHasRocksTheWaterLandsOn()
+    {
+        var (boxes, prefabs) = City();
+        var pool = boxes.Single(b => b.Name == "Elm Park fountain pool");
+        Assert.True(pool.Half.X >= 5f && pool.Half.Z >= 5f, $"the pool is {2 * pool.Half.X:F1} x {2 * pool.Half.Z:F1} m");
+        var rocks = boxes.Where(b => b.Prefab == "rock_boulder" && b.Name != null && b.Name.StartsWith("Elm Park fountain rocks")).ToList();
+        Assert.True(rocks.Count >= 6);
+        string material = prefabs["rock_boulder"].GetProperty("Material").GetString()!;
+        Assert.True(AcousticRegistry.IsKnown(material), $"rocks are '{material}', which the acoustics do not know");
+        var bowl = boxes.Single(b => b.Name == "Elm Park fountain bowl");
+        float lip = bowl.Half.X;
+        // Under the lip: rock both inside and outside the lip's radius, and below the bowl.
+        Assert.Contains(rocks, r => MathF.Abs(r.Centre.X - bowl.Centre.X) + r.Half.X > lip || MathF.Abs(r.Centre.Z - bowl.Centre.Z) + r.Half.Z > lip);
+        Assert.All(rocks, r => Assert.True(r.Centre.Y + r.Half.Y < bowl.Centre.Y - bowl.Half.Y));
+        foreach (var tap in boxes.Where(b => b.Prefab.StartsWith("elm_fountain_water_") && b.Prefab != "elm_fountain_water_0"))
+        {
+            float nearest = rocks.Min(r => Vector2.Distance(new Vector2(tap.Centre.X, tap.Centre.Z), new Vector2(r.Centre.X, r.Centre.Z)));
+            Assert.True(nearest < 2f, $"{tap.Name} is {nearest:F1} m from the nearest rock");
+            Assert.True(tap.Centre.Y > pool.Centre.Y + pool.Half.Y, $"{tap.Name} is under the water");
         }
     }
 

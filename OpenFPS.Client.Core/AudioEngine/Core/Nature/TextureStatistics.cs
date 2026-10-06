@@ -282,13 +282,58 @@ public static class TextureStatistics
     // ── The references ───────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The summary features of the reference recordings, measured with tools/texture_stats.py json
-    /// (30 s from the start of each file; the files are in ~/openfps-scratch-archive, listed with their
-    /// sources in each refs/SOURCES.txt). Recordings are a yardstick and are never played in the game;
-    /// their numbers are written here so the tests can hold a model inside their spread without them.
+    /// The summary features of the reference recordings, measured with
+    /// <c>tools/texture_stats.py json sec=600</c> over each whole file (up to a minute; the files are in
+    /// ~/openfps-scratch-archive/{nature,rain}-2026-10-05/refs, listed with their sources in
+    /// SOURCES.txt). Recordings are a yardstick and are never played in the game; their numbers are
+    /// written here so the tests can hold a model inside their spread without them. "fountain", "leaves"
+    /// (wind in broadleaf trees), "fire", "rain" (streets, gardens, woods, a car roof, a tiled roof, a
+    /// window; not the two whose originals stop at 4 and 8 kHz).
     /// </summary>
-    public static IReadOnlyDictionary<string, double>[] References(string texture) => texture switch
+    public static IReadOnlyList<(string File, IReadOnlyDictionary<string, double> Summary)> References(string texture)
+        => ReferenceRows[texture].Select(r => (r.File, (IReadOnlyDictionary<string, double>)Keys.Select((k, i) => (k, r.Values[i])).ToDictionary(p => p.k, p => p.Item2))).ToList();
+
+    /// <summary>The references' range of one feature.</summary>
+    public static (double Min, double Max) Range(string texture, string key)
     {
-        _ => throw new ArgumentException(texture),
+        var rows = References(texture);
+        return (rows.Min(r => r.Summary[key]), rows.Max(r => r.Summary[key]));
+    }
+
+    /// <summary>The summary keys, in the order the reference rows below are written.</summary>
+    public static readonly string[] Keys = { "cv 0.2-1k", "skew 0.2-1k", "kurt 0.2-1k", "cv 1-3k", "skew 1-3k", "kurt 1-3k", "cv 3-6k", "skew 3-6k", "kurt 3-6k", "cv 6-12k", "skew 6-12k", "kurt 6-12k", "cv 12-16k", "skew 12-16k", "kurt 12-16k", "corr near", "corr octave", "corr far", "mod slow", "mod mid", "mod fast" };
+
+    private static readonly Dictionary<string, (string File, double[] Values)[]> ReferenceRows = new()
+    {
+        ["fountain"] = new[]
+        {
+            ("fountain_1", new[] { 0.165, 0.022, 3.083, 0.140, 0.336, 3.619, 0.114, 0.489, 3.943, 0.096, 0.660, 4.892, 0.080, 0.553, 4.388, 0.258, 0.082, 0.001, 0.037, 0.241, 0.672 }),
+            ("fountain_2", new[] { 0.186, 0.390, 3.816, 0.147, 0.288, 3.361, 0.126, 0.261, 3.249, 0.149, 0.168, 2.944, 0.150, 0.285, 3.156, 0.350, 0.179, 0.113, 0.050, 0.137, 0.450 }),
+            ("fountain_3", new[] { 0.288, 1.315, 6.172, 0.231, 1.094, 5.036, 0.207, 1.321, 6.611, 0.190, 1.196, 5.674, 0.167, 1.026, 4.752, 0.522, 0.153, 0.122, 0.143, 0.373, 0.389 }),
+        },
+        ["leaves"] = new[]
+        {
+            ("wind_1", new[] { 0.202, 0.402, 3.124, 0.203, 0.647, 3.145, 0.248, 0.458, 2.678, 0.260, 0.261, 2.391, 0.252, 0.350, 2.481, 0.665, 0.609, 0.560, 0.019, 0.050, 0.181 }),
+            ("wind_2", new[] { 0.162, -0.104, 2.748, 0.141, 0.135, 3.029, 0.118, 0.211, 2.970, 0.107, 0.283, 3.048, 0.106, 0.463, 3.493, 0.335, 0.228, 0.105, 0.024, 0.124, 0.467 }),
+            ("wind_3", new[] { 0.176, 0.327, 4.161, 0.168, 1.005, 6.796, 0.140, 0.619, 4.466, 0.125, 0.715, 4.597, 0.111, 1.813, 10.375, 0.449, 0.220, 0.034, 0.102, 0.196, 0.377 }),
+        },
+        ["fire"] = new[]
+        {
+            ("fire_1", new[] { 0.194, 1.609, 19.530, 0.232, 4.139, 48.755, 0.266, 3.937, 30.470, 0.240, 3.534, 24.399, 0.213, 3.349, 22.978, 0.680, 0.479, 0.183, 0.150, 0.300, 0.486 }),
+            ("fire_2", new[] { 0.231, 3.185, 39.199, 0.258, 6.692, 100.584, 0.242, 6.926, 98.638, 0.209, 5.902, 73.066, 0.170, 5.883, 71.712, 0.747, 0.592, 0.343, 0.159, 0.343, 0.440 }),
+            ("fire_3", new[] { 0.209, 0.946, 5.783, 0.271, 2.616, 16.705, 0.274, 2.940, 18.564, 0.256, 3.143, 21.065, 0.221, 3.027, 20.290, 0.706, 0.491, 0.117, 0.109, 0.491, 0.354 }),
+        },
+        ["rain"] = new[]
+        {
+            ("street", new[] { 0.303, -0.397, 2.598, 0.289, -0.566, 2.797, 0.302, -0.697, 2.827, 0.317, -0.733, 2.587, 0.325, -0.658, 2.180, 0.833, 0.800, 0.779, 0.026, 0.035, 0.115 }),
+            ("urban_street_60s", new[] { 0.316, 0.770, 3.015, 0.236, 0.627, 2.965, 0.233, 0.671, 2.712, 0.214, 0.959, 3.459, 0.178, 1.277, 4.737, 0.774, 0.692, 0.701, 0.038, 0.089, 0.178 }),
+            ("Garden_rainfall", new[] { 0.166, 0.034, 3.138, 0.136, 0.444, 4.819, 0.103, 0.733, 6.135, 0.087, 1.232, 9.241, 0.111, 0.995, 6.598, 0.261, 0.132, 0.081, 0.036, 0.224, 0.682 }),
+            ("calm_rain_60s", new[] { 0.186, 0.423, 3.786, 0.145, 0.569, 4.584, 0.112, 0.805, 5.579, 0.102, 1.271, 7.743, 0.104, 1.809, 11.027, 0.363, 0.203, 0.123, 0.064, 0.261, 0.630 }),
+            ("Sound_of_light_rainfall", new[] { 0.254, 1.313, 7.547, 0.174, 0.904, 5.831, 0.178, 0.809, 5.164, 0.154, 0.820, 5.328, 0.140, 0.775, 5.678, 0.513, 0.152, -0.115, 0.079, 0.306, 0.444 }),
+            ("Bourne_woods_rain_2020-05-10_0757", new[] { 0.171, 0.115, 3.334, 0.143, 0.426, 4.367, 0.123, 1.009, 8.347, 0.111, 1.333, 9.962, 0.107, 1.459, 10.253, 0.344, 0.226, 0.204, 0.064, 0.164, 0.523 }),
+            ("carroof", new[] { 0.232, 0.163, 3.416, 0.221, 0.281, 3.569, 0.151, -0.157, 5.009, 0.097, -1.431, 7.881, 0.079, -1.400, 7.258, 0.615, 0.480, 0.333, 0.077, 0.239, 0.359 }),
+            ("tileroof", new[] { 0.210, -0.288, 4.500, 0.205, -0.021, 5.023, 0.175, -0.250, 6.154, 0.144, -1.371, 8.089, 0.134, -1.984, 8.927, 0.640, 0.539, 0.474, 0.096, 0.113, 0.268 }),
+            ("Rain_against_the_window", new[] { 0.250, 0.404, 2.996, 0.248, 0.726, 3.740, 0.200, 1.183, 5.456, 0.125, 1.556, 7.945, 0.060, 0.779, 9.162, 0.715, 0.631, 0.452, 0.188, 0.120, 0.286 }),
+        },
     };
 }
