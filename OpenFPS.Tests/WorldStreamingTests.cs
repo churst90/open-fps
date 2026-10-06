@@ -323,6 +323,9 @@ public class WorldStreamingTests
         Assert.DoesNotContain(sent, m => m is TileStreamUpdate);
         Assert.Equal(EntityDefinitionFactory.StaticEntities(world).Count, Defs(sent).Count());
         Assert.Equal(manifest.ExpectedEntityCount, Defs(sent).Count());
+        long packed = sent.OfType<EntityDefinitionPack>().Sum(p => (long)MemoryPackSerializer.Serialize<IMessage>(p).Length);
+        long raw = sent.OfType<EntityDefinitionPack>().Sum(p => (long)MemoryPackSerializer.Serialize<IMessage>(p.Unpack()!).Length);
+        _o.WriteLine($"city join: {Defs(sent).Count()} definitions, {packed / 1024} KB packed, {raw / 1024} KB as plain batches");
     }
 
     /// <summary>Every definition in what was sent, unpacked.</summary>
