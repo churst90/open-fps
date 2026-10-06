@@ -241,8 +241,18 @@ public class SpatialGrid<T>
     private readonly List<T> _unindexed = new();
 
     /// <summary>The static solid boxes of this grid as a triangle world, or null where nothing has built one
-    /// (every query then answers from the grid, as before).</summary>
-    public OpenFPS.Common.Geometry.TriangleWorld? Geometry { get; private set; }
+    /// (every query then answers from the grid, as before). Its movers (door leaves) are brought up to
+    /// where they stand first (<see cref="BeforeGeometry"/>).</summary>
+    public OpenFPS.Common.Geometry.TriangleWorld? Geometry
+    {
+        get { BeforeGeometry?.Invoke(); return _geometry; }
+        private set => _geometry = value;
+    }
+    private OpenFPS.Common.Geometry.TriangleWorld? _geometry;
+
+    /// <summary>Run before <see cref="Geometry"/> is handed out: the owner places the movers again if any
+    /// has moved since it last did (ServerGeometry, Geometry.MoverPoses).</summary>
+    public Action? BeforeGeometry { get; set; }
 
     /// <summary>Static items <see cref="Geometry"/> does not hold: test them as the grid always did.</summary>
     public IReadOnlyList<T> Unindexed => _unindexed;
@@ -259,7 +269,7 @@ public class SpatialGrid<T>
     /// <summary>The same geometry with movers in new poses (door leaves): no static item changed.</summary>
     public void MoveGeometry(OpenFPS.Common.Geometry.TriangleWorld geometry)
     {
-        if (ReferenceEquals(geometry, Geometry)) return;
+        if (ReferenceEquals(geometry, _geometry)) return;
         Geometry = geometry;
         StaticVersion++;
     }
@@ -268,7 +278,7 @@ public class SpatialGrid<T>
     /// next build takes it in.</summary>
     public void AddUnindexed(T item)
     {
-        if (Geometry != null) _unindexed.Add(item);
+        if (_geometry != null) _unindexed.Add(item);
     }
 
     /// <summary>

@@ -137,6 +137,23 @@ public static class GeometryParitySpike
         var tallies = new List<Tally>();
         var spatial = new SpatialService();
 
+        // raydebug=x,y,z,dx,dy,dz: every face a ray crosses within 50 m, with what it belongs to.
+        if (args.FirstOrDefault(a => a.StartsWith("raydebug=")) is { } rayArg)
+        {
+            var f = rayArg[9..].Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray();
+            var o = new Vector3(f[0], f[1], f[2]); var d = Vector3.Normalize(new Vector3(f[3], f[4], f[5]));
+            var crossings = new List<GeometryCrossing>(); var any = new AcceptAll();
+            serverWorld.All(o, d, 50f, GeometryLayers.All, ref any, crossings);
+            foreach (var c in crossings)
+            {
+                var (bc, bs, _) = serverWorld.BoxOf(c.Solid);
+                var e = lookup.TryGetValue(c.Owner, out var en) ? en : Entity.Null;
+                string name = e != Entity.Null && ecs.Has<IdentityComponent>(e) ? ecs.Get<IdentityComponent>(e).Name : "";
+                Console.WriteLine($"  t {c.T:R} {(c.Front ? "in" : "out")} #{c.Owner} '{name}' {serverWorld.SurfaceOf(c.Solid).Material} centre {V(bc)} size {V(bs)} volume {serverWorld.VolumeOf(c.Solid):G4}");
+            }
+            return 0;
+        }
+
         // stepdebug=x,y,z,ix,iz: one step on both paths, with every obstacle's answer at the moved and
         // the stepped-up position.
         if (args.FirstOrDefault(a => a.StartsWith("stepdebug=")) is { } stepArg)

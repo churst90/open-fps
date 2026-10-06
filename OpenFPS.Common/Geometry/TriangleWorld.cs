@@ -290,7 +290,7 @@ public sealed class TriangleWorld
         while (sp > 0)
         {
             ref readonly var n = ref _nodes[stack[--sp]];
-            if (BvhBuilder.Slab(n, o, inv, tMin, best) == float.MaxValue) continue;
+            if (BvhBuilder.Slab(n, o, inv, tMin, MathF.Min(tMax, best + GeometryPiece.TieSlack(best))) == float.MaxValue) continue;
             if (n.Count > 0)
             {
                 for (int i = n.LeftFirst; i < n.LeftFirst + n.Count; i++)
@@ -299,7 +299,7 @@ public sealed class TriangleWorld
                     ref readonly var inst = ref _instances[ii];
                     Vector3 lo = inst.ToLocal(o), ld = inst.DirectionToLocal(d);
                     var linv = inst.Rotated ? BvhBuilder.Inverse(ld) : inv;
-                    if (inst.Piece.Closest(lo, ld, linv, tMin, ref best, ref tie, faces, layers, ref filter, inst.Owner, out int tri, out bool front))
+                    if (inst.Piece.Closest(lo, ld, linv, tMin, tMax, ref best, ref tie, faces, layers, ref filter, inst.Owner, out int tri, out bool front))
                     {
                         found = true;
                         hit.T = best; hit.Triangle = tri; hit.Front = front;
@@ -309,7 +309,8 @@ public sealed class TriangleWorld
                 continue;
             }
             int a = n.LeftFirst, b = a + 1;
-            float ta = BvhBuilder.Slab(_nodes[a], o, inv, tMin, best), tb = BvhBuilder.Slab(_nodes[b], o, inv, tMin, best);
+            float reach = MathF.Min(tMax, best + GeometryPiece.TieSlack(best));
+            float ta = BvhBuilder.Slab(_nodes[a], o, inv, tMin, reach), tb = BvhBuilder.Slab(_nodes[b], o, inv, tMin, reach);
             if (ta > tb) { (a, b) = (b, a); (ta, tb) = (tb, ta); }
             if (tb != float.MaxValue) stack[sp++] = b;
             if (ta != float.MaxValue) stack[sp++] = a;

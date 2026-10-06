@@ -33,22 +33,37 @@ public sealed class ServerGeometry
     /// <summary>Everything again from the world's fixed solids, into the grid. Unchanged tiles are kept.</summary>
     public void Rebuild(World world, SpatialGrid<Entity> grid)
     {
+        _world = world;
+        _grid = grid;
+        grid.BeforeGeometry ??= PlaceMoversIfMoved;
         var statics = new List<SolidSpec>();
         var movers = new List<SolidSpec>();
         var unindexed = new List<Entity>();
         _movers.Clear();
         Collect(world, statics, movers, unindexed, _movers);
+        _placedAt = MoverPoses.Version;
         var built = _builder.Build(statics, movers);
         grid.SetGeometry(built, unindexed);
         _dirty = false;
     }
 
-    /// <summary>Once a tick, after the doors and the parts have been placed: door leaves follow their
-    /// transforms, and anything spawned since the last build is taken in.</summary>
-    public void Sync(World world, SpatialGrid<Entity> grid)
+    private World? _world;
+    private SpatialGrid<Entity>? _grid;
+    private long _placedAt = -1;
+
+    /// <summary>Before the grid hands its geometry out: if anything has moved a leaf since they were last
+    /// placed (MoverPoses), every leaf goes where its transform now is.</summary>
+    private void PlaceMoversIfMoved()
     {
-        if (_dirty) { Rebuild(world, grid); return; }
-        if (_movers.Count == 0) return;
+        if (_world == null || _grid == null || _movers.Count == 0) return;
+        long now = MoverPoses.Version;
+        if (now == _placedAt) return;
+        _placedAt = now;
+        PlaceMovers(_world, _grid);
+    }
+
+    private void PlaceMovers(World world, SpatialGrid<Entity> grid)
+    {
         _poses.Clear();
         foreach (var e in _movers)
         {
@@ -57,6 +72,14 @@ public sealed class ServerGeometry
             _poses.Add((e.Id, t.Position, t.Rotation));
         }
         grid.MoveGeometry(_builder.Move(_poses));
+    }
+
+    /// <summary>Once a tick, after the doors and the parts have been placed: door leaves follow their
+    /// transforms, and anything spawned since the last build is taken in.</summary>
+    public void Sync(World world, SpatialGrid<Entity> grid)
+    {
+        if (_dirty) { Rebuild(world, grid); return; }
+        PlaceMoversIfMoved();
     }
 
     /// <summary>The fixed solids of a world as the triangle world takes them, sorted into its kinds.</summary>

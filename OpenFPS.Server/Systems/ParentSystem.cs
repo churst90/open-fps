@@ -31,6 +31,8 @@ public static class ParentSystem
                         transform.Position = worldPos;
                         transform.Rotation = worldRot;
                         transform.IsDirty = true;
+                        // A door leaf in a building is placed here: the triangle world follows it.
+                        if (world.Has<DoorComponent>(e)) OpenFPS.Common.Geometry.MoverPoses.Moved();
                     }
                 }
             }

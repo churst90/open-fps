@@ -209,14 +209,18 @@ public class BulletFlightTests : IDisposable
         g.Fire(a);
         g.Run(0.2);
         Assert.Equal("Hit the ground at 4 metres.", Assert.Single(g.Said(a)));
-        // ...and at 10 degrees the same round skips off it.
-        var skip = g.Player("skip", new Vector3(-400f, 0f, 320f));
+        // ...and at 10 degrees a round skips off concrete: the airport's apron. (This shot used to be
+        // made at the west edge too, where the map's own ground is Dirt and the loader's concrete
+        // foundation lies flush under it. Of two surfaces in the same place the server's box grid met
+        // whichever its cell listed first, the foundation, and the client's met the map's ground; the
+        // triangle world meets the smaller of the two, the ground, on both: docs/GEOMETRY.md stage 1.)
+        var skip = g.Player("skip", new Vector3(258f, 0.08f, 40f));
         skip.AimAssist = false;
         g.Arm(skip, "akm");
         g.Face(skip, 0f, 10f * MathF.PI / 180f);
         g.Fire(skip);
         g.Run(0.2);
-        Assert.Equal("Ricochet off the ground.", g.Said(skip)[0]);
+        Assert.Equal("Ricochet off Apron.", g.Said(skip)[0]);
 
         // Brandt Court's roof, a few metres in front of you.
         var b = g.Player("b", new Vector3(-20f, 18.25f, 200f));

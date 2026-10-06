@@ -286,7 +286,7 @@ public sealed class GeometryPiece
     /// distance (two surfaces in the same place) the smaller solid's wins, and of two the same size the
     /// lower owner's (<see cref="Ties"/>), so a server and a client agree on which one a ray met whatever
     /// order their trees visit them in.</summary>
-    internal bool Closest<F>(Vector3 o, Vector3 d, Vector3 inv, float tMin, ref float best, ref Ties tie, RayFaces faces,
+    internal bool Closest<F>(Vector3 o, Vector3 d, Vector3 inv, float tMin, float tMax, ref float best, ref Ties tie, RayFaces faces,
                              GeometryLayers layers, ref F filter, int ownerOverride, out int triangle, out bool front)
         where F : IGeometryFilter
     {
@@ -294,7 +294,7 @@ public sealed class GeometryPiece
         if (Tris.Length == 0) return false;
         Span<int> stack = stackalloc int[BvhBuilder.MaxDepth + 2];
         int sp = 0;
-        if (BvhBuilder.Slab(TriNodes[0], o, inv, tMin, best) == float.MaxValue) return false;
+        if (BvhBuilder.Slab(TriNodes[0], o, inv, tMin, MathF.Min(tMax, best + TieSlack(best))) == float.MaxValue) return false;
         stack[sp++] = 0;
         while (sp > 0)
         {
@@ -303,26 +303,35 @@ public sealed class GeometryPiece
             {
                 for (int i = n.LeftFirst; i < n.LeftFirst + n.Count; i++)
                 {
-                    if (!HitTriangle(Tris[i], o, d, tMin, best, out float t, out bool f)) continue;
+                    float slack = TieSlack(best);
+                    if (!HitTriangle(Tris[i], o, d, tMin, MathF.Min(tMax, best + slack), out float t, out bool f)) continue;
                     if ((faces & (f ? RayFaces.Front : RayFaces.Back)) == 0) continue;
                     ref readonly var surface = ref Surfaces[TriSurface[i]];
                     if ((surface.Layers & layers) == 0) continue;
                     ref readonly var rec = ref Solids[Tris[i].Solid];
                     int owner = ownerOverride >= 0 ? ownerOverride : rec.Owner;
-                    if (t == best && !tie.Beats(rec.Volume, owner)) continue;
+                    // Within a hair of the best so far is the same place (two faces laid flush, worked out
+                    // from different triangles): the tie rule decides, not the rounding.
+                    if (t >= best - slack && !tie.Beats(rec.Volume, owner)) continue;
                     if (!filter.Accept(owner, surface)) continue;
                     best = t; tie = new Ties(rec.Volume, owner); triangle = i; front = f;
                 }
                 continue;
             }
             int a = n.LeftFirst, b = a + 1;
-            float ta = BvhBuilder.Slab(TriNodes[a], o, inv, tMin, best), tb = BvhBuilder.Slab(TriNodes[b], o, inv, tMin, best);
+            float reach = MathF.Min(tMax, best + TieSlack(best));
+            float ta = BvhBuilder.Slab(TriNodes[a], o, inv, tMin, reach), tb = BvhBuilder.Slab(TriNodes[b], o, inv, tMin, reach);
             if (ta > tb) { (a, b) = (b, a); (ta, tb) = (tb, ta); }
             if (tb != float.MaxValue) stack[sp++] = b;
             if (ta != float.MaxValue) stack[sp++] = a;
         }
         return triangle >= 0;
     }
+
+    /// <summary>How close two hits are to be the same place, metres: a few millionths of the distance
+    /// (what Möller–Trumbore's rounding leaves between two coplanar faces) and never less than 2 µm.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static float TieSlack(float t) => 2e-6f * (1f + MathF.Abs(t));
 
     /// <summary>Whether anything counted lies along the ray within [tMin, tMax].</summary>
     internal bool Any<F>(Vector3 o, Vector3 d, Vector3 inv, float tMin, float tMax, RayFaces faces,
