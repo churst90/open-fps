@@ -143,6 +143,11 @@ public class ClientWorldState
             _env.WindGustiness = Math.Clamp(update.WindGustiness, 0f, 1f);
             _env.PrecipitationIntensity = update.PrecipitationIntensity;
         }
+        // The wind every tree, fire and ear on the map reads: this broadcast, reached from the last one
+        // over a second so it never lands as a step (WindWeather).
+        var air = WindAir.FromBroadcast(update.WindVelocity, update.WindGustiness,
+                                        update.WindClock, update.WindTravelEast, update.WindTravelNorth);
+        WindField.Weather = WindField.Weather.Following(air, WindField.Now());
         Touch();
     }
 

@@ -421,6 +421,8 @@ public class ClientAudioSystem
         _regionAmbienceId = "";
         _ambienceRegionId = int.MinValue;
         _audio.StopAllWorldSounds();
+        // Nobody is standing anywhere: no wind at the ears until the next map.
+        _audio.SetEarWind(null);
         // Entity ids belong to the map just left: whoever had one there is nobody here.
         _talkersVoiced.Clear();
         _talkerRooms.Clear();
@@ -494,14 +496,6 @@ public class ClientAudioSystem
         _listenerRegion = listenerRegionId;
 
         // 2. Synchronize the listener's smoothed physical state.
-        //
-        // The wind the listener actually feels is synthesized HERE, not received. The server broadcasts
-        // the sustained wind and a single gustiness scalar once a second; sampling a gust at 1 Hz would
-        // alias it into a stutter, so the swell is generated locally at audio rate from that scalar and
-        // the local clock (see WindModel). Shelter attenuates it: indoors the air is still.
-        Vector3 feltWind = WindModel.Felt(
-            world.WindVelocity, world.WindGustiness, _now(), _state.ShelterFactor);
-        _state.FeltWind = feltWind;
 
         // Not the wind: a uniform wind moves the source, the listener and the air together and shifts
         // no pitch. A share of it added here bent every pitch in the world with each gust.
@@ -514,6 +508,19 @@ public class ClientAudioSystem
             // ...and you move at its speed. A passenger is not predicted, so their own velocity reads
             // zero — which against the vehicle's moving voice is a Doppler shift on your own bus.
             listenerVelocity = carrying.Velocity;
+        }
+
+        // The wind at your ears: the weather's wind where your head is, less your own movement through
+        // it, from the side it comes from. The mixer reads the field itself once a block (EarWindVoice);
+        // this is where the head is, which way it faces, and what is round it.
+        var earListener = EarListener(world, visualEyePos, listenerVelocity, listenerRotation);
+        _audio.SetEarWind(earListener);
+        {
+            double windNow = WindField.Now();
+            var weather = WindField.Weather;
+            var air = WindField.VelocityAt(weather, visualEyePos.X, earListener.HeightMetres, visualEyePos.Z, windNow);
+            var felt = EarWind.Relative(air, earListener);
+            _state.FeltWind = new Vector3(felt.X, 0f, felt.Y);
         }
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
@@ -1231,6 +1238,39 @@ public class ClientAudioSystem
     /// plausibly be near the ground at all: one more than sixty metres over the listener's head is
     /// flying, and that is settled without touching the world.
     /// </summary>
+    /// <summary>
+    /// Where the listener's head is, for the wind at the ears: its place, how it moves, which way it
+    /// faces, how much of the weather's wind reaches it, and what covers the ears.
+    ///
+    /// Exposure is one minus the enclosure the acoustic survey measures round the listener (the same
+    /// sphere of rays that decides how much reverb there is), and nothing at all inside a room: a
+    /// street between tall buildings takes a third off the wind, a walled yard half, a room all of
+    /// it. The weather's wind only; walking or driving still moves air past the ears anywhere.
+    /// In a vehicle: a cabin lets in what its open windows let in, and a vehicle without one (a
+    /// motorcycle, a formula car) has a helmet on the rider.
+    /// </summary>
+    private EarWindListener EarListener(WorldSnapshot world, Vector3 head, Vector3 velocity, Quaternion rotation)
+    {
+        Vector3 forward = Vector3.Transform(Vector3.UnitZ, rotation);
+        float facing = MathF.Atan2(forward.X, forward.Z) * 180f / MathF.PI;
+        float exposure = _state.IsIndoor ? 0f : 1f - Math.Clamp(_acousticWorker.ListenerEnclosure, 0f, 1f);
+        var cover = EarCover.None;
+        float windows = 0f;
+        if (_state.IsRiding)
+        {
+            cover = EarCover.Cabin;
+            if (world.Entities.TryGetValue(_state.RidingEntityId, out var ride)
+                && OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(ride) is { } vehicle)
+            {
+                if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.HasCabin(vehicle))
+                    windows = _cabins.WindowsOpen(ride, _now());
+                else cover = EarCover.Helmet;
+            }
+        }
+        return new EarWindListener(head, _state.IsRiding ? 1.3f : _state.EyeHeight, new Vector2(velocity.X, velocity.Z),
+                                   facing, exposure, cover, windows);
+    }
+
     /// <summary>An open bus doorway's share of the cabin's wall area, as transmitted power.</summary>
     private const float DoorwayPowerFraction = 0.0225f;
 

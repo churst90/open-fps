@@ -94,6 +94,7 @@ public static class Permissions
         ["removeseat"] = (Dev, "remove a seat, on any map", true),
         ["drivable"] = (Dev, "make a group drivable, on any map", true),
         ["savemap"] = (Dev, "save the map, on any map", true),
+        ["weather"] = (Dev, "set the weather and the wind for the whole server", false),
         [EditAny] = (Dev, "change things other people built", false),
         ["grant"] = (Dev, "give a player a single permission you have yourself", false),
         ["revoke"] = (Dev, "take back a single permission you have yourself", false),

@@ -26,6 +26,9 @@ public class GameServer
     private readonly NetworkService _network = new();
     private SessionManager _sessions = new();
     private readonly WorldEnvironmentSystem _environment = new();
+
+    /// <summary>The weather: time, season, sky and wind, for every map (/weather sets it).</summary>
+    public WorldEnvironmentSystem WorldEnvironment => _environment;
     private MapRepository _mapRepo = null!;
     private MapManager _maps = null!;
     private readonly IUserRepository _userRepo;
@@ -1873,9 +1876,12 @@ public class GameServer
     /// and the client's `distance / max(0.1, multiplier)` guard silently multiplied the absorption
     /// distance by ten, switching air absorption off for the whole game.
     /// </summary>
-    private void BroadcastEnvironment()
+    public void BroadcastEnvironment()
     {
         var perMap = new Dictionary<string, WorldStateUpdate>();
+        // One moment for every map: the wind's eddies are the server's, not a map's.
+        double clock = WindField.Now();
+        var travel = _environment.WindTravel;
 
         foreach (var session in _sessions.GetAllSessions())
         {
@@ -1893,7 +1899,8 @@ public class GameServer
                     Temperature = state.Temperature, Humidity = state.Humidity,
                     AirPressure = state.AirPressure, AirAbsorptionMultiplier = state.AirAbsorptionMultiplier,
                     WindVelocity = state.WindVelocity,
-                    WindGustiness = state.WindGustiness, PrecipitationIntensity = state.PrecipitationIntensity
+                    WindGustiness = state.WindGustiness, PrecipitationIntensity = state.PrecipitationIntensity,
+                    WindClock = clock, WindTravelEast = travel.East, WindTravelNorth = travel.North,
                 };
                 perMap[session.CurrentMapId] = update;
             }

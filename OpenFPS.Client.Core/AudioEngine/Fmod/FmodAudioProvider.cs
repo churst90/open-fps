@@ -641,6 +641,13 @@ public class FmodAudioProvider : IAudioProvider
     private FMOD.DSP _masterLimiter;
     private FMOD.DSP _loudnessMeter;
     private MasterTap? _masterTap;
+
+    // The wind at the listener's ears (EarWindVoice). One generator, flat on the master, for the
+    // provider's life; silent while nobody is in a world.
+    private EarWindState? _earWind;
+    private FMOD.DSP _earWindDsp;
+    private FMOD.Channel _earWindChannel;
+    private System.Runtime.InteropServices.GCHandle _earWindHandle;
     private EngineRenderPool? _enginePool;
     private readonly List<IRenderedVoice> _engineSnapshot = new();
 
@@ -1022,6 +1029,8 @@ public class FmodAudioProvider : IAudioProvider
                 else Log.Warning("Could not attach the capture tap; playback is unaffected.");
             }
 
+            StartEarWind();
+
             TryInitSteamAudio();
 
             // Engines render ahead, off the mixer thread. See EngineRenderPool.
@@ -1032,6 +1041,46 @@ public class FmodAudioProvider : IAudioProvider
         }
         catch (Exception ex) { Log.Error(ex, "Failed to initialize FMOD"); return false; }
     }
+
+    /// <summary>
+    /// Starts the wind at the ears: a generator played 2D on the master, so it gets no reverb send and
+    /// no binaural placement, the way the ambience beds play their finished stereo. It is part of the
+    /// listener, not a sound in the world. OPENFPS_EAR_WIND=0 leaves it silent.
+    /// </summary>
+    private void StartEarWind()
+    {
+        _system.getSoftwareFormat(out int rate, out _, out _);
+        var state = new EarWindState(rate > 0 ? rate : 44100);
+        if (Environment.GetEnvironmentVariable("OPENFPS_EAR_WIND") == "0")
+        {
+            state.Enabled = false;
+            Log.Information("Ear wind: OFF (OPENFPS_EAR_WIND=0).");
+        }
+        if (EarWindProcessor.CreateDSP(_system, state, out var dsp, out var handle) != RESULT.OK)
+        {
+            Log.Warning("Ear wind: the DSP could not be created; there will be no wind at the ears.");
+            return;
+        }
+        if (_system.playDSP(dsp, default, false, out var channel) != RESULT.OK)
+        {
+            dsp.release();
+            if (handle.IsAllocated) handle.Free();
+            Log.Warning("Ear wind: FMOD would not play the DSP; there will be no wind at the ears.");
+            return;
+        }
+        channel.setMode(MODE._2D);
+        _earWind = state;
+        _earWindDsp = dsp;
+        _earWindChannel = channel;
+        _earWindHandle = handle;
+    }
+
+    /// <summary>Where the listener is, for the wind at their ears; null when nobody is in a world.</summary>
+    public void SetEarWind(OpenFPS.Common.EarWindListener? listener) => _earWind?.SetListener(listener);
+
+    /// <summary>Diagnostics: what the ears were last placed at, dBFS, and what the wind is there.</summary>
+    public (float LeftDbfs, float RightDbfs, OpenFPS.Common.EarWindAtEars Ears) EarWindLevels
+        => _earWind is { } w ? (w.Synth.RenderedLeftDb, w.Synth.RenderedRightDb, w.Synth.Last) : (-150f, -150f, default);
 
     // --- Steam Audio (phonon) HRTF binaural spatialization. Falls back to FMOD panning if unavailable. ---
 
@@ -5217,6 +5266,8 @@ public class FmodAudioProvider : IAudioProvider
             ReturnReverbVoices();
             ReleaseReverbUnits();
             foreach (var id in new List<string>(_ambientBeds.Keys)) StopAmbientBed(id);
+            if (_earWindChannel.hasHandle()) _earWindChannel.stop();
+            if (_earWindDsp.hasHandle()) _earWindDsp.release();
             // The three units on the MASTER GROUP come off it before they are freed, for the same
             // reason the reverb units do: FMOD refuses to release an attached unit, so releasing
             // them where they stood freed none of them and left the assertion at close.
@@ -5245,6 +5296,7 @@ public class FmodAudioProvider : IAudioProvider
         _resources?.Dispose();
         _granularBank?.Dispose();
         if (_isInitialized) _system.close();   // FMOD requires close() before release()
+        if (_earWindHandle.IsAllocated) _earWindHandle.Free();
 
         if (_steamAudioEnabled)
         {

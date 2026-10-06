@@ -4,6 +4,23 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- The weather's wind makes sound. You hear it at your ears: a low, buffeting rush, louder in the ear
+  on the far side of the wind and quieter in the ear it blows straight into, so turning your head
+  tells you where it comes from. Facing into it, both ears are the same; with your back to it, both
+  a little louder. It is the air moving past your head, so walking into the wind makes it stronger
+  and walking with it makes it weaker. Indoors there is none at all, and a walled yard or a street
+  between tall buildings takes some of it off. A closed vehicle has none, a car with its windows
+  down some, and a motorcycle rider a helmet's worth. It gets no reverb and is not placed anywhere:
+  it is in your ears. Walking or running in still air outdoors makes only a faint low rush, about
+  21 dB under a fresh breeze.
+- The trees, the fire and the fountain now move with the server's weather instead of a fixed
+  breeze, and every player hears the same gust reach the same tree at the same moment.
+- `/weather` (developers and the administrator) says the weather and the wind. `/weather storm`
+  (or clear, rain, snow) and `/weather wind 8 north west gusty` set it for everybody; it arrives in
+  a few seconds and holds until `/weather auto`. Try `/weather wind 10 north` in Elm Park
+  (`/tp -375 195 0.2`) and turn slowly: the wind moves between your ears, and the trees around you
+  roar with the gusts. `/weather wind 0` is still air. Client and server must both be this build:
+  the weather message has three new fields.
 - The park fountain and the wind in the trees are smoother; their tone and loudness are unchanged.
   The fountain's static came from three things. Only twelve drop impacts were rendered per 3 ms
   block, each standing in for several drops. The falling lumps of water struck as sharply as

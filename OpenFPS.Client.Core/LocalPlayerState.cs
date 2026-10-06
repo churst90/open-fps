@@ -99,8 +99,9 @@ public class LocalPlayerState
     /// synthesizes locally; see <see cref="OpenFPS.Common.WindModel"/>.</summary>
     public float WindGustiness { get; set; } = 0.0f;
 
-    /// <summary>The wind actually felt at the listener this frame: the sustained wind swung by the
-    /// gust envelope and attenuated by shelter. This is the one that reaches the mix.</summary>
+    /// <summary>The air moving past the listener's head this frame, m/s (x east, z north): the
+    /// weather's wind where the head is (WindField, gusts and all, less what the place shelters),
+    /// minus the head's own movement. What the ears hear (EarWind).</summary>
     public Vector3 FeltWind { get; set; } = Vector3.Zero;
 
     public float PrecipitationIntensity { get; set; } = 0.0f;
