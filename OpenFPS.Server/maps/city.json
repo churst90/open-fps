@@ -88699,16 +88699,16 @@
   },
   {
    "EntityId": 5976,
-   "PrefabId": "metal_wall",
+   "PrefabId": "metal_roof",
    "Position": {
     "X": 7.9,
-    "Y": 2.45,
+    "Y": 2.4996,
     "Z": -60.0
    },
    "Scale": {
     "X": 1.6,
-    "Y": 0.0333,
-    "Z": 88.0
+    "Y": 1.0,
+    "Z": 2.2
    },
    "Name": "Bus shelter roof"
   },
@@ -88759,16 +88759,16 @@
   },
   {
    "EntityId": 5980,
-   "PrefabId": "metal_wall",
+   "PrefabId": "metal_roof",
    "Position": {
     "X": -7.9,
-    "Y": 2.45,
+    "Y": 2.4996,
     "Z": 86.0
    },
    "Scale": {
     "X": 1.6,
-    "Y": 0.0333,
-    "Z": 88.0
+    "Y": 1.0,
+    "Z": 2.2
    },
    "Name": "Bus shelter roof"
   },

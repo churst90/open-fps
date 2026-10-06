@@ -116,6 +116,7 @@ public class WorldEnvironmentSystem
         }
 
         SetScenario(scenario);
+        _held = FrontPrecipitation(scenario);
         FrontProbabilityPerTick = 0;
         Log.Information("WorldEnvironment: PINNED to {Scenario} by OPENFPS_WEATHER — no fronts will roll in.",
                         scenario);
@@ -162,8 +163,8 @@ public class WorldEnvironmentSystem
         _travelEast += carryEast * (double)dt;
         _travelNorth += carryNorth * (double)dt;
 
-        // Check for Freezing (affects precipitation type)
-        if (_env.Temperature < 0 && _currentScenario == WeatherType.Rain)
+        // Check for Freezing (affects precipitation type). Rain asked for by hand at a rate stays rain.
+        if (_env.Temperature < 0 && _currentScenario == WeatherType.Rain && _held == null)
         {
             Log.Information("WorldEnvironment: Rain turning to Snow due to freezing temperatures.");
             SetScenario(WeatherType.Snow);
@@ -229,7 +230,17 @@ public class WorldEnvironmentSystem
         SetScenario(scenario);
         FrontProbabilityPerTick = 0;
         _weatherRate = SetByHandRate;
+        // Rain, a storm or snow asked for by hand is that, at the front's own rate, whatever the season.
+        _held = FrontPrecipitation(scenario);
     }
+
+    /// <summary>What a front set by hand holds falling: rain for Rain and Storm, snow for Snow.</summary>
+    private Precipitation? FrontPrecipitation(WeatherType scenario) => scenario switch
+    {
+        WeatherType.Rain or WeatherType.Storm => new Precipitation(PrecipitationKind.Rain, Rainfall.RateFromIntensity(_targetPrecipitation)),
+        WeatherType.Snow => new Precipitation(PrecipitationKind.Snow, Rainfall.RateFromIntensity(_targetPrecipitation)),
+        _ => null,
+    };
 
     /// <summary>
     /// The wind set by hand: a mean velocity (map axes, x east, z north, m/s) and a gustiness (0..1).
@@ -243,9 +254,56 @@ public class WorldEnvironmentSystem
         _weatherRate = SetByHandRate;
     }
 
+    /// <summary>
+    /// Rain set by hand at a rate (/weather rain heavy, /weather rain 12): the Rain front with its
+    /// precipitation set to give that rate, held, and rain whatever the season, so a tester asking for
+    /// rain hears rain.
+    /// </summary>
+    public void PinRain(float rateMmPerHour) => PinPrecipitation(new Precipitation(PrecipitationKind.Rain, rateMmPerHour));
+
+    /// <summary>
+    /// Any precipitation set by hand (/weather rain heavy drops 3 mm, /weather hail golf, /weather
+    /// snow): its front (Snow for snow, Rain for the rest), its precipitation brought to the rate, and
+    /// the kind and sizes held whatever the season and the map's air.
+    /// </summary>
+    public void PinPrecipitation(Precipitation p)
+    {
+        PinScenario(p.Kind == PrecipitationKind.Snow ? WeatherType.Snow : WeatherType.Rain);
+        float rate = p.Kind == PrecipitationKind.Hail && !(p.RateMmPerHour > 0f) ? Hydrometeors.HailRainRate : p.RateMmPerHour;
+        _targetPrecipitation = Rainfall.IntensityFor(rate);
+        _held = p with { RateMmPerHour = rate };
+    }
+
+    /// <summary>The precipitation set by hand, or null.</summary>
+    public Precipitation? HeldPrecipitation => _held;
+    private Precipitation? _held;
+
+    /// <summary>The rate liquid rain (rain, freezing rain, the rain hail falls in) was set to by hand, or null.</summary>
+    public float? HeldRainRate => _held is { Kind: not PrecipitationKind.Snow and not PrecipitationKind.Sleet } h ? h.RateMmPerHour : null;
+
+    /// <summary>
+    /// The rain falling on one map, mm/h: <see cref="RainRateFor"/>, except that rain set by hand at a
+    /// rate is rain however cold the map's air is.
+    /// </summary>
+    public float RainRate(in WorldEnvironmentComponent state)
+        => _held != null ? Rainfall.RateFromIntensity(state.PrecipitationIntensity) : RainRateFor(state);
+
+    /// <summary>
+    /// What is falling on one map: the kind, its water-equivalent rate as the weather has it now
+    /// (rising and falling with the front), and its sizes. Set by hand, what was set; otherwise rain,
+    /// or snow when the map's air is below <see cref="Rainfall.SnowBelowCelsius"/>.
+    /// </summary>
+    public Precipitation PrecipitationFor(in WorldEnvironmentComponent state)
+    {
+        float rate = Rainfall.RateFromIntensity(state.PrecipitationIntensity);
+        if (_held is { } h) return h with { RateMmPerHour = rate };
+        return new Precipitation(state.Temperature < Rainfall.SnowBelowCelsius ? PrecipitationKind.Snow : PrecipitationKind.Rain, rate);
+    }
+
     /// <summary>Lets the weather roll on its own again from what it is now.</summary>
     public void Unpin()
     {
+        _held = null;
         FrontProbabilityPerTick = DefaultFrontProbabilityPerTick;
         _weatherRate = 1f;
     }
@@ -267,6 +325,14 @@ public class WorldEnvironmentSystem
         _env.GameTime = Math.Clamp(gameTimeHours, 0f, 23.999f);
         _env.DayOfYear = Math.Clamp(dayOfYear, 1, 365);
     }
+
+    /// <summary>
+    /// The rain the precipitation is, mm/h, as it falls on one map: the intensity as a rain rate
+    /// (Rainfall.RateFromIntensity: a drizzle at 0.1, moderate at the Rain front's 0.6, violent at the
+    /// Storm's 1.0), and nothing when the map's air is cold enough that what falls is snow.
+    /// </summary>
+    public static float RainRateFor(in WorldEnvironmentComponent state)
+        => Rainfall.RateFor(state.PrecipitationIntensity, state.Temperature);
 
     /// <summary>The global sky state, with no map applied. Callers that are about to send this to a
     /// player want <see cref="GetStateForMap"/> instead.</summary>

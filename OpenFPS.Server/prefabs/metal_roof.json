@@ -1,0 +1,12 @@
+{
+  "Id": "metal_roof",
+  "Name": "Sheet-Steel Roof",
+  "Description": "One profiled steel sheet, 0.7 mm: a bus shelter canopy, a lean-to, a shed. The box is the sheet itself, so rain on it is a light plate ringing (RainPlate) and what gets through it is one thin leaf's mass law, not a slab's.",
+  "Material": "Metal",
+  "ColliderSize": { "X": 2, "Y": 0.0007, "Z": 2 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.3,
+  "TransmissionMid": 0.1,
+  "TransmissionHigh": 0.05
+}

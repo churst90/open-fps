@@ -1030,7 +1030,9 @@ for shelter_z, shelter_x in ((-60.0, WALK), (86.0, -WALK)):
         name="Bus shelter")
     box("glass_wall", min(front, back), max(front, back), 0.0, 2.4, shelter_z + 2.14, shelter_z + 2.2,
         name="Bus shelter")
-    box("metal_wall", min(front, back), max(front, back), 2.4, 2.5, shelter_z - 2.2, shelter_z + 2.2,
+    # The canopy is one 0.7 mm sheet of profiled steel, and the box is the sheet: as a 10 cm box of
+    # Metal it was a steel slab to anything that asked what it was, and rain on a slab is silent.
+    box("metal_roof", min(front, back), max(front, back), 2.5 - 0.0007, 2.5, shelter_z - 2.2, shelter_z + 2.2,
         name="Bus shelter roof")
 
 # ══ The plaza ═════════════════════════════════════════════════════════════════════════════════════

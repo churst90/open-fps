@@ -4,6 +4,36 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Weather can be set as what falls, how hard and how big. `/weather rain` takes a class (drizzle,
+  light, moderate, heavy, extreme), a rate (`/weather rain 12`), a radar reading
+  (`/weather rain 45 dBZ`) or a drop size (`/weather rain heavy drops 3 mm`); `/weather drizzle`,
+  `/weather freezing rain`, `/weather sleet`, `/weather snow` (light, moderate or heavy) and
+  `/weather hail` with a size (pea, marble, penny, quarter, golf, tennis, baseball, softball, or
+  millimetres) set the other kinds. The reply says it back with its colour on the radar: "Rain,
+  heavy, 25 millimetres an hour, drops 1.8 millimetres, orange on the radar." Drizzle is pale green,
+  light green, moderate yellow, heavy orange, extreme red, hail purple, snow blue. The drops are a
+  gamma spectrum of the given median size carrying the rate; a radar reading gives the rate by the
+  WSR-88D's Z-R and the median that has that reflectivity. Restart the server: the world state
+  message has three new fields (the kind, the drop size, the hail size), after the rate.
+- Snow is all but silent on the street and a faint thump on a sheet roof. Sleet is ice pellets:
+  hard ticks that bounce, louder than rain of the same water. Freezing rain sounds like rain. Hail is
+  ice spheres falling at their own speed (about 12 times the square root of the size in cm, m/s),
+  struck for the Hertz contact time against what they land on, and bouncing off hard ground; a
+  sheet roof takes at most half of a stone's energy. Golf-ball hail runs the master limiter 20 dB
+  down, as gunfire does.
+- Near drops are played one by one. Within 2.5 m, and on your own head and shoulders under the open
+  sky, the loudest drops are taken out of the rain's patches and each played where it lands, about
+  12 a second in all: more than that, the lab's `--rain resolve` found, are no longer heard as
+  separate impacts. On a car roof beside you, under a shelter's sheet, or in hail, they are every
+  ping and every stone.
+- Sitting in a car in the rain, the roof, windscreen and rear glass drum over your head through the
+  headliner, and the street comes in through the car's shell. Side windows take no rain until wind
+  drives it onto them, which is not modelled yet.
+- Renders of rain at every class, two drop sizes, a radar reading, freezing rain, sleet, snow and
+  three sizes of hail, on the street, in a park, under the bus shelter, beside and inside a parked
+  car, under a tree and by a pond, at the level the game plays them (through the master limiter),
+  are in inbox/rain-round3-2026-10-06 with a README.
+
 - The tests run on GitHub (`.github/workflows/tests.yml`): every push to main and every pull request,
   or by hand from the Actions tab. Eight runners each take an eighth of the test classes
   (`tools/ci/shard_tests.py`); results are kept for two weeks as artifacts. No FMOD or Steam Audio
@@ -11,6 +41,36 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- Rain can be heard. Nothing played before; now the drops are synthesised on whatever they land on
+  round you: a road clicks, grass is softer and lower, a pond adds the small ringing bubbles, a sheet
+  metal roof over you drums, a car beside you rings on its steel and glass, a tree patters and drips
+  big drops onto the ground under it. It comes from where the surfaces are: a near and a far patch in
+  each compass direction, and the roof over your head as its own voice. Indoors under a concrete roof
+  the roof is silent and the street is heard through the walls and windows (with a window shut it is
+  barely audible; an open one lets it in). The bus shelter's glass ends shade the street behind them,
+  and you hear round their edges. How hard it rains is the server's precipitation turned into a rain
+  rate: light (about 1.5 mm/h), moderate (Rain front, about 7), heavy, and violent (Storm, 60). It
+  builds up and dies away over a minute as the weather changes; snow makes no rain sound. To try it:
+  `/weather rain` or `/weather storm`, or a rate: `/weather rain light`, `moderate`, `heavy`,
+  `violent`, or a number of millimetres an hour (`/weather rain 12`). Rain set by hand stays rain
+  whatever the season. Then stand on Main Street, under the bus shelter on Main Street (x 8, y -60 in
+  player coordinates), in Elm Park under a tree, and indoors on a top floor. Restart the server: the
+  world state message has a new field. Moderate rain on an open street plays at about the level of
+  a window air conditioner three metres away. Renders of each case at four rates, at the level the
+  game plays them, are in inbox/rain-2026-10-05 with a README. Not done yet: rain blown onto
+  walls and windows by the wind (with no wind a vertical pane takes no drops, so there is no tapping
+  on glass), gutters, downpipes and run-off, and wet tyre noise.
+- The bus shelters' roofs are a 0.7 mm steel sheet (new prefab metal_roof) instead of a 10 cm steel
+  box. As a box they were a slab to anything that asked, so the rain on them was silent; the sheet
+  also lets a little more of the street through from above, as a real canopy does.
+- Rain on hard and soft ground is darker and smoother than in the first renders: each drop's click
+  now lasts as long as its water takes to spread on the ground, not just the time it takes to stop,
+  and its first contact is not a single-sample spike. Measured against recordings of rain on streets,
+  in a garden and in a wood, the street is now within a few dB in every octave and no grainier.
+- `--rain` in the AudioLab: `levels`, `render out=DIR` (at the game's level), `live` (through the
+  real provider, against an air conditioner, a fountain and a tree), `physics` (drop counts, the
+  kinetic energy against van Dijk 2002, the plate law for roofs and glazing), `survey map=city
+  ear=x,y,z` for a real place, and `compare=FILE.wav` for a recording.
 - Two maps of real places, made from open data: "magnolia tx" (magnolia_tx), a 3 km square south
   of Magnolia, Texas, starting on the drive of 31907 Bobcat Lane, and "albany or" (albany_or), a
   3 km square of southwest Albany, Oregon, starting in front of 1042 Belmont Avenue Southwest.
