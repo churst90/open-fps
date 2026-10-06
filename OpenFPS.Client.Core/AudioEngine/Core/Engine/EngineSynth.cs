@@ -248,6 +248,9 @@ public sealed class EngineSynth
     /// structural modes, two copies because the two drives are in different units.</summary>
     private Mode[] _structKnock = Array.Empty<Mode>(), _structValves = Array.Empty<Mode>();
     private float _knockTemp = 1100f, _knockBore = 0.1f;
+    /// <summary>Per-sample coefficients chosen at 44.1 kHz, at this engine's rate (At44k): the knock gas's
+    /// relaxation (0.001, 23 ms) and Kellet's three pinking poles (0.99765, 0.963, 0.57).</summary>
+    private float _knockRelax, _kp0 = 0.99765f, _kp1 = 0.963f, _kp2 = 0.57f;
     private int _knockRetune;
     private readonly ClickVoice _click;
     private double _whinePhase, _blowerPhase, _turboPhase, _turbinePhase;
@@ -282,6 +285,8 @@ public sealed class EngineSynth
     {
         Profile = e;
         _rate = rate;
+        _knockRelax = At44k.Step(0.001f, rate);
+        _kp0 = At44k.Decay(0.99765f, rate); _kp1 = At44k.Decay(0.96300f, rate); _kp2 = At44k.Decay(0.57000f, rate);
         _dt = 1f / rate;
         _rng = new Random(seed);
         SetUpPinkBand();
@@ -479,9 +484,9 @@ public sealed class EngineSynth
     /// </summary>
     private float PinkBand(ref Cylinder cy, float n)
     {
-        cy.Pk0 = 0.99765f * cy.Pk0 + n * 0.0990460f;
-        cy.Pk1 = 0.96300f * cy.Pk1 + n * 0.2965164f;
-        cy.Pk2 = 0.57000f * cy.Pk2 + n * 1.0526913f;
+        cy.Pk0 = _kp0 * cy.Pk0 + n * 0.0990460f;
+        cy.Pk1 = _kp1 * cy.Pk1 + n * 0.2965164f;
+        cy.Pk2 = _kp2 * cy.Pk2 + n * 1.0526913f;
         float pink = cy.Pk0 + cy.Pk1 + cy.Pk2 + n * 0.1848f;
         cy.PkHp += _pinkHpA * (pink - cy.PkHp);
         cy.PkLp += _pinkLpA * ((pink - cy.PkHp) - cy.PkLp);
@@ -984,7 +989,7 @@ public sealed class EngineSynth
         float knockRing;
         if (DebugLegacyDiesel) { knockRing = knockDrive; goto knockDone; }   // Stryker disable once all : lab A/B switch
         if (knockTempWgt > 1e-6f) _knockTemp = knockTempAcc / knockTempWgt;
-        else _knockTemp += (1100f - _knockTemp) * 0.001f;
+        else _knockTemp += (1100f - _knockTemp) * _knockRelax;
         if (++_knockRetune >= 32)
         {
             _knockRetune = 0;
@@ -1381,9 +1386,9 @@ public sealed class EngineSynth
         // rippling a little at the commutator. Pink, 250 Hz to about 6 kHz: flat per octave and
         // falling above, like the recordings.
         float w = (float)(_rng.NextDouble() * 2 - 1);
-        _pink0 = 0.99765f * _pink0 + w * 0.0990460f;
-        _pink1 = 0.96300f * _pink1 + w * 0.2965164f;
-        _pink2 = 0.57000f * _pink2 + w * 1.0526913f;
+        _pink0 = _kp0 * _pink0 + w * 0.0990460f;
+        _pink1 = _kp1 * _pink1 + w * 0.2965164f;
+        _pink2 = _kp2 * _pink2 + w * 1.0526913f;
         float pink = _pink0 + _pink1 + _pink2 + w * 0.1848f;
         _noiseHp = _noiseHpA * (_noiseHp + pink - _noiseHpIn); _noiseHpIn = pink;
         _noiseLp += (_noiseHp - _noiseLp) * _noiseLpA;
@@ -1779,7 +1784,8 @@ public sealed class EngineSynth
         private readonly float _rate;
         private readonly Random _rng;
         private float _env, _freq = 3500f;
-        public ClickVoice(float rate, int seed) { _rate = rate; _rng = new Random(seed); }
+        private readonly float _decay;   // 0.9 a sample at 44.1 kHz: 0.2 ms
+        public ClickVoice(float rate, int seed) { _rate = rate; _rng = new Random(seed); _decay = At44k.Decay(0.9f, rate); }
         public void Trigger(float amp, float freq)
         {
             _env = MathF.Min(1.5f, _env + amp * (0.7f + 0.6f * (float)_rng.NextDouble()));
@@ -1793,7 +1799,7 @@ public sealed class EngineSynth
             // own at 3.1-4.4 kHz makes the valvetrain sound zippy.
             if (_env < 1e-5f) return 0f;
             float x = _env * ((float)_rng.NextDouble() * 2f - 1f);
-            _env *= 0.9f;
+            _env *= _decay;
             return x;
         }
     }

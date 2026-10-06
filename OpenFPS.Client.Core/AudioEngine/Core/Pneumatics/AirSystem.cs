@@ -33,6 +33,7 @@ public sealed class AirPort
     private readonly Random _rng;
     private Mode _clack;
     private float _clackRing;
+    private readonly float _clackDecay;   // 0.9955 a sample at 44.1 kHz: 5 ms
     private float _mix1, _mix2, _shock1, _shock2, _muff1, _muff2, _hp;
     private float _pressure;               // kPa gauge in the vessel behind the port
     private bool _open;
@@ -46,7 +47,7 @@ public sealed class AirPort
 
     public AirPort(AirPortSpec p, float jetTrimDb, float rate, int seed)
     {
-        _p = p; _rate = rate; _dt = 1f / rate;
+        _p = p; _rate = rate; _dt = 1f / rate; _clackDecay = At44k.Decay(0.9955f, rate);
         _rng = new Random(seed);
         _trim = MathF.Pow(10f, jetTrimDb / 20f);
         _clackAmp = 20e-6f * MathF.Pow(10f, p.ValveClackDb / 20f);
@@ -131,7 +132,7 @@ public sealed class AirPort
         }
 
         float clack = _clack.Process(_clackRing) * 7f;
-        _clackRing *= 0.9955f;
+        _clackRing *= _clackDecay;
 
         float y = jet + clack;
         _hp += OnePole.AlphaFor(60f, _rate) * (y - _hp);
@@ -169,6 +170,7 @@ public sealed class AirSystem
     private float _reservoir;
     private bool _loaded = true;
     private float _compKnock;
+    private readonly float _knockDecay;   // 0.994 a sample at 44.1 kHz: 3.8 ms
     private Mode _comp;
     private readonly float _compAmp;
     private double _compPhase;
@@ -201,7 +203,7 @@ public sealed class AirSystem
 
     public AirSystem(AirSystemSpec s, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 61)
     {
-        _s = s; _dt = 1f / rate; _rng = new Random(seed);
+        _s = s; _dt = 1f / rate; _rng = new Random(seed); _knockDecay = At44k.Decay(0.994f, rate);
         _reservoir = s.CutOutKPa;
         int i = 0;
         foreach (var p in s.Ports) _ports[p.Name] = new AirPort(p, s.JetTrimDb, rate, seed + 10 * ++i);
@@ -279,7 +281,7 @@ public sealed class AirSystem
             float knock = _comp.Process(_compKnock) * 5f;
             y += knock;
             if (_compressorAtFront) front += knock;
-            _compKnock *= 0.994f;
+            _compKnock *= _knockDecay;
         }
         FrontOut = front;
         return y;

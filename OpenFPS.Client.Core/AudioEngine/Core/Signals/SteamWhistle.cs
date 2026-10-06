@@ -40,6 +40,7 @@ public sealed class SteamWhistle
     private float _valve, _kelvin;
     private readonly Random _rng;
     private float _wobble, _wobbleLp;
+    private readonly float _wobbleStep;   // 0.0009 a sample at 44.1 kHz: 6.3 Hz
 
     /// <summary>
     /// What the bell sits at between blasts. NOT ambient: a whistle lives on top of a boiler with
@@ -59,7 +60,7 @@ public sealed class SteamWhistle
 
     public SteamWhistle(WhistleSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 23)
     {
-        _spec = spec; _rate = rate; _rng = new Random(seed);
+        _spec = spec; _rate = rate; _rng = new Random(seed); _wobbleStep = At44k.Step(0.0009f, rate);
         _kelvin = IdleKelvin;
         _bells = new Bell[spec.Bells.Length];
         for (int i = 0; i < _bells.Length; i++) _bells[i] = new Bell(spec, spec.Bells[i], rate, seed + i * 13);
@@ -83,7 +84,7 @@ public sealed class SteamWhistle
         // Water carried over with the steam, and the boiler breathing: a slow roughness on both the
         // level and the pitch, a few hertz, which is most of what separates steam from a siren.
         float n = (float)(_rng.NextDouble() * 2 - 1);
-        _wobbleLp += 0.0009f * (n - _wobbleLp);
+        _wobbleLp += _wobbleStep * (n - _wobbleLp);
         _wobble = _wobbleLp * 26f;
 
         float c = SoundSpeed * (1f + 0.004f * _wobble);
@@ -128,10 +129,11 @@ public sealed class SteamWhistle
         private float _lastC;
         private float _amp = 1f;
         private float _jitter;
+        private readonly float _jitterStep;   // 0.0006 a sample at 44.1 kHz: 4.2 Hz
 
         public Bell(WhistleSpec s, WhistleBellSpec b, float rate, int seed)
         {
-            _b = b; _rate = rate; _dt = 1f / rate; _rng = new Random(seed);
+            _b = b; _rate = rate; _dt = 1f / rate; _rng = new Random(seed); _jitterStep = At44k.Step(0.0006f, rate);
             _trim = MathF.Pow(10f, b.LevelTrimDb / 20f);
             _breath = Math.Clamp(s.Breathiness, 0f, 1f);
             _lastC = MathF.Sqrt(1.33f * 461.5f * s.SteamKelvin);
@@ -182,7 +184,7 @@ public sealed class SteamWhistle
             // A real whistle wanders, but only slightly: the first version wobbled six per cent,
             // which is most of a semitone, continuously — and a note that is never in one place is
             // not a note. ("Not like solid notes.")
-            _jitter += 0.0006f * ((float)_rng.NextDouble() * 2f - 1f - _jitter);
+            _jitter += _jitterStep * ((float)_rng.NextDouble() * 2f - 1f - _jitter);
             _phase += f1 * (1f + 0.7f * _jitter) * _dt;
             if (_phase >= 1.0) _phase -= 1.0;
 
