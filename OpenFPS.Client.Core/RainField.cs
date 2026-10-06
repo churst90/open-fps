@@ -52,8 +52,12 @@ public sealed class RainSurvey
     public const int NearRings = 4;
 
     /// <summary>The slot of the roof overhead; the near patches are 1-4 (east, north, west, south)
-    /// and the far ones 5-8.</summary>
+    /// and the far ones 5-8. Under the open sky, the listener's own head and shoulders.</summary>
     public const int OverheadSlot = 0;
+
+    /// <summary>The ring numbers the listener's head and shoulders go in as (past every ring of the
+    /// ground's).</summary>
+    public const int HeadRing = 100, ShouldersRing = 101;
 
     /// <summary>How high above the ear a column starts, m: above any roof on a map.</summary>
     public const float SkyMetres = 250f;
@@ -268,6 +272,10 @@ public sealed class RainSurvey
         }
         result.Columns = columns;
 
+        // ── The listener ───────────────────────────────────────────────────────────────────────
+        // Nothing over the ear but the sky: the rain lands on the listener too (RainSurfaces.HeadSquareMetres).
+        if (!overhead.Hit || overhead.Top <= ear.Y + 0.05f) Body(result, ear);
+
         // ── Into patches ───────────────────────────────────────────────────────────────────────
         for (int slot = 0; slot < RainFeeds.Slots; slot++)
         {
@@ -279,7 +287,7 @@ public sealed class RainSurvey
             var centre = _wPos[slot] / (float)_wSum[slot];
             float dist = MathF.Max(1f, Vector3.Distance(centre, ear));
             // A roof overhead quieter than anything could hear is not a voice.
-            if (slot == OverheadSlot)
+            if (slot == OverheadSlot && roofed)
             {
                 float p2 = 0f;
                 foreach (var l in layers)
@@ -388,6 +396,32 @@ public sealed class RainSurvey
 
     private Result? _near;
     private float _nearAngle;
+
+    /// <summary>The head and shoulders as a soft surface in the overhead slot, all of it near: its
+    /// biggest drops are placed one by one, the rest is the slot's patch.</summary>
+    private void Body(Result result, Vector3 ear)
+    {
+        var props = AcousticRegistry.GetProperties(Known(RainSurfaces.BodyMaterial));
+        var layer = Layer(OverheadSlot, new RainLayer
+        {
+            Kind = RainSurfaceKind.Soft, Material = RainSurfaces.BodyMaterial, ModulusGPa = props.YoungsModulusGPa,
+            Stretch = RainSurfaces.ContactStretch(props),
+        });
+        Part(HeadRing, RainSurfaces.HeadSquareMetres, 0f, RainSurfaces.HeadRadiusMetres, ear.Y + RainSurfaces.CrownAboveEarMetres);
+        Part(ShouldersRing, RainSurfaces.ShouldersSquareMetres, RainSurfaces.ShouldersInnerMetres, RainSurfaces.ShouldersOuterMetres,
+             ear.Y - RainSurfaces.ShouldersBelowEarMetres);
+
+        void Part(int ring, float area, float inner, float outer, float top)
+        {
+            float rc = MathF.Sqrt(0.5f * (inner * inner + outer * outer));
+            float d = MathF.Sqrt(rc * rc + (top - ear.Y) * (top - ear.Y));
+            layer.Add(ring, area, d, (ear.Y - top) / d, discrete: true);
+            float w = area / (d * d);
+            _wSum[OverheadSlot] += w;
+            _wPos[OverheadSlot] += new Vector3(ear.X, top, ear.Z) * w;
+            result.Near.Add(new NearCell(layer, area, inner, outer, 0f, MathF.Tau, top, OverheadSlot, false, ring));
+        }
+    }
 
     private void Near(RainLayer layer, float area, int ring, float top, int slot, bool fromBelow)
     {
@@ -930,7 +964,7 @@ public sealed class RainField
                 made++;
                 if (!_audio.RegisterSynthesisedSound(sound.Id, TransientSynth.ToPcm16(sound.Pcm), DropBank.Rate)) continue;
             }
-            float dist = MathF.Max(0.3f, Vector3.Distance(impact.Position, ear));
+            float dist = MathF.Max(0.1f, Vector3.Distance(impact.Position, ear));
             float aim = (ear.Y - impact.Position.Y) / dist;
             float level = DropBank.LevelDb(sound, impact, aim);
             var (gain, reference) = Loudness.Place(level);

@@ -331,7 +331,9 @@ public class RainTests
         var world = World(); Ground(world, "Asphalt");
         var r = new RainSurvey().Run(world, new Vector3(0f, 1.6f, 0f), -1, -1);
         _o.WriteLine(r.Describe());
-        Assert.Null(r.Patches[RainSurvey.OverheadSlot]);
+        // Nothing overhead but the sky: the overhead slot is the rain on the listener's own head and shoulders.
+        Assert.Equal(0, r.OverheadEntity);
+        Assert.All(r.Patches[RainSurvey.OverheadSlot]!.Layers, l => Assert.Equal(RainSurfaces.BodyMaterial, l.Material));
         for (int s = 1; s < RainFeeds.Slots; s++)
         {
             Assert.NotNull(r.Patches[s]);

@@ -61,6 +61,7 @@ public static class RainSpike
             return 0;
         }
         if (args.Contains("physics")) return Physics();
+        if (args.Contains("resolve")) return Resolve(Arg(args, "sec=", 10f));
         if (args.Contains("live")) return Live(Arg(args, "sec=", 10f));
 
         float sec = Arg(args, "sec=", 20f);
@@ -88,8 +89,14 @@ public static class RainSpike
         var summary = new List<string>();
         foreach (var (name, make) in scenes)
         {
+            _riding = -1;
             var (world, ear, about) = make();
-            var survey = new RainSurvey { TraceColumns = args.Contains("columns") }.Run(world, ear, -1, -1);
+            // Sitting in a car, everything outside it comes through its shell, as the provider does it
+            // (ClientAudioSystem.CabinEnclosure, the windows shut).
+            _cabinDb = (0f, 0f, 0f);
+            if (_riding >= 0 && OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(world.Entities[_riding]) is { } cabin)
+                _cabinDb = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(cabin, 0f);
+            var survey = new RainSurvey { TraceColumns = args.Contains("columns") }.Run(world, ear, -1, _riding);
             if (survey.Trace != null) foreach (var line in survey.Trace) Console.WriteLine("    " + line);
             Console.WriteLine();
             Console.WriteLine($"== {name}: {about}");
@@ -122,7 +129,7 @@ public static class RainSpike
                 NatureSpike.Report($"{name} {label}", r.Mono, Rate, calibrated: true);
                 Console.WriteLine("  " + Grain(r.Mono, Rate));
                 Console.WriteLine("  " + Balance(r.Mono, Rate));
-                summary.Add($"{name,-10} {label,-9} {mmh,5:F1} mm/h  in game {r.GameRmsDbfs,6:F1} dBFS  Leq {Db(r.Mono),5:F1} dB  " +
+                summary.Add($"{name,-10} {label,-9} {mmh,5:F1} mm/h  in game {r.GameRmsDbfs,6:F1} dBFS (limiter -{r.LimitedDb:F1} dB)  Leq {Db(r.Mono),5:F1} dB  " +
                             $"LAeq {AWeighted(r.Mono),5:F1} dB(A)  headroom {Headroom(r.Mono),4:F1} dB  " +
                             $"low/mid/high octaves (125+250 / 1k+2k / 8k+16k) {r.BandSummary}");
                 if (dir != null)
@@ -147,6 +154,8 @@ public static class RainSpike
         /// <summary>The same, at the level the game plays it (see <see cref="GameDb"/>), full scale 1.</summary>
         public float[] GameLeft = Array.Empty<float>(), GameRight = Array.Empty<float>();
         public double GameRmsDbfs;
+        /// <summary>The most the master limiter took off, dB (0: it never acted).</summary>
+        public double LimitedDb;
         public int Voices;
         public double CostPerVoice, WorstCost;
         public List<string> PatchLines = new();
@@ -193,6 +202,8 @@ public static class RainSpike
                 eq = (p.EqLow, p.EqMid, p.EqHigh);
                 air = (p.AirLowDb, p.AirMidDb, p.AirHighDb);
             }
+            if (s != RainSurvey.OverheadSlot || !survey.OverheadIsVehicle)
+                (air.lo, air.mid, air.hi) = (air.lo + _cabinDb.Low, air.mid + _cabinDb.Mid, air.hi + _cabinDb.High);
             ThreeEq(x, eq.lo * MathF.Pow(10f, air.lo / 20f), eq.mid * MathF.Pow(10f, air.mid / 20f), eq.hi * MathF.Pow(10f, air.hi / 20f));
             double e = 0; foreach (float v in x) e += v * (double)v;
             double db = 10 * Math.Log10(Math.Max(1e-20, e / n) / 4e-10);
@@ -232,19 +243,26 @@ public static class RainSpike
             int start = (int)((impact.At - 1.0) * Rate);
             if (start < 0 || start >= n) continue;
             r.NearImpacts++;
-            float dist = MathF.Max(0.3f, Vector3.Distance(impact.Position, ear));
+            float dist = MathF.Max(0.1f, Vector3.Distance(impact.Position, ear));
             float aim = (ear.Y - impact.Position.Y) / dist;
             float level = DropBank.LevelDb(sound, impact, aim);
             float pascalsAtEar = 20e-6f * MathF.Pow(10f, level / 20f) / dist;
             var (gain, reference) = Loudness.Place(level);
-            float eq = impact.FromBelow && impact.Slot == RainSurvey.OverheadSlot ? survey.OverheadEq.Mid : 1f;
+            // Through the roof's EQ (a car's headliner), or through the shell of the car the listener sits in.
+            bool overhead = impact.FromBelow && impact.Slot == RainSurvey.OverheadSlot;
+            var bands = overhead ? survey.OverheadEq : (1f, 1f, 1f);
+            if (!(overhead && survey.OverheadIsVehicle))
+                bands = (bands.Item1 * MathF.Pow(10f, _cabinDb.Low / 20f), bands.Item2 * MathF.Pow(10f, _cabinDb.Mid / 20f), bands.Item3 * MathF.Pow(10f, _cabinDb.High / 20f));
+            var pcm = (float[])sound.Pcm.Clone();
+            if (bands != (1f, 1f, 1f)) ThreeEq(pcm, bands.Item1, bands.Item2, bands.Item3);
+            const float eq = 1f;
             float game = gain * MathF.Min(1f, reference / dist) * (float)Math.Pow(10, ProviderDb / 20) * 1.4142135f * eq;
             var to = impact.Position - ear;
             float pan = impact.FromBelow ? 0f : MathF.Sin(MathF.Atan2(to.X, to.Z)) * MathF.Min(1f, new Vector2(to.X, to.Z).Length() / MathF.Max(0.1f, dist));
             float gl = MathF.Cos((pan + 1f) * MathF.PI / 4f), gr = MathF.Sin((pan + 1f) * MathF.PI / 4f);
-            for (int i = 0; i < sound.Pcm.Length && start + i < n; i++)
+            for (int i = 0; i < pcm.Length && start + i < n; i++)
             {
-                float x = sound.Pcm[i];
+                float x = pcm[i];
                 r.Mono[start + i] += x * pascalsAtEar * eq;
                 nearMono[start + i] += x * pascalsAtEar * eq;
                 r.Left[start + i] += x * pascalsAtEar * eq * gl;
@@ -258,6 +276,7 @@ public static class RainSpike
                         (fall.Kind == PrecipitationKind.Hail ? $", hail from {near.HailFromMm:F1} mm" : "") +
                         $"), {10 * Math.Log10(Math.Max(1e-20, ne / n) / 4e-10):F1} dB at the ear; {bank.Made.Count()} sounds made";
         r.CostPerVoice = r.Voices > 0 ? costSum / r.Voices : 0;
+        r.LimitedDb = MasterLimiter(r.GameLeft, r.GameRight);
         double ge = 0;
         for (int i = 0; i < n; i++) ge += 0.5 * (r.GameLeft[i] * (double)r.GameLeft[i] + r.GameRight[i] * (double)r.GameRight[i]);
         r.GameRmsDbfs = 10 * Math.Log10(Math.Max(1e-20, ge / n));
@@ -272,6 +291,100 @@ public static class RainSpike
     /// each window; the median and the 95th percentile), computed the same way for a render and a
     /// recording so the two compare.
     /// </summary>
+    /// <summary>
+    /// How many separate impacts a second can be told apart. A Poisson train of drops on one surface,
+    /// at a metre, sizes from moderate rain's spectrum above 1.5 mm, at rising rates; counted by the
+    /// same onset detector the levels report uses (a 1 ms peak 12 dB over the median of the 200 ms
+    /// round it, in each octave 250 Hz-8 kHz, the best octave kept). Where the count stops following
+    /// the true rate is where impacts stop being events and become a texture.
+    /// </summary>
+    private static int Resolve(float sec)
+    {
+        var surfaces = new (string Name, RainLayer Layer)[]
+        {
+            ("asphalt", new RainLayer { Kind = RainSurfaceKind.Hard, Material = "Asphalt", ModulusGPa = 3f }),
+            ("steel 0.7 mm", new RainLayer { Kind = RainSurfaceKind.Plate, Material = "Metal", ModulusGPa = 200f,
+                                             Plate = new RainPlate("Metal", 0.0007f, 1.2f, 0.6f) }),
+            ("puddle", new RainLayer { Kind = RainSurfaceKind.Pool, Material = "Water", ModulusGPa = 2.2f }),
+            ("head (skin)", new RainLayer { Kind = RainSurfaceKind.Soft, Material = "Skin", ModulusGPa = 0.0015f,
+                                            Stretch = RainSurfaces.ContactStretch(AcousticRegistry.GetProperties("Skin")) }),
+        };
+        var spectrum = new ParticleSpectrum();
+        spectrum.Build(PrecipitationKind.Rain, 5f, Hydrometeors.MarshallPalmerMedianMm(5f));
+        float[] rates = { 2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128 };
+        var bank = new DropBank();
+        int n = (int)(sec * Rate);
+        Console.WriteLine($"Separate impacts a second counted, against the true rate ({sec:F0} s each, best octave 250 Hz-8 kHz):");
+        Console.WriteLine("  true rate     " + string.Join(" ", rates.Select(r => $"{r,6:F0}")));
+        foreach (var (name, layer) in surfaces)
+        {
+            var counted = new List<double>();
+            foreach (float rate in rates)
+            {
+                var rng = new Random(7);
+                var x = new float[n];
+                int events = 0;
+                double t = 0;
+                while (true)
+                {
+                    t += -Math.Log(1.0 - rng.NextDouble()) / rate;
+                    int at = (int)(t * Rate);
+                    if (at >= n) break;
+                    events++;
+                    float d = spectrum.DrawAbove(1.5f, (float)rng.NextDouble());
+                    var impact = new NearDrops.Impact(Vector3.Zero, layer, PrecipitationKind.Rain, d,
+                                                      Hydrometeors.FallSpeed(PrecipitationKind.Rain, d), t, false, 0, false);
+                    var sound = bank.Get(impact, events % DropBank.Variants)!;
+                    float p = 20e-6f * MathF.Pow(10f, DropBank.LevelDb(sound, impact, 1f) / 20f);
+                    for (int i = 0; i < sound.Pcm.Length && at + i < n; i++) x[at + i] += sound.Pcm[i] * p;
+                }
+                // A floor 50 dB under the drops' mean peak, so silence between them is not a median of zero.
+                float floor = 0f;
+                for (int i = 0; i < n; i++) floor = MathF.Max(floor, MathF.Abs(x[i]));
+                floor *= 0.00316f;
+                for (int i = 0; i < n; i++) x[i] += floor * (float)(rng.NextDouble() * 2.0 - 1.0);
+                double best = 0;
+                foreach (float c in new[] { 250f, 500f, 1000f, 2000f, 4000f, 8000f })
+                    best = Math.Max(best, Onsets(NatureSpike.BandPass(x, Rate, c / MathF.Sqrt(2f), MathF.Min(c * MathF.Sqrt(2f), 0.45f * Rate)), Rate) / sec);
+                counted.Add(best);
+            }
+            Console.WriteLine($"  {name,-13} " + string.Join(" ", counted.Select(c => $"{c,6:F1}")));
+            int k = 0;
+            while (k < rates.Length && counted[k] >= 0.8 * rates[k]) k++;
+            double peak = counted.Max();
+            Console.WriteLine($"  {"",-13} follows the rate (within a fifth) up to {(k > 0 ? rates[k - 1] : 0):F0} a second; never counts more than {peak:F1} a second");
+        }
+        return 0;
+    }
+
+    /// <summary>Onsets in a band: 1 ms peaks that are local maxima and stand 12 dB over the median of the
+    /// 200 ms round them, no two within 30 ms (the ear's integration window: two clicks closer than
+    /// that are heard as one).</summary>
+    private static int Onsets(float[] band, int sr)
+    {
+        int pw = Math.Max(1, sr / 1000);
+        var peaks = new List<double>();
+        for (int s = 0; s + pw <= band.Length; s += pw)
+        {
+            double p = 0;
+            for (int i = s; i < s + pw; i++) p = Math.Max(p, Math.Abs(band[i]));
+            peaks.Add(p);
+        }
+        int count = 0, last = -1000;
+        var round = new List<double>();
+        for (int i = 0; i < peaks.Count; i++)
+        {
+            if (i > 0 && peaks[i - 1] >= peaks[i]) continue;
+            if (i + 1 < peaks.Count && peaks[i + 1] > peaks[i]) continue;
+            int a = Math.Max(0, i - 100), z = Math.Min(peaks.Count, i + 100);
+            round.Clear();
+            round.AddRange(peaks.GetRange(a, z - a));
+            round.Sort();
+            if (peaks[i] > 3.98 * round[round.Count / 2] && i - last >= 30) { count++; last = i; }
+        }
+        return count;
+    }
+
     internal static string Grain(float[] x, int sr)
     {
         int n = Math.Min(x.Length, sr * 15);
@@ -420,6 +533,12 @@ public static class RainSpike
             Car(w, new Vector3(1.8f, 0f, 0f), "v6");
             return (w, new Vector3(0f, 1.6f, 0f), "on the street beside a parked saloon (the v6 sedan, its side 0.85 m to the right)");
         }),
+        ("incar", () =>
+        {
+            var w = World(); Ground(w, "Asphalt");
+            _riding = Car(w, new Vector3(0f, 0f, 0f), "v6");
+            return (w, new Vector3(-0.35f, 1.15f, 0.1f), "in the driver's seat of a parked saloon (the v6 sedan) on the street");
+        }),
         ("pond", () =>
         {
             var w = World(); Ground(w, "Grass");
@@ -490,7 +609,13 @@ public static class RainSpike
         w.AudioEntityIds.Add(id);
     }
 
-    private static void Car(WorldSnapshot w, Vector3 restsAt, string preset)
+    /// <summary>The entity the scene's listener sits in, or -1.</summary>
+    private static int _riding = -1;
+
+    /// <summary>What the shell of the car the listener sits in takes off everything outside it, dB per band.</summary>
+    private static (float Low, float Mid, float High) _cabinDb;
+
+    private static int Car(WorldSnapshot w, Vector3 restsAt, string preset)
     {
         int id = ++_nextId + 100;
         var p = MachineRegistry.VehicleFor(preset);
@@ -507,6 +632,7 @@ public static class RainSpike
         var snap = new EntitySnapshot { Id = id, Definition = def, Transform = def.Transform };
         w.Entities[id] = snap;
         w.DynamicEntities.Add(snap);
+        return id;
     }
 
     // ── Through the real provider ───────────────────────────────────────────────────────────────
@@ -877,6 +1003,27 @@ public static class RainSpike
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// The game's master limiter (FmodAudioProvider: FMOD's LIMITER at the head of the master, ceiling
+    /// -2 dBFS, 50 ms release, no look-ahead), so a render is what the game lets out: the gain drops at
+    /// once to hold a peak under the ceiling and comes back over the release. Returns the most it took off.
+    /// </summary>
+    private static double MasterLimiter(float[] left, float[] right)
+    {
+        const float Ceiling = 0.794f;                                   // -2 dBFS
+        float release = MathF.Exp(-1f / (0.050f * Rate));
+        float gain = 1f, least = 1f;
+        for (int i = 0; i < left.Length; i++)
+        {
+            float peak = MathF.Max(MathF.Abs(left[i]), MathF.Abs(right[i]));
+            float target = peak > Ceiling ? Ceiling / peak : 1f;
+            gain = target < gain ? target : target - (target - gain) * release;
+            left[i] *= gain; right[i] *= gain;
+            least = MathF.Min(least, gain);
+        }
+        return -20.0 * Math.Log10(least);
     }
 
     private static void WriteStereo(string path, float[] left, float[] right)

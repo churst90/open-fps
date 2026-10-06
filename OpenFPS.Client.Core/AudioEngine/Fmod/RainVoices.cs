@@ -89,7 +89,9 @@ public sealed class RainVoiceState : PhysicalVoiceState
     public const float ReferenceDb = 60f;
 
     /// <summary>The room its peaks need over the measured level, dB. MEASURED with --rain levels:
-    /// the 99.9th percentile of the 10 ms peaks over the Leq across the lab's scenes and rates.</summary>
+    /// the 99.9th percentile of the 10 ms peaks over the Leq across the lab's scenes and kinds. Rain
+    /// needs 15-30 dB; hail, whose stones are single blows on a quiet bed, up to 43 (golf balls on the
+    /// street), and the patches render it too.</summary>
     public const float HeadroomDb = 45f;
 
     /// <summary>How long the level is measured over, s.</summary>

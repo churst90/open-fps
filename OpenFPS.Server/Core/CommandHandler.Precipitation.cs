@@ -173,7 +173,10 @@ public partial class CommandHandler
         var spectrum = new ParticleSpectrum();
         var rain = p with { Kind = p.Kind == PrecipitationKind.Hail ? PrecipitationKind.Rain : p.Kind };
         spectrum.Build(rain);
-        float dbz = spectrum.Dbz;
+        // A drop size given: the radar sees that spectrum. None given: the rate as a radar reads it, by
+        // the WSR-88D's Z-R (Hydrometeors.DbzFromRate), which is how the colour scale is read off the rain.
+        float dbz = p.MedianDropMm > 0f || p.Kind is PrecipitationKind.Snow or PrecipitationKind.Sleet
+            ? spectrum.Dbz : Hydrometeors.DbzFromRate(p.RateMmPerHour);
         string rate = p.RateMmPerHour.ToString("0.#", CultureInfo.InvariantCulture);
         string drops = p.EffectiveMedianMm.ToString("0.#", CultureInfo.InvariantCulture);
         string colour = Hydrometeors.RadarColour(dbz, p.Kind);

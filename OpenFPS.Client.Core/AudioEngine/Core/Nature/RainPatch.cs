@@ -91,7 +91,7 @@ public sealed class RainLayer
     public void Add(int ring, float area, float distance, float aim = 1f, bool discrete = false)
     {
         if (area <= 0f) return;
-        distance = MathF.Max(0.3f, distance);
+        distance = MathF.Max(0.1f, distance);
         aim = Math.Clamp(aim, MinAim, 1f);
         // Bins are kept by ring. Distances merge so the bin's Σ A / d² is kept, and the aim so its
         // Σ A cos²θ / d² is.

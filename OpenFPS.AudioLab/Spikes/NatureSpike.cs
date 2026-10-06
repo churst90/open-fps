@@ -411,7 +411,7 @@ public static class NatureSpike
     }
 
     /// <summary>A fourth-order band-pass: two RBJ high-passes then two low-passes.</summary>
-    private static float[] BandPass(float[] x, int sr, float lo, float hi)
+    internal static float[] BandPass(float[] x, int sr, float lo, float hi)
     {
         var y = (float[])x.Clone();
         for (int pass = 0; pass < 2; pass++)

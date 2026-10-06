@@ -12,7 +12,8 @@ namespace OpenFPS.Client.Core;
 /// Further off, rain is a texture: thousands of drops a second whose sum is a hiss, and the patches
 /// (RainSynth) render it as that. Close to you it is not: the drop that hits the car roof beside you,
 /// the shelter's sheet over your head, the puddle at your feet, is an event with a place. So within
-/// <see cref="NearRings"/> of the survey (2.5 m), the biggest drops are taken out of the patches and
+/// <see cref="NearRings"/> of the survey (2.5 m), and on the listener's own head and shoulders under
+/// the open sky (RainSurfaces.HeadSquareMetres), the loudest drops are taken out of the patches and
 /// placed one at a time, each at a random point of the surface it lands on, with its own size, as a
 /// sound of its own (DropBank).
 ///
@@ -29,8 +30,11 @@ public sealed class NearDrops
     public const int NearRings = 2;
 
     /// <summary>How many separate impacts a second are placed, on every near surface together. MEASURED
-    /// with --rain resolve: the rate at which an onset detector's count of separate impacts falls
-    /// under four fifths of the true rate.</summary>
+    /// with --rain resolve: a Poisson train of drops on asphalt, a puddle, a head and 0.7 mm steel,
+    /// counted by an onset detector (a 1 ms peak 12 dB over the median of the 200 ms round it, no two
+    /// within the ear's 30 ms integration window). Its count follows the true rate within a fifth up
+    /// to 12 a second (16 on steel, whose ring keeps each one apart), and never passes about 27 a
+    /// second however many fall. More than this a second are not more events, only more texture.</summary>
     public const float ResolvableImpactsPerSecond = 12f;
 
     /// <summary>One impact: where, on what, what, how big, how fast, when (seconds), facing the ear how
@@ -149,7 +153,7 @@ public sealed class NearDrops
             var probe = new Impact(at, c.Surface, kind, referenceMm, vRef, 0, c.FromBelow, c.Slot, false);
             var sound = bank.Get(probe, 0);
             if (sound == null) continue;
-            float dist = MathF.Max(0.3f, Vector3.Distance(at, ear));
+            float dist = MathF.Max(0.1f, Vector3.Distance(at, ear));
             float level = MathF.Pow(10f, DropBank.LevelDb(sound, probe, (ear.Y - c.Top) / dist) / 20f) / dist;
             _gain[i] = level;
             best = MathF.Max(best, level);

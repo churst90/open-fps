@@ -164,6 +164,29 @@ public static class RainSurfaces
     /// </summary>
     public static readonly (float Low, float Mid, float High) HeadlinerGains = (1f, 0.75f, 0.45f);
 
+    // ── The listener's own body ──────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Under the open sky the rain lands on you too: on your head a hand's breadth from your ears and
+    /// on your shoulders a little further. Those drops are ten times nearer than the nearest ground,
+    /// so each is a hundred times the energy at the ear of one at your feet, and they are the drops
+    /// that stand out one by one. The figures are a body's, adult and upright: a head about 15 cm
+    /// across and 20 cm front to back (π/4 · 0.15 · 0.2 ≈ 0.024 m²), its crown about 12 cm above the
+    /// ear canal; shoulders 40 cm across and 25 cm deep less the neck (about 0.08 m²), 15-25 cm out
+    /// from the ears and 18 cm below them. The material is <see cref="BodyMaterial"/>: the map knows
+    /// no clothing, so hair and a coat are both a soft surface. ASSUMPTION, flagged: no hood, no hat,
+    /// no umbrella.
+    /// </summary>
+    public const float HeadSquareMetres = 0.024f, HeadRadiusMetres = 0.09f, CrownAboveEarMetres = 0.12f;
+
+    /// <summary>The shoulders: area, m²; how far out from between the ears they start and end, m;
+    /// how far below the ears they are, m. See <see cref="HeadSquareMetres"/>.</summary>
+    public const float ShouldersSquareMetres = 0.08f, ShouldersInnerMetres = 0.12f, ShouldersOuterMetres = 0.24f,
+                       ShouldersBelowEarMetres = 0.18f;
+
+    /// <summary>What a drop landing on the listener lands on.</summary>
+    public const string BodyMaterial = "Skin";
+
     // ── Built panels ─────────────────────────────────────────────────────────────────────────────
 
     /// <summary>The free span of a built panel between its supports, m: purlins under a roof sheet,
