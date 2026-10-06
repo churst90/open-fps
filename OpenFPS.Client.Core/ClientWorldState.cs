@@ -136,6 +136,15 @@ public class ClientWorldState
     public float CurrentRainRate { get { lock(_envLock) return _rainRate; } }
     private float _rainRate;
     private Precipitation _precipitation = Precipitation.None;
+    /// <summary>The water on this map's roads as the server last sent it (RoadWater): the texture, the
+    /// sheet and the puddles. Dry until a server sends one.</summary>
+    private readonly RoadWater _roadWater = new();
+    private float _roadWaterMm;
+    /// <summary>The water in a wheel path of an asphalt road now, mm (RoadWater.WaterMm 2.5 m from the
+    /// crown, no kerb, no puddle): for a vehicle whose wheels the server does not send.</summary>
+    public float CurrentRoadWaterMm { get { lock (_envLock) return _roadWaterMm; } }
+    /// <summary>The road water state, for an instrument. Read under no lock: a copy is not kept.</summary>
+    public RoadWater RoadWater => _roadWater;
     public float CurrentTemperature { get { lock(_envLock) return _env.Temperature; } }
     public float CurrentWindGustiness { get { lock(_envLock) return _env.WindGustiness; } }
     public Vector3 CurrentWindVelocity { get { lock(_envLock) return _env.WindVelocity; } }
@@ -152,6 +161,8 @@ public class ClientWorldState
             _env.WindGustiness = Math.Clamp(update.WindGustiness, 0f, 1f);
             _env.PrecipitationIntensity = update.PrecipitationIntensity;
             _rainRate = update.RainRateMmPerHour;
+            _roadWater.Load(update.RoadWater);
+            _roadWaterMm = _roadWater.WaterMm(RoadSurfaces.IndexOf(RoadData.DefaultSurface), 2.5f, float.PositiveInfinity, 0f);
             _precipitation = new Precipitation((PrecipitationKind)Math.Clamp(update.PrecipitationKind, 0, 4),
                                                update.RainRateMmPerHour, update.RainMedianDropMm, update.HailDiameterMm);
         }
@@ -219,6 +230,11 @@ public class ClientWorldState
             _mapEpoch++;
         }
         _tiles.Clear();
+        _woods = null;
+        _crownIds.Clear();
+        _crownsDirty = false;
+        _woodIds.Clear();
+        _woodKeys.Clear();
 
         lock (_gridLock)
         {
@@ -281,6 +297,11 @@ public class ClientWorldState
         if (def.SoundEmitter.RunsOnItsOwn())
             _audioEntityIds[def.EntityId] = 0;
 
+        if (!IsWood(def.EntityId) && def.SoundEmitter.IsSynth
+            && def.SoundEmitter.SoundId?.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            if (_crownIds.TryAdd(def.EntityId, 0)) _crownsDirty = true;
+        }
         if (IsMarker(def)) _markerEntityIds[def.EntityId] = 0;
         else _markerEntityIds.TryRemove(def.EntityId, out _);
 
@@ -436,6 +457,7 @@ public class ClientWorldState
             _audioEntityIds.TryRemove(id, out _);
             _regionEntityIds.TryRemove(id, out _);
             _markerEntityIds.TryRemove(id, out _);
+            if (_crownIds.TryRemove(id, out _)) _crownsDirty = true;
             lock (_snapshotBuffer) _held.Remove(id);
             if (known) removed.Add(id);
         }
@@ -746,6 +768,7 @@ public class ClientWorldState
             AcousticMap = AcousticMap,
             GeometryVersion = GeometryVersion,
             TileMetres = TileMetres,
+            Woods = _woods,
             PositionsSampledAt = _positionsSampledAt
         };
 
@@ -760,6 +783,7 @@ public class ClientWorldState
             snap.PrecipitationIntensity = _env.PrecipitationIntensity;
             snap.RainRateMmPerHour = _rainRate;
             snap.Precipitation = _precipitation;
+            snap.RoadWaterMm = _roadWaterMm;
         }
 
         foreach (var kvp in _definitions)
@@ -1058,6 +1082,85 @@ public class ClientWorldState
     }
 
 
+    // ── Woods heard as one ──────────────────────────────────────────────────────────────────────
+    //
+    // A wood's trees past the hand-over distance are one source (WoodChorus). Each wood is an entity of
+    // the client's own, never the server's: a definition with a synthetic id below WoodChorus.FirstId,
+    // made from the crowns held, so the audio system ranks, places and voices it as it does a tree.
+
+    private WoodChorus? _woods;
+    /// <summary>The tree crowns held, and whether they changed since the woods were last made.</summary>
+    private readonly ConcurrentDictionary<int, byte> _crownIds = new();
+    private volatile bool _crownsDirty;
+    private readonly Dictionary<(int, int, string), int> _woodIds = new();
+    private readonly Dictionary<int, (string Key, Vector3 Centre, float Range)> _woodKeys = new();
+
+    /// <summary>What the last making of the woods cost the calling thread, and the most it has, ms.</summary>
+    public double LastWoodsMs { get; private set; }
+    public double WoodsMsMax { get; set; }
+
+    /// <summary>Whether an id is one of the client's own wood entities.</summary>
+    public static bool IsWood(int entityId) => entityId <= WoodChorus.FirstId && entityId > WoodChorus.FirstId - 1_000_000;
+
+    /// <summary>
+    /// Makes the woods again from the tree crowns held: after a map loads and after tiles come or go.
+    /// A wood whose key, middle and range are unchanged keeps its definition; the rest are made, changed
+    /// or taken away as entities. Returns the ids taken away, for the caller to stop their voices.
+    /// </summary>
+    public List<int> RefreshWoods()
+    {
+        if (!_crownsDirty) return new List<int>();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        _crownsDirty = false;
+        var crowns = new List<WoodChorus.Crown>();
+        EntityDefinition? sample = null;
+        foreach (int id in _crownIds.Keys)
+        {
+            if (!_definitions.TryGetValue(id, out var def)) continue;
+            var sid = def.SoundEmitter.SoundId!;
+            crowns.Add(new WoodChorus.Crown(id, _serverTransforms.TryGetValue(id, out var t) ? t.Position : def.Transform.Position, sid[8..]));
+            sample ??= def;
+        }
+        var chorus = WoodChorus.Build(crowns, (cell, preset) =>
+        {
+            var key = (cell.X, cell.Z, preset);
+            if (!_woodIds.TryGetValue(key, out int id)) _woodIds[key] = id = WoodChorus.FirstId - _woodIds.Count;
+            return id;
+        });
+        var keep = new HashSet<int>();
+        foreach (var w in chorus.Woods)
+        {
+            keep.Add(w.Id);
+            if (_woodKeys.TryGetValue(w.Id, out var had) && had.Key == w.Key && had.Centre == w.Centre && had.Range == w.RangeMetres) continue;
+            _woodKeys[w.Id] = (w.Key, w.Centre, w.RangeMetres);
+            var def = new EntityDefinition
+            {
+                EntityId = w.Id,
+                Type = EntityType.StaticObject,
+                Transform = new Transform { Position = w.Centre, Rotation = Quaternion.Identity },
+            };
+            def.Identity.Name = "Woods";
+            def.Material.Material = "Foliage";
+            // The trees' own emitter, as the wood's: the same mode and running state, its own key and reach.
+            var em = sample!.SoundEmitter;
+            em.SoundId = w.Key;
+            em.Range = w.RangeMetres;
+            em.Volume = 1f;
+            em.ExtentMetres = w.Extent;
+            def.SoundEmitter = em;
+            RegisterDefinition(def);
+        }
+        var gone = new List<int>();
+        foreach (int id in _woodKeys.Keys) if (!keep.Contains(id)) gone.Add(id);
+        foreach (int id in gone) _woodKeys.Remove(id);
+        if (gone.Count > 0) RemoveEntities(gone);
+        _woods = chorus.Woods.Count > 0 ? chorus : null;
+        Touch();
+        LastWoodsMs = clock.Elapsed.TotalMilliseconds;
+        WoodsMsMax = Math.Max(WoodsMsMax, LastWoodsMs);
+        return gone;
+    }
+
     public int? GetClosestEntityId(Vector3 pos)
     {
         int? bestId = null;
@@ -1065,7 +1168,7 @@ public class ClientWorldState
 
         foreach (var kvp in _definitions)
         {
-            if (kvp.Value.Type == EntityType.Player) continue;
+            if (kvp.Value.Type == EntityType.Player || IsWood(kvp.Key)) continue;
             var transform = _serverTransforms.GetValueOrDefault(kvp.Key);
             float d = Vector3.Distance(pos, transform.Position);
             if (d < bestDist) { bestDist = d; bestId = kvp.Key; }

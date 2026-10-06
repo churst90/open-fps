@@ -78,6 +78,15 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// squeal from <see cref="RoadSlip"/>. Game thread writes.
     /// </summary>
     public volatile OpenFPS.Common.Networking.WheelState[]? Wheels;
+    /// <summary>
+    /// The water on the road under a vehicle whose wheels the server does not send, mm (RoadWater; the
+    /// world's wheel-path figure). Wheels that are sent carry their own. Game thread writes.
+    /// </summary>
+    public volatile float RoadWaterMm;
+    /// <summary>The water on the road: the tyres' hiss, the spray in the arches, the bow and the splash
+    /// (WetTyres). Per wheel, from each wheel's own water.</summary>
+    private readonly OpenFPS.Client.AudioEngine.Core.WetTyres _wet;
+    private readonly float[] _wetWater, _wetTexture, _wheelWetSqueal;
     /// <summary>Whether the engine should be running. Game thread writes.</summary>
     public volatile bool Running = true;
     /// <summary>Standing at a stop that takes passengers: set the spring brakes, kneel, open the
@@ -596,6 +605,10 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         _wheelStatic = new float[nw]; _wheelAt = new Vector3[nw];
         _wheelDemand = new float[nw]; _wheelSlipVelocity = new float[nw]; _wheelLoad = new float[nw]; _wheelGain = new float[nw];
         _wheelStickSlip = new float[nw];
+        _wetWater = new float[nw]; _wetTexture = new float[nw]; _wheelWetSqueal = new float[nw];
+        var wheelAxle = new int[nw];
+        for (int i = 0; i < nw; i++) { wheelAxle[i] = body.Wheels[i].Axle; _wheelWetSqueal[i] = 1f; _wheelGain[i] = 1f; }
+        _wet = new OpenFPS.Client.AudioEngine.Core.WetTyres(v, body.Wheels.Select(w => w.Front).ToArray(), wheelAxle, sampleRate, seed + 131);
         float cogZ = chassis.CentreOfGravityZ;
         for (int i = 0; i < nw; i++)
         {
@@ -664,7 +677,10 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             var w = wheels[i];
             float kappa = w.SlipRatioValue, tanAlpha = MathF.Tan(w.SlipAngleRad);
             _wheelDemand[i] = w.DemandFraction;
-            _wheelStickSlip[i] = OpenFPS.Common.RoadSurfaces.StickSlipOf(w.Surface);
+            // Water in the contact lubricates the stick-snap the squeal is made of (RoadWaterLaw.SquealFactor).
+            float wetSqueal = OpenFPS.Common.RoadWaterLaw.SquealFactor(w.Surface, w.WaterMm);
+            _wheelWetSqueal[i] = wetSqueal;
+            _wheelStickSlip[i] = OpenFPS.Common.RoadSurfaces.StickSlipOf(w.Surface) * wetSqueal;
             _wheelSlipVelocity[i] = u * MathF.Sqrt(kappa * kappa + tanAlpha * tanAlpha);
             _wheelLoad[i] = w.LoadNewtons / _wheelStatic[i];
             if (placed)
@@ -1179,6 +1195,19 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         float liftStep = (liftTarget - _levelGain) / MathF.Max(1, count);
         var wheels = Wheels;
         bool perWheel = WheelsDrive(wheels, inside);
+        // The water under each wheel this block: its own when the server sends the wheels, the road's
+        // wheel-path figure when it does not.
+        float fallbackWater = RoadWaterMm;
+        for (int k = 0; k < _wetWater.Length; k++)
+        {
+            bool sent = perWheel && wheels != null;
+            byte surface = sent ? wheels![k].Surface : OpenFPS.Common.RoadSurfaces.IndexOf(OpenFPS.Common.RoadData.DefaultSurface);
+            _wetWater[k] = sent ? wheels![k].WaterMm : fallbackWater;
+            _wetTexture[k] = OpenFPS.Common.RoadWaterLaw.HoldsMm(surface);
+            if (!sent) _wheelGain[k] = 1f;
+        }
+        _wet.Block(_wetWater, _wheelGain, _wetTexture, Driveline.Speed, count);
+        float wetMix = TyreMix / DefaultTyreMix;
         double blockSum = 0, tyreSum = 0, outSum = 0;
         float windLpA = 1f - MathF.Exp(-2f * MathF.PI * 1200f * dt);
         float windHpA = MathF.Exp(-2f * MathF.PI * 180f * dt);
@@ -1214,7 +1243,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                 {
                     float demand = _wheelDemand[k] + (_wheelDriven[k] ? _tyreChirp : 0f);
                     float sq = VehicleSynth.WheelSqueal(Vehicle.Tyres, demand, _wheelSlipVelocity[k], _wheelLoad[k], _squealSlipVelocity,
-                                                         _wheelSqueal.Length, _rng, ref _wheelSqueal[k], _wheelStickSlip[k], SampleRate) * _wheelGain[k];
+                                                         _wheelSqueal.Length, _rng, ref _wheelSqueal[k], _wheelStickSlip[k], SampleRate)
+                             * _wheelGain[k] * _wheelWetSqueal[k];
                     if (_wheelFront[k]) frontSliding += sq; else rearSliding += sq;
                 }
                 tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _tyre, _rollingRearPa, _rearRadius, rearSliding, SampleRate);
@@ -1228,6 +1258,10 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             }
             float rearTyre = tyreRear * PerAxle * TyreMix;
             float frontTyre = tyreFront * PerAxle * TyreMix;
+            // The water: already pascals at a metre, each end's wheels at that end's tap.
+            _wet.Step();
+            rearTyre += _wet.Rear * wetMix;
+            frontTyre += _wet.Front * wetMix;
             // The front of the machine: the tyres at that end, the fan, and what the bay lets out.
             //
             // The BLOCK is not added here directly. One mechanism, one route: the block gets outside
@@ -1366,6 +1400,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                 _starterLp1 += (Engine.StarterOut * _starterPath - _starterLp1) * starterA;
                 _starterLp2 += (_starterLp1 - _starterLp2) * starterA;
                 inCabin += _starterLp2;
+                // The spray on the arches and the floor, through the wheelhouses and the trim.
+                inCabin += _wet.Cabin * wetMix;
                 inCabin += _cabin.Process(inCabin);
 
                 // The wind: broadband turbulence, most of it between a couple of hundred hertz and a

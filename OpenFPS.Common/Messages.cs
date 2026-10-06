@@ -419,7 +419,7 @@ public partial struct EntityState
     /// <summary>
     /// Each wheel of a vehicle, front axle first and left before right; null for anything without
     /// wheels. What the server's wheel model (WheelDynamics) worked out this tick: the load on it,
-    /// its slip, how fast it turns and what it is standing on. Eight bytes a wheel.
+    /// its slip, how fast it turns, what it is standing on and the water on it. Ten bytes a wheel.
     /// </summary>
     public WheelState[]? Wheels;
 
@@ -438,7 +438,7 @@ public partial struct EntityState
 }
 
 /// <summary>
-/// One wheel on the wire, quantised. An unmanaged struct, copied as its eight bytes.
+/// One wheel on the wire, quantised. An unmanaged struct, copied as its bytes (nine, padded to ten).
 /// </summary>
 public struct WheelState
 {
@@ -454,16 +454,24 @@ public struct WheelState
     public byte Surface;
     /// <summary>Its share of its grip in use, 0..2 with 1 the limit, as <see cref="EntityState.TyreDemand"/>.</summary>
     public byte Demand;
+    // APPEND ONLY BELOW THIS LINE: the struct is copied as its bytes.
+    /// <summary>The water under it, mm from the bottom of the road's texture (RoadWater), on a square
+    /// root scale: (Water / 40)^2 mm, a hundredth of a millimetre at 4, a millimetre at 40, 40 mm at 255.</summary>
+    public byte Water;
 
     public float LoadNewtons => LoadDaN * 10f;
+    public float WaterMm => (Water / 40f) * (Water / 40f);
+    public static byte EncodeWater(float mm) => (byte)Math.Clamp((int)MathF.Round(40f * MathF.Sqrt(MathF.Max(0f, float.IsFinite(mm) ? mm : 0f))), 0, 255);
     public float AngularSpeedRadPerSec => AngularSpeed / 50f;
     public float SlipRatioValue => SlipRatio / 127f;
     public float SlipAngleRad => SlipAngle / 254f;
     public float DemandFraction => Demand / 127.5f;
 
-    public static WheelState Encode(float loadNewtons, float angularSpeed, float slipRatio, float slipAngle, byte surface, float demand)
+    public static WheelState Encode(float loadNewtons, float angularSpeed, float slipRatio, float slipAngle, byte surface, float demand,
+                                    float waterMm = 0f)
         => new()
         {
+            Water = EncodeWater(waterMm),
             LoadDaN = (ushort)Math.Clamp((int)MathF.Round(loadNewtons / 10f), 0, ushort.MaxValue),
             AngularSpeed = (short)Math.Clamp((int)MathF.Round(angularSpeed * 50f), short.MinValue, short.MaxValue),
             SlipRatio = (sbyte)Math.Clamp((int)MathF.Round(slipRatio * 127f), -127, 127),
@@ -752,4 +760,7 @@ public partial class WorldStateUpdate : IMessage
     public int PrecipitationKind;
     public float RainMedianDropMm;
     public float HailDiameterMm;
+    /// <summary>The water on this map's roads (RoadWater.Save): the texture, the running sheet and the
+    /// puddles, so a client works out the same water anywhere the server does. Null from an older server.</summary>
+    public float[]? RoadWater;
 }

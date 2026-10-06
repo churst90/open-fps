@@ -74,6 +74,7 @@ string[] usage =
     "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
     "  --intake-ir [preset ...] [thr=] [sec=] [out=] the intake tract alone, thumped once",
     "  --wheel-squeal [out=] [axle] [binaural]       each wheel squealing for itself, and four drives",
+    "  --wet-roads [water|levels out=|game out= set=] tyres on wet roads: the water, the grip, the sound",
     "  --speedway [map] [seconds=] [voices=] [probe] the shipped race heard from its spawn point",
     "  --earshot [map=city] [at=x,z] [top=]          everything audible from a spot, ranked, under both distance laws",
     "  --car-horn / --siren [preset] [sec=]          horns and the siren on the bench, measured and written",
@@ -140,6 +141,7 @@ string[] usage =
     "  --tail-cost [t60=2]                           the late tail's cost per mixer piece: one channel against the field",
     "  --sim-reverbfield                             the simulator's reverb against enclosure across places",
     "  --scene-cost [map=city]                       what rebuilding the Steam Audio scenes costs",
+    "  --distant-woods [set=sum|walk|all] [out=DIR]   a wood from 300-800 m: the sum of its trees against the wood heard as one; the walk up to it",
     "  --tile-scenes [map=magnolia_tx]                Steam Audio scene per tile on Embree against one mesh: cost and answers",
     "  --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium]  a streamed map walked: tile costs, worker gaps",
     "  --geometry [map=magnolia_tx] [terrain=5] [sa=1] the world as triangles: BVH and Steam Audio costs (docs/GEOMETRY.md)",
@@ -511,6 +513,13 @@ if (args.Contains("--nature"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.NatureSpike.Run(args));
 }
 
+if (args.Contains("--wet-roads"))
+{
+    // --wet-roads [water|levels out=DIR|game out=DIR set=]: tyres on wet roads, the road's water,
+    // the grip it leaves, and the sound through the game.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WetRoadSpike.Run(args));
+}
+
 if (args.Contains("--running-water"))
 {
     // --running-water [levels|runoff|render out=DIR|game out=DIR set=] [preset ...] [sec= rain= flow=]:
@@ -726,6 +735,11 @@ if (args.Contains("--path-probe"))
 {
     // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.Run(args));
+}
+if (args.Contains("--distant-woods"))
+{
+    // --distant-woods [set=sum|walk|all] [out=DIR] [trees=40] [sec=30]: a wood heard far off, as the sum of its trees and as one.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.DistantWoodsSpike.Run(args));
 }
 if (args.Contains("--tile-scenes"))
 {

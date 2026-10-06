@@ -134,8 +134,14 @@ distance, leave out only what it cannot):
   qualify the same way; the real places have none (their vehicles move and are sent as moving things).
 - **Out:** rooms and named places, the inside of houses (inner walls, inner doors, furniture), lawns,
   drives, paths and verges (flat slabs on ground that already reflects), posts and other small
-  props, and any sound source that carries less than the smallest full radius (100 m). A tree's wind
-  in its crown carries 90 m (the prefab's own range), so it is inaudible from a coarse tile.
+  props, and any sound source that carries less than the smallest full radius (100 m).
+- **Tree crowns are in** (2026-10-06, distant woods). One tree's wind carries about 90 m, but a wood of
+  N trees is the same sound N times over, 10 log N dB louder, and carries much further. Past 110 m the
+  client hears each wood's trees (by 200 m square and species) as one source over the wood's extent
+  (`WoodChorus`, `FoliageSynth.Trees`), handing each tree to its own voice between 110 and 70 m with
+  its power split between the two, so nothing steps; a tree the voice budget leaves out stays in its
+  wood. Measured against the trees summed one by one (AudioLab `--distant-woods`): within 0.4 dB in
+  level and 0.5 dB in every octave band from 125 Hz to 8 kHz, at 300, 500 and 800 m.
 - **Front doors** are in, as shut leaves in their walls. A doorway and the rooms it joins share their
   tiles as one group (a house), so a door in a full tile always comes with its rooms; a door in a coarse
   tile has no room behind it, and the client treats it as a shut leaf, not as a doorway into nothing.

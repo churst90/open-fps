@@ -127,6 +127,37 @@ public sealed class FoliageSynth
         }
     }
 
+    /// <summary>
+    /// Reads the wind field at the given offsets from (x, z), one per bough: for a wood heard as one
+    /// source (WoodChorus), whose "boughs" stand across the whole wood, so a gust crosses it from its
+    /// upwind side to its downwind side as it crosses the trees.
+    /// </summary>
+    public void ReadWindAt(float x, float z, double seconds, ReadOnlySpan<Vector3> boughOffsets)
+    {
+        for (int b = 0; b < Boughs; b++)
+        {
+            var at = boughOffsets.Length > 0 ? boughOffsets[b % boughOffsets.Length] : Vector3.Zero;
+            _boughWindIn[b] = WindField.SpeedAt(x + at.X, Spec.CrownHeightMetres, z + at.Z, seconds);
+        }
+    }
+
+    /// <summary>
+    /// How many trees this synth is: 1 for a tree; for a wood heard as one source (WoodChorus), how many
+    /// of its trees it stands for now. N independent trees are N independent streams of strikes and N
+    /// independent shedding noises, so their sum is one stream at N times the rate and N times the
+    /// power: up to <see cref="MaxDensityTrees"/> that is what is rendered (the strikes and the twig
+    /// episodes come N times as often, the shedding's power is N times), and past it the rendered
+    /// trees' sum is scaled in amplitude to N trees' power. Under one, a share of a tree.
+    /// </summary>
+    public float Trees = 1f;
+
+    /// <summary>The most trees' worth of strikes a synth schedules; past it the power is made up in
+    /// amplitude. At three a wood's rustle is already dense enough to merge, and twig episodes stay
+    /// within the synth's slots.</summary>
+    public const float MaxDensityTrees = 3f;
+
+    private float _density = 1f, _ampTarget = 1f, _amp = 1f;
+
     /// <summary>The wind last handed to bough <paramref name="b"/>, m/s.</summary>
     public float BoughWind(int b) => _boughWindIn[b];
 
@@ -335,7 +366,10 @@ public sealed class FoliageSynth
         // The fluctuating force's dipole: pressure as the force times the speed it changes at,
         // U^(2+V) times U^(1/2) for the flutter's share — U^1.8, power U^3.6, Fégeant's birch.
         float u = mean / 5f;
-        _shedLevel = SheddingPascals * _shedScale * MathF.Pow(u, 2.5f + Vogel);
+        float trees = MathF.Max(0f, Trees);
+        _density = MathF.Min(trees, MaxDensityTrees);
+        _ampTarget = _density > 0f ? MathF.Sqrt(trees / _density) : 0f;
+        _shedLevel = SheddingPascals * _shedScale * MathF.Pow(u, 2.5f + Vogel) * MathF.Sqrt(_density);
 
         // The places' shares: events by probability, the shedding's power by gain.
         if (_sums.Length > 1)
@@ -364,9 +398,10 @@ public sealed class FoliageSynth
         _samples++;
         // The level is set once a control call; glide to it over a few milliseconds so it never steps.
         _shedGain += (_shedLevel - _shedGain) * _shedGlide;
+        _amp += (_ampTarget - _amp) * _shedGlide;
         float n = _sum.Signed() * 1.7320508f;
         float shed = (_shed.Process(n) * _shedNorm + _shedHigh.Process(n) * _shedHighNorm) * _shedGain;
-        return shed * ShedPart + _sum.Next();
+        return (shed * ShedPart + _sum.Next()) * _amp;
     }
 
     /// <summary>The next sample at each place, pascals at a metre from it: <paramref name="places"/>
@@ -380,6 +415,7 @@ public sealed class FoliageSynth
         }
         _samples++;
         _shedGain += (_shedLevel - _shedGain) * _shedGlide;
+        _amp += (_ampTarget - _amp) * _shedGlide;
         for (int k = 0; k < _sums.Length; k++)
         {
             _placeGain[k] += (_placeGainTarget[k] - _placeGain[k]) * _shedGlide;
@@ -388,7 +424,7 @@ public sealed class FoliageSynth
             float shed = k == 0
                 ? _shed.Process(n) * _shedNorm + _shedHigh.Process(n) * _shedHighNorm
                 : _shedAt[k].Process(n) * _shedNorm + _shedHighAt[k].Process(n) * _shedHighNorm;
-            float y = shed * _shedGain * _placeGain[k] * ShedPart + sum.Next();
+            float y = (shed * _shedGain * _placeGain[k] * ShedPart + sum.Next()) * _amp;
             if (k < places.Length) places[k] = y;
         }
     }
@@ -408,7 +444,7 @@ public sealed class FoliageSynth
         for (int b = 0; b < Boughs; b++)
         {
             float speed = _agitation[b];
-            float strikes = StrikesPerSecond(speed) / Boughs;
+            float strikes = StrikesPerSecond(speed) / Boughs * _density;
             // The closing speed of two fluttering leaves is a fraction of the wind through them.
             float closing = MathF.Pow(MathF.Max(0f, speed) / 5f, StrikeSpeedPower);
 

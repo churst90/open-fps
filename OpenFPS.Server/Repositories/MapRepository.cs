@@ -238,6 +238,24 @@ public class StreetLifeData
     /// <summary>How long somebody stands at the kerb before drivers who can stop comfortably stop for
     /// them, seconds. Drivers always stop for somebody already on the crossing.</summary>
     public float PedestrianAssertSeconds { get; set; } = 8f;
+
+    // ── In the rain ──────────────────────────────────────────────────────────────────────────────
+    //
+    // Drivers on a wet road go a little slower and leave a little more room; in heavy rain, slower
+    // still. Read against the road's water and the rain (RoadWaterSystem): "wet" is the road's texture
+    // full, "heavy" the rain at Rainfall.HeavyRate. FHWA's loop-detector study of three cities (Rakha
+    // et al., FHWA-HOP-07-073, 2007, Table ES.2): free-flow speed 2-3.6 % lower in light rain and 6-9 %
+    // in rain of about 16 mm/h; capacity 10-11 % lower in either, with jam density unchanged, which at
+    // much the same speed is a time headway about 12 % longer. Zero turns either off.
+
+    /// <summary>The share of their speed drivers give up on a wet road in light rain.</summary>
+    public float WetSpeedReduction { get; set; } = 0.03f;
+    /// <summary>...and in heavy rain.</summary>
+    public float HeavyRainSpeedReduction { get; set; } = 0.08f;
+    /// <summary>How much longer a time headway drivers keep on a wet road, as a share.</summary>
+    public float WetHeadwayIncrease { get; set; } = 0.12f;
+    /// <summary>...and in heavy rain (the same: the capacity loss did not grow with the rain).</summary>
+    public float HeavyRainHeadwayIncrease { get; set; } = 0.12f;
     /// <summary>After this long at the kerb a pedestrian takes a gap only just long enough to walk across,
     /// without the start-up margin, seconds. The HCM puts pedestrians' likelihood of taking risks as high
     /// above 30 s of delay at an uncontrolled crossing (HCM 2010, chapter 19, *to confirm*).</summary>

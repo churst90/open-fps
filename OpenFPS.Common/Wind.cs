@@ -41,10 +41,29 @@ public static class WindField
     /// thread never sees half of one broadcast and half of the next.</summary>
     public static WindWeather Weather
     {
-        get => System.Threading.Volatile.Read(ref _weather);
+        get => _held.Value ?? System.Threading.Volatile.Read(ref _weather);
         set => System.Threading.Volatile.Write(ref _weather, value ?? WindWeather.Default);
     }
     private static WindWeather _weather = WindWeather.Default;
+
+    /// <summary>
+    /// Holds a weather for the calling flow only (a test, a lab render) until the returned handle is
+    /// disposed. The shared weather is one global that a game session writes on every broadcast, so a
+    /// test reading the wind while a session test runs beside it heard that session's weather change
+    /// under it (WideSourcesTests.ATreesPlaceVoicesAddUpToItsOneVoice failed now and then in a mixed
+    /// run, 2026-10-06). The game never holds one: on the mixer thread this is one AsyncLocal read.
+    /// </summary>
+    public static IDisposable Hold(WindWeather weather)
+    {
+        var before = _held.Value;
+        _held.Value = weather;
+        return new Release(before);
+    }
+    private static readonly System.Threading.AsyncLocal<WindWeather?> _held = new();
+    private sealed class Release(WindWeather? before) : IDisposable
+    {
+        public void Dispose() => _held.Value = before;
+    }
 
     /// <summary>The mean wind at ten metres, m/s, now. A moderate breeze — Beaufort 3, leaves and
     /// small twigs in constant motion — is 3.4 to 5.4. Setting it (the lab does) makes a steady wind

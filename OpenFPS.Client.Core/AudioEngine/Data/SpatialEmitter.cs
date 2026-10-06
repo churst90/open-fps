@@ -220,6 +220,9 @@ public struct SpatialEmitter
     /// <summary>For an extended source's own voice: how much of it its outer places carry, 0 to 1,
     /// already slewed (ExtendedSources.SpreadFor, Slew).</summary>
     public float Spread;
+    /// <summary>For a wood heard as one (WoodChorus): how many of its trees its synth stands for now.
+    /// Read only for a wood's voice.</summary>
+    public float Trees;
     /// <summary>
     /// How hard the road is working this vehicle's tyres, as a fraction of the grip they have.
     ///
@@ -232,6 +235,8 @@ public struct SpatialEmitter
     /// <summary>Each wheel as the server sent it, front axle first, or null. The tyre voices take
     /// each axle's share of <see cref="TyreSlip"/> from it.</summary>
     public OpenFPS.Common.Networking.WheelState[]? Wheels;
+    /// <summary>The road's water under a vehicle whose wheels are not sent, mm (WorldSnapshot.RoadWaterMm).</summary>
+    public float RoadWaterMm;
     public SynthWaveType SynthWave;
     public float SynthFrequency; // Base frequency (e.g. 440.0f)
     public float SynthLfoRate; // Lfo speed in Hz

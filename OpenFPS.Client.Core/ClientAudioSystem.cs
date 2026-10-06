@@ -445,6 +445,9 @@ public class ClientAudioSystem
         OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
     }
 
+    /// <summary>The water in a wheel path of the roads, mm (WorldSnapshot.RoadWaterMm).</summary>
+    private float _roadWaterMm;
+
     /// <summary>
     /// Primary entry point called every frame from the Game Loop.
     /// Uses the VisualPosition for the listener to ensure smooth audio during server corrections.
@@ -943,6 +946,8 @@ public class ClientAudioSystem
 
         // Scale down precipitation intensity based on local shelter
         _state.PrecipitationIntensity = world.PrecipitationIntensity * (1.0f - _state.ShelterFactor);
+        // The water on the roads, for the vehicles whose wheels the server does not send.
+        _roadWaterMm = world.RoadWaterMm;
 
         // Update readable region for accessibility. Named by the boxes: in a doorway, which for sound is
         // the room on your side of it, you are told you are in the doorway.
@@ -1147,6 +1152,8 @@ public class ClientAudioSystem
                 h = OpenFPS.Common.FireSpec.ByName(soundId[5..]).PeakHeadroomDb;
             else if (soundId.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.FoliageSpec.ByName(soundId[8..]).PeakHeadroomDb;
+            else if (OpenFPS.Common.WoodChorus.ParseKey(soundId, out string woodPreset, out _, out _))
+                h = OpenFPS.Common.FoliageSpec.ByName(woodPreset).PeakHeadroomDb;
             else if (soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]).PeakHeadroomDb;
             else if (soundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase))
@@ -1219,6 +1226,13 @@ public class ClientAudioSystem
             {
                 var tree = OpenFPS.Common.FoliageSpec.ByName(soundId[8..]);
                 return (tree.SourceLevelDb, tree.ExtentMetres);
+            }
+            // A wood heard as one (WoodChorus): one tree's level (its synth renders its trees), the
+            // wood's size.
+            if (OpenFPS.Common.WoodChorus.ParseKey(soundId, out string woodPreset, out float woodX, out float woodZ))
+            {
+                var tree = OpenFPS.Common.FoliageSpec.ByName(woodPreset);
+                return (tree.SourceLevelDb, MathF.Max(woodX, woodZ));
             }
             // Running water: a creek, a gutter, a drain, a downpipe (RunningWaterSynth). Its size is its
             // length or its opening; its level is declared at its base flow or its reference rain.
@@ -1379,18 +1393,54 @@ public class ClientAudioSystem
         try { return OpenFPS.Common.AircraftProfile.ByName(sid[9..]); } catch { return null; }
     }
 
+    private readonly Dictionary<string, OpenFPS.Common.RunningWaterSpec> _flowSpecs = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>When a tap was last seen on, by entity.</summary>
+    private readonly Dictionary<int, double> _tapOnAt = new();
+
+    /// <summary>How long a basin is heard after its tap is shut, s: the longest a full sink takes to drain.</summary>
+    private const double TapDrainSeconds = 90.0;
+
     /// <summary>Running water fed only by the rain, with less than a trickle in it now (Runoff): it makes
     /// no sound and is given no voice. A creek or a fountain's overflow, with a flow of its own, never is.</summary>
-    private static bool Dry(string soundId)
+    private bool Dry(string soundId, int entityId, bool running, double now)
     {
         if (!soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return false;
         try
         {
-            var spec = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
+            // Looked up once a sound id: this runs for every sink in every flat, every frame.
+            if (!_flowSpecs.TryGetValue(soundId, out var spec))
+                _flowSpecs[soundId] = spec = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
+            // A tap: heard while it is on, and for as long after as its basin takes to empty. A shut tap
+            // nobody has opened since you arrived is an empty sink; a leaking one drips.
+            if (spec.Tap is { } tap)
+            {
+                if (running) { _tapOnAt[entityId] = now; return false; }
+                if (tap.LeakLitresPerSecond > 0f) return false;
+                return !_tapOnAt.TryGetValue(entityId, out double on) || now - on > TapDrainSeconds;
+            }
             if (spec.BaseFlowLitresPerSecond > 0f || spec.CatchmentSquareMetres <= 0f) return false;
-            return spec.FlowFor(OpenFPS.Common.Runoff.Through(spec.CatchmentSeconds)) < OpenFPS.Common.RunningWaterSpec.DryLitresPerSecond;
+            return spec.FlowNow() < OpenFPS.Common.RunningWaterSpec.DryLitresPerSecond;
         }
         catch (Exception) { return false; }
+    }
+
+    // ── Woods heard as one (WoodChorus) ──────────────────────────────────────────────────────────
+    private readonly OpenFPS.Common.WoodChorus.Weights _woodWeights = new();
+    private Func<int, bool>? _isLiveMachine;
+
+    /// <summary>A tree's or a wood's share this frame: the amplitude its voice is played at (0: no voice
+    /// of its own), and for a wood how many trees its synth stands for. Everything else: 1, 1.</summary>
+    private float ChorusShare(int entityId, out float trees)
+    {
+        trees = 1f;
+        if (OpenFPS.Client.Core.ClientWorldState.IsWood(entityId))
+        {
+            if (!_woodWeights.Woods.TryGetValue(entityId, out var w)) return 0f;
+            trees = w.Trees;
+            return w.Gain;
+        }
+        return _woodWeights.Individual.TryGetValue(entityId, out float g) ? g : 1f;
     }
 
     private void ChooseLiveMachines(WorldSnapshot world, Vector3 eyePos)
@@ -1398,6 +1448,9 @@ public class ClientAudioSystem
         double now = _now();
         _machineOrder.Clear();
         _machineGroups.Clear();
+        // Trees the budget left without a voice last frame are heard in their wood (WoodChorus.Weigh).
+        if (world.Woods != null) world.Woods.Weigh(eyePos, _woodWeights, _isLiveMachine ??= id => _liveMachines.Contains(id));
+        else { _woodWeights.Individual.Clear(); _woodWeights.Woods.Clear(); }
 
         // A TRAIN IS ONE MACHINE. A light-rail set is up to nine taps — one per bogie and source
         // along it, all reading one shared synth. Ranked tap by tap against every air conditioner and
@@ -1413,14 +1466,19 @@ public class ClientAudioSystem
             if (!em.IsSynth || em.SoundId == null) continue;
             if (!PhysicalLevel(em.SoundId, out float levelDb, out float extent)) continue;
             // A gutter, a drain or a downpipe with no rain running off into it is not there to be heard.
-            if (Dry(em.SoundId)) continue;
+            if (Dry(em.SoundId, entityId, em.SynthRunning, now)) continue;
+            // A tree past the hand-over is heard in its wood, and a wood with no trees in it now is not
+            // heard; ranked by what each plays (a wood's trees in power, so its amplitude by their root).
+            float chorus = ChorusShare(entityId, out float chorusTrees);
+            if (chorus <= 0f || chorusTrees <= 1e-3f) continue;
+            chorus *= MathF.Sqrt(chorusTrees);
 
             float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
             float range = MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb));
             // Ranked in loudness: the law's correction for what this machine is made of, once heard.
             gain *= MathF.Pow(10f, OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb(em.SoundId, levelDb) / 20f);
-            float level = OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume, reference, range, d);
+            float level = OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume * chorus, reference, range, d);
 
             // A water feature's taps are one fountain the same way, and come and go together.
             string group = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _)
@@ -2563,6 +2621,7 @@ public class ClientAudioSystem
         float engineExtent = def.SoundEmitter.ExtentMetres;
         // A tree or a fire: the places it is heard from across its extent (ExtendedSources).
         Vector3[]? extentLayout = null;
+        float chorusTrees = 1f;
         // The declared level the voice is placed by, for the ear model; an authored source with only a
         // volume has none.
         float earLevel = 0f;
@@ -2603,6 +2662,8 @@ public class ClientAudioSystem
                 // gets the difference back here, so it is placed by its level and not its peaks.
                 engineVolume = gain * def.SoundEmitter.Volume
                              * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
+                // A tree's share of itself, or a wood's gain (its synth renders its trees: WoodChorus).
+                engineVolume *= ChorusShare(snap.Id, out chorusTrees);
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
@@ -2763,6 +2824,7 @@ public class ClientAudioSystem
             FollowsListener = interior,
             ListenerOffset = interior ? Vector3.Transform(new Vector3(0f, -0.4f, 0.6f), snap.Transform.Rotation) : Vector3.Zero,
             PhysicalKey = physicalKey,
+            Trees = chorusTrees,
             PowerLever = powerLever,
             RotorWake = rotorWake,
             OnGround = onGround,
@@ -2786,6 +2848,7 @@ public class ClientAudioSystem
             // corner would render pure broadband skid, a white-noise tail travelling with the field.
             TyreSlip = snap.TyreDemand,
             Wheels = snap.Wheels,
+            RoadWaterMm = _roadWaterMm,
 
             // Synthesis mapping
             IsGranular = def.SoundEmitter.IsGranular,

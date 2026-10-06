@@ -2393,7 +2393,11 @@ public partial class FmodAudioProvider : IAudioProvider
             return new NaturePlaceState(shared, emitter.Place, rate, emitter.Position);
         }
         int places = ExtendedSources.Layout(emitter.PhysicalKey)?.Length ?? 1;
-        PlacedNatureVoice voice = kind == "flow"
+        PlacedNatureVoice voice = kind == "wood" && OpenFPS.Common.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
+            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(woodPreset), places, rate,
+                                    emitter.EntityId * 43 + 17, emitter.Position)
+              { WindPlaces = ExtendedSources.Layout(emitter.PhysicalKey)?[1..], TargetTrees = emitter.Trees }
+            : kind == "flow"
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.RunningWaterSpec.ByName(preset), rate,
                                     emitter.EntityId * 47 + 19, emitter.Position)
             : kind == "fire"
@@ -2865,7 +2869,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     "water" => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position, emitter),
                     // A tree or a fire is heard from places across it (ExtendedSources): its own
                     // voice is the middle, and the others read the same synth.
-                    "fire" or "foliage" or "flow" => NaturePlace(kind.ToLowerInvariant(), preset, emitter, mrate),
+                    "fire" or "foliage" or "flow" or "wood" => NaturePlace(kind.ToLowerInvariant(), preset, emitter, mrate),
                     // A patch of rain round the listener, fed by the rain survey. See RainVoiceState.
                     // The roof over the ear and the near quarters are several, each a part (RainFeeds.PartsFor).
                     "rain" => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot, out int rainPart)
@@ -2919,6 +2923,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 ServingStop = emitter.ServingStop,
                 WindowsOpen = emitter.WindowsOpen,
                 Interior = emitter.Interior,
+                RoadWaterMm = emitter.RoadWaterMm,
                 // Live: the loudness law applies to what the engine is doing now, not just to its
                 // declared level. See EngineVoiceState.CompensateLevel.
                 CompensateLevel = true,
@@ -3323,6 +3328,8 @@ public partial class FmodAudioProvider : IAudioProvider
                     {
                         // The middle of a tree or a fire carries how much of it its other places play.
                         middle.Shared.TargetSpread = emitter.Spread;
+                        // ...and a wood, how many of its trees it stands for now (WoodChorus).
+                        if (middle.Shared.WindPlaces != null) middle.Shared.TargetTrees = emitter.Trees;
                     }
                     else if (active.MachineState is WaterTapState { Place: 0 } tapMiddle)
                     {
@@ -3341,6 +3348,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     active.EngineState.WindowsOpen = emitter.WindowsOpen;
                     active.EngineState.RoadSlip = emitter.TyreSlip;
                     active.EngineState.Wheels = emitter.Wheels;
+                    active.EngineState.RoadWaterMm = emitter.RoadWaterMm;
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var local))
                         active.EngineState.SetListener(local);
                 }
