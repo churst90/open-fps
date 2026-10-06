@@ -237,6 +237,10 @@ public class MachineVoiceTests
                     Assert.True(RunningWaterSpec.Presets.ContainsKey(preset),
                         $"{Path.GetFileName(file)} names running water '{preset}', which is not a preset");
                     break;
+                case "shore":
+                    Assert.True(ShoreSpec.Presets.ContainsKey(preset),
+                        $"{Path.GetFileName(file)} names shore '{preset}', which is not a preset");
+                    break;
                 default:
                     Assert.Fail($"{Path.GetFileName(file)} names '{id}', and '{kind}:' is not a model kind "
                               + "this client knows — it will be silent.");

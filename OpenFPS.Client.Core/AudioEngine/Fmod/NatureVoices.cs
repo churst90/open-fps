@@ -286,6 +286,7 @@ public sealed class PlacedNatureVoice
     public readonly FoliageSynth? Foliage;
     public readonly FireSynth? Fire;
     public readonly RunningWaterSynth? Flow;
+    public readonly ShoreSynth? Shore;
 
     private const int RingBits = 17;
     public const int RingLength = 1 << RingBits;
@@ -319,6 +320,12 @@ public sealed class PlacedNatureVoice
     public PlacedNatureVoice(string key, RunningWaterSpec spec, float sampleRate, int seed, Vector3 position)
         : this(key, Math.Max(1, spec.Places), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f)
         => Flow = new RunningWaterSynth(spec, sampleRate, seed);
+
+    /// <summary>Waves at an edge (ShoreSynth): the source's own fetch, the way its water lies and its
+    /// length come from the map's key (ShoreSpec.KeyFor).</summary>
+    public PlacedNatureVoice(string key, ShoreSpec spec, ShoreGeometry geometry, float sampleRate, int seed, Vector3 position)
+        : this(key, spec.TotalPlaces, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 10f)
+        => Shore = new ShoreSynth(spec, sampleRate, seed, geometry);
 
     private PlacedNatureVoice(string key, int places, float sampleRate, Vector3 position, float levelDb, float headroomDb, float windHeight)
     {
@@ -357,7 +364,8 @@ public sealed class PlacedNatureVoice
                         }
                         if (Foliage != null) Foliage.NextPlaces(_out);
                         else if (Fire != null) Fire.NextPlaces(_out);
-                        else Flow!.NextPlaces(_out);
+                        else if (Flow != null) Flow.NextPlaces(_out);
+                        else Shore!.NextPlaces(_out);
                         int idx = (int)(s & Mask);
                         for (int i = 0; i < _rings.Length; i++) _rings[i][idx] = _out[i];
                     }
@@ -403,6 +411,16 @@ public sealed class PlacedNatureVoice
             Flow.Flow = spec.Tap != null ? spec.FlowNow(tapOn: Running) : Running ? spec.FlowNow() : 0f;
             Flow.RainOnWater = Runoff.RainMmPerHour;
             Flow.Control(dt);
+        }
+        else if (Shore != null)
+        {
+            // The sea follows the mean wind over the water (the synth glides it over minutes); a gust is
+            // too short to raise waves.
+            var air = WindField.Weather.At(now);
+            Shore.Spread = spread;
+            Shore.WindSpeed = Running ? air.Speed : 0f;
+            Shore.WindFromDegrees = air.FromDegrees;
+            Shore.Control(dt);
         }
     }
 }

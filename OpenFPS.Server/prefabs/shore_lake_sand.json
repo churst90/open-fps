@@ -1,0 +1,21 @@
+{
+  "Id": "shore_lake_sand",
+  "Name": "Lake beach",
+  "Description": "Waves on a lake's sandy beach (ShoreSpec.LakeSand, ShoreSynth): small spilling breakers, the swash running up the sand and soaking in with a fizz. Its box is the stretch of edge it stands for: X its length along the edge, Z the fetch, how far the water reaches straight out from it; turn the entity so its +Z faces the water. Silent in a calm. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 1,
+    "Y": 0.2,
+    "Z": 1
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "shore:lake_sand",
+  "Volume": 1.0,
+  "Range": 120,
+  "MinDistance": 1,
+  "Mode": "LoopOne"
+}

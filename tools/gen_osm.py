@@ -2486,6 +2486,77 @@ for nm, F, u0, u1, v0, v1, y0, y1 in named_places:
     obox("named_place", F, u0, u1, v0, v1, y0, y1, name=nm, layer="zones")
 
 
+# ══ Shores ════════════════════════════════════════════════════════════════════════════════════════
+#
+# Waves lapping at the edge of every pond and lake (ShoreSpec, ShoreSynth; docs/WAVES_AND_SHORES.md).
+# The edge is cut into stretches of about SHORE_STRETCH metres along the real outline, each a source
+# whose box says what the waves at it are made from: X the stretch's length along the edge, Z the
+# fetch, how far the water reaches straight out from it to the far side (the wind blowing straight
+# onshore has that much water to raise waves over), its +Z turned to the water. The client works the
+# fetch at any other wind from it, and the wind is the weather's, so a stretch on the lee side of a pond
+# is still and the one the wind blows onto laps. A swimming pool's edge is a skimmer, not a shore, and a
+# stream's water is the running water's (RunningWaterSpec). Which bank it is: what the land cover says
+# just ashore, a reed bed where WorldCover has herbaceous wetland, a grassed bank otherwise (nothing open
+# says what a pond's edge is made of). Laid after the named places so no other id moves.
+SHORE_STRETCH = 20.0
+SHORE_CLASSES = ("pond", "water", "lake", "reservoir", "basin", "lagoon")
+n_shores = 0
+
+
+def ring_ccw(ring):
+    """The ring turning anticlockwise (x east, z north), so the water is on the left of the way it runs."""
+    a = sum(ring[i - 1][0] * ring[i][1] - ring[i][0] * ring[i - 1][1] for i in range(len(ring)))
+    return list(ring) if a > 0 else list(reversed(ring))
+
+
+def fetch_across(ring, x, z, nx, nz):
+    """How far a ray from (x, z) along (nx, nz) runs inside the ring before it leaves, m."""
+    best = None
+    for i in range(len(ring)):
+        (ax, az), (bx, bz) = ring[i - 1], ring[i]
+        ex, ez = bx - ax, bz - az
+        den = nx * ez - nz * ex
+        if abs(den) < 1e-12:
+            continue
+        t = ((ax - x) * ez - (az - z) * ex) / den
+        s = ((ax - x) * nz - (az - z) * nx) / den
+        if t > 0.05 and 0.0 <= s <= 1.0 and (best is None or t < best):
+            best = t
+    return best or 1.0
+
+
+if LEVEL >= 1:
+    for wf in WATER:
+        if wf["kind"] != "area" or wf["class"] not in SHORE_CLASSES:
+            continue
+        ring = [P(a, b) for a, b in wf["ring"]]
+        if len(ring) > 1 and ring[0] == ring[-1]:
+            ring = ring[:-1]
+        if len(ring) < 3:
+            continue
+        ring = ring_ccw(ring)
+        closed = ring + [ring[0]]
+        perim = plen(closed)
+        n = max(1, int(round(perim / SHORE_STRETCH)))
+        piece = perim / n
+        nm = (wf["name"] or "Pond") + " shore"
+        for k in range(n):
+            ax, az = point_at(closed, k * piece)
+            bx, bz = point_at(closed, (k + 1) * piece)
+            mx, mz = point_at(closed, (k + 0.5) * piece)
+            a = math.atan2(bz - az, bx - ax)
+            nx, nz = -math.sin(a), math.cos(a)            # to the left: the water
+            if not in_area(mx, mz):
+                continue
+            fetch = round(fetch_across(ring, mx + 0.1 * nx, mz + 0.1 * nz, nx, nz))
+            ashore = landcover_at(mx - 5.0 * nx, mz - 5.0 * nz)
+            preset = "reed_shore" if ashore == "M" else "pond_bank"
+            e = {"EntityId": new_id(), "PrefabId": "shore_" + preset, "Position": v3(mx, Y_ROAD + 0.06, mz),
+                 "Rotation": yaw(-a), "Scale": v3(round(piece, 2), 1, max(1, fetch))}
+            _finish(e, nm, "water")
+            n_shores += 1
+
+
 # ══ Traffic ═══════════════════════════════════════════════════════════════════════════════════════
 VEHICLES = []
 if LEVEL >= 1:
@@ -2609,7 +2680,7 @@ print(f"  area {XMAX - XMIN:.0f} x {ZMAX - ZMIN:.0f} m; {len(ROADS)} roads, {len
       f"({INTERPOLATED} interpolated from Census ranges), {len(LOTS)} lots, {len(BLD)} buildings")
 print("  buildings: " + ", ".join(f"{k} {STATS[k]}" for k in ("house", "mobile_home", "premises", "church", "building", "garage", "workshop", "barn", "outbuilding", "shed")))
 print(f"  {regions} zones and rooms, {by_prefab['named_place']} named places, {STATS['doors']} outside doors, "
-      f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {len(VEHICLES)} vehicles")
+      f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {n_shores} stretches of shore, {len(VEHICLES)} vehicles")
 print("  by layer: " + ", ".join(f"{k} {v}" for k, v in sorted(COUNT.items())))
 print(f"  spawn {tuple(round(c, 2) for c in spawn)} facing {math.degrees(spawn_yaw) % 360:.0f} degrees from north, "
       f"at {SPAWN_ADDR.label if SPAWN_ADDR else 'the origin'}")
