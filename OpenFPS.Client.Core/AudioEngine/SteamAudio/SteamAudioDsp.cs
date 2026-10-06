@@ -60,6 +60,16 @@ internal sealed class SteamAudioVoiceState
     /// <summary>Where the image is, listener-relative, in Steam Audio's frame.</summary>
     public volatile float GroundDirX, GroundDirY = -1f, GroundDirZ;
 
+    /// <summary>
+    /// An equaliser on what this stage places, ahead of the HRTF and after the room's send (which leaves
+    /// the channel before any of its stages): what the HRTF does to the level at the ears in this
+    /// direction, taken back to another direction's. For the paths into a cabin (CabinPaths), which
+    /// keep the one interior voice's level and change only where they come from; see HrtfOctaves.
+    /// Null for every other voice. Swapped in whole from the game thread; its state is the stage's.
+    /// </summary>
+    public volatile OpenFPS.Client.AudioEngine.Core.Engine.OctaveEq? PreEq;
+    public readonly float[] PreEqState = OpenFPS.Client.AudioEngine.Core.Engine.OctaveEq.State();
+
     /// <summary>The sound this stage places, for the [NONFINITE] line (NonFinite); set when it is
     /// handed to a sound. Its flags: reported for its output, for its input.</summary>
     public volatile string? GuardName;
@@ -71,6 +81,7 @@ internal sealed class SteamAudioVoiceState
         if (Effect != IntPtr.Zero) Phonon.iplBinauralEffectReset(Effect);
         if (GroundEffect != IntPtr.Zero) Phonon.iplBinauralEffectReset(GroundEffect);
         Ground?.Reset();
+        Array.Clear(PreEqState);
     }
 
     // Diagnostics for the headless smoke test.
@@ -251,6 +262,13 @@ internal static class SteamAudioDsp
                     mono[i] = s * inv;
                 }
             }
+        }
+
+        // 1a. A cabin path's direction's HRTF colouring taken back to the one interior voice's.
+        if (inchannels == 1 && state.PreEq is { } pre)
+        {
+            float[] mono = state.MonoScratch, z = state.PreEqState;
+            for (int i = 0; i < n; i++) mono[i] = pre.Process(mono[i], z);
         }
 
         // 1b. The ground's answer, on a point source only (a stereo input is a bus, not a place): the

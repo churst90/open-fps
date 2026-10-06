@@ -85,6 +85,13 @@ public static class CabinPaths
     /// pressure at the ear, so every path is placed where the single voice was and only turned.</summary>
     public const float PlacedMetres = 0.72f;
 
+    /// <summary>Where the one interior voice was played from, against the head in the vehicle's frame.</summary>
+    public static readonly Vector3 OnePlace = new(0f, -0.4f, 0.6f);
+
+    /// <summary>For the lab: every path from where the one voice was (still separate streams), to tell
+    /// what the directions do from what the split does.</summary>
+    internal static bool LabOnePlace;
+
     private static readonly ConcurrentDictionary<string, Layout?> _layouts = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The paths into this vehicle's cabin, or null if it has no cabin (or the split is off).</summary>
@@ -179,6 +186,7 @@ public static class CabinPaths
     /// </summary>
     public static Vector3 Offset(Layout layout, int path, Vector3 ear)
     {
+        if (LabOnePlace) return OnePlace;
         var d = layout.Paths[path].At - ear;
         float len = d.Length();
         if (!(len > 1e-3f)) return new Vector3(0f, 0f, PlacedMetres);

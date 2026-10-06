@@ -9,6 +9,8 @@
                                           and per octave, and the difference
     cabin.py cut DIR OUT PREFIX           each scene of a game capture as its own 24-bit WAV, named
                                           PREFIX_<scene>.wav
+    cabin.py hrtf DIR                     the HRTF in each path's direction (AudioLab --cabin hrtf): the two
+                                          ears' mean power per octave, against the one interior voice's direction
     cabin.py check FILE...                every file: RMS, peak, samples at or over full scale, gaps
                                           (50 ms or more under -90 dBFS), and IACC per octave
 
@@ -120,6 +122,27 @@ def cut(d, out, prefix):
         print(os.path.join(out, name))
 
 
+def hrtf(d):
+    rows = list(csv.DictReader(open(os.path.join(d, "hrtf.csv"))))
+    gains = {}
+    for r in rows:
+        x, sr = sf.read(os.path.join(d, r["file"]), always_2d=True, dtype="float64")
+        n = 1 << 15
+        H = np.fft.rfft(x, n, axis=0)
+        f = np.fft.rfftfreq(n, 1 / sr)
+        p = (np.abs(H) ** 2).mean(axis=1)
+        o = {}
+        for fc in OCTAVES:
+            m = (f >= fc / np.sqrt(2)) & (f < fc * np.sqrt(2))
+            o[fc] = 10 * np.log10(np.mean(p[m]) + 1e-30)
+        gains[(r["vehicle"], r["seat"], r["path"])] = (r["kind"], o, (float(r["x"]), float(r["y"]), float(r["z"])))
+    print(f"{'vehicle seat path':<34} {'kind':<9} {'direction x,y,z':<20} | ears' mean power, dB re the one voice's direction  {oct_header()}")
+    for (v, seat, path), (kind, o, dirn) in gains.items():
+        ref = gains[(v, seat, "one")][1]
+        print(f"{v + ' ' + seat + ' ' + path:<34} {kind:<9} {dirn[0]:5.2f},{dirn[1]:5.2f},{dirn[2]:5.2f}    | "
+              + " ".join(f"{o[f] - ref[f]:6.2f}" for f in OCTAVES))
+
+
 def check(paths):
     print(f"{'file':<52} {'s':>5} {'rms':>6} {'peak':>6} {'clip':>5} {'gaps':>5} | IACC " + " ".join(f"{(str(f // 1000) + 'k') if f >= 1000 else f:>5}" for f in interaural.OCTAVES))
     for p in paths:
@@ -155,6 +178,8 @@ if __name__ == "__main__":
         compare(sys.argv[2], sys.argv[3])
     elif cmd == "cut":
         cut(sys.argv[2], sys.argv[3], sys.argv[4])
+    elif cmd == "hrtf":
+        hrtf(sys.argv[2])
     elif cmd == "check":
         check(sys.argv[2:])
     else:

@@ -836,6 +836,10 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// </summary>
     public volatile float CabinEarX;
 
+    /// <summary>The interior voice's send into the room you sit in (the provider's, game thread), which
+    /// its cabin taps send at too; negative until it has one.</summary>
+    public volatile float CabinRoomSend = -1f;
+
     private void EnsureCabin()
     {
         var layout = _cabinLayout!;
@@ -863,6 +867,57 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         int mask = r.Length - 1;
         float a = r[(int)(i0 & mask)], b = r[(int)((i0 + 1) & mask)];
         return Soft(a + (b - a) * f);
+    }
+
+    // Which samples of this voice went out at which time on the parent's clock: a seqlock of two copies
+    // of the time round the position, written by the mixer, read by the cabin taps.
+    private long _blockAtA = long.MinValue, _blockFrom, _blockAtB = long.MinValue;
+
+    /// <summary>For the lab: replace the cabin with a click in this voice and its negative in the first
+    /// path, to measure how the taps line up with the voice.</summary>
+    internal static bool LabAlignProbe;
+
+    /// <summary>
+    /// Where this voice's channel's own clock sits on its parent's (parent minus own), once the channel
+    /// has started; long.MinValue until then. Set from the game thread (Channel.getDSPClock).
+    /// </summary>
+    public long ChannelClockOffset { get => Volatile.Read(ref _channelClockOffset); set => Volatile.Write(ref _channelClockOffset, value); }
+    private long _channelClockOffset = long.MinValue;
+    public bool ChannelClockKnown => ChannelClockOffset != long.MinValue;
+
+    /// <summary>The mixer took the block starting at <paramref name="from"/> in a block whose channel
+    /// clock was <paramref name="clock"/>. Mixer thread.</summary>
+    internal void NoteBlock(ulong clock, long from)
+    {
+        long offset = ChannelClockOffset;
+        if (offset == long.MinValue) return;
+        long at = (long)clock + offset;
+        Volatile.Write(ref _blockAtA, at);
+        Volatile.Write(ref _blockFrom, from);
+        Volatile.Write(ref _blockAtB, at);
+    }
+
+    /// <summary>
+    /// Where in this voice's stream the sample that leaves at <paramref name="parentTime"/> on the parent's
+    /// clock is: so a tap plays the samples this voice plays at the same moment, whichever of the two
+    /// FMOD calls first and however far into a block either channel was started. A cabin path read by a
+    /// tap is part of one pressure field with the paths this voice carries (the block, the intake and the
+    /// exhaust are one engine), so it must line up sample for sample. A tap on its own clock sat 239 to
+    /// 1 024 samples away (AudioLab --cabin probe=align), and at idle that turned the cancellation
+    /// between the intake's suction and the exhaust's pressure into a sum: +6.5 dB, measured. False
+    /// until both clocks are known, and the tap keeps its own.
+    /// </summary>
+    internal bool BlockAt(long parentTime, out long position)
+    {
+        long b = Volatile.Read(ref _blockAtB);
+        long from = Volatile.Read(ref _blockFrom);
+        long a = Volatile.Read(ref _blockAtA);
+        position = 0;
+        if (a != b || a == long.MinValue) return false;
+        long delta = parentTime - a;
+        if (delta < -2 * DspCallback.MaxBlock || delta > 2 * DspCallback.MaxBlock) return false;
+        position = from + delta;
+        return true;
     }
 
     /// <summary>The cabin paths this voice still carries at sample <paramref name="j"/> (absolute),
@@ -1708,6 +1763,9 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                          + _interiorMix * insideExtras;
             pa = (pa - extras) * _levelGain + extras;
             float outSample = pa * gain * _envelope;
+            // The lab's alignment probe: a click every tenth of a second in this voice and the same
+            // click upside down in the first cabin path, nothing else. In line, they cancel.
+            if (LabAlignProbe && split) outSample = w % 4800 == 0 ? 0.25f : 0f;
             _ring[(int)(w & mask)] = outSample;
             outSum += (double)outSample * outSample;
             _front[(int)(w & mask)] = (front * _levelGain + (1f - _interiorMix) * frontExtras) * gain * _envelope;
@@ -1720,6 +1778,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                 for (int p = 1; p < _pathNow.Length && p - 1 < cabinRings.Length; p++)
                 {
                     float v = split ? (_pathNow[p] * k * _levelGain + (p == door ? doorUnlifted * k : 0f)) * ge : 0f;
+                    if (LabAlignProbe && split) v = p == 1 && w % 4800 == 0 ? -0.25f : 0f;
                     var r = cabinRings[p - 1];
                     r[(int)(w & (r.Length - 1))] = v;
                     outSum += (double)v * v;
@@ -2077,6 +2136,15 @@ public sealed class EngineTapState : IGuardedUnit
         CabinPath = cabinPath;
     }
 
+    /// <summary>Cabin path blocks read in line with the engine's own voice by the mixer clock, and
+    /// read on the tap's own clock because the two could not be lined up. For the instruments.</summary>
+    internal static long AlignedBlocks, UnalignedBlocks;
+
+    /// <summary>Where this tap's channel's own clock sits on its parent's (EngineVoiceState.ChannelClockOffset).</summary>
+    public long ChannelClockOffset { get => Volatile.Read(ref _channelClockOffset); set => Volatile.Write(ref _channelClockOffset, value); }
+    private long _channelClockOffset = long.MinValue;
+    public bool ChannelClockKnown => ChannelClockOffset != long.MinValue;
+
     /// <summary>The cabin path this tap plays (1 and up), or -1 for the machine's front outlet.</summary>
     public readonly int CabinPath = -1;
 
@@ -2091,13 +2159,35 @@ public sealed class EngineTapState : IGuardedUnit
     /// <summary>The ground between the front of the machine and the listener.</summary>
     public readonly OpenFPS.Client.AudioEngine.Acoustics.GroundReflection Ground;
 
-    public void Render(Span<float> mono)
+    public void Render(Span<float> mono) => Render(mono, long.MinValue);
+
+    /// <param name="parentTime">Where this block starts on the parent's clock (this channel's clock plus
+    /// <see cref="ChannelClockOffset"/>), or long.MinValue if not known.</param>
+    public void Render(Span<float> mono, long parentTime)
     {
         // Nothing until the engine has something to give. A tap that synthesized on demand would be
         // doing it on the mixer thread, which is the one thing the whole producer design exists to
         // prevent.
         if (!Source.Primed) { mono.Clear(); return; }
 
+        // A cabin path: the samples the engine's own voice plays at the same moment, exactly. Rider and
+        // vehicle move together, so neither channel is pitched and there is no rate to follow.
+        if (CabinPath > 0 && parentTime != long.MinValue && Source.BlockAt(parentTime, out long from))
+        {
+            Interlocked.Increment(ref AlignedBlocks);
+            float gStep = 1f / (0.06f * MathF.Max(1f, Source.SampleRate));
+            float gTo = TargetGain;
+            for (int i = 0; i < mono.Length; i++)
+            {
+                _gain += Math.Clamp(gTo - _gain, -gStep, gStep);
+                mono[i] = Source.ReadCabinAt(CabinPath, from + i) * _gain;
+            }
+            _clock.Position = from + mono.Length;
+            if (gTo <= 0f && _gain <= 1e-4f) FadedOut = true;
+            return;
+        }
+
+        if (CabinPath > 0) Interlocked.Increment(ref UnalignedBlocks);
         // In step with the voice we are the other half of, on a continuous clock: the source's own
         // rate over ours, leaning slowly on where the source has got to. It used to step up to ten
         // samples once a block toward Played, and Played moves in whole blocks when either channel is
@@ -2234,7 +2324,11 @@ public static class TapProcessor
         int ch = outchannels, n = (int)length;
         if (n > state.MixScratch.Length) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
         var mono = state.MixScratch.AsSpan(0, n);
-        try { state.Render(mono); } catch { mono.Clear(); }
+        long parentTime = long.MinValue;
+        if (state.CabinPath > 0 && state.ChannelClockOffset is long offset && offset != long.MinValue
+            && DspCallback.Clock(ref dsp_state, out ulong clock))
+            parentTime = (long)clock + offset;
+        try { state.Render(mono, parentTime); } catch { mono.Clear(); }
         unsafe
         {
             float* outBuf = (float*)outbuffer;
@@ -2409,8 +2503,12 @@ public static class EngineProcessor
         int n = (int)length;
         if (n > state.MixScratch.Length) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
         var mono = state.MixScratch.AsSpan(0, n);
+        // Which samples went out when, for the cabin's taps (EngineVoiceState.BlockAt).
+        long from = state.Played;
         try { state.Consume(mono); }
         catch { mono.Clear(); }
+        if (state.CabinLayout != null && state.ChannelClockKnown && DspCallback.Clock(ref dsp_state, out ulong clock))
+            state.NoteBlock(clock, from);
 
         unsafe
         {

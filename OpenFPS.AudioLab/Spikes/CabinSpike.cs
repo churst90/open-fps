@@ -24,8 +24,9 @@ namespace OpenFPS.AudioLab.Spikes;
 ///
 ///   --cabin game out=DIR [paths=on|off] [set=all|car|bus|police] [sec=10]
 ///        the game's own path: ClientAudioSystem over the FMOD provider, the HRTF, the ear model, the
-///        loudness law, the cabin's traced reverberation (TracedReverbSet.RideIn over a street of open
-///        ground), the rain when it rains. The listener sits where the server seats them
+///        loudness law, the cabin's traced reverberation (TracedReverbSet.RideIn; the vehicle's room,
+///        a trigger moving with it, as the server sends a vehicle shell's), on a street between brick
+///        facades 15 m tall, the rain when it rains. The listener sits where the server seats them
 ///        (VehicleShell's rows: the driver on the left of the front row), the vehicle drives along a
 ///        straight road with its wheels as the server sends them. Captured from the master in float
 ///        (DIR/capture.post.wav) with DIR/segments.csv, for tools/interaural.py segments and
@@ -38,13 +39,24 @@ namespace OpenFPS.AudioLab.Spikes;
 public static class CabinSpike
 {
     private const int Rate = 48000;
+    /// <summary>The street of the rides: brick facades 15 m tall either side, this far off the crown
+    /// (a 7 m road and a 4.5 m pavement each side), so the late field round the car is a street's, as on
+    /// the city, and not open ground's.</summary>
+    private const float FacadeZ = 8f;
     private static readonly byte Asphalt = RoadSurfaces.IndexOf("Asphalt");
 
     public static int Run(string[] args)
     {
         AcousticRegistry.Initialize();
         if (Arg(args, "paths=") is "off" or "0") CabinPaths.Enabled = false;
+        // place=one: the paths split, every one played from where the one voice was.
+        if (Arg(args, "place=") is "one") CabinPaths.LabOnePlace = true;
+        // cabin=DB: the cabin's traced response against its physical level, as /cabin sets it (-80: none).
+        if (Arg(args, "cabin=") is { } cabinDb) FmodAudioProvider.CabinDb = float.Parse(cabinDb, CultureInfo.InvariantCulture);
+        // probe=align: a click in the engine's voice and its negative in the exhaust's tap (EngineVoiceState.LabAlignProbe).
+        if (Arg(args, "probe=") is "align") EngineVoiceState.LabAlignProbe = true;
         if (args.Contains("model")) return Model(args);
+        if (args.Contains("hrtf")) return Hrtf(args);
         return Game(args);
     }
 
@@ -118,6 +130,72 @@ public static class CabinSpike
         return 0;
     }
 
+    // ── The HRTF in each path's direction ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// --cabin hrtf out=DIR: Steam Audio's HRTF (as the game makes it) in the direction of every path
+    /// into the cabin from each seat of the renders, and in the one interior voice's: an impulse response
+    /// per direction (stereo float WAV) and hrtf.csv, for tools/cabin.py hrtf. What the directions do to
+    /// the level at the ears, apart from everything else.
+    /// </summary>
+    private static int Hrtf(string[] args)
+    {
+        string outDir = Arg(args, "out=") ?? "/tmp/openfps-cabin-hrtf";
+        Directory.CreateDirectory(outDir);
+        const int Block = 1024, Blocks = 4;
+        var cs = Phonon.DefaultContextSettings();
+        if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
+        var au = new Phonon.IPLAudioSettings { samplingRate = Rate, frameSize = Block };
+        var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
+        Phonon.iplHRTFCreate(ctx, ref au, ref hs, out IntPtr hrtf);
+        var csv = new StringBuilder("file,vehicle,seat,path,kind,x,y,z\n");
+        void One(string vehicle, string seat, string path, string kind, Vector3 dir)
+        {
+            var es = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
+            Phonon.iplBinauralEffectCreate(ctx, ref au, ref es, out IntPtr effect);
+            var inBuf = new Phonon.IPLAudioBuffer(); var outBuf = new Phonon.IPLAudioBuffer();
+            Phonon.iplAudioBufferAllocate(ctx, 1, Block, ref inBuf);
+            Phonon.iplAudioBufferAllocate(ctx, 2, Block, ref outBuf);
+            var mono = new float[Block]; var stereo = new float[Block * 2];
+            var all = new List<float>();
+            // Steam Audio's frame: x right, y up, z BACK (the game's z forward, negated).
+            var d = Vector3.Normalize(dir);
+            for (int b = 0; b < Blocks; b++)
+            {
+                Array.Clear(mono);
+                if (b == 0) mono[0] = 1f;
+                Phonon.iplAudioBufferDeinterleave(ctx, mono, ref inBuf);
+                var prm = new Phonon.IPLBinauralEffectParams
+                {
+                    direction = new Phonon.IPLVector3 { x = d.X, y = d.Y, z = -d.Z }, interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR,
+                    spatialBlend = 1f, hrtf = hrtf, peakDelays = IntPtr.Zero,
+                };
+                Phonon.iplBinauralEffectApply(effect, ref prm, ref inBuf, ref outBuf);
+                Phonon.iplAudioBufferInterleave(ctx, ref outBuf, stereo);
+                all.AddRange(stereo);
+            }
+            Phonon.iplAudioBufferFree(ctx, ref inBuf); Phonon.iplAudioBufferFree(ctx, ref outBuf);
+            Phonon.iplBinauralEffectRelease(ref effect);
+            string file = $"hrtf_{vehicle}_{seat}_{path}.wav";
+            RunningWaterSpike.WriteFloatWav(Path.Combine(outDir, file), all.ToArray(), 2);
+            csv.Append(CultureInfo.InvariantCulture, $"{file},{vehicle},{seat},{path},{kind},{d.X:F3},{d.Y:F3},{d.Z:F3}\n");
+        }
+        foreach (var (key, seatName) in new[] { ("i4_economy", "driver"), ("transit_bus", "middle"), ("police_interceptor", "driver") })
+        {
+            var v = MachineRegistry.VehicleFor(key);
+            var layout = CabinPaths.Build(v);
+            if (layout == null) continue;
+            var ear = Seat(v, seatName) + new Vector3(0f, 1.0f, 0f);
+            One(key, seatName, "one", "OnePlace", CabinPaths.OnePlace);
+            for (int k = 0; k < layout.Count; k++)
+                One(key, seatName, k.ToString(CultureInfo.InvariantCulture), layout.Paths[k].Kind.ToString(), CabinPaths.Offset(layout, k, ear));
+        }
+        File.WriteAllText(Path.Combine(outDir, "hrtf.csv"), csv.ToString());
+        Phonon.iplHRTFRelease(ref hrtf); Phonon.iplContextRelease(ref ctx);
+        Console.WriteLine($"tools/cabin.py hrtf {outDir}");
+        return 0;
+    }
+
     // ── Through the game ────────────────────────────────────────────────────────────────────────
 
     private sealed record Segment(string Name, double Start, double Seconds, string Note);
@@ -139,7 +217,12 @@ public static class CabinSpike
         var cs = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var scene = new SteamAudioScene(ctx);
-        scene.Build(new List<SteamAudioScene.Box> { new(new Vector3(0f, -0.5f, 0f), new Vector3(1200f, 1f, 1200f), Quaternion.Identity, "Asphalt") });
+        scene.Build(new List<SteamAudioScene.Box>
+        {
+            new(new Vector3(0f, -0.5f, 0f), new Vector3(1200f, 1f, 1200f), Quaternion.Identity, "Asphalt"),
+            new(new Vector3(0f, 7.5f, FacadeZ), new Vector3(900f, 15f, 0.4f), Quaternion.Identity, "Brick"),
+            new(new Vector3(0f, 7.5f, -FacadeZ), new Vector3(900f, 15f, 0.4f), Quaternion.Identity, "Brick"),
+        });
         TracedReverbSet.Configure(ctx, scene);
 
         var provider = new FmodAudioProvider();
@@ -148,11 +231,13 @@ public static class CabinSpike
         facade.InitializeForTest(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         provider.EarWindEnabled = false;
-        provider.SetAcousticMap(new AcousticMap(new Vector3(1200, 100, 1200), new Vector3(-600, -10, -600)) { GlobalEnvironmentId = AcousticConstants.GlobalRegionId });
         var clock = System.Diagnostics.Stopwatch.StartNew();
 
         var world = new ClientWorldState();
         world.Clear(new Vector3(4000, 400, 4000));
+        // The street's acoustic map: open ground, and whatever rooms arrive (the cabin of the vehicle
+        // ridden, as the server sends a composite's room: CompositeService.RefreshRoom).
+        world.SetAcousticMap(new AcousticMap(new Vector3(1200, 100, 1200), new Vector3(-600, -10, -600)) { GlobalEnvironmentId = AcousticConstants.GlobalRegionId });
         var player = new LocalPlayerState();
         var mapping = new SoundMappingService(player);
         mapping.Initialize(sounds);
@@ -165,6 +250,15 @@ public static class CabinSpike
             Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(1200f, 1f, 1200f), IsSolid = true },
             Material = new MaterialComponent { Material = "Asphalt" },
         });
+        foreach (float side in new[] { -1f, 1f })
+            world.RegisterDefinition(new EntityDefinition
+            {
+                EntityId = side < 0 ? 2 : 3,
+                Type = EntityType.StaticObject,
+                Transform = new Transform { Position = new Vector3(0f, 7.5f, side * FacadeZ), Rotation = Quaternion.Identity, Scale = Vector3.One },
+                Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(900f, 15f, 0.4f), IsSolid = true },
+                Material = new MaterialComponent { Material = "Brick" },
+            });
         WindField.Weather = WindWeather.Steady(0f, 250f, 0f);
 
         var segments = new List<Segment>();
@@ -189,7 +283,8 @@ public static class CabinSpike
             Pump(seconds);
             segments.Add(new Segment(name, start, seconds, note));
             Console.WriteLine($"  {start,7:F2} s  {name} ({seconds:F1} s)  {note}");
-            Console.WriteLine($"           cabin trace {(TracedReverbSet.Cabin != null ? "ready" : "none")}, listener trace {(TracedReverbSet.Listener != null ? "ready" : "none")}, HRTF voices free {provider.SpatialVoicesFree}");
+            Console.WriteLine($"           cabin trace {(TracedReverbSet.Cabin != null ? "ready" : "none")}, listener trace {(TracedReverbSet.Listener != null ? "ready" : "none")}, HRTF voices free {provider.SpatialVoicesFree}, "
+                              + $"cabin tap blocks in line {EngineTapState.AlignedBlocks} / on their own clock {EngineTapState.UnalignedBlocks}");
         }
         void Weather(float rain, RoadWater road)
         {
@@ -218,6 +313,9 @@ public static class CabinSpike
             {
                 EntityId = id, Type = EntityType.NPC, Moves = true,
                 Transform = new Transform { Position = new Vector3(-300f, 0f, -1.75f), Rotation = heading },
+                // Its hull, as the server sends it (VehicleSystem): the rain survey finds its roof by it.
+                Collider = new ColliderComponent { Shape = ColliderShape.Box, IsSolid = true,
+                                                   Size = new Vector3(profile.WidthMetres, profile.HeightMetres, profile.LengthMetres) },
             };
             def.SoundEmitter = new SoundEmitterComponent();
             def.SoundEmitter.IsSynth = true;
@@ -234,6 +332,31 @@ public static class CabinSpike
             world.RemoveEntities(new[] { id });
             audio.ForgetEntity(id);
         }
+        // The vehicle's room, as the server makes it for a vehicle shell (VehicleShell.TryCabin): the cabin
+        // box, a trigger that moves with the vehicle. Floor and roof its lining, the sides glass.
+        int AddRoom(VehicleProfile v, out Vector3 centre)
+        {
+            centre = Vector3.Zero;
+            if (VehicleCabin.Measure(v) is not { } g) return -1;
+            centre = new Vector3(0f, g.FloorTop + g.Hc * 0.5f, g.Cz);
+            var size = new Vector3(g.Wc, g.Hc, g.Lc);
+            var body = v.Body ?? VehicleBody.Saloon;
+            int I(string m) => AcousticRegistry.TryGetResonanceIndex(m, out int k) ? k : 0;
+            string lining = VehicleCabin.MaterialOf(body.CabinAbsorption >= 0.25f ? VehicleCabin.Carpet : VehicleCabin.Steel);
+            int id = nextId++;
+            world.RegisterDefinition(new EntityDefinition
+            {
+                EntityId = id, Type = EntityType.Trigger, Moves = true,
+                Transform = new Transform { Position = new Vector3(-300f, 0f, -1.75f) + Vector3.Transform(centre, heading), Rotation = heading, Scale = Vector3.One },
+                Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = size, IsSolid = false },
+                Region = new RegionComponent
+                {
+                    FriendlyName = v.Name, IsIndoor = true, RoomSize = size, ReverbTimeScale = 1f,
+                    Materials = new[] { I(lining), I(lining), I("Glass"), I("Glass"), I("Glass"), I("Glass") },
+                },
+            });
+            return id;
+        }
         string SeatNote(VehicleProfile v, Vector3 seat) => $"seat ({seat.X:F2}, {seat.Y:F2}, {seat.Z:F2}) m in the {v.Name}'s frame, ear 1.0 m above it";
 
         // A ride: the vehicle along the lane at the speed the profile gives for each moment, the
@@ -243,6 +366,7 @@ public static class CabinSpike
             var v = MachineRegistry.VehicleFor(preset);
             var rig = new Rig(v);
             int id = AddCar(preset);
+            int room = AddRoom(v, out var roomCentre);
             var seat = Seat(v, seatName);
             double t0 = clock.Elapsed.TotalSeconds;
             double lastT = t0;
@@ -257,11 +381,19 @@ public static class CabinSpike
                 lastSpeed = sp;
                 x += sp * dt;
                 var at = new Vector3(x, 0f, -1.75f);
-                world.SyncState(new[] { new EntityState
+                var states = new List<EntityState> { new EntityState
                 {
                     EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = at, Rotation = heading }),
                     LinearVelocity = new Vector3(sp, 0f, 0f), Wheels = rig.Wire(sp, accel, waterMm),
-                } });
+                } };
+                if (room >= 0)
+                    states.Add(new EntityState
+                    {
+                        EntityId = room,
+                        Transform = QuantizedTransform.FromTransform(new Transform { Position = at + Vector3.Transform(roomCentre, heading), Rotation = heading, Scale = Vector3.One }),
+                        LinearVelocity = new Vector3(sp, 0f, 0f),
+                    });
+                world.SyncState(states.ToArray());
                 player.Position = at + Vector3.Transform(seat, heading);
                 player.Yaw = MathF.PI / 2f;
                 player.Rotation = heading;
@@ -272,6 +404,7 @@ public static class CabinSpike
             perFrame = null;
             player.RidingEntityId = -1;
             Remove(id);
+            if (room >= 0) Remove(room);
             Pump(1.5);
         }
 

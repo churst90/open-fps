@@ -83,6 +83,34 @@ internal static class DspCallback
     [ThreadStatic] private static IntPtr _cachedTable;
     [ThreadStatic] private static FMOD.DSP_GETUSERDATA_FUNC? _cachedGet;
 
+    [ThreadStatic] private static IntPtr _cachedClockTable;
+    [ThreadStatic] private static FMOD.DSP_GETCLOCK_FUNC? _cachedClock;
+
+    /// <summary>
+    /// The clock of the block this callback is rendering, through the callback's own function table (as
+    /// <see cref="UserData"/>, and for the same reason). It is the CHANNEL's clock, counted from when that
+    /// channel started, not the mixer's: two channels started a frame apart disagree by however far apart
+    /// they started, and FMOD starts a channel part way into a block, so the gap is any number of samples
+    /// (AudioLab --cabin probe=align: 239 one run, 785 another). Add the channel's offset to its parent's
+    /// clock (Channel.getDSPClock, game thread) to put two channels on one time line.
+    /// </summary>
+    public static bool Clock(ref FMOD.DSP_STATE state, out ulong clock)
+    {
+        clock = 0;
+        IntPtr table = state.functionsPtr;
+        if (table == IntPtr.Zero) return false;
+        if (table != _cachedClockTable || _cachedClock == null)
+        {
+            var fns = System.Runtime.InteropServices.Marshal
+                .PtrToStructure<FMOD.DSP_STATE_FUNCTIONS>(table);
+            _cachedClock = fns.getclock;
+            _cachedClockTable = table;
+        }
+        var get = _cachedClock;
+        if (get == null) return false;
+        return get(ref state, out clock, out _, out _) == FMOD.RESULT.OK;
+    }
+
     public static IntPtr UserData(ref FMOD.DSP_STATE state)
     {
         IntPtr table = state.functionsPtr;
