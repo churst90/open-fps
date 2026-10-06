@@ -187,6 +187,7 @@ public sealed class RainSynth
         _rate = sampleRate;
         _sum = new EventSum(sampleRate, seed);
         for (int i = 0; i < MaxPlates; i++) _plates[i] = new PlateState();
+        InitSpray();
     }
 
     /// <summary>The next sample: pressure at the listener times the patch's reference distance, Pa.</summary>
@@ -201,7 +202,7 @@ public sealed class RainSynth
         int c = (int)(_clickNow++ & (ClickRing - 1));
         float click = _clicks[c];
         _clicks[c] = 0f;
-        return _sum.Next() + _plateOut[_blockAt++] + click;
+        return _sum.Next() + _plateOut[_blockAt++] + click + NextSpray(c);
     }
 
     private void Schedule()
@@ -574,8 +575,9 @@ public sealed class RainSynth
     /// A drop's click on something solid, at the listener.
     ///
     /// The air hears the rate of change of the drop's push on it: a dipole at a rigid boundary
-    /// radiates dF/dt. It has the blow's shape (RainPlate.BlowShape: √t to its peak, then its fall),
-    /// but not the blow's length. What moves the air is the drop's water going from a falling sphere
+    /// radiates dF/dt. It has the blow's peak and fall (RainPlate.BlowShape), but rises smoothly
+    /// (sin², texture round 2: on a wet surface the drop meets the film first; the dry wall's √t had
+    /// an infinite slope at first contact, a one-sample spike), and not the blow's length. What moves the air is the drop's water going from a falling sphere
     /// to a sheet spreading over the wet ground, and that takes the spreading time, about 8/3 D / v
     /// (RainSurfaces.SplashSeconds) — two and a half times the time the drop takes to stop. So the
     /// click rises to a broad top near 1 / (2π · 0.2 · 8/3 D / v), 0.5-1.5 kHz for the drops that carry
@@ -596,7 +598,125 @@ public sealed class RainSynth
     {
         if (spikePascals <= 0f || ClickPart <= 0f) return;
         float energy = spikePascals * spikePascals * ImpactRise * 1.7724539f / (stretch * stretch * stretch);
-        ClickEnergy(at, RainSurfaces.SplashSeconds(d, v) * stretch * _rate, energy);
+        ClickEnergy(at, RainSurfaces.SplashSeconds(d, v) * stretch * _rate, energy * (1f - SprayShare));
+        Spray(at, energy * SprayShare);
+    }
+
+    // ── The spray (texture round 2, 2026-10-06) ──────────────────────────────────────────────────
+    //
+    // Rain round 1's street measured right on its band envelopes but wrong INSIDE them: its 4-16 kHz
+    // waveform had a kurtosis of 9-10 in 10 ms windows (moderate) where every recording of rain is
+    // 3.0-4.4, a few needle-sharp clicks in each window, which Cody heard as "low bit rate, crunchy".
+    // The click was the force on a dry wall, F ∝ √t to its peak, whose slope is infinite at first
+    // contact: a single-sample spike carrying the whole top end. Two things a wet surface does
+    // instead:
+    //   * The drop meets the water film first, and the force on the ground builds as the film is
+    //     driven out from under it, over a good part of the time to its peak (Gordillo, Sun and Cheng
+    //     2018, J. Fluid Mech. 840, 190-214 and Mitchell et al. 2019, J. Fluid Mech. 867, 300-322: the
+    //     force peaks near 0.2 D / v and its rise is set by the spreading sheet, not a point). So the
+    //     click's force rises smoothly (ClickShape) and its spectrum falls 12 dB an octave above a few
+    //     kilohertz.
+    //   * What a listener hears above that is the splash: a crown off the film that throws secondary
+    //     droplets, which land round it over the next milliseconds, and the micro-bubbles of the film
+    //     bursting (Cossali, Coghe and Marengo 1997; Okawa, Shiraishi and Mori 2006: the ejected
+    //     droplets are a tenth of the drop and smaller, tens to hundreds of them). Each is a tiny
+    //     event; together, per drop, a short burst of noise in the top octaves. Rendered as one noise
+    //     per voice whose power follows the sum of every drop's spray: a burst rising over a
+    //     millisecond and dying over a few.
+    //
+    // FITTED 2026-10-06 against the rain recordings (both the 10 ms waveform and the envelope
+    // statistics, and the octave balance round 1 matched): the spray's share of a drop's impact
+    // energy, its band, and how long it lasts.
+
+    /// <summary>The share of a drop's impact energy heard as its spray rather than its click. Fitted on
+    /// the street at 5 mm/h: with none, the smooth click alone is already a wash in 10 ms (kurtosis 3.6)
+    /// but 4-5 dB dull at 8-16 kHz; at 0.35 the top octaves stood 4-7 dB over round 1's balance; 0.15
+    /// puts 8 kHz at -11.6 dB and 16 kHz at -20 dB under 1 kHz (round 1 -13 and -22; recordings -1 to
+    /// -25 and -15 to -33).</summary>
+    public const float SprayShare = 0.15f;
+    /// <summary>The spray's band, Hz: secondary droplets of 0.05-0.3 mm striking the film and the
+    /// bubbles they and the crown leave bursting.</summary>
+    public const float SprayLowHz = 2500f, SprayHighHz = 14000f;
+    /// <summary>How fast a drop's spray rises and how long it lasts, s (time constants).</summary>
+    public const float SprayRiseSeconds = 0.001f, SprayDecaySeconds = 0.005f;
+
+    private readonly float[] _sprayDrive = new float[ClickRing];
+    private float _sprayQ1, _sprayQ2;
+    private float _sprayA1, _sprayA2;
+    private Biquad _sprayHp1, _sprayHp2, _sprayLp1, _sprayLp2;
+    private float _sprayNorm;
+
+    private void InitSpray()
+    {
+        _sprayA1 = MathF.Exp(-1f / (SprayRiseSeconds * _rate));
+        _sprayA2 = MathF.Exp(-1f / (SprayDecaySeconds * _rate));
+        float hi = MathF.Min(SprayHighHz, 0.45f * _rate);
+        _sprayHp1 = Biquad.HighPass(SprayLowHz, _rate); _sprayHp2 = _sprayHp1;
+        _sprayLp1 = Biquad.LowPass(hi, _rate); _sprayLp2 = _sprayLp1;
+        _sprayNorm = SprayNorm(_rate);
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<float, float> SprayNorms = new();
+
+    /// <summary>1 / the rms the spray's band passes of unit-variance white noise, measured once a rate.</summary>
+    private static float SprayNorm(float rate) => SprayNorms.GetOrAdd(rate, r =>
+    {
+        float hi = MathF.Min(SprayHighHz, 0.45f * r);
+        Biquad h1 = Biquad.HighPass(SprayLowHz, r), h2 = h1, l1 = Biquad.LowPass(hi, r), l2 = l1;
+        var rng = new Random(5);
+        double e = 0;
+        int n = (int)r;
+        for (int i = 0; i < n; i++)
+        {
+            float x = (float)(rng.NextDouble() * 2 - 1) * 1.7320508f;
+            float y = l2.Process(l1.Process(h2.Process(h1.Process(x))));
+            e += y * (double)y;
+        }
+        return (float)(1.0 / Math.Sqrt(e / n));
+    });
+
+    /// <summary>A drop's spray, this much energy (Pa²·s at the ear), starting at <paramref name="at"/>.</summary>
+    private void Spray(int at, float energy)
+    {
+        if (!(energy > 0f) || ClickPart <= 0f) return;
+        if (at < 0 || at >= ClickRing - Block) return;
+        _sprayDrive[(int)((_clickNow + at + 1) & (ClickRing - 1))] += energy * (1f - _sprayA1);
+    }
+
+    /// <summary>The spray's next sample: band noise at the power the drops' sprays add to now.</summary>
+    private float NextSpray(int index)
+    {
+        float drive = _sprayDrive[index];
+        _sprayDrive[index] = 0f;
+        _sprayQ1 = _sprayA1 * _sprayQ1 + drive;
+        _sprayQ2 = _sprayA2 * _sprayQ2 + (1f - _sprayA2) * _sprayQ1;
+        if (_sprayQ2 < 1e-30f) { _sprayQ2 = 0f; if (_sprayQ1 < 1e-30f) _sprayQ1 = 0f; }
+        float w = _sprayLp2.Process(_sprayLp1.Process(_sprayHp2.Process(_sprayHp1.Process(_sum.Signed() * 1.7320508f))));
+        return MathF.Sqrt(_sprayQ2 * _rate) * _sprayNorm * w;
+    }
+
+    /// <summary>A second-order section (RBJ), Butterworth Q.</summary>
+    private struct Biquad
+    {
+        private float _b0, _b1, _b2, _a1, _a2, _x1, _x2, _y1, _y2;
+
+        public static Biquad LowPass(float hz, float rate) => Make(hz, rate, low: true);
+        public static Biquad HighPass(float hz, float rate) => Make(hz, rate, low: false);
+
+        private static Biquad Make(float hz, float rate, bool low)
+        {
+            float w = MathF.Tau * hz / rate, c = MathF.Cos(w), alpha = MathF.Sin(w) / (2f * 0.7071f);
+            float a0 = 1f + alpha;
+            float b0 = low ? (1f - c) / 2f : (1f + c) / 2f, b1 = low ? 1f - c : -(1f + c);
+            return new Biquad { _b0 = b0 / a0, _b1 = b1 / a0, _b2 = b0 / a0, _a1 = -2f * c / a0, _a2 = (1f - alpha) / a0 };
+        }
+
+        public float Process(float x)
+        {
+            float y = _b0 * x + _b1 * _x1 + _b2 * _x2 - _a1 * _y1 - _a2 * _y2;
+            _x2 = _x1; _x1 = x; _y2 = _y1; _y1 = y;
+            return y;
+        }
     }
 
     /// <summary>A click of this time scale (samples) carrying this energy (Pa²·s at the ear).</summary>
@@ -631,7 +751,10 @@ public sealed class RainSynth
         for (int i = 0; i < length; i++)
         {
             float t = i + 1;
-            float g = t < peakAt ? MathF.Sqrt(t / peakAt) : MathF.Exp(-(t - peakAt) / (RainPlate.BlowFall * tau));
+            // The force builds smoothly to its peak (sin², no corner at either end) rather than as the
+            // dry-wall √t, whose slope is infinite at first contact: see Click.
+            float s = MathF.Sin(0.5f * MathF.PI * MathF.Min(1f, t / peakAt));
+            float g = t < peakAt ? s * s : MathF.Exp(-(t - peakAt) / (RainPlate.BlowFall * tau));
             raw[i] = g - prev;
             prev = g;
         }

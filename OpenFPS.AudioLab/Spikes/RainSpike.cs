@@ -60,6 +60,7 @@ public static class RainSpike
             }
             return 0;
         }
+        _near = args.FirstOrDefault(a => a.StartsWith("near=", StringComparison.Ordinal))?[5..] ?? "on";
         if (args.Contains("physics")) return Physics();
         if (args.Contains("resolve")) return Resolve(Arg(args, "sec=", 10f));
         if (args.Contains("live")) return Live(Arg(args, "sec=", 10f));
@@ -175,6 +176,10 @@ public static class RainSpike
         var impacts = new List<NearDrops.Impact>();
         var bank = new DropBank();
         near.Plan(survey, fall, ear, -10.0, 0f, impacts, bank);
+        // Each patch's level as its voice measures it: the near drops of that patch are placed in its
+        // loudness frame (DropBank.Placement), as the game places them.
+        var slotLevel = new float[survey.Patches.Length];
+        Array.Fill(slotLevel, float.NaN);
         for (int s = 0; s < survey.Patches.Length; s++)
         {
             var patch = survey.Patches[s];
@@ -193,6 +198,8 @@ public static class RainSpike
             // What the game plays it at: the voice measures this level and the loudness law places it.
             double raw = 0; foreach (float v in x) raw += v * (double)v;
             double rawRms = Math.Sqrt(raw / n);
+            slotLevel[s] = rawRms > 0 ? (float)(20 * Math.Log10(rawRms * patch.ReferenceDistance / 20e-6)) : float.NaN;
+            if (_near == "only") continue;
             float toGame = rawRms > 0 ? (float)(Math.Pow(10, GameDb(rawRms, patch.ReferenceDistance) / 20) / rawRms) : 0f;
             // The path: three bands as the mixer's THREE_EQ takes them, and the air.
             (float lo, float mid, float hi) eq = s == RainSurvey.OverheadSlot ? survey.OverheadEq : (1f, 1f, 1f);
@@ -241,13 +248,13 @@ public static class RainSpike
         {
             var sound = bank.Get(impact, variant++ % DropBank.Variants)!;
             int start = (int)((impact.At - 1.0) * Rate);
-            if (start < 0 || start >= n) continue;
+            if (start < 0 || start >= n || _near == "off") continue;
             r.NearImpacts++;
             float dist = MathF.Max(0.1f, Vector3.Distance(impact.Position, ear));
             float aim = (ear.Y - impact.Position.Y) / dist;
             float level = DropBank.LevelDb(sound, impact, aim);
             float pascalsAtEar = 20e-6f * MathF.Pow(10f, level / 20f) / dist;
-            var (gain, reference) = Loudness.Place(level);
+            var (gain, reference) = DropBank.Placement(level, impact.Slot >= 0 && impact.Slot < slotLevel.Length ? slotLevel[impact.Slot] : float.NaN);
             // Through the roof's EQ (a car's headliner), or through the shell of the car the listener sits in.
             bool overhead = impact.FromBelow && impact.Slot == RainSurvey.OverheadSlot;
             var bands = overhead ? survey.OverheadEq : (1f, 1f, 1f);
@@ -611,6 +618,10 @@ public static class RainSpike
 
     /// <summary>The entity the scene's listener sits in, or -1.</summary>
     private static int _riding = -1;
+
+    /// <summary>near=off renders the patches alone, near=only the near drops alone: to tell which of
+    /// the two a fault is in.</summary>
+    private static string _near = "on";
 
     /// <summary>What the shell of the car the listener sits in takes off everything outside it, dB per band.</summary>
     private static (float Low, float Mid, float High) _cabinDb;
