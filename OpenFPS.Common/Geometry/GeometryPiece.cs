@@ -45,9 +45,10 @@ public struct SolidRecord
     public int TriStart, TriCount;
     public int PlaneStart, PlaneCount;
     public bool Convex, Closed;
-    /// <summary>How big it is (its box's volume, or its bounds'): of two surfaces in the same place, the
-    /// smaller thing's is the one met (a path laid flush on the ground is the path).</summary>
-    public float Volume;
+    /// <summary>How much ground it covers (its box's width by depth, or its bounds'): of two surfaces in
+    /// the same place, the smaller patch is the one met (a path laid flush on the ground is the path, and
+    /// a map's own ground beats the bigger foundation the loader lays under it).</summary>
+    public float Footprint;
     /// <summary>The box this solid is, in the piece's frame: centre, size and turn. Size zero when the
     /// solid is not a box.</summary>
     public Vector3 BoxCentre, BoxSize;
@@ -203,7 +204,7 @@ public sealed class GeometryPiece
             rec.TriCount = t - rec.TriStart;
             rec.Min = lo; rec.Max = hi;
             var extent = s.Mesh == null ? s.BoxSize : hi - lo;
-            rec.Volume = extent.X * extent.Y * extent.Z;
+            rec.Footprint = extent.X * extent.Z;
             rec.PlaneStart = planes.Count;
             if (rec.Convex && rec.Closed) AddPlanes(tris, rec.TriStart, rec.TriCount, planes);
             rec.PlaneCount = planes.Count - rec.PlaneStart;
@@ -316,9 +317,9 @@ public sealed class GeometryPiece
                     int owner = ownerOverride >= 0 ? ownerOverride : rec.Owner;
                     // Within a hair of the best so far is the same place (two faces laid flush, worked out
                     // from different triangles): the tie rule decides, not the rounding.
-                    if (t >= best - slack && !tie.Beats(rec.Volume, owner)) continue;
+                    if (t >= best - slack && !tie.Beats(rec.Footprint, owner)) continue;
                     if (!filter.Accept(owner, surface)) continue;
-                    best = t; tie = new Ties(rec.Volume, owner); triangle = i; front = f;
+                    best = t; tie = new Ties(rec.Footprint, owner); triangle = i; front = f;
                 }
                 continue;
             }
@@ -559,18 +560,18 @@ public static class PieceColumns
 }
 
 /// <summary>
-/// Which of two surfaces met at exactly the same distance counts: the smaller solid's, then the lower
-/// owner's. Two surfaces in the same place are a thing laid flush on another (a drive on the ground, a
-/// rug on a floor), and the thing laid on is the smaller. The box path took whichever its list had first,
+/// Which of two surfaces met at the same distance counts: the one whose solid covers less ground, then the
+/// lower owner's. Two surfaces in the same place are a thing laid flush on another (a drive on the ground,
+/// a rug on a floor), and the thing laid on is the smaller patch. The box path took whichever its list had first,
 /// which was not the same on the server and the client.
 /// </summary>
 public readonly struct Ties
 {
-    public readonly float Volume;
+    public readonly float Footprint;
     public readonly int Owner;
-    public Ties(float volume, int owner) { Volume = volume; Owner = owner; }
+    public Ties(float footprint, int owner) { Footprint = footprint; Owner = owner; }
     public static Ties None => new(float.MaxValue, int.MaxValue);
-    public bool Beats(float volume, int owner) => volume < Volume || (volume == Volume && owner < Owner);
+    public bool Beats(float footprint, int owner) => footprint < Footprint || (footprint == Footprint && owner < Owner);
 }
 
 /// <summary>A solid in a world: which instance (a tile's piece, or a door leaf) and which solid in it.</summary>

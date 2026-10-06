@@ -238,7 +238,7 @@ public sealed class TriangleWorld
     }
 
     /// <summary>How big a solid is (Ties).</summary>
-    public float VolumeOf(SolidRef s) => _instances[s.Instance].Piece.Solids[s.Solid].Volume;
+    public float FootprintOf(SolidRef s) => _instances[s.Instance].Piece.Solids[s.Solid].Footprint;
 
     /// <summary>How many triangles a solid has.</summary>
     public int TriangleCountOf(SolidRef s) => _instances[s.Instance].Piece.Solids[s.Solid].TriCount;
@@ -340,11 +340,11 @@ public sealed class TriangleWorld
             // whatever order they met them in.
             var pick = inside[0];
             int owner = OwnerOf(pick);
-            var tie = new Ties(VolumeOf(pick), owner);
+            var tie = new Ties(FootprintOf(pick), owner);
             for (int i = 1; i < inside.Count; i++)
             {
                 int other = OwnerOf(inside[i]);
-                float volume = VolumeOf(inside[i]);
+                float volume = FootprintOf(inside[i]);
                 if (tie.Beats(volume, other)) { owner = other; pick = inside[i]; tie = new Ties(volume, other); }
             }
             // Its normal is the face the ray came in by, behind where it starts, as a box test reports it:
@@ -612,7 +612,7 @@ public sealed class TriangleWorld
                 if (!Closest(from, down, GroundReach, layers, RayFaces.Front, ref filter, out var hit, tFrom)) break;
                 float y = HeightOn(hit, from.X, from.Z);
                 if (y > top) { tFrom = MathF.Max(hit.T, tFrom) + 1e-6f; continue; }
-                if (y > bestY || (y == bestY && owner >= 0 && new Ties(VolumeOf(solid), owner).Beats(VolumeOf(hit.Solid), hit.Owner)))
+                if (y > bestY || (y == bestY && owner >= 0 && new Ties(FootprintOf(solid), owner).Beats(FootprintOf(hit.Solid), hit.Owner)))
                 {
                     bestY = y; solid = hit.Solid; owner = hit.Owner;
                 }

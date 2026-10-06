@@ -181,7 +181,7 @@ public static class GeometryParitySpike
                 var (bc, bs, _) = serverWorld.BoxOf(c.Solid);
                 var e = lookup.TryGetValue(c.Owner, out var en) ? en : Entity.Null;
                 string name = e != Entity.Null && ecs.Has<IdentityComponent>(e) ? ecs.Get<IdentityComponent>(e).Name : "";
-                Console.WriteLine($"  t {c.T:R} {(c.Front ? "in" : "out")} #{c.Owner} '{name}' {serverWorld.SurfaceOf(c.Solid).Material} centre {V(bc)} size {V(bs)} volume {serverWorld.VolumeOf(c.Solid):G4}");
+                Console.WriteLine($"  t {c.T:R} {(c.Front ? "in" : "out")} #{c.Owner} '{name}' {serverWorld.SurfaceOf(c.Solid).Material} centre {V(bc)} size {V(bs)} volume {serverWorld.FootprintOf(c.Solid):G4}");
             }
             return 0;
         }
