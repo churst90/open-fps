@@ -4,6 +4,20 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- A car close enough to be heard as two voices (its tailpipe and its front) now has each end placed
+  as a point. Both voices were also spread over the 3.3 m between the ends, so the car stopped
+  getting louder inside 3.3 m: 4 dB short 2 m behind a hatchback, 9 dB short at 1 m. Measured in the
+  game's output: +4.5 dB 1 m behind a hatchback, +5.1 dB behind the police car, +1.6 to +2.2 dB at
+  2 m; nothing changes beyond 3.3 m.
+- AudioLab `--game-levels` plays one thing at a time through the real client audio (the client's
+  audio system, the voice budget, the placement, the idle lift, the HRTF and the master) and
+  captures the output: cars idling and passing, your footsteps, a passer-by's speech, the fountain,
+  an air conditioner, a door, the wind at the ears. `spectra` measures how much of each engine is
+  bass, idling and at full load. `tools/game_levels.py` measures a capture (RMS, peak, LUFS, dB(A),
+  an equal-loudness view, the share below 100 Hz, gaps). Results and renders in
+  inbox/idle-loudness-2026-10-05. Found: idling cars are 4 to 12 dB(A) under where the loudness law
+  means them, because the law and the idle lift count an idling engine's bass, which is most of it
+  and barely heard. Not changed; the README gives Cody the numbers for a decision.
 - The front of a car is no longer silent. The engine's own noise (valve ticking, diesel clatter, the
   belt, the turbo, the intake) leaves only through the engine bay, and every car let out a flat 0.15
   of it, so an idling hatchback was louder behind than in front. The bay is now its openings (grille,
