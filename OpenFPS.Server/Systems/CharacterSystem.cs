@@ -61,6 +61,7 @@ public sealed class CharacterSystem
         public Haunt? RideTo;
         public Entity Bus = Entity.Null;
         public double BusSince;
+        public double OffAt = double.NegativeInfinity;
         public int Decisions;
         public int Day;
         public double GoneUntil = double.NaN;
@@ -272,8 +273,17 @@ public sealed class CharacterSystem
 
             case Doing.WaitingForBus:
             {
-                Stand(c, ref t, ref vel, now);
+                // Back to the stop from wherever a missed bus left him.
+                if (Flat(t.Position, c.At!.Stand) > 0.3f)
+                {
+                    c.Route = new List<Vector3> { t.Position, c.At.Stand };
+                    c.Leg = 1;
+                    Walk(c, ref t, ref vel, dt);
+                }
+                else Stand(c, ref t, ref vel, now);
                 var bus = BusAt(world, c.At!.StopAt);
+                // Not the bus he has just got off, still standing at the stop.
+                if (bus == c.Bus && now - c.OffAt < 90) bus = Entity.Null;
                 if (bus != Entity.Null && FreeSeat(world, bus, t.Position) >= 0)
                 {
                     c.Bus = bus;
@@ -282,7 +292,7 @@ public sealed class CharacterSystem
                     c.Leg = 1;
                     Log.Information("CHARACTER {Name}: the bus (entity {Bus}) is in at {Place}; getting on.", c.Data.Name, bus.Id, c.At.Name);
                 }
-                else if (now - c.BusSince >= BusWaitSeconds / Pace)
+                else if (now - c.BusSince >= BusWaitSeconds)          // the bus keeps real time, whatever his pace
                 {
                     Log.Information("CHARACTER {Name}: no bus at {Place}; walking to {To} instead.", c.Data.Name, c.At.Name, c.RideTo!.Name);
                     WalkTo(c, world, t.Position, c.RideTo!, now, cond);
@@ -298,7 +308,7 @@ public sealed class CharacterSystem
                 {
                     // It went without him: back to the stop to wait for the next.
                     c.Now = Doing.WaitingForBus;
-                    c.Route = new List<Vector3>();
+                    c.Bus = Entity.Null;
                     Log.Information("CHARACTER {Name}: the bus left without him.", c.Data.Name);
                     break;
                 }
@@ -333,6 +343,7 @@ public sealed class CharacterSystem
                 if (atStop && now - c.BusSince > 10 && (mine || tooLong))
                 {
                     CompositeService.Disembark(world, c.Entity);
+                    c.OffAt = now;
                     var off = DoorOf(world, c.Bus);
                     off.Y = Ground(world, grid, off);
                     t.Position = off;
