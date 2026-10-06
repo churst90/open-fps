@@ -4,6 +4,32 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Audio quality: what makes the synthesis sound grainy or static, measured (unheard). Report in
+  docs/AUDIO_QUALITY_2026-10-06.md, renders in inbox/audio-quality-2026-10-06.
+- The biggest cause is not fixed here: the fountain, trees and rain are tens of thousands of small
+  events a second, and their 4-16 kHz bands measure like Gaussian noise. Recordings move 1.5 to 5
+  times as much there. The report recommends refitting the models on band-envelope statistics.
+- FMOD's resampler is now spline instead of linear. It runs on every moving voice (Doppler) and on
+  every buffer not at 44.1 kHz. OPENFPS_RESAMPLER=linear|cubic|spline overrides it.
+- Synthesised one-shots (doors, guns, claps, speech) are kept in float, not truncated 16-bit, and
+  are brought to the mixer's rate on their render thread by a band-limited resampler. Thunder is
+  too. UI sounds, beacons and driving aids are float.
+- A car's reflection no longer skips 23 ms of sound whenever its channel's pitch makes FMOD take an
+  extra block. The front of a passing car no longer steps at nearly every block. Both read on a
+  continuous clock at the car's channel rate.
+- Smoothed per-block steps: the binaural stage's spatial blend, a traced echo's input gain, and the
+  ear wind's knee and buffeting rate.
+- Triangular dither on the master, because FMOD hands PulseAudio 16-bit audio. Off for the lab's
+  WAV writer, whose files are read for exact silence; OPENFPS_DITHER=0 or 1 overrides.
+- The boundary reflections run at the mixer's rate, not the sound card's (9 % off on 48 kHz
+  devices).
+- The "Mix loudness" log line's peak is the peak since the last line. It was the peak since start,
+  so it read -0.0 dBFS all session.
+- AudioLab `--quality` (resampler, orbit, echo, ceiling, quant, lsb, output, thunderfile, scenes)
+  and tools/audio_quality.py measure all of this. MasterTap can capture float
+  (OPENFPS_AUDIO_CAPTURE_FLOAT=1) and before the limiter (OPENFPS_AUDIO_CAPTURE_PRE).
+- The thunder lab's files are upsampled band-limited.
+- A granular read past the end of its buffer is clamped.
 - Weather can be set as what falls, how hard and how big. `/weather rain` takes a class (drizzle,
   light, moderate, heavy, extreme), a rate (`/weather rain 12`), a radar reading
   (`/weather rain 45 dBZ`) or a drop size (`/weather rain heavy drops 3 mm`); `/weather drizzle`,

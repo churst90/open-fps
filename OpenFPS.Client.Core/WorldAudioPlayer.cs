@@ -234,7 +234,7 @@ public sealed class WorldAudioPlayer
             System.Threading.Tasks.Task.Run(async () =>
             {
                 await gate.WaitAsync();
-                try { _rendered.Enqueue((id, RenderDoorKey(key, _fullScaleDb))); }
+                try { _rendered.Enqueue((id, AtMixerRate(RenderDoorKey(key, _fullScaleDb)))); }
                 finally { gate.Release(); }
             });
         }
@@ -420,7 +420,7 @@ public sealed class WorldAudioPlayer
                 {
                     var toRender = sound;
                     int seed = message.Seed;
-                    System.Threading.Tasks.Task.Run(() => _rendered.Enqueue((id, RenderOne(toRender, seed))));
+                    System.Threading.Tasks.Task.Run(() => _rendered.Enqueue((id, AtMixerRate(RenderOne(toRender, seed)))));
                 }
                 // ...but it is not simply let go. It waits for its own buffer and plays if that comes
                 // back in time — see MaxRenderLateness. Dropping every first hearing would silence
@@ -464,6 +464,15 @@ public sealed class WorldAudioPlayer
             try
             {
                 var parts = Thunder.Render(strike, listener, air, options);
+                // At the mixer's rate, band-limited, here on the worker: from 24 kHz FMOD's resampler
+                // left the rumble's images across the top octave. About 4 ms a second of thunder.
+                int mix = MixerQuality.MixerRate;
+                foreach (var part in parts)
+                    if (part.SampleRate != mix)
+                    {
+                        part.Pressure = MixerQuality.Resample(part.Pressure, part.SampleRate, mix);
+                        part.SampleRate = mix;
+                    }
                 _thunder.Enqueue((strike, now, listener, parts, sw.ElapsedMilliseconds, map));
             }
             catch (Exception ex)
@@ -559,7 +568,10 @@ public sealed class WorldAudioPlayer
         // Anything a worker finished is registered here, on the thread that owns the engine.
         while (_rendered.TryDequeue(out var done))
         {
-            if (_audio.RegisterSynthesisedSound(done.Id, TransientSynth.ToPcm16(done.Pcm), TransientSynth.SampleRate))
+            // In float, at the mixer's rate (AtMixerRate). Sixteen bits truncated the quiet end of every
+            // one-shot to its last bit and clipped a render over full scale; FMOD's resampler imaged its
+            // top octave down into the band.
+            if (_audio.RegisterSynthesisedSoundFloat(done.Id, done.Pcm, MixerQuality.MixerRate))
             {
                 _registered.Add(done.Id);
                 _rendering.Remove(done.Id);
@@ -1477,9 +1489,17 @@ public sealed class WorldAudioPlayer
 
     private readonly HashSet<string> _missingLines = new();
 
-    /// <summary>Linear interpolation. The shipped lines are already at the mixer's rate; this is for
-    /// a file that is not, so it plays at the right pitch rather than not at all.</summary>
-    internal static float[] Resample(float[] pcm, int from, int to)
+    /// <summary>A rendered one-shot (at <see cref="TransientSynth.SampleRate"/>) brought to the mixer's
+    /// rate, band-limited, on the worker that rendered it (MixerQuality.Resample).</summary>
+    private static float[] AtMixerRate(float[] pcm) => MixerQuality.Resample(pcm, TransientSynth.SampleRate, MixerQuality.MixerRate);
+
+    /// <summary>A line at another rate brought to the render rate, band-limited. The shipped lines are
+    /// already at 48 kHz; this is for a file that is not, so it plays at the right pitch, and without the
+    /// images linear interpolation left above the old Nyquist.</summary>
+    internal static float[] Resample(float[] pcm, int from, int to) => MixerQuality.Resample(pcm, from, to);
+
+    /// <summary>Linear interpolation, kept for anything that wanted it exactly.</summary>
+    internal static float[] ResampleLinear(float[] pcm, int from, int to)
     {
         int n = (int)((long)pcm.Length * to / from);
         var y = new float[Math.Max(1, n)];
@@ -1527,7 +1547,7 @@ public sealed class WorldAudioPlayer
         {
             var sound = item.Sound;
             int seed = item.Seed;
-            System.Threading.Tasks.Task.Run(() => _rendered.Enqueue((id, Diffuse(RenderOne(sound, seed), step / 4f, seed))));
+            System.Threading.Tasks.Task.Run(() => _rendered.Enqueue((id, AtMixerRate(Diffuse(RenderOne(sound, seed), step / 4f, seed)))));
         }
         return id;
     }

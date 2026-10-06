@@ -314,20 +314,16 @@ public static class ThunderSpike
 
     // ── Binaural ────────────────────────────────────────────────────────────────────────────
 
-    private static float[] To48k(Thunder.Part p)
-    {
-        if (p.SampleRate == OutRate) return p.Pressure;
-        int n = (int)((long)p.Pressure.Length * OutRate / p.SampleRate);
-        var y = new float[n];
-        double step = p.SampleRate / (double)OutRate;
-        for (int i = 0; i < n; i++)
-        {
-            double x = i * step; int k = (int)x; float f = (float)(x - k);
-            float a = p.Pressure[Math.Min(k, p.Pressure.Length - 1)], b = p.Pressure[Math.Min(k + 1, p.Pressure.Length - 1)];
-            y[i] = a + (b - a) * f;
-        }
-        return y;
-    }
+    /// <summary>A part at the files' rate, band-limited (MixerQuality.Resample). It was linear
+    /// interpolation, which from 24 kHz left the rumble's images across 12-24 kHz: in round 2's 1 km
+    /// file the 20 kHz third-octave stood 26 dB over the 12.5 kHz one (docs/AUDIO_QUALITY_2026-10-06.md).</summary>
+    internal static float[] To48k(Thunder.Part p)
+        => p.SampleRate == OutRate ? p.Pressure
+         : OpenFPS.Client.AudioEngine.Fmod.MixerQuality.Resample(p.Pressure, p.SampleRate, OutRate);
+
+    /// <summary>The old linear interpolation, kept to show what it did (--quality thunderfile).</summary>
+    internal static float[] To48kLinear(Thunder.Part p)
+        => p.SampleRate == OutRate ? p.Pressure : OpenFPS.Client.Core.WorldAudioPlayer.ResampleLinear(p.Pressure, p.SampleRate, OutRate);
 
     /// <summary>Every part through the HRTF from its own direction, listener facing north.</summary>
     private static (float[] L, float[] R) Binaural(List<Thunder.Part> parts, bool gameLevel)

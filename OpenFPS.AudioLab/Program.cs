@@ -140,6 +140,8 @@ string[] usage =
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
     "  --ambisonic                                   ambisonic encode and decode come out of the right ear",
     "  --dsp-order                                   where HEAD and TAIL put a unit in a channel's chain",
+    "  --quality resampler|orbit|echo|ceiling|quant|lsb|output|thunderfile|scene=NAME [out=DIR] [tag=]",
+    "                                                what the mixer does to a sound: resampler, binaural steps, limiter (tools/audio_quality.py)",
     "",
     "The mixer thread (docs/THE_MIXER_THREAD_CRASH.md)",
     "  --scene-churn / --provider-churn / --physical-churn / --reap-churn / --send-churn",
@@ -479,6 +481,14 @@ if (args.Contains("--weather-wind"))
     // --weather-wind [out=DIR] [sec=] [ears|trees]: the weather's wind at the ears and in a tree,
     // measured against the published figures (WeatherWindSpike).
     Environment.Exit(OpenFPS.AudioLab.Spikes.WeatherWindSpike.Run(args));
+}
+if (args.Contains("--quality"))
+{
+    // --quality resampler|orbit|quant|scene=NAME: known signals and typical scenes through the real
+    // mixer, captured in float before and after the master limiter (QualitySpike).
+    int qcode = OpenFPS.AudioLab.Spikes.QualitySpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(qcode);
 }
 if (args.Contains("--thunder"))
 {

@@ -193,7 +193,9 @@ public static class GranularProcessor
 
                     // Read sample with basic linear interpolation
                     float readPos = grain.StartSample + grain.CurrentSample;
-                    int idx0 = (int)readPos;
+                    // Clamped like idx1: a grain started near the end read past it, threw, and the
+                    // guard silenced the whole block.
+                    int idx0 = Math.Min((int)readPos, totalFrames - 1);
                     int idx1 = Math.Min(idx0 + 1, totalFrames - 1);
                     float frac = readPos - idx0;
 
