@@ -123,7 +123,7 @@ public static class SynthProcessor
 
         if (outchannels == 0) outchannels = 2; 
         int outCh = outchannels;
-        float sampleRate = 44100f; 
+        float sampleRate = MixerQuality.MixerRate;
 
         unsafe
         {

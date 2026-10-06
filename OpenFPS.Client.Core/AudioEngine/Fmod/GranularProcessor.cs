@@ -162,7 +162,7 @@ public static class GranularProcessor
                 outBuf[i] = 0.0f;
             }
 
-            float sampleRateOut = 44100f; // Typical
+            float sampleRateOut = MixerQuality.MixerRate;
             float samplesPerGrain = (state.GrainSizeMs / 1000f) * state.SampleRate;
             float samplesBetweenGrains = sampleRateOut / Math.Max(0.1f, state.Density);
 

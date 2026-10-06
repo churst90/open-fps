@@ -73,7 +73,7 @@ public sealed class AircraftSynth
     private bool _onGround;
     private const int SlowEvery = 64;
 
-    public AircraftSynth(AircraftProfile p, float rate = 44100f, int seed = 3)
+    public AircraftSynth(AircraftProfile p, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 3)
     {
         Profile = p;
         _rate = rate;

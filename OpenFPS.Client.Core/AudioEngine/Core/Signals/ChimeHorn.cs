@@ -57,7 +57,7 @@ public sealed class ChimeHorn
     /// <summary>How much air is reaching the manifold, 0..1.</summary>
     public float Valve => _valve;
 
-    public ChimeHorn(ChimeHornSpec spec, float rate = 44100f, int seed = 11)
+    public ChimeHorn(ChimeHornSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 11)
     {
         _spec = spec; _rate = rate;
         _bells = new Bell[spec.Bells.Length];

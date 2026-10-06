@@ -65,7 +65,7 @@ public sealed class ElectricHorn
 
     public ElectricHornSpec Spec => _spec;
 
-    public ElectricHorn(ElectricHornSpec spec, float rate = 44100f, int seed = 11)
+    public ElectricHorn(ElectricHornSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 11)
     {
         if (spec.Units == null || spec.Units.Length == 0) throw new ArgumentException("An electric horn needs at least one unit.", nameof(spec));
         _spec = spec; _rate = rate; _seed = seed;

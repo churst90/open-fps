@@ -185,7 +185,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// coherent signal had (0.6 at each end, summed in phase: 1.2, so 0.6 x root 2 each). The squeal
     /// is still quoted against this; the rolling noise is anchored through it.</summary>
     private const float PerAxle = 0.6f * 1.41421356f;
-    public float SampleRate = 44100f;
+    public float SampleRate = MixerQuality.MixerRate;
 
     private float _speedSmooth;
 
@@ -1489,7 +1489,7 @@ public sealed class EngineEchoState : IGuardedUnit
     public volatile float TargetGain;
     private double _delay = -1;
     private float _gain;
-    public float SampleRate = 44100f;
+    public float SampleRate = MixerQuality.MixerRate;
     /// <summary>
     /// Floor on the echo's delay, as a MULTIPLE OF THE MIXER'S BLOCK, not as a time.
     ///
