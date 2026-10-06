@@ -1,0 +1,22 @@
+{
+  "Id": "dripping_sink_water",
+  "Name": "Kitchen sink",
+  "Description": "A kitchen sink whose tap drips when it is shut (RunningWaterSpec.DrippingKitchenSink): a drop about every second and a half onto the steel. Turned on and off like any other tap. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 0.2,
+    "Y": 0.2,
+    "Z": 0.2
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "flow:dripping_sink",
+  "Volume": 1.0,
+  "Range": 30,
+  "MinDistance": 0.5,
+  "Mode": "LoopOne",
+  "SynthRunning": false
+}

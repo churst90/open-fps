@@ -398,7 +398,9 @@ public sealed class PlacedNatureVoice
             // Its water: its own flow, and the rain running off its catchment now (Runoff).
             var spec = Flow.Spec;
             Flow.Spread = spread;
-            Flow.Flow = Running ? spec.FlowFor(Runoff.Through(spec.CatchmentSeconds)) : 0f;
+            // A tap runs when somebody has turned it on (Running, from the server), and the basin under
+            // it goes on draining after; anything else runs with its own flow and the rain.
+            Flow.Flow = spec.Tap != null ? spec.FlowNow(tapOn: Running) : Running ? spec.FlowNow() : 0f;
             Flow.RainOnWater = Runoff.RainMmPerHour;
             Flow.Control(dt);
         }

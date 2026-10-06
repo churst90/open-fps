@@ -68,6 +68,29 @@ Recent work, newest first. `git log` has the rest.
 - A doorway and the rooms it joins are sent together, so a door at the edge of full detail opens into
   its room; a front door held without its room is a shut door, not a doorway into nothing.
 - Stage 2 will key world tiles to the standard UTM grid (docs/WORLD_STREAMING.md).
+- Running water round 2 (unheard): gurgles, taps and sinks. Design in docs/RUNNING_WATER.md section
+  10; renders in inbox/running-water-round2-2026-10-06 with a README.
+  - Water leaving through a hole (a sink's waste, a roof gutter's outlet into its downpipe) sounds by how
+    deep it stands over the hole: it spills in quietly when shallow, gurgles once the water closes over
+    the hole and a vortex draws air down in gulps, and runs full and quiet when deep. Outlet capacity
+    from HR Wallingford's measured gutter outlets.
+  - Taps over basins. The tap's stream lands on the bare bottom or in the water standing there; a
+    stainless sink's bottom rings, and rings duller as water covers it; an aerated stream hisses. With
+    the tap on the plug is in and the bowl fills; turned off, the plug comes out and it drains, gurgling
+    as it empties. A worn washer drips.
+  - New sound ids: `flow:kitchen_sink`, `flow:dripping_sink`, `flow:washbasin`, `flow:shower`,
+    `flow:gutter_outlet`.
+  - Press E standing at a tap (within 1.3 m) to turn it on or off. Taps start off. The tap's state is
+    the emitter's `SynthRunning`, now settable in a prefab. A shut tap whose basin has drained gets no
+    voice.
+  - On the city: every flat in the towers has a kitchen sink, a washbasin and a shower (999 fixtures);
+    the Union Building flat 11F's kitchen tap drips; every house has a downpipe and its roof gutter
+    outlet (64 each). city.json regenerated; only named-place ids move.
+  - Round 1's open items: falls now grow 4-7 dB per doubling of flow across the drop-to-sheet
+    transition (was 3); water leaving a downpipe's shoe carries the film's speed (brighter, louder in
+    heavy rain); a roof's run-off goes partly through a slow store, so downpipes drip for half an hour
+    after rain.
+  - Not built: toilet flush and cistern refill; the plug as its own control; NPCs using taps.
 
 - Large maps stream (docs/WORLD_STREAMING.md, stage 1). A map with tiles (the real places) is sent
   to each client a radius at a time: everything within 300 m, and the ground, roads and building

@@ -78,6 +78,111 @@ public sealed record FlowFall
     /// <summary>It arrives as a film held to a wall, however thin (the water down a pipe's wall striking
     /// its bend): a sheet that has had nowhere to tear into drops.</summary>
     public bool Film { get; init; }
+    /// <summary>It leaves the foot of the source's pipe (a downpipe's shoe): already moving at the film's
+    /// terminal speed before it falls <see cref="DropMetres"/>.</summary>
+    public bool FromPipe { get; init; }
+    /// <summary>Where its water comes from (<see cref="FallFeed"/>): a share of the source's flow, or a
+    /// tap's jet and the drain of a basin, whose flows the synth works out as the basin fills and empties.</summary>
+    public FallFeed Feed { get; init; } = FallFeed.Source;
+}
+
+/// <summary>What feeds a fall.</summary>
+public enum FallFeed
+{
+    /// <summary><see cref="FlowFall.FlowShare"/> of the source's flow.</summary>
+    Source,
+    /// <summary>A tap's jet where it strikes the basin's bare face (<see cref="FlowBasin"/>): all of it
+    /// while the basin is dry, less as water gathers over the face.</summary>
+    TapOntoBasin,
+    /// <summary>A tap's jet where it plunges into the water standing in the basin.</summary>
+    TapIntoWater,
+    /// <summary>What leaves through the inlet (<see cref="FlowInlet"/>) while it is not running full: the
+    /// water spilling over the rim of a strainer, a gutter's outlet, into the pipe below.</summary>
+    Drain,
+}
+
+/// <summary>
+/// Where the water leaves: a sink's waste through its strainer, a roof gutter's outlet into its downpipe.
+/// What it sounds like depends on how deep the water stands over it (docs/RUNNING_WATER.md, round 2):
+/// shallow, it spills over the rim with the air core open, a weir round a hole; deeper, the water
+/// closes over the hole and air is drawn down in gulps (the gurgle), round a vortex whose air core
+/// reaches the outlet now and then; deep enough, the vortex can no longer reach it and the outlet runs
+/// full and quiet.
+/// </summary>
+public sealed record FlowInlet
+{
+    /// <summary>The hole's diameter, m: a sink's waste 32-40 mm, a roof gutter's outlet 50-68 mm.</summary>
+    public required float DiameterMetres { get; init; }
+    /// <summary>The share of the hole left open by a strainer's bars or a leaf guard.</summary>
+    public float OpenShare { get; init; } = 1f;
+    /// <summary>The length of edge the water spills over while it is shallow, m: π D for a plain outlet
+    /// (zero takes that), several times it for a basket strainer whose slots each have their own edges.</summary>
+    public float RimMetres { get; init; }
+    /// <summary>
+    /// How strongly the water swirls as it comes to the hole: Gordon's C in the vortex's critical
+    /// submergence S = C v √D (SI; Gordon 1970: 0.54 for a symmetric approach, 0.72 for an asymmetric one,
+    /// as water arriving along a gutter does). Water draining from rest in a basin has almost no
+    /// circulation (a bathtub vortex needs rotation to reach the drain: Andersen, Lautrup and Bohr 2003),
+    /// so its vortex reaches the hole only when it is shallow: taken as 0.25, a judgement.
+    /// </summary>
+    public float Swirl { get; init; } = 0.72f;
+    /// <summary>How long the pipe below it is before the water meets standing water or turns, m: the air
+    /// a gulp is heard through (with <see cref="RunningWaterSpec.Cavity"/> if the source has one).</summary>
+    public float PipeMetres { get; init; } = 0.4f;
+}
+
+/// <summary>
+/// A basin the water gathers in before it leaves: a sink, a washbasin, a shower tray. Its water rises and
+/// falls with what comes in and what its inlet lets out (an orifice: Q = Cd A √(2 g h)), and where the
+/// tap's jet lands depends on how deep it is.
+/// </summary>
+public sealed record FlowBasin
+{
+    /// <summary>What it is made of, by material name (AcousticRegistry): "Metal" for a stainless sink (a thin plate that
+    /// rings), "Tile" for a ceramic washbasin (thick and stiff: a hard surface that barely rings).</summary>
+    public string Material { get; init; } = "Metal";
+    /// <summary>The thickness of its bottom, m: 0.7-1 mm for a steel sink, 6-10 mm for a ceramic basin.</summary>
+    public float SkinMetres { get; init; } = 0.0009f;
+    /// <summary>Its bottom's sides and its depth, m.</summary>
+    public float LengthMetres { get; init; } = 0.45f;
+    public float WidthMetres { get; init; } = 0.38f;
+    public float DepthMetres { get; init; } = 0.18f;
+    /// <summary>The loss factor of the bottom in place: a stainless sink with its anti-drum pads about
+    /// 0.03-0.05; bare steel 0.002.</summary>
+    public float LossFactor { get; init; } = 0.04f;
+    /// <summary>The flat of the bottom that rings, m: a pressed bowl is stiffened by its radiused sides and
+    /// the strainer's dished boss, and what drums is the flat panel between them, not the whole bottom.</summary>
+    public float PanelMetres { get; init; } = 0.2f;
+    /// <summary>The dished middle over the waste where the first water gathers, m², and how far the bottom
+    /// falls to it, m: below that depth the water stands in the dish, not over the whole bottom.</summary>
+    public float SumpSquareMetres { get; init; } = 0.012f;
+    public float FallToWasteMetres { get; init; } = 0.006f;
+    /// <summary>The plug is in: nothing leaves but over the overflow.</summary>
+    public bool PlugIn { get; init; }
+    /// <summary>The plug goes in while the tap runs and comes out when it is shut: a person filling the
+    /// basin to use it and letting it go after. One key does both (the game's interact key on the tap).</summary>
+    public bool PlugWhileRunning { get; init; }
+    /// <summary>Where the overflow slot is, m above the bottom.</summary>
+    public float OverflowMetres { get; init; } = 0.15f;
+}
+
+/// <summary>A tap over a basin: how much it lets through open, and what its stream is like.</summary>
+public sealed record FlowTap
+{
+    /// <summary>The flow fully open, L/s: a kitchen tap 0.1-0.15, a washbasin 0.07-0.1, a shower 0.13-0.2.</summary>
+    public float OpenLitresPerSecond { get; init; } = 0.12f;
+    /// <summary>The spout's bore, mm.</summary>
+    public float NozzleMm { get; init; } = 16f;
+    /// <summary>It has an aerator: the stream comes out white, air and water mixed, and lands soft and hissing
+    /// instead of as a glassy column.</summary>
+    public bool Aerated { get; init; } = true;
+    /// <summary>A shower rose: the water leaves as many fine jets that break into drops.</summary>
+    public int Jets { get; init; } = 1;
+    /// <summary>How far the spout stands over the basin's bottom, m.</summary>
+    public float HeightMetres { get; init; } = 0.3f;
+    /// <summary>What a worn washer lets past when it is shut, L/s: a drip every second or two is about
+    /// 0.0001.</summary>
+    public float LeakLitresPerSecond { get; init; }
 }
 
 /// <summary>
@@ -115,6 +220,12 @@ public sealed record RunningWaterSpec
     public float CatchmentSeconds { get; init; } = 120f;
     /// <summary>The rain the declared level was measured at, mm/h (a rain-fed source).</summary>
     public float ReferenceRainMmPerHour { get; init; } = Rainfall.ModerateRate;
+    /// <summary>The share of the run-off held back in a slow store (water standing in a roof gutter's
+    /// sag, soaked into moss and grit) that drains over <see cref="SlowSeconds"/>: what keeps a downpipe
+    /// dripping long after the roof has run off (round 2: two-stage drainage).</summary>
+    public float SlowShare { get; init; }
+    /// <summary>The slow store's time constant, s.</summary>
+    public float SlowSeconds { get; init; } = 1800f;
 
     // ── The channel ─────────────────────────────────────────────────────────────────────────────
 
@@ -148,6 +259,14 @@ public sealed record RunningWaterSpec
     /// <summary>The drips land inside the cavity (a grate's bars over its pot), not outside (a shoe).</summary>
     public bool DripsInside { get; init; }
 
+    /// <summary>Where the water leaves, if its leaving is heard (a strainer, a gutter's outlet).</summary>
+    public FlowInlet? Inlet { get; init; }
+    /// <summary>The basin it gathers in, for a sink, a washbasin or a shower tray.</summary>
+    public FlowBasin? Basin { get; init; }
+    /// <summary>The tap over it: this source runs when somebody turns it on (SoundEmitterComponent.SynthRunning),
+    /// not with the rain.</summary>
+    public FlowTap? Tap { get; init; }
+
     // ── How it is heard ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>Overall level at one metre, dB, the whole source as if at one point: MEASURED with
@@ -171,7 +290,18 @@ public sealed record RunningWaterSpec
            * Math.Clamp(RunoffCoefficient, 0f, 1f) * MathF.Max(0f, runoffMmPerHour) / 3600f;
 
     /// <summary>The flow the declared level was measured at.</summary>
-    public float ReferenceFlow => FlowFor(CatchmentSquareMetres > 0f ? ReferenceRainMmPerHour : 0f);
+    public float ReferenceFlow => Tap is { } tap ? tap.OpenLitresPerSecond : FlowFor(CatchmentSquareMetres > 0f ? ReferenceRainMmPerHour : 0f);
+
+    /// <summary>The flow now, L/s, from the world's rain through both of the catchment's stores (Runoff),
+    /// or a tap's (on, or leaking).</summary>
+    public float FlowNow(bool tapOn = true)
+    {
+        if (Tap is { } tap) return tapOn ? tap.OpenLitresPerSecond : tap.LeakLitresPerSecond;
+        if (CatchmentSquareMetres <= 0f) return BaseFlowLitresPerSecond;
+        float slow = Math.Clamp(SlowShare, 0f, 1f);
+        float through = (1f - slow) * Runoff.Through(CatchmentSeconds) + (slow > 0f ? slow * Runoff.Through(SlowSeconds) : 0f);
+        return FlowFor(through);
+    }
 
     /// <summary>
     /// A gurgling creek: a riffle a couple of metres wide over cobbles and stones, a couple of hand's
@@ -276,21 +406,25 @@ public sealed record RunningWaterSpec
         CatchmentSquareMetres = 45f,
         RunoffCoefficient = 0.95f,
         CatchmentSeconds = 60f,
+        // An eighth of the roof's water lingers in the gutter's sags and the grit and moss on the roof and
+        // comes away over half an hour: the drips long after the rain (round 2, two-stage drainage).
+        SlowShare = 0.12f,
+        SlowSeconds = 1800f,
         Channel = FlowChannel.None,
         Falls = new[]
         {
             new FlowFall { Name = "the film striking the shoe's bend", DropMetres = 5.5f, Onto = WaterSurface.Rock,
                            LipWidthMetres = 0.21f, Inside = true, Film = true },
             new FlowFall { Name = "out of the shoe onto the paving", DropMetres = 0.15f, Onto = WaterSurface.Rock,
-                           LipWidthMetres = 0.06f },
+                           LipWidthMetres = 0.06f, FromPipe = true },
         },
         Cavity = new FlowCavity { LengthMetres = 5.5f, DiameterMetres = 0.068f, FarEndOpen = true },
         DripLipMm = 3f,
         DripFallMetres = 0.15f,
         DripOnto = WaterSurface.Pool,
-        // MEASURED with `--running-water levels sec=60`, 2026-10-06: downpipe at 5 mm/h: Leq 51.7 dB, LAeq 51.1 dB(A); peaks 22.4 dB over.
-        SourceLevelDb = 52f,
-        PeakHeadroomDb = 22.5f,
+        // MEASURED with `--running-water levels sec=60`, 2026-10-06 (round 2): moderate rain, its shoe now carrying the film's speed: Leq 53.3 dB, LAeq 53.1 dB(A); peaks 23.0 dB over.
+        SourceLevelDb = 53.5f,
+        PeakHeadroomDb = 23f,
         ExtentMetres = 0.6f,
         Places = 3,
         Layout = FlowLayout.Ring,
@@ -322,6 +456,147 @@ public sealed record RunningWaterSpec
         Layout = FlowLayout.Ring,
     };
 
+
+    /// <summary>
+    /// Where a house's roof gutter empties into its downpipe: a 63 mm outlet in the bottom of a half-round
+    /// gutter, a swan-neck offset 0.3 m below it, then the pipe (the same 45 m² of roof as
+    /// <see cref="Downpipe"/>; place it at the eaves over the downpipe's shoe). In light rain the water
+    /// spills over the outlet's rim and slides down the pipe's wall to the swan neck. In a downpour it stands
+    /// deep enough over the outlet to close over it: a vortex forms, and air goes down with the water in
+    /// gulps, the gurgle a downpipe makes at the top in heavy rain.
+    /// </summary>
+    public static RunningWaterSpec GutterOutlet => new()
+    {
+        Name = "Roof gutter outlet into a downpipe",
+        CatchmentSquareMetres = 45f,
+        RunoffCoefficient = 0.95f,
+        CatchmentSeconds = 60f,
+        SlowShare = 0.12f,
+        SlowSeconds = 1800f,
+        Channel = FlowChannel.None,
+        Inlet = new FlowInlet { DiameterMetres = 0.063f, OpenShare = 1f, PipeMetres = 0.3f },
+        Falls = new[]
+        {
+            new FlowFall { Name = "over the outlet's rim onto the swan neck", Feed = FallFeed.Drain, DropMetres = 0.3f,
+                           Onto = WaterSurface.Rock, LipWidthMetres = 0.2f, Inside = true, Film = true },
+        },
+        Cavity = new FlowCavity { LengthMetres = 5.5f, DiameterMetres = 0.068f, FarEndOpen = true },
+        // MEASURED with `--running-water levels sec=60`, 2026-10-06 (round 2): moderate rain, spilling over the rim: Leq 48.0 dB, LAeq 48.0 dB(A); peaks 19.1 dB over.
+        SourceLevelDb = 48f,
+        PeakHeadroomDb = 20f,
+        ExtentMetres = 0.3f,
+        Places = 3,
+        Layout = FlowLayout.Ring,
+    };
+
+    /// <summary>
+    /// A kitchen sink: a stainless bowl 0.45 by 0.38 m and 0.18 deep (0.9 mm steel with its anti-drum
+    /// pads), an aerated mixer tap 0.28 m over its bottom giving 0.12 L/s fully open, and a 40 mm basket
+    /// strainer (its bars leave about half of it open) over 0.35 m of waste down to the trap. The tap is
+    /// turned on and off by a person (SoundEmitterComponent.SynthRunning): on, the plug goes in and the bowl
+    /// fills; off, the plug comes out and it drains, gurgling as it empties.
+    /// </summary>
+    public static RunningWaterSpec KitchenSink => new()
+    {
+        Name = "Kitchen sink, stainless, mixer tap",
+        Channel = FlowChannel.None,
+        Tap = new FlowTap { OpenLitresPerSecond = 0.12f, NozzleMm = 18f, Aerated = true, HeightMetres = 0.28f },
+        Basin = new FlowBasin { Material = "Metal", SkinMetres = 0.0009f, LengthMetres = 0.45f, WidthMetres = 0.38f, DepthMetres = 0.18f, LossFactor = 0.04f,
+                                PlugWhileRunning = true },
+        Inlet = new FlowInlet { DiameterMetres = 0.04f, OpenShare = 0.45f, RimMetres = 0.5f, Swirl = 0.25f, PipeMetres = 0.35f },
+        Falls = new[]
+        {
+            new FlowFall { Name = "the tap onto the bottom", Feed = FallFeed.TapOntoBasin, DropMetres = 0.28f, Onto = WaterSurface.Rock },
+            new FlowFall { Name = "the tap into the water", Feed = FallFeed.TapIntoWater, DropMetres = 0.28f, Onto = WaterSurface.Pool },
+            new FlowFall { Name = "through the strainer down the waste", Feed = FallFeed.Drain, DropMetres = 0.35f, Onto = WaterSurface.Pool,
+                           LipWidthMetres = 0.12f, Inside = true, Film = true },
+        },
+        Cavity = new FlowCavity { LengthMetres = 0.35f, DiameterMetres = 0.04f },
+        DripLipMm = 3f,
+        DripFallMetres = 0.28f,
+        DripOnto = WaterSurface.Rock,
+        // MEASURED with `--running-water levels sec=60`, 2026-10-06 (round 2): the tap running a minute, filling: Leq 56.8 dB, LAeq 56.0 dB(A); peaks 26.2 dB over.
+        SourceLevelDb = 57f,
+        PeakHeadroomDb = 26.5f,
+        ExtentMetres = 0.5f,
+        Places = 3,
+        Layout = FlowLayout.Ring,
+    };
+
+    /// <summary>The same kitchen sink with a worn washer: shut, it drips about once every one and a half
+    /// seconds onto the steel (a drop a lip of 3 mm lets go is about 0.08 mL).</summary>
+    public static RunningWaterSpec DrippingKitchenSink => KitchenSink with
+    {
+        Name = "Kitchen sink, dripping tap",
+        Tap = KitchenSink.Tap! with { LeakLitresPerSecond = 0.00005f },
+        // Declared at the drip, which is what it is there for (MEASURED, `--running-water cycle dripping_sink
+        // on=0 off=60`: Leq 21.4 dB, its 10 ms peaks 36.8 dB over): placed by its level the mixer gives a
+        // quiet drip the law's lift, where declared at the running tap's 57 dB it would play 36 dB under that,
+        // unheard. Turned on, it runs 35 dB over the drip, and the headroom is the room for that and its peaks.
+        SourceLevelDb = 21.5f,
+        PeakHeadroomDb = 62f,
+    };
+
+    /// <summary>
+    /// A bathroom washbasin: vitreous china (stiff and thick, so it does not ring like steel: a hard wet
+    /// surface), 0.45 by 0.35 m and 0.15 deep, an aerated tap 0.2 m over the bottom at 0.08 L/s, a 32 mm
+    /// waste with a pop-up plug standing open (about half the hole), 0.3 m to its trap.
+    /// </summary>
+    public static RunningWaterSpec Washbasin => new()
+    {
+        Name = "Bathroom washbasin, ceramic",
+        Channel = FlowChannel.None,
+        Tap = new FlowTap { OpenLitresPerSecond = 0.08f, NozzleMm = 16f, Aerated = true, HeightMetres = 0.2f },
+        Basin = new FlowBasin { Material = "Tile", SkinMetres = 0.008f, LengthMetres = 0.45f, WidthMetres = 0.35f, DepthMetres = 0.15f, LossFactor = 0.02f,
+                                OverflowMetres = 0.12f, PlugWhileRunning = true },
+        Inlet = new FlowInlet { DiameterMetres = 0.032f, OpenShare = 0.5f, Swirl = 0.25f, PipeMetres = 0.3f },
+        Falls = new[]
+        {
+            new FlowFall { Name = "the tap onto the china", Feed = FallFeed.TapOntoBasin, DropMetres = 0.2f, Onto = WaterSurface.Rock },
+            new FlowFall { Name = "the tap into the water", Feed = FallFeed.TapIntoWater, DropMetres = 0.2f, Onto = WaterSurface.Pool },
+            new FlowFall { Name = "down the waste", Feed = FallFeed.Drain, DropMetres = 0.3f, Onto = WaterSurface.Pool,
+                           LipWidthMetres = 0.1f, Inside = true, Film = true },
+        },
+        Cavity = new FlowCavity { LengthMetres = 0.3f, DiameterMetres = 0.032f },
+        DripLipMm = 3f,
+        DripFallMetres = 0.2f,
+        DripOnto = WaterSurface.Rock,
+        // MEASURED with `--running-water levels sec=60`, 2026-10-06 (round 2): the tap running a minute, filling: Leq 51.9 dB, LAeq 52.1 dB(A); peaks 20.8 dB over.
+        SourceLevelDb = 52f,
+        PeakHeadroomDb = 21f,
+        ExtentMetres = 0.45f,
+        Places = 3,
+        Layout = FlowLayout.Ring,
+    };
+
+    /// <summary>
+    /// A shower with nobody in it: a rose of sixty 1 mm jets 1.9 m over a ceramic tray 0.8 m square, 0.15
+    /// L/s; the jets break into millimetre drops long before they land, so it is rain onto a wet hard floor
+    /// from a couple of metres, gathering on the tray and leaving through a 40 mm grated waste.
+    /// </summary>
+    public static RunningWaterSpec Shower => new()
+    {
+        Name = "Shower onto a ceramic tray",
+        Channel = FlowChannel.None,
+        Tap = new FlowTap { OpenLitresPerSecond = 0.15f, NozzleMm = 7.75f, Jets = 60, Aerated = false, HeightMetres = 1.9f },
+        Basin = new FlowBasin { Material = "Tile", SkinMetres = 0.008f, LengthMetres = 0.8f, WidthMetres = 0.8f, DepthMetres = 0.04f, LossFactor = 0.02f },
+        Inlet = new FlowInlet { DiameterMetres = 0.04f, OpenShare = 0.5f, RimMetres = 0.4f, Swirl = 0.25f, PipeMetres = 0.3f },
+        Falls = new[]
+        {
+            new FlowFall { Name = "the spray onto the tray", Feed = FallFeed.TapOntoBasin, DropMetres = 1.9f, Onto = WaterSurface.Rock, Streams = 60 },
+            new FlowFall { Name = "the spray into the water on the tray", Feed = FallFeed.TapIntoWater, DropMetres = 1.9f, Onto = WaterSurface.Pool, Streams = 60 },
+            new FlowFall { Name = "down the waste", Feed = FallFeed.Drain, DropMetres = 0.3f, Onto = WaterSurface.Pool,
+                           LipWidthMetres = 0.12f, Inside = true, Film = true },
+        },
+        Cavity = new FlowCavity { LengthMetres = 0.3f, DiameterMetres = 0.04f },
+        // MEASURED with `--running-water levels sec=60`, 2026-10-06 (round 2): running: Leq 59.8 dB, LAeq 59.4 dB(A); peaks 17.6 dB over.
+        SourceLevelDb = 60f,
+        PeakHeadroomDb = 18f,
+        ExtentMetres = 0.8f,
+        Places = 3,
+        Layout = FlowLayout.Ring,
+    };
+
     public static IReadOnlyDictionary<string, Func<RunningWaterSpec>> Presets { get; } =
         new Dictionary<string, Func<RunningWaterSpec>>(StringComparer.OrdinalIgnoreCase)
         {
@@ -330,6 +605,11 @@ public sealed record RunningWaterSpec
             ["drain_grate"] = () => DrainGrate,
             ["downpipe"] = () => Downpipe,
             ["basin_overflow"] = () => BasinOverflow,
+            ["gutter_outlet"] = () => GutterOutlet,
+            ["kitchen_sink"] = () => KitchenSink,
+            ["dripping_sink"] = () => DrippingKitchenSink,
+            ["washbasin"] = () => Washbasin,
+            ["shower"] = () => Shower,
         };
 
     /// <summary>A preset by name, through the <see cref="ModelLibrary"/> so a map's own wins.</summary>
