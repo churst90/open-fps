@@ -20,6 +20,7 @@ public class EnclosureCostTests
     private readonly ITestOutputHelper _o;
     public EnclosureCostTests(ITestOutputHelper o) => _o = o;
 
+    [Trait("Category", "Timing")] // depends on this machine's speed or on real time; not run on CI
     [Fact]
     public void TheSurveyStaysCheapWhileYouWalkDownMainStreet()
     {

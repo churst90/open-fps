@@ -71,6 +71,7 @@ public class HigherOrderReflectionTests
     }
 
     /// <summary>What it costs on the real city, where it runs for every sound's echoes.</summary>
+    [Trait("Category", "Timing")] // depends on this machine's speed or on real time; not run on CI
     [Fact]
     public void OnTheCityItStaysCheap()
     {
