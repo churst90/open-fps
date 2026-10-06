@@ -39,6 +39,11 @@ public sealed record WaterFallSpec
     /// second of wind over two. Small drops falling far go first. Zero for a fall under a canopy or
     /// into a deep basin.</summary>
     public float DriftPerMetrePerSecond { get; init; } = 0.03f;
+    /// <summary>How many separate jets or strands this fall stands for. Each one necks and bursts
+    /// in its own time, so the bunching of its drops and the wandering of where it breaks up are
+    /// independent from one to the next, and the more of them there are the steadier their sum: the
+    /// fluctuation of the whole goes down as one over the square root of the count.</summary>
+    public int Streams { get; init; } = 1;
 
     /// <summary>A vertical jet from a nozzle, worked out from the nozzle and how high the water
     /// goes: the exit speed is what lifts it there, √(2 g h), and the flow is that speed through the
@@ -100,15 +105,22 @@ public sealed record WaterFeatureSpec
                 FlowLitresPerSecond = 0.86f, FallMetres = 1.1f,
                 DropShare = 0.8f, MeanDropRadiusMm = 1.8f, ChunkRadiusMm = 3f,
                 DriftPerMetrePerSecond = 0.01f,
+                // A thin sheet falling off a rim fingers into strands about 2π√3 capillary lengths
+                // apart (the Rayleigh-Taylor wavelength of a liquid rim; water's capillary length is
+                // 2.7 mm, so about 3 cm): 7.5 m of lip is some 250 strands.
+                Streams = 250,
             },
             WaterFallSpec.Jet("rim jets", 8f, 0.9f, 0.15f, dropShare: 0.35f, meanDropRadiusMm: 1.2f, chunkRadiusMm: 4f) with
             {
                 // Eight of them.
                 FlowLitresPerSecond = 8f * WaterFallSpec.Jet("", 8f, 0.9f, 0.15f).FlowLitresPerSecond,
+                Streams = 8,
             },
         },
         // MEASURED with `--nature levels water`, 2026-10-04: Leq 71.9 dB, 71.4 dB(A), at a metre with
-        // the field's mean wind; its 10 ms peaks' 99.9th percentile 21.2 dB over that.
+        // the field's mean wind; its 10 ms peaks' 99.9th percentile 21.2 dB over that. Re-measured
+        // 2026-10-05 after the grain was taken out (every impact rendered, lumps cushioned): Leq
+        // 72.3 dB, 72.3 dB(A), peaks 19.1 dB over, so the 22 dB of room is now to spare.
         SourceLevelDb = 72f,
         PeakHeadroomDb = 22f,
         ExtentMetres = 3f,
@@ -257,7 +269,9 @@ public sealed record FoliageSpec
         SwayHz = 0.45f,
         // MEASURED with `--nature levels park_tree sec=600`, 2026-10-04: over ten minutes of the field
         // (4.1 m/s mean at the crown) Leq 48.2 dB, 46.7 dB(A); the gustiest second 7.5 dB over that. A
-        // minute is not enough to measure it by — a minute of gusts read 2.3 dB high.
+        // minute is not enough to measure it by — a minute of gusts read 2.3 dB high. Re-measured
+        // 2026-10-05 with the boughs reading the wind across the crown and the field's turbulence at
+        // 0.25: Leq 47.9 dB, 46.3 dB(A), the gustiest second 6.6 dB over.
         SourceLevelDb = 48f,
         PeakHeadroomDb = 20f,
         ExtentMetres = 4f,
@@ -275,7 +289,8 @@ public sealed record FoliageSpec
         ShedDiameterMm = 1.5f,
         StillSpeed = 0.5f,
         SwayHz = 0.35f,
-        // MEASURED with `--nature levels pine sec=600`, 2026-10-04: Leq 44.8 dB over ten minutes.
+        // MEASURED with `--nature levels pine sec=600`, 2026-10-04: Leq 44.8 dB over ten minutes;
+        // 44.4 dB on 2026-10-05 with the field's turbulence at 0.25.
         SourceLevelDb = 45f,
         PeakHeadroomDb = 20f,
         ExtentMetres = 3f,

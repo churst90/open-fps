@@ -4,6 +4,20 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- The park fountain and the wind in the trees are smoother; their tone and loudness are unchanged.
+  The fountain's static came from three things. Only twelve drop impacts were rendered per 3 ms
+  block, each standing in for several drops. The falling lumps of water struck as sharply as
+  single drops, and each lump carried a hundred times a drop's energy. The bunching of the drops
+  stepped the level up and down tens of times a second. Now every impact is rendered, a lump lands
+  softly in the foam left by the one before it, and the bunching glides. It is also averaged over
+  the eight rim jets and the strands falling off the bowl's lip, since each one bunches on its own.
+  For the tree, an eddy hitting a twig was 400 leaf strikes, about ten times what a twig's sixteen
+  leaves can make. It is now about 35, so the rustle comes as many small patches instead of a few
+  loud ones. Each bough reads the wind where it is in the crown, so a gust takes a second or two to
+  cross the tree instead of arriving everywhere at once. The wind field's gustiness goes from 0.3
+  to 0.25, the value the surface-layer law gives at a tree's height over this ground. Before and
+  after pairs are in inbox/nature-round2-2026-10-05.
+
 - `/levels real` is gone. 100 percent is still there as a number, but it is literal source levels,
   which on headphones lost footsteps and idling cars; the default, 45 percent, is the setting to use.
   `/levels` now says "the default" when you are on it.

@@ -31,8 +31,8 @@ public abstract class NatureVoiceState : PhysicalVoiceState
         WindHeight = windHeight;
     }
 
-    /// <summary>The wind where this source is, m/s, now. The field is read once a block, which is
-    /// eleven milliseconds against gusts that last seconds.</summary>
+    /// <summary>The wind where this source is, m/s, now. The field is read once a block, eleven
+    /// milliseconds apart against gusts that last seconds; each synth glides between the readings.</summary>
     protected float WindHere() => WindField.SpeedAt(Position.X, WindHeight, Position.Z, WindField.Now());
 
     protected override void PushListener(Vector3 frame) { }
@@ -99,7 +99,8 @@ public sealed class FoliageVoiceState : NatureVoiceState
 
     protected override void Control(float seconds, float dt)
     {
-        Foliage.Wind = WindHere();
+        // Each bough reads the wind where it is in the crown, not all of them at its middle.
+        Foliage.ReadWind(Position.X, Position.Z, WindField.Now());
         Foliage.Control(dt);
     }
 

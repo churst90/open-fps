@@ -52,11 +52,22 @@ public sealed class FallingWaterSynth
     public const float BubblePascalsPerMm = 0.015f;
 
     /// <summary>An impact's spike, Pa at a metre, for a 1 mm radius drop at 5 m/s. Its energy goes as
-    /// m v³ (Franz 1959) and its rise is fixed, so its peak goes as (r v)^1.5.</summary>
+    /// m v³ (Franz 1959) and a drop's rise is fixed, so its peak goes as (r v)^1.5.</summary>
     public const float ImpactPascals = 0.0142f;
 
-    /// <summary>How fast an impact's force arrives, s: the first contact, microseconds.</summary>
+    /// <summary>How fast a drop's impact force arrives, s: the first contact, microseconds.</summary>
     private const float ImpactRise = 16e-6f;
+
+    /// <summary>A coherent lump's force rise as a share of its r / v: it lands in the froth of the one
+    /// before it, not on still water. Set on 2026-10-05 by measuring, not by ear: with the lumps
+    /// striking as sharply as drops, a 6 mm lump's spike carried a hundred times a drop's energy in
+    /// one click, and the few of them made the 8-16 kHz hiss peaky (its kurtosis over 10 ms windows
+    /// 5.2 against recorded fountains' 3.5-3.8, even with every impact rendered) — the "static" in
+    /// it. A fiftieth brings that band to 3.8 and keeps the octaves 500 Hz-16 kHz within 2 dB of the
+    /// fountain the constants were fitted to; the level does not move. A thirtieth was smoother
+    /// still in 2-8 kHz (kurtosis 3.4, the recordings' own) but left the top octave 2.8 dB short.
+    /// Small lumps still strike in the drop's own rise.</summary>
+    private const float LumpCushion = 0.02f;
 
     /// <summary>β in the depth factor u^β: how skewed the bubbles' loudness is.</summary>
     public const float DepthSkew = 4f;
@@ -93,9 +104,23 @@ public sealed class FallingWaterSynth
     /// two constants above against a recorded fountain of jets falling back into their pool.</summary>
     private const float PlungeAirShare = 0.012f;
 
-    /// <summary>The most events of one kind a fall renders per block; more are stood for, each
-    /// carrying √(real / rendered) of them so the energy is kept.</summary>
+    /// <summary>The most BUBBLES of one kind a fall renders per block; more are stood for, each
+    /// carrying √(real / rendered) of them so the energy is kept. Bubbles ring for milliseconds and
+    /// are most of the cost; their notes are spread in pitch and time, so a dozen a block of each
+    /// kind already sum to a wash.</summary>
     private const int MaxPerBlock = 12;
+
+    /// <summary>The most IMPACTS a fall renders per block: in practice every one. An impact is a few
+    /// samples of spike and a short tail, and it is what the hiss of a fountain is made of, so it is
+    /// not thinned the way the bubbles are. Thinning it was grain in the whoosh: twelve clicks a block
+    /// each twice as loud as a drop stand out of the sum where fifty clicks of their own size merge
+    /// into it — a sum of many small independent events tends to Gaussian noise, a sum of a few large
+    /// ones does not.</summary>
+    private const int MaxImpactsPerBlock = 256;
+
+    /// <summary>How unevenly ONE jet sheds its drops: the standard deviation of the log of its rate
+    /// from slug to slug. A column necks and bursts in slugs tens of milliseconds long.</summary>
+    private const float ClumpSigma = 0.7f;
 
     private const int Block = 128;
 
@@ -108,6 +133,7 @@ public sealed class FallingWaterSynth
     /// <summary>The water is running. When it stops, what is in the air still lands.</summary>
     public bool Running = true;
     private float _flow = 1f;
+    private float _wind = float.NaN;
 
     /// <summary>The wind at the spray, m/s.</summary>
     public float Wind;
@@ -124,7 +150,8 @@ public sealed class FallingWaterSynth
         public float ChunkSpeed;                          // m/s
         public float BubbleMeanVolume;                    // m^3
         public float Wander, WanderTarget, WanderClock;  // the column's breakup moving about
-        public float Clump = 1f, ClumpClock;             // drops arriving in bunches
+        public float Clump = 1f, ClumpFrom = 1f, ClumpTo = 1f, ClumpLength = 1f, ClumpClock; // drops arriving in bunches
+        public float Spread;                              // 1/√streams: how much of one jet's wobble is left in the sum
     }
 
     public FallingWaterSynth(WaterFeatureSpec spec, float sampleRate, int seed)
@@ -141,6 +168,7 @@ public sealed class FallingWaterSynth
                 Spec = f,
                 DropMean = f.MeanDropRadiusMm * 1e-3f,
                 DropMax = MathF.Max(f.MeanDropRadiusMm, f.MaxDropRadiusMm) * 1e-3f,
+                Spread = 1f / MathF.Sqrt(Math.Max(1, f.Streams)),
             };
             float q = f.FlowLitresPerSecond * 1e-3f;                                  // m^3/s
             float meanVolume = 4f / 3f * MathF.PI * MeanCube(s.DropMean, MinDropRadius, s.DropMax);
@@ -264,8 +292,10 @@ public sealed class FallingWaterSynth
             if (f.WanderClock <= 0f)
             {
                 // The top of a jet does not break up the same way twice: sometimes it holds together
-                // and comes down as a column, sometimes it bursts into spray. Seconds at a time.
-                f.WanderTarget = 0.18f * _sum.Signed();
+                // and comes down as a column, sometimes it bursts into spray. Seconds at a time. Each
+                // jet or strand of a fall does it on its own, so the fall as a whole wanders by the
+                // square root of their count less.
+                f.WanderTarget = 0.18f * f.Spread * _sum.Signed();
                 f.WanderClock = 0.4f + 1.6f * _sum.Uniform();
             }
             f.Wander += (f.WanderTarget - f.Wander) * MathF.Min(1f, dt * 2f);
@@ -285,8 +315,11 @@ public sealed class FallingWaterSynth
 
     private void Schedule(float dt)
     {
+        // The wind is handed in once a control call, eleven milliseconds apart; glide to it over a
+        // few blocks so the spray's share never steps.
+        _wind = float.IsNaN(_wind) ? Wind : _wind + (Wind - _wind) * MathF.Min(1f, dt / 0.05f);
         if (_flow <= 0f) return;
-        float wind = Wind;
+        float wind = _wind;
         foreach (var f in _falls)
         {
             // Wind breaks more of a column into spray, and the spray is what it carries away.
@@ -297,14 +330,22 @@ public sealed class FallingWaterSynth
 
             // A jet's top does not shed drops evenly: the column necks and bursts in slugs, and a
             // slug's drops arrive together, tens of milliseconds at a time. That bunching is what
-            // makes the hiss of spray flicker the way a real one does.
+            // makes the hiss of spray flicker the way a real one does. A fall of many jets or
+            // strands flickers by the square root of their count less, since each bunches on its
+            // own. And a slug does not land in an instant — its drops are spread along it by their
+            // different speeds — so the rate glides from one slug's to the next rather than
+            // stepping; the steps, tens a second, were heard as a crackle in the hiss.
             f.ClumpClock -= dt;
             if (f.ClumpClock <= 0f)
             {
                 float g = MathF.Sqrt(-2f * MathF.Log(MathF.Max(1e-6f, _sum.Uniform()))) * MathF.Cos(MathF.Tau * _sum.Uniform());
-                f.Clump = MathF.Exp(0.7f * g - 0.245f);
-                f.ClumpClock = 0.015f + 0.05f * _sum.Uniform();
+                float sigma = ClumpSigma * f.Spread;
+                f.ClumpFrom = f.Clump;
+                f.ClumpTo = MathF.Exp(sigma * g - 0.5f * sigma * sigma);
+                f.ClumpLength = 0.015f + 0.05f * _sum.Uniform();
+                f.ClumpClock = f.ClumpLength;
             }
+            f.Clump = f.ClumpTo + (f.ClumpFrom - f.ClumpTo) * MathF.Max(0f, f.ClumpClock / f.ClumpLength);
             Drops(f, f.DropRate * dropScale * _flow * dt * f.Clump, drift);
             Chunks(f, f.ChunkRate * coherentScale * _flow * dt * f.Clump);
             Plunge(f, f.BubbleRate * coherentScale * _flow * dt);
@@ -315,8 +356,11 @@ public sealed class FallingWaterSynth
     {
         int real = _sum.Poisson(mean);
         if (real == 0) return;
-        int n = Math.Min(real, MaxPerBlock);
+        int n = Math.Min(real, MaxImpactsPerBlock);
         float weight = MathF.Sqrt(real / (float)n);
+        // Every drop's impact is rendered; one drop in `stride` also traps its bubble, for the rest.
+        int stride = (n + MaxPerBlock - 1) / MaxPerBlock;
+        float ringWeight = weight * MathF.Sqrt(stride);
         float tail = 1f - MathF.Exp(-(f.DropMax - MinDropRadius) / f.DropMean);
         for (int k = 0; k < n; k++)
         {
@@ -336,21 +380,22 @@ public sealed class FallingWaterSynth
                 continue;
             }
             _sum.Impact(at, ImpactRise, tau, impact);
+            if (k % stride != 0) continue;
 
             float rmm = r * 1e3f;
             int later = at + (int)(0.003f * _rate * (0.5f + _sum.Uniform()));
             if (rmm >= 0.4f && rmm <= 0.55f && v > 0.8f * TerminalSpeed(r))
             {
                 // The regular bubble: always about the same size, rain on a lake.
-                if (_sum.Uniform() < RegularShare) Ring(later, 0.18f + 0.08f * _sum.Uniform(), weight * DropBubblePart);
+                if (_sum.Uniform() < RegularShare) Ring(later, 0.18f + 0.08f * _sum.Uniform(), ringWeight * DropBubblePart);
             }
             else if (rmm >= 1.1f)
             {
                 if (_sum.Uniform() > IrregularShare) continue;
                 float b = TypeTwoBubbleMm(rmm) * (0.8f + 0.4f * _sum.Uniform());
-                Ring(later, b, weight * DropBubblePart);
+                Ring(later, b, ringWeight * DropBubblePart);
                 if (_sum.Uniform() < SecondaryShare)
-                    Ring(later + (int)(0.004f * _rate * _sum.Uniform()), b * (0.3f + 0.6f * _sum.Uniform()), 0.4f * weight * DropBubblePart);
+                    Ring(later + (int)(0.004f * _rate * _sum.Uniform()), b * (0.3f + 0.6f * _sum.Uniform()), 0.4f * ringWeight * DropBubblePart);
             }
         }
     }
@@ -359,21 +404,28 @@ public sealed class FallingWaterSynth
     {
         int real = _sum.Poisson(mean);
         if (real == 0) return;
-        int n = Math.Min(real, MaxPerBlock);
+        int n = Math.Min(real, MaxImpactsPerBlock);
         float weight = MathF.Sqrt(real / (float)n);
+        int stride = (n + MaxPerBlock - 1) / MaxPerBlock;
+        float ringWeight = weight * MathF.Sqrt(stride);
         float r0 = f.Spec.ChunkRadiusMm * 1e-3f;
         for (int k = 0; k < n; k++)
         {
             int at = (int)(_sum.Uniform() * Block);
             float r = r0 * (0.5f + _sum.Uniform());
             float v = f.ChunkSpeed * (0.9f + 0.2f * _sum.Uniform());
-            _sum.Impact(at, ImpactRise, r / v, ImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart);
-            if (_sum.Uniform() > ChunkShare) continue;
+            // A lump lands where the column before it landed, into its own crater and the froth that
+            // left, so its force builds over a share of the time it takes to bury itself rather than
+            // in the microseconds a drop's round front meets still water. Same energy (m v³), spread
+            // over the longer rise, so the peak comes down as the root of it.
+            float rise = MathF.Max(ImpactRise, LumpCushion * r / v);
+            _sum.Impact(at, rise, r / v, MathF.Sqrt(ImpactRise / rise) * ImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart);
+            if (k % stride != 0 || _sum.Uniform() > ChunkShare) continue;
             // A lump opens a crater too big to close in one: the bubble it traps is a large one, up to
             // the lump's own size — the low "glug" under a fountain. Smaller ones far more often.
             float u = _sum.Uniform();
             float bubbleMm = r * 1e3f * (0.15f + 0.85f * u * u);
-            Ring(at + (int)(0.006f * _rate * (0.5f + _sum.Uniform())), bubbleMm, weight * LumpBubblePart);
+            Ring(at + (int)(0.006f * _rate * (0.5f + _sum.Uniform())), bubbleMm, ringWeight * LumpBubblePart);
         }
     }
 
