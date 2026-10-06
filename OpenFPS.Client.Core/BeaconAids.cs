@@ -197,6 +197,7 @@ public sealed class BeaconAids
             TransmissionBleed = path?.TransmissionBleed ?? 0f,
             TargetRegionId = region != -1 ? region : path?.RegionId ?? -1,
             Volume = gain,
+            EarLevelDb = BlipDb + (float)_prefs.LevelDb,
             MinDistance = reference,
             Range = 40f,
             IsEvent = true,
