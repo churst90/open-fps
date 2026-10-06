@@ -91,17 +91,23 @@ public sealed class MapTiles
             }
         });
         // A doorway and the rooms it joins go together: a door on the edge of full detail whose room
-        // stands in the next tile would otherwise open onto nothing (43 such on Magnolia). Each is in
-        // the other's tiles, so where one is sent the other is.
+        // stands in the next tile would otherwise open onto nothing (43 such on Magnolia). Rooms joined
+        // by doorways, and their doorways, are one group (a house), and every member is in every tile
+        // any member is in: where one is sent, all are.
+        var parent = new Dictionary<int, int>();
+        int Find(int x) { while (parent.TryGetValue(x, out var p) && p != x) x = parent[x] = parent.GetValueOrDefault(p, p); return x; }
+        void Union(int a, int b) { int ra = Find(a), rb = Find(b); if (ra != rb) parent[ra] = rb; }
         foreach (var (id, ra, rb) in doorways)
             foreach (int room in new[] { ra, rb })
-            {
-                if (!pending.TryGetValue(room, out var r) || !pending.TryGetValue(id, out var d)) continue;
-                var both = new HashSet<TileKey>(d.Keys);
-                both.UnionWith(r.Keys);
-                d.Keys.UnionWith(both);
-                r.Keys.UnionWith(both);
-            }
+                if (pending.ContainsKey(room) && pending.ContainsKey(id)) { parent.TryAdd(id, id); parent.TryAdd(room, room); Union(id, room); }
+        var groups = new Dictionary<int, HashSet<TileKey>>();
+        foreach (int id in parent.Keys)
+        {
+            int root = Find(id);
+            if (!groups.TryGetValue(root, out var keys)) groups[root] = keys = new HashSet<TileKey>();
+            keys.UnionWith(pending[id].Keys);
+        }
+        foreach (int id in parent.Keys) pending[id].Keys.UnionWith(groups[Find(id)]);
         foreach (var (e, keys, needs) in pending.Values)
             tiles.Add(e, keys.OrderBy(k => k.X).ThenBy(k => k.Z).ToArray(), needs);
         return tiles;

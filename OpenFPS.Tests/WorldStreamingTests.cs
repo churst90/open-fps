@@ -217,8 +217,10 @@ public class WorldStreamingTests
                 coarseBytes += MemoryPackSerializer.Serialize(EntityDefinitionFactory.From(world, e)).Length;
         }
         foreach (var (kind, (c, f)) in byKind.OrderBy(kv => kv.Key)) _o.WriteLine($"  {id} {kind}: {c} coarse, {f} full");
-        foreach (var kind in new[] { "fence", "hedge", "tree", "woods", "outer wall" })
+        foreach (var kind in new[] { "hedge", "tree", "woods" })
             if (byKind.TryGetValue(kind, out var n)) Assert.Equal(0, n.Full);
+        // Fences and walls by the rule, not the name: a run at least 2 m long and 0.8 m tall is coarse.
+        Assert.True(byKind.GetValueOrDefault("outer wall").Coarse > 1000);
         foreach (var kind in new[] { "room", "tree crown", "post", "lawn" })
             if (byKind.TryGetValue(kind, out var n)) Assert.Equal(0, n.Coarse);
 
