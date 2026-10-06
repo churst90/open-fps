@@ -260,6 +260,8 @@ public class WideSourcesTests
     [Fact]
     public void ATreesPlaceVoicesAddUpToItsOneVoice()
     {
+        // The field's own weather, held for this test: a session test running beside it writes the shared one.
+        using var held = WindField.Hold(WindWeather.Default);
         var spec = FoliageSpec.ParkTree;
         var at = new Vector3(400f, 7f, -300f);
         int n = 1 + FoliageSynth.Boughs;
