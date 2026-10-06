@@ -2911,6 +2911,51 @@ public class ClientAudioSystem
     /// trail and slide around you. So an own step is placed at a fixed offset from the listener's
     /// head and follows it, whatever the network is doing to the position underneath.
     /// </summary>
+    // ── The listening-level calibration's voice (ListeningCalibration) ────────────────────────
+    //
+    // A person one step in front, at a digital gain the calibration chooses: placed directly, not by
+    // the loudness law, and with no ear stage (no EarLevelDb), because it is meant to play at exactly
+    // the level a real voice has there, with its real tone. Two ids taken in turn, so a new saying
+    // never has to wait for the old one's voice to be released.
+    private const int ReferenceVoiceBase = -7_900_000;
+    private int _referenceVoice;
+
+    public void PlayReferenceVoice(string soundId, float gainDb)
+    {
+        StopReferenceVoice();
+        _referenceVoice = (_referenceVoice + 1) & 1;
+        var forward = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(_state.Yaw, 0f, 0f));
+        Vector3 ear = _state.VisualPosition + new Vector3(0f, _state.EyeHeight, 0f);
+        Vector3 mouth = ear + forward * 1f - new Vector3(0f, _state.EyeHeight - OpenFPS.Common.Speech.MouthHeight, 0f);
+        _audio.Submit(new SpatialEmitter
+        {
+            EntityId = ReferenceVoiceBase - _referenceVoice,
+            SoundId = soundId,
+            Mode = PlaybackMode.Single,
+            Type = EmitterType.WorldLocked,
+            Position = mouth,
+            ApparentPosition = mouth,
+            Direction = -forward,
+            Volume = MathF.Pow(10f, gainDb / 20f),
+            // Flat out to the speaker, so the gain is the level at the ear.
+            MinDistance = 1f,
+            Range = 20f,
+            Pitch = 1f,
+            Essential = true,
+            IsEvent = true,
+            EqLow = 1f, EqMid = 1f, EqHigh = 1f,
+            ApertureFactor = 1f,
+            CarriesPath = true,
+            TargetRegionId = _listenerRegion,
+        });
+    }
+
+    public void StopReferenceVoice()
+    {
+        _audio.StopSoundImmediate(ReferenceVoiceBase);
+        _audio.StopSoundImmediate(ReferenceVoiceBase - 1);
+    }
+
     public void OnOwnFootstep(Vector3 pos, string mat, string var, StepSlope slope = StepSlope.Level)
     {
         if (_footTrace) Log.Information("[FOOT] step {Slope} on {Mat} at {Pos}", slope, mat, pos);

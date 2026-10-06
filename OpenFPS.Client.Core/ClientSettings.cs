@@ -48,6 +48,23 @@ public sealed class ClientSettings
     /// </summary>
     public float LevelCompression { get; set; } = OpenFPS.Common.Loudness.DefaultCompression;
 
+    /// <summary>
+    /// How loud your headphones play the game: the level, dB SPL at your ears, of a sound the mix places
+    /// at its pivot. 70 (the default) is the pivot at its own level, a normal voice at arm's length at a
+    /// conversational 62 dB. Set by ear with `/listening`, or `/listening 65`. It changes no level in the
+    /// mix, only how much of a sound's tone the ear model gives back at the level it plays at
+    /// (docs/EAR_MODEL.md). The live value is the truth: <see cref="Save"/> records it.
+    /// </summary>
+    public float ListeningLevelDb { get; set; } = OpenFPS.Common.Hearing.EarModel.DefaultListeningLevelDb;
+
+    /// <summary>Puts this file's listening level into play, unless the environment chose one for the
+    /// run. Each head calls it once, after loading.</summary>
+    public void ApplyHearing()
+    {
+        if (!OpenFPS.Common.Hearing.EarModel.ListeningFromEnvironment)
+            OpenFPS.Common.Hearing.EarModel.ListeningLevelDb = ListeningLevelDb;
+    }
+
     /// <summary>Saying what is in front of you as you turn (N in game). See <see cref="NavigationAids"/>.</summary>
     public bool TurnNarration { get; set; } = true;
     /// <summary>The knock and the name when you walk into something (/bumps in game).</summary>
@@ -127,6 +144,8 @@ public sealed class ClientSettings
         // What is playing, unless a run's environment chose it: that is not the player's choice.
         if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
             LevelCompression = OpenFPS.Common.Loudness.DynamicRangeCompression;
+        if (!OpenFPS.Common.Hearing.EarModel.ListeningFromEnvironment)
+            ListeningLevelDb = OpenFPS.Common.Hearing.EarModel.ListeningLevelDb;
         // ...and the navigation aids as they are now: a key in game turns them, not this copy.
         TurnNarration = NavigationAids.TurnNarration;
         WallBumps = NavigationAids.WallBumps;

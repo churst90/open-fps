@@ -176,6 +176,7 @@ internal static partial class GtkClientProgram
         if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
             OpenFPS.Common.Loudness.DynamicRangeCompression = _settings.LevelCompression;
         _settings.ApplyNavigationAids();
+        _settings.ApplyHearing();
         _session.BeginAudioInit(ApplyAudioSettings);
 
         var loop = new Thread(GameLoop) { IsBackground = true, Name = "GameLoop" };
