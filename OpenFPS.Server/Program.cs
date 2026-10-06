@@ -38,6 +38,7 @@ public class GameServer
     private readonly System.Collections.Concurrent.ConcurrentQueue<int> _dirtyAudioEntities = new();
     private readonly VehicleSystem _vehicles = new();
     private readonly PedestrianSpeech _speech = new();
+    private readonly CharacterSystem _characters = new();
     private readonly RailSystem _rail = new();
     private CrossingSystem _crossings = null!;
 
@@ -112,6 +113,9 @@ public class GameServer
 
     /// <summary>The traffic, walkers and parked aircraft: what /spawn and /give add to.</summary>
     public VehicleSystem Vehicles => _vehicles;
+    /// <summary>People with names on the maps (Alex), and what the street says.</summary>
+    public CharacterSystem Characters => _characters;
+    public PedestrianSpeech StreetSpeech => _speech;
     /// <summary>The trains: what /spawn train adds to.</summary>
     public RailSystem Rail => _rail;
 
@@ -356,6 +360,10 @@ public class GameServer
         _composites = new CompositeService(_maps, prefabRepo, new CompositeRepository("composites"));
         _composites.PlaceRecorded(_maps);
         _vehicles.Spawn(_maps, _composites);
+        // Somebody with a name and a day of their own (Alex): made once the map's places are known.
+        _characters.Spawn(_maps);
+        _speech.CharacterView = _characters.ViewOf;
+        _speech.FaceCharacter = _characters.Face;
         _rail.Spawn(_maps);
         _crossings = new CrossingSystem(_rail, SyncAudioComponent);
         _rail.CrossingsOn = _crossings.PositionsOn;
@@ -794,6 +802,14 @@ public class GameServer
                     stage.Dispose();
                     stage = PerfProbe.Measure("server.traffic");
                     _vehicles.Update(entry.Key, world, dt);
+                    // Before the seats carry anybody: Alex gets on and off the bus here.
+                    if (_characters.Count > 0)
+                    {
+                        var day = _environment.GetStateForMap(_maps.TryGetMapData(entry.Key, out var dayMap)
+                            ? new MapAtmosphere(dayMap.Temperature, dayMap.Humidity, dayMap.AirPressure, dayMap.AirAbsorptionMultiplier)
+                            : MapAtmosphere.Default);
+                        _characters.Update(entry.Key, world, grid, dt, day, _environment.CurrentScenario);
+                    }
                     stage.Dispose();
                     stage = PerfProbe.Measure("server.rail+combat");
                     // Reloads that are due, the dead got up again or taken away.

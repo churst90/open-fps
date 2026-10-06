@@ -36,10 +36,12 @@ public class PedestrianSpeechTests
     {
         // Cody's set on 2026-09-27, and glenn, louis, steve and two children on 2026-09-28: twenty-three
         // grown-ups who walk the streets, two children for the schools to come, and five angry drivers.
-        Assert.Equal(30, Speech.Voices.Count);
-        Assert.Equal(new[] { "alec", "ben", "camel", "ethan", "fluke", "glenn", "jimdale", "joeb", "joel", "louis", "presidents_kid", "seanterry", "steve", "tim", "tyler" },
+        // And alex on 2026-10-06: one homeless man, who is a character and not one of the crowd.
+        Assert.Equal(31, Speech.Voices.Count);
+        Assert.Equal(new[] { "alec", "alex", "ben", "camel", "ethan", "fluke", "glenn", "jimdale", "joeb", "joel", "louis", "presidents_kid", "seanterry", "steve", "tim", "tyler" },
                      Speech.Takes.Where(t => t.Kind == "cloned").Select(t => t.Voice).Distinct().OrderBy(v => v));
-        Assert.Equal(23, Speech.VoicesWith("greet").Count);
+        Assert.Equal(24, Speech.VoicesWith("greet").Count);
+        Assert.DoesNotContain("alex", PedestrianSpeech.WalkerVoices);
         Assert.DoesNotContain("ethan", PedestrianSpeech.WalkerVoices);
         Assert.Contains("angry_vito", Speech.VoicesWith("yell"));
         Assert.DoesNotContain("angry_vito", PedestrianSpeech.WalkerVoices);

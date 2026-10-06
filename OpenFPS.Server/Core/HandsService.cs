@@ -871,6 +871,35 @@ public class HandsService
         if (world.Has<T>(e)) world.Set(e, value); else world.Add(e, value);
     }
 
+    /// <summary>
+    /// Hands what is in a player's hands to somebody who takes it and keeps it (/hand: Alex): out of
+    /// their hands and out of the world. <paramref name="name"/> is what it was. A body is not handed over.
+    /// </summary>
+    public bool HandOver(UserSession session, string which, out string name, out string message)
+    {
+        name = ""; message = "";
+        if (!_maps.TryGetMap(session.CurrentMapId, out var world, out _, out _, out var lookup))
+        { message = "The map is not loaded."; return false; }
+        if (session.Entity == Entity.Null || !world.IsAlive(session.Entity))
+        { message = "You are not in the world yet."; return false; }
+        var held = InHands(world, session.Entity, lookup, which);
+        if (held.Count == 0)
+        {
+            message = string.IsNullOrEmpty(which) ? "You are not holding anything to give." : $"You are not holding a {which}.";
+            return false;
+        }
+        var item = held[0];
+        if (world.Has<Corpse>(item)) { message = "Nobody wants that."; return false; }
+        name = NameOf(world, item);
+        ClearFromHands(world, session.Entity, item.Id);
+        if (world.Has<InventoryComponent>(session.Entity)) Bag(world, session.Entity).Remove(item.Id);
+        int id = item.Id;
+        _maps.DestroyEntity(session.CurrentMapId, item);
+        Removed?.Invoke(session.CurrentMapId, id);
+        Log.Information("{User} handed over {Item}.", session.Username, name);
+        return true;
+    }
+
     private static void ClearFromHands(World world, Entity player, int itemId)
     {
         if (!world.Has<HandsComponent>(player)) return;

@@ -96,6 +96,13 @@ public partial struct IdentityComponent
     /// </summary>
     public string BeaconCategory { get; set; } = "";
 
+    /// <summary>
+    /// A person with a name of their own (a character such as Alex, not a passer-by): the scope and
+    /// everything else that names people says <see cref="Name"/>, as it says a player's, where a walker
+    /// is "person" or "someone". Appended: the wire format is positional.
+    /// </summary>
+    public bool Named { get; set; } = false;
+
     public IdentityComponent() { }
 }
 

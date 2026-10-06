@@ -141,6 +141,9 @@ public class MapData
     /// <summary>Places on the roads where vehicles stop. See RoadStopData.</summary>
     public List<RoadStopData>? RoadStops { get; set; }
 
+    /// <summary>People with names and lives of their own on this map, one of each (CharacterSystem).</summary>
+    public List<CharacterData>? Characters { get; set; }
+
     /// <summary>
     /// Composites placed on this map — houses, stalls, barricades, anything built out of parts and
     /// saved. Instantiated at load in the order they appear.
@@ -345,6 +348,24 @@ public class TrainData
     public float StartOffsetMetres { get; set; }
     public float AccelerationMps2 { get; set; } = 0.9f;
     public float BrakingMps2 { get; set; } = 1.0f;
+}
+
+/// <summary>
+/// Somebody who lives on a map rather than walking a line of it: a name, a voice, and what kind of
+/// life they lead, which decides where they go (CharacterSystem). Where those places are is found
+/// from the map itself: its bus stops, its buildings' front entrances, its squares.
+/// </summary>
+public class CharacterData
+{
+    /// <summary>What people call them, and what the world says: "Alex".</summary>
+    public string Name { get; set; } = "";
+    /// <summary>The voice they speak in (Speech/voices.csv).</summary>
+    public string Voice { get; set; } = "";
+    /// <summary>The life they lead. "homeless": no home and no money, the street by day and a
+    /// lobby or a shelter by night.</summary>
+    public string Kind { get; set; } = "homeless";
+    /// <summary>How they are described when looked at: "a homeless man".</summary>
+    public string Description { get; set; } = "";
 }
 
 /// <summary>A vehicle on a map: which car, which road, how fast on each pass.</summary>

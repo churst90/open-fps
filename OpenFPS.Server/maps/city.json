@@ -1681,6 +1681,14 @@
    "ForPreset": "bus"
   }
  ],
+ "Characters": [
+  {
+   "Name": "Alex",
+   "Voice": "alex",
+   "Kind": "homeless",
+   "Description": "a homeless man"
+  }
+ ],
  "StreetLife": {
   "HornEverySeconds": 15,
   "HardBrakeEverySeconds": 60,

@@ -1483,6 +1483,7 @@ public sealed partial class CombatService
     internal static string HitWords(World world, Entity e, bool killed, bool head, float metres)
     {
         string whom = world.Has<PlayerComponent>(e) ? world.Get<PlayerComponent>(e).Username
+                    : world.Has<IdentityComponent>(e) && world.Get<IdentityComponent>(e).Named ? NameOf(world, e)
                     : world.Has<Pedestrian>(e) ? "pedestrian"
                     : NameOf(world, e);
         return $"{(killed ? "Killed" : "Hit")} {whom}{(head ? " in the head" : "")} at {MathF.Round(metres):F0} metres.";

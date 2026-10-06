@@ -55,7 +55,8 @@ public static class ScopeView
         string name = e.Definition.Identity.Name ?? "";
         return kind switch
         {
-            SightKind.Person => "person",
+            // A person with a name of their own is called by it, as a player is (IdentityComponent.Named).
+            SightKind.Person => e.Definition.Identity.Named && !string.IsNullOrWhiteSpace(name) ? name.Trim() : "person",
             SightKind.Player => string.IsNullOrWhiteSpace(name) ? "a player" : name,
             SightKind.Aircraft => string.IsNullOrWhiteSpace(name) ? "aircraft" : name,
             SightKind.Train => "train",
