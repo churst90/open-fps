@@ -345,6 +345,8 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/stow [name|left|right|all]` (or `/sling`): put on your back.
 - `/draw [name]` (or `/equip`, `/wield`, `/unsling`): take into your hands.
 - `/hands`: what is in your hands. `/inv` (or `/i`, `/inventory`): everything you carry.
+- `/hand [name]` (or `/offer`): give what you hold to the person beside you, if they will take it. On
+  the city that is Alex, who asks everybody for something; he keeps it and thanks you.
 
 ### Guns
 - `/fire` (or `/shoot`): fire the gun in your hands.
@@ -814,6 +816,7 @@ this command." `/help` lists only the commands you may use.
 - `/announce message`: a message to everyone, from "Server".
 - `/setmotd [text]`.
 - `/where NAME` (or `/locate`): which way and how far, if they are on your map; which map otherwise.
+  `/where alex` finds Alex, says where he is (x east, y north, height) and what he is doing.
 - `/bring NAME`: bring a player to you.
 - `/kick NAME [reason]`: disconnect a player.
 - `/mute NAME [minutes]`: stop a player chatting, 10 minutes if not said. `/unmute NAME`.

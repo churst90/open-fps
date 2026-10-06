@@ -2055,6 +2055,17 @@ for name, a, b, kmh, wait, delay, pair in WALKERS:
         "WaitSeconds": wait, "StartDelaySeconds": delay, **({"Pair": pair} if pair else {}),
     })
 
+# ── Alex ──────────────────────────────────────────────────────────────────────────────────────
+#
+# A homeless man (Cody, 2026-10-06: "he walks the streets, rides the bus, hangs out at bus stops and in
+# front of stores and the lobby in apartment buildings because he's homeless"). One of him, with his
+# own voice, which no walker or driver is given. Only who he is is declared here: where he goes is
+# found by the server from what the map is (its bus stops, its front entrances, its squares), and so is
+# the way between them (its pavements). See CharacterSystem.
+CHARACTERS = [
+    {"Name": "Alex", "Voice": "alex", "Kind": "homeless", "Description": "a homeless man"},
+]
+
 # ── Trains ────────────────────────────────────────────────────────────────────────────────────
 #
 # Two light rail sets on the loop, half a lap apart. The server places one entity per sound
@@ -2337,6 +2348,7 @@ map_data = {
     "Roads": ROADS,
     "Junctions": JUNCTIONS,
     "RoadStops": ROAD_STOPS,
+    "Characters": CHARACTERS,
     "StreetLife": STREET_LIFE,
     "Vehicles": VEHICLES,
     "Trains": TRAINS,

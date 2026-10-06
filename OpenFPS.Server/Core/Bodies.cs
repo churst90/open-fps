@@ -86,6 +86,9 @@ public static class Bodies
     {
         if (world.Has<PlayerComponent>(person) && !string.IsNullOrWhiteSpace(world.Get<PlayerComponent>(person).Username))
             return world.Get<PlayerComponent>(person).Username;
+        // Somebody with a name of their own is called by it, as a player is: "body of Alex".
+        if (world.Has<IdentityComponent>(person) && world.Get<IdentityComponent>(person) is { Named: true, Name: { Length: > 0 } own })
+            return own.Trim();
         string name = world.Has<IdentityComponent>(person) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(person).Name)
             ? world.Get<IdentityComponent>(person).Name
             : world.Has<NameComponent>(person) ? world.Get<NameComponent>(person).Name ?? "" : "";

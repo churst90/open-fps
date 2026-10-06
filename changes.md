@@ -45,6 +45,35 @@ Recent work, newest first. `git log` has the rest.
   - Open: the fountain's rim jets are heard from the rocks' taps, 2.3 m from its middle, though they
     land near the kerb; a tree still has a floor of about 0.3 at 4-8 kHz with seven places; machines
     with several radiators are still one point.
+- Alex, a homeless man, lives on the city (unheard). His voice is imported (629 lines, alex) and is
+  nobody else's: a voice with homeless_* lines is never handed to a walker, a driver, a pair or a
+  phone call.
+- His places are found from the map: the two bus shelters on Main Street, the pavement outside each
+  front entrance (the five towers and the terminal), the lobbies behind the towers' doors (the
+  stairwell on the ground floor), Market Square and Elm Park. There are no shops on the city yet;
+  a street door named as a shop's entrance would become one of his places by itself.
+- He stays at each for minutes (3-10 by day; a lobby 8-20 at night, in the cold or the wet) and
+  walks to the next along the pavements, round shelters and anything else standing on them, crossing
+  at corners. At night and in the cold or rain he mostly goes to a lobby; by day to the bus stops,
+  doorways and the square. A tower's front door is locked from the street: he waits at it until
+  somebody opens it, and after 45 s somebody inside lets him in. From a bus stop he sometimes waits
+  for the bus, gets on, rides and gets off at the other stop. His day is seeded by map, name and game
+  day.
+- What he says follows Cody's table: asks (money, smokes, food, weed, drugs, and somewhere to sleep at
+  night or in the cold) when a player or passer-by comes within 4.5 m; thanks after /hand; something
+  bitter when you walk past his ask; angry when bumped or crowded and now and then at nothing; cops
+  when a police car is within 30 m; cars when a car passes within 5 m or honks; ride when a car stops
+  beside him with somebody at it or in it; mutter or shelter lines to himself every minute or two; a
+  story to a player who stands with him ten seconds. Never two lines at once, 3 s after each line
+  (15 s walking), each player asked once in two minutes, passers-by at most one every 30-60 s. Lines
+  that name the hour or the weather only when true. Passers-by he asks sometimes say no.
+- /hand [thing] (or /offer) gives what you hold to the person beside you who will take it. /where alex
+  says where he is (x y height, for /tp) and what he is doing. The scope, a body and a hit call him by
+  name (IdentityComponent.Named, appended: a new Windows zip is needed).
+- A person who is not a player can sit in a seat (Alex on the bus): carried by OccupancySystem, and
+  no footsteps (RidingEntityId for anyone in a seat).
+- OPENFPS_GAME_HOUR and OPENFPS_TIME_MULTIPLIER set the server clock; OPENFPS_CHARACTER_PACE speeds
+  his day up for testing.
 
 - Rain round 2 (unheard). Renders in inbox/textures-round2-rain-2026-10-06, with a README.
 - Rain no longer crunches. A drop's click on a road, a roof or the ground rises smoothly instead of as

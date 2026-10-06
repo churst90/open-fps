@@ -88,6 +88,30 @@ public class WorldEnvironmentSystem
     {
         _random = random ?? Random.Shared;
         ApplyPinnedWeather();
+        ApplyClock();
+    }
+
+    /// <summary>
+    /// The clock for testing what happens at an hour of the day, or over a day in a few minutes:
+    ///
+    ///     OPENFPS_GAME_HOUR=21.5 OPENFPS_TIME_MULTIPLIER=600 ./run-server.sh city
+    ///
+    /// starts the day at half past nine at night and runs it ten minutes a second. Unset, the day
+    /// starts at eight and runs a minute a second.
+    /// </summary>
+    private void ApplyClock()
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        if (float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_GAME_HOUR"), System.Globalization.NumberStyles.Float, inv, out float hour))
+        {
+            _env.GameTime = Math.Clamp(hour, 0f, 23.999f);
+            Log.Information("WorldEnvironment: the day starts at {Hour:F2} (OPENFPS_GAME_HOUR).", _env.GameTime);
+        }
+        if (float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_TIME_MULTIPLIER"), System.Globalization.NumberStyles.Float, inv, out float rate) && rate > 0f)
+        {
+            _timeMultiplier = rate;
+            Log.Information("WorldEnvironment: game time runs {Rate}x real time (OPENFPS_TIME_MULTIPLIER).", rate);
+        }
     }
 
     /// <summary>

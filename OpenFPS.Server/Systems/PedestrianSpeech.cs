@@ -17,6 +17,9 @@ public struct Pedestrian
     public string Voice;
     /// <summary>Two people walking together share this ("" for somebody on their own).</summary>
     public string Pair;
+    /// <summary>The name of somebody in particular (CharacterSystem: "Alex"), or "" for a passer-by.
+    /// What a character says is their own (PedestrianSpeech.Homeless), not the crowd's.</summary>
+    public string Character;
 }
 
 /// <summary>What is true about the world right now that a person might remark on.</summary>
@@ -35,7 +38,7 @@ public readonly record struct SpeechConditions(float Hour, float TemperatureC, f
 /// "Morning" only in the morning by the game clock, "Looks like rain" only when a wet front is coming
 /// in, "Cold out here today" only when it is. A line the world cannot make true is not used at all.
 /// </summary>
-public sealed class PedestrianSpeech
+public sealed partial class PedestrianSpeech
 {
     /// <summary>Close enough that a hello is meant for you: a pavement's width and a step.</summary>
     public const float GreetMetres = 4f;
@@ -132,9 +135,21 @@ public sealed class PedestrianSpeech
 
     private static IReadOnlyList<string>? _walkerVoices;
 
-    /// <summary>Everybody who can greet you, with the favourites in twice.</summary>
+    /// <summary>Everybody who can greet you, with the favourites in twice. Not a character's voice:
+    /// there is one Alex, and a passer-by in his voice would be him twice.</summary>
     public static IReadOnlyList<string> WalkerVoices => _walkerVoices ??=
-        Speech.VoicesWith("greet").Concat(Speech.VoicesWith("greet").Where(Favourites.Contains)).ToArray();
+        PasserByVoices().Concat(PasserByVoices().Where(Favourites.Contains)).ToArray();
+
+    private static IEnumerable<string> PasserByVoices() => Speech.VoicesWith("greet").Where(v => !IsCharacterVoice(v));
+
+    /// <summary>The categories that make a voice somebody in particular: a panhandler's asks
+    /// (homeless_money, homeless_cops...). Any voice that recorded them is a character's (Alex), never
+    /// handed out to a walker, a driver or a pair, and never on the phone.</summary>
+    public const string CharacterCategoryPrefix = "homeless_";
+
+    /// <summary>Whether a voice belongs to a character rather than to the crowd.</summary>
+    public static bool IsCharacterVoice(string voice)
+        => Speech.Takes.Any(t => t.Voice == voice && t.Category.StartsWith(CharacterCategoryPrefix, StringComparison.Ordinal));
 
     /// <summary>
     /// The next voice for a new person on a map. Handed out in turn, so a street of a dozen people is a
@@ -165,7 +180,8 @@ public sealed class PedestrianSpeech
     }
 
     /// <summary>The next driver's voice: somebody with something to yell.</summary>
-    public static string NextDriverVoice(string mapId) => Next("drive:" + mapId, Speech.VoicesWith("yell"));
+    public static string NextDriverVoice(string mapId)
+        => Next("drive:" + mapId, Speech.VoicesWith("yell").Where(v => !IsCharacterVoice(v)).ToArray());
 
     private static string Next(string key, IReadOnlyList<string> voices)
     {
@@ -184,11 +200,21 @@ public sealed class PedestrianSpeech
                        Action<int, string, TransientSound> say)
     {
         var people = new List<(int Id, Vector3 At, Vector3 Forward, float Speed, string Voice)>();
+        var characters = new List<(int Id, Vector3 At, Vector3 Forward, float Speed, string Voice)>();
         var pairs = new Dictionary<string, List<int>>();
         world.Query(new QueryDescription().WithAll<Transform, Velocity, Pedestrian>().WithNone<DeadComponent>(),
             (Entity e, ref Transform t, ref Velocity v, ref Pedestrian p) =>
             {
                 if (string.IsNullOrEmpty(p.Voice)) return;
+                if (!string.IsNullOrEmpty(p.Character))
+                {
+                    // Somebody in particular: what they say is their own (Homeless), not the crowd's.
+                    var cf = Vector3.Transform(Vector3.UnitZ, t.Rotation);
+                    cf.Y = 0f;
+                    cf = cf.LengthSquared() > 1e-6f ? Vector3.Normalize(cf) : Vector3.UnitZ;
+                    characters.Add((e.Id, t.Position, cf, new Vector2(v.Linear.X, v.Linear.Z).Length(), p.Voice));
+                    return;
+                }
                 if (!string.IsNullOrEmpty(p.Pair))
                 {
                     if (!pairs.TryGetValue(p.Pair, out var members)) pairs[p.Pair] = members = new List<int>();
@@ -199,8 +225,8 @@ public sealed class PedestrianSpeech
                 fwd = fwd.LengthSquared() > 1e-6f ? Vector3.Normalize(fwd) : Vector3.UnitZ;
                 people.Add((e.Id, t.Position, fwd, new Vector2(v.Linear.X, v.Linear.Z).Length(), p.Voice));
             });
-        PruneGone(mapId, people);
-        if (people.Count == 0) return;
+        PruneGone(mapId, people.Concat(characters).ToList());
+        if (people.Count == 0 && characters.Count == 0) return;
 
         var players = new List<(int Id, Vector3 At, float Speed)>();
         world.Query(new QueryDescription().WithAll<Transform, PlayerComponent>().WithNone<DeadComponent>(),
@@ -220,7 +246,10 @@ public sealed class PedestrianSpeech
             Phone(mapId, p, me, players, now, cond, say);
             Remark(p, me, players, now, cond, say);
         }
-        React(mapId, people, players, now, say);
+        foreach (var ch in characters)
+            Panhandle(mapId, world, ch, people, players, now, cond, say);
+        // A character startles at a shot like anybody, and is asked nothing by the crowd.
+        React(mapId, people.Concat(characters).ToList(), players, now, say);
         foreach (var (pair, members) in pairs)
             if (members.Count == 2) Converse(mapId, pair, people[members[0]], people[members[1]], players, now, say);
 
@@ -252,6 +281,7 @@ public sealed class PedestrianSpeech
         foreach (var key in _people.Keys.Where(k => k.Map == mapId && !_seen.Contains(k)).ToList())
         {
             _people.Remove(key);
+            lock (_panhandlers) _panhandlers.Remove(key);
             foreach (var enc in _encounters.Keys.Where(k => k.Map == mapId && (k.Person == key.Id || k.Other == key.Id)).ToList())
                 _encounters.Remove(enc);
         }
@@ -493,6 +523,7 @@ public sealed class PedestrianSpeech
                      : string.Equals(label, "horn", StringComparison.OrdinalIgnoreCase) ? "horn" : null;
         if (kind == null) return;
         lock (_happened) _happened.Add((mapId, kind, sounds[0].Position, now));
+        if (kind == "horn") HeardHorn(mapId, sounds[0].Position, now);
     }
 
     /// <summary>A shot this close is "near": people duck and swear. Further, up to the far range, it is
@@ -513,7 +544,8 @@ public sealed class PedestrianSpeech
             float reach = h.Kind == "shot" ? ShotFarMetres : HornMetres;
             var near = people.Where(p => Apart(p.At, h.At) < reach
                                          && players.Any(q => Apart(q.At, p.At) < HeardMetres)
-                                         && _people.TryGetValue((mapId, p.Id), out var pp) && now >= pp.BusyUntil)
+                                         && _people.TryGetValue((mapId, p.Id), out var pp) && now >= pp.BusyUntil
+                                         && MayReact(mapId, p.Id, h.Kind, Apart(p.At, h.At), now))
                              .OrderBy(p => Apart(p.At, h.At)).Take(h.Kind == "shot" ? 3 : 1).ToList();
             int said = 0;
             foreach (var p in near)

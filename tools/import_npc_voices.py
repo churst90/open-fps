@@ -2,7 +2,7 @@
 """Imports a folder of NPC voice lines into the game.
 
     tools/import_npc_voices.py approved/voices/npc-voices-2026-09-26 \
-        --clones=seanterry,jimdale,joeb,joel,tim,ben,alec,fluke,camel,tyler,glenn,louis,steve,ethan,presidents_kid
+        --clones=seanterry,jimdale,joeb,joel,tim,ben,alec,fluke,camel,tyler,glenn,louis,steve,ethan,presidents_kid,alex
 
 Reads the folder's manifest.csv (voice, kind, category, file, text, seconds, whisper_match) and:
 
@@ -15,6 +15,8 @@ of the game, and its recordings are removed from ASSETS. A manifest row whose fi
 
 Cloned voices (kind "cloned") copy real people, so they are left out unless named with --clones.
 Cody's choice on 2026-09-27: seanterry, jimdale, joeb, joel, tim, ben, alec, fluke, camel, tyler; glenn and louis added 2026-09-28, then steve and two children (ethan, presidents_kid).
+alex added 2026-10-06: a homeless man, one named character on the city (CharacterSystem), never a walker,
+a driver or somebody on the phone; his homeless_* categories are what keep him out of those (PedestrianSpeech).
 
 Stories: every .wav in a <voice>_preview folder is imported as category "story" for that voice, except
 the audition samples (a name with "sample" in it). The
