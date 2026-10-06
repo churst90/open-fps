@@ -225,7 +225,7 @@ public static class Footsteps
     //  `--footsteps` in the AudioLab. Nothing has to be reverted to keep using samples.
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-    public const int SampleRate = 44100;
+    public const int SampleRate = 48000;   // the rate the game mixes at (MixerQuality.DefaultRate)
 
     /// <summary>
     /// The fraction of a walker's mass that is actually moving downward when the heel lands.

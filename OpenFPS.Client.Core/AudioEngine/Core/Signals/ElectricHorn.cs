@@ -65,7 +65,7 @@ public sealed class ElectricHorn
 
     public ElectricHornSpec Spec => _spec;
 
-    public ElectricHorn(ElectricHornSpec spec, float rate = 44100f, int seed = 11)
+    public ElectricHorn(ElectricHornSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 11)
     {
         if (spec.Units == null || spec.Units.Length == 0) throw new ArgumentException("An electric horn needs at least one unit.", nameof(spec));
         _spec = spec; _rate = rate; _seed = seed;
@@ -266,6 +266,7 @@ public sealed class ElectricHorn
         private double _phase;
         private bool _open;
         private float _x, _v, _i, _jitter, _hp1, _hp2;
+        private readonly float _jitterStep;   // 0.003 a sample at 44.1 kHz
         private float _gain = 1f;
         private int _strikes;
         private float _vIn, _vOutSum; private int _bounces;
@@ -286,7 +287,7 @@ public sealed class ElectricHorn
 
         public Unit(ElectricHornSpec spec, ElectricHornUnitSpec u, float rate, int seed)
         {
-            _spec = spec; _u = u; _rate = rate; _dt = 1f / (rate * Over);
+            _spec = spec; _u = u; _rate = rate; _dt = 1f / (rate * Over); _jitterStep = At44k.Step(0.003f, rate);
             _rng = new Random(seed);
             _trim = MathF.Pow(10f, u.LevelTrimDb / 20f);
             _duty = Math.Clamp(spec.ContactDuty, 0.2f, 0.8f);
@@ -381,7 +382,7 @@ public sealed class ElectricHorn
         {
             // The loop wanders a little: the points wear, the voltage sags. It is what makes a pair
             // of horns a third apart roll against each other instead of standing still.
-            _jitter += 0.003f * ((float)_rng.NextDouble() * 2f - 1f - 0.02f * _jitter);
+            _jitter += _jitterStep * ((float)_rng.NextDouble() * 2f - 1f - 0.02f * _jitter);
             float f = _u.Hz * (1f + 0.0015f * Math.Clamp(_jitter, -1f, 1f));
 
             float acc = 0f;

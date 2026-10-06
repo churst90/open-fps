@@ -18,6 +18,11 @@ namespace OpenFPS.Client.AudioEngine.Core;
 /// render; the player's folders for other builds are removed.
 ///
 /// Glass breaking is not kept: every pane and every break has a key of its own.
+///
+/// A render is kept at the rate it is made, <see cref="TransientSynth.SampleRate"/> (48 kHz), not the
+/// mixer's: it is brought to the mixer's rate when it is registered (WorldAudioPlayer.AtMixerRate), so
+/// a mixer at another rate (OPENFPS_MIXER_RATE) plays a kept render at its right pitch, and the files
+/// need no rate of their own. If TransientSynth's rate ever changes, bump <c>Version</c>.
 /// </summary>
 public static class DoorRenderCache
 {

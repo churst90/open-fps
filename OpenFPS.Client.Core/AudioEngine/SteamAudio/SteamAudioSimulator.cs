@@ -140,8 +140,9 @@ public sealed class SteamAudioSimulator : IDisposable
     public bool IsValid => _simulator != IntPtr.Zero;
 
     public SteamAudioSimulator(IntPtr context, int maxSources = 64, bool enablePathing = false,
-        bool enableReflections = false, bool enableDirect = true, int samplingRate = 44100, int frameSize = 1024)
+        bool enableReflections = false, bool enableDirect = true, int samplingRate = 0, int frameSize = 1024)
     {
+        if (samplingRate <= 0) samplingRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;   // 0: the mixer's
         _context = context;
         _maxSources = maxSources;
         _samplingRate = samplingRate;

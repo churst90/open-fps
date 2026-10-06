@@ -23,6 +23,8 @@ internal sealed class AmbisonicBedState : IGuardedUnit
     public int Channels;
     public int Order;
     public int SourceSampleRate;
+    /// <summary>The mixer's rate, which the bed is read out at.</summary>
+    public int OutputSampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
     public int FrameSize;
 
     /// <summary>Playhead, in source frames. Fractional so a bed recorded at a different sample rate
@@ -155,10 +157,10 @@ internal static class AmbisonicBedDsp
 
         int ch = s.Channels;
         int totalFrames = s.Pcm.Length / ch;
-        double step = (double)s.SourceSampleRate / 44100.0;
+        double step = (double)s.SourceSampleRate / (s.OutputSampleRate > 0 ? s.OutputSampleRate : OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate);
 
-        // 1. Pull one block out of the bed, interleaved, with linear interpolation so a 48 kHz bed
-        //    plays correctly through a 44.1 kHz mixer instead of running fast.
+        // 1. Pull one block out of the bed, interleaved, with linear interpolation so a bed at another
+        //    rate plays at its own speed through the mixer instead of running fast or slow.
         var scratch = s.Scratch;
         double pos = s.Position;
         for (int i = 0; i < n; i++)

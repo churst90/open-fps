@@ -29,7 +29,10 @@ namespace OpenFPS.Client.AudioEngine.Acoustics;
 /// </summary>
 public sealed class GroundReflection
 {
-    private const int Size = 1024;                 // 23 ms at 44.1 kHz: a 7 m path difference
+    private const int Size = 2048;                 // room for MaxDelaySeconds at up to 88 kHz
+    /// <summary>The longest ground path difference held, seconds: 23 ms, a 7.9 m path difference (what
+    /// 1,020 samples held at 44.1 kHz, kept as a time at any rate).</summary>
+    private const float MaxDelaySeconds = 1020f / 44100f;
     private const int Mask = Size - 1;
     private readonly float[] _line = new float[Size];
     private int _w;
@@ -65,7 +68,7 @@ public sealed class GroundReflection
     /// <summary>Game thread: where the ground is for this voice right now. The extra path in seconds.</summary>
     public void Set(float delaySeconds, float lowGain, float highGain)
     {
-        TargetDelaySamples = Math.Clamp(delaySeconds * _rate, 0f, Size - 4);
+        TargetDelaySamples = Math.Clamp(delaySeconds * _rate, 0f, MathF.Min(Size - 4, MaxDelaySeconds * _rate));
         TargetLowGain = Math.Clamp(lowGain, 0f, 1f);
         TargetHighGain = Math.Clamp(highGain, 0f, 1f);
     }

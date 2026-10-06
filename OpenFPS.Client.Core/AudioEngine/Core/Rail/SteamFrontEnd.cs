@@ -51,6 +51,7 @@ public sealed class SteamFrontEnd
     private float _jetLp1, _jetLp2, _leak1, _leak2, _draught, _hp;
     private Mode _clank;
     private float _clankRing;
+    private readonly float _clankDecay;   // 0.988 a sample at 44.1 kHz: 1.9 ms
     private int _lastBeat = -1;
     private double _lastClankRev = -1;
 
@@ -72,7 +73,7 @@ public sealed class SteamFrontEnd
 
     public SteamFrontEnd(SteamLocoSpec s, float rate, int seed)
     {
-        _s = s; _rate = rate; _dt = 1f / rate; _rng = new Random(seed);
+        _s = s; _rate = rate; _dt = 1f / rate; _rng = new Random(seed); _clankDecay = At44k.Decay(0.988f, rate);
 
         int beats = 2 * Math.Max(1, s.Cylinders);
         _beatPhase = new float[beats];
@@ -186,7 +187,7 @@ public sealed class SteamFrontEnd
             }
         }
         float clank = _clank.Process(_clankRing) * 6f;
-        _clankRing *= 0.988f;
+        _clankRing *= _clankDecay;
 
         float outp = y + leak + clank;
         _hp += OnePole.AlphaFor(28f, _rate) * (outp - _hp);

@@ -216,3 +216,39 @@ stage scaled by the angle the source fills.
   as the provider does.
 
 A/B renders: `inbox/audio-quality-2026-10-06` (README there).
+
+## Done later on 10-06: the limiter (finding 6) and the 48 kHz mixer
+
+The master limiter is now `MasterLimiter` (TruePeakLimiter):
+- Look-ahead of 2 ms, with a smooth attack spanning it.
+- True peak per ITU-R BS.1770-4 Annex 2.
+- Both ears at one gain.
+- Ceiling -1 dBTP.
+- Release depends on the material: held 25 ms, then fast (40 ms) down to the average reduction, and
+  slow (500 ms) from there.
+
+The makeup is unchanged. The added latency is 2.1 ms (101-102 samples at 48 kHz). Every capture after
+it (the post capture, the loudness meter) is that much later than the pre capture; `audio_quality.py`
+lines them up by cross-correlation. OPENFPS_LIMITER=fmod is the A/B.
+
+Through the real mixer (`--quality limiter`, `audio_quality.py limiter`):
+
+| Tones 6-12 dB over | FMOD's | TruePeakLimiter |
+|---|---|---|
+| 50 Hz THD+N | -26 dB | -146 dB |
+| 1 kHz THD+N | -50 dB | -149 dB |
+| SMPTE IMD | -31 dB | -153 dB |
+| CCIF IMD | -46 dB | -152 dB |
+
+- Output true peak: FMOD's reached -0.88 dBTP, over its own -2 ceiling. The new limiter stays within
+  -1.00 to -1.17 dBTP.
+- Shots: FMOD's reached +0.02 dBTP between samples. The new limiter stays at -0.92 dBTP.
+- Flat-topped runs on thunder: 24 before, 0 after.
+
+The mixer runs at 48 kHz (MixerQuality.DefaultRate; OPENFPS_MIXER_RATE overrides).
+- Every hard-coded 44100 in the list above now reads the mixer's rate.
+- Per-sample constants chosen at 44.1 kHz are carried to the voice's rate by At44k. An audit found
+  about 25 of them: decays, one-pole steps and slews.
+- FMOD's PulseAudio stream is s16le 48000 Hz into a 48000 Hz PipeWire sink, so nothing resamples it.
+- Footstep, weapon and bird recordings are 44.1 kHz files. FMOD's spline resampler plays them at the
+  right pitch. Speech, voice chat (Opus) and every render are 48 kHz.

@@ -26,12 +26,18 @@ internal sealed class DiffuseBranch
     private readonly float[] _line;
     private int _at;
 
-    /// <param name="taps">How many taps; <paramref name="span"/> the samples they spread over (30 ms,
-    /// 32 taps for a direction's share). More taps closer together leave two filters fed alike signals
-    /// less alike: the ear decorrelation uses 128 over 40 ms.</param>
-    public DiffuseBranch(int index, int taps = 32, int span = 1323)
+    /// <summary>The rate the spans below are counted at. Not an assumption about the mixer: a span is
+    /// given in samples at this rate and laid out at <c>rate</c>, so the filter lasts as long at any.</summary>
+    public const int DesignRate = 44100;
+
+    /// <param name="taps">How many taps; <paramref name="span"/> the samples they spread over, counted at
+    /// <see cref="DesignRate"/> (30 ms, 32 taps for a direction's share). More taps closer together leave
+    /// two filters fed alike signals less alike: the ear decorrelation uses 128 over 40 ms.</param>
+    /// <param name="rate">The rate the filter runs at.</param>
+    public DiffuseBranch(int index, int taps = 32, int span = 1323, int rate = DesignRate)
     {
         Taps = taps;
+        if (rate > 0 && rate != DesignRate) span = (int)Math.Round(span * (double)rate / DesignRate);
         _pos = new int[taps]; _gain = new float[taps]; _line = new float[span + 1];
         int Span = span;
         var rng = new Random(7919 * (index + 1) + 13);
@@ -42,7 +48,7 @@ internal sealed class DiffuseBranch
             int slot = Span / Taps;
             _pos[k] = k * slot + rng.Next(slot);
             float sign = rng.Next(2) == 0 ? -1f : 1f;
-            float weight = MathF.Exp(-_pos[k] / (0.02f * 44100f));
+            float weight = MathF.Exp(-_pos[k] / (0.02f * (rate > 0 ? rate : DesignRate)));
             _gain[k] = sign * weight;
             energy += weight * (double)weight;
         }
@@ -59,8 +65,8 @@ internal sealed class DiffuseBranch
     /// heard as a metallic reverb. Taps free across their slots do not ring; the ears are a little
     /// less unlike for it.
     /// </summary>
-    public static (DiffuseBranch Left, DiffuseBranch Right) EarPair(int seed, int span = 1764, int taps = 96)
-        => (new DiffuseBranch(seed, taps, span), new DiffuseBranch(seed + 977, taps, span));
+    public static (DiffuseBranch Left, DiffuseBranch Right) EarPair(int seed, int span = 1764, int taps = 96, int rate = DesignRate)
+        => (new DiffuseBranch(seed, taps, span, rate), new DiffuseBranch(seed + 977, taps, span, rate));
 
     private DiffuseBranch(int taps, int span)
     {
@@ -108,7 +114,10 @@ internal sealed class EarDecorrelator
     private const float G = 0.5f;
 
     /// <param name="ear">0 left, 1 right: which set of delays.</param>
-    public EarDecorrelator(int ear)
+    /// <param name="rate">The rate it runs at. The delays below are counted at 44.1 kHz
+    /// (<see cref="DiffuseBranch.DesignRate"/>) and laid out in time at this rate, with the two ears'
+    /// totals kept equal.</param>
+    public EarDecorrelator(int ear, int rate = DiffuseBranch.DesignRate)
     {
         // Samples at 44.1 kHz, 0.16 to 2.2 ms. Keep them short: six all-passes running to 13 ms at a
         // feedback of 0.6 are a reverberator, turning a click into 100 ms of build-up peaking 20-45 ms
@@ -120,6 +129,14 @@ internal sealed class EarDecorrelator
         // ears, and the ear puts the whole room on the early side whichever way you face. Both sets
         // sum to 260.
         int[] delays = ear == 0 ? new[] { 7, 19, 31, 47, 67, 89 } : new[] { 13, 17, 41, 43, 71, 75 };
+        if (rate > 0 && rate != DiffuseBranch.DesignRate)
+        {
+            double k = (double)rate / DiffuseBranch.DesignRate;
+            int total = (int)Math.Round(260 * k), sum = 0;
+            for (int i = 0; i < delays.Length; i++) { delays[i] = Math.Max(1, (int)Math.Round(delays[i] * k)); sum += delays[i]; }
+            delays[^1] = Math.Max(1, delays[^1] + total - sum);   // both ears' totals the same again
+        }
+        _lpA = 1f - MathF.Exp(-2f * MathF.PI * SplitHz / (rate > 0 ? rate : DiffuseBranch.DesignRate));
         _lines = new float[delays.Length][];
         _at = new int[delays.Length];
         for (int k = 0; k < delays.Length; k++) _lines[k] = new float[delays[k]];
@@ -129,7 +146,7 @@ internal sealed class EarDecorrelator
     // wavelength is longer than the head — so the bottom is left shared and only the rest is pulled
     // apart. Pulled apart all the way down, a room's bass goes wide and hollow in headphones.
     private const float SplitHz = 300f;
-    private readonly float _lpA = 1f - MathF.Exp(-2f * MathF.PI * SplitHz / 44100f);
+    private readonly float _lpA;
     private float _a1, _a2, _b1;
 
     public float Process(float x)

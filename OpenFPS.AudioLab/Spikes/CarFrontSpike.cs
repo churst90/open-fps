@@ -31,7 +31,7 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// level=physical renders pascals with spherical spreading from each outlet, the WAVs at 1 Pa = 0.1
 /// full scale (94 dB SPL is -20 dBFS).
 ///
-/// Writes, per preset, the mono signals (float32, 44.1 kHz) to DIR/raw for measuring, and binaural
+/// Writes, per preset, the mono signals (float32, at the mixer's 48 kHz) to DIR/raw for measuring, and binaural
 /// WAVs to DIR for listening:
 ///   {preset}_{tag}_idle_front2m.wav  standing 2 m in front of the bumper, facing the car
 ///   {preset}_{tag}_idle_rear2m.wav   2 m behind the rear bumper, facing it
@@ -41,7 +41,7 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// </summary>
 public static class CarFrontSpike
 {
-    const int Rate = 44100, Block = 512;
+    const int Rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Block = 512;   // the rate the game runs it at
     const float WavScale = 0.1f;
     const float C = 343f;
     /// <summary>bay=X: every voice's engine-bay leak forced to X, to bracket a value before declaring it.</summary>

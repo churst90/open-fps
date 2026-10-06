@@ -675,6 +675,7 @@ public class FmodAudioProvider : IAudioProvider
     private System.Runtime.InteropServices.GCHandle _boundaryHandle;
     private BoundaryVoiceState? _boundaryState;
     private FMOD.DSP _masterLimiter;
+    private MasterLimiter? _trueLimiter;
     private FMOD.DSP _loudnessMeter;
     private MasterTap? _masterTap;
     private MasterTap? _preLimiterTap;
@@ -873,7 +874,11 @@ public class FmodAudioProvider : IAudioProvider
             // convention (+X right, +Y up, +Z forward), so NO handedness flag is needed.
             // Empirically: setting INITFLAGS._3D_RIGHTHANDED inverts left/right (a +X source is
             // heard on the LEFT). Verified by ear 2026-06 — leave FMOD in its default left-handed mode.
-            FmodCheck(_system.setSoftwareFormat(44100, SPEAKERMODE.STEREO, 0), "setSoftwareFormat");
+            // The mixer's rate: 48 kHz (MixerQuality.RequestedRate; OPENFPS_MIXER_RATE overrides). It was
+            // 44.1, under a sound server and devices that run at 48 and renders made at 48, so every
+            // one-shot went through a resampler on its way in and the whole mix through another on its
+            // way out. Everything that cares reads the rate back (MixerQuality.MixerRate), never a constant.
+            FmodCheck(_system.setSoftwareFormat(MixerQuality.RequestedRate, SPEAKERMODE.STEREO, 0), "setSoftwareFormat");
 
             // OPENFPS_FMOD_WAV=<path> captures exactly what the mixer produced to a file, instead of
             // (or as well as) the speakers. Worth having permanently: "it crackles" is not something
@@ -970,8 +975,17 @@ public class FmodAudioProvider : IAudioProvider
 
 
             _system.getVersion(out uint version);
-            Log.Information("FMOD initialized: v{Major:X}.{Minor:X2}.{Patch:X2}, left-handed 3D (+X right / +Z fwd), 44.1kHz stereo.",
-                (version >> 16) & 0xFFFF, (version >> 8) & 0xFF, version & 0xFF);
+            Log.Information("FMOD initialized: v{Major:X}.{Minor:X2}.{Patch:X2}, left-handed 3D (+X right / +Z fwd), mixer {Rate} Hz stereo.",
+                (version >> 16) & 0xFFFF, (version >> 8) & 0xFF, version & 0xFF, mixRate);
+            // And what the device runs at: a mixer at the device's rate is handed over unresampled.
+            if (_system.getDriver(out int driver) == RESULT.OK
+                && _system.getDriverInfo(driver, out string driverName, 256, out _, out int deviceRate, out _, out _) == RESULT.OK)
+            {
+                _system.getOutput(out OUTPUTTYPE outputType);
+                Log.Information("Audio output: {Output}, device '{Device}' at {DeviceRate} Hz; the mixer is at {Rate} Hz{Note}.",
+                                outputType, driverName, deviceRate, mixRate,
+                                deviceRate > 0 && deviceRate != mixRate ? " (the output resamples)" : "");
+            }
 
             _resources = new FmodResourceManager(_system);
             _granularBank = new GranularBank(_system);
@@ -1046,13 +1060,30 @@ public class FmodAudioProvider : IAudioProvider
             // The maximizer raises the whole mix into the top of the range and the brick wall catches
             // whatever that pushes over, so adding a hundred more sound sources changes what you hear
             // and never how loud the master is.
-            _system.createDSPByType(DSP_TYPE.LIMITER, out _masterLimiter);
-            _masterLimiter.setParameterFloat(0, 50.0f);            // release time (ms)
-            // Two decibels under full scale, not one: FMOD's limiter does not look ahead, so a sharp
-            // transient — a shot, an exhaust crack — gets through for a moment before it reacts; the
-            // meter caught +1.6 dBFS leaving the mixer with the ceiling at -1.
-            _masterLimiter.setParameterFloat(1, -2.0f);            // ceiling (dBFS)
-            _masterLimiter.setParameterFloat(2, MasterMakeupDb);   // maximizer gain (dB)
+            //
+            // The brick wall is a look-ahead true-peak limiter (MasterLimiter): FMOD's own has no
+            // look-ahead, so it clipped the leading edge of every shot and thunder crack flat at its
+            // ceiling (975 flat-topped runs in a 16-minute capture). It delays the mix by
+            // MasterLimiter latency (2 ms) and takes the same makeup. OPENFPS_LIMITER=fmod puts FMOD's
+            // back for an A/B.
+            if (!MasterLimiter.UseFmodLimiter
+                && (_trueLimiter = MasterLimiter.Create(_system, MixerQuality.MixerRate, MasterMakeupDb)) != null)
+            {
+                _masterLimiter = _trueLimiter.Dsp;
+                Log.Information("Master limiter: look-ahead true peak, ceiling {Ceiling:F1} dBTP, makeup {Makeup:F1} dB, latency {Samples} samples ({Ms:F2} ms).",
+                                TruePeakLimiter.DefaultCeilingDb, MasterMakeupDb, _trueLimiter.Core.LatencySamples, _trueLimiter.Core.LatencySeconds * 1000.0);
+            }
+            else
+            {
+                _system.createDSPByType(DSP_TYPE.LIMITER, out _masterLimiter);
+                _masterLimiter.setParameterFloat(0, 50.0f);            // release time (ms)
+                // Two decibels under full scale, not one: FMOD's limiter does not look ahead, so a sharp
+                // transient gets through for a moment before it reacts; the meter caught +1.6 dBFS
+                // leaving the mixer with the ceiling at -1.
+                _masterLimiter.setParameterFloat(1, -2.0f);            // ceiling (dBFS)
+                _masterLimiter.setParameterFloat(2, MasterMakeupDb);   // maximizer gain (dB)
+                Log.Information("Master limiter: FMOD's (OPENFPS_LIMITER=fmod), no look-ahead, ceiling -2.0 dBFS.");
+            }
             master.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, _masterLimiter);
 
             // And the meter that says whether the number above is right. Integrated loudness on the
@@ -1071,7 +1102,7 @@ public class FmodAudioProvider : IAudioProvider
             if (!string.IsNullOrEmpty(capturePath))
             {
                 _system.getSoftwareFormat(out int capRate, out _, out _);
-                _masterTap = MasterTap.Attach(_system, master, capturePath, capRate > 0 ? capRate : 44100,
+                _masterTap = MasterTap.Attach(_system, master, capturePath, capRate > 0 ? capRate : MixerQuality.MixerRate,
                                               asFloat: MixerQuality.CaptureFloat);
                 if (_masterTap != null) Log.Information("Capturing the mix to {Path} (playback continues).", capturePath);
                 else Log.Warning("Could not attach the capture tap; playback is unaffected.");
@@ -1082,7 +1113,7 @@ public class FmodAudioProvider : IAudioProvider
             if (!string.IsNullOrEmpty(prePath) && master.getDSPIndex(_masterLimiter, out int limiterAt) == RESULT.OK)
             {
                 _system.getSoftwareFormat(out int preRate, out _, out _);
-                _preLimiterTap = MasterTap.Attach(_system, master, prePath, preRate > 0 ? preRate : 44100,
+                _preLimiterTap = MasterTap.Attach(_system, master, prePath, preRate > 0 ? preRate : MixerQuality.MixerRate,
                                                   index: limiterAt + 1, asFloat: MixerQuality.CaptureFloat);
             }
             // Last of all, after the meter and the capture: dither for the sixteen bits the output is
@@ -1111,7 +1142,7 @@ public class FmodAudioProvider : IAudioProvider
     private void StartEarWind()
     {
         _system.getSoftwareFormat(out int rate, out _, out _);
-        var state = new EarWindState(rate > 0 ? rate : 44100);
+        var state = new EarWindState(rate > 0 ? rate : MixerQuality.MixerRate);
         if (Environment.GetEnvironmentVariable("OPENFPS_EAR_WIND") == "0")
         {
             state.Enabled = false;
@@ -1170,7 +1201,7 @@ public class FmodAudioProvider : IAudioProvider
             if (Phonon.iplContextCreate(ref cs, out _saContext) != Phonon.IPL_STATUS_SUCCESS)
             { Log.Warning("Steam Audio: context create failed (SIMD {Simd}); DEGRADED to FMOD panning — no HRTF binaural.", simd); return; }
 
-            var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
+            var au = new Phonon.IPLAudioSettings { samplingRate = MixerQuality.MixerRate, frameSize = _saFrameSize };
             var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
             if (Phonon.iplHRTFCreate(_saContext, ref au, ref hs, out _saHrtf) != Phonon.IPL_STATUS_SUCCESS)
             { Log.Warning("Steam Audio: HRTF create failed; DEGRADED to FMOD panning — no HRTF binaural."); Phonon.iplContextRelease(ref _saContext); return; }
@@ -1196,14 +1227,14 @@ public class FmodAudioProvider : IAudioProvider
     private float SaGroundRate()
     {
         _system.getSoftwareFormat(out int rate, out _, out _);
-        return rate > 0 ? rate : 48000f;
+        return rate > 0 ? rate : MixerQuality.MixerRate;
     }
 
     /// <summary>Allocates one pooled voice (effect + Phonon buffers + DSP). Called only at init.</summary>
     private bool CreatePooledVoice(out SaVoice voice)
     {
         voice = null!;
-        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
+        var au = new Phonon.IPLAudioSettings { samplingRate = MixerQuality.MixerRate, frameSize = _saFrameSize };
         var es = new Phonon.IPLBinauralEffectSettings { hrtf = _saHrtf };
         if (Phonon.iplBinauralEffectCreate(_saContext, ref au, ref es, out IntPtr effect) != Phonon.IPL_STATUS_SUCCESS) return false;
 
@@ -1691,7 +1722,13 @@ public class FmodAudioProvider : IAudioProvider
     {
         _echoRigsTried = true;
         if (_saContext == IntPtr.Zero || _saHrtf == IntPtr.Zero) return;
-        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
+        // As for a traced stage: echoes traced for another rate would play every delay time-scaled.
+        if (echoes.SampleRate != MixerQuality.MixerRate)
+        {
+            Log.Warning("Traced echoes: traced at {Trace} Hz, the mixer is at {Mixer} Hz; no traced echoes.", echoes.SampleRate, MixerQuality.MixerRate);
+            return;
+        }
+        var au = new Phonon.IPLAudioSettings { samplingRate = MixerQuality.MixerRate, frameSize = _saFrameSize };
         for (int k = 0; k < TracedEchoes.MaxSources; k++)
         {
             var es = new Phonon.IPLReflectionEffectSettings
@@ -1708,7 +1745,7 @@ public class FmodAudioProvider : IAudioProvider
                 Effect = effect, EffectB = effectB, Decode = decode, Hrtf = _saHrtf,
                 Capture = new float[_saFrameSize], MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
                 AmbiScratchA = new float[_saFrameSize * TracedEchoes.Channels], AmbiScratchB = new float[_saFrameSize * TracedEchoes.Channels],
-                Orientation = Phonon.ListenerFrame(_listenerRot),
+                Orientation = Phonon.ListenerFrame(_listenerRot), SampleRate = echoes.SampleRate,
             };
             Phonon.iplAudioBufferAllocate(echoes.Context, 1, _saFrameSize, ref rig.Mono);
             Phonon.iplAudioBufferAllocate(echoes.Context, TracedEchoes.Channels, _saFrameSize, ref rig.Ambi);
@@ -2139,7 +2176,16 @@ public class FmodAudioProvider : IAudioProvider
         // it answers late by is ITS block, not the mixer's.
         int sub = tr.FrameSize;
         if (_saFrameSize % sub != 0) { Log.Warning("Traced reverb: mixer block {Block} is not a multiple of {Sub}.", _saFrameSize, sub); return; }
-        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = sub };
+        // A trace made for another rate than the mixer's would play every delay and the whole tail
+        // time-scaled (8 % between 44.1 and 48 kHz). Traces take the mixer's rate when they are made, so
+        // this only happens if one was made before the mixer was: say so rather than play it wrong.
+        if (tr.SampleRate != MixerQuality.MixerRate)
+        {
+            Log.Warning("Traced reverb: the trace runs at {Trace} Hz and the mixer at {Mixer} Hz; region {Id} plays without it.",
+                        tr.SampleRate, MixerQuality.MixerRate, regionId);
+            return;
+        }
+        var au = new Phonon.IPLAudioSettings { samplingRate = tr.SampleRate, frameSize = sub };
         var es = new Phonon.IPLReflectionEffectSettings
         {
             type = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, irSize = tr.IrSize, numChannels = TracedReverb.Channels,
@@ -2170,7 +2216,7 @@ public class FmodAudioProvider : IAudioProvider
         { Phonon.iplReflectionEffectRelease(ref effect); return; }
         var st = new TracedReverbState
         {
-            FrameSize = _saFrameSize, SubFrame = sub, WorkerContext = tr.Context, ProviderContext = _saContext,
+            FrameSize = _saFrameSize, SubFrame = sub, SampleRate = tr.SampleRate, WorkerContext = tr.Context, ProviderContext = _saContext,
             Effect = effect, Decode = decode, Hrtf = _saHrtfTraced, Trace = tr,
             MonoScratch = new float[sub], StereoScratch = new float[sub * 2],
             AmbiScratch = new float[sub * TracedReverb.Channels],
@@ -2179,10 +2225,10 @@ public class FmodAudioProvider : IAudioProvider
             // Never the last: that one is the tracer's own, for reading the late tail back.
             Reader = Math.Min(_traced.Count, TracedReverb.ExtractReader - 1),
             LateConv = new LateTailConvolver(sub, tr.MaxLatePartitions),
-            SdmConv = new SharedInputConvolver(sub, SdmTailIr.PartitionsFor(44100, sub), DiffuseBranch.Count),
+            SdmConv = new SharedInputConvolver(sub, SdmTailIr.PartitionsFor(tr.SampleRate, sub), DiffuseBranch.Count),
             LateOut = new float[sub],
             // The room you are in: its late tail as a field round the head, not one channel.
-            Diffuse = DiffuseTail.Create(_saContext, sub, TracedReverb.Channels, _saHrtfTraced),
+            Diffuse = DiffuseTail.Create(_saContext, sub, TracedReverb.Channels, _saHrtfTraced, tr.SampleRate),
             Delay = _tracedPreDelay > 0 ? new PreDelay(_tracedPreDelay) : null,
             Region = regionId,
         };
@@ -3559,6 +3605,12 @@ public class FmodAudioProvider : IAudioProvider
         // master living at its ceiling. Reset, it is the peak of the interval since the last line.
         _loudnessMeter.setParameterInt(0, (int)DSP_LOUDNESS_METER_STATE_TYPE.RESET_MAXPEAK);
         _loudnessMeter.setParameterInt(0, (int)DSP_LOUDNESS_METER_STATE_TYPE.ANALYZING);
+        // What the brick wall did in the interval: nothing, most of the time.
+        if (_trueLimiter != null)
+        {
+            float gr = _trueLimiter.Core.TakeMaxReductionDb();
+            if (gr >= 0.1f) Log.Information("Master limiter: up to {Gr:F1} dB of gain reduction this interval.", gr);
+        }
     }
 
     private readonly System.Diagnostics.Stopwatch _cpuClock = System.Diagnostics.Stopwatch.StartNew();
@@ -4656,7 +4708,7 @@ public class FmodAudioProvider : IAudioProvider
             Pcm = converted,
             Channels = channels,
             Order = order,
-            SourceSampleRate = sampleRate > 0 ? sampleRate : 44100,
+            SourceSampleRate = sampleRate > 0 ? sampleRate : MixerQuality.MixerRate,
             FrameSize = _saFrameSize,
             Loop = loop,
             Context = _saContext,
@@ -4668,7 +4720,7 @@ public class FmodAudioProvider : IAudioProvider
             Orientation = Phonon.ListenerFrame(_listenerRot)
         };
 
-        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
+        var au = new Phonon.IPLAudioSettings { samplingRate = MixerQuality.MixerRate, frameSize = _saFrameSize };
         var settings = new Phonon.IPLAmbisonicsDecodeEffectSettings
         {
             speakerLayout = Phonon.StereoLayout(),
@@ -5297,12 +5349,12 @@ public class FmodAudioProvider : IAudioProvider
         if (!_isInitialized) return;
         StopDiagnosticSound();
 
-        // 1 second mono 44.1kHz loop of short broadband noise bursts. Broadband transients
+        // 1 second mono loop, at the mixer's rate, of short broadband noise bursts. Broadband transients
         // localize far better than pure tones, so HRTF / panning cues are unmistakable.
-        const int sampleRate = 44100;
+        int sampleRate = MixerQuality.MixerRate;
         int numSamples = sampleRate;
         _diagPcm = new byte[numSamples * 2];
-        const int periodSamples = sampleRate / 8; // 8 bursts per second
+        int periodSamples = sampleRate / 8; // 8 bursts per second
         uint seed = 22695477;
         for (int i = 0; i < numSamples; i++)
         {
@@ -5403,6 +5455,7 @@ public class FmodAudioProvider : IAudioProvider
         if (_isInitialized) _system.close();   // FMOD requires close() before release()
         if (_earWindHandle.IsAllocated) _earWindHandle.Free();
         _dither?.FreeHandle(); _dither = null;
+        _trueLimiter?.FreeHandle(); _trueLimiter = null;
 
         if (_steamAudioEnabled)
         {

@@ -70,8 +70,18 @@ internal sealed class TracedReverbState
         if (Decode != IntPtr.Zero) Phonon.iplAmbisonicsDecodeEffectReset(Decode);
     }
 
-    /// <summary>One per ear: the tail the trace hands back is the same in both, and a room is not.</summary>
-    public readonly EarDecorrelator Left = new(0), Right = new(1);
+    /// <summary>One per ear: the tail the trace hands back is the same in both, and a room is not.
+    /// Made for the stage's rate (<see cref="SampleRate"/>): their all-passes are times.</summary>
+    public EarDecorrelator Left { get; private set; } = new(0, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate);
+    public EarDecorrelator Right { get; private set; } = new(1, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate);
+
+    /// <summary>The rate the stage runs at: the trace's, which is the mixer's.</summary>
+    public int SampleRate
+    {
+        get => _sampleRate;
+        init { _sampleRate = value; Left = new EarDecorrelator(0, value); Right = new EarDecorrelator(1, value); }
+    }
+    private readonly int _sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
 
     // Diagnostics: what goes in and what comes out, for the /reverb line.
     public volatile float InRms, OutRms;
@@ -171,8 +181,10 @@ internal sealed class DiffuseTail
     /// 100 Hz), not at the ear decorrelator's 300: a step on carpet is nearly all below 300 Hz, and
     /// a tail that is the same in both ears there sits in the head however diffuse the rest is.</summary>
     public const float SplitHz = 120f;
-    private readonly float _lpA = 1f - MathF.Exp(-2f * MathF.PI * SplitHz / 44100f);
+    private readonly float _lpA;
     private float _a1, _a2, _b1;
+    /// <summary>The rate the tail runs at: the mixer's.</summary>
+    public readonly int SampleRate;
 
     // ── Straight to the ears ─────────────────────────────────────────────────────────────────
     //
@@ -210,10 +222,7 @@ internal sealed class DiffuseTail
     public const float EarSplitHz = 400f;
     // A fourth-order Linkwitz-Riley split (two Butterworth sections each side): steep, so the
     // decorrelation above does not leak into the band below, where the ears should stay alike.
-    private readonly Biquad _loL1 = Biquad.LowPass(EarSplitHz), _loL2 = Biquad.LowPass(EarSplitHz);
-    private readonly Biquad _hiL1 = Biquad.HighPass(EarSplitHz), _hiL2 = Biquad.HighPass(EarSplitHz);
-    private readonly Biquad _loR1 = Biquad.LowPass(EarSplitHz), _loR2 = Biquad.LowPass(EarSplitHz);
-    private readonly Biquad _hiR1 = Biquad.HighPass(EarSplitHz), _hiR2 = Biquad.HighPass(EarSplitHz);
+    private readonly Biquad _loL1, _loL2, _hiL1, _hiL2, _loR1, _loR2, _hiR1, _hiR2;
     private readonly DiffuseBranch _earL, _earR;
 
     /// <summary>A Butterworth biquad section, direct form I, allocation-free.</summary>
@@ -222,9 +231,9 @@ internal sealed class DiffuseTail
         private readonly float _b0, _b1, _b2, _a1, _a2;
         private float _x1, _x2, _y1, _y2;
         private Biquad(float b0, float b1, float b2, float a1, float a2) { _b0 = b0; _b1 = b1; _b2 = b2; _a1 = a1; _a2 = a2; }
-        private static (double c, double al) W(float hz) { double w = 2 * Math.PI * hz / 44100.0; return (Math.Cos(w), Math.Sin(w) / (2 * Math.Sqrt(0.5))); }
-        public static Biquad LowPass(float hz) { var (c, al) = W(hz); double a0 = 1 + al; return new((float)((1 - c) / 2 / a0), (float)((1 - c) / a0), (float)((1 - c) / 2 / a0), (float)(-2 * c / a0), (float)((1 - al) / a0)); }
-        public static Biquad HighPass(float hz) { var (c, al) = W(hz); double a0 = 1 + al; return new((float)((1 + c) / 2 / a0), (float)(-(1 + c) / a0), (float)((1 + c) / 2 / a0), (float)(-2 * c / a0), (float)((1 - al) / a0)); }
+        private static (double c, double al) W(float hz, int rate) { double w = 2 * Math.PI * hz / rate; return (Math.Cos(w), Math.Sin(w) / (2 * Math.Sqrt(0.5))); }
+        public static Biquad LowPass(float hz, int rate) { var (c, al) = W(hz, rate); double a0 = 1 + al; return new((float)((1 - c) / 2 / a0), (float)((1 - c) / a0), (float)((1 - c) / 2 / a0), (float)(-2 * c / a0), (float)((1 - al) / a0)); }
+        public static Biquad HighPass(float hz, int rate) { var (c, al) = W(hz, rate); double a0 = 1 + al; return new((float)((1 + c) / 2 / a0), (float)(-(1 + c) / a0), (float)((1 + c) / 2 / a0), (float)(-2 * c / a0), (float)((1 - al) / a0)); }
         public float Process(float x)
         {
             float y = _b0 * x + _b1 * _x1 + _b2 * _x2 - _a1 * _y1 - _a2 * _y2;
@@ -243,7 +252,7 @@ internal sealed class DiffuseTail
     private bool CreateEars(IntPtr context, int sub, IntPtr hrtf)
     {
         EarContext = context; EarHrtf = hrtf;
-        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = sub };
+        var au = new Phonon.IPLAudioSettings { samplingRate = SampleRate, frameSize = sub };
         var bs = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
         for (int i = 0; i < DiffuseBranch.Count; i++)
             if (Phonon.iplBinauralEffectCreate(context, ref au, ref bs, out Ears[i]) != Phonon.IPL_STATUS_SUCCESS) return false;
@@ -367,7 +376,7 @@ internal sealed class DiffuseTail
         var inter = new float[sub * channels];
         var rng = new Random(17);
         double eIn = 0, eEar = 0;
-        int blocks = Math.Max(12, 44100 / sub);
+        int blocks = Math.Max(12, SampleRate / sub);
         for (int b = 0; b < blocks; b++)
         {
             Array.Clear(inter);
@@ -406,7 +415,7 @@ internal sealed class DiffuseTail
 
     private bool CreateSdmEars(int sub)
     {
-        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = sub };
+        var au = new Phonon.IPLAudioSettings { samplingRate = SampleRate, frameSize = sub };
         var bs = new Phonon.IPLBinauralEffectSettings { hrtf = EarHrtf };
         for (int i = 0; i < DiffuseBranch.Count; i++)
             if (Phonon.iplBinauralEffectCreate(EarContext, ref au, ref bs, out SdmEars[i]) != Phonon.IPL_STATUS_SUCCESS) return false;
@@ -472,7 +481,18 @@ internal sealed class DiffuseTail
         return v.ToArray();
     }
 
-    public DiffuseTail() { (_earL, _earR) = DiffuseBranch.EarPair(101); }
+    /// <param name="sampleRate">The mixer's rate. Every filter and every velvet tap is laid out in time,
+    /// so the tail is the same tail at any rate.</param>
+    public DiffuseTail(int sampleRate)
+    {
+        SampleRate = sampleRate > 0 ? sampleRate : OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
+        _lpA = 1f - MathF.Exp(-2f * MathF.PI * SplitHz / SampleRate);
+        _loL1 = Biquad.LowPass(EarSplitHz, SampleRate); _loL2 = Biquad.LowPass(EarSplitHz, SampleRate);
+        _hiL1 = Biquad.HighPass(EarSplitHz, SampleRate); _hiL2 = Biquad.HighPass(EarSplitHz, SampleRate);
+        _loR1 = Biquad.LowPass(EarSplitHz, SampleRate); _loR2 = Biquad.LowPass(EarSplitHz, SampleRate);
+        _hiR1 = Biquad.HighPass(EarSplitHz, SampleRate); _hiR2 = Biquad.HighPass(EarSplitHz, SampleRate);
+        (_earL, _earR) = DiffuseBranch.EarPair(101, rate: SampleRate);
+    }
 
     /// <summary>Forgets everything it holds: the branches, the split filters, the ears. Mixer thread
     /// (after a non-finite block, NonFinite); allocation-free.</summary>
@@ -492,11 +512,11 @@ internal sealed class DiffuseTail
     }
 
     /// <summary>The tail's renderer, or null when Steam Audio will not make its ears.</summary>
-    public static DiffuseTail? Create(IntPtr context, int subFrame, int channels, IntPtr hrtf)
+    public static DiffuseTail? Create(IntPtr context, int subFrame, int channels, IntPtr hrtf, int sampleRate)
     {
         if (hrtf == IntPtr.Zero) return null;
-        var d = new DiffuseTail { Context = context };
-        for (int i = 0; i < DiffuseBranch.Count; i++) d.Branches[i] = new DiffuseBranch(i);
+        var d = new DiffuseTail(sampleRate) { Context = context };
+        for (int i = 0; i < DiffuseBranch.Count; i++) d.Branches[i] = new DiffuseBranch(i, rate: d.SampleRate);
         d.W = new float[subFrame]; d.Branch = new float[subFrame]; d.Low = new float[subFrame];
         d.LateIn = new float[DiffuseBranch.Count][];
         for (int i = 0; i < DiffuseBranch.Count; i++) d.LateIn[i] = new float[subFrame];
@@ -559,7 +579,7 @@ internal static class TracedReverbDsp
     public static int BinauralOnset(IntPtr context, IntPtr hrtf, int frame)
     {
         if (context == IntPtr.Zero || hrtf == IntPtr.Zero || frame <= 0) return -1;
-        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = frame };
+        var au = new Phonon.IPLAudioSettings { samplingRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate, frameSize = frame };
         var bs = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
         if (Phonon.iplBinauralEffectCreate(context, ref au, ref bs, out IntPtr fx) != Phonon.IPL_STATUS_SUCCESS) return -1;
         var inB = new Phonon.IPLAudioBuffer(); var outB = new Phonon.IPLAudioBuffer();

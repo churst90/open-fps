@@ -129,6 +129,9 @@ public sealed class OwnVoiceTap : IGuardedUnit
     /// <summary>The callback's buffer, made with the voice so the mixer thread never allocates.</summary>
     internal readonly float[] Scratch = new float[DspCallback.MaxBlock];
     private readonly double _step, _blockShare, _maxPull;
+    /// <summary>A starved sample's fade (0.995, 4.5 ms) and the envelope's glide (0.002, 11 ms), chosen at
+    /// 44.1 kHz, at the mixer's rate.</summary>
+    private readonly float _starveDecay, _envelopeStep;
     private readonly bool _measures;
     /// <summary>Where the delay is heading, seconds. Game thread writes.</summary>
     public volatile float TargetDelay;
@@ -150,6 +153,8 @@ public sealed class OwnVoiceTap : IGuardedUnit
         _maxPull = maxPull;
         _measures = measures;
         _step = (double)OwnVoiceRing.Rate / mixerRate;
+        _starveDecay = OpenFPS.Client.AudioEngine.Core.At44k.Decay(0.995f, mixerRate);
+        _envelopeStep = OpenFPS.Client.AudioEngine.Core.At44k.Step(0.002f, mixerRate);
         _blockShare = 1.0 / (2.0 * mixerRate);
     }
 
@@ -194,12 +199,12 @@ public sealed class OwnVoiceTap : IGuardedUnit
                 // what has not arrived yet is still to be said, and running on would skip it. The last
                 // sample dies away instead of stopping dead.
                 if (live && !_starved) { if (_measures) Ring.Starved(); _starved = true; }
-                _last *= 0.995f;
+                _last *= _starveDecay;
                 mono[i] = _last * _envelope;
                 continue;
             }
             _starved = false;
-            _envelope += ((live ? 1f : 0f) - _envelope) * 0.002f;
+            _envelope += ((live ? 1f : 0f) - _envelope) * _envelopeStep;
             _last = Ring.At(_position);
             mono[i] = _last * _envelope;
             _position += rate;

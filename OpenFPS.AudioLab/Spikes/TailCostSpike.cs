@@ -17,7 +17,7 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class TailCostSpike
 {
-    private const int Fs = 44100, Sub = TracedReverb.TracedFrame;
+    private const int Fs = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Sub = TracedReverb.TracedFrame;
 
     public static int Run(string[] args)
     {
@@ -58,7 +58,7 @@ public static class TailCostSpike
         {
             var lc = new LateTailConvolver(Sub, len / Sub + 1);
             lc.SetIr(late);
-            var df = DiffuseTail.Create(ctx, Sub, TracedReverb.Channels, hrtf)!;
+            var df = DiffuseTail.Create(ctx, Sub, TracedReverb.Channels, hrtf, Fs)!;
             var ambi = new float[Sub * TracedReverb.Channels]; var tmp = new float[Sub];
             long conv = 0, render = 0, worst = 0; int pieces = 0;
             for (int at = 0; at + Sub <= n; at += Sub)
@@ -81,7 +81,7 @@ public static class TailCostSpike
         {
             var lf = new DiffuseLateConvolver(Sub, noise.Partitions, DiffuseBranch.Count, noise.Start);
             var other = tail.BuildDiffuseLate(noise);
-            var df = DiffuseTail.Create(ctx, Sub, TracedReverb.Channels, hrtf)!;
+            var df = DiffuseTail.Create(ctx, Sub, TracedReverb.Channels, hrtf, Fs)!;
             long conv = 0, render = 0, worst = 0, worstConv = 0; int pieces = 0;
             int per = Fs / 4 / Sub;
             for (int at = 0, piece = 0; at + Sub <= n; at += Sub, piece++)
