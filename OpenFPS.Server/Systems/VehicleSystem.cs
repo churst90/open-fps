@@ -466,7 +466,10 @@ public sealed partial class VehicleSystem
                         // A driver takes a bend no faster than is comfortable (the side friction at
                         // which drivers ease off, DriverSteering.ComfortTurnSpeed), and never faster
                         // than keeps the tyres quiet.
-                        v.CornerSpeed = k => MathF.Min(DriverSteering.ComfortTurnSpeed(k), body.SteadyTurnSpeed(k, TyreFriction.SquealOnset));
+                        // On a wet road the tyres' limit is the dry one scaled by the grip the water
+                        // leaves (a steady turn's speed goes as the root of the friction).
+                        v.CornerSpeed = k => MathF.Min(DriverSteering.ComfortTurnSpeed(k),
+                                                       body.SteadyTurnSpeed(k, TyreFriction.SquealOnset) * MathF.Sqrt(body.WetGripShare));
                         v.Driver = new LineFollower(v.Wheels);
                         v.Driver.Place(0f);
                         v.Wheels.Vx = v.Speed;
@@ -708,6 +711,8 @@ public sealed partial class VehicleSystem
         line.Sample(v.Lap, out Vector3 here, out float heading, out _, out float cornerLimit);
         // The slowest of the whole stretch ahead, not its far end: see RaceLine.SlowestWithin.
         float want = line.SlowestWithin(v.Lap, lookahead);
+        // A wet road, and the rain: a little slower than the road allows (StreetLife).
+        if (_streetLife.TryGetValue(v.MapId, out var weatherLife)) want *= 1f - RainCaution(v.MapId, weatherLife).Speed;
         // Steering itself round on its tyres, it has to take the bends the line really makes.
         // It looks twice its straight-line braking distance ahead, because braking beside cornering
         // sheds less.

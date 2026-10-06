@@ -73,6 +73,7 @@ string[] usage =
     "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
     "  --intake-ir [preset ...] [thr=] [sec=] [out=] the intake tract alone, thumped once",
     "  --wheel-squeal [out=] [axle] [binaural]       each wheel squealing for itself, and four drives",
+    "  --wet-roads [water|levels out=|game out= set=] tyres on wet roads: the water, the grip, the sound",
     "  --speedway [map] [seconds=] [voices=] [probe] the shipped race heard from its spawn point",
     "  --earshot [map=city] [at=x,z] [top=]          everything audible from a spot, ranked, under both distance laws",
     "  --car-horn / --siren [preset] [sec=]          horns and the siren on the bench, measured and written",
@@ -507,6 +508,13 @@ if (args.Contains("--nature"))
     // --nature [levels|render out=DIR|compare=FILE.wav] [preset ...] [sec= wind=]: water, fire and
     // the wind in leaves, rendered from their models and measured against recordings.
     Environment.Exit(OpenFPS.AudioLab.Spikes.NatureSpike.Run(args));
+}
+
+if (args.Contains("--wet-roads"))
+{
+    // --wet-roads [water|levels out=DIR|game out=DIR set=]: tyres on wet roads, the road's water,
+    // the grip it leaves, and the sound through the game.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WetRoadSpike.Run(args));
 }
 
 if (args.Contains("--running-water"))

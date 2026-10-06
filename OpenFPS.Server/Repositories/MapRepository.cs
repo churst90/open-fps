@@ -238,6 +238,21 @@ public class StreetLifeData
     /// <summary>How long somebody stands at the kerb before drivers who can stop comfortably stop for
     /// them, seconds. Drivers always stop for somebody already on the crossing.</summary>
     public float PedestrianAssertSeconds { get; set; } = 8f;
+
+    // ── In the rain ──────────────────────────────────────────────────────────────────────────────
+    //
+    // Drivers on a wet road go a little slower and leave a little more room; in heavy rain, more.
+    // Read against the road's water and the rain (RoadWaterSystem): "wet" is the road's texture full,
+    // "heavy" the rain at Rainfall.HeavyRate. Zero turns either off.
+
+    /// <summary>The share of their speed drivers give up on a wet road in light rain.</summary>
+    public float WetSpeedReduction { get; set; } = 0.04f;
+    /// <summary>...and in heavy rain.</summary>
+    public float HeavyRainSpeedReduction { get; set; } = 0.08f;
+    /// <summary>How much longer a time headway drivers keep on a wet road in light rain, as a share.</summary>
+    public float WetHeadwayIncrease { get; set; } = 0.1f;
+    /// <summary>...and in heavy rain.</summary>
+    public float HeavyRainHeadwayIncrease { get; set; } = 0.2f;
     /// <summary>After this long at the kerb a pedestrian takes a gap only just long enough to walk across,
     /// without the start-up margin, seconds. The HCM puts pedestrians' likelihood of taking risks as high
     /// above 30 s of delay at an uncontrolled crossing (HCM 2010, chapter 19, *to confirm*).</summary>
