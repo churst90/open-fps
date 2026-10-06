@@ -1,0 +1,21 @@
+{
+  "Id": "gutter_outlet_water",
+  "Name": "Roof gutter outlet",
+  "Description": "Where a house's roof gutter empties into its downpipe (RunningWaterSpec.GutterOutlet): fed by the same roof as the downpipe below it; in a downpour the water stands over the outlet and air goes down with it in gulps. Place it at the eaves over the downpipe. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 0.2,
+    "Y": 0.2,
+    "Z": 0.2
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "flow:gutter_outlet",
+  "Volume": 1.0,
+  "Range": 50,
+  "MinDistance": 0.6,
+  "Mode": "LoopOne"
+}

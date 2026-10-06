@@ -55,7 +55,7 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// into its own notes). The bubble's loudness for its size and the splash's efficiency are the
 /// fountain's (FallingWaterSynth), fitted there and not refitted here.
 /// </summary>
-public sealed class RunningWaterSynth
+public sealed partial class RunningWaterSynth
 {
     // ── The fitted constants ─────────────────────────────────────────────────────────────────────
 
@@ -140,6 +140,7 @@ public sealed class RunningWaterSynth
     private readonly FallingWaterSynth? _falls;
     private readonly int[] _fallHome;
     private readonly float _referenceFlow;
+    private float _tunedFlow = float.NaN;
     private int _untilBlock;
 
     /// <summary>The flow the water is carrying now, L/s. The voice sets it from the spec and the rain;
@@ -192,6 +193,7 @@ public sealed class RunningWaterSynth
             }
         }
         _referenceFlow = MathF.Max(1e-6f, spec.ReferenceFlow);
+        InitBasin(sampleRate, seed);
         if (spec.Channel == FlowChannel.KerbGutter)
         {
             _rain = new RainSynth[places];
@@ -232,7 +234,7 @@ public sealed class RunningWaterSynth
             var taps = new WaterTapSpec[spec.Falls.Length];
             for (int i = 0; i < falls.Length; i++)
             {
-                falls[i] = FallFor(spec, spec.Falls[i], _referenceFlow) with { Tap = i };
+                falls[i] = FallFor(spec, spec.Falls[i], _referenceFlow) with { Tap = i, Onto = spec.Falls[i].Onto };
                 taps[i] = new WaterTapSpec { Name = spec.Falls[i].Name };
                 // A line's falls are spread along it; a ring's land in its middle and are scattered by
                 // the placer below.
@@ -313,11 +315,20 @@ public sealed class RunningWaterSynth
         return at;
     }
 
-    /// <summary>The fountain's fall for one of this source's falls, at this flow: the sheet leaving the
-    /// lip, its thickness from the weir law, and from that how it arrives — a thin sheet fingers into
-    /// strands that bead into drops; a thick one falls coherent, in lumps the size of its strands
-    /// (Rayleigh-Plateau: about 1.9 strand diameters apart).</summary>
-    public static WaterFallSpec FallFor(RunningWaterSpec spec, FlowFall fall, float flowLitresPerSecond)
+    /// <summary>How one of this source's falls arrives at a flow (<see cref="Shape"/>).</summary>
+    public readonly record struct FallShape(float FlowLitresPerSecond, float FallMetres, float DropShare, float MeanDropRadiusMm, float ChunkRadiusMm);
+
+    /// <summary>
+    /// How one of this source's falls arrives at this flow: the sheet leaving the lip, its thickness from
+    /// the weir law, and from that how it lands. A thin sheet fingers into strands that bead into drops;
+    /// a thick one falls coherent, in lumps the size of its strands (Rayleigh-Plateau: about 1.9 strand
+    /// diameters apart). So the same lip at twice the flow throws a thicker sheet, more of it coherent
+    /// and in bigger lumps, which plunge and drive air under where drops would not: a fall grows faster
+    /// than its flow (Watts et al. 2009: a weir 6 dB(A) quieter at half its flow). Computed afresh as the
+    /// flow changes (round 2, 2026-10-06; round 1 fixed it at the reference flow and scaled the rates,
+    /// 3 dB a doubling).
+    /// </summary>
+    public static FallShape Shape(RunningWaterSpec spec, FlowFall fall, float flowLitresPerSecond)
     {
         float q = MathF.Max(1e-6f, flowLitresPerSecond * fall.FlowShare);
         float head = Hydraulics.WeirHead(q, fall.LipWidthMetres);
@@ -330,21 +341,37 @@ public sealed class RunningWaterSynth
         float strandMm = Math.Clamp(thickness * 1e3f, 1f, 12f);
         // A film down a pipe does not fall freely: the wall holds it to a terminal speed after a few
         // metres, 3.9 m/s at 1 L/s in a 110 mm pipe and as (Q/D)^0.4 (Wyly and Eaton 1961; Aoki, Öhler and
-        // Kaltbeitzel 2025). It strikes the bend as if it had fallen v²/2g, never more than the pipe.
+        // Kaltbeitzel 2025). It strikes the bend as if it had fallen v²/2g, never more than the pipe; and
+        // water leaving the pipe's foot (a downpipe's shoe) is already moving that fast before it falls.
         float fallMetres = fall.DropMetres;
-        if (fall.Film && spec.Cavity is { } pipe)
+        if ((fall.Film || fall.FromPipe) && spec.Cavity is { } pipe)
         {
-            float terminal = 3.9f * MathF.Pow(q * 0.110f / MathF.Max(0.02f, pipe.DiameterMetres), 0.4f);
-            fallMetres = MathF.Min(fall.DropMetres, terminal * terminal / (2f * Hydraulics.Gravity));
+            float terminal = TerminalFilmSpeed(q, pipe.DiameterMetres);
+            float asIfFallen = MathF.Min(pipe.LengthMetres, terminal * terminal / (2f * Hydraulics.Gravity));
+            fallMetres = fall.Film ? MathF.Min(fall.DropMetres, asIfFallen) : fall.DropMetres + asIfFallen;
         }
+        return new FallShape(q, fallMetres, Math.Clamp(1f - 0.85f * coherent, 0.1f, 1f),
+                             Math.Clamp(0.6f * strandMm, 0.8f, 2.2f), Math.Clamp(0.95f * strandMm, 1.5f, 8f));
+    }
+
+    /// <summary>The speed a film reaches down a vertical pipe, m/s (see <see cref="Shape"/>).</summary>
+    public static float TerminalFilmSpeed(float litresPerSecond, float diameterMetres)
+        => 3.9f * MathF.Pow(MathF.Max(0f, litresPerSecond) * 0.110f / MathF.Max(0.02f, diameterMetres), 0.4f);
+
+    /// <summary>The fountain's fall for one of this source's falls at this flow, as a spec (for the
+    /// synth's construction and the lab).</summary>
+    public static WaterFallSpec FallFor(RunningWaterSpec spec, FlowFall fall, float flowLitresPerSecond)
+    {
+        var f = fall.Feed is FallFeed.TapOntoBasin or FallFeed.TapIntoWater && spec.Tap is { } tap
+            ? TapShape(spec, tap, flowLitresPerSecond, 0f) : Shape(spec, fall, flowLitresPerSecond);
         return new WaterFallSpec
         {
             Name = fall.Name,
-            FlowLitresPerSecond = q,
-            FallMetres = fallMetres,
-            DropShare = Math.Clamp(1f - 0.85f * coherent, 0.1f, 1f),
-            MeanDropRadiusMm = Math.Clamp(0.6f * strandMm, 0.8f, 2.2f),
-            ChunkRadiusMm = Math.Clamp(0.95f * strandMm, 1.5f, 8f),
+            FlowLitresPerSecond = f.FlowLitresPerSecond,
+            FallMetres = f.FallMetres,
+            DropShare = f.DropShare,
+            MeanDropRadiusMm = f.MeanDropRadiusMm,
+            ChunkRadiusMm = f.ChunkRadiusMm,
             Streams = Math.Max(1, fall.Streams),
             Onto = fall.Onto,
             DriftPerMetrePerSecond = 0f,
@@ -357,6 +384,7 @@ public sealed class RunningWaterSynth
     /// otherwise the middle; inside the cavity if it lands there.</summary>
     private EventSum PlaceForFall(int tap)
     {
+        if (PlateDriveFor(tap) is { } plate) return plate;
         int home = tap >= 0 && tap < _fallHome.Length ? _fallHome[tap] : 0;
         if (home < 0) home = _open.Length > 1 ? 1 + (_nextRingHome++ % (_open.Length - 1)) : 0;
         int k = home != 0 && _rng.Uniform() < _toHome ? home : 0;
@@ -382,13 +410,32 @@ public sealed class RunningWaterSynth
         if (float.IsNaN(_flow)) _flow = target;
         // A channel takes a second or two to change its water; glide in proportion, so a trickle
         // and a torrent settle as fast as each other.
-        _flow += (target - _flow) * MathF.Min(1f, dt / 1.5f);
+        // A channel takes a second or two to change its water; a tap is opened or shut in a fraction of one.
+        _flow += (target - _flow) * MathF.Min(1f, dt / (Spec.Tap != null ? 0.25f : 1.5f));
         UpdateFlow(_flow);
+        BasinControl(dt);
+        PlateControl();
         if (_falls != null)
         {
             // Too little to leave its lip as a stream, it drips instead (Drips).
             bool dripping = Spec.DripLipMm > 0f && _flow < JetOnsetLitresPerSecond;
-            _falls.FlowScale = dripping ? 0f : _flow / _referenceFlow;
+            _falls.FlowScale = dripping ? 0f : 1f;
+            // Each fall as it arrives at this flow, re-worked when the flow has moved a few per cent.
+            float signature = _flow + 50f * _level + 3f * _inletFlow;
+            if (!(MathF.Abs(signature - _tunedFlow) <= 0.03f * _tunedFlow) && signature > 0f)
+            {
+                _tunedFlow = signature;
+                for (int i = 0; i < Spec.Falls.Length; i++)
+                {
+                    var fall = Spec.Falls[i];
+                    float q = FallFlow(i);
+                    var f = fall.Feed is FallFeed.TapOntoBasin or FallFeed.TapIntoWater && Spec.Tap is { } tap
+                        ? TapShape(Spec, tap, _flow, _level) with { FlowLitresPerSecond = q }
+                        : Shape(Spec, fall, q);
+                    if (q <= 0f) f = f with { FlowLitresPerSecond = 0f };
+                    _falls.Retune(i, f.FlowLitresPerSecond, f.DropShare, f.MeanDropRadiusMm, f.ChunkRadiusMm, f.FallMetres);
+                }
+            }
             _falls.ImpactPart = _falls.DropBubblePart = _falls.LumpBubblePart = _falls.PlungePart = _falls.SplashPart = FallPart;
             _falls.Control(dt);
         }
@@ -504,6 +551,8 @@ public sealed class RunningWaterSynth
         {
             float y = _open[k].Next() + RainAt(k);
             if (_inside != null) y += _tubes![k].Process(_inside[k].Next());
+            // The basin's bottom is one plate and rings as one: at the middle.
+            if (k == 0) y += PlateSample();
             if (k < places.Length) places[k] = y;
         }
     }
@@ -518,7 +567,7 @@ public sealed class RunningWaterSynth
             y += _open[k].Next() + RainAt(k);
             if (_inside != null) y += _tubes![k].Process(_inside[k].Next());
         }
-        return y;
+        return y + PlateSample();
     }
 
     private void Step()
@@ -533,6 +582,7 @@ public sealed class RunningWaterSynth
 
     private void Schedule(float dt)
     {
+        Gulps(dt);
         float flow = _flow;
         if (!(flow > 0f)) return;
         foreach (var s in _sites)
@@ -715,7 +765,15 @@ public sealed class RunningWaterSynth
         int home = _open.Length > 1 ? 1 + (int)(_rng.Uniform() * (_open.Length - 1)) % (_open.Length - 1) : 0;
         int k = home != 0 && _rng.Uniform() < _toHome ? home : 0;
         var place = Spec.DripsInside && _inside != null ? _inside[k] : _open[k];
-        float impact = (Spec.DripOnto == WaterSurface.Rock ? FallingWaterSynth.HardImpactPascals : FallingWaterSynth.ImpactPascals)
+        // Under a tap the drip lands on whatever the basin is now: its bare bottom (and a steel one rings
+        // for it), or the water standing in it.
+        var onto = Spec.DripOnto;
+        if (Spec.Basin != null)
+        {
+            onto = _level > 0.003f ? WaterSurface.Pool : WaterSurface.Rock;
+            if (onto == WaterSurface.Rock && _plateDrive != null) place = _plateDrive;
+        }
+        float impact = (onto == WaterSurface.Rock ? FallingWaterSynth.HardImpactPascals : FallingWaterSynth.ImpactPascals)
                        * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * DripPart;
         // Onto wet stone the blow builds through the film (as the falls' do). Into a puddle too it is not a
         // point: the air under the drop is squeezed out and a thin disc of it trapped, and the contact
@@ -723,8 +781,8 @@ public sealed class RunningWaterSynth
         // first-contact spike, one sample wide, measured a 10 ms kurtosis of 31: a digital tick on its
         // own, where in rain a thousand of them merge.
         float rise = MathF.Max(16e-6f, WetCushion * r / v);
-        place.Impact(at, rise, (Spec.DripOnto == WaterSurface.Rock ? 0.4f : 1f) * r / v, impact * MathF.Sqrt(16e-6f / rise));
-        if (Spec.DripOnto != WaterSurface.Pool) return;
+        place.Impact(at, rise, (onto == WaterSurface.Rock ? 0.4f : 1f) * r / v, impact * MathF.Sqrt(16e-6f / rise));
+        if (onto != WaterSurface.Pool) return;
         // Into a puddle: the crater closes on a bubble often enough to be the sound of it (Phillips,
         // Agarwal and Jordan 2018: the "plink" of a dripping tap is that bubble driving the surface).
         if (_rng.Uniform() < 0.6f)

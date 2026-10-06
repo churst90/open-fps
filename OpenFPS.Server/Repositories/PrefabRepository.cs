@@ -292,7 +292,8 @@ public class PrefabRepository
                 SynthLfoDepth = t.SynthLfoDepth ?? 0f,
                 SynthFilterCutoff = t.SynthFilterCutoff ?? 1.0f,
                 SynthFilterResonance = t.SynthFilterResonance ?? 0.0f,
-                SynthPulseWidth = t.SynthPulseWidth ?? 0.5f
+                SynthPulseWidth = t.SynthPulseWidth ?? 0.5f,
+                SynthRunning = t.SynthRunning ?? true,
             });
         }
 

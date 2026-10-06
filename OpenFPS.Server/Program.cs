@@ -1883,6 +1883,10 @@ public class GameServer
             // door opens, press it again and you are in; sitting in one, press it once and your door
             // opens, again and you are out. Climbing in through a shut door would be the alternative,
             // and it is not one.
+            // A tap you are standing at, first: it needs you right beside it (TapReach), so it never takes
+            // the key from a door across the room, and a door five metres off would otherwise always win.
+            if (ToggleTapInReach(world, position, Say)) return;
+
             if (OpenDoorInReach(world, position, session.Entity, Say)) return;
 
             if (world.Has<OccupantComponent>(session.Entity))
@@ -1956,6 +1960,49 @@ public class GameServer
         say(DoorSystem.OpenedPhrase(opened, name) + "."
             + (DoorSystem.InTheWay(world, nearest.Value, 1f, who) != null ? " Someone is in the way of it." : ""));
         return true;
+    }
+
+    /// <summary>How close you must stand to a tap to turn it, m, measured along the floor: at the sink.</summary>
+    internal const float TapReach = 1.3f;
+
+    /// <summary>
+    /// Turns the tap you are standing at on, or off (running water with a tap: RunningWaterSpec.Tap). The
+    /// tap's flow is its emitter's SynthRunning, which every client reads from the definition, so the
+    /// definition goes out again; the basin under it fills and drains on each client from that one flag.
+    /// </summary>
+    private bool ToggleTapInReach(World world, Vector3 position, Action<string> say)
+    {
+        Entity? nearest = null;
+        float best = TapReach;
+        world.Query(new QueryDescription().WithAll<Transform, SoundEmitterComponent>(), (Entity e, ref Transform t, ref SoundEmitterComponent em) =>
+        {
+            if (!IsTap(em.SoundId)) return;
+            float dx = t.Position.X - position.X, dz = t.Position.Z - position.Z;
+            float distance = MathF.Sqrt(dx * dx + dz * dz);
+            if (distance > best || MathF.Abs(t.Position.Y - position.Y) > 2.5f) return;
+            best = distance; nearest = e;
+        });
+        if (nearest == null) return false;
+        ref var tap = ref world.Get<SoundEmitterComponent>(nearest.Value);
+        tap.SynthRunning = !tap.SynthRunning;
+        SyncAudioComponent(nearest.Value.Id);
+        string name = world.Has<IdentityComponent>(nearest.Value) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(nearest.Value).Name)
+            ? world.Get<IdentityComponent>(nearest.Value).Name : "tap";
+        say($"You turn the {name.ToLowerInvariant()} {(tap.SynthRunning ? "on" : "off")}.");
+        return true;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> TapIds = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Whether a sound id is running water with a tap a person turns.</summary>
+    internal static bool IsTap(string? soundId)
+    {
+        if (soundId == null || !soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return false;
+        return TapIds.GetOrAdd(soundId, static id =>
+        {
+            try { return OpenFPS.Common.RunningWaterSpec.ByName(id[5..]).Tap != null; }
+            catch (Exception) { return false; }
+        });
     }
 
     /// <summary>Shuts the nearest open door within arm's length, if there is one, unless somebody is in

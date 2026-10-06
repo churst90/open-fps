@@ -467,6 +467,12 @@ for ax in AVENUES:
 
 # ══ An apartment or office tower ══════════════════════════════════════════════════════════════════
 
+# Every flat, as (label, flat name, storey's floor height, its far wall's inner face and the way into the
+# room from it (across), and its two party walls (along), and the place() that turns across/along into
+# x/z): what the water fixtures at the end of the file are placed by. Nothing is laid here, so recording
+# them moves no id.
+FLAT_PLANS = []
+
 
 def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
     """
@@ -709,6 +715,9 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
                 if which == "front" and i == 0:
                     continue
                 flat = f"{label} flat {s}{i}{which[0].upper()}"
+                # The outer wall is the side away from the corridor.
+                outer, inward_a = (fa0, +1) if fa1 <= corridor[0] else (fa1, -1)
+                FLAT_PLANS.append((label, flat, floor_top, outer, inward_a, b0, b0 + slot_len, place))
                 B("furniture_soft", fa0 + 0.6, fa0 + 1.5, floor_top, floor_top + 0.85, b0 + 1.0, b0 + 3.2,
                   name=f"{flat} sofa")
                 B("furniture_soft", fa1 - 2.1, fa1 - 0.3, floor_top, floor_top + 0.6, b0 + 4.6, b0 + 6.4,
@@ -1330,6 +1339,11 @@ box("asphalt_road", TERM_X0 - 6.0, TERM_X0, 0.0, 0.05, 40.0, STREETS[2] + KERB, 
 # ══ The residential quarter ═══════════════════════════════════════════════════════════════════════
 
 
+# Every house, as (label, cx, cz, facing, roof height): what the downpipes at the end of the file are
+# placed by. Recording them lays nothing.
+HOUSE_PLANS = []
+
+
 def house(label, cx, cz, facing, two_storey=False):
     """
     A house with a front garden, a back garden, a drive, a fence and two doors.
@@ -1344,6 +1358,7 @@ def house(label, cx, cz, facing, two_storey=False):
     x0, x1 = cx - HOUSE_W / 2, cx + HOUSE_W / 2
     zlo, zhi = min(front_z, back_z), max(front_z, back_z)
     h = HOUSE_H * 2 + 0.2 if two_storey else HOUSE_H
+    HOUSE_PLANS.append((label, cx, cz, facing, h))
 
     # The back garden runs fourteen metres out of the back door — unless a street crosses the plot
     # first. Birch Street's north side backs onto Central Street, and its gardens ran straight over
@@ -2321,6 +2336,34 @@ GUTTER_Z = STREETS[2] - KERB + 0.15            # in the road, against the kerb's
 GUTTER_X0, GUTTER_X1 = SPAWN[0] - 8.0, SPAWN[0] + 7.0
 prop("gutter_water", (GUTTER_X0 + GUTTER_X1) / 2, 0.08, GUTTER_Z, name="Foundry Street gutter")
 prop("drain_grate_water", GUTTER_X1 + 0.3, 0.1, GUTTER_Z + 0.1, name="Foundry Street drain")
+
+# ══ Water in the flats and off the roofs ══════════════════════════════════════════════════════════
+#
+# Round 2 of running water (docs/RUNNING_WATER.md section 10). Every flat has a kitchen sink, a washbasin
+# and a shower, against its outer wall at the far end from its sofa: RunningWaterSpec.KitchenSink,
+# Washbasin and Shower. A person turns each on and off with the interact key standing at it; running,
+# the sink and the basin fill with the plug in, shut, they drain and gurgle. Silent until somebody does.
+# One kitchen tap, in the Union Building's first-floor flat 1F, has a worn washer and drips.
+#
+# Every house has a downpipe at the garden end of its back wall, and at the eaves over it the outlet
+# where the roof gutter empties into it (RunningWaterSpec.Downpipe and GutterOutlet): silent in dry
+# weather, running and, in a downpour, gurgling at the top.
+#
+# All of it laid here, after everything else, so no other id moves.
+for (t_label, flat, floor_top, outer, inward_a, b0, b1, t_place) in FLAT_PLANS:
+    def fixture(prefab, across_in, along, y, name):
+        fx, _, fz, _ = t_place(outer + inward_a * across_in, 0, along, 0)
+        prop(prefab, fx, y, fz, name=name)
+    sink = "dripping_sink_water" if flat == "Union Building flat 11F" else "kitchen_sink_water"
+    fixture(sink, 0.35, b1 - 2.0, floor_top + 0.9, "Kitchen tap")
+    fixture("washbasin_water", 0.3, b1 - 4.5, floor_top + 0.85, "Washbasin tap")
+    fixture("shower_water", 0.6, b1 - 6.2, floor_top + 0.05, "Shower")
+
+for (h_label, cx, cz, d, h) in HOUSE_PLANS:
+    back_face = cz - d * (HOUSE_D / 2)                  # the back wall's outer face
+    px, pz = cx + HOUSE_W / 2 - 0.35, back_face - d * 0.1
+    prop("downpipe_water", px, 0.15, pz, name=f"{h_label} downpipe")
+    prop("gutter_outlet_water", px, h + 0.1, back_face - d * 0.2, name=f"{h_label} roof gutter outlet")
 
 # The named places last, so that adding one moved no other part's id.
 for _name, *_span in named_places:

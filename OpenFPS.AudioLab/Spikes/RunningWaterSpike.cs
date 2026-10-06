@@ -46,6 +46,7 @@ public static class RunningWaterSpike
         AcousticRegistry.Initialize();
         if (args.Contains("game")) return Game(args);
         if (args.Contains("runoff")) return RunoffTable();
+        if (args.Contains("cycle")) return TapCycle(args);
         float sec = Arg(args, "sec=", 30f);
         float rain = Arg(args, "rain=", float.NaN);
         float flow = Arg(args, "flow=", float.NaN);
@@ -117,6 +118,51 @@ public static class RunningWaterSpike
             pa[i] = s.Next();
         }
         return pa;
+    }
+
+    /// <summary>
+    /// --running-water cycle PRESET [on=10] [off=20] [out=DIR] [flow=]: a tap turned on for on= seconds and
+    /// shut for off=, the basin's level, what leaves through the inlet and how much it gurgles every half
+    /// second, and the whole as a mono float WAV at a metre (flow_PRESET_cycle.wav). For a rain-fed outlet,
+    /// flow= sets the flow for the on= part and nothing runs in the off= part.
+    /// </summary>
+    private static int TapCycle(string[] args)
+    {
+        string key = args.First(a => !a.StartsWith("--") && !a.Contains('=') && a != "cycle");
+        var spec = RunningWaterSpec.ByName(key);
+        float on = Arg(args, "on=", 10f), off = Arg(args, "off=", 20f);
+        float flowOn = Arg(args, "flow=", spec.Tap?.OpenLitresPerSecond ?? spec.ReferenceFlow);
+        float flowOff = spec.Tap?.LeakLitresPerSecond ?? 0f;
+        var s = new RunningWaterSynth(spec, Rate, 7) { Flow = 0f };
+        int n = (int)((on + off) * Rate);
+        var pa = new float[n];
+        int lead = Rate / 2;
+        var sw = Stopwatch.StartNew();
+        for (int i = -lead; i < n; i++)
+        {
+            float t = i / (float)Rate;
+            if ((i & 255) == 0)
+            {
+                s.Flow = t >= 0f && t < on ? flowOn : flowOff;
+                s.Control(256f / Rate);
+                if (i >= 0 && i % (Rate / 2) == 0)
+                    Console.WriteLine($"  {t,5:F1} s  flow {s.Flow * 1000,6:F1} mL/s  level {s.Level * 1000,6:F1} mm  over the inlet {s.InletDepth * 1000,6:F1} mm"
+                                      + $"  out {s.InletFlow * 1000,6:F1} mL/s  gurgle {(spec.Inlet != null ? RunningWaterSynth.GurgleShare(spec.Inlet, s.InletDepth, s.InletFlow) : 0f):F2}");
+            }
+            float y = s.Next();
+            if (i >= 0) pa[i] = y;
+        }
+        Console.WriteLine($"  rendered {(on + off):F0} s in {sw.Elapsed.TotalSeconds:F1} s");
+        NatureSpike.Report("flow:" + key + " cycle", pa, Rate, calibrated: true);
+        string? dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..];
+        if (dir != null)
+        {
+            Directory.CreateDirectory(dir);
+            string path = Path.Combine(dir, $"flow_{key}_cycle.wav");
+            WriteFloatWav(path, pa.Select(p => p * PascalsToFull).ToArray(), 1);
+            Console.WriteLine($"  wrote {path}");
+        }
+        return 0;
     }
 
     private static int RunoffTable()

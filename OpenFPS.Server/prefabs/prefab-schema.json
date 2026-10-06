@@ -326,6 +326,10 @@
       "type": "boolean",
       "description": "Generate the signal instead of playing a sample. Synth fields without this are REJECTED."
     },
+    "SynthRunning": {
+      "type": "boolean",
+      "description": "Whether a synthesised source starts sounding. False for something a player turns on, such as a tap. Default true."
+    },
     "SynthWave": {
       "type": "integer",
       "minimum": 0,

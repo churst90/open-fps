@@ -1377,16 +1377,34 @@ public class ClientAudioSystem
         try { return OpenFPS.Common.AircraftProfile.ByName(sid[9..]); } catch { return null; }
     }
 
+    private readonly Dictionary<string, OpenFPS.Common.RunningWaterSpec> _flowSpecs = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>When a tap was last seen on, by entity.</summary>
+    private readonly Dictionary<int, double> _tapOnAt = new();
+
+    /// <summary>How long a basin is heard after its tap is shut, s: the longest a full sink takes to drain.</summary>
+    private const double TapDrainSeconds = 90.0;
+
     /// <summary>Running water fed only by the rain, with less than a trickle in it now (Runoff): it makes
     /// no sound and is given no voice. A creek or a fountain's overflow, with a flow of its own, never is.</summary>
-    private static bool Dry(string soundId)
+    private bool Dry(string soundId, int entityId, bool running, double now)
     {
         if (!soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return false;
         try
         {
-            var spec = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
+            // Looked up once a sound id: this runs for every sink in every flat, every frame.
+            if (!_flowSpecs.TryGetValue(soundId, out var spec))
+                _flowSpecs[soundId] = spec = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
+            // A tap: heard while it is on, and for as long after as its basin takes to empty. A shut tap
+            // nobody has opened since you arrived is an empty sink; a leaking one drips.
+            if (spec.Tap is { } tap)
+            {
+                if (running) { _tapOnAt[entityId] = now; return false; }
+                if (tap.LeakLitresPerSecond > 0f) return false;
+                return !_tapOnAt.TryGetValue(entityId, out double on) || now - on > TapDrainSeconds;
+            }
             if (spec.BaseFlowLitresPerSecond > 0f || spec.CatchmentSquareMetres <= 0f) return false;
-            return spec.FlowFor(OpenFPS.Common.Runoff.Through(spec.CatchmentSeconds)) < OpenFPS.Common.RunningWaterSpec.DryLitresPerSecond;
+            return spec.FlowNow() < OpenFPS.Common.RunningWaterSpec.DryLitresPerSecond;
         }
         catch (Exception) { return false; }
     }
@@ -1411,7 +1429,7 @@ public class ClientAudioSystem
             if (!em.IsSynth || em.SoundId == null) continue;
             if (!PhysicalLevel(em.SoundId, out float levelDb, out float extent)) continue;
             // A gutter, a drain or a downpipe with no rain running off into it is not there to be heard.
-            if (Dry(em.SoundId)) continue;
+            if (Dry(em.SoundId, entityId, em.SynthRunning, now)) continue;
 
             float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
