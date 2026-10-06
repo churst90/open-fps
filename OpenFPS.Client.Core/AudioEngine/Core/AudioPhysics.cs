@@ -22,6 +22,16 @@ public static class AudioPhysics
     }
     private static float _current = SpeedOfSound;
 
+    /// <summary>The air temperature the world has now, degrees C, as the server's weather sends it.
+    /// What a vehicle's cooling system runs against: on a warm day a car's air conditioning is on and
+    /// its radiator fan runs whenever it is standing or crawling.</summary>
+    public static float CurrentAirCelsius
+    {
+        get => System.Threading.Volatile.Read(ref _currentCelsius);
+        set => System.Threading.Volatile.Write(ref _currentCelsius, value);
+    }
+    private static float _currentCelsius = 20f;
+
     /// <summary>
     /// Speed of sound in dry air at a given temperature, m/s: c = 331.3 + 0.606·T(°C).
     ///

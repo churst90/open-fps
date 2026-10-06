@@ -84,6 +84,148 @@ public sealed record FanClutchSpec
     public static FanClutchSpec Viscous => new() { DisengagedFraction = 0.25f, EngageSeconds = 6f };
 }
 
+/// <summary>
+/// A car's electric cooling fan: a motor on a relay behind the radiator, switched by the coolant and
+/// by the air conditioning, its speed nothing to do with the crank's. See
+/// <see cref="VehicleProfile.ElectricFan"/>, and the heat balance in CoolingSystem that decides the
+/// coolant temperature.
+///
+/// Two speeds, as on most cars of the last thirty years (the low one through a dropping resistor).
+/// Each switches on at one coolant temperature and off at a lower one, so it does not chatter. And
+/// the condenser of the air conditioning sits in front of the radiator: while the compressor runs
+/// and the road is too slow to push air through it, the fan runs at low speed whatever the coolant is
+/// doing. That is why a queue of cars at a light on a hot day is a row of fans.
+/// </summary>
+public sealed record ElectricFanSpec
+{
+    /// <summary>Coolant temperature the low speed comes on at, and goes off at, degrees C. The
+    /// first stage of a two-stage radiator thermo-switch (VW-type switches are marked 95/84 C for
+    /// stage one and 102/91 C for stage two).</summary>
+    public float LowOnCelsius { get; init; } = 95f;
+    public float LowOffCelsius { get; init; } = 84f;
+    /// <summary>...and the high speed, on and off.</summary>
+    public float HighOnCelsius { get; init; } = 102f;
+    public float HighOffCelsius { get; init; } = 91f;
+    /// <summary>The low speed over the high one. A series resistor drops a two-speed fan's motor to
+    /// roughly two thirds of its speed; the broadband falls as the cube of that, about 11 dB.</summary>
+    public float LowSpeedFraction { get; init; } = 0.65f;
+    /// <summary>How long the motor takes to come up to speed, seconds.</summary>
+    public float SpinUpSeconds { get; init; } = 1.5f;
+    /// <summary>
+    /// The air conditioning keeps the fan running below this road speed, m/s (about 30 km/h), and
+    /// lets it go above half as fast again, where the ram air through the condenser is enough. A
+    /// setting for the condenser's pressure switch, which differs between cars; not a published
+    /// figure.
+    /// </summary>
+    public float AirConBelowMetresPerSecond { get; init; } = 8f;
+    /// <summary>The air temperature drivers turn the air conditioning on at, degrees C, and how far
+    /// either side of it one driver differs from the next (each car is fixed, from its seed). A
+    /// setting, not a survey.</summary>
+    public float AirConAmbientCelsius { get; init; } = 24f;
+    public float AirConAmbientSpread { get; init; } = 4f;
+
+    /// <summary>A two-speed fan with air conditioning: what nearly every road car carries.</summary>
+    public static ElectricFanSpec TwoSpeed => new();
+}
+
+/// <summary>
+/// The engine bay as something the engine's own noise has to get out of: its openings and the
+/// absorbing lining inside it. See <see cref="VehicleProfile.EngineBay"/>.
+///
+/// A bay is an enclosure with holes in it, and the steady state of one is an energy balance: the
+/// power the engine radiates into it leaves either through the holes or into the absorbing surfaces,
+/// in proportion to their areas, because an open hole absorbs everything that reaches it (the
+/// leaky-enclosure result; Beranek and Ver, Noise and Vibration Control Engineering, the chapter on
+/// enclosures). So the share that escapes is open / (open + absorption), and the pressure that
+/// escapes is its square root: <see cref="Leakage"/>. The bonnet panel itself is left out: steel of
+/// six or seven kilograms a square metre has a mass-law transmission loss of 25 dB and more above
+/// 250 Hz, so the holes carry nearly all of it.
+///
+/// A car's bay is not a sealed box. It is open underneath, where the undertray does not reach, and
+/// at the grille, and that is why you hear an engine ticking from the front of an idling car. The
+/// earlier constant (0.15, about -16.5 dB, "inaudible, which is correct") put an idling hatchback
+/// LOUDER behind than in front. NHTSA measured the opposite (FMVSS 141 final rule, 81 FR 90416,
+/// 14 December 2016, VRTC phase 3): for the internal combustion cars "the sound pressure level behind
+/// the vehicle was 6 to 10 dB lower than that directly in front", and ICE cars passing at 10 km/h
+/// measured 56.6 to 59.9 dB(A). The Car preset below lands an idling 1.6 hatchback inside both.
+///
+/// The areas are estimates from the size of the parts, not measurements of any one car; the check is
+/// the NHTSA figures above, and `--car-fronts` is the instrument that makes it.
+/// </summary>
+public sealed record EngineBaySpec
+{
+    /// <summary>The grille's open area as the sound sees it, through the condenser and radiator
+    /// cores, square metres.</summary>
+    public float GrilleOpenM2 { get; init; }
+    /// <summary>The bay floor that is open to the road, square metres: the bay's footprint less
+    /// whatever undertray covers it.</summary>
+    public float UndersideOpenM2 { get; init; }
+    /// <summary>
+    /// The absorption inside the bay, square metres (metric sabins): each lining's area times its
+    /// absorption coefficient, plus the bare metal and the engine's own surfaces at about 0.05.
+    /// </summary>
+    public float AbsorptionM2 { get; init; }
+    /// <summary>
+    /// What the gap between the floor and the road takes off the sound from the bay's open floor, dB
+    /// per metre of underbody it runs along before it gets out (BayRadiation): the subframe, the
+    /// exhaust and its heat shields, the tank and the axle are all in the way. No published figure
+    /// was found for it, so it is set from the one measurement there is: NHTSA's idling ICE cars, 6
+    /// to 10 dB quieter behind than in front. At 0.6 dB a metre the 1.6 hatchback (whose exhaust
+    /// carries part of its rear) is 6.4 dB(A) louder in front and the 2.8 diesel pickup (whose
+    /// clatter is most of both ends) 9.7; at 1.0 the pickup went over, 10.7, and at 1.5 it was 11.8.
+    /// A hatchback's floor loses about 2 dB on its way to the back bumper.
+    /// </summary>
+    public float UnderbodyLossDbPerMetre { get; init; } = 0.6f;
+
+    /// <summary>The pressure share of the engine's noise that gets out, 0..1:
+    /// sqrt(open / (open + absorption)).</summary>
+    public float Leakage
+    {
+        get
+        {
+            float open = GrilleOpenM2 + UndersideOpenM2;
+            return open <= 0f ? 0f : MathF.Sqrt(open / (open + MathF.Max(0f, AbsorptionM2)));
+        }
+    }
+
+    /// <summary>The share of what gets out that leaves by the grille rather than underneath.</summary>
+    public float GrilleShare
+    {
+        get
+        {
+            float open = GrilleOpenM2 + UndersideOpenM2;
+            return open <= 0f ? 0f : GrilleOpenM2 / open;
+        }
+    }
+
+    /// <summary>
+    /// A modern car: a plastic undertray over about half of a square-metre bay floor, the grille's
+    /// opening seen through the condenser and radiator, a lined bonnet. Open 0.12 + 0.5 m^2;
+    /// absorption 0.9 m^2 of bonnet liner at 0.6, 0.6 m^2 of bulkhead pad at 0.4 and 3 m^2 of bare
+    /// metal and engine at 0.05, 0.93 m^2. Leakage 0.63, about -4 dB.
+    /// </summary>
+    public static EngineBaySpec Car => new() { GrilleOpenM2 = 0.12f, UndersideOpenM2 = 0.5f, AbsorptionM2 = 0.93f };
+
+    /// <summary>
+    /// A car of the sixties and seventies: no undertray, no bonnet liner, a big grille. Open 0.2 +
+    /// 1.0 m^2; absorption a firewall pad and bare metal, 0.3 m^2. Leakage 0.89, about -1 dB.
+    /// </summary>
+    public static EngineBaySpec ClassicCar => new() { GrilleOpenM2 = 0.2f, UndersideOpenM2 = 1.0f, AbsorptionM2 = 0.3f };
+
+    /// <summary>
+    /// A pickup or a body-on-frame utility: a bigger grille than a car's, and an engine undercover
+    /// (skid plate) over the front of a bay floor that is otherwise open between the frame rails.
+    /// Open 0.2 + 0.5 m^2; absorption 0.9 m^2. Leakage 0.66, about -3.6 dB.
+    /// </summary>
+    public static EngineBaySpec Pickup => new() { GrilleOpenM2 = 0.2f, UndersideOpenM2 = 0.5f, AbsorptionM2 = 0.9f };
+
+    /// <summary>
+    /// A step van or a delivery truck: an engine under a short bonnet on a truck chassis, open
+    /// underneath and barely lined. Open 0.35 + 1.2 m^2; absorption 0.5 m^2. Leakage 0.87.
+    /// </summary>
+    public static EngineBaySpec Van => new() { GrilleOpenM2 = 0.35f, UndersideOpenM2 = 1.2f, AbsorptionM2 = 0.5f };
+}
+
 public sealed record TyreProfile
 {
     /// <summary>Tread blocks around the circumference. Their passing rate is a real tonal component of
@@ -378,33 +520,45 @@ public sealed record VehicleProfile
     }
 
     /// <summary>
-    /// How much of the engine's MECHANICAL noise — injection clatter, timing gears, the block —
-    /// reaches the street, 0..1. A car's engine sits under a bonnet in a lined bay and next to none
-    /// of it does; the exhaust is the car. A truck's engine hangs in the open air under a cab and a
-    /// bus's sits in a compartment ventilated by grilles, and for both of those the mechanical noise
-    /// is a good part of what a bystander hears — it is why a diesel truck idling is loud and a
-    /// diesel car idling is not, on the same fuel.
+    /// How much of the engine's MECHANICAL noise — valve ticking, injection clatter, timing gears,
+    /// the block — reaches the street, 0..1, as a pressure share.
     ///
     /// It is the block's ONLY route out. The front tap must not carry it as well: a fixed second
-    /// leak is irrelevant on a car and most of the engine on a bus. One mechanism, one path,
-    /// declared from what is actually around the engine:
+    /// leak is irrelevant on a car and most of the engine on a bus. One mechanism, one path. The
+    /// intake leaves the same way: its mouth is inside the bay, under the same bonnet.
     ///
-    ///   0.15  a car: a steel bonnet with a lined underside over a bay closed at the sides. Not a
-    ///         sealed box — nothing is — but next to nothing gets out, and against an exhaust
-    ///         twenty or thirty decibels louder it is inaudible, which is correct.
-    ///   0.30  a pickup or a van: the same bonnet with less deadening paid for and a bigger grille.
-    ///   0.80  a truck or a bus: a doghouse ventilated by grilles, or an engine hanging in the open
-    ///         air under a cab, with a radiator fan blowing straight through it at the street.
-    ///   1     a motorcycle: there is no bay.
+    /// Worked out from the bay (<see cref="EngineBay"/>, <see cref="EngineBaySpec.Leakage"/>) unless
+    /// a vehicle declares it outright:
     ///
-    /// The intake leaves the same way. Its mouth is inside the bay, under the same bonnet.
+    ///   0.63  a modern car (EngineBaySpec.Car), the default. It was 0.15 until 2026-10-05, which
+    ///         made the front of every car silent at idle; see EngineBaySpec for the measurements.
+    ///   0.89  a classic car with no undertray and no liner (EngineBaySpec.ClassicCar).
+    ///   0.66  a pickup (EngineBaySpec.Pickup); 0.87 a step van (EngineBaySpec.Van).
+    ///   0.80  a truck or a bus, declared: a doghouse ventilated by grilles, or an engine hanging in
+    ///         the open air under a cab. Approved by ear as it is; the bay model would give about 0.9.
+    ///   1     a motorcycle, declared: there is no bay.
     /// </summary>
-    public float EngineBayLeakage { get; init; } = 0.15f;
+    public float EngineBayLeakage
+    {
+        get => _engineBayLeakage ?? EngineBay?.Leakage ?? 1f;
+        init => _engineBayLeakage = value;
+    }
+    private readonly float? _engineBayLeakage;
 
     /// <summary>
-    /// The engine's cooling fan, if it has one that is always turning.
+    /// The engine bay: its openings and its lining (<see cref="EngineBaySpec"/>). It sets how much of
+    /// the engine gets out (<see cref="EngineBayLeakage"/>) and where from: the grille faces the
+    /// street ahead of the car, the open floor the road under it, and a listener behind the car hears
+    /// both only round the body. Null for a vehicle with no bay model, which then leaks its declared
+    /// share evenly in every direction (motorcycles, trucks, buses).
+    /// </summary>
+    public EngineBaySpec? EngineBay { get; init; } = EngineBaySpec.Car;
+
+    /// <summary>
+    /// The engine's cooling fan.
     ///
-    /// A car's is electric and off most of the time. A truck's or a bus's is bolted to the front of
+    /// A car's is electric (<see cref="ElectricFan"/>): off at a cruise, on when the coolant is hot or
+    /// the air conditioning is on and the car is idling or crawling. A truck's or a bus's is bolted to the front of
     /// the crank and belt-driven, so it turns whenever the engine does, and at full load it is one
     /// of the loudest things on the vehicle — a metre of plastic paddle blades throwing air through
     /// a radiator, right behind an open grille with nothing between it and the street. It is most
@@ -434,6 +588,31 @@ public sealed record VehicleProfile
     /// coming in is a real and recognisable roar.
     /// </summary>
     public FanClutchSpec? FanClutch { get; init; }
+
+    /// <summary>
+    /// The relay a car's electric fan runs on, or null for a fan on the crank (or no fan). With it,
+    /// <see cref="CoolingFan"/> turns at its own motor's speed — RpmMax on high, a fraction of it on
+    /// low — whatever the engine is doing. See <see cref="ElectricFanSpec"/>.
+    /// </summary>
+    public ElectricFanSpec? ElectricFan { get; init; }
+
+    /// <summary>
+    /// A car's electric radiator fan: seven swept plastic blades, 36 cm across (a 14-inch fan, the
+    /// size of a compact's), 2,700 rpm on high, in a shroud behind the radiator.
+    ///
+    /// Its tips do 51 m/s, Mach 0.15: all rush of air with a hum under it. The levels are the truck
+    /// fan's anchor (88 dB tone, 93 dB broadband at 93 m/s) carried down by the model's own laws:
+    /// broadband as the cube of tip speed (-16 dB) and as the blade area (a fifth of it, -7 dB), so
+    /// 70 dB broadband and 64 dB of tone at a metre, on high. That is a derivation, not a measurement
+    /// of a car fan; low speed is 11 dB under it.
+    /// </summary>
+    public static BladeRowSpec CarRadiatorFan => new()
+    {
+        Blades = 7, DiameterMetres = 0.36f, ChordMetres = 0.06f, ThicknessRatio = 0.08f,
+        RpmMax = 2700f, RpmIdle = 0f, ReferenceDb = 64f, SelfNoiseDb = 70f,
+        // Car fans space their blades unevenly to spread the blade-passing tone.
+        BladeScatter = 0.05f,
+    };
 
     /// <summary>
     /// How many tyres are on the road. The rolling noise of the vehicle is one tyre's
@@ -654,6 +833,7 @@ public sealed record VehicleProfile
         TyreCount = 2,
         ExhaustOffsetZ = -0.75f, IntakeOffsetZ = 0.25f, ExhaustHeight = 0.55f,
         EngineBayLeakage = 1f,     // no bay: the engine hangs in the frame and the airbox is under the tank
+        EngineBay = null,
         FrontAxleZ = 0.70f, RearAxleZ = -0.70f,
         // 106.8 on the live voice with the stock system: the pipe 100.6, the engine itself 103.0.
         SourceLevelDb = 107f,
@@ -689,6 +869,7 @@ public sealed record VehicleProfile
         // Two tons of Detroit steel with a full interior: a big, well-damped body, not a race shell.
         Body = VehicleBody.Saloon,
         Name = "1969 big-block Charger, Flowmasters",
+        EngineBay = EngineBaySpec.ClassicCar,
         EngineKey = "v8_charger440",
         SourceLevelDb = 113f,          // measured on the live voice
         Engine = EngineProfile.V8Charger440,
@@ -735,6 +916,7 @@ public sealed record VehicleProfile
         Chassis = RunningGear.Chevelle70,
         LengthMetres = 4.9f, WidthMetres = 1.9f, HeightMetres = 1.35f,
         Name = "Big-block muscle car, true duals",
+        EngineBay = EngineBaySpec.ClassicCar,
         EngineKey = "v8_muscle",
         SourceLevelDb = 122f,
         Engine = EngineProfile.V8MuscleBigBlock,
@@ -755,6 +937,7 @@ public sealed record VehicleProfile
     {
         Chassis = RunningGear.MustangGt11,
         Name = "V8 sports car, Flowmaster 40s",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "v8_sports",
         SourceLevelDb = 116f,
         Engine = EngineProfile.V8SportsFlowmaster40,
@@ -769,6 +952,7 @@ public sealed record VehicleProfile
         // Small aluminium panels, a tiny cabin, and an exhaust that barely touches the shell.
         Body = VehicleBody.Supercar,
         Name = "Flat-plane V8 supercar",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "v8_flatplane",
         SourceLevelDb = 125f,
         Engine = EngineProfile.V8FlatPlane,
@@ -784,6 +968,7 @@ public sealed record VehicleProfile
         Horn = "electric:disc_single",
         LengthMetres = 4.1f, WidthMetres = 1.75f, HeightMetres = 1.45f,
         Name = "1.6 hatchback",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "i4_economy",
         // 99.7 on the live voice: flat out near the redline this car is doing motorway speeds, and
         // there a small car is mostly its tyres.
@@ -855,7 +1040,7 @@ public sealed record VehicleProfile
         Name = "3.0 straight-six sport saloon",
         EngineKey = "i6_street",
         Engine = EngineProfile.Inline6Street,
-        SourceLevelDb = 99f,   // 99.0 measured
+        SourceLevelDb = 102f,   // 101.9 measured; 99.0 before the bay was opened up (2026-10-05)
     };
 
     public static VehicleProfile HotHatch => new()
@@ -863,6 +1048,7 @@ public sealed record VehicleProfile
         Chassis = RunningGear.CivicTypeR,
         LengthMetres = 4.25f, WidthMetres = 1.8f, HeightMetres = 1.45f,
         Name = "2.0 hot hatch",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "i4_sport",
         SourceLevelDb = 119f,
         Engine = EngineProfile.Inline4Sport,
@@ -885,6 +1071,7 @@ public sealed record VehicleProfile
         Chassis = RunningGear.GolfGti7,
         LengthMetres = 4.3f, WidthMetres = 1.8f, HeightMetres = 1.45f,
         Name = "2.0 turbo hatch",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "i4_turbo",
         // Measured, not guessed: EngineSynthTests renders every preset and holds its declared level
         // to what it actually produces. A guess can be sixteen decibels out, which puts a car forty
@@ -902,6 +1089,7 @@ public sealed record VehicleProfile
         Chassis = RunningGear.Bmw530iE60,
         LengthMetres = 4.9f, WidthMetres = 1.85f, HeightMetres = 1.45f,
         Name = "3.0 straight-six saloon",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "i6",
         SourceLevelDb = 117f,
         Engine = EngineProfile.Inline6,
@@ -915,6 +1103,7 @@ public sealed record VehicleProfile
         Chassis = RunningGear.AccordV6,
         LengthMetres = 4.9f, WidthMetres = 1.85f, HeightMetres = 1.45f,
         Name = "3.5 V6 sedan",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "v6",
         // Measured on the live voice (`--voice-levels`), not the tailpipe bench: the bench renders
         // the exhaust alone, and on a road car with a silencer the body and the tyres carry several
@@ -946,6 +1135,7 @@ public sealed record VehicleProfile
         MassKg = 380f, DragArea = 0.55f,
         ExhaustOffsetZ = -0.5f, IntakeOffsetZ = 0.1f, FrontAxleZ = 0.8f, RearAxleZ = -0.8f,
         EngineBayLeakage = 1f,     // no bay: the engine hangs in the frame and the airbox is under the tank
+        EngineBay = null,
     };
 
     public static VehicleProfile DirtBike => new()
@@ -967,6 +1157,7 @@ public sealed record VehicleProfile
         MassKg = 190f, DragArea = 0.5f,
         ExhaustOffsetZ = -0.4f, IntakeOffsetZ = 0.1f, FrontAxleZ = 0.75f, RearAxleZ = -0.75f,
         EngineBayLeakage = 1f,     // no bay: the engine hangs in the frame and the airbox is under the tank
+        EngineBay = null,
     };
 
     /// <summary>A full-size gas pickup with the 5.3 V8, as it left the factory.</summary>
@@ -997,10 +1188,9 @@ public sealed record VehicleProfile
     {
         Chassis = RunningGear.F250HD,
         LengthMetres = 6.0f, WidthMetres = 2.0f, HeightMetres = 2.0f,
-        EngineBayLeakage = 0.35f,
         Name = "1998 Ford F-250, 7.3 Power Stroke",
         EngineKey = "powerstroke73",
-        SourceLevelDb = 102f,
+        SourceLevelDb = 104f,   // 104.1 on the live voice; 101.2 before the bay was opened up (2026-10-05)
         Engine = EngineProfile.PowerStroke73,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.71f, 1.54f, 1.00f, 0.71f }, FinalDrive = 3.73f, ShiftSeconds = 0.5f, UpshiftRpm = 2800f, DownshiftRpm = 1200f, WheelRadiusMetres = 0.40f },
         MassKg = 3200f, DragArea = 1.6f,
@@ -1043,11 +1233,11 @@ public sealed record VehicleProfile
     {
         Chassis = RunningGear.Mt45,
         LengthMetres = 7.3f, WidthMetres = 2.4f, HeightMetres = 3.1f,
-        EngineBayLeakage = 0.5f,
+        EngineBay = EngineBaySpec.Van,
         Body = VehicleBody.Van,
         Name = "parcel step van",
         EngineKey = "step_van",
-        SourceLevelDb = 96f,      // measured on the live voice
+        SourceLevelDb = 101f,     // 100.9 on the live voice; 97.6 before the bay was opened up (2026-10-05)
         Engine = EngineProfile.CumminsIsbStepVan,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.10f, 1.81f, 1.41f, 1.00f, 0.71f }, FinalDrive = 4.88f, ShiftSeconds = 0.5f, UpshiftRpm = 2400f, DownshiftRpm = 1100f, WheelRadiusMetres = 0.42f },
         Tyres = TyreProfile.TruckOnAsphalt,
@@ -1061,7 +1251,6 @@ public sealed record VehicleProfile
     {
         Chassis = RunningGear.Llv,
         LengthMetres = 4.4f, WidthMetres = 2.0f, HeightMetres = 2.2f,
-        EngineBayLeakage = 0.25f,
         Name = "mail truck (LLV)",
         EngineKey = "mail_truck",
         SourceLevelDb = 96f,
@@ -1077,14 +1266,15 @@ public sealed record VehicleProfile
         Chassis = RunningGear.Hilux,
         LengthMetres = 5.3f, WidthMetres = 1.9f, HeightMetres = 1.8f,
         // A cab and an empty steel bed, which is the most resonant thing on the road.
-        EngineBayLeakage = 0.30f,   // a pickup bonnet: less deadening, bigger grille
+        EngineBay = EngineBaySpec.Pickup,
         Body = VehicleBody.Van,
         Name = "2.8 turbo-diesel pickup",
         EngineKey = "diesel_i4",
-        // 99.4 on the live voice, against 88 on the tailpipe bench, and nearly all of the difference
-        // is the TYRES: this is a silenced turbo-diesel worked at motorway speed, where the tyres
-        // really are louder than the engine, and they are as much a part of the vehicle as the pipe.
-        SourceLevelDb = 99.5f,
+        // 102.5 on the live voice, against 88 on the tailpipe bench: this is a silenced turbo-diesel
+        // worked at motorway speed, where the tyres and the clatter out of its bay are both louder
+        // than the pipe. (99.4 until 2026-10-05, when the bay was 0.30 rather than the 0.66 its
+        // openings give.)
+        SourceLevelDb = 103f,
         Engine = EngineProfile.DieselPickupI4,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.31f, 2.33f, 1.52f, 1.13f, 0.86f, 0.68f }, FinalDrive = 3.73f, ShiftSeconds = 0.45f, UpshiftRpm = 3600f, DownshiftRpm = 1300f, WheelRadiusMetres = 0.38f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 48, SurfaceRoughness = 0.6f },
@@ -1107,6 +1297,7 @@ public sealed record VehicleProfile
         SourceLevelDb = 104f,   // includes the exhaust valves' flow noise and the block's clatter
         AirSystem = "tractor_trailer",
         EngineBayLeakage = 0.8f,   // engine in the open under a cab, behind an open grille
+        EngineBay = null,
         // Nine plastic paddles of 0.81 m on the crank nose, a little over engine speed. At the
         // governed 1,800 rpm the tips do 72 m/s — Mach 0.21 — so there is no tone worth the name
         // and it is all rush: twelve times the mower's blade area at four fifths of its tip speed,
@@ -1139,7 +1330,7 @@ public sealed record VehicleProfile
     {
         Chassis = RunningGear.Ram2500,
         LengthMetres = 5.9f, WidthMetres = 2.0f, HeightMetres = 1.95f,
-        EngineBayLeakage = 0.30f,   // a pickup bonnet: less deadening, bigger grille
+        EngineBay = EngineBaySpec.Pickup,
         Body = VehicleBody.Van,
         Name = "5.9 Cummins pickup, straight pipe",
         // Measured with --engine-levels, not guessed: a straight-piped 5.9 is eleven decibels above
@@ -1183,6 +1374,7 @@ public sealed record VehicleProfile
         AirSystem = "transit_bus",
         DoorChime = true,
         EngineBayLeakage = 0.8f,   // a doghouse ventilated by grilles, inside the cabin
+        EngineBay = null,
         // Smaller engine, smaller fan: seven blades of 0.66 m straight off the crank. Same tip
         // speed as the truck's at the speeds this thing is worked at, a third of the blade area.
         CoolingFan = new BladeRowSpec
@@ -1257,6 +1449,7 @@ public sealed record VehicleProfile
         // A long roof and a big rear volume — a wagon booms where a saloon does not.
         Body = VehicleBody.Van,
         Name = "2.5 flat-four wagon",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "boxer4",
         SourceLevelDb = 118f,
         Engine = EngineProfile.Boxer4,
@@ -1269,6 +1462,7 @@ public sealed record VehicleProfile
     {
         Chassis = RunningGear.ViperSrt10,
         Name = "V10 coupe, side pipes",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "v10",
         SourceLevelDb = 120f,   // 120.0 measured: the exhaust valves' flow noise on side pipes
         Engine = EngineProfile.V10,
@@ -1376,6 +1570,7 @@ public sealed record VehicleProfile
         LengthMetres = 5.1f, WidthMetres = 2.0f, HeightMetres = 1.55f,
         Body = VehicleBody.Saloon,
         Name = "Police interceptor, road",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "police_interceptor",
         // Measured on the live voice at 99.6 with the pursuit exhaust (EngineProfile.PoliceInterceptorV8):
         // a V8 you hear working, where a fully stock one at 93 sits level with an economy hatchback.
@@ -1432,6 +1627,7 @@ public sealed record VehicleProfile
         Horn = "electric:trumpet_pair",
         LengthMetres = 4.9f, WidthMetres = 2.0f, HeightMetres = 1.3f,
         Name = "V12 grand tourer",
+        CoolingFan = CarRadiatorFan, ElectricFan = ElectricFanSpec.TwoSpeed,
         EngineKey = "v12",
         // 124 on the live voice, against 128 at the tailpipe. This one declares itself
         // LOUDER than it plays, which places it about two decibels under where it belongs.

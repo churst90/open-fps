@@ -563,6 +563,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         _engineAtRear = v.EngineAtRear;
         _bayIntake = new EchoDiffuser(BayScattering, seed + 71, sampleRate);
         _radiation = new OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation(v, sampleRate);
+        _bayRadiation = new OpenFPS.Client.AudioEngine.Core.Engine.BayRadiation(v, sampleRate);
         // Drums or discs, as the axle doing most of the stopping has.
         var chassis = v.Running;
         _squeal = new OpenFPS.Client.AudioEngine.Core.BrakeSqueal(sampleRate, drums: chassis.MainBrake == OpenFPS.Common.BrakeKind.Drum, seed: seed + 97);
@@ -597,8 +598,15 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // vehicle's. That is also why it belongs in the front tap and not with the tailpipe.
             _fan = new OpenFPS.Client.AudioEngine.Core.Aircraft.BladeRow(fan, sampleRate, Vector3.UnitZ, seed + 53);
             _fanRatio = v.FanDriveRatio > 0f ? v.FanDriveRatio : 1f;
+            _fanMaxRpm = fan.RpmMax;
             if (v.FanClutch is { } clutch)
                 _cooling = new OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem(clutch, v.Engine, seed);
+            else if (v.ElectricFan is { } relay)
+            {
+                // A car's fan is on a motor: its speed is the relay's, never the crank's.
+                _cooling = new OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem(relay, v.Engine, seed);
+                _electricFan = true;
+            }
         }
         // Rolling noise per axle, anchored: one tyre's declared level summed over the tyres at that
         // end — the steered pair at the front (one on a motorcycle), the rest at the back. Divided
@@ -823,7 +831,16 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>The cooling fan, for a vehicle whose fan is on the engine rather than on a relay.
     /// The same BladeRow a propeller and a mower blade are; see VehicleProfile.CoolingFan.</summary>
     private readonly OpenFPS.Client.AudioEngine.Core.Aircraft.BladeRow? _fan;
-    private readonly float _fanRatio;
+    private readonly float _fanRatio, _fanMaxRpm;
+    /// <summary>The fan runs on its own motor (VehicleProfile.ElectricFan), not off the crank.</summary>
+    private readonly bool _electricFan;
+    /// <summary>
+    /// The air round the vehicle, degrees C, for its cooling system: what decides whether a car's
+    /// driver has the air conditioning on, and so whether its fan runs at a standstill. NaN (the
+    /// default) takes the world's, AudioPhysics.CurrentAirCelsius, which the provider keeps from the
+    /// server's weather; an instrument or a test sets it outright.
+    /// </summary>
+    public float AmbientCelsius = float.NaN;
     private float _bayLeak;
     /// <summary>
     /// The intake as it leaves through the bay: the same noise as at the grille, but not the same
@@ -836,6 +853,11 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>Which way the tailpipe throws its sound and what the body does to it, for where the
     /// listener is. See ExhaustRadiation.</summary>
     private readonly OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation _radiation;
+    /// <summary>Where the bay's noise leaves the vehicle, grille and open floor, and what the body does
+    /// to it on the way to the listener. See BayRadiation.</summary>
+    private readonly OpenFPS.Client.AudioEngine.Core.Engine.BayRadiation _bayRadiation;
+    /// <summary>The bay's radiation, for tests and instruments.</summary>
+    internal OpenFPS.Client.AudioEngine.Core.Engine.BayRadiation BayRadiation => _bayRadiation;
     /// <summary>The pipe's radiation, for tests and instruments.</summary>
     internal OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation Radiation => _radiation;
     /// <summary>The front brakes singing at the end of a stop, on a vehicle whose brakes do. See
@@ -1051,8 +1073,9 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // two ends have voices of their own, the compromise point before (VehicleProfile.ExhaustOffset).
             var placedAt = SplitVoices ? Vehicle.ExhaustSlot : Vehicle.ExhaustOffset;
             _radiation.Aim(heard + placedAt);
+            _bayRadiation.Aim(heard + placedAt);
         }
-        else _radiation.Aim(null);
+        else { _radiation.Aim(null); _bayRadiation.Aim(null); }
         float panelA = 1f - MathF.Exp(-2f * MathF.PI * _panelCorner * dt);
         float starterA = 1f - MathF.Exp(-2f * MathF.PI * StarterPathCornerHz * dt);
         // The lift for this block, from the level the machine has been running at lately.
@@ -1145,8 +1168,16 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                 // that does not change per sample.
                 if ((i & 63) == 0)
                 {
-                    _cooling?.Step(dt * 64f, Engine.Rpm, Engine.LoadTorque, Driveline.Speed);
-                    _fan.SetSpeed(Engine.Rpm * _fanRatio * (_cooling?.FanSpeedFraction ?? 1f), 1f,
+                    if (_cooling != null)
+                    {
+                        _cooling.AmbientCelsius = float.IsNaN(AmbientCelsius)
+                            ? OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius : AmbientCelsius;
+                        _cooling.Step(dt * 64f, Engine.Rpm, Engine.LoadTorque, Driveline.Speed);
+                    }
+                    float fanRpm = _electricFan
+                        ? _fanMaxRpm * (_cooling?.FanSpeedFraction ?? 0f)
+                        : Engine.Rpm * _fanRatio * (_cooling?.FanSpeedFraction ?? 1f);
+                    _fan.SetSpeed(fanRpm, 1f,
                                   _listenerKnown
                                       ? new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ))
                                       : Vector3.UnitZ);
@@ -1172,16 +1203,22 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // one rule — a body that coloured one and not the other is how a change can be measured
             // as working and heard as nothing.
             pa += _body.Process(Engine.Exhaust) * BodyMix;
-            // What escapes the engine bay (VehicleProfile.EngineBayLeakage; 0.15 unless declared).
+            // What escapes the engine bay (VehicleProfile.EngineBayLeakage, from its EngineBay).
             // It leaves from the BAY, which is where the engine is — the intake slot marks it, nose
             // or mid-ship — so it goes out of the front tap, not the back with the tailpipe. On the
             // school bus the block is 97.7 dB against an 83 dB silenced pipe, so out of the back an
             // idling bus would be one sound at its tail. Once far enough to be one voice, nothing changes.
-            float bay = _bayLeak > 0f ? (Engine.Block - Engine.StarterOut + FrontMix * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
+            // It leaves by the grille and the open floor, and the body shades both from a listener
+            // behind the vehicle (BayRadiation); `bayLevel` is the same before any shading, for the
+            // level the loudness law reads.
+            float bayLevel = _bayLeak > 0f ? (Engine.Block - Engine.StarterOut + FrontMix * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
+            float bay = _bayRadiation.Process(bayLevel);
             // The starter is not in the bay: it hangs under the car on the bellhousing, behind the
             // sill and the wheels but in no enclosure. Through the bay leak it was 16 dB down and a
             // big V8's start could not be heard from the kerb at all.
-            bay += Engine.StarterOut * MathF.Max(_bayLeak, StarterUnderbody);
+            float starterOut = Engine.StarterOut * MathF.Max(_bayLeak, StarterUnderbody);
+            bay += starterOut;
+            bayLevel += starterOut;
             if (_engineAtRear) pa += bay; else front += bay;
             // The air and the door beeper are their own sources at their own levels, each at its own
             // end of the vehicle: the door valve, the kneeling valve and the beeper at the front door,
@@ -1220,7 +1257,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // quietly, and the idle lift must not turn it back up.
             // Both axles' tyres count: they are the machine radiating too, and at a cruise the larger
             // part of it. Only the rear one is in `pa`, so the front one is added here.
-            float engineOnly = pa - rearExtras + (_engineAtRear ? -fanOut : bay) + frontTyre + (Engine.Exhaust - exhaustOut);
+            float engineOnly = pa - rearExtras + (_engineAtRear ? -fanOut : bayLevel) + frontTyre + (Engine.Exhaust - exhaustOut);
             blockSum += (double)engineOnly * engineOnly;
             tyreSum += (double)(rearTyre * rearTyre + frontTyre * frontTyre);
 
