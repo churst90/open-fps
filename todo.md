@@ -243,6 +243,22 @@ Wind is done (2026-10-05); rain and thunder are being built. Still to do:
 - A more physical weather model: fronts, clouds, fog, a random walk instead of four fixed states.
 - Ear wind assumptions to check: the per-angle figures, a helmet's 12 dB, the open-window cabin airflow.
 
+### The ground reflection, done properly (discussed 2026-10-06)
+The ground is the strongest reflection outdoors, so it stays, but as the ground really answers:
+filtered by the surface's impedance (grass and soil absorb the top and shift the phase; Delany-Bazley
+or Miki), with the coherent share falling with frequency, distance, roughness and turbulence
+(Clifford and Lataitis; Nord2000 and Harmonoise do this), and the rest scattered. A perfect mirror
+copy is what flanged, which is why speech has none today; done this way speech can have it back.
+Moving bodies (cars, buses, aircraft, people) go into the acoustic scene so sound reflects off and
+is shadowed by them (Bodies and wheels, stage 2).
+
+### Tests on GitHub (asked 2026-10-06)
+Every test and build runs on Cody's machine today. GitHub Actions is free for a public repo: a
+workflow sharded across parallel runners (4 cores each; the suite is 48 minutes on 24 cores here).
+The Linux FMOD and Steam Audio libraries are not in the repo: Steam Audio is Apache-2.0 and can be
+fetched in the workflow; FMOD's licence does not allow publishing its SDK, so tests that need FMOD
+either skip in CI or get the library from a private store.
+
 ### Fire at any size
 The fire model scales (a wider fire is lower and slower; more heat, a louder roar and more crackles)
 but is one point source with a capped crackle stream. A blaze needs sources over the burning area,

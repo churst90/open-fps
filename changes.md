@@ -2,6 +2,13 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-06
+
+- The tests run on GitHub (`.github/workflows/tests.yml`): every push to main and every pull request,
+  or by hand from the Actions tab. Eight runners each take an eighth of the test classes
+  (`tools/ci/shard_tests.py`); results are kept for two weeks as artifacts. No FMOD or Steam Audio
+  is needed: no test loads the native audio engine.
+
 ## 2026-10-05
 
 - Two maps of real places, made from open data: "magnolia tx" (magnolia_tx), a 3 km square south
