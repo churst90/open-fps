@@ -148,10 +148,10 @@ public sealed class FoliageSynth
         Vogel = Math.Clamp(spec.VogelExponent, -1.5f, 0f);
         // The increments carry the same mean energy as the fit of LeafStrikePascals was made with: a
         // strike's goes as (u e)^(2 · 1.2), an episode's scale as the old 0.4 + 1.2 u's (mean square 1.12).
-        _incrementOrder = Math.Clamp((int)FitTune.T("iorder", IncrementOrder), 1, 64);
+        _incrementOrder = IncrementOrder;
         _incrementNorm = MathF.Sqrt(GammaMoment(_incrementOrder, 2 * StrikeSpeedPower));
-        _episodeOrder = Math.Clamp((int)FitTune.T("eorder", EpisodeOrder), 1, 64);
-        _episodeNorm = MathF.Sqrt(GammaMoment(_episodeOrder, 2 * FitTune.T("epow", EpisodePower)) / 1.12f);
+        _episodeOrder = EpisodeOrder;
+        _episodeNorm = MathF.Sqrt(GammaMoment(_episodeOrder, 2 * EpisodePower) / 1.12f);
         float crownArea = MathF.PI * spec.CrownRadiusMetres * spec.CrownRadiusMetres;
         float leafArea = MathF.Max(0.01f, spec.LeafAreaCm2) * 1e-4f;
         _leaves = spec.Leaves == LeafKind.Broadleaf ? spec.LeafAreaIndex * crownArea / leafArea : 0f;
@@ -334,7 +334,7 @@ public sealed class FoliageSynth
                         Rate = episodeRate,
                         // How hard this eddy hit — a velocity increment across the twig, heavy-tailed
                         // as the next strike's (see Increment) — and how big this twig's leaves are.
-                        Scale = closing * MathF.Pow(Increment(_episodeOrder), FitTune.T("epow", EpisodePower)) / _episodeNorm,
+                        Scale = closing * MathF.Pow(Increment(_episodeOrder), EpisodePower) / _episodeNorm,
                         Tone = 0.6f + 1.0f * _sum.Uniform(),
                     };
                     break;

@@ -153,7 +153,7 @@ public sealed class RainSynth
         // Each scale's knots have unit variance; the cosine glide between two independent knots keeps
         // three quarters of it on average.
         g /= MathF.Sqrt(0.75f * ClusterScales.Length);
-        float sigma = FitTune.T("rsig", ClusterSigma);
+        float sigma = ClusterSigma;
         return MathF.Exp(sigma * g - 0.5f * sigma * sigma);
     }
 

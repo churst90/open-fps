@@ -298,8 +298,8 @@ public sealed class FallingWaterSynth
             float meanVolume = 4f / 3f * MathF.PI * MeanCube(s.DropMean, MinDropRadius, s.DropMax, s.Order);
             s.DropRate = f.DropShare * q / meanVolume;
             // The lumps: a gamma law of their own order about the stated size, up to three times it.
-            s.ChunkMean = f.ChunkRadiusMm * 1e-3f * FitTune.T("lscale", 1f);
-            s.ChunkMax = FitTune.T("max", 3f) * s.ChunkMean;
+            s.ChunkMean = f.ChunkRadiusMm * 1e-3f;
+            s.ChunkMax = 3f * s.ChunkMean;
             s.ChunkMeanVolume = 4f / 3f * MathF.PI * MeanCube(s.ChunkMean, MinDropRadius, s.ChunkMax, s.LumpOrder);
             s.ChunkRate = (1f - f.DropShare) * q / s.ChunkMeanVolume;
             s.ChunkSpeed = MathF.Sqrt(2f * 9.81f * f.FallMetres);
@@ -432,9 +432,9 @@ public sealed class FallingWaterSynth
     public static (float Rise, float Decay, float Pascals) Splash(float radius, float speed, float crownShare)
     {
         float mass = 1000f * 4f / 3f * MathF.PI * radius * radius * radius;
-        float energy = 0.5f * mass * speed * speed * crownShare * FitTune.T("eff", SplashEfficiency);
+        float energy = 0.5f * mass * speed * speed * crownShare * SplashEfficiency;
         float rise = 0.0002f;
-        float decay = FitTune.T("floor", SplashFloorSeconds) + FitTune.T("dur", SplashDurations) * radius / MathF.Max(0.3f, speed);
+        float decay = SplashFloorSeconds + SplashDurations * radius / MathF.Max(0.3f, speed);
         float t = rise / 3f + decay / 2f;
         return (rise, decay, MathF.Sqrt(energy * RhoC / (2f * MathF.PI * t)));
     }
@@ -446,7 +446,7 @@ public sealed class FallingWaterSynth
     /// to splash (the scatter drawn round this), so each splash lights its own octave or two, not all of
     /// them at once.</summary>
     public static float SplashCentreHz(float radius, float speed)
-        => FitTune.T("sfc", SplashCentreReferenceHz) * MathF.Pow(MathF.Max(0.3f, speed) / 4f, 1.5f) * MathF.Pow(radius / 5e-3f, -0.5f);
+        => SplashCentreReferenceHz * MathF.Pow(MathF.Max(0.3f, speed) / 4f, 1.5f) * MathF.Pow(radius / 5e-3f, -0.5f);
 
     private static float Gauss(EventSum s)
         => MathF.Sqrt(-2f * MathF.Log(MathF.Max(1e-7f, s.Uniform()))) * MathF.Cos(MathF.Tau * s.Uniform());
@@ -530,7 +530,7 @@ public sealed class FallingWaterSynth
             if (f.ClumpClock <= 0f)
             {
                 float g = MathF.Sqrt(-2f * MathF.Log(MathF.Max(1e-6f, rng.Uniform()))) * MathF.Cos(MathF.Tau * rng.Uniform());
-                float sigma = FitTune.T("clump", ClumpSigma) * f.Spread;
+                float sigma = ClumpSigma * f.Spread;
                 f.ClumpFrom = f.Clump;
                 f.ClumpTo = MathF.Exp(sigma * g - 0.5f * sigma * sigma);
                 f.ClumpLength = 0.015f + 0.05f * rng.Uniform();
@@ -560,13 +560,13 @@ public sealed class FallingWaterSynth
             // The impact: the force arrives as the drop's front meets the surface and goes over the
             // time the whole drop takes to bury itself.
             float tau = r / v;
-            float impact = FitTune.T("imp", ImpactPascals) * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart;
+            float impact = ImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart;
             // On stone the drop stops in its own length and splashes flat: a shorter force, and
             // nothing trapped. Small drops falling far are also the ones the wind takes to the
             // paving round a pool.
             if (f.Rock || (drift > 0f && r < 1e-3f && sum.Uniform() < drift * (1f - r / 1e-3f)))
             {
-                sum.Impact(at, ImpactRise, 0.4f * tau, impact * (HardImpactPascals / FitTune.T("imp", ImpactPascals)));
+                sum.Impact(at, ImpactRise, 0.4f * tau, impact * (HardImpactPascals / ImpactPascals));
                 continue;
             }
             sum.Impact(at, ImpactRise, tau, impact);
@@ -614,12 +614,12 @@ public sealed class FallingWaterSynth
             // over the longer rise, so the peak comes down as the root of it.
             float rise = MathF.Max(ImpactRise, LumpCushion * r / v);
             sum.Impact(at, rise, (f.Rock ? 0.4f : 1f) * r / v,
-                       MathF.Sqrt(ImpactRise / rise) * FitTune.T("imp", ImpactPascals) * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart);
+                       MathF.Sqrt(ImpactRise / rise) * ImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart);
 
             // Its crown, or on stone its lamella, tearing into spray: every lump, as loud as it is big.
             var (sr, sd, sp) = Splash(r, v, crown);
-            float fc = SplashCentreHz(r, v) * MathF.Exp(FitTune.T("sjit", SplashScatter) * Gauss(sum));
-            float spread = FitTune.T("sbw", SplashBandHalfWidth);
+            float fc = SplashCentreHz(r, v) * MathF.Exp(SplashScatter * Gauss(sum));
+            float spread = SplashBandHalfWidth;
             sum.Burst(at, sr, sd, sp * weight * SplashPart, fc / spread, MathF.Min(fc * spread, 0.45f * _rate), steep: true);
 
             if (f.Rock) continue;
@@ -636,7 +636,7 @@ public sealed class FallingWaterSynth
                     Ring(sum, at + (int)(cavity * (0.2f + sum.Uniform())), DrawPlungeBubbleMm(sum), bw);
             }
 
-            if (k % stride != 0 || sum.Uniform() > FitTune.T("cshare", ChunkShare)) continue;
+            if (k % stride != 0 || sum.Uniform() > ChunkShare) continue;
             // A lump opens a crater too big to close in one: the bubble it traps is a large one, up to
             // the lump's own size — the low "glug" under a fountain. Smaller ones far more often.
             float u = sum.Uniform();

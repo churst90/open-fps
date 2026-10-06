@@ -54,7 +54,9 @@ public sealed class FireSynth
     /// one end-grain jet that sings (the steam jets below). FITTED 2026-10-06 (texture round 1) to the
     /// three fire recordings' envelope statistics: without it the fire was silent between its pops
     /// above 2 kHz (envelope spread 0.45-0.59 at 3-12 kHz against the recordings' 0.18-0.30); the
-    /// recordings are a steady fizz with very rare loud cracks over it (kurtosis 21-100).
+    /// recordings are a steady fizz with very rare loud cracks over it (kurtosis 21-100). Carrying the
+    /// crackles' power law ten to a hundred times further down instead did not fill it: under a law of
+    /// exponent 2.2 the energy is in the big pops, and the small ones only lowered the kurtosis.
     /// </summary>
     public const float FizzPascals = 0.0035f;
 
@@ -70,17 +72,6 @@ public sealed class FireSynth
     /// <summary>How many crackles a second a fire with seasoned wood makes when it is burning well,
     /// per 100 kW, before clustering.</summary>
     private const float CracklesPer100Kw = 28f;
-    /// <summary>
-    /// How far below the smallest distinct pop the crackles go on: the power law does not stop where
-    /// an ear stops picking pops out. Crackling noise has no smallest event until the size of what
-    /// breaks (Sethna, Dahmen and Myers 2001), and in wood that is one cell, far under a pop you can
-    /// count; so under the dozen-odd distinct pops a second are hundreds of fainter ones a second, the
-    /// fizz of a fire between its cracks. Texture round 1 (2026-10-06): with the law cut at the smallest
-    /// distinct pop the fire was silent between pops above 2 kHz (envelope spread 0.55-0.59 at 3-12 kHz
-    /// against the recordings' 0.24-0.31). FITTED to the recordings' envelope statistics.
-    /// </summary>
-    private const float CrackleFloor = 1f;
-
     /// <summary>A crackle this many times the smallest throws an ember.</summary>
     private const float EmberSize = 60f;
 
@@ -202,7 +193,7 @@ public sealed class FireSynth
 
         // The fizz follows how hard the wood is gassing: the burn, the wetness, and the clusters of
         // pockets reaching temperature together that the crackles come in.
-        _fizzTarget = FitTune.T("fizz", FizzPascals) * _burn * MathF.Sqrt(Spec.Moisture / 0.2f * _clusterGain);
+        _fizzTarget = FizzPascals * _burn * MathF.Sqrt(Spec.Moisture / 0.2f * _clusterGain);
 
         // The wind at the flames: more air, more burning, more turbulence.
         float gust = 1f + 0.35f * MathF.Max(0f, Wind - 1f);
@@ -297,11 +288,7 @@ public sealed class FireSynth
 
     private void Schedule(float dt)
     {
-        // The pops under the distinct ones: the same law carried down CrackleFloor further, as many
-        // more as the law says (N(>a) ∝ a^−(α−1)).
-        float floor = FitTune.T("cfloor", CrackleFloor);
-        float rate = CrackleRate * MathF.Pow(floor, CrackleExponent - 1f)
-                   * _clusterGain * (1f + 1.5f * _flare) * (1f + 0.2f * MathF.Max(0f, Wind - 2f));
+        float rate = CrackleRate * _clusterGain * (1f + 1.5f * _flare) * (1f + 0.2f * MathF.Max(0f, Wind - 2f));
         int count = _sum.Poisson(rate * dt);
         for (int k = 0; k < count; k++) Crackle((int)(_sum.Uniform() * Block));
 
@@ -325,9 +312,8 @@ public sealed class FireSynth
     private void Crackle(int at)
     {
         // Size on the power law: P(size > s) = s^-(α-1), cut at the range.
-        float floor = FitTune.T("cfloor", CrackleFloor);
-        float u = MathF.Max(1f / (CrackleRange * floor), _sum.Uniform());
-        float size = MathF.Min(CrackleRange, MathF.Pow(u, -1f / (CrackleExponent - 1f)) / floor);
+        float u = MathF.Max(1f / CrackleRange, _sum.Uniform());
+        float size = MathF.Min(CrackleRange, MathF.Pow(u, -1f / (CrackleExponent - 1f)));
         float p = SmallestCracklePascals * size * _burn * CracklePart;
         // A pocket bursting is a volume of gas let out at once: the pressure is the rate of change of
         // the outflow, a spike as the wall gives and a tail as the pocket empties. A bigger pocket
