@@ -90,7 +90,7 @@ is **speech at normal effort, ANSI S3.5-1997 table 3** (the standard speech spec
 extended at 12 dB an octave either side). Speech because the mix was balanced against a talker and
 the calibration (below) uses one, and because its spectrum is an everyday one.
 
-- Pivot: the loudness of 70 dB of the reference speech, **83.4 phon** (20.3 sone) by ISO 532-1.
+- 70 dB of the reference speech is **83.4 phon** (20.3 sone) by ISO 532-1.
 - A pure 1 kHz tone at 70 dB is 68 phon: the same level, 15 phon quieter. That is loudness
   summation, and it is real.
 
@@ -102,34 +102,59 @@ hears differently from the reference.
 
 ## The law in loudness units
 
-For a source of spectrum shape S at level L:
+### Two ways a level is declared
 
-    E_S(L) = the level of reference speech that is exactly as loud (ISO 532-1) as S at L
+The game declares levels two ways, and loudness needs the real one (found while building, 2026-10-06):
 
-E_S is the "speech-equivalent level". For speech it is L itself. The law is the old law, applied to
-the speech-equivalent level, and the result turned back into the source's own level:
+- A **recording or a render** (every world sound through WorldAudioPlayer, footsteps, birds, beacons,
+  near rain drops) is placed by mapping its buffer's FULL SCALE to its declared level at a metre
+  (Speech.LevelDb: a speech line sits 28 dB under full scale, so normal speech, 62.35 dB, is declared
+  90.35). Whatever a declaration's comment calls the number, that is what `Place` does with it. Its
+  real level is the declared level plus where the sound sits in its buffer, measured: a **gated RMS**,
+  the mean square of its 125 ms blocks within 20 dB of the loudest (the sound while it sounds; the
+  125 ms is the ear's temporal integration, which is why a click is quieter than its peak says).
+- A **physical voice** (engines, machines, water, fire, rain patches, sirens, horns, bells, trains,
+  the wind at the ears) declares its RMS level and plays it 16 dB under full scale
+  (VehicleProfile.PeakHeadroomDb).
 
-    old:  rendered level at the reference distance  =  c (L_ref - C)
-    new:  E' = K + c (E_S(L_ref) - C),   L' = E_S^-1(E'),   rendered = L' - K
+Treating a bird call, a beacon and a footfall as declaring their real level (as their comments say)
+made footsteps 18 dB louder: the game's balance was built on the full-scale mapping, and it stays.
 
-C is the old ceiling (112 dB at 45 %), c the /levels compression, K the playback calibration's
-nominal value (the level at which a 0 dBFS reference-speech source would play if the pivot plays at
-its own level: 70 - c (70 - C) = 88.9 dB at 45 %). The reference distance is where the source's
-speech-equivalent level falls to the ceiling, as before.
+### The law
 
-- A source as loud as 70 dB of speech plays as loud as it is, at any setting (pivot invariance).
-- Speech is placed exactly as before.
-- Every source keeps its rank: louder to the ear stays louder.
-- At /levels 100 % nothing changes for anything (E' = E).
+For a source S with declared level L (at its reference distance):
 
-In phons the law is very nearly P' = 83.4 + c (P - 83.4) for every source; the speech conjugation is
-what makes it exact for speech and keeps "45 %" meaning what it meant.
+1. its real level R = L + its offset (gated RMS for a recording, 0 for a physical voice);
+2. the speech line exactly as loud (ISO 532-1, S's measured spectrum at R against the ANSI speech
+   spectrum): declared at E = R_speech + 28;
+3. the old law places that line: its RMS plays at  K + c (E - C) - 28;
+4. S plays exactly as loud as that line, at its own level, in its own digital units.
 
-The correction a source gets over the old law is `PlacedDb(L, S) - PlacedDb(L, speech)`; beyond the
+C is the old ceiling (112 dB at 45 %), c the /levels compression, and K the **designed playback**:
+the level at the ear of a 0 dB rendered level at which a normal voice a metre away plays as loud as
+life (62.35 dB) at the shipped /levels: K = 100.8 dB (Loudness.DesignFullScaleDb). The reference
+distance is where S is as loud as a line declared at the ceiling.
+
+- Speech is placed exactly as before (Loudness.Place returns the old law for the reference).
+- A source exactly as loud as a speech line plays exactly as loud as that line, at any /levels, from
+  either convention (EarModelTests.AsLoudAsALineIsPlayedAsLoudAsTheLine). The old law's pivot (a line
+  declared 70 at its reference) is where the speech-equivalent of every source turns from lifted to
+  lowered.
+- Everything keeps its order of loudness.
+- The two conventions are now consistent at every /levels. Under the old law a physical voice and a
+  speech line of the same real level played the same only near 45 % (28c - 12 = 0.6 dB apart at 45 %,
+  16 dB apart at 100 %): at 100 % physical voices were 16 dB under real. At the shipped 45 % this
+  costs nothing.
+- The gain is not held to 1 as the old law's was: a sound the ear hears less of per decibel (an idle,
+  a tone) needs more level than speech to be as loud, and at the ceiling that is more than speech's
+  full scale.
+
+The correction a source gets over the old law is `PlacedDb(L, S) - PlacedDb(L)`; beyond the
 reference distance it does not depend on distance. It is applied as a smooth gain on the voice
-(slewed, never stepped). Estimated (prototype, shapes measured from the game's own captures):
+(slewed at 6 dB/s, never stepped). The estimates below were made before the build, on the spectrum
+alone; the measured results are under "What it changed".
 
-| source (estimate) | change against the old law |
+| source (estimate, spectrum only) | change against the old law |
 |---|---|
 | speech (the game's walker lines) | +0.4 dB |
 | own footsteps, concrete | -0.5 |
@@ -151,16 +176,18 @@ them loud turns them down; this is the change Cody most needs to hear.
 The lift was "however far under its declared level the engine runs, lift it by (1 - c) of that",
 capped at 20 dB. In loudness units it is the law itself:
 
-    lift = PlacedDb(L_now, S_now) - PlacedDb(L_declared, speech) - (L_now - L_declared)
+    lift = PlacedDb(L_now, S_now) - PlacedDb(L_declared) - (L_now - L_declared)
 
-where L_now is the level the engine is running at (its own pressure, smoothed over half a second, as
+(PlacedDb(L_declared) is the old law: how the voice was placed) where L_now is the level the engine is running at (its own pressure, smoothed over half a second, as
 before) and S_now the spectrum it is making now. The voice was placed as its declared level of the
 reference sound; the lift moves it to where the law puts what it is actually doing, level and tone.
 
 `MaxLiftDb` (20 dB) existed only to bound the unweighted law. Before/after:
 
 - The hatchback idles 38 dB under its declared 99.5 dB: the old law wanted 20.9 dB of lift and the
-  cap took 0.9 off. The loudness law asks for about 28 from the front and more from behind.
+  cap took 0.9 off. Measured in the game's output the idling hatchback comes up 1 to 1.2 dB, the
+  diesel pickup 6, the police car 10 (it was the furthest under its declared level, and its idle
+  is 94-99 % bass): see "What it changed".
 - The cap is removed. What it also did, by accident, was limit the burst at a voice's first blocks
   (the level estimate starts at zero) and the lift chasing silence. Those get their own rules:
   the level estimate starts from the first block it hears rather than from zero, and when the
@@ -213,11 +240,13 @@ left alone.
 The compensation needs the absolute level at the ears. The game cannot know the volume knob, so it
 assumes and lets the player correct it.
 
-`ClientSettings.ListeningLevelDb`: the level, dB SPL at the ears, at which a sound the law places at
-the pivot reaches the player. **Default 70**: the pivot plays at its own level, so a talker at normal
-effort a metre away plays at 62 dB, conversational, which is where most people set headphones for
-speech in a quiet room and well under the 80 dB(A) a week's listening is referenced to in WHO/ITU-T
-H.870. Every voice's playback level is its law level plus (ListeningLevelDb - 70).
+`ClientSettings.ListeningLevelDb`: how loud the player's headphones play the game, as the level,
+dB SPL at the ears, of a normal voice a metre away as the game plays it at the shipped /levels.
+**Default 62.35** (ANSI S3.5 normal effort at a metre): that voice as loud as life. Conversational
+speech is where most people set headphones in a quiet room, and it is well under the 80 dB(A) a
+week's listening is referenced to in WHO / ITU-T H.870. A level 5 dB under the default says the
+headphones play everything 5 dB quieter than the design (K above), and the compensation gives back
+the tone that costs. Held to 40-90.
 
 `/listening` in game opens the calibration:
 
@@ -225,14 +254,16 @@ H.870. Every voice's playback level is its law level plus (ListeningLevelDb - 70
    and Down, until they sound like someone talking to you normally at arm's length. Enter saves,
    Escape cancels."
 2. A walker's line plays on a loop from 1 m ahead, at the digital level that is 62.35 dB (ANSI S3.5
-   normal effort at 1 m) if the current calibration is right.
+   normal effort at 1 m) if the current calibration is right. At the default it is exactly the gain
+   the law gives a normal voice a metre away, so the game's own voice is the reference.
 3. Up: "Louder" (the voice is too quiet: your headphones play quieter than assumed; the setting goes
    down 1 dB and the voice up 1 dB). Down: "Quieter". Shift with either: 5 dB. Space: the line again.
    R: back to the default.
-4. Enter: saved, and said back ("Listening level 66: your headphones play 4 decibels under life.").
+4. Enter: saved, and said back ("Listening level 58: your headphones play 4 decibels under life, and
+   the game gives back more of the bass and treble a quiet sound loses.").
    Escape: the old value is put back.
 
-`/listening 65` sets it directly; `/listening default`. The system volume is the player's: the
+`/listening 58` sets it directly; `/listening default`. The system volume is the player's: the
 calibration changes no level in the mix, only the tone correction (a quieter system gets more bass
 and treble back) and the loudness figures the instruments report.
 
@@ -256,6 +287,45 @@ level rank by loudness. Engines are ranked by their declared level as before.
 
 `/ear off` and `/ear on` switch the whole model (law correction, lift, compensation) live, for
 listening. `OPENFPS_EAR_MODEL=0` starts with it off (what `--game-levels` uses for "before").
+
+## What it changed (measured 2026-10-06)
+
+Through the game's own client audio (AudioLab `--game-levels set=ear`, once with `ear=off` and once
+with `ear=on`), measured by `tools/ear_loudness.py` (an independent Python port of ISO 532-1). "phon"
+is the loudness level of the output, mapped so the talker at 2 m reads 56.3 dB before. Bass and top
+are the 63 Hz and 8 kHz octaves against the 1 kHz octave: what the compensation did. Renders and the
+full measurements: inbox/ear-model-2026-10-06.
+
+| source | dB RMS | LUFS | dB(A) | phon before -> after | bass | top |
+|---|---|---|---|---|---|---|
+| speech, normal, 2 m | -0.9 | -0.9 | -0.8 | 70 -> 69 | -0.5 | -0.5 |
+| own footsteps, concrete | -1.1 | 0.0 | +0.1 | 64 -> 63 | -6.5 | -1.1 |
+| fountain, 5 m | -1.0 | -1.0 | -1.1 | 70 -> 69 | +2.2 | +0.3 |
+| window air conditioner, 3 m | -0.6 | -0.5 | -0.5 | 59 -> 59 | -0.9 | 0.0 |
+| door, knob, open and close, 2 m | +0.1 | -0.8 | -2.2 | 71 -> 69 | +4.2 | +2.1 |
+| hatchback idling, front / rear 2 m | +1.1 / +1.0 | +1.8 / +1.2 | +2.0 / +2.1 | 62 -> 64 / 59 -> 61 | -1.1 / -1.4 | 0 |
+| police car idling, front / rear 2 m | +10.0 / +10.2 | +9.8 / +10.2 | +8.2 / +8.7 | 56 -> 66 / 64 -> 74 | +2.0 / +1.8 | 0 |
+| diesel pickup idling, front / rear 2 m | +6.1 / +6.1 | +5.7 / +5.7 | +5.2 / +5.3 | 61 -> 67 / 53 -> 60 | +1.0 | 0 |
+| hatchback passing, 30 km/h, 7.5 m | +1.6 | +1.4 | +1.1 | 65 -> 67 | +3.3 | +0.2 |
+| police car passing, 30 km/h, 7.5 m | +2.9 | +2.8 | +2.3 | 65 -> 67 | +4.2 | +0.2 |
+| diesel pickup passing, 30 km/h, 7.5 m | +3.0 | +2.3 | +1.1 | 65 -> 66 | +3.8 | +0.2 |
+| thunder, ground strike 3 km | +3.5 | +3.3 | +2.3 | 68 -> 70 | +2.5 | +6.3 |
+| rain, moderate (5 mm/h), open street | +2.1 | +1.7 | +2.2 | 70 -> 72 | -6.8 | -3.1 |
+| wind at the ears, 2.2 / 4.5 / 7 m/s | the law's own gain: +17 / +11 / +8 dB | | | | | |
+
+Over 2 dB, which Cody approved by ear: the idling police car (+10), the idling diesel pickup (+6),
+the police car and the pickup passing slowly (+3), thunder at 3 km (+3.5), rain (+2), the door (2 dB
+quieter in dB(A), with more bass), and the wind at the ears (a light breeze +17 dB, a 7 m/s wind
++8). The wind is bass at a level the ear barely hears, so the law, which lifts what is quiet toward
+the pivot, lifts it the most; the captures of it differ run to run because the wind wanders, so the
+figures given are the model's own (the [EAR] log line). Measured in loudness rather than LUFS, the
+wind at 4.5 m/s was 8 phon UNDER the talker at 2 m before, not over it as LUFS said.
+
+Other sources the log shows, not in the captures: bird calls about 8 dB quieter (their recordings sit
+13 dB hotter in their buffers than speech lines, a difference the old law passed through uncompressed
+and the loudness law compresses), and the near rain drops about 12 dB louder (a drop's buffer is
+declared at its peak; its 125 ms level, what the ear integrates, is far under that, and the law lifts
+what is quiet). Beacons (sine blips) are estimated +7 to +9.
 
 ## Later: masking (partial loudness), designed, not built
 
