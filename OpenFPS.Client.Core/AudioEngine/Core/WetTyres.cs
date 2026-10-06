@@ -49,8 +49,9 @@ public sealed class WetTyres
     public static float SpeedExponent = 3f;
     /// <summary>The hiss's band: a two-pole high-pass at this, Hz.</summary>
     public static float EjectionLowHz = 900f;
-    /// <summary>And a one-pole low-pass at this times (u / reference)^<see cref="BrightnessExponent"/>, Hz.</summary>
-    public static float EjectionHighHz = 5000f;
+    /// <summary>And a two-pole low-pass at this times (u / reference)^<see cref="BrightnessExponent"/>, Hz:
+    /// the recorded wet pass-bys fall 5-10 dB an octave above 4 kHz (docs/WET_ROADS.md, "Fitting").</summary>
+    public static float EjectionHighHz = 3500f;
     public static float BrightnessExponent = 0.5f;
     /// <summary>How deep the groove pulses modulate the hiss, 0..1.</summary>
     public static float GrooveModulation = 0.35f;
@@ -157,7 +158,7 @@ public sealed class WetTyres
         _lpA = 1f - MathF.Exp(-2f * MathF.PI * hiHz / _rate);
         // The band's own gain on unit-variance noise: two high-pass poles and one low-pass, worked out
         // as a noise bandwidth so the rms comes out as declared.
-        float band = MathF.Max(1e-4f, (hiHz * MathF.PI / 2f - EjectionLowHz * 0.5f) / (0.5f * _rate));
+        float band = MathF.Max(1e-4f, (hiHz * MathF.PI / 4f - EjectionLowHz * 0.5f) / (0.5f * _rate));
         float bowBand = MathF.Max(1e-4f, (BowHighHz * MathF.PI / 2f - BowLowHz) / (0.5f * _rate));
         float eRef = Pa(EjectionDb), bRef = Pa(BowDb);
         float impactShare = MathF.Pow(10f, ImpactDb / 10f);
@@ -246,6 +247,7 @@ public sealed class WetTyres
             _hp1[i] = _hpA * (_hp1[i] + x - _hpIn1[i]); _hpIn1[i] = x;
             _hp2[i] = _hpA * (_hp2[i] + _hp1[i] - _hpIn2[i]); _hpIn2[i] = _hp1[i];
             _lp1[i] += _lpA * (_hp2[i] - _lp1[i]);
+            _lp2[i] += _lpA * (_lp1[i] - _lp2[i]);
             // The grooves empty in turn: the hiss pulses at the tread's pitch rate.
             float mod = 1f;
             if (_grooves[i] > 0)
@@ -254,7 +256,7 @@ public sealed class WetTyres
                 if (_groove[i] >= 1.0) _groove[i] -= Math.Floor(_groove[i]);
                 mod = 1f + GrooveModulation * (1f - 4f * MathF.Abs((float)_groove[i] - 0.5f));
             }
-            float y = _lp1[i] * _ampE[i] * mod;
+            float y = _lp2[i] * _ampE[i] * mod;
             if (_ampB[i] > 0f)
             {
                 float z = Signed();

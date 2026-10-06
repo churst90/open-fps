@@ -374,7 +374,8 @@ public sealed class RoadWater
         float water = held;
         // The sheet stands only on a texture that is full.
         float full = holds > 0f ? Math.Clamp((held / holds - 0.9f) / 0.1f, 0f, 1f) : 1f;
-        if (full > 0f)
+        // Nothing running anywhere on the ladder: no sheet and no gutter (and none of their powers).
+        if (full > 0f && _held[0] + _held[^1] + _held[_held.Length / 2] > 1e-3f)
         {
             float x = MathF.Max(0.3f, fromCrownMetres);
             float tau = RoadWaterLaw.EquilibriumSeconds(x, MathF.Max(_rain, _held[0]), t.ManningN, Drainage.CrossSlope);
