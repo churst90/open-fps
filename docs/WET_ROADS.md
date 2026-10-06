@@ -21,9 +21,13 @@ dense asphalt 0.5-1.0 mm (0.7 used), brushed concrete 0.6-1.2 (0.8). Rain fills 
 evaporation empties it. This is the damp road that is still noisy an hour after the rain.
 
 **The sheet.** While it rains, water runs across the road to the kerb. Its depth above the texture at
-a distance L down the cross-fall is Gallaway et al.'s equation (FHWA-RD-79-31, 1979):
+a distance L down the cross-fall is Gallaway et al.'s equation 16 (FHWA-RD-79-31, 1979, p. 79; checked
+against the scanned report):
 
-    WD = 0.01485 TXD^0.11 L^0.43 I^0.59 / S^0.42 - TXD      (inches, feet, in/h, ft/ft)
+    WD = 0.00338 TXD^0.11 L^0.43 I^0.59 / S^0.42 - TXD      (inches, feet, in/h, ft/ft)
+
+which in millimetres, metres and mm/h has the constant 0.01485 (the form used here). It is thin: over
+a 0.5 mm texture on one 3.65 m lane, 0.33 mm in 25 mm/h and 0.75 in 50 mm/h.
 
 It comes up to that over the kinematic-wave time to equilibrium of sheet flow,
 t_e = (n L / sqrt S)^0.6 / i^0.4 (Woolhiser and Liggett 1967; HEC-22 eq. 3-4), one to three minutes,
@@ -53,13 +57,15 @@ the crown of a 7 m street, and at 3.3 m (by the kerb):
 |---|---|---|---|---|
 | drizzle | 0.3 | 0.70 mm | 0.70 | 0.12 m |
 | light | 1.5 | 0.70 | 1.25 | 0.23 |
-| moderate | 5 | 1.24 | 3.84 | 0.36 |
-| heavy | 25 | 3.22 | 9.75 | 0.65 |
-| violent | 70 | 5.91 | 15.89 | 0.96 |
+| moderate | 5 | 0.70 | 3.84 | 0.36 |
+| heavy | 25 | 0.73 | 9.75 | 0.65 |
+| violent | 70 | 1.34 | 15.89 | 0.96 |
 
-After an hour of heavy rain stops: the sheet is gone in ten minutes (3.2 mm to 0.6); the texture then
-dries over 1 to 1.5 hours on an overcast spring afternoon (0.46 mm/h), in under an hour at a dry summer
-noon (0.9 mm/h), and not at all on a humid night (it is still wet in the morning).
+So on a two-lane town street the wheel paths are wet (the texture full) in any rain, and only violent
+rain stands a film on them; heavy rain is wetter at the kerb (the gutter spreads 0.65 m) and in the
+puddles. After an hour of heavy rain stops, the texture dries over 1 to 1.5 hours on an overcast spring
+afternoon (0.46 mm/h), in under an hour at a dry summer noon (0.9 mm/h), and not at all on a humid
+night (it is still wet in the morning).
 
 **On the wire.** `WorldStateUpdate.RoadWater` carries the whole state (rain, evaporation, the ladder,
 the textures, the puddles; 21 floats) for every client on the map, and each wheel carries the water
@@ -84,21 +90,16 @@ Both appended: the server and the client must be rebuilt together and the server
 
       V = SD^0.04 P^0.3 (TD + 1)^0.06 A,  A = max(10.409 / WD^0.06 + 3.507, (28.952 / WD^0.06 - 7.817) TXD^0.14)
 
-  For a car tyre at 220 kPa on 2 mm it gives 88 km/h, beside Horne's 6.36 sqrt(p kPa) = 94 km/h for a
-  flooded smooth tyre (Horne and Dreher 1963, NASA TN D-2056). Tyres declare their pressure and tread
+  For a car tyre at 220 kPa on 2 mm it gives 88 km/h, beside Horne's 6.34 sqrt(p kPa) = 94 km/h for a
+  flooded smooth tyre (Horne and Dreher 1963, NASA TN D-2056: 10.35 sqrt(p psi) mph, which is 6.34 in
+  km/h and kPa). Tyres declare their pressure and tread
   (`TyreProfile.InflationKPa`, `TreadDepthMm`): car 220 kPa and 5 mm, bike 270 and 3, truck and bus 760
   and 12, slick 160 and none.
 
-So, a car on asphalt in the wheel path:
-
-| rain | 30 km/h | 50 | 80 | 110 |
-|---|---|---|---|---|
-| light | 0.73 | 0.71 | 0.67 | 0.64 |
-| moderate | 0.71 | 0.66 | 0.55 | 0.47 |
-| heavy | 0.68 | 0.56 | 0.31 | 0.24 |
-
-(share of the dry grip; a bus in heavy rain keeps 0.71 / 0.66 / 0.57 / 0.46). Stopping from 50 km/h on
-the brakes: 10.5 m dry, 14.9 m wet, 16.4 m on 4 mm of water.
+So, a car on asphalt in the wheel path keeps 0.73 / 0.71 / 0.67 / 0.64 of its dry grip at 30 / 50 / 80
+/ 110 km/h in any rain up to heavy, and 0.71 / 0.65 / 0.53 / 0.45 in violent rain; a bus 0.73 / 0.69 /
+0.64 / 0.58 in violent rain. In a kerbside gutter or a puddle the film lifts it far more. Stopping from
+50 km/h on the brakes: 10.5 m dry, 14.9 m wet (1.2 mm), 16.4 m on 4 mm of water.
 
 **Squeal.** Water in the contact lubricates the tread's stick-snap that the squeal is made of: a wheel's
 squeal is scaled by `RoadWaterLaw.SquealFactor`, falling to a fifth as the texture fills and to nothing
@@ -114,7 +115,10 @@ scaled by the root of the wet share (a steady turn's speed goes as the root of t
 comfortable side friction drivers keep to (AASHTO) is usually lower and still decides. On a map with
 street life drivers also give up a share of their speed and keep a longer headway in the IDM/ACC
 following model (`StreetLifeData.WetSpeedReduction`, `HeavyRainSpeedReduction`, `WetHeadwayIncrease`,
-`HeavyRainHeadwayIncrease`), blended from the wet road (the asphalt's texture full) to heavy rain.
+`HeavyRainHeadwayIncrease`), blended from the wet road (the asphalt's texture full) to heavy rain:
+3 % and 8 % slower, 12 % more headway, from FHWA's three-city loop-detector study (Rakha et al.,
+FHWA-HOP-07-073, 2007: free-flow speed -2 to -3.6 % in light rain and -6 to -9 % at about 16 mm/h;
+capacity -10 to -11 % in both, jam density unchanged, so a time headway about 12 % longer).
 
 ## 4. The sound
 
@@ -137,3 +141,57 @@ same distance weighting as its squeal. Inside, the impacts and a share of the hi
 through the wheelhouses and the floor trim (a low-pass and a loss), into the cabin model.
 
 Wipers are not modelled (next step), nor the spray thrown by other vehicles onto the windscreen.
+
+## 5. Fitting
+
+Yardsticks (never shipped): 47 recordings in `~/openfps-scratch-archive/wet-roads-2026-10-06/refs`
+with `SOURCES.txt` (Freesound previews, CC0 and CC-BY): 11 wet and 10 dry car pass-bys (four wet/dry
+pairs by the same recordist), 6 wet and 2 dry traffic, 3 wet trucks, 3 wet buses, 7 puddle splashes, 3
+wet and 2 dry car interiors. Literature notes in `LITERATURE.txt` there. No per-band wet-against-dry
+figure in the literature could be read (Descornet 2000 and Freitas 2009 are paywalled); the checked
+ones are the overall 0 to 15 dB(A) (Sandberg and Ejsmont 2002, via Caltrans TeNS 2013, p. 2-33) and
+the spectral peak moving from about 0.6 kHz dry to 0.8-1 kHz wet (Kongrattanaprasert et al. 2009).
+
+Measured on the loudest 2 s of each pass, each normalised to its own 1 kHz octave, wet minus dry:
+
+| | 2 kHz | 4 kHz | 8 kHz |
+|---|---|---|---|
+| recordings, mean of 11 wet against 10 dry | +4.6 | +10.2 | +12.6 |
+| recordings, median | +3.8 | +7.7 | +7.2 |
+| recordings, same-recordist pairs | +6.8 | +14.2 | +17.5 |
+| the game, car at 50 km/h, light rain (0.7 mm) | +4.7 | +9.1 | +11.9 |
+| the game, car at 30 km/h, light rain | +3.9 | +8.4 | +10.1 |
+
+The game's A-weighted increase at 50 km/h: +4.4 dB(A) in light rain, +4.9 heavy (and the rain itself),
++2.3 at 30 km/h; the bus at 40 km/h +4.8. At a metre, with no rain, the increase shrinks with speed
+(+4.6 / +3.7 / +2.8 dB(A) at 30 / 50 / 80 km/h on 0.7 mm), as the literature describes. The 250-500 Hz
+octaves move by under a decibel in the recordings and by under 2 dB in the game.
+
+Fine texture: the 10 ms 4-16 kHz kurtosis of the loudest 2 s is 2.7-3.25 in the wet recordings (Gaussian:
+wet hiss is smooth noise, not clicks) and 3.0-3.3 in the game's wet pass-bys; puddle splashes 3.1-3.7
+recorded, 3.2-3.4 in the game.
+
+Inside the same car on a wet and a dry road (augustsandberg, one microphone; the wet take also has rain
+on the roof), wet minus dry relative to the 125 Hz octave: 250 Hz +3.9, 500 +8.0, 1 kHz +13.8, 2 kHz
++16.9, 4 kHz +22.4, 8 kHz +19.7. The game's cabin at 50 km/h on a wet road with no rain: +4.8, +4.0,
++12.9, +19.2, +19.3, +14.2, and +12 dB(A). A recalled figure of +2-5 dB(A) inside cars with plastic
+liners could not be checked; this is the number to judge by ear.
+
+Constants (WetTyres): the ejection hiss is 83 dB at a metre for one 205 mm tyre at 50 km/h on 1 mm of
+water, its power linear in the water and in the cube of the speed, band 0.9-3.5 kHz with two poles
+above (brighter as the root of the speed); impacts 3000 a second per tyre at -6 dB of it; the bow 66
+dB per mm of film; the splash 92 dB for a 10 mm step at 50 km/h with 120 drops falling back; the cabin
+path a 2.5 kHz low-pass at -14 dB.
+
+## 6. Not modelled yet
+
+- Wipers, and the spray of other vehicles on your windscreen.
+- Ruts: worn wheel paths hold water in heavy rain, which is what makes most roads splash more in a
+  downpour than the thin sheet here allows. A rut depth per road would be the next datum.
+- Porous asphalt (drains like gravel until it clogs), and concrete's joints.
+- Puddles only along kerbs; none at junctions, drains or dips in the road, and the player's car finds
+  its puddles by position while traffic finds them by lane.
+- The spray in the air behind a vehicle (a mist that hisses on the next car), and its effect on sight.
+- Squeal against water depth is an assumption (section 2).
+- Cloud cover: the weather has none, so it is read off the humidity for the drying.
+

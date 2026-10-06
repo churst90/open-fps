@@ -89,8 +89,8 @@ public static class WetRoadSpike
             Console.WriteLine($"  {name,-9} {rain,5:F1} mm/h  {WheelWater(w, 1f),5:F2} / {wp,5:F2} / {WheelWater(w, 3.3f),5:F2}  spread {spread:F2}  puddles {w.PuddleFill:F2}"
                               + $"   car {Grip(car)}   bus {Grip(bus)}");
         }
-        Console.WriteLine($"\nAquaplaning speed, km/h (Gallaway), car tyre {car.Tyres.InflationKPa:F0} kPa {car.Tyres.TreadDepthMm:F0} mm tread / bus {bus.Tyres.InflationKPa:F0} kPa / slick 160 kPa no tread; Horne's 6.36 sqrt(p): "
-                          + $"{6.36f * MathF.Sqrt(car.Tyres.InflationKPa):F0} / {6.36f * MathF.Sqrt(bus.Tyres.InflationKPa):F0}");
+        Console.WriteLine($"\nAquaplaning speed, km/h (Gallaway), car tyre {car.Tyres.InflationKPa:F0} kPa {car.Tyres.TreadDepthMm:F0} mm tread / bus {bus.Tyres.InflationKPa:F0} kPa / slick 160 kPa no tread; Horne's 6.34 sqrt(p): "
+                          + $"{6.34f * MathF.Sqrt(car.Tyres.InflationKPa):F0} / {6.34f * MathF.Sqrt(bus.Tyres.InflationKPa):F0}");
         foreach (float film in new[] { 0.1f, 0.5f, 1f, 2f, 5f, 10f })
             Console.WriteLine($"  film {film,4:F1} mm: {RoadWaterLaw.AquaplaningKmh(film, 0.7f, car.Tyres.InflationKPa, car.Tyres.TreadDepthMm),5:F0}"
                               + $" / {RoadWaterLaw.AquaplaningKmh(film, 0.7f, bus.Tyres.InflationKPa, bus.Tyres.TreadDepthMm),5:F0}"
@@ -162,9 +162,9 @@ public static class WetRoadSpike
         {
             ("dry", _ => 0f),
             ("damp", _ => 0.35f),
-            ("light", x => WheelWater(Settled(Rainfall.LightRate), x)),
-            ("moderate", x => WheelWater(Settled(Rainfall.ModerateRate), x)),
-            ("heavy", x => WheelWater(Settled(Rainfall.HeavyRate), x)),
+            ("wet", x => WheelWater(Settled(Rainfall.LightRate), x)),
+            ("violent", x => WheelWater(Settled(Rainfall.ViolentRate), x)),
+            ("film2mm", _ => 2.7f),
         };
         var csv = new StringBuilder("file,vehicle,kmh,condition,water_mm\n");
         foreach (var key in cars)
@@ -389,7 +389,7 @@ public static class WetRoadSpike
             if (set is "all" or "passby")
             {
                 foreach (float kmh in new[] { 30f, 50f })
-                    foreach (var (cond, rain) in new[] { ("dry", 0f), ("light rain", Rainfall.LightRate), ("heavy rain", Rainfall.HeavyRate) })
+                    foreach (var (cond, rain) in new[] { ("dry", 0f), ("light rain", Rainfall.LightRate), ("heavy rain", Rainfall.HeavyRate), ("violent rain", Rainfall.ViolentRate) })
                     {
                         var road = Settled(rain);
                         Weather(rain, road);

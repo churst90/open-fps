@@ -319,7 +319,7 @@ public sealed record TyreProfile
     // ── Water ───────────────────────────────────────────────────────────────────────────────────
     //
     // What decides how a tyre meets a wet road (RoadWater, docs/WET_ROADS.md): its pressure sets the
-    // speed it aquaplanes at (Horne's 6.36 sqrt(p kPa) km/h for a flooded smooth tyre; Gallaway's
+    // speed it aquaplanes at (Horne's 6.34 sqrt(p kPa) km/h for a flooded smooth tyre; Gallaway's
     // equation for a treaded one), and its tread's grooves carry the water out of the contact patch,
     // so a worn tyre or a slick lets a film lift it sooner.
 

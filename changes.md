@@ -4,6 +4,18 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Roads get wet in the rain (docs/WET_ROADS.md). The server keeps the water on each map's roads: the
+  road's texture fills with rain and dries by evaporation (sun, wind, humidity), a thin sheet runs to
+  the kerb while it rains, the gutter's flow spreads into the road in heavy rain, and puddles along the
+  kerbs fill and empty over hours. Each wheel is told the water under it, on the server and on the wire.
+- Wet roads have less grip: about 0.7 of dry at town speed, less at speed, and much less where water
+  stands (aquaplaning by Gallaway's and NASA's equations, from each tyre's pressure and tread). Wet
+  braking takes longer; tyre squeal is damped by the water. Traffic drives 3 % slower on a wet road
+  and 8 % in heavy rain and keeps 12 % more headway (`StreetLife` settings).
+- Tyres hiss on a wet road: water thrown from the tread, drops striking the arches and body, a swish
+  where water stands, and a splash through a puddle; each wheel from its own water, heard inside the
+  car through the arches and floor too. Fitted to 21 recorded pass-bys. Renders in
+  inbox/wet-roads-2026-10-06. The server and client must both be rebuilt (the wire changed).
 - Steam Audio's scenes are built per tile and use Embree. Each tile the client holds has its own
   sub-scenes, built when its geometry changes; the scenes the simulators trace are made of instances
   of them, in two pairs used in turn, so a tile arriving or leaving, or a door swinging, rebuilds only

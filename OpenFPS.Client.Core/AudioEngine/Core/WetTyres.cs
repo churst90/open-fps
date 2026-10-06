@@ -42,7 +42,7 @@ public sealed class WetTyres
     public const float ReferenceWidth = 0.205f;
 
     /// <summary>One tyre's ejection hiss at the reference, dB SPL at a metre, broadband.</summary>
-    public static float EjectionDb = 79f;
+    public static float EjectionDb = 83f;
     /// <summary>How its power grows with the water: p² ∝ W^this. One is the water swept, all of it thrown.</summary>
     public static float WaterExponent = 1f;
     /// <summary>How its power grows with speed: p² ∝ u^this. Three is the kinetic energy of the water thrown.</summary>

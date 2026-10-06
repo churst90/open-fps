@@ -31,12 +31,15 @@ public class WetRoadTests
 
     // ── The water ─────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>Gallaway's equation by hand: 25 mm/h (0.984 in/h) down 2.5 m (8.2 ft) of a 2 % cross-fall over
-    /// a 0.7 mm (0.02756 in) texture is 0.0992 in above it, 2.52 mm.</summary>
+    /// <summary>Gallaway's equation 16 (0.00338 in inches, feet and in/h; 0.01485 in mm, m and mm/h):
+    /// over a 0.5 mm texture on a 2 % cross-fall, one lane (3.65 m) in 25 mm/h stands 0.33 mm above it,
+    /// in 50 mm/h 0.75, and two lanes (7.3 m) in 25 mm/h 0.62 (worked through from the report).</summary>
     [Fact]
     public void The_sheet_is_gallaways_film()
     {
-        Assert.Equal(2.52f, RoadWaterLaw.SheetDepthMm(25f, 2.5f, 0.7f, 0.02f), 1);
+        Assert.Equal(0.33f, RoadWaterLaw.SheetDepthMm(25f, 3.65f, 0.5f, 0.02f), 2);
+        Assert.Equal(0.75f, RoadWaterLaw.SheetDepthMm(50f, 3.65f, 0.5f, 0.02f), 2);
+        Assert.Equal(0.62f, RoadWaterLaw.SheetDepthMm(25f, 7.3f, 0.5f, 0.02f), 2);
         Assert.Equal(0f, RoadWaterLaw.SheetDepthMm(0f, 2.5f, 0.7f, 0.02f));
         // Deeper further down the cross-fall, and in heavier rain.
         Assert.True(RoadWaterLaw.SheetDepthMm(25f, 3.3f, 0.7f, 0.02f) > RoadWaterLaw.SheetDepthMm(25f, 1f, 0.7f, 0.02f));
@@ -59,7 +62,7 @@ public class WetRoadTests
         var heavy = Settled(Rainfall.HeavyRate);
         float holds = RoadWaterLaw.HoldsMm(Asphalt);
         Assert.Equal(holds, light.TextureMm(Asphalt), 3);
-        Assert.True(heavy.WaterMm(Asphalt, 2.5f, 1f, 3.5f) > holds + 1f, "heavy rain stands above the texture in the wheel path");
+        Assert.True(Settled(Rainfall.ViolentRate).WaterMm(Asphalt, 3f, 0.5f, 3.5f) > holds + 0.2f, "violent rain stands above the texture by the kerb");
         // In heavy rain the gutter's flow reaches into the road: the kerb is wetter than the crown.
         Assert.True(heavy.WaterMm(Asphalt, 3.4f, 0.1f, 3.5f) > heavy.WaterMm(Asphalt, 1f, 2.5f, 3.5f) + 2f);
     }
@@ -170,7 +173,7 @@ public class WetRoadTests
     public void Gallaways_aquaplaning_speed_sits_by_hornes()
     {
         float car = RoadWaterLaw.AquaplaningKmh(2f, 0.7f, 220f, 5f);
-        float horne = 6.36f * MathF.Sqrt(220f);
+        float horne = 6.34f * MathF.Sqrt(220f);
         _o.WriteLine($"car tyre, 2 mm film: {car:F0} km/h; Horne {horne:F0}");
         Assert.InRange(car, 0.85f * horne, 1.05f * horne);
         Assert.True(RoadWaterLaw.AquaplaningKmh(2f, 0.7f, 760f, 12f) > car + 30f, "a truck tyre at 7.6 bar holds on far longer");
@@ -221,6 +224,26 @@ public class WetRoadTests
         float wetDemand = b.SteadyTurn(15f, 1f / 30f);
         _o.WriteLine($"a 30 m turn at 54 km/h: demand dry {dryLimit:F2}, wet {wetDemand:F2}");
         Assert.True(wetDemand > dryLimit * 1.25f);
+    }
+
+    // ── Drivers ───────────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Drivers_slow_and_hang_back_in_the_rain()
+    {
+        var env = new OpenFPS.Common.Components.WorldEnvironmentComponent { Temperature = 14f, Humidity = 0.9f, GameTime = 14f, DayOfYear = 120 };
+        var life = new OpenFPS.Server.Repositories.StreetLifeData();
+        OpenFPS.Server.Systems.RoadWaterSystem.Update("wet_test_dry", env, 0f, null, 1f);
+        OpenFPS.Server.Systems.RoadWaterSystem.Update("wet_test_heavy", env, Rainfall.HeavyRate, null, 1f);
+        var dry = OpenFPS.Server.Systems.VehicleSystem.RainCaution("wet_test_dry", life);
+        var heavy = OpenFPS.Server.Systems.VehicleSystem.RainCaution("wet_test_heavy", life);
+        _o.WriteLine($"dry {dry}, heavy rain {heavy}");
+        Assert.Equal((0f, 0f), dry);
+        Assert.Equal(life.HeavyRainSpeedReduction, heavy.Speed, 3);
+        Assert.Equal(life.HeavyRainHeadwayIncrease, heavy.Headway, 3);
+        // The water under a wheel on the server, on a street with puddles.
+        Assert.True(OpenFPS.Server.Systems.RoadWaterSystem.WaterAt("wet_test_heavy", new Vector3(0f, 0f, 0f), Asphalt) >= RoadWaterLaw.HoldsMm(Asphalt) - 1e-3f);
+        Assert.Equal(0f, OpenFPS.Server.Systems.RoadWaterSystem.WaterAt("wet_test_dry", new Vector3(0f, 0f, 0f), Asphalt));
     }
 
     [Fact]

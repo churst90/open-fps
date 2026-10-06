@@ -18,9 +18,10 @@ namespace OpenFPS.Common;
 //     only evaporation empties it. This is the "damp" road that stays noisy for an hour after the rain.
 //
 //   * The SHEET: the film running across the road to its edge while it rains. Its depth above the
-//     texture at a distance L down the cross-fall is Gallaway et al.'s equation (FHWA-RD-79-31, 1979;
-//     as used in Anderson et al. 1998, PTI 9827, and the hydroplaning literature since):
-//         WD = 0.01485 TXD^0.11 L^0.43 I^0.59 / S^0.42 - TXD      (inches, feet, in/h, ft/ft)
+//     texture at a distance L down the cross-fall is Gallaway et al.'s equation 16 (FHWA-RD-79-31, 1979,
+//     p. 79, fitted to 335 measurements):
+//         WD = 0.00338 TXD^0.11 L^0.43 I^0.59 / S^0.42 - TXD      (inches, feet, in/h, ft/ft)
+//     which in millimetres, metres and mm/h has the constant 0.01485.
 //     It comes up to that depth over the kinematic-wave time to equilibrium of overland flow,
 //     t_e = (n L / sqrt S)^0.6 / i^0.4 (Woolhiser and Liggett 1967; HEC-22 eq. 3-4), a minute or two,
 //     and drains away over the same once the rain stops. Rain is passed through the same ladder of
@@ -76,7 +77,7 @@ public sealed record RoadDrainageSpec
 /// <summary>The laws, as pure functions: nothing here keeps state.</summary>
 public static class RoadWaterLaw
 {
-    private const float MmPerInch = 25.4f, MetresPerFoot = 0.3048f;
+    private const float MmPerInch = 25.4f;
 
     // Index by RoadSurfaces: unknown, asphalt, concrete, gravel, dirt, snow, ice.
     // Texture depths: dense asphalt concrete 0.5-1.0 mm sand patch, brushed or tined concrete 0.6-1.2
@@ -114,12 +115,11 @@ public static class RoadWaterLaw
     public static float SheetDepthMm(float rainMmPerHour, float drainMetres, float textureMm, float crossSlope)
     {
         if (!(rainMmPerHour > 0f) || !(drainMetres > 0f)) return 0f;
-        float txd = MathF.Max(0.01f, textureMm) / MmPerInch;
-        float l = drainMetres / MetresPerFoot;
-        float i = rainMmPerHour / MmPerInch;
+        // The SI form: 0.00338 x 25.4 x 25.4^-0.11 x 0.3048^-0.43 x 25.4^-0.59 = 0.01485.
+        float txd = MathF.Max(0.01f, textureMm);
         float s = MathF.Max(0.002f, crossSlope);
-        float wd = 0.01485f * MathF.Pow(txd, 0.11f) * MathF.Pow(l, 0.43f) * MathF.Pow(i, 0.59f) / MathF.Pow(s, 0.42f) - txd;
-        return MathF.Max(0f, wd * MmPerInch);
+        float wd = 0.01485f * MathF.Pow(txd, 0.11f) * MathF.Pow(drainMetres, 0.43f) * MathF.Pow(rainMmPerHour, 0.59f) / MathF.Pow(s, 0.42f) - txd;
+        return MathF.Max(0f, wd);
     }
 
     /// <summary>
@@ -197,7 +197,7 @@ public static class RoadWaterLaw
     /// km/h: Gallaway et al.'s (1979) empirical equation for treaded car tyres,
     ///   V = SD^0.04 P^0.3 (TD + 1)^0.06 A,  A = max(10.409 / WD^0.06 + 3.507, (28.952 / WD^0.06 − 7.817) TXD^0.14)
     /// (mph, spin-down 10 %, P psi, TD in 32nds of an inch, WD and TXD in inches). For a 220 kPa car tyre
-    /// on a 2 mm film it gives about 89 km/h, beside NASA's 6.36 sqrt(p kPa) = 94 km/h for a fully flooded
+    /// on a 2 mm film it gives about 89 km/h, beside NASA's 6.34 sqrt(p kPa) = 94 km/h (10.35 sqrt(p psi) mph) for a fully flooded
     /// smooth tyre (Horne and Dreher 1963, NASA TN D-2056); it depends on the film only weakly.
     /// </summary>
     public static float AquaplaningKmh(float filmMm, float textureMm, float inflationKPa, float treadMm)
