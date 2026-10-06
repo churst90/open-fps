@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- The fountain and the trees are smoother again (round 3). The grain left in the fountain was
+  still the falling lumps of water: they now land over a longer moment, so their sound sits lower,
+  under the hiss, as a little more low splash. Its drops now come in the sizes a breaking jet makes,
+  without the long tail of large drops that rain has. Measured against the recorded fountains, the
+  hiss is now as smooth as theirs, and the loudness is unchanged. In the trees, how hard two leaves
+  hit now depends on the angle they meet at. Before, it was a made-up spread whose loudest hits were
+  twenty times the faintest and stood out as scratches. A park tree's leaves also fold away from the
+  wind a little more, as large soft leaves do. Its rustle grows more slowly with the wind: the gusts
+  swell less, and in strong wind the tree is about 2 dB quieter than before. Pairs are in
+  inbox/nature-round3-2026-10-05.
 - Thunder and lightning (unheard). In a Storm the server runs a thunderstorm cell that forms upwind
   of the map and drifts across or past it with the wind, flashing about twice a minute on average
   (four at its peak), a quarter of the flashes to the ground, about four strokes each; heavy Rain

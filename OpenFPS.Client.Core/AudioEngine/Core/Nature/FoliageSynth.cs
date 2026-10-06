@@ -30,7 +30,7 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// under a rustle. Over pine needles a millimetre and a half thick it is near a kilohertz, and with
 /// no leaves to flutter it is nearly all a conifer makes: the sough. Over a rigid cylinder that is a
 /// dipole whose pressure goes as the cube of the speed; a crown is not rigid. Leaves and twigs fold
-/// and streamline as the wind rises (Vogel 1984: the drag on a plant goes as U^(2+V), V about −0.7),
+/// and streamline as the wind rises (Vogel 1984: the drag on a plant goes as U^(2+V), V −0.5 to −1.2),
 /// so the force on them — and the sound of it, and the push on the boughs — grows far more slowly,
 /// and the whole crown keeps to the 30-36 dB a decade Fégeant measured.
 ///
@@ -51,8 +51,6 @@ public sealed class FoliageSynth
 
     // ── The tree's laws ──────────────────────────────────────────────────────────────────────────
 
-    /// <summary>Vogel's exponent: the drag on a crown as U^(2+V). Leaves reconfigure.</summary>
-    private const float Vogel = -0.7f;
     /// <summary>Strouhal number of a cylinder in cross-flow.</summary>
     private const float Strouhal = 0.2f;
     /// <summary>A leaf flutters at about this many times the wind speed over its length.</summary>
@@ -63,6 +61,9 @@ public sealed class FoliageSynth
     /// impact pressure as the closing speed to this power. With the strike rate going as the speed
     /// too, the power goes as U^3.4 — 34 dB a decade, inside Fégeant's 30 (oak) to 36 (birch).</summary>
     private const float StrikeSpeedPower = 1.2f;
+    /// <summary>The scale on (cos θ)^StrikeSpeedPower that gives a strike the mean energy the fit of
+    /// <see cref="LeafStrikePascals"/> was made with: √(1.533 (2 · 1.2 + 1)).</summary>
+    private const float StrikeAngleScale = 2.283f;
     /// <summary>How many separately swinging boughs a crown is split into.</summary>
     public const int Boughs = 6;
 
@@ -89,6 +90,7 @@ public sealed class FoliageSynth
     private readonly float _leafLength;      // m
     private readonly float _leafScale;       // strike size for this leaf
     private readonly float _shedScale;       // shedding size for this crown
+    private readonly float Vogel;            // the crown's reconfiguration exponent, FoliageSpec.VogelExponent
 
     /// <summary>The wind at the crown, m/s: setting it sets every bough's. A voice that can read the
     /// field at each bough's own place uses <see cref="ReadWind"/> instead.</summary>
@@ -143,6 +145,7 @@ public sealed class FoliageSynth
         Spec = spec;
         _rate = sampleRate;
         _sum = new EventSum(sampleRate, seed);
+        Vogel = Math.Clamp(spec.VogelExponent, -1.5f, 0f);
         float crownArea = MathF.PI * spec.CrownRadiusMetres * spec.CrownRadiusMetres;
         float leafArea = MathF.Max(0.01f, spec.LeafAreaCm2) * 1e-4f;
         _leaves = spec.Leaves == LeafKind.Broadleaf ? spec.LeafAreaIndex * crownArea / leafArea : 0f;
@@ -300,9 +303,15 @@ public sealed class FoliageSynth
         for (int k = 0; k < n; k++)
         {
             int at = (int)(_sum.Uniform() * Block);
-            // Most touches are glancing and a few are square: the strike sizes are skewed.
+            // Most touches are glancing and a few are square. Two leaves meet at any angle, and for
+            // directions spread evenly over a sphere the cosine of the angle to the normal is
+            // uniform, so the closing speed's normal part is the speed times a uniform number, and
+            // the strike goes as that to StrikeSpeedPower. It had been 0.15 + 3u³, a skew nothing
+            // physical set, whose loudest strikes were twenty times the faintest and poked out of
+            // the rustle as scratches; this has the same mean energy (0.15 + 3u³ squared averages
+            // 1.53, and so does 2.28 u^1.2).
             float u = _sum.Uniform();
-            float p = LeafStrikePascals * _leafScale * scale * weight * (0.15f + 3f * u * u * u) * LeafPart;
+            float p = LeafStrikePascals * _leafScale * scale * weight * StrikeAngleScale * MathF.Pow(u, StrikeSpeedPower) * LeafPart;
             // The tap: a light plate stopped over a few tenths of a millisecond...
             _sum.Pulse(at, 70e-6f * (0.7f + 0.6f * _sum.Uniform()) * _leafScale / tone, p);
             // ...and the leaf's own membrane ringing, damped almost at once, with the scrape of
