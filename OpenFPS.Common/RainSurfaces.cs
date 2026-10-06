@@ -80,6 +80,25 @@ public static class RainSurfaces
     /// <summary>The rate at which the low places are half as full as they get, mm/h.</summary>
     public const float PuddleHalfRate = 5f;
 
+    // ── The splash ─────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// How long a drop's water takes to go from a falling sphere to a sheet at its widest on the
+    /// ground, s: the time over which the splash pushes the air, and so the time scale of the click
+    /// the air hears (RainSynth.Click).
+    ///
+    /// The kinematic estimate of the time to maximum spreading is t = 8/3 · D / v (Pasandideh-Fard,
+    /// Qiao, Chandra and Mostaghimi 1996, "Capillary effects during droplet impact on a solid
+    /// surface", Phys. Fluids 8, 650-659), which their photographs and later measurements put in the
+    /// right range for water drops at raindrop speeds: about 2-3 D / v, against the D / v the drop's
+    /// centre takes to stop. On a wet road the sheet spreads into the film and lifts a crown, which
+    /// lives about as long (Cossali, Coghe and Marengo 1997, Exp. Fluids 22, 463-472).
+    /// </summary>
+    public static float SplashSeconds(float diameterMm, float speed) => SpreadFactor * diameterMm * 1e-3f / MathF.Max(0.1f, speed);
+
+    /// <summary>The 8/3 in the spreading time (see <see cref="SplashSeconds"/>).</summary>
+    public const float SpreadFactor = 8f / 3f;
+
     // ── Soft ground ──────────────────────────────────────────────────────────────────────────────
 
     /// <summary>

@@ -77,6 +77,43 @@ public static class Rainfall
         return DrizzleRate * MathF.Exp(k * (i - DrizzleIntensity));
     }
 
+    /// <summary>The precipitation intensity that gives a rain rate: <see cref="RateFromIntensity"/>
+    /// backwards.</summary>
+    public static float IntensityFor(float rate)
+    {
+        if (!(rate > 0f)) return 0f;
+        if (rate <= DrizzleRate) return DrizzleIntensity * rate / DrizzleRate;
+        float k = MathF.Log(FullIntensityRate / DrizzleRate) / (1f - DrizzleIntensity);
+        return MathF.Min(1f, DrizzleIntensity + MathF.Log(rate / DrizzleRate) / k);
+    }
+
+    /// <summary>A rate by its class's word (light, moderate, heavy, violent), or a number of mm/h.</summary>
+    public static bool TryParseRate(string word, out float rate)
+    {
+        rate = word.ToLowerInvariant() switch
+        {
+            "light" or "drizzle" => LightRate,
+            "moderate" => ModerateRate,
+            "heavy" => HeavyRate,
+            "violent" or "torrential" => ViolentRate,
+            _ => float.NaN,
+        };
+        if (!float.IsNaN(rate)) return true;
+        string n = word.ToLowerInvariant().Replace("mm/h", "").Replace("mm", "");
+        return float.TryParse(n, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out rate)
+               && float.IsFinite(rate) && rate > 0f && rate <= FullIntensityRate;
+    }
+
+    /// <summary>The class's word, for saying.</summary>
+    public static string Word(RainCategory c) => c switch
+    {
+        RainCategory.Light => "light",
+        RainCategory.Moderate => "moderate",
+        RainCategory.Heavy => "heavy",
+        RainCategory.Violent => "violent",
+        _ => "no",
+    };
+
     /// <summary>The rain rate with the air's temperature in it: nothing when what falls is snow.</summary>
     public static float RateFor(float precipitationIntensity, float temperatureCelsius)
         => temperatureCelsius < SnowBelowCelsius ? 0f : RateFromIntensity(precipitationIntensity);

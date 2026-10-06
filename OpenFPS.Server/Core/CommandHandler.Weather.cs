@@ -15,6 +15,7 @@ namespace OpenFPS.Server.Core;
 ///
 ///     /weather                        the weather and the wind now
 ///     /weather clear|rain|snow|storm  that front, held until /weather auto
+///     /weather rain heavy             rain at a rate: light, moderate, heavy, violent, or mm/h
 ///     /weather wind 8 northwest       the wind, held; a direction and steady/gusty/very gusty optional
 ///     /weather auto                   back to fronts rolling in on their own
 ///
@@ -23,7 +24,7 @@ namespace OpenFPS.Server.Core;
 public partial class CommandHandler
 {
     private const string WeatherUsage =
-        "Usage: /weather, /weather clear, rain, snow or storm, /weather wind SPEED [DIRECTION] [steady, gusty or very gusty], or /weather auto.";
+        "Usage: /weather, /weather clear, rain, snow or storm, /weather rain light, moderate, heavy, violent or a rate in millimetres an hour, /weather wind SPEED [DIRECTION] [steady, gusty or very gusty], or /weather auto.";
 
     private void HandleWeather(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -32,6 +33,8 @@ public partial class CommandHandler
         {
             var now = env.GetCurrentState();
             string held = env.Pinned ? " Held until /weather auto." : " It changes on its own.";
+            if (env.HeldRainRate is float r)
+                held = $" Rain {r.ToString("0.#", CultureInfo.InvariantCulture)} millimetres an hour, {Rainfall.Word(Rainfall.Category(r))}.{held}";
             Say(reply, $"{ScenarioWord(env.CurrentScenario)}. {DescribeWind(now.WindVelocity, now.WindGustiness)} " +
                        $"{now.Temperature.ToString("F0", CultureInfo.InvariantCulture)} degrees.{held}");
             return;
@@ -42,6 +45,19 @@ public partial class CommandHandler
         {
             env.Unpin();
             Say(reply, "The weather changes on its own again.");
+            return;
+        }
+
+        if (first == "rain" && args.Length > 1)
+        {
+            if (!Rainfall.TryParseRate(args[1], out float rate))
+            {
+                Say(reply, "Say light, moderate, heavy or violent, or a rate in millimetres an hour up to 60.");
+                return;
+            }
+            env.PinRain(rate);
+            _server.BroadcastEnvironment();
+            Say(reply, $"Rain, {Rainfall.Word(Rainfall.Category(rate))}, {rate.ToString("0.#", CultureInfo.InvariantCulture)} millimetres an hour, coming in.");
             return;
         }
 

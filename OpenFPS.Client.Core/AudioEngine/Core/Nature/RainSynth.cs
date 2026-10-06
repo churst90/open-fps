@@ -333,13 +333,17 @@ public sealed class RainSynth
     /// <summary>
     /// A drop's click on something solid, at the listener.
     ///
-    /// The air hears the rate of change of the drop's force on the surface: a dipole at a rigid
-    /// boundary radiates dF/dt. The force has the blow's shape (RainPlate.BlowShape: √t to its peak
-    /// at a fifth of D / v, then its fall), so the click's spectrum is the drop's own: it rises to a
-    /// broad top near 1 / (2π · 0.2 D / v) — 1.5-3 kHz for the drops that carry the energy — and
-    /// stays nearly flat per octave above it, where the fountain's pool click, a 16 µs spike, put most
-    /// of its energy above 4 kHz and on a road with no bubbles to balance it measured 15 dB too bright
-    /// against every recording of rain on a street (the lab's --rain levels against compare=).
+    /// The air hears the rate of change of the drop's push on it: a dipole at a rigid boundary
+    /// radiates dF/dt. It has the blow's shape (RainPlate.BlowShape: √t to its peak, then its fall),
+    /// but not the blow's length. What moves the air is the drop's water going from a falling sphere
+    /// to a sheet spreading over the wet ground, and that takes the spreading time, about 8/3 D / v
+    /// (RainSurfaces.SplashSeconds) — two and a half times the time the drop takes to stop. So the
+    /// click rises to a broad top near 1 / (2π · 0.2 · 8/3 D / v), 0.5-1.5 kHz for the drops that carry
+    /// the energy, and falls gently above. Two earlier time scales were measured against recordings of
+    /// rain on streets, a garden and a wood (the lab's --rain levels and compare=): the fountain's pool
+    /// click, a 16 µs spike, was 15 dB too bright above 4 kHz; the drop's stopping time, D / v, still
+    /// 8-13 dB too bright there and 7-20 dB short at 250-500 Hz, and its 10 ms windows 2.4 dB too
+    /// peaky (the "grain" figure). The spreading time brings both within a few dB.
     ///
     /// Its ENERGY is the fountain's, which was fitted against measured falling water (Watts et al.
     /// 2009): the energy of the spike that law gives a drop of that size and speed. Only where in the
@@ -352,32 +356,76 @@ public sealed class RainSynth
     {
         if (spikePascals <= 0f || ClickPart <= 0f) return;
         float energy = spikePascals * spikePascals * ImpactRise * 1.7724539f / (stretch * stretch * stretch);
-        float tauSamples = RainPlate.BlowSeconds(d, v) * stretch * _rate;
-        int length = Math.Min(_clickShape.Length, (int)((RainPlate.BlowPeakAt + 7f * RainPlate.BlowFall) * tauSamples) + 2);
-        // The blow's sample-to-sample steps, and their energy at this sampling, so the event carries
-        // exactly the energy asked for. The fall is a geometric series, not an exp per sample.
-        double shape = 0;
-        float prev = 0f, g = 0f;
-        float peakAt = RainPlate.BlowPeakAt * tauSamples;
-        float fall = MathF.Exp(-1f / (RainPlate.BlowFall * tauSamples));
+        float tauSamples = RainSurfaces.SplashSeconds(d, v) * stretch * _rate;
+        var shape = ClickShape(tauSamples);
+        float gain = MathF.Sqrt(energy * _rate) * ClickPart;
+        long start = _clickNow + at + 1;
+        for (int i = 0; i < shape.Length; i++)
+            _clicks[(int)((start + i) & (ClickRing - 1))] += gain * shape[i];
+    }
+
+    // The click's shape depends only on its time scale, so the shapes are made once, a ninth of an
+    // octave apart, and a click is a scaled copy of the nearest.
+    private const float ShapeStepsPerOctave = 9f, ShapeMinSamples = 2f;
+    private readonly float[]?[] _shapes = new float[]?[96];
+
+    /// <summary>The click of time scale <paramref name="tauSamples"/>, at unit energy (Σ y² = 1).</summary>
+    private float[] ClickShape(float tauSamples)
+    {
+        int index = Math.Clamp((int)MathF.Round(MathF.Log2(MathF.Max(ShapeMinSamples, tauSamples) / ShapeMinSamples) * ShapeStepsPerOctave),
+                               0, _shapes.Length - 1);
+        if (_shapes[index] is { } made) return made;
+        float tau = ShapeMinSamples * MathF.Pow(2f, index / ShapeStepsPerOctave);
+        int length = Math.Min(ClickRing - Block - 2 * OnsetHalf, (int)((RainPlate.BlowPeakAt + 7f * RainPlate.BlowFall) * tau) + 2);
+        // The blow's sample-to-sample steps (see Click).
+        var raw = new float[length];
+        float prev = 0f;
+        float peakAt = RainPlate.BlowPeakAt * tau;
         for (int i = 0; i < length; i++)
         {
             float t = i + 1;
-            if (t < peakAt) g = MathF.Sqrt(t / peakAt);
-            else g = t - 1f < peakAt ? MathF.Exp(-(t - peakAt) / (RainPlate.BlowFall * tauSamples)) : g * fall;
-            float dg = g - prev;
-            _clickShape[i] = dg;
-            shape += dg * (double)dg;
+            float g = t < peakAt ? MathF.Sqrt(t / peakAt) : MathF.Exp(-(t - peakAt) / (RainPlate.BlowFall * tau));
+            raw[i] = g - prev;
             prev = g;
         }
-        if (shape <= 0) return;
-        float gain = MathF.Sqrt((float)(energy * _rate / shape)) * ClickPart;
-        long start = _clickNow + at + 1;
-        for (int i = 0; i < length; i++)
-            _clicks[(int)((start + i) & (ClickRing - 1))] += gain * _clickShape[i];
+        // The √t rise has no bottom to it: taken literally its first step is a single sample, which
+        // is energy flat to the top of hearing. A real first contact is not a point: the air under the
+        // drop is squeezed out and a thin disc of it trapped (Thoroddsen et al. 2005, J. Fluid Mech.
+        // 545, 203-212; Mandre, Mani and Brenner 2009, Phys. Rev. Lett. 102, 134502), and the contact
+        // spreads over the drop's tip in some microseconds. So the onset is smoothed over the
+        // fountain's own first-contact time, ImpactRise.
+        var kernel = OnsetKernel(_rate);
+        var y = new float[length + 2 * OnsetHalf];
+        double e = 0;
+        for (int i = 0; i < y.Length; i++)
+        {
+            float sum = 0f;
+            for (int k = -OnsetHalf; k <= OnsetHalf; k++)
+            {
+                int j = i - OnsetHalf - k;
+                if ((uint)j < (uint)length) sum += kernel[k + OnsetHalf] * raw[j];
+            }
+            y[i] = sum;
+            e += sum * (double)sum;
+        }
+        float norm = e > 0 ? (float)(1.0 / Math.Sqrt(e)) : 0f;
+        for (int i = 0; i < y.Length; i++) y[i] *= norm;
+        return _shapes[index] = y;
     }
 
-    private readonly float[] _clickShape = new float[ClickRing - Block];
+    private const int OnsetHalf = 3;
+    private float[]? _onsetKernel;
+
+    /// <summary>A Gaussian of standard deviation ImpactRise, sampled, summing to one.</summary>
+    private float[] OnsetKernel(float rate)
+    {
+        if (_onsetKernel != null) return _onsetKernel;
+        var k = new float[2 * OnsetHalf + 1];
+        float s = MathF.Max(0.3f, ImpactRise * rate), sum = 0f;
+        for (int i = -OnsetHalf; i <= OnsetHalf; i++) sum += k[i + OnsetHalf] = MathF.Exp(-0.5f * i * i / (s * s));
+        for (int i = 0; i < k.Length; i++) k[i] /= sum;
+        return _onsetKernel = k;
+    }
 
     private const int ClickRing = 1 << 13;
     private readonly float[] _clicks = new float[ClickRing];

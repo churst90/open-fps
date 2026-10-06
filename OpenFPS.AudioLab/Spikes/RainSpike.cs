@@ -24,8 +24,11 @@ namespace OpenFPS.AudioLab.Spikes;
 ///        the game's), summed. Leq, LAeq, octave shape, headroom and texture (NatureSpike.Report, the
 ///        statistics the footstep rounds lacked), the share of each patch, and what a voice costs.
 ///   --rain render out=DIR [...]          the same, written as stereo WAVs (the listener faces north;
-///        east is to the right) at ONE shared gain: 94 dB SPL is −6 dBFS, so the files compare by level
-///        as well as by ear.
+///        east is to the right) at the level the game plays them at its master (GameDb): the loudness
+///        law at the default /levels, and the provider's own gain as --rain live measured it.
+///   --rain live [sec=10]                 rain on the street at three rates, under a bus shelter, and an
+///        air conditioner, a fountain and a tree for scale, each through the REAL provider (the
+///        voices, the mixer, the HRTF, the master), captured and measured: what the game plays.
 ///   --rain physics                      the rain itself: drops per m² per second, the drop-size
 ///        closure, the kinetic energy against van Dijk et al. (2002), and the plate law for the roofs
 ///        in the scenes under natural rain and under ISO 10140-1's artificial heavy rain.
@@ -40,7 +43,6 @@ namespace OpenFPS.AudioLab.Spikes;
 public static class RainSpike
 {
     private const int Rate = 48000;
-    private const float PascalsToFull = 0.5f;     // 94 dB SPL = −6 dBFS
 
     public static int Run(string[] args)
     {
@@ -53,10 +55,13 @@ public static class RainSpike
             {
                 var (pcm, sr) = NatureSpike.ReadWav(path);
                 NatureSpike.Report(Path.GetFileName(path), pcm, sr, calibrated: false);
+                Console.WriteLine("  " + Grain(pcm, sr));
+                Console.WriteLine("  " + Balance(pcm, sr));
             }
             return 0;
         }
         if (args.Contains("physics")) return Physics();
+        if (args.Contains("live")) return Live(Arg(args, "sec=", 10f));
 
         float sec = Arg(args, "sec=", 20f);
         var rates = Rates(args.FirstOrDefault(a => a.StartsWith("rate=", StringComparison.Ordinal))?[5..]);
@@ -113,13 +118,15 @@ public static class RainSpike
                                   $"{r.Voices} voices, {r.CostPerVoice * 100:F2} % of a core each (worst {r.WorstCost * 100:F2} %)");
                 foreach (var line in r.PatchLines) Console.WriteLine("    " + line);
                 NatureSpike.Report($"{name} {label}", r.Mono, Rate, calibrated: true);
-                summary.Add($"{name,-10} {label,-9} {mmh,5:F1} mm/h  Leq {Db(r.Mono),5:F1} dB  " +
+                Console.WriteLine("  " + Grain(r.Mono, Rate));
+                Console.WriteLine("  " + Balance(r.Mono, Rate));
+                summary.Add($"{name,-10} {label,-9} {mmh,5:F1} mm/h  in game {r.GameRmsDbfs,6:F1} dBFS  Leq {Db(r.Mono),5:F1} dB  " +
                             $"LAeq {AWeighted(r.Mono),5:F1} dB(A)  headroom {Headroom(r.Mono),4:F1} dB  " +
                             $"low/mid/high octaves (125+250 / 1k+2k / 8k+16k) {r.BandSummary}");
                 if (dir != null)
                 {
                     string path = Path.Combine(dir, $"rain_{name}_{label}.wav");
-                    WriteStereo(path, r.Left, r.Right);
+                    WriteStereo(path, r.GameLeft, r.GameRight);
                     Console.WriteLine($"  wrote {path}");
                 }
             }
@@ -135,6 +142,9 @@ public static class RainSpike
     private sealed class Rendered
     {
         public float[] Mono = Array.Empty<float>(), Left = Array.Empty<float>(), Right = Array.Empty<float>();
+        /// <summary>The same, at the level the game plays it (see <see cref="GameDb"/>), full scale 1.</summary>
+        public float[] GameLeft = Array.Empty<float>(), GameRight = Array.Empty<float>();
+        public double GameRmsDbfs;
         public int Voices;
         public double CostPerVoice, WorstCost;
         public List<string> PatchLines = new();
@@ -145,7 +155,7 @@ public static class RainSpike
                                    Vector3 ear, float mmh, float sec, int seed)
     {
         int n = (int)(sec * Rate);
-        var r = new Rendered { Mono = new float[n], Left = new float[n], Right = new float[n] };
+        var r = new Rendered { Mono = new float[n], Left = new float[n], Right = new float[n], GameLeft = new float[n], GameRight = new float[n] };
         double costSum = 0;
         for (int s = 0; s < survey.Patches.Length; s++)
         {
@@ -162,6 +172,10 @@ public static class RainSpike
             costSum += cost;
             r.WorstCost = Math.Max(r.WorstCost, cost);
             r.Voices++;
+            // What the game plays it at: the voice measures this level and the loudness law places it.
+            double raw = 0; foreach (float v in x) raw += v * (double)v;
+            double rawRms = Math.Sqrt(raw / n);
+            float toGame = rawRms > 0 ? (float)(Math.Pow(10, GameDb(rawRms, patch.ReferenceDistance) / 20) / rawRms) : 0f;
             // The path: three bands as the mixer's THREE_EQ takes them, and the air.
             (float lo, float mid, float hi) eq = s == RainSurvey.OverheadSlot ? survey.OverheadEq : (1f, 1f, 1f);
             (float lo, float mid, float hi) air = (0f, 0f, 0f);
@@ -179,7 +193,11 @@ public static class RainSpike
             float az = MathF.Atan2(to.X, to.Z);                      // 0 ahead, +π/2 right
             float pan = s == RainSurvey.OverheadSlot ? 0f : MathF.Sin(az);
             float gl = MathF.Cos((pan + 1f) * MathF.PI / 4f), gr = MathF.Sin((pan + 1f) * MathF.PI / 4f);
-            for (int i = 0; i < n; i++) { r.Mono[i] += x[i]; r.Left[i] += x[i] * gl; r.Right[i] += x[i] * gr; }
+            for (int i = 0; i < n; i++)
+            {
+                r.Mono[i] += x[i]; r.Left[i] += x[i] * gl; r.Right[i] += x[i] * gr;
+                r.GameLeft[i] += x[i] * gl * toGame; r.GameRight[i] += x[i] * gr * toGame;
+            }
             string layers = string.Join(", ", patch.Layers.Select(l => $"{l.Kind}/{l.Material}{(l.FromBelow ? "↑" : "")}"));
             string extra = "";
             if (s == RainSurvey.OverheadSlot)
@@ -192,10 +210,83 @@ public static class RainSpike
                              $"path {Db20(eq.lo):F0}/{Db20(eq.mid):F0}/{Db20(eq.hi):F0} dB, cost {cost * 100:F2} %: {layers}{extra}");
         }
         r.CostPerVoice = r.Voices > 0 ? costSum / r.Voices : 0;
+        double ge = 0;
+        for (int i = 0; i < n; i++) ge += 0.5 * (r.GameLeft[i] * (double)r.GameLeft[i] + r.GameRight[i] * (double)r.GameRight[i]);
+        r.GameRmsDbfs = 10 * Math.Log10(Math.Max(1e-20, ge / n));
         var oct = OctaveDb(r.Mono);
         r.BandSummary = $"{Pow(oct, 125, 250):F1} / {Pow(oct, 1000, 2000):F1} / {Pow(oct, 8000, 16000):F1} dB";
         return r;
     }
+
+    /// <summary>
+    /// The grain of the 2-8 kHz band, where "staticy, grainy, scratchy" lives: its kurtosis (3 is a
+    /// smooth wash, tens are separate clicks), and the crest of its 10 ms windows (peak over rms in
+    /// each window; the median and the 95th percentile), computed the same way for a render and a
+    /// recording so the two compare.
+    /// </summary>
+    internal static string Grain(float[] x, int sr)
+    {
+        int n = Math.Min(x.Length, sr * 15);
+        int size = 1;
+        while (size < n) size <<= 1;
+        var re = new double[size]; var im = new double[size];
+        for (int i = 0; i < n; i++) re[i] = x[i];
+        Fft(re, im);
+        for (int k = 0; k < size; k++)
+        {
+            double f = (k <= size / 2 ? k : size - k) * (double)sr / size;
+            if (f < 2000 || f > 8000) { re[k] = 0; im[k] = 0; }
+        }
+        for (int k = 0; k < size; k++) im[k] = -im[k];
+        Fft(re, im);
+        var y = new double[n];
+        for (int i = 0; i < n; i++) y[i] = re[i] / size;
+        double m2 = 0, m4 = 0;
+        foreach (double v in y) { m2 += v * v; m4 += v * v * v * v; }
+        m2 /= n; m4 /= n;
+        double kurt = m4 / Math.Max(1e-30, m2 * m2);
+        int w = sr / 100;
+        var crests = new List<double>();
+        for (int s = 0; s + w <= n; s += w)
+        {
+            double pk = 0, e = 0;
+            for (int i = s; i < s + w; i++) { pk = Math.Max(pk, Math.Abs(y[i])); e += y[i] * y[i]; }
+            if (e > 0) crests.Add(20 * Math.Log10(pk / Math.Sqrt(e / w)));
+        }
+        crests.Sort();
+        double med = crests.Count > 0 ? crests[crests.Count / 2] : 0, p95 = crests.Count > 0 ? crests[(int)(0.95 * (crests.Count - 1))] : 0;
+        return $"grain 2-8 kHz: kurtosis {kurt:F1}, 10 ms crest median {med:F1} dB, 95th percentile {p95:F1} dB";
+    }
+
+    /// <summary>Octave bands 250 Hz-16 kHz relative to the 1 kHz octave, dB.</summary>
+    internal static string Balance(float[] x, int sr)
+    {
+        if (sr != Rate) return "balance: (resample to 48 kHz to compare)";
+        var oct = OctaveDb(x);
+        double r = oct[1000];
+        return "balance re 1 kHz: " + string.Join("  ", new[] { 250, 500, 2000, 4000, 8000, 16000 }.Select(c => $"{c}:{oct[c] - r:+0.0;-0.0}"));
+    }
+
+    /// <summary>
+    /// The level a patch plays at in the game, dBFS at the master, for its pressure at the ear: the
+    /// voice measures its level (RainVoiceState) as a source at a metre placed at the patch's reference
+    /// distance, renders it a fixed headroom under full scale and is given that headroom back over the
+    /// fleet's shared one (PhysicalVoiceState.HeadroomGain); the loudness law places it (Loudness.Place
+    /// with the extent, at the default /levels, 45 per cent); and the provider's own chain — the HRTF,
+    /// the master trim — adds <see cref="ProviderDb"/>, measured with --rain live.
+    /// </summary>
+    internal static double GameDb(double pascalsAtEar, float referenceDistance)
+    {
+        double level = 20 * Math.Log10(Math.Max(1e-12, pascalsAtEar * referenceDistance) / 20e-6);
+        var (gain, _) = Loudness.Place((float)level, referenceDistance);
+        return 20 * Math.Log10(Math.Max(1e-9, gain)) - VehicleProfile.PeakHeadroomDb + ProviderDb;
+    }
+
+    /// <summary>What the provider's chain adds to the rain voices' channel levels at the master, dB:
+    /// MEASURED with --rain live, 2026-10-05 (the street at three rates and the bus shelter, captured
+    /// at the master against what the law predicts for the same patches: +5.0 to +5.6 dB; the master
+    /// trim is 2 of it).</summary>
+    internal const double ProviderDb = 5.5;
 
     private static float Db20(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
 
@@ -368,6 +459,179 @@ public static class RainSpike
         var snap = new EntitySnapshot { Id = id, Definition = def, Transform = def.Transform };
         w.Entities[id] = snap;
         w.DynamicEntities.Add(snap);
+    }
+
+    // ── Through the real provider ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// What the game plays: each case alone through a real FmodAudioProvider, its master captured.
+    /// Rain the way RainField plays it (the patches' voices, placed by the level each measures);
+    /// the others as ClientAudioSystem places a physical source (Loudness.Place with its extent and
+    /// headroom gain). The first three seconds are the voices priming and finding their level.
+    /// </summary>
+    private static int Live(float sec)
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "openfps-rain-live");
+        Directory.CreateDirectory(dir);
+        var ear = new Vector3(0f, 1.6f, 0f);
+        var results = new List<(string Name, double Db, double Predicted)>();
+        var scenes = Scenes().ToDictionary(s => s.Name, s => s.Make);
+
+        foreach (var (name, scene, mmh) in new[] { ("rain, street, light", "street", Rainfall.LightRate),
+                                                   ("rain, street, moderate", "street", Rainfall.ModerateRate),
+                                                   ("rain, street, heavy", "street", Rainfall.HeavyRate),
+                                                   ("rain, bus shelter, heavy", "shelter", Rainfall.HeavyRate) })
+        {
+            var (world, at, _) = scenes[scene]();
+            var survey = new RainSurvey().Run(world, at, -1, -1);
+            for (int s = 0; s < OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Slots; s++)
+            {
+                var feed = OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Feed[s];
+                feed.Patch = survey.Patches[s];
+                feed.Rate = mmh;
+                feed.LevelDb = float.NaN;
+            }
+            double predicted = 0;
+            string cap = Path.Combine(dir, $"{scene}_{mmh:F0}.wav");
+            double db = Capture(cap, at, sec, provider =>
+            {
+                predicted = 0;
+                for (int s = 0; s < survey.Patches.Length; s++)
+                {
+                    var patch = survey.Patches[s];
+                    if (patch == null) continue;
+                    float level = OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Feed[s].LevelDb;
+                    if (float.IsNaN(level)) level = 40f;
+                    var (gain, reference) = Loudness.Place(level, patch.ReferenceDistance);
+                    predicted += Math.Pow(10, (20 * Math.Log10(Math.Max(1e-9, gain)) - VehicleProfile.PeakHeadroomDb) / 10);
+                    provider.PlaySpatialSound(new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
+                    {
+                        EntityId = OpenFPS.Client.Core.RainField.VoiceBase - s,
+                        SoundId = "rain",
+                        IsSynth = true,
+                        PhysicalKey = OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Key(s),
+                        EngineKey = "",
+                        Mode = PlaybackMode.LoopOne,
+                        Type = OpenFPS.Client.AudioEngine.Data.EmitterType.WorldLocked,
+                        Position = survey.Centres[s],
+                        ApparentPosition = survey.Centres[s],
+                        Volume = gain * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(OpenFPS.Client.AudioEngine.Fmod.RainVoiceState.HeadroomDb),
+                        MinDistance = reference,
+                        ExtentMetres = patch.ReferenceDistance,
+                        Range = MathF.Max(60f, Loudness.AudibleRange(level)),
+                        Pitch = 1f,
+                        EngineRunning = true,
+                        CarriesPath = true,
+                        ApertureFactor = 1f,
+                        EqLow = 1f, EqMid = 1f, EqHigh = 1f,
+                        EffectiveDistance = patch.ReferenceDistance,
+                        TargetRegionId = -1,
+                    });
+                }
+            });
+            results.Add((name, db, 10 * Math.Log10(Math.Max(1e-20, predicted))));
+            for (int s = 0; s < OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Slots; s++) OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Feed[s].Patch = null;
+        }
+
+        foreach (var (name, key, level, extent, headroom, dist) in new[]
+        {
+            ("window air conditioner at 3 m", "machine:ac_window", SmallMachineSpec.ByName("ac_window").SourceLevelDb, SmallMachineSpec.ByName("ac_window").ExtentMetres, VehicleProfile.PeakHeadroomDb, 3f),
+            ("park fountain at 10 m", "water:park_fountain", WaterFeatureSpec.ByName("park_fountain").SourceLevelDb, WaterFeatureSpec.ByName("park_fountain").ExtentMetres, WaterFeatureSpec.ByName("park_fountain").PeakHeadroomDb, 10f),
+            ("park tree in the wind at 8 m", "foliage:park_tree", FoliageSpec.ByName("park_tree").SourceLevelDb, FoliageSpec.ByName("park_tree").ExtentMetres, FoliageSpec.ByName("park_tree").PeakHeadroomDb, 8f),
+        })
+        {
+            var (gain, reference) = Loudness.Place(level, extent);
+            string cap = Path.Combine(dir, key.Replace(':', '_') + ".wav");
+            double db = Capture(cap, ear, sec, provider => provider.PlaySpatialSound(new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
+            {
+                EntityId = 777001,
+                Type = OpenFPS.Client.AudioEngine.Data.EmitterType.EntityAttached,
+                IsSynth = true,
+                PhysicalKey = key,
+                EngineRunning = true,
+                Position = ear + new Vector3(0f, 0f, dist),
+                Direction = Vector3.UnitZ,
+                Volume = gain * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(headroom),
+                MinDistance = reference,
+                ExtentMetres = extent,
+                Range = MathF.Max(60f, Loudness.AudibleRange(level)),
+                TargetRegionId = -1,
+            }));
+            double predicted = 20 * Math.Log10(Math.Max(1e-9, gain * reference / Math.Max(reference, dist))) - VehicleProfile.PeakHeadroomDb;
+            results.Add((name, db, predicted));
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("At the master, through the real provider (rms over the last seconds; the law's prediction for the channel levels alone):");
+        foreach (var r in results)
+            Console.WriteLine($"  {r.Name,-32} {r.Db,6:F1} dBFS   law {r.Predicted,6:F1} dBFS   provider adds {r.Db - r.Predicted:+0.0;-0.0} dB");
+        Console.WriteLine($"  captures in {dir}");
+        return 0;
+    }
+
+    /// <summary>One provider, the listener at <paramref name="ear"/> facing north, <paramref name="each"/>
+    /// called every frame; the master captured to <paramref name="path"/>; its rms after the first three
+    /// seconds, dBFS.</summary>
+    private static double Capture(string path, Vector3 ear, float sec, Action<OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider> each)
+    {
+        // The mixer into a file instead of the sound card: exact, and silent.
+        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", path);
+        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
+        if (!provider.Initialize()) throw new InvalidOperationException("provider init failed");
+        provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
+        var sw = Stopwatch.StartNew();
+        while (sw.Elapsed.TotalSeconds < sec)
+        {
+            each(provider);
+            provider.Update();
+            System.Threading.Thread.Sleep(16);
+        }
+        provider.Dispose();
+        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
+        var (pcm, sr) = ReadAnyWav(path);
+        int from = Math.Min(pcm.Length, 3 * sr);
+        double e = 0; int count = 0;
+        for (int i = from; i < pcm.Length; i++) if (float.IsFinite(pcm[i])) { e += pcm[i] * (double)pcm[i]; count++; }
+        return 10 * Math.Log10(Math.Max(1e-15, e / Math.Max(1, count)));
+    }
+
+    /// <summary>A WAV of 16-bit or 32-bit float samples, as the rms over its channels per frame.</summary>
+    private static (float[] Pcm, int Rate) ReadAnyWav(string path)
+    {
+        using var r = new BinaryReader(File.OpenRead(path));
+        r.ReadBytes(12);
+        int channels = 1, rate = 44100, bits = 16, format = 1;
+        while (r.BaseStream.Position + 8 <= r.BaseStream.Length)
+        {
+            string id = new string(r.ReadChars(4));
+            int size = r.ReadInt32();
+            if (id == "fmt ")
+            {
+                format = r.ReadInt16(); channels = r.ReadInt16(); rate = r.ReadInt32(); r.ReadInt32(); r.ReadInt16(); bits = r.ReadInt16();
+                if (size > 16) r.ReadBytes(size - 16);
+            }
+            else if (id == "data")
+            {
+                long avail = r.BaseStream.Length - r.BaseStream.Position;
+                if (size <= 0 || size > avail) size = (int)avail;
+                int bytes = bits / 8;
+                int frames = size / (bytes * channels);
+                var pcm = new float[frames];
+                for (int i = 0; i < frames; i++)
+                {
+                    double e = 0;
+                    for (int c = 0; c < channels; c++)
+                    {
+                        float v = bits == 32 && format == 3 ? r.ReadSingle() : bits == 16 ? r.ReadInt16() / 32768f : r.ReadInt32() / 2147483648f;
+                        e += v * (double)v;
+                    }
+                    pcm[i] = (float)Math.Sqrt(e / channels);
+                }
+                return (pcm, rate);
+            }
+            else r.ReadBytes(size);
+        }
+        throw new InvalidDataException($"{path}: no data chunk");
     }
 
     // ── The physics, printed ────────────────────────────────────────────────────────────────────
@@ -547,8 +811,8 @@ public static class RainSpike
         w.Write(Rate); w.Write(Rate * 4); w.Write((short)4); w.Write((short)16); w.Write("data"u8); w.Write(n * 4);
         for (int i = 0; i < n; i++)
         {
-            w.Write((short)Math.Clamp(left[i] * PascalsToFull * 32767f, -32768f, 32767f));
-            w.Write((short)Math.Clamp(right[i] * PascalsToFull * 32767f, -32768f, 32767f));
+            w.Write((short)Math.Clamp(left[i] * 32767f, -32768f, 32767f));
+            w.Write((short)Math.Clamp(right[i] * 32767f, -32768f, 32767f));
         }
     }
 

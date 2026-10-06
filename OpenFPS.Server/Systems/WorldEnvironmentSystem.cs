@@ -116,6 +116,7 @@ public class WorldEnvironmentSystem
         }
 
         SetScenario(scenario);
+        _heldRainRate = scenario is WeatherType.Rain or WeatherType.Storm ? Rainfall.RateFromIntensity(_targetPrecipitation) : null;
         FrontProbabilityPerTick = 0;
         Log.Information("WorldEnvironment: PINNED to {Scenario} by OPENFPS_WEATHER — no fronts will roll in.",
                         scenario);
@@ -162,8 +163,8 @@ public class WorldEnvironmentSystem
         _travelEast += carryEast * (double)dt;
         _travelNorth += carryNorth * (double)dt;
 
-        // Check for Freezing (affects precipitation type)
-        if (_env.Temperature < 0 && _currentScenario == WeatherType.Rain)
+        // Check for Freezing (affects precipitation type). Rain asked for by hand at a rate stays rain.
+        if (_env.Temperature < 0 && _currentScenario == WeatherType.Rain && _heldRainRate == null)
         {
             Log.Information("WorldEnvironment: Rain turning to Snow due to freezing temperatures.");
             SetScenario(WeatherType.Snow);
@@ -229,6 +230,9 @@ public class WorldEnvironmentSystem
         SetScenario(scenario);
         FrontProbabilityPerTick = 0;
         _weatherRate = SetByHandRate;
+        // Rain or a storm asked for by hand is rain, at the front's own rate, whatever the season.
+        _heldRainRate = scenario is WeatherType.Rain or WeatherType.Storm
+            ? Rainfall.RateFromIntensity(_targetPrecipitation) : null;
     }
 
     /// <summary>
@@ -243,9 +247,33 @@ public class WorldEnvironmentSystem
         _weatherRate = SetByHandRate;
     }
 
+    /// <summary>
+    /// Rain set by hand at a rate (/weather rain heavy, /weather rain 12): the Rain front with its
+    /// precipitation set to give that rate, held, and rain whatever the season, so a tester asking for
+    /// rain hears rain.
+    /// </summary>
+    public void PinRain(float rateMmPerHour)
+    {
+        PinScenario(WeatherType.Rain);
+        _targetPrecipitation = Rainfall.IntensityFor(rateMmPerHour);
+        _heldRainRate = rateMmPerHour;
+    }
+
+    /// <summary>The rate rain was set to by hand, or null.</summary>
+    public float? HeldRainRate => _heldRainRate;
+    private float? _heldRainRate;
+
+    /// <summary>
+    /// The rain falling on one map, mm/h: <see cref="RainRateFor"/>, except that rain set by hand at a
+    /// rate is rain however cold the map's air is.
+    /// </summary>
+    public float RainRate(in WorldEnvironmentComponent state)
+        => _heldRainRate != null ? Rainfall.RateFromIntensity(state.PrecipitationIntensity) : RainRateFor(state);
+
     /// <summary>Lets the weather roll on its own again from what it is now.</summary>
     public void Unpin()
     {
+        _heldRainRate = null;
         FrontProbabilityPerTick = DefaultFrontProbabilityPerTick;
         _weatherRate = 1f;
     }
