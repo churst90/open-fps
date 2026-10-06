@@ -176,10 +176,14 @@ public static class RainSpike
         var impacts = new List<NearDrops.Impact>();
         var bank = new DropBank();
         near.Plan(survey, fall, ear, -10.0, 0f, impacts, bank);
+        // Each patch's level as its voice measures it: the near drops of that patch are placed in its
+        // loudness frame (DropBank.Placement), as the game places them.
+        var slotLevel = new float[survey.Patches.Length];
+        Array.Fill(slotLevel, float.NaN);
         for (int s = 0; s < survey.Patches.Length; s++)
         {
             var patch = survey.Patches[s];
-            if (patch == null || _near == "only") continue;
+            if (patch == null) continue;
             var synth = new RainSynth(Rate, seed * 31 + s) { Patch = patch, Falling = fall };
             var x = new float[n];
             var sw = Stopwatch.StartNew();
@@ -194,6 +198,8 @@ public static class RainSpike
             // What the game plays it at: the voice measures this level and the loudness law places it.
             double raw = 0; foreach (float v in x) raw += v * (double)v;
             double rawRms = Math.Sqrt(raw / n);
+            slotLevel[s] = rawRms > 0 ? (float)(20 * Math.Log10(rawRms * patch.ReferenceDistance / 20e-6)) : float.NaN;
+            if (_near == "only") continue;
             float toGame = rawRms > 0 ? (float)(Math.Pow(10, GameDb(rawRms, patch.ReferenceDistance) / 20) / rawRms) : 0f;
             // The path: three bands as the mixer's THREE_EQ takes them, and the air.
             (float lo, float mid, float hi) eq = s == RainSurvey.OverheadSlot ? survey.OverheadEq : (1f, 1f, 1f);
@@ -248,7 +254,7 @@ public static class RainSpike
             float aim = (ear.Y - impact.Position.Y) / dist;
             float level = DropBank.LevelDb(sound, impact, aim);
             float pascalsAtEar = 20e-6f * MathF.Pow(10f, level / 20f) / dist;
-            var (gain, reference) = Loudness.Place(level);
+            var (gain, reference) = DropBank.Placement(level, impact.Slot >= 0 && impact.Slot < slotLevel.Length ? slotLevel[impact.Slot] : float.NaN);
             // Through the roof's EQ (a car's headliner), or through the shell of the car the listener sits in.
             bool overhead = impact.FromBelow && impact.Slot == RainSurvey.OverheadSlot;
             var bands = overhead ? survey.OverheadEq : (1f, 1f, 1f);

@@ -943,7 +943,7 @@ public sealed class RainField
     private const int MakePerFrame = 2;
 
     /// <summary>The impacts close by in the time since the last frame, each played where it lands
-    /// (NearDrops, DropBank), placed by its own peak through the loudness law as a one-off sound is.</summary>
+    /// (NearDrops, DropBank), placed in the loudness frame of the rain it is part of (DropBank.Placement).</summary>
     private void PlayNear(Vector3 ear, double now, int listenerRegion)
     {
         if (_last == null) return;
@@ -967,7 +967,9 @@ public sealed class RainField
             float dist = MathF.Max(0.1f, Vector3.Distance(impact.Position, ear));
             float aim = (ear.Y - impact.Position.Y) / dist;
             float level = DropBank.LevelDb(sound, impact, aim);
-            var (gain, reference) = Loudness.Place(level);
+            // In the loudness frame of the rain on that surface, not on its own (DropBank.Placement).
+            float field = impact.Slot >= 0 && impact.Slot < RainFeeds.Slots ? RainFeeds.Feed[impact.Slot].LevelDb : float.NaN;
+            var (gain, reference) = DropBank.Placement(level, field);
             var e = new SpatialEmitter
             {
                 EntityId = NearVoiceBase - (_nearVoice++ % NearVoicePool),

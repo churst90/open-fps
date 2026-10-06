@@ -7,6 +7,7 @@ using System.Text.Json;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Client.Core;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -524,6 +525,29 @@ public class NatureTests
             x[i] = fire.Next();
         }
         HoldInRange("fire", TextureStatistics.Analyse(x).Summary(), Fitted.Where(k => k != "mod mid"));
+    }
+
+    /// <summary>
+    /// A near drop is placed in the loudness frame of the rain it is part of: its gain per pascal is
+    /// the patch's, whatever the loudness law's compression. Placed by its own peak, the twenty-odd
+    /// drops a second under a steel shelter came out within 2 dB of the whole roof at every rate, and
+    /// heavy rain on the roof sounded like light (Cody, 2026-10-06).
+    /// </summary>
+    [Fact]
+    public void ANearDropIsHeardAsPartOfItsRain()
+    {
+        foreach (float field in new[] { 35f, 50f, 65f })
+        {
+            float drop = field + 10f;                  // a drop's peak, 10 dB over the patch's Leq
+            var (g, _) = DropBank.Placement(drop, field);
+            var (pg, _) = Loudness.Place(field);
+            // The patch's Leq plays the shared headroom under its gain; the drop's peak at its own.
+            float patchRms = 20f * MathF.Log10(pg) - VehicleProfile.PeakHeadroomDb;
+            float dropPeak = 20f * MathF.Log10(g);
+            Assert.Equal(10f, dropPeak - patchRms, 2);
+        }
+        // With no field measured yet, a drop is placed on its own.
+        Assert.Equal(Loudness.Place(60f).Gain, DropBank.Placement(60f, float.NaN).Gain);
     }
 
     /// <summary>"water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;" is a tap; a plain "water:&lt;preset&gt;" is the whole.</summary>
