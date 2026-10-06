@@ -47,23 +47,9 @@ public sealed class Timbre
     /// <summary>This shape, for a buffer whose gated RMS is <paramref name="gatedRmsDbfs"/>.</summary>
     public Timbre WithGatedRms(float gatedRmsDbfs) => new(_shape, Name, Live) { GatedRmsDbfs = gatedRmsDbfs };
 
-    /// <summary>How far the real level is over the declared one, dB: the gated RMS for a buffer whose
-    /// level is declared as its full scale, 0 for a live voice (its declared level is its RMS) or a
-    /// buffer whose declared level is its real one (<see cref="DeclaresReal"/>).</summary>
-    public float RealOffsetDb => !DeclaresReal && float.IsFinite(GatedRmsDbfs) ? GatedRmsDbfs : 0f;
-
-    /// <summary>
-    /// A recording whose source declares its REAL level (a bird call's SPL, a beacon's, a footfall's),
-    /// not its buffer's full scale: its real level is the declared one, and the buffer still plays its
-    /// RMS <see cref="GatedRmsDbfs"/> under full scale.
-    /// </summary>
-    public bool DeclaresReal { get; private init; }
-
-    private Timbre? _declaringReal;
-
-    /// <summary>This sound, for a source that declares its real level (see <see cref="DeclaresReal"/>).</summary>
-    public Timbre DeclaringRealLevel
-        => DeclaresReal ? this : _declaringReal ??= new Timbre(_shape, Name, Live) { GatedRmsDbfs = GatedRmsDbfs, DeclaresReal = true };
+    /// <summary>How far the real level is over the declared one, dB: the gated RMS for a buffer, 0 for a
+    /// live voice (its declared level is its RMS).</summary>
+    public float RealOffsetDb => float.IsFinite(GatedRmsDbfs) ? GatedRmsDbfs : 0f;
 
     /// <summary>Where the voice's RMS sits under its digital full scale when played at unit gain, dB.</summary>
     public float DigitalRmsDb => float.IsFinite(GatedRmsDbfs) ? GatedRmsDbfs : Loudness.PhysicalRmsDbfs;

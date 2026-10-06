@@ -198,7 +198,6 @@ public sealed class BeaconAids
             TargetRegionId = region != -1 ? region : path?.RegionId ?? -1,
             Volume = gain,
             EarLevelDb = BlipDb + (float)_prefs.LevelDb,
-            EarLevelIsReal = true,
             MinDistance = reference,
             Range = 40f,
             IsEvent = true,

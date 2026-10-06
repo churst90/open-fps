@@ -45,7 +45,6 @@ public partial class FmodAudioProvider
         public GCHandle Handle;
         public EarVoiceState State = null!;
         public float LevelDb, CopyDb;
-        public bool LevelIsReal;
         public string Key = "";
         public bool Live;
         public Timbre? Timbre;
@@ -84,7 +83,7 @@ public partial class FmodAudioProvider
         var ear = new EarVoice
         {
             Dsp = unit.Dsp, Handle = unit.Handle, State = unit.State,
-            LevelDb = emitter.EarLevelDb, CopyDb = emitter.EarCopyDb, LevelIsReal = emitter.EarLevelIsReal,
+            LevelDb = emitter.EarLevelDb, CopyDb = emitter.EarCopyDb,
             Key = !string.IsNullOrEmpty(emitter.PhysicalKey) ? emitter.PhysicalKey : emitter.SoundId ?? "",
             Live = engine == null && !sample,
         };
@@ -165,7 +164,7 @@ public partial class FmodAudioProvider
             }
             else if (!ear.Live && (ear.Timbre == null || !EarTimbres.Has(ear.Key)))
                 ear.Timbre = EarTimbres.Find(ear.Key) ?? ear.Timbre;
-            timbre = ear.LevelIsReal && !ear.Live ? ear.Timbre?.DeclaringRealLevel : ear.Timbre;
+            timbre = ear.Timbre;
             levelDb = ear.LevelDb;
             correction = on ? Loudness.TimbreCorrectionDb(levelDb, timbre) : 0f;
             placedDb = Loudness.PlacedDb(levelDb, timbre);
@@ -176,7 +175,7 @@ public partial class FmodAudioProvider
         // Real and played levels in the voice's own convention (Loudness: a recording declares its full
         // scale, a physical voice its RMS). A recording not measured yet is taken as a speech line.
         bool physical = engine != null || ear.Live;
-        float realOffset = timbre?.RealOffsetDb ?? (physical || ear.LevelIsReal ? 0f : Loudness.ReferenceRmsDbfs);
+        float realOffset = timbre?.RealOffsetDb ?? (physical ? 0f : Loudness.ReferenceRmsDbfs);
         float digitalRms = timbre?.DigitalRmsDb ?? (physical ? Loudness.PhysicalRmsDbfs : Loudness.ReferenceRmsDbfs);
         float real = EarModel.RealAtEarDb(levelDb + realOffset + ear.CopyDb, distance, pathDb);
         float played = EarModel.PlayedAtEarDb(placedDb + ear.CopyDb, digitalRms, active.MinDistance, distance, pathDb);
