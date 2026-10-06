@@ -14,18 +14,26 @@ Recent work, newest first. `git log` has the rest.
   and you hear round their edges. How hard it rains is the server's precipitation turned into a rain
   rate: light (about 1.5 mm/h), moderate (Rain front, about 7), heavy, and violent (Storm, 60). It
   builds up and dies away over a minute as the weather changes; snow makes no rain sound. To try it:
-  `OPENFPS_WEATHER=Rain ./run-server.sh city` (or `Storm`), then stand on Main Street, under the bus
-  shelter on Main Street (x 8, y -60 in player coordinates), in Elm Park under a tree, and indoors on
-  a top floor. Restart the server: the world state message has a new field. Renders of each case at
-  four rates, measured, are in inbox/rain-2026-10-05 with a README. Not done yet: rain blown onto
+  `/weather rain` or `/weather storm`, or a rate: `/weather rain light`, `moderate`, `heavy`,
+  `violent`, or a number of millimetres an hour (`/weather rain 12`). Rain set by hand stays rain
+  whatever the season. Then stand on Main Street, under the bus shelter on Main Street (x 8, y -60 in
+  player coordinates), in Elm Park under a tree, and indoors on a top floor. Restart the server: the
+  world state message has a new field. Moderate rain on an open street plays at about the level of
+  a window air conditioner three metres away. Renders of each case at four rates, at the level the
+  game plays them, are in inbox/rain-2026-10-05 with a README. Not done yet: rain blown onto
   walls and windows by the wind (with no wind a vertical pane takes no drops, so there is no tapping
   on glass), gutters, downpipes and run-off, and wet tyre noise.
 - The bus shelters' roofs are a 0.7 mm steel sheet (new prefab metal_roof) instead of a 10 cm steel
   box. As a box they were a slab to anything that asked, so the rain on them was silent; the sheet
   also lets a little more of the street through from above, as a real canopy does.
-- `--rain` in the AudioLab: `levels`, `render out=DIR`, `physics` (drop counts, the kinetic energy
-  against van Dijk 2002, the plate law for roofs and glazing), `survey map=city ear=x,y,z` for a real
-  place, and `compare=FILE.wav` for a recording.
+- Rain on hard and soft ground is darker and smoother than in the first renders: each drop's click
+  now lasts as long as its water takes to spread on the ground, not just the time it takes to stop,
+  and its first contact is not a single-sample spike. Measured against recordings of rain on streets,
+  in a garden and in a wood, the street is now within a few dB in every octave and no grainier.
+- `--rain` in the AudioLab: `levels`, `render out=DIR` (at the game's level), `live` (through the
+  real provider, against an air conditioner, a fountain and a tree), `physics` (drop counts, the
+  kinetic energy against van Dijk 2002, the plate law for roofs and glazing), `survey map=city
+  ear=x,y,z` for a real place, and `compare=FILE.wav` for a recording.
 
 - The front of a car is no longer silent. The engine's own noise (valve ticking, diesel clatter, the
   belt, the turbo, the intake) leaves only through the engine bay, and every car let out a flat 0.15

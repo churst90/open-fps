@@ -196,7 +196,9 @@ public static class RainSpike
             for (int i = 0; i < n; i++)
             {
                 r.Mono[i] += x[i]; r.Left[i] += x[i] * gl; r.Right[i] += x[i] * gr;
-                r.GameLeft[i] += x[i] * gl * toGame; r.GameRight[i] += x[i] * gr * toGame;
+                // The game's binaural voice puts a source's whole level in each ear (the live capture
+                // measures it per channel), where a pan splits it: √2 per ear gives the same.
+                r.GameLeft[i] += x[i] * gl * toGame * 1.4142135f; r.GameRight[i] += x[i] * gr * toGame * 1.4142135f;
             }
             string layers = string.Join(", ", patch.Layers.Select(l => $"{l.Kind}/{l.Material}{(l.FromBelow ? "↑" : "")}"));
             string extra = "";
