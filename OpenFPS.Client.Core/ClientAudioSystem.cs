@@ -1245,7 +1245,7 @@ public class ClientAudioSystem
     /// Exposure is one minus the enclosure the acoustic survey measures round the listener (the same
     /// sphere of rays that decides how much reverb there is), and nothing at all inside a room: a
     /// street between tall buildings takes a third off the wind, a walled yard half, a room all of
-    /// it. The weather's wind only; walking or driving still moves air past the ears anywhere.
+    /// it. It takes your own movement off with the weather's: indoors no wind at the ears at all.
     /// In a vehicle: a cabin lets in what its open windows let in, and a vehicle without one (a
     /// motorcycle, a formula car) has a helmet on the rider.
     /// </summary>

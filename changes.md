@@ -11,8 +11,9 @@ Recent work, newest first. `git log` has the rest.
   and walking with it makes it weaker. Indoors there is none at all, and a walled yard or a street
   between tall buildings takes some of it off. A closed vehicle has none, a car with its windows
   down some, and a motorcycle rider a helmet's worth. It gets no reverb and is not placed anywhere:
-  it is in your ears. Walking or running in still air outdoors makes only a faint low rush, about
-  21 dB under a fresh breeze.
+  it is in your ears. Walking or running in still air outdoors makes only a faint low rush: the game's
+  walk (4.5 metres a second, a jog) is heard as a real walk's 1.4. The levels are what reaches the
+  eardrum, which is 14 to 19 dB less than the published wind-tunnel microphone figures.
 - The trees, the fire and the fountain now move with the server's weather instead of a fixed
   breeze, and every player hears the same gust reach the same tree at the same moment.
 - `/weather` (developers and the administrator) says the weather and the wind. `/weather storm`

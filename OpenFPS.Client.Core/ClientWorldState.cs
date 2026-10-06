@@ -144,12 +144,22 @@ public class ClientWorldState
             _env.PrecipitationIntensity = update.PrecipitationIntensity;
         }
         // The wind every tree, fire and ear on the map reads: this broadcast, reached from the last one
-        // over a second so it never lands as a step (WindWeather).
+        // over a second so it never lands as a step (WindWeather). The session hands it to WindField;
+        // kept here rather than written there, so a world built in a test does not blow on every
+        // other test's trees.
         var air = WindAir.FromBroadcast(update.WindVelocity, update.WindGustiness,
                                         update.WindClock, update.WindTravelEast, update.WindTravelNorth);
-        WindField.Weather = WindField.Weather.Following(air, WindField.Now());
+        Wind = Wind.Following(air, WindField.Now());
         Touch();
     }
+
+    /// <summary>The server's wind as this client follows it (see <see cref="UpdateAtmosphere"/>).</summary>
+    public WindWeather Wind
+    {
+        get => Volatile.Read(ref _wind);
+        private set => Volatile.Write(ref _wind, value);
+    }
+    private WindWeather _wind = WindWeather.Default;
 
     /// <summary>
     /// Applies the map's authored atmosphere the moment the manifest lands.

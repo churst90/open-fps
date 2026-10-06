@@ -39,9 +39,9 @@ public class WeatherWindTests
         Assert.Equal(0.6f, dx, 4);
         Assert.Equal(0.8f, dz, 4);
         // Gustiness to turbulence intensity: steady to a gale's.
-        Assert.Equal(0.12f, WindAir.TurbulenceFor(0f), 4);
-        Assert.Equal(0.27f, air.Turbulence, 4);
-        Assert.Equal(0.42f, WindAir.TurbulenceFor(1f), 4);
+        Assert.Equal(0.18f, WindAir.TurbulenceFor(0f), 4);
+        Assert.Equal(0.24f, air.Turbulence, 4);
+        Assert.Equal(0.30f, WindAir.TurbulenceFor(1f), 4);
         // The pattern's travel is carried on from its anchor at the wind.
         var (te, tn) = air.TravelAt(102.0);
         Assert.Equal(16.0, te, 6);
@@ -190,11 +190,15 @@ public class WeatherWindTests
     [Fact]
     public void TheLevelFollowsThePublishedLaw()
     {
-        Assert.Equal(85f, EarWind.GrazingDb(4.47f), 2);
+        // Seidman's 84.9 dB at 10 mph is a microphone in the flow; the ear canal is 14 to 19 dB under that.
+        Assert.Equal(85f + EarWind.OpenEarDb, EarWind.GrazingDb(4.47f), 2);
+        Assert.InRange(EarWind.OpenEarDb, -19f, -14f);
         // 43 dB a decade: about 13 a doubling, between flow-noise theory's 12 and the measured 13.7.
         Assert.Equal(12.94f, EarWind.GrazingDb(8.94f) - EarWind.GrazingDb(4.47f), 1);
-        // Seidman's 60 mph point is 120 dB at the worst ear: the law gives 117.6 at grazing, 119 in the wake.
-        Assert.InRange(EarWind.GrazingDb(26.8f) + EarWind.LeeDb, 117f, 121f);
+        // Seidman's 60 mph point, 120 dB at the worst microphone, is 101 to 106 at the eardrum.
+        Assert.InRange(EarWind.GrazingDb(26.8f) + EarWind.LeeDb - EarWind.OpenEarDb, 117f, 121f);
+        // A real walk, 1.4 m/s, is under 50 dB, nearly all of it under 100 Hz: about nothing.
+        Assert.True(EarWind.GrazingDb(1.4f) < 50f);
         // The knee rides the speed.
         Assert.Equal(300f, EarWind.KneeHz(5f), 1);
         Assert.True(EarWind.KneeHz(15f) > EarWind.KneeHz(5f) * 2.9f);
@@ -231,17 +235,27 @@ public class WeatherWindTests
     public void WhatYouFeelIsTheAirLessYourOwnMovement()
     {
         var north = new Vector2(0f, 5f);
-        // Walking north at 4.5 into air moving south at 4.5: nine past the face.
-        var into = EarWind.Relative(new Vector2(0f, -4.5f), new EarWindListener(default, 1.7f, new Vector2(0f, 4.5f), 0f, 1f));
-        Assert.Equal(9f, into.Length(), 3);
-        // Walking with it at its own speed: still air at the ears.
-        var with = EarWind.Relative(new Vector2(0f, 4.5f), new EarWindListener(default, 1.7f, new Vector2(0f, 4.5f), 0f, 1f));
-        Assert.True(with.Length() < 1e-4f);
-        // Indoors the weather does not reach you; running still moves air past your ears.
+        // The game's walk (4.5 m/s, a jog) counts as the real walk it stands for, 1.4 m/s.
+        float walk = PhysicsConstants.WalkSpeed;
+        Assert.Equal(1.4f, walk * EarWind.OnFootShare, 3);
+        // Walking north into air moving south at 4.5: 5.9 past the face.
+        var into = EarWind.Relative(new Vector2(0f, -4.5f), new EarWindListener(default, 1.7f, new Vector2(0f, walk), 0f, 1f));
+        Assert.Equal(5.9f, into.Length(), 3);
+        // Walking with air moving north at 1.4: still air at the ears.
+        var with = EarWind.Relative(new Vector2(0f, 1.4f), new EarWindListener(default, 1.7f, new Vector2(0f, walk), 0f, 1f));
+        Assert.True(with.Length() < 1e-3f);
+        // Indoors nothing reaches the ears: not the weather, and not your own running.
         var indoors = EarWind.Relative(north, new EarWindListener(default, 1.7f, Vector2.Zero, 0f, 0f));
         Assert.True(indoors.Length() < 1e-4f);
         var running = EarWind.Relative(north, new EarWindListener(default, 1.7f, new Vector2(3f, 0f), 0f, 0f));
-        Assert.Equal(3f, running.Length(), 3);
+        Assert.True(running.Length() < 1e-4f);
+        // Outdoors in still air your own movement is all of it, and walking is faint: under 50 dB at
+        // the eardrum, nearly all of it under 100 Hz. Sprinting is under 57.
+        var jog = EarWind.Relative(Vector2.Zero, new EarWindListener(default, 1.7f, new Vector2(walk, 0f), 0f, 1f));
+        Assert.Equal(1.4f, jog.Length(), 3);
+        Assert.True(EarWind.GrazingDb(jog.Length()) < 50f);
+        var sprint = EarWind.Relative(Vector2.Zero, new EarWindListener(default, 1.7f, new Vector2(PhysicsConstants.SprintSpeed, 0f), 0f, 1f));
+        Assert.True(EarWind.GrazingDb(sprint.Length()) < 57f);
         // A street between tall buildings: what its enclosure lets through.
         var street = EarWind.Relative(north, new EarWindListener(default, 1.7f, Vector2.Zero, 0f, 0.6f));
         Assert.Equal(3f, street.Length(), 3);

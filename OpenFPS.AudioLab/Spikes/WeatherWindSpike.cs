@@ -285,21 +285,24 @@ public static class WeatherWindSpike
     {
         var settings = new (string Name, Action<WorldEnvironmentSystem> Set)[]
         {
+            ("still", e => e.PinWind(Vector3.Zero, 0f)),
             ("calm", e => e.PinWind(new Vector3(1.2f, 0f, 0.9f), 0.1f)),
             ("breezy", e => e.PinWind(new Vector3(-3.5f, 0f, -3.5f), 0.4f)),   // from the north east
             ("stormy", e => e.PinScenario(WeatherType.Storm)),                  // from the north west
         };
-        var walks = new (string Name, Vector2 Velocity, float Facing)[]
+        var walks = new (string Name, Vector2 Velocity, float Facing, float Exposure)[]
         {
-            ("standing facing north", Vector2.Zero, 0f),
-            ("walking north", new Vector2(0f, PhysicsConstants.WalkSpeed), 0f),
-            ("walking south", new Vector2(0f, -PhysicsConstants.WalkSpeed), 180f),
+            ("standing facing north", Vector2.Zero, 0f, 1f),
+            ("walking north", new Vector2(0f, PhysicsConstants.WalkSpeed), 0f, 1f),
+            ("walking south", new Vector2(0f, -PhysicsConstants.WalkSpeed), 180f, 1f),
+            ("sprinting north", new Vector2(0f, PhysicsConstants.SprintSpeed), 0f, 1f),
+            ("walking north indoors", new Vector2(0f, PhysicsConstants.WalkSpeed), 0f, 0f),
         };
         Console.WriteLine();
         Console.WriteLine("== The ears in the weather, out in the open at 1.7 m (the weather's wind at 10 m is the server's)");
         Console.WriteLine("   weather  what                     felt mean  from(face)  L dBFS  R dBFS  L SPL  R SPL   L range (1 s, dBFS)");
         foreach (var (wname, set) in settings)
-            foreach (var (name, vel, facing) in walks)
+            foreach (var (name, vel, facing, exposure) in walks)
             {
                 double start = 5000.0;
                 var sim = new WeatherSim(set, start);
@@ -315,7 +318,7 @@ public static class WeatherWindSpike
                     double t = start + i / (double)Rate;
                     sim.Advance(t);
                     var at = head + new Vector3(vel.X, 0f, vel.Y) * (float)(i / (double)Rate);
-                    var listener = new EarWindListener(at, 1.7f, vel, facing, 1f);
+                    var listener = new EarWindListener(at, 1.7f, vel, facing, exposure);
                     last = EarWind.Hear(sim.Weather, listener, t);
                     meanSpeed += last.MeanSpeed; meanL += last.LeftDb; meanR += last.RightDb; blocks++;
                     synth.Control(last, m / (float)Rate);
@@ -325,8 +328,9 @@ public static class WeatherWindSpike
                 for (int a = Rate; a + Rate <= n; a += Rate) sec1.Add(Db(Rms(l.AsSpan(a, Rate))));
                 int skip = Rate; // the first second is the gain gliding in
                 double dl = Db(Rms(l.AsSpan(skip))), dr = Db(Rms(r.AsSpan(skip)));
+                if (sec1.Count == 0 || double.IsInfinity(sec1.Min())) sec1 = new List<double> { -240, -240 };
                 Console.WriteLine($"   {wname,-7}  {name,-22}  {meanSpeed / blocks,6:F1} m/s   {last.FromDegrees,5:F0}     {dl,6:F1}  {dr,6:F1}  {meanL / blocks,5:F0}  {meanR / blocks,5:F0}   {sec1.Min(),6:F1} .. {sec1.Max(),6:F1}");
-                if (dir != null && (name.StartsWith("standing") || wname == "calm"))
+                if (dir != null && exposure > 0f && wname != "calm" && (name.StartsWith("standing") != (wname == "still")))
                     WriteStereo(Path.Combine(dir, $"weather_{wname}_{name.Replace(' ', '_')}.wav"), l, r);
             }
     }

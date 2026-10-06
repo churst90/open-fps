@@ -11,8 +11,8 @@ namespace OpenFPS.Common;
 /// <param name="Velocity">How the head moves over the ground, m/s, east and north: your own walk, or
 /// the vehicle you are in.</param>
 /// <param name="FacingDegrees">The way the face points, degrees clockwise from north.</param>
-/// <param name="Exposure">How much of the weather's wind reaches this place, 0 (indoors) to 1 (open
-/// ground): one minus the place's enclosure.</param>
+/// <param name="Exposure">How much of the moving air reaches the ears here, 0 (indoors) to 1 (open
+/// ground): one minus the place's enclosure. It scales your own movement too (see EarWind.Relative).</param>
 /// <param name="Cabin">How the head is shielded from the air it moves through: <see cref="EarCover.None"/>
 /// on foot or on a bicycle, a helmet on a motorcycle, a cabin with its windows open some of the way.</param>
 /// <param name="WindowsOpen">In a cabin, how far the windows are down, 0 to 1.</param>
@@ -48,14 +48,22 @@ public readonly record struct EarWindAtEars(float MeanSpeed, float Speed, float 
 ///
 /// THE NUMBERS, all published, none tuned:
 ///
-/// LEVEL against speed. Seidman et al. 2017 (Otolaryngol Head Neck Surg 157(5):848-852, a manikin
-/// on a bicycle in a wind tunnel) measured 84.9 dB at the ear at 10 mph (4.47 m/s), rising with speed
-/// to 120.3 dB at 60 mph (26.8 m/s): 45 dB per decade. Flow-noise theory gives 40 (the mean square
-/// pressure of turbulence growing as U^4; the hearing-aid review by Korhonen 2021, Semin Hear
-/// 42(3):248-259, states it as 12 dB per doubling and notes real wind exceeds it). The law here is
-/// 85 dB at 4.47 m/s, 43 dB per decade of speed. At 12 m/s it gives 103 dB, under the 116 dB that
-/// Zakis 2011 (JASA 129(6):3897-3907) recorded at an exposed behind-the-ear microphone that was
-/// already clipping, and above what an in-the-canal one sees, which is where an open ear sits.
+/// LEVEL against speed. Seidman et al. 2017 (Otolaryngol Head Neck Surg 157(5):848-852, a cyclist
+/// manikin in a wind tunnel, "microphones attached near the ears") measured 84.9 dB at 10 mph
+/// (4.47 m/s), rising with speed to 120.3 dB at 60 mph (26.8 m/s): 45 dB per decade. Flow-noise
+/// theory gives 40 (the mean square pressure growing as U^4; the hearing-aid review by Korhonen
+/// 2021, Semin Hear 42(3):248-259, states it as 12 dB per doubling). The slope here is 43 dB per
+/// decade of speed.
+///
+/// THOSE ARE MICROPHONES IN THE FLOW, NOT EARDRUMS. A microphone on the outside of the ear makes its
+/// own flow noise; the ear canal sits in the concha, behind the tragus, out of the stream. The one
+/// published comparison at the same place and speeds: a microphone in the ear canal measured 14 to
+/// 19 dB less wind noise overall than one on top of the pinna, at 2 to 8 m/s (Groth 2020, GN Hearing,
+/// as Korhonen 2021 reports it; in-the-canal hearing aids are also the quietest in Zakis 2011, JASA
+/// 129(6):3897-3907). So the eardrum here is <see cref="OpenEarDb"/>, the middle of that, under the
+/// in-the-flow law: 68.5 dB at 4.47 m/s, nearly all of it under 300 Hz (about 57 dB(A)); 53 dB at
+/// 2 m/s (33 dB(A)); 47 dB at a real walk's 1.4 m/s (22 dB(A), about nothing). Below 2 m/s nothing is
+/// measured and the slope is carried on.
 ///
 /// DIRECTION. Chung, Mongeau and McKibben 2009 (JASA 125(4):2243-2259) on a manikin: the noise was
 /// lowest with the microphone facing upstream, higher facing downstream, highest with the flow
@@ -75,8 +83,12 @@ public readonly record struct EarWindAtEars(float MeanSpeed, float Speed, float 
 /// </summary>
 public static class EarWind
 {
-    /// <summary>The level at <see cref="ReferenceSpeed"/>, grazing incidence, dB SPL (Seidman 2017).</summary>
+    /// <summary>The level at <see cref="ReferenceSpeed"/>, grazing incidence, at a microphone in the
+    /// flow beside the ear, dB SPL (Seidman 2017).</summary>
     public const float ReferenceDb = 85f;
+    /// <summary>The ear canal against a microphone on top of the pinna: 14 to 19 dB less (Groth 2020,
+    /// via Korhonen 2021). The middle of it.</summary>
+    public const float OpenEarDb = -16.5f;
     /// <summary>10 mph, m/s.</summary>
     public const float ReferenceSpeed = 4.47f;
     /// <summary>dB per decade of speed: between flow-noise theory's 40 and Seidman's measured 45.</summary>
@@ -95,21 +107,40 @@ public static class EarWind
 
     /// <summary>A full-face motorcycle helmet over the ear. Riders are reported at 105 to 110 dB at the
     /// ear at 100 km/h under one (McCombe 1995; Jordan et al. 2004, figures from memory, not checked
-    /// against the papers), where the bare-ear law gives 119.</summary>
+    /// against the papers); 12 dB under the bare ear is an assumption.</summary>
     public const float HelmetDb = -12f;
 
     /// <summary>The air reaching an occupant's head through an open side window, as a share of the
     /// car's speed through the air, with the window right down. AN ASSUMPTION, not a measurement: the
     /// flow inside a cabin is a recirculating eddy driven by the opening's shear layer, and a quarter
-    /// puts 100 km/h with the windows down at about 93 dB, loud and well below the open-air figure.</summary>
+    /// puts 100 km/h with the windows down at about 77 dB at the ear.</summary>
     public const float CabinFlowShare = 0.25f;
+
+    /// <summary>A real walk, m/s: what people walk at, and what holding the walk key stands for.</summary>
+    public const float RealWalkMetresPerSecond = 1.4f;
+
+    /// <summary>
+    /// How much of your own speed on foot counts as air past your ears: a real walk's share of the
+    /// game's walk, 1.4 / 4.5.
+    ///
+    /// A DECISION, said here so it is not taken for physics. The game's walk is 4.5 m/s
+    /// (PhysicsConstants.WalkSpeed), a brisk jog, standing in for walking until somebody decides to
+    /// slow it. Taken literally, the law above puts a jog through still air at 67 dB at the eardrum,
+    /// about 55 dB(A) of low rumble, which the loudness law plays at −26 LUFS: as loud as the busy street
+    /// the mix is set for, on every walk. Heard as the walk it stands for (1.4 m/s) it is 47 dB, 22
+    /// dB(A), and plays at about −37 LUFS, nearly all of it under 100 Hz (−61 dBFS A-weighted): faint,
+    /// which is what the measurements give for walking.
+    /// Running counts the same way (7.2 m/s is heard as 2.2). Vehicles count at their real speed.
+    /// If the walk is ever brought down to a real walk, this goes to one.
+    /// </summary>
+    public static float OnFootShare => RealWalkMetresPerSecond / PhysicsConstants.WalkSpeed;
 
     /// <summary>Below this the air is still, as far as an ear is concerned, m/s.</summary>
     public const float StillAir = 0.05f;
 
-    /// <summary>The level at the ear for a wind past the head, grazing incidence, dB SPL.</summary>
+    /// <summary>The level at the eardrum for a wind past the head, grazing incidence, dB SPL.</summary>
     public static float GrazingDb(float speed)
-        => ReferenceDb + DbPerDecade * MathF.Log10(MathF.Max(StillAir, speed) / ReferenceSpeed);
+        => ReferenceDb + OpenEarDb + DbPerDecade * MathF.Log10(MathF.Max(StillAir, speed) / ReferenceSpeed);
 
     /// <summary>Where the spectrum turns down for a wind past the head, Hz.</summary>
     public static float KneeHz(float speed) => Math.Clamp(KneeHzPerMetrePerSecond * speed, MinKneeHz, MaxKneeHz);
@@ -140,13 +171,21 @@ public static class EarWind
     private static readonly float Diffuse = DiffuseDb(true);
 
     /// <summary>
-    /// The air moving past the head, m/s east and north: the weather's wind where the head is
-    /// (the field's speed at head height, along the weather's direction, scaled by how exposed the
-    /// place is), minus the head's own movement, and then whatever covers the ear.
+    /// The air moving past the head, m/s east and north: the weather's wind where the head is (the
+    /// field's speed at head height, along the weather's direction) minus the head's own movement,
+    /// the whole of it scaled by how exposed the place is, and then whatever covers the ear.
+    ///
+    /// Exposure scales the whole of it, your own movement included, so indoors there is no wind at
+    /// the ears however you move, and among tall buildings less. That is a decision, not physics: the
+    /// air in a room is still, and walking through it moves it past your ears just as outside. But
+    /// nobody notices their own walk as wind in a room, and it would be in the ears on every walk
+    /// through every building.
     /// </summary>
     public static Vector2 Relative(Vector2 air, in EarWindListener l)
     {
-        Vector2 rel = air * Math.Clamp(l.Exposure, 0f, 1f) - l.Velocity;
+        // On foot, your movement counts as the walk it stands for (OnFootShare).
+        Vector2 own = l.Cabin == EarCover.None ? l.Velocity * OnFootShare : l.Velocity;
+        Vector2 rel = (air - own) * Math.Clamp(l.Exposure, 0f, 1f);
         if (l.Cabin == EarCover.Cabin) rel *= CabinFlowShare * Math.Clamp(l.WindowsOpen, 0f, 1f);
         return rel;
     }
@@ -215,8 +254,8 @@ public static class EarWind
     /// gale past the head would run the master limiter on every buffet and pull the whole world down
     /// with it. Above <see cref="SoftKneeDb"/> the placed level bends over toward this and never
     /// reaches it; the two ears' difference and the gusts ride on top unchanged. A deliberate departure
-    /// from the law, said here so it is not mistaken for physics: by the law alone 10 m/s past the head
-    /// is −21 dBFS and 15 m/s −18; held, they are −23 and −22.
+    /// from the law, said here so it is not mistaken for physics: by the law alone 15 m/s past the head
+    /// is −25.4 dBFS and 25 m/s −21.1; held, they are −25.6 and −23.2.
     /// </summary>
     public const float CeilingDb = -21f;
     public const float SoftKneeDb = -27f;
