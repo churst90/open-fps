@@ -303,6 +303,31 @@ public sealed class DropBank
     /// it was rendered for to its own size as the click law scales (the peak as (r v)^1.5 for a drop;
     /// as the mass and the speed for ice), and square on or not (RainLayer.Aim, the dipole's cosine).
     /// </summary>
+    /// <summary>
+    /// The volume and reference distance a near drop plays at: in the same loudness frame as the rain
+    /// it is part of. The near drops are the loudest few of the drops on a surface, pulled out of its
+    /// patch to be heard one by one; the patch's voice is placed by the patch's level
+    /// (<paramref name="fieldLevelDb"/>, what RainVoiceState measured), and a drop that is 9 dB under
+    /// that has to arrive 9 dB under it. Placed by its own peak instead, each drop went through the
+    /// loudness law on its own and came out lifted by the compression: under a steel bus shelter the
+    /// twenty-odd drops a second played within 2 dB of the whole roof's drumming at every rate, so
+    /// heavy rain on the roof sounded like a few metallic drops, as light rain does (Cody,
+    /// 2026-10-06; texture round 2). Physically they are 5 dB under at light rain and 10 under at heavy.
+    /// With no measured field (NaN) the drop is placed by its own level.
+    ///
+    /// The two are declared differently: a drop's level is its PEAK, and its sound is normalised to
+    /// its peak; a patch's is its Leq, which its voice renders the fleet's shared headroom
+    /// (VehicleProfile.PeakHeadroomDb) under full scale. So a pascal of drop is a pascal of patch when
+    /// the drop plays at the patch's gain times its level over the patch's, less that headroom.
+    /// </summary>
+    public static (float Gain, float Reference) Placement(float dropLevelDb, float fieldLevelDb)
+    {
+        if (float.IsNaN(fieldLevelDb) || fieldLevelDb <= 0f) return Loudness.Place(dropLevelDb);
+        var (gain, reference) = Loudness.Place(fieldLevelDb);
+        float relative = dropLevelDb - fieldLevelDb - VehicleProfile.PeakHeadroomDb;
+        return (MathF.Min(1f, gain * MathF.Pow(10f, relative / 20f)), reference);
+    }
+
     public static float LevelDb(Sound s, in NearDrops.Impact impact, float aim)
     {
         float d = impact.DiameterMm, v = impact.Speed;

@@ -34,6 +34,7 @@ syllabic (4-16 Hz) and fast (32-128 Hz).
                                                          against it (* = outside), Gaussian noise of the
                                                          model's own spectrum for scale
     texture_stats.py json FILE...                        summary features as JSON (for tests and READMEs)
+    texture_stats.py wave FILE...                        inside 10 ms: the 4-16 kHz waveform's kurtosis and crest
 
 Options: sec=30 (seconds read, from offset), off=0, hp=0 (high-pass Hz before analysis).
 Needs numpy, scipy, soundfile (/home/cody/drumsynth/venv/bin/python).
@@ -180,6 +181,25 @@ def summary(a):
     return out
 
 
+def waveform(x, sr, lo=4000.0, hi=16000.0, ms=10.0):
+    """What happens INSIDE 10 ms, which the envelope statistics (2.5 ms envelope, compressed) cannot
+    see: the 4-16 kHz band's waveform kurtosis and crest per 10 ms window. Gaussian noise is 3 and
+    about 9-10 dB; a window holding a few needle-sharp clicks is far more. Windows more than 40 dB
+    under the median window's level are skipped (silence). Returns (mean kurtosis, median kurtosis,
+    median crest dB, 95th percentile crest dB)."""
+    hi = min(hi, 0.45 * sr)
+    y = sosfilt(butter(4, [lo, hi], btype="band", fs=sr, output="sos"), x)
+    w = int(sr * ms / 1000)
+    m = len(y) // w
+    Y = y[: m * w].reshape(m, w)
+    m2 = (Y ** 2).mean(axis=1)
+    keep = m2 > np.median(m2) * 1e-4
+    Y, m2 = Y[keep], m2[keep]
+    k = (Y ** 4).mean(axis=1) / (m2 ** 2 + 1e-60)
+    crest = 20 * np.log10(np.abs(Y).max(axis=1) / np.sqrt(m2 + 1e-60))
+    return float(k.mean()), float(np.median(k)), float(np.median(crest)), float(np.percentile(crest, 95))
+
+
 def phase_randomised(x, seed=1):
     """Gaussian noise with exactly this signal's long-term spectrum."""
     X = np.fft.rfft(x)
@@ -262,6 +282,13 @@ if __name__ == "__main__":
     elif cmd == "compare":
         i = rest.index("--")
         compare_cmd(rest[:i], rest[i + 1:], opts)
+    elif cmd == "wave":
+        for p in rest:
+            x, sr = read(p, opts["sec"], opts["off"])
+            if opts["hp"]:
+                x = sosfilt(butter(4, opts["hp"], btype="high", fs=sr, output="sos"), x)
+            km, kmed, c50, c95 = waveform(x, sr)
+            print(f"{os.path.basename(p):48} 4-16 kHz in 10 ms: kurtosis mean {km:5.2f} median {kmed:5.2f}, crest median {c50:5.1f} dB, 95th pct {c95:5.1f} dB")
     elif cmd == "json":
         json_cmd(rest, opts)
     else:
