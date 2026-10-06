@@ -110,6 +110,38 @@ public static class GeometryParitySpike
                         + $"{(pieceTimes.Count > 0 ? pieceTimes[pieceTimes.Count / 2].Ms : 0):F2} ms, max {(pieceTimes.Count > 0 ? pieceTimes[^1].Ms : 0):F1} ms "
                         + $"({(pieceTimes.Count > 0 ? pieceTimes[^1].Tris : 0):N0} triangles); memory {bytes / 1e6:F1} MB");
 
+        // What the server pays when its static geometry changes (MapManager.RefreshGrid: a pick-up, a
+        // drop, a composite placed): the grid refilled, every tile's solids hashed, the changed tile built.
+        {
+            var refresh = Stopwatch.StartNew();
+            maps.RefreshGrid(mapId);
+            double same = refresh.Elapsed.TotalMilliseconds;
+            Entity some = Entity.Null;
+            ecs.Query(new Arch.Core.QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) =>
+            {
+                if (some == Entity.Null && c.IsSolid && c.Shape == ColliderShape.Box && !ecs.Has<Velocity>(e) && !ecs.Has<PortalComponent>(e) && c.Size.X < 5f && c.Size.Y > 1f) some = e;
+            });
+            if (some != Entity.Null)
+            {
+                ref var tt = ref ecs.Get<Transform>(some);
+                tt.Position += new Vector3(0.2f, 0, 0);
+                refresh.Restart();
+                maps.RefreshGrid(mapId);
+                double one = refresh.Elapsed.TotalMilliseconds;
+                int oneBuilt = serverGeometry.LastBuilt; double oneCollect = serverGeometry.LastCollectMs, oneTiles = serverGeometry.LastBuildMs;
+                tt.Position -= new Vector3(0.2f, 0, 0);
+                maps.RefreshGrid(mapId);
+                OpenFPS.Common.Geometry.TriangleGeometry.Enabled = false;
+                refresh.Restart();
+                maps.RefreshGrid(mapId);
+                double gridOnly = refresh.Elapsed.TotalMilliseconds;
+                OpenFPS.Common.Geometry.TriangleGeometry.Enabled = true;
+                maps.RefreshGrid(mapId);
+                serverWorld = serverGeometry.World;
+                Console.WriteLine($"  server RefreshGrid: {gridOnly:F0} ms the grid alone; with the triangles {same:F0} ms when nothing changed, {one:F0} ms with one box moved ({oneBuilt} tile built; reading the solids {oneCollect:F0} ms, the tiles {oneTiles:F0} ms)");
+            }
+        }
+
         // ── The client: every static definition, as a whole map arrives ──────────────────────────
         var defs = EntityDefinitionFactory.StaticDefinitions(ecs);
         var (oldSnap, newSnap) = ClientSnapshots(defs, data.TileMetres);

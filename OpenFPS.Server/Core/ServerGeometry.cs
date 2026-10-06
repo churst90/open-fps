@@ -26,6 +26,8 @@ public sealed class ServerGeometry
     public TriangleWorldBuilder Builder => _builder;
     public double LastBuildMs => _builder.LastBuildMs;
     public int LastBuilt => _builder.LastBuilt;
+    /// <summary>Of the last rebuild, reading the world's solids, milliseconds.</summary>
+    public double LastCollectMs { get; private set; }
 
     /// <summary>A static was added outside a rebuild: take it in at the next <see cref="Sync"/>.</summary>
     public void MarkDirty() => _dirty = true;
@@ -40,11 +42,32 @@ public sealed class ServerGeometry
         var movers = new List<SolidSpec>();
         var unindexed = new List<Entity>();
         _movers.Clear();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         Collect(world, statics, movers, unindexed, _movers);
+        LastCollectMs = clock.Elapsed.TotalMilliseconds;
         _placedAt = MoverPoses.Version;
-        var built = _builder.Build(statics, movers);
+        // Most changes are not to the solids at all (an item picked up or put down is not one of them): an
+        // order-free hash of every solid says so, and the tiles are then not looked at again.
+        long fingerprint = Fingerprint(statics, poses: true) ^ (Fingerprint(movers, poses: false) * 31);   // a leaf's pose is its instance's
+        var built = fingerprint == _fingerprint && _builder.TileCount > 0 ? _builder.Current : _builder.Build(statics, movers);
+        _fingerprint = fingerprint;
         grid.SetGeometry(built, unindexed);
         _dirty = false;
+    }
+
+    private long _fingerprint;
+
+    private static long Fingerprint(List<SolidSpec> solids, bool poses)
+    {
+        long sum = 17;
+        foreach (var s in solids)
+        {
+            var h = new HashCode();
+            h.Add(s.Owner); h.Add(s.BoxSize); h.Add(s.Surface);
+            if (poses) { h.Add(s.Position); h.Add(s.Rotation); }
+            sum += h.ToHashCode();
+        }
+        return sum ^ solids.Count;
     }
 
     private World? _world;

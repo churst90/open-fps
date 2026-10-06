@@ -70,11 +70,18 @@ public sealed class TriangleWorldBuilder
         var pieces = new GeometryPiece[keys.Count];
         var signatures = new ulong[keys.Count];
         var toBuild = new List<int>();
-        for (int i = 0; i < keys.Count; i++)
+        // Each tile's solids sorted and hashed: on every core when allowed (a server's whole map, every
+        // time its static geometry changes), each tile alone, so the answer is the same either way.
+        void Sign(int i)
         {
             var list = byTile[keys[i]];
             list.Sort(static (a, b) => a.Owner.CompareTo(b.Owner));
             signatures[i] = Signature(list);
+        }
+        if (Parallel && keys.Count > 4) System.Threading.Tasks.Parallel.For(0, keys.Count, Sign);
+        else for (int i = 0; i < keys.Count; i++) Sign(i);
+        for (int i = 0; i < keys.Count; i++)
+        {
             if (_pieces.TryGetValue(keys[i], out var had) && had.Signature == signatures[i]) pieces[i] = had;
             else toBuild.Add(i);
         }
