@@ -338,7 +338,9 @@ public class NatureTests
     /// The fountain's hiss is a wash, not static. Recorded fountains have a kurtosis of 3.5-3.8 over
     /// 10 ms windows in 8-16 kHz and their 50 ms level flickers by 0.7-0.9 dB; the first model was 6.6
     /// and 1.5, because a dozen impacts a block stood for fifty, a collapsing column's lumps struck as
-    /// sharply as drops, and a jet's slugs stepped its rate tens of times a second.
+    /// sharply as drops, and a jet's slugs stepped its rate tens of times a second. In 2-8 kHz the
+    /// recordings are 3.0-3.4, as near a wash as white noise (2.96 on this measure); the round-2
+    /// model was 3.7, the lumps' sharp strikes and the exponential drop sizes' long tail.
     /// </summary>
     [Fact]
     public void TheFountainHissesWithoutStatic()
@@ -351,9 +353,11 @@ public class NatureTests
             x[i] = water.Next();
         }
         double kurtosis = WindowKurtosis(Band(x, 8000f, 16000f));
+        double mid = WindowKurtosis(Band(x, 2000f, 8000f));
         double flicker = Flicker(x);
-        _o.WriteLine($"8-16 kHz kurtosis {kurtosis:F2}, 50 ms flicker {flicker:F2} dB");
-        Assert.InRange(kurtosis, 2.5, 4.5);
+        _o.WriteLine($"8-16 kHz kurtosis {kurtosis:F2}, 2-8 kHz {mid:F2}, 50 ms flicker {flicker:F2} dB");
+        Assert.InRange(kurtosis, 2.5, 4.0);
+        Assert.InRange(mid, 2.5, 3.35);
         Assert.InRange(flicker, 0.3, 1.2);
     }
 

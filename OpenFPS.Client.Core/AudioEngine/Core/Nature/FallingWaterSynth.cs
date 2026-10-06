@@ -59,15 +59,17 @@ public sealed class FallingWaterSynth
     private const float ImpactRise = 16e-6f;
 
     /// <summary>A coherent lump's force rise as a share of its r / v: it lands in the froth of the one
-    /// before it, not on still water. Set on 2026-10-05 by measuring, not by ear: with the lumps
-    /// striking as sharply as drops, a 6 mm lump's spike carried a hundred times a drop's energy in
-    /// one click, and the few of them made the 8-16 kHz hiss peaky (its kurtosis over 10 ms windows
-    /// 5.2 against recorded fountains' 3.5-3.8, even with every impact rendered) — the "static" in
-    /// it. A fiftieth brings that band to 3.8 and keeps the octaves 500 Hz-16 kHz within 2 dB of the
-    /// fountain the constants were fitted to; the level does not move. A thirtieth was smoother
-    /// still in 2-8 kHz (kurtosis 3.4, the recordings' own) but left the top octave 2.8 dB short.
-    /// Small lumps still strike in the drop's own rise.</summary>
-    private const float LumpCushion = 0.02f;
+    /// before it, not on still water. Set by measuring, not by ear. With the lumps striking as
+    /// sharply as drops, a 6 mm lump's spike carried a hundred times a drop's energy in one click,
+    /// and the few of them were the static in the hiss: lump impacts alone have a 2-8 kHz kurtosis
+    /// of 5.8 over 10 ms windows, drop impacts 3.3, recorded fountains 3.0-3.4 all told. Round 2
+    /// (2026-10-05) set a fiftieth, which left the whole fountain at 3.7 with a 10 ms crest of
+    /// 11.1 dB. Round 3 sets 0.07: the 2-8 kHz band at 3.06 and 10.0 dB, the recordings' own (white
+    /// noise reads 2.96 and 9.9 dB on the same measure), and the octaves 500 Hz-8 kHz within 1.3 dB
+    /// of the fountain the constants were fitted to, the top octave 2.2 dB under it. Anything from
+    /// 0.05 to 0.12 measures the same texture; 0.07 is where the octaves fit best. Small lumps still
+    /// strike in the drop's own rise.</summary>
+    private const float LumpCushion = 0.07f;
 
     /// <summary>β in the depth factor u^β: how skewed the bubbles' loudness is.</summary>
     public const float DepthSkew = 4f;
@@ -152,6 +154,7 @@ public sealed class FallingWaterSynth
         public float Wander, WanderTarget, WanderClock;  // the column's breakup moving about
         public float Clump = 1f, ClumpFrom = 1f, ClumpTo = 1f, ClumpLength = 1f, ClumpClock; // drops arriving in bunches
         public float Spread;                              // 1/√streams: how much of one jet's wobble is left in the sum
+        public int Order;                                 // the drop sizes' gamma order
     }
 
     public FallingWaterSynth(WaterFeatureSpec spec, float sampleRate, int seed)
@@ -169,9 +172,10 @@ public sealed class FallingWaterSynth
                 DropMean = f.MeanDropRadiusMm * 1e-3f,
                 DropMax = MathF.Max(f.MeanDropRadiusMm, f.MaxDropRadiusMm) * 1e-3f,
                 Spread = 1f / MathF.Sqrt(Math.Max(1, f.Streams)),
+                Order = Math.Clamp(f.DropSizeOrder, 1, 16),
             };
             float q = f.FlowLitresPerSecond * 1e-3f;                                  // m^3/s
-            float meanVolume = 4f / 3f * MathF.PI * MeanCube(s.DropMean, MinDropRadius, s.DropMax);
+            float meanVolume = 4f / 3f * MathF.PI * MeanCube(s.DropMean, MinDropRadius, s.DropMax, s.Order);
             s.DropRate = f.DropShare * q / meanVolume;
             float chunk = f.ChunkRadiusMm * 1e-3f;
             s.ChunkRate = (1f - f.DropShare) * q / (4f / 3f * MathF.PI * chunk * chunk * chunk);
@@ -193,18 +197,35 @@ public sealed class FallingWaterSynth
 
     private const float MinDropRadius = 0.2e-3f;
 
-    /// <summary>The mean of r³ for radii exponential about <paramref name="mean"/>, cut to [lo, hi].</summary>
-    private static float MeanCube(float mean, float lo, float hi)
+    /// <summary>The mean of r³ for radii over <paramref name="lo"/> following a gamma law of this
+    /// order with mean <paramref name="mean"/> (see <see cref="WaterFallSpec.DropSizeOrder"/>), cut
+    /// to [lo, hi]. Order 1 is the exponential.</summary>
+    private static float MeanCube(float mean, float lo, float hi, int order)
     {
         double num = 0, den = 0;
         for (int k = 0; k < 400; k++)
         {
             double r = lo + (hi - lo) * (k + 0.5) / 400.0;
-            double w = Math.Exp(-(r - lo) / mean);
+            double x = (r - lo) / mean;
+            double w = Math.Pow(x, order - 1) * Math.Exp(-order * x);
             num += w * r * r * r;
             den += w;
         }
         return (float)(num / den);
+    }
+
+    /// <summary>A drop's radius, m: over the smallest, a gamma law of the fall's order about its mean
+    /// (the sum of that many exponentials); the few over the largest are drawn again.</summary>
+    private float DrawDropRadius(FallState f)
+    {
+        for (int tries = 0; tries < 32; tries++)
+        {
+            float x = 0f;
+            for (int j = 0; j < f.Order; j++) x -= MathF.Log(MathF.Max(1e-7f, 1f - _sum.Uniform()));
+            float r = MinDropRadius + f.DropMean / f.Order * x;
+            if (r <= f.DropMax) return r;
+        }
+        return MinDropRadius + f.DropMean;
     }
 
     /// <summary>The mean volume of a plunge bubble under the Deane-Stokes spectrum, m³.</summary>
@@ -361,11 +382,10 @@ public sealed class FallingWaterSynth
         // Every drop's impact is rendered; one drop in `stride` also traps its bubble, for the rest.
         int stride = (n + MaxPerBlock - 1) / MaxPerBlock;
         float ringWeight = weight * MathF.Sqrt(stride);
-        float tail = 1f - MathF.Exp(-(f.DropMax - MinDropRadius) / f.DropMean);
         for (int k = 0; k < n; k++)
         {
             int at = (int)(_sum.Uniform() * Block);
-            float r = MinDropRadius - f.DropMean * MathF.Log(1f - _sum.Uniform() * tail);
+            float r = DrawDropRadius(f);
             float v = ArrivalSpeed(r, f.Spec.FallMetres);
             // The impact: the force arrives as the drop's front meets the surface and goes over the
             // time the whole drop takes to bury itself.
