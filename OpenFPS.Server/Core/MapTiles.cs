@@ -118,8 +118,8 @@ public sealed class MapTiles
     /// from beyond the full-detail radius (docs/WORLD_STREAMING.md, Detail layers):
     /// <list type="bullet">
     /// <item>Full only: rooms and named places, the inside of houses (inner walls, inner doors,
-    /// furniture), and a sound source that carries less than the smallest full radius (a tree's wind in
-    /// its crown carries 90 m).</item>
+    /// furniture), and a sound source that carries less than the smallest full radius, except a tree's
+    /// crown: one tree carries 90 m, but the client hears a wood's trees together (WoodChorus).</item>
     /// <item>Coarse: the ground, roads, building shells with their front doors (a shut leaf in the wall;
     /// its doorway opens only onto a room that is sent), rail, water, the woods and tree trunks, and
     /// anything else solid that stands as a barrier: fences, hedges, garden walls, guard rails.</item>
@@ -132,6 +132,10 @@ public sealed class MapTiles
         if (world.Has<SoundEmitterComponent>(e))
         {
             var s = world.Get<SoundEmitterComponent>(e);
+            // A tree's wind is heard from its crown to 90 m, but a wood of them much further: the client
+            // hears the trees past the hand-over as one source per wood (WoodChorus), so it needs them.
+            if (!string.IsNullOrEmpty(s.SoundId) && s.SoundId.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
+                return TileDetail.Coarse;
             if (!string.IsNullOrEmpty(s.SoundId) && s.Range < StreamRadii.MinFullMetres) return TileDetail.Full;
         }
         if (!string.IsNullOrEmpty(layer) && CoarseLayers.Contains(layer)) return TileDetail.Coarse;

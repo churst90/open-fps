@@ -1006,7 +1006,12 @@ public sealed partial class ClientGameSession : IDisposable
                 // The join's own update says how many definitions it sent: that is the count to wait for,
                 // whatever detail the manifest guessed.
                 if (!_mapLoaded) _expectedEntityCount = tiles.Definitions;
-                else _world.RequestAcousticRefresh();
+                else
+                {
+                    _world.RequestAcousticRefresh();
+                    // The trees that came or went change the woods heard as one (WoodChorus).
+                    foreach (int gone in _world.RefreshWoods()) _audioSystem.ForgetEntity(gone);
+                }
                 Serilog.Log.Information("Tiles: {Changed} changed ({Defs} definitions, {Removed} removed); holding {Held}, {Count} entities.",
                     tiles.Tiles.Count, tiles.Definitions, tiles.Removed, _world.Tiles.Count, _world.EntityCount);
                 break;
@@ -1021,6 +1026,8 @@ public sealed partial class ClientGameSession : IDisposable
 
             case MapLoadComplete:
                 _mapLoaded = true;
+                // The woods the map's trees make, heard as one past the hand-over (WoodChorus).
+                foreach (int gone in _world.RefreshWoods()) _audioSystem.ForgetEntity(gone);
                 Serilog.Log.Information("MapLoadComplete: {Count} entity definitions received.", _world.EntityCount);
                 LoadProgress("Geometry ready. Finalizing acoustics...", 80);
                 // Niced, and off the shared pool. The voxel bake is seconds of solid CPU that lands

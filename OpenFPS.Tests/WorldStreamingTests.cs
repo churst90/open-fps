@@ -180,14 +180,14 @@ public class WorldStreamingTests
                 foreach (int room in new[] { p.RegionAId, p.RegionBId })
                     if (tiles.TryGet(room, out var r)) Assert.Equal(r.Tiles, m.Tiles);
             }
-            // A sound that carries less than the full radius is full detail (a tree's wind).
-            if (world.Has<SoundEmitterComponent>(e) && world.Get<SoundEmitterComponent>(e).SoundId.StartsWith("foliage")) { crowns++; Assert.Equal(TileDetail.Full, m.Needs); }
+            // A tree's crown is coarse: the client hears far trees together as woods (WoodChorus).
+            if (world.Has<SoundEmitterComponent>(e) && world.Get<SoundEmitterComponent>(e).SoundId.StartsWith("foliage")) { crowns++; Assert.Equal(TileDetail.Coarse, m.Needs); }
             // An entity is in the tile its centre is in.
             var at = world.Get<Transform>(e).Position;
             Assert.Contains(TileKey.Of(at, tiles.TileMetres), m.Tiles);
         }
         Assert.True(doors > 100 && rooms > 100, $"{doors} doors, {rooms} rooms");
-        _o.WriteLine($"  {crowns} tree crowns full only");
+        _o.WriteLine($"  {crowns} tree crowns, coarse");
     }
 
     /// <summary>What the coarse ring is made of, by what sound would notice: the shells and front doors,
@@ -221,7 +221,7 @@ public class WorldStreamingTests
             if (byKind.TryGetValue(kind, out var n)) Assert.Equal(0, n.Full);
         // Fences and walls by the rule, not the name: a run at least 2 m long and 0.8 m tall is coarse.
         Assert.True(byKind.GetValueOrDefault("outer wall").Coarse > 1000);
-        foreach (var kind in new[] { "room", "tree crown", "post", "lawn" })
+        foreach (var kind in new[] { "room", "post", "lawn" })
             if (byKind.TryGetValue(kind, out var n)) Assert.Equal(0, n.Coarse);
 
         // The cost: the join at medium, and the average coarse tile.

@@ -50,6 +50,10 @@ public class WorldSnapshot
     /// scene is kept in sub-scenes of this size (of 250 m on a map sent whole).</summary>
     public float TileMetres;
 
+    /// <summary>The woods the client's tree crowns make, heard as one source each past the hand-over
+    /// distance (WoodChorus); null before any crowns are held.</summary>
+    public WoodChorus? Woods;
+
     /// <summary>
     /// When the transforms in this snapshot were last TRUE, seconds on <see cref="AudioClock"/>.
     ///
