@@ -9,6 +9,8 @@
     audio_quality.py jumps FILE...    discontinuities: second-difference spikes far over the local level
     audio_quality.py texture FILE...  spectrum and band-envelope statistics (what a texture is made of)
     audio_quality.py check FILE...    level, peak, clipping and silent gaps of files given to a listener
+    audio_quality.py limiter DIR TAG  the master limiter on --quality limiter's tones: THD+N, IMD, true peak, recovery
+    audio_quality.py flattops FILE... runs of identical samples near the top: what a limiter without look-ahead leaves
 
 Needs numpy and scipy (/home/cody/drumsynth/venv/bin/python). See docs/AUDIO_QUALITY_2026-10-06.md.
 """
@@ -340,6 +342,127 @@ def scene(pre_path, post_path):
     return s
 
 
+def true_peak_db(x, up=8):
+    """The peak between samples too: 8x oversampled by a polyphase low-pass, dB re full scale."""
+    from scipy.signal import resample_poly
+    y = resample_poly(x, up, 1, axis=0)
+    return 20 * np.log10(np.abs(y).max() + 1e-30)
+
+
+def flat_runs(x, min_len=3, top_db=6.0):
+    """Runs of at least min_len samples that are exactly equal (per channel) and within top_db of the
+    file's peak: a clipped or flat-limited top. Returns (runs, samples in them)."""
+    peak = np.abs(x).max()
+    if peak <= 0:
+        return 0, 0
+    floor = peak * 10 ** (-top_db / 20)
+    runs = samples = 0
+    for c in range(x.shape[1]):
+        v = x[:, c]
+        same = (v[1:] == v[:-1]) & (np.abs(v[1:]) >= floor)
+        # run lengths of True in `same`; a run of k equal pairs is k + 1 samples
+        d = np.diff(np.concatenate(([0], same.astype(np.int8), [0])))
+        starts, ends = np.flatnonzero(d == 1), np.flatnonzero(d == -1)
+        lens = ends - starts + 1
+        keep = lens >= min_len
+        runs += int(keep.sum())
+        samples += int(lens[keep].sum())
+    return runs, samples
+
+
+def flattops(paths):
+    for p in paths:
+        sr, x = read(p)
+        runs, samples = flat_runs(x)
+        peak = 20 * np.log10(np.abs(x).max() + 1e-30)
+        print(f"  {os.path.basename(p)}: {len(x) / sr:.1f} s; peak {peak:+.2f} dBFS, true peak {true_peak_db(x):+.2f} dBTP; "
+              f"flat-topped runs (3+ equal samples within 6 dB of the peak) {runs}, {samples} samples")
+
+
+def thd_n(seg, sr, f):
+    """THD+N against a least-squares sine at f, dB."""
+    t = np.arange(len(seg)) / sr
+    a = np.column_stack([np.sin(2 * np.pi * f * t), np.cos(2 * np.pi * f * t), np.ones_like(t)])
+    coef, *_ = np.linalg.lstsq(a, seg, rcond=None)
+    fit = a[:, :2] @ coef[:2]
+    rest = seg - a @ coef
+    return 10 * np.log10((rest ** 2).sum() / max(1e-30, (fit ** 2).sum()))
+
+
+def line_db(seg, sr, f):
+    w = np.hanning(len(seg))
+    t = np.arange(len(seg)) / sr
+    return 20 * np.log10(abs(np.sum(seg * w * np.exp(-2j * np.pi * f * t))) + 1e-30)
+
+
+def limiter(dirname, tag):
+    base = os.path.join(dirname, f"limiter-{tag}")
+    sr, pre = read(base + ".pre.wav")
+    _, post = read(base + ".post.wav")
+    n = min(len(pre), len(post))
+    pre, post = pre[:n], post[:n]
+    rows = list(csv.DictReader(open(base + ".csv")))
+    # The tones start when the lab's clock said; find the first in the capture and line up from there.
+    t0 = first_onset(pre[:, 0], sr, 0.0, 3.0)
+    first = float(rows[0]["start"])
+    off = (t0 - first) if t0 is not None else 0.0
+    lag = 0
+    seg = slice(int((first + off + 0.5) * sr), int((first + off + 0.5) * sr) + 4096)
+    best = -1
+    for l in range(0, 600):
+        c = abs(np.dot(pre[seg, 0], post[seg.start + l: seg.stop + l, 0]))
+        if c > best:
+            best, lag = c, l
+    print(f"  {os.path.basename(base)}: {sr} Hz; the post capture trails the pre by {lag} samples ({lag / sr * 1000:.2f} ms: the limiter's latency)")
+    print(f"  {'signal':<10} {'over':>5} {'in TP':>8} {'out TP':>8} {'out pk':>8} {'GR':>6} {'THD+N':>8} {'IMD':>8} {'flat runs':>9}")
+    for r in rows:
+        name, start, sec = r["name"], float(r["start"]) + off, float(r["seconds"])
+        if name in ("bed", "burst", "roll"):
+            continue
+        a, b = int((start + sec * 0.5) * sr), int((start + sec * 0.9) * sr)
+        xi, yo = pre[a:b, 0], post[a + lag:b + lag, 0]
+        gr = 20 * np.log10(np.sqrt((yo ** 2).mean()) / max(1e-30, np.sqrt((xi ** 2).mean()))) - float(os.environ.get("MAKEUP_DB", "7"))
+        hz1, hz2 = float(r["hz1"]), float(r["hz2"])
+        thd = imd = float("nan")
+        if hz2 == 0:
+            thd = thd_n(yo, sr, hz1)
+        elif hz1 < 1000:            # SMPTE: sidebands of the high tone at +-hz1, +-2 hz1
+            c = line_db(yo, sr, hz2)
+            side = max(line_db(yo, sr, hz2 + k * hz1) for k in (-2, -1, 1, 2))
+            imd = side - c
+        else:                       # CCIF: the difference tone and the third-order products
+            c = line_db(yo, sr, hz1)
+            d = hz2 - hz1
+            imd = max(line_db(yo, sr, d), line_db(yo, sr, 2 * hz1 - hz2), line_db(yo, sr, 2 * hz2 - hz1) if 2 * hz2 - hz1 < sr / 2 else -300) - c
+        full = post[int(start * sr) + lag:int((start + sec) * sr) + lag]
+        runs, _ = flat_runs(full, top_db=1.0)
+        print(f"  {name:<10} {r['over_db']:>5} {true_peak_db(pre[int(start * sr):int((start + sec) * sr)]) + float(os.environ.get("MAKEUP_DB", "7")):+8.2f} "
+              f"{true_peak_db(full):+8.2f} {20 * np.log10(np.abs(full).max() + 1e-30):+8.2f} {-gr:6.2f} {thd:8.1f} {imd:8.1f} {runs:9d}")
+    # Recovery: the bed's level in 5 ms windows after the burst and after the roll, against before.
+    bed = next(r for r in rows if r["name"] == "bed")
+    burst = next(r for r in rows if r["name"] == "burst")
+    roll = next(r for r in rows if r["name"] == "roll")
+    win = int(0.005 * sr)
+    def level(t):
+        a = int(t * sr) + lag
+        return 20 * np.log10(np.sqrt((post[a:a + win, 0] ** 2).mean()) + 1e-30)
+    ref = level(float(bed["start"]) + off + 0.5)
+    for ev in (burst, roll):
+        end = float(ev["start"]) + off + float(ev["seconds"])
+        depth = min(level(end + k * 0.005) for k in range(0, 20)) - ref
+        t1 = t01 = None
+        for k in range(0, 600):
+            t = end + 0.02 + k * 0.005
+            dl = level(t) - ref
+            if t1 is None and dl > -1.0:
+                t1 = t - end
+            if t01 is None and dl > -0.1:
+                t01 = t - end
+                break
+        print(f"  after the {ev['name']} ({ev['seconds']} s, {ev['over_db']} dB over): the bed went down {-depth:.1f} dB; "
+              f"back within 1 dB in {t1 * 1000 if t1 else float('nan'):.0f} ms, within 0.1 dB in {t01 * 1000 if t01 else float('nan'):.0f} ms")
+
+
 def check(paths):
     for p in paths:
         sr, x = read(p)
@@ -362,7 +485,8 @@ def check(paths):
         print(f"  {os.path.basename(p)}: {len(x) / sr:.1f} s, {sr} Hz, {x.shape[1]} ch; rms {rms:.1f} dBFS, peak {peak:+.1f} dBFS, "
               f"clipped samples {clipped}, silent gaps >=0.2 s inside: {len(inner)}"
               + (f" (longest {max(inner):.1f} s)" if inner else "")
-              + (f"; leading silence {np.argmax(~silent) * 0.05:.2f} s" if silent.any() else ""))
+              + (f"; leading silence {np.argmax(~silent) * 0.05:.2f} s" if silent.any() else "")
+              + f"; true peak {true_peak_db(x):+.2f} dBTP; flat-topped runs {flat_runs(x)[0]}")
 
 
 if __name__ == "__main__":
@@ -389,6 +513,10 @@ if __name__ == "__main__":
         texture(sys.argv[2:])
     elif cmd == "check":
         check(sys.argv[2:])
+    elif cmd == "limiter":
+        limiter(sys.argv[2], sys.argv[3])
+    elif cmd == "flattops":
+        flattops(sys.argv[2:])
     else:
         print(__doc__)
         sys.exit(1)

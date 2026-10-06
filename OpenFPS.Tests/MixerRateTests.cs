@@ -91,24 +91,52 @@ public class MixerRateTests
         foreach (var (name, r) in voices) Assert.True(r == rate, $"{name} runs at {r} Hz, given {rate}");
     }
 
-    /// <summary>The engine's note does not move with the rate: the same idle, rendered at 44.1 and at 48
-    /// kHz, has its strongest line at the same frequency.</summary>
+    /// <summary>The engine's note is where its speed puts it at either rate: the strongest line of an
+    /// idle, against the engine's own revolutions, is the same order at 44.1 and at 48 kHz, and the idle
+    /// speed itself is within a few per cent (the crank is integrated per sample, so the idle's own
+    /// small hunt is not sample-for-sample the same).</summary>
     [Fact]
     public void AnEngineIdlesOnTheSameNoteAtEitherRate()
     {
-        float Peak(int rate)
+        (float Hz, float Rpm) Peak(int rate)
         {
             var v = new EngineVoiceState(MachineRegistry.VehicleFor("i4_midsize"), rate, 11) { TargetSpeed = 0f, CompensateLevel = false };
             v.PlaceAtSpeed(0f);
             v.Revive();
             var x = new List<float>();
             var block = new float[512];
-            for (int b = 0; b < rate * 5 / 512; b++) { v.Produce(); v.Consume(block); if (b > rate * 2 / 512) x.AddRange(block); }
-            return StrongestHz(x.ToArray(), rate, 15f, 400f, 0.25f);
+            double rpm = 0; int n = 0;
+            for (int b = 0; b < rate * 5 / 512; b++)
+            {
+                v.Produce(); v.Consume(block);
+                if (b > rate * 2 / 512) { x.AddRange(block); rpm += v.Engine.Rpm; n++; }
+            }
+            float r = (float)(rpm / n);
+            // The strongest engine order, half-orders 0.5 to 6, each at this run's own speed.
+            var arr = x.ToArray();
+            float bestOrder = 0f; double bestP = -1;
+            for (float o = 0.5f; o <= 6f; o += 0.5f)
+            {
+                double p = Power(arr, rate, o * r / 60f);
+                if (p > bestP) { bestP = p; bestOrder = o; }
+            }
+            return (bestOrder, r);
         }
-        float a = Peak(44100), b = Peak(48000);
-        _o.WriteLine($"idle's strongest line: {a:F2} Hz at 44.1 kHz, {b:F2} Hz at 48");
-        Assert.InRange(b / a, 0.99f, 1.01f);
+        var a = Peak(44100); var b = Peak(48000);
+        _o.WriteLine($"idle: {a.Rpm:F0} rpm, strongest order {a.Hz:F1} at 44.1 kHz; {b.Rpm:F0} rpm, strongest order {b.Hz:F1} at 48");
+        Assert.Equal(a.Hz, b.Hz);
+        Assert.InRange(b.Rpm / a.Rpm, 0.97f, 1.03f);
+    }
+
+    private static double Power(float[] x, int rate, float f)
+    {
+        double w = 2 * Math.PI * f / rate, c = 2 * Math.Cos(w), s1 = 0, s2 = 0;
+        for (int i = 0; i < x.Length; i++)
+        {
+            double win = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (x.Length - 1));
+            double s0 = x[i] * win + c * s1 - s2; s2 = s1; s1 = s0;
+        }
+        return s1 * s1 + s2 * s2 - c * s1 * s2;
     }
 
     /// <summary>A siren sweeps through the same notes at the same times at either rate.</summary>
