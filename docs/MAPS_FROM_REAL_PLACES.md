@@ -60,8 +60,8 @@ when the engine has terrain.
 - Every entity carries `Tile` (the 250 m square it stands in, counted from the origin, "x,z") and
   `Layer` (ground, roads, drives, paths, verges, yards, zones, structure, rooms, interiors, trees,
   props, rail, water). Roads carry `Tiles`, junctions `Tile`, the map `GeoOrigin` and `TileMetres`.
-  Nothing reads them yet; they are there so a streaming loader can split a town by tile and layer
-  without regenerating it.
+  The server streams the map by tile from geometry (docs/WORLD_STREAMING.md) and reads `Layer` for
+  the coarse level (ground, roads, structure, rail, water).
 
 ## Detail levels
 
@@ -143,6 +143,6 @@ not checked.
    is what the generator makes from them.
 5. Add the spawn's expected name to `RealPlaceMapTests.The_spawn_is_where_the_place_says`.
 
-A whole town is the same steps with a bigger area. The client loads a whole map at once today, so a
-town needs tile streaming first (the tile and layer tags are for that); until then, keep a map to
-about 3 km.
+A whole town is the same steps with a bigger area. Clients are sent only the tiles near them, but
+the server still loads the whole map, so keep a map to a few kilometres until stage 2 of
+docs/WORLD_STREAMING.md.

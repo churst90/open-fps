@@ -386,6 +386,10 @@ A team holds up to 16 players. Your team's player beacons sound on a different i
 - `/map public`, `/map private`: let anybody in, or only you and the people you invite.
 - `/map invite NAME`, `/map uninvite NAME`. The person is told.
 - `/maps`: the maps you can go to. `/maps mine`: your own, and who is invited.
+- `/detail low|medium|high`: how much of a large map is loaded round you. The maps of real places
+  (magnolia tx, albany or) are sent in 250 m tiles: everything within 150, 300 or 500 m, and the
+  ground, roads and building shells out to 500, 800 or 1,200 m. Tiles load and drop as you move.
+  Medium is the default. Saved. Other maps are always loaded whole.
 - On a map you own you have the building commands: `/spawn`, `/move x y z`, `/savemap`, the
   building verbs and the sound tools (see Staff commands).
 
@@ -511,7 +515,7 @@ value.
 - `/valveflow on|off`: the rush of gas through each exhaust valve as it opens, on every engine.
 
 `/tail`, `/copies`, `/reflections`, `/cabin`, `/echoes` and `/valveflow` last until you quit.
-`/levels`, `/listening`, `/beacons`, `/narrate`, `/bumps`, `/aimassist` and `/track` are saved.
+`/levels`, `/listening`, `/beacons`, `/narrate`, `/bumps`, `/aimassist`, `/detail` and `/track` are saved.
 
 `/track KIND` chooses what comma and period step through, like Shift+comma and Shift+period.
 
@@ -691,6 +695,10 @@ is loaded at start.
 - Each map can be public or private and can have an owner. Players can enter public maps, their
   own, and maps they are invited to. Moderators, developers and the administrator can enter any
   map. All shipped maps are public.
+
+- A map with `"TileMetres"` above 0 (the real places, made by tools/gen_osm.py) is streamed: each
+  client is sent the tiles near it and the rest as it moves (docs/WORLD_STREAMING.md). The server
+  log says what each join and each set of tiles cost ("Join of ...", "Tiles for ...").
 
 ### Players' own maps
 

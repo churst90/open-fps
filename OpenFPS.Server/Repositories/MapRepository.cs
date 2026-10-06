@@ -43,11 +43,11 @@ public class EntityData
 
     /// <summary>Which tile of a tiled map this stands in ("3,-2": TileMetres squares from the map's
     /// origin, x then z). Written by tools/gen_osm.py so a map can later be streamed by tile without
-    /// being regenerated; nothing reads it yet.</summary>
+    /// being regenerated. The streamer works tiles out from geometry instead (MapTiles).</summary>
     public string? Tile { get; set; }
 
     /// <summary>What a generated map's entity is part of ("roads", "zones", "structure", "rooms",
-    /// "interiors", "trees", ...), so a loader can leave a layer out; nothing reads it yet.</summary>
+    /// "interiors", "trees", ...). MapTiles reads it for a tile's coarse level.</summary>
     public string? Layer { get; set; }
 }
 

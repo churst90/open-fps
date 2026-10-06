@@ -168,8 +168,8 @@ the sessions' interests). Ids on the wire stay what they are (int, the ECS id).
 Clients can cache tiles on disk to skip the download: a tile file has a version (the generator
 version and the content hash), and each stored entity has an ordinal within its tile. The server
 then sends `TileCached { Tile, Version, int[] EntityIds }` instead of the definitions when the client
-says it has that version: four bytes an entity instead of about 140. Not in stage 1: a 300 m radius
-on Magnolia is about a megabyte, and the join takes seconds either way.
+says it has that version: four bytes an entity instead of about 40 packed (700 unpacked). Not in
+stage 1: a join at medium on Magnolia is 530 KB packed.
 
 Persistent runtime state (a door left open, a dropped item, a broken window) is kept per tile as a
 small delta beside the tile, applied when the tile is loaded.
@@ -178,6 +178,9 @@ small delta beside the tile, applied when the tile is loaded.
 
 Added (append-only):
 
+- `EntityDefinitionPack` (union 39): an `EntityDefinitionBatch` compressed with Brotli. Used for
+  every map load and every tile, on every map. A definition is about 700 bytes (most of it the
+  prefab's description and sound settings, the same for every wall of a kind) and packs about 16 to 1.
 - `TileStreamUpdate` (union 38): the tile size, the tiles whose level changed (x, z, level; level 0
   means dropped), how many definitions were sent for them and how many entities removed. Sent after
   the definitions and removals it describes, so when it arrives they have arrived.
@@ -375,4 +378,46 @@ Risks:
 
 ## Stage 1 as built
 
-See the 2026-10-06 entry in changes.md for the list of changes and the measurements.
+Code: `OpenFPS.Common/Tiles.cs` (TileKey, TileDetail, StreamRadii, TileSelection),
+`OpenFPS.Server/Core/MapTiles.cs` (the index, built at map load), `OpenFPS.Server/Core/TileStreamer.cs`
+(per-session interest, called from `GameServer.BroadcastWorldState`), `GameServer.SendMapData`,
+`ClientWorldState` (deferred rooms, `RequestAcousticRefresh`, the grid swap),
+`AsyncAcousticWorker.RebuildSceneIfNeeded` (GeometryVersion), `/detail` on both sides. Tests:
+`OpenFPS.Tests/WorldStreamingTests.cs`. Instrument: AudioLab `--stream-walk`.
+
+Differences from the plan above:
+
+- Definitions are packed (Brotli) everywhere, not only for streamed maps. It was the cheapest large
+  saving: the city's join went from 5.0 MB to 186 KB.
+- A tile change with no rooms or doorways in it (the coarse ring moving) does not rebuild the acoustic
+  map, only the Steam Audio scene.
+- The client's collision grid keeps a slab bigger than 400 cells (the 3 km ground) apart from its
+  cells; filing the ground in 90,000 cells was three quarters of every grid rebuild.
+
+Measurements (development machine):
+
+| | Magnolia | Albany |
+|---|---|---|
+| Join at medium: entities of the map | 12,344 of 32,598 | 17,140 of 41,327 |
+| Join bytes (packed) | 530 KB | 740 KB |
+| Server time to send the join | 27-36 ms | |
+| Client acoustic map at join | 0.4 s | 0.7 s |
+| Walking 700 m east (test, 5 m a tick) | 41 tiles in, 2,764 definitions, 7,207 removed, 176 KB | |
+| Server broadcast tick while streaming (one player) | median 1.2 ms, worst 2.9 ms | |
+| Game thread on a frame with tile messages (`--stream-walk`, 15 m/s) | median 10 ms, worst 30 ms | median 15 ms, worst 33 ms |
+| Acoustic map rebuild (niced thread) | 130-310 ms | 280 ms |
+| Steam Audio scene rebuild (niced thread, ~11,000 boxes) | 0.8-1.1 s | up to 1.8 s |
+| Worker answer gaps, quiet / while tiles change | median 33 / 33 ms, worst 175 / 172 ms | worst 399 / 462 ms |
+
+The worker's gaps do not grow while tiles change: nothing waits on a rebuild. At driving speed the
+scene is rebuilt about once a second (31 rebuilds in 40 s at 15 m/s), which is one niced core kept
+busy; walking, it is a few a minute. That cost grows with the far radius and is the reason to do
+stage 3's instanced meshes per tile early.
+
+Not done in stage 1:
+
+- The server still simulates traffic and walkers on the whole map; it only stops sending them.
+- Portals between a door in a loaded tile and a room in an unloaded one are left out (43 such links
+  on Magnolia), so a house cut by the edge of full detail has a door that opens on nothing.
+- No client tile cache; no frames (stage 2); no per-tile Steam Audio meshes (stage 3).
+- The settings menus have no world detail control yet; `/detail` does it.
