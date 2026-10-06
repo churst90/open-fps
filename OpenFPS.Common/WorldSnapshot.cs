@@ -40,6 +40,13 @@ public class WorldSnapshot
     public AcousticMap? AcousticMap;
 
     /// <summary>
+    /// Counts the times the static geometry under <see cref="AcousticMap"/> changed without the map
+    /// itself being replaced: tiles of a streamed map arriving and leaving. The acoustic worker rebuilds
+    /// its Steam Audio scene in the background when it moves (docs/WORLD_STREAMING.md).
+    /// </summary>
+    public long GeometryVersion;
+
+    /// <summary>
     /// When the transforms in this snapshot were last TRUE, seconds on <see cref="AudioClock"/>.
     ///
     /// Remote entities move on the interpolation clock, which ticks once per simulation step; anything

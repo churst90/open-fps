@@ -1042,7 +1042,7 @@ public class GameServer
             return;
         }
 
-        SendManifest(peer, session);
+        SendManifest(session);
     }
 
     /// <summary>
@@ -1111,18 +1111,28 @@ public class GameServer
                                                  Func<int, bool> hasSession, DateTime nowUtc)
         => connections.Where(c => nowUtc - c.SinceUtc > LoginTimeout && !hasSession(c.Id)).Select(c => c.Id).ToList();
 
-    private void SendManifest(NetPeer peer, UserSession session)
+    /// <summary>The map a session is on, described: what the client clears its world for and answers with
+    /// a MapDataRequest. Internal so a test can start a join without a socket (the <see cref="Sent"/> hook).</summary>
+    internal void SendManifest(UserSession session)
     {
         string mapId = session.CurrentMapId;
         if (!_maps.TryGetMap(mapId, out var world, out var mapSize, out var _, out var _))
         {
             Log.Error("Login for {User}: map '{Map}' is not loaded; no manifest sent.", session.Username, mapId);
-            _network.SendMessage(peer, new TextEvent { Text = $"Map '{mapId}' is not loaded on this server." }, DeliveryMethod.ReliableOrdered);
+            SendToSession(session, new TextEvent { Text = $"Map '{mapId}' is not loaded on this server." });
             return;
         }
 
         int staticCount = 0;
-        world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) => {
+        bool streamed = _maps.TryGetTiles(mapId, out var tiles);
+        if (streamed)
+        {
+            // What the join will send: the tiles round where they will stand. Worked out again when the
+            // data is asked for, with the client's own detail setting; this is the count it waits for.
+            var probe = new TileInterest { Radii = session.Tiles.Radii };
+            staticCount = TileStreamer.Begin(probe, tiles, ArrivalPoint(session, mapId)).Count;
+        }
+        else world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) => {
             if (!world.Has<PlayerComponent>(e) && !world.Has<Velocity>(e)) staticCount++;
         });
 
@@ -1134,7 +1144,8 @@ public class GameServer
             ExpectedEntityCount = staticCount,
             SpawnPoint = new Transform { Position = new Vector3(0, 5, 0) },
             MapMin = new Vector3(-50, 0, -50),
-            MapMax = new Vector3(50, 20, 50)
+            MapMax = new Vector3(50, 20, 50),
+            TileMetres = streamed ? tiles.TileMetres : 0f,
         };
 
         // Straight from the loaded map rather than re-reading every map file from disk per login.
@@ -1164,24 +1175,29 @@ public class GameServer
             Log.Warning("Login for {User}: no authored data for map '{Map}'; sending defaults.", session.Username, mapId);
         }
 
-        _network.SendMessage(peer, manifest, DeliveryMethod.ReliableOrdered);
+        SendToSession(session, manifest);
         Log.Information("Manifest sent to {User}. Waiting for data request or ready.", session.Username);
     }
 
     private void HandleMapDataRequest(NetPeer peer, MapDataRequest request)
     {
         if (!_sessions.TryGetSession(peer.Id, out var session)) return;
+        SendMapData(session, request);
+    }
+
+    /// <summary>
+    /// The map's fixed entities, in batches, then MapLoadComplete: the whole map, or on a map streamed in
+    /// tiles, the tiles round where the player will arrive (TileStreamer), and a TileStreamUpdate saying
+    /// which. Runs on the tick thread (the dispatcher's). Internal so a test can drive a join without a
+    /// socket: the messages go through <see cref="SendToSession"/> and its <see cref="Sent"/> hook.
+    /// </summary>
+    internal void SendMapData(UserSession session, MapDataRequest request)
+    {
         // Only the map you are on. Any loaded map could be asked for by name, and a private one would
         // have streamed its whole layout to somebody it refuses at the door.
         if (!string.Equals(request.MapName, session.CurrentMapId, StringComparison.OrdinalIgnoreCase)) return;
-        if (!_maps.TryGetMap(session.CurrentMapId, out var world, out var _, out var _, out var _)) return;
-
-        var staticEntities = new List<Entity>();
-        world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) => {
-            if (!world.Has<PlayerComponent>(e) && !world.Has<Velocity>(e)) staticEntities.Add(e);
-        });
-
-        Log.Information("Streaming {Count} entities to {Peer}...", staticEntities.Count, peer.Id);
+        if (!_maps.TryGetMap(session.CurrentMapId, out var world, out var _, out var _, out var lookup)) return;
+        var started = Stopwatch.StartNew();
 
         // The client clears its world on the manifest, so the server's record of what it knows starts
         // over here too — otherwise a re-request would leave the two disagreeing about a set the removal
@@ -1190,20 +1206,98 @@ public class GameServer
         session.VisibleDynamicEntities.Clear();
         session.SentStates.Clear();
         session.LastStats = null;
+        var keepRadii = session.Tiles.Radii;
+        session.Tiles.Reset();
+        session.Tiles.Radii = keepRadii;
+
+        List<Entity> staticEntities;
+        bool streamed = _maps.TryGetTiles(session.CurrentMapId, out var tiles);
+        if (streamed)
+        {
+            if (request.FullDetailMetres > 0f || request.FarMetres > 0f)
+                session.Tiles.Radii = StreamRadii.Clamp(request.FullDetailMetres, request.FarMetres);
+            var ids = TileStreamer.Begin(session.Tiles, tiles, ArrivalPoint(session, session.CurrentMapId));
+            staticEntities = new List<Entity>(ids.Count);
+            foreach (int id in ids)
+                if ((lookup.TryGetValue(id, out var e) || tiles.TryGetGlobal(id, out e)) && world.IsAlive(e)) staticEntities.Add(e);
+        }
+        else
+        {
+            staticEntities = new List<Entity>();
+            world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) => {
+                if (!world.Has<PlayerComponent>(e) && !world.Has<Velocity>(e)) staticEntities.Add(e);
+            });
+        }
+
+        Log.Information("Streaming {Count} entities to {User}...", staticEntities.Count, session.Username);
 
         // In batches: one reliable message per definition made the load wait on round trips.
+        long bytes = 0;
         var batch = new EntityDefinitionBatch();
         foreach (var e in staticEntities)
         {
             batch.Definitions.Add(CreateDefinition(world, e));
             session.KnownEntities.Add(e.Id);
             if (batch.Definitions.Count < EntityDefinitionBatch.Size) continue;
-            _network.SendMessage(peer, batch, DeliveryMethod.ReliableOrdered);
+            bytes += SendCounted(session, EntityDefinitionPack.Pack(batch));
             batch = new EntityDefinitionBatch();
         }
-        if (batch.Definitions.Count > 0) _network.SendMessage(peer, batch, DeliveryMethod.ReliableOrdered);
+        if (batch.Definitions.Count > 0) bytes += SendCounted(session, EntityDefinitionPack.Pack(batch));
 
-        _network.SendMessage(peer, new MapLoadComplete(), DeliveryMethod.ReliableOrdered);
+        if (streamed)
+        {
+            bytes += SendCounted(session, TileStreamer.Snapshot(session.Tiles, tiles, staticEntities.Count));
+            session.Tiles.DefinitionsSent = staticEntities.Count;
+            session.Tiles.BytesSent = bytes;
+            int full = session.Tiles.Levels.Count(kv => kv.Value == TileDetail.Full);
+            Log.Information("Join of {Map} for {User}: {Full} full and {Coarse} coarse tile(s) of {All} ({FullM:F0} m and {FarM:F0} m), "
+                          + "{Count} of {Total} entities, {KB:F0} KB, {Ms} ms.",
+                            session.CurrentMapId, session.Username, full, session.Tiles.Levels.Count - full, tiles.Tiles.Count(),
+                            session.Tiles.Radii.FullMetres, session.Tiles.Radii.FarMetres,
+                            staticEntities.Count, tiles.TiledCount + tiles.Global.Count, bytes / 1024.0, started.ElapsedMilliseconds);
+        }
+        else Log.Information("Join of {Map} for {User}: {Count} entities, {KB:F0} KB, {Ms} ms.",
+                             session.CurrentMapId, session.Username, staticEntities.Count, bytes / 1024.0, started.ElapsedMilliseconds);
+        SendToSession(session, new MapLoadComplete());
+    }
+
+    /// <summary>
+    /// Where a player arriving on a map will stand: the spot a teleport named, else where they left it
+    /// if that is still somewhere to stand, else its spawn. The same choice <see cref="HandlePlayerReady"/>
+    /// makes, asked earlier so a streamed map can send the tiles round it first.
+    /// </summary>
+    internal Vector3 ArrivalPoint(UserSession session, string mapId)
+    {
+        if (session.ArriveAt is { } arrive && arrive.MapId.Equals(mapId, StringComparison.OrdinalIgnoreCase)) return arrive.At;
+        if (_store != null) return _store.Arrival(mapId, session.Saved, out _).At.Position;
+        return _maps.GetSpawnPoint(mapId).Position;
+    }
+
+    /// <summary>A message to a session as <see cref="SendToSession"/> sends it, and its size on the wire
+    /// (0 with no socket).</summary>
+    private int SendCounted(UserSession session, IMessage message)
+    {
+        Sent?.Invoke(session, message);
+        var peer = _network.GetPeer(session.ConnectionId);
+        if (peer != null) return _network.SendMessage(peer, message, DeliveryMethod.ReliableOrdered);
+        _mudGateway?.TrySend(session.ConnectionId, message);
+        return 0;
+    }
+
+    /// <summary>
+    /// /detail: how far round this player a streamed map is sent in full and in its coarse layer. Takes
+    /// effect at the next tick (TileStreamer). Returns what is now in force, to be said.
+    /// </summary>
+    public string SetStreamRadii(UserSession session, StreamRadii? asked)
+    {
+        if (asked is { } r)
+        {
+            session.Tiles.Radii = StreamRadii.Clamp(r.FullMetres, r.FarMetres);
+            session.Tiles.Stale = true;
+        }
+        var now = session.Tiles.Radii;
+        string what = $"World detail: everything to {now.FullMetres:F0} metres, buildings and roads to {now.FarMetres:F0} metres.";
+        return _maps.TryGetTiles(session.CurrentMapId, out _) ? what : what + " This map is sent whole, so it applies on maps that stream.";
     }
 
     internal void HandlePlayerReady(int connectionId)
@@ -1315,6 +1409,7 @@ public class GameServer
         LeaveWorld(session);
 
         session.CurrentMapId = mapId;
+        session.Tiles.Reset();
         session.KnownEntities.Clear();
         session.VisibleDynamicEntities.Clear();
         session.SentStates.Clear();
@@ -1336,7 +1431,7 @@ public class GameServer
         Say($"Travelling to {_maps.DisplayName(mapId)}.");
 
         var peer = _network.GetPeer(session.ConnectionId);
-        if (peer != null) SendManifest(peer, session);
+        if (peer != null) SendManifest(session);
         else HandlePlayerReady(session.ConnectionId); // a text session has nothing to load
     }
 
@@ -1354,6 +1449,29 @@ public class GameServer
     private const float BroadcastCellMetres = 10f;
     private readonly HashSet<int> _dirtyAudioBuffer = new();
     private readonly List<int> _removedBuffer = new();
+
+    /// <summary>One tick of the tile streamer for one player (TileStreamer.Update), with what it sends
+    /// counted and each finished set of tiles logged.</summary>
+    private void StreamTiles(NetPeer? peer, UserSession session, MapTiles tiles, World world,
+                             Dictionary<int, Entity> lookup, Vector3 at)
+    {
+        TileStreamer.Update(session, tiles, world, lookup, at, message =>
+        {
+            Broadcasted?.Invoke(session, message);
+            int bytes = peer != null ? _network.SendMessage(peer, message, DeliveryMethod.ReliableOrdered) : 0;
+            session.Tiles.BytesSent += bytes;
+            session.Tiles.BytesSinceUpdate += bytes;
+            if (message is not TileStreamUpdate update) return;
+            int full = 0, coarse = 0, dropped = 0;
+            foreach (var tile in update.Tiles)
+                if (tile.Detail == TileDetail.Full) full++; else if (tile.Detail == TileDetail.Coarse) coarse++; else dropped++;
+            Log.Information("Tiles for {User} at ({X:F0}, {Z:F0}): {Full} now full, {Coarse} now coarse, {Dropped} dropped; "
+                          + "{Defs} definitions, {Removed} removed, {KB:F0} KB. Holding {Held} tile(s).",
+                            session.Username, at.X, at.Z, full, coarse, dropped, update.Definitions, update.Removed,
+                            session.Tiles.BytesSinceUpdate / 1024.0, session.Tiles.Levels.Count);
+            session.Tiles.BytesSinceUpdate = 0;
+        });
+    }
 
     /// <summary>
     /// What one tick's broadcast chooses from on a map: every entity that has a collider, and every item.
@@ -1417,6 +1535,8 @@ public class GameServer
             // over the world finds the same set once, with no repeats; each player then filters it.
             using (PerfProbe.Measure("server.broadcast.gather"))
                 GatherBroadcastCandidates(world, _broadcastCandidates);
+            // A map streamed in tiles: each client is sent the tiles near it, and only what stands in them.
+            _maps.TryGetTiles(mapEntry.Key, out var tiles);
 
             foreach (var session in sessionsInMap)
             {
@@ -1449,19 +1569,30 @@ public class GameServer
                     _visibleDynamicBuffer.Clear();
                     float reach = earshot + BroadcastCellMetres;
 
+                    if (tiles != null)
+                        using (PerfProbe.Measure("server.broadcast.tiles"))
+                            StreamTiles(peer, session, tiles, world, mapEntry.Value.lookup, pPos);
+
                     var scan = PerfProbe.Measure("server.broadcast.scan");
                     foreach (var (e, isDynamic, isDirty) in _broadcastCandidates)
                     {
                         // Geometry that stays put, has not moved, and this client already has (the whole
                         // map was streamed to it on arrival) has nothing to say: most of the city, every
                         // tick, settled by one lookup.
-                        if (!isDynamic && !isDirty && session.KnownEntities.Contains(e.Id)
-                            && !_dirtyAudioBuffer.Contains(e.Id)) continue;
+                        bool known = session.KnownEntities.Contains(e.Id);
+                        if (!isDynamic && !isDirty && known && !_dirtyAudioBuffer.Contains(e.Id)) continue;
+                        // On a streamed map the map's own geometry is the tile streamer's to send, with
+                        // its tile: not here, one wall at a time, because it is in earshot.
+                        if (!isDynamic && !known && tiles != null && tiles.IsTiled(e.Id)) continue;
                         // Anything taken, killed or removed earlier in this tick: asking a dead entity
                         // what it has throws, which used to skip this player's whole update.
                         if (!world.IsAlive(e)) continue;
                         ref var t = ref world.Get<Transform>(e);
                         if (MathF.Abs(t.Position.X - pPos.X) > reach || MathF.Abs(t.Position.Z - pPos.Z) > reach) continue;
+                        // ...and everything else only while it stands in a tile this client has: a car
+                        // that drives out of them goes as anything leaving earshot does.
+                        if (tiles != null && e != session.Entity && !tiles.IsTiled(e.Id) && !tiles.IsGlobal(e.Id)
+                            && !tiles.Holds(t.Position, session.Tiles.Levels)) continue;
 
                         if (isDynamic) _visibleDynamicBuffer.Add(e.Id);
 

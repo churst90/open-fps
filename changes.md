@@ -4,6 +4,29 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Large maps stream (docs/WORLD_STREAMING.md, stage 1). A map with tiles (the real places) is sent
+  to each client a radius at a time: everything within 300 m, and the ground, roads and building
+  shells out to 800 m (`/detail low|medium|high`: 150/500, 300/800, 500/1,200 m; saved). Tiles load
+  as you move and drop 50 m past their radius; what leaves your tiles (walls, rooms, cars, walkers,
+  their sounds and beacons) leaves your client. The server keeps the whole map and still runs its
+  traffic everywhere. The city, the speedway and every map without tiles are sent whole as before.
+- On the client a tile's rooms and doorways go on the acoustic map together, rebuilt on a niced
+  thread and swapped into the map in use, so no reverb bus is dropped; the Steam Audio scene is
+  rebuilt off the worker thread as for a door. A tile of only walls and roads rebuilds only the scene.
+- Map data is compressed (Brotli): a definition is about 700 bytes, mostly its prefab's description,
+  and a batch of 256 packs about 16 to 1. Joining the city: 5.0 MB before, 186 KB now. Joining
+  Magnolia at medium: 12,344 of 32,598 entities, 530 KB (the whole map was about 22 MB). Walking 700 m
+  east from the spawn: 41 tiles loaded or upgraded, 176 KB.
+- The client's collision grid is made into a new grid and swapped in, not cleared and refilled under
+  readers, and a slab bigger than 400 cells (a town's ground) is kept apart instead of filed in 90,000
+  cells: a rebuild on Magnolia went from about 30 ms to 7 ms.
+- Measured with `--stream-walk` (AudioLab), Magnolia at 15 m/s with Steam Audio: game thread 10 ms
+  median and 30 ms worst on a frame where tiles arrive; acoustic map rebuild 130-310 ms and Steam
+  Audio scene rebuild about 1 s, both off the game, audio and worker threads; the occlusion worker's
+  answers came as often while tiles changed as when they did not (median 33 ms, worst 172 ms).
+- New wire messages: TileStreamUpdate (38), EntityDefinitionPack (39); MapManifest.TileMetres and
+  MapDataRequest's two radii appended. Client and server must be rebuilt together.
+
 - Door sounds are rendered once and kept. The client's door render cache is now named by the door
   models' own fingerprint (`DoorModelFingerprint`, a hash of the door model sources listed in
   OpenFPS.Common.csproj) instead of the whole OpenFPS.Common hash, so a change anywhere else no longer

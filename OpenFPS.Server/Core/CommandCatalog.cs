@@ -35,6 +35,7 @@ public static class CommandCatalog
         E("Moving", "where", "/where [NAME]", "where a player is", "locate"),
         E("Moving", "scan", "/scan", "what is around you"),
         E("Moving", "room", "/room", "the room you are in and what it is made of"),
+        E("Moving", "detail", "/detail [low|medium|high]", "how far round you a large map is loaded: everything to 150, 300 or 500 metres, buildings and roads to 500, 800 or 1200; medium by default"),
         E("Things", "take", "/take [THING]", "pick up the nearest thing, or the one named", "get", "grab", "pickup"),
         E("Things", "drop", "/drop [THING]", "put down what you hold", "putdown"),
         E("Things", "stow", "/stow [THING]", "sling what you hold onto your back", "sling"),

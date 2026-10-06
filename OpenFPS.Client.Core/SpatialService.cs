@@ -344,11 +344,14 @@ public class SpatialService
                     ? snap.Definition.Collider.Size 
                     : snap.Definition.Region.RoomSize;
             }
-            else if (world.AcousticMap.RegionPositions.TryGetValue(regId, out var regPos))
+            else if (world.AcousticMap.RegionPositions.TryGetValue(regId, out var regPos)
+                     && world.AcousticMap.Regions.TryGetValue(regId, out var reg))
             {
+                // Both asked: a streamed map's tables are swapped one after another as tiles come and
+                // go, and for a moment one can have a room the other has not.
                 pos = regPos;
                 rot = world.AcousticMap.RegionRotations.GetValueOrDefault(regId, Quaternion.Identity);
-                size = world.AcousticMap.Regions[regId].RoomSize;
+                size = reg.RoomSize;
             }
 
             if (size.X > 0 && GeometryUtils.IsPointInOBB(position, pos, size, rot))

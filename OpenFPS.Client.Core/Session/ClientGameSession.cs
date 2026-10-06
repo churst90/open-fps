@@ -84,6 +84,9 @@ public sealed partial class ClientGameSession : IDisposable
     private float _voxelResolution = AcousticConstants.DefaultVoxelResolution;
     private float _occlusionFloor = 0.2f;
     private Vector3 _mapMin;
+    /// <summary>The map's tiles are streamed (MapManifest.TileMetres), and its first load is complete: every
+    /// definition batch from now on is a tile arriving.</summary>
+    private bool _streamed, _mapLoaded;
 
     // Interactable proximity tracking — announce a named object once, on entering its radius.
     private const float InteractionRadius = 3.0f;
@@ -958,6 +961,9 @@ public sealed partial class ClientGameSession : IDisposable
                 _voxelResolution = manifest.VoxelResolution;
                 _occlusionFloor = manifest.OcclusionFloor;
                 _mapMin = manifest.MapMin;
+                _streamed = manifest.TileMetres > 0f;
+                _mapLoaded = false;
+                _world.ConfigureAcoustics(manifest.MapMin, manifest.VoxelResolution, manifest.OcclusionFloor, manifest.TileMetres);
 
                 _physics.MapMin = manifest.PlayMin;
                 _physics.MapMax = manifest.PlayMax;
@@ -969,7 +975,9 @@ public sealed partial class ClientGameSession : IDisposable
                 _state.MapMax = manifest.PlayMax;
                 _state.MapSize = manifest.WorldSize;
 
-                _network.Send(new MapDataRequest { MapName = manifest.MapName });
+                // With how far round us a streamed map should be sent: the world detail setting.
+                var radii = WorldDetail.Radii;
+                _network.Send(new MapDataRequest { MapName = manifest.MapName, FullDetailMetres = radii.FullMetres, FarMetres = radii.FarMetres });
                 break;
 
             case EntityDefinition def:
@@ -978,8 +986,29 @@ public sealed partial class ClientGameSession : IDisposable
                 break;
 
             case EntityDefinitionBatch batch:
-                foreach (var d in batch.Definitions) _world.RegisterDefinition(d);
-                ReportEntityProgress();
+                {
+                    // After the first load of a streamed map, a batch is a tile arriving: its rooms and
+                    // doorways wait for the tile's TileStreamUpdate and go on the acoustic map together.
+                    bool tile = _streamed && _mapLoaded;
+                    foreach (var d in batch.Definitions) _world.RegisterDefinition(d, deferAcoustics: tile);
+                    if (!tile) ReportEntityProgress();
+                }
+                break;
+
+            case EntityDefinitionPack pack:
+                // A batch, compressed: unpacked here and filed as the batch it was.
+                if (pack.Unpack() is { } unpacked) HandleMessage(unpacked);
+                else Serilog.Log.Warning("A pack of {Count} definitions could not be unpacked; dropped.", pack.Count);
+                break;
+
+            case TileStreamUpdate tiles:
+                _world.NoteTiles(tiles.Tiles);
+                // The join's own update says how many definitions it sent: that is the count to wait for,
+                // whatever detail the manifest guessed.
+                if (!_mapLoaded) _expectedEntityCount = tiles.Definitions;
+                else _world.RequestAcousticRefresh();
+                Serilog.Log.Information("Tiles: {Changed} changed ({Defs} definitions, {Removed} removed); holding {Held}, {Count} entities.",
+                    tiles.Tiles.Count, tiles.Definitions, tiles.Removed, _world.Tiles.Count, _world.EntityCount);
                 break;
 
             case EntityRemoved removed:
@@ -991,6 +1020,7 @@ public sealed partial class ClientGameSession : IDisposable
                 break;
 
             case MapLoadComplete:
+                _mapLoaded = true;
                 Serilog.Log.Information("MapLoadComplete: {Count} entity definitions received.", _world.EntityCount);
                 LoadProgress("Geometry ready. Finalizing acoustics...", 80);
                 // Niced, and off the shared pool. The voxel bake is seconds of solid CPU that lands
@@ -1126,9 +1156,8 @@ public sealed partial class ClientGameSession : IDisposable
 
         try
         {
-            var map = OpenFPS.Common.Systems.AcousticVolumeGenerator.GenerateRegions(
-                snapshot.Entities.Values.Select(e => e.Definition),
-                _world.CurrentMapSize, _mapMin, _voxelResolution, _occlusionFloor);
+            var map = ClientWorldState.BuildAcousticMap(snapshot.Entities.Values.Select(e => e.Definition),
+                _world.CurrentMapSize, _mapMin, _voxelResolution, _occlusionFloor, streamed: _streamed, report: true);
             _world.SetAcousticMap(map);
         }
         catch (Exception ex)
@@ -1336,6 +1365,23 @@ public sealed partial class ClientGameSession : IDisposable
             (save ?? SaveSettings)();
         }
         send = new TextCommand { Command = "aimassist", Args = new[] { NavigationAids.AimAssist ? "on" : "off" } };
+        return null;
+    }
+
+    /// <summary>
+    /// /detail [low|medium|high]: how far round you a streamed map is loaded, switched and saved here, and
+    /// the command for the server, which sends or takes away tiles to match and says what it now does.
+    /// </summary>
+    internal static string? DetailCommand(string[] args, out TextCommand? send, Action? save = null)
+    {
+        send = null;
+        if (args.Length > 0)
+        {
+            if (StreamRadii.Named(args[0]) == null) return "Say /detail low, /detail medium or /detail high.";
+            WorldDetail.Level = args[0].Trim().ToLowerInvariant() == "med" ? "medium" : args[0].Trim().ToLowerInvariant();
+            (save ?? SaveSettings)();
+        }
+        send = new TextCommand { Command = "detail", Args = new[] { WorldDetail.Level } };
         return null;
     }
 
@@ -1747,6 +1793,13 @@ public sealed partial class ClientGameSession : IDisposable
             if (parts[0].Equals("aimassist", StringComparison.OrdinalIgnoreCase))
             {
                 if (AimAssistCommand(parts.Skip(1).ToArray(), out var send) is { } refusal) Say(refusal);
+                else _network.Send(send!);
+                return;
+            }
+            // So is how far round you a large map is loaded: saved here, and the server told.
+            if (parts[0].Equals("detail", StringComparison.OrdinalIgnoreCase))
+            {
+                if (DetailCommand(parts.Skip(1).ToArray(), out var send) is { } refusal) Say(refusal);
                 else _network.Send(send!);
                 return;
             }

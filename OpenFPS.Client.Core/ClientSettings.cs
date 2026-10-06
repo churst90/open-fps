@@ -75,6 +75,9 @@ public sealed class ClientSettings
     /// <summary>What comma and period step through: "Doors", "Items", "Places"... (Shift with either
     /// changes it, or /track). See <see cref="MapTracker"/>.</summary>
     public string TrackCategory { get; set; } = nameof(Core.TrackCategory.Doors);
+    /// <summary>How far round you a large map is loaded: "low", "medium" or "high" (/detail in game).
+    /// See <see cref="Core.WorldDetail"/>.</summary>
+    public string WorldDetail { get; set; } = "medium";
 
     /// <summary>Puts this file's navigation aids into play. Each head calls it once, after loading.</summary>
     public void ApplyNavigationAids()
@@ -83,6 +86,7 @@ public sealed class ClientSettings
         NavigationAids.WallBumps = WallBumps;
         NavigationAids.AimAssist = AimAssist;
         NavigationAids.Track = MapTracker.Parse(TrackCategory) ?? Core.TrackCategory.Doors;
+        Core.WorldDetail.Level = OpenFPS.Common.StreamRadii.Named(WorldDetail) != null ? WorldDetail.Trim().ToLowerInvariant() : "medium";
     }
 
     public SavedServer? Preferred => Servers.FirstOrDefault(s => s.Preferred) ?? (Servers.Count == 1 ? Servers[0] : null);
@@ -151,6 +155,7 @@ public sealed class ClientSettings
         WallBumps = NavigationAids.WallBumps;
         AimAssist = NavigationAids.AimAssist;
         TrackCategory = NavigationAids.Track.ToString();
+        WorldDetail = Core.WorldDetail.Level;
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
         if (!OperatingSystem.IsWindows())
@@ -174,6 +179,20 @@ public static class NavigationAids
     public static bool AimAssist { get; set; } = true;
     /// <summary>The kind of thing comma and period step through.</summary>
     public static TrackCategory Track { get; set; } = TrackCategory.Doors;
+}
+
+/// <summary>
+/// How far round the player a map streamed in tiles is loaded (docs/WORLD_STREAMING.md): everything to
+/// 150, 300 or 500 metres, and the ground, roads and building shells to 500, 800 or 1,200. Sent with each
+/// map request, and to the server when /detail changes it. Static for the same reason as
+/// <see cref="NavigationAids"/>.
+/// </summary>
+public static class WorldDetail
+{
+    /// <summary>"low", "medium" or "high".</summary>
+    public static string Level { get; set; } = "medium";
+
+    public static OpenFPS.Common.StreamRadii Radii => OpenFPS.Common.StreamRadii.Named(Level) ?? OpenFPS.Common.StreamRadii.Default;
 }
 
 /// <summary>"host:port" as typed into a connect form or saved, with the defaults filled in.</summary>

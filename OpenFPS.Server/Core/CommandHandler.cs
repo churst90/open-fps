@@ -198,6 +198,11 @@ public partial class CommandHandler
                 string assist = AimAssistCommand(session, args);
                 if (!args.Any(a => a.Equals("quiet", StringComparison.OrdinalIgnoreCase))) Say(reply, assist);
                 break;
+            // How far round you a streamed map is sent: the client's world detail setting, which it
+            // restates ("quiet") when it joins a map. Not elevated: it is your own bandwidth.
+            case "detail":
+                HandleDetail(session, args, reply);
+                break;
             // Not elevated: loading the gun in your hands is part of having it.
             case "reload":
                 _combat.Reload(session, reply);
@@ -484,6 +489,26 @@ public partial class CommandHandler
         return session.AimAssist
             ? "Aim assist on: a shot from the hip near somebody in plain view is turned onto them."
             : "Aim assist off: a shot from the hip goes where you point.";
+    }
+
+    /// <summary>/detail low|medium|high, or /detail FULL FAR in metres: see GameServer.SetStreamRadii.</summary>
+    private void HandleDetail(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        bool quiet = args.Any(a => a.Equals("quiet", StringComparison.OrdinalIgnoreCase));
+        var words = args.Where(a => !a.Equals("quiet", StringComparison.OrdinalIgnoreCase)).ToArray();
+        OpenFPS.Common.StreamRadii? asked = null;
+        if (words.Length == 1) asked = OpenFPS.Common.StreamRadii.Named(words[0]);
+        else if (words.Length >= 2
+                 && float.TryParse(words[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float full)
+                 && float.TryParse(words[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float far))
+            asked = new OpenFPS.Common.StreamRadii(full, far);
+        if (words.Length > 0 && asked == null)
+        {
+            Say(reply, "Say /detail low, /detail medium or /detail high.");
+            return;
+        }
+        string said = _server.SetStreamRadii(session, asked);
+        if (!quiet) Say(reply, said);
     }
 
     private static void DenyCommand(Action<IMessage> reply) =>

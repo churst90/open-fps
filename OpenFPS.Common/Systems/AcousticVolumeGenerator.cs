@@ -20,8 +20,13 @@ public static class AcousticVolumeGenerator
     /// unopened boundary, because walls still transmit and occlude correctly on their own. Undescribed
     /// boundaries are always reported either way, with the exact portal the map is missing.
     /// </param>
-    public static AcousticMap GenerateRegions(IEnumerable<EntityDefinition> entities, Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false)
+    /// <param name="report">
+    /// Whether to write what was found, and what the map is missing, to the console. A streamed map
+    /// rebuilds this every time tiles arrive, and says it once, at the first build.
+    /// </param>
+    public static AcousticMap GenerateRegions(IEnumerable<EntityDefinition> entities, Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true)
     {
+        var console = report ? Console.Out : System.IO.TextWriter.Null;
         // 1. Initialize the map with the full map bounds
         var acousticMap = new AcousticMap(mapSize, minBound, voxelResolution);
         acousticMap.OcclusionFloor = occlusionFloor;
@@ -78,7 +83,7 @@ public static class AcousticVolumeGenerator
                 // would say so. Exactly the shape of fault that let the speedway go without regions for
                 // weeks — "not configured" and "working" look the same from everywhere else.
                 if (def.Region.IsIndoor && RoomAcoustics.OpenFaceCount(def.Region) == 6)
-                    System.Console.WriteLine(
+                    console.WriteLine(
                         $"[WARNING] AcousticVolumeGenerator: region '{def.Region.FriendlyName}' (entity {regionId}) " +
                         "is marked indoors but declares no RoomMaterials, so it has no surfaces and cannot reverberate.");
 
@@ -95,7 +100,7 @@ public static class AcousticVolumeGenerator
         // player who cannot see, which is the fault the speedway had for weeks without anything
         // noticing — a two-kilometre loop that answered "where am I" once and then never again.
         if (acousticMap.Regions.Count <= 1)
-            System.Console.WriteLine(
+            console.WriteLine(
                 "[WARNING] AcousticVolumeGenerator: this map has no named regions, so every place in it " +
                 "answers to 'Outside'. Nothing else will report this.");
 
@@ -131,7 +136,7 @@ public static class AcousticVolumeGenerator
                 if (foundRegions.Count >= 2) { rA = foundRegions[0]; rB = foundRegions[1]; }
                 else if (foundRegions.Count == 1) { rA = foundRegions[0]; rB = AcousticConstants.GlobalRegionId; }
 
-                Console.WriteLine(rA != rB
+                console.WriteLine(rA != rB
                     ? $"[AcousticMap] Portal {def.EntityId} had no region link; probed the voxel grid and joined region {rA} to {rB}."
                     : $"[AcousticMap] WARNING: portal {def.EntityId} at {def.Transform.Position} has no region link and probing found no rooms — it will be ignored. Set RegionAId/RegionBId on the map entity.");
             }
@@ -162,7 +167,7 @@ public static class AcousticVolumeGenerator
         // neighbours is not what an opening is. Never the floor: that is the ground.
         int openingCount = AddFaceOpenings(acousticMap, entities);
         if (openingCount > 0)
-            Console.WriteLine($"[AcousticMap] {openingCount} opening(s) from the gaps in rooms' faces (open sides, tunnel mouths, doorways with no door).");
+            console.WriteLine($"[AcousticMap] {openingCount} opening(s) from the gaps in rooms' faces (open sides, tunnel mouths, doorways with no door).");
 
         // 5. UNDESCRIBED BOUNDARY AUDIT (and, only on request, synthesis).
         // Report every region boundary the map did not describe. Optionally fill it with a guessed portal
@@ -212,13 +217,13 @@ public static class AcousticVolumeGenerator
 
                 if (!autoDiscoverPortals)
                 {
-                    Console.WriteLine($"[AcousticMap] NOTE: '{nameA}' ({r1}) borders '{nameB}' ({r2}) with no portal authored, " +
+                    console.WriteLine($"[AcousticMap] NOTE: '{nameA}' ({r1}) borders '{nameB}' ({r2}) with no portal authored, " +
                                       $"so the two are not acoustically coupled. If there is a real opening there, add a portal " +
                                       $"entity at the doorway with RegionAId={r1}, RegionBId={r2}.");
                     continue;
                 }
 
-                Console.WriteLine($"[AcousticMap] WARNING: no portal authored between '{nameA}' ({r1}) and '{nameB}' ({r2}). " +
+                console.WriteLine($"[AcousticMap] WARNING: no portal authored between '{nameA}' ({r1}) and '{nameB}' ({r2}). " +
                                   $"Guessing one at the centre of a face, {edgePos} — reverb and occlusion will arrive from the wrong direction. " +
                                   $"Add a portal entity at the real doorway with RegionAId={r1}, RegionBId={r2}.");
 
@@ -229,7 +234,7 @@ public static class AcousticVolumeGenerator
             }
         }
 
-        Console.WriteLine($"[AcousticMap] {acousticMap.Regions.Count - 1} region(s), {authoredCount} authored portal(s), {discoveredCount} guessed.");
+        console.WriteLine($"[AcousticMap] {acousticMap.Regions.Count - 1} region(s), {authoredCount} authored portal(s), {discoveredCount} guessed.");
 
         return acousticMap;
     }

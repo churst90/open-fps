@@ -83,6 +83,7 @@ public class SpatialAcoustics
 
     private List<EarlyReflections.Arrival>? _reflectionScratch;
     private object? _reflectionSolidsFor;
+    private long _reflectionSolidsVersion;
     private IReadOnlyList<EarlyReflections.Solid> _reflectionSolids = System.Array.Empty<EarlyReflections.Solid>();
 
     /// <summary>The world's solid boxes as the reflection model wants them, rebuilt only when the
@@ -90,13 +91,16 @@ public class SpatialAcoustics
     /// two paths cannot disagree about what a wall is.</summary>
     public IReadOnlyList<EarlyReflections.Solid> ReflectionSolids(WorldSnapshot world)
     {
-        if (ReferenceEquals(_reflectionSolidsFor, world.AcousticMap) && _reflectionSolids.Count > 0)
+        // The map, and its version: tiles of a streamed map arrive and leave under the same map object.
+        if (ReferenceEquals(_reflectionSolidsFor, world.AcousticMap) && _reflectionSolidsVersion == world.GeometryVersion
+            && _reflectionSolids.Count > 0)
             return _reflectionSolids;
         var boxes = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world);
         var solids = new List<EarlyReflections.Solid>(boxes.Count);
         foreach (var b in boxes) solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
         _reflectionSolids = solids;
         _reflectionSolidsFor = world.AcousticMap;
+        _reflectionSolidsVersion = world.GeometryVersion;
         return solids;
     }
 
@@ -112,6 +116,7 @@ public class SpatialAcoustics
     private volatile OpeningRoutes? _localRoutes;
     private object? _localRoutesMap;
     private long _localRoutesDoors;
+    private long _localRoutesVersion;
     private long _localRoutesStartedAt;
     private System.Threading.Tasks.Task? _localRoutesBuild;
     private readonly object _localRoutesLock = new();
@@ -140,8 +145,11 @@ public class SpatialAcoustics
                 _localRoutes = current;
                 _localRoutesMap = world.AcousticMap;
                 _localRoutesDoors = doors;
+                _localRoutesVersion = world.GeometryVersion;
                 return current;
             }
+            // Tiles arriving or leaving count as a door moving: the graph is rebuilt in the background.
+            if (_localRoutesVersion != world.GeometryVersion) { _localRoutesVersion = world.GeometryVersion; _localRoutesDoors = ~doors; }
             if (_localRoutesDoors == doors || _localRoutesBuild is { IsCompleted: false }) return current;
             long now = Environment.TickCount64;
             if (now - _localRoutesStartedAt < DoorRebuildSeconds * 1000) return current;

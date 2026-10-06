@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="OpenFPS.Tests" />
+    <InternalsVisibleTo Include="OpenFPS.AudioLab" />
   </ItemGroup>
 
   <PropertyGroup>
