@@ -34,11 +34,14 @@ public sealed class ListeningCalibration
     private readonly Action<string, float> _play;
     private readonly Action _stop;
     private readonly Action _save;
+    private readonly Func<(string SoundId, double Seconds)> _line;
     private float _was;
     private double _nextAt;
 
-    public ListeningCalibration(ISpeechOutput speech, UiSounds? ui, Action<string, float> play, Action stop, Action save)
+    public ListeningCalibration(ISpeechOutput speech, UiSounds? ui, Action<string, float> play, Action stop, Action save,
+                                Func<(string SoundId, double Seconds)>? line = null)
     {
+        _line = line ?? Line;
         _speech = speech;
         _ui = ui;
         _play = play;
@@ -86,7 +89,7 @@ public sealed class ListeningCalibration
     public void Tick(double now)
     {
         if (!IsOpen || now < _nextAt) return;
-        var (id, seconds) = Line();
+        var (id, seconds) = _line();
         if (id.Length == 0) return;
         _play(id, ReferenceGainDb(EarModel.ListeningLevelDb));
         _nextAt = now + Math.Max(1.0, seconds) + GapSeconds;
