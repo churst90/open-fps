@@ -211,6 +211,8 @@ public class MapManager
         
         float foundMinimumY = 1000f;
         bool hasAnyFloor = false;
+        // On a map streamed in tiles, the layer of everything that came from the file (MapTiles).
+        var layers = m.TileMetres > 0f ? new Dictionary<int, string?>() : null;
 
         bool foundationExists = false;
         
@@ -227,6 +229,7 @@ public class MapManager
                     if (world.Has<IdentityComponent>(entity)) world.Get<IdentityComponent>(entity).Name = entityData.Name;
                 }
                 lookup[entity.Id] = entity;
+                if (layers != null) layers[entity.Id] = entityData.Layer;
                 if (entityData.EntityId > 0)
                 {
                     authored[entityData.EntityId] = entity;
@@ -401,6 +404,14 @@ public class MapManager
         Log.Information("MapManager: Loaded map '{Id}' with {Count} entities. Void Plane (MinimumY): {MinY}", m.Id, m.Entities.Count, m.MinimumY);
         
         _maps[m.Id] = (world, m.Size, grid, lookup, m);
+        if (layers != null)
+        {
+            var tiles = MapTiles.Build(world, m.TileMetres, m.MinBound, m.MaxBound, layers);
+            _tiles[m.Id] = tiles;
+            Log.Information("MapManager: '{Id}' is streamed in {Count} tiles of {Metres} m ({Tiled} entities in tiles, {Global} sent to everyone).",
+                            m.Id, tiles.Tiles.Count(), m.TileMetres, tiles.TiledCount, tiles.Global.Count);
+        }
+        else _tiles.Remove(m.Id);
         BuildRoads(m);
         ComputeEarshot(m, world);
         if (m.IsDefault)
@@ -864,6 +875,11 @@ public class MapManager
     }
 
     private readonly Dictionary<string, RoadNetwork> _roads = new();
+
+    private readonly Dictionary<string, MapTiles> _tiles = new();
+
+    /// <summary>The tiles of a map that is streamed (MapData.TileMetres above 0); false for a map sent whole.</summary>
+    public bool TryGetTiles(string mapId, out MapTiles tiles) => _tiles.TryGetValue(mapId, out tiles!);
 
     /// <summary>
     /// The map's road network, from its roads and junctions. Its problems are logged at load, one line

@@ -1136,6 +1136,32 @@ public class AsyncAcousticWorker : IDisposable
     private System.Threading.Tasks.Task<(SteamAudioScene Full, SteamAudioScene Listener, List<SteamAudioScene.Box> Boxes, AcousticMap? Map, OpeningRoutes Routes)>? _doorBuild;
     private readonly List<(SteamAudioScene Scene, long At)> _retiredScenes = new();
 
+    // ── Tiles arriving and leaving ─────────────────────────────────────────────────────────────
+    //
+    // On a map streamed in tiles the acoustic map object stays the same while its contents follow the
+    // player (ClientWorldState.RefreshAcousticsNow), and each refresh bumps the snapshot's
+    // GeometryVersion. A change of version rebuilds the scene exactly as a door does: off this thread, on
+    // a niced one of its own because a radius of tiles is a bigger scene than a door's, and swapped in
+    // when it is ready. Sources keep their last answers meanwhile; nothing waits for it.
+    private long _builtGeometryVersion;
+    private bool _buildIsForTiles;
+    private long _buildStartedTicks;
+
+    /// <summary>Tile rebuilds swapped in, and how long the last took, milliseconds. Diagnostic.</summary>
+    public int TileSceneBuilds { get; private set; }
+    public double LastTileSceneBuildMs { get; private set; }
+
+    private static System.Threading.Tasks.Task<T> RunLowered<T>(string name, Func<T> work)
+    {
+        var done = new System.Threading.Tasks.TaskCompletionSource<T>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
+        OpenFPS.Client.Core.Platform.BackgroundPriority.RunLowered(name, () =>
+        {
+            try { done.SetResult(work()); }
+            catch (Exception ex) { done.SetException(ex); }
+        });
+        return done.Task;
+    }
+
     private void SwapInDoorBuild()
     {
         if (_doorBuild is not { IsCompleted: true } t || _saSim == null) return;
@@ -1156,7 +1182,13 @@ public class AsyncAcousticWorker : IDisposable
         _barrierBoxes = boxes;
         _lastSceneBoxes = boxes.Count;
         PublishRoutes(routes);
-        Console.WriteLine("[AcousticWorker] A door moved: the scene now has the leaves where they are.");
+        if (_buildIsForTiles)
+        {
+            TileSceneBuilds++;
+            LastTileSceneBuildMs = (DateTime.UtcNow.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
+            Console.WriteLine($"[AcousticWorker] Tiles changed: the scene now has {boxes.Count} boxes ({LastTileSceneBuildMs:F0} ms, off this thread).");
+        }
+        else Console.WriteLine("[AcousticWorker] A door moved: the scene now has the leaves where they are.");
     }
 
     private void ReleaseRetiredScenes()
@@ -1178,22 +1210,31 @@ public class AsyncAcousticWorker : IDisposable
         if (!mapChanged)
         {
             if (_doorBuild != null) return;
-            if ((DateTime.UtcNow.Ticks - _lastDoorRebuildTicks) < DoorRebuildSeconds * TimeSpan.TicksPerSecond) return;
-            if (!NearDoorMoved(world)) return;
+            bool tiles = world.GeometryVersion != _builtGeometryVersion;
+            if (!tiles)
+            {
+                if ((DateTime.UtcNow.Ticks - _lastDoorRebuildTicks) < DoorRebuildSeconds * TimeSpan.TicksPerSecond) return;
+                if (!NearDoorMoved(world)) return;
+            }
+            _builtGeometryVersion = world.GeometryVersion;
             _lastDoorRebuildTicks = DateTime.UtcNow.Ticks;
+            _buildStartedTicks = DateTime.UtcNow.Ticks;
+            _buildIsForTiles = tiles;
             RecordDoorPoses(world);
             var doorBoxes = SteamAudioScene.BoxesFromWorld(world);
             var ctx = _saContext; var forMap = _saSceneMap;
-            _doorBuild = System.Threading.Tasks.Task.Run(() =>
+            Func<(SteamAudioScene, SteamAudioScene, List<SteamAudioScene.Box>, AcousticMap?, OpeningRoutes)> build = () =>
             {
                 var full = new SteamAudioScene(ctx);
                 full.Build(doorBoxes);
                 var listener = new SteamAudioScene(ctx);
                 listener.Build(SteamAudioScene.WithoutOpenGround(doorBoxes));
                 return (full, listener, doorBoxes, forMap, BuildRoutes(world, doorBoxes, report: false));
-            });
+            };
+            _doorBuild = tiles ? RunLowered("TileScene", build) : System.Threading.Tasks.Task.Run(build);
             return;
         }
+        _builtGeometryVersion = world.GeometryVersion;
         _lastDoorRebuildTicks = DateTime.UtcNow.Ticks;
         RecordDoorPoses(world);
         var built = System.Diagnostics.Stopwatch.StartNew();

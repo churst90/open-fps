@@ -49,6 +49,10 @@ public class UserSession
     /// </summary>
     public HashSet<int> VisibleDynamicEntities { get; } = new();
 
+    /// <summary>On a map streamed in tiles, which tiles this client has and what it is still owed
+    /// (TileStreamer). Empty on a map sent whole.</summary>
+    public TileInterest Tiles { get; } = new();
+
     /// <summary>What this client was last sent about each moving thing, so a thing at rest is not sent
     /// again every tick (<see cref="RestingStates"/>).</summary>
     public Dictionary<int, SentState> SentStates { get; } = new();

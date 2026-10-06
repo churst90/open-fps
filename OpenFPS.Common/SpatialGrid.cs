@@ -34,6 +34,24 @@ public class SpatialGrid<T>
     }
 
     /// <summary>
+    /// A grid that keeps any STATIC item covering more than <paramref name="oversizeCells"/> cells in a
+    /// list of its own, handed back by every query, instead of filing it in each cell. A town's ground is
+    /// one slab three kilometres square: ninety thousand cells, three quarters of the work of filling a
+    /// client's grid, every time a tile of it arrives (ClientWorldState). Every query then has it, as it
+    /// would anyway wherever there is ground; callers test what they are handed against its box.
+    /// </summary>
+    public SpatialGrid(float cellSize, int oversizeCells) : this(cellSize)
+    {
+        _oversizeCells = oversizeCells;
+    }
+
+    private readonly int _oversizeCells;
+    private readonly List<T> _oversize = new();
+
+    /// <summary>Static items too big to file by cell, handed back by every query.</summary>
+    public IReadOnlyList<T> Oversize => _oversize;
+
+    /// <summary>
     /// Maps a 3D world position to a 2D grid coordinate (ignoring Y/Height).
     /// </summary>
     private (int, int) GetCell(Vector3 pos)
@@ -100,6 +118,13 @@ public class SpatialGrid<T>
 
         var grid = isStatic ? _staticGrid : _dynamicGrid;
 
+        if (isStatic && _oversizeCells > 0 && (long)(maxX - minX + 1) * (maxZ - minZ + 1) > _oversizeCells)
+        {
+            _oversize.Add(item);
+            StaticVersion++;
+            return;
+        }
+
         for (int x = minX; x <= maxX; x++)
         {
             for (int z = minZ; z <= maxZ; z++)
@@ -123,6 +148,7 @@ public class SpatialGrid<T>
     /// </summary>
     public IEnumerable<T> GetItemsInRadius(Vector3 pos, float radius)
     {
+        for (int i = 0; i < _oversize.Count; i++) yield return _oversize[i];
         int cellRadius = (int)Math.Ceiling(radius / _cellSize);
         var centerCell = GetCell(pos);
 
@@ -160,6 +186,8 @@ public class SpatialGrid<T>
     {
         into.Clear();
         seen.Clear();
+        for (int i = 0; i < _oversize.Count; i++)
+            if (seen.Add(_oversize[i])) into.Add(_oversize[i]);
 
         int cellRadius = (int)Math.Ceiling(radius / _cellSize);
         var centerCell = GetCell(pos);
@@ -199,6 +227,7 @@ public class SpatialGrid<T>
     {
         _staticGrid.Clear();
         _dynamicGrid.Clear();
+        _oversize.Clear();
         StaticVersion++;
     }
 }

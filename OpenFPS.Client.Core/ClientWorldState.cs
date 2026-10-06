@@ -202,7 +202,11 @@ public class ClientWorldState
         lock (_metaLock)
         {
             CurrentMapSize = size;
+            // A refresh still running for the last map is not this one's: it is thrown away when it
+            // finishes (RefreshAcousticsNow checks this).
+            _mapEpoch++;
         }
+        _tiles.Clear();
 
         lock (_gridLock)
         {
@@ -222,7 +226,13 @@ public class ClientWorldState
         Touch();
     }
 
-    public void RegisterDefinition(EntityDefinition def)
+    /// <param name="deferAcoustics">
+    /// A tile of a streamed map arriving: its rooms and doorways wait for the tile's acoustic rebuild
+    /// (<see cref="RequestAcousticRefresh"/>) instead of going on the acoustic map one at a time. One at a
+    /// time, each room copied every region table and surveyed its walls against every definition held,
+    /// on the game thread, and a room that came before its walls was found open on every side.
+    /// </param>
+    public void RegisterDefinition(EntityDefinition def, bool deferAcoustics = false)
     {
         _definitions[def.EntityId] = def;
         _serverTransforms[def.EntityId] = def.Transform;
@@ -233,7 +243,7 @@ public class ClientWorldState
         // nowhere.
         if (def.Region.RoomSize.X > 0f)
         {
-            TrackRegion(def);
+            if (!deferAcoustics) TrackRegion(def);
             _regionEntityIds[def.EntityId] = 0;
         }
 
@@ -241,7 +251,7 @@ public class ClientWorldState
         // server re-sends the definition as it moves, and this is what turns that into the opening
         // the acoustics actually use — without it a door swings silently and nothing sounds different
         // on the other side of it, which is the entire point of a door.
-        if (def.Portal.RegionAId != def.Portal.RegionBId) TrackPortal(def);
+        if (!deferAcoustics && def.Portal.RegionAId != def.Portal.RegionBId) TrackPortal(def);
 
         // Anything that makes sound on its own is processed every frame. See RunsOnItsOwn: this used
         // to be a list of two playback modes rather than a rule, and everything outside the list was
@@ -342,8 +352,9 @@ public class ClientWorldState
 
             // ...and the openings in its faces go with it.
             List<int>? openings = null;
+            var gone = new HashSet<int>(present);
             foreach (var (id, frame) in map.OpeningFrames)
-                if (present.Contains(frame.Room)) (openings ??= new List<int>()).Add(id);
+                if (gone.Contains(frame.Room)) (openings ??= new List<int>()).Add(id);
             if (openings != null)
             {
                 var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
@@ -698,6 +709,7 @@ public class ClientWorldState
         {
             StaticGrid = gridCopy,
             AcousticMap = AcousticMap,
+            GeometryVersion = GeometryVersion,
             PositionsSampledAt = _positionsSampledAt
         };
 
@@ -741,19 +753,234 @@ public class ClientWorldState
         => def.Type == EntityType.StaticObject && !def.Moves && !def.Collider.IsSolid
            && (!string.IsNullOrEmpty(def.Identity.BeaconCategory) || NamedPlaces.Is(def));
 
+    /// <summary>
+    /// The static collision grid, made again from the definitions, into a NEW grid that replaces the old.
+    /// It used to be cleared and refilled in place, and the grid is the one every snapshot hands out: the
+    /// acoustic worker and the audio thread, walking the snapshot they hold, could find it half empty.
+    /// On a streamed map that happens each time a tile arrives or leaves, not once per map.
+    /// </summary>
     private void RebuildGrid()
     {
         if (_staticGrid == null) return;
-        _staticGrid.ClearAll(); // Clear both static and dynamic just in case, though it's the static grid.
+        var grid = new SpatialGrid<int>(10.0f, OversizeCells);
         foreach (var kvp in _definitions)
         {
             if (kvp.Value.Type == EntityType.StaticObject && !kvp.Value.Moves && kvp.Value.Collider.IsSolid)
             {
-                _staticGrid.AddOverlapping(kvp.Value.Transform.Position, kvp.Value.Collider.Size, kvp.Value.Transform.Rotation, kvp.Key, isStatic: true);
+                grid.AddOverlapping(kvp.Value.Transform.Position, kvp.Value.Collider.Size, kvp.Value.Transform.Rotation, kvp.Key, isStatic: true);
             }
         }
+        _staticGrid = grid;
         _gridNeedsRebuild = false;
+        GridRebuilds++;
     }
+
+    /// <summary>A static box over this many 10 m cells (a town's ground) is kept apart in the grid rather than
+    /// filed in each cell: see SpatialGrid's oversize items.</summary>
+    private const int OversizeCells = 400;
+
+    /// <summary>Times the static grid has been made again. Diagnostic.</summary>
+    public int GridRebuilds { get; private set; }
+
+    // ── A map streamed in tiles ─────────────────────────────────────────────────────────────────────
+    //
+    // The server sends the tiles near the player and takes away the ones left behind (TileStreamer;
+    // docs/WORLD_STREAMING.md). Each arrival or departure is said by a TileStreamUpdate after its
+    // definitions or removals, and the acoustic map is then made again from what is held, on a niced
+    // thread, and its tables swapped into the map object in use. The object itself is kept: the mixer
+    // drops every reverb bus when the map object changes (FmodAudioProvider.SetAcousticMap), and region
+    // ids are entity ids, so a room that stays loaded keeps its id and its bus. The swap bumps
+    // GeometryVersion, which tells the acoustic worker to rebuild its Steam Audio scene in the background.
+
+    private readonly ConcurrentDictionary<TileKey, TileDetail> _tiles = new();
+    private Vector3 _acousticMin;
+    private float _voxelResolution = 0.5f, _occlusionFloor = 0.2f;
+    private long _mapEpoch;
+    private long _geometryVersion;
+    private int _refreshRunning;
+    private volatile bool _refreshAgain;
+
+    /// <summary>The side of the tiles this map streams in, metres; 0 for a map sent whole.</summary>
+    public float TileMetres { get; private set; }
+
+    /// <summary>The tiles held and how much of each.</summary>
+    public IReadOnlyDictionary<TileKey, TileDetail> Tiles => _tiles;
+
+    /// <summary>Bumped each time a refresh swaps new tables into the acoustic map. See WorldSnapshot.GeometryVersion.</summary>
+    public long GeometryVersion => Interlocked.Read(ref _geometryVersion);
+
+    /// <summary>Refreshes finished, and how long the last one took, milliseconds. Diagnostic.</summary>
+    public int AcousticRefreshes { get; private set; }
+    public double LastAcousticRefreshMs { get; private set; }
+
+    /// <summary>Runs a refresh off the calling thread. The game uses a niced thread of its own
+    /// (BackgroundPriority); a test can run it in place.</summary>
+    public Action<Action> RefreshRunner { get; set; } =
+        work => OpenFPS.Client.Core.Platform.BackgroundPriority.RunLowered("TileAcoustics", work);
+
+    /// <summary>What the acoustic map of this map is built with: from the manifest.</summary>
+    public void ConfigureAcoustics(Vector3 acousticMin, float voxelResolution, float occlusionFloor, float tileMetres)
+    {
+        lock (_metaLock)
+        {
+            _acousticMin = acousticMin;
+            _voxelResolution = voxelResolution;
+            _occlusionFloor = occlusionFloor;
+            TileMetres = tileMetres;
+        }
+    }
+
+    /// <summary>Notes the tiles a TileStreamUpdate says changed.</summary>
+    public void NoteTiles(IEnumerable<TileState> tiles)
+    {
+        foreach (var t in tiles)
+            if (t.Detail == TileDetail.None) _tiles.TryRemove(t.Key, out _);
+            else _tiles[t.Key] = t.Detail;
+    }
+
+    /// <summary>
+    /// The acoustic map for a set of definitions. On a streamed map, doorways into rooms that are not
+    /// held (a door on the edge of what is loaded, whose room is in the next tile) are left out: there is
+    /// nothing on the far side of them to hear into.
+    /// </summary>
+    public static AcousticMap BuildAcousticMap(IEnumerable<EntityDefinition> definitions, Vector3 mapSize, Vector3 min,
+                                               float voxelResolution, float occlusionFloor, bool streamed, bool report)
+    {
+        var map = OpenFPS.Common.Systems.AcousticVolumeGenerator.GenerateRegions(definitions, mapSize, min,
+                      voxelResolution, occlusionFloor, report: report);
+        if (streamed) DropDanglingPortals(map);
+        return map;
+    }
+
+    private static void DropDanglingPortals(AcousticMap map)
+    {
+        List<int>? dangling = null;
+        foreach (var (id, (portal, _)) in map.Portals)
+            if (!Holds(map, portal.RegionAId) || !Holds(map, portal.RegionBId)) (dangling ??= new List<int>()).Add(id);
+        if (dangling == null) return;
+        var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
+        var frames = new Dictionary<int, OpeningFrame>(map.OpeningFrames);
+        foreach (int id in dangling) { portals.Remove(id); frames.Remove(id); }
+        map.Portals = portals;
+        map.OpeningFrames = frames;
+
+        static bool Holds(AcousticMap m, int region)
+            => region == AcousticConstants.GlobalRegionId || region == m.GlobalEnvironmentId || m.Regions.ContainsKey(region);
+    }
+
+    /// <summary>
+    /// Asks for the acoustic map to be made again from what is held, off this thread. If one is running,
+    /// it runs once more when it finishes, so tiles that arrive during a refresh are never missed.
+    /// </summary>
+    public void RequestAcousticRefresh()
+    {
+        _refreshAgain = true;
+        if (Interlocked.CompareExchange(ref _refreshRunning, 1, 0) != 0) return;
+        RefreshRunner(() =>
+        {
+            try
+            {
+                while (_refreshAgain)
+                {
+                    _refreshAgain = false;
+                    try { RefreshAcousticsNow(); }
+                    catch (Exception ex) { Serilog.Log.Error(ex, "Tile acoustics: the refresh failed; the acoustic map stays as it was."); }
+                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _refreshRunning, 0);
+                // A request that landed between the last check and letting go.
+                if (_refreshAgain) RequestAcousticRefresh();
+            }
+        });
+    }
+
+    /// <summary>True while a refresh is running or asked for. For tests and the log.</summary>
+    public bool AcousticRefreshPending => _refreshAgain || Volatile.Read(ref _refreshRunning) != 0;
+
+    /// <summary>
+    /// Makes the acoustic map again from every definition held and swaps its tables into the map in use.
+    /// Returns false if there was nothing to refresh (no map yet) or the map changed while it ran.
+    /// </summary>
+    public bool RefreshAcousticsNow()
+    {
+        AcousticMap? live;
+        long epoch;
+        Vector3 size, min;
+        float res, floor;
+        lock (_metaLock)
+        {
+            live = AcousticMap;
+            epoch = _mapEpoch;
+            size = CurrentMapSize; min = _acousticMin; res = _voxelResolution; floor = _occlusionFloor;
+        }
+        if (live == null) return false;
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var defs = _definitions.Values.ToList();
+        var built = BuildAcousticMap(defs, size, min, res, floor, streamed: TileMetres > 0f, report: false);
+
+        lock (_metaLock)
+        {
+            if (!ReferenceEquals(AcousticMap, live) || epoch != _mapEpoch) return false;
+            Reconcile(built);
+            // The voxel grid and the tables, each replaced whole: everything reading them takes the
+            // dictionary it found and walks that, as with TrackRegion's build-then-swap.
+            live.VoxelGrid = built.VoxelGrid;
+            live.Regions = built.Regions;
+            live.RegionPositions = built.RegionPositions;
+            live.RegionRotations = built.RegionRotations;
+            live.OpeningFrames = built.OpeningFrames;
+            live.Portals = built.Portals;
+        }
+        Interlocked.Increment(ref _geometryVersion);
+        AcousticRefreshes++;
+        LastAcousticRefreshMs = sw.Elapsed.TotalMilliseconds;
+        Serilog.Log.Information("Tile acoustics: {Regions} region(s), {Openings} opening(s) from {Defs} definitions in {Ms:F0} ms; {Tiles} tile(s) held.",
+                                built.Regions.Count - 1, built.Portals.Count, defs.Count, LastAcousticRefreshMs, _tiles.Count);
+        Touch();
+        return true;
+    }
+
+    /// <summary>
+    /// Brings a freshly built map up to what is held now, before it is swapped in: a door that swung while
+    /// it was being built is put where it is, a room that arrived is added (its openings come with the
+    /// next refresh), and anything that has gone is taken out.
+    /// </summary>
+    private void Reconcile(AcousticMap built)
+    {
+        foreach (int id in built.Regions.Keys.ToList())
+        {
+            if (id == built.GlobalEnvironmentId || id == AcousticConstants.GlobalRegionId) continue;
+            if (_definitions.ContainsKey(id)) continue;
+            built.Regions.Remove(id); built.RegionPositions.Remove(id); built.RegionRotations.Remove(id);
+        }
+        foreach (int id in _regionEntityIds.Keys)
+        {
+            if (built.Regions.ContainsKey(id) || !_definitions.TryGetValue(id, out var def)) continue;
+            built.Regions[id] = def.Region;
+            built.RegionPositions[id] = def.Transform.Position;
+            built.RegionRotations[id] = def.Transform.Rotation;
+        }
+        foreach (int id in built.Portals.Keys.ToList())
+        {
+            if (id >= 0 && !_definitions.ContainsKey(id)) { built.Portals.Remove(id); continue; }
+            if (built.OpeningFrames.TryGetValue(id, out var frame) && !built.Regions.ContainsKey(frame.Room))
+            {
+                built.Portals.Remove(id); built.OpeningFrames.Remove(id);
+            }
+        }
+        foreach (var def in _definitions.Values)
+        {
+            if (def.Portal.RegionAId == def.Portal.RegionBId) continue;
+            bool ends = (def.Portal.RegionAId == AcousticConstants.GlobalRegionId || built.Regions.ContainsKey(def.Portal.RegionAId))
+                     && (def.Portal.RegionBId == AcousticConstants.GlobalRegionId || built.Regions.ContainsKey(def.Portal.RegionBId));
+            if (def.Portal.ApertureSize > 0f && (ends || TileMetres <= 0f)) built.Portals[def.EntityId] = (def.Portal, def.Transform.Position);
+            else built.Portals.Remove(def.EntityId);
+        }
+    }
+
 
     public int? GetClosestEntityId(Vector3 pos)
     {

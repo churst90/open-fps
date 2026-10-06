@@ -73,16 +73,19 @@ public class NetworkService : INetEventListener
     /// </summary>
     public void Flush() => _netManager.TriggerUpdate();
 
-    public void SendMessage(NetPeer peer, IMessage message, DeliveryMethod deliveryMethod)
+    /// <summary>Sends one message; returns its size in bytes (0 if it could not be sent).</summary>
+    public int SendMessage(NetPeer peer, IMessage message, DeliveryMethod deliveryMethod)
     {
         try
         {
             byte[] data = MemoryPackSerializer.Serialize<IMessage>(message);
             peer.Send(data, deliveryMethod);
+            return data.Length;
         }
         catch (Exception ex)
         {
             Log.Error(ex, "FAILED to serialize/send message of type {Type} to peer {Id}", message.GetType().Name, peer.Id);
+            return 0;
         }
     }
 

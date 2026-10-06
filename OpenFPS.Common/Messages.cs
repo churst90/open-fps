@@ -42,6 +42,8 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(35, typeof(ScopedShot))]
 [MemoryPackUnion(36, typeof(InventoryRequest))]
 [MemoryPackUnion(37, typeof(InventoryList))]
+[MemoryPackUnion(38, typeof(TileStreamUpdate))]
+[MemoryPackUnion(39, typeof(EntityDefinitionPack))]
 public partial interface IMessage { }
 
 public enum PlayerListScope
@@ -171,6 +173,11 @@ public partial class MapManifest : IMessage
     public Vector3 PlayMin = new Vector3(-50, 0, -50);
     public Vector3 PlayMax = new Vector3(50, 10, 50);
 
+    /// <summary>The side of the tiles this map is streamed in, metres; 0 for a map sent whole. On a
+    /// streamed map the client is sent the tiles near it, and every definition batch after
+    /// MapLoadComplete is a tile arriving (docs/WORLD_STREAMING.md). Appended last.</summary>
+    public float TileMetres;
+
     public MapManifest() { }
 }
 
@@ -178,7 +185,30 @@ public partial class MapManifest : IMessage
 public partial class MapDataRequest : IMessage
 {
     public string MapName = "";
+    /// <summary>On a streamed map, how far round the player everything is sent, and how far the coarse
+    /// layer (ground, roads, building shells) is: the client's world detail setting. 0 asks for the
+    /// server's default. The server clamps both (StreamRadii.Clamp). Appended last.</summary>
+    public float FullDetailMetres;
+    public float FarMetres;
     public MapDataRequest() { }
+}
+
+/// <summary>
+/// Tiles of a streamed map that changed for this client: each tile and the detail it is at now
+/// (None: dropped). Sent after the definitions and removals it describes, on the same reliable channel,
+/// so by the time it arrives they have all arrived; the client then brings its acoustic map and Steam
+/// Audio scene up to date with them, in the background. See docs/WORLD_STREAMING.md.
+/// </summary>
+[MemoryPackable]
+public partial class TileStreamUpdate : IMessage
+{
+    public float TileMetres;
+    public List<TileState> Tiles = new();
+    /// <summary>Definitions sent for these tiles since the last update.</summary>
+    public int Definitions;
+    /// <summary>Entities taken away because their tiles went.</summary>
+    public int Removed;
+    public TileStreamUpdate() { }
 }
 
 [MemoryPackable]
@@ -199,6 +229,56 @@ public partial class EntityDefinitionBatch : IMessage
 
     public List<EntityDefinition> Definitions = new();
     public EntityDefinitionBatch() { }
+}
+
+/// <summary>
+/// An <see cref="EntityDefinitionBatch"/>, Brotli-compressed: what the map load and the tile streamer
+/// send. A definition is about 700 bytes, most of it its prefab's description and sound settings, the
+/// same for every wall of a kind; a batch of 256 packs about sixteen to one (Magnolia's join at medium
+/// detail: 8.1 MB as batches, 0.5 MB packed, 14 ms to pack). The client unpacks it and files it as the
+/// batch it was.
+/// </summary>
+[MemoryPackable]
+public partial class EntityDefinitionPack : IMessage
+{
+    /// <summary>How many definitions are in it.</summary>
+    public int Count;
+    /// <summary>The batch, serialised as an IMessage and compressed.</summary>
+    public byte[] Brotli = Array.Empty<byte>();
+
+    /// <summary>Unpacked, no batch is bigger than this: a pack that claims more is refused.</summary>
+    public const int MaxUnpackedBytes = 32 * 1024 * 1024;
+
+    public EntityDefinitionPack() { }
+
+    public static EntityDefinitionPack Pack(EntityDefinitionBatch batch, int quality = 1)
+    {
+        byte[] raw = MemoryPackSerializer.Serialize<IMessage>(batch);
+        var packed = new byte[System.IO.Compression.BrotliEncoder.GetMaxCompressedLength(raw.Length)];
+        using var encoder = new System.IO.Compression.BrotliEncoder(quality, 22);
+        encoder.Compress(raw, packed, out _, out int written, isFinalBlock: true);
+        return new EntityDefinitionPack { Count = batch.Definitions.Count, Brotli = packed.AsSpan(0, written).ToArray() };
+    }
+
+    /// <summary>The batch it carries, or null if it is not one.</summary>
+    public EntityDefinitionBatch? Unpack()
+    {
+        try
+        {
+            using var input = new System.IO.MemoryStream(Brotli);
+            using var brotli = new System.IO.Compression.BrotliStream(input, System.IO.Compression.CompressionMode.Decompress);
+            using var output = new System.IO.MemoryStream();
+            var buffer = new byte[81920];
+            int read;
+            while ((read = brotli.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                output.Write(buffer, 0, read);
+                if (output.Length > MaxUnpackedBytes) return null;
+            }
+            return MemoryPackSerializer.Deserialize<IMessage>(output.ToArray()) as EntityDefinitionBatch;
+        }
+        catch (Exception ex) when (ex is System.IO.InvalidDataException or MemoryPackSerializationException) { return null; }
+    }
 }
 
 /// <summary>
