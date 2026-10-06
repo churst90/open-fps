@@ -71,7 +71,7 @@ public sealed class ShoreSynth
 
     /// <summary>How unevenly a crowd of events comes, the standard deviation of the log of its rate
     /// from one 40 ms to the next: turbulent intermittency is log-normal (Kolmogorov 1962). FITTED.</summary>
-    public static readonly float Flicker = Knob("FLICKER", 0.7f);
+    public static readonly float Flicker = Knob("FLICKER", 1.3f);
 
     /// <summary>How much of that unevenness every size of bubble shares (the rest each octave of sizes has
     /// on its own). FITTED.</summary>
@@ -115,10 +115,10 @@ public sealed class ShoreSynth
 
     /// <summary>The share of the swash's front that breaks as a creek's lee jet does: only its tip, where it
     /// runs into the last wave's backwash or over the bed. FITTED.</summary>
-    public static readonly float FrontShare = Knob("FRONT", 0.03f);
+    public static readonly float FrontShare = Knob("FRONT", 0.01f);
 
     /// <summary>How many drops run off a metre of wetted face after a crest that stood 10 cm up it. FITTED.</summary>
-    public static readonly float RunOffDrops = Knob("DRIPS", 20f);
+    public static readonly float RunOffDrops = Knob("DRIPS", 5f);
 
     /// <summary>The lip's bubbles against the front's thickness: the tube it closes on is about half the front
     /// across, and breaks into bubbles of about a third of that radius. An estimate.</summary>
@@ -128,7 +128,7 @@ public sealed class ShoreSynth
     /// collective oscillation: 10-300 Hz under breakers (Lamarre and Melville 1994), the low roar that
     /// plunging breakers add and spilling ones barely do (Loewen and Melville 1994). FITTED to the
     /// recorded surf's low octaves.</summary>
-    public static readonly float CloudEfficiency = Knob("CLOUD", 1e-6f);
+    public static readonly float CloudEfficiency = Knob("CLOUD", 1e-7f);
 
     /// <summary>The void fraction of a fresh plume, 0.3-0.4 (Deane 1997).</summary>
     private const float PlumeVoid = 0.3f;
@@ -138,7 +138,7 @@ public sealed class ShoreSynth
 
     /// <summary>The air sand lets out per volume of swash soaking into it: the pore air it held, its
     /// porosity of about 0.35, for the share of the swash that soaks in before it runs back.</summary>
-    private static readonly float SandVentShare = Knob("VENT", 0.0003f);
+    private static readonly float SandVentShare = Knob("VENT", 0.0001f);
 
     /// <summary>The sea surface's Hinze scale, mm: the plume's size spectrum steepens above it (Deane and
     /// Stokes 2002).</summary>
@@ -162,7 +162,7 @@ public sealed class ShoreSynth
     /// <summary>The share of the surface layer of stones the backwash keeps moving for each unit its
     /// speed squared stands over the threshold's, and the speed they close on each other at, as a share
     /// of the backwash's: stones rolled in a sheet mostly nudge. FITTED to the shingle recordings.</summary>
-    public static readonly float StoneShare = Knob("STONESHARE", 0.001f), StoneClosing = Knob("STONECLOSE", 0.1f);
+    public static readonly float StoneShare = Knob("STONESHARE", 0.001f), StoneClosing = Knob("STONECLOSE", 0.05f);
 
     /// <summary>The density of stone, kg/m³, and its Young's modulus, Pa (granite, flint).</summary>
     private const float StoneDensity = 2650f, StoneModulus = 5e10f;
