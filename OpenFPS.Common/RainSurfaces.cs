@@ -257,7 +257,11 @@ public readonly record struct RainPlate
         MountedLossFactor = mountedLossFactor;
     }
 
-    public MaterialProperties Properties => AcousticRegistry.GetProperties(AcousticRegistry.IsKnown(Material) ? Material : "Generic");
+    public MaterialProperties Properties => Custom ?? AcousticRegistry.GetProperties(AcousticRegistry.IsKnown(Material) ? Material : "Generic");
+
+    /// <summary>The stuff itself, for a plate of something the registry has no name for (a boat's
+    /// aluminium or fibreglass hull, ShoreSynth). Null: <see cref="Material"/>'s registry entry.</summary>
+    public MaterialProperties? Custom { get; init; }
 
     /// <summary>m″, kg/m².</summary>
     public float SurfaceDensity => MathF.Max(0.01f, Properties.DensityKgM3 * SkinMetres);

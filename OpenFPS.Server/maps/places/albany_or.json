@@ -956300,6 +956300,5043 @@
    "Name": "Service road junction",
    "Tile": "5,5",
    "Layer": "zones"
+  },
+  {
+   "EntityId": 42328,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 1441.2077,
+    "Y": 0.14,
+    "Z": 1258.1538
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.390182,
+    "Z": 0.0,
+    "W": 0.920738
+   },
+   "Scale": {
+    "X": 24.27,
+    "Y": 1,
+    "Z": 7
+   },
+   "Name": "Pond shore",
+   "Tile": "5,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42329,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 1446.6057,
+    "Y": 0.14,
+    "Z": 1263.2276
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.920738,
+    "Z": 0.0,
+    "W": 0.390182
+   },
+   "Scale": {
+    "X": 24.27,
+    "Y": 1,
+    "Z": 7
+   },
+   "Name": "Pond shore",
+   "Tile": "5,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42330,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 854.7392,
+    "Y": 0.14,
+    "Z": -1485.336
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.543414,
+    "Z": 0.0,
+    "W": 0.839465
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 155
+   },
+   "Name": "Pond shore",
+   "Tile": "3,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42331,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 857.5237,
+    "Y": 0.14,
+    "Z": -1465.2541
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.690799,
+    "Z": 0.0,
+    "W": 0.723047
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 182
+   },
+   "Name": "Pond shore",
+   "Tile": "3,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42332,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 857.7056,
+    "Y": 0.14,
+    "Z": -1444.8702
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.735015,
+    "Z": 0.0,
+    "W": 0.678051
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 185
+   },
+   "Name": "Pond shore",
+   "Tile": "3,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42333,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 851.7684,
+    "Y": 0.14,
+    "Z": -1425.8361
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.921656,
+    "Z": 0.0,
+    "W": 0.388008
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 102
+   },
+   "Name": "Pond shore",
+   "Tile": "3,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42334,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 832.8114,
+    "Y": 0.14,
+    "Z": -1420.9228
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999998,
+    "Z": 0.0,
+    "W": 0.001739
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 76
+   },
+   "Name": "Pond shore",
+   "Tile": "3,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42335,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 812.4331,
+    "Y": 0.14,
+    "Z": -1421.5539
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.999984,
+    "Z": 0.0,
+    "W": 0.00567
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 76
+   },
+   "Name": "Pond shore",
+   "Tile": "3,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42336,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 792.0445,
+    "Y": 0.14,
+    "Z": -1421.4136
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999943,
+    "Z": 0.0,
+    "W": 0.010654
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 76
+   },
+   "Name": "Pond shore",
+   "Tile": "3,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42337,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 771.6609,
+    "Y": 0.14,
+    "Z": -1420.8998
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999974,
+    "Z": 0.0,
+    "W": 0.007278
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 76
+   },
+   "Name": "Pond shore",
+   "Tile": "3,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42338,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 751.2708,
+    "Y": 0.14,
+    "Z": -1420.748
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999993,
+    "Z": 0.0,
+    "W": 0.003751
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 77
+   },
+   "Name": "Pond shore",
+   "Tile": "3,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42339,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 730.8806,
+    "Y": 0.14,
+    "Z": -1420.5931
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999993,
+    "Z": 0.0,
+    "W": 0.003815
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 77
+   },
+   "Name": "Pond shore",
+   "Tile": "2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42340,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 710.7566,
+    "Y": 0.14,
+    "Z": -1422.7285
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.973062,
+    "Z": 0.0,
+    "W": 0.230544
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 83
+   },
+   "Name": "Pond shore",
+   "Tile": "2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42341,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 695.7405,
+    "Y": 0.14,
+    "Z": -1436.4277
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.926752,
+    "Z": 0.0,
+    "W": 0.375674
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 85
+   },
+   "Name": "Pond shore",
+   "Tile": "2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42342,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 681.2254,
+    "Y": 0.14,
+    "Z": -1450.748
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.918393,
+    "Z": 0.0,
+    "W": 0.395669
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 68
+   },
+   "Name": "Pond shore",
+   "Tile": "2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42343,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 669.5016,
+    "Y": 0.14,
+    "Z": -1466.973
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.818619,
+    "Z": 0.0,
+    "W": 0.574336
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 89
+   },
+   "Name": "Pond shore",
+   "Tile": "2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42344,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 667.1083,
+    "Y": 0.14,
+    "Z": -1487.1633
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.720838,
+    "Z": 0.0,
+    "W": 0.693104
+   },
+   "Scale": {
+    "X": 20.39,
+    "Y": 1,
+    "Z": 181
+   },
+   "Name": "Pond shore",
+   "Tile": "2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42345,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 1039.7169,
+    "Y": 0.14,
+    "Z": -1438.6687
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.002626,
+    "Z": 0.0,
+    "W": 0.999997
+   },
+   "Scale": {
+    "X": 21.47,
+    "Y": 1,
+    "Z": 20
+   },
+   "Name": "Pond shore",
+   "Tile": "4,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42346,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 1061.1834,
+    "Y": 0.14,
+    "Z": -1438.5559
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.011462,
+    "Z": 0.0,
+    "W": 0.999934
+   },
+   "Scale": {
+    "X": 21.47,
+    "Y": 1,
+    "Z": 19
+   },
+   "Name": "Pond shore",
+   "Tile": "4,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42347,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 1073.0102,
+    "Y": 0.14,
+    "Z": -1427.6157
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.765831,
+    "Z": 0.0,
+    "W": 0.643042
+   },
+   "Scale": {
+    "X": 21.47,
+    "Y": 1,
+    "Z": 48
+   },
+   "Name": "Pond shore",
+   "Tile": "4,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42348,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 1059.1432,
+    "Y": 0.14,
+    "Z": -1418.9991
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999335,
+    "Z": 0.0,
+    "W": 0.03647
+   },
+   "Scale": {
+    "X": 21.47,
+    "Y": 1,
+    "Z": 20
+   },
+   "Name": "Pond shore",
+   "Tile": "4,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42349,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 1037.6784,
+    "Y": 0.14,
+    "Z": -1418.7093
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.999907,
+    "Z": 0.0,
+    "W": 0.013615
+   },
+   "Scale": {
+    "X": 21.47,
+    "Y": 1,
+    "Z": 20
+   },
+   "Name": "Pond shore",
+   "Tile": "4,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42350,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": 1025.7969,
+    "Y": 0.14,
+    "Z": -1429.7892
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.672845,
+    "Z": 0.0,
+    "W": 0.739784
+   },
+   "Scale": {
+    "X": 21.47,
+    "Y": 1,
+    "Z": 47
+   },
+   "Name": "Pond shore",
+   "Tile": "4,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42351,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -497.6732,
+    "Y": 0.14,
+    "Z": -1347.4834
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.822815,
+    "Z": 0.0,
+    "W": 0.568309
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 75
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42352,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -498.1784,
+    "Y": 0.14,
+    "Z": -1367.2676
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.563235,
+    "Z": 0.0,
+    "W": 0.826297
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 70
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42353,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -481.9758,
+    "Y": 0.14,
+    "Z": -1373.0108
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.010705,
+    "Z": 0.0,
+    "W": 0.999943
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 32
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42354,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -462.1898,
+    "Y": 0.14,
+    "Z": -1373.4345
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.010705,
+    "Z": 0.0,
+    "W": 0.999943
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 32
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42355,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -442.4037,
+    "Y": 0.14,
+    "Z": -1373.8582
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.010705,
+    "Z": 0.0,
+    "W": 0.999943
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 32
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42356,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -422.6177,
+    "Y": 0.14,
+    "Z": -1374.2819
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.010705,
+    "Z": 0.0,
+    "W": 0.999943
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 33
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42357,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -402.8317,
+    "Y": 0.14,
+    "Z": -1374.7056
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.010705,
+    "Z": 0.0,
+    "W": 0.999943
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 33
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42358,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -383.0456,
+    "Y": 0.14,
+    "Z": -1375.1293
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.010705,
+    "Z": 0.0,
+    "W": 0.999943
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 33
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42359,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -363.353,
+    "Y": 0.14,
+    "Z": -1375.0164
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.194357,
+    "Z": 0.0,
+    "W": 0.980931
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42360,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -357.0805,
+    "Y": 0.14,
+    "Z": -1358.7067
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.716906,
+    "Z": 0.0,
+    "W": 0.69717
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 141
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42361,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -363.2919,
+    "Y": 0.14,
+    "Z": -1342.2775
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.97784,
+    "Z": 0.0,
+    "W": 0.209352
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42362,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -383.0049,
+    "Y": 0.14,
+    "Z": -1341.7114
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999998,
+    "Z": 0.0,
+    "W": 0.00174
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 33
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42363,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -402.7954,
+    "Y": 0.14,
+    "Z": -1341.6426
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999998,
+    "Z": 0.0,
+    "W": 0.00174
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 33
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42364,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -422.5858,
+    "Y": 0.14,
+    "Z": -1341.5737
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999998,
+    "Z": 0.0,
+    "W": 0.00174
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 33
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42365,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -442.3763,
+    "Y": 0.14,
+    "Z": -1341.5049
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999998,
+    "Z": 0.0,
+    "W": 0.00174
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 32
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42366,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -462.1668,
+    "Y": 0.14,
+    "Z": -1341.436
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999998,
+    "Z": 0.0,
+    "W": 0.00174
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 32
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42367,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -481.9572,
+    "Y": 0.14,
+    "Z": -1341.3671
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999998,
+    "Z": 0.0,
+    "W": 0.00174
+   },
+   "Scale": {
+    "X": 19.79,
+    "Y": 1,
+    "Z": 32
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-6",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42368,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -125.1455,
+    "Y": 0.14,
+    "Z": -1002.834
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.704479,
+    "Z": 0.0,
+    "W": 0.709725
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 25
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42369,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -124.9958,
+    "Y": 0.14,
+    "Z": -982.6532
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.704479,
+    "Z": 0.0,
+    "W": 0.709725
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 35
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42370,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -124.8461,
+    "Y": 0.14,
+    "Z": -962.4723
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.704479,
+    "Z": 0.0,
+    "W": 0.709725
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42371,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -124.6963,
+    "Y": 0.14,
+    "Z": -942.2915
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.704479,
+    "Z": 0.0,
+    "W": 0.709725
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42372,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -124.5466,
+    "Y": 0.14,
+    "Z": -922.1106
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.704479,
+    "Z": 0.0,
+    "W": 0.709725
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 35
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42373,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -124.3969,
+    "Y": 0.14,
+    "Z": -901.9297
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.836019,
+    "Z": 0.0,
+    "W": 0.5487
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 38
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42374,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -140.6898,
+    "Y": 0.14,
+    "Z": -897.5561
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999872,
+    "Z": 0.0,
+    "W": 0.015991
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 113
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42375,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -157.8056,
+    "Y": 0.14,
+    "Z": -903.2141
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.853537,
+    "Z": 0.0,
+    "W": 0.521032
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 37
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42376,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -159.56,
+    "Y": 0.14,
+    "Z": -923.2261
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.727958,
+    "Z": 0.0,
+    "W": 0.685621
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 35
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42377,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -160.7678,
+    "Y": 0.14,
+    "Z": -943.3714
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.718463,
+    "Z": 0.0,
+    "W": 0.695565
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42378,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -160.5069,
+    "Y": 0.14,
+    "Z": -963.538
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.696163,
+    "Z": 0.0,
+    "W": 0.717884
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42379,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -159.268,
+    "Y": 0.14,
+    "Z": -983.5783
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.616848,
+    "Z": 0.0,
+    "W": 0.787082
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 35
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42380,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -150.692,
+    "Y": 0.14,
+    "Z": -1001.7381
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.4841,
+    "Z": 0.0,
+    "W": 0.875013
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 30
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42381,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -135.1729,
+    "Y": 0.14,
+    "Z": -1012.7642
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.076117,
+    "Z": 0.0,
+    "W": 0.997099
+   },
+   "Scale": {
+    "X": 20.18,
+    "Y": 1,
+    "Z": 69
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,-5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42382,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -366.8986,
+    "Y": 0.14,
+    "Z": -995.2174
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.930854,
+    "Z": 0.0,
+    "W": 0.365391
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 7
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42383,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -385.6056,
+    "Y": 0.14,
+    "Z": -988.3847
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.984709,
+    "Z": 0.0,
+    "W": 0.174205
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 12
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42384,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -404.3125,
+    "Y": 0.14,
+    "Z": -981.552
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.984709,
+    "Z": 0.0,
+    "W": 0.174205
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 19
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42385,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -423.0195,
+    "Y": 0.14,
+    "Z": -974.7193
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.984709,
+    "Z": 0.0,
+    "W": 0.174205
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 26
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42386,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -441.7264,
+    "Y": 0.14,
+    "Z": -967.8866
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.983248,
+    "Z": 0.0,
+    "W": 0.18227
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 34
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42387,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -460.1822,
+    "Y": 0.14,
+    "Z": -960.404
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.986782,
+    "Z": 0.0,
+    "W": 0.162052
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 41
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42388,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -479.609,
+    "Y": 0.14,
+    "Z": -957.6561
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999949,
+    "Z": 0.0,
+    "W": 0.010069
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 41
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42389,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -499.5206,
+    "Y": 0.14,
+    "Z": -957.2551
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999949,
+    "Z": 0.0,
+    "W": 0.010069
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 41
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42390,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -519.4132,
+    "Y": 0.14,
+    "Z": -957.0106
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.99637,
+    "Z": 0.0,
+    "W": 0.08513
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 42
+   },
+   "Name": "Pond shore",
+   "Tile": "-3,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42391,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -531.5604,
+    "Y": 0.14,
+    "Z": -969.2658
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.761958,
+    "Z": 0.0,
+    "W": 0.647626
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 169
+   },
+   "Name": "Pond shore",
+   "Tile": "-3,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42392,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -530.7123,
+    "Y": 0.14,
+    "Z": -989.0709
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.583615,
+    "Z": 0.0,
+    "W": 0.81203
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 81
+   },
+   "Name": "Pond shore",
+   "Tile": "-3,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42393,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -516.3522,
+    "Y": 0.14,
+    "Z": -998.5557
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.047315,
+    "Z": 0.0,
+    "W": 0.99888
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 42
+   },
+   "Name": "Pond shore",
+   "Tile": "-3,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42394,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -496.438,
+    "Y": 0.14,
+    "Z": -998.8005
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.006146,
+    "Z": 0.0,
+    "W": 0.999981
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 41
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42395,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -476.5238,
+    "Y": 0.14,
+    "Z": -999.0453
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.006146,
+    "Z": 0.0,
+    "W": 0.999981
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 41
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42396,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -456.6096,
+    "Y": 0.14,
+    "Z": -999.2901
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.006146,
+    "Z": 0.0,
+    "W": 0.999981
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 37
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42397,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -436.6954,
+    "Y": 0.14,
+    "Z": -999.5349
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.006146,
+    "Z": 0.0,
+    "W": 0.999981
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 30
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42398,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -416.7812,
+    "Y": 0.14,
+    "Z": -999.7797
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.006146,
+    "Z": 0.0,
+    "W": 0.999981
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 23
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42399,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -396.867,
+    "Y": 0.14,
+    "Z": -1000.0245
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.006146,
+    "Z": 0.0,
+    "W": 0.999981
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 16
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42400,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -376.9528,
+    "Y": 0.14,
+    "Z": -1000.2693
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.006146,
+    "Z": 0.0,
+    "W": 0.999981
+   },
+   "Scale": {
+    "X": 19.92,
+    "Y": 1,
+    "Z": 9
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,-5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42401,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -731.2581,
+    "Y": 0.14,
+    "Z": 622.3187
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.758563,
+    "Z": 0.0,
+    "W": 0.6516
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-3,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42402,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -740.2737,
+    "Y": 0.14,
+    "Z": 638.9395
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.93333,
+    "Z": 0.0,
+    "W": 0.359019
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 33
+   },
+   "Name": "Pond shore",
+   "Tile": "-3,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42403,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -756.3089,
+    "Y": 0.14,
+    "Z": 650.8189
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.967812,
+    "Z": 0.0,
+    "W": 0.251676
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 35
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42404,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -774.8461,
+    "Y": 0.14,
+    "Z": 658.3314
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.985521,
+    "Z": 0.0,
+    "W": 0.169552
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 33
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42405,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -793.0183,
+    "Y": 0.14,
+    "Z": 666.3872
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.963504,
+    "Z": 0.0,
+    "W": 0.267695
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 31
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42406,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -809.7953,
+    "Y": 0.14,
+    "Z": 677.3106
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.965849,
+    "Z": 0.0,
+    "W": 0.259104
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 34
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42407,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -827.6686,
+    "Y": 0.14,
+    "Z": 686.3185
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.973386,
+    "Z": 0.0,
+    "W": 0.229172
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 35
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42408,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -846.1431,
+    "Y": 0.14,
+    "Z": 693.536
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.993751,
+    "Z": 0.0,
+    "W": 0.111619
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 35
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42409,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -865.8979,
+    "Y": 0.14,
+    "Z": 696.1445
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.999955,
+    "Z": 0.0,
+    "W": 0.009439
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 34
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42410,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -885.742,
+    "Y": 0.14,
+    "Z": 693.4981
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.997002,
+    "Z": 0.0,
+    "W": 0.077379
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 30
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42411,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -905.3901,
+    "Y": 0.14,
+    "Z": 689.7004
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.990911,
+    "Z": 0.0,
+    "W": 0.134517
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 34
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42412,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -924.249,
+    "Y": 0.14,
+    "Z": 683.0065
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.983069,
+    "Z": 0.0,
+    "W": 0.183234
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 40
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42413,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -941.2594,
+    "Y": 0.14,
+    "Z": 672.9618
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.943475,
+    "Z": 0.0,
+    "W": 0.331444
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 41
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42414,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -952.505,
+    "Y": 0.14,
+    "Z": 657.9066
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.792937,
+    "Z": 0.0,
+    "W": 0.609304
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 45
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42415,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -955.5935,
+    "Y": 0.14,
+    "Z": 638.1265
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.762635,
+    "Z": 0.0,
+    "W": 0.646829
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42416,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -960.5285,
+    "Y": 0.14,
+    "Z": 619.4366
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.936269,
+    "Z": 0.0,
+    "W": 0.351283
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 78
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42417,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -977.9665,
+    "Y": 0.14,
+    "Z": 612.2727
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.890133,
+    "Z": 0.0,
+    "W": 0.455701
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 84
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42418,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -977.7167,
+    "Y": 0.14,
+    "Z": 594.2735
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.479579,
+    "Z": 0.0,
+    "W": 0.877499
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 68
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42419,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -967.2826,
+    "Y": 0.14,
+    "Z": 578.6403
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.56309,
+    "Z": 0.0,
+    "W": 0.826396
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 49
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42420,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -958.6418,
+    "Y": 0.14,
+    "Z": 560.6536
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.497697,
+    "Z": 0.0,
+    "W": 0.867351
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 47
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42421,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -948.4072,
+    "Y": 0.14,
+    "Z": 543.4476
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.461227,
+    "Z": 0.0,
+    "W": 0.887282
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 44
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42422,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -935.538,
+    "Y": 0.14,
+    "Z": 528.1364
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.427691,
+    "Z": 0.0,
+    "W": 0.903925
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 38
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42423,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -927.2797,
+    "Y": 0.14,
+    "Z": 510.5586
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.640425,
+    "Z": 0.0,
+    "W": 0.768021
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 42
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42424,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -924.305,
+    "Y": 0.14,
+    "Z": 491.3244
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.427174,
+    "Z": 0.0,
+    "W": 0.904169
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 47
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42425,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -905.7774,
+    "Y": 0.14,
+    "Z": 483.7404
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.20034,
+    "Z": 0.0,
+    "W": 0.979726
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 43
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42426,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -888.1736,
+    "Y": 0.14,
+    "Z": 474.3586
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.439786,
+    "Z": 0.0,
+    "W": 0.898102
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 26
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42427,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -887.747,
+    "Y": 0.14,
+    "Z": 456.3873
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.858168,
+    "Z": 0.0,
+    "W": 0.513369
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 26
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42428,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -903.0487,
+    "Y": 0.14,
+    "Z": 444.7455
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.983785,
+    "Z": 0.0,
+    "W": 0.179353
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 18
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42429,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -922.1024,
+    "Y": 0.14,
+    "Z": 438.6066
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.989601,
+    "Z": 0.0,
+    "W": 0.143842
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 15
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42430,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -941.401,
+    "Y": 0.14,
+    "Z": 433.2818
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.990939,
+    "Z": 0.0,
+    "W": 0.134313
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 13
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42431,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -960.6563,
+    "Y": 0.14,
+    "Z": 427.8047
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.989893,
+    "Z": 0.0,
+    "W": 0.141817
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 14
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42432,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -979.8707,
+    "Y": 0.14,
+    "Z": 422.1838
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.989893,
+    "Z": 0.0,
+    "W": 0.141817
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 15
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42433,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -994.5045,
+    "Y": 0.14,
+    "Z": 414.308
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.740416,
+    "Z": 0.0,
+    "W": 0.672148
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 30
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42434,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -983.2929,
+    "Y": 0.14,
+    "Z": 404.4136
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.084287,
+    "Z": 0.0,
+    "W": 0.996441
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 16
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42435,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -964.5063,
+    "Y": 0.14,
+    "Z": 411.3312
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.175493,
+    "Z": 0.0,
+    "W": 0.984481
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 15
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42436,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -945.7197,
+    "Y": 0.14,
+    "Z": 418.2488
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.156771,
+    "Z": 0.0,
+    "W": 0.987635
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 13
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42437,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -926.2974,
+    "Y": 0.14,
+    "Z": 422.8954
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.094708,
+    "Z": 0.0,
+    "W": 0.995505
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 14
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42438,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -906.5753,
+    "Y": 0.14,
+    "Z": 426.3166
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.0785,
+    "Z": 0.0,
+    "W": 0.996914
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 17
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42439,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -887.1567,
+    "Y": 0.14,
+    "Z": 430.6923
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.170551,
+    "Z": 0.0,
+    "W": 0.985349
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 19
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42440,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -868.3379,
+    "Y": 0.14,
+    "Z": 437.2001
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.336487,
+    "Z": 0.0,
+    "W": 0.941688
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 28
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42441,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -864.0161,
+    "Y": 0.14,
+    "Z": 455.054
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.66828,
+    "Z": 0.0,
+    "W": 0.74391
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 23
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42442,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -862.5165,
+    "Y": 0.14,
+    "Z": 474.9988
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.730475,
+    "Z": 0.0,
+    "W": 0.68294
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 25
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42443,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -869.5969,
+    "Y": 0.14,
+    "Z": 492.9396
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.875608,
+    "Z": 0.0,
+    "W": 0.483023
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 28
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,1",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42444,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -880.275,
+    "Y": 0.14,
+    "Z": 509.8738
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.875608,
+    "Z": 0.0,
+    "W": 0.483023
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 41
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42445,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -890.953,
+    "Y": 0.14,
+    "Z": 526.808
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.879055,
+    "Z": 0.0,
+    "W": 0.476721
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 42
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42446,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -902.2603,
+    "Y": 0.14,
+    "Z": 543.3247
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.864206,
+    "Z": 0.0,
+    "W": 0.503138
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42447,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -909.5935,
+    "Y": 0.14,
+    "Z": 561.8401
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.816741,
+    "Z": 0.0,
+    "W": 0.577004
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 43
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42448,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -916.7792,
+    "Y": 0.14,
+    "Z": 580.519
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.829356,
+    "Z": 0.0,
+    "W": 0.55872
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 47
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42449,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -921.9189,
+    "Y": 0.14,
+    "Z": 599.6613
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.748011,
+    "Z": 0.0,
+    "W": 0.663686
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 54
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42450,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -922.4816,
+    "Y": 0.14,
+    "Z": 619.5343
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.669038,
+    "Z": 0.0,
+    "W": 0.743228
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42451,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -916.4922,
+    "Y": 0.14,
+    "Z": 638.3511
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.470788,
+    "Z": 0.0,
+    "W": 0.882247
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 42
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42452,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -902.3546,
+    "Y": 0.14,
+    "Z": 652.2649
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.330687,
+    "Z": 0.0,
+    "W": 0.94374
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 38
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42453,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -885.0906,
+    "Y": 0.14,
+    "Z": 661.8919
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.143523,
+    "Z": 0.0,
+    "W": 0.989647
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 31
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42454,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -865.7884,
+    "Y": 0.14,
+    "Z": 661.7995
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.100323,
+    "Z": 0.0,
+    "W": 0.994955
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 34
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42455,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -846.7048,
+    "Y": 0.14,
+    "Z": 656.0326
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.185589,
+    "Z": 0.0,
+    "W": 0.982627
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 36
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42456,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -828.0642,
+    "Y": 0.14,
+    "Z": 648.7308
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.202515,
+    "Z": 0.0,
+    "W": 0.979279
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 34
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42457,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -810.1474,
+    "Y": 0.14,
+    "Z": 639.8352
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.237342,
+    "Z": 0.0,
+    "W": 0.971426
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 32
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42458,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -792.3831,
+    "Y": 0.14,
+    "Z": 630.6037
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.237342,
+    "Z": 0.0,
+    "W": 0.971426
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 32
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42459,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -774.6556,
+    "Y": 0.14,
+    "Z": 621.3023
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.241922,
+    "Z": 0.0,
+    "W": 0.970296
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 34
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42460,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -757.0012,
+    "Y": 0.14,
+    "Z": 611.8631
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.250072,
+    "Z": 0.0,
+    "W": 0.968227
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 32
+   },
+   "Name": "Pond shore",
+   "Tile": "-4,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42461,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -738.9835,
+    "Y": 0.14,
+    "Z": 607.4293
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.146493,
+    "Z": 0.0,
+    "W": 0.989212
+   },
+   "Scale": {
+    "X": 20.02,
+    "Y": 1,
+    "Z": 42
+   },
+   "Name": "Pond shore",
+   "Tile": "-3,2",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42462,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -304.3462,
+    "Y": 0.14,
+    "Z": 1497.4017
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -1.0,
+    "Z": 0.0,
+    "W": 2.4e-05
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 34
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42463,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -323.4186,
+    "Y": 0.14,
+    "Z": 1496.0352
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.93759,
+    "Z": 0.0,
+    "W": 0.347743
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 34
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42464,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -330.4314,
+    "Y": 0.14,
+    "Z": 1477.2087
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.852392,
+    "Z": 0.0,
+    "W": 0.522903
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 29
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42465,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -341.6345,
+    "Y": 0.14,
+    "Z": 1460.555
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.860813,
+    "Z": 0.0,
+    "W": 0.508921
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 28
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42466,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -348.6634,
+    "Y": 0.14,
+    "Z": 1441.851
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.795992,
+    "Z": 0.0,
+    "W": 0.605307
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 21
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42467,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -350.8933,
+    "Y": 0.14,
+    "Z": 1422.1142
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.707126,
+    "Z": 0.0,
+    "W": 0.707088
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 20
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42468,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -349.8919,
+    "Y": 0.14,
+    "Z": 1402.131
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.649573,
+    "Z": 0.0,
+    "W": 0.760299
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 24
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42469,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -342.7435,
+    "Y": 0.14,
+    "Z": 1383.7962
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.47453,
+    "Z": 0.0,
+    "W": 0.88024
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 24
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42470,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -330.9107,
+    "Y": 0.14,
+    "Z": 1367.5605
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.358286,
+    "Z": 0.0,
+    "W": 0.933612
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 24
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42471,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -313.5143,
+    "Y": 0.14,
+    "Z": 1357.5223
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.211637,
+    "Z": 0.0,
+    "W": 0.977348
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 23
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42472,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -294.2999,
+    "Y": 0.14,
+    "Z": 1352.1764
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.106574,
+    "Z": 0.0,
+    "W": 0.994305
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 22
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42473,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -274.6378,
+    "Y": 0.14,
+    "Z": 1348.1373
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.058784,
+    "Z": 0.0,
+    "W": 0.998271
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 21
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42474,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -254.5668,
+    "Y": 0.14,
+    "Z": 1347.2586
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.01402,
+    "Z": 0.0,
+    "W": 0.999902
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 22
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42475,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -234.5296,
+    "Y": 0.14,
+    "Z": 1347.9933
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.042751,
+    "Z": 0.0,
+    "W": 0.999086
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 21
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42476,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -214.5128,
+    "Y": 0.14,
+    "Z": 1349.7095
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.042751,
+    "Z": 0.0,
+    "W": 0.999086
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 20
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42477,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -194.4942,
+    "Y": 0.14,
+    "Z": 1351.3858
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.022883,
+    "Z": 0.0,
+    "W": 0.999738
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 18
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42478,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -174.405,
+    "Y": 0.14,
+    "Z": 1351.5864
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.128421,
+    "Z": 0.0,
+    "W": 0.99172
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 16
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42479,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -159.0478,
+    "Y": 0.14,
+    "Z": 1339.4455
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.452288,
+    "Z": 0.0,
+    "W": 0.891872
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 18
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42480,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -152.1374,
+    "Y": 0.14,
+    "Z": 1320.9265
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.667801,
+    "Z": 0.0,
+    "W": 0.74434
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 16
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42481,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -152.6899,
+    "Y": 0.14,
+    "Z": 1300.9296
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.749302,
+    "Z": 0.0,
+    "W": 0.662228
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 17
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42482,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -158.1983,
+    "Y": 0.14,
+    "Z": 1281.9174
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.933549,
+    "Z": 0.0,
+    "W": 0.35845
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 15
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42483,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -175.115,
+    "Y": 0.14,
+    "Z": 1273.9657
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.814137,
+    "Z": 0.0,
+    "W": 0.580673
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 21
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42484,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -162.9375,
+    "Y": 0.14,
+    "Z": 1263.3474
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.065314,
+    "Z": 0.0,
+    "W": 0.997865
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 17
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42485,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -145.1583,
+    "Y": 0.14,
+    "Z": 1272.5806
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.362903,
+    "Z": 0.0,
+    "W": 0.931827
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 17
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42486,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -136.5892,
+    "Y": 0.14,
+    "Z": 1290.0596
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.617235,
+    "Z": 0.0,
+    "W": 0.786779
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 17
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42487,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -135.401,
+    "Y": 0.14,
+    "Z": 1309.9344
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.707099,
+    "Z": 0.0,
+    "W": 0.707114
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 17
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42488,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -137.5629,
+    "Y": 0.14,
+    "Z": 1329.7474
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.785578,
+    "Z": 0.0,
+    "W": 0.618762
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 16
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42489,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -143.8046,
+    "Y": 0.14,
+    "Z": 1348.7621
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.842361,
+    "Z": 0.0,
+    "W": 0.538913
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 18
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42490,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -157.0176,
+    "Y": 0.14,
+    "Z": 1362.7591
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.97773,
+    "Z": 0.0,
+    "W": 0.209865
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 18
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42491,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -176.2818,
+    "Y": 0.14,
+    "Z": 1368.2732
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.995999,
+    "Z": 0.0,
+    "W": 0.089363
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 17
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42492,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -196.2743,
+    "Y": 0.14,
+    "Z": 1369.8447
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.99972,
+    "Z": 0.0,
+    "W": 0.023651
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 19
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42493,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -216.3482,
+    "Y": 0.14,
+    "Z": 1369.9615
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.999927,
+    "Z": 0.0,
+    "W": 0.012114
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 20
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42494,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -236.4325,
+    "Y": 0.14,
+    "Z": 1369.4748
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.999927,
+    "Z": 0.0,
+    "W": 0.012114
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 22
+   },
+   "Name": "Pond shore",
+   "Tile": "-1,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42495,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -256.5168,
+    "Y": 0.14,
+    "Z": 1368.9881
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.999927,
+    "Z": 0.0,
+    "W": 0.012114
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 22
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42496,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -276.4794,
+    "Y": 0.14,
+    "Z": 1369.4241
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.996044,
+    "Z": 0.0,
+    "W": 0.088864
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 21
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42497,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -295.751,
+    "Y": 0.14,
+    "Z": 1375.1004
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.98512,
+    "Z": 0.0,
+    "W": 0.17187
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 22
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42498,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -313.1796,
+    "Y": 0.14,
+    "Z": 1384.6692
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.94238,
+    "Z": 0.0,
+    "W": 0.334544
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 24
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42499,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -324.6676,
+    "Y": 0.14,
+    "Z": 1400.4481
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.833138,
+    "Z": 0.0,
+    "W": 0.553066
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 25
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42500,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -330.5735,
+    "Y": 0.14,
+    "Z": 1419.5174
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.743978,
+    "Z": 0.0,
+    "W": 0.668204
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 20
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42501,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -326.5866,
+    "Y": 0.14,
+    "Z": 1437.9343
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.453614,
+    "Z": 0.0,
+    "W": 0.891198
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 23
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42502,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -312.9898,
+    "Y": 0.14,
+    "Z": 1452.4832
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.438648,
+    "Z": 0.0,
+    "W": 0.898659
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 28
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42503,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -301.7023,
+    "Y": 0.14,
+    "Z": 1468.9556
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.522363,
+    "Z": 0.0,
+    "W": 0.852723
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 30
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42504,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -293.781,
+    "Y": 0.14,
+    "Z": 1487.4182
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.641771,
+    "Z": 0.0,
+    "W": 0.766897
+   },
+   "Scale": {
+    "X": 20.09,
+    "Y": 1,
+    "Z": 31
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42505,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -468.3859,
+    "Y": 0.14,
+    "Z": 1497.4115
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.999829,
+    "Z": 0.0,
+    "W": 0.018509
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 41
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42506,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -477.0755,
+    "Y": 0.14,
+    "Z": 1486.6791
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.701917,
+    "Z": 0.0,
+    "W": 0.712259
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 21
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42507,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -478.2759,
+    "Y": 0.14,
+    "Z": 1466.6641
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.744948,
+    "Z": 0.0,
+    "W": 0.667123
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 25
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42508,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -480.8429,
+    "Y": 0.14,
+    "Z": 1446.756
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.734901,
+    "Z": 0.0,
+    "W": 0.678174
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 15
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42509,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -477.9674,
+    "Y": 0.14,
+    "Z": 1427.3805
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.4925,
+    "Z": 0.0,
+    "W": 0.870312
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 20
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42510,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -463.9494,
+    "Y": 0.14,
+    "Z": 1413.265
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.426807,
+    "Z": 0.0,
+    "W": 0.904343
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 19
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42511,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -452.5022,
+    "Y": 0.14,
+    "Z": 1396.957
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.360952,
+    "Z": 0.0,
+    "W": 0.932584
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 27
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42512,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -435.4726,
+    "Y": 0.14,
+    "Z": 1386.3309
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.259523,
+    "Z": 0.0,
+    "W": 0.965737
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 26
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42513,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -417.7489,
+    "Y": 0.14,
+    "Z": 1376.9136
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.356088,
+    "Z": 0.0,
+    "W": 0.934452
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 19
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42514,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -406.7065,
+    "Y": 0.14,
+    "Z": 1360.2406
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.478155,
+    "Z": 0.0,
+    "W": 0.878276
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 15
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42515,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -395.7973,
+    "Y": 0.14,
+    "Z": 1343.3909
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.500568,
+    "Z": 0.0,
+    "W": 0.865697
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 13
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42516,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -388.2187,
+    "Y": 0.14,
+    "Z": 1324.9612
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.591297,
+    "Z": 0.0,
+    "W": 0.806454
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 12
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42517,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -384.7849,
+    "Y": 0.14,
+    "Z": 1305.3608
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.690111,
+    "Z": 0.0,
+    "W": 0.723704
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 13
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42518,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -387.0213,
+    "Y": 0.14,
+    "Z": 1286.05
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.832303,
+    "Z": 0.0,
+    "W": 0.554321
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 16
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42519,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -399.0648,
+    "Y": 0.14,
+    "Z": 1270.376
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.932623,
+    "Z": 0.0,
+    "W": 0.360854
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 14
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42520,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -414.6214,
+    "Y": 0.14,
+    "Z": 1257.7448
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.95831,
+    "Z": 0.0,
+    "W": 0.285731
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 9
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42521,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -432.4492,
+    "Y": 0.14,
+    "Z": 1248.6012
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.976088,
+    "Z": 0.0,
+    "W": 0.217376
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 7
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42522,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -450.6252,
+    "Y": 0.14,
+    "Z": 1240.0831
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.974579,
+    "Z": 0.0,
+    "W": 0.224043
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 9
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42523,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -468.4452,
+    "Y": 0.14,
+    "Z": 1230.8541
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.959576,
+    "Z": 0.0,
+    "W": 0.281451
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 9
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42524,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -483.9812,
+    "Y": 0.14,
+    "Z": 1218.2378
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.922219,
+    "Z": 0.0,
+    "W": 0.386669
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 10
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42525,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -496.2342,
+    "Y": 0.14,
+    "Z": 1202.3803
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.822497,
+    "Z": 0.0,
+    "W": 0.56877
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 10
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42526,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -489.2467,
+    "Y": 0.14,
+    "Z": 1195.9106
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.321979,
+    "Z": 0.0,
+    "W": 0.946747
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 10
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42527,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -476.5052,
+    "Y": 0.14,
+    "Z": 1211.3619
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.393539,
+    "Z": 0.0,
+    "W": 0.919308
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 10
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42528,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -461.1803,
+    "Y": 0.14,
+    "Z": 1223.9982
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.262004,
+    "Z": 0.0,
+    "W": 0.965067
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 9
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42529,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -443.4256,
+    "Y": 0.14,
+    "Z": 1233.3428
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.25673,
+    "Z": 0.0,
+    "W": 0.966483
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 9
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42530,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -426.1191,
+    "Y": 0.14,
+    "Z": 1243.4967
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.229386,
+    "Z": 0.0,
+    "W": 0.973335
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 7
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,4",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42531,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -407.6618,
+    "Y": 0.14,
+    "Z": 1251.3825
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.216431,
+    "Z": 0.0,
+    "W": 0.976298
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 9
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42532,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -389.7309,
+    "Y": 0.14,
+    "Z": 1260.4049
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.28315,
+    "Z": 0.0,
+    "W": 0.959076
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 14
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42533,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -375.6575,
+    "Y": 0.14,
+    "Z": 1274.3148
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.476712,
+    "Z": 0.0,
+    "W": 0.87906
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 16
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42534,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -370.5988,
+    "Y": 0.14,
+    "Z": 1293.2342
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.709452,
+    "Z": 0.0,
+    "W": 0.704754
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 14
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42535,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -372.4915,
+    "Y": 0.14,
+    "Z": 1313.1935
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.766516,
+    "Z": 0.0,
+    "W": 0.642225
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 13
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42536,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -377.657,
+    "Y": 0.14,
+    "Z": 1332.5624
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.802016,
+    "Z": 0.0,
+    "W": 0.597303
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 12
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42537,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -385.1827,
+    "Y": 0.14,
+    "Z": 1351.074
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.852182,
+    "Z": 0.0,
+    "W": 0.523246
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 13
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42538,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -394.2643,
+    "Y": 0.14,
+    "Z": 1368.9751
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.852182,
+    "Z": 0.0,
+    "W": 0.523246
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 15
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42539,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -402.8455,
+    "Y": 0.14,
+    "Z": 1387.1112
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.857335,
+    "Z": 0.0,
+    "W": 0.514758
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 19
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42540,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -415.0854,
+    "Y": 0.14,
+    "Z": 1402.7102
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.925854,
+    "Z": 0.0,
+    "W": 0.377881
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 25
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42541,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -430.8961,
+    "Y": 0.14,
+    "Z": 1414.8725
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.96375,
+    "Z": 0.0,
+    "W": 0.266806
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 27
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42542,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -448.3887,
+    "Y": 0.14,
+    "Z": 1424.7179
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.954461,
+    "Z": 0.0,
+    "W": 0.298337
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 21
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42543,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -461.9665,
+    "Y": 0.14,
+    "Z": 1439.0529
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.880061,
+    "Z": 0.0,
+    "W": 0.474862
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 19
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42544,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -466.282,
+    "Y": 0.14,
+    "Z": 1457.5586
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.532712,
+    "Z": 0.0,
+    "W": 0.846297
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 14
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42545,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -453.0336,
+    "Y": 0.14,
+    "Z": 1467.9963
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.567938,
+    "Z": 0.0,
+    "W": 0.823071
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 26
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
+  },
+  {
+   "EntityId": 42546,
+   "PrefabId": "shore_pond_bank",
+   "Position": {
+    "X": -456.4159,
+    "Y": 0.14,
+    "Z": 1487.5779
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.781846,
+    "Z": 0.0,
+    "W": 0.623472
+   },
+   "Scale": {
+    "X": 20.07,
+    "Y": 1,
+    "Z": 21
+   },
+   "Name": "Pond shore",
+   "Tile": "-2,5",
+   "Layer": "water"
   }
  ]
 }
