@@ -536,6 +536,31 @@ public class WorldStreamingTests
         Assert.False(client.AcousticRefreshPending);
     }
 
+    /// <summary>A coarse tile has a house's shell and front door but not its rooms: the door is a shut
+    /// leaf until the room arrives, and then a doorway.</summary>
+    [Fact]
+    public void A_front_door_without_its_room_is_a_shut_leaf_until_the_room_comes()
+    {
+        var client = new ClientWorldState { RefreshRunner = work => work() };
+        client.Clear(new Vector3(100, 20, 100));
+        client.ConfigureAcoustics(new Vector3(-50, 0, -50), 0.5f, 0.2f, 50f);
+        client.SetAcousticMap(ClientWorldState.BuildAcousticMap(Array.Empty<EntityDefinition>(), new Vector3(100, 20, 100), new Vector3(-50, 0, -50), 0.5f, 0.2f, true, false));
+        var door = new EntityDefinition { EntityId = 21, Transform = new Transform { Position = new Vector3(0, 1, 2), Rotation = Quaternion.Identity } };
+        door.Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(1, 2.1f, 0.05f), IsSolid = true };
+        door.Portal = new PortalComponent { RegionAId = 20, RegionBId = AcousticConstants.GlobalRegionId, ApertureSize = 1.2f };
+        client.RegisterDefinition(door);                        // swung open, re-sent alone
+        client.RegisterDefinition(door, deferAcoustics: true);  // or with its coarse tile
+        client.RequestAcousticRefresh();
+        Assert.False(client.AcousticMap!.Portals.ContainsKey(21));
+
+        var room = new EntityDefinition { EntityId = 20, Transform = new Transform { Position = new Vector3(0, 1.5f, 0), Rotation = Quaternion.Identity } };
+        room.Region.RoomSize = new Vector3(4, 3, 4);
+        room.Region.IsIndoor = true;
+        client.RegisterDefinition(room, deferAcoustics: true);  // the tile goes full
+        client.RequestAcousticRefresh();
+        Assert.True(client.AcousticMap!.Portals.ContainsKey(21));
+    }
+
     [Fact]
     public void Walls_alone_move_the_scene_on_without_rebuilding_the_rooms()
     {

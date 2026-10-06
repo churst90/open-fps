@@ -335,7 +335,10 @@ public class ClientWorldState
             var map = AcousticMap;
             if (map == null) return;
 
-            bool openable = def.Portal.ApertureSize > 0f;
+            // On a streamed map a front door can be held without its room (a coarse tile has the shell
+            // and the door, not the rooms): a shut leaf in a wall, and no doorway into nothing.
+            bool openable = def.Portal.ApertureSize > 0f
+                            && (TileMetres <= 0f || (Holds(def.Portal.RegionAId) && Holds(def.Portal.RegionBId)));
             bool known = map.Portals.ContainsKey(def.EntityId);
             if (!openable && !known) return;
 
