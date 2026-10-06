@@ -140,6 +140,7 @@ public class VoiceChatTests
         Assert.InRange(stream.Ring.MarginSeconds, 0.07, 0.2);
     }
 
+    [Trait("Category", "Timing")] // depends on this machine's speed or on real time; not run on CI
     [Fact]
     public void LostPacketsAreConcealedNotGaps()
     {

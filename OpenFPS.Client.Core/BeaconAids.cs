@@ -385,9 +385,9 @@ public sealed class BeaconAids
         foreach (var (category, kind) in Kinds)
         {
             float[] pcm = Tone(category, rate);
-            ok &= _audio.RegisterSynthesisedSound(kind.Sound, TransientSynth.ToPcm16(pcm), rate);
+            ok &= _audio.RegisterSynthesisedSoundFloat(kind.Sound, pcm, rate);
         }
-        ok &= _audio.RegisterSynthesisedSound(TeammateSound, TransientSynth.ToPcm16(TeammateTone(rate)), rate);
+        ok &= _audio.RegisterSynthesisedSoundFloat(TeammateSound, TeammateTone(rate), rate);
         _registered = ok;
     }
 

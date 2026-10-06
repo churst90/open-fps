@@ -38,7 +38,9 @@ public class BorrowedVoiceDopplerTests
     {
         var profile = VehicleProfile.StockCar;
         float speed = 200f / 3.6f;
-        var source = new EngineVoiceState(profile, Rate, 11) { TargetSpeed = speed };
+        // The provider tells a voice the rate its channel is pitched at whenever it pitches it
+        // (EngineVoiceState.ConsumeRate); a reflection follows that rate rather than Played's blocks.
+        var source = new EngineVoiceState(profile, Rate, 11) { TargetSpeed = speed, ConsumeRate = (float)consumeRate };
         source.PlaceAtSpeed(speed);
 
         var echo = new EngineEchoState(source)

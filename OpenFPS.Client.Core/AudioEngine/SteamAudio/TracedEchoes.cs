@@ -331,6 +331,9 @@ internal sealed class TracedEchoRig : IGuardedUnit
     /// <summary>Gain from the voice's raw samples to the source's level at a metre, the reference the
     /// trace's paths are attenuated from. Game thread writes.</summary>
     public volatile float InputGain;
+    /// <summary>The gain the capture's last block ended on (mixer thread); below zero when a new voice
+    /// takes the rig, so its first block starts at its own gain.</summary>
+    public volatile float LastInputGain = -1f;
     /// <summary>Set by the capture, cleared by the mix: the mix only plays a block captured this block.</summary>
     public volatile bool Fresh;
     /// <summary>The effect's convolution tail belongs to the last voice; the mix resets it on its
@@ -391,14 +394,19 @@ internal static class TracedEchoDsp
             for (int k = 0; k < n * ch; k++) o[k] = i[k];
             var rig = RigOf(ref dsp_state);
             if (rig == null || rig.Slot < 0 || n != rig.FrameSize) return RESULT.OK;
+            // Ramped across the block from the last block's gain: the gain carries the voice's fade and
+            // its distance, set once a game frame, and held per block it stepped every 23 ms.
             float g = rig.InputGain;
+            float g0 = rig.LastInputGain < 0f ? g : rig.LastInputGain;
+            rig.LastInputGain = g;
+            float gStep = (g - g0) / n;
             var cap = rig.Capture;
             double sum = 0;
             for (int k = 0; k < n; k++)
             {
                 float v = 0f;
                 for (int c = 0; c < ch; c++) v += i[k * ch + c];
-                v = v / ch * g;
+                v = v / ch * (g0 + gStep * (k + 1));
                 cap[k] = v;
                 sum += v * (double)v;
             }

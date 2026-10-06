@@ -242,6 +242,21 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>Samples the mixer has taken — the position of "now" for anything reading back.</summary>
     public long Played => Volatile.Read(ref _played);
 
+    /// <summary>
+    /// How fast the mixer takes this voice, relative to the mixer's own rate: its channel's pitch,
+    /// which is its Doppler. The provider sets it whenever it pitches the channel.
+    ///
+    /// <see cref="Played"/> does NOT move at this rate, it moves in whole blocks. FMOD resamples a
+    /// pitched DSP channel by calling the DSP more or fewer times per mixer block, 1024 samples each
+    /// time (measured: a car closing at 60 km/h was called 4.9 % more often, never with a different
+    /// length). So a reader that sits a fixed distance behind Played jumps a whole block, 23 ms of
+    /// waveform, every time the source gets an extra call or misses one — about twice a second for a
+    /// car passing at 60 km/h, more for its front voice. Readers that must stay in step with this
+    /// voice keep a continuous clock that runs at this rate and leans only slowly on Played
+    /// (<see cref="SourceClock"/>).
+    /// </summary>
+    public volatile float ConsumeRate = 1f;
+
     /// <summary>How far ahead the producer is, in samples.</summary>
     public long Lead => Volatile.Read(ref _written) - Volatile.Read(ref _played);
 
@@ -1653,21 +1668,28 @@ public sealed class EngineEchoState : IGuardedUnit
         if (OwnCursor) { RenderOwnCursor(mono, floorSamples, target, gTarget); return; }
         if (Scattering >= 0f && _diffuser == null) _diffuser = new EchoDiffuser(Scattering, Seed, SampleRate);
         float slew = GainSlew;
+        // The source's play position as a continuous clock, not Played itself: Played moves in whole
+        // blocks when the source's channel is pitched (EngineVoiceState.ConsumeRate), and an echo read
+        // a fixed distance behind it skipped or repeated 23 ms of the car at every extra call.
+        double rate = _clock.Begin(Source.Played, Source.ConsumeRate, mono.Length, SampleRate);
         // Slew: up to 12% per sample of drift, which covers the Doppler of a fast pass.
         for (int i = 0; i < mono.Length; i++)
         {
             double diff = target - _delay;
             _delay += Math.Clamp(diff * 0.002, -0.12, 0.12);
             _gain += (gTarget - _gain) * slew;
-            // Reading "back" from the source's current write position: the source rendered its
-            // block before or after this one; the minimum delay covers either order.
+            // Reading back from the source's play position: the source rendered its block before or
+            // after this one; the minimum delay covers either order.
             // Clamped to the slack as well as the target, so a delay that is being slewed downward
             // can never cross into the block the source may not have written yet.
-            double back = Math.Max(_delay, floorSamples) + (mono.Length - i);
-            float y = Source.ReadBack(back) * _gain;
+            double back = Math.Max(_delay, floorSamples) + mono.Length;
+            float y = Source.ReadAt(_clock.Position - back) * _gain;
+            _clock.Position += rate;
             mono[i] = _diffuser != null ? _diffuser.Process(y) : y;
         }
     }
+
+    private SourceClock _clock = SourceClock.Unset;
 
     /// <summary>
     /// The same audio, read at the rate it was synthesized.
@@ -1680,20 +1702,28 @@ public sealed class EngineEchoState : IGuardedUnit
     private void RenderOwnCursor(Span<float> mono, double floorSamples, double target, float gTarget)
     {
         long played = Source.Played;
-        double want = played - target;
+        // Where the source is, continuously (SourceClock): Played moves in whole blocks when the
+        // source's channel is pitched, and a cursor aimed at Played itself was pulled at that saw and
+        // clamped against it, a jump at the end of a block whenever the source missed a call. A block
+        // further back than the floor, too, so the saw's dips do not reach the ceiling below.
+        double rate = _clock.Begin(played, Source.ConsumeRate, mono.Length, SampleRate);
+        double where = _clock.Position;
+        double back = target + mono.Length;
         // Off the ring, or ahead of what the source has played at all: there is nothing to be
         // continuous with, so start again where we should be.
         if (_cursor < 0 || _cursor > played || played - _cursor > Source.RingLength - 4 * mono.Length)
-            _cursor = want;
+            _cursor = where - back;
 
         for (int i = 0; i < mono.Length; i++)
         {
             _gain += (gTarget - _gain) * 0.0015f;
             mono[i] = Source.ReadAt(_cursor) * _gain;
             // One sample per sample, plus an inaudible pull back toward where the cursor belongs.
-            double drift = (played - target) - _cursor;
+            double drift = (where - back) - _cursor;
             _cursor += 1.0 + Math.Clamp(drift * 1e-5, -MaxRateCorrection, MaxRateCorrection);
+            where += rate;
         }
+        _clock.Position = where;
         // Never let the cursor reach what the source has not played yet.
         double ceiling = played - floorSamples;
         if (_cursor > ceiling) _cursor = ceiling;
@@ -1736,7 +1766,6 @@ public sealed class EngineTapState : IGuardedUnit
     public volatile bool FadedOut;
 
     private float _gain;
-    private double _cursor = -1;
 
     public EngineTapState(EngineVoiceState source) { Source = source; Ground = new(source.SampleRate); source._frontGround = Ground; }
 
@@ -1750,29 +1779,64 @@ public sealed class EngineTapState : IGuardedUnit
         // prevent.
         if (!Source.Primed) { mono.Clear(); return; }
 
-        long played = Source.Played;
-        // Start in step with the voice we are the other half of, and resync outright only when there
-        // is no continuity left to keep — the source stopped, or we have fallen off the ring.
-        if (_cursor < 0 || Math.Abs(played - _cursor) > Source.RingLength - 4 * mono.Length)
-            _cursor = played;
+        // In step with the voice we are the other half of, on a continuous clock: the source's own
+        // rate over ours, leaning slowly on where the source has got to. It used to step up to ten
+        // samples once a block toward Played, and Played moves in whole blocks when either channel is
+        // pitched (EngineVoiceState.ConsumeRate), so a car going past had its front voice jump at
+        // nearly every block: 4-8 discontinuities a second, measured (--quality echo, "front").
+        float own = ChannelRate;
+        double rate = _clock.Begin(Source.Played, Source.ConsumeRate / (own > 0.05f ? own : 1f), mono.Length, Source.SampleRate);
 
         float gTarget = TargetGain;
         float step = 1f / (0.06f * MathF.Max(1f, Source.SampleRate));
         for (int i = 0; i < mono.Length; i++)
         {
             _gain += Math.Clamp(gTarget - _gain, -step, step);
-            mono[i] = Ground.Process(Source.ReadFrontAt(_cursor + i)) * _gain;
+            mono[i] = Ground.Process(Source.ReadFrontAt(_clock.Position)) * _gain;
+            _clock.Position += rate;
         }
 
-        // Wall clock, plus an inaudible pull back toward where the other half of this machine has
-        // got to. A hundredth of the block is about a sixth of a semitone, applied only while the
-        // two are out of step; what it is correcting is the difference between two channels' pitch,
-        // which for the two ends of one car is very nearly nothing.
-        double drift = played - _cursor;
-        double maxNudge = Math.Max(1.0, mono.Length * EngineEchoState.MaxRateCorrection);
-        _cursor += mono.Length + Math.Clamp(drift, -maxNudge, maxNudge);
-
         if (gTarget <= 0f && _gain <= 1e-4f) FadedOut = true;
+    }
+
+    /// <summary>This voice's own channel pitch (its Doppler), set by the provider with the pitch.</summary>
+    public volatile float ChannelRate = 1f;
+
+    private SourceClock _clock = SourceClock.Unset;
+}
+
+/// <summary>
+/// Where a live voice's play position IS, continuously, for a reader that has to stay in step with it.
+///
+/// The voice's <see cref="EngineVoiceState.Played"/> is only right on average: a pitched DSP channel is
+/// taken a whole block at a time, more or fewer times per mixer block (EngineVoiceState.ConsumeRate).
+/// This clock runs at the rate the reader is told, and leans on Played through an error averaged over
+/// half a second, applied as a rate of at most half a per cent (under a tenth of a semitone) — so the
+/// block-sized saw in Played never reaches the read, and a real drift is taken out within seconds.
+/// It restarts outright only when it has lost the source by more than a few blocks: the source
+/// stopped, restarted, or this reader was not called for a while.
+/// </summary>
+public struct SourceClock
+{
+    /// <summary>The source position this reader is at, samples.</summary>
+    public double Position;
+    private double _error;
+
+    public static SourceClock Unset => new() { Position = double.NaN };
+
+    /// <summary>Called once per block before reading; returns the per-sample advance for this block.</summary>
+    public double Begin(long played, float rate, int block, float sampleRate)
+    {
+        if (double.IsNaN(Position) || Math.Abs(played - Position) > 6.0 * Math.Max(256, block))
+        {
+            Position = played;
+            _error = 0;
+        }
+        double err = played - Position;
+        _error += (err - _error) * Math.Min(1.0, block / (0.5 * sampleRate));
+        double lean = Math.Clamp(_error / (2.0 * sampleRate), -0.005, 0.005);
+        float r = float.IsFinite(rate) && rate > 0.05f && rate < 20f ? rate : 1f;
+        return r + lean;
     }
 }
 

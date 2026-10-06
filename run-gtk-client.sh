@@ -150,6 +150,33 @@ DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
   "$DOTNET" build "$REPO/OpenFPS.Client.Gtk" -c "$CONFIG" --artifacts-path "$ART" \
   -nodeReuse:false -p:UseSharedCompilation=false -v minimal
 
+# ── Door sounds ready before the first door ─────────────────────────────────────────────────────
+#
+# A door's sound is a simulation that takes seconds to render (a glass door up to forty), and a door
+# opened before its render is ready is silent. The Windows zip ships every door render the client
+# makes at start (publish-windows.sh); here they go into the player's own render cache, which is
+# named by the build (WireContract.Hash) and so starts empty whenever OpenFPS.Common changes. Render
+# the full set once per build, on every core, before launching; a build that has them skips this.
+BUILD=$(grep -ho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Common/"$LOWER"/WireContract.g.cs 2>/dev/null | head -1 | tr -d '"')
+if [ "${OPENFPS_RENDER_CACHE:-}" != "off" ] && [ -n "$BUILD" ]; then
+  RCACHE="${OPENFPS_RENDER_CACHE:-${XDG_DATA_HOME:-$HOME/.local/share}/OpenFPS/rendercache/$BUILD}"
+  if [ ! -e "$RCACHE/.prerendered" ]; then
+    echo "Door sounds for build $BUILD are not rendered yet; rendering them now (about a minute) ..."
+    LAB_ART=/tmp/openfps-lab
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
+      "$DOTNET" build "$REPO/OpenFPS.AudioLab" -c Release --artifacts-path "$LAB_ART" \
+      -nodeReuse:false -p:UseSharedCompilation=false -v minimal
+    LAB_BUILD=$(grep -ho '"[0-9a-f]\{12\}"' "$LAB_ART"/obj/OpenFPS.Common/release/WireContract.g.cs 2>/dev/null | head -1 | tr -d '"')
+    if [ "$LAB_BUILD" != "$BUILD" ]; then
+      echo "  WARNING: the lab is build $LAB_BUILD and the client $BUILD; skipping, doors render as you play."
+    elif (cd "$LAB_ART/bin/OpenFPS.AudioLab/release" && nice ./OpenFPS.AudioLab --prerender-doors "out=$RCACHE"); then
+      touch "$RCACHE/.prerendered"
+    else
+      echo "  WARNING: some door renders failed; the rest are kept, and the missing ones render as you play."
+    fi
+  fi
+fi
+
 echo "Launching GTK client from $OUT ..."
 [ -n "$MODE" ] && echo "  mode: $MODE"
 cd "$OUT"                 # cwd so machines/ (loaded relative to cwd) resolves
