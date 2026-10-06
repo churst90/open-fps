@@ -51,6 +51,7 @@ public static class WideSourcesSpike
 
     public static int Run(string[] args)
     {
+        if (args.Contains("cost")) return WideSourcesCost.Run();
         string outDir = Arg(args, "out=") ?? "/tmp/openfps-wide-sources";
         string set = Arg(args, "set=") ?? "measure";
         bool wide = (Arg(args, "wide=") ?? "on") is not ("off" or "0");

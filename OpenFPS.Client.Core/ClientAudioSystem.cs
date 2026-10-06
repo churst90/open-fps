@@ -713,6 +713,15 @@ public class ClientAudioSystem
                         }
                         // And so is its borrowed engine, if it is voiced from afar.
                         if (_distantVoiced.Contains(id)) _audio.SetAcousticPath(DistantVoiceBase - Math.Abs(id), shadowed);
+                        // And a tree's, a fire's or a fountain tap's other places: behind the same wall,
+                        // each heard from its own offset round the same edge (ExtendedSources).
+                        if (_spreading.TryGetValue(id, out var spread) && spread.Voiced)
+                            for (int k = 1; k < spread.At.Length; k++)
+                            {
+                                var placePath = shadowed;
+                                placePath.ApparentPosition = shadowed.ApparentPosition + (spread.At[k] - spread.At[0]);
+                                _audio.SetAcousticPath(PlaceVoiceId(id, k), placePath);
+                            }
                         continue;
                     }
 
