@@ -448,7 +448,7 @@ public static class RunningWaterSpike
                     if (startOn) Turn(id, true);
                     if (on > 0f) Record($"{label} running", on);
                     Turn(id, false);
-                    if (off > 0f) Record($"{label} shut, draining", off);
+                    if (off > 0f) Record($"{label} shut draining", off);
                     Remove(id);
                 }
                 TapScene("kitchen sink", "flow:kitchen_sink", k + new Vector3(0f, 0.9f, 0f), 30f, 30f);

@@ -423,11 +423,16 @@ water stands over the hole.
   pipe below. Capacity: the lesser of the weir and the orifice above. A gutter's outlet stands at the
   depth that passes its flow; a basin's at its level.
 - **Gurgle**: none while the water is shallower than 0.08 of the hole's open diameter, rising to full
-  at 0.35 D, falling to none at the critical submergence. Air drawn down at 0.25 of the water's
-  volume at the full gurgle (fitted), in gulps every 3.3 √(D/g) ± 30 % (6 Hz for a 30 mm hole, as a
-  bottle). A gulp: one pocket about the hole's radius (log spread 0.35) ringing at its Minnaert note
-  with a steep climb (ξ 0.8), three smaller bubbles, the rush of air through the closing gap (a burst
-  of band noise), and a knock into the pipe below, which rings at its own modes.
+  at 0.35 D, falling to none at the critical submergence (Gordon's S = C v √D, C the inlet's swirl).
+  Air is drawn down at 0.8 of the water's volume at the full gurgle (fitted). Six tenths of it is shed
+  steadily from the vortex's tip as small bubbles (0.05-0.18 D); the rest goes in gulps every 3.3 √(D/g)
+  ± 70 % (about 6 Hz for a 30 mm hole, as a bottle). A gulp: pockets about 1.3 times the hole's radius,
+  never over a bottle's glug (1.7 cm; log spread 0.35), each ringing at its Minnaert note with a steep
+  climb (ξ 0.8) at 0.4 of the fountain's law for its size (fitted: a pocket drawn through a rim pinches
+  off more gently than a drop's bubble), three smaller bubbles, the rush of air through the closing gap
+  (band noise round c / 4π r), and a knock into the pipe below, which rings at its own modes.
+- **The aerated stream**: the air the aerator mixes in (0.5 of the water, fitted) comes out where the
+  stream lands; a quarter of it rings, as bubbles of 0.12-1 mm (fitted): the hiss of a running tap.
 - **Basin** (`FlowBasin`): a level that rises with the tap and falls through the inlet. The first water
   stands in the dish over the waste (0.012 m²) until it is deeper than the bottom falls (6 mm). With
   the plug in only the overflow lets water go. `PlugWhileRunning`: the interact key that turns the tap
@@ -471,7 +476,39 @@ its gutter outlet at the eaves (64 each). All appended at the end of `tools/gen_
 
 ### 10.8 Results
 
-(Filled in after fitting.)
+Recordings: 26 (CC0, CC-BY, CC-BY-SA), in `~/openfps-scratch-archive/running-water-round2-2026-10-06/refs`
+with `SOURCES.txt`: 7 taps into sinks (steel, ceramic, a bottle and a kettle filling), 7 gurgling drains
+and bottles, 4 gutter and downpipe gurgles (none recorded at a downpipe's top with its position
+stated), 3 drips, 2 showers, 3 toilets. Measured as round 1 (20 s pieces, the 14 texture statistics,
+the 10 ms 4-16 kHz kurtosis, octaves).
+
+At a metre (AudioLab `--running-water cycle` and `levels`):
+
+| model | inside (of 14) | kurtosis | recordings' kurtosis |
+|---|---|---|---|
+| kitchen sink, running | 14 | 3.38 | 3.01-7.59 |
+| kitchen sink, draining | 13 | 5.58 | 3.20-5.15 |
+| washbasin, running / draining | 14 / 12 | 3.35 / 4.71 | as above |
+| shower | 12 | 3.95 | 3.69-7.65 |
+| gutter outlet, heavy / violent rain | 13 / 12 | 5.65 / 5.07 | 3.09-4.82 |
+
+- Fitted: the aerator's air (0.5 of the water, a quarter of it ringing, 0.12-1 mm), the gulped air
+  (0.8), the shedding share (0.6), the gulp's excitation (0.4 of the fountain's law), the pocket
+  (1.3 hole radii, at most 1.7 cm), a looser rhythm (± 70 %), the slurp's band.
+- Not fitted: the showers (the recordings are 11-22 dB brighter at 4-16 kHz, close to the spray); the
+  violent-rain outlet is 4-6 dB heavy at 250-500 Hz (the gulp's air is a compromise between the drains
+  and the gutters); the dripping tap rings steel where the recorded drips plink into water.
+- Levels at a metre: kitchen sink 56.8 dB running, washbasin 51.9, shower 59.8, dripping tap 21.4
+  (declared at the drip, so the mixer lifts it as a quiet source), gutter outlet 48 dB in moderate rain
+  and 73.5 dB in violent, downpipe 53.3 moderate (round 1: 51.7), 66.0 heavy (58.9).
+- A fall now grows 6.7, 4.6, 4.0 and 3.6 dB per doubling from 0.25 to 4 L/s (the basin overflow):
+  steeper through the drop-to-sheet transition, as Watts et al.'s weir (6 dB(A)); 3 dB above it.
+- After heavy rain a house's downpipe still carries 25 mL/s at 10 minutes and 15 at 25 (round 1: dry).
+- Through the game (client, mixer, HRTF, ear model, loudness law): no clipping; draining is 2.7 dB over
+  the kitchen sink's running and 9.2 dB over the washbasin's. Renders and tables:
+  `inbox/running-water-round2-2026-10-06/README.txt`.
+- Cost of one core: kitchen sink 2.0 %, washbasin 1.3 %, shower 2.4 %, gutter outlet 0.9 %, downpipe
+  1.4 %.
 
 ### 10.9 Sources (round 2)
 

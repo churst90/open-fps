@@ -38,7 +38,7 @@ public sealed partial class RunningWaterSynth
     /// and bottles, which wanted 0.6 for their weight at 125-500 Hz, and four recorded downpipe and gutter
     /// gurgles, which at 0.6 stood 10 dB too heavy there in a downpour. A bottle lets in as much air as water
     /// leaves; an outlet's vortex less.</summary>
-    public const float GulpAirShare = 0.4f;
+    public const float GulpAirShare = 0.8f;
 
     /// <summary>A gulp pocket's equivalent radius as a share of the hole's (open) radius, and how it
     /// varies (log). A pocket is pinched off by the hole's own rim, so it is about the hole's size: a
@@ -61,6 +61,12 @@ public sealed partial class RunningWaterSynth
 
     /// <summary>The rush of air through the closing gap, its share of the pocket's bubble energy. FITTED.</summary>
     private const float SlurpShare = 0.5f;
+
+    /// <summary>How hard a gulp's pocket is set ringing against a drop's bubble of the same size (the fountain's law,
+    /// a fixed fraction of the radius): a pocket drawn through a rim pinches off over a longer neck, and the
+    /// collapse of the neck is what sets a bubble ringing (Czerski and Deane 2010). FITTED: at the full law a
+    /// draining washbasin stood 11 dB over its own running tap.</summary>
+    private const float GulpExcitation = 0.4f;
 
     // ── The inlet: physical ───────────────────────────────────────────────────────────────────────
 
@@ -353,7 +359,7 @@ public sealed partial class RunningWaterSynth
             // (it drives the surface over the hole like a piston), its note climbing.
             float hz = FallingWaterSynth.MinnaertHzMetres / main;
             if (hz < 0.45f * _rate)
-                open.Bubble(when, hz, FallingWaterSynth.BubbleDamping(mm), FallingWaterSynth.BubblePascalsPerMm * mm * GurglePart, GulpRise);
+                open.Bubble(when, hz, FallingWaterSynth.BubbleDamping(mm), FallingWaterSynth.BubblePascalsPerMm * mm * GulpExcitation * GurglePart, GulpRise);
             // The rest of its air breaks into a few smaller bubbles.
             for (int b = 0; b < 3; b++)
             {
@@ -364,7 +370,7 @@ public sealed partial class RunningWaterSynth
             }
             // The air rushing through the closing gap: a short burst of flow noise as loud as a share of
             // the pocket's ringing, its band from the gap's own size (a few kHz for a centimetre gap).
-            float ring = FallingWaterSynth.BubblePascalsPerMm * mm;
+            float ring = FallingWaterSynth.BubblePascalsPerMm * mm * GulpExcitation;
             float slurp = ring * MathF.Sqrt(SlurpShare) * 0.3f * GurglePart;
             float centre = Math.Clamp(343f / (2f * MathF.PI * MathF.Max(0.003f, 0.5f * holeDiameter)) * 0.5f, 400f, 4000f);
             open.Burst(when, 0.004f, 0.025f, slurp, centre / 2f, MathF.Min(centre * 2f, 0.45f * _rate));
