@@ -60,11 +60,49 @@ public static class RainFeeds
 
     public static string Key(int slot) => KeyPrefix + slot.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-    public static bool TryParse(string key, out int slot)
+    /// <summary>"rain:0/2": part 2 of slot 0, the roof over the ear. Part 0 is plain "rain:0".</summary>
+    public static string Key(int slot, int part) => part <= 0 ? Key(slot)
+        : Key(slot) + "/" + part.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// How many voices a slot's patch is heard from (RainVoiceState, RainField.PlayParts); one each with
+    /// ExtendedSources off.
+    ///
+    /// The roof over the ear, four. A roof over your head is rain landing all over it and a sheet ringing
+    /// all over it, not a point: played as one voice straight overhead, both ears heard the same thing
+    /// (interaural correlation 1.00 in a car and under a steel attic roof, 0.74-0.80 under the bus shelter,
+    /// rain round 2, 2026-10-06). Each part renders a quarter of the roof's area from round the point over
+    /// the ear.
+    ///
+    /// Each near quarter, two. A quarter played from its middle puts the whole of the north and south
+    /// quarters straight ahead and behind, where both ears hear the same: half the near rain was mono, and
+    /// the street measured 0.53 at 2 kHz (AudioLab --wide-sources). Two parts 22.5° either side of each
+    /// quarter's middle. The far ring stays one a quarter: it is quieter, and further off the angles matter less.
+    /// </summary>
+    public static int PartsFor(int slot)
     {
-        slot = -1;
+        if (!OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled) return 1;
+        if (slot == OpenFPS.Client.Core.RainSurvey.OverheadSlot) return RoofParts;
+        return slot >= 1 && slot <= 4 ? NearParts : 1;
+    }
+
+    public const int RoofParts = 4, NearParts = 2;
+
+    public static bool TryParse(string key, out int slot) => TryParse(key, out slot, out _);
+
+    public static bool TryParse(string key, out int slot, out int part)
+    {
+        slot = -1; part = 0;
         if (!key.StartsWith(KeyPrefix, StringComparison.Ordinal)) return false;
-        return int.TryParse(key.AsSpan(KeyPrefix.Length), System.Globalization.NumberStyles.Integer,
+        var rest = key.AsSpan(KeyPrefix.Length);
+        int slash = rest.IndexOf('/');
+        if (slash >= 0)
+        {
+            if (!int.TryParse(rest[(slash + 1)..], System.Globalization.NumberStyles.Integer,
+                              System.Globalization.CultureInfo.InvariantCulture, out part) || part < 0) return false;
+            rest = rest[..slash];
+        }
+        return int.TryParse(rest, System.Globalization.NumberStyles.Integer,
                             System.Globalization.CultureInfo.InvariantCulture, out slot)
                && slot >= 0 && slot < Slots;
     }
@@ -82,6 +120,12 @@ public static class RainFeeds
 /// placed by, so light rain and a cloudburst stand in the same relation to a car going past as they
 /// would in the street, compressed as everything is. A change faster than the measurement — a gust
 /// of heavier drops, a near drop — goes straight through: only the slow level is handed to the law.
+///
+/// A PART of a patch (the roof over the ear, or a near quarter, heard from several places, RainFeeds.PartsFor) renders
+/// its share of every surface's area with its own drops, and is rendered against the WHOLE patch's
+/// level: its own measured level times the number of parts, the parts being alike. So each part plays
+/// its share, the parts together play the patch, and all of them are placed by the patch's level.
+/// Only part 0 publishes the level.
 /// </summary>
 public sealed class RainVoiceState : PhysicalVoiceState
 {
@@ -105,15 +149,19 @@ public sealed class RainVoiceState : PhysicalVoiceState
 
     private readonly RainFeed _feed;
     public readonly RainSynth Synth;
+    public readonly int Part, Parts;
+    private RainPatch? _whole, _share;
     private double _meanSquare;
     private long _measured;
     private float _norm;
     private readonly float _alpha;
 
-    public RainVoiceState(RainFeed feed, float sampleRate, int seed)
+    public RainVoiceState(RainFeed feed, float sampleRate, int seed, int part = 0, int parts = 1)
         : base(ReferenceDb, sampleRate, HeadroomDb)
     {
         _feed = feed;
+        Parts = Math.Max(1, parts);
+        Part = Math.Clamp(part, 0, Parts - 1);
         // On the clock every rain voice shares, so the patches round a listener swell together.
         Synth = new RainSynth(sampleRate, seed) { Clock = OpenFPS.Common.WindField.Now() };
         _alpha = 1f / (LevelSeconds * sampleRate);
@@ -121,13 +169,19 @@ public sealed class RainVoiceState : PhysicalVoiceState
 
     protected override void Control(float seconds, float dt)
     {
-        Synth.Patch = _feed.Patch;
+        var patch = _feed.Patch;
+        if (Parts > 1 && patch != null)
+        {
+            if (!ReferenceEquals(patch, _whole)) { _whole = patch; _share = patch.Share(1f / Parts); }
+            patch = _share;
+        }
+        Synth.Patch = patch;
         Synth.Falling = _feed.Falling;
         if (_measured > 0)
         {
-            double ms = Math.Max(FloorMeanSquare, _meanSquare);
+            double ms = Math.Max(FloorMeanSquare, _meanSquare * Parts);
             _norm = (float)(ReferencePascals / Math.Sqrt(ms));
-            _feed.LevelDb = (float)(10.0 * Math.Log10(ms / (20e-6 * 20e-6)));
+            if (Part == 0) _feed.LevelDb = (float)(10.0 * Math.Log10(ms / (20e-6 * 20e-6)));
         }
     }
 

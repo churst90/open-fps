@@ -222,6 +222,18 @@ public class ClientAudioSystem
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_FRONT_VOICES"), out int fv) && fv >= 0 ? fv : 6;
     private int _adaptiveFront = FrontVoiceBudget;
 
+    /// <summary>
+    /// How many outer places of trees, fires and fountain taps may have voices at once (ExtendedSources),
+    /// nearest source first. Like a machine's front outlet, a place costs nothing but geometry when it is
+    /// given up: the source merges to its middle at the same level. So places are the first thing the
+    /// mixer gives up when it runs short, a source's worth at a time, and the last it takes back.
+    /// </summary>
+    /// <remarks>OPENFPS_PLACE_VOICES=0 keeps every extended source on its middle alone.</remarks>
+    private static readonly int PlaceVoiceBudget =
+        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_PLACE_VOICES"), out int pv) && pv >= 0 ? pv : 36;
+    private int _adaptivePlaces = PlaceVoiceBudget;
+    private const int PlaceBudgetStep = 6;
+
     /// <summary>Which machines currently have their front outlet on a voice of its own.</summary>
     private readonly HashSet<int> _frontVoiced = new();
     /// <summary>Which vehicles currently have a siren voice running.</summary>
@@ -398,6 +410,7 @@ public class ClientAudioSystem
         int distant = DistantVoiceBase - Math.Abs(entityId);
         if (_distantBoundTo.Remove(distant)) _audio.StopSound(distant);
         if (_frontVoiced.Remove(entityId)) _audio.StopSound(IntakeVoiceBase - Math.Abs(entityId));
+        if (_spreading.Remove(entityId, out var spreading) && spreading.Voiced) StopOuter(entityId, spreading, now: true);
         if (_sirenVoiced.Remove(entityId)) _audio.StopSound(SirenVoiceBase - Math.Abs(entityId));
         _sirenControl.Remove(entityId);
         _frontRetiring.Remove(entityId);
@@ -807,6 +820,7 @@ public class ClientAudioSystem
         // happens to whichever car is furthest away and being drowned by three nearer ones.
         ChooseLiveEngines(world, visualEyePos);
         ChooseLiveMachines(world, visualEyePos);
+        ChoosePlaces(world, visualEyePos);
         _engineEchoes.EchoesPerEngine = _adaptiveEchoes;
         _engineEchoes.SyncGeometry(world);
         float engineDt = (float)Math.Max(1e-3, _now() - _lastEngineTime);
@@ -830,6 +844,8 @@ public class ClientAudioSystem
                 ProcessAudioEmitter(world, snap, visualEyePos, engineDt);
             }
         }
+        // The outer places of trees and fires that were not placed this frame (out of the budget, gone).
+        RetireSpreading();
 
         long partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         UpdateHorns(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
@@ -1500,10 +1516,12 @@ public class ClientAudioSystem
         {
             if (load > MixerLoadCeiling && now - _overCeilingSince >= OverCeilingSeconds)
             {
-                // A machine's second outlet goes first: it is the only voice whose loss costs
-                // nothing but geometry — the machine stays exactly as loud, because the front tap
-                // slews back into the voice that is still playing.
-                if (_adaptiveFront > 0) _adaptiveFront--;
+                // The places of extended sources go first, a source's worth at a time, and then a
+                // machine's second outlet: the only voices whose loss costs nothing but geometry —
+                // the source stays exactly as loud, because what they carried slews back into the
+                // voice that is still playing.
+                if (_adaptivePlaces > 0) _adaptivePlaces = Math.Max(0, _adaptivePlaces - PlaceBudgetStep);
+                else if (_adaptiveFront > 0) _adaptiveFront--;
                 // Then a standing machine, before a reflection. A machine that drops out is one
                 // fewer air conditioner in a street of forty and is not missed; a car's first
                 // reflection is the wall of the building you are walking beside.
@@ -1522,6 +1540,7 @@ public class ClientAudioSystem
                 else if (_adaptiveMachines < MachineVoiceBudget) _adaptiveMachines++;
                 else if (_adaptiveDistant < MaxDistantVoices) _adaptiveDistant++;
                 else if (_adaptiveFront < FrontVoiceBudget) _adaptiveFront++;
+                else if (_adaptivePlaces < PlaceVoiceBudget) _adaptivePlaces = Math.Min(PlaceVoiceBudget, _adaptivePlaces + PlaceBudgetStep);
                 else if (_adaptiveEchoes < EchoCeiling && _echoMsSmoothed < EchoPassCeilingMs / 3) _adaptiveEchoes++;
                 else goto settled;
                 _lastBudgetChange = now;
@@ -1866,6 +1885,149 @@ public class ClientAudioSystem
         ApplyGround(ref e, _groundWorld);
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
         else _audio.PlayPhysicalSoundDirect(e);
+    }
+
+    // ── Extended sources: a tree's crown, a fire's bed (ExtendedSources) ───────────────────────────
+
+    /// <summary>Voice ids for the outer places of a tree or a fire: eight a source, place 1 to 7.</summary>
+    internal const int PlaceVoiceBase = -5_000_000;
+    internal static int PlaceVoiceId(int sourceId, int place) => PlaceVoiceBase - Math.Abs(sourceId) * 8 - place;
+
+    /// <summary>After a source merges to its middle, its outer voices are kept this long, s: what was
+    /// already written to them (a twig's clatter, a crackle's rattle, up to the render lead ahead) rings
+    /// out rather than being cut.</summary>
+    private const double MergeHoldSeconds = 2.0;
+
+    private sealed class Spreading
+    {
+        public Vector3[] Layout = Array.Empty<Vector3>();
+        public Vector3[] At = Array.Empty<Vector3>();
+        public float Spread;
+        public bool Voiced;
+        public double MergedSince = double.NaN;
+        public long Frame;
+    }
+    private readonly Dictionary<int, Spreading> _spreading = new();
+    private readonly HashSet<int> _placesGranted = new();
+    private readonly List<(float D2, int Id, int Outer)> _placeCandidates = new();
+
+    /// <summary>Which live extended sources may spread this frame: nearest first, while their outer
+    /// places fit in <see cref="_adaptivePlaces"/>. One that wants none (too far to be heard as wide)
+    /// asks for nothing.</summary>
+    private void ChoosePlaces(WorldSnapshot world, Vector3 eyePos)
+    {
+        _placesGranted.Clear();
+        _placeCandidates.Clear();
+        foreach (int id in _liveMachines)
+        {
+            if (!world.Entities.TryGetValue(id, out var snap)) continue;
+            var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(snap.Definition.SoundEmitter.SoundId);
+            if (layout == null) continue;
+            var at = OpenFPS.Common.AudioEmission.PointFor(snap);
+            float d2 = Vector3.DistanceSquared(at, eyePos);
+            if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.SpreadFor(
+                    OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), MathF.Sqrt(d2)) <= 0f) continue;
+            _placeCandidates.Add((d2, id, layout.Length - 1));
+        }
+        _placeCandidates.Sort(static (a, b) => a.D2.CompareTo(b.D2));
+        int left = _adaptivePlaces;
+        foreach (var (_, id, outer) in _placeCandidates)
+        {
+            if (outer > left) continue;
+            left -= outer;
+            _placesGranted.Add(id);
+        }
+    }
+    private readonly List<int> _spreadingGone = new();
+    private long _spreadFrame;
+
+    /// <summary>
+    /// How much of a tree or a fire its outer places carry from here, slewed, and the one gain that keeps
+    /// the places together as loud as the source from its middle (ExtendedSources.Balance), applied to its
+    /// own voice's emitter before it is submitted.
+    /// </summary>
+    private Spreading SpreadOf(EntitySnapshot snap, Vector3[] layout, ref SpatialEmitter e, Vector3 eyePos, float dt, double now)
+    {
+        if (!_spreading.TryGetValue(snap.Id, out var sp) || sp.Layout != layout)
+            _spreading[snap.Id] = sp = new Spreading { Layout = layout, At = new Vector3[layout.Length] };
+        sp.Frame = _spreadFrame;
+        for (int i = 0; i < layout.Length; i++) sp.At[i] = e.Position + Vector3.Transform(layout[i], snap.Transform.Rotation);
+        float target = !_placesGranted.Contains(snap.Id) ? 0f : OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.SpreadFor(
+            OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), Vector3.Distance(eyePos, e.Position));
+        sp.Spread = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Slew(sp.Spread, target, MathF.Min(dt, 0.25f));
+        Span<float> shares = stackalloc float[layout.Length];
+        OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Shares(sp.Spread, shares);
+        e.Volume *= OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Balance(eyePos, e.Position, sp.At, shares, e.MinDistance, e.Range);
+        e.Spread = sp.Spread;
+        if (sp.Spread > 0f) sp.MergedSince = double.NaN;
+        else if (double.IsNaN(sp.MergedSince)) sp.MergedSince = now;
+        return sp;
+    }
+
+    /// <summary>
+    /// The outer places of a tree or a fire, each a voice at its own point reading its own stream of the
+    /// one synth. Everything but the point is the source's own emitter: the same level reference, range,
+    /// path, region and declared level, and the same balance gain, so the places and the middle are one
+    /// source. Kept while any of it is spread, and <see cref="MergeHoldSeconds"/> after.
+    /// </summary>
+    private void PlaceOuter(int sourceId, Spreading sp, in SpatialEmitter middle, WorldSnapshot world, double now)
+    {
+        bool want = sp.Spread > 0f || (!double.IsNaN(sp.MergedSince) && now - sp.MergedSince < MergeHoldSeconds);
+        if (!want)
+        {
+            if (sp.Voiced) StopOuter(sourceId, sp);
+            return;
+        }
+        sp.Voiced = true;
+        for (int k = 1; k < sp.Layout.Length; k++)
+        {
+            var e = middle;
+            e.EntityId = PlaceVoiceId(sourceId, k);
+            e.Position = sp.At[k];
+            e.ApparentPosition = middle.ApparentPosition + (sp.At[k] - middle.Position);
+            e.PlaceOfEntity = sourceId;
+            e.Place = k;
+            e.Spread = 0f;
+            e.StartSoundId = "";
+            e.StopSoundId = "";
+            ApplyGround(ref e, world);
+            if (_placesRetiring.Remove(e.EntityId)) _audio.ReviveEngine(e.EntityId);
+            if (_audio.IsPlaying(e.EntityId)) _audio.UpdateSpatialAttributes(e);
+            else _audio.PlayPhysicalSoundDirect(e);
+        }
+    }
+
+    /// <summary>Lets a source's outer places go: faded, as any running synth is (they may still be
+    /// sounding when the source leaves the budget), or at once when the source itself is gone.</summary>
+    private void StopOuter(int sourceId, Spreading sp, bool now = false)
+    {
+        for (int k = 1; k < sp.Layout.Length; k++)
+        {
+            int id = PlaceVoiceId(sourceId, k);
+            _groundCache.Remove(id);
+            if (now) { _placesRetiring.Remove(id); _audio.StopSound(id); }
+            else if (!_placesRetiring.Contains(id)) _placesRetiring.Add(id);
+        }
+        sp.Voiced = false;
+    }
+    private readonly List<int> _placesRetiring = new();
+
+    /// <summary>Lets go the places of every source not placed this frame: out of the machine budget, or gone.</summary>
+    private void RetireSpreading()
+    {
+        _spreadingGone.Clear();
+        foreach (var (id, sp) in _spreading)
+            if (sp.Frame != _spreadFrame) _spreadingGone.Add(id);
+        foreach (int id in _spreadingGone)
+        {
+            if (_spreading.Remove(id, out var sp) && sp.Voiced) StopOuter(id, sp);
+        }
+        for (int i = _placesRetiring.Count - 1; i >= 0; i--)
+        {
+            int id = _placesRetiring[i];
+            if (_audio.FadeOutEngine(id)) { _audio.StopSound(id); _placesRetiring.RemoveAt(i); }
+        }
+        _spreadFrame++;
     }
 
     /// <summary>The birds: found from the map's foliage and roofs, not placed. See BirdLife.</summary>
@@ -2337,6 +2499,8 @@ public class ClientAudioSystem
         float engineMinDistance = def.SoundEmitter.MinDistance;
         float engineRange = def.SoundEmitter.Range;
         float engineExtent = def.SoundEmitter.ExtentMetres;
+        // A tree or a fire: the places it is heard from across its extent (ExtendedSources).
+        Vector3[]? extentLayout = null;
         // The declared level the voice is placed by, for the ear model; an authored source with only a
         // volume has none.
         float earLevel = 0f;
@@ -2381,6 +2545,7 @@ public class ClientAudioSystem
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
                 earLevel = levelDb;
+                extentLayout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(physicalKey);
                 if (physicalKey.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
                 {
                     (powerLever, rotorWake) = FlightPower(snap.Velocity);
@@ -2606,7 +2771,10 @@ public class ClientAudioSystem
         long groundAt = System.Diagnostics.Stopwatch.GetTimestamp();
         if (engineKey.Length > 0 || physicalKey != null) ApplyGround(ref emitter, world);
         _partMs[1] += Ms(groundAt);
+        Spreading? spreading = extentLayout != null ? SpreadOf(snap, extentLayout, ref emitter, eyePos, engineDt, now) : null;
         _audio.Submit(emitter);
+        // ...and its other places, after its middle, so the synth they read already exists.
+        if (spreading != null) PlaceOuter(snap.Id, spreading, emitter, world, now);
 
         // The other end of the machine, when it is close enough to be a second thing. Placed after
         // the machine's own voice, so an engine that has only just been built already exists for the

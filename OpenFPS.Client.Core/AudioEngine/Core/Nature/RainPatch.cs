@@ -119,6 +119,30 @@ public sealed class RainLayer
         Bins++;
     }
 
+    /// <summary>The same surface with <paramref name="share"/> of its area in every bin: one of several
+    /// voices that together render it (a roof over the ear heard from several places, RainVoiceState).
+    /// Its drops are that share of the whole's, so the voices' drops together are the whole's.</summary>
+    public RainLayer Share(float share)
+    {
+        var l = new RainLayer
+        {
+            Kind = Kind, Material = Material, Stretch = Stretch, Plate = Plate, FromBelow = FromBelow,
+            LeafAreaIndex = LeafAreaIndex, UnderKind = UnderKind, UnderStretch = UnderStretch,
+            DripFallMetres = DripFallMetres, ModulusGPa = ModulusGPa, Bins = Bins,
+        };
+        for (int i = 0; i < Bins; i++)
+        {
+            l.Area[i] = Area[i] * share;
+            l.Distance[i] = Distance[i];
+            l.Aim[i] = Aim[i];
+            l.Discrete[i] = Discrete[i];
+            l.DiscreteRainFromMm[i] = DiscreteRainFromMm[i];
+            l.DiscreteHailFromMm[i] = DiscreteHailFromMm[i];
+            l._ring[i] = _ring[i];
+        }
+        return l;
+    }
+
     /// <summary>The least a surface's clicks count for however edge-on it is: what the edge of a
     /// roof or a kerb diffracts toward an ear level with it or below it.</summary>
     public const float MinAim = 0.1f;
@@ -161,4 +185,11 @@ public sealed class RainPatch
     /// distance with this extent — so the mixer's law hands back exactly what arrived.</summary>
     public float ReferenceDistance = 1f;
 
+    /// <summary>The same patch with <paramref name="share"/> of every surface's area (RainLayer.Share).</summary>
+    public RainPatch Share(float share)
+    {
+        var layers = new RainLayer[Layers.Length];
+        for (int i = 0; i < layers.Length; i++) layers[i] = Layers[i].Share(share);
+        return new RainPatch { Layers = layers, ReferenceDistance = ReferenceDistance };
+    }
 }

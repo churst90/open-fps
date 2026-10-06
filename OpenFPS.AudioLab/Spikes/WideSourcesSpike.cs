@@ -9,6 +9,7 @@ using System.Threading;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;
@@ -34,7 +35,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class WideSourcesSpike
 {
-    private sealed record Segment(string Name, double Start, double Seconds, double CpuPercent, float MixerLoad, int Voices);
+    private sealed record Segment(string Name, double Start, double Seconds, double CpuPercent, float MixerLoad, int Voices, double PlacedDb);
 
     // Where the sources stand, relative to their own middle, as on the city map (tools/gen_city.py).
     private static readonly Vector3 FountainCentre = new(0f, 0f, 0f);
@@ -56,6 +57,10 @@ public static class WideSourcesSpike
         float renderSeconds = float.Parse(Arg(args, "sec=") ?? "30", CultureInfo.InvariantCulture);
         Directory.CreateDirectory(outDir);
         ExtendedSources.Enabled = wide;
+        if (Arg(args, "collapse=") is "1" or "on") ExtendedSources.LayoutScale = 0f;
+        if (Arg(args, "spread=") is { } forced) ExtendedSources.ForceSpread = float.Parse(forced, CultureInfo.InvariantCulture);
+        // A steady breeze for the level rows: the tree's level then holds still while it is measured.
+        if (Arg(args, "turbulence=") is { } turb) _turbulence = float.Parse(turb, CultureInfo.InvariantCulture);
         Console.WriteLine($"Extended sources {(wide ? "spread" : "one point")}; ear model {(OpenFPS.Common.Hearing.EarModel.Enabled ? "on" : "off")}");
 
         AcousticRegistry.Initialize();
@@ -93,6 +98,39 @@ public static class WideSourcesSpike
         int nextId = 100;
         double loadSum = 0; int loadCount = 0;
 
+        // What the mixer is placing the source at, from its voices' gains (LoudestVoices: the distance law,
+        // the path and the ear model's gain, per voice), each weighted by the share of the source its
+        // stream carries: the source's channel power, whatever its spread, without its own wandering.
+        string measuredSound = "";
+        int measuredMiddle = 0;
+        float measuredSpread = 0f;
+        int measuredPlaces = 1;
+        double placedSum = 0; int placedCount = 0, pumpCount = 0;
+        void SamplePlaced()
+        {
+            if (measuredSound.Length == 0 || (++pumpCount % 25) != 0) return;
+            Span<float> shares = stackalloc float[Math.Max(1, measuredPlaces)];
+            ExtendedSources.Shares(measuredSpread, shares);
+            double p = 0;
+            foreach (var v in facade.LoudestVoices(64))
+            {
+                if (v.SoundId != measuredSound || v.Reflection) continue;
+                float share = v.EntityId == measuredMiddle ? shares[0] : (shares.Length > 1 ? shares[1] : 0f);
+                p += share * Math.Pow(10, v.Mid / 10.0);
+            }
+            if (p > 0) { placedSum += p; placedCount++; }
+        }
+        void Measure(string soundId, int middle, Vector3 at, Vector3 ear)
+        {
+            measuredSound = soundId;
+            measuredMiddle = middle;
+            var layout = ExtendedSources.Layout(soundId);
+            measuredPlaces = layout?.Length ?? 1;
+            measuredSpread = layout == null ? 0f
+                : float.IsNaN(ExtendedSources.ForceSpread) ? ExtendedSources.SpreadFor(ExtendedSources.Reach(layout), Vector3.Distance(ear, at))
+                : ExtendedSources.ForceSpread;
+        }
+
         void Pump(double seconds)
         {
             var until = clock.Elapsed.TotalSeconds + seconds;
@@ -102,22 +140,24 @@ public static class WideSourcesSpike
                 audio.Update(world.GetSnapshot());
                 facade.PumpForTest();
                 loadSum += facade.MixerLoad; loadCount++;
+                SamplePlaced();
                 Thread.Sleep(4);
             }
         }
-        void Record(string name, double seconds)
+        void Record(string name, double seconds, Action<double>? pump = null)
         {
             double start = clock.Elapsed.TotalSeconds;
             proc.Refresh();
             var cpu0 = proc.TotalProcessorTime;
-            loadSum = 0; loadCount = 0;
-            int voicesBefore = provider.SpatialVoicesFree;
-            Pump(seconds);
+            loadSum = 0; loadCount = 0; placedSum = 0; placedCount = 0;
+            (pump ?? Pump)(seconds);
             proc.Refresh();
             double cpu = (proc.TotalProcessorTime - cpu0).TotalSeconds / seconds * 100.0;
             int used = 160 - provider.SpatialVoicesFree;
-            segments.Add(new Segment(name, start, seconds, cpu, loadCount > 0 ? (float)(loadSum / loadCount) : 0f, used));
-            Console.WriteLine($"  {start,7:F2} s  {name} ({seconds:F1} s)  cpu {cpu:F0} %  mixer {(loadCount > 0 ? loadSum / loadCount : 0):P1}  HRTF voices in use {used}");
+            double placed = placedCount > 0 ? 10 * Math.Log10(placedSum / placedCount) : double.NaN;
+            segments.Add(new Segment(name, start, seconds, cpu, loadCount > 0 ? (float)(loadSum / loadCount) : 0f, used, placed));
+            Console.WriteLine($"  {start,7:F2} s  {name} ({seconds:F1} s)  cpu {cpu:F0} %  mixer {(loadCount > 0 ? loadSum / loadCount : 0):P1}  HRTF voices in use {used}"
+                              + (double.IsNaN(placed) ? "" : $"  placed {placed:F2} dB (spread {measuredSpread:F2})"));
         }
         void Stand(Vector3 feet, float yaw)
         {
@@ -152,7 +192,7 @@ public static class WideSourcesSpike
         }
 
         var calm = WindWeather.Steady(0f, 250f, 0f);
-        var breeze = WindWeather.Steady(4.5f, 250f, 0.25f);
+        var breeze = WindWeather.Steady(4.5f, 250f, _turbulence);
         WindField.Weather = calm;
 
         // A park tree: its emitter at the middle of its crown, as the map places it (7 m up). d is from
@@ -168,9 +208,11 @@ public static class WideSourcesSpike
             {
                 var feet = trunk + new Vector3(0f, 0f, -d);
                 Stand(feet, YawTo(feet, trunk));
+                Measure("foliage:park_tree", id, trunk + new Vector3(0f, 7f, 0f), feet + new Vector3(0f, 1.7f, 0f));
                 Pump(2.5);
                 Record($"{label} {d:0.#}m", seconds);
             }
+            measuredSound = "";
             Remove(new[] { id });
             WindField.Weather = calm;
             Pump(1.5);
@@ -230,9 +272,11 @@ public static class WideSourcesSpike
             {
                 var feet = pit + new Vector3(0f, 0f, -d);
                 Stand(feet, YawTo(feet, pit));
+                Measure("fire:fire_pit", id, pit + new Vector3(0f, 0.6f, 0f), feet + new Vector3(0f, 1.7f, 0f));
                 Pump(2.5);
                 Record($"{label} {d:0.#}m", seconds);
             }
+            measuredSound = "";
             Remove(new[] { id });
             WindField.Weather = calm;
             Pump(1.5);
@@ -252,6 +296,38 @@ public static class WideSourcesSpike
             Pump(3.0);
         }
 
+        // Rain round a listener standing in one of the rain lab's scenes (RainSpike.Scenes: a bus shelter,
+        // a room under a steel roof, the driver's seat of a parked car), played by the game's RainField
+        // through this provider. roofOnly: the roof over the ear and its near drops alone.
+        void Roof(string scene, bool roofOnly, double seconds, string label)
+        {
+            RainSpike._riding = -1;
+            var (w, ear, _) = RainSpike.Scenes().First(x => x.Name == scene).Make();
+            int riding = RainSpike._riding;
+            w.Temperature = 15f; w.Humidity = 0.8f; w.AirPressure = 1013.25f; w.AirAbsorptionMultiplier = 1f;
+            w.PrecipitationIntensity = 0.5f;
+            w.RainRateMmPerHour = Rainfall.ModerateRate;
+            w.Precipitation = new Precipitation(PrecipitationKind.Rain, Rainfall.ModerateRate);
+            var field = new OpenFPS.Client.Core.RainField(facade, new SpatialAcoustics()) { OnlySlot = roofOnly ? OpenFPS.Client.Core.RainSurvey.OverheadSlot : -1 };
+            void RainPump(double sec)
+            {
+                var until = clock.Elapsed.TotalSeconds + sec;
+                while (clock.Elapsed.TotalSeconds < until)
+                {
+                    facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
+                    field.Update(w, ear, clock.Elapsed.TotalSeconds, -1, -1, riding);
+                    facade.PumpForTest();
+                    loadSum += facade.MixerLoad; loadCount++;
+                    Thread.Sleep(4);
+                }
+            }
+            RainPump(5.0);
+            Record(label, seconds, RainPump);
+            if (field.LastSurvey is { } survey) Console.WriteLine("      " + survey.Describe().Replace("\n", "\n      "));
+            field.Stop();
+            Pump(2.0);
+        }
+
         try
         {
             Pump(2.0);
@@ -264,6 +340,19 @@ public static class WideSourcesSpike
                 Fire(spots, 12.0);
                 Rain(Rainfall.ModerateRate, "street moderate", 12.0);
             }
+            if (set is "roofs" or "measure" or "all")
+            {
+                Roof("street", false, 12.0, "rain street (lab scene)");
+                foreach (var scene in new[] { "shelter", "attic", "incar" })
+                {
+                    Roof(scene, true, 12.0, $"roof only {scene}");
+                    Roof(scene, false, 12.0, $"rain {scene}");
+                }
+            }
+            if (set is "tree")
+            {
+                Tree(spots, 12.0);
+            }
             if (set is "render" or "all")
             {
                 Tree(new[] { 3f }, renderSeconds, "render tree");
@@ -271,12 +360,15 @@ public static class WideSourcesSpike
                 Fire(new[] { 3f }, renderSeconds, "render fire");
                 Rain(Rainfall.ModerateRate, "render street moderate", renderSeconds);
                 FountainWalk(18f, 1.1f);
+                Roof("shelter", false, renderSeconds, "render rain shelter");
+                Roof("attic", false, renderSeconds, "render rain attic");
+                Roof("incar", false, renderSeconds, "render rain incar");
             }
             if (set is "level")
             {
                 // The total at 1, 5 and 20 m from each source's middle, spread or not.
-                Tree(new[] { 1f, 5f, 20f }, 10.0, "level tree");
-                Fire(new[] { 1f, 5f, 20f }, 10.0, "level fire");
+                Tree(new[] { 1f, 5f, 20f }, 20.0, "level tree");
+                Fire(new[] { 1f, 5f, 20f }, 20.0, "level fire");
             }
             Record("silence end", 1.0);
         }
@@ -285,13 +377,15 @@ public static class WideSourcesSpike
             facade.Dispose();
         }
 
-        var sb = new StringBuilder("name,start,seconds,cpu_percent,mixer_load,hrtf_voices\n");
+        var sb = new StringBuilder("name,start,seconds,cpu_percent,mixer_load,hrtf_voices,placed_db\n");
         foreach (var s in segments)
-            sb.Append(CultureInfo.InvariantCulture, $"{s.Name},{s.Start:F3},{s.Seconds:F3},{s.CpuPercent:F1},{s.MixerLoad:F4},{s.Voices}\n");
+            sb.Append(CultureInfo.InvariantCulture, $"{s.Name},{s.Start:F3},{s.Seconds:F3},{s.CpuPercent:F1},{s.MixerLoad:F4},{s.Voices},{s.PlacedDb:F3}\n");
         File.WriteAllText(Path.Combine(outDir, "segments.csv"), sb.ToString());
         Console.WriteLine($"Wrote {outDir}/capture.post.wav and segments.csv ({segments.Count} segments)");
         return 0;
     }
+
+    private static float _turbulence = 0.25f;
 
     private static string? Arg(string[] args, string key) => args.FirstOrDefault(x => x.StartsWith(key, StringComparison.Ordinal))?[key.Length..];
 }

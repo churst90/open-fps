@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
@@ -38,6 +39,12 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// 2026-10-04 so a broadleaf crown of 400 m³ in a 4 m/s breeze makes about 50 dB(A) close to it —
 /// Fégeant's model (as tabled by Heutschi, Pieren and Müller 2014) puts an oak's 100 m³ at 44 dB(A)
 /// from 5 m in 5 m/s. The counts and the laws come from the tree and the wind.
+///
+/// PLACES (2026-10-06). A crown is eight metres of leaves, and each ear hears its own mix of them. With
+/// more than one place (ExtendedSources), each bough's strikes and twig episodes are written to the
+/// place that stands for that bough's part of the crown, or to the middle by the middle's share, and the
+/// shedding has its own noise at each place, its power split by the places' shares. So the places are
+/// independent streams that add up to the tree, not copies of it. One place is the tree as it was.
 /// </summary>
 public sealed class FoliageSynth
 {
@@ -80,12 +87,16 @@ public sealed class FoliageSynth
     private struct Episode
     {
         public float Left, Rate, Scale, Tone;
+        public int Bough;
     }
     private readonly Episode[] _episodes = new Episode[128];
 
     public readonly FoliageSpec Spec;
     private readonly float _rate;
     private readonly EventSum _sum;
+    /// <summary>Each place's events; place 0 (the middle) is <see cref="_sum"/>, which also draws every
+    /// random number the scheduling needs, so a tree of one place renders exactly as before places.</summary>
+    private readonly EventSum[] _sums;
     private readonly float _leaves;          // how many leaves on the tree
     private readonly float _leafLength;      // m
     private readonly float _leafScale;       // strike size for this leaf
@@ -109,21 +120,43 @@ public sealed class FoliageSynth
     /// than as air moving through a tree.</summary>
     public void ReadWind(float x, float z, double seconds)
     {
-        var (dx, dz) = WindField.Downwind;
         for (int b = 0; b < Boughs; b++)
         {
-            float along = BoughAlongMetres(Spec, b);
-            _boughWindIn[b] = WindField.SpeedAt(x + dx * along, Spec.CrownHeightMetres, z + dz * along, seconds);
+            var at = BoughOffset(Spec, b);
+            _boughWindIn[b] = WindField.SpeedAt(x + at.X, Spec.CrownHeightMetres, z + at.Z, seconds);
         }
     }
 
     /// <summary>The wind last handed to bough <paramref name="b"/>, m/s.</summary>
     public float BoughWind(int b) => _boughWindIn[b];
 
-    /// <summary>Where bough <paramref name="b"/> sits along the wind, m from the crown's middle:
-    /// spread evenly over the crown's diameter, upwind first.</summary>
-    public static float BoughAlongMetres(FoliageSpec spec, int b)
-        => spec.CrownRadiusMetres * (2f * (b + 0.5f) / Boughs - 1f);
+    /// <summary>
+    /// Where bough <paramref name="b"/> is in the crown, m from its middle (x east, y up, z north): round
+    /// the crown at two-thirds of its radius, the mean distance from the middle of a disc's area, every
+    /// sixty degrees, alternately a quarter of the radius above and below the middle. The wind is read
+    /// there (<see cref="ReadWind"/>), so a gust crosses the crown from its upwind boughs to its downwind
+    /// ones; and the bough's strikes are heard from there (ExtendedSources). Until 2026-10-06 the boughs
+    /// were a line along the wind, read but not placed.
+    /// </summary>
+    public static Vector3 BoughOffset(FoliageSpec spec, int b)
+    {
+        float r = spec.CrownRadiusMetres;
+        float angle = MathF.Tau * (b + 0.5f) / Boughs;
+        float up = (b & 1) == 0 ? 0.25f * r : -0.25f * r;
+        return new Vector3(MathF.Cos(angle) * r * 2f / 3f, up, MathF.Sin(angle) * r * 2f / 3f);
+    }
+
+    /// <summary>Which of <paramref name="places"/> outer places bough <paramref name="b"/> is heard from:
+    /// neighbouring boughs together, so each place is one side of the crown.</summary>
+    public static int PlaceOfBough(int b, int places) => places <= 0 ? 0 : Math.Clamp(b * places / Boughs, 0, places - 1);
+
+    /// <summary>How many places the tree is heard from: one, the middle, unless made with more.</summary>
+    public int Places => _sums.Length;
+
+    /// <summary>How much of the tree its outer places carry, 0 (all from the middle) to 1 (an equal share
+    /// each): ExtendedSources.Shares. Set between control calls; the shedding glides to it.</summary>
+    public float Spread;
+    private float _middleShare = 1f;
 
     /// <summary>Each part's share, for the lab to take the tree apart by muting. One in the game.</summary>
     public float LeafPart = 1f, ShedPart = 1f;
@@ -136,15 +169,28 @@ public sealed class FoliageSynth
     private readonly float[] _agitation = new float[Boughs];
 
     private Resonator _shed, _shedHigh;
+    // The outer places' own shedding (index 0 unused: the middle's is _shed, _shedHigh).
+    private readonly Resonator[] _shedAt, _shedHighAt;
+    private readonly float[] _placeGain, _placeGainTarget, _placeOut;
     private float _shedHz, _shedTargetHz, _shedLevel, _shedGain, _shedNorm, _shedHighNorm;
     private readonly float _shedGlide;
     private int _untilBlock, _samples;
 
-    public FoliageSynth(FoliageSpec spec, float sampleRate, int seed)
+    public FoliageSynth(FoliageSpec spec, float sampleRate, int seed, int places = 1)
     {
         Spec = spec;
         _rate = sampleRate;
         _sum = new EventSum(sampleRate, seed);
+        places = Math.Clamp(places, 1, 1 + Boughs);
+        _sums = new EventSum[places];
+        _sums[0] = _sum;
+        for (int k = 1; k < places; k++) _sums[k] = new EventSum(sampleRate, seed * 7919 + k * 104729 + 1);
+        _shedAt = new Resonator[places];
+        _shedHighAt = new Resonator[places];
+        _placeGain = new float[places];
+        _placeGainTarget = new float[places];
+        _placeOut = new float[places];
+        _placeGain[0] = _placeGainTarget[0] = 1f;
         Vogel = Math.Clamp(spec.VogelExponent, -1.5f, 0f);
         // The increments carry the same mean energy as the fit of LeafStrikePascals was made with: a
         // strike's goes as (u e)^(2 · 1.2), an episode's scale as the old 0.4 + 1.2 u's (mean square 1.12).
@@ -166,6 +212,7 @@ public sealed class FoliageSynth
         _shedHz = _shedTargetHz = Strouhal * 4f / (spec.ShedDiameterMm * 1e-3f);
         _shed.Tune(_shedHz, 0.7f, sampleRate);
         _shedHigh.Tune(_shedHz * 3f, 0.6f, sampleRate);
+        for (int k = 1; k < places; k++) { _shedAt[k].Tune(_shedHz, 0.7f, sampleRate); _shedHighAt[k].Tune(_shedHz * 3f, 0.6f, sampleRate); }
         _shedNorm = 0.8f / Resonator.NoiseGain(_shedHz, 0.7f, sampleRate);
         _shedHighNorm = 0.35f / Resonator.NoiseGain(_shedHz * 3f, 0.6f, sampleRate);
         _shedGlide = 1f - MathF.Exp(-1f / (0.005f * sampleRate));
@@ -282,16 +329,33 @@ public sealed class FoliageSynth
         _shedHz += (_shedTargetHz - _shedHz) * MathF.Min(1f, dt / 0.25f);
         _shed.Tune(_shedHz, 0.7f, _rate);
         _shedHigh.Tune(_shedHz * 3f, 0.6f, _rate);
+        for (int k = 1; k < _sums.Length; k++) { _shedAt[k].Tune(_shedHz, 0.7f, _rate); _shedHighAt[k].Tune(_shedHz * 3f, 0.6f, _rate); }
         _shedNorm = 0.8f / Resonator.NoiseGain(_shedHz, 0.7f, _rate);
         _shedHighNorm = 0.35f / Resonator.NoiseGain(_shedHz * 3f, 0.6f, _rate);
         // The fluctuating force's dipole: pressure as the force times the speed it changes at,
         // U^(2+V) times U^(1/2) for the flutter's share — U^1.8, power U^3.6, Fégeant's birch.
         float u = mean / 5f;
         _shedLevel = SheddingPascals * _shedScale * MathF.Pow(u, 2.5f + Vogel);
+
+        // The places' shares: events by probability, the shedding's power by gain.
+        if (_sums.Length > 1)
+        {
+            Span<float> shares = stackalloc float[_sums.Length];
+            ExtendedSources.Shares(Spread, shares);
+            _middleShare = shares[0];
+            for (int k = 0; k < shares.Length; k++) _placeGainTarget[k] = MathF.Sqrt(shares[k]);
+        }
     }
 
     public float Next()
     {
+        if (_sums.Length > 1)
+        {
+            NextPlaces(_placeOut);
+            float all = 0f;
+            for (int k = 0; k < _placeOut.Length; k++) all += _placeOut[k];
+            return all;
+        }
         if (--_untilBlock <= 0)
         {
             _untilBlock = Block;
@@ -303,6 +367,39 @@ public sealed class FoliageSynth
         float n = _sum.Signed() * 1.7320508f;
         float shed = (_shed.Process(n) * _shedNorm + _shedHigh.Process(n) * _shedHighNorm) * _shedGain;
         return shed * ShedPart + _sum.Next();
+    }
+
+    /// <summary>The next sample at each place, pascals at a metre from it: <paramref name="places"/>
+    /// holds <see cref="Places"/> of them. Their sum is the tree.</summary>
+    public void NextPlaces(Span<float> places)
+    {
+        if (--_untilBlock <= 0)
+        {
+            _untilBlock = Block;
+            Schedule(Block / _rate);
+        }
+        _samples++;
+        _shedGain += (_shedLevel - _shedGain) * _shedGlide;
+        for (int k = 0; k < _sums.Length; k++)
+        {
+            _placeGain[k] += (_placeGainTarget[k] - _placeGain[k]) * _shedGlide;
+            var sum = _sums[k];
+            float n = sum.Signed() * 1.7320508f;
+            float shed = k == 0
+                ? _shed.Process(n) * _shedNorm + _shedHigh.Process(n) * _shedHighNorm
+                : _shedAt[k].Process(n) * _shedNorm + _shedHighAt[k].Process(n) * _shedHighNorm;
+            float y = shed * _shedGain * _placeGain[k] * ShedPart + sum.Next();
+            if (k < places.Length) places[k] = y;
+        }
+    }
+
+    /// <summary>The place a strike of bough <paramref name="bough"/> is heard from: the middle by its
+    /// share, otherwise the bough's own side of the crown.</summary>
+    private EventSum PlaceFor(int bough)
+    {
+        if (_sums.Length == 1) return _sum;
+        if (_sum.Uniform() < _middleShare) return _sum;
+        return _sums[1 + PlaceOfBough(bough, _sums.Length - 1)];
     }
 
     private void Schedule(float dt)
@@ -336,25 +433,26 @@ public sealed class FoliageSynth
                         // as the next strike's (see Increment) — and how big this twig's leaves are.
                         Scale = closing * MathF.Pow(Increment(_episodeOrder), EpisodePower) / _episodeNorm,
                         Tone = 0.6f + 1.0f * _sum.Uniform(),
+                        Bough = b,
                     };
                     break;
                 }
             }
 
             // And the single ticks between.
-            Strikes(strikes * (1f - EpisodeShare) * dt, closing, 1f);
+            Strikes(strikes * (1f - EpisodeShare) * dt, closing, 1f, b);
         }
         for (int e = 0; e < _episodes.Length; e++)
         {
             ref var ep = ref _episodes[e];
             if (ep.Left <= 0f) continue;
             // An episode rises and dies away over its length.
-            Strikes(ep.Rate * dt, ep.Scale, ep.Tone);
+            Strikes(ep.Rate * dt, ep.Scale, ep.Tone, ep.Bough);
             ep.Left -= dt;
         }
     }
 
-    private void Strikes(float mean, float scale, float tone)
+    private void Strikes(float mean, float scale, float tone, int bough)
     {
         int real = _sum.Poisson(mean);
         if (real == 0) return;
@@ -363,6 +461,7 @@ public sealed class FoliageSynth
         for (int k = 0; k < n; k++)
         {
             int at = (int)(_sum.Uniform() * Block);
+            var place = PlaceFor(bough);
             // Most touches are glancing and a few are square. Two leaves meet at any angle, and for
             // directions spread evenly over a sphere the cosine of the angle to the normal is
             // uniform, so the closing speed's normal part is the speed times a uniform number, and
@@ -373,10 +472,10 @@ public sealed class FoliageSynth
             float u = _sum.Uniform() * Increment(_incrementOrder);
             float p = LeafStrikePascals * _leafScale * scale * weight * StrikeAngleScale * MathF.Pow(u, StrikeSpeedPower) * LeafPart / _incrementNorm;
             // The tap: a light plate stopped over a few tenths of a millisecond...
-            _sum.Pulse(at, 70e-6f * (0.7f + 0.6f * _sum.Uniform()) * _leafScale / tone, p);
+            place.Pulse(at, 70e-6f * (0.7f + 0.6f * _sum.Uniform()) * _leafScale / tone, p);
             // ...and the leaf's own membrane ringing, damped almost at once, with the scrape of
             // edge over edge as they part.
-            _sum.Burst(at + 3, 0.0002f, 0.0006f + 0.0012f * _sum.Uniform(), 0.35f * p,
+            place.Burst(at + 3, 0.0002f, 0.0006f + 0.0012f * _sum.Uniform(), 0.35f * p,
                        900f * tone / _leafScale, 7000f * tone / MathF.Sqrt(_leafScale));
         }
     }

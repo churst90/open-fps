@@ -12,6 +12,8 @@ using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
 using OpenFPS.Client.Core.Platform;
 
+using OpenFPS.Client.AudioEngine.Core.Nature;
+
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
@@ -1173,6 +1175,14 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>Where the listener is, for the wind at their ears; null when nobody is in a world.</summary>
     public void SetEarWind(OpenFPS.Common.EarWindListener? listener) => _earWind?.SetListener(listener);
 
+    /// <summary>The wind at the ears on or off: for the lab, which measures one source at a time and would
+    /// otherwise measure the wind's own noise at each ear as part of it.</summary>
+    public bool EarWindEnabled
+    {
+        get => _earWind?.Enabled ?? false;
+        set { if (_earWind != null) _earWind.Enabled = value; }
+    }
+
     /// <summary>Diagnostics: what the ears were last placed at, dBFS, and what the wind is there.</summary>
     public (float LeftDbfs, float RightDbfs, OpenFPS.Common.EarWindAtEars Ears) EarWindLevels
         => _earWind is { } w ? (w.Synth.RenderedLeftDb, w.Synth.RenderedRightDb, w.Synth.Last) : (-150f, -150f, default);
@@ -1945,11 +1955,19 @@ public partial class FmodAudioProvider : IAudioProvider
         foreach (var (a, score) in _echoCandidates)
         {
             if (keep.Count >= allowed || score < floor) break;
-            if (a.MachineState is TrainTapState tap)
+            // ...and so is a tree, a fire or a fountain heard from several places.
+            string? sharedKey = a.MachineState switch
             {
-                perTrain.TryGetValue(tap.Shared.Key, out int c);
+                TrainTapState tap => tap.Shared.Key,
+                NaturePlaceState place => "place:" + place.Shared.GetHashCode(),
+                WaterTapState water => "water:" + water.Shared.Key,
+                _ => null,
+            };
+            if (sharedKey != null)
+            {
+                perTrain.TryGetValue(sharedKey, out int c);
                 if (c >= MaxEchoTapsPerTrain) continue;
-                perTrain[tap.Shared.Key] = c + 1;
+                perTrain[sharedKey] = c + 1;
             }
             keep.Add(a);
         }
@@ -2368,26 +2386,63 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
+    /// <summary>
+    /// A tree's or a fire's voice: its middle (the map's emitter) makes the one synth, with as many
+    /// places as the source has (ExtendedSources.Layout); an outer place (SpatialEmitter.PlaceOfEntity)
+    /// reads the synth of its source's live voice, or is not made.
+    /// </summary>
+    private PhysicalVoiceState? NaturePlace(string kind, string preset, in SpatialEmitter emitter, int rate)
+    {
+        if (emitter.PlaceOfEntity != 0)
+        {
+            PlacedNatureVoice? shared;
+            lock (_lock) { shared = (FindActive(emitter.PlaceOfEntity)?.MachineState as NaturePlaceState)?.Shared; }
+            if (shared == null || emitter.Place <= 0 || emitter.Place >= shared.Places) return null;
+            return new NaturePlaceState(shared, emitter.Place, rate, emitter.Position);
+        }
+        int places = ExtendedSources.Layout(emitter.PhysicalKey)?.Length ?? 1;
+        PlacedNatureVoice voice = kind == "fire"
+            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FireSpec.ByName(preset), places, rate,
+                                    emitter.EntityId * 41 + 13, emitter.Position)
+            : new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(preset), places, rate,
+                                    emitter.EntityId * 43 + 17, emitter.Position);
+        voice.TargetSpread = emitter.Spread;
+        return new NaturePlaceState(voice, 0, rate, emitter.Position);
+    }
+
+    /// <summary>How many voices a rain slot is played as (RainFeeds.PartsFor).</summary>
+    private static int RainParts(int slot) => RainFeeds.PartsFor(slot);
+
     // See NatureVoices.cs. A map names each tap of a water feature "water:<preset>/<feature>/<tap>"; the
     // one synth for <preset>/<feature> is made on the first tap, at the mixer's own rate.
     private readonly Dictionary<string, WaterFeatureVoice> _waterFeatures = new();
 
-    private PhysicalVoiceState? Water(string key, int rate, int entityId, System.Numerics.Vector3 position)
+    private PhysicalVoiceState? Water(string key, int rate, int entityId, System.Numerics.Vector3 position, in SpatialEmitter emitter)
     {
         if (!WaterFeatureVoice.ParseKey(key, out string preset, out string feature, out int tap))
             return new WaterVoiceState(OpenFPS.Common.WaterFeatureSpec.ByName(key[(key.IndexOf(':') + 1)..]),
                                        rate, entityId * 37 + 11, position);
         string shared = preset + "/" + feature;
+        if (emitter.PlaceOfEntity != 0)
+        {
+            // One of the places round a tap: it reads its tap's middle's synth.
+            WaterTapState? middle;
+            lock (_lock) { middle = FindActive(emitter.PlaceOfEntity)?.MachineState as WaterTapState; }
+            if (middle == null || emitter.Place <= 0 || emitter.Place >= middle.Shared.PlacesPerTap) return null;
+            return new WaterTapState(middle.Shared, middle.Tap, rate, position, emitter.Place);
+        }
         lock (_waterFeatures)
         {
             if (!_waterFeatures.TryGetValue(shared, out var w))
             {
                 w = new WaterFeatureVoice(shared, OpenFPS.Common.WaterFeatureSpec.ByName(preset), rate,
-                                          (int)((uint)shared.GetHashCode() & 0x7fff));
+                                          (int)((uint)shared.GetHashCode() & 0x7fff),
+                                          ExtendedSources.Layout(emitter.PhysicalKey)?.Length ?? 1);
                 _waterFeatures[shared] = w;
                 Log.Information("Water feature '{Feature}' ({Spec}): one synth, {Taps} tap(s)", shared, w.Spec.Name, w.Water.TapCount);
             }
             if (tap >= w.Water.TapCount) return null;
+            w.SetSpread(tap, emitter.Spread);
             return new WaterTapState(w, tap, rate, position);
         }
     }
@@ -2812,14 +2867,15 @@ public partial class FmodAudioProvider : IAudioProvider
                                                  mrate, emitter.EntityId * 13 + 5),
                     // Water, fire and wind in leaves read the wind where they stand, so they are
                     // given their place. See NatureVoiceState.
-                    "water" => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position),
-                    "fire" => new FireVoiceState(OpenFPS.Common.FireSpec.ByName(preset),
-                                                 mrate, emitter.EntityId * 41 + 13, emitter.Position),
-                    "foliage" => new FoliageVoiceState(OpenFPS.Common.FoliageSpec.ByName(preset),
-                                                       mrate, emitter.EntityId * 43 + 17, emitter.Position),
+                    "water" => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position, emitter),
+                    // A tree or a fire is heard from places across it (ExtendedSources): its own
+                    // voice is the middle, and the others read the same synth.
+                    "fire" or "foliage" => NaturePlace(kind.ToLowerInvariant(), preset, emitter, mrate),
                     // A patch of rain round the listener, fed by the rain survey. See RainVoiceState.
-                    "rain" => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot)
-                        ? new RainVoiceState(RainFeeds.Feed[rainSlot], mrate, rainSlot * 53 + 23)
+                    // The roof over the ear and the near quarters are several, each a part (RainFeeds.PartsFor).
+                    "rain" => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot, out int rainPart)
+                                && rainPart < RainParts(rainSlot)
+                        ? new RainVoiceState(RainFeeds.Feed[rainSlot], mrate, rainSlot * 53 + 23 + rainPart * 7919, rainPart, RainParts(rainSlot))
                         : null,
                     // A vehicle's horn, with the rhythm of the hand on it in the key. See Honk.
                     "horn" => OpenFPS.Common.Honk.TryParse(emitter.PhysicalKey, out var hornKey, out var rhythm)
@@ -2836,6 +2892,9 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             if (machineState == null)
             {
+                // An outer place whose source has no voice this frame: there is nothing for it to be a
+                // place OF. The client asks again next frame.
+                if (emitter.PlaceOfEntity != 0) return;
                 Log.Warning("Physical voice: '{Key}' names no model this client knows.", emitter.PhysicalKey);
                 return;
             }
@@ -3264,6 +3323,16 @@ public partial class FmodAudioProvider : IAudioProvider
                         // as a fraction of eight and the wake slot carries the speed.
                         tap.Shared.TargetSpeed = emitter.RotorWake;
                         tap.Shared.TargetNotch = emitter.PowerLever * 8f;
+                    }
+                    else if (active.MachineState is NaturePlaceState { Place: 0 } middle)
+                    {
+                        // The middle of a tree or a fire carries how much of it its other places play.
+                        middle.Shared.TargetSpread = emitter.Spread;
+                    }
+                    else if (active.MachineState is WaterTapState { Place: 0 } tapMiddle)
+                    {
+                        // ...and the middle of a fountain's tap, of that tap.
+                        tapMiddle.Shared.SetSpread(tapMiddle.Tap, emitter.Spread);
                     }
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var mlocal))
                         active.MachineState.SetListener(mlocal);

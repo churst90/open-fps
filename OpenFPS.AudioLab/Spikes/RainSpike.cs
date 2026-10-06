@@ -491,7 +491,7 @@ public static class RainSpike
 
     private static int _nextId;
 
-    private static List<(string Name, Func<(WorldSnapshot World, Vector3 Ear, string About)> Make)> Scenes() => new()
+    internal static List<(string Name, Func<(WorldSnapshot World, Vector3 Ear, string About)> Make)> Scenes() => new()
     {
         ("street", () =>
         {
@@ -617,7 +617,7 @@ public static class RainSpike
     }
 
     /// <summary>The entity the scene's listener sits in, or -1.</summary>
-    private static int _riding = -1;
+    internal static int _riding = -1;
 
     /// <summary>near=off renders the patches alone, near=only the near drops alone: to tell which of
     /// the two a fault is in.</summary>

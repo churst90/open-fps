@@ -776,6 +776,9 @@ public sealed class RainField
     private int _surveys;
     private bool _surveyFailed;
 
+    /// <summary>For the lab: play only this slot's voices and near drops (the roof over the ear alone); -1 all.</summary>
+    internal int OnlySlot = -1;
+
     /// <summary>The last survey, for the log and the lab.</summary>
     public RainSurvey.Result? LastSurvey => _last;
 
@@ -859,16 +862,105 @@ public sealed class RainField
         for (int s = 0; s < RainFeeds.Slots; s++)
         {
             int id = VoiceBase - s;
-            var patch = _last.Patches[s];
+            var patch = OnlySlot < 0 || OnlySlot == s ? _last.Patches[s] : null;
             if (patch == null)
             {
                 if (_on[s]) { _audio.StopSound(id); _on[s] = false; }
+                StopParts(s);
                 continue;
             }
             var e = Emitter(s, patch, _last, listenerRegion);
+            if (RainFeeds.PartsFor(s) > 1)
+            {
+                PlayParts(s, e, patch, ear);
+                continue;
+            }
             if (_on[s] && _audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
             else { _audio.PlayPhysicalSoundDirect(e); _on[s] = true; }
         }
+    }
+
+    // ── A patch heard from several places: the roof over the ear, the near quarters ──────────────
+
+    /// <summary>Voice ids for a slot's parts after the first (which is the slot's own voice): eight a slot.</summary>
+    public const int PartBase = VoiceBase - 100;
+    public static int PartVoiceId(int slot, int part) => part == 0 ? VoiceBase - slot : PartBase - slot * 8 - part;
+
+    private readonly int[] _partsOn = new int[RainFeeds.Slots];
+    private readonly Vector3[] _partAt = new Vector3[8];
+    private readonly float[] _partShares = new float[8];
+
+    /// <summary>How far round the point over the ear the roof's parts are placed, m: a third of the side
+    /// of the roof heard (the patch's area), so each part sits over its own quarter of it; at least
+    /// 0.3 m (a car's roof is a metre or two across) and at most 2.5 (beyond, the rain on a big roof is
+    /// far enough off to be the ring patches' business, not the roof's).</summary>
+    public static float RoofReach(RainPatch patch)
+    {
+        float area = 0f;
+        foreach (var layer in patch.Layers) area += layer.TotalArea;
+        return Math.Clamp(0.35f * MathF.Sqrt(MathF.Max(0f, area)), 0.3f, 2.5f);
+    }
+
+    /// <summary>Where roof part <paramref name="part"/> of <paramref name="parts"/> is, round the point
+    /// over the ear: on the diagonals, so no part is straight ahead, behind or to a side.</summary>
+    public static Vector3 RoofPartAt(Vector3 middle, float reach, int part, int parts)
+    {
+        float a = MathF.Tau * (part + 0.5f) / Math.Max(1, parts);
+        return middle + new Vector3(MathF.Cos(a) * reach, 0f, MathF.Sin(a) * reach);
+    }
+
+    /// <summary>Where part <paramref name="part"/> of <paramref name="parts"/> of a near quarter is: the
+    /// patch's middle turned about the ear to the middle of that part's share of the quarter, so a
+    /// quarter of two parts is heard from 22.5° either side of its middle (and none of it from straight
+    /// ahead or behind, where both ears hear the same).</summary>
+    public static Vector3 QuarterPartAt(Vector3 ear, Vector3 middle, int part, int parts)
+    {
+        float turn = (MathF.PI / 2f) * ((part + 0.5f) / Math.Max(1, parts) - 0.5f);
+        float dx = middle.X - ear.X, dz = middle.Z - ear.Z;
+        float c = MathF.Cos(turn), s = MathF.Sin(turn);
+        return new Vector3(ear.X + dx * c - dz * s, middle.Y, ear.Z + dx * s + dz * c);
+    }
+
+    /// <summary>
+    /// A patch as RainFeeds.PartsFor(slot) voices, each rendering its share of the patch's area with its
+    /// own drops (RainVoiceState) from its own part of it: the roof over the ear round the point over the
+    /// ear, a near quarter across its quarter. All are placed by the whole patch's level, with the one gain
+    /// that keeps them together as loud as the patch from its middle (ExtendedSources.Balance; one for a
+    /// quarter, whose parts are as far away as its middle).
+    /// </summary>
+    private void PlayParts(int slot, SpatialEmitter whole, RainPatch patch, Vector3 ear)
+    {
+        int parts = Math.Min(RainFeeds.PartsFor(slot), _partAt.Length);
+        float reach = RoofReach(patch);
+        for (int k = 0; k < parts; k++)
+        {
+            _partAt[k] = slot == RainSurvey.OverheadSlot ? RoofPartAt(whole.Position, reach, k, parts)
+                                                         : QuarterPartAt(ear, whole.Position, k, parts);
+            _partShares[k] = 1f / parts;
+        }
+        float balance = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Balance(
+            ear, whole.Position, _partAt.AsSpan(0, parts), _partShares.AsSpan(0, parts), whole.MinDistance, whole.Range);
+        for (int k = 0; k < parts; k++)
+        {
+            var e = whole;
+            e.EntityId = PartVoiceId(slot, k);
+            e.PhysicalKey = RainFeeds.Key(slot, k);
+            e.Position = _partAt[k];
+            // Heard round an edge, the parts keep their spread about where the patch is heard from.
+            e.ApparentPosition = whole.ApparentPosition + (_partAt[k] - whole.Position);
+            e.Volume *= balance;
+            bool on = k == 0 ? _on[slot] : k < _partsOn[slot];
+            if (on && _audio.IsPlaying(e.EntityId)) _audio.UpdateSpatialAttributes(e);
+            else _audio.PlayPhysicalSoundDirect(e);
+        }
+        _on[slot] = true;
+        _partsOn[slot] = parts;
+    }
+
+    private void StopParts(int slot)
+    {
+        for (int k = 1; k < _partsOn[slot]; k++) _audio.StopSound(PartVoiceId(slot, k));
+        _partsOn[slot] = 0;
     }
 
     /// <summary>The emitter for one slot: where its patch is, the level its voice measured, the path.</summary>
@@ -957,6 +1049,7 @@ public sealed class RainField
         int made = 0;
         foreach (var impact in _impacts)
         {
+            if (OnlySlot >= 0 && impact.Slot != OnlySlot) continue;
             int variant = (_nearVoice + (int)(impact.DiameterMm * 97f)) % DropBank.Variants;
             var sound = _bank.Get(impact, variant, mayMake: made < MakePerFrame);
             if (sound == null) continue;
@@ -1008,6 +1101,7 @@ public sealed class RainField
         {
             if (_on[s]) _audio.StopSound(VoiceBase - s);
             _on[s] = false;
+            StopParts(s);
             RainFeeds.Feed[s].Patch = null;
             _paths[s] = null;
         }
