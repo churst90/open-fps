@@ -220,6 +220,9 @@ public struct SpatialEmitter
     /// <summary>For an extended source's own voice: how much of it its outer places carry, 0 to 1,
     /// already slewed (ExtendedSources.SpreadFor, Slew).</summary>
     public float Spread;
+    /// <summary>For a wood heard as one (WoodChorus): how many of its trees its synth stands for now.
+    /// Read only for a wood's voice.</summary>
+    public float Trees;
     /// <summary>
     /// How hard the road is working this vehicle's tyres, as a fraction of the grip they have.
     ///

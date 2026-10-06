@@ -26,6 +26,17 @@ Recent work, newest first. `git log` has the rest.
       is the next fix.
     - Short recorded knocks (one second or less) get their ground reflection from below for the
       first time.
+- Distant woods. Past 110 m a wood's trees are heard as one source per wood (the trees of one kind in
+  a 200 m square), placed across the wood, playing as many trees as it stands for, with the gusts
+  crossing it as they cross the trees. Between 110 and 70 m each tree is handed to its own voice
+  without a change in level. A tree the voice budget (10 standing sources) leaves out is heard in its
+  wood instead of not at all. Against the trees summed one by one: within 0.4 dB, every octave band
+  within 0.5 dB, the gust swing 1.9 dB against 1.7-1.8, at 300 to 800 m. A 40-tree wood in a breeze is
+  now heard from about 350 m instead of 230 m; past that it is under what the game renders (about
+  12 dB SPL at 500 m). In that walk the client used 138 % of a core instead of 87 % and up to 64 HRTF
+  voices instead of 46. Tree crowns are in the coarse tiles again, so the client can hear far woods.
+  Applies on every map, the city's parks too. Pair and figures: inbox/distant-woods-2026-10-06;
+  AudioLab `--distant-woods`.
 - Steam Audio's scenes are built per tile and use Embree. Each tile the client holds has its own
   sub-scenes, built when its geometry changes; the scenes the simulators trace are made of instances
   of them, in two pairs used in turn, so a tile arriving or leaving, or a door swinging, rebuilds only
@@ -39,7 +50,8 @@ Recent work, newest first. `git log` has the rest.
 - The distant (coarse) layer of a streamed map now holds what sound notices from past 300 m: building
   shells with their front doors, woods and tree trunks, fences, hedges, garden walls and guard rails,
   as well as the ground, roads, rail and water. Rooms, house interiors, lawns, drives, posts and the
-  wind in each tree (heard to 90 m) stay full detail only. Joining Magnolia at medium is now 13,590
+  wind in each tree stay full detail only (the crowns came back the same day: see distant woods
+  below). Joining Magnolia at medium is now 13,590
   entities and 588 KB (from 12,344 and 530 KB).
 - A doorway and the rooms it joins are sent together, so a door at the edge of full detail opens into
   its room; a front door held without its room is a shut door, not a doorway into nothing.

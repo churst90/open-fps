@@ -140,6 +140,7 @@ string[] usage =
     "  --tail-cost [t60=2]                           the late tail's cost per mixer piece: one channel against the field",
     "  --sim-reverbfield                             the simulator's reverb against enclosure across places",
     "  --scene-cost [map=city]                       what rebuilding the Steam Audio scenes costs",
+    "  --distant-woods [set=sum|walk|all] [out=DIR]   a wood from 300-800 m: the sum of its trees against the wood heard as one; the walk up to it",
     "  --tile-scenes [map=magnolia_tx]                Steam Audio scene per tile on Embree against one mesh: cost and answers",
     "  --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium]  a streamed map walked: tile costs, worker gaps",
     "  --geometry [map=magnolia_tx] [terrain=5] [sa=1] the world as triangles: BVH and Steam Audio costs (docs/GEOMETRY.md)",
@@ -725,6 +726,11 @@ if (args.Contains("--path-probe"))
 {
     // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.Run(args));
+}
+if (args.Contains("--distant-woods"))
+{
+    // --distant-woods [set=sum|walk|all] [out=DIR] [trees=40] [sec=30]: a wood heard far off, as the sum of its trees and as one.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.DistantWoodsSpike.Run(args));
 }
 if (args.Contains("--tile-scenes"))
 {
