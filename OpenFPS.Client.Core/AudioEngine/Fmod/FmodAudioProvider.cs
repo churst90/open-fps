@@ -1722,6 +1722,12 @@ public class FmodAudioProvider : IAudioProvider
     {
         _echoRigsTried = true;
         if (_saContext == IntPtr.Zero || _saHrtf == IntPtr.Zero) return;
+        // As for a traced stage: echoes traced for another rate would play every delay time-scaled.
+        if (echoes.SampleRate != MixerQuality.MixerRate)
+        {
+            Log.Warning("Traced echoes: traced at {Trace} Hz, the mixer is at {Mixer} Hz; no traced echoes.", echoes.SampleRate, MixerQuality.MixerRate);
+            return;
+        }
         var au = new Phonon.IPLAudioSettings { samplingRate = MixerQuality.MixerRate, frameSize = _saFrameSize };
         for (int k = 0; k < TracedEchoes.MaxSources; k++)
         {
@@ -2170,6 +2176,15 @@ public class FmodAudioProvider : IAudioProvider
         // it answers late by is ITS block, not the mixer's.
         int sub = tr.FrameSize;
         if (_saFrameSize % sub != 0) { Log.Warning("Traced reverb: mixer block {Block} is not a multiple of {Sub}.", _saFrameSize, sub); return; }
+        // A trace made for another rate than the mixer's would play every delay and the whole tail
+        // time-scaled (8 % between 44.1 and 48 kHz). Traces take the mixer's rate when they are made, so
+        // this only happens if one was made before the mixer was: say so rather than play it wrong.
+        if (tr.SampleRate != MixerQuality.MixerRate)
+        {
+            Log.Warning("Traced reverb: the trace runs at {Trace} Hz and the mixer at {Mixer} Hz; region {Id} plays without it.",
+                        tr.SampleRate, MixerQuality.MixerRate, regionId);
+            return;
+        }
         var au = new Phonon.IPLAudioSettings { samplingRate = tr.SampleRate, frameSize = sub };
         var es = new Phonon.IPLReflectionEffectSettings
         {
@@ -2201,7 +2216,7 @@ public class FmodAudioProvider : IAudioProvider
         { Phonon.iplReflectionEffectRelease(ref effect); return; }
         var st = new TracedReverbState
         {
-            FrameSize = _saFrameSize, SubFrame = sub, WorkerContext = tr.Context, ProviderContext = _saContext,
+            FrameSize = _saFrameSize, SubFrame = sub, SampleRate = tr.SampleRate, WorkerContext = tr.Context, ProviderContext = _saContext,
             Effect = effect, Decode = decode, Hrtf = _saHrtfTraced, Trace = tr,
             MonoScratch = new float[sub], StereoScratch = new float[sub * 2],
             AmbiScratch = new float[sub * TracedReverb.Channels],

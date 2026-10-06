@@ -161,6 +161,14 @@ public sealed class TruePeakLimiter
         ReductionDb = 0f;
     }
 
+    /// <summary>As the pointer form, for managed buffers (the lab and the tests): <paramref name="input"/>
+    /// and <paramref name="output"/> interleaved, the same length.</summary>
+    public unsafe void Process(ReadOnlySpan<float> input, Span<float> output, int channels)
+    {
+        if (channels <= 0 || output.Length < input.Length) return;
+        fixed (float* x = input, y = output) Process(x, y, input.Length / channels, channels);
+    }
+
     /// <summary>
     /// Limits <paramref name="frames"/> interleaved frames of <paramref name="channels"/> channels from
     /// <paramref name="input"/> into <paramref name="output"/> (which may be the same buffer). A layout
@@ -216,21 +224,29 @@ public sealed class TruePeakLimiter
                 _t++;
 
                 // ── 4: release ────────────────────────────────────────────────────────────────
+                // Two parts. _avgDb is what the material has been needing: it builds up toward the
+                // reduction while there is one to hold, and once released it decays SLOWLY. _envDb is
+                // the reduction applied: never less than what is needed now, and released FAST, but
+                // only as far as _avgDb. A shot builds little and is let go of at once; a roll builds
+                // a lot and is let go of slowly.
                 float t = held < 1f ? -20f * MathF.Log10(held) : 0f;
                 if (t >= _envDb - HoldToleranceDb && t > 0f)
                 {
                     if (t > _envDb) _envDb = t;
                     _hold = _holdSamples;
                 }
-                else if (_hold > 0) _hold--;
+                if (_hold > 0)
+                {
+                    _hold--;
+                    _avgDb += (_envDb - _avgDb) * _aAvg;
+                }
                 else if (_envDb > 0f)
                 {
+                    _avgDb = MathF.Max(t, _avgDb * _aSlow);
                     float floor = MathF.Max(t, _avgDb);
-                    _envDb = _envDb > floor ? floor + (_envDb - floor) * _aFast : MathF.Max(t, _envDb * _aSlow);
-                    if (_envDb < 1e-4f) _envDb = 0f;
+                    _envDb = floor + (_envDb - floor) * _aFast;
+                    if (_envDb < 1e-4f) { _envDb = 0f; _avgDb = 0f; }
                 }
-                _avgDb += (_envDb - _avgDb) * _aAvg;
-                if (_avgDb < 1e-5f) _avgDb = 0f;
                 float g = _envDb > 0f ? MathF.Exp(_envDb * -0.11512925f) : 1f;   // 10^(-dB/20)
 
                 // ── the two running means: the attack's S-curve ────────────────────────────────

@@ -70,8 +70,18 @@ internal sealed class TracedReverbState
         if (Decode != IntPtr.Zero) Phonon.iplAmbisonicsDecodeEffectReset(Decode);
     }
 
-    /// <summary>One per ear: the tail the trace hands back is the same in both, and a room is not.</summary>
-    public readonly EarDecorrelator Left = new(0), Right = new(1);
+    /// <summary>One per ear: the tail the trace hands back is the same in both, and a room is not.
+    /// Made for the stage's rate (<see cref="SampleRate"/>): their all-passes are times.</summary>
+    public EarDecorrelator Left { get; private set; } = new(0, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate);
+    public EarDecorrelator Right { get; private set; } = new(1, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate);
+
+    /// <summary>The rate the stage runs at: the trace's, which is the mixer's.</summary>
+    public int SampleRate
+    {
+        get => _sampleRate;
+        init { _sampleRate = value; Left = new EarDecorrelator(0, value); Right = new EarDecorrelator(1, value); }
+    }
+    private readonly int _sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
 
     // Diagnostics: what goes in and what comes out, for the /reverb line.
     public volatile float InRms, OutRms;
