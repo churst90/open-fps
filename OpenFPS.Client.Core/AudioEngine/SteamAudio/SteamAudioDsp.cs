@@ -82,37 +82,84 @@ internal sealed class SteamAudioVoiceState
 
 /// <summary>
 /// A custom FMOD DSP that spatializes a mono input into binaural stereo using Steam Audio's HRTF,
-/// replacing FMOD's amplitude panner. Modeled on the existing Granular/Synth DSP processors:
-/// created via System.createDSP, state passed through GCHandle/UserData, work done in the read
-/// callback on FMOD's mixer thread. Attach to a 2D mono channel (so FMOD does not also pan).
+/// replacing FMOD's amplitude panner. Created via System.createDSP, state passed through
+/// GCHandle/UserData, work done in the process callback on FMOD's mixer thread. Attach to a 2D
+/// channel (so FMOD does not also pan).
 /// </summary>
 internal static class SteamAudioDsp
 {
-    private static readonly FMOD.DSP_READ_CALLBACK _readCallback = ReadCallback;
+    private static readonly FMOD.DSP_PROCESS_CALLBACK _processCallback = ProcessCallback;
+
+    /// <summary>The channels the stage puts out: the binaural pair.</summary>
+    internal const int OutputChannels = 2;
+
+    /// <summary>
+    /// The stage as FMOD is told about it: a process callback, not a read callback, because only a
+    /// process callback can say it puts out two channels while taking one in.
+    ///
+    /// A read callback puts out what it is given, so the stage used to have its input made stereo
+    /// (setChannelFormat), and FMOD did that by panning the mono voice to the middle, 3.01 dB down on
+    /// each side. The stage averaged the two back to one, so every voice reached the HRTF 3.01 dB
+    /// under the level the law placed it at, and the recorded sounds' ground, which waits for a
+    /// one-channel input, never played. Measured with --binaural-input.
+    /// </summary>
+    internal static FMOD.DSP_DESCRIPTION Description() => new()
+    {
+        pluginsdkversion = FMOD.VERSION.number,
+        numinputbuffers = 1,
+        numoutputbuffers = 1,
+        process = _processCallback,
+    };
 
     public static RESULT CreateDSP(FMOD.System system, SteamAudioVoiceState state, out FMOD.DSP dsp, out GCHandle handle)
     {
-        var desc = new FMOD.DSP_DESCRIPTION
-        {
-            pluginsdkversion = FMOD.VERSION.number,
-            numinputbuffers = 1,
-            numoutputbuffers = 1,
-            read = _readCallback
-        };
-
+        var desc = Description();
         RESULT res = system.createDSP(ref desc, out dsp);
         if (res == RESULT.OK)
         {
             handle = GCHandle.Alloc(state);
             dsp.setUserData(GCHandle.ToIntPtr(handle));
-            // Force stereo output even though the input is mono — the HRTF produces a binaural pair.
-            dsp.setChannelFormat(0, 0, SPEAKERMODE.STEREO);
         }
         else
         {
             handle = default;
         }
         return res;
+    }
+
+    /// <summary>
+    /// FMOD asks first what the stage puts out (the query) and then has it do it. The answer is a
+    /// stereo pair, and the input is left as it comes: a point source arrives as its own one channel,
+    /// at its own level; a reverb bus as its stereo.
+    /// </summary>
+    internal static RESULT ProcessCallback(ref DSP_STATE dsp_state, uint length, ref DSP_BUFFER_ARRAY inbufferarray,
+                                           ref DSP_BUFFER_ARRAY outbufferarray, bool inputsidle, DSP_PROCESS_OPERATION op)
+    {
+        if (op == DSP_PROCESS_OPERATION.PROCESS_QUERY)
+        {
+            DeclareOutput(ref outbufferarray);
+            return RESULT.OK;
+        }
+        int inchannels = inbufferarray.numchannels, outchannels = OutputChannels;
+        IntPtr inbuffer = inbufferarray.buffer, outbuffer = outbufferarray.buffer;
+        if (outbuffer == IntPtr.Zero) return RESULT.OK;
+        if (inbuffer == IntPtr.Zero || inchannels <= 0)
+        {
+            DspCallback.Silence(outbuffer, length, outchannels);
+            return RESULT.OK;
+        }
+        // Idle input is silence; the HRTF and the ground still run, so what they hold plays out.
+        if (inputsidle) unsafe { new Span<float>((void*)inbuffer, (int)length * inchannels).Clear(); }
+        return Render(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+    }
+
+    /// <summary>The query's answer: a stereo pair out, whatever comes in.</summary>
+    internal static void DeclareOutput(ref DSP_BUFFER_ARRAY output)
+    {
+        if (output.numbuffers == 0) return;
+        output.numchannels = OutputChannels;
+        if (output.bufferchannelmask != IntPtr.Zero) Marshal.WriteInt32(output.bufferchannelmask, 0);
+        output.speakermode = SPEAKERMODE.STEREO;
     }
 
     /// <summary>
@@ -123,12 +170,12 @@ internal static class SteamAudioDsp
     /// exactly that way by an index slip in the boundary DSP, which had no guard either. Everything
     /// below stays as it was; a fault now costs one silent block and one line in the log.
     /// </summary>
-    private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
-                                       uint length, int inchannels, ref int outchannels)
+    private static RESULT Render(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
+                                 uint length, int inchannels, ref int outchannels)
     {
         try
         {
-            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            var r = RenderCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
             Guard(ref dsp_state, inbuffer, outbuffer, (int)length, inchannels, outchannels > 0 ? outchannels : 2);
             return r;
         }
@@ -165,7 +212,7 @@ internal static class SteamAudioDsp
 
     private static Phonon.IPLVector3 Dir(System.Numerics.Vector3 v) => new() { x = v.X, y = v.Y, z = v.Z };
 
-    private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
+    private static RESULT RenderCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
         IntPtr userData = DspCallback.UserData(ref dsp_state);
         if (userData == IntPtr.Zero) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }

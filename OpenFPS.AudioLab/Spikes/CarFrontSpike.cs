@@ -325,9 +325,9 @@ public static class CarFrontSpike
         return Loudness.RenderedGain(gain, reference, Loudness.AudibleRange(v.SourceLevelDb), d) * MasterGain;
     }
 
-    /// <summary>The master: FmodAudioProvider's 2 dB trim (its DefaultMasterDb) and the limiter's
-    /// makeup (MasterMakeupDb, 7 dB), which at these levels never limits.</summary>
-    static float MasterGain => MathF.Pow(10f, (2f + FmodAudioProvider.MasterMakeupDb) / 20f);
+    /// <summary>The master: FmodAudioProvider's trim and the limiter's makeup, which at these levels
+    /// never limits.</summary>
+    static float MasterGain => MathF.Pow(10f, (FmodAudioProvider.MasterTrimDb + FmodAudioProvider.MasterMakeupDb) / 20f);
 
     /// <summary>The bay's shading and the cooling system's state, read by name so the instrument
     /// builds against older trees.</summary>

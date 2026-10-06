@@ -350,8 +350,20 @@ catches what that pushes over. Metered on the speedway with the FMOD loudness me
 | 12 dB | -17 to -21 | -0.5 | limiter engaging |
 | 22 dB | -17 to -21 | -0.1 | no louder than 12, just squashed |
 
-Ten is the last value that buys loudness rather than compression. **When a map sounds quiet, read the
-"Mix loudness" line in the log before changing any level anywhere.** That, and "Mixer load", are also
+Ten is the last value that buys loudness rather than compression. (Measured on 2026-09-14.)
+
+The makeup is six now, and every decibel of it is accounted for. Three of the ten went back when the
+ground reflection came in, because it puts its energy on everything standing on a road, and a two-decibel
+master trim was added for the street. Three more were making up a fault: the binaural stage lost 3.01 dB
+on every voice, because FMOD panned the mono voice to the middle to give the stage the stereo input it
+asked for (`SteamAudioDsp`, `--binaural-input`). With that put right, the six that remain are the whole
+of the choice of how loud the game plays. For a player who has calibrated (`/listening`), 0 dBFS at the
+output is 94.8 dB SPL against the law's 100.8 (`Loudness.DesignFullScaleDb`). Nothing else in the chain
+loses level. The HRTF is within half a decibel of level averaged over the sphere (1.4 dB down straight
+ahead and up at the sides, as a head is), and the law in loudness units gives back a synthesized voice's
+16 dB of headroom.
+
+**When a map sounds quiet, read the "Mix loudness" line in the log before changing any level anywhere.** That, and "Mixer load", are also
 how the two failure modes are told apart: a wrong level reference CLIPS (a continuous rasp, worse the
 louder the source), a starved mixer TEARS (the same audio, stuttering). Both get called crackling.
 
