@@ -147,6 +147,7 @@ internal sealed class BogieVoice
     // Squeal.
     private Mode _squealMode;
     private float _squealState, _squealDrive;
+    private readonly float _squealRelease;   // 0.999 a sample at 44.1 kHz: 23 ms
     private readonly float _squealHz;
 
     // One bogie, not one axle. The axles of a bogie share a rail and share sleepers — the track
@@ -169,7 +170,7 @@ internal sealed class BogieVoice
     public BogieVoice(WheelsetSpec w, TrackSpec t, TrackResponse track, float referenceDb,
                       int axles, float wheelbase, float rate, int seed)
     {
-        _w = w; _t = t; _track = track; _rate = rate; _dt = 1f / rate;
+        _w = w; _t = t; _track = track; _rate = rate; _dt = 1f / rate; _squealRelease = At44k.Decay(0.999f, rate);
         _rng = new Random(seed);
         int na = Math.Max(1, axles);
         _axleOffset = new double[na];
@@ -376,7 +377,7 @@ internal sealed class BogieVoice
         }
         else if (_squealState != 0f)
         {
-            _squealState *= 0.999f;
+            _squealState *= _squealRelease;
             if (MathF.Abs(_squealState) < 1e-6f) _squealState = 0f;
         }
 

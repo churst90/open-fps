@@ -232,8 +232,10 @@ internal sealed class TracedReverb : IDisposable
 
     /// <param name="refreshMs">How often the trace is redone: a quarter second for the listener,
     /// who walks; a second for a room traced from its middle, which does not move.</param>
-    public TracedReverb(IntPtr context, int sampleRate = 44100, int frameSize = TracedFrame, int refreshMs = DefaultRefreshMs)
+    /// <param name="sampleRate">0: the mixer's (MixerQuality.MixerRate).</param>
+    public TracedReverb(IntPtr context, int sampleRate = 0, int frameSize = TracedFrame, int refreshMs = DefaultRefreshMs)
     {
+        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
         _refreshMs = refreshMs;
         Context = context; SampleRate = sampleRate; FrameSize = frameSize;
         var s = new Phonon.IPLSimulationSettings

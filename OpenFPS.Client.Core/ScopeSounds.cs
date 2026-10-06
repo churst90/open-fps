@@ -18,11 +18,13 @@ namespace OpenFPS.Client.Core;
 /// </summary>
 public static class ScopeSounds
 {
-    public const int SampleRate = 44100;
+    /// <summary>The rate both loops and the breath are rendered at: the mixer's, so they play without a
+    /// resampler.</summary>
+    public static int SampleRate => OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
 
-    /// <summary>The held note, Hz: thirty cycles in two thousand samples, so the loop joins without a
-    /// seam. About E5.</summary>
-    public const float SteadyHz = 30f * SampleRate / 2000f;   // 661.5
+    /// <summary>The held note, Hz. About E5. It was thirty cycles in two thousand samples at 44.1 kHz,
+    /// and stays that note at any rate: the loop is made of whole cycles instead (<see cref="SteadyLoopSamples"/>).</summary>
+    public const float SteadyHz = 661.5f;
     /// <summary>The pulse's note at the slowest rate, an octave under the held note.</summary>
     public const float PulseHz = SteadyHz / 2f;
     /// <summary>One pulse and its silence at the slowest rate, seconds: two and a half a second.</summary>
@@ -52,10 +54,20 @@ public static class ScopeSounds
         return x;
     }
 
+    /// <summary>The fewest samples, at least about 45 ms, that hold a whole number of cycles of
+    /// <see cref="SteadyHz"/> (1323/2 Hz) at <paramref name="rate"/>: 2000 at 44.1 kHz, 32000 at 48.</summary>
+    public static int SteadyLoopSamples(int rate)
+    {
+        static int Gcd(int a, int b) { while (b != 0) (a, b) = (b, a % b); return a; }
+        int n = 2 * rate / Gcd(2 * rate, 1323);          // cycles = n * 1323 / (2 * rate)
+        int want = Math.Max(1, (int)(0.045 * rate));
+        return n >= want ? n : n * ((want + n - 1) / n);
+    }
+
     /// <summary>The held note: whole cycles, so it loops without a seam.</summary>
     public static float[] RenderSteady()
     {
-        const int n = 2000;
+        int n = SteadyLoopSamples(SampleRate);
         var x = new float[n];
         double w = 2 * Math.PI * SteadyHz / SampleRate;
         for (int i = 0; i < n; i++) x[i] = Peak * Reed(w * i);

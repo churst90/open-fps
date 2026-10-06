@@ -34,7 +34,8 @@ public enum UiCue
 public sealed class UiSounds
 {
     private readonly AudioEngineFacade _audio;
-    public const int SampleRate = 44100;
+    /// <summary>The rate cues are rendered at: the mixer's, so they play without a resampler.</summary>
+    public static int SampleRate => OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
 
     /// <summary>Whether interface sounds play at all. Speech is unaffected.</summary>
     public bool Enabled { get; set; } = true;

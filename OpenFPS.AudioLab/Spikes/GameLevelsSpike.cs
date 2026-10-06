@@ -31,7 +31,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// sound. A flat asphalt ground is the only thing in the world.
 ///
 /// Each scene plays alone, between gaps of silence, and its name and start time are written to
-/// DIR/segments.csv beside DIR/capture.wav (stereo, 44.1 kHz, the game's full scale). tools/game_levels.py
+/// DIR/segments.csv beside DIR/capture.wav (stereo, the mixer's rate, the game's full scale). tools/game_levels.py
 /// cuts and measures them.
 ///
 /// Car frame: the car faces +Z, its origin on the ground at its middle. The listener's ear is 1.7 m up.
@@ -427,7 +427,7 @@ public static class GameLevelsSpike
     /// </summary>
     public static int Spectra(string[] names)
     {
-        const int rate = 44100, block = 512;
+        const int rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, block = 512;   // the rate the game runs it at
         if (names.Length == 0) names = new[] { "i4_economy", "i4_midsize", "police_interceptor", "v8_mild", "diesel_i4" };
         Console.WriteLine($"{"preset",-20} {"declared",8} {"idle Z",7} {"idle A",7} {"Z-A",5} {"load Z",7} {"load A",7} {"Z-A",5}");
         foreach (var n in names)

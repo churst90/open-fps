@@ -101,8 +101,10 @@ internal sealed class TracedEchoes : IDisposable
     public int Runs;
     public double LastRunMs;
 
-    public TracedEchoes(IntPtr context, int sampleRate = 44100, int frameSize = 1024)
+    /// <param name="sampleRate">0: the mixer's (MixerQuality.MixerRate).</param>
+    public TracedEchoes(IntPtr context, int sampleRate = 0, int frameSize = 1024)
     {
+        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
         Context = context; SampleRate = sampleRate; FrameSize = frameSize;
         var s = new Phonon.IPLSimulationSettings
         {
@@ -321,7 +323,7 @@ internal sealed class TracedEchoRig : IGuardedUnit
     public float Blend = -1f;
     /// <summary>Each bank's generation when the rig was given its slot (TracedEchoes.BankGeneration).</summary>
     public readonly int[] AttachGeneration = new int[2];
-    public float SampleRate = 44100f;
+    public float SampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
     public Phonon.IPLCoordinateSpace3 Orientation;
     public FMOD.DSP CaptureDsp, MixDsp;
     public GCHandle Handle;

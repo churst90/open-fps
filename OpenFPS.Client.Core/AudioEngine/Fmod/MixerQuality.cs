@@ -43,16 +43,31 @@ public static class MixerQuality
         _ => Default,
     };
 
-    /// <summary>The mixer's sample rate, once a mixer has been made (FmodAudioProvider.Initialize).</summary>
-    public static int MixerRate { get => _mixerRate; set => _mixerRate = value > 0 ? value : 44100; }
-    private static volatile int _mixerRate = 44100;
+    /// <summary>
+    /// The rate the mixer is asked for: 48 kHz. Sound servers (PipeWire, PulseAudio's default) and
+    /// almost every device run at 48 kHz, and the synthesised one-shots, the door renders, speech and
+    /// voice chat are made at 48 kHz; a 44.1 kHz mixer put all of those through a resampler on the way
+    /// in and the whole mix through the sound server's on the way out. OPENFPS_MIXER_RATE=44100 (or any
+    /// rate 22050-192000) asks for another, for an A/B.
+    /// </summary>
+    public const int DefaultRate = 48000;
+
+    /// <summary>What FmodAudioProvider asks FMOD for (setSoftwareFormat). See <see cref="DefaultRate"/>.</summary>
+    public static int RequestedRate
+        => int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MIXER_RATE"), out int r) && r >= 22050 && r <= 192000 ? r : DefaultRate;
+
+    /// <summary>The mixer's sample rate, once a mixer has been made (FmodAudioProvider.Initialize), and
+    /// <see cref="DefaultRate"/> until then. Everything that renders for the mixer, or sets up a stage
+    /// that runs in it, reads this: nothing may assume a rate.</summary>
+    public static int MixerRate { get => _mixerRate; set => _mixerRate = value > 0 ? value : DefaultRate; }
+    private static volatile int _mixerRate = DefaultRate;
 
     /// <summary>
     /// A buffer at another rate brought to <paramref name="to"/> properly: band-limited, by a
     /// Kaiser-windowed sinc (64 taps a side, about 90 dB down in the stop band, flat to 95 % of the
-    /// lower Nyquist). For the synthesised one-shots, which are rendered at 48 kHz and played by a
-    /// 44.1 kHz mixer: FMOD's resampler, even its spline, is a short polynomial, and from 48 kHz it
-    /// folds everything above 22 kHz back into the band and images the top octave 3.9 kHz down
+    /// lower Nyquist). For anything rendered at another rate than the mixer's (thunder at 24 kHz, a
+    /// one-shot at 48 kHz under OPENFPS_MIXER_RATE=44100): FMOD's resampler, even its spline, is a
+    /// short polynomial, and from 48 kHz to 44.1 it folds everything above 22 kHz back into the band and images the top octave 3.9 kHz down
     /// (a 15 kHz component came back at 11.1 kHz only 24-28 dB under itself, measured with the lab's
     /// --quality resampler). Done once per buffer, on the thread that rendered it.
     /// </summary>

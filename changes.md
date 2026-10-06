@@ -36,6 +36,37 @@ Recent work, newest first. `git log` has the rest.
   3 km, moderate rain), `set=wind`. `tools/ear_loudness.py`: an independent ISO 532-1 port (annex B.2,
   83.296 sone) and the before/after comparison of two captures.
 
+- New master limiter (unheard). It looks 2 ms ahead, measures true peak (ITU-R BS.1770-4, 4x
+  oversampled), puts both ears at one gain, and limits to -1 dBTP.
+  - The attack is smooth and spans the look-ahead. The release depends on what is playing: about
+    130 ms after a single shot, about 1 s after a 2 s roll.
+  - FMOD's limiter had no look-ahead and clipped the leading edge of shots and thunder flat at
+    -2 dBFS. Its peaks between samples reached +0.02 dBTP. A 50 Hz tone pushed over it had THD+N of
+    -26 dB; it is now -146 dB.
+  - The makeup gain is unchanged. The mix is 2.1 ms later (101-102 samples).
+  - OPENFPS_LIMITER=fmod puts the old limiter back. Renders are in
+    inbox/limiter-48k-2026-10-06 (README there).
+- The mixer runs at 48 kHz, which is what PipeWire, the devices and the renders already run at.
+  FMOD's stream reaches PipeWire as s16le 48000 Hz, so PipeWire no longer resamples it.
+  OPENFPS_MIXER_RATE=44100 goes back.
+- Everything that read 44100 now reads the mixer's rate:
+  - Steam Audio's HRTF, voices, traced reverb, traced echoes, late field and simulator.
+  - The tail's filters and velvet taps.
+  - Band shares, the ambisonic bed, the synth and granular processors.
+  - UI and scope sounds. The scope's held note is still 661.5 Hz.
+  - Engine benches and the lab spikes that use them.
+- Per-sample constants chosen at 44.1 kHz now keep their time or frequency at any rate (At44k):
+  tyre and squeal smoothing, the shift chirp, echo glides, air valves, rail clank and squeal, horn
+  and whistle jitter, the engine's knock and pink noise, and the own-voice fades.
+- One-shots carry the rate they were made at to registration. A door rendered before the mixer
+  started can no longer play at the wrong pitch.
+- A traced stage or echo rig traced at another rate than the mixer's is refused, with a log line,
+  instead of playing time-scaled.
+- Engine voices cost 7-12 % more CPU per second of audio, as expected. Mixer DSP on a street scene
+  went from 2.9 % to 3.2 %.
+- Tests: MasterLimiterTests and MixerRateTests. MixerRateTests checks for no 44100 default anywhere,
+  and the same engine order, siren sweep and horn note at either rate. AudioLab `--quality limiter`,
+  `scene=gunfire` and `scene=thunder km=`; `audio_quality.py limiter` and `flattops`.
 - Doors on the Linux client make their sound the first time. `run-gtk-client.sh` now renders every
   door sound the client makes at start into the player's render cache for the build, as the Windows
   zip ships them, once per build (about 80 s on all cores; a build that has them skips it). The cache

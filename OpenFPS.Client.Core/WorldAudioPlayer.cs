@@ -107,7 +107,10 @@ public sealed class WorldAudioPlayer
     private static double LatenessFor(in TransientSound sound)
         => sound.SynthKey != null && sound.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal)
             ? GlassRenderLateness : MaxRenderLateness;
-    private readonly System.Collections.Concurrent.ConcurrentQueue<(string Id, float[] Pcm)> _rendered = new();
+    /// <summary>Finished renders, with the rate each was brought to: the mixer's when it was made, which
+    /// a render begun before the mixer existed may not be (a door prewarm), so it is registered at the
+    /// rate it carries, never at whatever the mixer is by then.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(string Id, float[] Pcm, int Rate)> _rendered = new();
 
     /// <summary>
     /// A door model's render's own peak, dB SPL at a metre, by its key: the level its buffer's full scale
@@ -234,7 +237,7 @@ public sealed class WorldAudioPlayer
             System.Threading.Tasks.Task.Run(async () =>
             {
                 await gate.WaitAsync();
-                try { _rendered.Enqueue((id, AtMixerRate(RenderDoorKey(key, _fullScaleDb)))); }
+                try { _rendered.Enqueue(AtMixerRate(id, RenderDoorKey(key, _fullScaleDb))); }
                 finally { gate.Release(); }
             });
         }
@@ -420,7 +423,7 @@ public sealed class WorldAudioPlayer
                 {
                     var toRender = sound;
                     int seed = message.Seed;
-                    System.Threading.Tasks.Task.Run(() => _rendered.Enqueue((id, AtMixerRate(RenderOne(toRender, seed)))));
+                    System.Threading.Tasks.Task.Run(() => _rendered.Enqueue(AtMixerRate(id, RenderOne(toRender, seed))));
                 }
                 // ...but it is not simply let go. It waits for its own buffer and plays if that comes
                 // back in time — see MaxRenderLateness. Dropping every first hearing would silence
@@ -571,7 +574,7 @@ public sealed class WorldAudioPlayer
             // In float, at the mixer's rate (AtMixerRate). Sixteen bits truncated the quiet end of every
             // one-shot to its last bit and clipped a render over full scale; FMOD's resampler imaged its
             // top octave down into the band.
-            if (_audio.RegisterSynthesisedSoundFloat(done.Id, done.Pcm, MixerQuality.MixerRate))
+            if (_audio.RegisterSynthesisedSoundFloat(done.Id, done.Pcm, done.Rate))
             {
                 _registered.Add(done.Id);
                 _rendering.Remove(done.Id);
@@ -1494,7 +1497,11 @@ public sealed class WorldAudioPlayer
 
     /// <summary>A rendered one-shot (at <see cref="TransientSynth.SampleRate"/>) brought to the mixer's
     /// rate, band-limited, on the worker that rendered it (MixerQuality.Resample).</summary>
-    private static float[] AtMixerRate(float[] pcm) => MixerQuality.Resample(pcm, TransientSynth.SampleRate, MixerQuality.MixerRate);
+    private static (string Id, float[] Pcm, int Rate) AtMixerRate(string id, float[] pcm)
+    {
+        int rate = MixerQuality.MixerRate;
+        return (id, MixerQuality.Resample(pcm, TransientSynth.SampleRate, rate), rate);
+    }
 
     /// <summary>A line at another rate brought to the render rate, band-limited. The shipped lines are
     /// already at 48 kHz; this is for a file that is not, so it plays at the right pitch, and without the
@@ -1550,7 +1557,7 @@ public sealed class WorldAudioPlayer
         {
             var sound = item.Sound;
             int seed = item.Seed;
-            System.Threading.Tasks.Task.Run(() => _rendered.Enqueue((id, AtMixerRate(Diffuse(RenderOne(sound, seed), step / 4f, seed)))));
+            System.Threading.Tasks.Task.Run(() => _rendered.Enqueue(AtMixerRate(id, Diffuse(RenderOne(sound, seed), step / 4f, seed))));
         }
         return id;
     }

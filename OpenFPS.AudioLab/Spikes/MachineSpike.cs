@@ -256,12 +256,12 @@ public static class MachineSpike
     /// <summary>The RMS the game's live voice makes at a steady speed, as dB SPL at one metre.</summary>
     private static float CruiseLevelDb(VehicleProfile v, float metresPerSecond)
     {
-        var voice = new OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState(v, 44100f, 11)
+        var voice = new OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState(v, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, 11)
         { TargetSpeed = metresPerSecond };
         voice.PlaceAtSpeed(metresPerSecond);
         var block = new float[1024];
         double sum = 0; int n = 0;
-        for (int b = 0; b < 44100 * 2 / 1024; b++)
+        for (int b = 0; b < OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate * 2 / 1024; b++)
         {
             voice.Produce();
             voice.Consume(block);

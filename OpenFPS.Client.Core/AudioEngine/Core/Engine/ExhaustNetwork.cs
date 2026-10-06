@@ -29,6 +29,7 @@ internal sealed class ExhaustNetwork
     private readonly EngineProfile _e;
     private readonly ExhaustSpec _x;
     private readonly float _rate;
+    private readonly float _spreadSlew;
     private readonly int _n;
 
     private readonly Pipe[] _primary;
@@ -138,6 +139,7 @@ internal sealed class ExhaustNetwork
         _e = e;
         _x = e.Exhaust;
         _rate = rate;
+        _spreadSlew = At44k.Increment(0.0005f, rate);   // 2000 samples at 44.1 kHz, full scale
         _n = e.Cylinders;
         _groups = e.CollectorGroups;
         _valveArrived = new float[_n];
@@ -676,7 +678,7 @@ internal sealed class ExhaustNetwork
             if (_listenerKnown)
             {
                 br.PathSamples += Math.Clamp(br.PathTarget - br.PathSamples, -MaxPathSlew, MaxPathSlew);
-                br.Spread += Math.Clamp(br.SpreadTarget - br.Spread, -0.0005f, 0.0005f);
+                br.Spread += Math.Clamp(br.SpreadTarget - br.Spread, -_spreadSlew, _spreadSlew);
                 var ring = br.Path;
                 int mask = ring.Length - 1;
                 ring[br.PathAt] = heard;
