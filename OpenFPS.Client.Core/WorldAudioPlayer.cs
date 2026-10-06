@@ -464,6 +464,15 @@ public sealed class WorldAudioPlayer
             try
             {
                 var parts = Thunder.Render(strike, listener, air, options);
+                // At the mixer's rate, band-limited, here on the worker: from 24 kHz FMOD's resampler
+                // left the rumble's images across the top octave. About 4 ms a second of thunder.
+                int mix = MixerQuality.MixerRate;
+                foreach (var part in parts)
+                    if (part.SampleRate != mix)
+                    {
+                        part.Pressure = MixerQuality.Resample(part.Pressure, part.SampleRate, mix);
+                        part.SampleRate = mix;
+                    }
                 _thunder.Enqueue((strike, now, listener, parts, sw.ElapsedMilliseconds, map));
             }
             catch (Exception ex)

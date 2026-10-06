@@ -678,6 +678,7 @@ public class FmodAudioProvider : IAudioProvider
     private FMOD.DSP _loudnessMeter;
     private MasterTap? _masterTap;
     private MasterTap? _preLimiterTap;
+    private MasterDither? _dither;
 
     // The wind at the listener's ears (EarWindVoice). One generator, flat on the master, for the
     // provider's life; silent while nobody is in a world.
@@ -884,6 +885,7 @@ public class FmodAudioProvider : IAudioProvider
             // suits a person trying to reproduce something they can only find by ear.
             string? wavPath = Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV");
             IntPtr extra = IntPtr.Zero;
+            if (string.IsNullOrEmpty(wavPath)) MixerQuality.ApplyOutput(_system);
             if (!string.IsNullOrEmpty(wavPath))
             {
                 FmodCheck(_system.setOutput(OUTPUTTYPE.WAVWRITER), "setOutput(WAVWRITER)");
@@ -1083,6 +1085,10 @@ public class FmodAudioProvider : IAudioProvider
                 _preLimiterTap = MasterTap.Attach(_system, master, prePath, preRate > 0 ? preRate : 44100,
                                                   index: limiterAt + 1, asFloat: MixerQuality.CaptureFloat);
             }
+            // Last of all, after the meter and the capture: dither for the sixteen bits the output is
+            // handed (MasterDither).
+            _dither = MasterDither.Attach(_system, master);
+            if (_dither != null) Log.Information("Master dither: triangular, one 16-bit step (OPENFPS_DITHER=0 leaves it out).");
 
             StartEarWind();
 
@@ -5352,6 +5358,7 @@ public class FmodAudioProvider : IAudioProvider
             _enginePool?.Dispose(); _enginePool = null;
             _masterTap?.Dispose(); _masterTap = null;
             _preLimiterTap?.Dispose(); _preLimiterTap = null;
+            _dither?.Dispose();
             if (_loudnessMeter.hasHandle()) _loudnessMeter.release();
             if (_masterLimiter.hasHandle()) _masterLimiter.release();
         } 
@@ -5368,6 +5375,7 @@ public class FmodAudioProvider : IAudioProvider
         _granularBank?.Dispose();
         if (_isInitialized) _system.close();   // FMOD requires close() before release()
         if (_earWindHandle.IsAllocated) _earWindHandle.Free();
+        _dither?.FreeHandle(); _dither = null;
 
         if (_steamAudioEnabled)
         {

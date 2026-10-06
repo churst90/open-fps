@@ -27,11 +27,18 @@ namespace OpenFPS.AudioLab.Spikes;
 ///   --quality orbit [rates=0,90,360] [out=DIR]
 ///       A 300 Hz tone and pink noise circling the head at two metres: frame-rate steps in the binaural
 ///       stage show as a residual at multiples of the 1024-sample block.
-///   --quality scene=park|street|thunder [sec=] [out=DIR] [tag=]
+///   --quality scene=park|street|thunder|oneshots|fountain [sec=] [out=DIR] [tag=] [keepout] [legacy] [walk=1]
 ///       A typical scene, captured before and after the master limiter: Elm Park's fountain and trees
-///       with the listener walking in; four city cars passing on a street; a ground flash 3 km away.
-///   --quality quant
-///       Sixteen bits against float on the game's one-shot renders (TransientSynth), by level.
+///       with the listener walking in; four city cars passing on a street, with their front voices and
+///       facade echoes; a ground flash 3 km away; the synthesised one-shots (legacy: as registered
+///       before 10-06); the fountain alone. keepout keeps the 16-bit copy the output was handed.
+///   --quality echo [modes=moving,still,borrowed,approach,front,frontstill]
+///       A car's reflection, borrowed voice and front voice with the car itself muted: skips and steps.
+///   --quality ceiling [sec=]     how often each voice's SoftCeiling bends its samples
+///   --quality quant              sixteen bits against float on TransientSynth renders, by level
+///   --quality lsb                a tone two bits tall: the float mix against the 16 bits it is handed out as
+///   --quality output             the real output with nothing playing, to read its format off the server
+///   --quality thunderfile        a strike's file written with linear and with band-limited upsampling
 ///
 /// OPENFPS_RESAMPLER and the other switches in MixerQuality are read when each mixer is made, so
 /// one run can make one of each.
@@ -48,6 +55,65 @@ public static class QualitySpike
         if (args.Contains("orbit")) return Orbit(args, dir, tag);
         if (args.Contains("quant")) return Quant();
         if (args.Contains("echo")) return Echo(args, dir, tag);
+        if (args.Contains("ceiling")) return Ceiling(args);
+        if (args.Contains("thunderfile"))
+        {
+            // The thunder lab's files were taken from the render's 24 kHz to 48 kHz by linear
+            // interpolation; the same strike written both ways, mono, float, unnormalised.
+            var air = new Thunder.Air(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
+            foreach (float km in new[] { 1f, 3f })
+            {
+                var parts = Thunder.Render(ThunderSpike.Ground(km * 1000f, 45f, 3, 2), new Vector3(0f, 1.7f, 0f), air);
+                foreach (bool linear in new[] { true, false })
+                {
+                    float start = parts.Min(p => p.StartSeconds);
+                    float end = parts.Max(p => p.StartSeconds + p.Seconds);
+                    var mix = new float[(int)((end - start) * 48000) + 48000];
+                    foreach (var p in parts)
+                    {
+                        var y = linear ? ThunderSpike.To48kLinear(p) : ThunderSpike.To48k(p);
+                        int off = (int)((p.StartSeconds - start) * 48000);
+                        for (int i = 0; i < y.Length && off + i < mix.Length; i++) mix[off + i] += y[i];
+                    }
+                    float peak = mix.Max(MathF.Abs);
+                    for (int i = 0; i < mix.Length; i++) mix[i] *= 0.5f / MathF.Max(1e-9f, peak);
+                    string path = Path.Combine(dir, $"thunderfile-{km:F0}km-{(linear ? "linear" : "bandlimited")}.wav");
+                    WriteFloatWav(path, mix, 48000);
+                    Console.WriteLine($"  {path}: parts at {parts[0].SampleRate} Hz");
+                }
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                double secs = 0;
+                foreach (var p in parts) { MixerQuality.Resample(p.Pressure, p.SampleRate, 44100); secs += p.Seconds; }
+                Console.WriteLine($"  {km:F0} km: {parts.Count} parts, {secs:F1} s of sound; band-limited to 44.1 kHz in {sw.ElapsedMilliseconds} ms on one core");
+            }
+            return 0;
+        }
+        if (args.Contains("lsb"))
+        {
+            // A 1 kHz tone two bits tall through the whole mixer: the float tap against the sixteen
+            // bits FMOD hands the output (the WAV writer's copy goes through the same conversion).
+            using var s = new Session(dir, "lsb", pre: false);
+            int sr = 44100;
+            var tone = new float[sr * 6];
+            for (int i = 0; i < tone.Length; i++) tone[i] = 2e-5f * (float)Math.Sin(2 * Math.PI * 1000.0 * i / sr);
+            s.P.RegisterSynthesisedSoundFloat("lab:quality:lsb", tone, sr);
+            s.P.PlaySpatialSound(Plain(-1500, "lab:quality:lsb", new Vector3(0f, 0f, 2f), 1f, 1f, PlaybackMode.Single));
+            s.Pump(5.0);
+            s.Dispose();
+            Console.WriteLine($"  {dir}/lsb.post.wav (float) and lsb.fmodout.wav (what the output is handed)");
+            return 0;
+        }
+        if (args.Contains("output"))
+        {
+            // The real output, with nothing playing: for reading the stream's format off the sound
+            // server while it is open (pactl list sink-inputs). Silent: no voice is started.
+            Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
+            var p = new FmodAudioProvider();
+            if (!p.Initialize()) return 1;
+            for (int i = 0; i < 400; i++) { p.Update(); Thread.Sleep(10); }
+            p.Dispose();
+            return 0;
+        }
         string? scene = Str(args, "scene");
         if (scene != null) return Scene(scene, args, dir, tag);
         Console.WriteLine("  --quality resampler | orbit | scene=park|street|thunder | quant  (see QualitySpike)");
@@ -266,15 +332,31 @@ public static class QualitySpike
         switch (scene)
         {
             case "park": Park(s, sec); break;
+            case "fountain":
+            {
+                // The fountain alone, two metres off, the listener still (walk=1: walking past it at
+                // 1.2 m/s, so every sample goes through the resampler): the same model the nature
+                // renders write straight to a file, through the whole mixer.
+                bool walk = args.Contains("walk=1");
+                var v = Nature(-650, "water:park_fountain", new Vector3(0f, 0.6f, 2f));
+                s.Pump(sec, t =>
+                {
+                    var ear = walk ? new Vector3(-6f + 1.2f * (float)(t % 10.0), 1.7f, 0f) : new Vector3(0f, 1.7f, 0f);
+                    s.P.UpdateListener(ear, Quaternion.Identity, walk ? new Vector3(1.2f, 0f, 0f) : Vector3.Zero, -1);
+                    s.P.PlaySpatialSound(v);
+                });
+                break;
+            }
             case "street": Street(s, sec); break;
-            case "thunder": ThunderScene(s, sec); break;
+            case "thunder": ThunderScene(s, sec, !args.Contains("legacy")); break;
             case "oneshots": OneShots(s, sec, args.Contains("legacy")); break;
             default: Console.WriteLine($"  no scene '{scene}'"); return 1;
         }
         float cpu = s.Cpu.Count > 0 ? s.Cpu.Average() : float.NaN;
         s.Dispose();
-        s.DropSoundCardCopy();
-        Console.WriteLine($"  {name}: {sec:F0} s, mixer dsp {cpu:F1} % (resampler {MixerQuality.Resampler}); {dir}/{name}.pre.wav and .post.wav");
+        // keepout: keep the sixteen bits the output was handed (dither and all), not just the float tap.
+        if (!args.Contains("keepout")) s.DropSoundCardCopy();
+        Console.WriteLine($"  {name}: {sec:F0} s, mixer dsp {cpu:F1} % (resampler {MixerQuality.Resampler}, dither {(MasterDither.Enabled ? "on" : "off")}); {dir}/{name}.pre.wav and .post.wav");
         return 0;
     }
 
@@ -405,7 +487,7 @@ public static class QualitySpike
     /// <summary>A ground flash three kilometres away to the north-east, rendered and played as the
     /// client plays it (WorldAudioPlayer.QueueThunder): each part a float buffer at the part's own
     /// rate, placed out in its direction at its peak level.</summary>
-    private static void ThunderScene(Session s, float sec)
+    private static void ThunderScene(Session s, float sec, bool bandLimit)
     {
         var ear = new Vector3(0f, 1.7f, 0f);
         int seed = 4;
@@ -427,7 +509,10 @@ public static class QualitySpike
             float g = 1f / part.PeakPa;
             for (int i = 0; i < pcm.Length; i++) pcm[i] = part.Pressure[i] * g;
             string id = $"lab:quality:thunder:{k}";
-            if (!s.P.RegisterSynthesisedSoundFloat(id, pcm, part.SampleRate)) continue;
+            // As the client does now (WorldAudioPlayer.HearThunder): at the mixer rate, band-limited.
+            int rate = part.SampleRate;
+            if (bandLimit && rate != MixerQuality.MixerRate) { pcm = MixerQuality.Resample(pcm, rate, MixerQuality.MixerRate); rate = MixerQuality.MixerRate; }
+            if (!s.P.RegisterSynthesisedSoundFloat(id, pcm, rate)) continue;
             float level = WorldAudioPlayer.SkyLevelDb(part.PeakDb);
             var (gain, reference) = Loudness.Place(level);
             var at = ear + part.Direction * WorldAudioPlayer.SkyProxyMetres;
@@ -555,6 +640,70 @@ public static class QualitySpike
         return 0;
     }
 
+    // ── The voices' soft ceiling ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// How often a live voice's samples are bent by SoftCeiling (knee 0.8, ceiling +2 dB), and how much
+    /// of its energy the bend is: each bent sample's distance from the straight line it left, recovered
+    /// by inverting the bend. Engines at a steady cruise, read back from the voice's ring before the
+    /// ground (what the ceiling sees); nature voices and a condenser from their own ring.
+    /// </summary>
+    private static int Ceiling(string[] args)
+    {
+        float sec = float.TryParse(Str(args, "sec"), NumberStyles.Float, CultureInfo.InvariantCulture, out float sv) ? sv : 20f;
+        static (double Share, double DistDb, float Peak) Measure(Func<int, float> sample, int n)
+        {
+            float knee = SoftCeiling.Knee, room = SoftCeiling.Ceiling - SoftCeiling.Knee;
+            long bent = 0; double e = 0, d = 0; float peak = 0;
+            for (int i = 0; i < n; i++)
+            {
+                float y = sample(i), a = MathF.Abs(y);
+                e += y * (double)y; peak = MathF.Max(peak, a);
+                if (a <= knee) continue;
+                bent++;
+                float t = MathF.Min(0.999999f, (a - knee) / room);
+                float x = knee + room * 0.5f * MathF.Log((1 + t) / (1 - t));   // atanh
+                d += (x - a) * (double)(x - a);
+            }
+            return (bent / (double)n, d > 0 ? 10 * Math.Log10(d / e) : double.NegativeInfinity, peak);
+        }
+        int sr = 44100;
+        Console.WriteLine($"  {"voice",-28} {"bent",8} {"bend energy",12} {"peak",6}");
+        foreach (var (key, kmh) in new[] { ("i4_compact", 45f), ("i4_midsize", 50f), ("transit_bus", 35f), ("i6_street", 40f),
+                                           ("v8_muscle", 60f), ("police_interceptor", 80f), ("sportbike", 60f), ("single", 50f), ("diesel_truck", 40f) })
+        {
+            var v = new EngineVoiceState(MachineRegistry.VehicleFor(key), sr, 3) { TargetSpeed = kmh / 3.6f };
+            v.PlaceAtSpeed(kmh / 3.6f);
+            var block = new float[1024];
+            int n = (int)(sec * sr) / 1024 * 1024;
+            for (int i = 0; i < 2 * sr / 1024; i++) v.Render(block);
+            long start = v.Played;
+            var all = new float[n];
+            for (int i = 0; i < n; i += 1024) { v.Render(block); for (int k = 0; k < 1024; k++) all[i + k] = v.ReadAt(start + i + k); }
+            var m = Measure(i => all[i], n);
+            Console.WriteLine($"  {key + " " + kmh + " km/h",-28} {m.Share * 100,7:F3}% {m.DistDb,9:F1} dB {20 * MathF.Log10(m.Peak),6:F1}");
+        }
+        foreach (var key in new[] { "water:park_fountain", "foliage:park_tree", "fire:fire_pit", "machine:ac_window" })
+        {
+            string kind = key[..key.IndexOf(':')], preset = key[(key.IndexOf(':') + 1)..];
+            PhysicalVoiceState v = kind switch
+            {
+                "water" => new WaterVoiceState(WaterFeatureSpec.ByName(preset), sr, 11, Vector3.Zero),
+                "foliage" => new FoliageVoiceState(FoliageSpec.ByName(preset), sr, 11, Vector3.Zero),
+                "fire" => new FireVoiceState(FireSpec.ByName(preset), sr, 11, Vector3.Zero),
+                _ => new MachineVoiceState(SmallMachineSpec.ByName(preset), sr, 5, 11),
+            };
+            var block = new float[1024];
+            for (int i = 0; i < 2 * sr / 1024; i++) v.Render(block);
+            int n = (int)(sec * sr) / 1024 * 1024;
+            var all = new float[n];
+            for (int i = 0; i < n; i += 1024) { v.Render(block); Array.Copy(block, 0, all, i, 1024); }
+            var m = Measure(i => all[i], n);
+            Console.WriteLine($"  {key,-28} {m.Share * 100,7:F3}% {m.DistDb,9:F1} dB {20 * MathF.Log10(m.Peak),6:F1}");
+        }
+        return 0;
+    }
+
     // ── Sixteen bits ───────────────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -595,6 +744,17 @@ public static class QualitySpike
     }
 
     // ── Small things ───────────────────────────────────────────────────────────────────────────
+
+    private static void WriteFloatWav(string path, float[] x, int rate)
+    {
+        using var w = new BinaryWriter(File.Create(path));
+        int bytes = x.Length * 4;
+        w.Write("RIFF"u8.ToArray()); w.Write(36 + bytes); w.Write("WAVE"u8.ToArray());
+        w.Write("fmt "u8.ToArray()); w.Write(16); w.Write((short)3); w.Write((short)1);
+        w.Write(rate); w.Write(rate * 4); w.Write((short)4); w.Write((short)32);
+        w.Write("data"u8.ToArray()); w.Write(bytes);
+        foreach (float v in x) w.Write(v);
+    }
 
     private static string DescribeWav(string path)
     {

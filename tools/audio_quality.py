@@ -7,6 +7,7 @@
     audio_quality.py scenes DIR       the same for every scene-*.pre.wav / .post.wav pair in DIR
     audio_quality.py blocks FILE...   steps locked to the 1024-sample mixer block (a profile of |2nd difference|)
     audio_quality.py jumps FILE...    discontinuities: second-difference spikes far over the local level
+    audio_quality.py texture FILE...  spectrum and band-envelope statistics (what a texture is made of)
     audio_quality.py check FILE...    level, peak, clipping and silent gaps of files given to a listener
 
 Needs numpy and scipy (/home/cody/drumsynth/venv/bin/python). See docs/AUDIO_QUALITY_2026-10-06.md.
@@ -208,6 +209,66 @@ def jumps(paths, skip=1.0, z=8.0):
         print(f"  {os.path.basename(p)}: discontinuities " + ", ".join(counts))
 
 
+THIRDS = [63, 125, 250, 500, 1000, 2000, 4000, 6300, 8000, 10000, 12500, 16000, 20000]
+ENV_BANDS = [250, 500, 1000, 2000, 4000, 8000, 12500]
+
+
+def texture(paths, seconds=30.0, hp=150.0):
+    """What a texture is made of, after McDermott and Simoncelli (2011): its spectrum, and the
+    statistics of each band's envelope, which is what makes rain sound like rain and not like noise
+    shaped like rain. Per file: the third-octave spectrum against the 1-4 kHz band; per band the
+    envelope's spread (std/mean), skew and kurtosis; how the bands' envelopes move together; how much
+    is above 16 kHz; and for two channels, how alike the ears are. Gaussian noise of any spectrum has
+    envelope spread about 0.52, kurtosis about 3.2 and no comodulation; a crackle is a high kurtosis;
+    a texture of separate events moves its bands together."""
+    from scipy.signal import hilbert, sosfiltfilt
+    print(f"  {'file':<44} {'sr':>6} {'rms':>6} | 3rd-oct re 1-4k: "
+          + " ".join(f"{(str(b // 1000) + 'k') if b >= 1000 else str(b):>6}" for b in THIRDS))
+    rows = []
+    for p in paths:
+        sr, x = read(p)
+        n = min(len(x), int(seconds * sr))
+        x = x[:n]
+        mono = x.mean(axis=1)
+        if hp:
+            mono = sosfilt(butter(4, hp, btype="high", fs=sr, output="sos"), mono)
+        f, P = welch(mono, sr, nperseg=8192)
+        ref = P[(f >= 1000) & (f < 4000)].mean()
+        spec = []
+        for b in THIRDS:
+            lo, hi = b / 2 ** (1 / 6), b * 2 ** (1 / 6)
+            m = (f >= lo) & (f < hi)
+            spec.append(db(P[m].mean() / ref) if m.any() and hi < sr / 2 else float("nan"))
+        rms = 20 * np.log10(np.sqrt(np.mean(mono ** 2)) + 1e-30)
+        print(f"  {os.path.basename(p)[:44]:<44} {sr:>6} {rms:6.1f} | " + " ".join(f"{v:6.1f}" for v in spec))
+        envs, stats = [], []
+        dec = max(1, sr // 400)
+        for b in ENV_BANDS:
+            lo, hi = b / 2 ** (1 / 6), min(b * 2 ** (1 / 6), 0.45 * sr)
+            if lo >= hi:
+                continue
+            band = sosfiltfilt(butter(4, [lo, hi], btype="band", fs=sr, output="sos"), mono)
+            e = np.abs(hilbert(band))
+            e = np.maximum(sosfiltfilt(butter(2, 100, fs=sr, output="sos"), e)[::dec], 0)
+            m, sd = e.mean(), e.std()
+            z = (e - m) / (sd + 1e-30)
+            stats.append((b, sd / (m + 1e-30), (z ** 3).mean(), (z ** 4).mean()))
+            envs.append(z)
+        cc = np.corrcoef(np.array(envs)) if len(envs) > 1 else np.ones((1, 1))
+        como = (cc.sum() - len(envs)) / max(1, len(envs) * (len(envs) - 1))
+        print("      envelope spread/skew/kurtosis: "
+              + "  ".join(f"{(str(b // 1000) + 'k') if b >= 1000 else b} {c:.2f}/{sk:.1f}/{k:.1f}" for b, c, sk, k in stats)
+              + f"   comodulation {como:.2f}")
+        top = P[f >= 16000].sum() / P.sum() if (f >= 16000).any() else 0
+        line = f"      above 16 kHz {db(top):.1f} dB of the total"
+        if x.shape[1] == 2:
+            l, r = x[:, 0], x[:, 1]
+            line += f"; ears alike (zero-lag correlation) {np.dot(l, r) / np.sqrt(np.dot(l, l) * np.dot(r, r) + 1e-30):.2f}"
+        print(line)
+        rows.append((p, spec, stats, como))
+    return rows
+
+
 def lim_stats(pre_path, post_path):
     sr, pre = read(pre_path)
     _, post = read(post_path)
@@ -324,6 +385,8 @@ if __name__ == "__main__":
         blocks(sys.argv[2:])
     elif cmd == "jumps":
         jumps(sys.argv[2:])
+    elif cmd == "texture":
+        texture(sys.argv[2:])
     elif cmd == "check":
         check(sys.argv[2:])
     else:

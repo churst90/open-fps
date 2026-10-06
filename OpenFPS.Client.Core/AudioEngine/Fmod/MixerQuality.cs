@@ -123,6 +123,25 @@ public static class MixerQuality
         return sum;
     }
 
+    /// <summary>
+    /// OPENFPS_FMOD_OUTPUT=pulse|alsa|wasapi: which output FMOD drives, for measuring what reaches the
+    /// sound server (the lab's --quality output). Unset, FMOD chooses, as it always has.
+    /// </summary>
+    public static void ApplyOutput(FMOD.System system)
+    {
+        OUTPUTTYPE? type = Environment.GetEnvironmentVariable("OPENFPS_FMOD_OUTPUT")?.Trim().ToLowerInvariant() switch
+        {
+            "pulse" or "pulseaudio" => OUTPUTTYPE.PULSEAUDIO,
+            "alsa" => OUTPUTTYPE.ALSA,
+            "wasapi" => OUTPUTTYPE.WASAPI,
+            _ => null,
+        };
+        if (type == null) return;
+        RESULT r = system.setOutput(type.Value);
+        if (r == RESULT.OK) Log.Information("FMOD output: {Type} (OPENFPS_FMOD_OUTPUT).", type);
+        else Log.Warning("FMOD output {Type} refused: {Result}.", type, r);
+    }
+
     /// <summary>Sets the resampler. BEFORE System.init: FMOD reads it when the mixer is made.</summary>
     public static void ApplyResampler(FMOD.System system)
     {

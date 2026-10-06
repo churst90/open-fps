@@ -138,7 +138,7 @@ string[] usage =
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
     "  --ambisonic                                   ambisonic encode and decode come out of the right ear",
     "  --dsp-order                                   where HEAD and TAIL put a unit in a channel's chain",
-    "  --quality resampler|orbit|quant|scene=park|street|thunder [out=DIR] [tag=]",
+    "  --quality resampler|orbit|echo|ceiling|quant|lsb|output|thunderfile|scene=NAME [out=DIR] [tag=]",
     "                                                what the mixer does to a sound: resampler, binaural steps, limiter (tools/audio_quality.py)",
     "",
     "The mixer thread (docs/THE_MIXER_THREAD_CRASH.md)",
