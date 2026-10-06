@@ -346,6 +346,10 @@ def true_peak_db(x, up=8):
     """The peak between samples too: 8x oversampled by a polyphase low-pass, dB re full scale."""
     from scipy.signal import resample_poly
     y = resample_poly(x, up, 1, axis=0)
+    # The filter rings where the stretch is cut out of a longer signal: leave its edges out.
+    edge = 64 * up
+    if len(y) > 4 * edge:
+        y = y[edge:-edge]
     return 20 * np.log10(np.abs(y).max() + 1e-30)
 
 
@@ -406,13 +410,12 @@ def limiter(dirname, tag):
     t0 = first_onset(pre[:, 0], sr, 0.0, 3.0)
     first = float(rows[0]["start"])
     off = (t0 - first) if t0 is not None else 0.0
-    lag = 0
-    seg = slice(int((first + off + 0.5) * sr), int((first + off + 0.5) * sr) + 4096)
-    best = -1
-    for l in range(0, 600):
-        c = abs(np.dot(pre[seg, 0], post[seg.start + l: seg.stop + l, 0]))
-        if c > best:
-            best, lag = c, l
+    # The lag between the taps: the first sample of the first tone (out of digital silence) in each.
+    # A cross-correlation on a steady tone is ambiguous by half its period.
+    a0 = max(0, int((first + off - 0.1) * sr))
+    on_pre = a0 + int(np.argmax(np.abs(pre[a0:, 0]) > 1e-5))
+    on_post = a0 + int(np.argmax(np.abs(post[a0:, 0]) > 1e-5))
+    lag = on_post - on_pre
     print(f"  {os.path.basename(base)}: {sr} Hz; the post capture trails the pre by {lag} samples ({lag / sr * 1000:.2f} ms: the limiter's latency)")
     print(f"  {'signal':<10} {'over':>5} {'in TP':>8} {'out TP':>8} {'out pk':>8} {'GR':>6} {'THD+N':>8} {'IMD':>8} {'flat runs':>9}")
     for r in rows:

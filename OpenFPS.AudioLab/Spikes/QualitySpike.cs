@@ -646,7 +646,8 @@ public static class QualitySpike
         using var s = new Session(dir, name, pre: true);
         int sr = MixerQuality.MixerRate;
         float makeup = MathF.Pow(10f, FmodAudioProvider.MasterMakeupDb / 20f);
-        float Amp(float overDb) => MathF.Pow(10f, (-1f + overDb) / 20f) / makeup;
+        // A mono interface sound reaches the master 3 dB down in each channel (the 2D pan law): put back.
+        float Amp(float overDb) => MathF.Pow(10f, (-1f + overDb) / 20f) / makeup * MathF.Sqrt(2f);
         var rows = new List<string> { "name,start,seconds,hz1,hz2,over_db" };
         var plays = new List<(double At, string Id, Func<float[]> Render)>();
         double at = 0.5;
@@ -680,7 +681,7 @@ public static class QualitySpike
         }
         // Recovery: the bed, then a shot-like burst and a roll on it.
         double bedAt = at, bedSec = 8.0;
-        float bedAmp = MathF.Pow(10f, -30f / 20f) / makeup;
+        float bedAmp = MathF.Pow(10f, -30f / 20f) / makeup * MathF.Sqrt(2f);
         plays.Add((bedAt, "lab:limiter:bed", () =>
         {
             int n = (int)(bedSec * sr);
