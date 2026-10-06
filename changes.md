@@ -4,6 +4,28 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- The binaural stage hears a voice at its own level, and the master's makeup is 3 dB less to match.
+  FMOD gave the stage a mono voice panned to the middle, 3.01 dB down on each side, because the stage
+  asked for a stereo input so that it could put out a stereo pair. The stage averaged the two back to
+  one, so every voice through the HRTF reached it 3.01 dB under where the law placed it, and the
+  recorded impacts' ground reflection, which waits for a one-channel input, never played. The stage
+  now says through FMOD's process callback that it puts out two channels, and takes its input as it
+  comes. `--binaural-input` measures a mono voice through the stage against the HRTF alone: 0.00 dB
+  each ear, where it was -3.01.
+  - The master: makeup 6 dB, trim 0 (they were 7 and 2). Every voice through the HRTF plays exactly as
+    loud as before (`--game-levels`: speech, cars, the fountain, a door and thunder within 0.1 dB;
+    `--quality` gunfire: the same loudness, true peak and limiting). The six is the whole choice of
+    loudness: 0 dBFS at the output is 94.8 dB SPL for a calibrated player, against the law's 100.8.
+  - Heard differently, to be listened for:
+    - The wind at the ears and the interface sounds are 3 dB quieter. They never passed through a
+      voice's binaural stage, so they stood 3 dB over the voices.
+    - A room's traced reverb is 3 dB lower against the direct sound. The traced stage
+      (`TracedReverbDsp`) still asks for a stereo input and averages it, so the sends reach it 3.01 dB
+      down. That matched the direct sound's loss, so the tail set to -6 by ear is now 3 dB drier.
+      `/tail -3` comes close to the old balance for a voice in your own room. The traced stage's input
+      is the next fix.
+    - Short recorded knocks (one second or less) get their ground reflection from below for the
+      first time.
 - Steam Audio's scenes are built per tile and use Embree. Each tile the client holds has its own
   sub-scenes, built when its geometry changes; the scenes the simulators trace are made of instances
   of them, in two pairs used in turn, so a tile arriving or leaving, or a door swinging, rebuilds only
