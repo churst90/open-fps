@@ -41,6 +41,11 @@ Restart the server and update the client first.
 - The loudness law places a sound by its peak. Anything over about 126 dB peak at 1 m (gunshots, a
   window breaking, a thin steel plate) plays at full scale out to the 40 m clamp, so 5 m and 20 m
   sound the same (`Loudness.Place`).
+- City temperature: city.json authors 42 as an OFFSET over the server's seasonal curve (+22 C), so
+  the city runs 17 C in January and over 50 C in summer, and every stopped car's fan runs. Intended?
+- Car fans: real pickups and vans mostly have a belt-driven viscous-clutch fan (none modelled yet);
+  the car fan's 205 Hz blade hum stands 23 dB over its noise (level derived from the truck fan); a
+  3.4 kHz block mode is 12 dB louder from the front now and may be heard as a whistle.
 - Lightning: a spoken or tone cue at the flash ("lightning, north east"), or only the thunder?
 - The scope hint ("Nobody in view. Nearest person 60 metres, below and to the left"): parked by Cody
   2026-10-05. At 4 power the scope sees a 6 degree cone, so from a roof looking level the street
