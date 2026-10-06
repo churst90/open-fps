@@ -42,6 +42,8 @@ public static class GameLevelsSpike
 
     public static int Run(string[] args)
     {
+        if (args.Contains("spectra"))
+            return Spectra(args.Where(a => !a.StartsWith("--") && a != "spectra" && !a.Contains('=')).ToArray());
         string outDir = Arg(args, "out=") ?? "/tmp/openfps-game-levels";
         string set = Arg(args, "set=") ?? "measure";
         string[] cars = (Arg(args, "cars=") ?? "i4_economy,i4_midsize,police_interceptor").Split(',', StringSplitOptions.RemoveEmptyEntries);
@@ -361,6 +363,90 @@ public static class GameLevelsSpike
         File.WriteAllText(Path.Combine(outDir, "segments.csv"), sb.ToString());
         Console.WriteLine($"Wrote {wav} and segments.csv ({segments.Count} segments); compression {Loudness.DynamicRangeCompression:F2}");
         return 0;
+    }
+
+    /// <summary>
+    /// --game-levels spectra [preset ...]: how much of an engine's sound is low bass, idling and at
+    /// full load. The voice alone in pascals (no lift, no law), heard 7.5 m to the side: unweighted
+    /// and A-weighted, the idle (last 3 s of 8) and the loudest second of a pull from rest with the
+    /// throttle open. The idle lift and the loudness law both work on the unweighted level; this is
+    /// what that leaves out.
+    /// </summary>
+    public static int Spectra(string[] names)
+    {
+        const int rate = 44100, block = 512;
+        if (names.Length == 0) names = new[] { "i4_economy", "i4_midsize", "police_interceptor", "v8_mild", "diesel_i4" };
+        Console.WriteLine($"{"preset",-20} {"declared",8} {"idle Z",7} {"idle A",7} {"Z-A",5} {"load Z",7} {"load A",7} {"Z-A",5}");
+        foreach (var n in names)
+        {
+            var v = MachineRegistry.VehicleFor(n);
+            var voice = new EngineVoiceState(v, rate, 11) { TargetSpeed = 0f, CompensateLevel = false };
+            voice.PlaceAtSpeed(0f);
+            voice.Revive();
+            voice.SetListener(new Vector3(7.5f, 1.2f, 0f) - v.ExhaustSlot);
+            var aw = new AWeight(rate);
+            var buf = new float[block];
+            var z = new List<double>(); var a = new List<double>();
+            double ez = 0, ea = 0; int cnt = 0;
+            for (int b = 0; b < rate * 26 / block; b++)
+            {
+                if (b == rate * 8 / block) voice.TargetSpeed = 40f;
+                voice.Produce(); voice.Consume(buf);
+                foreach (var y in buf)
+                {
+                    double p = y * voice.PascalsAtFullScale;
+                    ez += p * p; double q = aw.Step(p); ea += q * q; cnt++;
+                    if (cnt == rate) { z.Add(10 * Math.Log10(ez / cnt / 4e-10)); a.Add(10 * Math.Log10(ea / cnt / 4e-10)); ez = ea = 0; cnt = 0; }
+                }
+            }
+            double Pow(IEnumerable<double> d) => 10 * Math.Log10(d.Average(x => Math.Pow(10, x / 10)));
+            double idleZ = Pow(z.Skip(5).Take(3)), idleA = Pow(a.Skip(5).Take(3));
+            int loud = Enumerable.Range(8, z.Count - 8).OrderByDescending(i => z[i]).First();
+            Console.WriteLine($"{n,-20} {v.SourceLevelDb,8:F1} {idleZ,7:F1} {idleA,7:F1} {idleZ - idleA,5:F1} {z[loud],7:F1} {a[loud],7:F1} {z[loud] - a[loud],5:F1}");
+        }
+        Console.WriteLine("dB SPL at 7.5 m to the side; 'load' is the loudest second of a pull from rest.");
+        return 0;
+    }
+
+    /// <summary>IEC 61672 A-weighting as four cascaded sections (bilinear, prewarped poles), at 44.1 or 48 kHz.</summary>
+    private sealed class AWeight
+    {
+        private readonly (double b0, double b1, double b2, double a1, double a2)[] _s;
+        private readonly double[] _z1, _z2;
+        private readonly double _gain;
+        public AWeight(int rate)
+        {
+            double T = 1.0 / rate;
+            double W(double f) => 2.0 / T * Math.Tan(Math.PI * f * T);
+            double f1 = W(20.598997), f2 = W(107.65265), f3 = W(737.86223), f4 = W(12194.217);
+            // s^4 / ((s+f1)^2 (s+f2)(s+f3)(s+f4)^2): two high-passes at f1, a high-pass pair at f2,f3,
+            // two low-passes at f4; each first-order section by the bilinear transform.
+            var list = new List<(double, double, double, double, double)>();
+            void HighPass(double w) { double k = 2.0 / T; double a0 = k + w; list.Add((k / a0, -k / a0, 0, (w - k) / a0, 0)); }
+            void LowPass(double w) { double k = 2.0 / T; double a0 = k + w; list.Add((w / a0, w / a0, 0, (w - k) / a0, 0)); }
+            HighPass(f1); HighPass(f1); HighPass(f2); HighPass(f3); LowPass(f4); LowPass(f4);
+            _s = list.ToArray(); _z1 = new double[_s.Length]; _z2 = new double[_s.Length];
+            // Normalise to 0 dB at 1 kHz.
+            double g = 1;
+            foreach (var (b0, b1, _, a1, _) in _s)
+            {
+                var zz = System.Numerics.Complex.FromPolarCoordinates(1, -2 * Math.PI * 1000.0 / rate);
+                g *= ((b0 + b1 * zz) / (1 + a1 * zz)).Magnitude;
+            }
+            _gain = 1 / g;
+        }
+        public double Step(double x)
+        {
+            x *= _gain;
+            for (int i = 0; i < _s.Length; i++)
+            {
+                var (b0, b1, _, a1, _) = _s[i];
+                double y = b0 * x + _z1[i];
+                _z1[i] = b1 * x - a1 * y;
+                x = y;
+            }
+            return x;
+        }
     }
 
     /// <summary>calm=SPEED,TURBULENCE: the air for every scene but the wind's own (default still air).</summary>
