@@ -260,8 +260,10 @@ public class WideSourcesTests
     [Fact]
     public void ATreesPlaceVoicesAddUpToItsOneVoice()
     {
-        // The field's own weather, held for this test: a session test running beside it writes the shared one.
-        using var held = WindField.Hold(WindWeather.Default);
+        // A steady wind held for this test. Gusts follow the clock, and the places and the one voice are
+        // rendered one after the other, so a gusty wind gave them different gusts (1.45 dB apart under
+        // load, 2026-10-06); and a session test running beside it writes the shared weather.
+        using var held = WindField.Hold(WindWeather.Steady(4.5f, 270f, 0f));
         var spec = FoliageSpec.ParkTree;
         var at = new Vector3(400f, 7f, -300f);
         int n = 1 + FoliageSynth.Boughs;
