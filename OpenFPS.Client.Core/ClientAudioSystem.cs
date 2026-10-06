@@ -1346,6 +1346,8 @@ public class ClientAudioSystem
             float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
             float range = MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb));
+            // Ranked in loudness: the law's correction for what this machine is made of, once heard.
+            gain *= MathF.Pow(10f, OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb(em.SoundId, levelDb) / 20f);
             float level = OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume, reference, range, d);
 
             string group = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _)
@@ -2010,6 +2012,7 @@ public class ClientAudioSystem
                 PositionSampledAt = world.PositionsSampledAt,
                 Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
                 Volume = gain,
+                EarLevelDb = levelDb,
                 MinDistance = reference,
                 Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
                 Pitch = 1f,
@@ -2085,6 +2088,7 @@ public class ClientAudioSystem
             // knows.
             Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
             Volume = gain,
+            EarLevelDb = spec.SourceLevelDb,
             MinDistance = reference,
             ExtentMetres = spec.HornMouthMetres,
             Range = OpenFPS.Common.Loudness.AudibleRange(spec.SourceLevelDb),
@@ -2317,6 +2321,9 @@ public class ClientAudioSystem
         float engineMinDistance = def.SoundEmitter.MinDistance;
         float engineRange = def.SoundEmitter.Range;
         float engineExtent = def.SoundEmitter.ExtentMetres;
+        // The declared level the voice is placed by, for the ear model; an authored source with only a
+        // volume has none.
+        float earLevel = 0f;
         // An authored source with a SIZE — a fountain, a grille, a waterfall. Same rule as a machine:
         // the reference widens to the thing's own radius and the gain is paid down to match, so the
         // far field is unchanged and only the near field goes flat.
@@ -2357,6 +2364,7 @@ public class ClientAudioSystem
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
+                earLevel = levelDb;
                 if (physicalKey.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
                 {
                     (powerLever, rotorWake) = FlightPower(snap.Velocity);
@@ -2409,6 +2417,7 @@ public class ClientAudioSystem
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(level));
+                earLevel = level;
 
                 // Close enough to hear which end is which: this voice moves back to the TAILPIPE and
                 // the front of the machine gets a voice of its own at the airbox. Further away the
@@ -2492,6 +2501,7 @@ public class ClientAudioSystem
                     : Vector3.UnitZ,
                 snap.Transform.Rotation),
             Volume = engineVolume,
+            EarLevelDb = earLevel,
             Range = Math.Max(1.0f, engineRange),
             Pitch = 1.0f,
             Type = EmitterType.EntityAttached,
@@ -2705,6 +2715,7 @@ public class ClientAudioSystem
                 PositionSampledAt = world.PositionsSampledAt,
                 Direction = facing,
                 Volume = gain,
+                EarLevelDb = levelDb,
                 MinDistance = reference,
                 Range = MathF.Max(reference, OpenFPS.Common.Loudness.AudibleRange(levelDb)),
                 Pitch = 1f,
@@ -2961,6 +2972,7 @@ public class ClientAudioSystem
             Essential = own,
             IsEvent = true,
             MinDistance = stepReference,
+            EarLevelDb = OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb,
             // The room the body is standing in, so its reverberation is THAT room's.
             TargetRegionId = _listenerRegion,
         };
@@ -2968,7 +2980,7 @@ public class ClientAudioSystem
         _audio.Submit(footstep);
 
         // The walls answering YOUR footfalls. Other people's steps have none: their pool is yours.
-        if (own) SubmitStepReflections(nudgePos, resolvedSoundId, stepGain, stepReference);
+        if (own) SubmitStepReflections(nudgePos, resolvedSoundId, stepGain, stepReference, OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb);
     }
 
     /// <summary>
@@ -3238,7 +3250,7 @@ public class ClientAudioSystem
             if (_voiceCopyOn[k]) { _audio.StopSound(OwnVoiceBase - 1 - k); _voiceCopyOn[k] = false; }
     }
 
-    private void SubmitStepReflections(Vector3 stepPos, string soundId, float stepGain, float stepReference)
+    private void SubmitStepReflections(Vector3 stepPos, string soundId, float stepGain, float stepReference, float stepLevelDb)
     {
         // The surfaces round your own footfall, placed as a clap's are (WorldAudioPlayer.QueueEarlyEchoes):
         // mirrored through the walls to third order, the loudest first, inside the window before the
@@ -3248,13 +3260,13 @@ public class ClientAudioSystem
         // sound, a tail 50 ms later, and nothing from the walls between.
         Vector3 ear = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
         if (_groundWorld is not { } world) return;
-        SubmitRoomStepEchoes(stepPos, ear, soundId, stepGain, stepReference, world);
+        SubmitRoomStepEchoes(stepPos, ear, soundId, stepGain, stepReference, stepLevelDb, world);
     }
 
     /// <summary>The room's first answers to your own footfall, placed as WorldAudioPlayer.QueueRoomEchoes
     /// places a clap's: mirrored through the walls to third order, the loudest first, inside the
     /// window before the tail, each from its own wall's direction with that wall's colour.</summary>
-    private void SubmitRoomStepEchoes(Vector3 stepPos, Vector3 ear, string soundId, float stepGain, float stepReference, WorldSnapshot world)
+    private void SubmitRoomStepEchoes(Vector3 stepPos, Vector3 ear, string soundId, float stepGain, float stepReference, float stepLevelDb, WorldSnapshot world)
     {
         var solids = _acoustics.ReflectionSolids(world);
         if (solids.Count == 0) return;
@@ -3292,6 +3304,8 @@ public class ClientAudioSystem
                 // engine's 1/r at the image is undone in `gain`, as for every other copy.
                 Volume = stepGain * gain,
                 MinDistance = stepReference,
+                EarLevelDb = stepLevelDb,
+                EarCopyDb = 20f * MathF.Log10(MathF.Max(1e-6f, gain)),
                 Range = 25f,
                 // No DelayMs: the facade delays every submission by its distance, and the image is
                 // the whole path away.
@@ -3603,6 +3617,7 @@ public class ClientAudioSystem
                 ListenerOffset = offset,
                 Type = EmitterType.WorldLocked,
                 Volume = landGain,
+                EarLevelDb = OpenFPS.Common.Loudness.FootstepDb,
                 Range = 20.0f,
                 Essential = true,
                 IsEvent = true,

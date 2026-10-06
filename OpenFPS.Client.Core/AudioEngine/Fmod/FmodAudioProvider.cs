@@ -240,7 +240,7 @@ internal class FmodResourceManager : IDisposable
     public void Dispose() { foreach (var s in _cache.Values) s.release(); _cache.Clear(); }
 }
 
-public class FmodAudioProvider : IAudioProvider
+public partial class FmodAudioProvider : IAudioProvider
 {
     private FMOD.System _system;
     private FmodResourceManager _resources = null!;
@@ -613,6 +613,8 @@ public class FmodAudioProvider : IAudioProvider
 
         // Steam Audio per-voice binaural effect (null when SA disabled / falling back to FMOD pan).
         public SteamAudioVoiceState? SaState;
+        /// <summary>The ear model on this voice (FmodAudioProvider.Ear.cs), or null.</summary>
+        public EarVoice? Ear;
         /// <summary>The surface a recorded sound's ground reflection comes off, or null for none.</summary>
         public float? GroundHeight;
         public FMOD.DSP SaDsp;
@@ -1109,6 +1111,7 @@ public class FmodAudioProvider : IAudioProvider
         _earWindDsp = dsp;
         _earWindChannel = channel;
         _earWindHandle = handle;
+        AttachEarToWind();
     }
 
     /// <summary>Where the listener is, for the wind at their ears; null when nobody is in a world.</summary>
@@ -3062,6 +3065,7 @@ public class FmodAudioProvider : IAudioProvider
                 }
             }
 
+            AttachEar(activeSound, emitter);
             AddActive(activeSound);
         }
 
@@ -3108,7 +3112,8 @@ public class FmodAudioProvider : IAudioProvider
                 active.FollowsListener = emitter.FollowsListener; active.ListenerOffset = emitter.ListenerOffset;
                 active.EffectiveDistance = emitter.EffectiveDistance; active.Velocity = emitter.Velocity; 
                 active.Direction = emitter.Direction; active.Range = emitter.Range; 
-                active.BaseVolume = emitter.Volume * TakeGain(emitter); 
+                active.BaseVolume = emitter.Volume * TakeGain(emitter);
+                UpdateEarLevel(active, emitter);
                 if (emitter.CarriesPath)
                 {
                     active.TargetLow = emitter.EqLow; active.TargetMid = emitter.EqMid; active.TargetHigh = emitter.EqHigh;
@@ -3587,6 +3592,7 @@ public class FmodAudioProvider : IAudioProvider
                 }
 
                 UpdateReverbBuses(lPosVec, listenerRegionId);
+                ReportEar();
             }
         }
         catch (Exception ex)
@@ -3644,6 +3650,7 @@ public class FmodAudioProvider : IAudioProvider
         ReleaseThreeEqDsp(active.Channel, active.ThreeEqDsp);
         ReleaseDiffractionDsp(active.Channel, active.DiffractionDsp);
         ReleaseSendTapDsp(active);
+        ReleaseEar(active);
         // The OWNED units come off the same way, and for the same reason. FMOD's logging build says
         // this in one line where a core file does not:
         //
@@ -4123,7 +4130,8 @@ public class FmodAudioProvider : IAudioProvider
         active.FadeGain += Math.Clamp(active.FadeTarget - active.FadeGain, -fadeStep, fadeStep);
 
         active.LastVolume = active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten
-                            * active.FadeGain * (active.OverloadExempt || active.IsReflection ? 1f : _overloadGain);
+                            * active.FadeGain * (active.OverloadExempt || active.IsReflection ? 1f : _overloadGain)
+                            * EarGain(active, lPosVec, dt);   // the law in loudness units (FmodAudioProvider.Ear.cs)
         active.Channel.setVolume(active.LastVolume);
 
         // Doppler: Steam Audio voices play on a 2D channel, so FMOD's own Doppler is bypassed — apply it

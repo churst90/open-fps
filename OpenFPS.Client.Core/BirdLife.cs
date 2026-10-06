@@ -361,6 +361,7 @@ public sealed class BirdLife
             AirLowDb = path?.AirLowDb ?? 0f, AirMidDb = path?.AirMidDb ?? 0f, AirHighDb = path?.AirHighDb ?? 0f,
             Velocity = velocity,
             Volume = gain,
+            EarLevelDb = sp.CallDb,
             MinDistance = reference,
             Range = range,
             Pitch = pitch,

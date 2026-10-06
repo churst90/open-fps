@@ -42,11 +42,18 @@ public sealed class BandAnalyser
     public BandAnalyser(int sampleRate)
     {
         _rate = sampleRate;
-        float lowRate = sampleRate / (float)Decimation;
-        (_weightsLow, _lowFrom, _lowTo) = Weights(lowRate, LowFft, 0, LowBands);
-        (_weightsHigh, _highFrom, _highTo) = Weights(sampleRate, HighFft, LowBands, Bands);
+        // The band weights depend only on the rate: built once per rate and shared, read-only.
+        var w = _byRate.GetOrAdd(sampleRate, static r =>
+        {
+            var low = Weights(r / (float)Decimation, LowFft, 0, LowBands);
+            var high = Weights(r, HighFft, LowBands, Bands);
+            return (low.W, low.From, low.To, high.W, high.From, high.To);
+        });
+        (_weightsLow, _lowFrom, _lowTo, _weightsHigh, _highFrom, _highTo) = w;
         _lp = new[] { Butter(sampleRate, 600.0, 0.5176), Butter(sampleRate, 600.0, 0.7071), Butter(sampleRate, 600.0, 1.9319) };
     }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, (float[], int[], int[], float[], int[], int[])> _byRate = new();
 
     public int SampleRate => _rate;
 
@@ -225,17 +232,28 @@ public sealed class BandAnalyser
 public sealed class LiveBands
 {
     private readonly float[] _ring = new float[BandAnalyser.WindowSamples];
-    private readonly float[] _window = new float[BandAnalyser.WindowSamples];
     private long _written;
     private long _analysedAt;
-    private readonly BandAnalyser _analyser;
     private readonly double[] _smoothed = new double[BandAnalyser.Bands];
     private readonly double[] _scratch = new double[BandAnalyser.Bands];
     private bool _primed;
 
-    public LiveBands(int sampleRate) => _analyser = new BandAnalyser(sampleRate);
+    // One analyser and one window per analysing thread, not per voice: a voice's tap is its ring.
+    [ThreadStatic] private static BandAnalyser? t_analyser;
+    [ThreadStatic] private static float[]? t_window;
 
-    public int SampleRate => _analyser.SampleRate;
+    public LiveBands(int sampleRate) => SampleRate = sampleRate;
+
+    public int SampleRate { get; }
+
+    /// <summary>Forgets what it heard, for a pooled tap about to serve another voice.</summary>
+    public void Reset()
+    {
+        Volatile.Write(ref _written, 0);
+        _analysedAt = 0;
+        _primed = false;
+        Array.Clear(_smoothed);
+    }
 
     /// <summary>Producer: copies a block in. Never allocates, never throws for a sane block.</summary>
     public void Write(ReadOnlySpan<float> block)
@@ -276,9 +294,11 @@ public sealed class LiveBands
         if (w - _analysedAt < due || w < BandAnalyser.WindowSamples / 4) return false;
         int n = _ring.Length;
         int take = (int)Math.Min(w, n);
-        for (int i = 0; i < take; i++) _window[i] = _ring[(int)((w - take + i) % n)];
+        if (t_analyser == null || t_analyser.SampleRate != SampleRate) t_analyser = new BandAnalyser(SampleRate);
+        var window = t_window ??= new float[BandAnalyser.WindowSamples];
+        for (int i = 0; i < take; i++) window[i] = _ring[(int)((w - take + i) % n)];
         Array.Clear(_scratch);
-        _analyser.Accumulate(new ReadOnlySpan<float>(_window, 0, take), _scratch);
+        t_analyser.Accumulate(new ReadOnlySpan<float>(window, 0, take), _scratch);
         double since = (w - _analysedAt) / (double)SampleRate;
         _analysedAt = w;
         double total = 0;

@@ -23,14 +23,19 @@ public sealed class Timbre
     /// <summary>The band levels relative to the overall level, dB (they sum in power to 0 dB).</summary>
     public ReadOnlySpan<float> ShapeDb => _shape;
 
-    private Timbre(float[] shape, string name)
+    private Timbre(float[] shape, string name, bool live)
     {
         _shape = shape;
         Name = name;
+        Live = live;
     }
 
+    /// <summary>A live voice's measurement, replaced every fraction of a second: its answers are not
+    /// worth caching, and it carries no cache.</summary>
+    public bool Live { get; }
+
     /// <summary>A shape from band powers in any units. Null when there is nothing in it.</summary>
-    public static Timbre? FromBandPowers(ReadOnlySpan<double> powers, string name = "")
+    public static Timbre? FromBandPowers(ReadOnlySpan<double> powers, string name = "", bool live = false)
     {
         if (powers.Length != Bands) throw new ArgumentException($"{Bands} bands expected", nameof(powers));
         double total = 0;
@@ -42,7 +47,7 @@ public sealed class Timbre
             double p = powers[b] > 0 && double.IsFinite(powers[b]) ? powers[b] : 0;
             shape[b] = (float)Math.Max(-120.0, 10.0 * Math.Log10(p / total + 1e-30));
         }
-        return new Timbre(shape, name);
+        return new Timbre(shape, name, live);
     }
 
     /// <summary>A shape from band levels, dB (any overall level; it is normalised).</summary>
@@ -208,15 +213,19 @@ public sealed class Timbre
 
     // ── The law's answers, cached per level and compression ─────────────────────────────────────
 
-    private readonly ConcurrentDictionary<long, (float Gain, float Reference)> _placed = new();
+    // Made on first use: a live voice's timbre is replaced every quarter second and is asked once or
+    // twice, so it should not carry a dictionary it never fills.
+    private ConcurrentDictionary<long, (float Gain, float Reference)>? _placed;
 
     internal (float Gain, float Reference) Placed(float levelDb, float compression, Func<float, Timbre, float, (float, float)> compute)
     {
+        if (Live) return compute(levelDb, this, compression);
+        var cache = _placed ?? System.Threading.Interlocked.CompareExchange(ref _placed, new(), null) ?? _placed!;
         long key = ((long)MathF.Round(levelDb * 20f) << 20) | (long)MathF.Round(compression * 10000f);
-        if (_placed.TryGetValue(key, out var hit)) return hit;
+        if (cache.TryGetValue(key, out var hit)) return hit;
         var value = compute(MathF.Round(levelDb * 20f) / 20f, this, compression);
-        if (_placed.Count > 8192) _placed.Clear();
-        _placed[key] = value;
+        if (cache.Count > 8192) cache.Clear();
+        cache[key] = value;
         return value;
     }
 

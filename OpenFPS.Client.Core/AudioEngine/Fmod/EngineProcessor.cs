@@ -777,16 +777,67 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     public float LiftNow => _levelGain;
     private double _levelMs;
     private float _levelGain = 1f;
-    private const float LevelSeconds = 0.5f, MaxLiftDb = 20f;
+    private const float LevelSeconds = 0.5f;
+    /// <summary>The unweighted lift's cap, which only the ear model switched off still uses (see
+    /// <see cref="LiftDb(float, float)"/>). With the model on there is no cap: see the three-argument form.</summary>
+    private const float UnweightedMaxLiftDb = 20f;
 
-    /// <summary>How far to lift a voice running at <paramref name="runningDb"/> that is placed as a
-    /// source of <paramref name="declaredDb"/>, so it is heard as the law places a source of the level
-    /// it is actually running at. See Synthesize.</summary>
+    /// <summary>
+    /// The lift as it was before the ear model: the unweighted law applied to the deficit, held to
+    /// 0..20 dB. What runs with the model off (/ear off, OPENFPS_EAR_MODEL=0).
+    /// </summary>
     internal static float LiftDb(float runningDb, float declaredDb)
     {
         float running = MathF.Min(runningDb, declaredDb);
         float lift = Loudness.PlacedDb(running) - Loudness.PlacedDb(declaredDb) - (running - declaredDb);
-        return Math.Clamp(lift, 0f, MaxLiftDb);
+        return Math.Clamp(lift, 0f, UnweightedMaxLiftDb);
+    }
+
+    /// <summary>
+    /// How far to lift a voice placed as <paramref name="declaredDb"/> of the reference sound (the law's
+    /// placement of its declared level) that is actually running at <paramref name="runningDb"/> with
+    /// spectrum <paramref name="running"/>: so it is heard where the law, in loudness units, puts what
+    /// it is doing now, level and tone (docs/EAR_MODEL.md). An idling engine is mostly bass the ear
+    /// barely hears, and the unweighted law pulled it down for bass nobody hears.
+    ///
+    /// No cap: the 20 dB the unweighted lift was held to only bounded that law. Below the threshold of
+    /// hearing there is nothing to place, and the caller holds the lift where it was (NaN here).
+    /// </summary>
+    internal static float LiftDb(float runningDb, OpenFPS.Common.Hearing.Timbre? running, float declaredDb)
+    {
+        if (!OpenFPS.Common.Hearing.EarModel.Enabled) return LiftDb(runningDb, declaredDb);
+        var timbre = running ?? OpenFPS.Common.Hearing.Timbre.Speech;
+        if (timbre.Sones(runningDb) <= 0f) return float.NaN;
+        return Loudness.PlacedDb(runningDb, timbre) - Loudness.PlacedDb(declaredDb) - (runningDb - declaredDb);
+    }
+
+    // ── What the engine's own sound is made of, for the lift and the compensation ────────────
+    //
+    // Measured from `engineOnly` (the machine radiating, without the air brakes and the beeper and
+    // without the listener's angle to the pipe), on this voice's render thread: the shape of the
+    // spectrum, smoothed over about a second, analysed every quarter second.
+    private OpenFPS.Common.Hearing.LiveBands? _bands;
+    private readonly float[] _bandScratch = new float[1024];
+    private int _bandFill;
+    private OpenFPS.Common.Hearing.Timbre? _timbre, _liftTimbre;
+    private float _liftDb, _liftAtDb, _liftCompression;
+    private bool _liftKnown, _liftEar;
+
+    /// <summary>The spectrum the engine is making now (null until it has sounded).</summary>
+    public OpenFPS.Common.Hearing.Timbre? RunningTimbre => Volatile.Read(ref _timbre);
+
+    /// <summary>The level the machine is running at, dB SPL at a metre, smoothed over half a second.</summary>
+    public float RunningLevelDb => _levelMs > 0 ? 10f * MathF.Log10((float)_levelMs / (20e-6f * 20e-6f) + 1e-12f) : 0f;
+
+    /// <summary>The lift in force, dB: what the law in loudness units adds to this voice.</summary>
+    public float LiftDbNow => 20f * MathF.Log10(MathF.Max(1e-6f, _levelGain));
+
+    private void FlushBands()
+    {
+        if (_bandFill == 0) return;
+        _bands ??= new OpenFPS.Common.Hearing.LiveBands((int)SampleRate);
+        _bands.Write(new ReadOnlySpan<float>(_bandScratch, 0, _bandFill));
+        _bandFill = 0;
     }
 
     /// <summary>Pressure fraction through an open bus doorway: sqrt(2.4 m^2 / ~106 m^2) = 0.15.</summary>
@@ -1084,11 +1135,27 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         {
             float nowDb = 10f * MathF.Log10((float)_levelMs / (20e-6f * 20e-6f) + 1e-12f);
             // The voice is placed as a source of its DECLARED level; running below that, it should be
-            // heard as the law places a source of the level it is actually running at. The difference is
-            // the lift. Below the mix's ceiling that is (1 - compression) of the shortfall; above it
-            // the law is literal and the lift is nothing. A flat share there too would lift a loud car
-            // idling nearly nine decibels too far.
-            liftTarget = MathF.Pow(10f, LiftDb(nowDb, Vehicle.SourceLevelDb) / 20f);
+            // heard as the law places a source of the level it is actually running at, and of the
+            // spectrum it is actually making (an idle is mostly bass). The difference is the lift. Below
+            // the mix's ceiling that is about (1 - compression) of the shortfall in loudness; above it
+            // the law is literal. Worked out when the spectrum is re-measured or the level has moved,
+            // not every block: the level is a half-second average anyway.
+            if (_bands != null && _bands.Update(0.25f, 1.0f))
+                Volatile.Write(ref _timbre, OpenFPS.Common.Hearing.Timbre.FromBandPowers(_bands.BandPowers, "engine", live: true));
+            bool ear = OpenFPS.Common.Hearing.EarModel.Enabled;
+            float compression = Loudness.DynamicRangeCompression;
+            if (!_liftKnown || MathF.Abs(nowDb - _liftAtDb) > 0.25f || !ReferenceEquals(_liftTimbre, _timbre)
+                || ear != _liftEar || compression != _liftCompression)
+            {
+                float lift = LiftDb(nowDb, _timbre, Vehicle.SourceLevelDb);
+                // Silence has no place in the law: hold what the sound had while it could be heard.
+                if (!float.IsNaN(lift)) { _liftDb = lift; _liftKnown = true; }
+                _liftAtDb = nowDb;
+                _liftTimbre = _timbre;
+                _liftEar = ear;
+                _liftCompression = compression;
+            }
+            if (_liftKnown) liftTarget = MathF.Pow(10f, _liftDb / 20f);
         }
         // Either way: a floor on the step made a FALLING lift rise through the block and then snap down
         // to its target at the end of it, a step in the waveform every block while an engine revved.
@@ -1259,6 +1326,11 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // part of it. Only the rear one is in `pa`, so the front one is added here.
             float engineOnly = pa - rearExtras + (_engineAtRear ? -fanOut : bayLevel) + frontTyre + (Engine.Exhaust - exhaustOut);
             blockSum += (double)engineOnly * engineOnly;
+            if (CompensateLevel)
+            {
+                _bandScratch[_bandFill++] = engineOnly;
+                if (_bandFill == _bandScratch.Length) FlushBands();
+            }
             tyreSum += (double)(rearTyre * rearTyre + frontTyre * frontTyre);
 
             // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.
@@ -1366,9 +1438,13 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             Ground.SetNear(_nearShare);
             _frontGround?.SetNear(_nearShare);
         }
+        FlushBands();
         float blockMs = (float)(blockSum / Math.Max(1, count));
         float a = 1f - MathF.Exp(-count / (LevelSeconds * SampleRate));
-        _levelMs += (blockMs - _levelMs) * a;
+        // From the first block it hears, not from zero: an average that starts at nothing reads a
+        // sounding engine as near silence for its first half second, and the lift chased that.
+        if (_levelMs <= 0 && blockMs > 0 && OpenFPS.Common.Hearing.EarModel.Enabled) _levelMs = blockMs;
+        else _levelMs += (blockMs - _levelMs) * a;
         if (envTarget <= 0f && _envelope <= 1e-4f) FadedOut = true;
     }
 }

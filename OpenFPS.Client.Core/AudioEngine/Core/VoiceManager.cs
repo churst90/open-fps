@@ -410,6 +410,14 @@ public class VoiceManager
     internal static float Audibility(in SpatialEmitter e, float distance, bool playing)
     {
         float level = OpenFPS.Common.Loudness.RenderedGain(e.Volume, e.MinDistance, e.Range, distance);
+        // In loudness, not level: the law's correction for what the voice is made of, when that has
+        // been measured (docs/EAR_MODEL.md). A pure tone and a broadband sound of one level are not
+        // equally loud, and the one that is heard more ranks higher.
+        if (e.EarLevelDb > 0f)
+        {
+            float db = EarTimbres.CorrectionDb(string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId : e.PhysicalKey, e.EarLevelDb);
+            if (db != 0f) level *= MathF.Pow(10f, db / 20f);
+        }
         level *= 1f - Math.Clamp(e.Occlusion, 0f, 1f);
         if (playing) level *= PlayingHysteresis;
         // Pinned, not weighted: an essential voice ranks above every voice that is merely loud, and
