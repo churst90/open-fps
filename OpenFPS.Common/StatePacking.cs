@@ -42,6 +42,10 @@ public static class StatePacking
     private const byte VelocityNone = 0, VelocityMillimetres = 1, VelocityFloats = 2, VelocityMask = 3;
     private const byte HasTyreDemand = 4, HasWheels = 8;
 
+    /// <summary>One wheel on the wire, as its bytes: the struct's own size, which grows when a field is
+    /// appended to it (WheelState.Water made it ten).</summary>
+    private static readonly int WheelBytes = System.Runtime.CompilerServices.Unsafe.SizeOf<WheelState>();
+
     /// <summary>The largest one state can pack to: id, flags, position, rotation, float velocity,
     /// demand, and a count. Wheels are on top of this.</summary>
     private const int MaxFixedBytes = 5 + 1 + 12 + 6 + 12 + 1 + 1;
@@ -79,7 +83,7 @@ public static class StatePacking
     {
         int bound = 0;
         for (int i = from; i < from + count; i++)
-            bound += MaxFixedBytes + (states[i].Wheels?.Length ?? 0) * 8;
+            bound += MaxFixedBytes + (states[i].Wheels?.Length ?? 0) * WheelBytes;
         var buffer = new byte[bound];
         int at = 0;
         offsets?.Clear();
@@ -173,8 +177,8 @@ public static class StatePacking
             {
                 int n = data[at++];
                 var wheels = new WheelState[n];
-                data.Slice(at, n * 8).CopyTo(MemoryMarshal.AsBytes(wheels.AsSpan()));
-                at += n * 8;
+                data.Slice(at, n * WheelBytes).CopyTo(MemoryMarshal.AsBytes(wheels.AsSpan()));
+                at += n * WheelBytes;
                 s.Wheels = wheels;
             }
             into.Add(s);

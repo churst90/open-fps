@@ -346,6 +346,8 @@ public static class MachineRegistry
                 SquealHz = tyrePart.Get("squealHz", tyres.SquealHz),
                 SquealQ = tyrePart.Get("squealQ", tyres.SquealQ),
                 SquealDb = tyrePart.Get("squealDb", tyres.SquealDb),
+                InflationKPa = tyrePart.Get("inflationKPa", tyres.InflationKPa),
+                TreadDepthMm = tyrePart.Get("treadDepthMm", tyres.TreadDepthMm),
             };
         }
 
@@ -476,6 +478,8 @@ public static class MachineRegistry
                     ["squealHz"] = v.Tyres.SquealHz,
                     ["squealQ"] = v.Tyres.SquealQ,
                     ["squealDb"] = v.Tyres.SquealDb,
+                    ["inflationKPa"] = v.Tyres.InflationKPa,
+                    ["treadDepthMm"] = v.Tyres.TreadDepthMm,
                 },
             },
             new()
