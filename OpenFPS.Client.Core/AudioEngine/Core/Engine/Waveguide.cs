@@ -425,7 +425,7 @@ internal sealed class OpenEnd
         _radAlpha = OnePole.AlphaFor(fKa1, _rate);
         _reflGain = (1f - m) / (1f + m);
         float corr = radius * MathHelper.Lerp(0.61f, 0.2f, m / 0.35f);
-        _endDelay = Math.Clamp(corr / soundSpeed * _rate, 0f, 12f);
+        _endDelay = Math.Clamp(corr / soundSpeed * _rate, 0f, 12f * _rate / At44k.Rate);   // 12 samples at 44.1 kHz: 0.27 ms
         _z = density * soundSpeed / area;
     }
 

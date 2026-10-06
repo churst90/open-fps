@@ -35,12 +35,14 @@ REPO = Path(__file__).resolve().parent.parent
 INBOX = REPO / "inbox"
 DEFAULT_OUT = REPO / "OpenFPS.Client" / "ASSETS" / "SOUNDS"
 
-# The mixer runs at 44.1 kHz (see FmodAudioProvider.Initialize). Anything above it is resampled down on
-# playback anyway, so shipping 96 kHz costs memory and disk and buys nothing at all.
-TARGET_RATE = 44100
+# The mixer runs at 48 kHz (MixerQuality.DefaultRate, since 2026-10-06; it was 44.1). A file at the
+# mixer's rate plays without a resampler; anything above it is resampled down on playback anyway, so
+# shipping 96 kHz costs memory and disk and buys nothing at all. Files already in ASSETS at 44.1 kHz
+# play correctly (FMOD's spline resampler brings them up).
+TARGET_RATE = 48000
 
 # An ambisonic bed is held in memory as float PCM for its whole length. 90 seconds of first order at
-# 44.1 kHz is about 63 MB; the seven-minute 96 kHz original is 647 MB.
+# 48 kHz is about 69 MB; the seven-minute 96 kHz original is 647 MB.
 MAX_BED_SECONDS = 90
 MAX_STEREO_BED_SECONDS = 120
 

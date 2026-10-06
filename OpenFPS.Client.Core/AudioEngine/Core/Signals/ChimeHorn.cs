@@ -57,7 +57,7 @@ public sealed class ChimeHorn
     /// <summary>How much air is reaching the manifold, 0..1.</summary>
     public float Valve => _valve;
 
-    public ChimeHorn(ChimeHornSpec spec, float rate = 44100f, int seed = 11)
+    public ChimeHorn(ChimeHornSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 11)
     {
         _spec = spec; _rate = rate;
         _bells = new Bell[spec.Bells.Length];
@@ -137,6 +137,7 @@ public sealed class ChimeHorn
         private double _t;
         private float _gain = 1f;
         private float _jitter;
+        private readonly float _jitterStep;   // 0.002 a sample at 44.1 kHz: 14 Hz
         private int _silentSamples = int.MaxValue;
 
         /// <summary>What the loop settled on, hertz.</summary>
@@ -160,7 +161,7 @@ public sealed class ChimeHorn
 
         public Bell(ChimeHornSpec spec, ChimeBellSpec b, float rate, int seed)
         {
-            _b = b; _rate = rate; _dt = 1f / rate; _rng = new Random(seed);
+            _b = b; _rate = rate; _dt = 1f / rate; _rng = new Random(seed); _jitterStep = At44k.Step(0.002f, rate);
             _startDelay = b.StartDelaySeconds;
             // The raggedness at low pressure is the same reed failing to lift cleanly, so it scales
             // with the bend: 8 at a bend of 6.5%.
@@ -265,7 +266,7 @@ public sealed class ChimeHorn
             // the start of every blast, and its mirror at the end, where it also goes ragged because
             // the swing can no longer lift the reed cleanly off its seat.
             float f = _b.Hz * ((1f - _bend) + _bend * supply);
-            _jitter += 0.002f * ((float)_rng.NextDouble() * 2f - 1f - _jitter);
+            _jitter += _jitterStep * ((float)_rng.NextDouble() * 2f - 1f - _jitter);
             f *= 1f + _jitter * (supply < 0.5f ? _ragged * (0.5f - supply) : 0.2f);
 
             _phase += f * _dt;

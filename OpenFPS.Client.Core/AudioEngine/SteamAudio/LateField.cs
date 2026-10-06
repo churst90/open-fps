@@ -66,8 +66,10 @@ internal sealed class LateField : IDisposable
     public int Runs;
     public double LastRunMs;
 
-    public LateField(IntPtr context, int sampleRate = 44100)
+    /// <param name="sampleRate">0: the mixer's (MixerQuality.MixerRate).</param>
+    public LateField(IntPtr context, int sampleRate = 0)
     {
+        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
         Context = context; SampleRate = sampleRate;
         var s = new Phonon.IPLSimulationSettings
         {

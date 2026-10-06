@@ -78,14 +78,16 @@ public sealed class SmallMachineSynth
     private float _compressorUp;
     private float _flowLp1, _flowLp2;
     private float _casingDrive;
+    private readonly float _casingRelease;   // 0.999 a sample at 44.1 kHz: 23 ms
     private Vector3 _listener = new(0f, 1.6f, -3f);
     private int _slowTick;
     private const int SlowEvery = 64;
 
-    public SmallMachineSynth(SmallMachineSpec spec, float rate = 44100f, int seed = 17)
+    public SmallMachineSynth(SmallMachineSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 17)
     {
         Spec = spec;
         _rate = rate;
+        _casingRelease = At44k.Decay(0.999f, rate);
         _dt = 1f / rate;
         _rng = new Random(seed);
 
@@ -324,7 +326,7 @@ public sealed class SmallMachineSynth
             compressor = inside + 0.5f * _shell.Process(inside) * 2.2f;
             _casingDrive = compressor;
         }
-        else _casingDrive *= 0.999f;
+        else _casingDrive *= _casingRelease;
 
         // ── The box it is all bolted into ───────────────────────────────────────────────────────
         if (_panel.Length > 0 && _casingAmp > 0f)

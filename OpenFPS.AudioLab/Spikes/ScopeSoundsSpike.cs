@@ -24,7 +24,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// </summary>
 public static class ScopeSoundsSpike
 {
-    private const int Sr = ScopeSounds.SampleRate;
+    private static readonly int Sr = ScopeSounds.SampleRate;
     private const float GameGain = 0.5f * 0.7f;
 
     public static int Run(string[] args)

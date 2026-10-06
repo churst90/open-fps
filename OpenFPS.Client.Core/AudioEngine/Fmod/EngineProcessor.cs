@@ -55,6 +55,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// at 12 m/s), so the declared squeal level means what it meant.</summary>
     private const float SquealReferenceSpeed = 12f;
     private float _tyreChirp;
+    private float _chirpDecay = 0.99985f;   // a sample at 44.1 kHz: 150 ms
     private int _tyreGear;
 
     /// <summary>Road speed the world says the vehicle is doing, m/s. Game thread writes.</summary>
@@ -185,7 +186,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// coherent signal had (0.6 at each end, summed in phase: 1.2, so 0.6 x root 2 each). The squeal
     /// is still quoted against this; the rolling noise is anchored through it.</summary>
     private const float PerAxle = 0.6f * 1.41421356f;
-    public float SampleRate = 44100f;
+    public float SampleRate = MixerQuality.MixerRate;
 
     private float _speedSmooth;
 
@@ -518,6 +519,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         Vehicle = v;
         PascalsAtFullScale = v.PascalsAtFullScale;
         SampleRate = sampleRate;
+        _chirpDecay = OpenFPS.Client.AudioEngine.Core.At44k.Decay(0.99985f, sampleRate);
         Engine = new EngineSynth(v.Engine, sampleRate, seed);
         Driveline = new Driveline(v);
         Driver = new VirtualDriver(Driveline, Engine);
@@ -1130,7 +1132,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                     _tyreChirp = MathF.Max(_tyreChirp, TyreFriction.ShiftChirp(from / to, Engine.Throttle));
             }
             _tyreGear = Driveline.Gear;
-            _tyreChirp *= 0.99985f;
+            _tyreChirp *= _chirpDecay;
             // Two axles, two tyre noises. They are different tyres on different patches of road, so
             // their noise is INDEPENDENT. One signal written to both ends would be the same roar
             // coming from two places a few metres apart, which combs against itself as the car goes
@@ -1489,7 +1491,7 @@ public sealed class EngineEchoState : IGuardedUnit
     public volatile float TargetGain;
     private double _delay = -1;
     private float _gain;
-    public float SampleRate = 44100f;
+    public float SampleRate = MixerQuality.MixerRate;
     /// <summary>
     /// Floor on the echo's delay, as a MULTIPLE OF THE MIXER'S BLOCK, not as a time.
     ///
@@ -1575,7 +1577,17 @@ public sealed class EngineEchoState : IGuardedUnit
     /// it swells and dies over a few hundred milliseconds rather than switching. A borrowed voice
     /// keeps the old, fast rate: it is a car, and a car's level is the car's business.
     /// </summary>
-    private float GainSlew => Scattering >= 0f ? 1f / (0.18f * SampleRate) : 0.0015f;
+    private float GainSlew => Scattering >= 0f ? 1f / (0.18f * SampleRate) : _k.Gain;
+
+    /// <summary>The per-sample glides, chosen at 44.1 kHz, at this voice's rate (At44k): the gain's
+    /// (0.0015, 15 ms), the delay's (0.002, 11 ms) and the own cursor's pull (1e-5).</summary>
+    private (float Rate, float Gain, double Delay, double Pull) _k = (44100f, 0.0015f, 0.002, 1e-5);
+    private void Glides()
+    {
+        if (_k.Rate == SampleRate) return;
+        _k = (SampleRate, OpenFPS.Client.AudioEngine.Core.At44k.Step(0.0015f, SampleRate),
+              OpenFPS.Client.AudioEngine.Core.At44k.Step(0.002, SampleRate), OpenFPS.Client.AudioEngine.Core.At44k.Step(1e-5, SampleRate));
+    }
 
     public void Render(Span<float> mono)
     {
@@ -1583,6 +1595,7 @@ public sealed class EngineEchoState : IGuardedUnit
         // length means a short block (FMOD hands out partial ones) cannot shrink the margin.
         int slack = MinDelayBlocks * mono.Length;
         if (slack > _blockSlack) _blockSlack = slack;
+        Glides();
 
         double floorSamples = Math.Max(MinDelaySeconds * SampleRate, _blockSlack);
         double target = Math.Max(floorSamples, TargetDelaySeconds * SampleRate);
@@ -1600,7 +1613,7 @@ public sealed class EngineEchoState : IGuardedUnit
         for (int i = 0; i < mono.Length; i++)
         {
             double diff = target - _delay;
-            _delay += Math.Clamp(diff * 0.002, -0.12, 0.12);
+            _delay += Math.Clamp(diff * _k.Delay, -0.12, 0.12);
             _gain += (gTarget - _gain) * slew;
             // Reading back from the source's play position: the source rendered its block before or
             // after this one; the minimum delay covers either order.
@@ -1640,11 +1653,11 @@ public sealed class EngineEchoState : IGuardedUnit
 
         for (int i = 0; i < mono.Length; i++)
         {
-            _gain += (gTarget - _gain) * 0.0015f;
+            _gain += (gTarget - _gain) * _k.Gain;
             mono[i] = Source.ReadAt(_cursor) * _gain;
             // One sample per sample, plus an inaudible pull back toward where the cursor belongs.
             double drift = (where - back) - _cursor;
-            _cursor += 1.0 + Math.Clamp(drift * 1e-5, -MaxRateCorrection, MaxRateCorrection);
+            _cursor += 1.0 + Math.Clamp(drift * _k.Pull, -MaxRateCorrection, MaxRateCorrection);
             where += rate;
         }
         _clock.Position = where;

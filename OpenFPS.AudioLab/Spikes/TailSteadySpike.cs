@@ -35,7 +35,7 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 public static class TailSteadySpike
 {
     private static readonly Quaternion Q = Quaternion.Identity;
-    private const int Fs = 44100, Block = TracedReverb.TracedFrame;
+    private const int Fs = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Block = TracedReverb.TracedFrame;
     private static readonly double[] Octaves = { 125, 250, 500, 1000, 2000, 4000 };
 
     private static bool Velvet;
@@ -371,7 +371,7 @@ public static class TailSteadySpike
         var lc = new LateTailConvolver(Block, Fs * 2 / Block + 1);
         var sc = new SharedInputConvolver(Block, SdmTailIr.PartitionsFor(Fs, Block), DiffuseBranch.Count);
         var lf = new DiffuseLateConvolver(Block, DiffuseLateNoise.PartitionsFor(Fs, 2 * Fs), DiffuseBranch.Count, DiffuseLateNoise.StartFor(Fs));
-        var df = DiffuseTail.Create(ctx, Block, TracedReverb.Channels, hrtf) ?? throw new InvalidOperationException("no DiffuseTail");
+        var df = DiffuseTail.Create(ctx, Block, TracedReverb.Channels, hrtf, Fs) ?? throw new InvalidOperationException("no DiffuseTail");
         var ambi = new float[Block * TracedReverb.Channels];
         var y = new[] { new float[x.Length], new float[x.Length] };
         var tmp = new float[Block];
