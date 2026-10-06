@@ -39,6 +39,12 @@ namespace OpenFPS.AudioLab.Spikes;
 ///   --quality lsb                a tone two bits tall: the float mix against the 16 bits it is handed out as (OPENFPS_DITHER=1: dithered)
 ///   --quality output             the real output with nothing playing, to read its format off the server
 ///   --quality thunderfile        a strike's file written with linear and with band-limited upsampling
+///   --quality limiter [tag=]     the master limiter on known signals: tones 6 and 12 dB over -1 dBFS (50 Hz,
+///       1 kHz, 5 kHz, SMPTE 60 Hz + 7 kHz, CCIF 19 + 20 kHz), then a 5 ms burst and a 2 s roll over a quiet
+///       tone for the recovery. Pre and post captures and limiter-TAG.csv (the schedule); tools/audio_quality.py
+///       limiter reads them. OPENFPS_LIMITER=fmod for FMOD's own limiter, OPENFPS_MIXER_RATE=44100 for the old rate.
+///   --quality scene=gunfire      a pistol at 1.5 m three times, a rifle burst at 3 m, a rifle at 30 m, a pistol
+///       at 1 m to the left: what the master limiter does to shots. scene=thunder takes km= (default 3).
 ///
 /// OPENFPS_RESAMPLER and the other switches in MixerQuality are read when each mixer is made, so
 /// one run can make one of each.
@@ -56,6 +62,7 @@ public static class QualitySpike
         if (args.Contains("quant")) return Quant();
         if (args.Contains("echo")) return Echo(args, dir, tag);
         if (args.Contains("ceiling")) return Ceiling(args);
+        if (args.Contains("limiter")) return LimiterTones(dir, tag);
         if (args.Contains("thunderfile"))
         {
             // The thunder lab's files were taken from the render's 24 kHz to 48 kHz by linear
@@ -350,7 +357,11 @@ public static class QualitySpike
                 break;
             }
             case "street": Street(s, sec); break;
-            case "thunder": ThunderScene(s, sec, !args.Contains("legacy")); break;
+            case "thunder":
+                ThunderScene(s, sec, !args.Contains("legacy"),
+                             float.TryParse(Str(args, "km"), NumberStyles.Float, CultureInfo.InvariantCulture, out float km) ? km : 3f);
+                break;
+            case "gunfire": Gunfire(s, sec); break;
             case "oneshots": OneShots(s, sec, args.Contains("legacy")); break;
             default: Console.WriteLine($"  no scene '{scene}'"); return 1;
         }
@@ -489,13 +500,13 @@ public static class QualitySpike
     /// <summary>A ground flash three kilometres away to the north-east, rendered and played as the
     /// client plays it (WorldAudioPlayer.QueueThunder): each part a float buffer at the part's own
     /// rate, placed out in its direction at its peak level.</summary>
-    private static void ThunderScene(Session s, float sec, bool bandLimit)
+    private static void ThunderScene(Session s, float sec, bool bandLimit, float km = 3f)
     {
         var ear = new Vector3(0f, 1.7f, 0f);
         int seed = 4;
         var rng = new Random(seed);
         float b = 45f * MathF.PI / 180f;
-        var to = new Vector3(3000f * MathF.Sin(b), 0f, 3000f * MathF.Cos(b));
+        var to = new Vector3(km * 1000f * MathF.Sin(b), 0f, km * 1000f * MathF.Cos(b));
         var from = to + new Vector3(LightningPhysics.Gaussian(rng) * 800f, 5000f, LightningPhysics.Gaussian(rng) * 800f);
         var strike = new LightningStrike(seed, FlashKind.CloudToGround, from, to, LightningPhysics.GroundFlashEnergyMedian, 2);
         var parts = Thunder.Render(strike, ear, new Thunder.Air(15f, 0.8f, 1013.25f, Vector3.Zero, 0f),
@@ -575,6 +586,143 @@ public static class QualitySpike
             for (int i = due.Count - 1; i >= 0; i--)
                 if (t - t0 >= due[i].At) { s.P.PlaySpatialSound(due[i].E); due.RemoveAt(i); }
         });
+    }
+
+    /// <summary>
+    /// Shots, as the client plays them (WorldAudioPlayer: WeaponSynth.MuzzleBlast at the render rate, brought
+    /// to the mixer's band-limited, declared at Loudness.MuzzleBlastDb): a pistol 1.5 m ahead three times, a
+    /// rifle burst of five 3 m off, a rifle three times at 30 m, a pistol 1 m to the left. Events, so the
+    /// ear's reflex (the world giving way) runs as in play.
+    /// </summary>
+    private static void Gunfire(Session s, float sec)
+    {
+        var ear = new Vector3(0f, 1.7f, 0f);
+        s.P.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
+        var due = new List<(double At, SpatialEmitter E)>();
+        int id = 0;
+        void Shots(string weapon, Vector3 at, double start, int count, double every)
+        {
+            if (!WeaponRegistry.TryGet(weapon, out var w)) { Console.WriteLine($"  no weapon '{weapon}'"); return; }
+            float level = Loudness.MuzzleBlastDb(w);
+            var (gain, reference) = Loudness.Place(level);
+            for (int k = 0; k < count; k++)
+            {
+                string sid = $"lab:quality:shot:{id}";
+                var pcm = MixerQuality.Resample(WeaponSynth.MuzzleBlast(WeaponProfile.From(w), 100 + id), TransientSynth.SampleRate, MixerQuality.MixerRate);
+                if (!s.P.RegisterSynthesisedSoundFloat(sid, pcm, MixerQuality.MixerRate)) continue;
+                var pos = ear + at;
+                due.Add((start + k * every, Plain(-1100 - id, sid, pos, gain, 1f, PlaybackMode.Single) with
+                {
+                    MinDistance = reference, LevelDb = level, Range = Loudness.AudibleRange(level), EffectiveDistance = at.Length(),
+                }));
+                id++;
+            }
+            Console.WriteLine($"  {weapon} at {at.Length():F1} m: {count} shot(s) from {start:F1} s, {level:F0} dB at a metre");
+        }
+        Shots("glock", new Vector3(0f, -0.3f, 1.5f), 0.5, 3, 1.2);
+        Shots("ar15", new Vector3(2f, -0.3f, 2.2f), 4.5, 5, 0.09);
+        Shots("akm", new Vector3(-12f, 0f, 27.5f), 7.0, 3, 1.5);
+        Shots("glock", new Vector3(-1f, -0.3f, 0f), 12.0, 2, 0.8);
+        double t0 = s.Clock.Elapsed.TotalSeconds;
+        s.Pump(sec, t =>
+        {
+            for (int i = due.Count - 1; i >= 0; i--)
+                if (t - t0 >= due[i].At) { s.P.PlaySpatialSound(due[i].E); due.RemoveAt(i); }
+        });
+    }
+
+    // ── The master limiter on known signals ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tones played flat on the interface group, at levels that put them a known amount over -1 dBFS where
+    /// they reach the limiter (after the master's own makeup; the master trim is set to 0 dB for the run).
+    /// Then the recovery: a quiet 400 Hz tone throughout, with a 5 ms burst 12 dB over and later a 2 s
+    /// 100 Hz roll 10 dB over laid on it. The schedule goes to limiter-TAG.csv.
+    /// </summary>
+    private static int LimiterTones(string dir, string tag)
+    {
+        Environment.SetEnvironmentVariable("OPENFPS_MASTER_DB", "0");
+        string name = $"limiter-{tag}";
+        using var s = new Session(dir, name, pre: true);
+        int sr = MixerQuality.MixerRate;
+        float makeup = MathF.Pow(10f, FmodAudioProvider.MasterMakeupDb / 20f);
+        float Amp(float overDb) => MathF.Pow(10f, (-1f + overDb) / 20f) / makeup;
+        var rows = new List<string> { "name,start,seconds,hz1,hz2,over_db" };
+        var plays = new List<(double At, string Id, Func<float[]> Render)>();
+        double at = 0.5;
+        void Tone(string label, float hz1, float hz2, float share2, float overDb, double seconds)
+        {
+            float a = Amp(overDb);
+            int n = (int)(seconds * sr), fade = (int)(0.005 * sr);
+            string id = $"lab:limiter:{label}:{overDb:F0}";
+            plays.Add((at, id, () =>
+            {
+                var x = new float[n];
+                for (int i = 0; i < n; i++)
+                {
+                    float w = i < fade ? 0.5f - 0.5f * MathF.Cos(MathF.PI * i / fade) : i >= n - fade ? 0.5f - 0.5f * MathF.Cos(MathF.PI * (n - i) / fade) : 1f;
+                    double t = (double)i / sr;
+                    x[i] = a * w * (float)((1 - share2) * Math.Sin(2 * Math.PI * hz1 * t) + share2 * Math.Sin(2 * Math.PI * hz2 * t));
+                }
+                return x;
+            }));
+            rows.Add(string.Join(",", label, at.ToString("F3", CultureInfo.InvariantCulture), seconds.ToString("F3", CultureInfo.InvariantCulture),
+                                 hz1.ToString(CultureInfo.InvariantCulture), hz2.ToString(CultureInfo.InvariantCulture), overDb.ToString(CultureInfo.InvariantCulture)));
+            at += seconds + 1.0;
+        }
+        foreach (float over in new[] { 6f, 12f })
+        {
+            Tone("sine50", 50f, 0f, 0f, over, 2.0);
+            Tone("sine1k", 1000f, 0f, 0f, over, 2.0);
+            Tone("sine5k", 5000f, 0f, 0f, over, 2.0);
+            Tone("smpte", 60f, 7000f, 0.2f, over, 2.0);
+            Tone("ccif", 19000f, 20000f, 0.5f, over, 2.0);
+        }
+        // Recovery: the bed, then a shot-like burst and a roll on it.
+        double bedAt = at, bedSec = 8.0;
+        float bedAmp = MathF.Pow(10f, -30f / 20f) / makeup;
+        plays.Add((bedAt, "lab:limiter:bed", () =>
+        {
+            int n = (int)(bedSec * sr);
+            var x = new float[n];
+            for (int i = 0; i < n; i++) x[i] = bedAmp * MathF.Sin(2f * MathF.PI * 400f * i / sr) * MathF.Min(1f, MathF.Min(i, n - 1 - i) / (0.01f * sr));
+            return x;
+        }));
+        rows.Add($"bed,{bedAt.ToString("F3", CultureInfo.InvariantCulture)},{bedSec.ToString("F3", CultureInfo.InvariantCulture)},400,0,-30");
+        double burstAt = bedAt + 1.0, rollAt = bedAt + 3.0;
+        plays.Add((burstAt, "lab:limiter:burst", () =>
+        {
+            int n = (int)(0.005 * sr);
+            var x = new float[n];
+            for (int i = 0; i < n; i++) x[i] = Amp(12f) * MathF.Sin(2f * MathF.PI * 1000f * i / sr) * MathF.Sin(MathF.PI * i / n);
+            return x;
+        }));
+        rows.Add($"burst,{burstAt.ToString("F3", CultureInfo.InvariantCulture)},0.005,1000,0,12");
+        plays.Add((rollAt, "lab:limiter:roll", () =>
+        {
+            int n = 2 * sr, fade = (int)(0.005 * sr);
+            var x = new float[n];
+            for (int i = 0; i < n; i++) x[i] = Amp(10f) * MathF.Sin(2f * MathF.PI * 100f * i / sr) * MathF.Min(1f, MathF.Min(i, n - 1 - i) / (float)fade);
+            return x;
+        }));
+        rows.Add($"roll,{rollAt.ToString("F3", CultureInfo.InvariantCulture)},2.000,100,0,10");
+        File.WriteAllLines(Path.Combine(dir, name + ".csv"), rows);
+
+        // Every buffer made now, so nothing is rendered on the clock; then each started at its time.
+        var made = plays.ToDictionary(p => p.Id, p => p.Render());
+        double t0 = s.Clock.Elapsed.TotalSeconds;
+        var pending = plays.Select(p => (p.At, p.Id, Render: (Func<float[]>)(() => made[p.Id]))).ToList();
+        s.Pump(bedAt + bedSec + 1.0, t =>
+        {
+            for (int i = pending.Count - 1; i >= 0; i--)
+                if (t - t0 >= pending[i].At) { var p = pending[i]; s.P.PlayUiSound(p.Id, p.Render, sr, 1f); pending.RemoveAt(i); }
+        });
+        float cpu = s.Cpu.Count > 0 ? s.Cpu.Average() : float.NaN;
+        s.Dispose();
+        s.DropSoundCardCopy();
+        Environment.SetEnvironmentVariable("OPENFPS_MASTER_DB", null);
+        Console.WriteLine($"  {name}: limiter {(MasterLimiter.UseFmodLimiter ? "FMOD's" : "true peak")}, mixer {sr} Hz, makeup {FmodAudioProvider.MasterMakeupDb:F1} dB, dsp {cpu:F1} %; {dir}/{name}.pre.wav, .post.wav, .csv");
+        return 0;
     }
 
     // ── A car's reflection ─────────────────────────────────────────────────────────────────────
