@@ -801,6 +801,12 @@ public class GameServer
                     MovementSystem.Update(world, entry.Value.data.WalkMin, entry.Value.data.WalkMax, grid, lookup, _sessions, _maps, dt);
                     stage.Dispose();
                     stage = PerfProbe.Measure("server.traffic");
+                    // The water on the roads first: traffic reads it under every wheel.
+                    var roadWeather = _environment.GetStateForMap(_maps.TryGetMapData(entry.Key, out var waterMap)
+                        ? new MapAtmosphere(waterMap.Temperature, waterMap.Humidity, waterMap.AirPressure, waterMap.AirAbsorptionMultiplier)
+                        : MapAtmosphere.Default);
+                    RoadWaterSystem.Update(entry.Key, roadWeather, _environment.RainRate(roadWeather),
+                                           _maps.TryGetRoads(entry.Key, out var waterRoads) ? waterRoads : null, dt);
                     _vehicles.Update(entry.Key, world, dt);
                     // Before the seats carry anybody: Alex gets on and off the bus here.
                     if (_characters.Count > 0)
@@ -853,7 +859,7 @@ public class GameServer
                     stage.Dispose();
                     stage = PerfProbe.Measure("server.driving+doors+parents");
                     DrivingSystem.Update(world, grid, entry.Value.data.WalkMin, entry.Value.data.WalkMax, dt,
-                                         (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds));
+                                         (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds), entry.Key);
                     // The glass in every car's windows, toward wherever it was last sent.
                     WindowSystem.Update(world, dt);
                     // Doors swing BEFORE the parts are placed: a door in a building is one of its
@@ -2092,6 +2098,7 @@ public class GameServer
                     PrecipitationKind = (int)falling.Kind,
                     RainMedianDropMm = falling.MedianDropMm,
                     HailDiameterMm = falling.HailMm,
+                    RoadWater = RoadWaterSystem.WaterOf(session.CurrentMapId)?.Save(),
                 };
                 perMap[session.CurrentMapId] = update;
             }

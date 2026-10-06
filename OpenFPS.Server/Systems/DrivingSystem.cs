@@ -111,6 +111,10 @@ public static class DrivingSystem
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, Running> _running = new();
 
+    /// <summary>The map being stepped, for the water on its roads (RoadWaterSystem); null in tests that
+    /// do not say, which drive on a dry road.</summary>
+    [ThreadStatic] private static string? _mapId;
+
     private static Running RunningFor(int id, string preset, VehicleProfile profile)
     {
         if (_running.TryGetValue(id, out var r) && r.Preset == preset) return r;
@@ -184,8 +188,9 @@ public static class DrivingSystem
 
     /// <summary>Everything currently under its own power on this map, moved one tick.</summary>
     public static void Update(World world, SpatialGrid<Entity> grid, Vector3 mapMin, Vector3 mapMax, float dt,
-                              Action<int, string, IReadOnlyList<TransientSound>>? heard = null)
+                              Action<int, string, IReadOnlyList<TransientSound>>? heard = null, string? mapId = null)
     {
+        _mapId = mapId;
         var query = new QueryDescription().WithAll<Transform, DriveComponent, Velocity>();
         var driven = new List<Entity>();
         world.Query(in query, (Entity e, ref Transform _, ref DriveComponent __, ref Velocity ___) => driven.Add(e));
@@ -285,6 +290,20 @@ public static class DrivingSystem
         body.Vx = v;
         body.ForwardOnly = false;
         body.SetSurface(running.Surface);
+        // The water under each wheel, where that wheel is: a puddle at the kerb is under the kerb-side
+        // wheels and not the others.
+        if (_mapId != null)
+        {
+            ref var at = ref world.Get<Transform>(root);
+            var fwd = new Vector3(MathF.Sin(drive.Heading), 0f, MathF.Cos(drive.Heading));
+            var rgt = new Vector3(MathF.Cos(drive.Heading), 0f, -MathF.Sin(drive.Heading));
+            float cog = body.Chassis.CentreOfGravityZ;
+            for (int i = 0; i < body.Wheels.Length; i++)
+            {
+                ref var w = ref body.Wheels[i];
+                body.SetWater(i, RoadWaterSystem.WaterAt(_mapId, at.Position + fwd * (w.X + cog) + rgt * w.Y, running.Surface));
+            }
+        }
         if (MathF.Abs(drive.Throttle) < 0.01f && speed <= StandstillSpeed && MathF.Abs(longitudinal) < 1e-3f)
             body.Halt();
         else
@@ -344,7 +363,7 @@ public static class DrivingSystem
         for (int i = 0; i < running.Wire.Length; i++)
         {
             ref var w = ref body.Wheels[i];
-            running.Wire[i] = WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand);
+            running.Wire[i] = WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand, w.Water);
         }
 
         // The client synthesises the engine from the speed this entity reports, and picks its own
