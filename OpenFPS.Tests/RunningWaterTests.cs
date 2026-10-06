@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Numerics;
+using System.Text.Json;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using Xunit;
@@ -40,6 +43,10 @@ public class RunningWaterTests
         }
         return x;
     }
+
+    /// <summary>The checkout this test file is in (as NatureTests finds it).</summary>
+    private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")
+        => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, ".."));
 
     private static double MeanSquare(float[] x) => x.Sum(v => (double)v * v) / x.Length;
 
@@ -322,6 +329,56 @@ public class RunningWaterTests
         _o.WriteLine($"  4-16 kHz in 10 ms: kurtosis {kurtosis:F2}");
         // No needle-sharp clicks: drops on wet stone build through the film and splash (HardCushion).
         Assert.InRange(kurtosis, 2.8, 7.0);
+    }
+
+    /// <summary>
+    /// The city's gutter and its drain, on Foundry Street's south kerb by the spawn: each a model this
+    /// client knows, the gutter lying along the kerb, neither inside anything solid (a source inside a
+    /// box is heard through it), both rain-fed so they are silent in dry weather.
+    /// </summary>
+    [Fact]
+    public void The_gutter_and_its_drain_are_on_the_city_by_the_spawn()
+    {
+        string root = RepoRoot();
+        var prefabs = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in Directory.GetFiles(Path.Combine(root, "OpenFPS.Server", "prefabs"), "*.json"))
+        {
+            if (path.EndsWith("prefab-schema.json")) continue;
+            var doc = JsonDocument.Parse(File.ReadAllText(path)).RootElement.Clone();
+            prefabs[doc.GetProperty("Id").GetString()!] = doc;
+        }
+        var map = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "OpenFPS.Server", "maps", "city.json"))).RootElement;
+        var solids = new List<(Vector3 Centre, Vector3 Half, string Name)>();
+        var water = new List<(string Prefab, Vector3 At, bool Turned)>();
+        foreach (var e in map.GetProperty("Entities").EnumerateArray())
+        {
+            string id = e.GetProperty("PrefabId").GetString()!;
+            if (!prefabs.TryGetValue(id, out var p)) continue;
+            var pos = e.GetProperty("Position");
+            var at = new Vector3(pos.GetProperty("X").GetSingle(), pos.GetProperty("Y").GetSingle(), pos.GetProperty("Z").GetSingle());
+            if (id is "gutter_water" or "drain_grate_water") { water.Add((id, at, e.TryGetProperty("Rotation", out _))); continue; }
+            bool solid = !p.TryGetProperty("IsSolid", out var so) || so.GetBoolean();
+            if (!solid || !p.TryGetProperty("ColliderSize", out var cs)) continue;
+            var c = new Vector3(cs.GetProperty("X").GetSingle(), cs.GetProperty("Y").GetSingle(), cs.GetProperty("Z").GetSingle());
+            var s = e.TryGetProperty("Scale", out var sc) ? new Vector3(sc.GetProperty("X").GetSingle(), sc.GetProperty("Y").GetSingle(), sc.GetProperty("Z").GetSingle()) : Vector3.One;
+            solids.Add((at, c * s / 2f, e.TryGetProperty("Name", out var nm) ? nm.GetString() ?? id : id));
+        }
+        Assert.Single(water, w => w.Prefab == "gutter_water");
+        Assert.Single(water, w => w.Prefab == "drain_grate_water");
+        foreach (var (prefab, at, turned) in water)
+        {
+            string sound = prefabs[prefab].GetProperty("SoundId").GetString()!;
+            var spec = RunningWaterSpec.ByName(sound[5..]);
+            Assert.True(spec.CatchmentSquareMetres > 0f && spec.BaseFlowLitresPerSecond == 0f, $"{prefab} should be fed by the rain alone");
+            var inside = solids.Where(b => MathF.Abs(at.X - b.Centre.X) < b.Half.X && MathF.Abs(at.Y - b.Centre.Y) < b.Half.Y && MathF.Abs(at.Z - b.Centre.Z) < b.Half.Z)
+                               .Select(b => b.Name).ToList();
+            Assert.True(inside.Count == 0, $"{prefab} at {at} is inside {string.Join(", ", inside)}");
+            // Within a few metres of the spawn (60, 122) and against the Foundry Street kerb (z 124).
+            Assert.InRange(at.Z, 124f, 124.6f);
+            Assert.InRange(at.X, 50f, 70f);
+            // The gutter's places lie along its x axis: unturned, along the street.
+            if (prefab == "gutter_water") Assert.False(turned);
+        }
     }
 
     [Fact]

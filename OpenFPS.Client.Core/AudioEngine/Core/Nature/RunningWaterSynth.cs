@@ -717,8 +717,12 @@ public sealed class RunningWaterSynth
         var place = Spec.DripsInside && _inside != null ? _inside[k] : _open[k];
         float impact = (Spec.DripOnto == WaterSurface.Rock ? FallingWaterSynth.HardImpactPascals : FallingWaterSynth.ImpactPascals)
                        * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * DripPart;
-        // Onto wet stone the blow builds through the film (as the falls' do); into water at first contact.
-        float rise = Spec.DripOnto == WaterSurface.Rock ? MathF.Max(16e-6f, WetCushion * r / v) : 16e-6f;
+        // Onto wet stone the blow builds through the film (as the falls' do). Into a puddle too it is not a
+        // point: the air under the drop is squeezed out and a thin disc of it trapped, and the contact
+        // spreads over the drop's tip (Thoroddsen et al. 2005, as RainSynth's click). A lone drip's
+        // first-contact spike, one sample wide, measured a 10 ms kurtosis of 31: a digital tick on its
+        // own, where in rain a thousand of them merge.
+        float rise = MathF.Max(16e-6f, WetCushion * r / v);
         place.Impact(at, rise, (Spec.DripOnto == WaterSurface.Rock ? 0.4f : 1f) * r / v, impact * MathF.Sqrt(16e-6f / rise));
         if (Spec.DripOnto != WaterSurface.Pool) return;
         // Into a puddle: the crater closes on a bubble often enough to be the sound of it (Phillips,

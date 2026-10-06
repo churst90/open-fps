@@ -133191,6 +133191,36 @@
   },
   {
    "EntityId": 8752,
+   "PrefabId": "gutter_water",
+   "Position": {
+    "X": 59.5,
+    "Y": 0.08,
+    "Z": 124.15
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Foundry Street gutter"
+  },
+  {
+   "EntityId": 8753,
+   "PrefabId": "drain_grate_water",
+   "Position": {
+    "X": 67.3,
+    "Y": 0.1,
+    "Z": 124.25
+   },
+   "Scale": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+   },
+   "Name": "Foundry Street drain"
+  },
+  {
+   "EntityId": 8754,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -133205,7 +133235,7 @@
    "Name": "Marlow Tower stairs, floor 0 to 1"
   },
   {
-   "EntityId": 8753,
+   "EntityId": 8755,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -133220,7 +133250,7 @@
    "Name": "Marlow Tower landing, floor 0"
   },
   {
-   "EntityId": 8754,
+   "EntityId": 8756,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -133235,7 +133265,7 @@
    "Name": "Marlow Tower stairs, floor 1 to 2"
   },
   {
-   "EntityId": 8755,
+   "EntityId": 8757,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -133250,7 +133280,7 @@
    "Name": "Marlow Tower landing, floor 1"
   },
   {
-   "EntityId": 8756,
+   "EntityId": 8758,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -133265,7 +133295,7 @@
    "Name": "Marlow Tower stairs, floor 2 to 3"
   },
   {
-   "EntityId": 8757,
+   "EntityId": 8759,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -133280,7 +133310,7 @@
    "Name": "Marlow Tower landing, floor 2"
   },
   {
-   "EntityId": 8758,
+   "EntityId": 8760,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -133295,7 +133325,7 @@
    "Name": "Marlow Tower stairs, floor 3 to 4"
   },
   {
-   "EntityId": 8759,
+   "EntityId": 8761,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -133310,7 +133340,7 @@
    "Name": "Marlow Tower landing, floor 3"
   },
   {
-   "EntityId": 8760,
+   "EntityId": 8762,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -133325,7 +133355,7 @@
    "Name": "Marlow Tower stairs, floor 4 to 5"
   },
   {
-   "EntityId": 8761,
+   "EntityId": 8763,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -133340,7 +133370,7 @@
    "Name": "Marlow Tower landing, floor 4"
   },
   {
-   "EntityId": 8762,
+   "EntityId": 8764,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -133355,7 +133385,7 @@
    "Name": "Marlow Tower stairs, floor 5 to 6"
   },
   {
-   "EntityId": 8763,
+   "EntityId": 8765,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -133370,7 +133400,7 @@
    "Name": "Marlow Tower landing, floor 5"
   },
   {
-   "EntityId": 8764,
+   "EntityId": 8766,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -133385,7 +133415,7 @@
    "Name": "Marlow Tower stairs, floor 6 to 7"
   },
   {
-   "EntityId": 8765,
+   "EntityId": 8767,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -133400,7 +133430,7 @@
    "Name": "Marlow Tower landing, floor 6"
   },
   {
-   "EntityId": 8766,
+   "EntityId": 8768,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -133415,7 +133445,7 @@
    "Name": "Marlow Tower stairs, floor 7 to the roof"
   },
   {
-   "EntityId": 8767,
+   "EntityId": 8769,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -133430,7 +133460,7 @@
    "Name": "Marlow Tower landing, floor 7"
   },
   {
-   "EntityId": 8768,
+   "EntityId": 8770,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -133445,7 +133475,7 @@
    "Name": "Kestrel House stairs, floor 0 to 1"
   },
   {
-   "EntityId": 8769,
+   "EntityId": 8771,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133460,7 +133490,7 @@
    "Name": "Kestrel House landing, floor 0"
   },
   {
-   "EntityId": 8770,
+   "EntityId": 8772,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -133475,7 +133505,7 @@
    "Name": "Kestrel House stairs, floor 1 to 2"
   },
   {
-   "EntityId": 8771,
+   "EntityId": 8773,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133490,7 +133520,7 @@
    "Name": "Kestrel House landing, floor 1"
   },
   {
-   "EntityId": 8772,
+   "EntityId": 8774,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -133505,7 +133535,7 @@
    "Name": "Kestrel House stairs, floor 2 to 3"
   },
   {
-   "EntityId": 8773,
+   "EntityId": 8775,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133520,7 +133550,7 @@
    "Name": "Kestrel House landing, floor 2"
   },
   {
-   "EntityId": 8774,
+   "EntityId": 8776,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -133535,7 +133565,7 @@
    "Name": "Kestrel House stairs, floor 3 to 4"
   },
   {
-   "EntityId": 8775,
+   "EntityId": 8777,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133550,7 +133580,7 @@
    "Name": "Kestrel House landing, floor 3"
   },
   {
-   "EntityId": 8776,
+   "EntityId": 8778,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -133565,7 +133595,7 @@
    "Name": "Kestrel House stairs, floor 4 to 5"
   },
   {
-   "EntityId": 8777,
+   "EntityId": 8779,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133580,7 +133610,7 @@
    "Name": "Kestrel House landing, floor 4"
   },
   {
-   "EntityId": 8778,
+   "EntityId": 8780,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -133595,7 +133625,7 @@
    "Name": "Kestrel House stairs, floor 5 to the roof"
   },
   {
-   "EntityId": 8779,
+   "EntityId": 8781,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133610,7 +133640,7 @@
    "Name": "Kestrel House landing, floor 5"
   },
   {
-   "EntityId": 8780,
+   "EntityId": 8782,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -133625,7 +133655,7 @@
    "Name": "Union Building stairs, floor 0 to 1"
   },
   {
-   "EntityId": 8781,
+   "EntityId": 8783,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133640,7 +133670,7 @@
    "Name": "Union Building landing, floor 0"
   },
   {
-   "EntityId": 8782,
+   "EntityId": 8784,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -133655,7 +133685,7 @@
    "Name": "Union Building stairs, floor 1 to 2"
   },
   {
-   "EntityId": 8783,
+   "EntityId": 8785,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133670,7 +133700,7 @@
    "Name": "Union Building landing, floor 1"
   },
   {
-   "EntityId": 8784,
+   "EntityId": 8786,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -133685,7 +133715,7 @@
    "Name": "Union Building stairs, floor 2 to 3"
   },
   {
-   "EntityId": 8785,
+   "EntityId": 8787,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133700,7 +133730,7 @@
    "Name": "Union Building landing, floor 2"
   },
   {
-   "EntityId": 8786,
+   "EntityId": 8788,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -133715,7 +133745,7 @@
    "Name": "Union Building stairs, floor 3 to 4"
   },
   {
-   "EntityId": 8787,
+   "EntityId": 8789,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133730,7 +133760,7 @@
    "Name": "Union Building landing, floor 3"
   },
   {
-   "EntityId": 8788,
+   "EntityId": 8790,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -133745,7 +133775,7 @@
    "Name": "Union Building stairs, floor 4 to 5"
   },
   {
-   "EntityId": 8789,
+   "EntityId": 8791,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133760,7 +133790,7 @@
    "Name": "Union Building landing, floor 4"
   },
   {
-   "EntityId": 8790,
+   "EntityId": 8792,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -133775,7 +133805,7 @@
    "Name": "Union Building stairs, floor 5 to 6"
   },
   {
-   "EntityId": 8791,
+   "EntityId": 8793,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133790,7 +133820,7 @@
    "Name": "Union Building landing, floor 5"
   },
   {
-   "EntityId": 8792,
+   "EntityId": 8794,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -133805,7 +133835,7 @@
    "Name": "Union Building stairs, floor 6 to 7"
   },
   {
-   "EntityId": 8793,
+   "EntityId": 8795,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133820,7 +133850,7 @@
    "Name": "Union Building landing, floor 6"
   },
   {
-   "EntityId": 8794,
+   "EntityId": 8796,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -133835,7 +133865,7 @@
    "Name": "Union Building stairs, floor 7 to 8"
   },
   {
-   "EntityId": 8795,
+   "EntityId": 8797,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133850,7 +133880,7 @@
    "Name": "Union Building landing, floor 7"
   },
   {
-   "EntityId": 8796,
+   "EntityId": 8798,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -133865,7 +133895,7 @@
    "Name": "Union Building stairs, floor 8 to 9"
   },
   {
-   "EntityId": 8797,
+   "EntityId": 8799,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133880,7 +133910,7 @@
    "Name": "Union Building landing, floor 8"
   },
   {
-   "EntityId": 8798,
+   "EntityId": 8800,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -133895,7 +133925,7 @@
    "Name": "Union Building stairs, floor 9 to the roof"
   },
   {
-   "EntityId": 8799,
+   "EntityId": 8801,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -133910,7 +133940,7 @@
    "Name": "Union Building landing, floor 9"
   },
   {
-   "EntityId": 8800,
+   "EntityId": 8802,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -133925,7 +133955,7 @@
    "Name": "Brandt Court stairs, floor 0 to 1"
   },
   {
-   "EntityId": 8801,
+   "EntityId": 8803,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -133940,7 +133970,7 @@
    "Name": "Brandt Court landing, floor 0"
   },
   {
-   "EntityId": 8802,
+   "EntityId": 8804,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -133955,7 +133985,7 @@
    "Name": "Brandt Court stairs, floor 1 to 2"
   },
   {
-   "EntityId": 8803,
+   "EntityId": 8805,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -133970,7 +134000,7 @@
    "Name": "Brandt Court landing, floor 1"
   },
   {
-   "EntityId": 8804,
+   "EntityId": 8806,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -133985,7 +134015,7 @@
    "Name": "Brandt Court stairs, floor 2 to 3"
   },
   {
-   "EntityId": 8805,
+   "EntityId": 8807,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -134000,7 +134030,7 @@
    "Name": "Brandt Court landing, floor 2"
   },
   {
-   "EntityId": 8806,
+   "EntityId": 8808,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -134015,7 +134045,7 @@
    "Name": "Brandt Court stairs, floor 3 to 4"
   },
   {
-   "EntityId": 8807,
+   "EntityId": 8809,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -134030,7 +134060,7 @@
    "Name": "Brandt Court landing, floor 3"
   },
   {
-   "EntityId": 8808,
+   "EntityId": 8810,
    "PrefabId": "named_place",
    "Position": {
     "X": -13.05,
@@ -134045,7 +134075,7 @@
    "Name": "Brandt Court stairs, floor 4 to 5"
   },
   {
-   "EntityId": 8809,
+   "EntityId": 8811,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -134060,7 +134090,7 @@
    "Name": "Brandt Court landing, floor 4"
   },
   {
-   "EntityId": 8810,
+   "EntityId": 8812,
    "PrefabId": "named_place",
    "Position": {
     "X": -10.65,
@@ -134075,7 +134105,7 @@
    "Name": "Brandt Court stairs, floor 5 to the roof"
   },
   {
-   "EntityId": 8811,
+   "EntityId": 8813,
    "PrefabId": "named_place",
    "Position": {
     "X": -11.85,
@@ -134090,7 +134120,7 @@
    "Name": "Brandt Court landing, floor 5"
   },
   {
-   "EntityId": 8812,
+   "EntityId": 8814,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -134105,7 +134135,7 @@
    "Name": "Selby House stairs, floor 0 to 1"
   },
   {
-   "EntityId": 8813,
+   "EntityId": 8815,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -134120,7 +134150,7 @@
    "Name": "Selby House landing, floor 0"
   },
   {
-   "EntityId": 8814,
+   "EntityId": 8816,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -134135,7 +134165,7 @@
    "Name": "Selby House stairs, floor 1 to 2"
   },
   {
-   "EntityId": 8815,
+   "EntityId": 8817,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -134150,7 +134180,7 @@
    "Name": "Selby House landing, floor 1"
   },
   {
-   "EntityId": 8816,
+   "EntityId": 8818,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -134165,7 +134195,7 @@
    "Name": "Selby House stairs, floor 2 to 3"
   },
   {
-   "EntityId": 8817,
+   "EntityId": 8819,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -134180,7 +134210,7 @@
    "Name": "Selby House landing, floor 2"
   },
   {
-   "EntityId": 8818,
+   "EntityId": 8820,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -134195,7 +134225,7 @@
    "Name": "Selby House stairs, floor 3 to 4"
   },
   {
-   "EntityId": 8819,
+   "EntityId": 8821,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -134210,7 +134240,7 @@
    "Name": "Selby House landing, floor 3"
   },
   {
-   "EntityId": 8820,
+   "EntityId": 8822,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -134225,7 +134255,7 @@
    "Name": "Selby House stairs, floor 4 to 5"
   },
   {
-   "EntityId": 8821,
+   "EntityId": 8823,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -134240,7 +134270,7 @@
    "Name": "Selby House landing, floor 4"
   },
   {
-   "EntityId": 8822,
+   "EntityId": 8824,
    "PrefabId": "named_place",
    "Position": {
     "X": 13.05,
@@ -134255,7 +134285,7 @@
    "Name": "Selby House stairs, floor 5 to 6"
   },
   {
-   "EntityId": 8823,
+   "EntityId": 8825,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -134270,7 +134300,7 @@
    "Name": "Selby House landing, floor 5"
   },
   {
-   "EntityId": 8824,
+   "EntityId": 8826,
    "PrefabId": "named_place",
    "Position": {
     "X": 10.65,
@@ -134285,7 +134315,7 @@
    "Name": "Selby House stairs, floor 6 to the roof"
   },
   {
-   "EntityId": 8825,
+   "EntityId": 8827,
    "PrefabId": "named_place",
    "Position": {
     "X": 11.85,
@@ -134300,7 +134330,7 @@
    "Name": "Selby House landing, floor 6"
   },
   {
-   "EntityId": 8826,
+   "EntityId": 8828,
    "PrefabId": "named_place",
    "Position": {
     "X": -325.0,
@@ -134315,7 +134345,7 @@
    "Name": "Elm Park, by the fountain"
   },
   {
-   "EntityId": 8827,
+   "EntityId": 8829,
    "PrefabId": "named_place",
    "Position": {
     "X": -330.0,

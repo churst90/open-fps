@@ -2309,6 +2309,19 @@ for (x0, x1, z0, z1) in ((FIRE_X - 0.7, FIRE_X + 0.7, FIRE_Z - 0.7, FIRE_Z - 0.5
 # sitting round it.
 prop("fire_pit", FIRE_X, 0.6, FIRE_Z, name="58 Alder Street fire pit")
 
+# ══ Rain running off Foundry Street ═══════════════════════════════════════════════════════════════
+#
+# The south kerb by the spawn, where every new player lands: fifteen metres of gutter falling east,
+# and the road drain it runs into (RunningWaterSpec.KerbGutter and DrainGrate). Both carry only what
+# the rain puts on the road and the pavement, through their catchment (Runoff): silent in dry weather,
+# filling over a few minutes when it rains, running on and dripping after it stops. The gutter is
+# heard from places along its length, so it lies east-west with the kerb. Laid after everything else
+# so no other id moves.
+GUTTER_Z = STREETS[2] - KERB + 0.15            # in the road, against the kerb's face
+GUTTER_X0, GUTTER_X1 = SPAWN[0] - 8.0, SPAWN[0] + 7.0
+prop("gutter_water", (GUTTER_X0 + GUTTER_X1) / 2, 0.08, GUTTER_Z, name="Foundry Street gutter")
+prop("drain_grate_water", GUTTER_X1 + 0.3, 0.1, GUTTER_Z + 0.1, name="Foundry Street drain")
+
 # The named places last, so that adding one moved no other part's id.
 for _name, *_span in named_places:
     box("named_place", *_span, name=_name)

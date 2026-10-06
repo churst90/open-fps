@@ -1,0 +1,17 @@
+{
+  "Id": "gutter_water",
+  "Name": "Gutter",
+  "Description": "Rain running along a street's gutter against the kerb (RunningWaterSpec.KerbGutter, RunningWaterSynth): fifteen metres of it above a drain, fed by the run-off from its half of the road and pavement. Silent in dry weather; fills over a few minutes when it rains and runs on after. Heard from places along its length, which lies along the entity's own x axis: turn the entity to lay it along the kerb. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": { "X": 0.2, "Y": 0.2, "Z": 0.2 },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "flow:gutter",
+  "Volume": 1.0,
+  "Range": 60,
+  "MinDistance": 1,
+  "Mode": "LoopOne"
+}

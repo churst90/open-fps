@@ -320,8 +320,8 @@ public static class RunningWaterSpike
             {
                 foreach (var (name, r) in new[] { ("moderate", Rainfall.ModerateRate), ("heavy", Rainfall.HeavyRate) })
                 {
-                    StreetScene($"gutter and drain {name}, no rain heard", r, r, false, onPavement, grate, true, true, false);
-                    StreetScene($"gutter and drain {name}, in the rain", r, r, true, onPavement, grate, true, true, false);
+                    StreetScene($"gutter and drain {name} no rain heard", r, r, false, onPavement, grate, true, true, false);
+                    StreetScene($"gutter and drain {name} in the rain", r, r, true, onPavement, grate, true, true, false);
                     StreetScene($"drain {name} 1.5m, no rain heard", r, r, false, grate + new Vector3(0f, 0f, -1.5f), grate, false, true, false);
                     StreetScene($"gutter {name} 1.5m, no rain heard", r, r, false, kerb + new Vector3(-2f, 0f, -1.5f), kerb + new Vector3(-2f, 0f, 0f), true, false, false);
                     StreetScene($"downpipe {name} 1.5m, no rain heard", r, r, false, pipe + new Vector3(0f, -0.15f, 1.5f), pipe, false, false, true);
@@ -330,19 +330,43 @@ public static class RunningWaterSpike
             }
             if (set is "all" or "after")
             {
-                // Half an hour after a heavy shower: what is left in the catchments, no rain falling.
-                OpenFPS.Common.Runoff.Held = false;
-                OpenFPS.Common.Runoff.Reset();
-                OpenFPS.Common.Runoff.Update(Rainfall.HeavyRate, 0);
-                OpenFPS.Common.Runoff.Update(0f, 0.001);
-                for (int t = 1; t <= 600; t++) OpenFPS.Common.Runoff.Update(0f, t);
-                float gutterAfter = OpenFPS.Common.Runoff.Through(RunningWaterSpec.ByName("gutter").CatchmentSeconds);
-                float pipeAfter = OpenFPS.Common.Runoff.Through(RunningWaterSpec.ByName("downpipe").CatchmentSeconds);
-                Console.WriteLine($"  ten minutes after heavy rain: gutter catchment {gutterAfter:F3} mm/h, roof {pipeAfter:F4} mm/h");
+                // After a heavy shower: what is left in the catchments, no rain falling. The street's
+                // ten minutes on, the roof's (a faster catchment) three.
+                float After(float seconds, string preset)
+                {
+                    OpenFPS.Common.Runoff.Held = false;
+                    OpenFPS.Common.Runoff.Reset();
+                    OpenFPS.Common.Runoff.Update(Rainfall.HeavyRate, 0);
+                    for (int t = 1; t <= seconds; t++) OpenFPS.Common.Runoff.Update(0f, t);
+                    return OpenFPS.Common.Runoff.Through(RunningWaterSpec.ByName(preset).CatchmentSeconds);
+                }
+                float gutterAfter = After(600f, "gutter");
+                float pipeAfter = After(180f, "downpipe");
+                Console.WriteLine($"  after heavy rain: street catchment 10 min on {gutterAfter:F3} mm/h, roof 3 min on {pipeAfter:F4} mm/h");
                 StreetScene("drain after the rain 1.5m", 0f, gutterAfter, false, grate + new Vector3(0f, 0f, -1.5f), grate, true, true, false);
                 StreetScene("downpipe after the rain 1.5m", 0f, pipeAfter, false, pipe + new Vector3(0f, -0.15f, 1.5f), pipe, false, false, true);
                 // Later still: the downpipe down to a drip.
                 StreetScene("downpipe dripping 1.5m", 0f, 0.15f, false, pipe + new Vector3(0f, -0.15f, 1.5f), pipe, false, false, true);
+            }
+            if (set is "fountain")
+            {
+                // The Elm Park fountain (its five taps where the city map has them), standing 4 m south of
+                // its kerb facing it: as it is, and with a basin overflow in the south kerb's inside face.
+                Runoff(0f);
+                Weather(0f);
+                WindField.Weather = WindWeather.Steady(2f, 250f, 0.2f);
+                Vector3 centre = o + new Vector3(-120f, 0f, 60f);
+                (int Tap, Vector3 At)[] taps = { (0, new(0f, 1.9f, 0f)), (1, new(0f, 0.8f, 2.3f)), (2, new(2.3f, 0.8f, 0f)), (3, new(0f, 0.8f, -2.3f)), (4, new(-2.3f, 0.8f, 0f)) };
+                var ids = taps.Select(t => Add($"water:park_fountain/elm_park/{t.Tap}", centre + t.At, 160f, 1.5f)).ToList();
+                Vector3 feet = centre + new Vector3(0f, 0f, -5.5f - 4f);
+                Stand(feet, centre);
+                Pump(5.0);
+                Record("fountain 4m as it is", sec);
+                // The overflow: in the south kerb's inside face, a 1.2 m weir, its sump under the paving.
+                int overflow = Add("flow:basin_overflow", centre + new Vector3(0f, 0.3f, -5.1f), 80f, 1f);
+                Pump(5.0);
+                Record("fountain 4m with its overflow", sec);
+                Remove(ids.Append(overflow).ToArray());
             }
             if (set is "all" or "overflow")
             {
