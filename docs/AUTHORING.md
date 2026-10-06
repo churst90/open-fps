@@ -138,6 +138,9 @@ rejected, because the loader would otherwise attach no emitter and the object wo
   model on the client, not by the `Synth*` oscillator: `machine:` (`ac_window`, `ac_condenser`,
   `mower_push`, `mower_riding`), `water:` (`park_fountain`), `fire:` (`fire_pit`), `foliage:`
   (`park_tree`, `pine`) and `bell:`. The part after the colon is a preset name in the model library.
+  A water feature with several landing places (`WaterFeatureSpec.Taps`) can instead be placed as one
+  emitter per tap, `water:<preset>/<feature>/<tap>`: one synth feeds them all, each tap plays the
+  water that lands there, and `<feature>` keeps two fountains of the same preset apart.
 
 ### Regions and portals
 
@@ -295,7 +298,9 @@ for a flight of stairs, a landing, a garden gate. Where named places overlap, th
 
 | Prefab | What it is |
 |---|---|
-| `water_fountain` | the sound of a fountain: `water:park_fountain`, not solid. Put it over the water, not inside the pedestal |
+| `water_fountain` | the sound of a fountain from one point: `water:park_fountain`, not solid. Put it over the water, not inside the pedestal |
+| `elm_fountain_water_0`..`_4` | the Elm Park fountain's five taps (`water:park_fountain/elm_park/0..4`): the bowl, then the north, east, south and west sides of its rocks |
+| `rock_boulder` | a boulder, scaled to size; material Concrete (there is no Stone material) |
 | `water_surface` | standing water: a solid box of material `Water`, a hard reflector |
 | `fire_pit` | a wood fire: `fire:fire_pit`, not solid. Put it above the ring of brick round it |
 | `tree_crown` | the wind in a tree, heard from the middle of the crown: `foliage:park_tree`. Pair it with a `foliage_hedge` box for the crown and a trunk box |

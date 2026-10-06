@@ -44,6 +44,10 @@ changes approved sounds and needs listening rounds.
 
 ## 1. The textures are noise, not events
 
+Followed up in texture round 1 (changes.md, 2026-10-06; inbox/textures-round1-2026-10-06): the
+fountain, rain, trees and fire refitted on McDermott-Simoncelli statistics (tools/texture_stats.py,
+TextureStatistics), and the fountain given five voices across its extent (item 8).
+
 This is the systemic cause, and it is not in the mixer. The nature round 3 files were written straight
 from the synths: 48 kHz mono, no FMOD, no HRTF. The fountain through the whole mixer, standing still,
 has the same statistics: 0.27 / 0.23 / 0.21 at 4k / 8k / 12.5k against 0.24 / 0.19 / 0.17 direct.
