@@ -32,6 +32,10 @@ internal sealed class SteamAudioVoiceState
     /// signal, and it clicks. Ramping this instead lets a listener cross a threshold silently.</summary>
     public volatile float SpatialBlend = 1f;
 
+    /// <summary>The blend the last block ended on, mixer thread only; below zero before the first.
+    /// The blend is ramped across each block from here, rather than stepped at its start.</summary>
+    public float LastBlend = -1f;
+
     /// <summary>
     /// The ground between a recorded sound and the listener, folded in before the HRTF. Recorded
     /// sounds reach the ear only through this stage, and the synthesised voices carry their own
@@ -257,8 +261,11 @@ internal static class SteamAudioDsp
         }
 
         // 5. Write to FMOD's (interleaved) output buffer — the placed signal blended with the input.
+        // Ramped across the block from where the last one ended: the game moves the blend once a frame,
+        // and held for a block and stepped at the next it was a 43 Hz staircase while it moved.
         float blend = Math.Clamp(state.SpatialBlend, 0f, 1f);
-        float dry = 1f - blend;
+        float fromBlend = state.LastBlend < 0f ? blend : state.LastBlend;
+        state.LastBlend = blend;
         bool nonZero = false;
         double sumSq = 0, sumSqL = 0, sumSqR = 0;
         unsafe
@@ -266,23 +273,26 @@ internal static class SteamAudioDsp
             float* o = (float*)outbuffer;
             float* inp = (float*)inbuffer;
             float[] st = state.StereoScratch;
-            if (dry > 0f)
+            if (blend < 1f || fromBlend < 1f)
             {
                 // What the stage would pass through at blend 0: its own input, stereo kept as
                 // stereo, anything else as its mono downmix in both ears.
+                float step = (blend - fromBlend) / n;
                 if (inchannels == 2)
                     for (int i = 0; i < n; i++)
                     {
-                        st[i * 2] = blend * st[i * 2] + dry * inp[i * 2];
-                        st[i * 2 + 1] = blend * st[i * 2 + 1] + dry * inp[i * 2 + 1];
+                        float b = fromBlend + step * (i + 1), d = 1f - b;
+                        st[i * 2] = b * st[i * 2] + d * inp[i * 2];
+                        st[i * 2 + 1] = b * st[i * 2 + 1] + d * inp[i * 2 + 1];
                     }
                 else
                 {
                     float[] mono = state.MonoScratch;
                     for (int i = 0; i < n; i++)
                     {
-                        st[i * 2] = blend * st[i * 2] + dry * mono[i];
-                        st[i * 2 + 1] = blend * st[i * 2 + 1] + dry * mono[i];
+                        float b = fromBlend + step * (i + 1), d = 1f - b;
+                        st[i * 2] = b * st[i * 2] + d * mono[i];
+                        st[i * 2 + 1] = b * st[i * 2 + 1] + d * mono[i];
                     }
                 }
             }

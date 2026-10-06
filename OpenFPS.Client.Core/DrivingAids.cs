@@ -472,11 +472,11 @@ public sealed class DrivingAids
         if (_registered) return;
         int rate = TransientSynth.SampleRate;
         _registered =
-            _audio.RegisterSynthesisedSound(GuideSound, TransientSynth.ToPcm16(Beep(rate, 1175f, 0.07f, 0f)), rate)
-            & _audio.RegisterSynthesisedSound(CentreSound, TransientSynth.ToPcm16(Beep(rate, 660f, 0.06f, 0.3f)), rate)
-            & _audio.RegisterSynthesisedSound(KerbSound, TransientSynth.ToPcm16(Beep(rate, 220f, 0.08f, 0.6f)), rate)
-            & _audio.RegisterSynthesisedSound(TurnSound, TransientSynth.ToPcm16(Beep(rate, 1800f, 0.018f, 0f)), rate)
-            & _audio.RegisterSynthesisedSound(AlignSound, TransientSynth.ToPcm16(Chime(rate)), rate);
+            _audio.RegisterSynthesisedSoundFloat(GuideSound, Beep(rate, 1175f, 0.07f, 0f), rate)
+            & _audio.RegisterSynthesisedSoundFloat(CentreSound, Beep(rate, 660f, 0.06f, 0.3f), rate)
+            & _audio.RegisterSynthesisedSoundFloat(KerbSound, Beep(rate, 220f, 0.08f, 0.6f), rate)
+            & _audio.RegisterSynthesisedSoundFloat(TurnSound, Beep(rate, 1800f, 0.018f, 0f), rate)
+            & _audio.RegisterSynthesisedSoundFloat(AlignSound, Chime(rate), rate);
     }
 
     /// <summary>A beep: a tone with soft edges so it does not click, and some odd harmonics to make it
