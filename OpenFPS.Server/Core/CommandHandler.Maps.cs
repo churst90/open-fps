@@ -118,7 +118,7 @@ public partial class CommandHandler
                                               _maps.TryGetMapData(id, out var d);
                                               string owner = string.IsNullOrWhiteSpace(d.OwnerId) ? ""
                                                   : d.OwnerId.Equals(session.Username, StringComparison.OrdinalIgnoreCase) ? ", yours" : $", {d.OwnerId}'s";
-                                              return $"{id}{owner}{(d.IsPublic ? "" : ", private")}";
+                                              return $"{d.DisplayName}{owner}{(d.IsPublic ? "" : ", private")}";
                                           });
         Say(reply, "Maps you can go to: " + string.Join("; ", enterable) + ". /join MAP goes there.");
     }
@@ -131,7 +131,7 @@ public partial class CommandHandler
         string owner = mine ? "your map" : string.IsNullOrWhiteSpace(d.OwnerId) ? "a map of the server's" : $"{d.OwnerId}'s map";
         string invited = (mine || session.Can(Permissions.MapsAny)) && d.Invited.Count > 0 ? $" Invited: {string.Join(", ", d.Invited)}." : "";
         string build = mine ? " You can build, spawn, move and save here." : "";
-        return $"You are on {d.Id}, {owner}, {(d.IsPublic ? "public" : "private")}.{invited}{build}";
+        return $"You are on {d.DisplayName}, {owner}, {(d.IsPublic ? "public" : "private")}.{invited}{build}";
     }
 
     /// <summary>A map whose access this session may change: their own, or any with maps-any.</summary>

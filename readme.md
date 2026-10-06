@@ -31,7 +31,9 @@ reverb that comes from the room's actual size and materials.
   something knocks and names it, and the game can say what is ahead as you turn and move.
 - Maps: a generated city with streets, traffic, buses, a light rail loop, level crossings, an
   airport, houses with gardens, a park with a fountain, birds, and buildings you can enter; a
-  speedway with a race; and a rooms map for trying doors and materials.
+  speedway with a race; a rooms map for trying doors and materials; and two real places made from
+  open data, Magnolia, Texas and Albany, Oregon, with their real streets, buildings and addresses
+  (listed as "magnolia tx" and "albany or").
 - Doors work as real ones do: knob doors, push-bar doors with closers, keyed glass front doors,
   automatic sliding doors and patio doors. Each is pushed from one side and pulled from the other,
   and no door shuts on a person.
@@ -104,5 +106,8 @@ reverb that comes from the room's actual size and materials.
 - Build with `--artifacts-path` pointing off the repository's volume (see the run scripts). Do not
   use `dotnet run`: it writes `obj/` and `bin/` into the repository.
 - Tests: `dotnet test OpenFPS.Tests` (about 1,800 test methods).
-- Map and prefab authoring: [docs/AUTHORING.md](docs/AUTHORING.md).
+- Map and prefab authoring: [docs/AUTHORING.md](docs/AUTHORING.md). Maps of real places, and how
+  to make another: [docs/MAPS_FROM_REAL_PLACES.md](docs/MAPS_FROM_REAL_PLACES.md). Their map data is
+  (c) OpenStreetMap contributors (ODbL), with buildings from Overture Maps, addresses from the US
+  National Address Database and Census TIGER/Line, and tree cover from ESA WorldCover 2021 (CC BY 4.0).
 - Planned work: [todo.md](todo.md). Recent changes: [changes.md](changes.md).

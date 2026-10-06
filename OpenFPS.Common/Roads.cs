@@ -28,6 +28,9 @@ public class RoadData
     /// not covered is <see cref="DefaultSurface"/>.</summary>
     public List<SurfaceData> Surfaces { get; set; } = new();
 
+    /// <summary>On a tiled map, the tiles the centreline passes through (EntityData.Tile). Nothing reads it yet.</summary>
+    public List<string>? Tiles { get; set; }
+
     public const string DefaultSurface = "Asphalt";
 }
 
@@ -67,6 +70,8 @@ public class JunctionData
     public List<string> PriorityRoads { get; set; } = new();
     /// <summary>How long a vehicle waits at the line when it gives way, seconds.</summary>
     public float GiveWaySeconds { get; set; } = 2f;
+    /// <summary>On a tiled map, the tile the junction is in (EntityData.Tile). Nothing reads it yet.</summary>
+    public string? Tile { get; set; }
 
     /// <summary>Whether traffic arriving along this road has to give way.</summary>
     public bool GivesWay(RoadData road)
@@ -232,9 +237,18 @@ public sealed class RoadNetwork
 
     private void Check()
     {
+        // Which junctions each road passes through, once per road rather than once per junction: on
+        // a town's two hundred roads and junctions the second was a hundred million projections.
+        var on = new Dictionary<JunctionData, int>();
+        foreach (var r in Roads)
+        {
+            if (r.Centreline.Count < 2) continue;
+            foreach (var j in JunctionsOn(r).Select(x => x.J).Distinct())
+                on[j] = on.GetValueOrDefault(j) + 1;
+        }
         foreach (var j in Junctions)
         {
-            int roads = Roads.Count(r => r.Centreline.Count >= 2 && JunctionsOn(r).Any(x => x.J == j));
+            int roads = on.GetValueOrDefault(j);
             if (roads < 2) _problems.Add($"junction {j.Id}: on {roads} road(s)");
         }
         foreach (var road in Roads)

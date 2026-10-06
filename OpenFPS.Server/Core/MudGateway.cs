@@ -398,7 +398,8 @@ public class MudGateway
         foreach (var map in response.Maps)
         {
             string people = map.PlayerCount == 1 ? "1 player" : $"{map.PlayerCount} players";
-            lines.Add($"  {map.Id}: {people}{(map.IsPublic ? "" : ", private")}{(map.IsCurrent ? ", where you are" : "")}.");
+            string named = string.IsNullOrWhiteSpace(map.Name) || map.Name == map.Id ? map.Id : $"{map.Name} ({map.Id})";
+            lines.Add($"  {named}: {people}{(map.IsPublic ? "" : ", private")}{(map.IsCurrent ? ", where you are" : "")}.");
         }
         return string.Join("\n", lines);
     }

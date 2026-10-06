@@ -30,6 +30,11 @@
     <None Include="..\OpenFPS.Server\prefabs\*.json" Link="prefabs\%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- The maps of real places, in a folder of their own: under maps\ they would be loaded by every
+         test that loads the shipped maps. RealPlaceMapTests loads each one alone. -->
+    <None Include="..\OpenFPS.Server\maps\places\*.json" Link="places\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- The rooms map (doors, portals, the material lab): a fixture only, never served to players. -->
     <None Update="maps\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

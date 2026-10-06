@@ -2,6 +2,43 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-06
+
+- Weather can be set as what falls, how hard and how big. `/weather rain` takes a class (drizzle,
+  light, moderate, heavy, extreme), a rate (`/weather rain 12`), a radar reading
+  (`/weather rain 45 dBZ`) or a drop size (`/weather rain heavy drops 3 mm`); `/weather drizzle`,
+  `/weather freezing rain`, `/weather sleet`, `/weather snow` (light, moderate or heavy) and
+  `/weather hail` with a size (pea, marble, penny, quarter, golf, tennis, baseball, softball, or
+  millimetres) set the other kinds. The reply says it back with its colour on the radar: "Rain,
+  heavy, 25 millimetres an hour, drops 1.8 millimetres, orange on the radar." Drizzle is pale green,
+  light green, moderate yellow, heavy orange, extreme red, hail purple, snow blue. The drops are a
+  gamma spectrum of the given median size carrying the rate; a radar reading gives the rate by the
+  WSR-88D's Z-R and the median that has that reflectivity. Restart the server: the world state
+  message has three new fields (the kind, the drop size, the hail size), after the rate.
+- Snow is all but silent on the street and a faint thump on a sheet roof. Sleet is ice pellets:
+  hard ticks that bounce, louder than rain of the same water. Freezing rain sounds like rain. Hail is
+  ice spheres falling at their own speed (about 12 times the square root of the size in cm, m/s),
+  struck for the Hertz contact time against what they land on, and bouncing off hard ground; a
+  sheet roof takes at most half of a stone's energy. Golf-ball hail runs the master limiter 20 dB
+  down, as gunfire does.
+- Near drops are played one by one. Within 2.5 m, and on your own head and shoulders under the open
+  sky, the loudest drops are taken out of the rain's patches and each played where it lands, about
+  12 a second in all: more than that, the lab's `--rain resolve` found, are no longer heard as
+  separate impacts. On a car roof beside you, under a shelter's sheet, or in hail, they are every
+  ping and every stone.
+- Sitting in a car in the rain, the roof, windscreen and rear glass drum over your head through the
+  headliner, and the street comes in through the car's shell. Side windows take no rain until wind
+  drives it onto them, which is not modelled yet.
+- Renders of rain at every class, two drop sizes, a radar reading, freezing rain, sleet, snow and
+  three sizes of hail, on the street, in a park, under the bus shelter, beside and inside a parked
+  car, under a tree and by a pond, at the level the game plays them (through the master limiter),
+  are in inbox/rain-round3-2026-10-06 with a README.
+
+- The tests run on GitHub (`.github/workflows/tests.yml`): every push to main and every pull request,
+  or by hand from the Actions tab. Eight runners each take an eighth of the test classes
+  (`tools/ci/shard_tests.py`); results are kept for two weeks as artifacts. No FMOD or Steam Audio
+  is needed: no test loads the native audio engine.
+
 ## 2026-10-05
 
 - Rain can be heard. Nothing played before; now the drops are synthesised on whatever they land on
@@ -34,6 +71,35 @@ Recent work, newest first. `git log` has the rest.
   real provider, against an air conditioner, a fountain and a tree), `physics` (drop counts, the
   kinetic energy against van Dijk 2002, the plate law for roofs and glazing), `survey map=city
   ear=x,y,z` for a real place, and `compare=FILE.wav` for a recording.
+- Two maps of real places, made from open data: "magnolia tx" (magnolia_tx), a 3 km square south
+  of Magnolia, Texas, starting on the drive of 31907 Bobcat Lane, and "albany or" (albany_or), a
+  3 km square of southwest Albany, Oregon, starting in front of 1042 Belmont Avenue Southwest.
+  Neither is the landing map. Roads, names, lanes, surfaces, gates, fences, sidewalks and railways
+  are OpenStreetMap's; buildings are Overture's footprints with their heights; addresses are
+  OpenStreetMap's and the National Address Database's, with Census interpolation for houses they
+  miss; the woods are ESA WorldCover's. Lot lines, rooms, wall materials and individual trees are
+  generated. Each lot is named by its address (the front yard is "31907 Bobcat Lane", then "back
+  yard" and "side yard"); rooms are "31907 Bobcat Lane, kitchen"; roads are named along their
+  length and junctions by their roads. Houses within 300 m of the start (200 m in Albany) have rooms
+  and inner doors; the rest are one room with a front door. A few cars drive the main roads.
+- tools/gen_osm.py makes such a map from any place: the area is a bounding box, a centre and size,
+  an OpenStreetMap boundary or a ZIP code area; `--detail=low|medium|high` chooses the layers; every
+  entity is tagged with its 250 m tile and its layer for a later streaming loader.
+  tools/fetch_place.py downloads and prepares the inputs. How, the sources and their licences:
+  docs/MAPS_FROM_REAL_PLACES.md.
+- A map can have a name for the maps list (MapData.Name, carried as MapSummary.Name). F6, /maps,
+  /join, /where and travel messages say it; /join takes the name or the id, with spaces, underscores
+  or hyphens.
+- Maps in OpenFPS.Server/maps/places load with the others, and are kept out of the test output's
+  maps folder.
+- A turned room is measured in its own frame. The survey that fills in a room's materials and decides
+  whether it is enclosed looked for walls along the map's axes, so a house turned a quarter round
+  was found half open. The city's rooms are all square to the map and are unchanged.
+- Loading a big map: the server's room survey and the client's openings pass ask each room about
+  the boxes near it, not every box on the map (18 s and 16 s on Magnolia before, under a second
+  now), and the road network checks its junctions once per road. Same answers as before.
+- New prefabs: siding_wall (timber-framed wall in lap siding), shingle_roof (asphalt shingles on a
+  deck) and gravel_floor.
 
 - The front of a car is no longer silent. The engine's own noise (valve ticking, diesel clatter, the
   belt, the turbo, the intake) leaves only through the engine bay, and every car let out a flat 0.15

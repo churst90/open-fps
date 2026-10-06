@@ -1,0 +1,11 @@
+{
+  "Id": "gravel_floor",
+  "Name": "Gravel",
+  "Description": "Loose stone: a gravel drive, an unpaved road, a railway's ballast. Porous and loose, so it absorbs much of what lands on it and scatters the rest, and every step on it is a crunch of stones shifting against each other.",
+  "Material": "Gravel",
+  "ColliderSize": { "X": 10, "Y": 0.1, "Z": 10 },
+  "Type": "StaticObject",
+  "TransmissionLow": 0.35,
+  "TransmissionMid": 0.45,
+  "TransmissionHigh": 0.55
+}

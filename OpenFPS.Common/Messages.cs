@@ -109,10 +109,15 @@ public partial struct MapSummary
     /// <summary>Whether this is the map you are standing on.</summary>
     public bool IsCurrent;
 
+    /// <summary>What the map is called in a list ("magnolia tx"); empty means say the id. Appended:
+    /// messages are serialised by position.</summary>
+    public string Name;
+
     public MapSummary()
     {
         Id = "";
         OwnerId = "";
+        Name = "";
     }
 }
 

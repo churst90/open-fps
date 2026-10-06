@@ -2005,12 +2005,12 @@ public partial class CommandHandler
             string place = (_maps.TryGetMap(session.CurrentMapId, out var w, out _, out _, out _)
                             && session.Entity != Entity.Null && w.IsAlive(session.Entity)
                 ? PlaceAt(w, w.Get<Transform>(session.Entity).Position) : null) ?? "";
-            Say(reply, $"You are on {session.CurrentMapId}{(place.Length > 0 ? ", at " + place : "")}.");
+            Say(reply, $"You are on {_maps.DisplayName(session.CurrentMapId)}{(place.Length > 0 ? ", at " + place : "")}.");
             return;
         }
         if (!target.CurrentMapId.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase))
         {
-            Say(reply, $"{target.Username} is on the map {target.CurrentMapId}.");
+            Say(reply, $"{target.Username} is on the map {_maps.DisplayName(target.CurrentMapId)}.");
             return;
         }
         string relative = RelativeTo(session, target);
@@ -2481,23 +2481,27 @@ public partial class CommandHandler
     private void HandleJoin(UserSession session, string[] args, Action<IMessage> reply)
     {
         var enterable = _maps.LoadedMapIds.Where(id => OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, id, session))
-                                          .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
+                                          .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).Select(_maps.DisplayName).ToList();
         if (args.Length < 1) { Say(reply, $"Usage: /join [map]. Maps: {string.Join(", ", enterable)}."); return; }
 
-        string? mapId = _maps.LoadedMapIds.FirstOrDefault(id => id.Equals(args[0], StringComparison.OrdinalIgnoreCase));
+        // A map is joined by its id or by the name it is listed under, which may be several words
+        // ("/join magnolia tx").
+        string said = string.Join(" ", args);
+        string? mapId = _maps.ResolveMapId(said) ?? _maps.ResolveMapId(args[0]);
         if (mapId == null)
         {
-            Say(reply, $"There is no map called {args[0]}. Maps: {string.Join(", ", enterable)}.");
+            Say(reply, $"There is no map called {said}. Maps: {string.Join(", ", enterable)}.");
             return;
         }
+        string named = _maps.DisplayName(mapId);
         if (!OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, mapId, session))
         {
-            Say(reply, $"{mapId} is private.");
+            Say(reply, $"{named} is private.");
             return;
         }
         if (mapId.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase) && session.Entity != Entity.Null)
         {
-            Say(reply, $"You are already on {mapId}.");
+            Say(reply, $"You are already on {named}.");
             return;
         }
         _server.MoveToMap(session, mapId, reply);

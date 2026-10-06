@@ -112,6 +112,7 @@ public class DiscoveryService
             maps.Add(new MapSummary
             {
                 Id = id,
+                Name = data?.Name ?? "",
                 OwnerId = owner,
                 IsPublic = isPublic,
                 PlayerCount = population.GetValueOrDefault(id),

@@ -47,24 +47,10 @@ OUT = next((a[len("--out="):] for a in sys.argv[1:] if a.startswith("--out=")), 
 # ── The prefabs' own dimensions, read rather than remembered ──────────────────────────────────────
 #
 # Every box below is written as the space it occupies, and the scale that produces it is worked out
-# from the prefab's collider. Hard-coding those sizes here is the standing way for a generated map to
-# drift from the prefabs it is made of.
-BASE = {}
-HINGED = set()                           # door prefabs whose leaf swings rather than slides
-for path in glob.glob(os.path.join(PREFAB_DIR, "*.json")):
-    if path.endswith("prefab-schema.json"):
-        continue
-    with open(path) as f:
-        p = json.load(f)
-    c = p.get("ColliderSize")
-    if c:
-        BASE[p["Id"]] = (c.get("X", 1.0), c.get("Y", 1.0), c.get("Z", 1.0))
-    if p.get("IsDoor") and not p.get("Slides", p.get("DoorKind") in ("auto-slide", "patio-slide", "elevator")):
-        HINGED.add(p["Id"])
-
-
-def v3(x, y, z):
-    return {"X": round(x, 4), "Y": round(y, 4), "Z": round(z, 4)}
+# from the prefab's collider (tools/mapgen.py, which tools/gen_osm.py shares): hard-coding those sizes
+# here is the standing way for a generated map to drift from the prefabs it is made of.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mapgen import BASE, HINGED, SOLID, v3, yaw  # noqa: E402
 
 
 _next_id = [1000]
@@ -123,10 +109,6 @@ def prop(prefab, x, y, z, name=None, facing=None):
         e["Name"] = name
     entities.append(e)
     return e["EntityId"]
-
-
-def yaw(radians):
-    return {"X": 0.0, "Y": round(math.sin(radians / 2), 6), "Z": 0.0, "W": round(math.cos(radians / 2), 6)}
 
 
 def region(name, x0, x1, y0, y1, z0, z1):
@@ -1974,16 +1956,10 @@ WALK_MIN = 25.0                          # a stretch shorter than this is not a 
 
 
 def _solid_boxes():
-    solid = {}
-    for path in glob.glob(os.path.join(PREFAB_DIR, "*.json")):
-        if path.endswith("prefab-schema.json"):
-            continue
-        with open(path) as f:
-            p = json.load(f)
-        # The server's rule (PrefabRepository): a prefab with a collider is solid unless it says it is
-        # not. Reading a missing IsSolid as false put the Main Street walks through the tunnel's
-        # concrete sides, where a player outside heard them walking inside the wall.
-        solid[p["Id"]] = "ColliderSize" in p and bool(p.get("IsSolid", True))
+    # The server's rule (PrefabRepository, mapgen.SOLID): a prefab with a collider is solid unless it
+    # says it is not. Reading a missing IsSolid as false put the Main Street walks through the tunnel's
+    # concrete sides, where a player outside heard them walking inside the wall.
+    solid = SOLID
     out = []
     for e in entities:
         pid = e.get("PrefabId")
