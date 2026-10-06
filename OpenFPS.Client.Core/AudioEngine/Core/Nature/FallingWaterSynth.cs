@@ -88,7 +88,7 @@ public sealed class FallingWaterSynth
     /// <summary>An impact's spike into a POOL, Pa at a metre in air, for a 1 mm radius drop at 5 m/s.
     /// Its energy goes as m v³ (Franz 1959) and a drop's rise is fixed, so its peak goes as (r v)^1.5.
     ///
-    /// Round 1 of the texture fit (2026-10-06) took it from 0.0142 to this. Off a pool, most of what
+    /// Round 1 of the texture fit (2026-10-06) took it from 0.0142 to this (-13.5 dB), fitted with the splash. Off a pool, most of what
     /// a drop's blow does goes into the crater, and in air the impact is quiet beside the bubble it
     /// may trap: Phillips, Agarwal and Jordan (2018, Sci. Rep. 8, 9515), filming a drip into a pool
     /// with the sound, found the airborne "plink" made by the trapped bubble driving the surface, not
@@ -96,7 +96,7 @@ public sealed class FallingWaterSynth
     /// fountain's top octaves and summed to Gaussian noise; the recordings' top end comes in loud
     /// moments (the splashes). A drop on stone has no crater to take its blow, and its click is
     /// <see cref="HardImpactPascals"/>, unchanged.</summary>
-    public const float ImpactPascals = 0.0071f;
+    public const float ImpactPascals = 0.003f;
 
     /// <summary>A drop's click on a HARD surface (stone, a road, a roof's top face), Pa at a metre for
     /// 1 mm at 5 m/s: it stops in its own length on the film and splashes flat. 1.2 times the pool's
@@ -111,7 +111,7 @@ public sealed class FallingWaterSynth
     /// earlier fit. For scale: a drop's whole impact radiates 10⁻⁶ to 10⁻⁵ of its kinetic energy in
     /// water (Franz 1959; Nystuen 1986), and only a small part of that crosses into air.
     /// </summary>
-    public const float SplashEfficiency = 5.0e-6f;
+    public const float SplashEfficiency = 3.0e-5f;
 
     /// <summary>How fast a drop's impact force arrives, s: the first contact, microseconds.</summary>
     private const float ImpactRise = 16e-6f;
@@ -146,15 +146,22 @@ public sealed class FallingWaterSynth
     public const float RockCrownShare = 0.8f;
 
     /// <summary>How long a crown sheds its spray, in units of the lump's r / v, plus a floor: the rim
-    /// breaks up while the crown rises, a few r / v (Deegan et al. 2008), so 2-5 ms for a fountain's
-    /// lumps, as the recordings' loud moments last.</summary>
-    private const float SplashDurations = 3f;
-    private const float SplashFloorSeconds = 0.0008f;
+    /// breaks up while the crown rises, a couple of r / v (Deegan et al. 2008): 1.5-4 ms decay for a
+    /// fountain's lumps, as the recordings' loud moments last (3-4 ms wide at half height). Fitted
+    /// within that: 3 r / v and a 0.8 ms floor made the 3-6 kHz envelopes too smooth.</summary>
+    private const float SplashDurations = 1.5f;
+    private const float SplashFloorSeconds = 0.0004f;
 
-    /// <summary>The splash's band, Hz. Its secondary droplets are 0.05-0.5 mm (a tenth of the crown's
-    /// thickness and less), striking in 10-250 µs and trapping bubbles of a few tenths of a millimetre:
-    /// energy from about a kilohertz to the top of hearing.</summary>
-    private const float SplashLowHz = 1000f, SplashHighHz = 16000f;
+    /// <summary>The splash band's middle for a 5 mm lump at 4 m/s, Hz (<see cref="SplashCentreHz"/>):
+    /// secondary droplets of 0.05-0.5 mm striking in 10-250 µs and trapping bubbles of a few tenths of
+    /// a millimetre. FITTED with the efficiency to the recordings' 4-12 kHz balance.</summary>
+    private const float SplashCentreReferenceHz = 2700f;
+
+    /// <summary>How far one splash's band middle scatters about that, the standard deviation of its
+    /// natural log, and how far its band reaches either side of its middle (a factor; 12 dB an octave
+    /// past it). Fitted: one band of 1-16 kHz for every splash moved the bands an octave apart together
+    /// (envelope correlation 0.35 against the recordings' 0.08-0.24).</summary>
+    private const float SplashScatter = 0.7f, SplashBandHalfWidth = 1.6f;
 
     /// <summary>ρ c of air, Pa s/m: the impedance a radiated power meets.</summary>
     private const float RhoC = 413f;
@@ -183,8 +190,12 @@ public sealed class FallingWaterSynth
     /// <summary>The chance a large drop's crater also sheds a weaker second bubble.</summary>
     private const float SecondaryShare = 0.3f;
 
-    /// <summary>The share of a coherent lump's craters that trap one.</summary>
-    private const float ChunkShare = 0.6f;
+    /// <summary>The share of a coherent lump's craters that trap one. Fitted, 2026-10-06: the lumps are
+    /// now drawn from a broad law (some three times the mean), and a trapped bubble goes up to the lump's
+    /// own size, so at the 0.6 that suited lumps all about one size the big ones' "glugs" stood 250-500 Hz
+    /// 5-8 dB over every recorded fountain. A lump lands in the aerated froth of the ones before it,
+    /// and a crater in bubbly water closes on a cloud more often than on one big bubble.</summary>
+    private const float ChunkShare = 0.2f;
 
     /// <summary>How much air a plunge drives under, per litre of water, at 3 m/s over the 1 m/s
     /// below which a falling sheet enters without entraining: about one per cent, fitted with the
@@ -285,9 +296,9 @@ public sealed class FallingWaterSynth
             float q = f.FlowLitresPerSecond * 1e-3f;                                  // m^3/s
             float meanVolume = 4f / 3f * MathF.PI * MeanCube(s.DropMean, MinDropRadius, s.DropMax, s.Order);
             s.DropRate = f.DropShare * q / meanVolume;
-            // The lumps: a gamma law of their own order about the stated size, up to twice it.
+            // The lumps: a gamma law of their own order about the stated size, up to three times it.
             s.ChunkMean = f.ChunkRadiusMm * 1e-3f * FitTune.T("lscale", 1f);
-            s.ChunkMax = FitTune.T("max", 2f) * s.ChunkMean;
+            s.ChunkMax = FitTune.T("max", 3f) * s.ChunkMean;
             s.ChunkMeanVolume = 4f / 3f * MathF.PI * MeanCube(s.ChunkMean, MinDropRadius, s.ChunkMax, s.LumpOrder);
             s.ChunkRate = (1f - f.DropShare) * q / s.ChunkMeanVolume;
             s.ChunkSpeed = MathF.Sqrt(2f * 9.81f * f.FallMetres);
@@ -426,6 +437,18 @@ public sealed class FallingWaterSynth
         float t = rise / 3f + decay / 2f;
         return (rise, decay, MathF.Sqrt(energy * RhoC / (2f * MathF.PI * t)));
     }
+
+    /// <summary>The middle of a splash's band, Hz. The crown's rim sheds droplets about as thick as the
+    /// rim, which thins as the impact's Reynolds number grows (r_s ∝ r Re^−½; Thoroddsen 2002, Deegan et
+    /// al. 2008), so the droplets' strikes and bubbles sit higher for a faster lump and lower for a
+    /// bigger one: f ∝ v / r_s ∝ v^1.5 r^−0.5. Which droplets a given crown throws varies from splash
+    /// to splash (the scatter drawn round this), so each splash lights its own octave or two, not all of
+    /// them at once.</summary>
+    public static float SplashCentreHz(float radius, float speed)
+        => FitTune.T("sfc", SplashCentreReferenceHz) * MathF.Pow(MathF.Max(0.3f, speed) / 4f, 1.5f) * MathF.Pow(radius / 5e-3f, -0.5f);
+
+    private static float Gauss(EventSum s)
+        => MathF.Sqrt(-2f * MathF.Log(MathF.Max(1e-7f, s.Uniform()))) * MathF.Cos(MathF.Tau * s.Uniform());
 
     /// <summary>Things that move on the scale of seconds: the jet's top breaking up now more, now
     /// less; the water being turned on or off.</summary>
@@ -594,7 +617,9 @@ public sealed class FallingWaterSynth
 
             // Its crown, or on stone its lamella, tearing into spray: every lump, as loud as it is big.
             var (sr, sd, sp) = Splash(r, v, crown);
-            sum.Burst(at, sr, sd, sp * weight * SplashPart, SplashLowHz, SplashHighHz);
+            float fc = SplashCentreHz(r, v) * MathF.Exp(FitTune.T("sjit", SplashScatter) * Gauss(sum));
+            float spread = FitTune.T("sbw", SplashBandHalfWidth);
+            sum.Burst(at, sr, sd, sp * weight * SplashPart, fc / spread, MathF.Min(fc * spread, 0.45f * _rate), steep: true);
 
             if (f.Rock) continue;
 

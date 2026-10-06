@@ -217,7 +217,10 @@ public sealed class EventSum
     /// <paramref name="rise"/> and decays with time constant <paramref name="decay"/>; its rms at the
     /// top is <paramref name="pascals"/>.
     /// </summary>
-    public void Burst(int offset, float rise, float decay, float pascals, float lowHz, float highHz)
+    /// <param name="steep">Two poles at the bottom as well as the top: a band that falls 12 dB an
+    /// octave either side, for a burst that should light its own octave and not the ones below it (a
+    /// splash's spray, whose droplets are of one size; see FallingWaterSynth.SplashCentreHz).</param>
+    public void Burst(int offset, float rise, float decay, float pascals, float lowHz, float highHz, bool steep = false)
     {
         if (pascals <= 0f) return;
         float a1 = MathF.Exp(-MathF.Tau * MathF.Min(highHz, 0.45f * _rate) / _rate);
@@ -228,18 +231,26 @@ public sealed class EventSum
         float gain = pascals / MathF.Sqrt(band) * 1.7320508f;
         int length = Math.Min(Horizon - offset, (int)((rise + 6f * decay) * _rate));
         long at = _now + offset;
-        float lp0 = 0f, lp = 0f, hp = 0f;
+        float lp0 = 0f, lp = 0f, hp = 0f, hp2 = 0f;
         float riseSamples = MathF.Max(1f, rise * _rate);
         float down = MathF.Exp(-1f / MathF.Max(1f, decay * _rate));
         float env = 0f;
+        // The second high-pass pole takes a little of the band's own power: give it back.
+        if (steep) gain *= 1.2f;
         for (int i = 0; i < length; i++)
         {
             float x = Signed();
             lp0 = (1f - a1) * x + a1 * lp0;
             lp = (1f - a1) * lp0 + a1 * lp;
             hp = (1f - a2) * lp + a2 * hp;
+            float y = lp - hp;
+            if (steep)
+            {
+                hp2 = (1f - a2) * y + a2 * hp2;
+                y -= hp2;
+            }
             env = i < riseSamples ? i / riseSamples : (i == (int)riseSamples ? 1f : env * down);
-            _ring[(int)((at + i) & Mask)] += gain * env * (lp - hp);
+            _ring[(int)((at + i) & Mask)] += gain * env * y;
         }
     }
 
