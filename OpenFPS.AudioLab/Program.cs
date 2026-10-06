@@ -140,6 +140,7 @@ string[] usage =
     "  --sim-reverbfield                             the simulator's reverb against enclosure across places",
     "  --scene-cost [map=city]                       what rebuilding the Steam Audio scenes costs",
     "  --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium]  a streamed map walked: tile costs, worker gaps",
+    "  --geometry [map=magnolia_tx] [terrain=5] [sa=1] the world as triangles: BVH and Steam Audio costs (docs/GEOMETRY.md)",
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
     "  --ambisonic                                   ambisonic encode and decode come out of the right ear",
     "  --dsp-order                                   where HEAD and TAIL put a unit in a channel's chain",
@@ -716,6 +717,11 @@ if (args.Contains("--stream-walk"))
 {
     // --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [heading=east]: tiles streamed as you move.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.StreamWalkSpike.Run(args));
+}
+if (args.Contains("--geometry"))
+{
+    // --geometry [map=magnolia_tx] [terrain=5] [sa=1]: the world as triangles (docs/GEOMETRY.md).
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GeometrySpike.Run(args));
 }
 if (args.Contains("--scene-cost"))
 {

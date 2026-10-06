@@ -1,0 +1,895 @@
+# Geometry beyond boxes
+
+The plan for a world made of triangles: every surface a triangle mesh with a material, terrain from
+real elevation, editable ground as a sparse voxel layer meshed to the same triangles, and every
+consumer (movement, ground, rays, bullets, the hand-built acoustics, Steam Audio, rooms) reading one
+triangle world. Written 2026-10-06 against main at 5454db81, with the world streaming plan
+(`docs/WORLD_STREAMING.md` on the streaming branch) in mind: geometry lives in 250 m tiles from the
+start.
+
+Agreed direction (Cody, 2026-10-06): a hybrid. Triangle meshes are the ground truth for every
+surface: buildings, terrain, ramps, stairs, round shapes, kerbs, vehicles. A sparse voxel layer exists
+only for ground that can be edited (digging, building underground, layered earth), and it is meshed
+to triangles so physics and acoustics still see one triangle world. The acoustic voxel grid
+(`AcousticMap`, `SparseAcousticOctree`, `AcousticVolumeGenerator`) becomes something derived from
+the triangles, not authored.
+
+Measurements are from the development machine (24 threads, shared with other work: load average 7
+to 8 during the runs). The instruments are committed: `python3 tools/geometry_estimate.py` and
+AudioLab `--geometry map=<id> [terrain=<metres>]`.
+
+## Contents
+
+1. What exists today
+2. The representation
+3. Every consumer and how it changes
+4. Formats: maps, prefabs, shapes, import, wire
+5. Real places: elevation, footprints, roads, bridges
+6. Performance: measured
+7. Stages, effort and risks
+8. Decisions for Cody
+
+---
+
+## 1. What exists today
+
+Every entity is a box that can be rotated (`ColliderComponent { Shape, Size, IsSolid }`). The other
+shapes in `ColliderShape` (Sphere, Cylinder, Cone, Polygon) are used by nothing in any map or prefab;
+only players are cylinders, and `/spawn` can make the others. Polygon has no vertex data anywhere.
+
+Geometry is queried through at least five separate spatial indexes, each built for one job:
+
+| Index | Where | Cell | Used by |
+|---|---|---|---|
+| `SpatialGrid<T>` | Common; server and client | 10 m, 2D | movement, ground height, rays, beacons, driving aids, rain |
+| `SightGrid` | Client | 4 m, 2D walk | the scope and sight rays at 10 Hz |
+| `OpeningRoutes.SolidGrid` | Common | 4 m, 3D DDA | routes through doorways |
+| `BoxColumns` | Common | 10 m | face openings, region surveys at load |
+| `Enclosure.Nearby` | Common | none: a scan of every solid | the enclosure survey |
+
+The queries, by consumer (full list with line numbers in the appendix):
+
+- **Movement** (`SharedMovementEngine.Step`, identical on client and server): an upright cylinder
+  against each nearby box in the box's own frame (`GeometryUtils.GetCylinderAABBOverlap`), three
+  depenetration passes, step-up by `StepHeight` 0.4 m, a guard against being pushed deeper, then the
+  map-bounds clamp.
+- **Ground height** (`PhysicsUtils.GetGroundHeight`): five points (centre and four at the body's
+  radius) tested against each box's footprint with its height stretched to 40 km; the highest top
+  within 0.4 m above the feet wins. It cannot see a slope: a box tilted about X or Z still answers
+  with the top of its axis-aligned extent. About twenty callers (movement per input, driving per
+  tick, footstep material, bullets' strikes, bodies, drops, spawns, teleports, Alex's routes).
+- **Rays** (`SpatialService`): occlusion with per-band wall transmission (`GetOcclusionData`, five
+  rays a source through `GetMultiPointOcclusionData`), `RaycastAll` (echolocation, ground
+  reflection), `RaycastMaterial`, `CastSight` (the scope, 2 km), `RaycastSingle`.
+- **Bullets** (`CombatService.FirstHit`): every round is flown in 10 ms segments; boxes by slab test,
+  ricochet normals worked out from which local axis of the box was hit.
+- **Hand-built acoustics**: `Enclosure.Look` (192 rays, a bounce each, openness probes),
+  `EarlyReflections.Find` and `ImageSource` (box faces as rectangles), `Diffraction.PathDifferenceAroundBox`,
+  `TrackClearance`, `OpeningRoutes`, `FaceOpenings`, `CompositeAcoustics.SurveyBox`.
+- **Steam Audio** (`SteamAudioScene.BoxesFromWorld`): every solid, static, non-emitting box becomes
+  8 vertices and 12 triangles in ONE static mesh, with a material per (name, transmission). A second
+  scene without the open ground is built for the listener's trace. A door that moves near the
+  listener rebuilds both in the background and swaps them in.
+- **Rooms**: regions are authored boxes (`acoustic_region`); their faces' materials are surveyed
+  from the boxes around them at load, and openings are found as gaps in the boxes round each room's
+  faces. The voxel grid (0.5 m, sparse octree) only marks which region a point is in.
+- **Wall transmission** (`WallTransmission.BandGains(material, panelSize, WallBuild)`): the panel's
+  thickness is the box's smallest dimension; leaf and stud spacing come from the prefab.
+
+Steam Audio already takes triangles. Everything else takes boxes.
+
+---
+
+## 2. The representation
+
+### 2.1 Meshes and surfaces
+
+A **mesh asset** is an immutable set of triangles in its own local frame:
+
+- vertices: `float3`, local metres;
+- triangles: three `int` indices;
+- a **surface index** per triangle (one byte; a mesh has at most 256 surfaces);
+- a **surface table**: for each surface,
+  - `Material` (an `AcousticRegistry` name, as today),
+  - `Construction`: what `WallTransmission` needs and a triangle does not carry: nominal panel
+    thickness, `LeafMetres`, `StudSpacingMetres` (the prefab's `WallBuild`, moved to where it belongs),
+  - `Layers`: which queries see it (movement, bullets, sight, acoustics, ground). Default all. A
+    stair can be stepped treads for sound and footsteps but a smooth ramp for movement, if wanted;
+    a chain-link fence blocks movement but hardly any sound; glass blocks movement and bullets
+    differently from sight,
+  - `Flags`: open ground (for the listener scene), roof, glass, porous volume (foliage), walkable;
+- a **closed** flag: whether the mesh is a closed solid (watertight, outward normals). A ray through a
+  closed mesh has an entry and an exit, and the chord between them is the panel thickness the
+  transmission model needs, as round shapes already do today in `GetOcclusionData`.
+
+A mesh is identified by the hash of its contents (vertices, indices, surfaces). The same hash means
+the same mesh on every machine, which is what lets a client cache meshes on disk and skip
+downloading them.
+
+**Instancing.** A prefab names a mesh; every placement is an instance (mesh id, position, rotation,
+scale). How instances are stored for queries is a separate decision from how they are authored:
+
+- **Static instances are flattened** into their tile's acceleration structure at tile load: their
+  triangles are transformed into the tile's frame and built into one BVH. Traversal is fastest and
+  the 1,145 tree crowns of Magnolia do not each cost a level of indirection.
+- **Moving instances stay instances**: door leaves, vehicles, bodies, lifts, anything with a
+  transform that changes. Each is a reference to its mesh's own BVH plus a transform, and moving it
+  costs nothing but writing the transform.
+
+**Boxes become a mesh shape.** `Box` is the first entry in the shape library (2.6): a closed mesh of
+12 triangles with one surface, generated from `Size`. Nothing in any map changes. The box's surface
+gets its `Construction` from the prefab exactly as `WallBuild` is read today, so the transmission
+through a converted wall is the same number it is now.
+
+**Precision.** Tile meshes are stored in tile-local coordinates (relative to the tile's corner), and
+the tile carries its origin. Float32 then holds sub-millimetre detail within a tile wherever the tile
+is in the world, which is what the streaming plan's frames (rebasing at 8 km) need: a rebase only
+changes tile origins, never vertex data.
+
+### 2.2 The acceleration structure: a two-level BVH
+
+One structure answers every geometric question, on the server and the client:
+
+- **Bottom level (BLAS):** a BVH over a triangle set: one per loaded tile's static geometry, one per
+  mesh asset used by a moving instance, one per voxel chunk (2.5).
+- **Top level (TLAS):** a BVH over instances (BLAS + transform + world bounds). Rebuilt whenever an
+  instance moves or a tile or chunk is swapped. With a few hundred to a few thousand instances this is
+  well under a millisecond; it is a refit when nothing was added or removed.
+
+Build: binned surface area heuristic (12 bins, leaves of up to 4 triangles), nodes flattened into one
+array of 32-byte structs (bounds and either the left child or the first triangle and count),
+triangles stored in leaf order as (v0, e1, e2, surface, owner) for Moller-Trumbore. This is what
+the spike builds; its numbers are in section 6.
+
+Queries, all allocation-free, all thread-safe for readers:
+
+| Query | Returns | Replaces |
+|---|---|---|
+| `Closest(ray, maxT, layers)` | distance, triangle, normal, surface, owning entity | `RaycastMaterial`, `RaycastSingle`, `CastSight`, bullet segments |
+| `Any(segment, layers)` | blocked or not | occlusion yes/no, routes through openings |
+| `All(segment, layers)` | every crossing in order (entry and exit, surface) | `GetOcclusionData`'s walk through walls in a row |
+| `Overlap(capsule or box, layers)` | the triangles touching it, with closest points | movement, `CheckCollision`, standing room |
+| `Ground(x, z, fromY, radius)` | height, normal, surface | `GetGroundHeight` |
+
+**Each triangle knows its owner.** The entity it belongs to is stored with it (4 bytes), so "what is
+this" (the scope's description, a door's name, the beacon on a thing) is answered from the hit, as it
+is from the box today.
+
+**Own code, not a library.** Considered:
+
+| Option | Licence | Verdict |
+|---|---|---|
+| Our own BVH in Common (as the spike) | ours | **recommended**: about 600 lines, no dependencies, deterministic, the same code on server and client, measured fast enough (section 6) |
+| BepuPhysics v2 (C#) | Apache-2.0 | excellent mesh queries and sweeps, but a physics engine to carry for its queries; its wide SIMD (`Vector<T>`) changes width with the CPU, so a client and server on different CPUs can disagree in the last bit, and movement prediction needs them to agree |
+| Jolt Physics through JoltPhysicsSharp | MIT | has a capsule character controller with stairs, slopes and sticking to the floor built in (`CharacterVirtual`), and cross-platform determinism as a build option. Native libraries on every platform. Worth a spike if our own capsule movement fights us; not the first choice, because the movement engine carries a long list of fixes Cody has heard (kerbs, ceilings, pushes, roof edges) that would all have to be found again |
+| Embree directly | Apache-2.0 | fastest tracer there is, but native, and the server would need it too. Steam Audio already carries it for its own use (2.4) |
+| DotRecast (Recast/Detour in C#) | MIT | not a BVH; the navmesh library for walkers later (3.11) |
+
+### 2.3 Terrain: a heightfield tile
+
+Terrain is a regular grid of heights per tile, a specialised mesh:
+
+- **Storage:** heights in centimetres (16-bit, relative to the tile's base height) at a fixed
+  spacing, plus a surface id per cell (grass, dirt, gravel, asphalt under a road, water edge). At 2 m
+  a 250 m tile is 126 x 126 posts: 32 KB of heights and 16 KB of surfaces.
+- **Queries do not use the BVH.** Ground height is a lookup and a bilinear (triangle) interpolation:
+  O(1). Rays march the grid cell by cell, skipping blocks with a min/max quadtree of the heights.
+  This is what keeps terrain cheap: the spike shows that putting a 2 m terrain into the triangle BVH
+  costs 2.4 s to build and 308 MB for one 3 km map (section 6); as a heightfield it is 4.5 MB for the
+  whole map and nothing to build.
+- **Holes:** a cell can be marked empty, for tunnels, culverts, cellars and dug ground (2.5); the
+  geometry there comes from meshes or the voxel layer.
+- **Steam Audio** gets the heightfield as triangles (two per cell), because Steam Audio needs
+  triangles. At 2 m that is 31,250 a tile; with Embree that sub-scene builds in about 13 ms
+  (section 6).
+- **Detail:** the full-detail ring gets the fine grid; the coarse ring (WORLD_STREAMING's levels)
+  gets the same tile at 8 m (2,000 triangles), which is plenty for a hill 600 m away.
+
+### 2.4 Steam Audio: Embree, one instanced sub-scene per tile, one per moving thing
+
+Measured in section 6, and the results settle the design:
+
+- Steam Audio's **default** ray tracer is slow to build (351 ms for Magnolia's 277,000 triangles, 12
+  s for 5 million) and **does not cope with instancing**: with one instanced sub-scene per tile, a
+  reflection trace took 24 times as long (1,200 ms against 50 ms), because it walks the instances one
+  by one.
+- **Embree** (bundled in the Steam Audio libraries already shipped for Linux and Windows x64; the
+  log says "Initialized Embree v4.04.00") builds the same scene in about 110 ms, traces in 29 ms
+  instead of 50, and handles instancing properly: with a sub-scene per tile the trace is 37 to 60 ms,
+  a tile is swapped in or out in under a millisecond, and a moving 1,000-triangle body costs 0.25 to
+  1.2 ms a commit.
+
+So the scene becomes:
+
+- the simulator and every scene use `IPL_SCENETYPE_EMBREE` with one Embree device per context;
+- **one sub-scene per loaded tile** (its static meshes flattened), instanced into the top scene;
+  loading or dropping a tile is building one small sub-scene on a background thread, then an
+  instance add or remove and a commit;
+- **two sub-scenes per tile**, "open ground" and "everything else", so the listener's ground-free
+  scene (`WithoutOpenGround`) is a second top scene that instances only the second kind. Sub-scenes
+  are shared between top scenes, so this costs no second copy of the geometry;
+- **one sub-scene per door leaf**, instanced: a door that swings is a transform update and a commit
+  (under a millisecond) instead of rebuilding the whole scene twice in the background (0.8 to 1.8 s
+  on the streaming branch, and before that a frozen second of sound). This alone retires the door
+  rebuild machinery (`NearDoorMoved`, `SwapInDoorBuild`, the five-second release);
+- **one sub-scene per vehicle body** in stage 6, its transform updated with the body;
+- commits are batched once per simulation step on the acoustic worker, between simulation runs
+  (Steam Audio forbids a commit during one).
+
+Embree's limits: Steam Audio documents its Embree option for x86 and x64 only (no ARM, so no Apple Silicon or ARM Linux client
+without the default tracer as a fallback). The fallback for those is the default tracer with one
+static mesh per tile in one scene (measured: a tile in 14 to 53 ms, trace 2 to 3 times the flat
+scene), never the default tracer with instancing.
+
+A **custom scene** (`IPL_SCENETYPE_CUSTOM`, Steam Audio calling back into our BVH) would mean one
+structure for both, but Embree traces about twice as fast as our managed BVH does and costs us
+nothing to keep. Not recommended.
+
+### 2.5 The voxel ground layer
+
+For ground that can be dug, built under or layered. Untouched ground stays heightfield; the voxel
+layer exists only where ground has been edited or was made to be edited.
+
+**Representation.**
+
+- **Resolution: 0.5 m** (recommended; decision 3). Each voxel holds a signed density (8 bits) and a
+  material (8 bits: a stratum or a placed fill). The surface lies where the density crosses zero,
+  interpolated, so a 0.5 m grid gives a smooth surface placed to a few centimetres, not 0.5 m steps.
+  0.25 m is eight times the memory and meshing for detail a spade does not need.
+- **Chunks** of 16 x 16 x 16 voxels (8 m cubes), sparse: a hash map from chunk key to chunk, held per
+  250 m tile. A chunk that is all solid or all air is one value. A chunk is created the first time
+  something edits inside it, initialised from the heightfield and the strata ("copy on dig"). A dug
+  garden is a handful of chunks; a 3 km map nobody has dug is none.
+- **Strata:** each place has a column profile, depths and materials from the surface down (topsoil
+  0.3 m, subsoil to 2 m, then clay or sand, weathered rock, bedrock), varied smoothly by position.
+  From real soil data where it exists (USDA SSURGO soil horizons are public domain; SoilGrids gives
+  depth to bedrock under CC BY 4.0), or from a place's profile in place.json (decision 4). New
+  acoustic materials: Clay, Sand, Rock, Mud (the registry has Dirt, Gravel, Concrete).
+- **Depth limit:** voxels exist from the surface down to a world floor (for example 30 m) per place;
+  below it is bedrock that cannot be dug.
+
+**Meshing: surface nets** (recommended).
+
+| Method | Triangles | Sharp edges | Seams between chunks | Verdict |
+|---|---|---|---|---|
+| Marching cubes | 2 to 5 per surface cell, slivers | no | needs a shared boundary layer | works, wasteful |
+| **Surface nets** | about 2 per surface cell, well shaped | no | one voxel of overlap | **recommended for earth** |
+| Dual contouring | about 2 per surface cell | yes, from normals (QEF solve) | as surface nets, plus care | only if dug faces must be sharp |
+
+Earth is not sharp. Anything that must be sharp underground (a cellar wall, a tunnel lining, a
+concrete footing) is a placed mesh from the shape library that carves the voxels it stands in, so the
+sharp faces come from meshes and the voxels stay soft. That keeps the voxel layer simple.
+
+**Meeting the heightfield.** A tile's terrain cells that are covered by voxel chunks are marked as
+holes, and the chunks' surface takes over. Where an edited chunk meets untouched heightfield, the
+chunk's boundary vertices are placed from the heightfield itself (the density there was made from
+it), and a short skirt below the seam closes any crack a ray could leak through.
+
+**Edits.**
+
+- An edit is an operation: a brush (sphere, box, or a mesh such as a spade's bite), add or remove, a
+  material. The server applies it, then sends the operation (a few dozen bytes) to every client that
+  has the tile. Each side applies it and re-meshes the affected chunks with the same code, so meshes
+  are never sent.
+- Per edited chunk: surface nets on 16^3 (well under a millisecond), the chunk's BLAS rebuilt (a few
+  thousand triangles: fractions of a millisecond), the TLAS refit, the chunk's Steam Audio sub-scene
+  rebuilt and swapped (a few milliseconds with Embree, on the acoustic worker, debounced so a burst of
+  digging is one rebuild).
+- The acoustic voxel grid (2.7) re-floods only the edited chunks and their neighbours: a cave dug
+  into a hillside becomes a room because it is enclosed, with nothing authored.
+- **Persistence:** per tile, the chunk data (run-length compressed) plus an edit log since the last
+  snapshot, stored beside the tile as the streaming plan stores runtime state.
+- **Not in scope at first:** collapse and structural support (an overhang that should fall), water
+  flowing into holes. Both are possible later on the same data.
+
+### 2.6 The shape library
+
+Parametric shapes, generated from a few numbers by the same code on server and client, so a map
+sends the numbers and never the triangles:
+
+| Shape | Parameters | Notes |
+|---|---|---|
+| box | size | today's every entity |
+| wedge / ramp | size, which edge is low | the kerb ramp, a loading ramp |
+| stairs | width, rise, run, steps, landing | real treads; optional smooth-ramp movement layer |
+| cylinder, cone, sphere, capsule | radius, height, segments | columns, tanks, bollards, trunks |
+| arch | span, rise, thickness, depth | bridges, doorways |
+| extruded polygon | outline (2D), height, holes | building footprints, kerbs along a curve, fences |
+| wall with openings | outline segment, height, thickness, openings | building walls with doors and windows cut |
+| roof | outline, pitch, kind (flat, gable, hip from the straight skeleton) | |
+| lathe | profile, segments | round things: a fountain basin, a bell |
+| swept profile | profile along a 3D polyline | kerbs, gutters, rails, handrails, road edges |
+| terrain patch | a small heightfield | a mound, a berm |
+| mesh | an imported mesh asset by hash | anything else (4.3) |
+
+Segment counts for round shapes default to what sound can tell apart: a column of 0.3 m radius at 12
+sides; a tank of 5 m at 32. Small facets scatter rather than mirror (3.4), so more sides buy
+nothing audible.
+
+### 2.7 Rooms and the acoustic voxel grid, derived from triangles
+
+The acoustic map stays a voxel grid of regions, but it is computed, not drawn:
+
+1. **Voxelise the solids** of the loaded tiles at 0.5 m (a conservative triangle-box overlap per
+   triangle, per tile, on a background thread).
+2. **Rooms are seeds.** A room is authored (or generated) as a point and a name ("living room") and,
+   for a while, its old box as a hint. A flood fill from the seed through empty voxels, stopped by
+   solid voxels and by door leaves and portals, gives the room's real shape: an L, a round tower, a
+   sloped attic, a dug cave.
+3. **Openings** are where a room's flood touches another room or the outside through a door or a
+   gap: the voxel faces on the boundary, grouped by plane. `FaceOpenings` today finds the same thing
+   from box faces; this finds it for any shape.
+4. **Room measurements** come from the geometry, as Cody's rule already requires ("regions measure
+   themselves"): volume is a count of voxels; surface area and the materials of each face from the
+   triangles lining the flood (or from the enclosure survey from inside, which already integrates
+   area and absorption from rays).
+
+Seeds with no enclosure (yards, streets) never flood: they are named places, as they are now.
+
+---
+
+## 3. Every consumer and how it changes
+
+### 3.1 Movement and collision (players)
+
+The structure of `SharedMovementEngine.Step` stays: gather what is near, collide and slide in up to
+three passes, step up, never end a step deeper in anything, clamp to the map. What changes is the
+contact:
+
+- **The body becomes a capsule** (radius 0.3 m, from 0.15 m above the feet to the head) instead of a
+  cylinder against box footprints. The near triangles come from `Overlap`; for each, the closest
+  points between the capsule's axis and the triangle give a depth and a normal.
+- **Contacts are classified by their normal**: a floor (the normal within the walkable slope of up, 45
+  degrees by default), a wall, a ceiling. Walls push out horizontally only, so a steep bank slides you
+  down rather than lifting you. Ceilings push down only when airborne, as now ("a head in a roof
+  slab"). Floors are left to the ground probe.
+- **Step-up** stays as it is: blocked by a wall while grounded, try the same move lifted by
+  `StepHeight`; if that is clear, take it and then settle to the ground. Stairs with real treads are
+  climbed by step-up (each riser 0.15 to 0.2 m against 0.4 m).
+- **Determinism:** client and server run the same code over the same triangles, built in the same
+  order from the same data. Scalar `System.Numerics` arithmetic on x64 gives the same bits on both;
+  that is the reason for our own code (2.2).
+- The fixes in today's engine are kept as cases in the tests, re-run against the triangle path: the
+  kerb that landed you, the roof slab that pushed you through a wall, the 489 m landing, the
+  push-deeper guard on Kestrel House.
+
+### 3.2 Slopes, ramps and stairs
+
+- Ground is a surface with a normal (3.3). On a slope the body stays on it while the slope is
+  walkable; walking speed is scaled by the grade (slower up, a little faster down) and the step
+  length with it, which the gait model already reads from speed.
+- Above the walkable slope the ground is a wall: you slide down it.
+- **Stairs:** real treads by default. Footsteps then fall one per tread at the stairs' rhythm, which
+  is how stairs sound. A stair can also carry a smooth movement layer (a hidden ramp) if real treads
+  make the body judder; decision 9.
+- Landing and falling keep today's logic, with the floor under the body found by the probe instead of
+  the highest box top.
+
+### 3.3 Ground height
+
+`Ground(x, z, fromY, radius)`: the same five points as today (centre and four at the body's radius),
+each a downward ray from `fromY + StepHeight` against the BVH and against the terrain heightfield;
+the highest walkable hit wins, and it returns the height, the normal and the surface (so the
+footstep material). On terrain alone it is a lookup.
+
+Callers keep their signature at first (`GetGroundHeight` returns a height and a material); the
+normal is added for movement, vehicles and the gait. The memo on the server stays, keyed on a
+geometry version per tile instead of the grid's `StaticVersion`.
+
+### 3.4 The hand-built acoustics
+
+| Model | Today | Becomes |
+|---|---|---|
+| `Enclosure.Look` | 192 rays against every box within 120 m (a scan of all), openness probes, a bounce each | the same rays through the BVH; measured 14 to 21 times faster (section 6) |
+| `EarlyReflections.Find`, `ImageSource` | box faces as rectangles | **facets**: coplanar connected triangles merged into planar polygons at mesh build, each with area, normal, material and scattering. A box has 6, as now. A facet smaller than the wavelengths that matter (a 12-sided column's faces) is a scatterer, not a mirror, which is what it physically is |
+| `Diffraction` | path difference round a box | over the top: the vertical profile along the path, sampled by downward rays through the BVH and the heightfield, gives the highest edge (this is how ISO 9613-2 treats terrain and barriers, and it is the right model for hills); round the ends: the same horizontally. The box version stays for boxes until stage 4 |
+| `TrackClearance` | track points against solid boxes | a swept box along the track through `Overlap` |
+| `OpeningRoutes` | segments through a 4 m 3D grid of boxes | `Any` through the BVH; the route search itself is unchanged |
+| `FaceOpenings`, `CompositeAcoustics.SurveyBox` | gaps in boxes round a room | the derived room grid (2.7) |
+| `WallTransmission` | panel = the box's smallest side | panel thickness = the chord between entry and exit of a closed mesh, or the surface's nominal thickness; leaf and studs from the surface's `Construction` |
+| `VehicleShadow` | Maekawa over a moving body's box | unchanged until stage 6 |
+
+### 3.5 Raycasts, occlusion and line of sight (`SpatialService`)
+
+Each method keeps its signature and answers from the BVH:
+
+- `GetOcclusionData`: `All` along the segment returns each wall entered and left, with its surface;
+  band gains multiply as now. Walls in a row, hollow shells (entry and exit of the same closed mesh)
+  and round things (the chord) all come out of one code path.
+- `RaycastAll`, `RaycastMaterial`, `RaycastSingle`, `CastSight`: `Closest` with the right layers
+  (glass seen through by the sight layer, as `glassBlocks` does now).
+- `GetRegionAt`: the derived room grid, unchanged in use.
+- The grids (`SpatialGrid` for statics, `SightGrid`, `SolidGrid`, `BoxColumns`, `Enclosure.Nearby`)
+  all go. Dynamic things go into the TLAS as instances each tick instead of into the dynamic grid.
+
+### 3.6 Bullets and ricochet
+
+- `FirstHit` is `Closest` along the 10 ms segment with the bullet layer; people stay moving cylinders
+  (`ExternalBallistics.SegmentHitsBody`) because they are rewound by velocity.
+- Ricochet takes the triangle's normal directly. Today's `Face` guesses it from the largest local
+  axis of the box, which is wrong near edges and on anything not a box.
+- Penetration through a closed mesh reads the chord, the same as transmission.
+- The strike's sound reads the surface (material) from the hit triangle.
+
+### 3.7 The scope
+
+`InView`, `Describe`, `Range` use `CastSight` and keep working. `StandsOnRoof` matches "roof" in an
+entity's name today; it becomes the `Roof` surface flag.
+
+### 3.8 Footsteps
+
+The ground probe returns the surface under each foot, so the footstep material is per triangle: a
+gravel strip beside a lawn, a kerb's concrete edge, a wooden stair tread. The server's
+`GetMaterialUnderPlayer` reads the same probe. Dug ground gives its stratum's material (clay, sand).
+
+### 3.9 Beacons
+
+`BeaconAids.Reaches` goes through `GetMultiPointOcclusionData` and `RaycastMaterial`, so it follows
+3.5 with no change of its own. Finding beacons near you uses the entity index (a list of things by
+tile), not the collision grid.
+
+### 3.10 Doors and openings
+
+- A door leaf is a moving instance: its own mesh (a box today, a panel with a knob later), its own
+  BLAS, a transform written by `DoorSystem`. The TLAS and the Steam Audio instance follow the
+  transform every tick it moves. No grid rebuilds, no scene rebuilds.
+- The portal and opening stay what they are: the doorway's frame and the two rooms it joins.
+
+### 3.11 Walkers, Alex, traffic and parking
+
+- Alex's pavement strips come from road data (sidewalks are part of a road's cross-section) and from
+  surfaces flagged as pavement, instead of slabs named "sidewalk". His clearance checks and his
+  waypoints' heights use `Overlap` and `Ground`.
+- Traffic follows lane lines whose heights come from the draped road (5.3), so a car climbs a hill
+  because the road does. Per-wheel physics (already merged) gets four ground rays, one per wheel,
+  each with its own height, normal and surface: pitch and roll on slopes, a wheel that drops off a
+  kerb, gravel under one side.
+- Parking spot checks become `Overlap`.
+- Walkers that leave roads (a park, a field) need a navigation mesh: walkable triangles per tile,
+  built with DotRecast (MIT) from the same triangles. Not before stage 3.
+
+### 3.12 Server surveys and composites
+
+- `SurveyRegions` at map load becomes the room flood (2.7) on the server too, so the server and client
+  agree on rooms.
+- Composites (`CompositeAcoustics`, `CompositeService`) work on their parts' bounds; a part that is a
+  mesh has bounds, so they keep working. A composite's own surface survey moves to rays through the
+  BVH in stage 4.
+- `VerifySpawnPoint`, `FindStandingRoom`, `IsSafe` and the spawning commands use `Ground` and
+  `Overlap`.
+
+---
+
+## 4. Formats
+
+### 4.1 Maps and prefabs
+
+A prefab or a map entity gets one new field, `Shape`, which is either a shape from the library with
+its parameters or a mesh asset:
+
+```json
+{ "PrefabId": "stone_stairs", "Position": {...}, "Rotation": {...},
+  "Shape": { "Kind": "stairs", "Width": 1.2, "Rise": 0.18, "Run": 0.28, "Steps": 14 } }
+
+{ "PrefabId": "fountain_basin", "Position": {...},
+  "Shape": { "Kind": "mesh", "Mesh": "b3f19c0e7d2a", "Surfaces": { "basin": "Concrete", "water": "Water" } } }
+```
+
+- No `Shape` means a box of `ColliderSize`, as now. Every existing map and prefab stays valid.
+- `ColliderSize` (scaled) stays and is filled in from the shape's local bounds when the shape has
+  them. Code not yet moved to triangles keeps seeing a box of the right size: a cylinder becomes its
+  bounding box, which is what it is treated as today anyway.
+- Surfaces are named in the shape and given materials and constructions in the prefab or the entity,
+  with the prefab's `Material` as the default for every surface.
+- Terrain is not an entity: a map (or a tile) carries a `Terrain` block (spacing, a heights file, a
+  surfaces file).
+
+### 4.2 Mesh assets on disk
+
+`OpenFPS.Server/meshes/<hash>.mesh`: the asset as MemoryPack (vertices quantised to 0.1 mm relative to
+the mesh's bounds, indices, surfaces, surface names), Brotli-compressed. A mesh is written once and
+never changed; a new version is a new hash.
+
+### 4.3 Import from glTF and OBJ
+
+An offline tool (`tools/import_mesh`, a small .NET console on SharpGLTF, MIT), never the server at run
+time:
+
+- reads glTF 2.0 (`.gltf`, `.glb`) and OBJ;
+- maps glTF materials (or OBJ groups) to surfaces by name, with a mapping file to set the acoustic
+  material and construction of each;
+- welds vertices, drops degenerate triangles, checks closure, reports the triangle count, and refuses
+  anything over the budget;
+- writes the `.mesh` and prints its hash.
+
+glTF is the format of nearly every free 3D model and of Blender's exporter, so a sighted friend could
+model a fountain or a church for a map. It also carries what a renderer would need later (normals,
+UVs, textures), which the importer keeps in a side file for a future client that draws. Decision 5.
+
+### 4.4 The wire
+
+All appended, as the positional format requires:
+
+- `ColliderShape` gains `Mesh` and `Heightfield` (new enum values at the end).
+- `ColliderComponent` gains `ShapeSpec` (the shape's kind and parameters, or a mesh hash), after
+  `IsSolid`.
+- `AcousticComponent` gains nothing: per-surface construction lives in the shape's surface table.
+- New messages (union numbers taken at implementation time; 32 to 34 and 38 to 39 are taken):
+  - `MeshAssetRequest { hashes }` and `MeshAssetBatch { assets }`: the client asks for meshes it does
+    not have cached, after a tile's definitions arrive. Packed with Brotli as definitions are.
+  - `TerrainTile { tile, level, spacing, base height, heights, surfaces, holes }`: 32 KB of heights
+    and 16 KB of surfaces raw at 2 m, a few KB packed for gentle ground. Sent with the tile.
+  - `GroundEdit { tile, chunk, brush, add or remove, material, sequence }`: one per edit.
+  - `GroundChunks { tile, chunks }`: the edited chunks of a tile, when the tile is loaded.
+- Parametric shapes travel as their parameters inside the definition: a staircase costs a few bytes
+  more than a box.
+- The client keeps a mesh cache on disk keyed by hash, beside the door render cache.
+
+### 4.5 Validation
+
+At map and prefab load (`PrefabValidator`, `MapManager`) and in the importer:
+
+- shape parameters in range (a stair's rise at most `StepHeight`, or it is reported as not climbable);
+- a closed solid really is closed (every edge shared by two triangles), with outward normals;
+  an open mesh is allowed only for surfaces marked as sheets (a fence, a canopy);
+- no degenerate or sliver triangles; no feature smaller than 1 cm;
+- every surface's material known to the registry (as now);
+- triangles per mesh and per tile within budget (decision 6);
+- solids that interpenetrate each other are reported (the speedway's track through the grandstand,
+  in general);
+- a mesh whose bounds disagree with its `ColliderSize` is rejected.
+
+---
+
+## 5. Real places
+
+### 5.1 Elevation to terrain tiles
+
+- **Data.** `elevation.json` holds 3DEP heights resampled to about 30 m (100 x 100 posts per map).
+  Magnolia's relief is 22 m, Albany's 17 m; the steepest post-to-post grade is 36 % and 25 %, both at
+  creek banks. 30 m is too coarse for a kerb or a ditch but right for the hills. The download step
+  should fetch 3DEP at 1/3 arc-second (about 10 m) everywhere, and the 1 m lidar DEM where it exists
+  (it covers most of the conterminous US; `fetch_place.py` should record which it got).
+- **Tiles.** For each 250 m tile, the DEM is resampled (bicubic) to the tile grid (2 m, decision 1)
+  and then **graded**: flattened under each building's footprint to a pad (the pad's height is the
+  ground at the footprint's front door, so a house on a slope shows a foundation on the low side),
+  shaped under roads to the road's cross-section (5.3), and under drives from the road edge to the
+  garage pad.
+- **Water.** Ponds and creeks from `water.json` cut into the terrain to a depth, with a Water surface
+  over them.
+- The generator writes tiles' terrain beside their entities; the 3 km ground slab disappears.
+
+### 5.2 Buildings from footprints
+
+- Each footprint ring (from `buildings.json`; median 4 vertices in Magnolia, 8 in Albany, up to 148)
+  becomes walls extruded along the ring itself, not a union of up to four rectangles: an L-shaped house
+  is an L, a curved wall is curved, a 148-sided Albany building has its 148 sides.
+- Walls are the shape library's wall-with-openings: front door, back door and windows cut in, with
+  their thickness and construction (brick, siding over studs).
+- Roofs: flat for flat, and for pitched the straight skeleton of the footprint (hip roofs for any
+  shape, gables for rectangles), with eaves.
+- Floors and ceilings: the footprint polygon, triangulated.
+- Interiors are the hard part. The room layouts are rectangles today. On a non-rectangular footprint
+  they go in the largest rectangles that fit, and the leftover becomes hall and closets. Room seeds
+  (2.7) mean a room's real shape is measured, so an odd-shaped leftover is still heard right.
+- Measured (section 6): the extruded shells come to 115,000 triangles for Magnolia and 212,000 for
+  Albany, against 170,000 and 245,000 for today's structure boxes. Real shapes cost no more than
+  today's rectangles.
+
+### 5.3 Roads draped on the terrain
+
+- A road's centreline gets heights from the terrain, smoothed along its length to the grade its class
+  allows (a residential street up to about 12 %, a highway 6 %), and a cross-section: crown, kerb
+  (15 cm), gutter, verge, sidewalk, as roads-as-data already describes.
+- The road surface is a swept-profile mesh along the centreline; junctions are polygons joined to the
+  roads' edges. The terrain under the road is graded to just below the road surface. Nothing draws the
+  world, so the road and the terrain need not share vertices; the road lies on graded ground and the
+  ground probe finds whichever is higher.
+- The road network's lanes get their heights from the same profile, so traffic and Alex follow it.
+- Measured: 51 km of road in Magnolia, 41 km in Albany. With both edges and both kerb lines every
+  2 m, the road and kerb meshes are about 200,000 and 160,000 triangles per map: under 2,000 for a
+  typical tile.
+
+### 5.4 Bridges, overpasses and tunnels
+
+- OpenStreetMap's `bridge=yes` with `layer` marks the segments that are bridges. A bridge is a deck
+  (swept profile) at the road's height from its ends, at least a clearance (5 m over a road, from
+  `layer` or the road it crosses) over what it spans, with parapets, and piers or abutments. The terrain
+  under it is not graded to it.
+- `tunnel=yes` and culverts: the road or stream is a mesh, and the terrain cells over its portals are
+  holes with a portal mesh; the tunnel is a room by enclosure (2.7), so its reverb is measured.
+- Rail on embankments and in cuttings: the rail profile is graded into the terrain like a road.
+
+### 5.5 Forests, water, boats
+
+- Trunks become cylinders (the shape library), crowns stay porous volumes with the Foliage material,
+  as boxes are now; a real forest's attenuation is a volume effect (ISO 9613 foliage), not a surface.
+- Lakes and the sea are planar Water surfaces at their level; the shore is the terrain meeting it.
+- Boats are moving bodies with a hull mesh (stage 6) and buoyancy (a separate piece of work, not
+  geometry).
+
+---
+
+## 6. Performance: measured
+
+### 6.1 Triangle counts
+
+`python3 tools/geometry_estimate.py`:
+
+| | Magnolia | Albany |
+|---|---|---|
+| Entities (medium detail, shipped) | 32,598 | 41,327 |
+| Solid boxes today | 23,118 | 32,165 |
+| Triangles today (12 a box) | 277,416 | 385,980 |
+| of which structure (walls, floors, roofs) | 169,644 | 245,052 |
+| Per 250 m tile today: median / 90th / max | 1,164 / 3,888 / 17,100 | 672 / 10,680 / 36,660 |
+| Buildings as extruded footprints (walls both sides, floors, ceilings, roofs, eaves) | 114,716 | 211,514 |
+| Roads with kerbs, draped (2 m along each edge line) | about 205,000 | about 162,000 |
+| Terrain, 3 km map, at 30 / 10 / 5 / 2 / 1 m | 22 k / 195 k / 778 k / 4.85 M / 19.4 M | the same |
+| Terrain per tile at 10 / 5 / 2 / 1 m | 1,250 / 5,000 / 31,250 / 125,000 | the same |
+
+A full-detail tile as meshes, with 2 m terrain kept as a heightfield: about 5,000 to 40,000 triangles
+of buildings, roads and props, plus 31,250 terrain triangles for Steam Audio only.
+
+### 6.2 The BVH (our own, in the spike)
+
+AudioLab `--geometry`, one thread, full JIT (`DOTNET_TieredCompilation=0`; the game reaches the
+same code after warm-up):
+
+| | Magnolia boxes | Albany boxes | Magnolia + 5 m terrain | Magnolia + 2 m terrain |
+|---|---|---|---|---|
+| Triangles | 277,416 | 385,980 | 1,054,916 | 5,132,112 |
+| Build (one thread) | 104 ms | 155 ms | 406 ms | 2,357 ms |
+| Memory (nodes + triangles) | 17 MB | 23 MB | 63 MB | 308 MB |
+| Closest hit, short rays (to 60 m) | 3.3 M/s | 3.0 M/s | 2.5 M/s | 2.0 M/s |
+| Closest hit, level sight rays (to 600 m) | 1.6 M/s | 1.6 M/s | 0.9 M/s | 0.9 M/s |
+| Any hit, point to point (to 850 m) | 2.1 M/s | 1.8 M/s | 1.1 M/s | 0.9 M/s |
+| Ground height (one downward ray) | 0.28 us | 0.33 us | 0.30 us | 0.38 us |
+| Capsule overlap (0.3 m x 1.8 m) | 0.68 us, 9 candidates | 0.78 us | 0.82 us | 0.92 us |
+| Short rays on all 24 threads (machine loaded) | not measured cleanly | 19.8 M/s | 18.3 M/s | 17.1 M/s |
+
+The terrain columns are the reason terrain is a heightfield (2.3): 2 m terrain in the BVH is 23 times
+the build and 18 times the memory of the buildings, for answers a grid lookup gives in O(1).
+
+### 6.3 Against today's box path
+
+| | Today | Through the BVH |
+|---|---|---|
+| `Enclosure.Look`, one survey, Magnolia (60 places near the spawn) | 1.37 ms | 0.10 ms (305 rays) |
+| `Enclosure.Look`, Albany | 2.29 ms | 0.11 ms (333 rays) |
+
+Today's survey scans every solid in the map to find the near ones, then tests every near box for each
+ray. The BVH's survey also skips Enclosure's openness cache and is still 14 to 21 times faster.
+
+Every other query today walks one of the five grids and slab-tests each box it finds; their cost
+depends on how many boxes are near (a city street: dozens to hundreds per query). A BVH query is a
+fraction of a microsecond plus a few triangle tests, and does not grow with what is nearby.
+
+### 6.4 Steam Audio
+
+Scene creation (vertices, triangles and materials to a committed scene; today's `Build` also keys
+materials by transmission and builds the listener scene, which is not counted here), and a trace
+with LateField's numbers (4,096 rays, 48 bounces, one thread) and a direct pass with occlusion and
+transmission for 32 sources:
+
+| | Magnolia boxes (277 k) | Albany boxes (386 k) | Magnolia + 5 m terrain (1.05 M) | Magnolia + 2 m terrain (5.1 M) |
+|---|---|---|---|---|
+| Default, one static mesh: build | 351 to 504 ms | 577 ms | 1,960 ms | 11,874 ms |
+| trace / direct | 50 ms / 0.09 ms | 52 / 0.12 | 62 / 0.10 | 69 / 0.09 |
+| **Embree, one static mesh: build** | 84 to 114 ms | 111 ms | 316 ms | 1,353 ms |
+| trace / direct | 29 ms / 0.03 ms | 30 / 0.06 | 34 / 0.05 | 35 / 0.05 |
+| Default, a static mesh per tile in one scene: add the biggest tile | 14 ms | 40 ms | 19 ms | 53 ms |
+| trace / direct | 111 ms / 0.20 | 98 / 0.25 | 134 / 0.23 | 184 / 0.29 |
+| Default, an instanced sub-scene per tile: trace | **1,077 to 1,200 ms** | 530 ms | 1,126 ms | 1,234 ms |
+| Embree, a static mesh per tile in one scene: any tile change (full commit) | 121 ms | 98 ms | 198 ms | 1,227 ms |
+| **Embree, an instanced sub-scene per tile: tile swap** | 0.51 ms | 0.21 ms | 0.48 ms | 0.24 ms |
+| sub-scene build, median / max | 5.4 / 24 ms | 0.7 / 44 ms | 5.3 / 35 ms | 13 / 34 ms |
+| moving 1,000-triangle body, per commit | 1.21 ms | 0.26 ms | 0.25 ms | 0.45 ms |
+| trace / direct | 60 ms / 0.09 | 37 / 0.08 | 37 / 0.06 | 38 / 0.07 |
+
+What it says:
+
+- The **trace cost hardly depends on the triangle count** (Embree: 29 ms at 277,000, 35 ms at 5.1
+  million). Triangles cost build time and memory, not sound quality per second of CPU.
+- Default with instances is unusable; Embree with instances is close to a flat scene and makes tile
+  loads, doors and moving bodies cheap. Hence 2.4.
+- Today's streaming branch rebuilds the whole scene (twice) for every tile change and every door near
+  the listener: 0.8 to 1.8 s on a niced thread, about once a second when driving. With Embree
+  instances a tile is one small sub-scene build (median 1 to 13 ms) and a sub-millisecond swap, and a
+  door is a transform.
+
+Peak memory of the spike process at 5.1 million triangles (both our BVH and several Steam Audio scenes
+alive at once) was 5.7 GB; 1.8 GB before Steam Audio. A client never holds that: it holds the tiles
+within its radius (at medium, 300 m full and 800 m coarse: about 10 full tiles and 30 coarse).
+
+### 6.5 Budget
+
+| | Per full-detail tile | Client at medium (about 10 full + 30 coarse tiles) | Server, whole 3 km map |
+|---|---|---|---|
+| Meshes (buildings, roads, props) | up to 150,000 triangles (decision 6) | about 0.5 M triangles, about 30 MB of BVH | 0.3 to 0.6 M triangles, 20 to 40 MB |
+| Terrain heightfield at 2 m | 48 KB | 2 MB | 4.5 MB |
+| Terrain as Steam Audio triangles | 31,250 (2,000 coarse) | about 0.4 M | none (the server runs no Steam Audio) |
+| Voxel chunks | a few to a few hundred where dug | small | small |
+| Tile load on the client, background | BLAS build about 20 to 60 ms, Steam Audio sub-scene 5 to 15 ms, room flood | | |
+
+---
+
+## 7. Stages, effort and risks
+
+A session is one working session of an agent, as in the streaming plan. Each stage leaves the game
+working and boxes valid.
+
+### Stage 1: the triangle world, the BVH, rays, Steam Audio and static collision (4 to 6 sessions)
+
+- `TriangleWorld` in Common: mesh assets, the shape library's box, BLAS and TLAS, the queries (2.2),
+  per-tile BLAS. Built on the server at map load and on the client per loaded tile on a background
+  thread, swapped in.
+- Boxes go in as box meshes. Existing maps load unchanged.
+- `SpatialService`, `GetGroundHeight`, `SharedMovementEngine` (capsule against triangles),
+  `CheckCollision`, bullets and ricochet, `Enclosure`, `OpeningRoutes`, `TrackClearance`, parking
+  and Alex's checks move to the BVH. The five grids are removed when their last caller is gone.
+- Steam Audio moves to Embree with a sub-scene per tile and one per door leaf; the door rebuild
+  machinery goes.
+- **A parity harness**: for a box-only map (the city, Magnolia, Albany), the old path and the new path
+  are run side by side over thousands of probes (ground heights along walking routes, occlusion bands
+  between random points, bullet hits, Enclosure surveys), and every difference over a tolerance is
+  listed. The new path is switched on per consumer when its list is empty or every entry is explained.
+- Coexistence with streaming: tile BLAS and tile sub-scenes follow the streaming tile set; this stage
+  replaces stage 3 of the streaming plan's "instanced meshes per tile" item.
+- Risks: movement feel changing (the capsule rounds corners that the cylinder-against-box did not;
+  every past fix needs a test); determinism between client and server (mitigated by one code path and
+  a replay test); the parity harness finding differences that are bugs in the old path (they will be
+  decided case by case, by ear where they are audible).
+
+### Stage 2: walking on slopes, ramps and stairs (2 to 3 sessions)
+
+- The wedge, stairs and arch shapes; ground normals; the walkable slope; speed and gait on grades;
+  step-up on real treads; the footstep rhythm on stairs; landing.
+- Vehicles: four wheel rays, per-wheel height, normal and surface.
+- The `--walk` instrument over ramps and stairs, and the AudioLab walk, as the kerb fix was checked.
+- Risks: stairs that judder (the ramp movement layer is the fallback); vehicles that bounce on the
+  edges between triangles (smooth the wheel contact over a contact patch, not one ray).
+
+### Stage 3: terrain from real elevation for the real places (4 to 6 sessions)
+
+- `fetch_place.py`: 3DEP at 10 m and 1 m where available. `gen_osm.py`: graded terrain tiles,
+  building pads, draped roads with kerbs and sidewalks, drives, bridges and tunnels from OSM tags,
+  creeks cut in. The 3 km ground slab goes.
+- The heightfield in Common (queries, holes, coarse level); `TerrainTile` on the wire; the terrain
+  sub-scene in Steam Audio; the open-ground split by surface flag instead of "a thin slab at ground
+  level".
+- Traffic, walkers and Alex on 3D lines.
+- Acoustics on uneven ground: diffraction over the terrain profile (3.4); the ground reflection reads
+  the ground's real height and slope under each source.
+- Risks: per-tile generation must give the same heights at tile edges from either side (the grading
+  of a road crossing an edge is decided from the road, not the tile); the generator's run time on
+  bigger DEMs; a house pad on steep ground making a cliff (cap the pad's step and slope the rest).
+
+### Stage 4: the shape library, import, generators and the map editor (3 to 5 sessions)
+
+- Every shape in 2.6, with facets for the image-source model; the extruded footprints and
+  straight-skeleton roofs in gen_osm (replacing the four-rectangle decomposition); swept kerbs; round
+  columns and trunks.
+- The importer (glTF and OBJ), mesh assets on disk, the client's mesh cache, `MeshAssetBatch`.
+- Validation (4.5), the authoring guide.
+- Map-editor hooks: `/place` and `/build` take shapes with parameters ("stairs 14 steps up north"),
+  and the build menu lists them.
+- Rooms derived from seeds by flood (2.7) replacing authored region boxes, with the old boxes as hints
+  until every generator writes seeds.
+- Risks: interior layouts on irregular footprints; imported meshes that are not closed (the importer
+  refuses them as solids and they can only be sheets).
+
+### Stage 5: diggable ground with strata (5 to 8 sessions)
+
+- Sparse voxel chunks, strata, surface nets, the heightfield-to-voxel seam, edits on the wire,
+  persistence per tile, incremental BLAS and Steam Audio updates, room flood in edited chunks.
+- A spade (inventory, an action, the bite as a brush), digging and dirt sounds by material
+  (synthesised: a spade into clay is not a spade into sand), falling into a hole, climbing out.
+- Building underground: placed meshes (a cellar's walls, a tunnel lining) that carve the voxels they
+  occupy.
+- Risks: the seam between voxels and heightfield leaking rays (the skirt); many players digging at
+  once (edits are small, re-meshing is per chunk and debounced); griefing on shared maps (permissions:
+  who may dig where, as who may build).
+
+### Stage 6: vehicles and bodies in the acoustic scene (3 to 5 sessions)
+
+- Each vehicle's body mesh from its parts list (machines as parts): the cabin shell (glass, doors,
+  roof, floor) as a closed mesh, its own BLAS and its own Steam Audio sub-scene instance, moved with
+  the body.
+- A vehicle's own sources (exhaust, intake through the bay, tyres) sit at their real emission points
+  on the outside of the shell, so the shell occludes other sources behind the car but not its own.
+  A listener in the cab is inside the shell and hears the street through glass and doors with the
+  same transmission model as a building. This needs no per-source exclusion, which Steam Audio does
+  not have.
+- `VehicleShadow` (the Maekawa model for moving bodies) is retired or kept for far vehicles only.
+- Boats: hull meshes on the same path.
+- Risks: commit cost with 40 moving cars (measured 0.25 to 1.2 ms a commit for one; batched, one
+  commit a step for all of them: to be measured with 40); the engine voices' tuning was done with no
+  body around them, so the change will be audible and must be judged by ear.
+
+### Order and why
+
+Stage 1 is the foundation and pays for itself in speed (Enclosure, doors, streaming tiles) before
+anything looks different. Stage 2 is the first thing Cody hears change (ramps, stairs, real slopes).
+Stage 3 is the biggest gain for the real places. Stage 4 makes building and import possible. Stage 5
+is the most new gameplay and needs 1 to 3. Stage 6 can run after stage 1 in parallel with the others.
+
+Total: about 21 to 33 sessions.
+
+---
+
+## 8. Decisions for Cody
+
+1. **Terrain resolution.** Recommended 2 m for full-detail tiles (kerbs and ditches are separate
+   meshes, so 2 m is enough for the ground between them), 8 m for the coarse ring. 1 m is four times
+   the Steam Audio triangles for detail the 3DEP data mostly does not have away from lidar.
+2. **Elevation data.** 3DEP 1/3 arc-second (10 m) everywhere, plus the 1 m lidar DEM where it
+   exists. 1 m is much bigger to download and store, and is what makes a creek bank or a road cut
+   real.
+3. **Voxel resolution for digging.** Recommended 0.5 m with smooth density (a few centimetres of
+   surface accuracy). 0.25 m costs eight times as much.
+4. **Strata.** Real soil data (USDA SSURGO, public domain; depth to bedrock from SoilGrids, CC BY 4.0)
+   or a simple profile per place in place.json. Real data is more work and more true; the profile is
+   enough to make clay sound like clay.
+5. **glTF import.** Recommended yes, as an offline tool (models from Blender or the free libraries,
+   checked and converted to mesh assets). Whether players may import meshes into their own maps is a
+   separate question (size, abuse, licences of what they upload); recommended admins only at first.
+6. **Triangle budget.** Recommended 150,000 triangles per full-detail tile for meshes (terrain apart),
+   20,000 per coarse tile, 50,000 per imported mesh.
+7. **Steam Audio on Embree.** Recommended yes. It is faster in every measurement and makes per-tile
+   loading, doors and moving bodies cheap. It ties the client to x86/x64 (Windows and Linux are both
+   x64 today); an ARM client would fall back to the slower layout.
+8. **Our own BVH and capsule movement** rather than a physics library (Jolt is the alternative for
+   movement if ours fights us).
+9. **Stairs.** Real treads for movement as well as sound (recommended, and step-up already handles
+   them), or a smooth ramp for movement with real treads for sound and footsteps.
+10. **Rooms from seeds.** Generated rooms become a point and a name, and their shape is measured from
+    the walls. This changes what gen_osm and gen_city write, and how a room is authored by hand.
+11. **Live editing of geometry.** Whether map editors build and dig live while others play on the map
+    (the streaming plan leaves this open for building too).
+
+---
+
+## Appendix: box-geometry consumers today
+
+From a survey of the code (2026-10-06). Line numbers drift; the names do not.
+
+- **Movement:** `SharedMovementEngine.Step` (Common), from `MovementSystem.Update` per input on the
+  server (memoised ground, `grid.CollectInRadius(pos, 5 m)`) and `ClientPhysicsSystem.Predict` on the
+  client (radius 5 m). `MovementSystem.CheckCollision` for teleport, spawn and login.
+- **Ground height**, `PhysicsUtils.GetGroundHeight`: MovementSystem (per input, memoised),
+  DrivingSystem.Step (per tick per driven vehicle, one probe at the body centre), Program
+  GetMaterialUnderPlayer (per broadcast per session), CombatService EmitStrike, BreakGlass, BodyFall,
+  Bodies.GroundUnder, HandsService.Drop, OccupancyService.FindStandingRoom, PlayerStore.IsSafe,
+  CommandHandler SpawnWalker, ClearGroundBeside, StandingSpot, CharacterSystem.Ground, Haunts,
+  MapManager.VerifySpawnPoint, ClientPhysicsSystem.Predict, OtherBodies (per remote footfall),
+  ClientAudioSystem.OnTheWheels. Related: ClientAudioSystem.ApplyGround (two downward RaycastAll),
+  Sightline.IsGround, AdminGun.IsGroundLike, CommandHandler.IsGroundOrOverhead.
+- **Bullets:** CombatService Fire, Shoot, Launch, FlyBullets, Segment, FirstHit (grid, RayIntersectsOBB,
+  cylinder, sphere), TryRicochet and Face (normal from the largest local axis), FlyAhead and
+  PassingSounds (pre-flown path), Assist and InPlainView (aim assist in 8 m pieces).
+- **Scope:** ScopeView.InView (CastSight to each person or vehicle), Describe and Range (2 km
+  CastSight), StandsOnRoof (a 1.5 m downward CastSight and "roof" in the name), every 0.1 s while
+  raised.
+- **Footsteps:** the ground probe's material, on the client per input and on the server per
+  broadcast; remote bodies per footfall.
+- **Beacons:** BeaconAids.Nearest (grid by radius), Reaches (SpatialAcoustics path, five rays,
+  WallTransmission), InSight (RaycastMaterial), TryDoorFace and TryVehicleSide (box faces).
+- **Walkers and Alex:** Pavements.StripsOf (slabs named sidewalk or pavement), SolidsOf, Clear,
+  HauntFinder; traffic follows lane lines with no world collision; VehicleSystem.Parking (segment
+  against boxes).
+- **Server load:** MapManager.CreateMapInstance (minimum floor, apertures), SurveyRegions
+  (BoxColumns, CompositeAcoustics.SurveyBox), ValidateTracks (TrackClearance), RefreshGrid;
+  CompositeService.RefreshRoom and MakeDrivable.
+- **Client load:** AcousticVolumeGenerator.GenerateRegions (0.5 m voxels), AddFaceOpenings (boxes
+  only); the static grid rebuilt in full on every definition change (`ClientWorldState.RebuildGrid`).
+- **Doors:** DoorSystem moves leaves (no Velocity, so the server grid keeps them at the load pose); a
+  15 % aperture change re-sends the definition; the client rebuilds its grid; the acoustic worker
+  rebuilds both Steam Audio scenes for a leaf within 50 m that moved, at most every 0.3 s.
+- **Wire:** EntityDefinition (MemoryPack, positional): EntityId, Type, Collider, Identity, Acoustics,
+  Physics, Material, SoundEmitter, Region, Portal, Transform, Moves, Team, RidingEntityId.
+  `ColliderComponent { Shape, Size, IsSolid }`. `WireContract.Hash` covers every Common source file.
+- **Shape-specific code:** CombatService FirstHit and Face; SpatialService GetOcclusionData, RaycastAll,
+  RaycastMaterial (box and sphere only), CastSight, RaycastSingle; SightGrid;
+  SharedMovementEngine.StandingRotation. Box-only filters: SteamAudioScene.BoxesFromWorld,
+  AcousticVolumeGenerator, RainField, MapManager, Pavements, VehicleSystem.Parking, AdminGun.
