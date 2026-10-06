@@ -4,6 +4,11 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Door sounds are rendered once and kept. The client's door render cache is now named by the door
+  models' own fingerprint (`DoorModelFingerprint`, a hash of the door model sources listed in
+  OpenFPS.Common.csproj) instead of the whole OpenFPS.Common hash, so a change anywhere else no longer
+  throws the renders away and the next launch no longer spends a minute rendering them again. Linux
+  (`run-gtk-client.sh`) and the Windows zip (`publish-windows.sh`) both use it.
 - Wide sources (unheard). Trees, the fire pit, the fountain and the rain round you are heard from
   several places across them, not from one point. Renders in inbox/wide-sources-2026-10-06, with a
   README. Why: as one point through the HRTF both ears got the same noise (interaural correlation

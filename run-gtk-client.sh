@@ -154,21 +154,26 @@ DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
 #
 # A door's sound is a simulation that takes seconds to render (a glass door up to forty), and a door
 # opened before its render is ready is silent. The Windows zip ships every door render the client
-# makes at start (publish-windows.sh); here they go into the player's own render cache, which is
-# named by the build (WireContract.Hash) and so starts empty whenever OpenFPS.Common changes. Render
-# the full set once per build, on every core, before launching; a build that has them skips this.
-BUILD=$(grep -ho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Common/"$LOWER"/WireContract.g.cs 2>/dev/null | head -1 | tr -d '"')
-if [ "${OPENFPS_RENDER_CACHE:-}" != "off" ] && [ -n "$BUILD" ]; then
-  RCACHE="${OPENFPS_RENDER_CACHE:-${XDG_DATA_HOME:-$HOME/.local/share}/OpenFPS/rendercache/$BUILD}"
-  if [ ! -e "$RCACHE/.prerendered" ]; then
-    echo "Door sounds for build $BUILD are not rendered yet; rendering them now (about a minute) ..."
+# makes at start (publish-windows.sh); here they go into the player's own render cache, rendered once
+# on every core and then kept. The cache is named by the door models' own fingerprint
+# (DoorRenderCache.Name: a hash of the door model sources, OpenFPS.Common.csproj DoorModelSource, and
+# the cache file version), so it survives every change that does not touch a door model.
+DOORHASH=$(grep -ho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Common/"$LOWER"/DoorModelFingerprint.g.cs 2>/dev/null | head -1 | tr -d '"')
+DOORVER=$(grep -o 'const int Version = [0-9]*' "$REPO/OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs" | grep -o '[0-9]*$')
+DOORS="$DOORHASH-v$DOORVER"
+if [ "${OPENFPS_RENDER_CACHE:-}" != "off" ] && [ -n "$DOORHASH" ] && [ -n "$DOORVER" ]; then
+  RCACHE="${OPENFPS_RENDER_CACHE:-${XDG_DATA_HOME:-$HOME/.local/share}/OpenFPS/rendercache/$DOORS}"
+  if [ -e "$RCACHE/.prerendered" ]; then
+    echo "Door sounds: kept from an earlier launch ($DOORS)."
+  else
+    echo "Door sounds for these door models ($DOORS) are not rendered yet; rendering them once now (about a minute) ..."
     LAB_ART=/tmp/openfps-lab
     DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
       "$DOTNET" build "$REPO/OpenFPS.AudioLab" -c Release --artifacts-path "$LAB_ART" \
       -nodeReuse:false -p:UseSharedCompilation=false -v minimal
-    LAB_BUILD=$(grep -ho '"[0-9a-f]\{12\}"' "$LAB_ART"/obj/OpenFPS.Common/release/WireContract.g.cs 2>/dev/null | head -1 | tr -d '"')
-    if [ "$LAB_BUILD" != "$BUILD" ]; then
-      echo "  WARNING: the lab is build $LAB_BUILD and the client $BUILD; skipping, doors render as you play."
+    LAB_DOORHASH=$(grep -ho '"[0-9a-f]\{12\}"' "$LAB_ART"/obj/OpenFPS.Common/release/DoorModelFingerprint.g.cs 2>/dev/null | head -1 | tr -d '"')
+    if [ "$LAB_DOORHASH" != "$DOORHASH" ]; then
+      echo "  WARNING: the lab's door models ($LAB_DOORHASH) are not the client's ($DOORHASH); skipping, doors render as you play."
     elif (cd "$LAB_ART/bin/OpenFPS.AudioLab/release" && nice ./OpenFPS.AudioLab --prerender-doors "out=$RCACHE"); then
       touch "$RCACHE/.prerendered"
     else

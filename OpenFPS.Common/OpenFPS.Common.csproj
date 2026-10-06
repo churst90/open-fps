@@ -75,4 +75,29 @@
     </ItemGroup>
   </Target>
 
+  <!-- ── THE DOOR MODELS' FINGERPRINT ─────────────────────────────────────────────────────────────
+       The client keeps every door model render on disk (DoorRenderCache), and a render only changes
+       when a door model does. Named by WireContract.Hash, the whole cache was thrown away by every
+       change anywhere in this project, and the next launch rendered all of it again (Cody, 2026-10-06:
+       "generate them once and keep them"). This hashes only the sources a door render is made from:
+       the models and what they call. A new model file, or one that starts using another file, belongs
+       in this list; DoorRenderCache.Version is the manual lever for anything else. -->
+  <ItemGroup>
+    <DoorModelSource Include="KnobDoor.cs;PushBarDoor.cs;SlidingDoor.cs;GlassDoor.cs;LockCylinder.cs;ElevatorDoor.cs;CarWindow.cs;GlassFracture.cs;DoorPhysics.cs;Doors.cs;Glass.cs;AcousticRegistry.cs;VehicleCabin.cs;VehicleBody.cs" />
+  </ItemGroup>
+  <Target Name="GenerateDoorModelFingerprint" BeforeTargets="CoreCompile" Inputs="@(DoorModelSource);$(MSBuildProjectFullPath)"
+          Outputs="$(IntermediateOutputPath)DoorModelFingerprint.g.cs">
+    <HashWireContract Files="@(DoorModelSource)" Root="$(MSBuildProjectDirectory)">
+      <Output TaskParameter="Hash" PropertyName="DoorModelHash" />
+    </HashWireContract>
+    <WriteLinesToFile File="$(IntermediateOutputPath)DoorModelFingerprint.g.cs" Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Lines="namespace OpenFPS.Common%3B;/// &lt;summary&gt;A hash of the sources a door model render is made from (OpenFPS.Common.csproj, DoorModelSource).&lt;/summary&gt;;public static class DoorModelFingerprint { public const string Hash = &quot;$(DoorModelHash)&quot;%3B }" />
+  </Target>
+  <Target Name="IncludeDoorModelFingerprint" BeforeTargets="CoreCompile" AfterTargets="GenerateDoorModelFingerprint">
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)DoorModelFingerprint.g.cs" />
+      <FileWrites Include="$(IntermediateOutputPath)DoorModelFingerprint.g.cs" />
+    </ItemGroup>
+  </Target>
+
 </Project>

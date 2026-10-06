@@ -42,14 +42,19 @@ rm -rf "$LAB_ART/obj/OpenFPS.Common"   # one WireContract.g.cs here too
 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
   "$DOTNET" build "$REPO/OpenFPS.AudioLab/OpenFPS.AudioLab.csproj" -c Release \
   --artifacts-path "$LAB_ART" -nodeReuse:false -p:UseSharedCompilation=false -v minimal
-LAB_BUILD=$(grep -rho '"[0-9a-f]\{12\}"' "$LAB_ART"/obj/OpenFPS.Common/*/WireContract.g.cs | head -1 | tr -d '"')
-[ "$LAB_BUILD" = "$BUILD" ] || { echo "!! the lab is build $LAB_BUILD, the client $BUILD: renders would not be used." >&2; exit 1; }
+# The renders are named by the door models' fingerprint (DoorRenderCache.Name), not the build, so a
+# zip made after a change elsewhere reuses the renders already made here.
+DOORHASH=$(grep -rho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Common/*/DoorModelFingerprint.g.cs | head -1 | tr -d '"')
+LAB_DOORHASH=$(grep -rho '"[0-9a-f]\{12\}"' "$LAB_ART"/obj/OpenFPS.Common/*/DoorModelFingerprint.g.cs | head -1 | tr -d '"')
+[ "$LAB_DOORHASH" = "$DOORHASH" ] || { echo "!! the lab's door models are $LAB_DOORHASH, the client's $DOORHASH: renders would not be used." >&2; exit 1; }
+DOORVER=$(grep -o 'const int Version = [0-9]*' "$REPO/OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs" | grep -o '[0-9]*$')
+DOORS="$DOORHASH-v$DOORVER"
 CACHES="${OPENFPS_PUBLISH_DIR:-$HOME/.cache/openfps-publish}/rendercache"
-find "$CACHES" -mindepth 1 -maxdepth 1 -type d ! -name "$BUILD" -exec rm -rf {} + 2>/dev/null || true
-CACHE="$CACHES/$BUILD"
+find "$CACHES" -mindepth 1 -maxdepth 1 -type d ! -name "$DOORS" -exec rm -rf {} + 2>/dev/null || true
+CACHE="$CACHES/$DOORS"
 (cd "$LAB_ART/bin/OpenFPS.AudioLab/release" && nice ./OpenFPS.AudioLab --prerender-doors "out=$CACHE")
-mkdir -p "$OUT/ASSETS/rendercache/$BUILD"
-cp "$CACHE"/*.pcm "$OUT/ASSETS/rendercache/$BUILD/"
+mkdir -p "$OUT/ASSETS/rendercache/$DOORS"
+cp "$CACHE"/*.pcm "$OUT/ASSETS/rendercache/$DOORS/"
 
 # The logging builds are for debugging here, not for players.
 rm -f "$OUT/fmodL.dll" "$OUT/fmodstudioL.dll"
