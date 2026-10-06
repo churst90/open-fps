@@ -2401,7 +2401,10 @@ public partial class FmodAudioProvider : IAudioProvider
             return new NaturePlaceState(shared, emitter.Place, rate, emitter.Position);
         }
         int places = ExtendedSources.Layout(emitter.PhysicalKey)?.Length ?? 1;
-        PlacedNatureVoice voice = kind == "fire"
+        PlacedNatureVoice voice = kind == "flow"
+            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.RunningWaterSpec.ByName(preset), rate,
+                                    emitter.EntityId * 47 + 19, emitter.Position)
+            : kind == "fire"
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FireSpec.ByName(preset), places, rate,
                                     emitter.EntityId * 41 + 13, emitter.Position)
             : new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(preset), places, rate,
@@ -2870,7 +2873,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     "water" => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position, emitter),
                     // A tree or a fire is heard from places across it (ExtendedSources): its own
                     // voice is the middle, and the others read the same synth.
-                    "fire" or "foliage" => NaturePlace(kind.ToLowerInvariant(), preset, emitter, mrate),
+                    "fire" or "foliage" or "flow" => NaturePlace(kind.ToLowerInvariant(), preset, emitter, mrate),
                     // A patch of rain round the listener, fed by the rain survey. See RainVoiceState.
                     // The roof over the ear and the near quarters are several, each a part (RainFeeds.PartsFor).
                     "rain" => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot, out int rainPart)

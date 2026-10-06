@@ -506,6 +506,13 @@ if (args.Contains("--nature"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.NatureSpike.Run(args));
 }
 
+if (args.Contains("--running-water"))
+{
+    // --running-water [levels|runoff|render out=DIR|game out=DIR set=] [preset ...] [sec= rain= flow=]:
+    // creeks, gutters, drains, downpipes and overflows from their models, measured and played through the game.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.RunningWaterSpike.Run(args));
+}
+
 if (args.Contains("--textures"))
 {
     // --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]: the cochlear

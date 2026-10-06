@@ -828,6 +828,13 @@ public class ClientAudioSystem
         // engine and its echoes stopped, which is a real cut rather than a fade — but it only ever
         // happens to whichever car is furthest away and being drowned by three nearer ones.
         ChooseLiveEngines(world, visualEyePos);
+        // The rain that has landed and is running off (gutters, drains, downpipes): fed before the
+        // machines are ranked, so a gutter that has run dry is not given a voice. Snow stays where it falls.
+        {
+            var p = world.Precipitation;
+            float wet = p.Falling ? (p.Kind == OpenFPS.Common.PrecipitationKind.Snow ? 0f : p.RateMmPerHour) : world.RainRateMmPerHour;
+            OpenFPS.Common.Runoff.Update(wet, OpenFPS.Common.AudioClock.Now);
+        }
         ChooseLiveMachines(world, visualEyePos);
         ChoosePlaces(world, visualEyePos);
         _engineEchoes.EchoesPerEngine = _adaptiveEchoes;
@@ -1138,6 +1145,8 @@ public class ClientAudioSystem
                 h = OpenFPS.Common.FireSpec.ByName(soundId[5..]).PeakHeadroomDb;
             else if (soundId.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.FoliageSpec.ByName(soundId[8..]).PeakHeadroomDb;
+            else if (soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
+                h = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]).PeakHeadroomDb;
             else if (soundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.ModelLibrary.Bell(soundId[5..]).PeakHeadroomDb;
         }
@@ -1208,6 +1217,13 @@ public class ClientAudioSystem
             {
                 var tree = OpenFPS.Common.FoliageSpec.ByName(soundId[8..]);
                 return (tree.SourceLevelDb, tree.ExtentMetres);
+            }
+            // Running water: a creek, a gutter, a drain, a downpipe (RunningWaterSynth). Its size is its
+            // length or its opening; its level is declared at its base flow or its reference rain.
+            if (soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
+            {
+                var flow = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
+                return (flow.SourceLevelDb, flow.ExtentMetres);
             }
             if (soundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
             {
@@ -1361,6 +1377,20 @@ public class ClientAudioSystem
         try { return OpenFPS.Common.AircraftProfile.ByName(sid[9..]); } catch { return null; }
     }
 
+    /// <summary>Running water fed only by the rain, with less than a trickle in it now (Runoff): it makes
+    /// no sound and is given no voice. A creek or a fountain's overflow, with a flow of its own, never is.</summary>
+    private static bool Dry(string soundId)
+    {
+        if (!soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return false;
+        try
+        {
+            var spec = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
+            if (spec.BaseFlowLitresPerSecond > 0f || spec.CatchmentSquareMetres <= 0f) return false;
+            return spec.FlowFor(OpenFPS.Common.Runoff.Through(spec.CatchmentSeconds)) < OpenFPS.Common.RunningWaterSpec.DryLitresPerSecond;
+        }
+        catch (Exception) { return false; }
+    }
+
     private void ChooseLiveMachines(WorldSnapshot world, Vector3 eyePos)
     {
         double now = _now();
@@ -1380,6 +1410,8 @@ public class ClientAudioSystem
             var em = snap.Definition.SoundEmitter;
             if (!em.IsSynth || em.SoundId == null) continue;
             if (!PhysicalLevel(em.SoundId, out float levelDb, out float extent)) continue;
+            // A gutter, a drain or a downpipe with no rain running off into it is not there to be heard.
+            if (Dry(em.SoundId)) continue;
 
             float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);

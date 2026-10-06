@@ -264,7 +264,7 @@ public sealed class FoliageVoiceState : NatureVoiceState
 }
 
 /// <summary>
-/// A tree or a fire heard from several places at once (ExtendedSources): ONE synth rendering each place's
+/// A tree, a fire or running water heard from several places at once (ExtendedSources): ONE synth rendering each place's
 /// own stream, each place a voice of its own (<see cref="NaturePlaceState"/>). Place 0 is the source's
 /// middle, the map's own emitter; the others are made by the client when the source is wide enough at
 /// the listener to be heard as wide, and let go when it is not.
@@ -285,6 +285,7 @@ public sealed class PlacedNatureVoice
     public readonly float SourceLevelDb, HeadroomDb, WindHeight;
     public readonly FoliageSynth? Foliage;
     public readonly FireSynth? Fire;
+    public readonly RunningWaterSynth? Flow;
 
     private const int RingBits = 17;
     public const int RingLength = 1 << RingBits;
@@ -309,6 +310,10 @@ public sealed class PlacedNatureVoice
     public PlacedNatureVoice(string key, FireSpec spec, int places, float sampleRate, int seed, Vector3 position)
         : this(key, places, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, spec.FlameHeightMetres)
         => Fire = new FireSynth(spec, sampleRate, seed, places);
+
+    public PlacedNatureVoice(string key, RunningWaterSpec spec, float sampleRate, int seed, Vector3 position)
+        : this(key, Math.Max(1, spec.Places), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f)
+        => Flow = new RunningWaterSynth(spec, sampleRate, seed);
 
     private PlacedNatureVoice(string key, int places, float sampleRate, Vector3 position, float levelDb, float headroomDb, float windHeight)
     {
@@ -346,7 +351,8 @@ public sealed class PlacedNatureVoice
                             Control(ControlBlock / _rate);
                         }
                         if (Foliage != null) Foliage.NextPlaces(_out);
-                        else Fire!.NextPlaces(_out);
+                        else if (Fire != null) Fire.NextPlaces(_out);
+                        else Flow!.NextPlaces(_out);
                         int idx = (int)(s & Mask);
                         for (int i = 0; i < _rings.Length; i++) _rings[i][idx] = _out[i];
                     }
@@ -373,6 +379,15 @@ public sealed class PlacedNatureVoice
             Fire.Lit = Running;
             Fire.Wind = WindField.SpeedAt(Position.X, WindHeight, Position.Z, now);
             Fire.Control(dt);
+        }
+        else if (Flow != null)
+        {
+            // Its water: its own flow, and the rain running off its catchment now (Runoff).
+            var spec = Flow.Spec;
+            Flow.Spread = spread;
+            Flow.Flow = Running ? spec.FlowFor(Runoff.Through(spec.CatchmentSeconds)) : 0f;
+            Flow.RainOnWater = Runoff.RainMmPerHour;
+            Flow.Control(dt);
         }
     }
 }

@@ -56,6 +56,8 @@ public static class ModelLibrary
         public const string Fire = "fire";
         /// <summary>A tree or a hedge with the wind in it.</summary>
         public const string Foliage = "foliage";
+        /// <summary>Water that runs: a creek, a gutter, a drain, a downpipe, an overflow.</summary>
+        public const string Flow = "flow";
     }
 
     private sealed class ModelFile
@@ -97,6 +99,7 @@ public static class ModelLibrary
         [Kinds.Water] = WaterFeatureSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Fire] = FireSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Foliage] = FoliageSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
+        [Kinds.Flow] = RunningWaterSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.RailVehicle] = new(StringComparer.OrdinalIgnoreCase)
         {
             ["genesis_p42"] = () => TrainProfile.GenesisP42,
@@ -132,6 +135,7 @@ public static class ModelLibrary
         [Kinds.Water] = typeof(WaterFeatureSpec),
         [Kinds.Fire] = typeof(FireSpec),
         [Kinds.Foliage] = typeof(FoliageSpec),
+        [Kinds.Flow] = typeof(RunningWaterSpec),
     };
 
     // ── Loading ─────────────────────────────────────────────────────────────────────────────────
@@ -255,6 +259,7 @@ public static class ModelLibrary
     public static WaterFeatureSpec Water(string id) => Get<WaterFeatureSpec>(Kinds.Water, id);
     public static FireSpec Fire(string id) => Get<FireSpec>(Kinds.Fire, id);
     public static FoliageSpec Foliage(string id) => Get<FoliageSpec>(Kinds.Foliage, id);
+    public static RunningWaterSpec Flow(string id) => Get<RunningWaterSpec>(Kinds.Flow, id);
 
     // ── Writing ─────────────────────────────────────────────────────────────────────────────────
 
