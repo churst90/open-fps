@@ -414,6 +414,7 @@ public class ClientAudioSystem
         if (_sirenVoiced.Remove(entityId)) _audio.StopSound(SirenVoiceBase - Math.Abs(entityId));
         _sirenControl.Remove(entityId);
         _frontRetiring.Remove(entityId);
+        _placed.Remove(entityId);
         // Its image-source reflections: one voice per slot (see ReflectionVoiceId).
         for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
             _audio.StopSound(ReflectionVoiceId(entityId, slot));
@@ -763,6 +764,9 @@ public class ClientAudioSystem
                     // collision is one voice handed two reflections from opposite sides of a room,
                     // flickering between them.
                     int reflectId = ReflectionVoiceId(id, path.ReflectionIndex);
+                    var placed = _placed.TryGetValue(id, out var p)
+                        ? p : (originalSnap.Definition.SoundEmitter.Volume, originalSnap.Definition.SoundEmitter.MinDistance);
+                    var echo = LoopEchoLevel(path, placed.Volume, placed.MinDistance, dist);
 
                     var reflectEmitter = new SpatialEmitter
                     {
@@ -773,11 +777,9 @@ public class ClientAudioSystem
                         ApparentPosition = path.ApparentPosition,
                         // What the copy has left, per band, is the whole of what makes it a
                         // reflection rather than a second source: the surface took some of it and
-                        // the extra distance took the rest. The emitter's volume less occlusion would
-                        // not do: for an image source that is always zero, so every reflection would
-                        // come back at full strength however absorbent the wall was.
-                        Volume = originalSnap.Definition.SoundEmitter.Volume
-                               * Math.Clamp(path.EqMid, 0f, 1f),
+                        // the extra distance took the rest (LoopEchoLevel).
+                        Volume = echo.Volume,
+                        MinDistance = echo.MinDistance,
                         Range = originalSnap.Definition.SoundEmitter.Range * 0.8f,
                         IsReflection = true,
                         // The copy starts at the source voice's own playback position, so it is what
@@ -785,9 +787,9 @@ public class ClientAudioSystem
                         ReflectionOf = id,
                         DelayMs = path.ReflectionDelayMs,
                         Type = EmitterType.WorldLocked,
-                        EqLow = path.EqLow,
-                        EqMid = path.EqMid,
-                        EqHigh = path.EqHigh,
+                        EqLow = echo.EqLow,
+                        EqMid = echo.EqMid,
+                        EqHigh = echo.EqHigh,
                         AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
                         ReflectionSpread = path.Spread,
                         // Feed leftover energy into the reverb bus
@@ -1791,6 +1793,24 @@ public class ClientAudioSystem
 
     /// <summary>When each repeating emitter is next due to speak. See RepeatIntervalSeconds.</summary>
     private readonly Dictionary<int, double> _repeatDue = new();
+
+    /// <summary>Each entity voice's own volume and reference distance as last submitted: what its walls' copies are
+    /// placed against.</summary>
+    private readonly Dictionary<int, (float Volume, float MinDistance)> _placed = new();
+
+    /// <summary>
+    /// A wall's copy of a recorded loop, as loud as the wall sends it back: the copy law at the loop's own reference
+    /// distance (EarlyReflections.PlacedCopyGain), so the copy's extra spreading is counted once, by the renderer at the
+    /// image; and its colour against its middle band, so the middle is counted once, in its volume.
+    /// </summary>
+    internal static (float Volume, float MinDistance, float EqLow, float EqMid, float EqHigh) LoopEchoLevel(
+        in AcousticPathData path, float sourceVolume, float sourceMinDistance, float directDistance)
+    {
+        float mid = Math.Clamp(path.EqMid, 1e-4f, 1f);
+        float volume = sourceVolume * EarlyReflections.PlacedCopyGain(Math.Clamp(path.EqMid, 0f, 1f), path.EffectiveDistance,
+                                                                      directDistance, sourceMinDistance);
+        return (volume, sourceMinDistance, path.EqLow / mid, 1f, path.EqHigh / mid);
+    }
 
 
     private readonly Dictionary<int, string> _carPreset = new();
@@ -2814,6 +2834,7 @@ public class ClientAudioSystem
         if (engineKey.Length > 0 || physicalKey != null) ApplyGround(ref emitter, world);
         _partMs[1] += Ms(groundAt);
         Spreading? spreading = extentLayout != null ? SpreadOf(snap, extentLayout, ref emitter, eyePos, engineDt, now) : null;
+        _placed[snap.Id] = (emitter.Volume, emitter.MinDistance);
         _audio.Submit(emitter);
         // ...and its other places, after its middle, so the synth they read already exists.
         if (spreading != null) PlaceOuter(snap.Id, spreading, emitter, world, now);
