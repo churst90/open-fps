@@ -333,6 +333,9 @@ public readonly record struct RainPlate
     public static float BlowShape(float x)
         => x <= 0f ? 0f : x < BlowPeakAt ? MathF.Sqrt(x / BlowPeakAt) : MathF.Exp(-(x - BlowPeakAt) / BlowFall);
 
+    /// <summary>∫ shape d(t/τ): the blow's momentum in units of F_peak τ.</summary>
+    public static readonly float BlowShapeArea = 2f / 3f * BlowPeakAt + BlowFall;
+
     /// <summary>∫ shape² d(t/τ): the blow's energy in units of F_peak² τ.</summary>
     public static readonly float BlowShapeEnergy = BlowPeakAt / 2f + BlowFall / 2f;
 

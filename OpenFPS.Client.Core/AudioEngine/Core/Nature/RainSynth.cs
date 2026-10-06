@@ -87,7 +87,9 @@ public sealed class RainSynth
 
     private readonly float _rate;
     private readonly EventSum _sum;
-    private readonly DropSizeTable _sizes = new();
+    private readonly ParticleSpectrum _main = new(), _stones = new();
+    private ParticleSpectrum _spec = null!;
+    private PrecipitationKind _particle;
     private readonly PlateState[] _plates = new PlateState[MaxPlates];
     private readonly float[] _plateOut = new float[Block];
     private int _untilBlock, _blockAt;
@@ -97,8 +99,19 @@ public sealed class RainSynth
     /// <summary>The patch to render. Read once a block; written by the owner.</summary>
     public volatile RainPatch? Patch;
 
-    /// <summary>The rain rate, mm/h. Read once a block.</summary>
-    public float RainRate;
+    /// <summary>What is falling: its kind, its water-equivalent rate, its sizes. Read once a block.</summary>
+    public Precipitation Falling;
+
+    /// <summary>The rain rate, mm/h: the rate of <see cref="Falling"/>, as rain if nothing else was said.</summary>
+    public float RainRate
+    {
+        get => Falling.RateMmPerHour;
+        set => Falling = Falling with { RateMmPerHour = value };
+    }
+
+    /// <summary>The bins whose biggest drops are played one by one elsewhere (RainPatch.DiscreteFromMm):
+    /// drops of this size and over are not rendered here.</summary>
+    private float _skipFromMm = float.MaxValue;
 
     /// <summary>Each part's share, for the lab to take the sound apart by muting: the drops' clicks,
     /// the bubbles, the plates' ringing and thuds, and the drips. One in the game.</summary>
@@ -133,21 +146,41 @@ public sealed class RainSynth
     {
         var patch = Patch;
         if (!ReferenceEquals(patch, _bound)) Bind(patch);
-        float rate = RainRate;
+        var falling = Falling;
+        float rate = falling.RateMmPerHour;
         float dt = Block / _rate;
-        if (patch != null && rate > 0f)
+        if (patch != null && falling.Falling)
         {
-            _sizes.Build(rate);
-            float flux = _sizes.DropsPerSquareMetreSecond;
+            // The main particles: the rain (the rain hail falls in, for hail), the sleet, the snow.
+            var mainKind = falling.Kind == PrecipitationKind.Hail ? PrecipitationKind.Rain : falling.Kind;
+            _main.Build(mainKind, rate, falling.Kind == PrecipitationKind.Hail ? Hydrometeors.MarshallPalmerMedianMm(rate) : falling.EffectiveMedianMm);
+            if (falling.Kind == PrecipitationKind.Hail) _stones.Build(falling);
+            for (int pass = 0; pass < (falling.Kind == PrecipitationKind.Hail ? 2 : 1); pass++)
+            {
+                _spec = pass == 0 ? _main : _stones;
+                _particle = pass == 0 ? mainKind : PrecipitationKind.Hail;
+                Surfaces(patch, dt, rate, _spec.PerSquareMetreSecond);
+            }
+        }
+        Array.Clear(_plateOut);
+        for (int i = 0; i < MaxPlates; i++)
+            if (_plates[i].Active) _plates[i].Render(_plateOut, _sum, PlatePart);
+    }
+
+    private void Surfaces(RainPatch patch, float dt, float rate, float flux)
+    {
+        {
             float scale = patch.ReferenceDistance;
             for (int l = 0; l < patch.Layers.Length; l++)
             {
                 var layer = patch.Layers[l];
                 var plate = l < _layerPlate.Length ? _layerPlate[l] : null;
+                _modulus = layer.ModulusGPa;
                 for (int b = 0; b < layer.Bins; b++)
                 {
                     float near = layer.Distance[b];
                     _aim = layer.Aim[b];
+                    _skipFromMm = layer.Discrete[b] ? patch.DiscreteFromMm(_particle) : float.MaxValue;
                     float mean = flux * layer.Area[b] * dt;
                     switch (layer.Kind)
                     {
@@ -156,7 +189,7 @@ public sealed class RainSynth
                             break;
                         case RainSurfaceKind.Hard:
                         {
-                            float puddle = RainSurfaces.PuddleShare(rate);
+                            float puddle = _particle is PrecipitationKind.Rain or PrecipitationKind.FreezingRain ? RainSurfaces.PuddleShare(rate) : 0f;
                             Drops(mean * (1f - puddle), near, scale, RainSurfaceKind.Hard, 1f, null, false);
                             Drops(mean * puddle, near, scale, RainSurfaceKind.Pool, 1f, null, false);
                             break;
@@ -175,18 +208,19 @@ public sealed class RainSynth
                             _leaf = false;
                             Drops(mean * (1f - caught), near, scale, layer.UnderKind, layer.UnderStretch, null, false);
                             // What the leaves catch leaves them as drips: the same water, in big drops.
-                            float dripVolume = MathF.PI / 6f * MathF.Pow(RainSurfaces.DripDiameterMm * 1e-3f, 3f);
-                            float drips = caught * rate / 3.6e6f / dripVolume * layer.Area[b] * dt;
-                            Drips(drips, near, scale, layer);
+                            // Rain only: snow and ice do not drip off leaves.
+                            if (_particle is PrecipitationKind.Rain or PrecipitationKind.FreezingRain)
+                            {
+                                float dripVolume = MathF.PI / 6f * MathF.Pow(RainSurfaces.DripDiameterMm * 1e-3f, 3f);
+                                float drips = caught * rate / 3.6e6f / dripVolume * layer.Area[b] * dt;
+                                Drips(drips, near, scale, layer);
+                            }
                             break;
                         }
                     }
                 }
             }
         }
-        Array.Clear(_plateOut);
-        for (int i = 0; i < MaxPlates; i++)
-            if (_plates[i].Active) _plates[i].Render(_plateOut, _sum, PlatePart);
     }
 
     /// <summary>Configures the plates for a new patch, keeping the ringing of any plate that is
@@ -240,11 +274,12 @@ public sealed class RainSynth
                        PlateState? plate, bool fromBelow)
     {
         if (mean <= 0f) return;
-        // One size class at a time (DropSizeTable.ClassEdgesMm): the big drops, few and loud, are
-        // rendered every one; only the swarm of small ones is stood for by a few.
-        for (int c = 0; c < DropSizeTable.Classes; c++)
+        // One size class at a time (ParticleSpectrum): the big drops, few and loud, are rendered every
+        // one; only the swarm of small ones is stood for by a few.
+        for (int c = 0; c < ParticleSpectrum.Classes; c++)
         {
-            int real = _sum.Poisson(mean * _sizes.ClassShare(c));
+            if (_spec.ClassFloorMm(c) >= _skipFromMm) break;      // played one by one, elsewhere
+            int real = _sum.Poisson(mean * _spec.ClassShare(c));
             if (real == 0) continue;
             int n = Math.Min(real, PerClass[c]);
             float weight = MathF.Sqrt(real / (float)n);
@@ -252,8 +287,9 @@ public sealed class RainSynth
             for (int k = 0; k < n; k++)
             {
                 int at = (int)(_sum.Uniform() * Block);
-                float d = _sizes.DrawIn(c, _sum.Uniform());
-                float v = Rainfall.TerminalSpeed(d);
+                float d = _spec.DrawIn(c, _sum.Uniform());
+                if (d >= _skipFromMm) continue;
+                float v = Hydrometeors.FallSpeed(_particle, d);
                 // Somewhere in the bin's ring: the bin's distance holds its 1/r², so the jitter is
                 // around it, not added to it.
                 float r = distance * (0.8f + 0.4f * _sum.Uniform());
@@ -276,7 +312,10 @@ public sealed class RainSynth
             float h = layer.DripFallMetres * (0.5f + _sum.Uniform());
             float v = vt * MathF.Sqrt(1f - MathF.Exp(-2f * 9.81f * h / (vt * vt)));
             float r = distance * (0.8f + 0.4f * _sum.Uniform());
+            var was = _particle;
+            _particle = PrecipitationKind.Rain;
             Land(at, d, v, r, weight, scale, layer.UnderKind, layer.UnderStretch, null, false);
+            _particle = was;
         }
     }
 
@@ -289,6 +328,11 @@ public sealed class RainSynth
         float tau = rmm * 1e-3f / v;
         // Clicks and bubbles radiate along the surface's normal (RainLayer.Aim); a leaf faces every way.
         float atEar = scale / MathF.Max(0.3f, r) * (_leaf ? 1f : _aim);
+        if (_particle is not (PrecipitationKind.Rain or PrecipitationKind.FreezingRain))
+        {
+            Solid(at, d, v, weight, atEar, kind, stretch, plate, fromBelow);
+            return;
+        }
         float law = FallingWaterSynth.ImpactPascals * MathF.Pow(rmm * v / 5f, 1.5f) * weight * atEar;
         switch (kind)
         {
@@ -320,12 +364,89 @@ public sealed class RainSynth
             {
                 if (!fromBelow) Click(at, d, v, HardClickGain * law, 1f);
                 if (plate == null) break;
-                plate.Inject(at, d, v, weight * weight, _sum.Uniform(), _sum.Uniform());
-                // The struck spot's thud: ρ0 F(t) / (2π m″ r), the shape of the blow itself.
-                float blow = RainPlate.BlowSeconds(d, v);
-                float thud = plate.Plate.ForcedPeak(d, v, 1f) * weight * atEar * PlatePart;
-                _sum.Impact(at, RainPlate.BlowPeakAt * blow, 2f * blow, thud);
+                Strike(at, plate, RainPlate.Impulse(d, v), RainPlate.BlowSeconds(d, v), weight, atEar);
                 break;
+            }
+        }
+    }
+
+    /// <summary>A blow of this momentum (N·s) over this time (s) into a plate: its ringing, and the
+    /// struck spot's thud, ρ0 F(t) / (2π m″ r), the shape of the blow itself.</summary>
+    private void Strike(int at, PlateState plate, float impulse, float blow, float weight, float atEar)
+    {
+        plate.Inject(at, impulse, blow, weight * weight, _sum.Uniform(), _sum.Uniform());
+        float peak = impulse / (blow * RainPlate.BlowShapeArea);
+        float thud = WallTransmission.AirDensity * peak / (2f * MathF.PI * plate.Plate.SurfaceDensity) * weight * atEar * PlatePart;
+        _sum.Impact(at, RainPlate.BlowPeakAt * blow, 2f * blow, thud);
+    }
+
+    /// <summary>The surface's Young's modulus, GPa: what an ice sphere's contact time depends on.</summary>
+    private float _modulus = 30f;
+
+    /// <summary>
+    /// A particle that is not a drop: an ice pellet or a hailstone, which strikes and bounces, or a
+    /// snowflake, which crushes.
+    ///
+    /// Ice is a hard sphere, and the air hears it stop: the acceleration noise of a rigid body, the
+    /// dipole of its own deceleration, p ≈ 3 ρ0 V Δv / (4π c r τ²) at its peak with the ground's image
+    /// doubling it (Koss and Alfredson 1973, J. Sound Vib. 27, 59-75, for spheres in collision), over
+    /// the Hertz contact time τ against whatever it hits (Hydrometeors.HertzSeconds) — tens of
+    /// microseconds on a road, so a sharp, bright tick, where a drop of the same size splats over a
+    /// millimetre of time. It keeps some of its speed (Hydrometeors.Restitution) and lands again: a
+    /// bounce, as hail does, heard when it comes down within the half second this can look ahead.
+    /// Into water it is a plunge: a click and the bubble its cavity closes on. On leaves and grass the
+    /// contact is soft and long: a thud.
+    ///
+    /// A snowflake is mostly air: it stops over its own size at a metre a second, and its dipole is
+    /// thousands of times weaker. Snow falling is nearly silent, as it is.
+    /// </summary>
+    private void Solid(int at, float d, float v, float weight, float atEar, RainSurfaceKind kind, float stretch,
+                       PlateState? plate, bool fromBelow)
+    {
+        bool ice = Hydrometeors.IsIce(_particle);
+        float mass = Hydrometeors.Mass(_particle, d);
+        float size = ice ? d : d * Hydrometeors.FlakeSwell;
+        float volume = MathF.PI / 6f * MathF.Pow(size * 1e-3f, 3f);
+        if (kind == RainSurfaceKind.Pool)
+        {
+            if (!ice) return;                                        // snow on water melts in silence
+            float rmm = 0.5f * d;
+            float law = FallingWaterSynth.ImpactPascals * MathF.Pow(rmm * v / 5f, 1.5f) * weight * atEar;
+            _sum.Impact(at, ImpactRise, rmm * 1e-3f / v, law * ClickPart);
+            // The cavity a solid sphere drags down closes on a bubble about its own size.
+            Bubble(at + (int)(0.01f * _rate * (0.5f + _sum.Uniform())), rmm * (0.5f + 0.5f * _sum.Uniform()), weight * atEar);
+            return;
+        }
+        float modulus = kind == RainSurfaceKind.Plate ? plate?.Plate.Properties.YoungsModulusGPa ?? _modulus
+                      : kind == RainSurfaceKind.Soft ? MathF.Min(_modulus, 0.05f) : _modulus;
+        float e = ice ? Hydrometeors.Restitution(modulus) : 0f;
+        float contact = ice ? Hydrometeors.HertzSeconds(_particle, d, v, modulus) : Hydrometeors.FlakeCrushSeconds(d, v);
+        contact *= kind == RainSurfaceKind.Soft ? MathF.Max(1f, stretch) : 1f;
+        float impulse = mass * v * (1f + e);
+        if (!(kind == RainSurfaceKind.Plate && fromBelow))
+        {
+            float peak = 3f * WallTransmission.AirDensity * volume * v * (1f + e)
+                         / (4f * MathF.PI * WallTransmission.SoundSpeed * contact * contact) * weight * atEar;
+            // The click's shape (the blow's derivative) at the contact's length; its energy is the peak
+            // held over about a quarter of the contact.
+            float tauSamples = MathF.Max(ShapeMinSamples, 0.8f * contact * _rate);
+            ClickEnergy(at, tauSamples, peak * peak * 0.25f * contact);
+        }
+        if (kind == RainSurfaceKind.Plate && plate != null) Strike(at, plate, impulse, contact, weight, atEar);
+        // The bounce, if it lands inside what can be looked ahead.
+        if (ice && e > 0.2f)
+        {
+            float up = e * v;
+            int later = at + (int)(2f * up / 9.81f * _rate);
+            if (later < Block + _sum.Horizon / 2)
+            {
+                float rebound = up;
+                float c2 = Hydrometeors.HertzSeconds(_particle, d, rebound, modulus);
+                float peak2 = 3f * WallTransmission.AirDensity * volume * rebound * (1f + e)
+                              / (4f * MathF.PI * WallTransmission.SoundSpeed * c2 * c2) * weight * atEar;
+                if (!(kind == RainSurfaceKind.Plate && fromBelow))
+                    ClickEnergy(later, MathF.Max(ShapeMinSamples, 0.8f * c2 * _rate), peak2 * peak2 * 0.25f * c2);
+                if (kind == RainSurfaceKind.Plate && plate != null && later < Block) Strike(later, plate, mass * rebound * (1f + e), c2, weight, atEar);
             }
         }
     }
@@ -356,7 +477,14 @@ public sealed class RainSynth
     {
         if (spikePascals <= 0f || ClickPart <= 0f) return;
         float energy = spikePascals * spikePascals * ImpactRise * 1.7724539f / (stretch * stretch * stretch);
-        float tauSamples = RainSurfaces.SplashSeconds(d, v) * stretch * _rate;
+        ClickEnergy(at, RainSurfaces.SplashSeconds(d, v) * stretch * _rate, energy);
+    }
+
+    /// <summary>A click of this time scale (samples) carrying this energy (Pa²·s at the ear).</summary>
+    private void ClickEnergy(int at, float tauSamples, float energy)
+    {
+        if (!(energy > 0f) || ClickPart <= 0f) return;
+        if (at < 0 || at >= ClickRing - MaxShape - Block) return;
         var shape = ClickShape(tauSamples);
         float gain = MathF.Sqrt(energy * _rate) * ClickPart;
         long start = _clickNow + at + 1;
@@ -376,7 +504,7 @@ public sealed class RainSynth
                                0, _shapes.Length - 1);
         if (_shapes[index] is { } made) return made;
         float tau = ShapeMinSamples * MathF.Pow(2f, index / ShapeStepsPerOctave);
-        int length = Math.Min(ClickRing - Block - 2 * OnsetHalf, (int)((RainPlate.BlowPeakAt + 7f * RainPlate.BlowFall) * tau) + 2);
+        int length = Math.Min(MaxShape - 2 * OnsetHalf, (int)((RainPlate.BlowPeakAt + 7f * RainPlate.BlowFall) * tau) + 2);
         // The blow's sample-to-sample steps (see Click).
         var raw = new float[length];
         float prev = 0f;
@@ -427,7 +555,9 @@ public sealed class RainSynth
         return _onsetKernel = k;
     }
 
-    private const int ClickRing = 1 << 13;
+    private const int ClickRing = 1 << 15;          // 0.68 s: a hailstone's bounce lands inside it
+    /// <summary>The longest click, samples: a tenth of a second.</summary>
+    private const int MaxShape = 4800;
     private readonly float[] _clicks = new float[ClickRing];
     private long _clickNow;
 
@@ -541,11 +671,12 @@ public sealed class RainSynth
             }
         }
 
-        public void Inject(int at, float d, float v, float energyWeight, float x, float y)
+        /// <summary>A blow of this momentum (N·s) lasting this long (s), at a block offset.</summary>
+        public void Inject(int at, float impulse, float seconds, float energyWeight, float x, float y)
         {
-            if (_pending >= MaxPending) return;
+            if (_pending >= MaxPending || at < 0 || at >= 128) return;
             int i = _pending++;
-            _pAt[i] = at; _pD[i] = d; _pV[i] = v; _pW[i] = energyWeight; _pX[i] = x; _pY[i] = y;
+            _pAt[i] = at; _pD[i] = impulse; _pV[i] = seconds; _pW[i] = energyWeight; _pX[i] = x; _pY[i] = y;
         }
 
         public void Render(float[] output, EventSum rng, float part)
@@ -592,13 +723,12 @@ public sealed class RainSynth
 
         private void Blow(int i)
         {
-            float d = _pD[i], v = _pV[i], w = _pW[i];
-            float tau = RainPlate.BlowSeconds(d, v);
+            float momentum = _pD[i], tau = _pV[i], w = _pW[i];
             // Modes: the blow's momentum at each mode's frequency, through the mode's shape where it
             // landed, into the bay's modal mass. Weighted in amplitude by √ of the energy weight.
             if (_modes > 0)
             {
-                float impulse = RainPlate.Impulse(d, v) * MathF.Sqrt(w) / _modalMass;
+                float impulse = momentum * MathF.Sqrt(w) / _modalMass;
                 float px = MathF.PI * _pX[i], py = MathF.PI * _pY[i];
                 for (int k = 0; k < _modes; k++)
                 {
@@ -608,7 +738,8 @@ public sealed class RainSynth
             }
             if (_bands > 0)
             {
-                float energy = _mobility * RainPlate.BlowEnergy(d, v) * w;
+                float peak = momentum / (tau * RainPlate.BlowShapeArea);
+                float energy = _mobility * peak * peak * tau * RainPlate.BlowShapeEnergy * w;
                 for (int b = 0; b < _bands; b++)
                 {
                     float e = energy * RainPlate.BlowShare(tau, _lo[b], _hi[b]);

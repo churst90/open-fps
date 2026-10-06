@@ -24,7 +24,7 @@ namespace OpenFPS.Server.Core;
 public partial class CommandHandler
 {
     private const string WeatherUsage =
-        "Usage: /weather, /weather clear, rain, snow or storm, /weather rain light, moderate, heavy, violent or a rate in millimetres an hour, /weather wind SPEED [DIRECTION] [steady, gusty or very gusty], or /weather auto.";
+        "Usage: /weather, /weather clear, rain, snow or storm, /weather drizzle, /weather rain light, moderate, heavy or extreme, or a rate in millimetres an hour, or dBZ, and drops then a size, /weather freezing rain, /weather sleet, /weather snow light, moderate or heavy, /weather hail pea, marble, quarter, golf or baseball, /weather wind SPEED [DIRECTION] [steady, gusty or very gusty], or /weather auto.";
 
     private void HandleWeather(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -33,8 +33,8 @@ public partial class CommandHandler
         {
             var now = env.GetCurrentState();
             string held = env.Pinned ? " Held until /weather auto." : " It changes on its own.";
-            if (env.HeldRainRate is float r)
-                held = $" Rain {r.ToString("0.#", CultureInfo.InvariantCulture)} millimetres an hour, {Rainfall.Word(Rainfall.Category(r))}.{held}";
+            if (env.HeldPrecipitation is { } falling)
+                held = " " + DescribePrecipitation(falling) + held;
             Say(reply, $"{ScenarioWord(env.CurrentScenario)}. {DescribeWind(now.WindVelocity, now.WindGustiness)} " +
                        $"{now.Temperature.ToString("F0", CultureInfo.InvariantCulture)} degrees.{held}");
             return;
@@ -48,18 +48,7 @@ public partial class CommandHandler
             return;
         }
 
-        if (first == "rain" && args.Length > 1)
-        {
-            if (!Rainfall.TryParseRate(args[1], out float rate))
-            {
-                Say(reply, "Say light, moderate, heavy or violent, or a rate in millimetres an hour up to 60.");
-                return;
-            }
-            env.PinRain(rate);
-            _server.BroadcastEnvironment();
-            Say(reply, $"Rain, {Rainfall.Word(Rainfall.Category(rate))}, {rate.ToString("0.#", CultureInfo.InvariantCulture)} millimetres an hour, coming in.");
-            return;
-        }
+        if (TryHandlePrecipitation(first, args, env, reply)) return;
 
         if (Enum.TryParse<WeatherType>(first, ignoreCase: true, out var scenario) && !int.TryParse(first, out _))
         {

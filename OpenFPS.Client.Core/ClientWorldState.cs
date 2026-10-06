@@ -130,6 +130,7 @@ public class ClientWorldState
     /// <summary>The rain rate, mm/h, as the server worked it out.</summary>
     public float CurrentRainRate { get { lock(_envLock) return _rainRate; } }
     private float _rainRate;
+    private Precipitation _precipitation = Precipitation.None;
     public float CurrentTemperature { get { lock(_envLock) return _env.Temperature; } }
     public float CurrentWindGustiness { get { lock(_envLock) return _env.WindGustiness; } }
     public Vector3 CurrentWindVelocity { get { lock(_envLock) return _env.WindVelocity; } }
@@ -146,6 +147,8 @@ public class ClientWorldState
             _env.WindGustiness = Math.Clamp(update.WindGustiness, 0f, 1f);
             _env.PrecipitationIntensity = update.PrecipitationIntensity;
             _rainRate = update.RainRateMmPerHour;
+            _precipitation = new Precipitation((PrecipitationKind)Math.Clamp(update.PrecipitationKind, 0, 4),
+                                               update.RainRateMmPerHour, update.RainMedianDropMm, update.HailDiameterMm);
         }
         // The wind every tree, fire and ear on the map reads: this broadcast, reached from the last one
         // over a second so it never lands as a step (WindWeather). The session hands it to WindField;
@@ -715,6 +718,7 @@ public class ClientWorldState
             snap.WindGustiness = _env.WindGustiness;
             snap.PrecipitationIntensity = _env.PrecipitationIntensity;
             snap.RainRateMmPerHour = _rainRate;
+            snap.Precipitation = _precipitation;
         }
 
         foreach (var kvp in _definitions)

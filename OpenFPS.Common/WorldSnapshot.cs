@@ -60,6 +60,8 @@ public class WorldSnapshot
     public float PrecipitationIntensity = 0.0f;
     /// <summary>How hard it is raining, mm/h; zero when dry or when what falls is snow (Rainfall).</summary>
     public float RainRateMmPerHour = 0.0f;
+    /// <summary>What is falling and how big (Precipitation): the rate above is its water equivalent.</summary>
+    public Precipitation Precipitation = OpenFPS.Common.Precipitation.None;
 }
 
 /// <summary>

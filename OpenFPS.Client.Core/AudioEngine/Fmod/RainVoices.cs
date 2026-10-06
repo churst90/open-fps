@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using System.Threading;
 using OpenFPS.Client.AudioEngine.Core.Nature;
+using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -15,9 +16,24 @@ public sealed class RainFeed
     /// <summary>The surfaces this voice renders. Replaced whole by the survey, never edited.</summary>
     public volatile RainPatch? Patch;
 
-    private float _rate;
-    /// <summary>The rain rate, mm/h.</summary>
+    private float _rate, _median, _hail;
+    private int _kind;
+    /// <summary>The rain rate, mm/h (the water-equivalent rate of whatever falls).</summary>
     public float Rate { get => Volatile.Read(ref _rate); set => Volatile.Write(ref _rate, value); }
+
+    /// <summary>What falls: its kind, rate and sizes. Written field by field; a block that reads it
+    /// mid-change renders one block of the old size at the new rate, which nobody can hear.</summary>
+    public Precipitation Falling
+    {
+        get => new((PrecipitationKind)Volatile.Read(ref _kind), Volatile.Read(ref _rate), Volatile.Read(ref _median), Volatile.Read(ref _hail));
+        set
+        {
+            Volatile.Write(ref _kind, (int)value.Kind);
+            Volatile.Write(ref _median, value.MedianDropMm);
+            Volatile.Write(ref _hail, value.HailMm);
+            Volatile.Write(ref _rate, value.RateMmPerHour);
+        }
+    }
 
     private float _levelDb = float.NaN;
     /// <summary>The level the voice is rendering at, as dB at a metre of a source placed at the
@@ -103,7 +119,7 @@ public sealed class RainVoiceState : PhysicalVoiceState
     protected override void Control(float seconds, float dt)
     {
         Synth.Patch = _feed.Patch;
-        Synth.RainRate = _feed.Rate;
+        Synth.Falling = _feed.Falling;
         if (_measured > 0)
         {
             double ms = Math.Max(FloorMeanSquare, _meanSquare);

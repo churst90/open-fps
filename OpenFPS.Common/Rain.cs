@@ -143,12 +143,14 @@ public static class Rainfall
 
     /// <summary>
     /// A raindrop's terminal speed, m/s, for its diameter in mm: Atlas et al. (1973), which is within
-    /// a few per cent of Gunn and Kinzer's measurements from 0.3 mm up. Under that the fit runs to zero
-    /// where the real drops still fall at a quarter of a metre a second or more, so it is held off the
-    /// floor by Gunn and Kinzer's own figure for a 0.1 mm drop.
+    /// a few per cent of Gunn and Kinzer's measurements from 0.6 mm up. Under that the fit runs to zero
+    /// where drizzle drops still fall at a quarter of a metre a second or more; there Gunn and Kinzer's
+    /// own table is nearly a straight line, 4.5 D − 0.18 m/s (0.27 at 0.1 mm, 1.17 at 0.3, 2.06 at 0.5).
     /// </summary>
     public static float TerminalSpeed(float diameterMm)
-        => MathF.Max(0.27f, 9.65f - 10.3f * MathF.Exp(-0.6f * diameterMm));
+        => diameterMm < 0.6f
+            ? MathF.Max(0.27f, 4.5f * diameterMm - 0.18f)
+            : 9.65f - 10.3f * MathF.Exp(-0.6f * diameterMm);
 
     /// <summary>Marshall-Palmer's number density as published, per m³ per mm, before the closure.</summary>
     public static float MarshallPalmerDensity(float rate, float diameterMm)

@@ -50,9 +50,16 @@ public sealed class RainLayer
     /// </summary>
     public readonly float[] Aim = new float[MaxBins];
 
+    /// <summary>The bin is near enough that its biggest drops are played one by one, each where it
+    /// lands (RainPatch.DiscreteFromMm, NearDrops); the patch renders only the rest of it.</summary>
+    public readonly bool[] Discrete = new bool[MaxBins];
+
+    /// <summary>The surface's Young's modulus, GPa: how long an ice sphere's contact with it lasts.</summary>
+    public float ModulusGPa = 30f;
+
     /// <summary>Adds an area at a distance, facing the ear at <paramref name="aim"/> (see
     /// <see cref="Aim"/>): to the bin of that ring, or a new one.</summary>
-    public void Add(int ring, float area, float distance, float aim = 1f)
+    public void Add(int ring, float area, float distance, float aim = 1f, bool discrete = false)
     {
         if (area <= 0f) return;
         distance = MathF.Max(0.3f, distance);
@@ -79,6 +86,7 @@ public sealed class RainLayer
         Area[Bins] = area;
         Distance[Bins] = distance;
         Aim[Bins] = aim;
+        Discrete[Bins] = discrete;
         Bins++;
     }
 
@@ -123,4 +131,10 @@ public sealed class RainPatch
     /// listener times this, which is the level at a metre of a source the mixer then places at this
     /// distance with this extent — so the mixer's law hands back exactly what arrived.</summary>
     public float ReferenceDistance = 1f;
+
+    /// <summary>From what size up (mm) the drops in this patch's near bins (RainLayer.Discrete) are
+    /// played one by one instead, by kind of particle: the rain's, and hail's. Infinite: none are.</summary>
+    public float DiscreteRainFromMm = float.MaxValue, DiscreteHailFromMm = float.MaxValue;
+
+    public float DiscreteFromMm(PrecipitationKind kind) => kind == PrecipitationKind.Hail ? DiscreteHailFromMm : DiscreteRainFromMm;
 }

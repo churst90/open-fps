@@ -1933,6 +1933,7 @@ public class GameServer
                     : MapAtmosphere.Default;
 
                 var state = _environment.GetStateForMap(atmosphere);
+                var falling = _environment.PrecipitationFor(state);
                 update = new WorldStateUpdate {
                     GameTime = state.GameTime,
                     Temperature = state.Temperature, Humidity = state.Humidity,
@@ -1940,7 +1941,10 @@ public class GameServer
                     WindVelocity = state.WindVelocity,
                     WindGustiness = state.WindGustiness, PrecipitationIntensity = state.PrecipitationIntensity,
                     WindClock = clock, WindTravelEast = travel.East, WindTravelNorth = travel.North,
-                    RainRateMmPerHour = _environment.RainRate(state),
+                    RainRateMmPerHour = falling.RateMmPerHour,
+                    PrecipitationKind = (int)falling.Kind,
+                    RainMedianDropMm = falling.MedianDropMm,
+                    HailDiameterMm = falling.HailMm,
                 };
                 perMap[session.CurrentMapId] = update;
             }

@@ -323,7 +323,7 @@ public sealed class RainSurvey
             }).Add(ring, area * glass, d, aim);
             return;
         }
-        var layer = new RainLayer { Kind = thing.Kind, Material = thing.Material };
+        var layer = new RainLayer { Kind = thing.Kind, Material = thing.Material, ModulusGPa = AcousticRegistry.GetProperties(Known(thing.Material)).YoungsModulusGPa };
         switch (thing.Kind)
         {
             case RainSurfaceKind.Plate:
@@ -704,6 +704,7 @@ public sealed class RainField
     private readonly double[] _pathAt = new double[RainFeeds.Slots];
     private int _nextPath;
     private double _dryFrom = double.NaN;
+    private Precipitation _falling;
     private System.Threading.Tasks.Task<RainSurvey.Result>? _pending, _running;
     private int _surveys;
     private bool _surveyFailed;
@@ -721,10 +722,13 @@ public sealed class RainField
 
     public void Update(WorldSnapshot world, Vector3 ear, double now, int listenerRegion, int ownEntityId, int ridingEntityId)
     {
-        float rate = world.RainRateMmPerHour;
         (_humidity, _temperature, _pressure, _airMultiplier) = (world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
-        for (int s = 0; s < RainFeeds.Slots; s++) RainFeeds.Feed[s].Rate = rate;
-        if (!(rate > 0f))
+        var falling = world.Precipitation.Falling ? world.Precipitation
+                    : new Precipitation(PrecipitationKind.Rain, world.RainRateMmPerHour);
+        float rate = falling.RateMmPerHour;
+        for (int s = 0; s < RainFeeds.Slots; s++) RainFeeds.Feed[s].Falling = falling;
+        _falling = falling;
+        if (!falling.Falling)
         {
             if (double.IsNaN(_dryFrom)) _dryFrom = now;
             if (now - _dryFrom > StopAfterSeconds) Stop();
