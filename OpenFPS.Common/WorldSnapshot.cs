@@ -58,6 +58,8 @@ public class WorldSnapshot
     public Vector3 WindVelocity = Vector3.Zero;
     public float WindGustiness = 0.0f;
     public float PrecipitationIntensity = 0.0f;
+    /// <summary>How hard it is raining, mm/h; zero when dry or when what falls is snow (Rainfall).</summary>
+    public float RainRateMmPerHour = 0.0f;
 }
 
 /// <summary>

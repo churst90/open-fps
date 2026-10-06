@@ -365,6 +365,7 @@ public class ClientAudioSystem
         WorldAudio.HornReceived = StartHorn;
         WorldAudio.Ground = ApplyRecordedGround;
         _birds = new BirdLife(audio, _acoustics);
+        _rain = new RainField(audio, _acoustics);
         WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
         _audio.RoutesSource = () => _acoustics.Routes;
         _acousticWorker = new AsyncAcousticWorker(_acoustics);
@@ -420,6 +421,7 @@ public class ClientAudioSystem
         _mapAmbienceId = "";
         _regionAmbienceId = "";
         _ambienceRegionId = int.MinValue;
+        _rain.Stop();
         _audio.StopAllWorldSounds();
         // Nobody is standing anywhere: no wind at the ears until the next map.
         _audio.SetEarWind(null);
@@ -837,6 +839,7 @@ public class ClientAudioSystem
         _partMs[3] += Ms(partAt);
         partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _birds.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
+        _rain.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
         _partMs[2] += Ms(partAt);
 
         // Every source has now been offered to the reflection system; it can work out what the
@@ -1849,6 +1852,9 @@ public class ClientAudioSystem
 
     /// <summary>The birds: found from the map's foliage and roofs, not placed. See BirdLife.</summary>
     private readonly BirdLife _birds;
+
+    /// <summary>The rain round the listener: the surfaces it lands on, as a few voices. See RainField.</summary>
+    private readonly RainField _rain;
 
     /// <summary>Vehicles carrying a siren, found this frame.</summary>
     private readonly HashSet<int> _sirenCars = new();

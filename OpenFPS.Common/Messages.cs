@@ -658,4 +658,7 @@ public partial class WorldStateUpdate : IMessage
     public double WindClock;
     public double WindTravelEast;
     public double WindTravelNorth;
+    /// <summary>The rain rate the precipitation is, mm/h: zero when dry or snowing (Rainfall.RateFor,
+    /// worked out on the server so every client hears the same rain).</summary>
+    public float RainRateMmPerHour;
 }

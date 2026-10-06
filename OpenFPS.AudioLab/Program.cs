@@ -83,6 +83,7 @@ string[] usage =
     "  --nature [levels|render out=DIR] [preset ...] water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
     "  --weather-wind [out=DIR] [sec=] [ears|trees]  the wind at your ears by speed and heading, a 360 turn, and a tree under /weather",
     "  --thunder [out=DIR] [seed=] [city=x,z] [nowav] thunder at 0.1-15 km, ground and cloud flashes, open field and a city street",
+    "  --rain [levels|render out=DIR|physics|survey map= ear=] [scene ...] [rate=]  rain on the surfaces round a listener, by rate",
     "  --models [export=DIR]                         the model library's ids, or each as JSON",
     "  --aircraft / --landing / --spool [preset]     flyovers, arrivals, and an engine against its lever",
     "  --train / --crossing / --airbrake / --signals trains, a level crossing, air brakes, horns and bells",
@@ -490,6 +491,13 @@ if (args.Contains("--nature"))
     // --nature [levels|render out=DIR|compare=FILE.wav] [preset ...] [sec= wind=]: water, fire and
     // the wind in leaves, rendered from their models and measured against recordings.
     Environment.Exit(OpenFPS.AudioLab.Spikes.NatureSpike.Run(args));
+}
+
+if (args.Contains("--rain"))
+{
+    // --rain [levels|render out=DIR|physics|survey map= ear=|compare=FILE.wav] [scene ...] [rate= sec=]:
+    // rain surveyed and rendered as the game does it, measured at light, moderate, heavy and violent.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.RainSpike.Run(args));
 }
 
 if (args.Contains("--earshot"))

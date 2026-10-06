@@ -1940,6 +1940,7 @@ public class GameServer
                     WindVelocity = state.WindVelocity,
                     WindGustiness = state.WindGustiness, PrecipitationIntensity = state.PrecipitationIntensity,
                     WindClock = clock, WindTravelEast = travel.East, WindTravelNorth = travel.North,
+                    RainRateMmPerHour = WorldEnvironmentSystem.RainRateFor(state),
                 };
                 perMap[session.CurrentMapId] = update;
             }

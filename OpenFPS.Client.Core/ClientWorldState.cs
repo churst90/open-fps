@@ -127,6 +127,9 @@ public class ClientWorldState
     private void Touch() => Interlocked.Increment(ref _version);
 
     public float CurrentPrecipitation { get { lock(_envLock) return _env.PrecipitationIntensity; } }
+    /// <summary>The rain rate, mm/h, as the server worked it out.</summary>
+    public float CurrentRainRate { get { lock(_envLock) return _rainRate; } }
+    private float _rainRate;
     public float CurrentTemperature { get { lock(_envLock) return _env.Temperature; } }
     public float CurrentWindGustiness { get { lock(_envLock) return _env.WindGustiness; } }
     public Vector3 CurrentWindVelocity { get { lock(_envLock) return _env.WindVelocity; } }
@@ -142,6 +145,7 @@ public class ClientWorldState
             _env.WindVelocity = update.WindVelocity;
             _env.WindGustiness = Math.Clamp(update.WindGustiness, 0f, 1f);
             _env.PrecipitationIntensity = update.PrecipitationIntensity;
+            _rainRate = update.RainRateMmPerHour;
         }
         // The wind every tree, fire and ear on the map reads: this broadcast, reached from the last one
         // over a second so it never lands as a step (WindWeather). The session hands it to WindField;
@@ -710,6 +714,7 @@ public class ClientWorldState
             snap.WindVelocity = _env.WindVelocity;
             snap.WindGustiness = _env.WindGustiness;
             snap.PrecipitationIntensity = _env.PrecipitationIntensity;
+            snap.RainRateMmPerHour = _rainRate;
         }
 
         foreach (var kvp in _definitions)

@@ -268,6 +268,14 @@ public class WorldEnvironmentSystem
         _env.DayOfYear = Math.Clamp(dayOfYear, 1, 365);
     }
 
+    /// <summary>
+    /// The rain the precipitation is, mm/h, as it falls on one map: the intensity as a rain rate
+    /// (Rainfall.RateFromIntensity: a drizzle at 0.1, moderate at the Rain front's 0.6, violent at the
+    /// Storm's 1.0), and nothing when the map's air is cold enough that what falls is snow.
+    /// </summary>
+    public static float RainRateFor(in WorldEnvironmentComponent state)
+        => Rainfall.RateFor(state.PrecipitationIntensity, state.Temperature);
+
     /// <summary>The global sky state, with no map applied. Callers that are about to send this to a
     /// player want <see cref="GetStateForMap"/> instead.</summary>
     public WorldEnvironmentComponent GetCurrentState() => _env;

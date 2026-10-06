@@ -2719,6 +2719,10 @@ public class FmodAudioProvider : IAudioProvider
                                                  mrate, emitter.EntityId * 41 + 13, emitter.Position),
                     "foliage" => new FoliageVoiceState(OpenFPS.Common.FoliageSpec.ByName(preset),
                                                        mrate, emitter.EntityId * 43 + 17, emitter.Position),
+                    // A patch of rain round the listener, fed by the rain survey. See RainVoiceState.
+                    "rain" => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot)
+                        ? new RainVoiceState(RainFeeds.Feed[rainSlot], mrate, rainSlot * 53 + 23)
+                        : null,
                     // A vehicle's horn, with the rhythm of the hand on it in the key. See Honk.
                     "horn" => OpenFPS.Common.Honk.TryParse(emitter.PhysicalKey, out var hornKey, out var rhythm)
                         ? new HornVoiceState(hornKey, rhythm, mrate, emitter.EntityId * 29 + 1)
