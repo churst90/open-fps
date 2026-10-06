@@ -203,6 +203,7 @@ public static class NatureSpike
                     s.DropBubblePart = Parts.Contains("drop") ? 1f : 0f;
                     s.LumpBubblePart = Parts.Contains("lump") ? 1f : 0f;
                     s.PlungePart = Parts.Contains("plunge") ? 1f : 0f;
+                    s.SplashPart = Parts.Contains("splash") ? 1f : 0f;
                 }
                 for (int i = 0; i < n; i += block)
                 {
