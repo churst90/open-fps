@@ -131,6 +131,15 @@ public class ClientWorldState
     public float CurrentRainRate { get { lock(_envLock) return _rainRate; } }
     private float _rainRate;
     private Precipitation _precipitation = Precipitation.None;
+    /// <summary>The water on this map's roads as the server last sent it (RoadWater): the texture, the
+    /// sheet and the puddles. Dry until a server sends one.</summary>
+    private readonly RoadWater _roadWater = new();
+    private float _roadWaterMm;
+    /// <summary>The water in a wheel path of an asphalt road now, mm (RoadWater.WaterMm 2.5 m from the
+    /// crown, no kerb, no puddle): for a vehicle whose wheels the server does not send.</summary>
+    public float CurrentRoadWaterMm { get { lock (_envLock) return _roadWaterMm; } }
+    /// <summary>The road water state, for an instrument. Read under no lock: a copy is not kept.</summary>
+    public RoadWater RoadWater => _roadWater;
     public float CurrentTemperature { get { lock(_envLock) return _env.Temperature; } }
     public float CurrentWindGustiness { get { lock(_envLock) return _env.WindGustiness; } }
     public Vector3 CurrentWindVelocity { get { lock(_envLock) return _env.WindVelocity; } }
@@ -147,6 +156,8 @@ public class ClientWorldState
             _env.WindGustiness = Math.Clamp(update.WindGustiness, 0f, 1f);
             _env.PrecipitationIntensity = update.PrecipitationIntensity;
             _rainRate = update.RainRateMmPerHour;
+            _roadWater.Load(update.RoadWater);
+            _roadWaterMm = _roadWater.WaterMm(RoadSurfaces.IndexOf(RoadData.DefaultSurface), 2.5f, float.PositiveInfinity, 0f);
             _precipitation = new Precipitation((PrecipitationKind)Math.Clamp(update.PrecipitationKind, 0, 4),
                                                update.RainRateMmPerHour, update.RainMedianDropMm, update.HailDiameterMm);
         }
@@ -747,6 +758,7 @@ public class ClientWorldState
             snap.PrecipitationIntensity = _env.PrecipitationIntensity;
             snap.RainRateMmPerHour = _rainRate;
             snap.Precipitation = _precipitation;
+            snap.RoadWaterMm = _roadWaterMm;
         }
 
         foreach (var kvp in _definitions)

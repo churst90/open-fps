@@ -2927,6 +2927,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 ServingStop = emitter.ServingStop,
                 WindowsOpen = emitter.WindowsOpen,
                 Interior = emitter.Interior,
+                RoadWaterMm = emitter.RoadWaterMm,
                 // Live: the loudness law applies to what the engine is doing now, not just to its
                 // declared level. See EngineVoiceState.CompensateLevel.
                 CompensateLevel = true,
@@ -3349,6 +3350,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     active.EngineState.WindowsOpen = emitter.WindowsOpen;
                     active.EngineState.RoadSlip = emitter.TyreSlip;
                     active.EngineState.Wheels = emitter.Wheels;
+                    active.EngineState.RoadWaterMm = emitter.RoadWaterMm;
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var local))
                         active.EngineState.SetListener(local);
                 }

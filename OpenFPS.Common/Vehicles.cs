@@ -316,6 +316,19 @@ public sealed record TyreProfile
     /// </summary>
     public float LoadSensitivity { get; init; } = -0.146f;
 
+    // ── Water ───────────────────────────────────────────────────────────────────────────────────
+    //
+    // What decides how a tyre meets a wet road (RoadWater, docs/WET_ROADS.md): its pressure sets the
+    // speed it aquaplanes at (Horne's 6.36 sqrt(p kPa) km/h for a flooded smooth tyre; Gallaway's
+    // equation for a treaded one), and its tread's grooves carry the water out of the contact patch,
+    // so a worn tyre or a slick lets a film lift it sooner.
+
+    /// <summary>Inflation pressure, kPa. The force data above are for the tyre at 2.2 bar.</summary>
+    public float InflationKPa { get; init; } = 220f;
+
+    /// <summary>Tread depth, mm: a car tyre is 8 mm new and 1.6 at the legal limit; a part-worn one, 5.</summary>
+    public float TreadDepthMm { get; init; } = 5f;
+
     /// <summary>A decent road tyre on dry asphalt.</summary>
     public static TyreProfile SportsOnAsphalt => new();
 
@@ -331,6 +344,8 @@ public sealed record TyreProfile
         // Narrower than a car tyre (120-180 mm against 225): about 4 dB less rolling noise each.
         ReferenceDb = 80f,
         PeakGripG = 1.1f,
+        // 2.5 bar front and 2.9 rear on a sports bike; 5-6 mm of tread new, 3 part-worn.
+        InflationKPa = 270f, TreadDepthMm = 3f,
     };
 
     /// <summary>
@@ -351,6 +366,8 @@ public sealed record TyreProfile
         // the reason it looks wrong, and the honest fix — the server sending the friction demand it
         // already computes from the racing line, banking included — is a protocol change for later.
         PeakGripG = 3.1f, SquealHz = 620f, SquealQ = 17f, SquealDb = 99f,
+        // No grooves at all, run at 1.4-1.8 bar hot: it aquaplanes on any film.
+        InflationKPa = 160f, TreadDepthMm = 0f,
     };
 
     /// <summary>A loaded truck tyre: coarse tread, a lot of roar, and it gives up early and groans.</summary>
@@ -358,6 +375,8 @@ public sealed record TyreProfile
     {
         TreadBlocks = 96, SurfaceRoughness = 0.72f, ReferenceDb = 85f,
         PeakGripG = 0.75f, SquealHz = 430f, SquealQ = 9f, SquealDb = 97f,
+        // 7.6 bar (110 psi) and 12 mm of tread part-worn (a drive tyre is 20-26 mm new).
+        InflationKPa = 760f, TreadDepthMm = 12f,
     };
 
     /// <summary>Every tyre by key, so a machine's parts list can name one (see MachinePart).</summary>

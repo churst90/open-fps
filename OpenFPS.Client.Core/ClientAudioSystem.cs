@@ -444,6 +444,9 @@ public class ClientAudioSystem
         OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
     }
 
+    /// <summary>The water in a wheel path of the roads, mm (WorldSnapshot.RoadWaterMm).</summary>
+    private float _roadWaterMm;
+
     /// <summary>
     /// Primary entry point called every frame from the Game Loop.
     /// Uses the VisualPosition for the listener to ensure smooth audio during server corrections.
@@ -941,6 +944,8 @@ public class ClientAudioSystem
 
         // Scale down precipitation intensity based on local shelter
         _state.PrecipitationIntensity = world.PrecipitationIntensity * (1.0f - _state.ShelterFactor);
+        // The water on the roads, for the vehicles whose wheels the server does not send.
+        _roadWaterMm = world.RoadWaterMm;
 
         // Update readable region for accessibility. Named by the boxes: in a doorway, which for sound is
         // the room on your side of it, you are told you are in the doorway.
@@ -2766,6 +2771,7 @@ public class ClientAudioSystem
             // corner would render pure broadband skid, a white-noise tail travelling with the field.
             TyreSlip = snap.TyreDemand,
             Wheels = snap.Wheels,
+            RoadWaterMm = _roadWaterMm,
 
             // Synthesis mapping
             IsGranular = def.SoundEmitter.IsGranular,
