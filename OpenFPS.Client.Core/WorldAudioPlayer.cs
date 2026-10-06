@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
@@ -56,6 +57,11 @@ public sealed class WorldAudioPlayer
         /// placed AS its source and then scaled by this, never by its own lowered level: see Play.</summary>
         public float CopyGain { get; init; }
         public float SourceLevelDb { get; init; }
+        /// <summary>A part of a strike's thunder. It stands for kilometres of lightning channel in one
+        /// direction, so it is placed <see cref="SkyOffset"/> from the listener wherever the listener
+        /// is, and gets only a sky sound's copies (see <see cref="MaxSkyRoomEchoes"/>).</summary>
+        public bool Sky { get; init; }
+        public Vector3 SkyOffset { get; init; }
     }
 
     private readonly AudioEngineFacade _audio;
@@ -111,6 +117,42 @@ public sealed class WorldAudioPlayer
     /// much off its physics. Written on the render worker, read when the sound plays.
     /// </summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, float> _fullScaleDb = new(StringComparer.Ordinal);
+
+    // ── Thunder ─────────────────────────────────────────────────────────────────────────────────
+    //
+    // A strike arrives as one sound whose key is the whole flash (LightningStrike). Its thunder is
+    // worked out here, for where this listener stands (Thunder.Render), on a worker: kilometres of
+    // channel, each bit arriving after its own distance over the speed of sound. What comes back is
+    // a few parts, one per direction the thunder comes from, each already carrying everything the
+    // way did to it (distance, the air, the ground, the shadow), and each is placed as a voice
+    // SkyProxyMetres off in its direction, so the city round the listener still blocks it, bends it
+    // and answers it as it does any one-off sound.
+
+    /// <summary>How far out a part of the thunder is placed, metres: the loudness law's largest
+    /// reference distance, so a part is placed at its reference and its level at the ear is the
+    /// level the law gives the peak it was rendered with. Nearer, the reference clamp would flatten
+    /// strikes to one level from further out (see Loudness.Place).</summary>
+    internal const float SkyProxyMetres = Loudness.MaxReferenceDistance;
+
+    /// <summary>
+    /// How many of the room's mirrors a part of the thunder gets (PlanRoomEchoes, strongest first,
+    /// no washes): a far source over a street is answered by the facade it shines on, inside the
+    /// fusion window. Each copy is the whole rumble for as long as it lasts, a voice for tens of
+    /// seconds, so two, not the twelve a clap gets; and no flutter, which is for impulses.
+    /// </summary>
+    internal const int MaxSkyRoomEchoes = 2;
+
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(LightningStrike Strike, double ReceivedAt, Vector3 Listener, List<Thunder.Part> Parts, long Ms, int Map)> _thunder = new();
+    /// <summary>Counts map changes (<see cref="Clear"/>): thunder rendered for the map you have left is
+    /// not played on the one you are on.</summary>
+    private int _mapGeneration;
+    /// <summary>One-off buffers to let go of once they have played: each strike's thunder is rendered
+    /// for one listener at one moment and never asked for again.</summary>
+    private readonly List<(string Id, double At)> _releases = new();
+    private Vector3 _lastListener;
+    private Thunder.Air _air = Thunder.Air.Standard;
+    private float _earAboveGround = 1.7f;
+    private int _thunderCount;
 
     /// <summary>
     /// How far a transient carries at most.
@@ -364,6 +406,11 @@ public sealed class WorldAudioPlayer
         }
         foreach (var sound in message.Sounds)
         {
+            if (LightningStrike.TryParseKey(sound.SynthKey, out var strike))
+            {
+                HearThunder(strike, now);
+                continue;
+            }
             string id = IdFor(sound, message.Seed);
             if (!_registered.Contains(id))
             {
@@ -400,6 +447,80 @@ public sealed class WorldAudioPlayer
     }
 
     /// <summary>
+    /// A lightning flash: its thunder worked out on a worker for where the listener is now, and queued
+    /// for its moment when it comes back (<see cref="QueueThunder"/>). The nearest thunder is heard a
+    /// third of a second after the flash at 100 m, and the render takes about half that.
+    /// </summary>
+    private void HearThunder(LightningStrike strike, double now)
+    {
+        var listener = _lastListener;
+        var air = _air;
+        int map = _mapGeneration;
+        var options = new Thunder.Options { EarAboveGround = _earAboveGround };
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                var parts = Thunder.Render(strike, listener, air, options);
+                _thunder.Enqueue((strike, now, listener, parts, sw.ElapsedMilliseconds, map));
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "[THUNDER] could not render strike {Key}", strike.Key());
+            }
+        });
+    }
+
+    /// <summary>Registers each part of a rendered strike and queues it, placed in its direction.</summary>
+    private void QueueThunder(LightningStrike strike, double receivedAt, Vector3 listener, List<Thunder.Part> parts, long ms, double now)
+    {
+        int n = ++_thunderCount;
+        var flat = new Vector2(strike.Centre.X - listener.X, strike.Centre.Z - listener.Z);
+        Serilog.Log.Information("[THUNDER] {Kind} {Km:F1} km away, bearing {Bearing:F0}; {Parts} part(s), loudest {Db:F0} dB SPL peak, "
+                              + "first heard {First:F1} s after the flash; rendered in {Ms} ms, queued {Late:F2} s after it arrived",
+            strike.Kind == FlashKind.CloudToGround ? "ground flash" : "cloud flash", flat.Length() / 1000f,
+            (MathF.Atan2(flat.X, flat.Y) * 180f / MathF.PI + 360f) % 360f, parts.Count,
+            parts.Count > 0 ? parts[0].PeakDb : 0f, parts.Count > 0 ? parts.Min(p => p.StartSeconds) : 0f, ms, now - receivedAt);
+        for (int k = 0; k < parts.Count; k++)
+        {
+            var part = parts[k];
+            if (part.PeakPa <= 0f || part.Pressure.Length == 0) continue;
+            // Full scale is the part's own peak: the level it is declared at.
+            var pcm = new float[part.Pressure.Length];
+            float g = 1f / part.PeakPa;
+            for (int i = 0; i < pcm.Length; i++) pcm[i] = part.Pressure[i] * g;
+            string id = $"synth:thunder:{strike.Seed}:{n}:{k}";
+            if (!_audio.RegisterSynthesisedSound(id, TransientSynth.ToPcm16(pcm), part.SampleRate)) continue;
+            _registered.Add(id);
+            var offset = part.Direction * SkyProxyMetres;
+            _pending.Add(new Pending
+            {
+                Sound = new TransientSound
+                {
+                    Character = SoundCharacter.Knock,
+                    Position = listener + offset,
+                    // Its peak at the ear, carried out to where it is placed.
+                    LevelDb = SkyLevelDb(part.PeakDb),
+                    DecaySeconds = part.Seconds,
+                    Noisiness = 1f,
+                },
+                SoundId = id,
+                SourceEntityId = -1,
+                DueAt = receivedAt + part.StartSeconds,
+                Seed = strike.Seed,
+                Sky = true,
+                SkyOffset = offset,
+            });
+            _releases.Add((id, receivedAt + part.StartSeconds + part.Seconds + 5.0));
+        }
+    }
+
+    /// <summary>The level a part of the thunder is declared at, dB SPL at a metre: its peak at the ear
+    /// carried out to <see cref="SkyProxyMetres"/>, where it is placed.</summary>
+    internal static float SkyLevelDb(float peakDbAtEar) => peakDbAtEar + 20f * MathF.Log10(SkyProxyMetres);
+
+    /// <summary>
     /// Submits everything whose moment has come, through the ordinary acoustic path.
     ///
     /// The source entity is ignored when the path is worked out, because a door must not be occluded
@@ -429,6 +550,24 @@ public sealed class WorldAudioPlayer
                 // The engine is not up yet. Forget it was ever asked for, so the next event asks again.
                 _rendering.Remove(done.Id);
             }
+        }
+
+        // The listener and the air, for the next strike's thunder; and any thunder that has come back.
+        _lastListener = listenerPosition;
+        _air = new Thunder.Air(world.Temperature, world.Humidity, world.AirPressure, world.WindVelocity);
+        if (Self != null)
+        {
+            float ear = listenerPosition.Y - Self().Feet.Y;
+            if (ear > 0.3f && ear < 3f) _earAboveGround = ear;
+        }
+        while (_thunder.TryDequeue(out var t))
+            if (t.Map == _mapGeneration) QueueThunder(t.Strike, t.ReceivedAt, t.Listener, t.Parts, t.Ms, now);
+        for (int i = _releases.Count - 1; i >= 0; i--)
+        {
+            if (now < _releases[i].At) continue;
+            _audio.ReleaseSynthesisedSound(_releases[i].Id);
+            _registered.Remove(_releases[i].Id);
+            _releases.RemoveAt(i);
         }
 
         // Sounds that were waiting on their first render: in time, they join the queue as if they
@@ -463,6 +602,13 @@ public sealed class WorldAudioPlayer
             // A door model plays at its own render's peak, the level its buffer's full scale stands for. A
             // copy keeps the level it was given from its source, which already had this.
             if (!item.IsReflection) item = item with { Sound = AtOwnLevel(item.Sound, _fullScaleDb) };
+            // A part of the thunder is out in its direction from wherever the listener is now.
+            if (item.Sky)
+            {
+                var sky = item.Sound;
+                sky.Position = listenerPosition + item.SkyOffset;
+                item = item with { Sound = sky };
+            }
             if (!item.IsReflection && item.Sound.OnBody && BodyNow(world, item.SourceEntityId, out var feet, out var facing))
             {
                 var onBody = item.Sound;
@@ -495,7 +641,12 @@ public sealed class WorldAudioPlayer
             // Not a driver's yell, which is said out of the window they have wound down to say it.
             bool inCabin = InCabin(world, item.SourceEntityId, item.Sound.Position, out var cabinCar, out var cabinVehicle)
                            && !item.IsReflection && !spoken;
-            if (!item.IsReflection && !spoken && !inCabin)
+            if (item.Sky)
+            {
+                QueueEarlyEchoes(item, world, listenerPosition, MaxSkyRoomEchoes, washes: false);
+                QueueReflections(item, reflections, listenerPosition, now, diffuse: false);
+            }
+            else if (!item.IsReflection && !spoken && !inCabin)
             {
                 QueueEarlyEchoes(item, world, listenerPosition);
                 QueueReflections(item, reflections, listenerPosition, now);
@@ -623,8 +774,21 @@ public sealed class WorldAudioPlayer
                 emitter.CarriesPath = true;
                 ThroughCabin(ref emitter, cabinCar, cabinVehicle, now);
             }
-            if (!inCabin && HearsTheGround(item, spoken)) Ground?.Invoke(ref emitter, world);
+            // Thunder carries its own ground reflection, worked out from where each bit of channel is.
+            if (!inCabin && !item.Sky && HearsTheGround(item, spoken)) Ground?.Invoke(ref emitter, world);
             _audio.Submit(emitter);
+
+            // A part of the thunder stays in its direction while the listener walks on under it.
+            if (item.Sky)
+                _following.Add(new Following
+                {
+                    Emitter = emitter,
+                    SourceEntityId = -1,
+                    Sky = true,
+                    Offset = item.SkyOffset,
+                    Until = now + Math.Max(0f, item.Sound.DecaySeconds - 0.1f),
+                    StartedAt = now,
+                });
 
             // A sound in a cabin rides with it, turning as it turns: a window's motor is in its door.
             if (inCabin)
@@ -757,6 +921,8 @@ public sealed class WorldAudioPlayer
         /// <summary>Not on a body at all: a sound travelling from <see cref="From"/> to <see cref="To"/>
         /// over <see cref="MoveSeconds"/>, off a panel facing <see cref="Face"/> (a sliding door's run).</summary>
         public bool Moving;
+        /// <summary>A part of the thunder: at <see cref="Offset"/> from the listener, wherever the listener is.</summary>
+        public bool Sky;
         public Vector3 From, To, Face;
         public float MoveSeconds;
     }
@@ -801,25 +967,27 @@ public sealed class WorldAudioPlayer
         {
             var f = _following[i];
             EntitySnapshot speaker = default;
-            if (now >= f.Until || (!f.Moving && !world.Entities.TryGetValue(f.SourceEntityId, out speaker))
+            if (now >= f.Until || (!f.Moving && !f.Sky && !world.Entities.TryGetValue(f.SourceEntityId, out speaker))
                 || (now - f.StartedAt > StartGraceSeconds && !_audio.IsPlaying(f.Emitter.EntityId)))
             {
                 _following.RemoveAt(i);
                 continue;
             }
-            var at = f.Moving ? TransientSound.FacingListener(
+            var at = f.Sky ? listenerPosition + f.Offset
+                   : f.Moving ? TransientSound.FacingListener(
                                     TransientSound.Along(f.From, f.To, f.MoveSeconds, (float)(now - f.StartedAt)), f.Face, listenerPosition)
                    : f.InCabin ? speaker.Transform.Position + Vector3.Transform(f.Offset, speaker.Transform.Rotation)
                    : f.BodyFrame ? speaker.Transform.Position + Vector3.Transform(f.Offset, Yaw(speaker.Transform.Rotation))
                    : speaker.Transform.Position + f.Offset;
             // The simulator's answer for the speaker, as for any other source; the hand-rolled tracer
             // only until it has one.
-            AskAbout(f.SourceEntityId, listenerPosition, at);
-            if (!TryAsked(f.SourceEntityId, at, out var path))
+            if (f.SourceEntityId >= 0) AskAbout(f.SourceEntityId, listenerPosition, at);
+            if (f.SourceEntityId < 0 || !TryAsked(f.SourceEntityId, at, out var path))
                 path = _acoustics.CalculateAcousticPath(world, f.SourceEntityId, listenerPosition, at);
             var e = f.Emitter;
             e.Position = at;
-            e.Velocity = f.Moving
+            e.Velocity = f.Sky ? Vector3.Zero
+                : f.Moving
                 ? (now - f.StartedAt < f.MoveSeconds ? (f.To - f.From) / MathF.Max(0.01f, f.MoveSeconds) : Vector3.Zero)
                 : speaker.Velocity;
             e.ApparentPosition = path.ApparentPosition;
@@ -838,7 +1006,7 @@ public sealed class WorldAudioPlayer
                 if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(speaker) is { } vehicle)
                     ThroughCabin(ref e, speaker, vehicle, now);
             }
-            else if (!f.Moving) Facing(ref e, speaker.Transform.Rotation, listenerPosition);
+            else if (!f.Moving && !f.Sky) Facing(ref e, speaker.Transform.Rotation, listenerPosition);
             _audio.Submit(e);
         }
     }
@@ -1018,8 +1186,10 @@ public sealed class WorldAudioPlayer
     private readonly List<EarlyReflections.Arrival> _room = new();
     private readonly List<RoomEcho> _roomPlan = new();
 
-    private void QueueEarlyEchoes(in Pending item, WorldSnapshot world, Vector3 listenerPosition)
+    private void QueueEarlyEchoes(in Pending item, WorldSnapshot world, Vector3 listenerPosition,
+                                  int maxMirrors = int.MaxValue, bool washes = true)
     {
+        int mirrors = 0;
         var solids = _acoustics.ReflectionSolids(world);
         if (solids.Count == 0) return;
         Vector3 src = item.Sound.Position;
@@ -1037,9 +1207,10 @@ public sealed class WorldAudioPlayer
             // The scattered share of a first-order wall, as the wall's wash rather than a copy: the
             // sound smeared by that surface's roughness, from the same place, carrying what the
             // mirror does not. A wall that scatters little sends back almost all of it as the crack.
-            if (e.WashGain >= ImageSource.MinGain) QueueWash(item, a, e.WashGain);
+            if (washes && e.WashGain >= ImageSource.MinGain) QueueWash(item, a, e.WashGain);
             float gain = e.MirrorGain;
             if (gain < ImageSource.MinGain) continue;
+            if (++mirrors > maxMirrors) break;
             var echo = item.Sound;
             echo.Position = a.ImagePosition;
             echo.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
@@ -1141,7 +1312,7 @@ public sealed class WorldAudioPlayer
     }
 
     private void QueueReflections(in Pending item, EngineReflections? reflections,
-                                  Vector3 listenerPosition, double now)
+                                  Vector3 listenerPosition, double now, bool diffuse = true)
     {
         if (reflections == null || reflections.SurfaceCount == 0) return;
 
@@ -1152,7 +1323,7 @@ public sealed class WorldAudioPlayer
         // skipped the obstruction test, and an echo that cannot be blocked is the one thing left when
         // the direct sound is — which is what "I only hear the reflections of the clapping" was.
         int n = reflections.FindReflections(item.Sound.Position, listenerPosition,
-                                            AudioPhysics.CurrentSpeedOfSound, found, DiffuseTaps);
+                                            AudioPhysics.CurrentSpeedOfSound, found, diffuse ? DiffuseTaps : 0);
         if (n == 0) return;
 
         float directDist = Vector3.Distance(item.Sound.Position, listenerPosition);
@@ -1160,6 +1331,8 @@ public sealed class WorldAudioPlayer
         for (int i = 0; i < n; i++)
         {
             var r = found[i];
+            // A scattered tap is a wash, rendered from the sound's own model, which thunder has not.
+            if (!diffuse && r.IsDiffuse) continue;
             // Inside the window the surface is already placed by QueueEarlyEchoes; this is the facade
             // up the street, a separate event.
             if (r.DelaySeconds <= RoomEchoWindowSeconds) continue;
@@ -1359,7 +1532,7 @@ public sealed class WorldAudioPlayer
 
     /// <summary>Forgets everything queued. Called on a map change, where the positions mean nothing
     /// any more and the things that made them are gone.</summary>
-    public void Clear() { _pending.Clear(); _awaitingRender.Clear(); _following.Clear(); }
+    public void Clear() { _pending.Clear(); _awaitingRender.Clear(); _following.Clear(); _mapGeneration++; }
 
     /// <summary>
     /// A sound's parameters ARE its identity.

@@ -81,6 +81,15 @@ internal class FmodResourceManager : IDisposable
     /// registered here is heard through a wall exactly as a recorded one would be, with none of those
     /// paths knowing that nobody recorded it.
     /// </summary>
+    /// <summary>Releases a registered synthesised buffer. Stops anything still playing it.</summary>
+    public bool ReleasePcm(string soundId)
+    {
+        if (string.IsNullOrEmpty(soundId) || !_cache.TryGetValue(soundId, out var sound)) return false;
+        _cache.Remove(soundId);
+        sound.release();
+        return true;
+    }
+
     public bool RegisterPcm(string soundId, byte[] pcm16Mono, int sampleRate)
     {
         if (string.IsNullOrEmpty(soundId) || pcm16Mono.Length == 0) return false;
@@ -4857,6 +4866,9 @@ public class FmodAudioProvider : IAudioProvider
     /// </summary>
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
         => _isInitialized && _resources.RegisterPcm(soundId, pcm16Mono, sampleRate);
+
+    public bool ReleaseSynthesisedSound(string soundId)
+        => _isInitialized && _resources.ReleasePcm(soundId);
 
     /// <summary>Interface sounds, made once and kept. Releasing an FMOD sound stops every channel
     /// playing it, so a sound created, played and released at once is cut off almost before it

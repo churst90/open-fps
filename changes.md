@@ -4,6 +4,22 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- Thunder and lightning (unheard). In a Storm the server runs a thunderstorm cell that forms upwind
+  of the map and drifts across or past it with the wind, flashing about twice a minute on average
+  (four at its peak), a quarter of the flashes to the ground, about four strokes each; heavy Rain
+  flashes now and then (about once in half an hour at the server's 0.6). Most strikes are kilometres
+  away; a strike within a kilometre of the map's centre comes about once in ten hours of storm. Each
+  flash is sent to every player on every map, wherever they are on it, as one event whose seed and
+  numbers rebuild the same channel on every client (OpenFPS.Common/Lightning.cs,
+  OpenFPS.Server/Systems/LightningSystem.cs). The client works out the thunder for where you stand
+  (OpenFPS.Client.Core/AudioEngine/Core/Thunder.cs): the channel is a tortuous walk of 8 m steps
+  (Hill's 16 degrees), every bit of it sends an N-wave at once, and each arrives after its own
+  distance over the speed of sound, so the nearest part is the crack and the rest is the rumble. The
+  air takes the top off with distance, the ground under you adds a second arrival, and refraction
+  lifts thunder from high and far over your head (it fades out past about 15-25 km). It plays in up
+  to three parts, one per direction it comes from, through the same walls, edges and facades as any
+  other sound. `--thunder` in the AudioLab measures it; renders are in inbox/thunder-2026-10-05.
+  There is no cue for the flash itself.
 - The weather's wind makes sound. You hear it at your ears: a low, buffeting rush, louder in the ear
   on the far side of the wind and quieter in the ear it blows straight into, so turning your head
   tells you where it comes from. Facing into it, both ears are the same; with your back to it, both
