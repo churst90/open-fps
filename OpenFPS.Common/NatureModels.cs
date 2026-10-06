@@ -180,11 +180,11 @@ public sealed record WaterFeatureSpec
     {
         var falls = new List<WaterFallSpec>
         {
-            WaterFallSpec.Jet("central jet into the bowl", 16f, 2.0f, 0.05f, dropShare: 0.4f, meanDropRadiusMm: 2.0f, chunkRadiusMm: 8f)
+            WaterFallSpec.Jet("central jet into the bowl", 16f, 2.0f, 0.05f, dropShare: 0.4f, meanDropRadiusMm: 2.0f, chunkRadiusMm: 7f)
                 with { Tap = 0 },
         };
         float overflow = falls[0].FlowLitresPerSecond / 4f;
-        var rim = WaterFallSpec.Jet("", 8f, 1.0f, 0.15f, dropShare: 0.2f, meanDropRadiusMm: 1.2f, chunkRadiusMm: 7.5f);
+        var rim = WaterFallSpec.Jet("", 8f, 1.0f, 0.15f, dropShare: 0.2f, meanDropRadiusMm: 1.2f, chunkRadiusMm: 6f);
         string[] sides = { "north", "east", "south", "west" };
         for (int q = 0; q < 4; q++)
         {

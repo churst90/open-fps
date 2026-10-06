@@ -56,8 +56,10 @@ public sealed class RainSynth
     public const float ImpactRise = 16e-6f;
 
     /// <summary>On a hard surface the drop stops in its own length and splashes flat, and its click
-    /// is this much stronger than into a pool: the fountain's figure for a drop blown onto its paving.</summary>
-    public const float HardClickGain = 1.2f;
+    /// is this much stronger than into a pool: the fountain's two figures (FallingWaterSynth). The
+    /// hard click is what the street and roof rain were fitted with and is held; the pool's was
+    /// refitted lower on 2026-10-06 (texture round 1), so the ratio grew from 1.2 to 2.4.</summary>
+    public const float HardClickGain = FallingWaterSynth.HardImpactPascals / FallingWaterSynth.ImpactPascals;
 
     /// <summary>The share of drops of 0.8-1.1 mm that trap the regular bubble (Pumphrey and Elmore
     /// 1990 found nearly all of them, at near-terminal speed); of drops over 2.2 mm that make a type II
