@@ -191,7 +191,8 @@ public static class GeometryParitySpike
         if (args.FirstOrDefault(a => a.StartsWith("stepdebug=")) is { } stepArg)
         {
             var f = stepArg[10..].Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray();
-            DebugStep(ecs, grid, serverWorld, serverUnindexed, new Vector3(f[0], f[1], f[2]), Vector3.Normalize(new Vector3(f[3], 0, f[4])), data);
+            DebugStep(ecs, grid, serverWorld, serverUnindexed, new Vector3(f[0], f[1], f[2]), Vector3.Normalize(new Vector3(f[3], 0, f[4])), data,
+                      f.Length >= 8 ? new Vector3(f[5], f[6], f[7]) : Vector3.Zero, f.Length >= 9 ? f[8] != 0 : null);
             return 0;
         }
 
@@ -430,6 +431,7 @@ public static class GeometryParitySpike
                     for (int k = 0; k < 90; k++)
                     {
                         if (k % 20 == 0) dirNow = Vector3.Normalize(new Vector3((float)(rng.NextDouble() * 2 - 1), 0, (float)(rng.NextDouble() * 2 - 1)));
+                        var (pa, pav, pb, pbv) = (a, av, b, bv);
                         (a, av, _) = StepOnServer(ecs, grid, null, serverUnindexed, a, av, dirNow, sprint, data);
                         (cc, cv, _) = StepOnServer(ecs, grid, null, serverUnindexed, cc, cv, dirNow, sprint, data);
                         worstControl = MathF.Max(worstControl, Vector3.Distance(a, cc) - 1e-4f);
@@ -438,6 +440,10 @@ public static class GeometryParitySpike
                         if (args.Contains("walkdebug") && e > 1e-5f && e > worst * 1.5f)
                             Console.WriteLine($"  walk from {V(p)} step {k}: old {V(a)} new {V(b)} apart {e * 1000:F3} mm{WhatTouches(serverWorld, a)}");
                         if (e > worst) worst = e;
+                        if (args.Contains("walkdebug") && e > 1e-3f && partedAt < 0)
+                            Console.WriteLine($"  walk from {V(p)} parted at step {k}; turns near it (length - 1): {TurnsNear(serverWorld, oldSnap, a)}\n"
+                                            + $"    before it: old {pa.X:R},{pa.Y:R},{pa.Z:R} v {pav.X:R},{pav.Y:R},{pav.Z:R}; new {pb.X:R},{pb.Y:R},{pb.Z:R} v {pbv.X:R},{pbv.Y:R},{pbv.Z:R}; "
+                                            + $"stepdebug={pa.X:R},{pa.Y:R},{pa.Z:R},{dirNow.X:R},{dirNow.Z:R},{pav.X:R},{pav.Y:R},{pav.Z:R},{(sprint ? 1 : 0)}");
                         if (e > 1e-3f && partedAt < 0) partedAt = k;
                     }
                     walks.Probes++;
@@ -1090,13 +1096,14 @@ public static class GeometryParitySpike
         static float Rel(float x, float y) => MathF.Abs(x - y) / MathF.Max(1e-6f, MathF.Max(MathF.Abs(x), MathF.Abs(y)));
     }
 
-    private static void DebugStep(World ecs, SpatialGrid<Entity> grid, TriangleWorld world, List<Entity> unindexed, Vector3 p, Vector3 input, MapData data)
+    private static void DebugStep(World ecs, SpatialGrid<Entity> grid, TriangleWorld world, List<Entity> unindexed, Vector3 p, Vector3 input, MapData data,
+                                  Vector3 vel = default, bool? onlySprint = null)
     {
-        foreach (bool sprint in new[] { false, true })
+        foreach (bool sprint in onlySprint is { } only ? new[] { only } : new[] { false, true })
         {
-            var (p0, _, g0) = StepOnServer(ecs, grid, null, unindexed, p, Vector3.Zero, input, sprint, data);
-            var (p1, _, g1) = StepOnServer(ecs, grid, world, unindexed, p, Vector3.Zero, input, sprint, data);
-            Console.WriteLine($"sprint {sprint}: old {V(p0)} {g0}, new {V(p1)} {g1}");
+            var (p0, v0, g0) = StepOnServer(ecs, grid, null, unindexed, p, vel, input, sprint, data);
+            var (p1, v1, g1) = StepOnServer(ecs, grid, world, unindexed, p, vel, input, sprint, data);
+            Console.WriteLine($"sprint {sprint}: old {p0.X:R},{p0.Y:R},{p0.Z:R} v {V(v0)} {g0}, new {p1.X:R},{p1.Y:R},{p1.Z:R} v {V(v1)} {g1}");
             SetGrid(grid, null, unindexed);
             float gOld = PhysicsUtils.GetGroundHeight(ecs, grid, p, out string mOld);
             SetGrid(grid, world, unindexed);
@@ -1135,6 +1142,20 @@ public static class GeometryParitySpike
                 }
             }
         }
+    }
+
+    /// <summary>The solids within a metre of a body, with how far each one's turn is from unit length.</summary>
+    private static string TurnsNear(TriangleWorld world, WorldSnapshot snap, Vector3 feet)
+    {
+        var near = new List<SolidRef>(); var all = new AcceptAll();
+        world.Overlapping(feet - new Vector3(1, 0.5f, 1), feet + new Vector3(1, 2.5f, 1), GeometryLayers.Movement, ref all, near);
+        return string.Join(", ", near.Select(s =>
+        {
+            int id = world.OwnerOf(s);
+            var (_, bs, _) = world.BoxOf(s);
+            string turn = snap.Entities.TryGetValue(id, out var e) ? (e.Transform.Rotation.Length() - 1f).ToString("G3") : "?";
+            return $"#{id} {V(bs)} {turn}";
+        }));
     }
 
     /// <summary>The solids a body standing at <paramref name="feet"/> overlaps, with the box test's answer and the triangles'.</summary>
