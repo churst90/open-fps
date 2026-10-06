@@ -4,6 +4,28 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Waves at the water's edge (unheard). A physical model of waves meeting an edge: a lake's sandy beach,
+  a rocky lake edge, a pond's grassed bank and a reedy one, a big river's bank, sea surf on sand, a
+  shingle beach, a harbour wall, and wavelets against a moored wooden or aluminium boat (lab only: there
+  are no boats yet). Research and design in docs/WAVES_AND_SHORES.md; renders in
+  inbox/waves-2026-10-06 with a README.
+  - The waves come from the weather's wind over the water in front of the edge (the fetch), by the
+    JONSWAP growth laws. They come in groups, as a real sea's do. The side the wind blows onto laps; the
+    lee side is still. The sea grows and dies over minutes, as the wind's sea does. The sea has its swell
+    whatever the wind. A river's current rocks the water at its bank even in a calm.
+  - Each wave breaks or surges by its steepness and the beach's slope. A breaker fast enough folds a
+    plume of bubbles under. The swash's front breaks like a creek's stone. Sand lets out its air as a
+    fizz. Shingle clicks in the backwash. Walls and rocks slap, throw up spray that falls back, and close
+    on air in their cracks (the clop). A hull's planking rings at its own notes, lowered by the water on
+    it.
+  - Fitted to 42 recordings of lake shores, river banks, surf, shingle, harbour walls and boats, on the
+    texture statistics, the 10 ms kurtosis and the octave balance.
+  - On Albany and Magnolia: every pond's edge, cut into stretches of about 20 m along its real outline
+    (219 in Albany, 38 in Magnolia), each knowing how much water lies in front of it. tools/gen_osm.py;
+    both maps regenerated. Still water takes no voice.
+  - New prefabs shore_* (a stretch's box is its length along the edge and its fetch, its +Z turned to the
+    water). AudioLab `--waves levels|sea|render|game`.
+
 - The binaural stage hears a voice at its own level, and the master's makeup is 3 dB less to match.
   FMOD gave the stage a mono voice panned to the middle, 3.01 dB down on each side, because the stage
   asked for a stereo input so that it could put out a stereo pair. The stage averaged the two back to

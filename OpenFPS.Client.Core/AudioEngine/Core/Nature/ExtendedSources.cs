@@ -122,6 +122,16 @@ public static class ExtendedSources
                     for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
                     return places;
                 }
+                // Waves at an edge: along it, and on its break line (ShoreSynth.Layout), its length the map's.
+                if (key.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
+                {
+                    ShoreSpec.ParseKey(key, out string preset, out var geometry);
+                    var spec = ShoreSpec.ByName(preset);
+                    if (spec.TotalPlaces <= 1) return null;
+                    var places = ShoreSynth.Layout(spec, geometry?.LengthMetres ?? spec.LengthMetres);
+                    for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
+                    return places;
+                }
                 // A wood heard as one (WoodChorus): a place a bough's worth of it, six round the wood at
                 // two-thirds of its half-widths, where its trees' wind is read as well (FoliageSynth.ReadWindAt).
                 if (WoodChorus.ParseKey(key, out _, out float rx, out float rz))

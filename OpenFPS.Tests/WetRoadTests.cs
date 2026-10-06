@@ -126,6 +126,25 @@ public class WetRoadTests
         Assert.InRange(w.WaterMm, mm * 0.94f - 0.001f, mm * 1.06f + 0.001f);
     }
 
+    /// <summary>The state packer copies wheels as their bytes: it must take the struct's own size, which
+    /// the water byte made ten, and bring the water back.</summary>
+    [Fact]
+    public void Wheels_with_their_water_survive_the_state_packer()
+    {
+        var wheels = new[] { WheelState.Encode(3000f, 40f, 0.01f, 0.02f, Asphalt, 0.3f, 0.7f), WheelState.Encode(3100f, 41f, 0f, 0f, Asphalt, 0.2f, 12f) };
+        var states = new List<EntityState>
+        {
+            new() { EntityId = 7, LinearVelocity = new Vector3(1f, 0f, 2f), Wheels = wheels, TyreDemand = 9 },
+            new() { EntityId = 8, LinearVelocity = new Vector3(0f, 0f, 1f) },
+        };
+        var back = new List<EntityState>();
+        StatePacking.Unpack(StatePacking.Pack(states, 0, 2), back);
+        Assert.Equal(2, back.Count);
+        Assert.Equal(8, back[1].EntityId);
+        Assert.Equal(wheels, back[0].Wheels);
+        Assert.Equal(12f, back[0].Wheels![1].WaterMm, 0);
+    }
+
     // ── Puddles ───────────────────────────────────────────────────────────────────────────────
 
     private static List<RoadData> Street() => new()
