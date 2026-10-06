@@ -67,6 +67,7 @@ string[] usage =
     "  --shift-trace [preset] [top=]                 what the game's driver does with the gearbox in town",
     "  --tap-balance                                 each machine's rear voice against its front voice",
     "  --car-fronts [preset ...] [out= tag= ambient=] the whole voice from in front, behind, and passing at 10 km/h",
+    "  --binaural-input                              a mono voice through the binaural stage in FMOD against the HRTF alone",
     "  --game-levels [out=DIR] [set=measure|render|compare|all] [cars=a,b]  one thing at a time through the real mixer, captured",
     "  --wide-sources [out=DIR] [set=measure|render|level|all] [wide=on|off] [sec=]  a tree, the fountain, the fire and rain through the game path, for interaural coherence",
     "  --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]  texture statistics and game-level texture files",
@@ -590,6 +591,10 @@ if (args.Contains("--reload-sounds"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.ReloadSpecSpike.Render(args));
 }
 
+if (args.Contains("--binaural-input"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.BinauralInputSpike.Run(args));
+}
 if (args.Contains("--game-levels"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.GameLevelsSpike.Run(args));
