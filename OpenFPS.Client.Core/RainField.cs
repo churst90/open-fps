@@ -793,6 +793,8 @@ public sealed class RainField
     public void Update(WorldSnapshot world, Vector3 ear, double now, int listenerRegion, int ownEntityId, int ridingEntityId)
     {
         (_humidity, _temperature, _pressure, _airMultiplier) = (world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
+        _rideVelocity = ridingEntityId >= 0 && world.Entities.TryGetValue(ridingEntityId, out var ride) ? ride.Velocity : (Vector3?)null;
+        _ear = ear;
         var falling = world.Precipitation.Falling ? world.Precipitation
                     : new Precipitation(PrecipitationKind.Rain, world.RainRateMmPerHour);
         float rate = falling.RateMmPerHour;
@@ -816,6 +818,7 @@ public sealed class RainField
             if (done.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
             {
                 _last = done.Result;
+                _lastAt = _surveyedAt;
                 for (int s = 0; s < RainFeeds.Slots; s++) RainFeeds.Feed[s].Patch = _last.Patches[s];
                 if (_surveys++ % 30 == 0)
                     Serilog.Log.Information("[RAIN] {Rate:F1} mm/h ({Class}): {Survey}", rate, Rainfall.Category(rate), _last.Describe());
@@ -875,6 +878,7 @@ public sealed class RainField
                 PlayParts(s, e, patch, ear);
                 continue;
             }
+            if (s == RainSurvey.OverheadSlot) OnYourRoof(ref e, e.Position);
             if (_on[s] && _audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
             else { _audio.PlayPhysicalSoundDirect(e); _on[s] = true; }
         }
@@ -949,12 +953,39 @@ public sealed class RainField
             // Heard round an edge, the parts keep their spread about where the patch is heard from.
             e.ApparentPosition = whole.ApparentPosition + (_partAt[k] - whole.Position);
             e.Volume *= balance;
+            if (slot == RainSurvey.OverheadSlot) OnYourRoof(ref e, _partAt[k]);
             bool on = k == 0 ? _on[slot] : k < _partsOn[slot];
             if (on && _audio.IsPlaying(e.EntityId)) _audio.UpdateSpatialAttributes(e);
             else _audio.PlayPhysicalSoundDirect(e);
         }
         _on[slot] = true;
         _partsOn[slot] = parts;
+    }
+
+    /// <summary>The vehicle you are sitting in (its velocity), or null on foot; and the ear this frame.</summary>
+    private Vector3? _rideVelocity;
+    private Vector3 _ear;
+    /// <summary>Where the ear was when the survey in use was asked for.</summary>
+    private Vector3 _lastAt;
+
+    /// <summary>
+    /// The roof of the vehicle you are sitting in rides with your head. The survey places the roof's
+    /// parts in the world round the point over the ear where it last looked, and a survey is only
+    /// asked for every metre and a half: at 100 km/h the roof was left behind between surveys, a metre
+    /// or two back, and with no velocity of its own it was Doppler-shifted against a listener doing
+    /// 28 m/s, about eight per cent flat. Riding, each part is kept where it was against the head at
+    /// the survey (the roof is fixed to the car, and so is the head) and moves with the vehicle.
+    /// OPENFPS_CABIN_PATHS=0 leaves it in the world, as before 2026-10-06.
+    /// </summary>
+    private void OnYourRoof(ref SpatialEmitter e, Vector3 at)
+    {
+        if (!OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled || _rideVelocity is not { } v || !e.InsideListenersVehicle) return;
+        var offset = at - _lastAt;
+        e.FollowsListener = true;
+        e.ListenerOffset = offset;
+        e.Position = _ear + offset;
+        e.ApparentPosition = e.Position;
+        e.Velocity = v;
     }
 
     private void StopParts(int slot)

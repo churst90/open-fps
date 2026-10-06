@@ -410,6 +410,11 @@ public class ClientAudioSystem
         int distant = DistantVoiceBase - Math.Abs(entityId);
         if (_distantBoundTo.Remove(distant)) _audio.StopSound(distant);
         if (_frontVoiced.Remove(entityId)) _audio.StopSound(IntakeVoiceBase - Math.Abs(entityId));
+        if (_cabinVoiced == entityId)
+        {
+            for (int p = 1; p < _cabinVoicedPaths; p++) _audio.StopSound(CabinVoiceId(p));
+            _cabinVoiced = int.MinValue; _cabinVoicedPaths = 0;
+        }
         if (_spreading.Remove(entityId, out var spreading) && spreading.Voiced) StopOuter(entityId, spreading, now: true);
         if (_sirenVoiced.Remove(entityId)) _audio.StopSound(SirenVoiceBase - Math.Abs(entityId));
         _sirenControl.Remove(entityId);
@@ -867,6 +872,8 @@ public class ClientAudioSystem
         }
         // The outer places of trees and fires that were not placed this frame (out of the budget, gone).
         RetireSpreading();
+        // The cabin's paths, if you are no longer sitting in what they were paths of.
+        UpdateCabinVoices();
 
         long partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         UpdateHorns(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
@@ -2006,6 +2013,76 @@ public class ClientAudioSystem
         else _audio.PlayPhysicalSoundDirect(e);
     }
 
+    // ── The cabin you are sitting in, path by path (CabinPaths) ────────────────────────────────────
+
+    internal const int CabinVoiceBase = -1_600_000;
+    /// <summary>The vehicle whose cabin paths have voices, and how many paths it has.</summary>
+    private int _cabinVoiced = int.MinValue, _cabinVoicedPaths;
+    /// <summary>Cabin path voices fading out, by voice id.</summary>
+    private readonly List<int> _cabinRetiring = new();
+    private int _cabinSeenFrame = -1;
+
+    private static int CabinVoiceId(int path) => CabinVoiceBase - path;
+
+    /// <summary>
+    /// Every path into the cabin but the bulkhead (which is the engine's own voice): a tap each on the
+    /// engine's ring for it, riding with the head, turned to where the path comes in. Everything about
+    /// each that is not the direction is the interior voice's: the same level, the same distance, the
+    /// same room. See CabinPaths and EngineTapState.
+    /// </summary>
+    private void CabinVoices(EntitySnapshot snap, OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Layout layout,
+                             Vector3 ear, in SpatialEmitter engine, Vector3 eyePos)
+    {
+        if (_cabinVoiced != snap.Id) RetireCabinVoices();
+        _cabinVoiced = snap.Id;
+        _cabinVoicedPaths = layout.Count;
+        _cabinSeenFrame = _frameCount;
+        for (int p = 1; p < layout.Count; p++)
+        {
+            int voiceId = CabinVoiceId(p);
+            _cabinRetiring.Remove(voiceId);
+            var offset = Vector3.Transform(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Offset(layout, p, ear), snap.Transform.Rotation);
+            var e = engine;
+            e.EntityId = voiceId;
+            e.SoundId = "engine-cabin";
+            e.EngineKey = "";
+            e.PhysicalKey = "";
+            e.CabinOfEntity = snap.Id;
+            e.CabinPath = p;
+            e.IntakeOfEntity = 0;
+            e.EchoOfEntity = 0;
+            e.Interior = false;
+            e.FollowsListener = true;
+            e.ListenerOffset = offset;
+            // A voice on the head still needs a world position: the budget culls by it.
+            e.Position = eyePos + offset;
+            e.ApparentPosition = e.Position;
+            if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
+            else _audio.PlayPhysicalSoundDirect(e);
+        }
+    }
+
+    /// <summary>Called once a frame: the cabin's voices go when you are no longer sitting in that
+    /// vehicle, or its engine has no voice. Faded, then stopped.</summary>
+    private void UpdateCabinVoices()
+    {
+        if (_cabinVoiced != int.MinValue && _cabinSeenFrame != _frameCount) RetireCabinVoices();
+        for (int i = _cabinRetiring.Count - 1; i >= 0; i--)
+        {
+            int voice = _cabinRetiring[i];
+            if (_audio.FadeOutEngine(voice)) { _audio.StopSound(voice); _cabinRetiring.RemoveAt(i); }
+        }
+    }
+
+    private void RetireCabinVoices()
+    {
+        if (_cabinVoiced == int.MinValue) return;
+        for (int p = 1; p < _cabinVoicedPaths; p++)
+            if (!_cabinRetiring.Contains(CabinVoiceId(p))) _cabinRetiring.Add(CabinVoiceId(p));
+        _cabinVoiced = int.MinValue;
+        _cabinVoicedPaths = 0;
+    }
+
     // ── Extended sources: a tree's crown, a fire's bed (ExtendedSources) ───────────────────────────
 
     /// <summary>Voice ids for the outer places of a tree or a fire: eight a source, place 1 to 7.</summary>
@@ -2608,6 +2685,9 @@ public class ClientAudioSystem
 
         string resolvedSoundId = "";
         bool interior = false;
+        // Sitting in it: the paths into its cabin, and where the ear is in its frame.
+        OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Layout? cabinLayout = null;
+        Vector3 cabinEar = default;
         string engineKey = "";
         string physicalKey = "";
         float powerLever = 1f, rotorWake = 0f;
@@ -2758,6 +2838,10 @@ public class ClientAudioSystem
                     engineVolume = MathF.Min(1f, g0 * r0) * def.SoundEmitter.Volume;
                     engineMinDistance = 1f;
                     engineExtent = 0f;
+                    // ...and from where each way in IS, if it has a cabin (CabinPaths): this voice is the
+                    // bulkhead, and every other path gets a voice of its own below.
+                    cabinLayout = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(profile);
+                    cabinEar = Vector3.Transform(eyePos - snap.Transform.Position, Quaternion.Inverse(snap.Transform.Rotation));
                 }
             }
         }
@@ -2822,7 +2906,11 @@ public class ClientAudioSystem
             // Inside, the voice rides with your head, just ahead and below: where the firewall and
             // the floor are. Turned with the car, so the engine stays in front of you through a corner.
             FollowsListener = interior,
-            ListenerOffset = interior ? Vector3.Transform(new Vector3(0f, -0.4f, 0.6f), snap.Transform.Rotation) : Vector3.Zero,
+            // With a cabin, the voice is the bulkhead, from where the firewall is.
+            ListenerOffset = !interior ? Vector3.Zero
+                           : cabinLayout != null ? Vector3.Transform(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Offset(cabinLayout, 0, cabinEar), snap.Transform.Rotation)
+                           : Vector3.Transform(new Vector3(0f, -0.4f, 0.6f), snap.Transform.Rotation),
+            CabinEarX = cabinEar.X,
             PhysicalKey = physicalKey,
             Trees = chorusTrees,
             PowerLever = powerLever,
@@ -2908,6 +2996,10 @@ public class ClientAudioSystem
         if (engineKey.Length > 0 && _frontVoiced.Contains(snap.Id))
             FrontVoice(snap, OpenFPS.Common.MachineRegistry.VehicleFor(engineKey), acousticPath,
                        engineVolume, engineMinDistance, Math.Max(1.0f, engineRange), world.PositionsSampledAt);
+
+        // ...and sitting in it, every other way into the cabin from where it comes in.
+        if (interior && cabinLayout != null && engineKey.Length > 0)
+            CabinVoices(snap, cabinLayout, cabinEar, emitter, eyePos);
 
         // The siren is NOT placed here: see UpdateSirens.
 

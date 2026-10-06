@@ -2765,6 +2765,28 @@ public partial class FmodAudioProvider : IAudioProvider
             // switched: see EngineVoiceState.SplitVoices.
             src.SplitVoices = true;
         }
+        else if (emitter.IsSynth && emitter.CabinOfEntity != 0)
+        {
+            // A path into the cabin of the vehicle the listener sits in (CabinPaths): it reads that
+            // engine's ring for the path. No engine this frame, nothing to be a path of.
+            if (!_isInitialized) return;
+            EngineVoiceState? src;
+            lock (_lock) { src = FindActive(emitter.CabinOfEntity)?.EngineState; }
+            if (src?.CabinLayout == null || emitter.CabinPath < 1 || emitter.CabinPath >= src.CabinLayout.Count) return;
+            var tap = new EngineTapState(src, emitter.CabinPath);
+            if (TapProcessor.CreateDSP(_system, tap, out engineDsp, out engineHandle) != RESULT.OK) return;
+            engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
+            if (_system.playDSP(engineDsp, targetGroup, true, out channel) != RESULT.OK)
+            {
+                engineDsp.release();
+                engineHandle.Free();
+                return;
+            }
+            channel.setMode(MODE._3D | Rolloff.Mode);
+            tapState = tap;
+            // ...and the engine's own voice stops carrying the path, slewed as the tap fades in.
+            src.SetCabinTapLive(emitter.CabinPath, true);
+        }
         else if (emitter.IsSynth && emitter.EchoOfEntity != 0)
         {
             if (!_isInitialized) return;
@@ -2923,6 +2945,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 ServingStop = emitter.ServingStop,
                 WindowsOpen = emitter.WindowsOpen,
                 Interior = emitter.Interior,
+                CabinEarX = emitter.CabinEarX,
                 RoadWaterMm = emitter.RoadWaterMm,
                 // Live: the loudness law applies to what the engine is doing now, not just to its
                 // declared level. See EngineVoiceState.CompensateLevel.
@@ -3343,6 +3366,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 {
                     active.EngineState.TargetSpeed = emitter.EngineSpeed;
                     active.EngineState.Interior = emitter.Interior;
+                    active.EngineState.CabinEarX = emitter.CabinEarX;
                     active.EngineState.Running = emitter.EngineRunning;
                     active.EngineState.ServingStop = emitter.ServingStop;
                     active.EngineState.WindowsOpen = emitter.WindowsOpen;
@@ -3885,7 +3909,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // A machine whose second outlet has gone is a machine heard through one voice again, and
             // the front tap slews back into it. Without this the intake would simply disappear — the
             // car would lose a third of its sound for being far enough away to be heard as one thing.
-            if (active.TapState != null) active.TapState.Source.SplitVoices = false;
+            active.TapState?.HandBack();
             active.TapState = null;
         }
         // ...and only now is nothing left pointing at it.
@@ -5022,9 +5046,9 @@ public partial class FmodAudioProvider : IAudioProvider
             {
                 tap.TargetGain = 0f;
                 // Handed back at the moment the fade STARTS, so the two crossfade rather than
-                // leaving a hole: the voice that stays gains the front tap over the same sixty
-                // milliseconds this one loses it.
-                tap.Source.SplitVoices = false;
+                // leaving a hole: the voice that stays gains the front tap (or the cabin path) over
+                // the same sixty milliseconds this one loses it.
+                tap.HandBack();
                 return tap.FadedOut;
             }
             var mach = active?.MachineState;
