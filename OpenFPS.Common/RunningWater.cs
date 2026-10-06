@@ -422,9 +422,9 @@ public sealed record RunningWaterSpec
         DripLipMm = 3f,
         DripFallMetres = 0.15f,
         DripOnto = WaterSurface.Pool,
-        // MEASURED with `--running-water levels sec=60`, 2026-10-06: downpipe at 5 mm/h: Leq 51.7 dB, LAeq 51.1 dB(A); peaks 22.4 dB over.
-        SourceLevelDb = 52f,
-        PeakHeadroomDb = 22.5f,
+        // MEASURED with `--running-water levels sec=60`, 2026-10-06 (round 2): moderate rain, its shoe now carrying the film's speed: Leq 53.3 dB, LAeq 53.1 dB(A); peaks 23.0 dB over.
+        SourceLevelDb = 53.5f,
+        PeakHeadroomDb = 23f,
         ExtentMetres = 0.6f,
         Places = 3,
         Layout = FlowLayout.Ring,
@@ -481,8 +481,9 @@ public sealed record RunningWaterSpec
                            Onto = WaterSurface.Rock, LipWidthMetres = 0.2f, Inside = true, Film = true },
         },
         Cavity = new FlowCavity { LengthMetres = 5.5f, DiameterMetres = 0.068f, FarEndOpen = true },
-        SourceLevelDb = 45f,
-        PeakHeadroomDb = 22f,
+        // MEASURED with `--running-water levels sec=60`, 2026-10-06 (round 2): moderate rain, spilling over the rim: Leq 48.0 dB, LAeq 48.0 dB(A); peaks 19.1 dB over.
+        SourceLevelDb = 48f,
+        PeakHeadroomDb = 20f,
         ExtentMetres = 0.3f,
         Places = 3,
         Layout = FlowLayout.Ring,
@@ -514,8 +515,9 @@ public sealed record RunningWaterSpec
         DripLipMm = 3f,
         DripFallMetres = 0.28f,
         DripOnto = WaterSurface.Rock,
-        SourceLevelDb = 60f,
-        PeakHeadroomDb = 22f,
+        // MEASURED with `--running-water levels sec=60`, 2026-10-06 (round 2): the tap running a minute, filling: Leq 56.8 dB, LAeq 56.0 dB(A); peaks 26.2 dB over.
+        SourceLevelDb = 57f,
+        PeakHeadroomDb = 26.5f,
         ExtentMetres = 0.5f,
         Places = 3,
         Layout = FlowLayout.Ring,
@@ -527,6 +529,12 @@ public sealed record RunningWaterSpec
     {
         Name = "Kitchen sink, dripping tap",
         Tap = KitchenSink.Tap! with { LeakLitresPerSecond = 0.00005f },
+        // Declared at the drip, which is what it is there for (MEASURED, `--running-water cycle dripping_sink
+        // on=0 off=60`: Leq 21.4 dB, its 10 ms peaks 36.8 dB over): placed by its level the mixer gives a
+        // quiet drip the law's lift, where declared at the running tap's 57 dB it would play 36 dB under that,
+        // unheard. Turned on, it runs 35 dB over the drip, and the headroom is the room for that and its peaks.
+        SourceLevelDb = 21.5f,
+        PeakHeadroomDb = 62f,
     };
 
     /// <summary>
@@ -553,8 +561,9 @@ public sealed record RunningWaterSpec
         DripLipMm = 3f,
         DripFallMetres = 0.2f,
         DripOnto = WaterSurface.Rock,
-        SourceLevelDb = 55f,
-        PeakHeadroomDb = 22f,
+        // MEASURED with `--running-water levels sec=60`, 2026-10-06 (round 2): the tap running a minute, filling: Leq 51.9 dB, LAeq 52.1 dB(A); peaks 20.8 dB over.
+        SourceLevelDb = 52f,
+        PeakHeadroomDb = 21f,
         ExtentMetres = 0.45f,
         Places = 3,
         Layout = FlowLayout.Ring,
@@ -580,8 +589,9 @@ public sealed record RunningWaterSpec
                            LipWidthMetres = 0.12f, Inside = true, Film = true },
         },
         Cavity = new FlowCavity { LengthMetres = 0.3f, DiameterMetres = 0.04f },
+        // MEASURED with `--running-water levels sec=60`, 2026-10-06 (round 2): running: Leq 59.8 dB, LAeq 59.4 dB(A); peaks 17.6 dB over.
         SourceLevelDb = 60f,
-        PeakHeadroomDb = 22f,
+        PeakHeadroomDb = 18f,
         ExtentMetres = 0.8f,
         Places = 3,
         Layout = FlowLayout.Ring,

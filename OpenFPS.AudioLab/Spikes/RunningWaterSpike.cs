@@ -134,6 +134,14 @@ public static class RunningWaterSpike
         float flowOn = Arg(args, "flow=", spec.Tap?.OpenLitresPerSecond ?? spec.ReferenceFlow);
         float flowOff = spec.Tap?.LeakLitresPerSecond ?? 0f;
         var s = new RunningWaterSynth(spec, Rate, 7) { Flow = 0f };
+        if (args.FirstOrDefault(a => a.StartsWith("parts=", StringComparison.Ordinal))?[6..].Split(',') is { } parts)
+        {
+            s.SitePart = parts.Contains("sites") ? 1f : 0f;
+            s.FallPart = parts.Contains("falls") ? 1f : 0f;
+            s.DripPart = parts.Contains("drips") ? 1f : 0f;
+            s.GurglePart = parts.Contains("gurgle") ? 1f : 0f;
+            s.PlatePart = parts.Contains("plate") ? 1f : 0f;
+        }
         int n = (int)((on + off) * Rate);
         var pa = new float[n];
         int lead = Rate / 2;
@@ -273,6 +281,7 @@ public static class RunningWaterSpike
             player.Yaw = yaw;
             player.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, yaw);
         }
+        var defs = new Dictionary<int, EntityDefinition>();
         int Add(string soundId, Vector3 at, float range = 120f, float minDistance = 1f)
         {
             int id = nextId++;
@@ -286,7 +295,17 @@ public static class RunningWaterSpike
                 IsSynth = true, SoundId = soundId, Mode = PlaybackMode.LoopOne, Volume = 1f, Range = range, MinDistance = minDistance,
             };
             world.RegisterDefinition(def);
+            defs[id] = def;
             return id;
+        }
+        // A tap turned on or off: the server's SynthRunning, the definition sent again.
+        void Turn(int id, bool on)
+        {
+            var def = defs[id];
+            var em = def.SoundEmitter;
+            em.SynthRunning = on;
+            def.SoundEmitter = em;
+            world.RegisterDefinition(def);
         }
         void Remove(params int[] ids)
         {
@@ -413,6 +432,69 @@ public static class RunningWaterSpike
                 Pump(5.0);
                 Record("fountain 4m with its overflow", sec);
                 Remove(ids.Append(overflow).ToArray());
+            }
+            if (set is "taps" or "round2")
+            {
+                // A kitchen in a flat (no walls here: the open path). Standing at the sink, facing it.
+                Runoff(0f);
+                Weather(0f);
+                Vector3 k = o + new Vector3(-30f, 0f, 30f);
+                void TapScene(string label, string sound, Vector3 at, float on, float off, bool startOn = true)
+                {
+                    int id = Add(sound, at, 30f, 0.5f);
+                    Turn(id, false);
+                    Stand(new Vector3(at.X, 0f, at.Z - 0.6f), at);
+                    Pump(2.0);
+                    if (startOn) Turn(id, true);
+                    if (on > 0f) Record($"{label} running", on);
+                    Turn(id, false);
+                    if (off > 0f) Record($"{label} shut, draining", off);
+                    Remove(id);
+                }
+                TapScene("kitchen sink", "flow:kitchen_sink", k + new Vector3(0f, 0.9f, 0f), 30f, 30f);
+                TapScene("washbasin", "flow:washbasin", k + new Vector3(4f, 0.85f, 0f), 25f, 25f);
+                TapScene("shower", "flow:shower", k + new Vector3(8f, 0.05f, 0f), 30f, 10f);
+                TapScene("dripping tap", "flow:dripping_sink", k + new Vector3(12f, 0.9f, 0f), 0f, 30f, startOn: false);
+            }
+            if (set is "roof" or "round2")
+            {
+                // A house's downpipe and, 2.7 m over it, its roof gutter's outlet; the listener in the garden
+                // 2 m from the wall, in heavy and in violent rain, then after the rain.
+                Vector3 shoe = o + new Vector3(30f, 0.15f, 60f);
+                Vector3 outlet = shoe + new Vector3(0f, 2.65f, -0.1f);
+                Vector3 garden = new(shoe.X - 1f, 0f, shoe.Z + 2f);
+                foreach (var (name, r) in new[] { ("heavy", Rainfall.HeavyRate), ("violent", Rainfall.ViolentRate) })
+                {
+                    Weather(0f);
+                    Runoff(r);
+                    int a = Add("flow:downpipe", shoe, 50f, 0.6f), b = Add("flow:gutter_outlet", outlet, 50f, 0.6f);
+                    Stand(garden, shoe);
+                    Pump(5.0);
+                    Record($"downpipe and gutter outlet {name}", sec);
+                    Remove(a, b);
+                    int c = Add("flow:gutter_outlet", outlet, 50f, 0.6f);
+                    Stand(new Vector3(outlet.X - 1f, 0f, outlet.Z + 1.5f), outlet);
+                    Pump(5.0);
+                    Record($"gutter outlet alone {name}", sec);
+                    Remove(c);
+                }
+                // The long drip: the roof's run-off through its two stores, 10 and 25 minutes after a heavy
+                // shower.
+                foreach (float minutes in new[] { 10f, 25f })
+                {
+                    OpenFPS.Common.Runoff.Held = false;
+                    OpenFPS.Common.Runoff.Reset();
+                    OpenFPS.Common.Runoff.Update(Rainfall.HeavyRate, 0);
+                    for (int t = 1; t <= minutes * 60f; t++) OpenFPS.Common.Runoff.Update(0f, t);
+                    OpenFPS.Common.Runoff.Held = true;
+                    var dp = RunningWaterSpec.ByName("downpipe");
+                    Console.WriteLine($"  {minutes:F0} min after heavy rain: downpipe {dp.FlowNow() * 1000:F2} mL/s");
+                    int a = Add("flow:downpipe", shoe, 50f, 0.6f);
+                    Stand(garden, shoe);
+                    Pump(4.0);
+                    Record($"downpipe {minutes:F0} min after the rain", sec);
+                    Remove(a);
+                }
             }
             if (set is "all" or "overflow")
             {

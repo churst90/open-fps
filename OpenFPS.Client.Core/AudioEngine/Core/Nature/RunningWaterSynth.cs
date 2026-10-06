@@ -417,18 +417,19 @@ public sealed partial class RunningWaterSynth
         PlateControl();
         if (_falls != null)
         {
-            // Too little to leave its lip as a stream, it drips instead (Drips).
+            // Too little to leave its lip as a stream, it drips instead (Drips); what drains through an
+            // inlet is the basin's own business and goes on.
             bool dripping = Spec.DripLipMm > 0f && _flow < JetOnsetLitresPerSecond;
-            _falls.FlowScale = dripping ? 0f : 1f;
+            _falls.FlowScale = 1f;
             // Each fall as it arrives at this flow, re-worked when the flow has moved a few per cent.
-            float signature = _flow + 50f * _level + 3f * _inletFlow;
-            if (!(MathF.Abs(signature - _tunedFlow) <= 0.03f * _tunedFlow) && signature > 0f)
+            float signature = (dripping ? 0f : _flow) + 50f * _level + 3f * _inletFlow;
+            if (!(MathF.Abs(signature - _tunedFlow) <= 0.03f * _tunedFlow))
             {
                 _tunedFlow = signature;
                 for (int i = 0; i < Spec.Falls.Length; i++)
                 {
                     var fall = Spec.Falls[i];
-                    float q = FallFlow(i);
+                    float q = dripping && fall.Feed != FallFeed.Drain ? 0f : FallFlow(i);
                     var f = fall.Feed is FallFeed.TapOntoBasin or FallFeed.TapIntoWater && Spec.Tap is { } tap
                         ? TapShape(Spec, tap, _flow, _level) with { FlowLitresPerSecond = q }
                         : Shape(Spec, fall, q);
@@ -583,6 +584,7 @@ public sealed partial class RunningWaterSynth
     private void Schedule(float dt)
     {
         Gulps(dt);
+        Fizz(dt);
         float flow = _flow;
         if (!(flow > 0f)) return;
         foreach (var s in _sites)
@@ -780,7 +782,9 @@ public sealed partial class RunningWaterSynth
         // spreads over the drop's tip (Thoroddsen et al. 2005, as RainSynth's click). A lone drip's
         // first-contact spike, one sample wide, measured a 10 ms kurtosis of 31: a digital tick on its
         // own, where in rain a thousand of them merge.
-        float rise = MathF.Max(16e-6f, WetCushion * r / v);
+        // Onto a steel bottom that is wet but not under water the film is tens of microns: the blow keeps
+        // its sharp first contact (the √t onset that rings a plate's upper modes, RainPlate), barely cushioned.
+        float rise = MathF.Max(16e-6f, (place == _plateDrive ? PlateCushion : WetCushion) * r / v);
         place.Impact(at, rise, (onto == WaterSurface.Rock ? 0.4f : 1f) * r / v, impact * MathF.Sqrt(16e-6f / rise));
         if (onto != WaterSurface.Pool) return;
         // Into a puddle: the crater closes on a bubble often enough to be the sound of it (Phillips,

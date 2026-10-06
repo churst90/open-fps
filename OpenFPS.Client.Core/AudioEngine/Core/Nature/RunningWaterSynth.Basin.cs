@@ -34,15 +34,17 @@ public sealed partial class RunningWaterSynth
     // ── The inlet: fitted ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>The volume of air the vortex draws down, per volume of water through the hole, at the
-    /// height of the gurgle. FITTED to recorded gurgling drains (section 10). The bottle's glug lets in
-    /// as much air as water leaves; an outlet's vortex less.</summary>
-    public const float GulpAirShare = 0.25f;
+    /// height of the gurgle. FITTED (2026-10-06, docs/RUNNING_WATER.md 10.8) between seven recorded drains
+    /// and bottles, which wanted 0.6 for their weight at 125-500 Hz, and four recorded downpipe and gutter
+    /// gurgles, which at 0.6 stood 10 dB too heavy there in a downpour. A bottle lets in as much air as water
+    /// leaves; an outlet's vortex less.</summary>
+    public const float GulpAirShare = 0.4f;
 
     /// <summary>A gulp pocket's equivalent radius as a share of the hole's (open) radius, and how it
     /// varies (log). A pocket is pinched off by the hole's own rim, so it is about the hole's size: a
     /// bottle's glug lets in about 17 mL through a 20-40 mm neck, a sphere of 1.6 cm radius (Perez et al.
     /// 2026, from their flow and glug period), about the hole's own radius.</summary>
-    private const float GulpPocketShare = 0.9f, GulpPocketSpread = 0.35f;
+    private const float GulpPocketShare = 1.3f, GulpPocketSpread = 0.35f, LargestPocketMetres = 0.017f;
 
     /// <summary>The rhythm of the gulps: one every this many √(D / g), jittered. A bottle glugs about six
     /// times a second through a 20-40 mm hole, a little faster for a wider one (Perez, Monnet, Vidal and
@@ -223,6 +225,8 @@ public sealed partial class RunningWaterSynth
                 // What spills over the rim into the pipe while the hole is a weir; once the water closes
                 // over it the hole runs as an orifice and what goes down is the gulps' business.
                 if (Spec.Inlet is not { } inlet) return 0f;
+                // A trickle too small to leave the rim as a stream slides down the pipe's wall unheard.
+                if (_inletFlow < JetOnsetLitresPerSecond) return 0f;
                 float x = _inletDepth / MathF.Max(0.005f, inlet.DiameterMetres);
                 return _inletFlow * Math.Clamp(1f - x / (2f * ClosureDepth), 0f, 1f);
             }
@@ -280,17 +284,47 @@ public sealed partial class RunningWaterSynth
         if (Spec.Inlet is not { } inlet || GurglePart <= 0f) return;
         float g = GurgleShare(inlet, _inletDepth, _inletFlow);
         if (g <= 0f || _inletFlow <= 0f) { _gulpClock = -1f; _gulpAir = 0f; return; }
-        _gulpAir += GulpAirShare * g * _inletFlow * 1e-3f * dt;
+        float drawn = GulpAirShare * g * _inletFlow * 1e-3f * dt;
+        _gulpAir += (1f - VortexSheddingShare) * drawn;
         var (_, d) = InletOpening();
+        // Between the gulps the vortex's tip sheds small bubbles steadily (Andersen et al. 2003: bubbles
+        // detach from the tip of the dip and are dragged down before the air core reaches through).
+        Shed(VortexSheddingShare * drawn, d);
         float period = GulpPeriodScale * MathF.Sqrt(d / Hydraulics.Gravity);
         if (_gulpClock < 0f) _gulpClock = period * _rng.Uniform();
         _gulpClock -= dt;
         while (_gulpClock <= 0f)
         {
             int at = Math.Clamp((int)((dt + _gulpClock) * _rate), 0, Block - 1);
-            // The column and the air under it push each other in a rhythm, not a clock: ±30 %.
-            _gulpClock += period * (0.7f + 0.6f * _rng.Uniform());
+            // The column and the air under it push each other in a rhythm, not a clock: ±70 %.
+            _gulpClock += period * (0.3f + 1.4f * _rng.Uniform());
             Gulp(at, d);
+        }
+    }
+
+    /// <summary>The share of the drawn air that goes down as small bubbles shed steadily from the vortex's
+    /// tip, rather than in the gulps. FITTED: with all of it in the gulps, the gurgle's band envelopes
+    /// moved at the gulps' few hertz far more than any recorded drain's (modulation at 4-16 Hz 0.82
+    /// against 0.20-0.47).</summary>
+    private const float VortexSheddingShare = 0.6f;
+
+    private const int MaxShedPerBlock = 16;
+
+    /// <summary>This much air shed as small bubbles, a tenth to a third of the hole across, this block.</summary>
+    private void Shed(float air, float holeDiameter)
+    {
+        if (air <= 0f) return;
+        float lo = 0.05f * holeDiameter, hi = 0.18f * holeDiameter;
+        float meanCube = (hi * hi * hi - lo * lo * lo) / (3f * MathF.Log(hi / lo));
+        int real = _rng.Poisson(air / (4f / 3f * MathF.PI * meanCube));
+        if (real <= 0) return;
+        int n = Math.Min(real, MaxShedPerBlock);
+        float w = MathF.Sqrt(real / (float)n) * GurglePart;
+        for (int b = 0; b < n; b++)
+        {
+            float r = lo * MathF.Pow(hi / lo, _rng.Uniform());
+            int k = _open.Length > 1 && _rng.Uniform() < _toHome ? 1 + (int)(_rng.Uniform() * (_open.Length - 1)) % (_open.Length - 1) : 0;
+            FallingWaterSynth.Ring(_open[k], (int)(_rng.Uniform() * Block), r * 1e3f, w);
         }
     }
 
@@ -302,7 +336,9 @@ public sealed partial class RunningWaterSynth
         if (air <= 0f) return;
         // The pocket the rim pinches off: about the hole's size; more air owed is more pockets, not a
         // bigger one.
-        float pocketR = GulpPocketShare * 0.5f * holeDiameter * MathF.Exp(GulpPocketSpread * Gauss(_rng));
+        // No bigger than a bottle's glug, though: 17 mL through a 40 mm neck as through a 20 mm one (Perez et al.
+        // 2026), a sphere of 1.6 cm. A wide outlet lets more pockets down, not bigger ones.
+        float pocketR = MathF.Min(GulpPocketShare * 0.5f * holeDiameter, LargestPocketMetres) * MathF.Exp(GulpPocketSpread * Gauss(_rng));
         float pocketV = 4f / 3f * MathF.PI * pocketR * pocketR * pocketR;
         int pockets = Math.Clamp((int)MathF.Round(air / pocketV), 1, 4);
         float each = air / pockets;
@@ -330,11 +366,57 @@ public sealed partial class RunningWaterSynth
             // the pocket's ringing, its band from the gap's own size (a few kHz for a centimetre gap).
             float ring = FallingWaterSynth.BubblePascalsPerMm * mm;
             float slurp = ring * MathF.Sqrt(SlurpShare) * 0.3f * GurglePart;
-            float centre = Math.Clamp(343f / (2f * MathF.PI * MathF.Max(0.003f, 0.5f * holeDiameter)) * 1.5f, 800f, 6000f);
+            float centre = Math.Clamp(343f / (2f * MathF.PI * MathF.Max(0.003f, 0.5f * holeDiameter)) * 0.5f, 400f, 4000f);
             open.Burst(when, 0.004f, 0.025f, slurp, centre / 2f, MathF.Min(centre * 2f, 0.45f * _rate));
             // And the pipe below takes the knock: its air rings at its own modes (the Tube).
             if (_inside != null)
                 _inside[k].Pulse(when, 0.0015f, ring * 0.5f * GurglePart);
+        }
+    }
+
+    // ── The aerated stream ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>The volume of air an aerator mixes into the stream, per volume of water. FITTED to the
+    /// recordings of taps into sinks (section 10.8): without it the model's tap was 8-15 dB under them
+    /// at 4-16 kHz. An aerator draws in about as much air as water (a judgement; no measurement found).</summary>
+    private const float AeratorAirShare = 0.5f;
+
+    /// <summary>The aerated stream's bubbles: radii from this to that, mm, evenly on a log scale. An
+    /// aerator's mesh makes bubbles of a few tenths of a millimetre.</summary>
+    private const float FizzSmallestMm = 0.12f, FizzLargestMm = 1.0f;
+
+    /// <summary>The share of them that ring as they are let go at the surface and break up there: most
+    /// rise and burst quietly. FITTED with the air share.</summary>
+    private const float FizzRingShare = 0.25f;
+
+    private const int MaxFizzPerBlock = 24;
+
+    /// <summary>A drop's blow on the wet (not flooded) steel of a sink keeps its first contact
+    /// (<see cref="WetCushion"/> is for stone under running water).</summary>
+    private const float PlateCushion = 0.05f;
+
+    /// <summary>
+    /// An aerated tap's stream is white: air and water mixed through the aerator's mesh. Where it lands
+    /// the air comes out as a cloud of small bubbles ringing high (a few tenths of a millimetre: 5-25 kHz),
+    /// the hiss of a running tap that a glassy stream from a plain spout does not have.
+    /// </summary>
+    private void Fizz(float dt)
+    {
+        if (Spec.Tap is not { Aerated: true } || !(_flow >= JetOnsetLitresPerSecond) || FallPart <= 0f) return;
+        float air = AeratorAirShare * FizzRingShare * _flow * 1e-3f;                // m³/s
+        float lo = FizzSmallestMm * 1e-3f, hi = FizzLargestMm * 1e-3f;
+        float meanCube = (hi * hi * hi - lo * lo * lo) / (3f * MathF.Log(hi / lo));
+        float meanVolume = 4f / 3f * MathF.PI * meanCube;
+        int real = _rng.Poisson(air / meanVolume * dt);
+        if (real <= 0) return;
+        int n = Math.Min(real, MaxFizzPerBlock);
+        float w = MathF.Sqrt(real / (float)n) * FallPart;
+        // Into the water if there is any, else onto the wet bottom where they burst in the film.
+        for (int b = 0; b < n; b++)
+        {
+            float mm = FizzSmallestMm * MathF.Pow(FizzLargestMm / FizzSmallestMm, _rng.Uniform());
+            int k = _open.Length > 1 && _rng.Uniform() < _toHome ? 1 + (int)(_rng.Uniform() * (_open.Length - 1)) % (_open.Length - 1) : 0;
+            FallingWaterSynth.Ring(_open[k], (int)(_rng.Uniform() * Block), mm, w);
         }
     }
 
