@@ -211,6 +211,16 @@ public struct SpatialEmitter
     /// </summary>
     public int IntakeOfEntity;
     /// <summary>
+    /// When non-zero, this voice is place <see cref="Place"/> of that entity's tree or fire: one of the
+    /// independent streams its synth renders across its extent (ExtendedSources, NaturePlaceState). Its
+    /// PhysicalKey is the source's own.
+    /// </summary>
+    public int PlaceOfEntity;
+    public int Place;
+    /// <summary>For an extended source's own voice: how much of it its outer places carry, 0 to 1,
+    /// already slewed (ExtendedSources.SpreadFor, Slew).</summary>
+    public float Spread;
+    /// <summary>
     /// How hard the road is working this vehicle's tyres, as a fraction of the grip they have.
     ///
     /// Zero is rolling; one is the limit, where a tyre squeals; above that it is sliding. Computed

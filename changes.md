@@ -4,6 +4,48 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Wide sources (unheard). Trees, the fire pit, the fountain and the rain round you are heard from
+  several places across them, not from one point. Renders in inbox/wide-sources-2026-10-06, with a
+  README. Why: as one point through the HRTF both ears got the same noise (interaural correlation
+  0.9-1.0 in every band for a tree, a fire and a roof over the ear), which sounds narrow, inside the
+  head and harsh at the top (docs/AUDIO_QUALITY_2026-10-06.md item 8).
+  - A tree: the middle of its crown and one place per bough round it (seven). The fire pit: the
+    flames and three places round the bed. Each fountain tap: its middle and three places round
+    where its water lands. The roof over the ear in rain: four places round the point above you.
+    Each near rain quarter: two places 22.5 degrees either side of its middle.
+  - Each place is an independent stream of the one synth: every event (a leaf strike, a crackle, a
+    drop, a lump) goes to one place, and the continuous parts (the shedding off the twigs, the roar,
+    the fizz) have their own noise at each place. Never a copy, so nothing combs. A roof part or a
+    rain-quarter part renders its share of the patch's area with its own drops.
+  - The places' shares always sum to one, and one balance gain keeps them as loud as the source from
+    its middle under the mixer's own distance law. Tested at 1, 5 and 20 m (exact), and through the
+    game path from the voices' gains: within 0.5 dB.
+  - How much of a source its outer places carry follows the angle they fill from where you stand:
+    none under 2.5 degrees, all over 6, slewed over about 1.4 s. Merged sources let their outer
+    voices go.
+  - At most 36 outer place voices at once, nearest source first. Under mixer load they are the first
+    thing given up, six at a time, before a machine's front outlet; they come back last.
+  - A tree's boughs now stand round its crown (two-thirds of its radius, alternately a quarter of the
+    radius up and down) and read the wind there. They were a line along the wind.
+  - Measured (AudioLab `--wide-sources`, through the client, the mixer, the HRTF and the ear model;
+    `tools/interaural.py`, IACC per octave): a tree at 2 m went from 0.96 / 0.90 / 0.93 at 1 / 2 /
+    4 kHz to 0.24 / 0.11 / 0.32. Street rain at 2 kHz went from 0.55 to 0.08. A steel roof over the
+    ear went from 0.88 / 0.84 / 0.88 to 0.45 / 0.38 / 0.28. The fountain changes less (0.59 to 0.48
+    at 2 kHz at 2 m from the kerb): its five taps were already independent streams, and they sit
+    within 2.3 m of its middle.
+  - Cost: synthesis about the same for trees, fire and fountain (a tree 2.2 to 2.5 % of a core);
+    rain over a bus shelter 1.0 to 3.1 %, each near quarter 0.5 to 0.8 %. The HRTF is 0.08 % of a
+    core per voice; a second-order ambisonic field for the same seven streams costs more (0.9 %) and
+    would lose each place's own path, so each place is a voice.
+  - Traced echoes: a tree, a fire or a fountain takes at most two echo rigs, as a train does (the
+    fountain's five taps could take five).
+  - OPENFPS_WIDE_SOURCES=0 plays everything from one point; OPENFPS_PLACE_VOICES sets the budget.
+  - AudioLab `--wide-sources [set=measure|render|roofs|level|tree|cost] [wide=on|off]`, and
+    `tools/interaural.py files|segments|windows`.
+  - Open: the fountain's rim jets are heard from the rocks' taps, 2.3 m from its middle, though they
+    land near the kerb; a tree still has a floor of about 0.3 at 4-8 kHz with seven places; machines
+    with several radiators are still one point.
+
 - Rain round 2 (unheard). Renders in inbox/textures-round2-rain-2026-10-06, with a README.
 - Rain no longer crunches. A drop's click on a road, a roof or the ground rises smoothly instead of as
   a one-sample spike, and its top end is the spray of its splash (2.5-14 kHz noise following every

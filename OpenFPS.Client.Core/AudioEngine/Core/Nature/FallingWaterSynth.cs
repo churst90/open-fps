@@ -63,6 +63,13 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// <see cref="NextTaps"/> hands each tap its own pressure. Different events at each, so the voices
 /// are decorrelated as the water is. <see cref="Next"/> is all of them at one point.
 ///
+/// PLACES (2026-10-06). A tap is itself a metre and a half of rock face and rim jets, and was one point.
+/// With more than one place a tap (ExtendedSources), each drop's and each lump's sound (its impact, its
+/// splash, its bubbles) lands at one place of its tap: the tap's middle by the middle's share, otherwise
+/// one of the places round it, as the tap's spread says (<see cref="SetSpread"/>). Every event goes to
+/// one place, so the places add up to the tap. <see cref="NextPlaces"/> hands out every place;
+/// <see cref="NextTaps"/> sums each tap's. One place a tap is the fountain as it was.
+///
 /// WHAT IS FITTED. Three constants and the plunge's air share, named here and nowhere else. The
 /// first two were fitted together on 2026-10-04 to a recording of a dozen jets falling back into their
 /// pool (its octaves 500 Hz-16 kHz within 4 dB) and then brought to 71 dB(A) at the kerb, from Watts
@@ -251,12 +258,42 @@ public sealed class FallingWaterSynth
     public float ImpactPart = 1f, DropBubblePart = 1f, LumpBubblePart = 1f, PlungePart = 1f, SplashPart = 1f;
 
     /// <summary>How many places the feature is heard from (<see cref="WaterFeatureSpec.Taps"/>).</summary>
-    public int TapCount => _sums.Length;
+    public int TapCount => _taps;
+
+    /// <summary>How many places each tap is heard from (its middle first): one unless made with more.</summary>
+    public int PlacesPerTap => _placesPerTap;
+
+    private readonly int _taps, _placesPerTap;
+    private readonly float[] _tapSpread, _tapMiddle;
+
+    /// <summary>How much of tap <paramref name="tap"/> its outer places carry, 0 to 1
+    /// (ExtendedSources.Shares). Takes effect at the next control call.</summary>
+    public void SetSpread(int tap, float spread)
+    {
+        if (tap >= 0 && tap < _taps) _tapSpread[tap] = Math.Clamp(spread, 0f, 1f);
+    }
+
+    /// <summary>The place one event of fall <paramref name="f"/> lands at: its tap's middle by the
+    /// middle's share, otherwise one of the places round it.</summary>
+    private EventSum PlaceFor(FallState f)
+    {
+        if (_placesPerTap == 1) return f.Sum;
+        float middle = _tapMiddle[f.Tap];
+        float u = f.Sum.Uniform();
+        if (u >= middle && middle < 1f)
+        {
+            int outer = _placesPerTap - 1;
+            int k = 1 + Math.Min(outer - 1, (int)((u - middle) / (1f - middle) * outer));
+            return _sums[f.Tap * _placesPerTap + k];
+        }
+        return f.Sum;
+    }
 
     private sealed class FallState
     {
         public WaterFallSpec Spec = null!;
-        public EventSum Sum = null!;                      // the tap it lands at
+        public EventSum Sum = null!;                      // the tap it lands at (its middle)
+        public int Tap;
         public bool Rock;
         public float DropRate, ChunkRate, BubbleRate;   // per second, at full flow
         public float DropMean, DropMax;                  // m
@@ -271,13 +308,21 @@ public sealed class FallingWaterSynth
         public int LumpOrder;                             // the lumps' gamma order
     }
 
-    public FallingWaterSynth(WaterFeatureSpec spec, float sampleRate, int seed)
+    public FallingWaterSynth(WaterFeatureSpec spec, float sampleRate, int seed, int placesPerTap = 1)
     {
         Spec = spec;
         _rate = sampleRate;
         int taps = Math.Max(1, spec.Taps?.Length ?? 1);
-        _sums = new EventSum[taps];
-        for (int t = 0; t < taps; t++) _sums[t] = new EventSum(sampleRate, seed * 7919 + t * 104729 + 1);
+        _taps = taps;
+        _placesPerTap = Math.Max(1, placesPerTap);
+        _tapSpread = new float[taps];
+        _tapMiddle = new float[taps];
+        Array.Fill(_tapMiddle, 1f);
+        _sums = new EventSum[taps * _placesPerTap];
+        // A tap's middle keeps the seed it always had; its other places have their own.
+        for (int t = 0; t < taps; t++)
+            for (int k = 0; k < _placesPerTap; k++)
+                _sums[t * _placesPerTap + k] = new EventSum(sampleRate, seed * 7919 + t * 104729 + 1 + k * 15485863);
         _rng = _sums[0];
         _falls = new FallState[spec.Falls.Length];
         for (int i = 0; i < _falls.Length; i++)
@@ -286,7 +331,8 @@ public sealed class FallingWaterSynth
             var s = new FallState
             {
                 Spec = f,
-                Sum = _sums[Math.Clamp(f.Tap, 0, taps - 1)],
+                Sum = _sums[Math.Clamp(f.Tap, 0, taps - 1) * _placesPerTap],
+                Tap = Math.Clamp(f.Tap, 0, taps - 1),
                 Rock = f.Onto == WaterSurface.Rock,
                 DropMean = f.MeanDropRadiusMm * 1e-3f,
                 DropMax = MathF.Max(f.MeanDropRadiusMm, f.MaxDropRadiusMm) * 1e-3f,
@@ -458,6 +504,15 @@ public sealed class FallingWaterSynth
         // A pump coming up to pressure or running down takes a couple of seconds.
         float target = Running ? 1f : 0f;
         _flow += Math.Clamp(target - _flow, -dt / 2f, dt / 2f);
+        if (_placesPerTap > 1)
+        {
+            Span<float> shares = stackalloc float[_placesPerTap];
+            for (int t = 0; t < _taps; t++)
+            {
+                ExtendedSources.Shares(_tapSpread[t], shares);
+                _tapMiddle[t] = shares[0];
+            }
+        }
         foreach (var f in _falls)
         {
             f.WanderClock -= dt;
@@ -483,14 +538,27 @@ public sealed class FallingWaterSynth
         return sum;
     }
 
-    /// <summary>The next sample of each tap, pascals at a metre from that tap.</summary>
+    /// <summary>The next sample of each tap, pascals at a metre from that tap: its places summed.</summary>
     public void NextTaps(Span<float> taps)
     {
         Step();
-        for (int t = 0; t < _sums.Length; t++)
+        for (int t = 0; t < _taps; t++)
         {
-            float v = _sums[t].Next();
+            float v = 0f;
+            for (int k = 0; k < _placesPerTap; k++) v += _sums[t * _placesPerTap + k].Next();
             if (t < taps.Length) taps[t] = v;
+        }
+    }
+
+    /// <summary>The next sample of every place of every tap, tap by tap, its middle first:
+    /// <paramref name="places"/>[tap · PlacesPerTap + place].</summary>
+    public void NextPlaces(Span<float> places)
+    {
+        Step();
+        for (int i = 0; i < _sums.Length; i++)
+        {
+            float v = _sums[i].Next();
+            if (i < places.Length) places[i] = v;
         }
     }
 
@@ -561,15 +629,16 @@ public sealed class FallingWaterSynth
             // time the whole drop takes to bury itself.
             float tau = r / v;
             float impact = ImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart;
+            var place = PlaceFor(f);
             // On stone the drop stops in its own length and splashes flat: a shorter force, and
             // nothing trapped. Small drops falling far are also the ones the wind takes to the
             // paving round a pool.
             if (f.Rock || (drift > 0f && r < 1e-3f && sum.Uniform() < drift * (1f - r / 1e-3f)))
             {
-                sum.Impact(at, ImpactRise, 0.4f * tau, impact * (HardImpactPascals / ImpactPascals));
+                place.Impact(at, ImpactRise, 0.4f * tau, impact * (HardImpactPascals / ImpactPascals));
                 continue;
             }
-            sum.Impact(at, ImpactRise, tau, impact);
+            place.Impact(at, ImpactRise, tau, impact);
             if (k % stride != 0) continue;
 
             float rmm = r * 1e3f;
@@ -577,15 +646,15 @@ public sealed class FallingWaterSynth
             if (rmm >= 0.4f && rmm <= 0.55f && v > 0.8f * TerminalSpeed(r))
             {
                 // The regular bubble: always about the same size, rain on a lake.
-                if (sum.Uniform() < RegularShare) Ring(sum, later, 0.18f + 0.08f * sum.Uniform(), ringWeight * DropBubblePart);
+                if (sum.Uniform() < RegularShare) Ring(place, later, 0.18f + 0.08f * sum.Uniform(), ringWeight * DropBubblePart);
             }
             else if (rmm >= 1.1f)
             {
                 if (sum.Uniform() > IrregularShare) continue;
                 float b = TypeTwoBubbleMm(rmm) * (0.8f + 0.4f * sum.Uniform());
-                Ring(sum, later, b, ringWeight * DropBubblePart);
+                Ring(place, later, b, ringWeight * DropBubblePart);
                 if (sum.Uniform() < SecondaryShare)
-                    Ring(sum, later + (int)(0.004f * _rate * sum.Uniform()), b * (0.3f + 0.6f * sum.Uniform()), 0.4f * ringWeight * DropBubblePart);
+                    Ring(place, later + (int)(0.004f * _rate * sum.Uniform()), b * (0.3f + 0.6f * sum.Uniform()), 0.4f * ringWeight * DropBubblePart);
             }
         }
     }
@@ -613,14 +682,15 @@ public sealed class FallingWaterSynth
             // in the microseconds a drop's round front meets still water. Same energy (m v³), spread
             // over the longer rise, so the peak comes down as the root of it.
             float rise = MathF.Max(ImpactRise, LumpCushion * r / v);
-            sum.Impact(at, rise, (f.Rock ? 0.4f : 1f) * r / v,
+            var place = PlaceFor(f);
+            place.Impact(at, rise, (f.Rock ? 0.4f : 1f) * r / v,
                        MathF.Sqrt(ImpactRise / rise) * ImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart);
 
             // Its crown, or on stone its lamella, tearing into spray: every lump, as loud as it is big.
             var (sr, sd, sp) = Splash(r, v, crown);
             float fc = SplashCentreHz(r, v) * MathF.Exp(SplashScatter * Gauss(sum));
             float spread = SplashBandHalfWidth;
-            sum.Burst(at, sr, sd, sp * weight * SplashPart, fc / spread, MathF.Min(fc * spread, 0.45f * _rate), steep: true);
+            place.Burst(at, sr, sd, sp * weight * SplashPart, fc / spread, MathF.Min(fc * spread, 0.45f * _rate), steep: true);
 
             if (f.Rock) continue;
 
@@ -633,7 +703,7 @@ public sealed class FallingWaterSynth
                 float bw = MathF.Sqrt(count / (float)rendered) * PlungePart;
                 float cavity = CavitySeconds * r / 5e-3f * _rate;
                 for (int b = 0; b < rendered; b++)
-                    Ring(sum, at + (int)(cavity * (0.2f + sum.Uniform())), DrawPlungeBubbleMm(sum), bw);
+                    Ring(place, at + (int)(cavity * (0.2f + sum.Uniform())), DrawPlungeBubbleMm(sum), bw);
             }
 
             if (k % stride != 0 || sum.Uniform() > ChunkShare) continue;
@@ -641,7 +711,7 @@ public sealed class FallingWaterSynth
             // the lump's own size — the low "glug" under a fountain. Smaller ones far more often.
             float u = sum.Uniform();
             float bubbleMm = r * 1e3f * (0.15f + 0.85f * u * u);
-            Ring(sum, at + (int)(0.006f * _rate * (0.5f + sum.Uniform())), bubbleMm, ringWeight * LumpBubblePart);
+            Ring(place, at + (int)(0.006f * _rate * (0.5f + sum.Uniform())), bubbleMm, ringWeight * LumpBubblePart);
         }
     }
 

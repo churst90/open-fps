@@ -630,18 +630,25 @@ public class NatureTests
     [Fact]
     public void AGustCrossesTheCrown()
     {
+        // The boughs stand round the crown (FoliageSynth.BoughOffset, since 2026-10-06 where they are
+        // also heard from); along the wind, the most upwind and the most downwind are most of a crown apart.
         var spec = FoliageSpec.ByName("park_tree");
-        float first = FoliageSynth.BoughAlongMetres(spec, 0), last = FoliageSynth.BoughAlongMetres(spec, FoliageSynth.Boughs - 1);
+        var (dx, dz) = WindField.Downwind;
+        float Along(int b) { var o = FoliageSynth.BoughOffset(spec, b); return o.X * dx + o.Z * dz; }
+        int up = Enumerable.Range(0, FoliageSynth.Boughs).OrderBy(Along).First();
+        int down = Enumerable.Range(0, FoliageSynth.Boughs).OrderBy(Along).Last();
+        float first = Along(up), last = Along(down);
         Assert.True(first < 0f && last > 0f);
         Assert.InRange(last - first, spec.CrownRadiusMetres, 2f * spec.CrownRadiusMetres);
-        // What the last bough feels now, the first felt (last - first) / U seconds ago.
+        // What the downwind bough feels now, the upwind one felt (last - first) / U seconds ago, give or
+        // take what the eddies change across the wind between their two places.
         double t = 1234.5, lag = (last - first) / Math.Max(0.5, WindField.MeanSpeed);
         var tree = new FoliageSynth(spec, Rate, 1);
         tree.ReadWind(10f, -20f, t - lag);
-        float upwindEarlier = tree.BoughWind(0);
+        float upwindEarlier = tree.BoughWind(up);
         tree.ReadWind(10f, -20f, t);
-        Assert.Equal(upwindEarlier, tree.BoughWind(FoliageSynth.Boughs - 1), 2);
-        Assert.NotEqual(tree.BoughWind(0), tree.BoughWind(FoliageSynth.Boughs - 1));
+        Assert.InRange(tree.BoughWind(down) - upwindEarlier, -0.25f, 0.25f);
+        Assert.NotEqual(tree.BoughWind(up), tree.BoughWind(down));
     }
 
     // ── On the city ────────────────────────────────────────────────────────────────────────────

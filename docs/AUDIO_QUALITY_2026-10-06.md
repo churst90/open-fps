@@ -178,6 +178,13 @@ at both ears: 0.92 for the fountain at 2 m. Recommendation: give extended source
 decorrelated taps across their extent (as the train has one tap per bogie), or one decorrelation
 stage scaled by the angle the source fills.
 
+Followed up on 2026-10-06 (changes.md; inbox/wide-sources-2026-10-06). Trees, the fire pit, each
+fountain tap, the roof over the ear and the near rain quarters are now heard from several places
+across them. Each place is an independent stream of the one synth, not a copy of it
+(ExtendedSources). Measured through the game path with the HRTF (AudioLab `--wide-sources`,
+`tools/interaural.py`): a tree at 2 m went from IACC 0.96 / 0.90 / 0.93 at 1 / 2 / 4 kHz to
+0.24 / 0.11 / 0.32. A steel roof over the ear went from 0.88 / 0.84 / 0.88 to 0.45 / 0.38 / 0.28.
+
 ## Other recommendations
 
 - Leftover per-block steps: FoliageSynth retunes its shedding resonators and their gain once a

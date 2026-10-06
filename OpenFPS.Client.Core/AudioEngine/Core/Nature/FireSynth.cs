@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
@@ -37,6 +38,12 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// a campfire's ordinary loudness. The size law (N(>A) ∝ A^−1.2) and the rate (a dozen to twenty
 /// distinct pops a second) were measured from three recordings of fires. Everything else is the
 /// fire's own numbers.
+///
+/// PLACES (2026-10-06). The logs lie across a bed a metre wide and the flames stand over all of it.
+/// With more than one place (ExtendedSources), each crackle, ember and settling is written to one place
+/// (the middle by its share, otherwise one of the places round the bed), and the roar and the fizz have
+/// their own noise at each place, their power split by the places' shares, under the one fire's puffing
+/// and vigour. The steam jets stay at the middle. One place is the fire as it was.
 /// </summary>
 public sealed class FireSynth
 {
@@ -80,6 +87,29 @@ public sealed class FireSynth
     public readonly FireSpec Spec;
     private readonly float _rate;
     private readonly EventSum _sum;
+    /// <summary>Each place's events; place 0 (the middle) is <see cref="_sum"/>, which also draws every
+    /// random number the scheduling needs, so a fire of one place renders exactly as before places.</summary>
+    private readonly EventSum[] _sums;
+    // The outer places' own roar and fizz (index 0 unused: the middle's are the plain fields).
+    private readonly Resonator[] _roarLowAt, _roarHighAt, _fizzAt;
+    private readonly float[] _placeGain, _placeGainTarget, _placeOut;
+    private float _middleShare = 1f;
+
+    /// <summary>How many places the fire is heard from: one, the middle, unless made with more.</summary>
+    public int Places => _sums.Length;
+
+    /// <summary>How much of the fire its outer places carry, 0 to 1 (ExtendedSources.Shares).</summary>
+    public float Spread;
+
+    /// <summary>Where outer place <paramref name="j"/> of <paramref name="places"/> is, m from the
+    /// fire's middle (x east, y up, z north): round the bed at three-quarters of its radius, where the
+    /// logs' ends and the hot side of the bed are.</summary>
+    public static Vector3 PlaceOffset(FireSpec spec, int j, int places)
+    {
+        float r = 0.75f * 0.5f * spec.BaseDiameterMetres;
+        float angle = MathF.Tau * (j + 0.25f) / Math.Max(1, places);
+        return new Vector3(MathF.Cos(angle) * r, 0f, MathF.Sin(angle) * r);
+    }
 
     public bool Lit = true;
 
@@ -124,11 +154,22 @@ public sealed class FireSynth
     private float _clock;
     private int _samples;
 
-    public FireSynth(FireSpec spec, float sampleRate, int seed)
+    public FireSynth(FireSpec spec, float sampleRate, int seed, int places = 1)
     {
         Spec = spec;
         _rate = sampleRate;
         _sum = new EventSum(sampleRate, seed);
+        places = Math.Max(1, places);
+        _sums = new EventSum[places];
+        _sums[0] = _sum;
+        for (int k = 1; k < places; k++) _sums[k] = new EventSum(sampleRate, seed * 7919 + k * 104729 + 1);
+        _roarLowAt = new Resonator[places];
+        _roarHighAt = new Resonator[places];
+        _fizzAt = new Resonator[places];
+        _placeGain = new float[places];
+        _placeGainTarget = new float[places];
+        _placeOut = new float[places];
+        _placeGain[0] = _placeGainTarget[0] = 1f;
         _puffHz = 1.5f / MathF.Sqrt(MathF.Max(0.1f, spec.BaseDiameterMetres));
         // The roar sits a few octaves above the puffing: the turbulence inside each puff. A wider
         // fire's eddies are bigger and slower, so its roar is lower: about 300 Hz for a metre-wide
@@ -145,6 +186,12 @@ public sealed class FireSynth
         _roarGain = 1f;
         _gainGlide = 1f - MathF.Exp(-1f / (0.005f * sampleRate));
         _fizz.Tune(MathF.Min(FizzHz, 0.4f * sampleRate), 0.5f, sampleRate);
+        for (int k = 1; k < places; k++)
+        {
+            _roarLowAt[k].Tune(_roarHz, 0.5f, sampleRate);
+            _roarHighAt[k].Tune(_roarHz * 3f, 0.5f, sampleRate);
+            _fizzAt[k].Tune(MathF.Min(FizzHz, 0.4f * sampleRate), 0.5f, sampleRate);
+        }
         _fizzNorm = 1f / Resonator.NoiseGain(MathF.Min(FizzHz, 0.4f * sampleRate), 0.5f, sampleRate);
         // What the two in series pass of unit white noise, measured once rather than guessed.
         {
@@ -232,10 +279,105 @@ public sealed class FireSynth
             Settle();
             _settleClock = 40f + 90f * _sum.Uniform();
         }
+
+        // The places' shares: events by probability, the roar's and the fizz's power by gain.
+        if (_sums.Length > 1)
+        {
+            Span<float> shares = stackalloc float[_sums.Length];
+            ExtendedSources.Shares(Spread, shares);
+            _middleShare = shares[0];
+            for (int k = 0; k < shares.Length; k++) _placeGainTarget[k] = MathF.Sqrt(shares[k]);
+        }
+    }
+
+    /// <summary>The place an event is heard from: the middle by its share, otherwise any of the others.</summary>
+    private EventSum AnyPlace()
+    {
+        if (_sums.Length == 1) return _sum;
+        float u = _sum.Uniform();
+        if (u < _middleShare) return _sum;
+        int outer = _sums.Length - 1;
+        int k = 1 + (int)((u - _middleShare) / MathF.Max(1e-6f, 1f - _middleShare) * outer);
+        return _sums[Math.Clamp(k, 1, outer)];
+    }
+
+    /// <summary>The next sample at each place, pascals at a metre from it: <paramref name="places"/>
+    /// holds <see cref="Places"/> of them. Their sum is the fire.</summary>
+    public void NextPlaces(Span<float> places)
+    {
+        if (_sums.Length == 1)
+        {
+            float y = Next();
+            if (places.Length > 0) places[0] = y;
+            return;
+        }
+        if (--_untilBlock <= 0)
+        {
+            _untilBlock = Block;
+            Schedule(Block / _rate);
+        }
+        _puffPhase += _puffHz * (1f + 0.35f * _puffJitter) / _rate;
+        if (_puffPhase >= 1f)
+        {
+            _puffPhase -= 1f;
+            _puffJitter = _sum.Signed();
+            _puffDepth = 0.1f + 0.25f * _sum.Uniform();
+        }
+        float puff = 1f + _puffDepth * MathF.Sin(MathF.Tau * _puffPhase);
+        _roarGainNow += (_roarGain - _roarGainNow) * _gainGlide;
+        _fizzNow += (_fizzTarget - _fizzNow) * _gainGlide;
+        float roarScale = _roarPascals * _roarGainNow * puff * RoarPart;
+        float fizzScale = _fizzNorm * _fizzNow * CracklePart;
+        _samples++;
+        for (int k = 0; k < _sums.Length; k++)
+        {
+            _placeGain[k] += (_placeGainTarget[k] - _placeGain[k]) * _gainGlide;
+            var sum = _sums[k];
+            float n = sum.Signed() * 1.7320508f;
+            float f = sum.Signed() * 1.7320508f;
+            float roar, fizz;
+            if (k == 0) { roar = _roarHigh.Process(_roarLow.Process(n)); fizz = _fizz.Process(f); }
+            else { roar = _roarHighAt[k].Process(_roarLowAt[k].Process(n)); fizz = _fizzAt[k].Process(f); }
+            float y = (roar * _roarNorm * roarScale + fizz * fizzScale) * _placeGain[k] + sum.Next();
+            if (k == 0) y += Steam();
+            if (k < places.Length) places[k] = y;
+        }
+    }
+
+    /// <summary>The steam jets, at the middle.</summary>
+    private float Steam()
+    {
+        float y = 0f;
+        for (int i = 0; i < _jets.Length; i++)
+        {
+            ref var j = ref _jets[i];
+            if (!j.Live) continue;
+            float life = MathF.Sin(MathF.PI * j.Age / j.Life);
+            float level = j.Strength * life * _burn * SmallestCracklePascals * 0.06f;
+            float hn = _sum.Signed() * 1.7320508f;
+            y += j.Hiss.Process(hn) * level * SteamPart;
+            if (j.Whistle > 0f)
+            {
+                if ((_samples & 255) == 0)
+                {
+                    float drift = 1f + 0.06f * MathF.Sin(j.DriftPhase + MathF.Tau * j.DriftHz * _clock);
+                    j.Tone.Tune(j.WhistleHz * drift, 60f, _rate);
+                }
+                y += j.Tone.Process(hn) / Resonator.NoiseGain(j.WhistleHz, 60f, _rate) * level * j.Whistle * 0.3f * SteamPart;
+            }
+        }
+        return y;
     }
 
     public float Next()
     {
+        if (_sums.Length > 1)
+        {
+            NextPlaces(_placeOut);
+            float all = 0f;
+            for (int k = 0; k < _placeOut.Length; k++) all += _placeOut[k];
+            return all;
+        }
         if (--_untilBlock <= 0)
         {
             _untilBlock = Block;
@@ -301,11 +443,12 @@ public sealed class FireSynth
             _emberAt[i] = -1f;
             int at = (int)(_sum.Uniform() * Block);
             float p = SmallestCracklePascals * 0.15f * _emberSize[i] * CracklePart;
-            _sum.Pulse(at, 25e-6f, p);
+            var lands = AnyPlace();
+            lands.Pulse(at, 25e-6f, p);
             Span<float> hz = stackalloc float[] { 5200f + 2000f * _sum.Signed(), 9000f + 2500f * _sum.Signed() };
             Span<float> tau = stackalloc float[] { 0.0015f, 0.0008f };
             Span<float> amp = stackalloc float[] { 0.5f * p, 0.3f * p };
-            _sum.Ring(at, hz, tau, amp);
+            lands.Ring(at, hz, tau, amp);
         }
     }
 
@@ -319,9 +462,10 @@ public sealed class FireSynth
         // the outflow, a spike as the wall gives and a tail as the pocket empties. A bigger pocket
         // empties for longer, so a big pop has a body under its crack.
         float empty = 0.15e-3f * MathF.Pow(size, 0.4f);
-        _sum.Impact(at, 25e-6f, empty, p);
+        var place = AnyPlace();
+        place.Impact(at, 25e-6f, empty, p);
         // The char round it: a scatter of fragments, a few milliseconds of rattle.
-        _sum.Burst(at + 2, 0.0001f, 0.0015f + 0.002f * _sum.Uniform(), 0.2f * p, 1500f, 12000f);
+        place.Burst(at + 2, 0.0001f, 0.0015f + 0.002f * _sum.Uniform(), 0.2f * p, 1500f, 12000f);
         if (size >= EmberSize)
         {
             for (int i = 0; i < _emberAt.Length; i++)
@@ -339,7 +483,8 @@ public sealed class FireSynth
     {
         // The log giving way: a soft thump of a few kilos dropping a few centimetres onto the bed.
         int at = (int)(_sum.Uniform() * Block);
-        _sum.Pulse(at, 0.004f, SmallestCracklePascals * 6f * SettlePart);
+        var log = AnyPlace();
+        log.Pulse(at, 0.004f, SmallestCracklePascals * 6f * SettlePart);
         // Charcoal pieces tumbling: a dozen or so brittle little rings over half a second.
         int pieces = 6 + (int)(14 * _sum.Uniform());
         Span<float> hz = stackalloc float[3];
@@ -353,8 +498,8 @@ public sealed class FireSynth
             hz[0] = f0; hz[1] = f0 * 2.7f; hz[2] = f0 * 5.1f;
             tau[0] = 0.004f; tau[1] = 0.002f; tau[2] = 0.001f;
             amp[0] = 0.5f * p; amp[1] = 0.3f * p; amp[2] = 0.2f * p;
-            _sum.Pulse(when, 40e-6f, p);
-            _sum.Ring(when, hz, tau, amp);
+            log.Pulse(when, 40e-6f, p);
+            log.Ring(when, hz, tau, amp);
         }
         _flare = MathF.Min(1.5f, _flare + 0.8f);
     }
