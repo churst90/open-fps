@@ -19,8 +19,8 @@ Recent work, newest first. `git log` has the rest.
   continuous clock at the car's channel rate.
 - Smoothed per-block steps: the binaural stage's spatial blend, a traced echo's input gain, and the
   ear wind's knee and buffeting rate.
-- Triangular dither on the master, because FMOD hands PulseAudio 16-bit audio. OPENFPS_DITHER=0
-  turns it off.
+- Triangular dither on the master, because FMOD hands PulseAudio 16-bit audio. Off for the lab's
+  WAV writer, whose files are read for exact silence; OPENFPS_DITHER=0 or 1 overrides.
 - The boundary reflections run at the mixer's rate, not the sound card's (9 % off on 48 kHz
   devices).
 - The "Mix loudness" log line's peak is the peak since the last line. It was the peak since start,

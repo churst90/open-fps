@@ -36,7 +36,7 @@ namespace OpenFPS.AudioLab.Spikes;
 ///       A car's reflection, borrowed voice and front voice with the car itself muted: skips and steps.
 ///   --quality ceiling [sec=]     how often each voice's SoftCeiling bends its samples
 ///   --quality quant              sixteen bits against float on TransientSynth renders, by level
-///   --quality lsb                a tone two bits tall: the float mix against the 16 bits it is handed out as
+///   --quality lsb                a tone two bits tall: the float mix against the 16 bits it is handed out as (OPENFPS_DITHER=1: dithered)
 ///   --quality output             the real output with nothing playing, to read its format off the server
 ///   --quality thunderfile        a strike's file written with linear and with band-limited upsampling
 ///
@@ -106,7 +106,9 @@ public static class QualitySpike
         if (args.Contains("output"))
         {
             // The real output, with nothing playing: for reading the stream's format off the sound
-            // server while it is open (pactl list sink-inputs). Silent: no voice is started.
+            // server while it is open (pactl list sink-inputs). No voice is started and the dither is
+            // left out, so what it plays is digital silence.
+            Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
             Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
             var p = new FmodAudioProvider();
             if (!p.Initialize()) return 1;

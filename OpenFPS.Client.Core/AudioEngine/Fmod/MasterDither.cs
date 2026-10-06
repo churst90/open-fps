@@ -18,8 +18,8 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 ///
 /// Dither turns that error into a steady, signal-independent hiss at about -101 dBFS RMS, under any
 /// sound card's own floor, and leaves nothing that follows the signal. Where the output is float
-/// already (WASAPI in shared mode usually is) it costs a hiss nobody can hear. OPENFPS_DITHER=0 leaves
-/// it out.
+/// already (WASAPI in shared mode usually is) it costs a hiss nobody can hear. See Enabled for when it
+/// is left out.
 /// </summary>
 public sealed class MasterDither : IDisposable
 {
@@ -32,7 +32,17 @@ public sealed class MasterDither : IDisposable
     private GCHandle _handle;
     private uint _a = 0x9E3779B9u, _b = 0x85EBCA6Bu;
 
-    public static bool Enabled => Environment.GetEnvironmentVariable("OPENFPS_DITHER") != "0";
+    /// <summary>
+    /// On for a sound card, off for the WAV writer (OPENFPS_FMOD_WAV): the lab's instruments read that
+    /// file for exact silence and two-millisecond holes, which a step of dither would fill.
+    /// OPENFPS_DITHER=1 or 0 decides either way.
+    /// </summary>
+    public static bool Enabled => Environment.GetEnvironmentVariable("OPENFPS_DITHER") switch
+    {
+        "0" => false,
+        "1" => true,
+        _ => string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV")),
+    };
 
     /// <summary>Puts the dither at the head of the master group: added last, it is the last thing run.</summary>
     public static MasterDither? Attach(FMOD.System system, ChannelGroup master)
