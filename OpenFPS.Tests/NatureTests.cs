@@ -422,6 +422,28 @@ public class NatureTests
         Assert.InRange(cross / Math.Sqrt(north * south), -0.05, 0.05);
     }
 
+    /// <summary>
+    /// Rain on a street swells and eases over seconds as recorded rain does (RainSynth.Intermittency,
+    /// after Kostinski and Jameson's clustered drop counts): fed one steady rate its band envelopes had
+    /// 1.5-2.5 per cent of their modulation power at 0.5-2 Hz against the recordings' 3.3-31 per
+    /// cent, and three quarters of it above 32 Hz against at most 71 per cent.
+    /// </summary>
+    [Theory]
+    [InlineData(5f)]
+    [InlineData(25f)]
+    public void RainOnAStreetMovesAsRecordedRainDoes(float mmPerHour)
+    {
+        var street = new RainLayer { Kind = RainSurfaceKind.Hard, Material = "Asphalt" };
+        float[] areas = { 5f, 15f, 40f, 120f }, distances = { 1.5f, 3f, 6f, 12f };
+        for (int r = 0; r < areas.Length; r++) street.Add(r, areas[r], distances[r], MathF.Min(1f, 1.6f / distances[r]));
+        var patch = new RainPatch { Layers = new[] { street }, ReferenceDistance = 3f };
+        var synth = new RainSynth(TextureStatistics.Rate, 11) { Patch = patch, RainRate = mmPerHour };
+        for (int i = 0; i < TextureStatistics.Rate; i++) synth.Next();
+        var x = new float[TextureStatistics.Rate * 20];
+        for (int i = 0; i < x.Length; i++) x[i] = synth.Next();
+        HoldInRange("rain", TextureStatistics.Analyse(x).Summary(), Fitted);
+    }
+
     /// <summary>"water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;" is a tap; a plain "water:&lt;preset&gt;" is the whole.</summary>
     [Fact]
     public void AWaterTapKeyNamesItsFeatureAndTap()

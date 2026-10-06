@@ -119,6 +119,66 @@ public sealed class RainSynth
     /// the bubbles, the plates' ringing and thuds, and the drips. One in the game.</summary>
     public float ClickPart = 1f, BubblePart = 1f, PlatePart = 1f, DripPart = 1f;
 
+    /// <summary>Seconds on the clock every rain voice shares (WindField.Now in the game, from zero in
+    /// the lab): the patches round a listener read the same clustering at the same moment.</summary>
+    public double Clock;
+
+    /// <summary>
+    /// How much more or less rain than its mean is arriving now, a factor about one.
+    ///
+    /// Raindrops do not arrive as a Poisson stream at a fixed rate. Counted over a few square metres,
+    /// drops of one size come in clusters: their counts over seconds are far more variable than
+    /// Poisson's, the excess growing with the counting time (Kostinski and Jameson 1997, J. Atmos. Sci.
+    /// 54, "Fluctuation properties of precipitation. Part I"; Jameson and Kostinski 1999-2002, Parts
+    /// II-VI: the pair-correlation of drop arrivals is positive out to seconds and metres). That is the
+    /// slow swell a rain recording has and the model, fed one steady rate, did not: its band envelopes'
+    /// modulation power at 0.5-2 Hz was 1.5 per cent of their variance, the recordings' 2.6-19
+    /// (texture round 1, 2026-10-06).
+    ///
+    /// A lognormal factor on the flux, its log a smooth noise with knots every 0.6, 2.4 and 9.6
+    /// seconds, the same for every patch at one moment. Its spread, <see cref="ClusterSigma"/>, is
+    /// fitted to the recordings' slow modulation; the scales are Kostinski and Jameson's seconds.
+    /// </summary>
+    public static float Intermittency(double seconds)
+    {
+        float g = 0f;
+        for (int k = 0; k < ClusterScales.Length; k++)
+        {
+            double u = seconds / ClusterScales[k] + 17.3 * k;
+            long i = (long)Math.Floor(u);
+            float f = (float)(u - i);
+            float s = 0.5f - 0.5f * MathF.Cos(MathF.PI * f);
+            g += (Knot(i, k) * (1f - s) + Knot(i + 1, k) * s);
+        }
+        // Each scale's knots have unit variance; the cosine glide between two independent knots keeps
+        // three quarters of it on average.
+        g /= MathF.Sqrt(0.75f * ClusterScales.Length);
+        float sigma = FitTune.T("rsig", ClusterSigma);
+        return MathF.Exp(sigma * g - 0.5f * sigma * sigma);
+    }
+
+    /// <summary>The spread of the log of the clustering factor: a standard deviation of about 45 per
+    /// cent in the flux over seconds. FITTED 2026-10-06 on the street and in a car at moderate and heavy
+    /// rain: 0.35 left the slow modulation at the recordings' lowest, 0.6 moved the bands together more
+    /// than all but the gustiest recording; 0.45 puts the slow share at 0.055-0.06 (recordings' median
+    /// 0.07) and the fast at 0.54-0.55 (median 0.52), every statistic inside the recordings' spread.</summary>
+    public const float ClusterSigma = 0.45f;
+
+    private static readonly double[] ClusterScales = { 0.6, 2.4, 9.6 };
+
+    /// <summary>A unit-variance value at a knot: the sum of four hashed uniforms, centred.</summary>
+    private static float Knot(long i, int scale)
+    {
+        ulong h = (ulong)i * 0x9E3779B97F4A7C15UL ^ (ulong)(scale + 1) * 0xC2B2AE3D27D4EB4FUL;
+        float sum = 0f;
+        for (int j = 0; j < 4; j++)
+        {
+            h ^= h >> 33; h *= 0xFF51AFD7ED558CCDUL; h ^= h >> 33;
+            sum += (h >> 40) * (1f / 16777216f);
+        }
+        return (sum - 2f) * 1.7320508f;   // four uniforms: variance 1/3
+    }
+
     /// <summary>Drops rendered and drops stood for since the last call, for the lab.</summary>
     public long Rendered, Represented;
 
@@ -151,8 +211,12 @@ public sealed class RainSynth
         var falling = Falling;
         float rate = falling.RateMmPerHour;
         float dt = Block / _rate;
+        Clock += dt;
         if (patch != null && falling.Falling)
         {
+            // Rain does not fall at a steady rate onto a few square metres: it comes in clusters over
+            // seconds (see Intermittency), all the patches round a listener together.
+            float clustered = Intermittency(Clock);
             // The main particles: the rain (the rain hail falls in, for hail), the sleet, the snow.
             var mainKind = falling.Kind == PrecipitationKind.Hail ? PrecipitationKind.Rain : falling.Kind;
             _main.Build(mainKind, rate, falling.Kind == PrecipitationKind.Hail ? Hydrometeors.MarshallPalmerMedianMm(rate) : falling.EffectiveMedianMm);
@@ -161,7 +225,7 @@ public sealed class RainSynth
             {
                 _spec = pass == 0 ? _main : _stones;
                 _particle = pass == 0 ? mainKind : PrecipitationKind.Hail;
-                Surfaces(patch, dt, rate, _spec.PerSquareMetreSecond);
+                Surfaces(patch, dt, rate, _spec.PerSquareMetreSecond * clustered);
             }
         }
         Array.Clear(_plateOut);
