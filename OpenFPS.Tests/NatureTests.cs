@@ -444,6 +444,30 @@ public class NatureTests
         HoldInRange("rain", TextureStatistics.Analyse(x).Summary(), Fitted);
     }
 
+    /// <summary>
+    /// A park tree's rustle, in a steady wind, moves as recorded leaves in wind do: hard knocks out of
+    /// a bed of glancing touches, the air's small-scale velocity increments being exponential-tailed
+    /// (FoliageSynth.Increment). Driven by the mean wind alone its top bands were as steady as noise
+    /// (skew below zero against the recordings' 0.35-1.4). Steady, because the wind field's slow gusts
+    /// swing a 20 s stretch further than any 20 s of the recordings (an open question in changes.md),
+    /// and at 3 and 4.5 m/s because the recordings are of soft and moderate winds: at 6-10 m/s twice as
+    /// many twigs are going and the top bands are a wash again (skew 0.07-0.15).
+    /// </summary>
+    [Theory]
+    [InlineData(3f)]
+    [InlineData(4.5f)]
+    public void ATreeRustlesAsRecordedLeavesDo(float wind)
+    {
+        var tree = new FoliageSynth(FoliageSpec.ByName("park_tree"), TextureStatistics.Rate, 5) { Wind = wind };
+        var x = new float[TextureStatistics.Rate * 20];
+        for (int i = 0; i < x.Length; i++)
+        {
+            if (i % 256 == 0) tree.Control(256f / TextureStatistics.Rate);
+            x[i] = tree.Next();
+        }
+        HoldInRange("leaves", TextureStatistics.Analyse(x).Summary(), Fitted);
+    }
+
     /// <summary>"water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;" is a tap; a plain "water:&lt;preset&gt;" is the whole.</summary>
     [Fact]
     public void AWaterTapKeyNamesItsFeatureAndTap()
@@ -498,11 +522,14 @@ public class NatureTests
     /// flutter cycle each, some thirty-odd strikes an episode. The first model gave an episode 400,
     /// so a breeze was a few loud patches a second, each heard arriving: the leaves' 2-8 kHz band
     /// flickered by 2.7 dB over 50 ms where recorded leaves flicker by 0.5-0.7 (1.7 in the busiest).
+    /// Measured on the whole tree, as the recordings are of whole trees: since texture round 1
+    /// (2026-10-06) a hard knock stands out of the leaves on their own, as it does in the recordings,
+    /// and the whoosh under them is the bed it stands out of.
     /// </summary>
     [Fact]
     public void TheRustleIsNotAFewLoudPatches()
     {
-        var tree = new FoliageSynth(FoliageSpec.ByName("park_tree"), Rate, 5) { Wind = 4f, ShedPart = 0f };
+        var tree = new FoliageSynth(FoliageSpec.ByName("park_tree"), Rate, 5) { Wind = 4f };
         var x = new float[Rate * 20];
         for (int i = 0; i < x.Length; i++)
         {
