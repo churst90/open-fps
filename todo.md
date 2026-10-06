@@ -1,7 +1,7 @@
 # To do
 
 Planned work in priority order. Finished work is in [changes.md](changes.md) and `git log`.
-Updated 2026-10-05. Today's plan, agreed with Cody: [docs/PLAN_2026-10-05.md](docs/PLAN_2026-10-05.md).
+Updated 2026-10-05 (evening). Today's plan, agreed with Cody: [docs/PLAN_2026-10-05.md](docs/PLAN_2026-10-05.md).
 
 ## Now
 
@@ -21,6 +21,18 @@ Restart the server and update the client first.
 - The six Resonance-port fixes: tyres at the device's rate, the bus's air compressor at the back,
   rail axles from the model file, machines built on a base, the road vehicles' air horn, the bell's
   headroom. Also the diesel locomotives (crank, then the governor holds the notch).
+- After a map change, sounds keep their direction (the fountain moves as you turn; the speedway's
+  cars are placed). Fixed 2026-10-05; travel city -> speedway -> city and listen.
+- The fountain and the trees, rounds 2 and 3 (inbox/nature-round2-2026-10-05, nature-round3).
+  Cody on round 2: "almost there", the water still a little grainy, the hiss could be smoother.
+- Wind at the ears and the weather's wind in the trees (inbox/weather-wind-2026-10-05). Try
+  `/weather wind 8 north west gusty`, `/weather storm`, `/weather auto`. Is walking in still air
+  faint enough? Is a storm (about -19 LUFS, a busy street) too loud? `OPENFPS_EAR_WIND=0` for an A/B.
+- Car fronts: engine noise out of the bay, radiator fans (inbox/car-fronts-2026-10-05). Cody's first
+  listen: the renders were far too quiet (written at raw scale, -55 to -65 dBFS), and some fronts
+  louder than the tailpipes. Being redone.
+- Rain on surfaces, thunder and lightning (inbox/rain-2026-10-05, inbox/thunder-2026-10-05), when built.
+- The Magnolia and Albany maps, when built (`/join magnolia tx`, `/join albany or`).
 
 ### 2. Cody to say
 - The admin gun's report: which of the five (`/admingun report 1-5`, inbox/admin-gun-2026-10-05).
@@ -29,6 +41,10 @@ Restart the server and update the client first.
 - The loudness law places a sound by its peak. Anything over about 126 dB peak at 1 m (gunshots, a
   window breaking, a thin steel plate) plays at full scale out to the 40 m clamp, so 5 m and 20 m
   sound the same (`Loudness.Place`).
+- Lightning: a spoken or tone cue at the flash ("lightning, north east"), or only the thunder?
+- The scope hint ("Nobody in view. Nearest person 60 metres, below and to the left"): parked by Cody
+  2026-10-05. At 4 power the scope sees a 6 degree cone, so from a roof looking level the street
+  below is out of view.
 
 ### 3. Door models: gaps
 - The lift's close is soft: no bump and no rebounds.
@@ -182,6 +198,78 @@ the level to the footstep takes.
 
 ## Next
 
+### Doors as live models (filed 2026-10-05, not started)
+The door models are physical (hinges with their own friction and wear, the leaf's modes, the latch,
+the stop), but each is rendered once per key, far slower than real time, and replayed from one point
+by the handle; the leaf does not swing in the world. Cody wants the squeak in the hinge and the
+leaf's sound from the swinging leaf. Needs: the leaf swinging on the server from how it was pushed;
+the model reworked to run faster than real time (find what is slow first: probably the leaf's modes
+and the contacts); taps at each hinge, the latch edge and the leaf, as trains and cars already do.
+Knob door first, the approved renders as the yardstick. Large.
+
+### Real places from open data
+Maps from OpenStreetMap plus public records (tools/gen_osm.py; docs/MAPS_FROM_REAL_PLACES.md). Magnolia
+TX (31907 Bobcat Lane) and Albany OR (1042 Belmont Ave SW), 3 km each, in progress 2026-10-05.
+- Whole towns (a city's boundary, a ZIP area) need streaming: the map in tiles, full detail near the
+  player and a coarse layer (shells, roads) beyond, loaded as you move. The same work serves the 10 km
+  city and joined maps. A client detail setting (low, medium, high) then sets how far full detail
+  reaches. The importer already tags tiles and has detail levels.
+- Real weather for real places (Open-Meteo or NOAA by latitude and longitude).
+- Traffic volumes from published counts (average daily traffic by road), with time-of-day curves.
+- Ground height from USGS 3DEP once there is terrain.
+
+### Map editor
+In the game, typed commands and F-key menus with speech, building on `/map new`, `/put`, `/group`,
+`/saveas`, `/place` and the build cursor. Missing: copy, rename, delete and publish maps; choose things
+(nearest, by name, in an area) with each spoken back; move, turn and resize by numbers or small steps
+with snapping; duplicate and repeat; undo and redo for everything; a property menu (material, sound,
+model settings); a prefab browser that plays a prefab before placing it; ungroup; edit a prefab and
+update every copy; a road tool (from, to, class, lanes, speed limit, junctions made automatically);
+checks ("this room has no door"); "what is around me". Undo, choosing and moving first.
+
+### Weather, the rest
+Wind is done (2026-10-05); rain and thunder are being built. Still to do:
+- Wet roads: tyre hiss and spray; wetness that lasts after the rain; puddles.
+- Gutters, downpipes and run-off.
+- Snow, sleet, hail and freezing rain; ice. Snow and ice underfoot: measure before synthesising
+  (synthetic footsteps failed three times); recordings may be the answer.
+- Wind tilting the rain; ear-wind shelter that depends on the wind's direction (a wall upwind).
+- Grip from the weather (snow 0.2, ice 0.1 exist in `RoadSurfaces` but only from map materials).
+- A more physical weather model: fronts, clouds, fog, a random walk instead of four fixed states.
+- Ear wind assumptions to check: the per-angle figures, a helmet's 12 dB, the open-window cabin airflow.
+
+### Fire at any size
+The fire model scales (a wider fire is lower and slower; more heat, a louder roar and more crackles)
+but is one point source with a capped crackle stream. A blaze needs sources over the burning area,
+the turbulent roar of a large flame driven by the wind, trees flaring up, and falling branches.
+Medium.
+
+### Water bodies
+Lakes and ponds lapping at a shore, creeks running, surf. The importer brings them in as zones; none
+has a sound model.
+
+### Explosions
+Charge as TNT equivalent; peak overpressure and positive-phase duration from Kingery-Bulmash scaled
+distance; the Friedlander waveform near, a low boom far; ground reflection; the city's echoes; glass
+that breaks above an overpressure. Needs the loudness law fixed for very loud sounds first.
+
+### Vehicles: what is still simple
+- Bodies: a driven car is about ten boxes; traffic cars are one box; no vehicle is in the acoustic
+  scene, so nothing reflects off a car.
+- No suspension: one ground sample under the middle, no pitch or roll, a kerb lifts the whole car.
+- Brakes: ideal sharing by load, no brake torque, no wheel inertia, no ABS.
+- The server shifts instantly; the clutch exists only in the sound.
+- No belt or alternator whine of its own.
+- Fuel: a tank per vehicle, use from power (brake-specific fuel consumption), sputter and stall when
+  dry, gas stations with pumps, the nozzle click and the fill.
+- Road classes: the city has no highway. Arterials at 40-45 mph and highways at 65 mph, with lane
+  changes, on and off ramps (the ramps need shapes other than boxes).
+
+### Shapes other than boxes
+Plan in docs/NEXT_CITY_10KM.md. Order: a wedge ramp and stairs from steps (medium); a height grid for
+terrain; full meshes later (the largest engine job so far). Ground in layers you can dig into is a
+voxel ground, a separate structure. Then forests, ocean maps and boats.
+
 ### Experience and badges
 Rules, categories and tiers in docs/PLAN_2026-10-05.md section 3: scored by difficulty and variety,
 judged by the server, five tiers per category. Marksmanship, driving, exploration and community can
@@ -216,6 +304,9 @@ cyclic, pedals on keys). Giving jets later; the only jet is the airliner.
 ### Building services (Cody: after the core sounds)
 Corridor ventilation, fridges, extractor fans, pipes, lift machinery and electrical hum as physical
 sources placed by the generator. Also an inner lobby door in the towers.
+Also asked 2026-10-05: gas stove burners (the piezo click, the gas, the flame), cookware (sizzle,
+boiling, a lid rattling), HVAC with ducts and vents, running water and sinks, and electricity with a
+power grid (substations and lines as data; an outage silences fridges, fans and lights).
 
 ### A map's own sounds
 A map or server carries a sound pack: named cues (login, chat, menus, beacons), each a short
@@ -282,11 +373,10 @@ Some may already be fixed; confirm before fixing again.
 - The client sends interact only within 3 m; the server allows 5 m.
 
 ### Sound synthesis to come
-- Rain on surfaces from materials and geometry, with a rain rate (mm/h) and wetness that lasts.
-- Wind at the ear (wind in trees is done).
+- Rain on surfaces is being built (2026-10-05); wetness that lasts is not.
 - Wet roads: tyres +4-7 dB above 2 kHz.
 - Streams and surf.
-- Explosions.
+- Explosions (see Explosions above).
 - Refraction past 150 m; wind and temperature against height; turbulence.
 
 ## Later
