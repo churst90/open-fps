@@ -132,6 +132,19 @@ public static class ExtendedSources
                     for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
                     return places;
                 }
+                // A wood heard as one (WoodChorus): a place a bough's worth of it, six round the wood at
+                // two-thirds of its half-widths, where its trees' wind is read as well (FoliageSynth.ReadWindAt).
+                if (WoodChorus.ParseKey(key, out _, out float rx, out float rz))
+                {
+                    int n = FoliageSynth.Boughs;
+                    var places = new Vector3[1 + n];
+                    for (int j = 0; j < n; j++)
+                    {
+                        float a = MathF.Tau * (j + 0.5f) / n;
+                        places[1 + j] = new Vector3(MathF.Cos(a) * rx, 0f, MathF.Sin(a) * rz) * (2f / 3f) * LayoutScale;
+                    }
+                    return places;
+                }
                 if (key.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
                 {
                     var spec = FireSpec.ByName(key[5..]);

@@ -363,7 +363,7 @@ public static class WeatherWindSpike
         var (l, r, rate) = ReadStereo(cap);
         int from = Math.Min(l.Length, 2 * rate);
         double dl = Db(Rms(l.AsSpan(from))), dr = Db(Rms(r.AsSpan(from)));
-        float makeup = 2f + OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.MasterMakeupDb;
+        float makeup = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.MasterTrimDb + OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.MasterMakeupDb;
         Console.WriteLine($"== Live: 10 m/s from the east at 10 m ({ears.MeanSpeed:F1} m/s at the head), facing north, through FmodAudioProvider");
         Console.WriteLine($"   the voice placed L {lf:F1} R {rf:F1} dBFS; the master adds {makeup:F0} dB (trim and limiter makeup)");
         Console.WriteLine($"   captured L {dl:F1} R {dr:F1} dBFS over {(l.Length - from) / (double)rate:F1} s; expected L {lf + makeup:F1} R {rf + makeup:F1}; L-R {dl - dr:F1} dB (law {lf - rf:F1})");

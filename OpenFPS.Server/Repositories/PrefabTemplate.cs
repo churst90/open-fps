@@ -231,6 +231,9 @@ public class PrefabTemplate
 
     /// <summary>Generate the signal instead of playing a sample.</summary>
     public bool? IsSynth { get; set; }
+    /// <summary>Whether the synthesised source starts sounding (SoundEmitterComponent.SynthRunning). False
+    /// for something a player turns on: a tap. Default true.</summary>
+    public bool? SynthRunning { get; set; }
     /// <summary>Waveform: 0 Sine, 1 Square, 2 Triangle, 3 Saw, 4 Noise.</summary>
     public int? SynthWave { get; set; }
     /// <summary>Base frequency in Hz (1..20000).</summary>

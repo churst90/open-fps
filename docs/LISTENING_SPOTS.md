@@ -18,6 +18,9 @@ The city spawn is on the Foundry Street pavement, `/tp 60 122 0.15`, facing nort
 | 58 Alder Street back garden, by the fire | `/tp -325 141 0.2` | The fire pit: flames, crackle, hiss; the timber fence as the near wall |
 | Foundry Street spawn, in rain | `/tp 60 122 0.15` | Only when it rains, and for a while after: the gutter at your feet running east, the drain 7 m to your right (east) gurgling into its pot; drips from the grate as it dries |
 | Foundry Street drain | `/tp 67.3 122.8 0.15` | The drain close, in rain: water pouring between the bars into the pot below |
+| Union Building flat 11F, at the kitchen sink | `/tp 10.8 55.3 3.3` | The tap that drips, onto the steel. Press E at the sink: the tap runs and the bowl fills; E again: it drains and gurgles |
+| Any flat's kitchen, washbasin or shower | the far end of the flat from its sofa, against the outer wall | Each tap is off until you press E standing at it (within 1.3 m) |
+| 58 Alder Street back garden, at the downpipe | `/tp -320.5 136.5 0.2` | Only in rain: the downpipe onto the paving; in a downpour the gutter outlet gurgling up at the eaves; drips for half an hour after |
 | 58 Alder Street garden gate | `/tp -330 148.8 0.2` | The fire through the open gate, against the fence beside it |
 | Marlow Tower front entrance, outside | `/tp -7 -103 0.5` | The glass front door: keyed from the street, pulled open, swings out |
 | Marlow Tower front entrance, inside | `/tp -12 -103 0.5` | The same door from the stairwell: push bar, swings out |

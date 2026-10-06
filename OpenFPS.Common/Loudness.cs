@@ -360,7 +360,7 @@ public static class Loudness
     {
         if (levelDb <= 0f) return 0f;
         float atEar = levelDb - 20f * MathF.Log10(MathF.Max(1f, distance))
-                    + 20f * MathF.Log10(Math.Clamp(pathGain, 1e-4f, 1f)) + airDb;
+                    + 20f * MathF.Log10(Math.Clamp(pathGain, 1e-4f, 1f)) - airDb;
         // The ear's, not the player's: fixed at the shipped ceiling and compression, whatever /levels
         // is set to. Tied to the live setting, a player on "real" (1.0, a ceiling near 89 dB) had the
         // world give way the full 24 dB for a revolver 260 m off, and a little for every hand clap

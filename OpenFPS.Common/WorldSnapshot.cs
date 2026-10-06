@@ -46,6 +46,14 @@ public class WorldSnapshot
     /// </summary>
     public long GeometryVersion;
 
+    /// <summary>The side of the tiles the map streams in, metres; 0 for a map sent whole. The Steam Audio
+    /// scene is kept in sub-scenes of this size (of 250 m on a map sent whole).</summary>
+    public float TileMetres;
+
+    /// <summary>The woods the client's tree crowns make, heard as one source each past the hand-over
+    /// distance (WoodChorus); null before any crowns are held.</summary>
+    public WoodChorus? Woods;
+
     /// <summary>
     /// When the transforms in this snapshot were last TRUE, seconds on <see cref="AudioClock"/>.
     ///
@@ -69,6 +77,9 @@ public class WorldSnapshot
     public float RainRateMmPerHour = 0.0f;
     /// <summary>What is falling and how big (Precipitation): the rate above is its water equivalent.</summary>
     public Precipitation Precipitation = OpenFPS.Common.Precipitation.None;
+    /// <summary>The water in a wheel path of an asphalt road, mm (RoadWater): for a vehicle whose wheels
+    /// the server does not send. Wheels that are sent carry their own (WheelState.Water).</summary>
+    public float RoadWaterMm = 0.0f;
 }
 
 /// <summary>

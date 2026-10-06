@@ -1,0 +1,22 @@
+{
+  "Id": "washbasin_water",
+  "Name": "Washbasin",
+  "Description": "A ceramic bathroom washbasin and its tap (RunningWaterSpec.Washbasin): off until somebody turns it on with the interact key; fills with the plug in while it runs, drains and gurgles when it is shut. Place it over the basin. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 0.2,
+    "Y": 0.2,
+    "Z": 0.2
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "flow:washbasin",
+  "Volume": 1.0,
+  "Range": 25,
+  "MinDistance": 0.5,
+  "Mode": "LoopOne",
+  "SynthRunning": false
+}

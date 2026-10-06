@@ -81,8 +81,8 @@ stretch. Options:
 | Local tangent plane per place (today) | yes near the origin | between every pair of places | fine for one town, not for joining towns |
 | UTM zone grid | yes (scale error under 0.04 % inside a zone) | every 6° of longitude | recommended |
 
-Recommended: **UTM zones, 250 m tiles.** A world tile key is (zone, hemisphere, floor(E/250),
-floor(N/250)), written `15N/1023/13345`. Generation projects every feature into the tile's zone. A
+**Decided (Cody, 2026-10-06): the standard UTM grid, 250 m tiles.** A world tile key is (zone,
+hemisphere, floor(E/250), floor(N/250)), written `15N/1023/13345`. Generation projects every feature into the tile's zone. A
 zone edge is crossed rarely (Texas has three); a player keeps their zone's frame across it and the
 server reprojects the neighbour zone's tiles into that frame when it sends them (a rotation of up to
 about 1.5° at 30°N and a shift; boxes stay boxes).
@@ -96,6 +96,20 @@ it holds is shifted by a whole number of tiles, the acoustic map and the Steam A
 translated (rebuilt in the background), and voices are moved by the same offset in one step. Rebasing
 happens only between frames, so a car's Doppler never sees it.
 
+What stage 1 already does, and what stage 2 changes, to make the move easy:
+
+- Tile keys are already (x, z) integers of a fixed size from an origin, and a map's tile size is
+  data (`TileMetres`). Stage 2 adds the zone and hemisphere to the key and takes the origin from the
+  grid instead of the place.
+- A real place's origin today is its spawn address, so its tiles do not line up with the UTM grid.
+  Stage 2 generates places with the origin on a UTM 250 m grid corner and x and z along UTM east and
+  north (not true north): then a place's tile (x, z) is world tile (zone, origin E/250 + x, origin
+  N/250 + z), and the maps made now can be regenerated into the world without moving anything by hand.
+  `GeoOrigin` stays on the map, as the origin's latitude and longitude.
+- Nothing on the wire names a tile by its world key yet. `TileStreamUpdate` carries (x, z) of the
+  map's own grid; stage 2 appends the zone and the frame's origin (two doubles) to the manifest and
+  keeps (x, z) relative to the frame.
+
 Elevation: the ground is flat today and stays flat in stage 2. Each place keeps its 3DEP heights for
 when terrain exists.
 
@@ -106,12 +120,35 @@ Three levels per tile, per client:
 | Level | What is sent |
 |---|---|
 | Full | everything |
-| Coarse | the ground, roads, building shells (outer walls, floors, roofs, ceilings), rail, water. No doors, rooms, interiors, yards, drives, paths, verges, trees, props or named places |
+| Coarse | what sound notices from past the full radius (below) |
 | None | nothing |
 
-Coarse is what keeps far buildings occluding and reflecting sound, and roads under far traffic, at a
-fraction of the entities. A coarse building has a gap where its front door would be; with no room
-behind it, that is right for a sound heard from 400 m.
+The coarse layer is decided by acoustics (Cody, 2026-10-06: keep whatever sound would notice at that
+distance, leave out only what it cannot):
+
+- **In:** the ground, roads, building shells (outer walls, floors, roofs, ceilings) with their front
+  doors, rail, water, the woods (canopy volumes that scatter and absorb) and tree trunks, and any
+  other solid thing that stands at least 0.8 m tall and runs at least 2 m: fences, hedges, garden
+  walls, guard rails. Each is a barrier to a source near the ground, a surface that reflects, or (the
+  woods) the scattering that makes a far road behind trees sound far. A static parked vehicle would
+  qualify the same way; the real places have none (their vehicles move and are sent as moving things).
+- **Out:** rooms and named places, the inside of houses (inner walls, inner doors, furniture), lawns,
+  drives, paths and verges (flat slabs on ground that already reflects), posts and other small
+  props, and any sound source that carries less than the smallest full radius (100 m).
+- **Tree crowns are in** (2026-10-06, distant woods). One tree's wind carries about 90 m, but a wood of
+  N trees is the same sound N times over, 10 log N dB louder, and carries much further. Past 110 m the
+  client hears each wood's trees (by 200 m square and species) as one source over the wood's extent
+  (`WoodChorus`, `FoliageSynth.Trees`), handing each tree to its own voice between 110 and 70 m with
+  its power split between the two, so nothing steps; a tree the voice budget leaves out stays in its
+  wood. Measured against the trees summed one by one (AudioLab `--distant-woods`): within 0.4 dB in
+  level and 0.5 dB in every octave band from 125 Hz to 8 kHz, at 300, 500 and 800 m.
+- **Front doors** are in, as shut leaves in their walls. A doorway and the rooms it joins share their
+  tiles as one group (a house), so a door in a full tile always comes with its rooms; a door in a coarse
+  tile has no room behind it, and the client treats it as a shut leaf, not as a doorway into nothing.
+
+Cost (medium, at the spawn): Magnolia's join went from 12,344 to 13,590 entities and 530 to 588 KB;
+Albany's from 17,140 to 18,024 entities and 740 to 776 KB. About 34 entities and 1.5 KB packed more
+per coarse tile on Magnolia (woods and trunks), about 24 on Albany (fences, hedges, woods).
 
 Which level a tile gets depends on its distance from the player (nearest point of the tile):
 
@@ -222,14 +259,32 @@ rebuild is a fraction of a second on a background thread.
 
 ### Steam Audio scene
 
-The scene follows the acoustic map: each swap bumps a geometry version on the world snapshot, and the
-acoustic worker rebuilds the scene and the routes through openings off its thread when the version
-changes, exactly as it does for a door, and swaps them in. The old scene is released five seconds
-later. Nothing waits on it: sources keep their last occlusion until the new scene is in.
+Built (stage 1b, 2026-10-06), following docs/GEOMETRY.md 2.4 and its measurements:
 
-Stage 3: one Steam Audio instanced mesh per tile (`iplInstancedMeshCreate`), added to and removed
-from the top-level scene with a commit, instead of rebuilding the whole scene. That makes a tile load
-cost the tile, not the radius.
+- Every scene of the game's Steam Audio context is an **Embree** scene (`IPL_SCENETYPE_EMBREE`), and
+  every simulator on that context (the occlusion worker's, the listener's traced reverb, the traced
+  echoes, the late field, room traces, the cabin) is made for it (`SteamAudioScene.TypeFor`). Where
+  Embree does not start (Steam Audio carries it for x86 and x64 only), or with `OPENFPS_EMBREE=0`,
+  everything stays on the default tracer and the scene is rebuilt whole as before; the log says which.
+  This ties the client's fast path to x86/x64, which the geometry design accepts.
+- **A tile owns its geometry** (`TileSceneSet`): each tile the client holds (by where each box's centre
+  is; 250 m on a map sent whole) has two sub-scenes, its open ground and everything else, built when its
+  boxes change and kept while they do not. The full scene instances both; the listener's scene (no
+  open ground under the listener's head) instances only the second, so the geometry is held once.
+  A door leaf stays in its tile's sub-scene: a door that swings rebuilds that tile.
+- **Two pairs of top scenes, used in turn.** While the simulators trace one pair, a change adds and
+  removes instances in the other and commits it, and the worker hands it over as it always handed over
+  a rebuilt scene. Steam Audio forbids a commit while a scene is traced, and this never does one: the
+  next change waits until the last pair has reached every tracer (`TracedReverbSet.Reconfiguring`).
+  Every instance is made when its sub-scene is new, before anything traces it; making one of a
+  sub-scene being traced waited for the trace (up to 0.66 s measured).
+- The routes through openings are made again when the openings change (a door, rooms coming or
+  going) and otherwise at most every 3 s while only walls and roads change.
+
+Tried and not kept: assembling new top scenes from scratch for each change (instances of traced
+sub-scenes waited for traces, 0.07 to 1.9 s an assembly); door leaves as instances of their own at
+their pose (about 500 within reach on Magnolia made each assembly 70 ms to 2.2 s). Doors as moving
+instances are left for geometry stage 1.
 
 ### Regions and named places
 
@@ -417,7 +472,28 @@ stage 3's instanced meshes per tile early.
 Not done in stage 1:
 
 - The server still simulates traffic and walkers on the whole map; it only stops sending them.
-- Portals between a door in a loaded tile and a room in an unloaded one are left out (43 such links
-  on Magnolia), so a house cut by the edge of full detail has a door that opens on nothing.
-- No client tile cache; no frames (stage 2); no per-tile Steam Audio meshes (stage 3).
+- No client tile cache; no frames (stage 2).
+
+### Stage 1b: per-tile Steam Audio scenes, the coarse layer by acoustics (2026-10-06)
+
+Measured with `--stream-walk` (real time, with Steam Audio, on a shared 24-core machine; A and B run
+back to back) and `--tile-scenes`:
+
+| | Before (default tracer, whole scene) | After (Embree, a sub-scene per tile) |
+|---|---|---|
+| Steam Audio scene work, Magnolia at 15 m/s | 492-561 ms a second (32 rebuilds in 43 s) | 32-46 ms a second |
+| ...walking at 1.4 m/s | 46 ms a second | 4 ms a second |
+| ...Albany at 15 m/s | 583 ms a second | 35 ms a second |
+| Routes through openings (both) | 85-104 ms a second at 15 m/s | the same |
+| Process CPU, Magnolia at 15 m/s | 199-210 % of a core | 185-203 % |
+| Worker answer gaps while tiles change | median 33 ms, worst 155-257 ms | median 33 ms, worst 179-224 ms |
+| One tile changed: rebuild, then swap in | (whole scene) 0.6-0.9 s | 23 ms, then 13 ms |
+| Build Magnolia's 11,761 boxes at the spawn | 197-293 ms one mesh | 360-404 ms as 64 tiles (85-125 ms as one Embree mesh) |
+| A run of direct and reflections, 48 sources | 95-147 ms | 40-58 ms |
+
+Same answers (`--tile-scenes`, 48 sources round the spawn, 18 of them mostly occluded): occlusion and
+transmission identical to the default tracer's one mesh (difference 0.000); mid-band reverberation time
+within 0.1-1.7 % on average of the default's, against Embree's own run-to-run spread of 0.1-1.8 %
+(Embree's reflections are not bit-for-bit repeatable; the default's are). The listener's scene holds
+the same 11,020 boxes as the whole-map open-ground filter.
 - The settings menus have no world detail control yet; `/detail` does it.

@@ -1,0 +1,22 @@
+{
+  "Id": "kitchen_sink_water",
+  "Name": "Kitchen sink",
+  "Description": "A stainless kitchen sink and its mixer tap (RunningWaterSpec.KitchenSink, RunningWaterSynth). Off until somebody turns it on with the interact key standing at it: then the tap runs onto the steel and the bowl fills with the plug in; shut, the plug comes out and the bowl drains through its strainer, gurgling as it empties. Place it over the sink at rim height. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 0.2,
+    "Y": 0.2,
+    "Z": 0.2
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "flow:kitchen_sink",
+  "Volume": 1.0,
+  "Range": 30,
+  "MinDistance": 0.5,
+  "Mode": "LoopOne",
+  "SynthRunning": false
+}

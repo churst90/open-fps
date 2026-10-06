@@ -466,7 +466,10 @@ public sealed partial class VehicleSystem
                         // A driver takes a bend no faster than is comfortable (the side friction at
                         // which drivers ease off, DriverSteering.ComfortTurnSpeed), and never faster
                         // than keeps the tyres quiet.
-                        v.CornerSpeed = k => MathF.Min(DriverSteering.ComfortTurnSpeed(k), body.SteadyTurnSpeed(k, TyreFriction.SquealOnset));
+                        // On a wet road the tyres' limit is the dry one scaled by the grip the water
+                        // leaves (a steady turn's speed goes as the root of the friction).
+                        v.CornerSpeed = k => MathF.Min(DriverSteering.ComfortTurnSpeed(k),
+                                                       body.SteadyTurnSpeed(k, TyreFriction.SquealOnset) * MathF.Sqrt(body.WetGripShare));
                         v.Driver = new LineFollower(v.Wheels);
                         v.Driver.Place(0f);
                         v.Wheels.Vx = v.Speed;
@@ -708,6 +711,8 @@ public sealed partial class VehicleSystem
         line.Sample(v.Lap, out Vector3 here, out float heading, out _, out float cornerLimit);
         // The slowest of the whole stretch ahead, not its far end: see RaceLine.SlowestWithin.
         float want = line.SlowestWithin(v.Lap, lookahead);
+        // A wet road, and the rain: a little slower than the road allows (StreetLife).
+        if (_streetLife.TryGetValue(v.MapId, out var weatherLife)) want *= 1f - RainCaution(v.MapId, weatherLife).Speed;
         // Steering itself round on its tyres, it has to take the bends the line really makes.
         // It looks twice its straight-line braking distance ahead, because braking beside cornering
         // sheds less.
@@ -888,6 +893,7 @@ public sealed partial class VehicleSystem
         vel.Linear = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)) * v.Speed;
         if (v.Wheels != null)
         {
+            WaterUnderLine(v);
             HoldWheels(v, line, (v.Speed - wasSpeed) / MathF.Max(1e-4f, dt));
             EncodeWheels(v);
         }
@@ -945,7 +951,23 @@ public sealed partial class VehicleSystem
                 : RoadNetwork.SurfaceAt(seg.Road, seg.StartAlongRoad + seg.Lane.Direction * at);
             w.Surface = RoadSurfaces.IndexOf(material);
             w.SurfaceGrip = RoadSurfaces.GripOf(w.Surface);
+            // The water under it, from where it is across the road: the lane's offset from the crown,
+            // the wheel's own track and any shift toward the kerb, each on the side the lane runs.
+            int dir = seg.Lane.Direction >= 0 ? 1 : -1;
+            float alongRoad = seg.StartAlongRoad + dir * Math.Clamp(at, 0f, seg.LengthMetres);
+            float lateral = seg.Lane.OffsetMetres + dir * (w.Y + v.KerbShift);
+            body.SetWater(i, RoadWaterSystem.WaterOn(v.MapId, seg.Road, alongRoad, lateral, w.Surface));
         }
+    }
+
+    /// <summary>The water under each wheel of a vehicle held to a line off the roads (a track): the
+    /// surface's own texture and a sheet a lane's width down the cross-fall.</summary>
+    private static void WaterUnderLine(DemoVehicle v)
+    {
+        var body = v.Wheels!;
+        var water = RoadWaterSystem.WaterOf(v.MapId);
+        for (int i = 0; i < body.Wheels.Length; i++)
+            body.SetWater(i, water?.WaterMm(body.Wheels[i].Surface, 2f, float.PositiveInfinity, 0f) ?? 0f);
     }
 
     /// <summary>The wheels as the wire carries them.</summary>
@@ -956,7 +978,7 @@ public sealed partial class VehicleSystem
         for (int i = 0; i < wire.Length; i++)
         {
             ref var w = ref body.Wheels[i];
-            wire[i] = OpenFPS.Common.Networking.WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand);
+            wire[i] = OpenFPS.Common.Networking.WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand, w.Water);
         }
     }
 

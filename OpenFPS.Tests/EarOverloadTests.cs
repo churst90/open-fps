@@ -49,6 +49,17 @@ public class EarOverloadTests
         Assert.Equal(0f, At(c, () => Loudness.OverloadDb(0f, 1f)));     // no level declared
     }
 
+    /// <summary>The air's loss over the way is taken off the level at the ear, as the wall's is: a shot
+    /// far off whose top the air has eaten overloads less, not more.</summary>
+    [Fact]
+    public void TheAirTakesItsShare()
+    {
+        float c = Loudness.DefaultCompression;
+        float still = At(c, () => Loudness.OverloadDb(157f, 30f));
+        float through = At(c, () => Loudness.OverloadDb(157f, 30f, airDb: 2f));
+        Assert.Equal(still - 2f * c, through, 2);
+    }
+
     [Fact]
     public void AWallBetweenTakesItsShare()
     {

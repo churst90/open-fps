@@ -4,6 +4,94 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- The binaural stage hears a voice at its own level, and the master's makeup is 3 dB less to match.
+  FMOD gave the stage a mono voice panned to the middle, 3.01 dB down on each side, because the stage
+  asked for a stereo input so that it could put out a stereo pair. The stage averaged the two back to
+  one, so every voice through the HRTF reached it 3.01 dB under where the law placed it, and the
+  recorded impacts' ground reflection, which waits for a one-channel input, never played. The stage
+  now says through FMOD's process callback that it puts out two channels, and takes its input as it
+  comes. `--binaural-input` measures a mono voice through the stage against the HRTF alone: 0.00 dB
+  each ear, where it was -3.01.
+  - The master: makeup 6 dB, trim 0 (they were 7 and 2). Every voice through the HRTF plays exactly as
+    loud as before (`--game-levels`: speech, cars, the fountain, a door and thunder within 0.1 dB;
+    `--quality` gunfire: the same loudness, true peak and limiting). The six is the whole choice of
+    loudness: 0 dBFS at the output is 94.8 dB SPL for a calibrated player, against the law's 100.8.
+  - Heard differently, to be listened for:
+    - The wind at the ears and the interface sounds are 3 dB quieter. They never passed through a
+      voice's binaural stage, so they stood 3 dB over the voices.
+    - A room's traced reverb is 3 dB lower against the direct sound. The traced stage
+      (`TracedReverbDsp`) still asks for a stereo input and averages it, so the sends reach it 3.01 dB
+      down. That matched the direct sound's loss, so the tail set to -6 by ear is now 3 dB drier.
+      `/tail -3` comes close to the old balance for a voice in your own room. The traced stage's input
+      is the next fix.
+    - Short recorded knocks (one second or less) get their ground reflection from below for the
+      first time.
+- Distant woods. Past 110 m a wood's trees are heard as one source per wood (the trees of one kind in
+  a 200 m square), placed across the wood, playing as many trees as it stands for, with the gusts
+  crossing it as they cross the trees. Between 110 and 70 m each tree is handed to its own voice
+  without a change in level. A tree the voice budget (10 standing sources) leaves out is heard in its
+  wood instead of not at all. Against the trees summed one by one: within 0.4 dB, every octave band
+  within 0.5 dB, the gust swing 1.9 dB against 1.7-1.8, at 300 to 800 m. A 40-tree wood in a breeze is
+  now heard from about 350 m instead of 230 m; past that it is under what the game renders (about
+  12 dB SPL at 500 m). In that walk the client used 138 % of a core instead of 87 % and up to 64 HRTF
+  voices instead of 46. Tree crowns are in the coarse tiles again, so the client can hear far woods.
+  Applies on every map, the city's parks too. Pair and figures: inbox/distant-woods-2026-10-06;
+  AudioLab `--distant-woods`.
+- Roads get wet in the rain (docs/WET_ROADS.md). The server keeps the water on each map's roads: the
+  road's texture fills with rain and dries by evaporation (sun, wind, humidity), a thin sheet runs to
+  the kerb while it rains, the gutter's flow spreads into the road in heavy rain, and puddles along the
+  kerbs fill and empty over hours. Each wheel is told the water under it, on the server and on the wire.
+- Wet roads have less grip: about 0.7 of dry at town speed, less at speed, and much less where water
+  stands (aquaplaning by Gallaway's and NASA's equations, from each tyre's pressure and tread). Wet
+  braking takes longer; tyre squeal is damped by the water. Traffic drives 3 % slower on a wet road
+  and 8 % in heavy rain and keeps 12 % more headway (`StreetLife` settings).
+- Tyres hiss on a wet road: water thrown from the tread, drops striking the arches and body, a swish
+  where water stands, and a splash through a puddle; each wheel from its own water, heard inside the
+  car through the arches and floor too. Fitted to 21 recorded pass-bys. Renders in
+  inbox/wet-roads-2026-10-06. The server and client must both be rebuilt (the wire changed).
+- Steam Audio's scenes are built per tile and use Embree. Each tile the client holds has its own
+  sub-scenes, built when its geometry changes; the scenes the simulators trace are made of instances
+  of them, in two pairs used in turn, so a tile arriving or leaving, or a door swinging, rebuilds only
+  that tile and never commits a scene that is being traced. Driving at 15 m/s on Magnolia the scene
+  work went from about 0.5 s to 0.04 s a second, walking from 46 to 4 ms a second; occlusion and
+  transmission are the same as before and reverberation times agree within the tracer's own
+  run-to-run spread (AudioLab `--tile-scenes`). Embree runs on x86 and x64; elsewhere, or with
+  `OPENFPS_EMBREE=0`, the default tracer and whole-scene rebuilds stay.
+- The routes through openings are rebuilt when doorways change and otherwise at most every 3 s
+  while only far walls and roads change.
+- The distant (coarse) layer of a streamed map now holds what sound notices from past 300 m: building
+  shells with their front doors, woods and tree trunks, fences, hedges, garden walls and guard rails,
+  as well as the ground, roads, rail and water. Rooms, house interiors, lawns, drives, posts and the
+  wind in each tree stay full detail only (the crowns came back the same day: see distant woods
+  below). Joining Magnolia at medium is now 13,590
+  entities and 588 KB (from 12,344 and 530 KB).
+- A doorway and the rooms it joins are sent together, so a door at the edge of full detail opens into
+  its room; a front door held without its room is a shut door, not a doorway into nothing.
+- Stage 2 will key world tiles to the standard UTM grid (docs/WORLD_STREAMING.md).
+- Running water round 2 (unheard): gurgles, taps and sinks. Design in docs/RUNNING_WATER.md section
+  10; renders in inbox/running-water-round2-2026-10-06 with a README.
+  - Water leaving through a hole (a sink's waste, a roof gutter's outlet into its downpipe) sounds by how
+    deep it stands over the hole: it spills in quietly when shallow, gurgles once the water closes over
+    the hole and a vortex draws air down in gulps, and runs full and quiet when deep. Outlet capacity
+    from HR Wallingford's measured gutter outlets.
+  - Taps over basins. The tap's stream lands on the bare bottom or in the water standing there; a
+    stainless sink's bottom rings, and rings duller as water covers it; an aerated stream hisses. With
+    the tap on the plug is in and the bowl fills; turned off, the plug comes out and it drains, gurgling
+    as it empties. A worn washer drips.
+  - New sound ids: `flow:kitchen_sink`, `flow:dripping_sink`, `flow:washbasin`, `flow:shower`,
+    `flow:gutter_outlet`.
+  - Press E standing at a tap (within 1.3 m) to turn it on or off. Taps start off. The tap's state is
+    the emitter's `SynthRunning`, now settable in a prefab. A shut tap whose basin has drained gets no
+    voice.
+  - On the city: every flat in the towers has a kitchen sink, a washbasin and a shower (999 fixtures);
+    the Union Building flat 11F's kitchen tap drips; every house has a downpipe and its roof gutter
+    outlet (64 each). city.json regenerated; only named-place ids move.
+  - Round 1's open items: falls now grow 4-7 dB per doubling of flow across the drop-to-sheet
+    transition (was 3); water leaving a downpipe's shoe carries the film's speed (brighter, louder in
+    heavy rain); a roof's run-off goes partly through a slow store, so downpipes drip for half an hour
+    after rain.
+  - Not built: toilet flush and cistern refill; the plug as its own control; NPCs using taps.
+
 - Large maps stream (docs/WORLD_STREAMING.md, stage 1). A map with tiles (the real places) is sent
   to each client a radius at a time: everything within 300 m, and the ground, roads and building
   shells out to 800 m (`/detail low|medium|high`: 150/500, 300/800, 500/1,200 m; saved). Tiles load

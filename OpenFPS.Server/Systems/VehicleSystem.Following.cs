@@ -58,12 +58,29 @@ public sealed partial class VehicleSystem
         return (lead, gap - 0.5f * (lead.LengthMetres + v.LengthMetres));
     }
 
+    /// <summary>
+    /// How much drivers on this map are holding back for the weather: the share of speed they give up and
+    /// the share of time headway they add. Wet is the asphalt's texture full (RoadWater), heavy the rain
+    /// against Rainfall.HeavyRate; each blends from the wet figures to the heavy ones.
+    /// </summary>
+    internal static (float Speed, float Headway) RainCaution(string mapId, StreetLifeData life)
+    {
+        var water = RoadWaterSystem.WaterOf(mapId);
+        if (water == null) return (0f, 0f);
+        byte asphalt = RoadSurfaces.IndexOf(RoadData.DefaultSurface);
+        float wet = Math.Clamp(water.TextureMm(asphalt) / MathF.Max(0.05f, RoadWaterLaw.HoldsMm(asphalt)), 0f, 1f);
+        float heavy = Math.Clamp(water.RainMmPerHour / Rainfall.HeavyRate, 0f, 1f);
+        float speed = wet * life.WetSpeedReduction + heavy * MathF.Max(0f, life.HeavyRainSpeedReduction - life.WetSpeedReduction);
+        float headway = wet * life.WetHeadwayIncrease + heavy * MathF.Max(0f, life.HeavyRainHeadwayIncrease - life.WetHeadwayIncrease);
+        return (Math.Clamp(speed, 0f, 0.5f), MathF.Max(0f, headway));
+    }
+
     /// <summary>Takes this tick's speed down to what the gap ahead allows.</summary>
     private void Follow(DemoVehicle v, float wasSpeed, float dt)
     {
         if (!_streetLife.TryGetValue(v.MapId, out var life) || Ahead(v) is not { } ahead) return;
         float a = MathF.Max(0.1f, v.Accel), b = MathF.Max(0.1f, v.Brake);
-        float s0 = life.FollowMinGapMetres, headway = life.FollowHeadwaySeconds;
+        float s0 = life.FollowMinGapMetres, headway = life.FollowHeadwaySeconds * (1f + RainCaution(v.MapId, life).Headway);
         float s = MathF.Max(0.1f, ahead.Gap);
         float sStar = s0 + MathF.Max(0f, wasSpeed * headway + wasSpeed * (wasSpeed - ahead.Lead.Speed) / (2f * MathF.Sqrt(a * b)));
         float idm = a * (1f - (sStar / s) * (sStar / s));

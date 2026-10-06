@@ -301,6 +301,11 @@ public sealed class PlacedNatureVoice
 
     public volatile float TargetSpread;
     public volatile bool Running = true;
+    /// <summary>For a wood heard as one (WoodChorus): the places its wind is read at, one a bough, and how
+    /// many trees it stands for now (the client's, eased here so it never steps). Null for a tree.</summary>
+    public Vector3[]? WindPlaces;
+    public volatile float TargetTrees = 1f;
+    private float _trees = -1f;
     /// <summary>How many place voices read this synth, for the log.</summary>
     public int Voices;
 
@@ -378,7 +383,15 @@ public sealed class PlacedNatureVoice
         if (Foliage != null)
         {
             Foliage.Spread = spread;
-            Foliage.ReadWind(Position.X, Position.Z, now);
+            if (WindPlaces != null)
+            {
+                // Eased over about a second: the share moves with the listener, a few metres a second.
+                float target = MathF.Max(0f, TargetTrees);
+                _trees = _trees < 0f ? target : _trees + (target - _trees) * MathF.Min(1f, dt / 0.5f);
+                Foliage.Trees = _trees;
+                Foliage.ReadWindAt(Position.X, Position.Z, now, WindPlaces);
+            }
+            else Foliage.ReadWind(Position.X, Position.Z, now);
             Foliage.Control(dt);
         }
         else if (Fire != null)
@@ -393,7 +406,9 @@ public sealed class PlacedNatureVoice
             // Its water: its own flow, and the rain running off its catchment now (Runoff).
             var spec = Flow.Spec;
             Flow.Spread = spread;
-            Flow.Flow = Running ? spec.FlowFor(Runoff.Through(spec.CatchmentSeconds)) : 0f;
+            // A tap runs when somebody has turned it on (Running, from the server), and the basin under
+            // it goes on draining after; anything else runs with its own flow and the rain.
+            Flow.Flow = spec.Tap != null ? spec.FlowNow(tapOn: Running) : Running ? spec.FlowNow() : 0f;
             Flow.RainOnWater = Runoff.RainMmPerHour;
             Flow.Control(dt);
         }

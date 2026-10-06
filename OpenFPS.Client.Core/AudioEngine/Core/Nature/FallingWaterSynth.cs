@@ -346,6 +346,7 @@ public sealed class FallingWaterSynth
         public int Tap;
         public bool Rock;
         public float DropRate, ChunkRate, BubbleRate;   // per second, at full flow
+        public float DropShare, FallMetres;               // the spec's, or what Retune last set
         public float DropMean, DropMax;                  // m
         public float ChunkMean, ChunkMax;                // m
         public float ChunkMeanVolume;                     // m^3
@@ -390,20 +391,42 @@ public sealed class FallingWaterSynth
                 Order = Math.Clamp(f.DropSizeOrder, 1, 16),
                 LumpOrder = Math.Clamp(f.LumpSizeOrder, 1, 16),
             };
-            float q = f.FlowLitresPerSecond * 1e-3f;                                  // m^3/s
-            float meanVolume = 4f / 3f * MathF.PI * MeanCube(s.DropMean, MinDropRadius, s.DropMax, s.Order);
-            s.DropRate = f.DropShare * q / meanVolume;
-            // The lumps: a gamma law of their own order about the stated size, up to three times it.
-            s.ChunkMean = f.ChunkRadiusMm * 1e-3f;
-            s.ChunkMax = 3f * s.ChunkMean;
-            s.ChunkMeanVolume = 4f / 3f * MathF.PI * MeanCube(s.ChunkMean, MinDropRadius, s.ChunkMax, s.LumpOrder);
-            s.ChunkRate = (1f - f.DropShare) * q / s.ChunkMeanVolume;
-            s.ChunkSpeed = MathF.Sqrt(2f * 9.81f * f.FallMetres);
-            float entrain = s.Rock ? 0f : PlungeAirShare * MathF.Max(0f, s.ChunkSpeed - 1f) / 2f;
             s.BubbleMeanVolume = PlungeMeanVolume();
-            s.BubbleRate = (1f - f.DropShare) * q * entrain / s.BubbleMeanVolume;
+            Tune(s, f.FlowLitresPerSecond, f.DropShare, f.MeanDropRadiusMm, f.ChunkRadiusMm, f.FallMetres);
             _falls[i] = s;
         }
+    }
+
+    /// <summary>A fall's rates from its flow, how it arrives and how far it falls.</summary>
+    private static void Tune(FallState s, float flowLitresPerSecond, float dropShare, float meanDropMm, float chunkMm, float fallMetres)
+    {
+        float q = MathF.Max(0f, flowLitresPerSecond) * 1e-3f;                     // m^3/s
+        s.DropShare = Math.Clamp(dropShare, 0f, 1f);
+        s.FallMetres = MathF.Max(0f, fallMetres);
+        s.DropMean = MathF.Max(0.1f, meanDropMm) * 1e-3f;
+        s.DropMax = MathF.Max(meanDropMm, s.Spec.MaxDropRadiusMm) * 1e-3f;
+        float meanVolume = 4f / 3f * MathF.PI * MeanCube(s.DropMean, MinDropRadius, s.DropMax, s.Order);
+        s.DropRate = s.DropShare * q / meanVolume;
+        // The lumps: a gamma law of their own order about the stated size, up to three times it.
+        s.ChunkMean = MathF.Max(0.3f, chunkMm) * 1e-3f;
+        s.ChunkMax = 3f * s.ChunkMean;
+        s.ChunkMeanVolume = 4f / 3f * MathF.PI * MeanCube(s.ChunkMean, MinDropRadius, s.ChunkMax, s.LumpOrder);
+        s.ChunkRate = (1f - s.DropShare) * q / s.ChunkMeanVolume;
+        s.ChunkSpeed = MathF.Sqrt(2f * 9.81f * s.FallMetres);
+        float entrain = s.Rock ? 0f : PlungeAirShare * MathF.Max(0f, s.ChunkSpeed - 1f) / 2f;
+        s.BubbleRate = (1f - s.DropShare) * q * entrain / s.BubbleMeanVolume;
+    }
+
+    /// <summary>
+    /// For running water: fall <paramref name="fall"/> now carries this much, arriving this way, from this
+    /// high. The sheet a lip lets go of thickens with the flow and comes down coherent in bigger lumps
+    /// (RunningWaterSynth.FallFor), and a thicker plunge drives more air: so a fall grows faster than its
+    /// flow. Rates only; nothing allocates.
+    /// </summary>
+    public void Retune(int fall, float flowLitresPerSecond, float dropShare, float meanDropMm, float chunkMm, float fallMetres)
+    {
+        if (fall < 0 || fall >= _falls.Length) return;
+        Tune(_falls[fall], flowLitresPerSecond, dropShare, meanDropMm, chunkMm, fallMetres);
     }
 
     /// <summary>How many drops, lumps and plunge bubbles a second each fall makes, for the lab.</summary>
@@ -632,10 +655,10 @@ public sealed class FallingWaterSynth
         foreach (var f in _falls)
         {
             // Wind breaks more of a column into spray, and the spray is what it carries away.
-            float share = Math.Clamp(f.Spec.DropShare + f.Wander + 0.03f * MathF.Max(0f, wind - 2f), 0.05f, 1f);
+            float share = Math.Clamp(f.DropShare + f.Wander + 0.03f * MathF.Max(0f, wind - 2f), 0.05f, 1f);
             float drift = Math.Clamp(f.Spec.DriftPerMetrePerSecond * (wind - 2f), 0f, 0.5f);
-            float dropScale = f.Spec.DropShare > 0f ? share / f.Spec.DropShare : 0f;
-            float coherentScale = f.Spec.DropShare < 1f ? (1f - share) / (1f - f.Spec.DropShare) : 0f;
+            float dropScale = f.DropShare > 0f ? share / f.DropShare : 0f;
+            float coherentScale = f.DropShare < 1f ? (1f - share) / (1f - f.DropShare) : 0f;
 
             // A jet's top does not shed drops evenly: the column necks and bursts in slugs, and a
             // slug's drops arrive together, tens of milliseconds at a time. That bunching is what
@@ -676,7 +699,7 @@ public sealed class FallingWaterSynth
         {
             int at = (int)(sum.Uniform() * Block);
             float r = DrawRadius(sum, f.DropMean, f.DropMax, f.Order);
-            float v = ArrivalSpeed(r, f.Spec.FallMetres);
+            float v = ArrivalSpeed(r, f.FallMetres);
             // The impact: the force arrives as the drop's front meets the surface and goes over the
             // time the whole drop takes to bury itself.
             float tau = r / v;

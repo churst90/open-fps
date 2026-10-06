@@ -1,0 +1,21 @@
+{
+  "Id": "downpipe_water",
+  "Name": "Downpipe",
+  "Description": "A house's downpipe where it comes down to the paving (RunningWaterSpec.Downpipe): fed by the rain on half the roof, silent in dry weather, running in rain, dripping for a long time after. Place it at the shoe, just off the wall. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 0.2,
+    "Y": 0.2,
+    "Z": 0.2
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "flow:downpipe",
+  "Volume": 1.0,
+  "Range": 50,
+  "MinDistance": 0.6,
+  "Mode": "LoopOne"
+}

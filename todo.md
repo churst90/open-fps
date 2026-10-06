@@ -269,6 +269,15 @@ Medium.
 Lakes and ponds lapping at a shore, creeks running, surf. The importer brings them in as zones; none
 has a sound model.
 
+### Water you are in or on (asked 2026-10-06)
+Shore, wave, river and hull-slap sound models are being built (docs/WAVES_AND_SHORES.md). After the
+triangle geometry and real terrain (docs/GEOMETRY.md stages 1 and 3), which give water a real surface
+and depth:
+- Being under water: sound about 4.3 times faster, so direction is mostly lost; little from the air
+  above; muffled, partly bone-conducted hearing; the ambient (rain on the surface overhead, snapping
+  shrimp in warm water); your own breath bubbles. Needs swimming and diving.
+- Boats as floating vehicles that pitch and roll, the hull heard from inside, and wavelets slapping it.
+
 ### Explosions
 Charge as TNT equivalent; peak overpressure and positive-phase duration from Kingery-Bulmash scaled
 distance; the Friedlander waveform near, a low boom far; ground reflection; the city's echoes; glass

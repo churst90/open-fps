@@ -1,0 +1,22 @@
+{
+  "Id": "shower_water",
+  "Name": "Shower",
+  "Description": "A shower onto a ceramic tray (RunningWaterSpec.Shower): sixty fine jets from 1.9 m breaking into drops on the tray and running away down its waste. Off until somebody turns it on with the interact key. Place it just over the tray. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 0.2,
+    "Y": 0.2,
+    "Z": 0.2
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "flow:shower",
+  "Volume": 1.0,
+  "Range": 30,
+  "MinDistance": 0.8,
+  "Mode": "LoopOne",
+  "SynthRunning": false
+}

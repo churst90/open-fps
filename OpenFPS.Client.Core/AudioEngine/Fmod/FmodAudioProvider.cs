@@ -728,34 +728,37 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
-    /// Makeup gain on the master, dB. See the gain-staging note in Initialize.
+    /// Makeup gain on the master, dB: how loud the game plays for a given volume setting, decided in
+    /// this one place. See the gain-staging note in Initialize.
     ///
-    /// Set from measurement, not taste. Metered on the speedway — eight cars, four live engines, a
-    /// grandstand answering them — against the loudness meter below:
+    /// It moves no balance and no level the law decides. Under it every voice plays where
+    /// Loudness.Place puts it for the playback the law is designed for (Loudness.DesignFullScaleDb):
+    /// 0 dBFS is 100.8 dB SPL at the ear, so a normal voice a metre away (62.35 dB) comes out at about
+    /// -38 dBFS RMS. The listening calibration and the ear model work in those units, and their
+    /// reference voice plays through this gain like everything else, so a player who calibrates sets
+    /// their volume 6 dB lower and 0 dBFS at the output is 94.8 dB SPL.
     ///
-    /// |  makeup |     short-term | peak      |                                                    |
-    /// |---------|----------------|-----------|----------------------------------------------------|
-    /// |    0 dB | -29 to -33 LUFS| -14 dBFS  | correct, and twelve decibels under where it belongs |
-    /// |    6 dB | -23 to -27     |  -4.5     | clean, still quiet                                  |
-    /// |   10 dB | -19 to -23     |  -3       | on target, limiter as a safety net                  |
-    /// |   12 dB | -17 to -21     |  -0.5     | limiter engaging                                    |
-    /// |   22 dB | -17 to -21     |  -0.1     | no louder than 12, just squashed                    |
+    /// Six: the loudness chosen by meter and by ear in September (ten for the speedway at -19 to -23
+    /// LUFS short-term; then three back for the ground's energy and a two-decibel trim for the street),
+    /// less the 3.01 dB the binaural stage was losing on every voice and no longer does (SteamAudioDsp).
+    /// So every voice through the HRTF plays as loud as it did. The wind at the ears and the interface,
+    /// which never passed through it, play 3 dB quieter, level with the voices again.
     ///
-    /// Ten is the last value that buys loudness rather than compression. Games sit at -18 to -23
-    /// LUFS and broadcast at -23, so this puts a busy outdoor scene where it belongs with the brick
-    /// wall still doing nothing most of the time.
-    ///
-    /// Raising it past about twelve is pointless — the table shows 22 dB is no louder than 12 — and
-    /// the thing to do when a map sounds quiet is read the "Mix loudness" line before changing
-    /// anything. Override with OPENFPS_MASTER_MAKEUP_DB.
-    ///
-    /// Seven, not ten: the ground reflection (GroundReflection) puts about three decibels on
-    /// everything standing on a road — the energy of the second path, which is real — and the whole
-    /// mix comes up by that much. The table above was measured without it.
+    /// Measured with --quality: four cars passing on a street, -35 LUFS integrated and no limiting;
+    /// shots from 1.5 to 30 m, -26.6 LUFS and -0.9 dBTP with the limiter taking 2.9 dB on average. Read
+    /// the "Mix loudness" line before changing it: once the limiter is working, more makeup buys
+    /// compression, not loudness. Override with OPENFPS_MASTER_MAKEUP_DB.
     /// </summary>
     public static readonly float MasterMakeupDb =
         float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MASTER_MAKEUP_DB"), out float mk)
-            ? Math.Clamp(mk, 0f, 40f) : 7f;
+            ? Math.Clamp(mk, 0f, 40f) : 6f;
+
+    /// <summary>A trim on the master for a run, dB, on top of the makeup: OPENFPS_MASTER_DB, 0 when unset.</summary>
+    public static readonly float MasterTrimDb =
+        float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MASTER_DB"),
+                       System.Globalization.NumberStyles.Float,
+                       System.Globalization.CultureInfo.InvariantCulture, out float mdb)
+            ? Math.Clamp(mdb, -24f, 24f) : 0f;
 
     private Vector3 _listenerPos = Vector3.Zero;
     private Vector3 _listenerVel = Vector3.Zero;
@@ -1003,25 +1006,10 @@ public partial class FmodAudioProvider : IAudioProvider
             _system.createChannelGroup("Interface", out _uiGroup);
             master.addGroup(_uiGroup);
 
-            // How loud the whole world is, and the ONE place it belongs.
-            //
-            // With the mixer on the inverse law the mix has headroom: measured with `--earshot`, the
-            // city's forty-two vehicles sum to -30 dBFS at the spawn, where under linear rolloff they
-            // would sum to +6 and clip on traffic alone.
-            //
-            // The correct answer to "everything is too quiet" is therefore a master trim and not a
-            // per-source one: the balance between sources is physics, and nudging individual
-            // presets to get overall loudness would undo exactly the work that made them agree.
-            // Set it by ear; the limiter at the head of this chain catches the peaks.
-            //
-            // TWO, set by ear and by meter: with the ground reflection's energy and the limiter's
-            // makeup on top, six put a busy street at -7 to -12 LUFS momentary, where a game sits at
-            // -18 to -23. Twelve is far too much. OPENFPS_MASTER_DB overrides it.
-            const float DefaultMasterDb = 2f;
-            float masterDb = float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MASTER_DB"),
-                                            System.Globalization.NumberStyles.Float,
-                                            System.Globalization.CultureInfo.InvariantCulture,
-                                            out float mdb) ? Math.Clamp(mdb, -24f, 24f) : DefaultMasterDb;
+            // A trim for a run (MasterTrimDb), none by default: how loud the game plays is the makeup's
+            // (MasterMakeupDb), and the balance between sources is the law's. Not per source: nudging
+            // presets for overall loudness would undo the work that made them agree.
+            float masterDb = MasterTrimDb;
             _masterTrim = MathF.Pow(10f, masterDb / 20f);
             if (MathF.Abs(masterDb) > 0.01f)
             {
@@ -1053,15 +1041,19 @@ public partial class FmodAudioProvider : IAudioProvider
             // fiddled with per sound, because it is the whole reason a listener can tell a rifle at
             // two hundred metres from a pistol at twenty.
             //
-            // The cost of getting that right is that the mix sits LOW. A source has to leave room for
-            // its own peaks (a synthesized engine's are 16 dB over its mean), and an outdoor scene
-            // spends another 30 dB on distance before anything reaches the ear. Nothing is clipping
-            // and nothing is wrong — there is simply a lot of unused range above the music.
+            // The cost of getting that right is that the mix sits LOW, and by design: the law plays a
+            // sound as loud as it is at a playback where 0 dBFS is 100.8 dB SPL (Loudness.DesignFullScaleDb),
+            // so a normal voice a metre away is about -38 dBFS RMS and an outdoor scene spends another 30 dB
+            // on distance. Nothing is lost on the way. A synthesized voice's 16 dB of headroom over its RMS
+            // is given back by the law in loudness units (Timbre.DigitalRmsDb), the HRTF is level over the
+            // sphere (+-0.4 dB; 1.4 dB down straight ahead and up at the sides, as a head is), and the
+            // binaural stage takes each voice at its own level (SteamAudioDsp). There is simply a lot of
+            // unused range above the music.
             //
             // That range is taken back HERE, once, for everything — not by making individual sounds
             // louder, which would destroy the relative levels the game is built on, and not by
             // guessing per map, which cannot work when nobody knows what sources a map will carry.
-            // The maximizer raises the whole mix into the top of the range and the brick wall catches
+            // The makeup raises the whole mix into the top of the range and the brick wall catches
             // whatever that pushes over, so adding a hundred more sound sources changes what you hear
             // and never how loud the master is.
             //
@@ -2403,6 +2395,10 @@ public partial class FmodAudioProvider : IAudioProvider
         int places = ExtendedSources.Layout(emitter.PhysicalKey)?.Length ?? 1;
         PlacedNatureVoice voice = kind == "shore"
             ? ShoreVoice(emitter, rate)
+            : kind == "wood" && OpenFPS.Common.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
+            ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.FoliageSpec.ByName(woodPreset), places, rate,
+                                    emitter.EntityId * 43 + 17, emitter.Position)
+              { WindPlaces = ExtendedSources.Layout(emitter.PhysicalKey)?[1..], TargetTrees = emitter.Trees }
             : kind == "flow"
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.RunningWaterSpec.ByName(preset), rate,
                                     emitter.EntityId * 47 + 19, emitter.Position)
@@ -2884,7 +2880,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     "water" => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position, emitter),
                     // A tree or a fire is heard from places across it (ExtendedSources): its own
                     // voice is the middle, and the others read the same synth.
-                    "fire" or "foliage" or "flow" or "shore" => NaturePlace(kind.ToLowerInvariant(), preset, emitter, mrate),
+                    "fire" or "foliage" or "flow" or "shore" or "wood" => NaturePlace(kind.ToLowerInvariant(), preset, emitter, mrate),
                     // A patch of rain round the listener, fed by the rain survey. See RainVoiceState.
                     // The roof over the ear and the near quarters are several, each a part (RainFeeds.PartsFor).
                     "rain" => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot, out int rainPart)
@@ -2938,6 +2934,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 ServingStop = emitter.ServingStop,
                 WindowsOpen = emitter.WindowsOpen,
                 Interior = emitter.Interior,
+                RoadWaterMm = emitter.RoadWaterMm,
                 // Live: the loudness law applies to what the engine is doing now, not just to its
                 // declared level. See EngineVoiceState.CompensateLevel.
                 CompensateLevel = true,
@@ -3342,6 +3339,8 @@ public partial class FmodAudioProvider : IAudioProvider
                     {
                         // The middle of a tree or a fire carries how much of it its other places play.
                         middle.Shared.TargetSpread = emitter.Spread;
+                        // ...and a wood, how many of its trees it stands for now (WoodChorus).
+                        if (middle.Shared.WindPlaces != null) middle.Shared.TargetTrees = emitter.Trees;
                     }
                     else if (active.MachineState is WaterTapState { Place: 0 } tapMiddle)
                     {
@@ -3360,6 +3359,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     active.EngineState.WindowsOpen = emitter.WindowsOpen;
                     active.EngineState.RoadSlip = emitter.TyreSlip;
                     active.EngineState.Wheels = emitter.Wheels;
+                    active.EngineState.RoadWaterMm = emitter.RoadWaterMm;
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var local))
                         active.EngineState.SetListener(local);
                 }

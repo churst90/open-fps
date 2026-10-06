@@ -142,6 +142,10 @@ public sealed class WheelDynamics
         /// <summary>The surface under it (<see cref="RoadSurfaces"/>) and the grip that gives.</summary>
         public byte Surface;
         public float SurfaceGrip;
+        /// <summary>The water under it, mm from the bottom of the road's texture (RoadWater), and the
+        /// share of its dry grip that leaves it at the body's speed (RoadWaterLaw.GripFactor), worked
+        /// out at the start of each step.</summary>
+        public float Water, WetGrip;
 
         // ── Working values of the step ──
         /// <summary>Its peak force at its load, the lateral Magic Formula's B, and the lateral force its
@@ -283,7 +287,7 @@ public sealed class WheelDynamics
             {
                 X = x, Y = y, Axle = k, Front = _axleFront[k], Steered = ax.Steered, Driven = ax.Driven,
                 Radius = MathF.Max(0.05f, ax.Tyre.RollingRadiusMetres), StaticLoad = each, Load = each,
-                Surface = RoadSurfaces.IndexOf(RoadData.DefaultSurface), SurfaceGrip = 1f,
+                Surface = RoadSurfaces.IndexOf(RoadData.DefaultSurface), SurfaceGrip = 1f, WetGrip = 1f,
             });
             if (ax.TrackMetres > 0f) { Add(-0.5f * ax.TrackMetres); Add(0.5f * ax.TrackMetres); }
             else Add(0f);
@@ -308,11 +312,45 @@ public sealed class WheelDynamics
     private float CorneringStiffness(float load, float nominal)
         => Tyre.CorneringStiffness * nominal * MathF.Sin(2f * MathF.Atan(load / MathF.Max(1f, Tyre.CorneringStiffnessLoad * nominal)));
 
-    /// <summary>The friction coefficient of a wheel at its load, on its surface.</summary>
+    /// <summary>The friction coefficient of a wheel at its load, on its surface, with the water on it.</summary>
     private float Mu(in Wheel w)
     {
         float dfz = (w.Load - w.StaticLoad) / MathF.Max(1f, w.StaticLoad);
-        return MathF.Max(0.05f, GripG) * w.SurfaceGrip * MathF.Max(0.2f, 1f + Tyre.LoadSensitivity * dfz);
+        float wet = _dryTable ? 1f : w.WetGrip;
+        return MathF.Max(0.05f, GripG) * w.SurfaceGrip * wet * MathF.Max(0.2f, 1f + Tyre.LoadSensitivity * dfz);
+    }
+
+    /// <summary>While the steady-turn table is built: the dry road, so the table is the vehicle's own and
+    /// a wet road is read off it by <see cref="WetGripShare"/>.</summary>
+    private bool _dryTable;
+
+    /// <summary>
+    /// Every wheel's share of its dry grip with the water under it, at the body's speed now. Called at
+    /// the start of every step: the speed changes little over one, and the aquaplaning law is too dear
+    /// to work out in every sub-step of every wheel.
+    /// </summary>
+    private void Wet()
+    {
+        for (int i = 0; i < Wheels.Length; i++)
+        {
+            ref var w = ref Wheels[i];
+            w.WetGrip = w.Water > 0f ? RoadWaterLaw.GripFactor(w.Surface, w.Water, Vx, Tyre.InflationKPa, Tyre.TreadDepthMm) : 1f;
+        }
+    }
+
+    /// <summary>Sets the water under one wheel, mm (RoadWater).</summary>
+    public void SetWater(int wheel, float waterMm) => Wheels[wheel].Water = float.IsFinite(waterMm) ? MathF.Max(0f, waterMm) : 0f;
+
+    /// <summary>The least share of its dry grip any wheel has on the water under it now: what a driver
+    /// who feels the car takes the bends and the brakes by.</summary>
+    public float WetGripShare
+    {
+        get
+        {
+            float least = 1f;
+            foreach (var w in Wheels) least = MathF.Min(least, w.WetGrip);
+            return least;
+        }
     }
 
     /// <summary>Stopped where it stands: no speed, no yaw, nothing slipping.</summary>
@@ -411,6 +449,7 @@ public sealed class WheelDynamics
         SteerWheels(steer);
         TickYaw = TickForward = TickRight = 0f;
         if (dt <= 0f) return;
+        Wet();
 
         float speed = MathF.Max(MathF.Abs(Vx), KinematicBelow);
         int sub = Math.Clamp((int)MathF.Ceiling(dt * _lateralRate / speed / 0.4f), 1, 16);
@@ -602,6 +641,7 @@ public sealed class WheelDynamics
         bool modulated = Modulated;
         float vx = Vx, vy = Vy, r = YawRate, ax = Ax, ay = Ay, steer = SteerAngle;
         Modulated = false;
+        _dryTable = true;
         for (int i = 0; i < TurnTableSize; i++)
         {
             // Radius from the tightest to the widest, evenly in its logarithm.
@@ -615,6 +655,7 @@ public sealed class WheelDynamics
             table[i] = lo;
         }
         Modulated = modulated;
+        _dryTable = false;
         Vx = vx; Vy = vy; YawRate = r; Ax = ax; Ay = ay;
         SteerWheels(steer);
         _turnTable = table;
@@ -770,6 +811,7 @@ public sealed class WheelDynamics
     public void Hold(float speed, float ax, float ay, float normal = G)
     {
         Vx = speed; Vy = 0f; YawRate = 0f;
+        Wet();
         Ax = ax; Ay = ay;
         SteerAngle = 0f;
         TickYaw = TickForward = TickRight = 0f;
