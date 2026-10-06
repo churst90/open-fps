@@ -28,6 +28,7 @@ AudioLab `--geometry map=<id> [terrain=<metres>]`.
 6. Performance: measured
 7. Stages, effort and risks
 8. Decisions for Cody
+9. Stage 1 as built (2026-10-06)
 
 ---
 
@@ -849,6 +850,196 @@ Total: about 21 to 33 sessions.
     (the streaming plan leaves this open for building too).
 
 ---
+
+## 9. Stage 1 as built (2026-10-06)
+
+Built on the branch after world streaming 1 and 1b. The world's static solid boxes are triangles in a
+two-level BVH, on the server and the client, and the consumers that stage 1 names ask it. Every map loads
+unchanged; `ColliderSize` is still each entity's box. `OPENFPS_TRIANGLES=0` (server or client) turns the
+triangle paths off and every query answers from the boxes as before.
+
+### 9.1 What exists
+
+Code: `OpenFPS.Common/Geometry/` (`Surfaces.cs`: layers, flags, construction, surface, `MeshAsset`,
+`ShapeLibrary.Box`; `Bvh.cs`; `GeometryPiece.cs`: the bottom level; `TriangleWorld.cs`: the top level
+and the queries; `TriangleWorldBuilder.cs`: tiles, movers, `EntityGeometry`; `SolidContact.cs`: a body
+against a solid; `MoverPoses.cs`; `TriangleGeometry.cs`: the switch). Server: `ServerGeometry`, kept by
+`MapManager` beside each map's grid. Client: `ClientGeometry` in `ClientWorldState`, handed to every
+snapshot (`WorldSnapshot.Geometry`); `AcousticGeometry` for the acoustic scene. Harness: AudioLab
+`--geometry-parity`. Tests: `GeometryStage1Tests`.
+
+- **A piece per tile.** A static solid belongs to the 250 m tile its centre is in (the streaming tiles;
+  250 m on a map sent whole too); one wider than a tile (the ground under a map) is in a piece of its
+  own. A piece holds its triangles in the tile's frame (its corner the origin), a tree over them (binned
+  SAH, 12 bins, leaves of four), its solids with a tree over their bounds, each convex solid's face
+  planes, and a surface table. The top level is a tree over the pieces' instances. Worlds are immutable:
+  a change makes a new world sharing every piece that did not change, so no reader ever locks.
+- **Boxes are the one shape.** Twelve triangles wound outward, closed and convex, one surface. The box's
+  corners are placed with the classical matrix of the unit quaternion: maps write turns in six digits
+  (0.707082, 0.707131 is not unit length), and `Vector3.Transform` with such a quaternion scales a box's
+  height by its length squared, which put a gravel strip's top a float's last bit low and stepped a body
+  onto a kerb the box path did not.
+- **The surface table** per triangle: material (as the entity has it), construction (the box's size as
+  the panel, `WallBuild`, shell thickness), absorption override, layers (movement, bullets, sight,
+  ground; acoustics unless it is a sound source's own box) and flags (glass, door leaf, hollow, roof by
+  name, open ground in the acoustic store).
+- **Door leaves are movers**: an instance of a piece made at its own origin (leaves of one size and build
+  share one), placed where the leaf's transform is. A swing is a new pose and a refit of the top tree, no
+  build. On the server `DoorSystem` and `ParentSystem` count a moved leaf (`MoverPoses`) and the grid
+  places its leaves again before it hands the world out; on the client each snapshot does.
+- **What is not a box** (no map has one; `/spawn` can make them) and anything not a fixed object (items)
+  stays on the old per-entity test, listed as unindexed beside the world.
+- **Built where**: the server at map load and in `RefreshGrid` (every core; an order-free fingerprint
+  skips the tile pass when no solid changed, as for an item picked up); statics spawned between rebuilds
+  are tested the old way until the tick's sync takes them in. The client off the game thread
+  (`ClientGeometry`): while a build runs the last one serves, and the owners whose solid changed since it
+  started are handed to each snapshot as stale (not counted from the triangles) and tested the old way,
+  so an answer is never wrong while the triangles catch up.
+- **Determinism**: a tile's solids are sorted by owner and built alone, single-threaded per tile, in
+  scalar `System.Numerics`. The server and a client holding the same solids in a tile build the same
+  piece bit for bit whatever order they hold them in (tests; the harness compares 4,000 rays and ground
+  probes per map, and a streamed client at the spawn, at zero bits apart).
+- **Ties.** Two faces within a few millionths of the distance are the same place. Of two such, the one
+  whose solid covers less ground is met, then the lower owner. The box path took whichever its list had
+  first, which was not the same on the server and the client (Magnolia's open ground: Concrete on the
+  server, Dirt on the client, from the loader's foundation lying flush under the map's own ground).
+
+### 9.2 The queries and who asks them
+
+| Query | Answers | Now asked by |
+|---|---|---|
+| `Closest`, `Enter` (inside means met at once, with the face it came in by) | the nearest face, its solid and owner | `RaycastSingle`, `RaycastMaterial`, `CastSight`, `RaycastAll`, bullets' static hits (`CombatService.StaticFirstHit`), the enclosure survey (front faces) |
+| `All` + `Containing` | every crossing; what a point is inside | `GetOcclusionData` (walls in a row, hollow shells) |
+| `Ground` | five downward probes, the height exactly on the face's plane | `PhysicsUtils.GetGroundHeight` (server and client) |
+| `Overlapping` + `SolidContact` | solids near a body; the way out of each | `SharedMovementEngine` (server and client), `MovementSystem.CheckCollision` |
+| `Along`, `Column` | solids a segment or a vertical plane can meet | `OpeningRoutes` (tile build) |
+
+Moving things (players, people, vehicles) are still the grid's dynamic half and the per-entity tests,
+asked beside the triangles.
+
+**The body.** The design said a capsule; stage 1 keeps the upright cylinder the engine has always used,
+met against each solid's triangles: cut by the cylinder's two ends, seen from above, out from the nearest
+point (or the nearest edge, from the support of the cut corners along every edge direction), ceilings
+and floors by the same rules as the box test. On boxes it is the box test's answer to rounding. A
+capsule's rounded foot would change how kerbs and steps feel on every box map, which stage 1 must not;
+it belongs with stage 2's slopes and stairs. Solids are gathered from the same reach the grid had (the
+3 x 3 cells of 10 m round the body), because the guard against ending a step deeper in anything can only
+see what is in the list, and every past fix was heard with that reach.
+
+**Acoustics.** The acoustic scene (`BoxesFromWorld`: no sound source's own box, door leaves where they
+stand) is one store, `AcousticGeometry`, incremental as the tile set was (a cheap hash finds the changed
+tiles; open ground is decided again for them and their neighbours only). `TileSceneSet` makes each
+tile's two Steam Audio sub-scenes from its piece, placed by an instance at the tile's corner; the worker's
+enclosure survey casts against the same world. Door leaves stay in their tiles' sub-scenes (a swing
+rebuilds that tile, as in 1b): instancing them in Steam Audio was not tried again.
+
+**Routes through openings, per tile** (Cody's addition). `OpeningRoutes` builds from the acoustic store:
+boxes asked of its trees instead of a grid over all of them, each tile's boxes' frames and transmissions
+kept while its piece is, each opening derived again only when a tile its walls could be in changed
+(`OpeningRoutes.TileCache`). A build after a change answers exactly as one from nothing (harness, 1,000
+routes, legs and barriers each, zero apart). The worker checks openings' sides against the places only
+when it reports them: the check only ever wrote the report. Found by the harness in main's code: the
+over-the-top search swept boxes once by height, so two roof slabs side by side held each other up only in
+one order; it now sweeps to a fixed point.
+
+**Track clearance** at load asks a tree over the solids instead of every solid at every point: the same
+obstructions, 3.5 ms instead of 426 on the city.
+
+### 9.3 Still reading boxes
+
+- `SpatialGrid`'s static half: still built, for the callers stage 1 did not move (beacons near you, rain,
+  driving aids, occupancy, spawning commands, the server's broadcast). The switched queries ask only its
+  dynamic half and the unindexed list.
+- `SightGrid` (the scope and sight lines at 10 Hz): it also indexes announced things that are not solid,
+  which the triangle world does not hold. Moving it needs a sight-only layer.
+- `BoxColumns` (the server's room survey and the client's face openings at load): box faces by nature;
+  replaced by the room flood (2.7, stage 4).
+- `EarlyReflections`, `ImageSource`, `Diffraction` round one box, `VehicleShadow`, `CompositeAcoustics`:
+  box faces and box edges, as the design keeps them until stages 4 and 6.
+- Ricochet's normal (`CombatService.Face`) is still the box's largest local axis; the triangle's normal is
+  there to use (decision below).
+
+### 9.4 The harness
+
+`--geometry-parity map=<id> [n=4000] [only=...]`: old and new asked the same thing from the same state.
+On all four maps (city, speedway, Magnolia, Albany), at 4,000 probes a kind:
+
+- **Exact or within rounding, nothing left over:** rays (single, material, sight, the fan), occlusion and
+  transmission (band gains within 2e-7), bullets' first static hit, teleport checks, the step test, every
+  single movement step (worst 0.3 mm), track clearance, the server and client worlds (same bits), a
+  streamed client against the server.
+- **Explained classes, listed as ties:**
+  - two surfaces in the same place: a different material at the same height or distance (ground: the
+    server's 300-1,200 a map where it now agrees with the client; inside houses, 1-4 Carpet/Tile/Wood a
+    map; the survey's absorption);
+  - a ray glancing along a face: a millimetre along the ray, under 0.2 mm square to the face;
+  - a body touching a wall to within 0.1 mm: touching on one side only;
+  - an axis exactly between two edges of a footprint: either way out.
+- **Far from the origin**: 2 of 32,364 body contacts on Albany, 1.6 km out, 0.04 mm and a twentieth of a
+  degree apart. The box test works in world coordinates, where a float's step is 0.12 mm that far out;
+  the triangles work in their tile's frame.
+- **Walks of 90 steps** part by more than a millimetre in 1-4 of 400, as often as the box path parts from
+  itself when started a tenth of a millimetre aside (1-3 of 400). The worst (Albany, 60 mm) was followed to
+  its step: a body sliding into a door frame touches three solids whose depths are within 7 micrometres
+  of each other, and which is pushed out of first flips; 2 mm later one walk steps onto a 10 cm slab
+  and the other does not.
+- **Routes** against main's box grid: 0-6 of 1,000 differ, all from the six-digit quaternions (the box
+  grid with its turns made unit agrees with the tiles exactly on every map, openings, routes, legs and
+  barriers), and 8-17 more are within 0.3 dB on the same openings. One Albany doorway's frame is 5 cm
+  apart for the same reason.
+
+### 9.5 Measured (this machine, shared, load 7 to 14)
+
+| | Box path | Triangles |
+|---|---|---|
+| Enclosure survey (city / Magnolia / Albany) | 11.4 / 3.4 / 6.7 ms | 0.33 / 0.25 / 0.23 ms |
+| `RaycastSingle`, 60 m (city / Magnolia / Albany) | 68 / 31 / 69 µs | 4.6 / 7.1 / 6.0 µs |
+| `CastSight`, 600 m | 63-107 µs | 1.5-3.7 µs |
+| `GetOcclusionData`; the five-ray form | 25-83; 93-295 µs | 5-8; 10-28 µs |
+| Ground height, server | 71-216 µs | 16-140 µs |
+| A movement step, server gather and step | 19-74 µs | 16-45 µs |
+| Bullet segment, static | 6-29 µs | 1.1-2.1 µs |
+| Build, whole map, server (one thread / 24) | | Magnolia 169-211 / 48 ms, Albany 211-324 / 50-133 ms, city 60 / 23 ms |
+| A tile's piece | | median 0.2-0.4 ms, worst 6-19 ms (a tile of 34,000 triangles) |
+| Memory, whole map | | Magnolia 23 MB, Albany 32 MB, city 6.5 MB |
+| Server `RefreshGrid`, one box moved (Magnolia / Albany) | grid 32-110 ms | the grid and the triangles 49-122 ms; the triangles' share: reading the solids 14-27 ms, the changed tile 4-41 ms |
+| Routes, whole (Magnolia / Albany / city) | 188-244 / 252-291 / 135-161 ms | 44-47 / 40-65 / 85-86 ms from the store |
+| Routes after one tile changed | 60-232 ms | 4-6 ms |
+| Track check, city | 426 ms | 3.5 ms |
+| `--stream-walk` Magnolia at 15 m/s: background acoustic work | 151-177 ms a second (routes 82-97) | 59-68 ms a second (routes 2) |
+| ...Albany at 15 m/s | 87 ms a second (routes 55) | 45 ms a second (routes 2) |
+| ...worker answer gaps while tiles change, worst | 139-198 ms | 100 ms |
+| ...game thread on frames with tile messages, median / worst | 6-20 / 14-245 ms | 6-10 / 16-62 ms |
+| `--tile-scenes` Magnolia, one tile changed | 23 ms (1b) | 42 ms (the tile's BVH is built too) |
+
+The game thread's worst frame varies more from run to run than between the two (three runs each). The
+Steam Audio tile update costs more than in 1b because the tile's tree is built with it; the routes,
+which no longer rebuild, more than pay for it. Nothing new runs on the audio thread.
+
+### 9.6 Left for stage 2 and after
+
+- The capsule, slopes, stairs on real treads, ground normals and walking speed on grades.
+- Dynamic things (players, vehicles) as instances in the top tree; then the grid's dynamic half goes.
+- The remaining box readers (9.3); `SightGrid` needs a sight-only layer for announced things.
+- Shapes other than the box, mesh assets on disk and on the wire, import (stage 4).
+- Steam Audio door leaves as instances (not tried again here).
+- The server's `RefreshGrid` reads every solid again on each call; tracking what changed would take the
+  10-40 ms it adds off a pick-up on a big map.
+
+### 9.7 Decisions for Cody
+
+1. **Two surfaces in the same place**: the smaller patch is met (a drive over the ground, a rug over a
+   floor, the map's ground over the loader's foundation). The client already heard it so at the ground;
+   the server now agrees, so bullets and other players' steps at the edge of the city and on Magnolia's
+   open ground are dirt where the server said concrete. Keep, or prefer something else?
+2. **The body stays a cylinder** in stage 1 for the same feel on every box map; a capsule with stage 2.
+3. **Ricochet off the triangle's normal** instead of the box's largest axis: right near edges and on any
+   shape, and audible as different bounces near corners. Not switched; say if wanted.
+4. **The loader's concrete foundation** lies flush under maps that have their own ground (the city,
+   Magnolia, Albany): the loader injects it whenever there is no `concrete_floor` at the origin. Worth
+   not injecting it when the map has a ground of its own.
+5. **Six-digit quaternions**: the triangles read every turn as unit length; the box tests still in use
+   read it as written. Worth normalising turns at map load for everything.
 
 ## Appendix: box-geometry consumers today
 
