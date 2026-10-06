@@ -355,3 +355,137 @@ and dominates that side. A before/after pair is in the inbox for Cody to decide.
 - Wüthrich, Shi, Chanson 2022. Environ. Fluid Mech. 22, 789-818.
 - Wyly, Eaton 1961. Capacities of stacks in sanitary drainage systems. NBS Monograph 31.
 - Zheng, James 2009. Harmonic fluids. ACM Trans. Graph. 28(3), 37.
+
+## 10. Round 2: gurgles, taps and sinks
+
+Cody, 2026-10-06, after hearing round 1: "all of the samples sound good for the running water, I like
+them... continue down this path with the additional work for the gurgle and sinks." Code:
+`RunningWaterSynth.Basin.cs`, new parts of `RunningWater.cs`. Sources in 10.9.
+
+### 10.1 Water leaving through a hole
+
+A sink's waste, a shower's grid and a roof gutter's outlet into its downpipe all sound by how deep the
+water stands over the hole.
+
+- Shallow, the water spills over the rim as a weir round an open air core and slides down the pipe.
+  Deeper, it closes over the hole and the hole runs as an orifice. BS 6367's gutter-outlet forms, as
+  back-calculated from HR Wallingford's measured outlets (Escarameia and May 1996, SR463/SR473 [ft]):
+  weir Q = D h^1.5 / 7000, orifice Q = D² h^0.5 / 13200 (L/s, mm). They meet at h ≈ 0.53 D. In SI:
+  Q = 1.44 L h^1.5 (L the rim length, π D for a plain outlet) and Q = 0.69 A √(2 g h).
+- At the switch an outlet surges: "intermittent surging ... transition from weir to orifice flow and
+  vice versa" (SR463 [ft]); a drop shaft's transitional regime pulses between full and weir flow
+  (Water 5:1380, 2013 [abs]). Once submerged, a small rise in flow gives a steep rise in head.
+- Over the hole a free-surface vortex draws air down while the water is shallower than its critical
+  submergence. Gordon (1970) [recalled]: S = C v √D (SI), C 0.54 for a symmetric approach, 0.72 for an
+  asymmetric one. The air core forms, strengthens, weakens and vanishes repeatedly near the critical
+  submergence before it settles (LES, 2023 [abs]): the intermittent slurp.
+- A bathtub vortex needs rotation to reach the drain: bubbles detach from the core's tip once its
+  downflow beats their rise (Andersen, Lautrup and Bohr 2003 [ft]). A basin draining from rest has
+  little circulation, so its vortex reaches the hole only when shallow.
+- A bottle glugs about six times a second through a 20-40 mm hole, a little faster for a wider one;
+  air enters in a quarter of each cycle, and each glug lets in about 17 mL, a bubble of about 1.6 cm
+  radius ringing near 200 Hz (Perez, Monnet, Vidal and Joubaud 2026 [ft]; Clanet and Searby 2004 [abs]:
+  the trapped gas is the spring and the liquid column the mass). The rhythm and the note are separate.
+- A bubble let go from a nozzle or a hole rings from the collapse of its neck as it pinches off
+  (Czerski and Deane 2010 [ft]); its note climbs as it rises at the surface (van den Doel 2005).
+- A downpipe usually runs with an air core all the way down; the outlet joint is not sealed (SR463
+  [ft]). A trap's water column sloshes like a U-tube, f = (1/2π)√(2g/L), about 1-1.5 Hz.
+
+### 10.2 Taps
+
+- Flows: kitchen 6-8.3 L/min, efficient basin 4.5-5.7, shower 5-9.5 (US EPA WaterSense [ft]; Adeyeye,
+  She and Meireles 2020 [ft]).
+- A smooth jet from a contoured nozzle drives no air under even at high Reynolds number; crests on a
+  disturbed jet open cavities that close into bubbles (Zhu, Oguz and Prosperetti 2000 [abs]). The onset
+  speed rises with free-jet length: 0.5 m/s for a 5 mm jet, 1.6 m/s for 100 mm, 2.1 m/s for 200 mm
+  (Chanson and Manasseh 2003 [ft]). Their bubbles: 1.8 mm diameter (3.6 kHz) at 2.3 m/s, 3.8 mm
+  (1.7 kHz) at 4.4 m/s. A tap falling 20-30 cm arrives at 2-2.5 m/s, near the onset.
+- An aerator mixes air into the stream: it comes out white and lands soft.
+- A falling stream thins as it speeds up, r = r0 (1 + 2 g z / v0²)^-1/4 (continuity).
+
+### 10.3 Sinks and basins
+
+- A stainless bowl is 0.7-1.2 mm steel with anti-drum pads. A flat simply supported panel's modes are
+  (π/2) √(B/m″) ((m/a)² + (n/b)²); a pressed bowl is stiffer than a flat panel of its size (its radiused
+  sides and the strainer's boss), so what drums is the flat between them. Steel's coincidence is near
+  14 kHz at 0.9 mm: it radiates from its edges across the band. Water on it adds mass and lowers its
+  modes (Lamb 1920 [recalled]), and damps them.
+- A ceramic basin is thick and stiff: a hard surface, it barely rings.
+- Filling a vessel raises its air column's note, f = c / 4(l + 0.62 R) (Bagad et al. 2025 [ft]; Cabe
+  and Pittenger 2000 [abs]: listeners fill to the brim by ear). In a wide basin the end correction
+  dominates and the rise is small.
+- Washing-up liquid kills the plinks (Phillips et al. 2018 [ft]): not modelled.
+
+### 10.4 The model
+
+- **Inlet** (`FlowInlet`): diameter, open share (strainer, leaf guard), rim length, swirl (Gordon's C:
+  0.72 for a gutter outlet fed from one side; 0.25 for a basin draining from rest, a judgement), the
+  pipe below. Capacity: the lesser of the weir and the orifice above. A gutter's outlet stands at the
+  depth that passes its flow; a basin's at its level.
+- **Gurgle**: none while the water is shallower than 0.08 of the hole's open diameter, rising to full
+  at 0.35 D, falling to none at the critical submergence. Air drawn down at 0.25 of the water's
+  volume at the full gurgle (fitted), in gulps every 3.3 √(D/g) ± 30 % (6 Hz for a 30 mm hole, as a
+  bottle). A gulp: one pocket about the hole's radius (log spread 0.35) ringing at its Minnaert note
+  with a steep climb (ξ 0.8), three smaller bubbles, the rush of air through the closing gap (a burst
+  of band noise), and a knock into the pipe below, which rings at its own modes.
+- **Basin** (`FlowBasin`): a level that rises with the tap and falls through the inlet. The first water
+  stands in the dish over the waste (0.012 m²) until it is deeper than the bottom falls (6 mm). With
+  the plug in only the overflow lets water go. `PlugWhileRunning`: the interact key that turns the tap
+  on puts the plug in, and turning it off pulls it: a person filling the basin and letting it go.
+- **The tap's jet** (`FlowTap`): onto the bare bottom while the water there is thinner than the jet
+  (e^(-h/d), the circular jump of a tap into a sink still meets the steel), into the water once deeper.
+  From the spout's height less the water's, already moving at the spout's speed. A plain spout's stream
+  lands whole, in lumps the stream's size; an aerated one as millimetre drops round a core; a shower
+  rose's jets as drops.
+- **The plate**: a steel bottom's flat panel (0.2 m) as up to 20 two-pole modes, struck near its
+  middle, weighted by the mode shape there and the edge radiation efficiency, coupled by the point
+  mobility; water lowers and damps them. Its blows are the fall's own events.
+- **Drips**: a leaking tap drips by Tate's law onto the bare bottom (and a steel one rings) or into the
+  water standing in it.
+- **Falls follow the flow** (round 1's open item): a fall's shape is worked out again as its flow
+  changes, so a thicker sheet comes down more coherent, in bigger lumps that drive air under.
+- **The downpipe's foot**: water leaving the shoe is already moving at the film's terminal speed.
+- **Two-stage drainage**: a share of a roof's run-off (0.12) goes through a slow store (30 minutes):
+  the long drip after rain.
+
+### 10.5 Presets
+
+`flow:kitchen_sink`, `flow:dripping_sink`, `flow:washbasin`, `flow:shower`, `flow:gutter_outlet`.
+Taps start off (`SynthRunning` false in the prefab); the interact key standing within 1.3 m of one
+turns it on or off (server `ToggleTapInReach`, before doors). A shut tap whose basin has drained is
+given no voice.
+
+### 10.6 On the city
+
+Every flat in the five towers has a kitchen sink, a washbasin and a shower against its outer wall at
+the far end from its sofa (333 flats, 999 fixtures). The Union Building's first-floor flat 11F has a
+dripping kitchen tap. Every house on the estate has a downpipe at the garden end of its back wall and
+its gutter outlet at the eaves (64 each). All appended at the end of `tools/gen_city.py`.
+
+### 10.7 Not modelled
+
+- Toilet flush and cistern refill: not built (they would need a timed sequence and a valve's hiss).
+- The plug as its own control; a person standing in the shower; washing-up liquid.
+- A filling vessel's rising note (the basin is too wide for it to matter); a kettle or a bucket.
+- People in the flats using their taps (NPC use).
+
+### 10.8 Results
+
+(Filled in after fitting.)
+
+### 10.9 Sources (round 2)
+
+- Andersen, Lautrup, Bohr 2003. Anatomy of a bathtub vortex. Phys. Rev. Lett. 91, 104502.
+- Adeyeye, She, Meireles 2020. Environ. Sci. Pollut. Res. 27, 4640.
+- Bagad, Tapaswi, Snoek, Zisserman 2025. The Sound of Water. ICASSP; arXiv:2411.11222.
+- Cabe, Pittenger 2000. Human sensitivity to acoustic information from vessel filling. J. Exp. Psychol. HPP 26, 313.
+- Chanson, Manasseh 2003. Air entrainment processes in a circular plunging jet. J. Fluids Eng. 125, 910.
+- Clanet, Searby 2004. On the glug-glug of ideal bottles. J. Fluid Mech. 510, 145-168.
+- Czerski, Deane 2010. J. Acoust. Soc. Am. 128, 2625.
+- Escarameia, May 1996. HR Wallingford reports SR463 (gutter outlets) and SR473 (flat roof outlets).
+- Gordon 1970. Vortices at intakes. Water Power 22.
+- Perez, Monnet, Vidal, Joubaud 2026. Emptying bottles filled with suspensions. J. Fluid Mech. 1036, A58.
+- Phillips, Agarwal, Jordan 2018. Sci. Rep. 8, 9515.
+- US EPA WaterSense specifications (faucets, showerheads).
+- Wyly, Eaton 1961. NBS Monograph 31.
+- Zhu, Oguz, Prosperetti 2000. J. Fluid Mech.; Phys. Fluids 12.
