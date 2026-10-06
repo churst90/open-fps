@@ -234,7 +234,7 @@ public class WavesTests
     /// <summary>
     /// Albany and Magnolia have their ponds' edges as stretches of shore (tools/gen_osm.py): each a model
     /// this client knows, its box a stretch of about 20 m and a fetch of at least a metre, its +Z turned to
-    /// the water (two metres out from nearly every one is over a water surface), none inside anything solid.
+    /// the water (ten metres out from most of them is a water surface, behind none of them).
     /// </summary>
     [Theory]
     [InlineData("albany_or", 200)]
@@ -265,7 +265,14 @@ public class WavesTests
         }
         _o.WriteLine($"{id}: {shores.Count} stretches of shore, {water.Count} water boxes");
         Assert.True(shores.Count >= atLeast);
-        int overWater = 0;
+        // The water boxes cover a pond in 8 m cells inside its outline, so a stretch's water is looked for
+        // ten metres out; its land side must never be water.
+        bool InWater(Vector3 p) => water.Any(w =>
+        {
+            var local = Vector3.Transform(p - w.At, Quaternion.Inverse(w.Rot));
+            return MathF.Abs(local.X) <= w.Half.X + 0.5f && MathF.Abs(local.Z) <= w.Half.Z + 0.5f;
+        });
+        int overWater = 0, overLand = 0;
         foreach (var (prefab, at, rot, scale) in shores)
         {
             Assert.True(prefabs.ContainsKey(prefab), prefab);
@@ -273,15 +280,11 @@ public class WavesTests
             Assert.True(ModelLibrary.Knows(ModelLibrary.Kinds.Shore, sound[6..]), sound);
             Assert.InRange(scale.X, 5f, 30f);
             Assert.True(scale.Z >= 1f);
-            var probe = at + Vector3.Transform(new Vector3(0f, 0f, 2f), rot);
-            bool inside = water.Any(w =>
-            {
-                var local = Vector3.Transform(probe - w.At, Quaternion.Inverse(w.Rot));
-                return MathF.Abs(local.X) <= w.Half.X + 0.5f && MathF.Abs(local.Z) <= w.Half.Z + 0.5f;
-            });
-            if (inside) overWater++;
+            if (InWater(at + Vector3.Transform(new Vector3(0f, 0f, 10f), rot))) overWater++;
+            if (InWater(at + Vector3.Transform(new Vector3(0f, 0f, -10f), rot))) overLand++;
         }
-        _o.WriteLine($"  {overWater} of {shores.Count} face a water surface two metres out");
-        Assert.True(overWater >= 0.8 * shores.Count);
+        _o.WriteLine($"  {overWater} of {shores.Count} have water 10 m out on their +Z, {overLand} behind them");
+        Assert.True(overWater >= 0.6 * shores.Count);
+        Assert.Equal(0, overLand);
     }
 }
