@@ -74,8 +74,13 @@ public static class EarTimbres
     /// The correction the law in loudness units gives a sound of this level and this id over the
     /// unweighted law, dB; zero for a sound with no declared level or no measurement yet.
     /// </summary>
-    public static float CorrectionDb(string? soundId, float levelDb)
-        => levelDb > 0f ? OpenFPS.Common.Loudness.TimbreCorrectionDb(levelDb, Find(soundId)) : 0f;
+    public static float CorrectionDb(string? soundId, float levelDb, bool levelIsReal = false)
+    {
+        if (levelDb <= 0f) return 0f;
+        var t = Find(soundId);
+        if (t != null && levelIsReal && float.IsFinite(t.GatedRmsDbfs)) t = t.DeclaringRealLevel;
+        return OpenFPS.Common.Loudness.TimbreCorrectionDb(levelDb, t);
+    }
 
     private static string Folder(string soundId)
     {

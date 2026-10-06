@@ -415,7 +415,7 @@ public class VoiceManager
         // equally loud, and the one that is heard more ranks higher.
         if (e.EarLevelDb > 0f)
         {
-            float db = EarTimbres.CorrectionDb(string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId : e.PhysicalKey, e.EarLevelDb);
+            float db = EarTimbres.CorrectionDb(string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId : e.PhysicalKey, e.EarLevelDb, e.EarLevelIsReal);
             if (db != 0f) level *= MathF.Pow(10f, db / 20f);
         }
         level *= 1f - Math.Clamp(e.Occlusion, 0f, 1f);

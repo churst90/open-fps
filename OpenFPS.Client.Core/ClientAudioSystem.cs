@@ -3018,6 +3018,7 @@ public class ClientAudioSystem
             IsEvent = true,
             MinDistance = stepReference,
             EarLevelDb = OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb,
+            EarLevelIsReal = true,
             // The room the body is standing in, so its reverberation is THAT room's.
             TargetRegionId = _listenerRegion,
         };
@@ -3350,6 +3351,7 @@ public class ClientAudioSystem
                 Volume = stepGain * gain,
                 MinDistance = stepReference,
                 EarLevelDb = stepLevelDb,
+                EarLevelIsReal = true,
                 EarCopyDb = 20f * MathF.Log10(MathF.Max(1e-6f, gain)),
                 Range = 25f,
                 // No DelayMs: the facade delays every submission by its distance, and the image is
@@ -3663,6 +3665,7 @@ public class ClientAudioSystem
                 Type = EmitterType.WorldLocked,
                 Volume = landGain,
                 EarLevelDb = OpenFPS.Common.Loudness.FootstepDb,
+                EarLevelIsReal = true,
                 Range = 20.0f,
                 Essential = true,
                 IsEvent = true,

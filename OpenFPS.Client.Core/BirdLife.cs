@@ -362,6 +362,7 @@ public sealed class BirdLife
             Velocity = velocity,
             Volume = gain,
             EarLevelDb = sp.CallDb,
+            EarLevelIsReal = true,
             MinDistance = reference,
             Range = range,
             Pitch = pitch,

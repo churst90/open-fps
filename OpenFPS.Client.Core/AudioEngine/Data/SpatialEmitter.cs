@@ -119,6 +119,12 @@ public struct SpatialEmitter
     /// <summary>A copy's level under its source, dB (20 log10 of what the surface and the path kept); 0
     /// for a direct sound.</summary>
     public float EarCopyDb;
+    /// <summary>
+    /// A recording whose <see cref="EarLevelDb"/> is the source's REAL level (a bird call's SPL, a
+    /// beacon's, a footfall's), not its buffer's full scale at a metre (the convention of world sounds:
+    /// Speech.LevelDb). Live voices declare their RMS level and need no flag.
+    /// </summary>
+    public bool EarLevelIsReal;
     public float ReflectionSpread; // (0-360) How wide the reflection feels in 3D space.
 
     // Granular Synthesis Parameters
