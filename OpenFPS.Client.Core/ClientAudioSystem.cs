@@ -2409,9 +2409,23 @@ public class ClientAudioSystem
                 // voice stays where it has always been — between the two, biased toward the exhaust
                 // (VehicleProfile.ExhaustEmitterBias) — because that is the honest position for a
                 // machine being heard as one thing.
+                //
+                // And once the two ends are two voices, each is placed as the POINT it is. The extent
+                // above stands in for "a metre nearer the intake is a metre further from the exhaust"
+                // while the machine is one voice; with a voice at each end that geometry is modelled
+                // outright, and widening each of them as well counted the car's length twice: inside
+                // its 3.3 m a hatchback's tailpipe stopped getting louder as you approached, about
+                // 4 dB short at 2 m and 9 dB at 1 m. Beyond the extent the two placements are the same
+                // (Widen holds gain times reference), so the switch between them is seamless.
                 if (_frontVoiced.Contains(snap.Id))
+                {
                     emitterPosition = snap.Transform.Position
                                     + Vector3.Transform(ExhaustSlot(profile), snap.Transform.Rotation);
+                    (gain, reference) = OpenFPS.Common.Loudness.Place(level);
+                    engineVolume = gain * def.SoundEmitter.Volume;
+                    engineMinDistance = reference;
+                    engineExtent = 0f;
+                }
 
                 // ...unless you are SITTING in it. Then there is no distance and no direction to
                 // speak of: the whole machine arrives through the floor and the firewall, a little
