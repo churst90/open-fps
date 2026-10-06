@@ -211,6 +211,68 @@ public static class Loudness
         return (MathF.Min(1f, MathF.Pow(10f, renderedDb / 20f)), reference);
     }
 
+    // ── The law in loudness units (docs/EAR_MODEL.md) ─────────────────────────────────────────
+    //
+    // The law above works on unweighted level. The ear does not: an idling engine is mostly bass the
+    // ear barely hears, and a pure tone is fifteen phon quieter than speech of the same level. So the
+    // law is applied to what a source sounds like: its level is turned into the level of reference
+    // speech that is just as loud (ISO 532-1, from the source's own measured spectrum), the old law
+    // places that, and the result is turned back into the source's own level. Speech is placed exactly
+    // as before; a source as loud as 70 dB of speech plays at its own level at any setting; at 100 %
+    // nothing changes for anything.
+
+    /// <summary>
+    /// Where the law puts a source of this level and this spectrum: gain and reference distance, as
+    /// <see cref="Place(float)"/>. A null timbre, the reference (speech), or the ear model switched off
+    /// is the unweighted law exactly.
+    /// </summary>
+    public static (float Gain, float ReferenceDistance) Place(float sourceLevelDb, Hearing.Timbre? timbre)
+    {
+        if (timbre == null || timbre.IsReference || !Hearing.EarModel.Enabled) return Place(sourceLevelDb);
+        return timbre.Placed(sourceLevelDb, DynamicRangeCompression, PlaceHeard);
+    }
+
+    /// <summary>The loudness-unit placement, widened for a source with a size (see <see cref="Place(float, float)"/>).</summary>
+    public static (float Gain, float ReferenceDistance) Place(float sourceLevelDb, Hearing.Timbre? timbre, float extentMetres)
+        => Widen(Place(sourceLevelDb, timbre), extentMetres);
+
+    /// <summary><see cref="PlacedDb(float)"/> for a source of this spectrum.</summary>
+    public static float PlacedDb(float sourceLevelDb, Hearing.Timbre? timbre)
+    {
+        var (gain, reference) = Place(sourceLevelDb, timbre);
+        return 20f * MathF.Log10(MathF.Max(1e-9f, gain * reference));
+    }
+
+    /// <summary>
+    /// How much more (or less) the law in loudness units gives a source than the unweighted law, dB.
+    /// Beyond the reference distance it is the same at every distance, so a voice placed by the
+    /// unweighted law is put right by this one gain.
+    /// </summary>
+    public static float TimbreCorrectionDb(float sourceLevelDb, Hearing.Timbre? timbre)
+        => timbre == null || timbre.IsReference || !Hearing.EarModel.Enabled ? 0f
+         : PlacedDb(sourceLevelDb, timbre) - PlacedDb(sourceLevelDb);
+
+    private static (float Gain, float ReferenceDistance) PlaceHeard(float sourceLevelDb, Hearing.Timbre timbre, float compression)
+    {
+        float ceiling = PivotDb - PivotRenderedDb / compression;           // the reference sound's ceiling
+        float fullScale = PivotDb - PivotRenderedDb;                       // nominal playback of 0 dB rendered
+        // Where this sound is as loud as the ceiling's worth of speech: the level that reaches full scale.
+        float ceilingHere = timbre.LevelForSpeechEquivalent(ceiling);
+        float ideal = MathF.Pow(10f, (sourceLevelDb - ceilingHere) / 20f);
+        float reference = Math.Clamp(ideal, MinReferenceDistance, MaxReferenceDistance);
+        float atReference = sourceLevelDb - 20f * MathF.Log10(MathF.Max(0.01f, reference));
+        float speech = timbre.SpeechEquivalent(atReference);
+        float speechPlayed = fullScale + (speech - ceiling) * compression;
+        float played = timbre.LevelForSpeechEquivalent(speechPlayed);
+        float renderedDb = played - fullScale;
+        // Not held to 1, as the unweighted law's gain is. There the gain reaches 1 exactly where the
+        // source reaches the ceiling and never passes it; here a sound the ear hears less of per
+        // decibel (an idling engine, a pure tone) needs more level than speech to be as loud, and at
+        // the ceiling that is more than the reference sound's full scale. Holding it would flatten
+        // every such source above the pivot to one level.
+        return (MathF.Pow(10f, renderedDb / 20f), reference);
+    }
+
     /// <summary>
     /// The same placement, for a source that is not a point.
     ///
