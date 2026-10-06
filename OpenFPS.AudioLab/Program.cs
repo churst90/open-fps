@@ -508,6 +508,13 @@ if (args.Contains("--nature"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.NatureSpike.Run(args));
 }
 
+if (args.Contains("--waves"))
+{
+    // --waves [levels|sea|render out=DIR|game out=DIR set=] [preset ...] [sec= wind= fetch= parts=]:
+    // lake shores, surf, shingle, a harbour wall, a river bank and a boat's hull from their models.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WavesSpike.Run(args));
+}
+
 if (args.Contains("--running-water"))
 {
     // --running-water [levels|runoff|render out=DIR|game out=DIR set=] [preset ...] [sec= rain= flow=]:

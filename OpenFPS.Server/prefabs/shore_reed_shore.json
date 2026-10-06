@@ -1,0 +1,21 @@
+{
+  "Id": "shore_reed_shore",
+  "Name": "Reedy edge",
+  "Description": "Waves lapping through a belt of reeds onto a pond's muddy edge (ShoreSpec.ReedShore, ShoreSynth): the stems take most of the waves before they arrive. Its box is the stretch of edge it stands for: X its length along the edge, Z the fetch, how far the water reaches straight out from it; turn the entity so its +Z faces the water. Silent in a calm. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 1,
+    "Y": 0.2,
+    "Z": 1
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "shore:reed_shore",
+  "Volume": 1.0,
+  "Range": 120,
+  "MinDistance": 1,
+  "Mode": "LoopOne"
+}

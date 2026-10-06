@@ -1,0 +1,21 @@
+{
+  "Id": "shore_pond_bank",
+  "Name": "Pond bank",
+  "Description": "Small waves lapping a pond's grassed, muddy bank (ShoreSpec.PondBank, ShoreSynth): the wind raises them over the water in front of it, so the bank the wind blows onto laps and the lee bank is still. Its box is the stretch of edge it stands for: X its length along the edge, Z the fetch, how far the water reaches straight out from it; turn the entity so its +Z faces the water. Silent in a calm. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 1,
+    "Y": 0.2,
+    "Z": 1
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "shore:pond_bank",
+  "Volume": 1.0,
+  "Range": 120,
+  "MinDistance": 1,
+  "Mode": "LoopOne"
+}

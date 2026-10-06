@@ -58,6 +58,8 @@ public static class ModelLibrary
         public const string Foliage = "foliage";
         /// <summary>Water that runs: a creek, a gutter, a drain, a downpipe, an overflow.</summary>
         public const string Flow = "flow";
+        /// <summary>Waves at an edge: a beach, a rocky shore, a harbour wall, a river bank, a boat's side.</summary>
+        public const string Shore = "shore";
     }
 
     private sealed class ModelFile
@@ -100,6 +102,7 @@ public static class ModelLibrary
         [Kinds.Fire] = FireSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Foliage] = FoliageSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Flow] = RunningWaterSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
+        [Kinds.Shore] = ShoreSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.RailVehicle] = new(StringComparer.OrdinalIgnoreCase)
         {
             ["genesis_p42"] = () => TrainProfile.GenesisP42,
@@ -136,6 +139,7 @@ public static class ModelLibrary
         [Kinds.Fire] = typeof(FireSpec),
         [Kinds.Foliage] = typeof(FoliageSpec),
         [Kinds.Flow] = typeof(RunningWaterSpec),
+        [Kinds.Shore] = typeof(ShoreSpec),
     };
 
     // ── Loading ─────────────────────────────────────────────────────────────────────────────────
@@ -260,6 +264,7 @@ public static class ModelLibrary
     public static FireSpec Fire(string id) => Get<FireSpec>(Kinds.Fire, id);
     public static FoliageSpec Foliage(string id) => Get<FoliageSpec>(Kinds.Foliage, id);
     public static RunningWaterSpec Flow(string id) => Get<RunningWaterSpec>(Kinds.Flow, id);
+    public static ShoreSpec Shore(string id) => Get<ShoreSpec>(Kinds.Shore, id);
 
     // ── Writing ─────────────────────────────────────────────────────────────────────────────────
 

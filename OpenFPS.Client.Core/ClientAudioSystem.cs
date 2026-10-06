@@ -1147,6 +1147,8 @@ public class ClientAudioSystem
                 h = OpenFPS.Common.FoliageSpec.ByName(soundId[8..]).PeakHeadroomDb;
             else if (soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]).PeakHeadroomDb;
+            else if (soundId.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
+                h = OpenFPS.Common.ShoreSpec.ByName(soundId).PeakHeadroomDb;
             else if (soundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.ModelLibrary.Bell(soundId[5..]).PeakHeadroomDb;
         }
@@ -1224,6 +1226,13 @@ public class ClientAudioSystem
             {
                 var flow = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
                 return (flow.SourceLevelDb, flow.ExtentMetres);
+            }
+            // Waves at an edge (ShoreSynth): declared at its reference wind straight onshore; its size is a
+            // stretch of the edge.
+            if (soundId.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
+            {
+                var shore = OpenFPS.Common.ShoreSpec.ByName(soundId);
+                return (shore.SourceLevelDb, shore.ExtentMetres);
             }
             if (soundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
             {
@@ -1381,6 +1390,12 @@ public class ClientAudioSystem
     /// no sound and is given no voice. A creek or a fountain's overflow, with a flow of its own, never is.</summary>
     private static bool Dry(string soundId)
     {
+        // Still water: no wind to raise waves, no swell, no current. It makes no sound.
+        if (soundId.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
+        {
+            try { return OpenFPS.Common.ShoreSpec.ByName(soundId).CalmAt(OpenFPS.Common.WindField.MeanSpeed); }
+            catch (Exception) { return false; }
+        }
         if (!soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return false;
         try
         {
@@ -2573,6 +2588,10 @@ public class ClientAudioSystem
                 // disagree if a model were ever reloaded between the two calls.
                 if (!PhysicalLevel(resolvedSoundId, out float levelDb, out float extent)) return;
                 physicalKey = resolvedSoundId;
+                // A stretch of shore carries its own geometry, its fetch and which way its water lies, in
+                // its box (tools/gen_osm.py): the voice reads it from the key.
+                if (physicalKey.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
+                    physicalKey = OpenFPS.Common.ShoreSpec.KeyFor(physicalKey, def.Collider.Size, snap.Transform.Rotation);
                 // Placed on its own declared level and its own size, the same way a vehicle is.
                 // The extent is what stops a window unit being a point source you can walk into:
                 // inside its own half-metre the level is flat, and the gain is paid down to match so

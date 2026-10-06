@@ -122,6 +122,16 @@ public static class ExtendedSources
                     for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
                     return places;
                 }
+                // Waves at an edge: along it, and on its break line (ShoreSynth.Layout), its length the map's.
+                if (key.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
+                {
+                    ShoreSpec.ParseKey(key, out string preset, out var geometry);
+                    var spec = ShoreSpec.ByName(preset);
+                    if (spec.TotalPlaces <= 1) return null;
+                    var places = ShoreSynth.Layout(spec, geometry?.LengthMetres ?? spec.LengthMetres);
+                    for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
+                    return places;
+                }
                 if (key.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
                 {
                     var spec = FireSpec.ByName(key[5..]);
