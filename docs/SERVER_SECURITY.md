@@ -65,6 +65,7 @@ hold, only for players, and never for somebody whose custom role can do somethin
 | `spawn` (`/spawn walker`, `vehicle`, `train`, `Box`), `set_sound`, `set_audio_mode`, `play_folder`, `start_state`, on any map | no | no | yes | yes |
 | `group`, `ungroup`, `saveas`, `place`, `addseat`, `removeseat`, `drivable`, on any map | no | no | yes | yes |
 | `origin`, `at`, `put`, `undo`, `savemap`, `move` (`/move x y z`, `/move NAME`), on any map | no | no | yes | yes |
+| `weather`: `/weather` says and sets the weather and the wind for the whole server | no | no | yes | yes |
 | `edit-any`: change things other people built | no | no | yes | yes |
 | `grant`, `revoke`: only what you hold, only for players | no | no | yes | yes |
 | `perms-any`: `/perms NAME` | no | no | yes | yes |

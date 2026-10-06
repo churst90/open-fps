@@ -313,6 +313,13 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.SetListenerEnclosure(lowDb, midDb, highDb);
     }
 
+    /// <summary>Where the listener is, for the wind at their ears. Thread-safe: the provider swaps it
+    /// in whole.</summary>
+    public void SetEarWind(OpenFPS.Common.EarWindListener? listener)
+    {
+        if (_isInitialized) _provider.SetEarWind(listener);
+    }
+
     public void UpdateShelter(float shelterFactor)
     {
         lock (_stateLock)
@@ -471,6 +478,11 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// </summary>
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
         => _isInitialized && _provider.RegisterSynthesisedSound(soundId, pcm16Mono, sampleRate);
+    /// <summary>Lets go of a one-off synthesised buffer once it has played (IAudioProvider.ReleaseSynthesisedSound).</summary>
+    public bool ReleaseSynthesisedSound(string soundId) => _isInitialized && _provider.ReleaseSynthesisedSound(soundId);
+    /// <summary>A synthesised buffer kept in float (IAudioProvider.RegisterSynthesisedSoundFloat).</summary>
+    public bool RegisterSynthesisedSoundFloat(string soundId, float[] pcm, int sampleRate)
+        => _isInitialized && _provider.RegisterSynthesisedSoundFloat(soundId, pcm, sampleRate);
     public Vector3 GetSoundPosition(int entityId) => _isInitialized ? _provider.GetSoundPosition(entityId) : Vector3.Zero;
     public float GetPlaybackProgress(int entityId) => _isInitialized ? _provider.GetPlaybackProgress(entityId) : 0f;
     public bool HasCategory(string category) => _isInitialized && _bank.HasCategory(category);

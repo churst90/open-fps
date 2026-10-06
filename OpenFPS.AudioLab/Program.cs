@@ -66,6 +66,7 @@ string[] usage =
     "  --ride [preset] [knobs] out=FILE.wav          the vehicle voice through a stop-go ride at a fixed gain",
     "  --shift-trace [preset] [top=]                 what the game's driver does with the gearbox in town",
     "  --tap-balance                                 each machine's rear voice against its front voice",
+    "  --car-fronts [preset ...] [out= tag= ambient=] the whole voice from in front, behind, and passing at 10 km/h",
     "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
     "  --intake-ir [preset ...] [thr=] [sec=] [out=] the intake tract alone, thumped once",
     "  --wheel-squeal [out=] [axle] [binaural]       each wheel squealing for itself, and four drives",
@@ -80,6 +81,8 @@ string[] usage =
     "  --machine-pass [id] [kmh=] [side=]            a machine driving past, as one voice and as two",
     "  --yard [preset ...] [levels] [pass]           mowers and air conditioners, measured and walked past",
     "  --nature [levels|render out=DIR] [preset ...] water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
+    "  --weather-wind [out=DIR] [sec=] [ears|trees]  the wind at your ears by speed and heading, a 360 turn, and a tree under /weather",
+    "  --thunder [out=DIR] [seed=] [city=x,z] [nowav] thunder at 0.1-15 km, ground and cloud flashes, open field and a city street",
     "  --models [export=DIR]                         the model library's ids, or each as JSON",
     "  --aircraft / --landing / --spool [preset]     flyovers, arrivals, and an engine against its lever",
     "  --train / --crossing / --airbrake / --signals trains, a level crossing, air brakes, horns and bells",
@@ -469,6 +472,19 @@ if (args.Contains("--yard"))
     Environment.Exit(yardCode);
 }
 
+if (args.Contains("--weather-wind"))
+{
+    // --weather-wind [out=DIR] [sec=] [ears|trees]: the weather's wind at the ears and in a tree,
+    // measured against the published figures (WeatherWindSpike).
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WeatherWindSpike.Run(args));
+}
+if (args.Contains("--thunder"))
+{
+    // --thunder [out=DIR] [seed=N] [city=x,z] [nowav]: the lightning channel's thunder at six
+    // distances, measured, and written binaurally at the game's level and normalised.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ThunderSpike.Run(args));
+}
+
 if (args.Contains("--nature"))
 {
     // --nature [levels|render out=DIR|compare=FILE.wav] [preset ...] [sec= wind=]: water, fire and
@@ -534,6 +550,11 @@ if (args.Contains("--scope-sounds"))
 if (args.Contains("--reload-sounds"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.ReloadSpecSpike.Render(args));
+}
+
+if (args.Contains("--car-fronts"))
+{
+    Environment.Exit(OpenFPS.Client.AudioEngine.Fmod.CarFrontSpike.Run(args));
 }
 
 if (args.Contains("--tap-balance"))

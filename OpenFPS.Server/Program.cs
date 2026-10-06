@@ -26,6 +26,11 @@ public class GameServer
     private readonly NetworkService _network = new();
     private SessionManager _sessions = new();
     private readonly WorldEnvironmentSystem _environment = new();
+
+    /// <summary>The weather: time, season, sky and wind, for every map (/weather sets it).</summary>
+    public WorldEnvironmentSystem WorldEnvironment => _environment;
+    /// <summary>When and where the storm flashes. The thunder is each client's own (see EmitStrike).</summary>
+    private readonly LightningSystem _lightning = new();
     private MapRepository _mapRepo = null!;
     private MapManager _maps = null!;
     private readonly IUserRepository _userRepo;
@@ -276,6 +281,42 @@ public class GameServer
             if (session.IsTextClient && label.StartsWith("speech: ", StringComparison.Ordinal)
                 && apart > Speech.MadeOutMetres) continue;
             SendToSession(session, message);
+        }
+    }
+
+    /// <summary>
+    /// A lightning flash, told to everyone on every map, wherever they are on it.
+    ///
+    /// Not through <see cref="EmitWorldAudio"/>: its earshot is the map's broadcast radius, a few
+    /// hundred metres to three kilometres, and thunder is heard from twenty. The storm is drawn round
+    /// each map's centre, so every map has the same storm in its own frame. Each client works out
+    /// the thunder for where its listener stands (Thunder.Render); a text player has nothing to render
+    /// it with and is not sent it.
+    /// </summary>
+    private void EmitStrike(LightningStrike strike)
+    {
+        foreach (var entry in _maps.GetAllMaps())
+        {
+            var data = entry.Value.data;
+            var world = entry.Value.world;
+            var centre = (data.MinBound + data.MaxBound) * 0.5f;
+            var placed = strike.Offset(new Vector3(centre.X, 0f, centre.Z));
+            WorldAudioEvent? message = null;
+            foreach (var session in _sessions.GetSessionsInMap(entry.Key))
+            {
+                if (session.IsTextClient || session.Entity == Entity.Null || !world.IsAlive(session.Entity)) continue;
+                var at = world.Get<Transform>(session.Entity).Position;
+                var flat = new Vector2(at.X - placed.Centre.X, at.Z - placed.Centre.Z);
+                if (flat.Length() > LightningPhysics.SendRangeMetres) continue;
+                message ??= new WorldAudioEvent
+                {
+                    SourceEntityId = -1,
+                    Label = placed.Kind == FlashKind.CloudToGround ? "lightning" : "lightning in the cloud",
+                    Sounds = new List<TransientSound> { LightningSystem.SoundFor(placed) },
+                    Seed = _audioEventSeed++,
+                };
+                SendToSession(session, message);
+            }
         }
     }
 
@@ -729,6 +770,7 @@ public class GameServer
             // 2. Update Environment
             float dt = FixedDeltaTime;
             _environment.Update(dt);
+            _lightning.Update(dt, _environment.CurrentScenario, _environment.GetCurrentState(), EmitStrike);
 
             foreach (var entry in _maps.GetAllMaps())
             {
@@ -1873,9 +1915,12 @@ public class GameServer
     /// and the client's `distance / max(0.1, multiplier)` guard silently multiplied the absorption
     /// distance by ten, switching air absorption off for the whole game.
     /// </summary>
-    private void BroadcastEnvironment()
+    public void BroadcastEnvironment()
     {
         var perMap = new Dictionary<string, WorldStateUpdate>();
+        // One moment for every map: the wind's eddies are the server's, not a map's.
+        double clock = WindField.Now();
+        var travel = _environment.WindTravel;
 
         foreach (var session in _sessions.GetAllSessions())
         {
@@ -1893,7 +1938,8 @@ public class GameServer
                     Temperature = state.Temperature, Humidity = state.Humidity,
                     AirPressure = state.AirPressure, AirAbsorptionMultiplier = state.AirAbsorptionMultiplier,
                     WindVelocity = state.WindVelocity,
-                    WindGustiness = state.WindGustiness, PrecipitationIntensity = state.PrecipitationIntensity
+                    WindGustiness = state.WindGustiness, PrecipitationIntensity = state.PrecipitationIntensity,
+                    WindClock = clock, WindTravelEast = travel.East, WindTravelNorth = travel.North,
                 };
                 perMap[session.CurrentMapId] = update;
             }

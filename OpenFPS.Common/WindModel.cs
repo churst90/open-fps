@@ -15,6 +15,9 @@ namespace OpenFPS.Common;
 /// The synthesis is deterministic in the clock it is handed: same seconds in, same factor out. That
 /// is what makes it testable, and it means two clients standing together hear the same weather as
 /// long as their clocks agree (they do not have to: a gust is not a game-state fact).
+///
+/// Only the server's bullets use this now (CombatService). Everything that is heard — the trees, the
+/// fire, the wind at the ears — reads <see cref="WindField"/>, which the server's weather drives.
 /// </summary>
 public static class WindModel
 {

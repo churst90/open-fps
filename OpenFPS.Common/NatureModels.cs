@@ -27,9 +27,19 @@ public sealed record WaterFallSpec
     public required float FallMetres { get; init; }
     /// <summary>The share of the flow that arrives as separate drops; the rest arrives coherent.</summary>
     public float DropShare { get; init; } = 1f;
-    /// <summary>The mean radius of the drops, mm. The radii spread exponentially about it, as a sheet
-    /// or a jet breaking up gives (Marshall and Palmer's raindrops are the same law).</summary>
+    /// <summary>The mean radius of the drops over the smallest (0.2 mm), mm. How they spread about it
+    /// is <see cref="DropSizeOrder"/>.</summary>
     public float MeanDropRadiusMm { get; init; } = 1.2f;
+    /// <summary>The order n of the gamma law the drop sizes follow. A jet or a sheet breaks up through
+    /// ligaments, and the drops one ligament makes follow a gamma law whose order is set by how
+    /// corrugated the ligament is: about 4 for the ligaments off a jet or sheet torn up in air,
+    /// higher for smooth ones (Villermaux, Marmottant and Duplat 2004, Phys. Rev. Lett. 92, 074501;
+    /// Villermaux 2007, Annu. Rev. Fluid Mech. 39). The exponential, order 1, is what RAIN looks
+    /// like: the overlap of many breakups of many sizes (Villermaux and Bossa 2009, Nature Physics
+    /// 5), not one fountain's. The exponential's long tail of big drops, each a click carrying its
+    /// r³ of energy, was part of the grain in the fountain's hiss: order 4 takes the 8-16 kHz
+    /// kurtosis over 10 ms windows from 3.76 to 3.52 (recorded fountains 3.45-3.75).</summary>
+    public int DropSizeOrder { get; init; } = 4;
     /// <summary>The largest drop, mm. Above about 4 mm a falling drop breaks up in the air.</summary>
     public float MaxDropRadiusMm { get; init; } = 4f;
     /// <summary>The size the coherent water arrives in, mm: the lumps a collapsing column or a
@@ -39,6 +49,11 @@ public sealed record WaterFallSpec
     /// second of wind over two. Small drops falling far go first. Zero for a fall under a canopy or
     /// into a deep basin.</summary>
     public float DriftPerMetrePerSecond { get; init; } = 0.03f;
+    /// <summary>How many separate jets or strands this fall stands for. Each one necks and bursts
+    /// in its own time, so the bunching of its drops and the wandering of where it breaks up are
+    /// independent from one to the next, and the more of them there are the steadier their sum: the
+    /// fluctuation of the whole goes down as one over the square root of the count.</summary>
+    public int Streams { get; init; } = 1;
 
     /// <summary>A vertical jet from a nozzle, worked out from the nozzle and how high the water
     /// goes: the exit speed is what lifts it there, √(2 g h), and the flow is that speed through the
@@ -100,15 +115,23 @@ public sealed record WaterFeatureSpec
                 FlowLitresPerSecond = 0.86f, FallMetres = 1.1f,
                 DropShare = 0.8f, MeanDropRadiusMm = 1.8f, ChunkRadiusMm = 3f,
                 DriftPerMetrePerSecond = 0.01f,
+                // A thin sheet falling off a rim fingers into strands about 2π√3 capillary lengths
+                // apart (the Rayleigh-Taylor wavelength of a liquid rim; water's capillary length is
+                // 2.7 mm, so about 3 cm): 7.5 m of lip is some 250 strands.
+                Streams = 250,
             },
             WaterFallSpec.Jet("rim jets", 8f, 0.9f, 0.15f, dropShare: 0.35f, meanDropRadiusMm: 1.2f, chunkRadiusMm: 4f) with
             {
                 // Eight of them.
                 FlowLitresPerSecond = 8f * WaterFallSpec.Jet("", 8f, 0.9f, 0.15f).FlowLitresPerSecond,
+                Streams = 8,
             },
         },
         // MEASURED with `--nature levels water`, 2026-10-04: Leq 71.9 dB, 71.4 dB(A), at a metre with
-        // the field's mean wind; its 10 ms peaks' 99.9th percentile 21.2 dB over that.
+        // the field's mean wind; its 10 ms peaks' 99.9th percentile 21.2 dB over that. Re-measured
+        // 2026-10-05 after the grain was taken out (every impact rendered, lumps cushioned): Leq
+        // 72.3 dB, 72.3 dB(A), peaks 19.1 dB over, so the 22 dB of room is now to spare. Round 3
+        // (gamma drop sizes, lumps cushioned to 0.07 r/v): 71.9 dB, 71.8 dB(A), peaks 17.0 dB over.
         SourceLevelDb = 72f,
         PeakHeadroomDb = 22f,
         ExtentMetres = 3f,
@@ -234,6 +257,12 @@ public sealed record FoliageSpec
     /// <summary>How fast the main branches swing, Hz. A big tree's crown sways at 0.3-0.6 Hz and
     /// its outer branches at a few hertz.</summary>
     public float SwayHz { get; init; } = 0.5f;
+    /// <summary>Vogel's exponent V: the crown's leaves and twigs fold and streamline as the wind
+    /// rises, so its drag goes as U^(2+V) rather than U². Measured from about −0.5 to −1.2 for
+    /// broad leaves and their clusters (Vogel 1989, J. Exp. Bot. 40) and in the same range for
+    /// whole plants (de Langre 2008, Annu. Rev. Fluid Mech. 40). It sets how fast the sound grows
+    /// with the wind: the shedding's power goes as U^(5+2V).</summary>
+    public float VogelExponent { get; init; } = -0.7f;
     /// <summary>Level at one metre from the crown with the wind at the field's mean, dB. MEASURED.</summary>
     public required float SourceLevelDb { get; init; }
     /// <summary>How far its loudest moments stand over <see cref="SourceLevelDb"/>, dB: the room its
@@ -255,9 +284,19 @@ public sealed record FoliageSpec
         ShedDiameterMm = 5f,
         StillSpeed = 1f,
         SwayHz = 0.45f,
+        // Big soft leaves on long stalks fold further than a stiff leaf does: the strong end of
+        // Vogel's range. At −0.7 (taken before for every tree) the crown grew 10.8 dB from 3 to
+        // 6 m/s, Fégeant's birch, and the gusts in an ordinary breeze swung it 4.4 dB (the standard
+        // deviation of its 400 ms level within a minute, over ten minutes) against 1.3-4.2 dB in
+        // recordings of leaves in wind; Cody heard the swings as too obvious. At −0.9 it grows 9.5 dB
+        // (32 dB a decade, between Fégeant's oak at 30 and birch at 36) and swings 4.0 dB.
+        VogelExponent = -0.9f,
         // MEASURED with `--nature levels park_tree sec=600`, 2026-10-04: over ten minutes of the field
         // (4.1 m/s mean at the crown) Leq 48.2 dB, 46.7 dB(A); the gustiest second 7.5 dB over that. A
-        // minute is not enough to measure it by — a minute of gusts read 2.3 dB high.
+        // minute is not enough to measure it by — a minute of gusts read 2.3 dB high. Re-measured
+        // 2026-10-05 with the boughs reading the wind across the crown and the field's turbulence at
+        // 0.25: Leq 47.9 dB, 46.3 dB(A), the gustiest second 6.6 dB over. Round 3 (Vogel −0.9, strikes
+        // by contact angle): 47.8 dB, 46.2 dB(A), the gustiest second 6.7 dB over.
         SourceLevelDb = 48f,
         PeakHeadroomDb = 20f,
         ExtentMetres = 4f,
@@ -275,7 +314,8 @@ public sealed record FoliageSpec
         ShedDiameterMm = 1.5f,
         StillSpeed = 0.5f,
         SwayHz = 0.35f,
-        // MEASURED with `--nature levels pine sec=600`, 2026-10-04: Leq 44.8 dB over ten minutes.
+        // MEASURED with `--nature levels pine sec=600`, 2026-10-04: Leq 44.8 dB over ten minutes;
+        // 44.4 dB on 2026-10-05 with the field's turbulence at 0.25.
         SourceLevelDb = 45f,
         PeakHeadroomDb = 20f,
         ExtentMetres = 3f,

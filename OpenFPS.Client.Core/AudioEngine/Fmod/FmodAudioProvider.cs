@@ -81,6 +81,42 @@ internal class FmodResourceManager : IDisposable
     /// registered here is heard through a wall exactly as a recorded one would be, with none of those
     /// paths knowing that nobody recorded it.
     /// </summary>
+    /// <summary>Releases a registered synthesised buffer. Stops anything still playing it.</summary>
+    public bool ReleasePcm(string soundId)
+    {
+        if (string.IsNullOrEmpty(soundId) || !_cache.TryGetValue(soundId, out var sound)) return false;
+        _cache.Remove(soundId);
+        sound.release();
+        return true;
+    }
+
+    /// <summary>The same, from 32-bit float samples: kept as float, so a quiet tail is not cut to the last bit.</summary>
+    public bool RegisterPcmFloat(string soundId, float[] pcm, int sampleRate)
+    {
+        if (string.IsNullOrEmpty(soundId) || pcm.Length == 0) return false;
+        if (_cache.ContainsKey(soundId)) return true;
+        var bytes = new byte[pcm.Length * 4];
+        Buffer.BlockCopy(pcm, 0, bytes, 0, bytes.Length);
+        var info = new CREATESOUNDEXINFO
+        {
+            cbsize = System.Runtime.InteropServices.Marshal.SizeOf<CREATESOUNDEXINFO>(),
+            length = (uint)bytes.Length,
+            numchannels = 1,
+            defaultfrequency = sampleRate,
+            format = SOUND_FORMAT.PCMFLOAT,
+        };
+        RESULT res = _system.createSound(bytes,
+            MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | Rolloff.Mode | MODE.LOOP_OFF,
+            ref info, out FMOD.Sound sound);
+        if (res != RESULT.OK)
+        {
+            Log.Warning("FmodResourceManager: could not register float sound {Id}: {Result}", soundId, res);
+            return false;
+        }
+        _cache[soundId] = sound;
+        return true;
+    }
+
     public bool RegisterPcm(string soundId, byte[] pcm16Mono, int sampleRate)
     {
         if (string.IsNullOrEmpty(soundId) || pcm16Mono.Length == 0) return false;
@@ -641,6 +677,13 @@ public class FmodAudioProvider : IAudioProvider
     private FMOD.DSP _masterLimiter;
     private FMOD.DSP _loudnessMeter;
     private MasterTap? _masterTap;
+
+    // The wind at the listener's ears (EarWindVoice). One generator, flat on the master, for the
+    // provider's life; silent while nobody is in a world.
+    private EarWindState? _earWind;
+    private FMOD.DSP _earWindDsp;
+    private FMOD.Channel _earWindChannel;
+    private System.Runtime.InteropServices.GCHandle _earWindHandle;
     private EngineRenderPool? _enginePool;
     private readonly List<IRenderedVoice> _engineSnapshot = new();
 
@@ -1022,6 +1065,8 @@ public class FmodAudioProvider : IAudioProvider
                 else Log.Warning("Could not attach the capture tap; playback is unaffected.");
             }
 
+            StartEarWind();
+
             TryInitSteamAudio();
 
             // Engines render ahead, off the mixer thread. See EngineRenderPool.
@@ -1032,6 +1077,46 @@ public class FmodAudioProvider : IAudioProvider
         }
         catch (Exception ex) { Log.Error(ex, "Failed to initialize FMOD"); return false; }
     }
+
+    /// <summary>
+    /// Starts the wind at the ears: a generator played 2D on the master, so it gets no reverb send and
+    /// no binaural placement, the way the ambience beds play their finished stereo. It is part of the
+    /// listener, not a sound in the world. OPENFPS_EAR_WIND=0 leaves it silent.
+    /// </summary>
+    private void StartEarWind()
+    {
+        _system.getSoftwareFormat(out int rate, out _, out _);
+        var state = new EarWindState(rate > 0 ? rate : 44100);
+        if (Environment.GetEnvironmentVariable("OPENFPS_EAR_WIND") == "0")
+        {
+            state.Enabled = false;
+            Log.Information("Ear wind: OFF (OPENFPS_EAR_WIND=0).");
+        }
+        if (EarWindProcessor.CreateDSP(_system, state, out var dsp, out var handle) != RESULT.OK)
+        {
+            Log.Warning("Ear wind: the DSP could not be created; there will be no wind at the ears.");
+            return;
+        }
+        if (_system.playDSP(dsp, default, false, out var channel) != RESULT.OK)
+        {
+            dsp.release();
+            if (handle.IsAllocated) handle.Free();
+            Log.Warning("Ear wind: FMOD would not play the DSP; there will be no wind at the ears.");
+            return;
+        }
+        channel.setMode(MODE._2D);
+        _earWind = state;
+        _earWindDsp = dsp;
+        _earWindChannel = channel;
+        _earWindHandle = handle;
+    }
+
+    /// <summary>Where the listener is, for the wind at their ears; null when nobody is in a world.</summary>
+    public void SetEarWind(OpenFPS.Common.EarWindListener? listener) => _earWind?.SetListener(listener);
+
+    /// <summary>Diagnostics: what the ears were last placed at, dBFS, and what the wind is there.</summary>
+    public (float LeftDbfs, float RightDbfs, OpenFPS.Common.EarWindAtEars Ears) EarWindLevels
+        => _earWind is { } w ? (w.Synth.RenderedLeftDb, w.Synth.RenderedRightDb, w.Synth.Last) : (-150f, -150f, default);
 
     // --- Steam Audio (phonon) HRTF binaural spatialization. Falls back to FMOD panning if unavailable. ---
 
@@ -1269,6 +1354,7 @@ public class FmodAudioProvider : IAudioProvider
     {
         _speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSoundAt(celsius);
         OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentSpeedOfSound = _speedOfSound;
+        OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius = celsius;
     }
 
     /// <summary>The wet level of the bus for the room the listener is in, dB, moved toward its target
@@ -4809,6 +4895,12 @@ public class FmodAudioProvider : IAudioProvider
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
         => _isInitialized && _resources.RegisterPcm(soundId, pcm16Mono, sampleRate);
 
+    public bool ReleaseSynthesisedSound(string soundId)
+        => _isInitialized && _resources.ReleasePcm(soundId);
+
+    public bool RegisterSynthesisedSoundFloat(string soundId, float[] pcm, int sampleRate)
+        => _isInitialized && _resources.RegisterPcmFloat(soundId, pcm, sampleRate);
+
     /// <summary>Interface sounds, made once and kept. Releasing an FMOD sound stops every channel
     /// playing it, so a sound created, played and released at once is cut off almost before it
     /// starts. These are never released until shutdown.</summary>
@@ -5217,6 +5309,8 @@ public class FmodAudioProvider : IAudioProvider
             ReturnReverbVoices();
             ReleaseReverbUnits();
             foreach (var id in new List<string>(_ambientBeds.Keys)) StopAmbientBed(id);
+            if (_earWindChannel.hasHandle()) _earWindChannel.stop();
+            if (_earWindDsp.hasHandle()) _earWindDsp.release();
             // The three units on the MASTER GROUP come off it before they are freed, for the same
             // reason the reverb units do: FMOD refuses to release an attached unit, so releasing
             // them where they stood freed none of them and left the assertion at close.
@@ -5245,6 +5339,7 @@ public class FmodAudioProvider : IAudioProvider
         _resources?.Dispose();
         _granularBank?.Dispose();
         if (_isInitialized) _system.close();   // FMOD requires close() before release()
+        if (_earWindHandle.IsAllocated) _earWindHandle.Free();
 
         if (_steamAudioEnabled)
         {

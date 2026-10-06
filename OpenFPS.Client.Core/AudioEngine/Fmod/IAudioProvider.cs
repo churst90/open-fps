@@ -21,6 +21,9 @@ public interface IAudioProvider : IDisposable
     /// <summary>What the body of the vehicle the listener is sitting in takes off everything outside
     /// it, dB per band (negative). Zero when on foot.</summary>
     void SetListenerEnclosure(float lowDb, float midDb, float highDb) { }
+    /// <summary>Where the listener is, for the wind at their ears (EarWind); null when nobody is in a
+    /// world.</summary>
+    void SetEarWind(OpenFPS.Common.EarWindListener? listener) { }
     /// <summary>Describes the surfaces immediately around the listener's head — one probe per
     /// direction, in HEAD space — so the mixer can render each as its own early reflection.</summary>
     void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes);
@@ -135,6 +138,32 @@ public interface IAudioProvider : IDisposable
     /// same path that handles a recording, and none of that path needs to know nobody recorded it.
     /// </summary>
     bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate);
+
+    /// <summary>
+    /// Lets go of a buffer registered by <see cref="RegisterSynthesisedSound"/>, once nothing is
+    /// playing it: releasing a sound stops every channel still playing it. For one-off renders that
+    /// will never be asked for again (a strike's thunder, worked out for one listener), which would
+    /// otherwise stay in memory for the rest of the session. False if there was nothing to release.
+    /// </summary>
+    bool ReleaseSynthesisedSound(string soundId) => false;
+
+    /// <summary>
+    /// The same as <see cref="RegisterSynthesisedSound"/>, kept in 32-bit float. For a long render with
+    /// a wide range in it (a strike's thunder: a crack and then a minute of rumble 40-60 dB under it),
+    /// whose quiet end sixteen bits would leave as a few steps of the last bit: heard as crackle and
+    /// as stretches of exact silence. Falls back to sixteen bits where a provider has no float path.
+    /// </summary>
+    bool RegisterSynthesisedSoundFloat(string soundId, float[] pcm, int sampleRate)
+    {
+        var bytes = new byte[pcm.Length * 2];
+        for (int i = 0; i < pcm.Length; i++)
+        {
+            short v = (short)Math.Clamp(pcm[i] * 32767f, short.MinValue, short.MaxValue);
+            bytes[i * 2] = (byte)(v & 0xFF);
+            bytes[i * 2 + 1] = (byte)((v >> 8) & 0xFF);
+        }
+        return RegisterSynthesisedSound(soundId, bytes, sampleRate);
+    }
 
     /// <summary>Plays a short interface sound in both ears, not in the world: no position, no room.
     /// The buffer is made once per id and kept; <paramref name="volume"/> is 0..1.</summary>

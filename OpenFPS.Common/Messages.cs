@@ -655,4 +655,12 @@ public partial class WorldStateUpdate : IMessage
     public Vector3 WindVelocity; // m/s
     public float WindGustiness; // 0.0 - 1.0
     public float PrecipitationIntensity; // 0.0 - 1.0
+    // APPEND ONLY BELOW THIS LINE: members are serialised by position.
+    /// <summary>The server's wind clock (WindField.Now) when this was sent, and how far the air had
+    /// carried the wind's eddy pattern by then, metres east and north. With them every client displaces
+    /// the same gusts by the same amount, so a gust reaches the same tree at the same moment for
+    /// everybody. Zero clock: a server from before it existed.</summary>
+    public double WindClock;
+    public double WindTravelEast;
+    public double WindTravelNorth;
 }

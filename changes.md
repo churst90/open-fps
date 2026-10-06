@@ -4,6 +4,93 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- The front of a car is no longer silent. The engine's own noise (valve ticking, diesel clatter, the
+  belt, the turbo, the intake) leaves only through the engine bay, and every car let out a flat 0.15
+  of it, so an idling hatchback was louder behind than in front. The bay is now its openings (grille,
+  open floor) against its lining: 0.63 for a modern car, 0.89 for a classic with no undertray or
+  liner, 0.66 for a pickup, 0.87 for a step van; trucks, buses and bikes are as they were. The sound
+  leaves by the grille and from under the car, so it is heard straight from in front and less from
+  behind. Checked against NHTSA's quiet-car measurements (FMVSS 141 final rule, 2016): idling cars
+  6 to 10 dB quieter behind than in front, 56.6 to 59.9 dB(A) passing at 10 km/h. The hatchback now
+  measures +6.4 dB and 57.4 dB(A) (it was -2.2 and 52.5). The exhaust is unchanged.
+- Road cars have electric radiator fans. They run at low speed when the air conditioning is on and
+  the car is under about 30 km/h (each driver turns it on somewhere between 20 and 28 C, from the
+  server's weather), and on the coolant at 95 C (low) and 102 C (high).
+- The diesel pickup, the 7.3 Power Stroke, the step van and the straight-six saloon are 2 to 5 dB
+  louder at full throttle with their bays opened, and their declared levels were re-measured. The
+  city vehicle voice table was updated for the pickup, step van and mail truck, which moved at a
+  50 km/h cruise; the cars, trucks, bus and bikes did not.
+- AudioLab `--car-fronts` renders a car idling from in front and behind and passing at 10 km/h, at
+  the level the game plays it or in pascals; `tailpipe` and `fan` measure those alone. Renders in
+  inbox/car-fronts-2026-10-05.
+- Thunder no longer crackles and breaks up (round 2, unheard). The rumble had been a train of
+  separate shock waves with exact silence between them (up to 386 holes in a cloud flash). Now the
+  air is turbulent: from the server's wind and gustiness, each arrival loses its top to scattering,
+  and what it loses comes in behind it as a tail, longer the further it came (a fraction of a
+  millisecond at 100 m, a tenth of a second at 8 km), so the gaps fill with rumble while a close
+  crack stays a crack. The channel's bends below 8 m are now followed at every distance, not only
+  within 3 km. The game keeps thunder in 32-bit float (its quiet end was being cut to the last bit
+  of sixteen) and never renders it below 24 kHz. Measured against five recordings of real thunder
+  (tools/thunder_texture.py): no holes in any render, and from 3 km out the texture is within the
+  recordings' range; strikes within a kilometre are still a little rougher above 500 Hz. Levels,
+  lengths and pitch are as before. Renders in inbox/thunder-round2-2026-10-05.
+- The fountain and the trees are smoother again (round 3). The grain left in the fountain was
+  still the falling lumps of water: they now land over a longer moment, so their sound sits lower,
+  under the hiss, as a little more low splash. Its drops now come in the sizes a breaking jet makes,
+  without the long tail of large drops that rain has. Measured against the recorded fountains, the
+  hiss is now as smooth as theirs, and the loudness is unchanged. In the trees, how hard two leaves
+  hit now depends on the angle they meet at. Before, it was a made-up spread whose loudest hits were
+  twenty times the faintest and stood out as scratches. A park tree's leaves also fold away from the
+  wind a little more, as large soft leaves do. Its rustle grows more slowly with the wind: the gusts
+  swell less, and in strong wind the tree is about 2 dB quieter than before. Pairs are in
+  inbox/nature-round3-2026-10-05.
+- Thunder and lightning (unheard). In a Storm the server runs a thunderstorm cell that forms upwind
+  of the map and drifts across or past it with the wind, flashing about twice a minute on average
+  (four at its peak), a quarter of the flashes to the ground, about four strokes each; heavy Rain
+  flashes now and then (about once in half an hour at the server's 0.6). Most strikes are kilometres
+  away; a strike within a kilometre of the map's centre comes about once in ten hours of storm. Each
+  flash is sent to every player on every map, wherever they are on it, as one event whose seed and
+  numbers rebuild the same channel on every client (OpenFPS.Common/Lightning.cs,
+  OpenFPS.Server/Systems/LightningSystem.cs). The client works out the thunder for where you stand
+  (OpenFPS.Client.Core/AudioEngine/Core/Thunder.cs): the channel is a tortuous walk of 8 m steps
+  (Hill's 16 degrees), every bit of it sends an N-wave at once, and each arrives after its own
+  distance over the speed of sound, so the nearest part is the crack and the rest is the rumble. The
+  air takes the top off with distance, the ground under you adds a second arrival, and refraction
+  lifts thunder from high and far over your head (it fades out past about 15-25 km). It plays in up
+  to three parts, one per direction it comes from, through the same walls, edges and facades as any
+  other sound. `--thunder` in the AudioLab measures it; renders are in inbox/thunder-2026-10-05.
+  There is no cue for the flash itself.
+- The weather's wind makes sound. You hear it at your ears: a low, buffeting rush, louder in the ear
+  on the far side of the wind and quieter in the ear it blows straight into, so turning your head
+  tells you where it comes from. Facing into it, both ears are the same; with your back to it, both
+  a little louder. It is the air moving past your head, so walking into the wind makes it stronger
+  and walking with it makes it weaker. Indoors there is none at all, and a walled yard or a street
+  between tall buildings takes some of it off. A closed vehicle has none, a car with its windows
+  down some, and a motorcycle rider a helmet's worth. It gets no reverb and is not placed anywhere:
+  it is in your ears. Walking or running in still air outdoors makes only a faint low rush: the game's
+  walk (4.5 metres a second, a jog) is heard as a real walk's 1.4. The levels are what reaches the
+  eardrum, which is 14 to 19 dB less than the published wind-tunnel microphone figures.
+- The trees, the fire and the fountain now move with the server's weather instead of a fixed
+  breeze, and every player hears the same gust reach the same tree at the same moment.
+- `/weather` (developers and the administrator) says the weather and the wind. `/weather storm`
+  (or clear, rain, snow) and `/weather wind 8 north west gusty` set it for everybody; it arrives in
+  a few seconds and holds until `/weather auto`. Try `/weather wind 10 north` in Elm Park
+  (`/tp -375 195 0.2`) and turn slowly: the wind moves between your ears, and the trees around you
+  roar with the gusts. `/weather wind 0` is still air. Client and server must both be this build:
+  the weather message has three new fields.
+- The park fountain and the wind in the trees are smoother; their tone and loudness are unchanged.
+  The fountain's static came from three things. Only twelve drop impacts were rendered per 3 ms
+  block, each standing in for several drops. The falling lumps of water struck as sharply as
+  single drops, and each lump carried a hundred times a drop's energy. The bunching of the drops
+  stepped the level up and down tens of times a second. Now every impact is rendered, a lump lands
+  softly in the foam left by the one before it, and the bunching glides. It is also averaged over
+  the eight rim jets and the strands falling off the bowl's lip, since each one bunches on its own.
+  For the tree, an eddy hitting a twig was 400 leaf strikes, about ten times what a twig's sixteen
+  leaves can make. It is now about 35, so the rustle comes as many small patches instead of a few
+  loud ones. Each bough reads the wind where it is in the crown, so a gust takes a second or two to
+  cross the tree instead of arriving everywhere at once. The wind field's gustiness goes from 0.3
+  to 0.25, the value the surface-layer law gives at a tree's height over this ground. Before and
+  after pairs are in inbox/nature-round2-2026-10-05.
 - After moving to another map, many sounds played the same in both ears: the fountain stayed in
   front of you however you turned, and about half the speedway's cars had no direction. Each room's
   reverb borrows a binaural stage from the same pool as everything else and sets it to pass its

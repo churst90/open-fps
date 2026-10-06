@@ -57,12 +57,29 @@ public class WorldEnvironmentSystem
     private WeatherType _currentScenario = WeatherType.Clear;
     private readonly Random _random;
 
+    /// <summary>How far the air has carried the wind's eddy pattern, metres east and north: the
+    /// integral of the wind over time (WindField). Broadcast with the wind, so every client displaces
+    /// the same pattern by the same amount and hears the same gust at the same tree.</summary>
+    private double _travelEast, _travelNorth;
+
+    /// <summary>How much faster than a front the weather moves after somebody set it by hand. A front
+    /// takes a minute to arrive; a tester who has typed /weather storm wants to hear it within
+    /// seconds, and still without a step.</summary>
+    private float _weatherRate = 1f;
+    private const float SetByHandRate = 5f;
+
+    /// <summary>The chance per tick of a new front, when the weather is rolling on its own.</summary>
+    public const double DefaultFrontProbabilityPerTick = 0.0005;
+
     /// <summary>The weather front currently in effect.</summary>
     public WeatherType CurrentScenario => _currentScenario;
 
     /// <summary>Chance per tick that a new weather front rolls in. Zero pins the current scenario,
     /// which is what the tests want when they are measuring the response to one.</summary>
-    public double FrontProbabilityPerTick { get; set; } = 0.0005;
+    public double FrontProbabilityPerTick { get; set; } = DefaultFrontProbabilityPerTick;
+
+    /// <summary>Whether the weather stays as it is (OPENFPS_WEATHER or /weather) rather than rolling.</summary>
+    public bool Pinned => FrontProbabilityPerTick <= 0;
 
     public WorldEnvironmentSystem() : this(null) { }
 
@@ -132,12 +149,18 @@ public class WorldEnvironmentSystem
 
         // --- WEATHER INTERPOLATION ---
         _env.Temperature = MathHelper.Lerp(_env.Temperature, targetTemp, dt * 0.1f);
-        _env.Humidity = MathHelper.Lerp(_env.Humidity, _targetHumidity, dt * 0.05f);
-        _env.PrecipitationIntensity = MathHelper.Lerp(_env.PrecipitationIntensity, _targetPrecipitation, dt * 0.02f);
-        _env.WindVelocity = Vector3.Lerp(_env.WindVelocity, _targetWind, dt * 0.05f);
+        float rate = dt * _weatherRate;
+        _env.Humidity = MathHelper.Lerp(_env.Humidity, _targetHumidity, MathF.Min(1f, rate * 0.05f));
+        _env.PrecipitationIntensity = MathHelper.Lerp(_env.PrecipitationIntensity, _targetPrecipitation, MathF.Min(1f, rate * 0.02f));
+        _env.WindVelocity = Vector3.Lerp(_env.WindVelocity, _targetWind, MathF.Min(1f, rate * 0.05f));
         // Gustiness used to be assigned straight onto the state, so a front snapped the air from calm to
         // a gale between one tick and the next. It fades like everything else it travels with.
-        _env.WindGustiness = MathHelper.Lerp(_env.WindGustiness, _targetGustiness, dt * 0.05f);
+        _env.WindGustiness = MathHelper.Lerp(_env.WindGustiness, _targetGustiness, MathF.Min(1f, rate * 0.05f));
+
+        // The air carries the eddy pattern on at the wind it has now.
+        var (carryEast, carryNorth) = WindField.Carry(_env.WindVelocity.X, _env.WindVelocity.Z);
+        _travelEast += carryEast * (double)dt;
+        _travelNorth += carryNorth * (double)dt;
 
         // Check for Freezing (affects precipitation type)
         if (_env.Temperature < 0 && _currentScenario == WeatherType.Rain)
@@ -151,6 +174,7 @@ public class WorldEnvironmentSystem
         {
             var next = (WeatherType)_random.Next(0, 4);
             SetScenario(next);
+            _weatherRate = 1f;
             Log.Information("WorldEnvironment: Atmospheric Front shifting to {Scenario}", next);
         }
     }
@@ -195,6 +219,43 @@ public class WorldEnvironmentSystem
                 break;
         }
     }
+
+    /// <summary>
+    /// The weather set by hand (/weather): this front, held until somebody says otherwise, arriving
+    /// over a few seconds rather than a minute.
+    /// </summary>
+    public void PinScenario(WeatherType scenario)
+    {
+        SetScenario(scenario);
+        FrontProbabilityPerTick = 0;
+        _weatherRate = SetByHandRate;
+    }
+
+    /// <summary>
+    /// The wind set by hand: a mean velocity (map axes, x east, z north, m/s) and a gustiness (0..1).
+    /// Holds the weather too, or the next front would blow it away.
+    /// </summary>
+    public void PinWind(Vector3 velocity, float gustiness)
+    {
+        _targetWind = new Vector3(velocity.X, 0f, velocity.Z);
+        _targetGustiness = Math.Clamp(gustiness, 0f, 1f);
+        FrontProbabilityPerTick = 0;
+        _weatherRate = SetByHandRate;
+    }
+
+    /// <summary>Lets the weather roll on its own again from what it is now.</summary>
+    public void Unpin()
+    {
+        FrontProbabilityPerTick = DefaultFrontProbabilityPerTick;
+        _weatherRate = 1f;
+    }
+
+    /// <summary>Where the wind is heading for, before it gets there.</summary>
+    public Vector3 TargetWind => _targetWind;
+    public float TargetGustiness => _targetGustiness;
+
+    /// <summary>How far the air has carried the eddy pattern, metres east and north.</summary>
+    public (double East, double North) WindTravel => (_travelEast, _travelNorth);
 
     /// <summary>
     /// Sets the world clock. The season is the largest single term in the temperature curve — day 1 is
