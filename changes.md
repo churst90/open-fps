@@ -4,6 +4,11 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Doors on the Linux client make their sound the first time. `run-gtk-client.sh` now renders every
+  door sound the client makes at start into the player's render cache for the build, as the Windows
+  zip ships them, once per build (about 80 s on all cores; a build that has them skips it). The cache
+  is named by the build, so it started empty whenever OpenFPS.Common changed, and a door opened
+  before its render was ready was silent.
 - Audio quality: what makes the synthesis sound grainy or static, measured (unheard). Report in
   docs/AUDIO_QUALITY_2026-10-06.md, renders in inbox/audio-quality-2026-10-06.
 - The biggest cause is not fixed here: the fountain, trees and rain are tens of thousands of small
