@@ -29,7 +29,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// costs to render. No air absorption in either (it is the same path for both), no ground.
 ///
 /// set=walk (through the game's client path and mixer, captured from the master): walking up to the wood
-/// from 800 m to 60 m from its middle along the ground at 10 m/s, before (each tree its own voice, as in
+/// from 800 m to 100 m from its middle along the ground at 10 m/s, before (each tree its own voice, as in
 /// the game until now: past 90 m every tree is too quiet to have one) and after (the woods, WoodChorus).
 /// Writes DIR/before/capture.post.wav and DIR/after/capture.post.wav, and the level every 50 m to
 /// DIR/levels.csv.
@@ -296,7 +296,7 @@ public static class DistantWoodsSpike
                     Thread.Sleep(4);
                 }
             }
-            const float From = 800f, To = 60f, Speed = 10f;
+            const float From = 800f, To = 100f, Speed = 10f;
             Stand(From);
             Pump(3.0);
             proc.Refresh();
