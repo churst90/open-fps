@@ -841,6 +841,10 @@ Sound on the nearest object:
 - `/grant NAME PERMISSION`, `/revoke NAME PERMISSION`: only to players, and only permissions you
   have yourself.
 - `/perms NAME`: a player's permissions.
+- `/weather`: the weather and the wind now. `/weather clear`, `rain`, `snow` or `storm` sets that
+  weather; `/weather wind 8 north west gusty` sets the wind (metres a second, where it blows from,
+  and steady, gusty or very gusty, the last two optional). What you set reaches everybody in a few
+  seconds and stays until `/weather auto`, which lets the weather change on its own again.
 
 ### The administrator only
 - `/setrole NAME ROLE`: player, moderator, dev, admin, or a custom role.
@@ -900,6 +904,7 @@ for each of its switches that is set, so a forgotten one shows up in the log.
 | `OPENFPS_LEVEL_COMPRESSION=0.45` | Sets `/levels` for this run only (0.2 to 1); it is not saved |
 | `OPENFPS_TAIL_DB=-6`, `OPENFPS_COPIES_DB=-6` | Start `/tail` and `/copies` at these levels |
 | `OPENFPS_ECHOES=off` | Start with the traced echoes off |
+| `OPENFPS_EAR_WIND=0` | No wind at your ears (for listening without it) |
 | `OPENFPS_CRASHDIR=folder` | `run-gtk-client.sh` only: where crash dumps go |
 
 The rest of the client's switches are for tracking down audio faults; they are listed in

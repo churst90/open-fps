@@ -313,6 +313,13 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.SetListenerEnclosure(lowDb, midDb, highDb);
     }
 
+    /// <summary>Where the listener is, for the wind at their ears. Thread-safe: the provider swaps it
+    /// in whole.</summary>
+    public void SetEarWind(OpenFPS.Common.EarWindListener? listener)
+    {
+        if (_isInitialized) _provider.SetEarWind(listener);
+    }
+
     public void UpdateShelter(float shelterFactor)
     {
         lock (_stateLock)

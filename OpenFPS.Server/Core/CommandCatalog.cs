@@ -92,6 +92,8 @@ public static class CommandCatalog
         E("Sound tools", "set_audio_mode", "/set_audio_mode MODE", "how an object plays its sounds"),
         E("Sound tools", "play_folder", "/play_folder FOLDER", "play a folder of sounds"),
         E("Sound tools", "start_state", "/start_state START LOOP", "an object's start and loop sounds"),
+        E("Sound tools", "weather", "/weather [clear|rain|snow|storm|auto], or /weather wind SPEED [DIRECTION] [steady|gusty|very gusty]",
+          "the weather and the wind now, or set them for the whole server for testing; what you set holds until /weather auto"),
         E("Moderation", "announce", "/announce MESSAGE", "say something to everybody as staff"),
         E("Moderation", "setmotd", "/setmotd [TEXT]", "set or clear the message of the day"),
         E("Moderation", "bring", "/bring NAME", "bring a player to you"),

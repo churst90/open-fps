@@ -71,6 +71,7 @@ public class StaffGateTests : IDisposable
         { "removeseat", new[] { "driver" }, UserRole.Dev },
         { "drivable", new[] { "v8_sports" }, UserRole.Dev },
         { "savemap", Array.Empty<string>(), UserRole.Dev },
+        { "weather", new[] { "storm" }, UserRole.Dev },
         { "sessions", Array.Empty<string>(), UserRole.Admin },
         { "user", new[] { "other" }, UserRole.Admin },
         { "account", new[] { "other" }, UserRole.Admin },
@@ -466,6 +467,8 @@ public class StaffGateTests : IDisposable
             text.Append($"roles {_session.Role} {_other.Role} {_users.RoleOf("other")} grants {_users.GrantsOf("other")} custom {_users.CustomOf("other")} defined {string.Join(",", _server.Roles.Names)}\n");
             text.Append($"other {_sessionsOnline()} muted {_other.MutedUntilUtc > DateTime.UtcNow}\n");
             text.Append($"locks {string.Join(",", _server.Auth.LockedNames().Select(l => l.Name))}\n");
+            var env = _server.WorldEnvironment;
+            text.Append($"weather {env.CurrentScenario} {env.TargetWind} {env.TargetGustiness} {env.Pinned}\n");
             foreach (string dir in new[] { _mapDir, _compositeDir })
                 if (Directory.Exists(dir))
                     foreach (string file in Directory.GetFiles(dir).OrderBy(f => f, StringComparer.Ordinal))

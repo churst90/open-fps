@@ -174,6 +174,10 @@ public partial class CommandHandler
             case "room":
                 HandleRoom(session, args, reply);
                 break;
+            // The whole server's weather, for testing: developers and administrators (Permissions).
+            case "weather":
+                HandleWeather(session, args, reply);
+                break;
             case "prefabs":
                 HandleListPrefabs(reply);
                 break;

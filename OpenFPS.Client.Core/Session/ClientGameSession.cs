@@ -1048,6 +1048,8 @@ public sealed partial class ClientGameSession : IDisposable
 
             case WorldStateUpdate wsu:
                 _world.UpdateAtmosphere(wsu);
+                // The one wind the trees, the fires and your ears read.
+                OpenFPS.Common.WindField.Weather = _world.Wind;
                 break;
 
             case HitConfirm confirm:
