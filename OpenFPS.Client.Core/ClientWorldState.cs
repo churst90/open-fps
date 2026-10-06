@@ -251,6 +251,7 @@ public class ClientWorldState
         if (def.Region.RoomSize.X > 0f)
         {
             if (!deferAcoustics) TrackRegion(def);
+            else _tablesDirty = true;
             _regionEntityIds[def.EntityId] = 0;
         }
 
@@ -258,7 +259,11 @@ public class ClientWorldState
         // server re-sends the definition as it moves, and this is what turns that into the opening
         // the acoustics actually use — without it a door swings silently and nothing sounds different
         // on the other side of it, which is the entire point of a door.
-        if (!deferAcoustics && def.Portal.RegionAId != def.Portal.RegionBId) TrackPortal(def);
+        if (def.Portal.RegionAId != def.Portal.RegionBId)
+        {
+            if (!deferAcoustics) TrackPortal(def);
+            else _tablesDirty = true;
+        }
 
         // Anything that makes sound on its own is processed every frame. See RunsOnItsOwn: this used
         // to be a list of two playback modes rather than a rule, and everything outside the list was
@@ -349,6 +354,8 @@ public class ClientWorldState
                 if (map.Regions.ContainsKey(id)) (present ??= new List<int>()).Add(id);
             if (present == null) return;
 
+            // The voxel grid still has them: the next refresh makes it again.
+            _tablesDirty = true;
             var regions = new Dictionary<int, RegionComponent>(map.Regions);
             var positions = new Dictionary<int, Vector3>(map.RegionPositions);
             var rotations = new Dictionary<int, Quaternion>(map.RegionRotations);
@@ -808,6 +815,10 @@ public class ClientWorldState
     private long _geometryVersion;
     private int _refreshRunning;
     private volatile bool _refreshAgain;
+    /// <summary>A room or a doorway arrived with a tile, or a room left: the acoustic tables need making
+    /// again. A tile of only walls and roads (the coarse ring, as the player moves) changes the Steam Audio
+    /// scene and nothing else, and is answered by a new GeometryVersion alone.</summary>
+    private volatile bool _tablesDirty;
 
     /// <summary>The side of the tiles this map streams in, metres; 0 for a map sent whole.</summary>
     public float TileMetres { get; private set; }
@@ -820,6 +831,8 @@ public class ClientWorldState
 
     /// <summary>Refreshes finished, and how long the last one took, milliseconds. Diagnostic.</summary>
     public int AcousticRefreshes { get; private set; }
+    /// <summary>Tile changes that moved only walls and roads: a new GeometryVersion, no rebuild.</summary>
+    public int GeometryOnlyChanges { get; private set; }
     public double LastAcousticRefreshMs { get; private set; }
 
     /// <summary>Runs a refresh off the calling thread. The game uses a niced thread of its own
@@ -883,6 +896,15 @@ public class ClientWorldState
     /// </summary>
     public void RequestAcousticRefresh()
     {
+        if (!_tablesDirty && !AcousticRefreshPending)
+        {
+            // Walls and roads only: the scene follows (the worker rebuilds it in the background), the
+            // rooms and openings are as they were.
+            Interlocked.Increment(ref _geometryVersion);
+            GeometryOnlyChanges++;
+            Touch();
+            return;
+        }
         _refreshAgain = true;
         if (Interlocked.CompareExchange(ref _refreshRunning, 1, 0) != 0) return;
         RefreshRunner(() =>
@@ -927,6 +949,8 @@ public class ClientWorldState
         if (live == null) return false;
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        // Cleared before the definitions are read: a room that arrives while this runs sets it again.
+        _tablesDirty = false;
         var defs = _definitions.Values.ToList();
         var built = BuildAcousticMap(defs, size, min, res, floor, streamed: TileMetres > 0f, report: false);
 

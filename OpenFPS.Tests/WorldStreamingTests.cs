@@ -460,7 +460,11 @@ public class WorldStreamingTests
         client.SetAcousticMap(ClientWorldState.BuildAcousticMap(new[] { room, door }, new Vector3(100, 20, 100), new Vector3(-50, 0, -50), 0.5f, 0.2f, true, false));
         Assert.False(client.AcousticMap!.Portals.ContainsKey(11));
 
-        // The refresh runs where the test says: the door opens in the middle of it.
+        // A tile arrives with a room in it, and its refresh runs where the test says: the door opens in
+        // the middle of it.
+        var next = new EntityDefinition { EntityId = 12, Transform = new Transform { Position = new Vector3(20, 1.5f, 0), Rotation = Quaternion.Identity } };
+        next.Region.RoomSize = new Vector3(4, 3, 4);
+        client.RegisterDefinition(next, deferAcoustics: true);
         Action? held = null;
         client.RefreshRunner = work => held = work;
         client.RequestAcousticRefresh();
@@ -470,7 +474,34 @@ public class WorldStreamingTests
         Assert.True(client.AcousticMap!.Portals.ContainsKey(11));
         held!();
         Assert.True(client.AcousticMap!.Portals.ContainsKey(11), "the open door was put back as it was before the refresh");
+        Assert.True(client.AcousticMap.Regions.ContainsKey(12));
         Assert.False(client.AcousticRefreshPending);
+    }
+
+    [Fact]
+    public void Walls_alone_move_the_scene_on_without_rebuilding_the_rooms()
+    {
+        var client = new ClientWorldState();
+        client.Clear(new Vector3(100, 20, 100));
+        client.ConfigureAcoustics(new Vector3(-50, 0, -50), 0.5f, 0.2f, 50f);
+        client.SetAcousticMap(ClientWorldState.BuildAcousticMap(Array.Empty<EntityDefinition>(), new Vector3(100, 20, 100), new Vector3(-50, 0, -50), 0.5f, 0.2f, true, false));
+        int ran = 0;
+        client.RefreshRunner = work => { ran++; work(); };
+        var wall = new EntityDefinition { EntityId = 5, Transform = new Transform { Position = new Vector3(30, 1, 30), Rotation = Quaternion.Identity } };
+        wall.Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(10, 3, 0.2f), IsSolid = true };
+        long v = client.GeometryVersion;
+        client.RegisterDefinition(wall, deferAcoustics: true);
+        client.RequestAcousticRefresh();
+        Assert.Equal((0, 1, v + 1), (ran, client.GeometryOnlyChanges, client.GeometryVersion));
+        Assert.Equal(client.GeometryVersion, client.GetSnapshot().GeometryVersion);
+
+        // A room is a rebuild.
+        var room = new EntityDefinition { EntityId = 6, Transform = new Transform { Position = new Vector3(30, 1.5f, 35), Rotation = Quaternion.Identity } };
+        room.Region.RoomSize = new Vector3(4, 3, 4);
+        client.RegisterDefinition(room, deferAcoustics: true);
+        client.RequestAcousticRefresh();
+        Assert.Equal(1, ran);
+        Assert.True(client.AcousticMap!.Regions.ContainsKey(6));
     }
 
     // ── Two clients through the real session code ────────────────────────────────────────────────
