@@ -32,18 +32,28 @@ public static class ThunderSpike
     public static int Run(string[] args)
     {
         string? S(string k) => args.FirstOrDefault(a => a.StartsWith(k + "=", StringComparison.Ordinal))?[(k.Length + 1)..];
-        string outDir = S("out") ?? Path.Combine(LabPaths.Repo, "inbox", "thunder-2026-10-05");
+        string outDir = S("out") ?? Path.Combine(LabPaths.Repo, "inbox", "thunder-round2-2026-10-05");
         int seed = int.TryParse(S("seed"), out int sd) ? sd : 7;
         bool wav = !args.Contains("nowav");
         Directory.CreateDirectory(outDir);
         AcousticRegistry.Initialize();
 
-        var air = new Thunder.Air(15f, 0.8f, 1013.25f, Vector3.Zero);
+        // The server's Storm: 15 C here, the air near saturated, its wind (15, 0, -10) m/s gusting
+        // (0.8). Thunder happens in storms, and the wind is what makes the air turbulent.
+        var air = args.Contains("still") ? new Thunder.Air(15f, 0.8f, 1013.25f, Vector3.Zero, 0f)
+                                         : new Thunder.Air(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
         var report = new List<string>();
         void Say(string s) { Console.WriteLine(s); report.Add(s); }
 
         Say("THUNDER, measured from the model (OpenFPS.Client.Core/AudioEngine/Core/Thunder.cs)");
-        Say($"air {air.TemperatureC} C, {air.Humidity * 100:F0} % RH, still; listener 1.7 m up, ground reflection {Thunder.GroundReflection}; seed {seed}");
+        Say($"air {air.TemperatureC} C, {air.Humidity * 100:F0} % RH, wind ({air.Wind.X}, {air.Wind.Z}) m/s gusting {air.Gustiness}; listener 1.7 m up, ground reflection {Thunder.GroundReflection}; seed {seed}");
+        {
+            float mu2 = Thunder.TurbulenceVariance(air, AudioPhysics.SpeedOfSoundAt(air.TemperatureC));
+            float cc = AudioPhysics.SpeedOfSoundAt(air.TemperatureC);
+            Say($"turbulence: mu^2 {mu2:E2}; coherent 100 Hz kept 1/e at {1f / Thunder.ScatterPerMetre(100f, mu2, cc):F0} m, 1 kHz at {1f / Thunder.ScatterPerMetre(1000f, mu2, cc):F1} m; "
+              + $"scattered tail spread {Thunder.ScatterSpreadSeconds(100f, mu2, cc) * 1000:F2} ms at 100 m, {Thunder.ScatterSpreadSeconds(1000f, mu2, cc) * 1000:F1} ms at 1 km, "
+              + $"{Thunder.ScatterSpreadSeconds(3000f, mu2, cc) * 1000:F0} ms at 3 km, {Thunder.ScatterSpreadSeconds(8000f, mu2, cc) * 1000:F0} ms at 8 km, {Thunder.ScatterSpreadSeconds(15000f, mu2, cc) * 1000:F0} ms at 15 km");
+        }
         Say($"source: {Thunder.SourcePa} Pa at {Thunder.SourceMetres} m for a {Thunder.SourcePeakHz} Hz wave (E = {Thunder.SourceEnergyPerMetre():0} J/m); first strokes here take {LightningPhysics.GroundFlashEnergyMedian:0} J/m");
         Say($"Few's peak frequency at that energy: {LightningPhysics.PeakFrequencyHz(LightningPhysics.GroundFlashEnergyMedian):F0} Hz; N-wave {LightningPhysics.NWaveSeconds(LightningPhysics.GroundFlashEnergyMedian) * 1000:F2} ms");
         float c = AudioPhysics.SpeedOfSoundAt(air.TemperatureC);
@@ -93,6 +103,8 @@ public static class ThunderSpike
         foreach (float d in distances) cases.Add(($"ic-{Km(d)}", Cloud(d, 45f, seed)));
 
         var rendered = new List<(string Name, List<Thunder.Part> Parts)>();
+        // One render first, untimed, as the client does at start: the times below are without the JIT.
+        Thunder.Render(Ground(3000f, 45f, seed + 1, 2), ear, air);
         foreach (var (name, strike) in cases)
         {
             var sw = Stopwatch.StartNew();
@@ -113,7 +125,7 @@ public static class ThunderSpike
             foreach (float r in new[] { 2f, 10f, 100f, 1000f })
             {
                 var e2 = new Vector3(100f - r, 1.7f, 0f);
-                var parts = Thunder.Render(straight, ch, e2, air, new Thunder.Options { Ground = false, MaxParts = 1, SampleRate = 48000, Plain = true });
+                var parts = Thunder.Render(straight, ch, e2, air, new Thunder.Options { Ground = false, MaxParts = 1, SampleRate = 48000, Plain = true, Turbulence = false });
                 float pk = parts.Count > 0 ? parts.Max(p => p.PeakPa) : 0f;
                 Say($"straight vertical channel, single stroke, free field, {r,5:F0} m: peak {pk,8:F2} Pa ({Db(pk):F1} dB); cylinder from 650 Pa at 2 m would be {650f * MathF.Sqrt(2f / r):F1} Pa");
             }
@@ -139,11 +151,17 @@ public static class ThunderSpike
             Say($"city street at ({xz[0]}, {xz[1]}) (Main Street canyon), {solids.Count} solids: each part placed {ProxyMetres:F0} m out in its direction, as the client places it;");
             Say("  blocked parts take the diffraction over the edge (Maekawa bands); copies as the client gives a sky sound: the strongest "
               + $"{OpenFPS.Client.Core.WorldAudioPlayer.MaxSkyRoomEchoes} mirrors inside 80 ms and up to two first-order facades after it.");
+            var survey = Enclosure.Look(cityEar, boxes.Select(b => new Enclosure.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList());
+            var tail = StreetTail(boxes, cityEar);
+            float sendGain = MathF.Pow(ProxyMetres, Math.Clamp(survey.Enclosure, 0f, 1f)) * OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailTrim;
+            Say($"  the street's late tail: Steam Audio's trace at the listener (the scene without its open ground, as the game builds it), "
+              + $"from 50 ms, fed as the mixer feeds it: enclosure {survey.Enclosure:F2}, send {Db20(sendGain):F1} dB against the direct sound at 40 m (tail trim {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailDb:F0} dB); "
+              + (tail.L.Length > 0 ? $"IR energy {10 * Math.Log10(Math.Max(1e-30, tail.L.Sum(v => (double)v * v) + tail.R.Sum(v => (double)v * v))):F1} dB re a 1 m source" : "no IR (Steam Audio not available)"));
             foreach (float d in new[] { 100f, 1000f, 3000f, 8000f })
             {
                 var strike = Ground(d, 45f, seed, 4).Offset(new Vector3(cityEar.X, 0f, cityEar.Z));
                 var parts = Thunder.Render(strike, cityEar, air);
-                var (l, r, notes) = CityBinaural(parts, cityEar, solids, c);
+                var (l, r, notes) = CityBinaural(parts, cityEar, solids, c, tail, sendGain);
                 cityRows.Add(($"city-cg-{Km(d)}", l, r));
                 Say($"  cg {Km(d),6}: {notes}");
             }
@@ -330,13 +348,15 @@ public static class ThunderSpike
         return (l, r);
     }
 
-    private static (float[] L, float[] R, string Notes) CityBinaural(List<Thunder.Part> parts, Vector3 ear, List<EarlyReflections.Solid> solids, float c)
+    private static (float[] L, float[] R, string Notes) CityBinaural(List<Thunder.Part> parts, Vector3 ear, List<EarlyReflections.Solid> solids, float c,
+                                                                      (float[] L, float[] R) tail, float sendGain)
     {
         float start = parts.Count == 0 ? 0f : parts.Min(p => p.StartSeconds);
         float end = parts.Count == 0 ? 1f : parts.Max(p => p.StartSeconds + p.Seconds) + 1f;
         end = MathF.Min(end, start + 45f);
         int n = (int)((end - start + 0.5f) * OutRate);
         var l = new float[n]; var r = new float[n];
+        var send = new float[n];
         var notes = new List<string>();
         var into = new List<EarlyReflections.Arrival>();
         foreach (var p in parts)
@@ -355,6 +375,8 @@ public static class ThunderSpike
             var (pl, pr) = Hrtf(direct, dir);
             int off = (int)((p.StartSeconds - start) * OutRate);
             for (int i = 0; i < pl.Length && off + i < n; i++) { l[off + i] += pl[i] * g; r[off + i] += pr[i] * g; }
+            // The direct voice feeds the listener's traced stage, after its fader and its path.
+            for (int i = 0; i < direct.Length && off + i < n; i++) send[off + i] += direct[i] * g * sendGain;
             string elev = $"{MathF.Asin(p.Direction.Y) * 180f / MathF.PI:F0} deg up";
             string note = worst > 0f ? $"part {elev} blocked, {worst:F1} m over the edge (bands {Db20(lo):F0}/{Db20(mid):F0}/{Db20(hi):F0} dB)" : $"part {elev} in plain view";
             // The copies the client gives a sky sound: the strongest mirrors inside the room window
@@ -395,7 +417,101 @@ public static class ThunderSpike
             }
             notes.Add(note);
         }
+        if (tail.L.Length > 0)
+        {
+            var wl = Convolve(send, tail.L); var wr = Convolve(send, tail.R);
+            for (int i = 0; i < n; i++) { l[i] += wl[i]; r[i] += wr[i]; }
+        }
         return (l, r, string.Join(" | ", notes));
+    }
+
+    /// <summary>
+    /// The listener's traced stage for a place, as the game builds it: Steam Audio's trace from the
+    /// listener in the scene without its open ground, decoded to two ears through the HRTF, its first
+    /// 50 ms left to the placed copies and faded in to 100 ms (the game plays the trace's late tail
+    /// only). The answer to a source at a metre. Empty if Steam Audio is not there.
+    /// </summary>
+    private static (float[] L, float[] R) StreetTail(List<SteamAudioScene.Box> boxes, Vector3 ear)
+    {
+        try
+        {
+            var cs = Phonon.DefaultContextSettings();
+            if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) return (Array.Empty<float>(), Array.Empty<float>());
+            using var scene = new SteamAudioScene(ctx);
+            scene.Build(SteamAudioScene.WithoutOpenGround(boxes));
+            int frame = TracedReverb.TracedFrame;
+            using var tr = new TracedReverb(ctx, OutRate, frame);
+            tr.SetScene(scene);
+            tr.SetListener(ear);
+            var until = DateTime.UtcNow.AddSeconds(60);
+            while (tr.Runs < 2 && DateTime.UtcNow < until) System.Threading.Thread.Sleep(50);
+            if (!tr.TryGetParams(out var prm)) return (Array.Empty<float>(), Array.Empty<float>());
+            var au = new Phonon.IPLAudioSettings { samplingRate = OutRate, frameSize = frame };
+            var es = new Phonon.IPLReflectionEffectSettings { type = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, irSize = tr.IrSize, numChannels = TracedReverb.Channels };
+            Phonon.iplReflectionEffectCreate(ctx, ref au, ref es, out IntPtr effect);
+            var inBuf = new Phonon.IPLAudioBuffer(); var outBuf = new Phonon.IPLAudioBuffer(); var stBuf = new Phonon.IPLAudioBuffer();
+            Phonon.iplAudioBufferAllocate(ctx, 1, frame, ref inBuf);
+            Phonon.iplAudioBufferAllocate(ctx, TracedReverb.Channels, frame, ref outBuf);
+            Phonon.iplAudioBufferAllocate(ctx, 2, frame, ref stBuf);
+            var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
+            Phonon.iplHRTFCreate(ctx, ref au, ref hs, out IntPtr hrtf);
+            var dsx = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = hrtf, maxOrder = TracedReverb.Order };
+            Phonon.iplAmbisonicsDecodeEffectCreate(ctx, ref au, ref dsx, out IntPtr dec);
+            var dp = new Phonon.IPLAmbisonicsDecodeEffectParams { order = TracedReverb.Order, hrtf = hrtf, orientation = Phonon.ListenerFrame(Quaternion.Identity), binaural = Phonon.IPL_TRUE };
+            int blocks = (int)(TracedReverb.DurationSeconds * OutRate) / frame + 2;
+            var l = new float[blocks * frame]; var r = new float[blocks * frame];
+            var mono = new float[frame]; var stI = new float[frame * 2];
+            for (int b = 0; b < blocks; b++)
+            {
+                Array.Clear(mono);
+                if (b == 1) mono[0] = 1f;   // block 0 measures the effect's crossfade in
+                Phonon.iplAudioBufferDeinterleave(ctx, mono, ref inBuf);
+                Phonon.iplReflectionEffectApply(effect, ref prm, ref inBuf, ref outBuf, IntPtr.Zero);
+                Phonon.iplAmbisonicsDecodeEffectApply(dec, ref dp, ref outBuf, ref stBuf);
+                Phonon.iplAudioBufferInterleave(ctx, ref stBuf, stI);
+                for (int k = 0; k < frame; k++) { l[b * frame + k] = stI[2 * k]; r[b * frame + k] = stI[2 * k + 1]; }
+            }
+            Phonon.iplAudioBufferFree(ctx, ref inBuf); Phonon.iplAudioBufferFree(ctx, ref outBuf); Phonon.iplAudioBufferFree(ctx, ref stBuf);
+            Phonon.iplAmbisonicsDecodeEffectRelease(ref dec); Phonon.iplReflectionEffectRelease(ref effect); Phonon.iplHRTFRelease(ref hrtf);
+            // From the impulse (block 1); the first 50 ms are the placed copies' and the tail fades in to 100 ms.
+            int from = frame, n = l.Length - from;
+            var tl = new float[n]; var trr = new float[n];
+            for (int i = 0; i < n; i++)
+            {
+                double t = i / (double)OutRate;
+                float fade = t < 0.05 ? 0f : t < 0.1 ? (float)((t - 0.05) / 0.05) : 1f;
+                tl[i] = l[from + i] * fade; trr[i] = r[from + i] * fade;
+            }
+            return (tl, trr);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  street tail: {ex.Message}");
+            return (Array.Empty<float>(), Array.Empty<float>());
+        }
+    }
+
+    /// <summary>Linear convolution by FFT, overlap-add, the result as long as <paramref name="x"/>.</summary>
+    private static float[] Convolve(float[] x, float[] h)
+    {
+        int block = 1 << 16;
+        int size = 1; while (size < block + h.Length) size <<= 1;
+        var hf = new System.Numerics.Complex[size];
+        for (int i = 0; i < h.Length; i++) hf[i] = h[i];
+        Spectrum.Fft(hf);
+        var y = new float[x.Length];
+        var buf = new System.Numerics.Complex[size];
+        for (int at = 0; at < x.Length; at += block)
+        {
+            Array.Clear(buf);
+            int len = Math.Min(block, x.Length - at);
+            for (int i = 0; i < len; i++) buf[i] = x[at + i];
+            Spectrum.Fft(buf);
+            for (int i = 0; i < size; i++) buf[i] = System.Numerics.Complex.Conjugate(buf[i] * hf[i]);
+            Spectrum.Fft(buf);
+            for (int i = 0; i < size && at + i < y.Length; i++) y[at + i] += (float)(buf[i].Real / size);
+        }
+        return y;
     }
 
     private static float Db20(float g) => 20f * MathF.Log10(MathF.Max(1e-6f, g));
@@ -450,10 +566,27 @@ public static class ThunderSpike
         return (l, r);
     }
 
+    /// <summary>24-bit WAV: a tail 60 dB down in a file normalised to its crack is not left to the last
+    /// bits of sixteen (round 1 was sixteen).</summary>
     private static void WriteStereo(string path, float[] l, float[] r, float gain)
     {
-        var a = new float[l.Length]; var b = new float[r.Length];
-        for (int i = 0; i < a.Length; i++) { a[i] = Math.Clamp(l[i] * gain, -1f, 1f); b[i] = Math.Clamp(r[i] * gain, -1f, 1f); }
-        File.WriteAllBytes(path, OpenFPS.Client.Core.AudioEngine.Fmod.CrossingSpike.ToWav16Stereo(a, b, OutRate));
+        int frames = Math.Min(l.Length, r.Length);
+        int dataBytes = frames * 6;
+        var b = new byte[44 + dataBytes];
+        void Str(int at, string v) { for (int i = 0; i < v.Length; i++) b[at + i] = (byte)v[i]; }
+        void I32(int at, int v) { b[at] = (byte)v; b[at + 1] = (byte)(v >> 8); b[at + 2] = (byte)(v >> 16); b[at + 3] = (byte)(v >> 24); }
+        void I16(int at, int v) { b[at] = (byte)v; b[at + 1] = (byte)(v >> 8); }
+        Str(0, "RIFF"); I32(4, 36 + dataBytes); Str(8, "WAVE");
+        Str(12, "fmt "); I32(16, 16); I16(20, 1); I16(22, 2);
+        I32(24, OutRate); I32(28, OutRate * 6); I16(32, 6); I16(34, 24);
+        Str(36, "data"); I32(40, dataBytes);
+        int o = 44;
+        for (int i = 0; i < frames; i++)
+            foreach (float v in new[] { l[i], r[i] })
+            {
+                int q = (int)Math.Round(Math.Clamp(v * gain, -1f, 1f) * 8388607.0);
+                b[o++] = (byte)q; b[o++] = (byte)(q >> 8); b[o++] = (byte)(q >> 16);
+            }
+        File.WriteAllBytes(path, b);
     }
 }

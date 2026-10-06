@@ -172,7 +172,7 @@ public class LightningTests
         {
             var (strike, channel) = Straight(d);
             var parts = Thunder.Render(strike, channel, new Vector3(0f, 1.7f, 0f), air,
-                                       new Thunder.Options { Ground = false, Plain = true, MaxParts = 1, Threads = 2 });
+                                       new Thunder.Options { Ground = false, Plain = true, MaxParts = 1, Threads = 2, Turbulence = false });
             var part = Assert.Single(parts);
             int first = Array.FindIndex(part.Pressure, v => MathF.Abs(v) > part.PeakPa * 0.05f);
             float heard = part.StartSeconds + first / (float)part.SampleRate;
@@ -189,7 +189,7 @@ public class LightningTests
         {
             var (strike, channel) = Straight(d);
             var parts = Thunder.Render(strike, channel, new Vector3(0f, 1.7f, 0f), air,
-                                       new Thunder.Options { Ground = false, Plain = true, MaxParts = 1, SampleRate = 24000, Threads = 2 });
+                                       new Thunder.Options { Ground = false, Plain = true, MaxParts = 1, SampleRate = 24000, Threads = 2, Turbulence = false });
             var p = parts[0];
             var bands = Spectrum.BandEnergy(p.Pressure, p.SampleRate, 4096);
             double num = 0, den = 0;
@@ -214,7 +214,7 @@ public class LightningTests
         {
             var (strike, channel) = Straight(d);
             return Thunder.Render(strike, channel, new Vector3(0f, 1.7f, 0f), air,
-                                  new Thunder.Options { Ground = false, Plain = true, MaxParts = 1, Threads = 2 })[0].PeakPa;
+                                  new Thunder.Options { Ground = false, Plain = true, MaxParts = 1, Threads = 2, Turbulence = false })[0].PeakPa;
         }
         float p1 = Peak(1000f), p3 = Peak(3000f), p9 = Peak(9000f);
         Assert.True(p1 > p3 && p3 > p9);
@@ -282,6 +282,81 @@ public class LightningTests
         // Placed 40 m out, declared at its peak carried out there: the law gives back that peak at the ear.
         Assert.Equal(40f, OpenFPS.Client.Core.WorldAudioPlayer.SkyProxyMetres);
         Assert.Equal(100f + 20f * MathF.Log10(40f), OpenFPS.Client.Core.WorldAudioPlayer.SkyLevelDb(100f), 3);
+    }
+
+    // ── Round 2: the rumble does not break up ────────────────────────────────────────────────
+
+    /// <summary>Runs of near silence (under -90 dB of the peak) of 5 ms or more, between the first and
+    /// last sound: what Cody heard as "crackly and breaks up" in round 1 (up to 361 in a cloud flash).
+    /// One running to the end of the buffer is its end, not a gap.</summary>
+    private static int Gaps(Thunder.Part p)
+    {
+        float floor = p.PeakPa * MathF.Pow(10f, -90f / 20f);
+        int first = Array.FindIndex(p.Pressure, v => MathF.Abs(v) > floor);
+        int last = Array.FindLastIndex(p.Pressure, v => MathF.Abs(v) > floor);
+        int gaps = 0, run = 0, min = (int)(0.005f * p.SampleRate);
+        for (int i = first; i <= last; i++)
+        {
+            if (MathF.Abs(p.Pressure[i]) < floor) run++;
+            else { if (run >= min) gaps++; run = 0; }
+        }
+        return gaps;
+    }
+
+    private static readonly Thunder.Air StormAir = new(15f, 0.95f, 1013.25f, new Vector3(15f, 0f, -10f), 0.8f);
+
+    [Fact]
+    public void TheRumbleHasNoHolesInIt()
+    {
+        var ear = new Vector3(0f, 1.7f, 0f);
+        var cloud = new LightningStrike(7, FlashKind.IntraCloud, new Vector3(-3000f, 6000f, 8000f), new Vector3(3000f, 9000f, 8000f),
+                                        LightningPhysics.GroundFlashEnergyMedian * LightningPhysics.CloudFlashEnergyShare, 1);
+        foreach (var strike in new[] { Ground(3000f, 7, strokes: 4), cloud })
+            foreach (var part in Thunder.Render(strike, ear, StormAir, new Thunder.Options { Threads = 2 }))
+                Assert.Equal(0, Gaps(part));
+    }
+
+    [Fact]
+    public void TurbulenceScattersTheTopFirstAndFurtherOffMore()
+    {
+        float c = 340f;
+        float mu2 = Thunder.TurbulenceVariance(StormAir, c);
+        Assert.InRange(mu2, 5e-6f, 5e-5f);
+        // Chernov: the coherent wave goes as k^2, so ten times the frequency is a hundred times the loss.
+        Assert.Equal(100f, Thunder.ScatterPerMetre(1000f, mu2, c) / Thunder.ScatterPerMetre(100f, mu2, c), 2);
+        // The spread grows as the square of the distance, to a ceiling.
+        Assert.Equal(4f, Thunder.ScatterSpreadSeconds(2000f, mu2, c) / Thunder.ScatterSpreadSeconds(1000f, mu2, c), 2);
+        Assert.Equal(Thunder.MaxScatterSeconds, Thunder.ScatterSpreadSeconds(1e6f, mu2, c));
+        // A crack 100 m off is still a crack; a kilometre off its top is half scattered; from 8 km the
+        // rumble's own octaves are.
+        Assert.True(Thunder.ScatteredShare(2000f, 100f, mu2, c) < 0.1f);
+        Assert.InRange(Thunder.ScatteredShare(1000f, 1000f, mu2, c), 0.4f, 0.9f);
+        Assert.True(Thunder.ScatteredShare(125f, 8000f, mu2, c) > 0.8f);
+        // Calm air scatters less than a storm.
+        Assert.True(Thunder.TurbulenceVariance(Thunder.Air.Standard, c) < mu2 / 5f);
+    }
+
+    [Fact]
+    public void ScatteringMovesEnergyItDoesNotMakeIt()
+    {
+        var ear = new Vector3(0f, 1.7f, 0f);
+        double Energy(bool turbulence)
+        {
+            double sum = 0;
+            foreach (var p in Thunder.Render(Ground(5000f, 9, strokes: 2), ear, StormAir, new Thunder.Options { Threads = 2, Turbulence = turbulence, MaxParts = 1 }))
+                foreach (float v in p.Pressure) sum += (double)v * v / p.SampleRate;
+            return sum;
+        }
+        double db = 10 * Math.Log10(Energy(true) / Energy(false));
+        Assert.InRange(db, -1.5, 1.5);
+    }
+
+    [Fact]
+    public void ThunderIsNeverRenderedBelow24kHz()
+    {
+        // The mixer resamples linearly; from 12 kHz its images land across the top.
+        Assert.Equal(24000, Thunder.ChooseRate(20000f, Thunder.Air.Standard));
+        Assert.Equal(48000, Thunder.ChooseRate(50f, Thunder.Air.Standard));
     }
 
     private static (LightningStrike Strike, LightningChannel Channel) Straight(float d)

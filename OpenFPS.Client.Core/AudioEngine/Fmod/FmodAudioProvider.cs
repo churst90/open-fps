@@ -90,6 +90,33 @@ internal class FmodResourceManager : IDisposable
         return true;
     }
 
+    /// <summary>The same, from 32-bit float samples: kept as float, so a quiet tail is not cut to the last bit.</summary>
+    public bool RegisterPcmFloat(string soundId, float[] pcm, int sampleRate)
+    {
+        if (string.IsNullOrEmpty(soundId) || pcm.Length == 0) return false;
+        if (_cache.ContainsKey(soundId)) return true;
+        var bytes = new byte[pcm.Length * 4];
+        Buffer.BlockCopy(pcm, 0, bytes, 0, bytes.Length);
+        var info = new CREATESOUNDEXINFO
+        {
+            cbsize = System.Runtime.InteropServices.Marshal.SizeOf<CREATESOUNDEXINFO>(),
+            length = (uint)bytes.Length,
+            numchannels = 1,
+            defaultfrequency = sampleRate,
+            format = SOUND_FORMAT.PCMFLOAT,
+        };
+        RESULT res = _system.createSound(bytes,
+            MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | Rolloff.Mode | MODE.LOOP_OFF,
+            ref info, out FMOD.Sound sound);
+        if (res != RESULT.OK)
+        {
+            Log.Warning("FmodResourceManager: could not register float sound {Id}: {Result}", soundId, res);
+            return false;
+        }
+        _cache[soundId] = sound;
+        return true;
+    }
+
     public bool RegisterPcm(string soundId, byte[] pcm16Mono, int sampleRate)
     {
         if (string.IsNullOrEmpty(soundId) || pcm16Mono.Length == 0) return false;
@@ -4869,6 +4896,9 @@ public class FmodAudioProvider : IAudioProvider
 
     public bool ReleaseSynthesisedSound(string soundId)
         => _isInitialized && _resources.ReleasePcm(soundId);
+
+    public bool RegisterSynthesisedSoundFloat(string soundId, float[] pcm, int sampleRate)
+        => _isInitialized && _resources.RegisterPcmFloat(soundId, pcm, sampleRate);
 
     /// <summary>Interface sounds, made once and kept. Releasing an FMOD sound stops every channel
     /// playing it, so a sound created, played and released at once is cut off almost before it

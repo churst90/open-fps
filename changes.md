@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- Thunder no longer crackles and breaks up (round 2, unheard). The rumble had been a train of
+  separate shock waves with exact silence between them (up to 386 holes in a cloud flash). Now the
+  air is turbulent: from the server's wind and gustiness, each arrival loses its top to scattering,
+  and what it loses comes in behind it as a tail, longer the further it came (a fraction of a
+  millisecond at 100 m, a tenth of a second at 8 km), so the gaps fill with rumble while a close
+  crack stays a crack. The channel's bends below 8 m are now followed at every distance, not only
+  within 3 km. The game keeps thunder in 32-bit float (its quiet end was being cut to the last bit
+  of sixteen) and never renders it below 24 kHz. Measured against five recordings of real thunder
+  (tools/thunder_texture.py): no holes in any render, and from 3 km out the texture is within the
+  recordings' range; strikes within a kilometre are still a little rougher above 500 Hz. Levels,
+  lengths and pitch are as before. Renders in inbox/thunder-round2-2026-10-05.
 - The fountain and the trees are smoother again (round 3). The grain left in the fountain was
   still the falling lumps of water: they now land over a longer moment, so their sound sits lower,
   under the hiss, as a little more low splash. Its drops now come in the sizes a breaking jet makes,

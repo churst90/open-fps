@@ -480,6 +480,9 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         => _isInitialized && _provider.RegisterSynthesisedSound(soundId, pcm16Mono, sampleRate);
     /// <summary>Lets go of a one-off synthesised buffer once it has played (IAudioProvider.ReleaseSynthesisedSound).</summary>
     public bool ReleaseSynthesisedSound(string soundId) => _isInitialized && _provider.ReleaseSynthesisedSound(soundId);
+    /// <summary>A synthesised buffer kept in float (IAudioProvider.RegisterSynthesisedSoundFloat).</summary>
+    public bool RegisterSynthesisedSoundFloat(string soundId, float[] pcm, int sampleRate)
+        => _isInitialized && _provider.RegisterSynthesisedSoundFloat(soundId, pcm, sampleRate);
     public Vector3 GetSoundPosition(int entityId) => _isInitialized ? _provider.GetSoundPosition(entityId) : Vector3.Zero;
     public float GetPlaybackProgress(int entityId) => _isInitialized ? _provider.GetPlaybackProgress(entityId) : 0f;
     public bool HasCategory(string category) => _isInitialized && _bank.HasCategory(category);

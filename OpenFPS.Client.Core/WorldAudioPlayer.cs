@@ -214,6 +214,7 @@ public sealed class WorldAudioPlayer
         _audio = audio;
         _acoustics = acoustics;
         PrewarmDoors();
+        PrewarmThunder();
     }
 
     /// <summary>
@@ -472,6 +473,22 @@ public sealed class WorldAudioPlayer
         });
     }
 
+    /// <summary>
+    /// One far strike rendered in the background at start and thrown away, so the first real one does
+    /// not wait on the JIT: the nearest thunder is due a third of a second after its flash, and the
+    /// render's first run took twice as long as its later ones.
+    /// </summary>
+    private static void PrewarmThunder()
+        => System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                var strike = new LightningStrike(1, FlashKind.CloudToGround, new Vector3(3000f, 4000f, 0f), new Vector3(3000f, 0f, 0f), 2e5f, 2);
+                Thunder.Render(strike, new Vector3(0f, 1.7f, 0f), Thunder.Air.Standard, new Thunder.Options { Threads = 1 });
+            }
+            catch (Exception ex) { Serilog.Log.Debug(ex, "[THUNDER] prewarm failed"); }
+        });
+
     /// <summary>Registers each part of a rendered strike and queues it, placed in its direction.</summary>
     private void QueueThunder(LightningStrike strike, double receivedAt, Vector3 listener, List<Thunder.Part> parts, long ms, double now)
     {
@@ -491,7 +508,9 @@ public sealed class WorldAudioPlayer
             float g = 1f / part.PeakPa;
             for (int i = 0; i < pcm.Length; i++) pcm[i] = part.Pressure[i] * g;
             string id = $"synth:thunder:{strike.Seed}:{n}:{k}";
-            if (!_audio.RegisterSynthesisedSound(id, TransientSynth.ToPcm16(pcm), part.SampleRate)) continue;
+            // In float: a minute of rumble 40-60 dB under the crack, in sixteen bits, ends as the last
+            // bit stepping on and off (round 1: "crackly and breaks up").
+            if (!_audio.RegisterSynthesisedSoundFloat(id, pcm, part.SampleRate)) continue;
             _registered.Add(id);
             var offset = part.Direction * SkyProxyMetres;
             _pending.Add(new Pending
@@ -554,7 +573,7 @@ public sealed class WorldAudioPlayer
 
         // The listener and the air, for the next strike's thunder; and any thunder that has come back.
         _lastListener = listenerPosition;
-        _air = new Thunder.Air(world.Temperature, world.Humidity, world.AirPressure, world.WindVelocity);
+        _air = new Thunder.Air(world.Temperature, world.Humidity, world.AirPressure, world.WindVelocity, world.WindGustiness);
         if (Self != null)
         {
             float ear = listenerPosition.Y - Self().Feet.Y;
