@@ -2,7 +2,7 @@
 """Loudness of the game's output, and the ear model's before/after (docs/EAR_MODEL.md).
 
     ear_loudness.py selftest
-    ear_loudness.py compare BEFORE_DIR AFTER_DIR [--speech-db 56.3] [--cut OUTDIR] [--json FILE]
+    ear_loudness.py compare BEFORE_DIR AFTER_DIR [--speech-db 56.3 | --offset DB] [--cut OUTDIR] [--json FILE]
 
 BEFORE_DIR and AFTER_DIR are AudioLab --game-levels captures (capture.wav, segments.csv), made with
 ear=off and ear=on. For each segment, over its middle (as tools/game_levels.py), in each capture:
@@ -149,13 +149,16 @@ def segments(d):
     return out, fs
 
 
-def compare(before, after, speech_db, cut, jout):
+def compare(before, after, speech_db, cut, jout, offset=None):
     bs, fs = segments(before)
     as_, fs2 = segments(after)
-    talker = next(k for k in bs if k.startswith('speech'))
-    # The mapping from the output to the ear: the 'before' talker at 2 m reads speech_db, unweighted.
-    offset = speech_db - gl.measure(bs[talker][0], fs)['rms']
-    print(f"output mapped so the before talker reads {speech_db} dB: 0 dBFS RMS = {offset:.1f} dB SPL")
+    if offset is None:
+        talker = next(k for k in bs if k.startswith('speech'))
+        # The mapping from the output to the ear: the 'before' talker at 2 m reads speech_db, unweighted.
+        offset = speech_db - gl.measure(bs[talker][0], fs)['rms']
+        print(f"output mapped so the before talker reads {speech_db} dB: 0 dBFS RMS = {offset:.1f} dB SPL")
+    else:
+        print(f"output mapped as given: 0 dBFS RMS = {offset:.1f} dB SPL")
     hdr = f"{'segment':34s} {'rms':>12s} {'lufs':>12s} {'dB(A)':>12s} {'phon':>12s} {'63Hz/1k':>12s} {'8k/1k':>12s} {'<100%':>9s} {'peak':>6s} {'clip':>4s} {'gap':>4s}"
     print(hdr)
     table = {}
@@ -189,7 +192,9 @@ def main():
 
         def opt(k, d=None):
             return args[args.index(k) + 1] if k in args else d
-        compare(sys.argv[2], sys.argv[3], float(opt('--speech-db', 56.3)), opt('--cut'), opt('--json'))
+        off = opt('--offset')
+        compare(sys.argv[2], sys.argv[3], float(opt('--speech-db', 56.3)), opt('--cut'), opt('--json'),
+                float(off) if off is not None else None)
         return
     print(__doc__)
 

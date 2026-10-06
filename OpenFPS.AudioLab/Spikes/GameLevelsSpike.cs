@@ -395,6 +395,8 @@ public static class GameLevelsSpike
                 RainAt(Rainfall.ModerateRate, "moderate", 8.0);
                 Wind(4.5f, 6.0);
             }
+            if (set is "wind")
+                foreach (var w in new[] { 2.2f, 4.5f, 7f }) Wind(w, 14.0);
             if (set is "compare")
             {
                 Footsteps(6.0);

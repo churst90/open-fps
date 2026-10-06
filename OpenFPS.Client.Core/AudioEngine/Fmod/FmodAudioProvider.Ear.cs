@@ -341,7 +341,7 @@ public partial class FmodAudioProvider
             if (name.Length > 28) name = "..." + name[^25..];
             top.Add((e.PlayedDb, $"{name} {e.RealDb:F0}->{e.PlayedDb:F0} dB ({e.RealPhon:F0}->{e.PlayedPhon:F0} phon) gain {e.GainDb:+0.0;-0.0} shelves {e.LowDb:+0.0;-0.0}/{e.HighDb:+0.0;-0.0}"));
         }
-        if (top.Count == 0) return;
+        if (top.Count == 0 && _windGainDb == 0f && _windCorrectionDb == 0f) return;
         top.Sort((x, y) => y.Played.CompareTo(x.Played));
         Log.Information("[EAR] {State}, listening level {Listening:F0} dB, ear wind gain {Wind:+0.0;-0.0}; {Voices}",
             EarModel.Enabled ? "on" : "OFF", EarModel.ListeningLevelDb, _windGainDb,
