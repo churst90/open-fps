@@ -113,6 +113,15 @@ public static class ExtendedSources
                     }
                     return places;
                 }
+                // Running water: along its length, or round where it lands (RunningWaterSynth.Layout).
+                if (key.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var spec = RunningWaterSpec.ByName(key[5..]);
+                    if (spec.Places <= 1) return null;
+                    var places = RunningWaterSynth.Layout(spec);
+                    for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
+                    return places;
+                }
                 if (key.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
                 {
                     var spec = FireSpec.ByName(key[5..]);

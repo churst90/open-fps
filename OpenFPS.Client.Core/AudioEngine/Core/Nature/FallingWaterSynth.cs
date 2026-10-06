@@ -273,10 +273,60 @@ public sealed class FallingWaterSynth
         if (tap >= 0 && tap < _taps) _tapSpread[tap] = Math.Clamp(spread, 0f, 1f);
     }
 
+    /// <summary>How much of the spec's flow is falling now, as a share (1: as the spec says). Running water
+    /// (RunningWaterSynth) sets it from the flow it carries, so its falls follow the rain: every rate
+    /// goes as the flow, the sizes do not.</summary>
+    public float FlowScale = 1f;
+
+    /// <summary>For running water: where an event of the fall feeding tap <c>tap</c> is written, if not
+    /// to this synth's own sums. Set once, before the first sample; the sums it hands back must advance
+    /// with <see cref="Advance"/>, one sample per call, so the events land at the sample they are meant
+    /// to. Null for a fountain.</summary>
+    public Func<int, EventSum>? Placer;
+
+    /// <summary>How long a drop's blow on stone takes to build, as a share of its r / v. Zero for the
+    /// fountain (its first contact, ImpactRise). Running water sets it: its stone is paving or a pipe's
+    /// bend under a film of the same water, which the drop meets first, and its blow builds the way the
+    /// rain's does on a wet street (RainSurfaces.BlowPeakAt, the peak at 0.2 D / v, a Gaussian of about
+    /// 0.2 r / v).</summary>
+    public float HardCushion;
+
+    /// <summary>The share of a drop's blow on wet stone heard as its spray, and the spray's band and
+    /// time: the rain's on a wet street (RainSynth.SprayShare, SprayLowHz, SprayHighHz,
+    /// SprayRiseSeconds, SprayDecaySeconds, fitted there to recorded rain, 2026-10-06), used only with a
+    /// cushioned blow (<see cref="HardCushion"/>): the cushion takes the top octaves out of the click,
+    /// and the secondary droplets the crown throws off the film put them back, over milliseconds.</summary>
+    private const float WetSprayShare = RainSynth.SprayShare;
+
+    /// <summary>The most wet sprays a fall renders a block; more are stood for by energy.</summary>
+    private const int MaxSpraysPerBlock = 6;
+    private int _spraysThisBlock;
+    private float _sprayCarry;
+
+    /// <summary>A drop's spray off wet stone: band noise rising over a millisecond and dying over a few,
+    /// carrying <see cref="WetSprayShare"/> of the energy its blow would have had as a bare spike (a
+    /// Gaussian of the first-contact time, ImpactRise, at this peak).</summary>
+    private void WetSpray(EventSum place, int at, float peakPascals)
+    {
+        float energy = peakPascals * peakPascals * ImpactRise * 1.7724539f * WetSprayShare + _sprayCarry;
+        // Thinned: past the block's few, the energy is carried to the next one rendered.
+        if (_spraysThisBlock >= MaxSpraysPerBlock) { _sprayCarry = energy; return; }
+        _sprayCarry = 0f;
+        _spraysThisBlock++;
+        const float rise = RainSynth.SprayRiseSeconds, decay = RainSynth.SprayDecaySeconds;
+        float pascals = MathF.Sqrt(energy / (rise / 3f + decay / 2f));
+        place.Burst(at, rise, decay, pascals * MathF.Sqrt(SplashPart), RainSynth.SprayLowHz, RainSynth.SprayHighHz);
+    }
+
+    /// <summary>Schedules the next sample's events without reading this synth's own sums: for a caller
+    /// whose <see cref="Placer"/> takes every event.</summary>
+    public void Advance() => Step();
+
     /// <summary>The place one event of fall <paramref name="f"/> lands at: its tap's middle by the
     /// middle's share, otherwise one of the places round it.</summary>
     private EventSum PlaceFor(FallState f)
     {
+        if (Placer != null) return Placer(f.Tap);
         if (_placesPerTap == 1) return f.Sum;
         float middle = _tapMiddle[f.Tap];
         float u = f.Sum.Uniform();
@@ -573,6 +623,7 @@ public sealed class FallingWaterSynth
 
     private void Schedule(float dt)
     {
+        _spraysThisBlock = 0;
         // The wind is handed in once a control call, eleven milliseconds apart; glide to it over a
         // few blocks so the spray's share never steps.
         _wind = float.IsNaN(_wind) ? Wind : _wind + (Wind - _wind) * MathF.Min(1f, dt / 0.05f);
@@ -605,8 +656,9 @@ public sealed class FallingWaterSynth
                 f.ClumpClock = f.ClumpLength;
             }
             f.Clump = f.ClumpTo + (f.ClumpFrom - f.ClumpTo) * MathF.Max(0f, f.ClumpClock / f.ClumpLength);
-            Drops(f, f.DropRate * dropScale * _flow * dt * f.Clump, drift);
-            Chunks(f, f.ChunkRate * coherentScale * _flow * dt * f.Clump);
+            float flow = _flow * MathF.Max(0f, FlowScale);
+            Drops(f, f.DropRate * dropScale * flow * dt * f.Clump, drift);
+            Chunks(f, f.ChunkRate * coherentScale * flow * dt * f.Clump);
         }
     }
 
@@ -635,7 +687,12 @@ public sealed class FallingWaterSynth
             // paving round a pool.
             if (f.Rock || (drift > 0f && r < 1e-3f && sum.Uniform() < drift * (1f - r / 1e-3f)))
             {
-                place.Impact(at, ImpactRise, 0.4f * tau, impact * (HardImpactPascals / ImpactPascals));
+                // Onto a film of running water the blow builds over a share of r / v (HardCushion); the
+                // same energy over the longer rise, so the peak comes down as its root.
+                float hardRise = MathF.Max(ImpactRise, HardCushion * tau);
+                float hard = impact * (HardImpactPascals / ImpactPascals);
+                place.Impact(at, hardRise, 0.4f * tau, hard * MathF.Sqrt((1f - (HardCushion > 0f ? WetSprayShare : 0f)) * ImpactRise / hardRise));
+                if (HardCushion > 0f) WetSpray(place, at, hard);
                 continue;
             }
             place.Impact(at, ImpactRise, tau, impact);
@@ -692,6 +749,11 @@ public sealed class FallingWaterSynth
             float spread = SplashBandHalfWidth;
             place.Burst(at, sr, sd, sp * weight * SplashPart, fc / spread, MathF.Min(fc * spread, 0.45f * _rate), steep: true);
 
+            // On a film of running water a lump spreads into a thin sheet that throws fine droplets, as
+            // a raindrop on a wet street does (running water only, HardCushion).
+            if (f.Rock && HardCushion > 0f)
+                WetSpray(place, at, HardImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart);
+
             if (f.Rock) continue;
 
             // The plunge's bubbles: pinched off in a burst as this lump's cavity closes.
@@ -715,7 +777,9 @@ public sealed class FallingWaterSynth
         }
     }
 
-    private static void Ring(EventSum sum, int at, float bubbleMm, float weight)
+    /// <summary>A bubble of this radius ringing, made at a random depth (the u^β loudness skew), as
+    /// every bubble in water here is: the fountain's, the rain's and running water's.</summary>
+    internal static void Ring(EventSum sum, int at, float bubbleMm, float weight)
     {
         if (bubbleMm < SmallestBubbleMm || weight <= 0f) return;
         float hz = MinnaertHzMetres / (bubbleMm * 1e-3f);

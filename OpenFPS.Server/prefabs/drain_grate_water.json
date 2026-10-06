@@ -1,0 +1,17 @@
+{
+  "Id": "drain_grate_water",
+  "Name": "Drain",
+  "Description": "A road drain in the rain (RunningWaterSpec.DrainGrate, RunningWaterSynth): the gutter's water pouring between the bars of the grate into the gully pot below, heard through the pot's air and out of the grate; drips from the bars when the flow dies away. Fed by the same run-off as the gutter above it: silent in dry weather. Place it just above the grate, never inside the road surface. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": { "X": 0.2, "Y": 0.2, "Z": 0.2 },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "flow:drain_grate",
+  "Volume": 1.0,
+  "Range": 60,
+  "MinDistance": 1,
+  "Mode": "LoopOne"
+}
