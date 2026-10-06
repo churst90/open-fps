@@ -86,7 +86,8 @@ public sealed class FireSynth
     private readonly float _puffHz, _roarHz, _roarPascals;
     private Resonator _roarLow, _roarHigh;
     private float _puffPhase, _puffJitter, _puffDepth = 0.2f;
-    private float _roarGain;
+    private float _roarGain, _roarGainNow = 1f;
+    private readonly float _gainGlide;
     private readonly float _roarNorm;
 
     // Steam jets
@@ -123,6 +124,7 @@ public sealed class FireSynth
         // roar stays out of the kilohertz bands where the crackles live.
         _roarHigh.Tune(_roarHz * 3f, 0.5f, sampleRate);
         _roarGain = 1f;
+        _gainGlide = 1f - MathF.Exp(-1f / (0.005f * sampleRate));
         // What the two in series pass of unit white noise, measured once rather than guessed.
         {
             var a = new Resonator(); a.Tune(_roarHz, 0.5f, sampleRate);
@@ -228,7 +230,9 @@ public sealed class FireSynth
         float n = _sum.Signed() * 1.7320508f;
         // Two band-passes in series, normalised by what the pair passes of white noise.
         float roar = _roarHigh.Process(_roarLow.Process(n)) * _roarNorm;
-        float y = roar * _roarPascals * _roarGain * puff * RoarPart;
+        // The gain is set once a control call, with the wind read then; glide to it so it never steps.
+        _roarGainNow += (_roarGain - _roarGainNow) * _gainGlide;
+        float y = roar * _roarPascals * _roarGainNow * puff * RoarPart;
         _samples++;
 
         // Steam.

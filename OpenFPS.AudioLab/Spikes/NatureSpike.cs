@@ -48,7 +48,8 @@ public static class NatureSpike
     /// only those parts.</summary>
     private static string[]? Parts;
 
-    /// <summary>steady=M: hold the wind at M m/s instead of reading the field.</summary>
+    /// <summary>steady=M: hold the wind at M m/s instead of reading the field. turb=T: the field's
+    /// turbulence intensity for this run.</summary>
     private static float? Steady;
 
     public static int Run(string[] args)
@@ -58,6 +59,7 @@ public static class NatureSpike
         float sec = Arg(args, "sec=", 30f);
         float wind = Arg(args, "wind=", WindField.MeanSpeed);
         WindField.MeanSpeed = wind;
+        if (args.Any(a => a.StartsWith("turb=", StringComparison.Ordinal))) WindField.Turbulence = Arg(args, "turb=", WindField.Turbulence);
         AcousticRegistry.Initialize();
 
         if (args.Contains("live")) return Live(Arg(args, "sec=", 10f), Arg(args, "dist=", 3f));
@@ -242,7 +244,8 @@ public static class NatureSpike
                 }
                 for (int i = 0; i < n; i += block)
                 {
-                    s.Wind = Steady ?? WindField.SpeedAt(x, spec.CrownHeightMetres, z, i / (double)Rate);
+                    if (Steady is float still) s.Wind = still;
+                    else s.ReadWind(x, z, i / (double)Rate);
                     s.Control(block / (float)Rate);
                     for (int k = i; k < Math.Min(n, i + block); k++) pa[k] = s.Next();
                 }

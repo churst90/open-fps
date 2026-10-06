@@ -35,8 +35,13 @@ public static class WindField
     /// West-south-west, the prevailing wind over most of the temperate world.</summary>
     public static float FromDegrees { get; set; } = 250f;
 
-    /// <summary>Standard deviation of the speed over its mean.</summary>
-    public static float Turbulence { get; set; } = 0.3f;
+    /// <summary>Standard deviation of the speed over its mean. Over ground of roughness z0 the surface
+    /// layer gives about 1 / ln(z / z0) (EN 1991-1-4 with its turbulence factor 1): with the
+    /// <see cref="RoughnessMetres"/> here, 0.24 at ten metres and 0.26 at a park tree's crown. It was
+    /// 0.3, the top of that range, and since a crown's sound goes as the wind to the 3.6, the lulls
+    /// took the trees nearly silent and the gusts were heard as someone turning them up and down
+    /// (seven decibels standard deviation over ten minutes; 0.25 gives five and a half).</summary>
+    public static float Turbulence { get; set; } = 0.25f;
 
     /// <summary>The roughness length of the ground, m: about 0.1 for open grass with scattered trees,
     /// 0.5 to 1 for a suburb. It sets how fast the wind falls off toward the ground.</summary>

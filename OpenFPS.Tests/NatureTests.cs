@@ -263,6 +263,142 @@ public class NatureTests
         Assert.Equal(0f, lime.StrikesPerSecond(0.5f));
     }
 
+    // ── Texture: grain and flicker ─────────────────────────────────────────────────────────────
+
+    /// <summary>A band of a signal: two RBJ high-passes then two low-passes, as the lab measures.</summary>
+    private static float[] Band(float[] x, float lo, float hi)
+    {
+        var y = (float[])x.Clone();
+        for (int pass = 0; pass < 2; pass++)
+        {
+            Biquad(y, lo, highPass: true);
+            Biquad(y, hi, highPass: false);
+        }
+        return y;
+    }
+
+    private static void Biquad(float[] y, float f, bool highPass)
+    {
+        double w = 2 * Math.PI * f / Rate, c = Math.Cos(w), alpha = Math.Sin(w) / (2 * 0.7071);
+        double b0 = highPass ? (1 + c) / 2 : (1 - c) / 2, b1 = highPass ? -(1 + c) : 1 - c, b2 = b0;
+        double a0 = 1 + alpha, a1 = -2 * c, a2 = 1 - alpha;
+        double x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+        for (int i = 0; i < y.Length; i++)
+        {
+            double xi = y[i];
+            double yi = (b0 * xi + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+            x2 = x1; x1 = xi; y2 = y1; y1 = yi;
+            y[i] = (float)yi;
+        }
+    }
+
+    /// <summary>The mean kurtosis of a signal over 10 ms windows: 3 for a wash of noise, more the more
+    /// it is made of separate clicks. Windows, so a slow swell is not counted as peakiness.</summary>
+    private static double WindowKurtosis(float[] x)
+    {
+        int w = Rate / 100;
+        double sum = 0;
+        int n = 0;
+        for (int s = Rate / 2; s + w <= x.Length; s += w)
+        {
+            double m2 = 0, m4 = 0;
+            for (int i = s; i < s + w; i++) { double q = (double)x[i] * x[i]; m2 += q; m4 += q * q; }
+            m2 /= w; m4 /= w;
+            if (m2 <= 1e-20) continue;
+            sum += m4 / (m2 * m2);
+            n++;
+        }
+        return sum / Math.Max(1, n);
+    }
+
+    /// <summary>How much a signal's level flickers: the standard deviation, dB, of its 50 ms level about
+    /// its own one-second running mean.</summary>
+    private static double Flicker(float[] x)
+    {
+        int w = Rate / 20;
+        var level = new List<double>();
+        for (int s = Rate / 2; s + w <= x.Length; s += w)
+        {
+            double e = 0;
+            for (int i = s; i < s + w; i++) e += (double)x[i] * x[i];
+            level.Add(10 * Math.Log10(e / w + 1e-30));
+        }
+        var dev = new List<double>();
+        for (int i = 10; i + 10 < level.Count; i++)
+        {
+            double mean = 0;
+            for (int k = i - 10; k < i + 10; k++) mean += level[k];
+            dev.Add(level[i] - mean / 20);
+        }
+        double m = dev.Average();
+        return Math.Sqrt(dev.Average(d => (d - m) * (d - m)));
+    }
+
+    /// <summary>
+    /// The fountain's hiss is a wash, not static. Recorded fountains have a kurtosis of 3.5-3.8 over
+    /// 10 ms windows in 8-16 kHz and their 50 ms level flickers by 0.7-0.9 dB; the first model was 6.6
+    /// and 1.5, because a dozen impacts a block stood for fifty, a collapsing column's lumps struck as
+    /// sharply as drops, and a jet's slugs stepped its rate tens of times a second.
+    /// </summary>
+    [Fact]
+    public void TheFountainHissesWithoutStatic()
+    {
+        var water = new FallingWaterSynth(WaterFeatureSpec.ByName("park_fountain"), Rate, 3) { Wind = 3f };
+        var x = new float[Rate * 20];
+        for (int i = 0; i < x.Length; i++)
+        {
+            if (i % 256 == 0) water.Control(256f / Rate);
+            x[i] = water.Next();
+        }
+        double kurtosis = WindowKurtosis(Band(x, 8000f, 16000f));
+        double flicker = Flicker(x);
+        _o.WriteLine($"8-16 kHz kurtosis {kurtosis:F2}, 50 ms flicker {flicker:F2} dB");
+        Assert.InRange(kurtosis, 2.5, 4.5);
+        Assert.InRange(flicker, 0.3, 1.2);
+    }
+
+    /// <summary>
+    /// The rustle comes in twig episodes, but a twig's sixteen leaves can strike only about twice a
+    /// flutter cycle each, some thirty-odd strikes an episode. The first model gave an episode 400,
+    /// so a breeze was a few loud patches a second, each heard arriving: the leaves' 2-8 kHz band
+    /// flickered by 2.7 dB over 50 ms where recorded leaves flicker by 0.5-0.7 (1.7 in the busiest).
+    /// </summary>
+    [Fact]
+    public void TheRustleIsNotAFewLoudPatches()
+    {
+        var tree = new FoliageSynth(FoliageSpec.ByName("park_tree"), Rate, 5) { Wind = 4f, ShedPart = 0f };
+        var x = new float[Rate * 20];
+        for (int i = 0; i < x.Length; i++)
+        {
+            if (i % 256 == 0) tree.Control(256f / Rate);
+            x[i] = tree.Next();
+        }
+        double flicker = Flicker(Band(x, 2000f, 8000f));
+        _o.WriteLine($"leaves' 2-8 kHz flicker {flicker:F2} dB");
+        Assert.InRange(flicker, 0.3, 1.7);
+    }
+
+    /// <summary>
+    /// A crown is metres across, so a gust reaches its upwind boughs before its downwind ones: the
+    /// boughs read the field at their own places, a crossing of the crown apart.
+    /// </summary>
+    [Fact]
+    public void AGustCrossesTheCrown()
+    {
+        var spec = FoliageSpec.ByName("park_tree");
+        float first = FoliageSynth.BoughAlongMetres(spec, 0), last = FoliageSynth.BoughAlongMetres(spec, FoliageSynth.Boughs - 1);
+        Assert.True(first < 0f && last > 0f);
+        Assert.InRange(last - first, spec.CrownRadiusMetres, 2f * spec.CrownRadiusMetres);
+        // What the last bough feels now, the first felt (last - first) / U seconds ago.
+        double t = 1234.5, lag = (last - first) / Math.Max(0.5, WindField.MeanSpeed);
+        var tree = new FoliageSynth(spec, Rate, 1);
+        tree.ReadWind(10f, -20f, t - lag);
+        float upwindEarlier = tree.BoughWind(0);
+        tree.ReadWind(10f, -20f, t);
+        Assert.Equal(upwindEarlier, tree.BoughWind(FoliageSynth.Boughs - 1), 2);
+        Assert.NotEqual(tree.BoughWind(0), tree.BoughWind(FoliageSynth.Boughs - 1));
+    }
+
     // ── On the city ────────────────────────────────────────────────────────────────────────────
 
     private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")
