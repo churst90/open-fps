@@ -193,15 +193,28 @@ draining 285 m² in moderate rain (5 mm/h) carries 0.27-0.36 L/s, 9 mm deep at t
 
 - One site per obstacle (up to 40 rendered; more are stood for by rate).
 - At each: the surface drops into the lee by the obstacle's height, or by the depth when the obstacle
-  stands out of the water (h·y/(h + y)). The water there runs at v_l = √(v² + 2g·drop).
-- Air driven under goes as the flow through the site times the jet's excess speed over an onset (the
-  plunging-jet law, fitted coefficient).
+  stands out of the water (h·y/(h + y)). The water there runs at v_l = √(v² + 2g·drop), as a sheet
+  of thickness q/v_l.
+- The lee jet meets the slower water behind the obstacle in a small jump. Air driven under goes as the
+  flow through the site times how far the jet's Froude number stands over 1.4, the undular jump's
+  limit (section 1.3). The coefficient is fitted (0.016). Deeper water drowns small obstacles: their
+  jets fall under the limit, so a gutter or a creek does not simply grow louder with more water.
+- Each bubble is heard through its image in the surface: a dipole, its pressure going as 2kz for a
+  bubble z deep (Pumphrey and Crum 1990; Medwin and Beaky 1989), z drawn down to how far the jet drives
+  its air. Small shallow bubbles carry further than their size says, which is why small water features
+  are bright in air (Watts et al. 2009). The fountain's plunge drives bubbles deep, where the factor
+  flattens; its law is unchanged.
 - Bubble sizes: the Deane-Stokes spectrum below the site's own Hinze scale (from the jet's dissipation,
   ε^-2/5, held to 0.5-3 mm), up to the size of the cavity the jet opens; and a share of each site's
   bubbles about its own characteristic radius, drawn once, so each stone repeats its own few notes.
 - Time: a steady trickle of bubbles plus bursts at the site's shedding rate (St = 0.2), each burst's
   air log-normally uneven; a big burst may close on a pocket of air, a large bubble whose note climbs
-  (ξ 0.35); the spilling crest throws spray (the fountain's splash, at the jet's speed).
+  (ξ 0.35), heard as a crater's bubble (the fountain's law, not the dipole: a cavity closing at the
+  surface drives it like a piston, Phillips et al. 2018); the spilling crest of a jet over 0.8 m/s
+  throws spray (the fountain's splash, at the jet's speed).
+- Fitted (2026-10-06, section 8): the air coefficient 0.016, a quarter of the air in bursts, the
+  bursts' spread 0.7, three tenths of a site's bubbles its own notes, the Hinze scale's reference
+  dissipation 15 W/kg (the Hinze scale held to 0.5-3 mm), a glug in six bursts of ten.
 - Each bubble's loudness for its size and depth, and the splash's efficiency, are the fountain's
   (`FallingWaterSynth`, fitted there, not refitted).
 
@@ -211,7 +224,21 @@ Each fall becomes a `WaterFallSpec` for the fountain's own physics (drops, lumps
 bubbles), its events written into this source's places through `FallingWaterSynth.Placer`, its rates
 following the flow (`FlowScale`). The sheet's thickness at the lip (weir law) decides how it arrives:
 under 2 mm it fingers into strands that bead into drops; from 6 mm it falls coherent, in lumps the
-size of its strands.
+size of its strands. A film down a pipe's wall arrives whole at its terminal speed (section 1.5,
+(Q/D)^0.4), as if it had fallen v²/2g.
+
+Onto wet stone (paving under a downpipe, the bars of a grate, a pipe's bend) a drop meets the film of
+the same water first: its blow builds over 0.2 r/v, not in the first-contact microseconds, and a
+share of its energy comes back as the rain's spray off a wet street (RainSynth, fitted to recorded
+rain). Without it the lone drops on stone were one-sample ticks (10 ms kurtosis 9-10). The fountain
+keeps its own impacts (`FallingWaterSynth.HardCushion` is zero there).
+
+### 5.4a Rain on a gutter's water
+
+A gutter's strip of water is not a surface the rain survey knows (it sees the asphalt), so the gutter
+renders the rain on its own wetted strip: the rain model's Pool layer (clicks and, for 0.8-1.1 mm
+drops, the regular bubble near 14 kHz) over its width along its length, at the rain falling now. A
+creek's water is a surface of the map and its rain is the survey's.
 
 ### 5.5 Cavities
 
@@ -243,15 +270,49 @@ round where its water lands. Every event goes to one place: no place is a copy o
 
 ## 7. Not modelled yet
 
-- Rain falling onto the running water itself (the rain model plays the surface it lands on).
 - The pipe wall radiating along its length, and structure-borne noise through clamps.
 - The vortex and gurgle where a gutter enters its downpipe, and trap seals clearing.
-- Fall sizes changing with flow (only the rates follow the flow).
+- Fall sizes changing with flow: only the rates follow the flow, so a fall grows about 3 dB a doubling
+  where Watts et al. measured 6 for a weir. The film's terminal speed is set at the reference rain.
+- The tail after rain is one exponential per catchment; real roofs drip longer (water held in gutters).
 - Snowmelt.
+- Taps and sinks (recordings gathered; no preset yet).
 
 ## 8. Results
 
-(Filled in after fitting.)
+Recordings: 29 (CC0, CC-BY, CC-BY-SA), in `~/openfps-scratch-archive/running-water-2026-10-06/refs`
+with `SOURCES.txt`: 8 creeks and riffles, 3 gutters, 4 drains, 7 downpipes and spouts, 4 overflows and
+weirs, 2 taps, 1 weak far creek. None binaural except creeks and rivers; no recording of a light
+gutter flow exists that we found. Their texture statistics (20 s pieces) are in `TextureStatistics`
+as "stream", "drain", "downpipe" and "overflow".
+
+At a metre (AudioLab `--running-water levels`), the 14 fitted statistics inside the recordings'
+spread, and the 4-16 kHz kurtosis in 10 ms windows:
+
+| model | inside | kurtosis | recordings' kurtosis |
+|---|---|---|---|
+| creek 10 / 40 / 160 L/s | 14 / 14 / 13 | 3.25 / 3.12 / 3.15 | 2.95-6.96 |
+| drain, 5 / 25 mm/h | 14 / 14 | 5.42 / 4.14 | 2.98-9.46 |
+| downpipe, 5 / 25 mm/h | 13 / 12 | 4.82 / 3.70 | 3.44-11.24 |
+| basin overflow, 2 L/s | 12 | 4.11 | 2.98-5.05 |
+| gutter, 5 / 25 mm/h | 5 / 6 | 3.76 / 5.00 | 3.29-4.22 |
+
+The creek's octaves from 250 Hz to 16 kHz sit inside the recordings' (2 kHz at their brightest). The
+downpipe is darker than every recorded downpipe at 4-8 kHz. The gutter's two recordings are larger
+flows than a 0.27 L/s trickle, both in heavy rain.
+
+Levels at a metre (point-equivalent): creek 67.3 dB at 40 L/s (59 at 10, 73 at 160); gutter 51 dB,
+drain 58 dB, downpipe 52 dB in moderate rain (39 / 47 / 34 at 0.5 mm/h, 58 / 70 / 63 at 70 mm/h);
+overflow 67 dB. The drain's 58.4 dB(A) at 0.36 L/s against Watts's weir law: 57.
+
+Through the game (client, mixer, HRTF, ear model, loudness law): no clipping, no gaps, the creek
+heard wide (IACC 0.1-0.3 at 500 Hz-4 kHz from its bank), the drain and downpipe near a point. Renders
+and the full table: `inbox/running-water-2026-10-06/README.txt`.
+
+Cost of one core: creek 7.6 %, gutter 1.6 %, drain 2.3 %, downpipe 1.5 %, overflow 1.2 %.
+
+Not connected to the Elm Park fountain: an overflow at 2 L/s adds 4.6 dB from 4 m south of its kerb
+and dominates that side. A before/after pair is in the inbox for Cody to decide.
 
 ## 9. Sources
 

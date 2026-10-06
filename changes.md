@@ -4,6 +4,31 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Running water (unheard). A physical model of water that runs: creeks, street gutters, road drains,
+  downpipes and a fountain basin's overflow. Research and design in docs/RUNNING_WATER.md; renders in
+  inbox/running-water-2026-10-06 with a README.
+  - A stream is heard where its surface breaks: behind each stone the water drops into a small jump
+    that drives air under, and the bubbles ring. Each stone repeats its own few notes, in bursts.
+    Shallow small bubbles are heard more strongly through the surface than deep ones.
+  - Drains, downpipes and overflows are falling water, made with the fountain's physics, heard through
+    the gully pot or the pipe. A trickle too small to run drips. A gutter in rain also has the rain on
+    its own water.
+  - Depth and speed come from the channel (Manning's law for a stream bed, the road-drainage formula
+    for a kerb gutter). Gutters, drains and downpipes are fed by the rain through their catchment:
+    they fill over a few minutes, run on after the rain stops, and are silent and take no voice when
+    dry.
+  - Sound ids `flow:creek`, `flow:gutter`, `flow:drain_grate`, `flow:downpipe`, `flow:basin_overflow`
+    (ModelLibrary kind `flow`). Creeks and gutters are heard from places along their length, drains
+    and downpipes from a ring round where the water lands.
+  - On the city: a gutter and its drain on the Foundry Street south kerb by the spawn (`/tp 60 122
+    0.15`). Only in rain. city.json regenerated; only named-place ids move.
+  - Fitted against 29 recordings (texture statistics, 10 ms kurtosis, octaves). Creek 14 of 14
+    statistics, drain 14, downpipe 12-13, overflow 12; the gutter 5-6 against two recordings of much
+    larger flows. Every render: no clipping, no gaps except between drips.
+  - The Elm Park fountain is unchanged. A basin overflow for it was rendered but not connected: it adds
+    4.6 dB on its side. Before and after are in the inbox.
+  - Lab: AudioLab `--running-water levels|runoff|render|game`.
+
 - Door sounds are rendered once and kept. The client's door render cache is now named by the door
   models' own fingerprint (`DoorModelFingerprint`, a hash of the door model sources listed in
   OpenFPS.Common.csproj) instead of the whole OpenFPS.Common hash, so a change anywhere else no longer
