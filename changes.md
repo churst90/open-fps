@@ -37,6 +37,8 @@ Recent work, newest first. `git log` has the rest.
     rain over a bus shelter 1.0 to 3.1 %, each near quarter 0.5 to 0.8 %. The HRTF is 0.08 % of a
     core per voice; a second-order ambisonic field for the same seven streams costs more (0.9 %) and
     would lose each place's own path, so each place is a voice.
+  - Traced echoes: a tree, a fire or a fountain takes at most two echo rigs, as a train does (the
+    fountain's five taps could take five).
   - OPENFPS_WIDE_SOURCES=0 plays everything from one point; OPENFPS_PLACE_VOICES sets the budget.
   - AudioLab `--wide-sources [set=measure|render|roofs|level|tree|cost] [wide=on|off]`, and
     `tools/interaural.py files|segments|windows`.

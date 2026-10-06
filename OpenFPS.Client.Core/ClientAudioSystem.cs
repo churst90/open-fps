@@ -1981,7 +1981,8 @@ public class ClientAudioSystem
     /// </summary>
     private void PlaceOuter(int sourceId, Spreading sp, in SpatialEmitter middle, WorldSnapshot world, double now)
     {
-        bool want = sp.Spread > 0f || (!double.IsNaN(sp.MergedSince) && now - sp.MergedSince < MergeHoldSeconds);
+        // A source that has never spread (out of the angle, or out of the budget) asks for nothing.
+        bool want = sp.Spread > 0f || (sp.Voiced && !double.IsNaN(sp.MergedSince) && now - sp.MergedSince < MergeHoldSeconds);
         if (!want)
         {
             if (sp.Voiced) StopOuter(sourceId, sp);
