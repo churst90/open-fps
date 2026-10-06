@@ -1047,6 +1047,16 @@ public class AsyncAcousticWorker : IDisposable
             // Pathing off: its probe grid is too coarse on a city (tens of metres) to say where a sound
             // comes from, nothing reads its answer, and the bake cost a core for minutes at every map
             // load. Routes round obstacles come from the barrier search (BarrierPathDifference).
+            // Embree, where it starts: the scene is then made of a sub-scene per tile and per door leaf
+            // (TileSceneSet), and a tile arriving or a door swinging rebuilds none of the rest. The
+            // simulators are made for the context's scene type, so this comes first.
+            // OPENFPS_EMBREE=0 keeps the default tracer and whole-scene rebuilds (for comparison, or a
+            // machine where Embree misbehaves); OPENFPS_TILE_SCENES=0 keeps Embree with whole scenes.
+            _embree = Environment.GetEnvironmentVariable("OPENFPS_EMBREE") != "0"
+                      && OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.UseEmbree(_saContext);
+            Console.WriteLine(_embree
+                ? "[AcousticWorker] Steam Audio scenes use Embree: a sub-scene per tile and per door leaf."
+                : "[AcousticWorker] Embree did not start here; Steam Audio scenes use the default tracer and are rebuilt whole.");
             _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: false);
             if (!_saSim.IsValid)
             {
@@ -1145,11 +1155,53 @@ public class AsyncAcousticWorker : IDisposable
     // when it is ready. Sources keep their last answers meanwhile; nothing waits for it.
     private long _builtGeometryVersion;
     private bool _buildIsForTiles;
+    /// <summary>Embree started on this context: scenes are assembled from tiles (TileSceneSet).</summary>
+    private bool _embree;
+    /// <summary>This map's sub-scenes. Replaced on a new map; the old set is let go once no build uses it.</summary>
+    private TileSceneSet? _tileScenes;
+    private double _lastScenesMs, _lastRoutesMs;
+    private object? _routesPortals;
+    private long _routesBuiltTicks;
+    /// <summary>The longest the routes go unmade while only walls and roads change, seconds.</summary>
+    private const double RoutesEverySeconds = 3.0;
+    private readonly List<(TileSceneSet Set, long At)> _retiredTileSets = new();
+
+    /// <summary>The tile sets of earlier maps, let go as replaced scenes are: once no build uses one, no
+    /// tracer is still being handed over, and five seconds have passed.</summary>
+    private void ReleaseRetiredTileSets()
+    {
+        if (_doorBuild != null || _retiredTileSets.Count == 0) return;
+        if (OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Reconfiguring) return;
+        long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
+        for (int i = _retiredTileSets.Count - 1; i >= 0; i--)
+            if (_retiredTileSets[i].At < cutoff) { _retiredTileSets[i].Set.Dispose(); _retiredTileSets.RemoveAt(i); }
+    }
+
+    /// <summary>The two scenes for a world: assembled from the tile set's sub-scenes (only the tiles
+    /// that changed are built), or, without Embree, built whole.</summary>
+    private static (SteamAudioScene Full, SteamAudioScene Listener) ScenesFor(IntPtr ctx, TileSceneSet? set, WorldSnapshot world,
+                                                                             List<SteamAudioScene.Box> boxes)
+    {
+        if (set != null)
+        {
+            set.Update(boxes);
+            return set.Assemble();
+        }
+        var full = new SteamAudioScene(ctx);
+        full.Build(boxes);
+        var listener = new SteamAudioScene(ctx);
+        listener.Build(SteamAudioScene.WithoutOpenGround(boxes));
+        return (full, listener);
+    }
     private long _buildStartedTicks;
 
     /// <summary>Tile rebuilds swapped in, and how long the last took, milliseconds. Diagnostic.</summary>
     public int TileSceneBuilds { get; private set; }
     public double LastTileSceneBuildMs { get; private set; }
+    /// <summary>Every background scene build so far (tiles and doors), milliseconds of wall time in all.</summary>
+    public double SceneBuildMsTotal { get; private set; }
+    /// <summary>Of those: making the Steam Audio scenes, and making the routes through openings, ms in all.</summary>
+    public double SceneOnlyMsTotal, RoutesMsTotal;
 
     private static System.Threading.Tasks.Task<T> RunLowered<T>(string name, Func<T> work)
     {
@@ -1182,11 +1234,14 @@ public class AsyncAcousticWorker : IDisposable
         _barrierBoxes = boxes;
         _lastSceneBoxes = boxes.Count;
         PublishRoutes(routes);
+        SceneBuildMsTotal += (DateTime.UtcNow.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
         if (_buildIsForTiles)
         {
             TileSceneBuilds++;
             LastTileSceneBuildMs = (DateTime.UtcNow.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
-            Console.WriteLine($"[AcousticWorker] Tiles changed: the scene now has {boxes.Count} boxes ({LastTileSceneBuildMs:F0} ms, off this thread).");
+            Console.WriteLine($"[AcousticWorker] Tiles changed: the scene now has {boxes.Count} boxes ({LastTileSceneBuildMs:F0} ms, off this thread"
+                + $"; scenes {_lastScenesMs:F0} ms, routes {_lastRoutesMs:F0} ms"
+                + (_tileScenes != null ? $"; {_tileScenes.LastBuilt} tile(s) built, update {_tileScenes.LastUpdateMs:F0} ms, assembled in {_tileScenes.LastAssembleMs:F1} ms)." : ")."));
         }
         else Console.WriteLine("[AcousticWorker] A door moved: the scene now has the leaves where they are.");
     }
@@ -1206,10 +1261,14 @@ public class AsyncAcousticWorker : IDisposable
         if (_saScene == null || _saSim == null) return;
         SwapInDoorBuild();
         ReleaseRetiredScenes();
+        ReleaseRetiredTileSets();
         bool mapChanged = !_saScene.IsBuilt || !ReferenceEquals(world.AcousticMap, _saSceneMap);
         if (!mapChanged)
         {
             if (_doorBuild != null) return;
+            // The tile set assembles into the pair of scenes not in use, which is only free once the last
+            // pair handed over has reached every tracer.
+            if (_tileScenes != null && OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Reconfiguring) return;
             bool tiles = world.GeometryVersion != _builtGeometryVersion;
             if (!tiles)
             {
@@ -1222,14 +1281,26 @@ public class AsyncAcousticWorker : IDisposable
             _buildIsForTiles = tiles;
             RecordDoorPoses(world);
             var doorBoxes = SteamAudioScene.BoxesFromWorld(world);
-            var ctx = _saContext; var forMap = _saSceneMap;
+            var ctx = _saContext; var forMap = _saSceneMap; var set = _tileScenes;
+            // The routes through openings are made again when the openings changed (a door moved, rooms
+            // came or went) and otherwise at most every few seconds: the coarse ring moving as you drive
+            // changes their far barriers, not their doorways, and making them is most of a tile's cost.
+            var portals = world.AcousticMap?.Portals;
+            bool routesDue = !tiles || _routes == null || !ReferenceEquals(portals, _routesPortals)
+                             || DateTime.UtcNow.Ticks - _routesBuiltTicks > RoutesEverySeconds * TimeSpan.TicksPerSecond;
+            var keptRoutes = _routes;
+            if (routesDue) { _routesPortals = portals; _routesBuiltTicks = DateTime.UtcNow.Ticks; }
             Func<(SteamAudioScene, SteamAudioScene, List<SteamAudioScene.Box>, AcousticMap?, OpeningRoutes)> build = () =>
             {
-                var full = new SteamAudioScene(ctx);
-                full.Build(doorBoxes);
-                var listener = new SteamAudioScene(ctx);
-                listener.Build(SteamAudioScene.WithoutOpenGround(doorBoxes));
-                return (full, listener, doorBoxes, forMap, BuildRoutes(world, doorBoxes, report: false));
+                var parts = System.Diagnostics.Stopwatch.StartNew();
+                var (full, listener) = ScenesFor(ctx, set, world, doorBoxes);
+                _lastScenesMs = parts.Elapsed.TotalMilliseconds;
+                SceneOnlyMsTotal += _lastScenesMs;
+                parts.Restart();
+                var routes = routesDue || keptRoutes == null ? BuildRoutes(world, doorBoxes, report: false) : keptRoutes;
+                _lastRoutesMs = parts.Elapsed.TotalMilliseconds;
+                RoutesMsTotal += _lastRoutesMs;
+                return (full, listener, doorBoxes, forMap, routes);
             };
             _doorBuild = tiles ? RunLowered("TileScene", build) : System.Threading.Tasks.Task.Run(build);
             return;
@@ -1254,7 +1325,20 @@ public class AsyncAcousticWorker : IDisposable
         if (_saDebug)
             foreach (var b in boxes)
                 Console.WriteLine($"[SABOX] center=({b.Center.X:F1},{b.Center.Y:F1},{b.Center.Z:F1}) size=({b.Size.X:F1},{b.Size.Y:F1},{b.Size.Z:F1}) mat={b.Material}");
-        _saScene.Build(boxes);
+        if (_embree)
+        {
+            // A new map's own set of tiles; the last map's goes once no build is using it.
+            if (_tileScenes != null) _retiredTileSets.Add((_tileScenes, DateTime.UtcNow.Ticks));
+            _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres);
+            var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, world, boxes);
+            _saScene.Dispose();
+            _saScene = assembledFull;
+            _saListenerScene?.Dispose();
+            _saListenerScene = assembledListener;
+            if (_tileScenes != null)
+                Console.WriteLine($"[AcousticWorker] {_tileScenes.TileCount} tile sub-scene(s) built in {_tileScenes.LastUpdateMs:F0} ms, assembled in {_tileScenes.LastAssembleMs:F1} ms.");
+        }
+        else _saScene.Build(boxes);
         _saSceneMap = world.AcousticMap;
         if (_saScene.IsBuilt)
         {
@@ -1265,15 +1349,18 @@ public class AsyncAcousticWorker : IDisposable
             // The listener's own trace gets the scene without its open ground: see
             // SteamAudioScene.WithoutOpenGround for why a trace from the listener's head must not hear
             // the floor under their feet.
-            _saListenerScene ??= new SteamAudioScene(_saContext);
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var withoutGround = SteamAudioScene.WithoutOpenGround(boxes);
-            _saListenerScene.Build(withoutGround);
-            if (mapChanged)
-                Console.WriteLine($"[AcousticWorker] Listener trace scene: {boxes.Count - withoutGround.Count} open-ground slab(s) left out "
-                                + $"of {boxes.Count} ({sw.ElapsedMilliseconds} ms).");
+            if (!_embree)
+            {
+                _saListenerScene ??= new SteamAudioScene(_saContext);
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var withoutGround = SteamAudioScene.WithoutOpenGround(boxes);
+                _saListenerScene.Build(withoutGround);
+                if (mapChanged)
+                    Console.WriteLine($"[AcousticWorker] Listener trace scene: {boxes.Count - withoutGround.Count} open-ground slab(s) left out "
+                                    + $"of {boxes.Count} ({sw.ElapsedMilliseconds} ms).");
+            }
             OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Configure(_saContext, _saScene,
-                _saListenerScene.IsBuilt ? _saListenerScene : null);
+                _saListenerScene is { IsBuilt: true } ? _saListenerScene : null);
             // Off the worker thread and out of the way. This is the work that used to sit inside
             // SetScene and take a hundred seconds of a single core before ANY source got an occlusion
             // value — a hundred seconds in which the whole world was rendered as if nothing were in
@@ -1444,6 +1531,9 @@ public class AsyncAcousticWorker : IDisposable
         foreach (var (retired, _) in _retiredScenes) retired.Dispose();
         _retiredScenes.Clear();
         if (_saListenerScene != null) { _saListenerScene.Dispose(); _saListenerScene = null; }
+        _tileScenes?.Dispose(); _tileScenes = null;
+        foreach (var (set, _) in _retiredTileSets) set.Dispose();
+        _retiredTileSets.Clear();
         if (_saContext != IntPtr.Zero) Phonon.iplContextRelease(ref _saContext);
 
         _cts.Dispose();

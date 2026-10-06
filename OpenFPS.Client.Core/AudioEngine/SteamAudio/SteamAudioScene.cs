@@ -25,6 +25,67 @@ public sealed class SteamAudioScene : IDisposable
     private readonly IntPtr _context;
     private IntPtr _scene;
     private IntPtr _mesh;
+    /// <summary>The handle is someone else's: see <see cref="Borrowed"/>.</summary>
+    private bool _borrowed;
+
+    // ── Which ray tracer a context's scenes use ─────────────────────────────────────────────────
+    //
+    // Embree where it starts (docs/GEOMETRY.md 2.4 and 6.4: builds in a quarter of the time, traces
+    // faster, and is the only tracer that handles a scene made of instanced tile sub-scenes), the default
+    // where it does not. Per context, so a lab instrument with a context of its own keeps the default. A
+    // simulator must be made for the type of the scenes it will be given (SteamAudioSimulator,
+    // TracedReverb, TracedEchoes, LateField ask TypeFor).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<IntPtr, IntPtr> EmbreeDevices = new();
+
+    /// <summary>Makes this context's scenes Embree scenes. False, and the default tracer stays, if Embree
+    /// does not start here (an ARM machine: Steam Audio carries Embree for x86 and x64 only).</summary>
+    public static bool UseEmbree(IntPtr context)
+    {
+        if (EmbreeDevices.ContainsKey(context)) return true;
+        try
+        {
+            var settings = new Phonon.IPLEmbreeDeviceSettings();
+            if (Phonon.iplEmbreeDeviceCreate(context, ref settings, out IntPtr device) != Phonon.IPL_STATUS_SUCCESS || device == IntPtr.Zero)
+                return false;
+            EmbreeDevices[context] = device;
+            return true;
+        }
+        catch (Exception ex) when (ex is EntryPointNotFoundException or DllNotFoundException) { return false; }
+    }
+
+    /// <summary>The scene type of a context's scenes.</summary>
+    public static int TypeFor(IntPtr context)
+        => EmbreeDevices.ContainsKey(context) ? Phonon.IPL_SCENETYPE_EMBREE : Phonon.IPL_SCENETYPE_DEFAULT;
+
+    /// <summary>A new, empty scene of the context's type, or zero.</summary>
+    internal static IntPtr CreateScene(IntPtr context)
+    {
+        var settings = new Phonon.IPLSceneSettings { type = TypeFor(context) };
+        if (EmbreeDevices.TryGetValue(context, out var device)) settings.embreeDevice = device;
+        return Phonon.iplSceneCreate(context, ref settings, out IntPtr scene) == Phonon.IPL_STATUS_SUCCESS ? scene : IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// A scene whose handle belongs to someone else (TileSceneSet's top scenes, used in turn): this
+    /// object carries it to the simulators and the reflection search, and never releases it.
+    /// </summary>
+    internal static SteamAudioScene Borrowed(IntPtr context, IntPtr scene) => new(context) { _scene = scene, _borrowed = true };
+
+    /// <summary>The boxes a borrowed scene now holds, for <see cref="Solids"/> and the bounds.</summary>
+    internal void SetGeometry(IReadOnlyList<Box> boxes)
+    {
+        var solids = new List<EarlyReflections.Solid>(boxes.Count);
+        var min = new Vector3(float.MaxValue); var max = new Vector3(float.MinValue);
+        foreach (var b in boxes)
+        {
+            if (b.Size.X <= 0 || b.Size.Y <= 0 || b.Size.Z <= 0) continue;
+            solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
+            var (lo, hi) = WorldExtents(b);
+            min = Vector3.Min(min, lo); max = Vector3.Max(max, hi);
+        }
+        Solids = solids;
+        if (solids.Count > 0) { BoundsMin = min; BoundsMax = max; }
+    }
 
     public IntPtr Handle => _scene;
     public bool IsBuilt => _scene != IntPtr.Zero;
@@ -110,6 +171,23 @@ public sealed class SteamAudioScene : IDisposable
     private const float GroundLevel = 1.0f;
 
     internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, (Vector3 Min, Vector3 Max)[] all)
+        => IsOpenGround(b, own, (x, z, above) =>
+        {
+            foreach (var (omin, omax) in all)
+            {
+                if (omin.Y < above) continue;
+                if (x >= omin.X && x <= omax.X && z >= omin.Z && z <= omax.Z) return true;
+            }
+            return false;
+        });
+
+    /// <summary>Anything this high or higher could stand over a slab of open ground (its top at most
+    /// <see cref="GroundLevel"/>, cover at least <see cref="Headroom"/> over that).</summary>
+    internal const float LowestCover = Headroom;
+
+    /// <summary>The same test, asking <paramref name="coveredAt"/>(x, z, lowest) whether anything whose
+    /// underside is at least <c>lowest</c> stands over the point (x, z).</summary>
+    internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, Func<float, float, float, bool> coveredAt)
     {
         if (b.Size.Y > SlabThickness || b.Size.X < 1f || b.Size.Z < 1f) return false;
         // Turned about anything but the vertical, it is not a floor.
@@ -128,19 +206,11 @@ public sealed class SteamAudioScene : IDisposable
         };
         int open = 0;
         foreach (var p in pts)
-        {
-            bool covered = false;
-            foreach (var (omin, omax) in all)
-            {
-                if (omin.Y < top + Headroom) continue;
-                if (p.X >= omin.X && p.X <= omax.X && p.Y >= omin.Z && p.Y <= omax.Z) { covered = true; break; }
-            }
-            if (!covered) open++;
-        }
+            if (!coveredAt(p.X, p.Y, top + Headroom)) open++;
         return open >= 3;
     }
 
-    private static (Vector3 Min, Vector3 Max) WorldExtents(in Box b)
+    internal static (Vector3 Min, Vector3 Max) WorldExtents(in Box b)
     {
         var h = b.Size * 0.5f;
         var min = new Vector3(float.MaxValue); var max = new Vector3(float.MinValue);
@@ -156,14 +226,27 @@ public sealed class SteamAudioScene : IDisposable
     public void Build(IReadOnlyList<Box> boxes)
     {
         Release();
-        if (Phonon.iplSceneCreate(_context, ref Defaults.SceneSettings, out _scene) != Phonon.IPL_STATUS_SUCCESS)
-        { _scene = IntPtr.Zero; return; }
+        _scene = CreateScene(_context);
+        if (_scene == IntPtr.Zero) return;
 
         var solids = new List<EarlyReflections.Solid>(boxes.Count);
         foreach (var b in boxes)
             if (b.Size.X > 0 && b.Size.Y > 0 && b.Size.Z > 0) solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
         Solids = solids;
 
+        _mesh = AddMesh(_context, _scene, boxes, out var bmin, out var bmax);
+        if (_mesh != IntPtr.Zero) { BoundsMin = bmin; BoundsMax = bmax; }
+        Phonon.iplSceneCommit(_scene);
+    }
+
+    /// <summary>
+    /// The boxes as one static mesh, added to <paramref name="scene"/> (not committed); zero if there are
+    /// none. Vertices in Steam Audio's frame. The bounds are in the game's.
+    /// </summary>
+    internal static IntPtr AddMesh(IntPtr context, IntPtr scene, IReadOnlyList<Box> boxes, out Vector3 boundsMin, out Vector3 boundsMax)
+    {
+        boundsMin = boundsMax = Vector3.Zero;
+        IntPtr mesh = IntPtr.Zero;
         var verts = new List<PV>();
         var tris = new List<Phonon.IPLTriangle>();
         var triMat = new List<int>();
@@ -176,7 +259,7 @@ public sealed class SteamAudioScene : IDisposable
             int mi = MaterialIndex(b, materials, matIndexByName);
             AppendBox(b, verts, tris, triMat, mi);
         }
-        if (tris.Count == 0) { Phonon.iplSceneCommit(_scene); return; }
+        if (tris.Count == 0) return IntPtr.Zero;
 
 
         var vArr = verts.ToArray();
@@ -194,7 +277,7 @@ public sealed class SteamAudioScene : IDisposable
             min = Vector3.Min(min, g);
             max = Vector3.Max(max, g);
         }
-        BoundsMin = min; BoundsMax = max;
+        boundsMin = min; boundsMax = max;
 
         var hV = GCHandle.Alloc(vArr, GCHandleType.Pinned);
         var hT = GCHandle.Alloc(tArr, GCHandleType.Pinned);
@@ -208,12 +291,12 @@ public sealed class SteamAudioScene : IDisposable
                 vertices = hV.AddrOfPinnedObject(), triangles = hT.AddrOfPinnedObject(),
                 materialIndices = hMI.AddrOfPinnedObject(), materials = hM.AddrOfPinnedObject(),
             };
-            if (Phonon.iplStaticMeshCreate(_scene, ref meshS, out _mesh) == Phonon.IPL_STATUS_SUCCESS)
-                Phonon.iplStaticMeshAdd(_mesh, _scene);
+            if (Phonon.iplStaticMeshCreate(scene, ref meshS, out mesh) == Phonon.IPL_STATUS_SUCCESS)
+                Phonon.iplStaticMeshAdd(mesh, scene);
+            else mesh = IntPtr.Zero;
         }
         finally { hV.Free(); hT.Free(); hMI.Free(); hM.Free(); }
-
-        Phonon.iplSceneCommit(_scene);
+        return mesh;
     }
 
     /// <summary>Steam Audio's three band centres (phonon.h, IPLMaterial): what its ABSORPTION figures
@@ -296,6 +379,7 @@ public sealed class SteamAudioScene : IDisposable
 
     private void Release()
     {
+        if (_borrowed) return;
         if (_mesh != IntPtr.Zero) Phonon.iplStaticMeshRelease(ref _mesh);
         if (_scene != IntPtr.Zero) Phonon.iplSceneRelease(ref _scene);
         _mesh = IntPtr.Zero; _scene = IntPtr.Zero;

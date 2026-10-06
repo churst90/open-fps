@@ -388,7 +388,9 @@ A team holds up to 16 players. Your team's player beacons sound on a different i
 - `/maps`: the maps you can go to. `/maps mine`: your own, and who is invited.
 - `/detail low|medium|high`: how much of a large map is loaded round you. The maps of real places
   (magnolia tx, albany or) are sent in 250 m tiles: everything within 150, 300 or 500 m, and the
-  ground, roads and building shells out to 500, 800 or 1,200 m. Tiles load and drop as you move.
+  what sound notices from further off (the ground, roads, the outsides of buildings with their front
+  doors, woods and trees, fences and hedges) out to 500, 800 or 1,200 m. Tiles load and drop as you
+  move.
   Medium is the default. Saved. Other maps are always loaded whole.
 - On a map you own you have the building commands: `/spawn`, `/move x y z`, `/savemap`, the
   building verbs and the sound tools (see Staff commands).
@@ -622,6 +624,10 @@ by you. A password is saved only if you ticked "Remember password". Beacon choic
   with an acoustic trace), `foot` (every footstep logged), `fmodlog` (FMOD's own logging build),
   `nohrtf`, `noecho`, `nophys`, `quiet`, `bare` and `nosplit`. The top of the script says what each
   one does.
+- The log says at startup whether Steam Audio's scenes use Embree ("Steam Audio scenes use Embree")
+  or the default tracer. `OPENFPS_EMBREE=0` before starting the client forces the default tracer,
+  which rebuilds the whole scene for every change of tiles or doors: slower, but a way to tell whether
+  a fault comes from Embree.
 
 ---
 

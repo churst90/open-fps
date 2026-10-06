@@ -241,7 +241,7 @@ internal sealed class TracedReverb : IDisposable
         var s = new Phonon.IPLSimulationSettings
         {
             flags = Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS,
-            sceneType = Phonon.IPL_SCENETYPE_DEFAULT,
+            sceneType = SteamAudioScene.TypeFor(context),
             reflectionType = SimulatedType,
             maxNumOcclusionSamples = 16, maxNumRays = Rays, numDiffuseSamples = 32,
             maxDuration = DurationSeconds, maxOrder = Order, maxNumSources = MaxReaders, numThreads = 2,

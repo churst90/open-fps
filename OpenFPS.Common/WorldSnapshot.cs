@@ -46,6 +46,10 @@ public class WorldSnapshot
     /// </summary>
     public long GeometryVersion;
 
+    /// <summary>The side of the tiles the map streams in, metres; 0 for a map sent whole. The Steam Audio
+    /// scene is kept in sub-scenes of this size (of 250 m on a map sent whole).</summary>
+    public float TileMetres;
+
     /// <summary>
     /// When the transforms in this snapshot were last TRUE, seconds on <see cref="AudioClock"/>.
     ///

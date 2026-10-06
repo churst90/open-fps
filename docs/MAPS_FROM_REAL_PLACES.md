@@ -61,7 +61,7 @@ when the engine has terrain.
   `Layer` (ground, roads, drives, paths, verges, yards, zones, structure, rooms, interiors, trees,
   props, rail, water). Roads carry `Tiles`, junctions `Tile`, the map `GeoOrigin` and `TileMetres`.
   The server streams the map by tile from geometry (docs/WORLD_STREAMING.md) and reads `Layer` for
-  the coarse level (ground, roads, structure, rail, water).
+  the coarse level (docs/WORLD_STREAMING.md, Detail layers).
 
 ## Detail levels
 

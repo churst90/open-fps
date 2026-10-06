@@ -168,18 +168,73 @@ public class WorldStreamingTests
         Assert.Equal(TileDetail.Coarse, g.Needs);
         Assert.True(g.Tiles.Length >= tiles.Tiles.Count() * 9 / 10, $"the ground is in {g.Tiles.Length} of {tiles.Tiles.Count()} tiles");
 
-        // Rooms and doors need full detail; walls and roads are coarse; named places full.
-        int doors = 0, rooms = 0;
+        // Rooms are full detail; a doorway shares its rooms' tiles, so where one goes the other does.
+        int doors = 0, rooms = 0, crowns = 0;
         foreach (var e in lookup.Values)
         {
             if (!tiles.TryGet(e.Id, out var m)) continue;
-            if (world.Has<DoorComponent>(e)) { doors++; Assert.Equal(TileDetail.Full, m.Needs); }
             if (world.Has<RegionComponent>(e) && world.Get<RegionComponent>(e).RoomSize.X > 0f) { rooms++; Assert.Equal(TileDetail.Full, m.Needs); }
+            if (world.Has<PortalComponent>(e) && world.Get<PortalComponent>(e) is { } p && p.RegionAId != p.RegionBId)
+            {
+                doors++;
+                foreach (int room in new[] { p.RegionAId, p.RegionBId })
+                    if (tiles.TryGet(room, out var r)) Assert.Equal(r.Tiles, m.Tiles);
+            }
+            // A sound that carries less than the full radius is full detail (a tree's wind).
+            if (world.Has<SoundEmitterComponent>(e) && world.Get<SoundEmitterComponent>(e).SoundId.StartsWith("foliage")) { crowns++; Assert.Equal(TileDetail.Full, m.Needs); }
             // An entity is in the tile its centre is in.
             var at = world.Get<Transform>(e).Position;
             Assert.Contains(TileKey.Of(at, tiles.TileMetres), m.Tiles);
         }
         Assert.True(doors > 100 && rooms > 100, $"{doors} doors, {rooms} rooms");
+        _o.WriteLine($"  {crowns} tree crowns full only");
+    }
+
+    /// <summary>What the coarse ring is made of, by what sound would notice: the shells and front doors,
+    /// the woods and trunks, fences, hedges and garden walls; never a room, an inner wall or furniture,
+    /// a lawn, a drive or a post. Reports what it costs a tile.</summary>
+    [Theory]
+    [InlineData("magnolia_tx")]
+    [InlineData("albany_or")]
+    public void The_coarse_ring_keeps_what_sound_notices(string id)
+    {
+        var maps = LoadPlace(id);
+        Assert.True(maps.TryGetTiles(id, out var tiles));
+        Assert.True(maps.TryGetMap(id, out var world, out _, out _, out var lookup));
+        var byKind = new Dictionary<string, (int Coarse, int Full)>();
+        long coarseBytes = 0;
+        foreach (var e in lookup.Values)
+        {
+            if (!tiles.TryGet(e.Id, out var m)) continue;
+            string name = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e).Name : "";
+            string kind = name.Contains("Fence") ? "fence" : name.Contains("Hedge") ? "hedge" : name.EndsWith("wall") && !name.Contains(',') ? "outer wall"
+                        : name.Contains(", ") && world.Has<RegionComponent>(e) ? "room" : name is "Tree" or "Woods" ? name.ToLowerInvariant()
+                        : name == "Trees" ? "tree crown" : name.EndsWith(" post") ? "post" : name.EndsWith("front yard") ? "lawn" : "";
+            if (kind.Length == 0) continue;
+            var (c, f) = byKind.GetValueOrDefault(kind);
+            byKind[kind] = m.Needs == TileDetail.Coarse ? (c + 1, f) : (c, f + 1);
+            if (m.Needs == TileDetail.Coarse && kind is "fence" or "hedge" or "tree" or "woods")
+                coarseBytes += MemoryPackSerializer.Serialize(EntityDefinitionFactory.From(world, e)).Length;
+        }
+        foreach (var (kind, (c, f)) in byKind.OrderBy(kv => kv.Key)) _o.WriteLine($"  {id} {kind}: {c} coarse, {f} full");
+        foreach (var kind in new[] { "hedge", "tree", "woods" })
+            if (byKind.TryGetValue(kind, out var n)) Assert.Equal(0, n.Full);
+        // Fences and walls by the rule, not the name: a run at least 2 m long and 0.8 m tall is coarse.
+        Assert.True(byKind.GetValueOrDefault("outer wall").Coarse > 1000);
+        foreach (var kind in new[] { "room", "tree crown", "post", "lawn" })
+            if (byKind.TryGetValue(kind, out var n)) Assert.Equal(0, n.Coarse);
+
+        // The cost: the join at medium, and the average coarse tile.
+        var interest = new TileInterest();
+        var ids = TileStreamer.Begin(interest, tiles, maps.GetSpawnPoint(id).Position);
+        long bytes = 0;
+        foreach (var chunk in ids.Where(lookup.ContainsKey).Chunk(EntityDefinitionBatch.Size))
+            bytes += MemoryPackSerializer.Serialize<IMessage>(EntityDefinitionPack.Pack(new EntityDefinitionBatch { Definitions = chunk.Select(i => EntityDefinitionFactory.From(world, lookup[i])).ToList() })).Length;
+        int coarseTiles = interest.Levels.Count(kv => kv.Value == TileDetail.Coarse);
+        int perCoarse = interest.Levels.Where(kv => kv.Value == TileDetail.Coarse)
+                                       .Sum(kv => tiles.Members(kv.Key).Count(i => tiles.TryGet(i, out var mm) && mm.Needs == TileDetail.Coarse)) / Math.Max(1, coarseTiles);
+        _o.WriteLine($"  {id} join at medium: {ids.Count} entities, {bytes / 1024} KB packed; {perCoarse} entities a coarse tile; " +
+                     $"trees, woods, fences and hedges now coarse: {coarseBytes / 1024} KB unpacked over the whole map");
     }
 
     // ── The server's per-client sets ─────────────────────────────────────────────────────────────
@@ -479,6 +534,31 @@ public class WorldStreamingTests
         Assert.True(client.AcousticMap!.Portals.ContainsKey(11), "the open door was put back as it was before the refresh");
         Assert.True(client.AcousticMap.Regions.ContainsKey(12));
         Assert.False(client.AcousticRefreshPending);
+    }
+
+    /// <summary>A coarse tile has a house's shell and front door but not its rooms: the door is a shut
+    /// leaf until the room arrives, and then a doorway.</summary>
+    [Fact]
+    public void A_front_door_without_its_room_is_a_shut_leaf_until_the_room_comes()
+    {
+        var client = new ClientWorldState { RefreshRunner = work => work() };
+        client.Clear(new Vector3(100, 20, 100));
+        client.ConfigureAcoustics(new Vector3(-50, 0, -50), 0.5f, 0.2f, 50f);
+        client.SetAcousticMap(ClientWorldState.BuildAcousticMap(Array.Empty<EntityDefinition>(), new Vector3(100, 20, 100), new Vector3(-50, 0, -50), 0.5f, 0.2f, true, false));
+        var door = new EntityDefinition { EntityId = 21, Transform = new Transform { Position = new Vector3(0, 1, 2), Rotation = Quaternion.Identity } };
+        door.Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(1, 2.1f, 0.05f), IsSolid = true };
+        door.Portal = new PortalComponent { RegionAId = 20, RegionBId = AcousticConstants.GlobalRegionId, ApertureSize = 1.2f };
+        client.RegisterDefinition(door);                        // swung open, re-sent alone
+        client.RegisterDefinition(door, deferAcoustics: true);  // or with its coarse tile
+        client.RequestAcousticRefresh();
+        Assert.False(client.AcousticMap!.Portals.ContainsKey(21));
+
+        var room = new EntityDefinition { EntityId = 20, Transform = new Transform { Position = new Vector3(0, 1.5f, 0), Rotation = Quaternion.Identity } };
+        room.Region.RoomSize = new Vector3(4, 3, 4);
+        room.Region.IsIndoor = true;
+        client.RegisterDefinition(room, deferAcoustics: true);  // the tile goes full
+        client.RequestAcousticRefresh();
+        Assert.True(client.AcousticMap!.Portals.ContainsKey(21));
     }
 
     [Fact]
