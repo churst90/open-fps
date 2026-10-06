@@ -298,28 +298,28 @@ full measurements: inbox/ear-model-2026-10-06.
 
 | source | dB RMS | LUFS | dB(A) | phon before -> after | bass | top |
 |---|---|---|---|---|---|---|
-| speech, normal, 2 m | -0.9 | -0.9 | -0.8 | 70 -> 69 | -0.5 | -0.5 |
-| own footsteps, concrete | -1.1 | 0.0 | +0.1 | 64 -> 63 | -6.5 | -1.1 |
-| fountain, 5 m | -1.0 | -1.0 | -1.1 | 70 -> 69 | +2.2 | +0.3 |
-| window air conditioner, 3 m | -0.6 | -0.5 | -0.5 | 59 -> 59 | -0.9 | 0.0 |
-| door, knob, open and close, 2 m | +0.1 | -0.8 | -2.2 | 71 -> 69 | +4.2 | +2.1 |
-| hatchback idling, front / rear 2 m | +1.1 / +1.0 | +1.8 / +1.2 | +2.0 / +2.1 | 62 -> 64 / 59 -> 61 | -1.1 / -1.4 | 0 |
-| police car idling, front / rear 2 m | +10.0 / +10.2 | +9.8 / +10.2 | +8.2 / +8.7 | 56 -> 66 / 64 -> 74 | +2.0 / +1.8 | 0 |
-| diesel pickup idling, front / rear 2 m | +6.1 / +6.1 | +5.7 / +5.7 | +5.2 / +5.3 | 61 -> 67 / 53 -> 60 | +1.0 | 0 |
-| hatchback passing, 30 km/h, 7.5 m | +1.6 | +1.4 | +1.1 | 65 -> 67 | +3.3 | +0.2 |
-| police car passing, 30 km/h, 7.5 m | +2.9 | +2.8 | +2.3 | 65 -> 67 | +4.2 | +0.2 |
+| speech, normal, 2 m | -0.8 | -0.8 | -0.8 | 70 -> 69 | -1.4 | -0.6 |
+| own footsteps, concrete (takes differ by run) | +0.5 | +1.8 | +1.2 | 64 -> 66 | -6.5 | +5.0 |
+| fountain, 5 m | -1.1 | -1.1 | -1.2 | 70 -> 69 | +2.4 | +0.2 |
+| window air conditioner, 3 m | -0.6 | -0.5 | -0.5 | 59 -> 59 | -1.0 | -0.1 |
+| door, knob, open and close, 2 m | -2.6 | -1.2 | -2.9 | 72 -> 69 | +3.3 | -2.2 |
+| hatchback idling, front / rear 2 m | +1.2 / +1.0 | +1.9 / +1.2 | +2.1 / +2.1 | 62 -> 64 / 59 -> 61 | -1.3 / -1.2 | 0 |
+| police car idling, front / rear 2 m | +10.0 / +9.9 | +9.7 / +9.9 | +8.1 / +8.5 | 55 -> 65 / 64 -> 74 | +2.0 / +1.8 | 0 |
+| diesel pickup idling, front / rear 2 m | +6.2 / +6.2 | +5.9 / +5.9 | +5.4 / +5.5 | 61 -> 67 / 53 -> 60 | +0.9 | 0 |
+| hatchback passing, 30 km/h, 7.5 m | +1.6 | +1.5 | +1.0 | 65 -> 67 | +3.5 | +0.4 |
+| police car passing, 30 km/h, 7.5 m | +2.9 | +2.7 | +2.3 | 65 -> 67 | +4.1 | +0.1 |
 | diesel pickup passing, 30 km/h, 7.5 m | +3.0 | +2.3 | +1.1 | 65 -> 66 | +3.8 | +0.2 |
-| thunder, ground strike 3 km | +3.5 | +3.3 | +2.3 | 68 -> 70 | +2.5 | +6.3 |
-| rain, moderate (5 mm/h), open street | +2.1 | +1.7 | +2.2 | 70 -> 72 | -6.8 | -3.1 |
-| wind at the ears, 2.2 / 4.5 / 7 m/s | the law's own gain: +17 / +11 / +8 dB | | | | | |
+| thunder, ground strike 3 km | +2.1 | +1.4 | +0.9 | 67 -> 68 | +3.7 | +0.1 |
+| rain, moderate (5 mm/h), open street | +2.9 | +2.6 | +2.9 | 70 -> 73 | -6.9 | -3.8 |
+| wind at the ears, 2.2 / 4.5 / 7 m/s | the law's own gain: +17 / +13 / +8 dB | | | | | |
 
 Over 2 dB, which Cody approved by ear: the idling police car (+10), the idling diesel pickup (+6),
-the police car and the pickup passing slowly (+3), thunder at 3 km (+3.5), rain (+2), the door (2 dB
-quieter in dB(A), with more bass), and the wind at the ears (a light breeze +17 dB, a 7 m/s wind
-+8). The wind is bass at a level the ear barely hears, so the law, which lifts what is quiet toward
+the police car and the pickup passing slowly (+3), thunder at 3 km (+2, with 3.7 dB more rumble),
+rain (+3), the door (2.6 dB quieter, with more bass), and the wind at the ears (a light breeze
++17 dB, a 7 m/s wind +8). Measured on main with the 48 kHz mixer and the true-peak limiter. The wind is bass at a level the ear barely hears, so the law, which lifts what is quiet toward
 the pivot, lifts it the most; the captures of it differ run to run because the wind wanders, so the
 figures given are the model's own (the [EAR] log line). Measured in loudness rather than LUFS, the
-wind at 4.5 m/s was 8 phon UNDER the talker at 2 m before, not over it as LUFS said.
+wind at 4.5 m/s was 8 to 19 phon UNDER the talker at 2 m before, not over him as LUFS said.
 
 Other sources the log shows, not in the captures: bird calls about 8 dB quieter (their recordings sit
 13 dB hotter in their buffers than speech lines, a difference the old law passed through uncompressed

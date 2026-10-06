@@ -21,9 +21,9 @@ Recent work, newest first. `git log` has the rest.
   chain, so its reverb send gets it too. The wind at your ears as well.
 - Measured in the game's output (inbox/ear-model-2026-10-06): speech, footsteps, the fountain and the
   air conditioner within about 1 dB; the idling police car 10 dB louder, the idling diesel pickup 6,
-  the hatchback 1 to 2; cars passing slowly 1.5 to 3 dB louder with more bass; thunder at 3 km 3.5;
-  rain 2; the door 2 dB(A) quieter with more bass. The wind at your ears is lifted most: +17 dB in
-  a light breeze, +11 at 4.5 m/s, +8 at 7. From the log: bird calls about 8 dB quieter, near rain
+  the hatchback 1 to 2; cars passing slowly 1.5 to 3 dB louder with more bass; thunder at 3 km 2
+  with more rumble; rain 3; the door 2.6 dB quieter with more bass. The wind at your ears is lifted
+  most: +17 dB in a light breeze, +13 at 4.5 m/s, +8 at 7. From the log: bird calls about 8 dB quieter, near rain
   drops about 12 louder, beacons (sine blips) an estimated 7 to 9 louder.
 - `/listening` tells the game how loud your headphones are: a person talks from one step in front;
   Up and Down until they sound like a normal voice at arm's length; Enter saves (client.json,
