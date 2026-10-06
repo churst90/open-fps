@@ -28,8 +28,9 @@ namespace OpenFPS.Client.AudioEngine.Core;
 /// </summary>
 public static class Thunder
 {
-    /// <summary>The air the thunder travels through.</summary>
-    public readonly record struct Air(float TemperatureC, float Humidity, float PressureMb, Vector3 Wind)
+    /// <summary>The air the thunder travels through. <paramref name="Gustiness"/> is the server's
+    /// 0..1 figure; with the wind it sets how turbulent the air is (<see cref="TurbulenceVariance"/>).</summary>
+    public readonly record struct Air(float TemperatureC, float Humidity, float PressureMb, Vector3 Wind, float Gustiness = 0.3f)
     {
         public static Air Standard => new(15f, 0.8f, 1013.25f, Vector3.Zero);
     }
@@ -64,6 +65,9 @@ public static class Thunder
         public int SampleRate;
         /// <summary>Cores to render on; zero is half of them, at most four.</summary>
         public int Threads;
+        /// <summary>Scatter by the air's turbulence (<see cref="TurbulenceVariance"/>). Off for checking
+        /// the coherent wave alone.</summary>
+        public bool Turbulence = true;
         /// <summary>The channel exactly as given: no structure below its 8 m steps and the same energy
         /// in every metre. For checking the level against a straight line.</summary>
         public bool Plain;
@@ -114,6 +118,78 @@ public static class Thunder
     /// shadow's edge (as a share of the distance to it) that is reached. 20-30 dB is where turbulent
     /// scattering into the shadow takes over (Embleton 1996).</summary>
     public const float ShadowMaxDb = 25f, ShadowRampShare = 0.5f;
+
+    // ── Turbulence ───────────────────────────────────────────────────────────────────────────────
+    //
+    // The air between the channel and the ear is not still: eddies of wind and warmth move the sound
+    // speed about by a few parts in a thousand. Over kilometres that scatters a weak shock: the
+    // coherent N-wave loses its high frequencies (its rise is rounded; sonic booms heard through
+    // turbulence are "rounded" or "peaked" at random: Pierce and Maglieri, J. Acoust. Soc. Am. 51,
+    // 1972), and what it loses arrives as an incoherent field, spread in time behind it. For thunder
+    // that is the difference between a train of separate N-waves with silence between them and a
+    // rumble: every piece of channel's arrival is followed by its own scattered tail, longer the
+    // further it came. Chernov's small-angle theory for a Gaussian medium (Ostashev and Wilson,
+    // "Acoustics in Moving Inhomogeneous Media", 2nd ed. 2015, ch. 7) gives both laws used here: the
+    // coherent intensity falls as exp(-sqrt(pi) mu^2 k^2 L r), and the mean square scattering angle
+    // grows as sqrt(pi) mu^2 r / L, which delays the scattered sound by about r <theta^2> / 4c.
+
+    /// <summary>Turbulence's scale along the path, metres (the Gaussian model's correlation length).
+    /// Near the ground it is about the height; along a path from kilometres up it is larger. A
+    /// judgement for the path as a whole.</summary>
+    public const float TurbulenceScaleMetres = 10f;
+
+    /// <summary>The temperature's fluctuation, K, and the wind's turbulent velocity in still air and
+    /// per m/s of wind, doubled at full gustiness (a storm's 18 m/s gusting gives about 1.2 m/s, the
+    /// order Ostashev and Wilson 2015, ch. 6, give for a windy day). Judgements: the server has one
+    /// wind and a gustiness.</summary>
+    public const float TemperatureSigmaK = 0.5f, CalmVelocitySigma = 0.2f, TurbulenceIntensity = 0.03f;
+
+    /// <summary>The longest a scattered tail is spread, seconds: past this the small-angle law no
+    /// longer holds (the scattering saturates), and thunder from 20 km is not a minute long.</summary>
+    public const float MaxScatterSeconds = 0.6f;
+
+    /// <summary>The variance of the refractive index, mu^2: the wind's turbulent velocity and the
+    /// temperature's fluctuation, each against the sound speed.</summary>
+    public static float TurbulenceVariance(Air air, float c)
+    {
+        float wind = new Vector2(air.Wind.X, air.Wind.Z).Length();
+        float sv = CalmVelocitySigma + TurbulenceIntensity * wind * (1f + Math.Clamp(air.Gustiness, 0f, 1f));
+        float st = TemperatureSigmaK / (2f * (air.TemperatureC + 273.15f));
+        return sv * sv / (c * c) + st * st;
+    }
+
+    /// <summary>How fast turbulence takes the coherent wave at <paramref name="f"/> Hz, per metre (intensity).</summary>
+    public static float ScatterPerMetre(float f, float mu2, float c)
+    {
+        float k = 2f * MathF.PI * f / c;
+        return MathF.Sqrt(MathF.PI) * mu2 * k * k * TurbulenceScaleMetres;
+    }
+
+    /// <summary>How long the scattered sound from <paramref name="distance"/> metres is spread behind the
+    /// coherent arrival, seconds (the mean of its delay).</summary>
+    public static float ScatterSpreadSeconds(float distance, float mu2, float c)
+        => Math.Clamp(MathF.Sqrt(MathF.PI) * mu2 * distance * distance / (4f * c * TurbulenceScaleMetres), 0f, MaxScatterSeconds);
+
+    /// <summary>
+    /// The share of a wave at <paramref name="f"/> Hz, come <paramref name="distance"/> metres, that is
+    /// heard as scattered sound: what turbulence took from the coherent wave, as far as it is spread by
+    /// more than a period. Scattered sound that arrives within a fraction of a period of the coherent
+    /// wave is that wave with its phase disturbed, and a crack 100 m off, scattered by 0.02 ms, is still
+    /// a crack; from kilometres, spread by tens of milliseconds, it is a rumble. The weighting,
+    /// spread / (spread + period), is a judgement.
+    /// </summary>
+    public static float ScatteredShare(float f, float distance, float mu2, float c)
+    {
+        float lost = 1f - MathF.Exp(-ScatterPerMetre(f, mu2, c) * distance);
+        float tau = ScatterSpreadSeconds(distance, mu2, c);
+        return lost * tau / (tau + 1f / MathF.Max(1f, f));
+    }
+
+    /// <summary>The octave bands the scattered field is made in, Hz.</summary>
+    private static readonly float[] ScatterBands = { 16f, 31.5f, 63f, 125f, 250f, 500f, 1000f, 2000f, 4000f, 8000f };
+
+    /// <summary>The scattered field's intensity is followed on frames this long, seconds.</summary>
+    private const double ScatterFrameSeconds = 0.001;
 
     /// <summary>
     /// The thunder of <paramref name="strike"/> as heard at <paramref name="listener"/>, in up to
@@ -186,7 +262,7 @@ public static class Thunder
         var (centres, member) = Cluster(dirs, weights, Math.Max(1, options.MaxParts), options.MergeDegrees);
 
         // ── The kernels: one element's wave, for its energy, as it arrives from each distance ──
-        var kernels = new KernelBank(fs, c, air, strike.EnergyPerMetre * MathF.Exp(3f * EnergySpreadSigma));
+        var kernels = new KernelBank(fs, c, air, strike.EnergyPerMetre * MathF.Exp(3f * EnergySpreadSigma), options.Turbulence ? TurbulenceVariance(air, c) : 0f);
 
         var parts = new List<Part>();
         for (int g = 0; g < centres.Count; g++)
@@ -208,6 +284,8 @@ public static class Thunder
             int pre = kernels.Pre;
             double start = tFirst - pre / (double)fs - 0.005;
             int length = (int)((tLast - start + strokeSpan) * fs) + kernels.MaxLength + pre + 16;
+            // Room after the last arrival for its scattered tail.
+            length += (int)(4f * ScatterSpreadSeconds((float)(tLast * c), kernels.Mu2, c) * fs);
             if (length > fs * 240) length = fs * 240;   // four minutes is more thunder than there is
             var mine = new List<int>();
             for (int i = 0; i < fine.Count; i++) if (member[i] == g) mine.Add(i);
@@ -231,6 +309,8 @@ public static class Thunder
             var buf = buffers[0];
             for (int t = 1; t < threads; t++)
                 for (int i = 0; i < buf.Length; i++) buf[i] += buffers[t][i];
+            if (options.Turbulence && kernels.Mu2 > 0f)
+                buf = Scatter(buf, start, fs, c, kernels.Mu2, unchecked(strike.Seed * 31 + g * 7919));
 
             float peak = 0f;
             foreach (float x in buf) peak = MathF.Max(peak, MathF.Abs(x));
@@ -275,11 +355,6 @@ public static class Thunder
     public static float RelaxationRadius(float energyPerMetre)
         => MathF.Sqrt(MathF.Max(1f, energyPerMetre) / (MathF.PI * LightningPhysics.AmbientPressurePa));
 
-    /// <summary>Within this distance of the listener, each 8 m step is followed down to its fine
-    /// structure; further off, the air has taken the high frequencies that structure makes (about
-    /// 15 dB at 1 kHz by 3 km) and the step is heard as the straight piece it is at 8 m.</summary>
-    public const float FineStructureMetres = 3000f;
-
     /// <summary>
     /// One 8 m step of channel as the pieces it is made of. Hill's 16 degrees is measured at the 8 m
     /// scale and the walk is built to it; below that, the step is taken to be as tortuous again, step
@@ -287,7 +362,9 @@ public static class Thunder
     /// to the step's far end so the 8 m geometry is kept. That a lightning channel is tortuous at every
     /// scale photographs resolve is an assumption here (a self-similar channel), and it is what decides
     /// how much of the thunder above a few hundred hertz there is: a straight 8 m piece seen obliquely
-    /// sends almost nothing above 1/W (W its arrival spread), and the kinks inside it do.
+    /// sends almost nothing above 1/W (W its arrival spread), and the kinks inside it do. It is done
+    /// at every distance: a straight 8 m piece seen end on is heard only at its two ends, with silence
+    /// between, and a rumble made of those breaks up (Cody, round 1: "crackly and breaks up").
     /// </summary>
     private static void FineStructure(List<Piece> into, Vector3 a, Vector3 b, Vector3 listener, float energy, bool main, int seed)
     {
@@ -295,7 +372,7 @@ public static class Thunder
         float r0 = RelaxationRadius(energy);
         int n = (int)MathF.Floor(len / MathF.Max(0.25f, r0));
         float d = Vector3.Distance((a + b) * 0.5f, listener);
-        if (n < 2 || d > FineStructureMetres || len <= 0f)
+        if (n < 2 || len <= 0f)
         {
             into.Add(new Piece(a, b, 1f, main, energy));
             return;
@@ -366,6 +443,166 @@ public static class Thunder
                 Deposit(buf, t * fs - k.Pre, k.Integral, gw);
                 Deposit(buf, (t + w) * fs - k.Pre, k.Integral, -gw);
             }
+        }
+    }
+
+    /// <summary>
+    /// The thunder as turbulence leaves it. Everything arriving at time t has come c t metres, so the
+    /// share each frequency keeps coherent, exp(-alpha(f) c t), is a function of time alone, and the
+    /// coherent sound is filtered by it frame by frame (short-time Fourier, overlapping sine windows,
+    /// so the gain glides). What it loses, octave by octave, is the scattered field: noise in that
+    /// octave whose intensity follows the energy lost, each frame's let out over the spread its
+    /// distance gives it (<see cref="ScatterSpreadSeconds"/>). Close by the spread is a fraction of a
+    /// millisecond and the scattered crack is still a crack; from kilometres off each arrival trails a
+    /// tail tens to hundreds of milliseconds long, and the gaps between arrivals fill.
+    /// </summary>
+    private static float[] Scatter(float[] coherent, double start, int fs, float c, float mu2, int seed)
+    {
+        int n = coherent.Length;
+        double dt = ScatterFrameSeconds;
+        int frames = (int)(n / (dt * fs)) + 2;
+        double Distance(double sample) => Math.Max(1.0, (start + sample / fs) * c);
+
+        // ── The energy each octave loses, per frame ───────────────────────────────────────────
+        int bands = 0;
+        while (bands < ScatterBands.Length && ScatterBands[bands] * 1.414f < 0.5f * fs) bands++;
+        var lostEnergy = new double[bands][];
+        // Each octave by three band-passes in a row (RBJ, Q = sqrt 2): skirts of 18 dB an octave, so
+        // the rumble's strong low octaves do not leak into the top ones (with two, the 500 Hz octave's
+        // noise put a top on thunder 8 km away that the air had taken off).
+        var filters = new (double B0, double B2, double A1, double A2)[bands];
+        for (int b = 0; b < bands; b++)
+        {
+            double w0 = 2.0 * Math.PI * ScatterBands[b] / fs, alpha = Math.Sin(w0) / (2.0 * Math.Sqrt(2.0));
+            double a0 = 1.0 + alpha;
+            filters[b] = (alpha / a0, -alpha / a0, -2.0 * Math.Cos(w0) / a0, (1.0 - alpha) / a0);
+        }
+        double total = 0;
+        foreach (float v in coherent) total += (double)v * v;
+        var bandTotal = new double[bands];
+        System.Threading.Tasks.Parallel.For(0, bands, b =>
+        {
+            var e = new double[frames];
+            var bp = new BandPass(filters[b]);
+            double sum = 0;
+            double perFrame = dt * fs;
+            for (int i = 0; i < n; i++)
+            {
+                double y = bp.Next(coherent[i]);
+                sum += y * y;
+                e[(int)(i / perFrame)] += y * y / fs;
+            }
+            for (int f = 0; f < frames; f++)
+                e[f] *= ScatteredShare(ScatterBands[b], (float)Distance(f * perFrame), mu2, c);
+            lostEnergy[b] = e;
+            bandTotal[b] = sum;
+        });
+        // The octave filters overlap: scale so the bands together hold the sound's energy.
+        double bandSum = 0;
+        foreach (double v in bandTotal) bandSum += v;
+        double overlap = bandSum > 0 ? total / bandSum : 1.0;
+
+        // ── The coherent sound, with what it keeps at each moment's distance ─────────────────
+        const int win = 1024, hop = win / 2;
+        var output = new float[n];
+        var window = new double[win];
+        for (int i = 0; i < win; i++) window[i] = Math.Sin(Math.PI * (i + 0.5) / win);
+        var spec = new System.Numerics.Complex[win];
+        var keepAt = new double[win / 2 + 1];
+        for (int at = -hop; at < n; at += hop)
+        {
+            bool any = false;
+            for (int i = 0; i < win; i++)
+            {
+                int j = at + i;
+                double v = j >= 0 && j < n ? coherent[j] * window[i] : 0.0;
+                if (v != 0.0) any = true;
+                spec[i] = new System.Numerics.Complex(v, 0.0);
+            }
+            if (!any) continue;
+            float d = (float)Distance(at + hop);
+            for (int k = 0; k <= win / 2; k++)
+                keepAt[k] = Math.Sqrt(1.0 - ScatteredShare(MathF.Max(1f, (float)(k * (double)fs / win)), d, mu2, c));
+            Spectrum.Fft(spec);
+            for (int k = 0; k < win; k++)
+            {
+                int kk = k <= win / 2 ? k : win - k;
+                spec[k] = System.Numerics.Complex.Conjugate(spec[k] * keepAt[kk]);
+            }
+            Spectrum.Fft(spec);
+            for (int i = 0; i < win; i++)
+            {
+                int j = at + i;
+                if (j >= 0 && j < n) output[j] += (float)(spec[i].Real / win * window[i]);
+            }
+        }
+
+        // ── The scattered field, octave by octave ─────────────────────────────────────────────
+        var fields = new float[bands][];
+        System.Threading.Tasks.Parallel.For(0, bands, b =>
+        {
+            var e = lostEnergy[b];
+            var intensity = new float[frames];
+            // Each frame's lost energy let out over its spread as two lags of half the spread each: a
+            // delay that rises from nothing and falls away, as sound scattered many times over arrives
+            // (a single lag would start every tail at full strength, a step).
+            double first = 0, level = 0, any = 0;
+            for (int f = 0; f < frames; f++)
+            {
+                double tau = 0.5 * ScatterSpreadSeconds((float)Distance(f * dt * fs), mu2, c);
+                double keep = tau > 1e-6 ? Math.Exp(-dt / tau) : 0.0;
+                first = first * keep + e[f] * overlap * (1.0 - keep) / dt;
+                level = level * keep + first * (1.0 - keep);
+                intensity[f] = (float)level;
+                any += e[f];
+            }
+            if (any <= 0) return;
+            var bp = new BandPass(filters[b]);
+            // White noise from a fixed generator (xorshift), seeded by the strike: every client the same.
+            uint state = unchecked((uint)(seed * 131 + b * 7919)) | 1u;
+            var noise = new float[n];
+            double power = 0;
+            for (int i = 0; i < n; i++)
+            {
+                state ^= state << 13; state ^= state >> 17; state ^= state << 5;
+                double y = bp.Next(state * (2.0 / uint.MaxValue) - 1.0);
+                noise[i] = (float)y;
+                power += y * y;
+            }
+            power = Math.Max(1e-30, power / n);
+            double perFrame = dt * fs;
+            for (int i = 0; i < n; i++)
+            {
+                // The intensity at the middle of each frame, joined straight between them.
+                double f = i / perFrame - 0.5;
+                int lo = Math.Clamp((int)Math.Floor(f), 0, frames - 1), hi = Math.Min(lo + 1, frames - 1);
+                double frac = Math.Clamp(f - lo, 0.0, 1.0);
+                double inten = intensity[lo] * (1.0 - frac) + intensity[hi] * frac;
+                noise[i] = (float)(noise[i] * Math.Sqrt(Math.Max(0.0, inten) / power));
+            }
+            fields[b] = noise;
+        });
+        foreach (var f in fields)
+            if (f != null)
+                for (int i = 0; i < n; i++) output[i] += f[i];
+        return output;
+    }
+
+    /// <summary>Three identical RBJ band-passes in a row.</summary>
+    private struct BandPass
+    {
+        private readonly double _b0, _b2, _a1, _a2;
+        private double _x1, _x2, _y1, _y2, _u1, _u2, _v1, _v2, _p1, _p2, _q1, _q2;
+        public BandPass((double B0, double B2, double A1, double A2) c) : this() { (_b0, _b2, _a1, _a2) = c; }
+        public double Next(double x)
+        {
+            double y = _b0 * x + _b2 * _x2 - _a1 * _y1 - _a2 * _y2;
+            _x2 = _x1; _x1 = x; _y2 = _y1; _y1 = y;
+            double v = _b0 * y + _b2 * _u2 - _a1 * _v1 - _a2 * _v2;
+            _u2 = _u1; _u1 = y; _v2 = _v1; _v1 = v;
+            double q = _b0 * v + _b2 * _p2 - _a1 * _q1 - _a2 * _q2;
+            _p2 = _p1; _p1 = v; _q2 = _q1; _q1 = q;
+            return q;
         }
     }
 
@@ -477,7 +714,10 @@ public static class Thunder
     /// integral.</summary>
     private sealed class KernelBank
     {
-        public sealed class Kernel { public float[] Wave = Array.Empty<float>(); public float[] Integral = Array.Empty<float>(); public int Pre; }
+        public sealed class Kernel
+        {
+            public float[] Wave = Array.Empty<float>(); public float[] Integral = Array.Empty<float>(); public int Pre;
+        }
 
         /// <summary>One energy per metre: its wave's length and its amplitude 2 m out, and the strength
         /// per metre of channel that gives that amplitude.</summary>
@@ -500,9 +740,12 @@ public static class Thunder
         /// <summary>Energy classes per doubling: neighbours' waves differ in length by 9 %.</summary>
         private const int PerDoubling = 4;
 
-        public KernelBank(int fs, float c, Air air, float largestEnergy)
+        /// <summary>The refractive index's variance; zero for still, smooth air.</summary>
+        public float Mu2 { get; }
+
+        public KernelBank(int fs, float c, Air air, float largestEnergy, float mu2)
         {
-            _fs = fs; _c = c; _air = air;
+            _fs = fs; _c = c; _air = air; Mu2 = mu2;
             float t0 = LightningPhysics.NWaveSeconds(largestEnergy, c);
             MaxLength = LengthFor(LengthenedSeconds(t0, AmplitudeAt2m(largestEnergy, c), 60000f, c));
         }
@@ -525,6 +768,7 @@ public static class Thunder
         }
 
         private int LengthFor(float t) => NextPow2((int)((1.3f * t + 0.012f) * _fs) + Pre);
+
 
         /// <summary>The air's absorption, dB per metre, at each bin of a transform this long.</summary>
         private double[] Alpha(int n)
@@ -600,12 +844,14 @@ public static class Thunder
 
     // ── Rate and grouping ────────────────────────────────────────────────────────────────────
 
-    /// <summary>The lowest of 48, 24 and 12 kHz whose top octave the air has taken at least 60 dB off
+    /// <summary>48 or 24 kHz: the lower when the air has taken at least 60 dB off its top octave
     /// by the time the nearest bit of channel is heard.</summary>
     public static int ChooseRate(float nearest, Air air)
     {
         int rate = 48000;
-        foreach (int r in new[] { 24000, 12000 })
+        // Not 12 kHz: the mixer resamples linearly, and from 12 kHz its images of the rumble sit
+        // across the audible top. Thunder at 24 kHz costs a little memory for a clean top octave.
+        foreach (int r in new[] { 24000 })
         {
             float loss = AudioPhysics.AirAttenuationDbPerMetre(0.4f * r, air.TemperatureC, air.Humidity, air.PressureMb) * nearest;
             if (loss >= 60f) rate = r; else break;

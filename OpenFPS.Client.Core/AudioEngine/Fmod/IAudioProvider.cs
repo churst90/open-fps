@@ -147,6 +147,24 @@ public interface IAudioProvider : IDisposable
     /// </summary>
     bool ReleaseSynthesisedSound(string soundId) => false;
 
+    /// <summary>
+    /// The same as <see cref="RegisterSynthesisedSound"/>, kept in 32-bit float. For a long render with
+    /// a wide range in it (a strike's thunder: a crack and then a minute of rumble 40-60 dB under it),
+    /// whose quiet end sixteen bits would leave as a few steps of the last bit: heard as crackle and
+    /// as stretches of exact silence. Falls back to sixteen bits where a provider has no float path.
+    /// </summary>
+    bool RegisterSynthesisedSoundFloat(string soundId, float[] pcm, int sampleRate)
+    {
+        var bytes = new byte[pcm.Length * 2];
+        for (int i = 0; i < pcm.Length; i++)
+        {
+            short v = (short)Math.Clamp(pcm[i] * 32767f, short.MinValue, short.MaxValue);
+            bytes[i * 2] = (byte)(v & 0xFF);
+            bytes[i * 2 + 1] = (byte)((v >> 8) & 0xFF);
+        }
+        return RegisterSynthesisedSound(soundId, bytes, sampleRate);
+    }
+
     /// <summary>Plays a short interface sound in both ears, not in the world: no position, no room.
     /// The buffer is made once per id and kept; <paramref name="volume"/> is 0..1.</summary>
     void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume);
