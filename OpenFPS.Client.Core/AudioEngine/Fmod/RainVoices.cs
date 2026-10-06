@@ -114,7 +114,8 @@ public sealed class RainVoiceState : PhysicalVoiceState
         : base(ReferenceDb, sampleRate, HeadroomDb)
     {
         _feed = feed;
-        Synth = new RainSynth(sampleRate, seed);
+        // On the clock every rain voice shares, so the patches round a listener swell together.
+        Synth = new RainSynth(sampleRate, seed) { Clock = OpenFPS.Common.WindField.Now() };
         _alpha = 1f / (LevelSeconds * sampleRate);
     }
 

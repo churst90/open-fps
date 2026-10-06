@@ -1,0 +1,11 @@
+{
+  "Id": "rock_boulder",
+  "Name": "Rock",
+  "Description": "A boulder of natural stone, scaled to its size where it lies: a fountain's rock heap, a garden's rockery. The acoustic registry has no stone of its own, so it is Concrete: as dense, as stiff and as hard a reflector, which is what a wet boulder is to sound.",
+  "Material": "Concrete",
+  "ColliderSize": { "X": 1, "Y": 1, "Z": 1 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "IsItem": false,
+  "HasEmitter": false
+}

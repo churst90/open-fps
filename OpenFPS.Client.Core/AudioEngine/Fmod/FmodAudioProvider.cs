@@ -2365,6 +2365,30 @@ public class FmodAudioProvider : IAudioProvider
         }
     }
 
+    // See NatureVoices.cs. A map names each tap of a water feature "water:<preset>/<feature>/<tap>"; the
+    // one synth for <preset>/<feature> is made on the first tap, at the mixer's own rate.
+    private readonly Dictionary<string, WaterFeatureVoice> _waterFeatures = new();
+
+    private PhysicalVoiceState? Water(string key, int rate, int entityId, System.Numerics.Vector3 position)
+    {
+        if (!WaterFeatureVoice.ParseKey(key, out string preset, out string feature, out int tap))
+            return new WaterVoiceState(OpenFPS.Common.WaterFeatureSpec.ByName(key[(key.IndexOf(':') + 1)..]),
+                                       rate, entityId * 37 + 11, position);
+        string shared = preset + "/" + feature;
+        lock (_waterFeatures)
+        {
+            if (!_waterFeatures.TryGetValue(shared, out var w))
+            {
+                w = new WaterFeatureVoice(shared, OpenFPS.Common.WaterFeatureSpec.ByName(preset), rate,
+                                          (int)((uint)shared.GetHashCode() & 0x7fff));
+                _waterFeatures[shared] = w;
+                Log.Information("Water feature '{Feature}' ({Spec}): one synth, {Taps} tap(s)", shared, w.Spec.Name, w.Water.TapCount);
+            }
+            if (tap >= w.Water.TapCount) return null;
+            return new WaterTapState(w, tap, rate, position);
+        }
+    }
+
     /// <summary>The DSP a source's reverb SEND must feed: the region bus's own SFXREVERB unit, which sits
     /// at the TAIL (input end) of the bus chain. Addressing it by identity rather than by
     /// <c>getDSP(HEAD)</c> is the point — the head is the binaural output stage, and sending into it
@@ -2785,8 +2809,7 @@ public class FmodAudioProvider : IAudioProvider
                                                  mrate, emitter.EntityId * 13 + 5),
                     // Water, fire and wind in leaves read the wind where they stand, so they are
                     // given their place. See NatureVoiceState.
-                    "water" => new WaterVoiceState(OpenFPS.Common.WaterFeatureSpec.ByName(preset),
-                                                   mrate, emitter.EntityId * 37 + 11, emitter.Position),
+                    "water" => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position),
                     "fire" => new FireVoiceState(OpenFPS.Common.FireSpec.ByName(preset),
                                                  mrate, emitter.EntityId * 41 + 13, emitter.Position),
                     "foliage" => new FoliageVoiceState(OpenFPS.Common.FoliageSpec.ByName(preset),

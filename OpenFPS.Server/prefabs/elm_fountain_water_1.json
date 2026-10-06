@@ -1,0 +1,21 @@
+{
+  "Id": "elm_fountain_water_1",
+  "Name": "Fountain",
+  "Description": "The Elm Park fountain's water where it lands at the north side of the rocks: one of its five voices (WaterFeatureSpec.ParkFountain's taps, read from one FallingWaterSynth by WaterFeatureVoice). Not a recording and not a loop. Place each over the water or the stone it names, never inside the rock or the pedestal.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 0.4,
+    "Y": 0.4,
+    "Z": 0.4
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "water:park_fountain/elm_park/1",
+  "Volume": 1.0,
+  "Range": 160,
+  "MinDistance": 1.5,
+  "Mode": "LoopOne"
+}

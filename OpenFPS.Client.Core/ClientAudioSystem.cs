@@ -1105,7 +1105,9 @@ public class ClientAudioSystem
         h = OpenFPS.Common.VehicleProfile.PeakHeadroomDb;
         try
         {
-            if (soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
+            if (OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(soundId, out string waterPreset, out _, out _))
+                h = OpenFPS.Common.WaterFeatureSpec.ByName(waterPreset).PeakHeadroomDb;
+            else if (soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.WaterFeatureSpec.ByName(soundId[6..]).PeakHeadroomDb;
             else if (soundId.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.FireSpec.ByName(soundId[5..]).PeakHeadroomDb;
@@ -1156,6 +1158,17 @@ public class ClientAudioSystem
             // Water, fire and the wind in a tree: nobody made them, and they are placed like a
             // machine all the same, at their declared level and their own size. A fountain's size
             // is its basin, a fire's its hearth, a tree's its crown.
+            //
+            // One TAP of a water feature ("water:<preset>/<feature>/<tap>", WaterFeatureVoice) is placed
+            // by the WHOLE feature's level and its own landing place's size: its voice renders its own
+            // share of the water against the whole's full scale, so the taps sum to the feature at
+            // any distance, and near one tap that tap is a point you can walk up to.
+            if (OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(soundId, out string waterPreset, out _, out int waterTap))
+            {
+                var feature = OpenFPS.Common.WaterFeatureSpec.ByName(waterPreset);
+                if (waterTap >= feature.Taps.Length) return null;
+                return (feature.SourceLevelDb, feature.Taps[waterTap].ExtentMetres);
+            }
             if (soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
             {
                 var water = OpenFPS.Common.WaterFeatureSpec.ByName(soundId[6..]);
@@ -1348,8 +1361,11 @@ public class ClientAudioSystem
             float range = MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb));
             float level = OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume, reference, range, d);
 
+            // A water feature's taps are one fountain the same way, and come and go together.
             string group = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _)
-                ? "rail:" + preset + "/" + train : "#" + entityId;
+                ? "rail:" + preset + "/" + train
+                : OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(em.SoundId, out string waterPreset, out string feature, out _)
+                ? "water:" + waterPreset + "/" + feature : "#" + entityId;
             if (!_machineGroups.TryGetValue(group, out var g)) _machineGroups[group] = g = new MachineGroup();
             g.Members.Add(entityId);
             g.Level = MathF.Max(g.Level, level);
