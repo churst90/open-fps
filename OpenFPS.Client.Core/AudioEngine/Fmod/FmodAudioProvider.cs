@@ -1265,6 +1265,7 @@ public class FmodAudioProvider : IAudioProvider
     {
         _speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSoundAt(celsius);
         OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentSpeedOfSound = _speedOfSound;
+        OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius = celsius;
     }
 
     /// <summary>The wet level of the bus for the room the listener is in, dB, moved toward its target

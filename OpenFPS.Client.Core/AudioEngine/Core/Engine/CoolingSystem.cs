@@ -22,6 +22,12 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// the thermostat is part closed, so the fan stays disengaged; pulling a load up to speed from a
 /// stop, the heat outruns a radiator with no air through it and, after twenty or thirty seconds of
 /// it, the clutch goes in.
+///
+/// A car's fan is the other kind (<see cref="ElectricFanSpec"/>): a motor on a relay, its speed
+/// nothing to do with the crank's. The same heat balance switches it, in two stages, and so does the
+/// air conditioning: the condenser sits in front of the radiator and the fan has to pull air through
+/// it whenever the compressor runs and the road is not doing it, so on a warm day an idling or
+/// crawling car runs its fan whatever the coolant is doing.
 /// </summary>
 public sealed class CoolingSystem
 {
@@ -41,8 +47,13 @@ public sealed class CoolingSystem
     /// work: about 0.3 against 0.42 on a diesel.</summary>
     private const float CoolantShare = 0.7f;
 
-    private readonly FanClutchSpec _clutch;
     private readonly EngineProfile _e;
+    // The switch, whichever kind it is: a clutch engages at one temperature and releases at a lower
+    // one; an electric fan's relay does the same at each of its two stages.
+    private readonly float _engageC, _releaseC, _idleFraction, _engageSeconds;
+    private readonly ElectricFanSpec? _electric;
+    private readonly float _airConAmbient = float.MaxValue;
+    private bool _stage1, _airCon;
     private readonly float _ratedW, _designW, _capacityJ;
     private float _celsius;
     private bool _engaged;
@@ -58,9 +69,39 @@ public sealed class CoolingSystem
     /// <summary>The air round the vehicle, degrees C.</summary>
     public float AmbientCelsius { get; set; } = 20f;
 
-    public CoolingSystem(FanClutchSpec clutch, EngineProfile e, int seed)
+    public CoolingSystem(FanClutchSpec clutch, EngineProfile e, int seed) : this(e, seed)
     {
-        _clutch = clutch;
+        _engageC = clutch.EngageCelsius; _releaseC = clutch.ReleaseCelsius;
+        _idleFraction = clutch.DisengagedFraction; _engageSeconds = clutch.EngageSeconds;
+        _drive = clutch.DisengagedFraction;
+    }
+
+    /// <summary>
+    /// An electric fan on a relay. Deterministic per vehicle from <paramref name="seed"/>: where its
+    /// coolant sits to start with, and how warm it has to be before its driver turns the air
+    /// conditioning on (<see cref="ElectricFanSpec.AirConAmbientCelsius"/>, give or take
+    /// <see cref="ElectricFanSpec.AirConAmbientSpread"/>).
+    /// </summary>
+    public CoolingSystem(ElectricFanSpec fan, EngineProfile e, int seed) : this(e, seed)
+    {
+        _electric = fan;
+        _engageC = fan.HighOnCelsius; _releaseC = fan.HighOffCelsius;
+        _idleFraction = 0f; _engageSeconds = fan.SpinUpSeconds;
+        _drive = 0f;
+        uint h = unchecked((uint)seed * 2654435761u);
+        h ^= h >> 15; h = unchecked(h * 2246822519u); h ^= h >> 13;
+        float u = (h & 0xFFFF) / 65535f * 2f - 1f;
+        _airConAmbient = fan.AirConAmbientCelsius + u * fan.AirConAmbientSpread;
+    }
+
+    /// <summary>Whether the driver has the air conditioning on and the fan is running for it
+    /// (electric fans only).</summary>
+    public bool AirConditioning => _airCon;
+    /// <summary>The air temperature at or above which this car's driver runs the air conditioning.</summary>
+    public float AirConFromCelsius => _airConAmbient;
+
+    private CoolingSystem(EngineProfile e, int seed)
+    {
         _e = e;
         float redlineW = e.RedlineRpm * MathF.PI / 30f;
         // A diesel's power curve falls from the torque peak to the governor; 0.7 of peak torque at the
@@ -71,7 +112,6 @@ public sealed class CoolingSystem
         // Where a warm engine sits at a light load, a degree or two either side so a fleet does not
         // all reach the threshold together.
         _celsius = 86f + (seed % 5 - 2) * 0.8f;
-        _drive = clutch.DisengagedFraction;
     }
 
     private static float EngineDisplacementLitres(EngineProfile e)
@@ -91,7 +131,8 @@ public sealed class CoolingSystem
 
         // The air through the core: the road's and the fan's, which add as flows through one core.
         float ram = MathF.Abs(roadSpeed) / RamEqualsFanSpeed;
-        float fan = _drive * MathF.Min(1f, rpm / MathF.Max(1f, _e.RedlineRpm));
+        // A fan on the crank moves air in proportion to the crank's speed; a fan on a motor, to its own.
+        float fan = _electric != null ? _drive : _drive * MathF.Min(1f, rpm / MathF.Max(1f, _e.RedlineRpm));
         float air = MathF.Sqrt(ram * ram + fan * fan);
         float thermostat = Math.Clamp((_celsius - ThermostatOpens) / (ThermostatFull - ThermostatOpens), 0.03f, 1f);
         float heatOut = MathF.Pow(air, AirExponent) * thermostat
@@ -99,11 +140,27 @@ public sealed class CoolingSystem
 
         _celsius += (heatIn - heatOut) * _designW / _capacityJ * dt;
 
-        if (!_engaged && _celsius >= _clutch.EngageCelsius) _engaged = true;
-        else if (_engaged && _celsius <= _clutch.ReleaseCelsius) _engaged = false;
-        float target = _engaged ? 1f : _clutch.DisengagedFraction;
+        if (!_engaged && _celsius >= _engageC) _engaged = true;
+        else if (_engaged && _celsius <= _releaseC) _engaged = false;
+        float target = _engaged ? 1f : _idleFraction;
+        if (_electric is { } ef)
+        {
+            // The first stage: low speed, on the lower pair of temperatures.
+            if (!_stage1 && _celsius >= ef.LowOnCelsius) _stage1 = true;
+            else if (_stage1 && _celsius <= ef.LowOffCelsius) _stage1 = false;
+            // The air conditioning: on if the day is warm enough for this driver, and the fan pulling
+            // air through the condenser while the road is too slow to. Off again only above half as
+            // fast again, so a car crawling at the threshold does not flicker.
+            float speed = MathF.Abs(roadSpeed);
+            if (AmbientCelsius < _airConAmbient || rpm < 50f) _airCon = false;
+            else if (speed < ef.AirConBelowMetresPerSecond) _airCon = true;
+            else if (speed > ef.AirConBelowMetresPerSecond * 1.5f) _airCon = false;
+            if (_stage1 || _airCon) target = MathF.Max(target, ef.LowSpeedFraction);
+            // The ignition is off, and so is the relay.
+            if (rpm < 50f) target = 0f;
+        }
         // Up over the engagement time; down as fast as the fan's own drag lets it run down.
-        float rate = (target > _drive ? 1f : 0.5f) / MathF.Max(0.05f, _clutch.EngageSeconds) * dt;
+        float rate = (target > _drive ? 1f : 0.5f) / MathF.Max(0.05f, _engageSeconds) * dt;
         _drive += Math.Clamp(target - _drive, -rate, rate);
     }
 

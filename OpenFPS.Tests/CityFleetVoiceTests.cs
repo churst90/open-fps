@@ -25,6 +25,13 @@ namespace OpenFPS.Tests;
 /// 94428d20). Half a decibel either way is room for floating point on another machine, not for a
 /// change anyone would hear.
 ///
+/// Changed on purpose on 2026-10-05, when the engine bays were opened up ("the front of the car seems
+/// to be quiet"): the bay is now worked out from its openings and lining (EngineBaySpec) instead of a
+/// flat 0.15 on every car. At this cruise the cars are their tyres and moved by at most 0.4 dB; the
+/// diesel pickup (bay 0.30 to 0.66) gained 1.8 dB below 250 Hz, the step van (0.5 to 0.87) 1.7 / 0.8 /
+/// 1.4 dB, and the mail truck (0.25 to 0.66) 0.4 dB below 250 Hz. The trucks, the bus and the bikes
+/// did not move. This table is that build's output; it waits on Cody's ear like any other change.
+///
 /// What the table also shows: at this cruise the commuter cars (i4_compact, i4_economy, i4_midsize,
 /// i6_street, mail_truck, diesel_i4) measure within half a decibel of each other in every band,
 /// 74.5 / 86.4 / 81.7 dB. Their engines are 11 to 20 dB under their tyres there, and every car has
@@ -42,24 +49,24 @@ public class CityFleetVoiceTests
     /// and the median rpm there.</summary>
     private static readonly Dictionary<string, (float Low, float Mid, float High, float Rpm)> Approved = new()
     {
-        ["boxer4_street"] = (81.3f, 89.1f, 82.5f, 3312f),
-        ["cummins_compound"] = (105.5f, 103.3f, 94.2f, 1994f),
-        ["diesel_i4"] = (78.2f, 86.6f, 81.5f, 1535f),
+        ["boxer4_street"] = (81.5f, 89.2f, 82.7f, 3312f),
+        ["cummins_compound"] = (105.5f, 103.2f, 94.5f, 1994f),
+        ["diesel_i4"] = (80.0f, 86.8f, 82.0f, 1535f),
         ["diesel_truck"] = (93.6f, 96.3f, 92.2f, 1372f),
-        ["duramax_compound"] = (107.5f, 106.4f, 93.8f, 1768f),
-        ["i4_compact"] = (74.7f, 86.4f, 81.7f, 2537f),
-        ["i4_economy"] = (74.5f, 86.4f, 81.7f, 2535f),
-        ["i4_midsize"] = (75.0f, 86.4f, 81.5f, 3187f),
-        ["i4_sport_street"] = (91.9f, 97.8f, 87.6f, 3918f),
-        ["i4_turbo"] = (89.0f, 92.2f, 85.3f, 2983f),
-        ["i6_street"] = (74.9f, 86.7f, 82.0f, 2938f),
-        ["mail_truck"] = (74.2f, 86.3f, 82.1f, 2353f),
+        ["duramax_compound"] = (107.6f, 106.5f, 94.0f, 1768f),
+        ["i4_compact"] = (75.1f, 86.5f, 81.8f, 2537f),
+        ["i4_economy"] = (74.9f, 86.4f, 81.7f, 2535f),
+        ["i4_midsize"] = (75.1f, 86.4f, 81.6f, 3187f),
+        ["i4_sport_street"] = (91.8f, 97.7f, 87.8f, 3918f),
+        ["i4_turbo"] = (89.2f, 92.2f, 85.4f, 2983f),
+        ["i6_street"] = (75.2f, 86.7f, 82.3f, 2938f),
+        ["mail_truck"] = (74.6f, 86.3f, 82.2f, 2353f),
         ["pickup_v8_flowmaster"] = (95.5f, 102.5f, 93.1f, 2754f),
-        ["police_interceptor"] = (78.7f, 88.5f, 82.8f, 2708f),
+        ["police_interceptor"] = (78.9f, 88.5f, 83.0f, 2708f),
         ["single"] = (101.1f, 107.1f, 98.9f, 5098f),
-        ["step_van"] = (85.1f, 89.4f, 85.6f, 1540f),
+        ["step_van"] = (86.8f, 90.2f, 87.0f, 1540f),
         ["transit_bus"] = (90.4f, 93.9f, 90.3f, 1976f),
-        ["v6"] = (78.6f, 88.6f, 82.5f, 3917f),
+        ["v6"] = (78.7f, 88.5f, 82.6f, 3917f),
         ["v8_mild"] = (97.6f, 102.1f, 93.4f, 2152f),
         ["vtwin_slipon"] = (95.8f, 95.1f, 89.4f, 2650f),
         ["vtwin_stock"] = (77.6f, 82.6f, 79.0f, 2649f),

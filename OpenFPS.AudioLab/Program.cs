@@ -66,6 +66,7 @@ string[] usage =
     "  --ride [preset] [knobs] out=FILE.wav          the vehicle voice through a stop-go ride at a fixed gain",
     "  --shift-trace [preset] [top=]                 what the game's driver does with the gearbox in town",
     "  --tap-balance                                 each machine's rear voice against its front voice",
+    "  --car-fronts [preset ...] [out= tag= ambient=] the whole voice from in front, behind, and passing at 10 km/h",
     "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
     "  --intake-ir [preset ...] [thr=] [sec=] [out=] the intake tract alone, thumped once",
     "  --wheel-squeal [out=] [axle] [binaural]       each wheel squealing for itself, and four drives",
@@ -534,6 +535,11 @@ if (args.Contains("--scope-sounds"))
 if (args.Contains("--reload-sounds"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.ReloadSpecSpike.Render(args));
+}
+
+if (args.Contains("--car-fronts"))
+{
+    Environment.Exit(OpenFPS.Client.AudioEngine.Fmod.CarFrontSpike.Run(args));
 }
 
 if (args.Contains("--tap-balance"))

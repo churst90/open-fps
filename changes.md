@@ -4,6 +4,26 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-05
 
+- The front of a car is no longer silent. The engine's own noise (valve ticking, diesel clatter, the
+  belt, the turbo, the intake) leaves only through the engine bay, and every car let out a flat 0.15
+  of it, so an idling hatchback was louder behind than in front. The bay is now its openings (grille,
+  open floor) against its lining: 0.63 for a modern car, 0.89 for a classic with no undertray or
+  liner, 0.66 for a pickup, 0.87 for a step van; trucks, buses and bikes are as they were. The sound
+  leaves by the grille and from under the car, so it is heard straight from in front and less from
+  behind. Checked against NHTSA's quiet-car measurements (FMVSS 141 final rule, 2016): idling cars
+  6 to 10 dB quieter behind than in front, 56.6 to 59.9 dB(A) passing at 10 km/h. The hatchback now
+  measures +6.4 dB and 57.4 dB(A) (it was -2.2 and 52.5). The exhaust is unchanged.
+- Road cars have electric radiator fans. They run at low speed when the air conditioning is on and
+  the car is under about 30 km/h (each driver turns it on somewhere between 20 and 28 C, from the
+  server's weather), and on the coolant at 95 C (low) and 102 C (high).
+- The diesel pickup, the 7.3 Power Stroke, the step van and the straight-six saloon are 2 to 5 dB
+  louder at full throttle with their bays opened, and their declared levels were re-measured. The
+  city vehicle voice table was updated for the pickup, step van and mail truck, which moved at a
+  50 km/h cruise; the cars, trucks, bus and bikes did not.
+- AudioLab `--car-fronts` renders a car idling from in front and behind and passing at 10 km/h, at
+  the level the game plays it or in pascals; `tailpipe` and `fan` measure those alone. Renders in
+  inbox/car-fronts-2026-10-05.
+
 - `/levels real` is gone. 100 percent is still there as a number, but it is literal source levels,
   which on headphones lost footsteps and idling cars; the default, 45 percent, is the setting to use.
   `/levels` now says "the default" when you are on it.
