@@ -593,6 +593,31 @@ public static class GeometryParitySpike
             }
         }
 
+        // ── Track clearance (at load) ────────────────────────────────────────────────────────────
+        if (only.Contains("tracks") && data.Tracks is { Count: > 0 })
+        {
+            var tracks = new Tally("TrackClearance (every track, every sampled point)");
+            tallies.Add(tracks);
+            var solidsList = new List<TrackClearance.Solid>();
+            ecs.Query(new Arch.Core.QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) =>
+            {
+                if (!c.IsSolid || c.Shape != ColliderShape.Box || c.Size.X <= 0 || c.Size.Y <= 0 || c.Size.Z <= 0) return;
+                solidsList.Add(new TrackClearance.Solid(t.Position, c.Size, t.Rotation));
+            });
+            foreach (var track in data.Tracks)
+            {
+                var c = Stopwatch.StartNew();
+                var a = OldTrackCheck(track.Waypoints, track.WidthMetres, solidsList);
+                tracks.OldMs += c.Elapsed.TotalMilliseconds; c.Restart();
+                var b = TrackClearance.Check(track.Waypoints, track.WidthMetres, solidsList);
+                tracks.NewMs += c.Elapsed.TotalMilliseconds;
+                tracks.Probes++;
+                if (a.SequenceEqual(b)) tracks.Same++;
+                else tracks.Differ("obstructions", $"track {track.Id}: old {a.Count}, new {b.Count}", show);
+            }
+            // Per track, not per point: the timing columns are per track here.
+        }
+
         // ── Routes through the openings ──────────────────────────────────────────────────────────
         if (only.Contains("routes"))
             RoutesParity(maps, mapId, ecs, lookup, data, mapSize, n, show, rng, tallies, args);
@@ -837,6 +862,51 @@ public static class GeometryParitySpike
         }
 
         static float Rel(float x, float y) => MathF.Abs(x - y) / MathF.Max(1e-6f, MathF.Max(MathF.Abs(x), MathF.Abs(y)));
+    }
+
+    /// <summary>TrackClearance.Check as main had it: every solid tested at every point.</summary>
+    private static List<TrackClearance.Obstruction> OldTrackCheck(IReadOnlyList<Vector3> waypoints, float widthMetres, IReadOnlyList<TrackClearance.Solid> solids)
+    {
+        const float vehicleHalfWidth = TrackClearance.DefaultVehicleHalfWidth;
+        var found = new List<TrackClearance.Obstruction>();
+        if (waypoints == null || waypoints.Count < 3 || solids.Count == 0) return found;
+        float halfLane = MathF.Max(0f, widthMetres * 0.5f - vehicleHalfWidth);
+        int n = waypoints.Count;
+        for (int i = 0; i < n; i++)
+        {
+            Vector3 here = waypoints[i], next = waypoints[(i + 1) % n], along = next - here;
+            float span = along.Length();
+            if (span < 1e-3f) continue;
+            along /= span;
+            var lateral = new Vector3(-along.Z, 0f, along.X);
+            if (lateral.LengthSquared() < 1e-6f) continue;
+            lateral = Vector3.Normalize(lateral);
+            int steps = Math.Max(1, (int)MathF.Ceiling(span / TrackClearance.SampleSpacing));
+            for (int s = 0; s < steps; s++)
+            {
+                Vector3 centre = here + along * (span * s / steps);
+                for (int lane = -1; lane <= 1; lane++)
+                {
+                    float offset = lane * halfLane;
+                    Vector3 side = centre + lateral * offset;
+                    bool hit = false;
+                    for (int b = 0; b < solids.Count && !hit; b++)
+                    {
+                        var solid = solids[b];
+                        var grown = new Vector3(solid.Size.X + vehicleHalfWidth * 2f, solid.Size.Y, solid.Size.Z + vehicleHalfWidth * 2f);
+                        for (float y = TrackClearance.BodyBottom; y <= TrackClearance.BodyTop + 1e-3f; y += 0.4f)
+                        {
+                            Vector3 p = side + new Vector3(0f, y, 0f);
+                            if (!GeometryUtils.IsPointInOBB(p, solid.Centre, grown, solid.Rotation)) continue;
+                            found.Add(new TrackClearance.Obstruction(p, offset, solid.Centre, solid.Size));
+                            hit = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return found;
     }
 
     // ═══ Helpers ═══════════════════════════════════════════════════════════════════════════════
