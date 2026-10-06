@@ -893,3 +893,16 @@ From a survey of the code (2026-10-06). Line numbers drift; the names do not.
   RaycastMaterial (box and sphere only), CastSight, RaycastSingle; SightGrid;
   SharedMovementEngine.StandingRotation. Box-only filters: SteamAudioScene.BoxesFromWorld,
   AcousticVolumeGenerator, RainField, MapManager, Pavements, VehicleSystem.Parking, AdminGun.
+
+## Decisions (Cody, 2026-10-06)
+
+- Live editing while players are on the map: yes.
+- Stairs: real treads for movement and sound, with automatic step-up; the controls stay as they are
+  (W walks up or down). Footfalls land on real treads, so cadence, material and height follow from
+  the geometry instead of a timed stair rhythm.
+- Soil layers: real soil survey data for maps of real places; a simple profile per place for made-up
+  maps.
+- Everything else as recommended above: terrain 2 m near, 8 m in the coarse ring; 3DEP 10 m plus 1 m
+  lidar where it exists; 0.5 m voxels; glTF/OBJ import as an offline tool; triangle budgets 150k per
+  full tile, 20k per coarse tile, 50k per imported mesh; Steam Audio on Embree (x86/x64 clients);
+  our own BVH and movement rather than Jolt; rooms authored as seeds.
