@@ -138,12 +138,17 @@ def main():
     jout = sys.argv[sys.argv.index('--json') + 1] if '--json' in sys.argv else None
     x, fs = sf.read(os.path.join(d, 'capture.wav'), dtype='float64', always_2d=True)
     rows = list(csv.DictReader(open(os.path.join(d, 'segments.csv'))))
+    # FMOD's WAV writer runs a fraction of a per cent slow against the wall clock the segments were
+    # stamped with (about 0.5 s in 260 s); the capture ends when the last segment does, so scale.
+    clock_end = max(float(r['start']) + float(r['seconds']) for r in rows)
+    rate = (len(x) / fs) / clock_end
+    print(f"capture {len(x) / fs:.2f} s against {clock_end:.2f} s of clock: times scaled by {rate:.5f}")
     if cut:
         os.makedirs(cut, exist_ok=True)
     print(f"{'segment':42s} {'rms':>6s} {'peak':>6s} {'clip':>4s} {'lufs':>6s} {'laeq':>6s} {'lafmax':>6s} {'l60':>6s} {'<100':>5s} {'gap':>4s}")
     out = {}
     for r in rows:
-        s, n = float(r['start']), float(r['seconds'])
+        s, n = float(r['start']) * rate, float(r['seconds']) * rate
         a, b = int((s + HEAD) * fs), int((s + n - TAIL) * fs)
         seg = x[a:b]
         if len(seg) < fs // 2:
@@ -154,7 +159,7 @@ def main():
               f"{m['lafmax']:6.1f} {m['l60']:6.1f} {m['below100']:5.0f} {m['gap']:4.1f}")
         if cut:
             name = ''.join(c if c.isalnum() or c in '-_.' else '_' for c in r['name'])
-            sf.write(os.path.join(cut, name + '.wav'), x[int(s * fs):int((s + n) * fs)], fs, subtype='FLOAT')
+            sf.write(os.path.join(cut, name + '.wav'), x[int(s * fs):int((s + n - TAIL) * fs)], fs, subtype='FLOAT')
     if jout:
         json.dump(out, open(jout, 'w'), indent=1)
 
