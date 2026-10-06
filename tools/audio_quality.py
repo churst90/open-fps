@@ -278,14 +278,18 @@ def lim_stats(pre_path, post_path):
     pre, post = pre[:n], post[:n]
     # Align: the tap before the limiter and the one after it see the same block, but check by
     # cross-correlating a stretch.
-    seg = slice(n // 3, n // 3 + 1 << 15)
-    best, lag = 0, 0
+    # Around the loudest moment, so a scene that is mostly quiet still lines up; and the largest
+    # POSITIVE correlation, since the limiter is a gain: a tone's half period anti-correlates too.
+    # (A look-ahead limiter delays its output by a few milliseconds.)
+    start = int(min(max(2048, np.argmax(np.abs(pre[:, 0])) - 2048), max(2048, n - 8192)))
+    seg = slice(start, start + 4096)
+    best, lag = -np.inf, 0
     for l in range(-2048, 2049, 1):
         if l < 0:
             c = np.dot(pre[seg.start - l: seg.start - l + 4096, 0], post[seg.start: seg.start + 4096, 0])
         else:
             c = np.dot(pre[seg.start: seg.start + 4096, 0], post[seg.start + l: seg.start + l + 4096, 0])
-        if abs(c) > abs(best):
+        if c > best:
             best, lag = c, l
     if lag > 0:
         pre, post = pre[:-lag or None], post[lag:]
@@ -300,7 +304,7 @@ def lim_stats(pre_path, post_path):
     q = post[:m].reshape(-1, win, 2)
     ep = (p ** 2).sum(axis=(1, 2))
     eq = (q ** 2).sum(axis=(1, 2))
-    live = ep > 1e-10
+    live = (ep > 1e-10) & (eq > 1e-14)   # a window both taps hold (not the last few ms the post has not reached)
     g = np.sqrt(eq[live] / ep[live])
     gdb = 20 * np.log10(g)
     makeup = np.percentile(gdb, 95)    # the gain when it is not reducing: the maximiser's makeup
