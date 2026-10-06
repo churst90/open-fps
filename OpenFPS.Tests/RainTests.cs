@@ -92,6 +92,33 @@ public class RainTests
         Assert.Equal(0f, WorldEnvironmentSystem.RainRateFor(winter.GetStateForMap(MapAtmosphere.Default)));
     }
 
+    [Theory]
+    [InlineData(0.2f)]
+    [InlineData(1.5f)]
+    [InlineData(5f)]
+    [InlineData(25f)]
+    [InlineData(60f)]
+    public void TheIntensityForARateGivesThatRate(float rate)
+        => Assert.Equal(rate, Rainfall.RateFromIntensity(Rainfall.IntensityFor(rate)), 2);
+
+    [Fact]
+    public void RainSetByHandIsRainInWinter()
+    {
+        // Deep winter on a map with no warmth of its own: the Rain front turns to snow, unless rain
+        // was asked for by hand.
+        var env = new WorldEnvironmentSystem(new Random(3)) { FrontProbabilityPerTick = 0 };
+        env.SetDate(4f, 1);
+        env.PinRain(Rainfall.HeavyRate);
+        for (int i = 0; i < 300 * 4; i++) env.Update(0.25f);
+        var state = env.GetStateForMap(MapAtmosphere.Default);
+        Assert.True(state.Temperature < Rainfall.SnowBelowCelsius);
+        Assert.Equal(WeatherType.Rain, env.CurrentScenario);
+        Assert.InRange(env.RainRate(state), 20f, 30f);
+        Assert.Equal(0f, WorldEnvironmentSystem.RainRateFor(state));    // the season's own answer
+        env.Unpin();
+        Assert.Null(env.HeldRainRate);
+    }
+
     [Fact]
     public void TheRateCrossesTheWireAfterEverythingElse()
     {

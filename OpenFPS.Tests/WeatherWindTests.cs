@@ -402,6 +402,35 @@ public class WeatherWindTests
         Assert.StartsWith("Usage: /weather", rig.Run(dev, "weather", "sunny"));
     }
 
+    [Fact]
+    public void WeatherRainTakesARate()
+    {
+        using var rig = new CommandRig();
+        var dev = rig.Online("dev", 1, UserRole.Dev);
+        var env = rig.Server.WorldEnvironment;
+
+        Assert.Equal("Rain, heavy, 25 millimetres an hour, coming in.", rig.Run(dev, "weather", "rain", "heavy"));
+        Assert.Equal(25f, env.HeldRainRate);
+        Assert.Equal(WeatherType.Rain, env.CurrentScenario);
+        Assert.Contains(rig.Sent, s => s.What is WorldStateUpdate);
+        for (int i = 0; i < 60 * 90; i++) env.Update(1f / 60f);
+        Assert.InRange(env.RainRate(env.GetCurrentState()), 22f, 27f);
+
+        Assert.Equal("Rain, heavy, 12 millimetres an hour, coming in.", rig.Run(dev, "weather", "rain", "12"));
+        Assert.Equal("Rain, light, 1.5 millimetres an hour, coming in.", rig.Run(dev, "weather", "rain", "light"));
+        Assert.StartsWith("Say light, moderate, heavy or violent", rig.Run(dev, "weather", "rain", "lots"));
+        Assert.StartsWith("Say light, moderate, heavy or violent", rig.Run(dev, "weather", "rain", "400"));
+
+        // Plain rain and a storm are rain at their fronts' own rates, whatever the season.
+        Assert.StartsWith("Rain coming in.", rig.Run(dev, "weather", "rain"));
+        Assert.InRange(env.HeldRainRate ?? 0f, 6f, 8f);
+        rig.Run(dev, "weather", "storm");
+        Assert.InRange(env.HeldRainRate ?? 0f, 55f, 61f);
+        rig.Run(dev, "weather", "snow");
+        Assert.Null(env.HeldRainRate);
+        Assert.Contains("Held until /weather auto.", rig.Run(dev, "weather"));
+    }
+
     /// <summary>The message carries the wind's travel, appended after the fields that were there.</summary>
     [Fact]
     public void TheBroadcastCarriesTheWindsTravel()
