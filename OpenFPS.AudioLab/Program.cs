@@ -67,6 +67,9 @@ string[] usage =
     "  --shift-trace [preset] [top=]                 what the game's driver does with the gearbox in town",
     "  --tap-balance                                 each machine's rear voice against its front voice",
     "  --car-fronts [preset ...] [out= tag= ambient=] the whole voice from in front, behind, and passing at 10 km/h",
+    "  --game-levels [out=DIR] [set=measure|render|compare|all] [cars=a,b]  one thing at a time through the real mixer, captured",
+    "  --wide-sources [out=DIR] [set=measure|render|level|all] [wide=on|off] [sec=]  a tree, the fountain, the fire and rain through the game path, for interaural coherence",
+    "  --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]  texture statistics and game-level texture files",
     "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
     "  --intake-ir [preset ...] [thr=] [sec=] [out=] the intake tract alone, thumped once",
     "  --wheel-squeal [out=] [axle] [binaural]       each wheel squealing for itself, and four drives",
@@ -83,6 +86,7 @@ string[] usage =
     "  --nature [levels|render out=DIR] [preset ...] water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
     "  --weather-wind [out=DIR] [sec=] [ears|trees]  the wind at your ears by speed and heading, a 360 turn, and a tree under /weather",
     "  --thunder [out=DIR] [seed=] [city=x,z] [nowav] thunder at 0.1-15 km, ground and cloud flashes, open field and a city street",
+    "  --rain [levels|render out=DIR|physics|survey map= ear=] [scene ...] [rate=]  rain on the surfaces round a listener, by rate",
     "  --models [export=DIR]                         the model library's ids, or each as JSON",
     "  --aircraft / --landing / --spool [preset]     flyovers, arrivals, and an engine against its lever",
     "  --train / --crossing / --airbrake / --signals trains, a level crossing, air brakes, horns and bells",
@@ -139,6 +143,8 @@ string[] usage =
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
     "  --ambisonic                                   ambisonic encode and decode come out of the right ear",
     "  --dsp-order                                   where HEAD and TAIL put a unit in a channel's chain",
+    "  --quality resampler|orbit|echo|ceiling|quant|lsb|output|thunderfile|scene=NAME [out=DIR] [tag=]",
+    "                                                what the mixer does to a sound: resampler, binaural steps, limiter (tools/audio_quality.py)",
     "",
     "The mixer thread (docs/THE_MIXER_THREAD_CRASH.md)",
     "  --scene-churn / --provider-churn / --physical-churn / --reap-churn / --send-churn",
@@ -479,6 +485,14 @@ if (args.Contains("--weather-wind"))
     // measured against the published figures (WeatherWindSpike).
     Environment.Exit(OpenFPS.AudioLab.Spikes.WeatherWindSpike.Run(args));
 }
+if (args.Contains("--quality"))
+{
+    // --quality resampler|orbit|quant|scene=NAME: known signals and typical scenes through the real
+    // mixer, captured in float before and after the master limiter (QualitySpike).
+    int qcode = OpenFPS.AudioLab.Spikes.QualitySpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(qcode);
+}
 if (args.Contains("--thunder"))
 {
     // --thunder [out=DIR] [seed=N] [city=x,z] [nowav]: the lightning channel's thunder at six
@@ -491,6 +505,20 @@ if (args.Contains("--nature"))
     // --nature [levels|render out=DIR|compare=FILE.wav] [preset ...] [sec= wind=]: water, fire and
     // the wind in leaves, rendered from their models and measured against recordings.
     Environment.Exit(OpenFPS.AudioLab.Spikes.NatureSpike.Run(args));
+}
+
+if (args.Contains("--textures"))
+{
+    // --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]: the cochlear
+    // envelope statistics a texture is recognised by, and the texture round's game-level files.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.TextureSpike.Run(args));
+}
+
+if (args.Contains("--rain"))
+{
+    // --rain [levels|render out=DIR|physics|survey map= ear=|compare=FILE.wav] [scene ...] [rate= sec=]:
+    // rain surveyed and rendered as the game does it, measured at light, moderate, heavy and violent.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.RainSpike.Run(args));
 }
 
 if (args.Contains("--earshot"))
@@ -551,6 +579,16 @@ if (args.Contains("--scope-sounds"))
 if (args.Contains("--reload-sounds"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.ReloadSpecSpike.Render(args));
+}
+
+if (args.Contains("--game-levels"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.GameLevelsSpike.Run(args));
+}
+
+if (args.Contains("--wide-sources"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WideSourcesSpike.Run(args));
 }
 
 if (args.Contains("--car-fronts"))

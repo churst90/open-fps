@@ -73,7 +73,7 @@ public sealed class AircraftSynth
     private bool _onGround;
     private const int SlowEvery = 64;
 
-    public AircraftSynth(AircraftProfile p, float rate = 44100f, int seed = 3)
+    public AircraftSynth(AircraftProfile p, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 3)
     {
         Profile = p;
         _rate = rate;
@@ -619,12 +619,13 @@ internal sealed class JetStream
     private readonly Random _rng;
     private float _amp, _n1, _n2;
     private float _l1, _l2, _l3, _l4, _mod;
+    private readonly float _modStep;   // 0.0004 a sample at 44.1 kHz: 2.8 Hz
     private float _a1, _a2, _hp;
 
     /// <param name="trimDb">Where this stream sits against the law: see GasTurbineSpec.CoreJetTrimDb.</param>
     public JetStream(float rate, float diameter, float kelvin, int seed, float trimDb)
     {
-        _rate = rate; _d = MathF.Max(0.02f, diameter); _kelvin = kelvin;
+        _rate = rate; _d = MathF.Max(0.02f, diameter); _kelvin = kelvin; _modStep = At44k.Step(0.0004f, rate);
         _trim = MathF.Pow(10f, trimDb / 20f);
         _rng = new Random(seed);
         SetVelocity(1f);
@@ -660,7 +661,7 @@ internal sealed class JetStream
         float bp = (_l1 - _l2) / _n1 * 0.85f + (_l3 - _l4) / _n2 * 0.5f;
         // Breathing: a few hertz.
         float m = (float)(_rng.NextDouble() * 2 - 1);
-        _mod += 0.0004f * (m - _mod);
+        _mod += _modStep * (m - _mod);
         float y = bp * _amp * (1f + 12f * _mod);
         _hp += OnePole.AlphaFor(30f, _rate) * (y - _hp);
         return y - _hp;

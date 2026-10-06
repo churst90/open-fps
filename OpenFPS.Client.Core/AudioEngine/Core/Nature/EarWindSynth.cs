@@ -39,6 +39,7 @@ public sealed class EarWindSynth
 
     private readonly Svf _hpL = new(), _hpR = new(), _lp1L = new(), _lp1R = new(), _lp2L = new(), _lp2R = new();
     private float _knee = 300f, _norm = 1f;
+    private int _sinceGlide;
     private float _gainL, _gainR, _targetL, _targetR, _gainStep;
 
     /// <summary>
@@ -94,10 +95,28 @@ public sealed class EarWindSynth
         _targetL = MathF.Pow(10f, l / 20f);
         _targetR = MathF.Pow(10f, r / 20f);
 
-        float k = 1f - MathF.Exp(-MathF.Max(0f, dt) / KneeSeconds);
-        float knee = float.IsFinite(ears.KneeHz) ? ears.KneeHz : _knee;
-        SetKnee(_knee + (knee - _knee) * k);
-        SetBuffetRate(Math.Clamp(ears.Speed / BuffetEddyMetres, 0.5f, 30f));
+        // Targets only: Render glides the knee and the buffeting rate to them every few samples. Set
+        // here once a block, the knee moved a fifth of the way at a time, its filters and their
+        // level with it — a 43 Hz staircase in the colour and level of the wind whenever it changed,
+        // as on every turn of the head.
+        if (float.IsFinite(ears.KneeHz)) _kneeTarget = ears.KneeHz;
+        _buffetTarget = Math.Clamp(ears.Speed / BuffetEddyMetres, 0.5f, 30f);
+    }
+
+    private float _kneeTarget = 300f, _buffetTarget = EarWind.ReferenceSpeed / BuffetEddyMetres, _buffetHz = EarWind.ReferenceSpeed / BuffetEddyMetres;
+
+    /// <summary>Samples between steps of the knee's and the buffeting's glides.</summary>
+    private const int GlideStride = 32;
+
+    private void Glide()
+    {
+        float k = 1f - MathF.Exp(-GlideStride / (KneeSeconds * SampleRate));
+        if (MathF.Abs(_kneeTarget - _knee) > 0.01f) SetKnee(_knee + (_kneeTarget - _knee) * k);
+        if (MathF.Abs(_buffetTarget - _buffetHz) > 1e-4f)
+        {
+            _buffetHz += (_buffetTarget - _buffetHz) * k;
+            SetBuffetRate(_buffetHz);
+        }
     }
 
     /// <summary>Forgets every filter and envelope: after a non-finite block. No allocation.</summary>
@@ -108,6 +127,8 @@ public sealed class EarWindSynth
         _gainL = _gainR = 0f;
         Array.Clear(_delayL); Array.Clear(_delayR); _peakEnv = 0f; _held = 0f; _holdLeft = 0;
         if (!float.IsFinite(_knee)) SetKnee(300f);
+        if (!float.IsFinite(_kneeTarget)) _kneeTarget = _knee;
+        if (!float.IsFinite(_buffetHz) || !float.IsFinite(_buffetTarget)) { _buffetHz = _buffetTarget = EarWind.ReferenceSpeed / BuffetEddyMetres; SetBuffetRate(_buffetHz); }
     }
 
     /// <summary>Whether there is anything to hear: lets a caller skip a silent block.</summary>
@@ -118,7 +139,11 @@ public sealed class EarWindSynth
     {
         int n = Math.Min(left.Length, right.Length);
         if (Silent) { left[..n].Clear(); right[..n].Clear(); return; }
-        for (int i = 0; i < n; i++) Next(out left[i], out right[i]);
+        for (int i = 0; i < n; i++)
+        {
+            if (++_sinceGlide >= GlideStride) { _sinceGlide = 0; Glide(); }
+            Next(out left[i], out right[i]);
+        }
     }
 
     /// <summary>One sample of each ear.</summary>

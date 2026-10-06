@@ -53,9 +53,10 @@ public static class EntityDefinitionFactory
             // Dead, a player is not a player beacon: their body lies there as an item, which is what
             // there is to find. The definition goes out again when they die and when they get up.
             if (world.Has<DeadComponent>(e)) def.Identity.BeaconCategory = "";
-            // In a seat, they are carried and not walking; see EntityDefinition.RidingEntityId.
-            if (world.Has<OccupantComponent>(e)) def.RidingEntityId = world.Get<OccupantComponent>(e).RootEntityId;
         }
+        // In a seat, they are carried and not walking; see EntityDefinition.RidingEntityId. Anybody in a
+        // seat: a player, or Alex on the bus, whose footsteps at forty kilometres an hour are as wrong.
+        if (world.Has<OccupantComponent>(e)) def.RidingEntityId = world.Get<OccupantComponent>(e).RootEntityId;
         return def;
     }
 

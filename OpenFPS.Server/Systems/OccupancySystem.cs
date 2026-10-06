@@ -86,6 +86,31 @@ public sealed class OccupancySystem
                 world.Get<Velocity>(e).Linear = world.Get<Velocity>(root).Linear;
         });
 
+        // Somebody who is not a player in a seat (Alex on the bus): carried the same way, facing the
+        // way the seat faces, since nobody is turning their head for them.
+        var others = new QueryDescription().WithAll<Transform, OccupantComponent>().WithNone<PlayerComponent>();
+        world.Query(in others, (Entity e, ref Transform transform, ref OccupantComponent occupant) =>
+        {
+            if (!lookup.TryGetValue(occupant.RootEntityId, out var root) || !world.IsAlive(root)
+                || !world.Has<OccupancyComponent>(root) || !world.Has<Transform>(root))
+            { _stranded.Add((e, occupant.RootEntityId)); return; }
+            var seats = world.Get<OccupancyComponent>(root).Seats;
+            if (seats == null || occupant.SeatIndex < 0 || occupant.SeatIndex >= seats.Count)
+            { _stranded.Add((e, occupant.RootEntityId)); return; }
+            var rootTransform = world.Get<Transform>(root);
+            var seat = seats[occupant.SeatIndex];
+            var seatPosition = OccupancyService.SeatPosition(rootTransform, seat);
+            var rotation = Quaternion.CreateFromYawPitchRoll(OccupancyService.SeatYaw(rootTransform, seat), 0f, 0f);
+            if (transform.Position != seatPosition || transform.Rotation != rotation)
+            {
+                transform.Position = seatPosition;
+                transform.Rotation = rotation;
+                transform.IsDirty = true;
+            }
+            if (world.Has<Velocity>(e) && world.Has<Velocity>(root))
+                world.Get<Velocity>(e).Linear = world.Get<Velocity>(root).Linear;
+        });
+
         foreach (var (occupant, rootId) in _stranded)
         {
             CompositeService.Disembark(world, occupant);

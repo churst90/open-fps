@@ -13,16 +13,26 @@ namespace OpenFPS.Client.AudioEngine.Core;
 ///
 /// A render is the same every time for the same key and the same models, so it is kept: first in the
 /// folder shipped with the client (ASSETS/rendercache/BUILD, filled when a build is published), then in
-/// the player's own cache, which fills as they play. Both are named by <see cref="WireContract.Hash"/>,
-/// the hash of OpenFPS.Common where the models live, so a changed model is never played from an old
-/// render; the player's folders for other builds are removed.
+/// the player's own cache, which fills as they play. Both are named by <see cref="Name"/>: the hash of the
+/// door models' own sources (<see cref="DoorModelFingerprint"/>, made by OpenFPS.Common.csproj) and
+/// <c>Version</c>, so a changed model is never played from an old render, and a change anywhere else in
+/// OpenFPS.Common keeps them (they used to be named by WireContract.Hash, and every change to the
+/// project rendered them all again at the next launch). The player's folders for other models are removed.
 ///
 /// Glass breaking is not kept: every pane and every break has a key of its own.
+///
+/// A render is kept at the rate it is made, <see cref="TransientSynth.SampleRate"/> (48 kHz), not the
+/// mixer's: it is brought to the mixer's rate when it is registered (WorldAudioPlayer.AtMixerRate), so
+/// a mixer at another rate (OPENFPS_MIXER_RATE) plays a kept render at its right pitch, and the files
+/// need no rate of their own. If TransientSynth's rate ever changes, bump <c>Version</c>.
 /// </summary>
 public static class DoorRenderCache
 {
     private const int Magic = 0x4352464F;   // "OFRC"
     private const int Version = 2;
+
+    /// <summary>The folder name for this build's door models: their sources' hash and the file version.</summary>
+    public static string Name => DoorModelFingerprint.Hash + "-v" + Version;
 
     // Stored as 16-bit, as the engine is given them (TransientSynth.ToPcm16), scaled by the render's own
     // peak so a render over full scale (a car window) is not clipped: half the size of floats, and the
@@ -34,7 +44,7 @@ public static class DoorRenderCache
 
     /// <summary>The renders shipped with the client, read only.</summary>
     public static string ShippedFolder { get; set; } =
-        Path.Combine(AppContext.BaseDirectory, "ASSETS", "rendercache", WireContract.Hash);
+        Path.Combine(AppContext.BaseDirectory, "ASSETS", "rendercache", Name);
 
     private static int _pruned;
 
@@ -45,7 +55,7 @@ public static class DoorRenderCache
         if (!string.IsNullOrWhiteSpace(env)) return env;
         string root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (string.IsNullOrEmpty(root)) return null;
-        return Path.Combine(root, "OpenFPS", "rendercache", WireContract.Hash);
+        return Path.Combine(root, "OpenFPS", "rendercache", Name);
     }
 
     /// <summary>Whether a key's render is kept: every model key but a pane of glass breaking.</summary>
@@ -123,7 +133,7 @@ public static class DoorRenderCache
         }
     }
 
-    /// <summary>The player's renders for other builds are of other models: removed, once a run.</summary>
+    /// <summary>The player's renders for other door models are stale: removed, once a run.</summary>
     private static void PruneOtherBuilds(string dir)
     {
         if (Interlocked.Exchange(ref _pruned, 1) == 1) return;
@@ -132,7 +142,7 @@ public static class DoorRenderCache
             var parent = Directory.GetParent(dir);
             if (parent == null || !string.Equals(parent.Name, "rendercache", StringComparison.OrdinalIgnoreCase)) return;
             foreach (var other in parent.GetDirectories())
-                if (!string.Equals(other.Name, WireContract.Hash, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(other.Name, Name, StringComparison.OrdinalIgnoreCase))
                     other.Delete(recursive: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

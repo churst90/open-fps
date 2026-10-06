@@ -57,7 +57,7 @@ Models are in `AudioEngine/Core/Nature`; voices in `AudioEngine/Fmod/NatureVoice
 
 | Sound | Model | Voice | Prefab and preset |
 |---|---|---|---|
-| Fountain | `FallingWaterSynth` | `WaterVoiceState` | `water_fountain`, "water:park_fountain" |
+| Fountain | `FallingWaterSynth` | `WaterVoiceState`; per tap `WaterTapState` over one `WaterFeatureVoice` | `water_fountain`, "water:park_fountain"; on the city `elm_fountain_water_0..4`, "water:park_fountain/elm_park/0..4" |
 | Wood fire | `FireSynth` | `FireVoiceState` | `fire_pit`, "fire:fire_pit" |
 | Wind in a tree | `FoliageSynth` | `FoliageVoiceState` | `tree_crown`, "foliage:park_tree" (also "pine") |
 

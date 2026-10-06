@@ -52,9 +52,13 @@ public static class NatureSpike
     /// turbulence intensity for this run.</summary>
     private static float? Steady;
 
+    /// <summary>tap=N: render only that tap of a water feature (its own voice), not all of them at one point.</summary>
+    private static int? Tap;
+
     public static int Run(string[] args)
     {
         Steady = args.Any(a => a.StartsWith("steady=", StringComparison.Ordinal)) ? Arg(args, "steady=", 4f) : null;
+        Tap = args.Any(a => a.StartsWith("tap=", StringComparison.Ordinal)) ? (int)Arg(args, "tap=", 0f) : null;
         Parts = args.FirstOrDefault(a => a.StartsWith("parts=", StringComparison.Ordinal))?.Substring(6).Split(',');
         float sec = Arg(args, "sec=", 30f);
         float wind = Arg(args, "wind=", WindField.MeanSpeed);
@@ -203,12 +207,18 @@ public static class NatureSpike
                     s.DropBubblePart = Parts.Contains("drop") ? 1f : 0f;
                     s.LumpBubblePart = Parts.Contains("lump") ? 1f : 0f;
                     s.PlungePart = Parts.Contains("plunge") ? 1f : 0f;
+                    s.SplashPart = Parts.Contains("splash") ? 1f : 0f;
                 }
+                Span<float> taps = stackalloc float[s.TapCount];
                 for (int i = 0; i < n; i += block)
                 {
                     s.Wind = Steady ?? WindField.SpeedAt(x, spec.WindHeightMetres, z, i / (double)Rate);
                     s.Control(block / (float)Rate);
-                    for (int k = i; k < Math.Min(n, i + block); k++) pa[k] = s.Next();
+                    for (int k = i; k < Math.Min(n, i + block); k++)
+                    {
+                        if (Tap is int t) { s.NextTaps(taps); pa[k] = taps[Math.Clamp(t, 0, taps.Length - 1)]; }
+                        else pa[k] = s.Next();
+                    }
                 }
                 string census = string.Join("\n", s.Census().Select(c =>
                     $"  {c.Name}: {c.Drops:F0} drops/s, {c.Lumps:F0} lumps/s, {c.Bubbles:F0} plunge bubbles/s"));
@@ -411,7 +421,7 @@ public static class NatureSpike
     }
 
     /// <summary>A fourth-order band-pass: two RBJ high-passes then two low-passes.</summary>
-    private static float[] BandPass(float[] x, int sr, float lo, float hi)
+    internal static float[] BandPass(float[] x, int sr, float lo, float hi)
     {
         var y = (float[])x.Clone();
         for (int pass = 0; pass < 2; pass++)

@@ -97,7 +97,7 @@ public static class EngineCostSpike
         var presets = args.Where(a => VehicleProfile.Presets.ContainsKey(a)).ToList();
         if (presets.Count == 0) presets.AddRange(VehicleProfile.Presets.Keys);
 
-        const int sr = 44100, block = 1024;
+        const int sr = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, block = 1024;   // the rate the game runs it at
         Console.WriteLine($"\n  Discontinuities in one live voice at {kmh:F0} km/h, {seconds:F0} s, no mixer.\n");
         Console.WriteLine("    preset            peak     median step    >0.04/s    >0.08/s    >0.15/s   largest");
         foreach (var key in presets)
@@ -144,7 +144,7 @@ public static class EngineCostSpike
         float kmh = Arg(args, "kmh", 280f), seconds = Arg(args, "sec", 5f);
         string key = args.FirstOrDefault(a => VehicleProfile.Presets.ContainsKey(a)) ?? "nascar_v8";
         var v = VehicleProfile.ByName(key);
-        const int sr = 44100;
+        const int sr = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;   // the rate the game runs it at
 
         var engine = new EngineSynth(v.Engine, sr, 11);
         var dl = new Driveline(v);
@@ -195,6 +195,7 @@ public static class EngineCostSpike
         // body=off strips the car's own resonances, so what they cost can be measured rather than
         // assumed. A remembered figure from a different build is not a baseline.
         bool withBody = true;
+        int rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;   // rate=44100 for the old mixer
         var presets = new System.Collections.Generic.List<string>();
         foreach (var arg in args)
         {
@@ -206,12 +207,13 @@ public static class EngineCostSpike
                 if (k == "kmh") kmh = float.Parse(v);
                 else if (k == "sec") seconds = float.Parse(v);
                 else if (k == "body") withBody = v != "off" && v != "0";
+                else if (k == "rate") rate = int.Parse(v);
             }
             else if (VehicleProfile.Presets.ContainsKey(arg)) presets.Add(arg);
         }
         if (presets.Count == 0) presets.AddRange(VehicleProfile.Presets.Keys);
 
-        const int sr = 48000, block = 512;
+        int sr = rate, block = 512;
         var buf = new float[block];
         int blocks = (int)(seconds * sr / block);
 
@@ -295,7 +297,7 @@ public static class EngineCostSpike
     /// </summary>
     public static int VoiceLevels(string[] args)
     {
-        const int sr = 44100, block = 1024;
+        const int sr = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, block = 1024;   // the rate the game runs it at
         var presets = args.Where(a => MachineRegistry.Knows(a)).ToList();
         if (presets.Count == 0) presets.AddRange(MachineRegistry.Ids);
         if (args.Contains("sweep")) return Sweep(presets, sr, block);

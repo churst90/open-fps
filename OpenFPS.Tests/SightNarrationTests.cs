@@ -432,6 +432,7 @@ public class SightNarrationTests
     /// What it costs: a look (centre line and cone) and a passing check, at places in the city and with
     /// three hundred and fifty people walking about it. The budget is half a millisecond of the game loop.
     /// </summary>
+    [Trait("Category", "Timing")] // depends on this machine's speed or on real time; not run on CI
     [Fact]
     public void ALookCostsLessThanHalfAMillisecond()
     {

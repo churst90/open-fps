@@ -197,6 +197,7 @@ public sealed class BeaconAids
             TransmissionBleed = path?.TransmissionBleed ?? 0f,
             TargetRegionId = region != -1 ? region : path?.RegionId ?? -1,
             Volume = gain,
+            EarLevelDb = BlipDb + (float)_prefs.LevelDb,
             MinDistance = reference,
             Range = 40f,
             IsEvent = true,
@@ -384,9 +385,9 @@ public sealed class BeaconAids
         foreach (var (category, kind) in Kinds)
         {
             float[] pcm = Tone(category, rate);
-            ok &= _audio.RegisterSynthesisedSound(kind.Sound, TransientSynth.ToPcm16(pcm), rate);
+            ok &= _audio.RegisterSynthesisedSoundFloat(kind.Sound, pcm, rate);
         }
-        ok &= _audio.RegisterSynthesisedSound(TeammateSound, TransientSynth.ToPcm16(TeammateTone(rate)), rate);
+        ok &= _audio.RegisterSynthesisedSoundFloat(TeammateSound, TeammateTone(rate), rate);
         _registered = ok;
     }
 

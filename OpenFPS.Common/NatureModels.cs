@@ -54,6 +54,19 @@ public sealed record WaterFallSpec
     /// independent from one to the next, and the more of them there are the steadier their sum: the
     /// fluctuation of the whole goes down as one over the square root of the count.</summary>
     public int Streams { get; init; } = 1;
+    /// <summary>What it lands on: the pool, or wet stone (<see cref="WaterSurface"/>).</summary>
+    public WaterSurface Onto { get; init; } = WaterSurface.Pool;
+    /// <summary>Which of the feature's <see cref="WaterFeatureSpec.Taps"/> it is heard from: where on the
+    /// feature this water lands. A map places one emitter per tap at that place.</summary>
+    public int Tap { get; init; }
+    /// <summary>The order of the gamma law the coherent lumps' radii follow about
+    /// <see cref="ChunkRadiusMm"/>. A column collapsing at a jet's apex, or a sheet tearing off a lip,
+    /// comes apart into irregular fragments, and coarse, corrugated fragmentation gives the broad end of
+    /// Villermaux's family (Villermaux 2007, Annu. Rev. Fluid Mech. 39: order 2-5, lower the more
+    /// corrugated): order 2. Its tail matters: a lump's splash goes as its volume, r³, so the few big
+    /// lumps are the few loud splashes a real fountain has, where lumps all one size (the first model:
+    /// uniform 0.5-1.5 of the mean) summed to a steady hiss.</summary>
+    public int LumpSizeOrder { get; init; } = 2;
 
     /// <summary>A vertical jet from a nozzle, worked out from the nozzle and how high the water
     /// goes: the exit speed is what lifts it there, √(2 g h), and the flow is that speed through the
@@ -75,6 +88,25 @@ public sealed record WaterFallSpec
     }
 }
 
+/// <summary>What falling water lands on.</summary>
+public enum WaterSurface
+{
+    /// <summary>Open water: the drop or lump opens a crater, which may trap a bubble that rings.</summary>
+    Pool,
+    /// <summary>Wet stone: a rock the water strikes and runs over. Nothing is trapped; the water stops
+    /// in its own length and splashes flat, and every lump throws a spray off the stone.</summary>
+    Rock,
+}
+
+/// <summary>One place on a water feature the sound comes from: where some of its water lands. Each is
+/// its own voice at its own place on the map, so a feature metres across is heard as metres across.</summary>
+public sealed record WaterTapSpec
+{
+    public string Name { get; init; } = "";
+    /// <summary>How big this landing place is, m: the voice is flat inside it.</summary>
+    public float ExtentMetres { get; init; } = 1.2f;
+}
+
 /// <summary>A fountain, a cascade, a weir: everything falling into one pool.</summary>
 public sealed record WaterFeatureSpec
 {
@@ -92,51 +124,103 @@ public sealed record WaterFeatureSpec
     public float ExtentMetres { get; init; } = 2f;
     /// <summary>The height the wind that moves the spray is taken at, m.</summary>
     public float WindHeightMetres { get; init; } = 1.5f;
+    /// <summary>Where on the feature its water lands, one voice each (<see cref="WaterFallSpec.Tap"/>).
+    /// A map places them as "water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;" emitters; the whole feature as
+    /// one "water:&lt;preset&gt;" emitter plays every tap from one point.</summary>
+    public WaterTapSpec[] Taps { get; init; } = { new() { Name = "the whole" } };
 
     /// <summary>
-    /// A park fountain of the ordinary kind: a round basin with a pedestal in the middle carrying a
-    /// bowl, a jet rising out of the bowl and falling back into it, the bowl overflowing all round
-    /// its lip into the basin, and a ring of small jets arching in from the basin's rim.
+    /// A park fountain, tiered, over rocks (Cody, 2026-10-06: "a little more lifelike, a little bigger,
+    /// with maybe some rocks where the water splashes over"): an 11 m square basin with a pedestal in
+    /// the middle carrying a bowl, a jet rising out of the bowl and falling back into it, the bowl
+    /// overflowing all round its lip onto a ring of boulders heaped round the pedestal's foot, the water
+    /// running over the stone and off it into the pool, and twelve small jets arching in from the
+    /// kerb, three a side.
     ///
-    /// The central jet is a 14 mm nozzle throwing 1.6 m (5.6 m/s, 0.86 L/s); the bowl is 2.4 m across
-    /// and 1.1 m over the basin, so its 7.5 m of lip carries 0.11 L/s a metre — too thin to stay a
-    /// sheet for long, so most of it reaches the basin as a fringe of strands and beads. Eight rim
-    /// jets of 8 mm arch 0.9 m up and come down inside the basin.
+    /// The central jet is a 16 mm nozzle throwing 2 m (6.3 m/s, 1.26 L/s). The bowl is 2.8 m across and
+    /// 1.25 m over the water, its lip 11.2 m round, so 0.11 L/s a metre: too thin to stay a sheet, it
+    /// fingers into strands about 3 cm apart (the Rayleigh-Taylor wavelength of a liquid rim, 2π√3
+    /// capillary lengths; water's capillary length is 2.7 mm) and falls 0.75 m onto the rocks as strands
+    /// and beads. Off the rocks it leaves over their outer edges as short sheets and strands, 0.45 m down
+    /// into the pool. The rim jets are 8 mm, rising a metre: 0.22 L/s each.
+    ///
+    /// It is heard from five places (<see cref="Taps"/>): the bowl, and the four sides of the rock heap,
+    /// where each side's overflow strikes the stone and runs off it and that side's three rim jets come
+    /// down. The map (tools/gen_city.py, Elm Park) puts an emitter at each.
     /// </summary>
     public static WaterFeatureSpec ParkFountain => new()
     {
-        Name = "Park fountain, tiered, with rim jets",
-        Falls = new[]
+        Name = "Park fountain, tiered, over rocks, with rim jets",
+        Falls = ParkFountainFalls(),
+        Taps = new[]
         {
-            WaterFallSpec.Jet("central jet into the bowl", 14f, 1.6f, 0.05f, dropShare: 0.55f, meanDropRadiusMm: 1.5f, chunkRadiusMm: 6f),
-            new WaterFallSpec
-            {
-                Name = "bowl overflow",
-                FlowLitresPerSecond = 0.86f, FallMetres = 1.1f,
-                DropShare = 0.8f, MeanDropRadiusMm = 1.8f, ChunkRadiusMm = 3f,
-                DriftPerMetrePerSecond = 0.01f,
-                // A thin sheet falling off a rim fingers into strands about 2π√3 capillary lengths
-                // apart (the Rayleigh-Taylor wavelength of a liquid rim; water's capillary length is
-                // 2.7 mm, so about 3 cm): 7.5 m of lip is some 250 strands.
-                Streams = 250,
-            },
-            WaterFallSpec.Jet("rim jets", 8f, 0.9f, 0.15f, dropShare: 0.35f, meanDropRadiusMm: 1.2f, chunkRadiusMm: 4f) with
-            {
-                // Eight of them.
-                FlowLitresPerSecond = 8f * WaterFallSpec.Jet("", 8f, 0.9f, 0.15f).FlowLitresPerSecond,
-                Streams = 8,
-            },
+            new WaterTapSpec { Name = "the bowl", ExtentMetres = 1.4f },
+            new WaterTapSpec { Name = "north side of the rocks", ExtentMetres = 1.5f },
+            new WaterTapSpec { Name = "east side of the rocks", ExtentMetres = 1.5f },
+            new WaterTapSpec { Name = "south side of the rocks", ExtentMetres = 1.5f },
+            new WaterTapSpec { Name = "west side of the rocks", ExtentMetres = 1.5f },
         },
-        // MEASURED with `--nature levels water`, 2026-10-04: Leq 71.9 dB, 71.4 dB(A), at a metre with
-        // the field's mean wind; its 10 ms peaks' 99.9th percentile 21.2 dB over that. Re-measured
-        // 2026-10-05 after the grain was taken out (every impact rendered, lumps cushioned): Leq
-        // 72.3 dB, 72.3 dB(A), peaks 19.1 dB over, so the 22 dB of room is now to spare. Round 3
-        // (gamma drop sizes, lumps cushioned to 0.07 r/v): 71.9 dB, 71.8 dB(A), peaks 17.0 dB over.
-        SourceLevelDb = 72f,
+        // MEASURED with `--nature levels water sec=60`, 2026-10-06 (texture round 1: the bigger fountain
+        // over rocks, every tap at one point, the field's mean wind): Leq 74.5 dB, 74.7 dB(A) at a
+        // metre; its 10 ms peaks' 99.9th percentile 17.8 dB over that. (The round-3 fountain, 2.6 L/s
+        // into one basin, was 71.9 dB; this one moves 3.9 L/s.)
+        SourceLevelDb = 75f,
         PeakHeadroomDb = 22f,
-        ExtentMetres = 3f,
+        ExtentMetres = 5.5f,
         WindHeightMetres = 1.5f,
     };
+
+    /// <summary>
+    /// The coherent water arrives in the sizes its breakup gives it. A jet necks and pinches into slugs
+    /// about 1.9 jet diameters across (Rayleigh-Plateau; Rayleigh 1878), so an 8 mm rim jet comes down
+    /// as lumps of about 7.5 mm radius, a hundred-odd a second a jet. The central jet's column spreads
+    /// at its apex and falls back in fragments of every size about a centimetre. The overflow's sheet,
+    /// 30 µm thick, fingers into strands a millimetre thick that bead into drops of about a millimetre,
+    /// so it reaches the rocks nearly all as drops. On the stone it gathers into rivulets that leave the
+    /// rocks' edges a few to a side, each pinching into slugs of about 5 mm.
+    /// </summary>
+    private static WaterFallSpec[] ParkFountainFalls()
+    {
+        var falls = new List<WaterFallSpec>
+        {
+            WaterFallSpec.Jet("central jet into the bowl", 16f, 2.0f, 0.05f, dropShare: 0.4f, meanDropRadiusMm: 2.0f, chunkRadiusMm: 7f)
+                with { Tap = 0 },
+        };
+        float overflow = falls[0].FlowLitresPerSecond / 4f;
+        var rim = WaterFallSpec.Jet("", 8f, 1.0f, 0.15f, dropShare: 0.2f, meanDropRadiusMm: 1.2f, chunkRadiusMm: 6f);
+        string[] sides = { "north", "east", "south", "west" };
+        for (int q = 0; q < 4; q++)
+        {
+            falls.Add(new WaterFallSpec
+            {
+                Name = $"bowl overflow onto the {sides[q]} rocks",
+                FlowLitresPerSecond = overflow, FallMetres = 0.75f,
+                DropShare = 0.9f, MeanDropRadiusMm = 1.2f, ChunkRadiusMm = 3f,
+                DriftPerMetrePerSecond = 0.01f,
+                // 2.8 m of lip a side, strands about 3 cm apart.
+                Streams = 90,
+                Onto = WaterSurface.Rock,
+                Tap = 1 + q,
+            });
+            falls.Add(new WaterFallSpec
+            {
+                Name = $"off the {sides[q]} rocks into the pool",
+                FlowLitresPerSecond = overflow, FallMetres = 0.45f,
+                DropShare = 0.15f, MeanDropRadiusMm = 1.5f, ChunkRadiusMm = 5f,
+                DriftPerMetrePerSecond = 0f,
+                Streams = 8,
+                Tap = 1 + q,
+            });
+            falls.Add(rim with
+            {
+                Name = $"{sides[q]} rim jets",
+                FlowLitresPerSecond = 3f * rim.FlowLitresPerSecond,
+                Streams = 3,
+                Tap = 1 + q,
+            });
+        }
+        return falls.ToArray();
+    }
 
     public static IReadOnlyDictionary<string, Func<WaterFeatureSpec>> Presets { get; } =
         new Dictionary<string, Func<WaterFeatureSpec>>(StringComparer.OrdinalIgnoreCase)
@@ -296,9 +380,11 @@ public sealed record FoliageSpec
         // minute is not enough to measure it by — a minute of gusts read 2.3 dB high. Re-measured
         // 2026-10-05 with the boughs reading the wind across the crown and the field's turbulence at
         // 0.25: Leq 47.9 dB, 46.3 dB(A), the gustiest second 6.6 dB over. Round 3 (Vogel −0.9, strikes
-        // by contact angle): 47.8 dB, 46.2 dB(A), the gustiest second 6.7 dB over.
+        // by contact angle): 47.8 dB, 46.2 dB(A), the gustiest second 6.7 dB over. Texture round 1
+        // (2026-10-06: strikes and twig episodes from exponential-tailed turbulent increments), five
+        // minutes: 47.4 dB, 45.7 dB(A), its 10 ms peaks' 99.9th percentile 21.1 dB over, so 22 of room.
         SourceLevelDb = 48f,
-        PeakHeadroomDb = 20f,
+        PeakHeadroomDb = 22f,
         ExtentMetres = 4f,
     };
 

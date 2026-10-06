@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common;
 
@@ -79,7 +80,7 @@ internal sealed class EarlyCopies
         var plan = new List<WorldAudioPlayer.RoomEcho>();
         WorldAudioPlayer.PlanRoomEchoes(found, src, listener, direct, 1f, 1f, audible: false, plan);
         var copies = new EarlyCopies(nearest < float.MaxValue ? (int)(nearest / c * sampleRate) : 0);
-        foreach (var e in plan) copies.Copies.Add(((int)(e.Arrival.PathLength / c * sampleRate), Energy(e, direct)));
+        foreach (var e in plan) copies.Copies.Add(((int)(e.Arrival.PathLength / c * sampleRate), Energy(e, direct, sampleRate)));
         copies.Copies.Sort(static (x, y) => x.Sample.CompareTo(y.Sample));
         return copies;
     }
@@ -87,8 +88,9 @@ internal sealed class EarlyCopies
     /// <summary>One placed copy's energy per band, a sound at the listener: what the surfaces keep
     /// over the path's spreading, its mirror share and the mirror's loss at the top, plus a first
     /// order's wash.</summary>
-    internal static double[] Energy(in WorldAudioPlayer.RoomEcho e, float direct)
+    internal static double[] Energy(in WorldAudioPlayer.RoomEcho e, float direct, int sampleRate)
     {
+        var shareOf = BandShareAt(sampleRate);
         var a = e.Arrival;
         // The arrival's gains are the surfaces' keep times direct / path: back to the keep.
         float back = a.PathLength / MathF.Max(1e-4f, direct);
@@ -109,13 +111,26 @@ internal sealed class EarlyCopies
                 double wash = a.Order == 1 && s > 0.05f ? Math.Sqrt(s) : 0.0;
                 share = mirror * mirror + wash * wash;
             }
-            band[b] = BandShare[b] * keep * keep * share / l2;
+            band[b] = shareOf[b] * keep * keep * share / l2;
         }
         return band;
     }
 
-    /// <summary>Each of SmoothTail's bands' share of a flat spectrum's energy (they sum to one).</summary>
-    internal static readonly double[] BandShare = MakeBandShare(44100);
+    /// <summary>Each of SmoothTail's bands' share of a flat spectrum's energy at the mixer's rate (they
+    /// sum to one). The top band runs to Nyquist, so the shares depend on the rate.</summary>
+    internal static double[] BandShare => BandShareAt(OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate);
+
+    /// <summary>As <see cref="BandShare"/>, at <paramref name="rate"/>; worked out once per rate.</summary>
+    internal static double[] BandShareAt(int rate)
+    {
+        var c = Volatile.Read(ref _bandShare);
+        if (c != null && c.Rate == rate) return c.Share;
+        var made = new RateShare(rate, MakeBandShare(rate));
+        Volatile.Write(ref _bandShare, made);
+        return made.Share;
+    }
+    private sealed record RateShare(int Rate, double[] Share);
+    private static RateShare? _bandShare;
 
     private static double[] MakeBandShare(int rate)
     {

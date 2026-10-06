@@ -315,6 +315,10 @@ public partial class CommandHandler
             case "inventory":
                 HandleInventory(session, reply);
                 break;
+            case "hand":
+            case "offer":
+                HandleHand(session, args, reply);
+                break;
             // ── People and places ───────────────────────────────────────────────────────────
             case "friend":
             case "unfriend":
@@ -1001,6 +1005,31 @@ public partial class CommandHandler
     {
         if (_hands == null) Say(reply, "Picking things up is not available on this server.");
         return _hands;
+    }
+
+    /// <summary>How near somebody must be to be handed something, metres: arm's length and a step.</summary>
+    public const float HandMetres = 2.5f;
+
+    /// <summary>
+    /// /hand [THING] — gives what you hold to the person beside you who will take it: Alex, who asks
+    /// everybody for something. It is his then, and gone from your hands; he thanks you for it.
+    /// </summary>
+    private void HandleHand(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Hands(reply); if (svc == null) return;
+        if (!TryGetBody(session, reply, out var world, out _, out var position)) return;
+        Entity taker = Entity.Null; string name = ""; float best = HandMetres;
+        world.Query(new QueryDescription().WithAll<Transform, OpenFPS.Server.Systems.Pedestrian>().WithNone<DeadComponent>(),
+            (Entity e, ref Transform t, ref OpenFPS.Server.Systems.Pedestrian p) =>
+            {
+                if (string.IsNullOrEmpty(p.Character)) return;
+                float d = Vector3.Distance(t.Position, position);
+                if (d < best) { best = d; taker = e; name = p.Character; }
+            });
+        if (taker == Entity.Null) { Say(reply, "There is nobody beside you who would take it."); return; }
+        if (!svc.HandOver(session, string.Join(" ", args), out string what, out string why)) { Say(reply, why); return; }
+        _server.StreetSpeech.Given(session.CurrentMapId, taker.Id, session.Entity.Id);
+        Say(reply, $"You hand {name} the {what}. He takes it.");
     }
 
     /// <summary>/take [name] — picks up the nearest thing you can reach, or the nearest one called that.</summary>
@@ -2020,6 +2049,12 @@ public partial class CommandHandler
     {
         if (args.Length < 1) { Say(reply, "Usage: /where [name]"); return; }
         var target = OnlineSession(args[0]);
+        // Somebody with a name who is not a player: Alex.
+        if (target == null && _server.Characters.Find(args[0]) is { } character)
+        {
+            WhereCharacter(session, character.MapId, character.Body, reply);
+            return;
+        }
         if (target == null)
         {
             Say(reply, TryFindUser(args[0], out var stored, out _) ? $"{stored} is not online." : $"There is no player called {args[0]}.");
@@ -2042,6 +2077,40 @@ public partial class CommandHandler
         Say(reply, relative.Length == 0
             ? $"{target.Username} is on this map, but not in the world yet."
             : $"{target.Username} is {relative}.");
+    }
+
+    /// <summary>/where for a character: where they are from you, and what they are doing.</summary>
+    private void WhereCharacter(UserSession session, string mapId, Entity body, Action<IMessage> reply)
+    {
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _) || !world.IsAlive(body)) return;
+        string name = world.Has<IdentityComponent>(body) ? world.Get<IdentityComponent>(body).Name : "They";
+        var view = _server.Characters.ViewOf(mapId, body.Id);
+        string doing = "";
+        if (view is { } v && v.Place.Length > 0)
+            doing = v.Doing == OpenFPS.Server.Systems.CharacterSystem.Doing.Lingering
+                ? $" He is at {v.Place}, for about {Math.Max(1, (int)Math.Round(v.Until / 60))} more minutes."
+                : v.Doing == OpenFPS.Server.Systems.CharacterSystem.Doing.WaitingForBus
+                    ? $" He is at {v.Place}."
+                    : $" He is {v.Place}.";
+        if (!mapId.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase))
+        {
+            Say(reply, $"{name} is on the map {_maps.DisplayName(mapId)}.{doing}");
+            return;
+        }
+        var them = world.Get<Transform>(body).Position;
+        string where = "";
+        if (session.Entity != Entity.Null && world.IsAlive(session.Entity))
+        {
+            var me = world.Get<Transform>(session.Entity);
+            var offset = them - me.Position;
+            var flat = new Vector3(offset.X, 0, offset.Z);
+            float distance = flat.Length();
+            where = distance < 1.5f ? "right beside you"
+                  : $"{MathF.Round(distance):0} metres away, {GetRelativeDirection(me.Rotation, Vector3.Normalize(flat))}";
+        }
+        if (PlaceAt(world, them) is { Length: > 0 } place) where += (where.Length > 0 ? ", at " : "at ") + place;
+        // x east, y north, z height: what /tp and /move take.
+        Say(reply, $"{name} is {where}, {them.X:F0} {them.Z:F0} {them.Y:F0}.{doing}");
     }
 
     /// <summary>

@@ -467,6 +467,7 @@ public sealed partial class CombatService
     /// <summary>A player by name, anybody else by what they are called.</summary>
     private static string Whom(World world, Entity e)
         => world.Has<PlayerComponent>(e) ? world.Get<PlayerComponent>(e).Username
+         : world.Has<IdentityComponent>(e) && world.Get<IdentityComponent>(e).Named ? NameOf(world, e)
          : world.Has<Pedestrian>(e) ? "pedestrian " + NameOf(world, e)
          : ThingName(world, e);
 

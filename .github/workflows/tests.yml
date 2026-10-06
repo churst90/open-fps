@@ -5,6 +5,12 @@
 # FMOD or Steam Audio libraries (none of them loads the native audio engine), only .NET and Python
 # (RoadNetworkTests regenerates the city with tools/gen_city.py).
 #
+# Built in Release: the audio tests synthesise seconds of sound, about three times faster than in
+# Debug on these 4-core runners. Tests marked [Trait("Category", "Timing")] assert this machine's
+# speed or real time (a cost budget in milliseconds, a jitter buffer); a shared runner cannot hold
+# them, so they run on the development machine only:
+#   dotnet test OpenFPS.Tests --filter Category=Timing
+#
 # Runs on every push to main, on pull requests, and by hand from the Actions tab
 # ("Run workflow"). A newer push to the same branch cancels the run still going.
 name: Tests
@@ -43,19 +49,19 @@ jobs:
           python-version: "3.12"
 
       - name: Build
-        run: dotnet build OpenFPS.Tests -c Debug
+        run: dotnet build OpenFPS.Tests -c Release
 
       - name: Pick this runner's share of the tests
         id: shard
         run: |
-          dotnet test OpenFPS.Tests -c Debug --no-build --list-tests > tests.txt
+          dotnet test OpenFPS.Tests -c Release --no-build --list-tests > tests.txt
           echo "filter=$(python3 tools/ci/shard_tests.py ${{ matrix.shard }} 8 < tests.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Test
         run: >
-          dotnet test OpenFPS.Tests -c Debug --no-build
-          --filter "${{ steps.shard.outputs.filter }}"
-          --blame-hang-timeout 10m --blame-hang-dump-type none
+          dotnet test OpenFPS.Tests -c Release --no-build
+          --filter "(${{ steps.shard.outputs.filter }})&Category!=Timing"
+          --blame-hang-timeout 30m --blame-hang-dump-type none
           --logger "trx;LogFileName=shard-${{ matrix.shard }}.trx"
           --logger "console;verbosity=minimal"
           --results-directory TestResults

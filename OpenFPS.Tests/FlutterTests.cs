@@ -84,6 +84,7 @@ public class FlutterTests
 
     /// <summary>On the real city, a shot on Main Street heard from along it: the flutter arrives, and
     /// the search stays cheap enough to run on the game thread once per shot.</summary>
+    [Trait("Category", "Timing")] // depends on this machine's speed or on real time; not run on CI
     [Fact]
     public void OnMainStreetAShotFluttersAndItIsCheap()
     {

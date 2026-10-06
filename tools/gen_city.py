@@ -1030,7 +1030,9 @@ for shelter_z, shelter_x in ((-60.0, WALK), (86.0, -WALK)):
         name="Bus shelter")
     box("glass_wall", min(front, back), max(front, back), 0.0, 2.4, shelter_z + 2.14, shelter_z + 2.2,
         name="Bus shelter")
-    box("metal_wall", min(front, back), max(front, back), 2.4, 2.5, shelter_z - 2.2, shelter_z + 2.2,
+    # The canopy is one 0.7 mm sheet of profiled steel, and the box is the sheet: as a 10 cm box of
+    # Metal it was a steel slab to anything that asked what it was, and rain on a slab is silent.
+    box("metal_roof", min(front, back), max(front, back), 2.5 - 0.0007, 2.5, shelter_z - 2.2, shelter_z + 2.2,
         name="Bus shelter roof")
 
 # ══ The plaza ═════════════════════════════════════════════════════════════════════════════════════
@@ -2053,6 +2055,17 @@ for name, a, b, kmh, wait, delay, pair in WALKERS:
         "WaitSeconds": wait, "StartDelaySeconds": delay, **({"Pair": pair} if pair else {}),
     })
 
+# ── Alex ──────────────────────────────────────────────────────────────────────────────────────
+#
+# A homeless man (Cody, 2026-10-06: "he walks the streets, rides the bus, hangs out at bus stops and in
+# front of stores and the lobby in apartment buildings because he's homeless"). One of him, with his
+# own voice, which no walker or driver is given. Only who he is is declared here: where he goes is
+# found by the server from what the map is (its bus stops, its front entrances, its squares), and so is
+# the way between them (its pavements). See CharacterSystem.
+CHARACTERS = [
+    {"Name": "Alex", "Voice": "alex", "Kind": "homeless", "Description": "a homeless man"},
+]
+
 # ── Trains ────────────────────────────────────────────────────────────────────────────────────
 #
 # Two light rail sets on the loop, half a lap apart. The server places one entity per sound
@@ -2220,10 +2233,12 @@ box("asphalt_road", lane_x - PARK_PATH / 2, lane_x + PARK_PATH / 2, 0.0, 0.1, la
     name="Elm Park path from Sycamore Lane")
 region("Elm Park, path from Sycamore Lane", lane_x - PARK_PATH, lane_x + PARK_PATH, 0.0, 6.0, lane_end, PARK_Z0)
 
-# The fountain: a square basin with a stone kerb too high to step over, standing water, a pedestal
-# carrying a bowl, and the water itself as an emitter at the bowl's lip — its jet, the bowl's
-# overflow and the rim jets all fall into this one basin (WaterFeatureSpec.ParkFountain).
-FTN_HALF, FTN_KERB, FTN_KERB_H = 4.0, 0.3, 0.5
+# The fountain (WaterFeatureSpec.ParkFountain): an 11 m square basin with a stone kerb too high to
+# step over, standing water, a pedestal carrying a bowl 2.8 m across with a jet rising out of it, and
+# round the pedestal's foot a heap of boulders the bowl's overflow falls onto and runs off into the
+# pool. Twelve rim jets in the kerb, three a side, arch in towards the rocks.
+FTN_HALF, FTN_KERB, FTN_KERB_H = 5.5, 0.3, 0.5
+FTN_WATER = 0.35
 box("brick_floor", PARK_CX - 12.0, PARK_CX + 12.0, 0.0, 0.11, PARK_CZ - 12.0, PARK_CZ + 12.0,
     name="Elm Park fountain square")
 fx0, fx1, fz0, fz1 = PARK_CX - FTN_HALF, PARK_CX + FTN_HALF, PARK_CZ - FTN_HALF, PARK_CZ + FTN_HALF
@@ -2231,13 +2246,29 @@ for (x0, x1, z0, z1) in ((fx0, fx1, fz0, fz0 + FTN_KERB), (fx0, fx1, fz1 - FTN_K
                          (fx0, fx0 + FTN_KERB, fz0 + FTN_KERB, fz1 - FTN_KERB),
                          (fx1 - FTN_KERB, fx1, fz0 + FTN_KERB, fz1 - FTN_KERB)):
     box("concrete_wall", x0, x1, 0.0, FTN_KERB_H, z0, z1, name="Elm Park fountain basin")
-box("water_surface", fx0 + FTN_KERB, fx1 - FTN_KERB, 0.0, 0.35, fz0 + FTN_KERB, fz1 - FTN_KERB,
+box("water_surface", fx0 + FTN_KERB, fx1 - FTN_KERB, 0.0, FTN_WATER, fz0 + FTN_KERB, fz1 - FTN_KERB,
     name="Elm Park fountain pool")
-box("concrete_wall", PARK_CX - 0.3, PARK_CX + 0.3, 0.35, 1.1, PARK_CZ - 0.3, PARK_CZ + 0.3, name="Elm Park fountain pedestal")
-box("concrete_floor", PARK_CX - 1.2, PARK_CX + 1.2, 1.1, 1.25, PARK_CZ - 1.2, PARK_CZ + 1.2, name="Elm Park fountain bowl")
-# Not on the pedestal's axis: the pedestal is solid concrete, and a source inside a wall is heard
-# through it. Over the water, between the pedestal and the kerb, under the bowl's lip.
-prop("water_fountain", PARK_CX, 0.7, PARK_CZ + 1.6, name="Elm Park fountain")
+box("concrete_wall", PARK_CX - 0.3, PARK_CX + 0.3, FTN_WATER, 1.45, PARK_CZ - 0.3, PARK_CZ + 0.3, name="Elm Park fountain pedestal")
+box("concrete_floor", PARK_CX - 1.4, PARK_CX + 1.4, 1.45, 1.6, PARK_CZ - 1.4, PARK_CZ + 1.4, name="Elm Park fountain bowl")
+# The rocks: eight boulders heaped round the pedestal, out to 1.9 m from it, standing 0.35-0.65 m
+# out of the water, under the bowl's lip (1.4 m out) so its overflow falls 0.75 m onto them. Each is
+# (x0, x1, z0, z1, top) about the basin's middle.
+FTN_ROCKS = [(-0.9, 0.7, 0.3, 1.9, 0.95, "north"), (0.7, 1.8, 0.6, 1.7, 0.8, "north-east"),
+             (0.3, 1.9, -0.8, 0.6, 1.0, "east"), (0.5, 1.6, -1.8, -0.8, 0.75, "south-east"),
+             (-0.8, 0.5, -1.9, -0.3, 0.9, "south"), (-1.8, -0.8, -1.6, -0.5, 0.8, "south-west"),
+             (-1.9, -0.3, -0.5, 0.8, 0.95, "west"), (-1.7, -0.9, 0.8, 1.7, 0.7, "north-west")]
+for (x0, x1, z0, z1, top, side) in FTN_ROCKS:
+    box("rock_boulder", PARK_CX + x0, PARK_CX + x1, FTN_WATER, top, PARK_CZ + z0, PARK_CZ + z1,
+        name=f"Elm Park fountain rocks, {side} side")
+# The water, where it lands: five voices of one fountain (WaterFeatureSpec.ParkFountain.Taps). The
+# bowl's over the bowl, where the jet comes down; each side's over the water just past the rocks,
+# between where the overflow strikes the stone and where that side's rim jets come down. None inside
+# the pedestal or a rock: a source inside a box is heard through it.
+FTN_TAPS = [(0.0, 1.9, 0.0, "bowl"), (0.0, 0.8, 2.3, "north"), (2.3, 0.8, 0.0, "east"),
+            (0.0, 0.8, -2.3, "south"), (-2.3, 0.8, 0.0, "west")]
+for i, (tx, ty, tz, where) in enumerate(FTN_TAPS):
+    prop(f"elm_fountain_water_{i}", PARK_CX + tx, ty, PARK_CZ + tz,
+         name="Elm Park fountain" if i == 0 else f"Elm Park fountain, {where} side")
 named_place("Elm Park, by the fountain", PARK_CX - 12.0, PARK_CX + 12.0, 0.0, 3.0, PARK_CZ - 12.0, PARK_CZ + 12.0)
 
 # The trees: a trunk you can walk into, a crown that scatters sound, and the wind in it heard from
@@ -2317,6 +2348,7 @@ map_data = {
     "Roads": ROADS,
     "Junctions": JUNCTIONS,
     "RoadStops": ROAD_STOPS,
+    "Characters": CHARACTERS,
     "StreetLife": STREET_LIFE,
     "Vehicles": VEHICLES,
     "Trains": TRAINS,

@@ -15,6 +15,7 @@ namespace OpenFPS.Server.Core;
 ///
 ///     /weather                        the weather and the wind now
 ///     /weather clear|rain|snow|storm  that front, held until /weather auto
+///     /weather rain heavy             rain at a rate: light, moderate, heavy, violent, or mm/h
 ///     /weather wind 8 northwest       the wind, held; a direction and steady/gusty/very gusty optional
 ///     /weather auto                   back to fronts rolling in on their own
 ///
@@ -23,7 +24,7 @@ namespace OpenFPS.Server.Core;
 public partial class CommandHandler
 {
     private const string WeatherUsage =
-        "Usage: /weather, /weather clear, rain, snow or storm, /weather wind SPEED [DIRECTION] [steady, gusty or very gusty], or /weather auto.";
+        "Usage: /weather, /weather clear, rain, snow or storm, /weather drizzle, /weather rain light, moderate, heavy or extreme, or a rate in millimetres an hour, or dBZ, and drops then a size, /weather freezing rain, /weather sleet, /weather snow light, moderate or heavy, /weather hail pea, marble, quarter, golf or baseball, /weather wind SPEED [DIRECTION] [steady, gusty or very gusty], or /weather auto.";
 
     private void HandleWeather(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -32,6 +33,8 @@ public partial class CommandHandler
         {
             var now = env.GetCurrentState();
             string held = env.Pinned ? " Held until /weather auto." : " It changes on its own.";
+            if (env.HeldPrecipitation is { } falling)
+                held = " " + DescribePrecipitation(falling) + held;
             Say(reply, $"{ScenarioWord(env.CurrentScenario)}. {DescribeWind(now.WindVelocity, now.WindGustiness)} " +
                        $"{now.Temperature.ToString("F0", CultureInfo.InvariantCulture)} degrees.{held}");
             return;
@@ -44,6 +47,8 @@ public partial class CommandHandler
             Say(reply, "The weather changes on its own again.");
             return;
         }
+
+        if (TryHandlePrecipitation(first, args, env, reply)) return;
 
         if (Enum.TryParse<WeatherType>(first, ignoreCase: true, out var scenario) && !int.TryParse(first, out _))
         {

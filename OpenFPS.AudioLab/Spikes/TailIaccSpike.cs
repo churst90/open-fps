@@ -16,7 +16,7 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class TailIaccSpike
 {
-    private const int Fs = 44100, Sub = 256;
+    private const int Fs = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Sub = 256;
 
     public static int Run(string[] args)
     {
@@ -33,7 +33,7 @@ public static class TailIaccSpike
         foreach (float yaw in new[] { 0f, 23f, 45f, 90f })
         {
             var rot = System.Numerics.Quaternion.CreateFromYawPitchRoll(yaw * MathF.PI / 180f, 0f, 0f);
-            var df = DiffuseTail.Create(ctx, Sub, ch, hrtf);
+            var df = DiffuseTail.Create(ctx, Sub, ch, hrtf, Fs);
             if (df == null) { Console.WriteLine("FAIL: no binaural effects"); return 1; }
             df.SetListenerRotation(rot);
             var L = new float[n]; var R = new float[n];
@@ -119,7 +119,7 @@ public static class TailIaccSpike
             Console.WriteLine("per octave 125-4000 Hz, four headings: level at the ears against the field's (dB), and IACC:");
             Report("one channel, velvet (as it was)", yaw =>
             {
-                var df = DiffuseTail.Create(ctx, Sub, ch, hrtf)!;
+                var df = DiffuseTail.Create(ctx, Sub, ch, hrtf, Fs)!;
                 df.SetListenerRotation(System.Numerics.Quaternion.CreateFromYawPitchRoll(yaw * MathF.PI / 180f, 0f, 0f));
                 var L = new float[n]; var R = new float[n]; var inter = new float[Sub * ch];
                 for (int at = 0; at + Sub <= n; at += Sub)
@@ -134,7 +134,7 @@ public static class TailIaccSpike
             });
             Report("the field (DiffuseLate, the game)", yaw =>
             {
-                var df = DiffuseTail.Create(ctx, Sub, ch, hrtf)!;
+                var df = DiffuseTail.Create(ctx, Sub, ch, hrtf, Fs)!;
                 df.SetListenerRotation(System.Numerics.Quaternion.CreateFromYawPitchRoll(yaw * MathF.PI / 180f, 0f, 0f));
                 var L = new float[n]; var R = new float[n];
                 var rs = Enumerable.Range(0, DiffuseBranch.Count).Select(i => new Random(300 + i)).ToArray();

@@ -222,6 +222,18 @@ public class ClientAudioSystem
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_FRONT_VOICES"), out int fv) && fv >= 0 ? fv : 6;
     private int _adaptiveFront = FrontVoiceBudget;
 
+    /// <summary>
+    /// How many outer places of trees, fires and fountain taps may have voices at once (ExtendedSources),
+    /// nearest source first. Like a machine's front outlet, a place costs nothing but geometry when it is
+    /// given up: the source merges to its middle at the same level. So places are the first thing the
+    /// mixer gives up when it runs short, a source's worth at a time, and the last it takes back.
+    /// </summary>
+    /// <remarks>OPENFPS_PLACE_VOICES=0 keeps every extended source on its middle alone.</remarks>
+    private static readonly int PlaceVoiceBudget =
+        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_PLACE_VOICES"), out int pv) && pv >= 0 ? pv : 36;
+    private int _adaptivePlaces = PlaceVoiceBudget;
+    private const int PlaceBudgetStep = 6;
+
     /// <summary>Which machines currently have their front outlet on a voice of its own.</summary>
     private readonly HashSet<int> _frontVoiced = new();
     /// <summary>Which vehicles currently have a siren voice running.</summary>
@@ -365,6 +377,7 @@ public class ClientAudioSystem
         WorldAudio.HornReceived = StartHorn;
         WorldAudio.Ground = ApplyRecordedGround;
         _birds = new BirdLife(audio, _acoustics);
+        _rain = new RainField(audio, _acoustics);
         WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
         _audio.RoutesSource = () => _acoustics.Routes;
         _acousticWorker = new AsyncAcousticWorker(_acoustics);
@@ -397,6 +410,7 @@ public class ClientAudioSystem
         int distant = DistantVoiceBase - Math.Abs(entityId);
         if (_distantBoundTo.Remove(distant)) _audio.StopSound(distant);
         if (_frontVoiced.Remove(entityId)) _audio.StopSound(IntakeVoiceBase - Math.Abs(entityId));
+        if (_spreading.Remove(entityId, out var spreading) && spreading.Voiced) StopOuter(entityId, spreading, now: true);
         if (_sirenVoiced.Remove(entityId)) _audio.StopSound(SirenVoiceBase - Math.Abs(entityId));
         _sirenControl.Remove(entityId);
         _frontRetiring.Remove(entityId);
@@ -420,6 +434,7 @@ public class ClientAudioSystem
         _mapAmbienceId = "";
         _regionAmbienceId = "";
         _ambienceRegionId = int.MinValue;
+        _rain.Stop();
         _audio.StopAllWorldSounds();
         // Nobody is standing anywhere: no wind at the ears until the next map.
         _audio.SetEarWind(null);
@@ -698,6 +713,15 @@ public class ClientAudioSystem
                         }
                         // And so is its borrowed engine, if it is voiced from afar.
                         if (_distantVoiced.Contains(id)) _audio.SetAcousticPath(DistantVoiceBase - Math.Abs(id), shadowed);
+                        // And a tree's, a fire's or a fountain tap's other places: behind the same wall,
+                        // each heard from its own offset round the same edge (ExtendedSources).
+                        if (_spreading.TryGetValue(id, out var spread) && spread.Voiced)
+                            for (int k = 1; k < spread.At.Length; k++)
+                            {
+                                var placePath = shadowed;
+                                placePath.ApparentPosition = shadowed.ApparentPosition + (spread.At[k] - spread.At[0]);
+                                _audio.SetAcousticPath(PlaceVoiceId(id, k), placePath);
+                            }
                         continue;
                     }
 
@@ -805,6 +829,7 @@ public class ClientAudioSystem
         // happens to whichever car is furthest away and being drowned by three nearer ones.
         ChooseLiveEngines(world, visualEyePos);
         ChooseLiveMachines(world, visualEyePos);
+        ChoosePlaces(world, visualEyePos);
         _engineEchoes.EchoesPerEngine = _adaptiveEchoes;
         _engineEchoes.SyncGeometry(world);
         float engineDt = (float)Math.Max(1e-3, _now() - _lastEngineTime);
@@ -828,6 +853,8 @@ public class ClientAudioSystem
                 ProcessAudioEmitter(world, snap, visualEyePos, engineDt);
             }
         }
+        // The outer places of trees and fires that were not placed this frame (out of the budget, gone).
+        RetireSpreading();
 
         long partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         UpdateHorns(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
@@ -837,6 +864,7 @@ public class ClientAudioSystem
         _partMs[3] += Ms(partAt);
         partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _birds.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
+        _rain.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
         _partMs[2] += Ms(partAt);
 
         // Every source has now been offered to the reflection system; it can work out what the
@@ -1102,7 +1130,9 @@ public class ClientAudioSystem
         h = OpenFPS.Common.VehicleProfile.PeakHeadroomDb;
         try
         {
-            if (soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
+            if (OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(soundId, out string waterPreset, out _, out _))
+                h = OpenFPS.Common.WaterFeatureSpec.ByName(waterPreset).PeakHeadroomDb;
+            else if (soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.WaterFeatureSpec.ByName(soundId[6..]).PeakHeadroomDb;
             else if (soundId.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.FireSpec.ByName(soundId[5..]).PeakHeadroomDb;
@@ -1153,6 +1183,17 @@ public class ClientAudioSystem
             // Water, fire and the wind in a tree: nobody made them, and they are placed like a
             // machine all the same, at their declared level and their own size. A fountain's size
             // is its basin, a fire's its hearth, a tree's its crown.
+            //
+            // One TAP of a water feature ("water:<preset>/<feature>/<tap>", WaterFeatureVoice) is placed
+            // by the WHOLE feature's level and its own landing place's size: its voice renders its own
+            // share of the water against the whole's full scale, so the taps sum to the feature at
+            // any distance, and near one tap that tap is a point you can walk up to.
+            if (OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(soundId, out string waterPreset, out _, out int waterTap))
+            {
+                var feature = OpenFPS.Common.WaterFeatureSpec.ByName(waterPreset);
+                if (waterTap >= feature.Taps.Length) return null;
+                return (feature.SourceLevelDb, feature.Taps[waterTap].ExtentMetres);
+            }
             if (soundId.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
             {
                 var water = OpenFPS.Common.WaterFeatureSpec.ByName(soundId[6..]);
@@ -1343,10 +1384,15 @@ public class ClientAudioSystem
             float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
             float range = MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb));
+            // Ranked in loudness: the law's correction for what this machine is made of, once heard.
+            gain *= MathF.Pow(10f, OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb(em.SoundId, levelDb) / 20f);
             float level = OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume, reference, range, d);
 
+            // A water feature's taps are one fountain the same way, and come and go together.
             string group = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _)
-                ? "rail:" + preset + "/" + train : "#" + entityId;
+                ? "rail:" + preset + "/" + train
+                : OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(em.SoundId, out string waterPreset, out string feature, out _)
+                ? "water:" + waterPreset + "/" + feature : "#" + entityId;
             if (!_machineGroups.TryGetValue(group, out var g)) _machineGroups[group] = g = new MachineGroup();
             g.Members.Add(entityId);
             g.Level = MathF.Max(g.Level, level);
@@ -1479,10 +1525,12 @@ public class ClientAudioSystem
         {
             if (load > MixerLoadCeiling && now - _overCeilingSince >= OverCeilingSeconds)
             {
-                // A machine's second outlet goes first: it is the only voice whose loss costs
-                // nothing but geometry — the machine stays exactly as loud, because the front tap
-                // slews back into the voice that is still playing.
-                if (_adaptiveFront > 0) _adaptiveFront--;
+                // The places of extended sources go first, a source's worth at a time, and then a
+                // machine's second outlet: the only voices whose loss costs nothing but geometry —
+                // the source stays exactly as loud, because what they carried slews back into the
+                // voice that is still playing.
+                if (_adaptivePlaces > 0) _adaptivePlaces = Math.Max(0, _adaptivePlaces - PlaceBudgetStep);
+                else if (_adaptiveFront > 0) _adaptiveFront--;
                 // Then a standing machine, before a reflection. A machine that drops out is one
                 // fewer air conditioner in a street of forty and is not missed; a car's first
                 // reflection is the wall of the building you are walking beside.
@@ -1501,6 +1549,7 @@ public class ClientAudioSystem
                 else if (_adaptiveMachines < MachineVoiceBudget) _adaptiveMachines++;
                 else if (_adaptiveDistant < MaxDistantVoices) _adaptiveDistant++;
                 else if (_adaptiveFront < FrontVoiceBudget) _adaptiveFront++;
+                else if (_adaptivePlaces < PlaceVoiceBudget) _adaptivePlaces = Math.Min(PlaceVoiceBudget, _adaptivePlaces + PlaceBudgetStep);
                 else if (_adaptiveEchoes < EchoCeiling && _echoMsSmoothed < EchoPassCeilingMs / 3) _adaptiveEchoes++;
                 else goto settled;
                 _lastBudgetChange = now;
@@ -1847,8 +1896,155 @@ public class ClientAudioSystem
         else _audio.PlayPhysicalSoundDirect(e);
     }
 
+    // ── Extended sources: a tree's crown, a fire's bed (ExtendedSources) ───────────────────────────
+
+    /// <summary>Voice ids for the outer places of a tree or a fire: eight a source, place 1 to 7.</summary>
+    internal const int PlaceVoiceBase = -5_000_000;
+    internal static int PlaceVoiceId(int sourceId, int place) => PlaceVoiceBase - Math.Abs(sourceId) * 8 - place;
+
+    /// <summary>After a source merges to its middle, its outer voices are kept this long, s: what was
+    /// already written to them (a twig's clatter, a crackle's rattle, up to the render lead ahead) rings
+    /// out rather than being cut.</summary>
+    private const double MergeHoldSeconds = 2.0;
+
+    private sealed class Spreading
+    {
+        public Vector3[] Layout = Array.Empty<Vector3>();
+        public Vector3[] At = Array.Empty<Vector3>();
+        public float Spread;
+        public bool Voiced;
+        public double MergedSince = double.NaN;
+        public long Frame;
+    }
+    private readonly Dictionary<int, Spreading> _spreading = new();
+    private readonly HashSet<int> _placesGranted = new();
+    private readonly List<(float D2, int Id, int Outer)> _placeCandidates = new();
+
+    /// <summary>Which live extended sources may spread this frame: nearest first, while their outer
+    /// places fit in <see cref="_adaptivePlaces"/>. One that wants none (too far to be heard as wide)
+    /// asks for nothing.</summary>
+    private void ChoosePlaces(WorldSnapshot world, Vector3 eyePos)
+    {
+        _placesGranted.Clear();
+        _placeCandidates.Clear();
+        foreach (int id in _liveMachines)
+        {
+            if (!world.Entities.TryGetValue(id, out var snap)) continue;
+            var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(snap.Definition.SoundEmitter.SoundId);
+            if (layout == null) continue;
+            var at = OpenFPS.Common.AudioEmission.PointFor(snap);
+            float d2 = Vector3.DistanceSquared(at, eyePos);
+            if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.SpreadFor(
+                    OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), MathF.Sqrt(d2)) <= 0f) continue;
+            _placeCandidates.Add((d2, id, layout.Length - 1));
+        }
+        _placeCandidates.Sort(static (a, b) => a.D2.CompareTo(b.D2));
+        int left = _adaptivePlaces;
+        foreach (var (_, id, outer) in _placeCandidates)
+        {
+            if (outer > left) continue;
+            left -= outer;
+            _placesGranted.Add(id);
+        }
+    }
+    private readonly List<int> _spreadingGone = new();
+    private long _spreadFrame;
+
+    /// <summary>
+    /// How much of a tree or a fire its outer places carry from here, slewed, and the one gain that keeps
+    /// the places together as loud as the source from its middle (ExtendedSources.Balance), applied to its
+    /// own voice's emitter before it is submitted.
+    /// </summary>
+    private Spreading SpreadOf(EntitySnapshot snap, Vector3[] layout, ref SpatialEmitter e, Vector3 eyePos, float dt, double now)
+    {
+        if (!_spreading.TryGetValue(snap.Id, out var sp) || sp.Layout != layout)
+            _spreading[snap.Id] = sp = new Spreading { Layout = layout, At = new Vector3[layout.Length] };
+        sp.Frame = _spreadFrame;
+        for (int i = 0; i < layout.Length; i++) sp.At[i] = e.Position + Vector3.Transform(layout[i], snap.Transform.Rotation);
+        float target = !_placesGranted.Contains(snap.Id) ? 0f : OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.SpreadFor(
+            OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), Vector3.Distance(eyePos, e.Position));
+        sp.Spread = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Slew(sp.Spread, target, MathF.Min(dt, 0.25f));
+        Span<float> shares = stackalloc float[layout.Length];
+        OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Shares(sp.Spread, shares);
+        e.Volume *= OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Balance(eyePos, e.Position, sp.At, shares, e.MinDistance, e.Range);
+        e.Spread = sp.Spread;
+        if (sp.Spread > 0f) sp.MergedSince = double.NaN;
+        else if (double.IsNaN(sp.MergedSince)) sp.MergedSince = now;
+        return sp;
+    }
+
+    /// <summary>
+    /// The outer places of a tree or a fire, each a voice at its own point reading its own stream of the
+    /// one synth. Everything but the point is the source's own emitter: the same level reference, range,
+    /// path, region and declared level, and the same balance gain, so the places and the middle are one
+    /// source. Kept while any of it is spread, and <see cref="MergeHoldSeconds"/> after.
+    /// </summary>
+    private void PlaceOuter(int sourceId, Spreading sp, in SpatialEmitter middle, WorldSnapshot world, double now)
+    {
+        // A source that has never spread (out of the angle, or out of the budget) asks for nothing.
+        bool want = sp.Spread > 0f || (sp.Voiced && !double.IsNaN(sp.MergedSince) && now - sp.MergedSince < MergeHoldSeconds);
+        if (!want)
+        {
+            if (sp.Voiced) StopOuter(sourceId, sp);
+            return;
+        }
+        sp.Voiced = true;
+        for (int k = 1; k < sp.Layout.Length; k++)
+        {
+            var e = middle;
+            e.EntityId = PlaceVoiceId(sourceId, k);
+            e.Position = sp.At[k];
+            e.ApparentPosition = middle.ApparentPosition + (sp.At[k] - middle.Position);
+            e.PlaceOfEntity = sourceId;
+            e.Place = k;
+            e.Spread = 0f;
+            e.StartSoundId = "";
+            e.StopSoundId = "";
+            ApplyGround(ref e, world);
+            if (_placesRetiring.Remove(e.EntityId)) _audio.ReviveEngine(e.EntityId);
+            if (_audio.IsPlaying(e.EntityId)) _audio.UpdateSpatialAttributes(e);
+            else _audio.PlayPhysicalSoundDirect(e);
+        }
+    }
+
+    /// <summary>Lets a source's outer places go: faded, as any running synth is (they may still be
+    /// sounding when the source leaves the budget), or at once when the source itself is gone.</summary>
+    private void StopOuter(int sourceId, Spreading sp, bool now = false)
+    {
+        for (int k = 1; k < sp.Layout.Length; k++)
+        {
+            int id = PlaceVoiceId(sourceId, k);
+            _groundCache.Remove(id);
+            if (now) { _placesRetiring.Remove(id); _audio.StopSound(id); }
+            else if (!_placesRetiring.Contains(id)) _placesRetiring.Add(id);
+        }
+        sp.Voiced = false;
+    }
+    private readonly List<int> _placesRetiring = new();
+
+    /// <summary>Lets go the places of every source not placed this frame: out of the machine budget, or gone.</summary>
+    private void RetireSpreading()
+    {
+        _spreadingGone.Clear();
+        foreach (var (id, sp) in _spreading)
+            if (sp.Frame != _spreadFrame) _spreadingGone.Add(id);
+        foreach (int id in _spreadingGone)
+        {
+            if (_spreading.Remove(id, out var sp) && sp.Voiced) StopOuter(id, sp);
+        }
+        for (int i = _placesRetiring.Count - 1; i >= 0; i--)
+        {
+            int id = _placesRetiring[i];
+            if (_audio.FadeOutEngine(id)) { _audio.StopSound(id); _placesRetiring.RemoveAt(i); }
+        }
+        _spreadFrame++;
+    }
+
     /// <summary>The birds: found from the map's foliage and roofs, not placed. See BirdLife.</summary>
     private readonly BirdLife _birds;
+
+    /// <summary>The rain round the listener: the surfaces it lands on, as a few voices. See RainField.</summary>
+    private readonly RainField _rain;
 
     /// <summary>Vehicles carrying a siren, found this frame.</summary>
     private readonly HashSet<int> _sirenCars = new();
@@ -2004,6 +2200,7 @@ public class ClientAudioSystem
                 PositionSampledAt = world.PositionsSampledAt,
                 Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
                 Volume = gain,
+                EarLevelDb = levelDb,
                 MinDistance = reference,
                 Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
                 Pitch = 1f,
@@ -2079,6 +2276,7 @@ public class ClientAudioSystem
             // knows.
             Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
             Volume = gain,
+            EarLevelDb = spec.SourceLevelDb,
             MinDistance = reference,
             ExtentMetres = spec.HornMouthMetres,
             Range = OpenFPS.Common.Loudness.AudibleRange(spec.SourceLevelDb),
@@ -2311,6 +2509,11 @@ public class ClientAudioSystem
         float engineMinDistance = def.SoundEmitter.MinDistance;
         float engineRange = def.SoundEmitter.Range;
         float engineExtent = def.SoundEmitter.ExtentMetres;
+        // A tree or a fire: the places it is heard from across its extent (ExtendedSources).
+        Vector3[]? extentLayout = null;
+        // The declared level the voice is placed by, for the ear model; an authored source with only a
+        // volume has none.
+        float earLevel = 0f;
         // An authored source with a SIZE — a fountain, a grille, a waterfall. Same rule as a machine:
         // the reference widens to the thing's own radius and the gain is paid down to match, so the
         // far field is unchanged and only the near field goes flat.
@@ -2351,6 +2554,8 @@ public class ClientAudioSystem
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
+                earLevel = levelDb;
+                extentLayout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(physicalKey);
                 if (physicalKey.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
                 {
                     (powerLever, rotorWake) = FlightPower(snap.Velocity);
@@ -2403,15 +2608,30 @@ public class ClientAudioSystem
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(level));
+                earLevel = level;
 
                 // Close enough to hear which end is which: this voice moves back to the TAILPIPE and
                 // the front of the machine gets a voice of its own at the airbox. Further away the
                 // voice stays where it has always been — between the two, biased toward the exhaust
                 // (VehicleProfile.ExhaustEmitterBias) — because that is the honest position for a
                 // machine being heard as one thing.
+                //
+                // And once the two ends are two voices, each is placed as the POINT it is. The extent
+                // above stands in for "a metre nearer the intake is a metre further from the exhaust"
+                // while the machine is one voice; with a voice at each end that geometry is modelled
+                // outright, and widening each of them as well counted the car's length twice: inside
+                // its 3.3 m a hatchback's tailpipe stopped getting louder as you approached, about
+                // 4 dB short at 2 m and 9 dB at 1 m. Beyond the extent the two placements are the same
+                // (Widen holds gain times reference), so the switch between them is seamless.
                 if (_frontVoiced.Contains(snap.Id))
+                {
                     emitterPosition = snap.Transform.Position
                                     + Vector3.Transform(ExhaustSlot(profile), snap.Transform.Rotation);
+                    (gain, reference) = OpenFPS.Common.Loudness.Place(level);
+                    engineVolume = gain * def.SoundEmitter.Volume;
+                    engineMinDistance = reference;
+                    engineExtent = 0f;
+                }
 
                 // ...unless you are SITTING in it. Then there is no distance and no direction to
                 // speak of: the whole machine arrives through the floor and the firewall, a little
@@ -2472,6 +2692,7 @@ public class ClientAudioSystem
                     : Vector3.UnitZ,
                 snap.Transform.Rotation),
             Volume = engineVolume,
+            EarLevelDb = earLevel,
             Range = Math.Max(1.0f, engineRange),
             Pitch = 1.0f,
             Type = EmitterType.EntityAttached,
@@ -2560,7 +2781,10 @@ public class ClientAudioSystem
         long groundAt = System.Diagnostics.Stopwatch.GetTimestamp();
         if (engineKey.Length > 0 || physicalKey != null) ApplyGround(ref emitter, world);
         _partMs[1] += Ms(groundAt);
+        Spreading? spreading = extentLayout != null ? SpreadOf(snap, extentLayout, ref emitter, eyePos, engineDt, now) : null;
         _audio.Submit(emitter);
+        // ...and its other places, after its middle, so the synth they read already exists.
+        if (spreading != null) PlaceOuter(snap.Id, spreading, emitter, world, now);
 
         // The other end of the machine, when it is close enough to be a second thing. Placed after
         // the machine's own voice, so an engine that has only just been built already exists for the
@@ -2685,6 +2909,7 @@ public class ClientAudioSystem
                 PositionSampledAt = world.PositionsSampledAt,
                 Direction = facing,
                 Volume = gain,
+                EarLevelDb = levelDb,
                 MinDistance = reference,
                 Range = MathF.Max(reference, OpenFPS.Common.Loudness.AudibleRange(levelDb)),
                 Pitch = 1f,
@@ -2880,6 +3105,51 @@ public class ClientAudioSystem
     /// trail and slide around you. So an own step is placed at a fixed offset from the listener's
     /// head and follows it, whatever the network is doing to the position underneath.
     /// </summary>
+    // ── The listening-level calibration's voice (ListeningCalibration) ────────────────────────
+    //
+    // A person one step in front, at a digital gain the calibration chooses: placed directly, not by
+    // the loudness law, and with no ear stage (no EarLevelDb), because it is meant to play at exactly
+    // the level a real voice has there, with its real tone. Two ids taken in turn, so a new saying
+    // never has to wait for the old one's voice to be released.
+    private const int ReferenceVoiceBase = -7_900_000;
+    private int _referenceVoice;
+
+    public void PlayReferenceVoice(string soundId, float gainDb)
+    {
+        StopReferenceVoice();
+        _referenceVoice = (_referenceVoice + 1) & 1;
+        var forward = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(_state.Yaw, 0f, 0f));
+        Vector3 ear = _state.VisualPosition + new Vector3(0f, _state.EyeHeight, 0f);
+        Vector3 mouth = ear + forward * 1f - new Vector3(0f, _state.EyeHeight - OpenFPS.Common.Speech.MouthHeight, 0f);
+        _audio.Submit(new SpatialEmitter
+        {
+            EntityId = ReferenceVoiceBase - _referenceVoice,
+            SoundId = soundId,
+            Mode = PlaybackMode.Single,
+            Type = EmitterType.WorldLocked,
+            Position = mouth,
+            ApparentPosition = mouth,
+            Direction = -forward,
+            Volume = MathF.Pow(10f, gainDb / 20f),
+            // Flat out to the speaker, so the gain is the level at the ear.
+            MinDistance = 1f,
+            Range = 20f,
+            Pitch = 1f,
+            Essential = true,
+            IsEvent = true,
+            EqLow = 1f, EqMid = 1f, EqHigh = 1f,
+            ApertureFactor = 1f,
+            CarriesPath = true,
+            TargetRegionId = _listenerRegion,
+        });
+    }
+
+    public void StopReferenceVoice()
+    {
+        _audio.StopSoundImmediate(ReferenceVoiceBase);
+        _audio.StopSoundImmediate(ReferenceVoiceBase - 1);
+    }
+
     public void OnOwnFootstep(Vector3 pos, string mat, string var, StepSlope slope = StepSlope.Level)
     {
         if (_footTrace) Log.Information("[FOOT] step {Slope} on {Mat} at {Pos}", slope, mat, pos);
@@ -2941,6 +3211,7 @@ public class ClientAudioSystem
             Essential = own,
             IsEvent = true,
             MinDistance = stepReference,
+            EarLevelDb = OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb,
             // The room the body is standing in, so its reverberation is THAT room's.
             TargetRegionId = _listenerRegion,
         };
@@ -2948,7 +3219,7 @@ public class ClientAudioSystem
         _audio.Submit(footstep);
 
         // The walls answering YOUR footfalls. Other people's steps have none: their pool is yours.
-        if (own) SubmitStepReflections(nudgePos, resolvedSoundId, stepGain, stepReference);
+        if (own) SubmitStepReflections(nudgePos, resolvedSoundId, stepGain, stepReference, OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb);
     }
 
     /// <summary>
@@ -3218,7 +3489,7 @@ public class ClientAudioSystem
             if (_voiceCopyOn[k]) { _audio.StopSound(OwnVoiceBase - 1 - k); _voiceCopyOn[k] = false; }
     }
 
-    private void SubmitStepReflections(Vector3 stepPos, string soundId, float stepGain, float stepReference)
+    private void SubmitStepReflections(Vector3 stepPos, string soundId, float stepGain, float stepReference, float stepLevelDb)
     {
         // The surfaces round your own footfall, placed as a clap's are (WorldAudioPlayer.QueueEarlyEchoes):
         // mirrored through the walls to third order, the loudest first, inside the window before the
@@ -3228,13 +3499,13 @@ public class ClientAudioSystem
         // sound, a tail 50 ms later, and nothing from the walls between.
         Vector3 ear = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
         if (_groundWorld is not { } world) return;
-        SubmitRoomStepEchoes(stepPos, ear, soundId, stepGain, stepReference, world);
+        SubmitRoomStepEchoes(stepPos, ear, soundId, stepGain, stepReference, stepLevelDb, world);
     }
 
     /// <summary>The room's first answers to your own footfall, placed as WorldAudioPlayer.QueueRoomEchoes
     /// places a clap's: mirrored through the walls to third order, the loudest first, inside the
     /// window before the tail, each from its own wall's direction with that wall's colour.</summary>
-    private void SubmitRoomStepEchoes(Vector3 stepPos, Vector3 ear, string soundId, float stepGain, float stepReference, WorldSnapshot world)
+    private void SubmitRoomStepEchoes(Vector3 stepPos, Vector3 ear, string soundId, float stepGain, float stepReference, float stepLevelDb, WorldSnapshot world)
     {
         var solids = _acoustics.ReflectionSolids(world);
         if (solids.Count == 0) return;
@@ -3272,6 +3543,8 @@ public class ClientAudioSystem
                 // engine's 1/r at the image is undone in `gain`, as for every other copy.
                 Volume = stepGain * gain,
                 MinDistance = stepReference,
+                EarLevelDb = stepLevelDb,
+                EarCopyDb = 20f * MathF.Log10(MathF.Max(1e-6f, gain)),
                 Range = 25f,
                 // No DelayMs: the facade delays every submission by its distance, and the image is
                 // the whole path away.
@@ -3583,6 +3856,7 @@ public class ClientAudioSystem
                 ListenerOffset = offset,
                 Type = EmitterType.WorldLocked,
                 Volume = landGain,
+                EarLevelDb = OpenFPS.Common.Loudness.FootstepDb,
                 Range = 20.0f,
                 Essential = true,
                 IsEvent = true,

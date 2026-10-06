@@ -42,6 +42,7 @@ public static class CommandCatalog
         E("Things", "draw", "/draw [THING]", "take something off your back into your hands", "equip", "wield", "unsling"),
         E("Things", "hands", "/hands", "what is in your hands"),
         E("Things", "inv", "/inv", "what you are carrying", "i", "inventory"),
+        E("Things", "hand", "/hand [THING]", "give what you hold to the person beside you, if they will take it", "offer"),
         E("Things", "fire", "/fire", "fire the weapon you hold", "shoot"),
         E("Things", "aimassist", "/aimassist [on|off]", "aim assistance from the hip: a shot near somebody in plain view is turned onto them; on by default"),
         E("Things", "reload", "/reload", "reload the gun in your hands from your spare ammunition"),

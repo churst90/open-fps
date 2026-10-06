@@ -345,6 +345,8 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/stow [name|left|right|all]` (or `/sling`): put on your back.
 - `/draw [name]` (or `/equip`, `/wield`, `/unsling`): take into your hands.
 - `/hands`: what is in your hands. `/inv` (or `/i`, `/inventory`): everything you carry.
+- `/hand [name]` (or `/offer`): give what you hold to the person beside you, if they will take it. On
+  the city that is Alex, who asks everybody for something; he keeps it and thanks you.
 
 ### Guns
 - `/fire` (or `/shoot`): fire the gun in your hands.
@@ -471,6 +473,26 @@ squeeze loud and quiet together. It applies to every sound in the game.
 
 The setting is saved.
 
+The levels are worked out from how loud each sound is to the ear, not from its level in decibels:
+an idling engine is mostly deep bass the ear hardly hears, and a beep is quieter to the ear than a
+voice of the same level. Each sound also keeps its tone at the level it plays at: a loud car played
+quieter than in life gets back the bass and treble a quiet sound loses.
+
+## How loud your headphones are
+
+The game assumes your headphones play a person talking normally an arm's length away about as loud
+as a real one. If yours play louder or quieter, tell it once:
+
+- `/listening`: a person talks to you from one step in front, again and again. Set your volume, or
+  press Up (louder) and Down (quieter), until they sound like someone talking to you normally at
+  arm's length. Shift with Up or Down moves five steps. Space says it again, R goes back to the
+  default, Enter saves, Escape cancels. You stand still while it is open.
+- `/listening 58`: set it directly, in decibels (40 to 90). `/listening default` is 62.
+- `/ear off` and `/ear on`: the ear model off and on, to hear what it does. Not saved.
+
+This changes no volume in the game: your volume is yours. It changes only how much bass and treble
+the game gives back to sounds that play quieter or louder than they really are. It is saved.
+
 ## Your own sound settings
 
 These change only what you hear. `/help settings` lists them. Each on its own says its current
@@ -489,7 +511,7 @@ value.
 - `/valveflow on|off`: the rush of gas through each exhaust valve as it opens, on every engine.
 
 `/tail`, `/copies`, `/reflections`, `/cabin`, `/echoes` and `/valveflow` last until you quit.
-`/levels`, `/beacons`, `/narrate`, `/bumps`, `/aimassist` and `/track` are saved.
+`/levels`, `/listening`, `/beacons`, `/narrate`, `/bumps`, `/aimassist` and `/track` are saved.
 
 `/track KIND` chooses what comma and period step through, like Shift+comma and Shift+period.
 
@@ -794,6 +816,7 @@ this command." `/help` lists only the commands you may use.
 - `/announce message`: a message to everyone, from "Server".
 - `/setmotd [text]`.
 - `/where NAME` (or `/locate`): which way and how far, if they are on your map; which map otherwise.
+  `/where alex` finds Alex, says where he is (x east, y north, height) and what he is doing.
 - `/bring NAME`: bring a player to you.
 - `/kick NAME [reason]`: disconnect a player.
 - `/mute NAME [minutes]`: stop a player chatting, 10 minutes if not said. `/unmute NAME`.
@@ -905,6 +928,8 @@ for each of its switches that is set, so a forgotten one shows up in the log.
 | `OPENFPS_TAIL_DB=-6`, `OPENFPS_COPIES_DB=-6` | Start `/tail` and `/copies` at these levels |
 | `OPENFPS_ECHOES=off` | Start with the traced echoes off |
 | `OPENFPS_EAR_WIND=0` | No wind at your ears (for listening without it) |
+| `OPENFPS_EAR_MODEL=0` | Start with the ear model off (`/ear on` turns it on) |
+| `OPENFPS_LISTENING_LEVEL=58` | Sets `/listening` for this run only (40 to 90); it is not saved |
 | `OPENFPS_CRASHDIR=folder` | `run-gtk-client.sh` only: where crash dumps go |
 
 The rest of the client's switches are for tracking down audio faults; they are listed in

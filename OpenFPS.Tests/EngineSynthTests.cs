@@ -15,7 +15,7 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class EngineSynthTests
 {
-    private const int Sr = 44100;
+    private const int Sr = VehicleSynth.SampleRate;   // the bench renders at the mixer's rate
 
     // ── Firing patterns ─────────────────────────────────────────────────────────────────────────
 

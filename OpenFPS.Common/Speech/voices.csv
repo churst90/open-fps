@@ -12209,6 +12209,635 @@ ethan,cloned,kid__greet,kid__greet_wanna_play_with_us,Wanna play with us?,1.00
 ethan,cloned,kid__swings,kid__swings_look_how_high_i_am,Look how high I am!,1.59
 ethan,cloned,kid__excited,kid__excited_look_a_bird,"Look, a bird!",1.75
 steve,cloned,greet,greet_hiya,Hiya.,1.61
+alex,cloned,homeless_money,homeless_money_hey_you_got_a_dollar,"Hey, you got a dollar?",1.66
+alex,cloned,homeless_money,homeless_money_spare_some_change_man,"Spare some change, man?",2.50
+alex,cloned,homeless_money,homeless_money_hey_brother_you_got_any_change,"Hey, brother, you got any change?",1.82
+alex,cloned,homeless_money,homeless_money_can_you_help_me_out_with_a_couple_bucks,Can you help me out with a couple bucks?,2.72
+alex,cloned,homeless_money,homeless_money_just_a_dollar_that_s_all_i_m_asking,Just a dollar. That's all I'm asking.,2.92
+alex,cloned,homeless_money,homeless_money_anything_helps_man_anything,"Anything helps, man. Anything.",2.84
+alex,cloned,homeless_money,homeless_money_you_got_a_five_i_ll_pay_you_back_i_swear,"You got a five? I'll pay you back, I swear.",2.66
+alex,cloned,homeless_money,homeless_money_come_on_man_just_a_quarter_a_quarter,"Come on, man, just a quarter. A quarter!",3.06
+alex,cloned,homeless_money,homeless_money_i_m_just_trying_to_get_something_to_eat,I'm just trying to get something to eat.,2.12
+alex,cloned,homeless_money,homeless_money_i_need_bus_fare_two_bucks_that_s_it,I need bus fare. Two bucks. That's it.,3.47
+alex,cloned,homeless_money,homeless_money_i_m_like_three_dollars_short_can_you_hel,I'm like three dollars short. Can you help me out?,2.85
+alex,cloned,homeless_money,homeless_money_you_don_t_got_a_dollar_look_at_your_shoe,"You don't got a dollar? Look at your shoes, man. You got a dollar.",3.60
+alex,cloned,homeless_money,homeless_money_i_ain_t_gonna_lie_to_you_it_s_for_beer,"I ain't gonna lie to you, it's for beer.",3.27
+alex,cloned,homeless_money,homeless_money_hey_hey_you_got_any_change,"Hey! Hey, you! Got any change?",2.58
+alex,cloned,homeless_money,homeless_money_spare_a_dollar_for_a_guy_who_s_having_th,Spare a dollar for a guy who's having the worst day of his life?,3.53
+alex,cloned,homeless_money,homeless_money_i_m_not_asking_for_much_man_just_some_ch,"I'm not asking for much, man. Just some change.",3.05
+alex,cloned,homeless_money,homeless_money_got_any_cash_on_you_even_a_little,Got any cash on you? Even a little.,2.54
+alex,cloned,homeless_money,homeless_money_hey_i_saw_you_get_change_back_in_there_c,"Hey, I saw you get change back in there. Come on.",3.62
+alex,cloned,homeless_money,homeless_money_god_bless_you_got_anything,God bless. You got anything?,2.81
+alex,cloned,homeless_money,homeless_money_i_m_good_for_it_i_m_good_for_it_i_swear_,"I'm good for it. I'm good for it, I swear to God.",3.73
+alex,cloned,homeless_money,homeless_money_you_got_a_card_there_s_an_atm_right_ther,You got a card? There's an ATM right there.,2.96
+alex,cloned,homeless_money,homeless_money_can_you_buy_me_a_scratch_ticket_i_got_a_,Can you buy me a scratch ticket? I got a good feeling.,3.07
+alex,cloned,homeless_money,homeless_money_help_a_guy_out_please,Help a guy out. Please.,1.90
+alex,cloned,homeless_smokes,homeless_smokes_hey_you_got_a_cigarette,"Hey, you got a cigarette?",1.39
+alex,cloned,homeless_smokes,homeless_smokes_let_me_bum_a_smoke_man,"Let me bum a smoke, man.",1.84
+alex,cloned,homeless_smokes,homeless_smokes_can_i_get_a_cigarette_off_you,Can I get a cigarette off you?,1.94
+alex,cloned,homeless_smokes,homeless_smokes_just_one_one_cigarette,Just one. One cigarette.,2.09
+alex,cloned,homeless_smokes,homeless_smokes_you_got_a_light,You got a light?,1.40
+alex,cloned,homeless_smokes,homeless_smokes_got_a_lighter_mine_s_dead,Got a lighter? Mine's dead.,2.49
+alex,cloned,homeless_smokes,homeless_smokes_can_i_get_the_rest_of_that_you_re_almost,Can I get the rest of that? You're almost done anyway.,2.99
+alex,cloned,homeless_smokes,homeless_smokes_menthol_even_better,Menthol? Even better.,2.19
+alex,cloned,homeless_smokes,homeless_smokes_two_smokes_and_i_ll_leave_you_alone_i_sw,"Two smokes, and I'll leave you alone. I swear.",3.28
+alex,cloned,homeless_smokes,homeless_smokes_hey_you_smoke_let_me_get_one,"Hey, you smoke? Let me get one.",2.92
+alex,cloned,homeless_smokes,homeless_smokes_man_i_d_kill_for_a_cigarette_right_now,"Man, I'd kill for a cigarette right now.",2.38
+alex,cloned,homeless_smokes,homeless_smokes_you_got_a_loose_one_i_ll_give_you_a_quar,You got a loose one? I'll give you a quarter.,2.86
+alex,cloned,homeless_weed,homeless_weed_hey_you_got_any_weed,"Hey, you got any weed?",2.05
+alex,cloned,homeless_weed,homeless_weed_you_smoke_you_got_anything_on_you,You smoke? You got anything on you?,2.68
+alex,cloned,homeless_weed,homeless_weed_let_me_hit_that_man,"Let me hit that, man.",2.05
+alex,cloned,homeless_weed,homeless_weed_you_know_where_i_can_get_some_weed_aroun,You know where I can get some weed around here?,2.61
+alex,cloned,homeless_weed,homeless_weed_come_on_just_a_little_nug_just_a_little,"Come on, just a little nug. Just a little.",3.00
+alex,cloned,homeless_weed,homeless_weed_you_got_a_joint_i_ll_smoke_it_with_you,You got a joint? I'll smoke it with you.,2.63
+alex,cloned,homeless_weed,homeless_weed_i_can_smell_it_on_you_man_don_t_lie,"I can smell it on you, man. Don't lie.",3.09
+alex,cloned,homeless_weed,homeless_weed_just_puff_puff_pass_brother_that_s_all,"Just puff, puff, pass, brother. That's all.",2.68
+alex,cloned,homeless_weed,homeless_weed_you_holding_i_won_t_tell_nobody,You holding? I won't tell nobody.,2.59
+alex,cloned,homeless_weed,homeless_weed_man_i_just_need_to_chill_out_you_got_any,"Man, I just need to chill out. You got any weed?",3.13
+alex,cloned,homeless_drugs,homeless_drugs_hey_you_got_anything_stronger,"Hey, you got anything stronger?",2.58
+alex,cloned,homeless_drugs,homeless_drugs_you_got_any_pills_anything,You got any pills? Anything?,2.56
+alex,cloned,homeless_drugs,homeless_drugs_you_know_anybody_holding,You know anybody holding?,1.77
+alex,cloned,homeless_drugs,homeless_drugs_i_just_need_something_to_take_the_edge_o,"I just need something to take the edge off, man.",2.61
+alex,cloned,homeless_drugs,homeless_drugs_my_back_is_killing_me_you_got_any_pain_p,My back is killing me. You got any pain pills?,3.10
+alex,cloned,homeless_drugs,homeless_drugs_don_t_look_at_me_like_that_you_know_what,Don't look at me like that. You know what I'm asking.,2.53
+alex,cloned,homeless_drugs,homeless_drugs_you_got_any_of_that_good_stuff,You got any of that good stuff?,1.73
+alex,cloned,homeless_drugs,homeless_drugs_man_i_m_hurting_i_m_really_hurting_you_g,"Man, I'm hurting. I'm really hurting. You got anything?",3.49
+alex,cloned,homeless_drugs,homeless_drugs_i_ll_trade_you_i_got_a_lighter_a_good_on,I'll trade you. I got a lighter. A good one.,2.69
+alex,cloned,homeless_drugs,homeless_drugs_if_you_re_holding_man_help_a_guy_out,"If you're holding, man, help a guy out.",2.90
+alex,cloned,homeless_food,homeless_food_you_gonna_eat_that,You gonna eat that?,1.47
+alex,cloned,homeless_food,homeless_food_hey_can_you_buy_me_a_sandwich,"Hey, can you buy me a sandwich?",2.89
+alex,cloned,homeless_food,homeless_food_i_haven_t_eaten_in_two_days_man,"I haven't eaten in two days, man.",2.31
+alex,cloned,homeless_food,homeless_food_can_you_grab_me_something_from_in_there_,Can you grab me something from in there? Anything.,2.91
+alex,cloned,homeless_food,homeless_food_just_a_burger_a_cheap_one_off_the_dollar,Just a burger. A cheap one. Off the dollar menu.,3.03
+alex,cloned,homeless_food,homeless_food_i_m_so_hungry_man_i_m_so_fucking_hungry,"I'm so hungry, man. I'm so fucking hungry.",3.65
+alex,cloned,homeless_food,homeless_food_hey_you_got_any_food_on_you,"Hey, you got any food on you?",1.76
+alex,cloned,homeless_food,homeless_food_you_got_any_leftovers_i_ll_take_leftover,You got any leftovers? I'll take leftovers.,3.45
+alex,cloned,homeless_food,homeless_food_can_you_get_me_a_coffee_just_a_coffee,Can you get me a coffee? Just a coffee.,2.74
+alex,cloned,homeless_food,homeless_food_they_threw_out_a_whole_tray_of_donuts_in,"They threw out a whole tray of donuts in there, and they won't let me have one.",4.19
+alex,cloned,homeless_food,homeless_food_hey_i_ll_eat_your_fries_if_you_don_t_wan,"Hey, I'll eat your fries if you don't want them.",3.00
+alex,cloned,homeless_food,homeless_food_a_bag_of_chips_that_s_all_i_m_starving,A bag of chips. That's all. I'm starving.,3.58
+alex,cloned,homeless_food,homeless_food_buy_me_a_hot_dog_and_i_ll_tell_you_a_sto,"Buy me a hot dog, and I'll tell you a story.",2.70
+alex,cloned,homeless_food,homeless_food_you_got_a_water_it_s_hot_as_hell_out_her,You got a water? It's hot as hell out here.,2.74
+alex,cloned,homeless_ride,homeless_ride_hey_can_i_get_a_ride,"Hey, can I get a ride?",1.71
+alex,cloned,homeless_ride,homeless_ride_you_heading_downtown_let_me_ride_with_yo,You heading downtown? Let me ride with you.,3.65
+alex,cloned,homeless_ride,homeless_ride_can_you_drop_me_off_at_the_shelter_it_s_,Can you drop me off at the shelter? It's not far.,3.13
+alex,cloned,homeless_ride,homeless_ride_just_a_ride_to_the_other_side_of_the_bri,"Just a ride to the other side of the bridge, man.",2.79
+alex,cloned,homeless_ride,homeless_ride_i_ll_sit_in_the_back_i_won_t_touch_nothi,I'll sit in the back. I won't touch nothing.,3.06
+alex,cloned,homeless_ride,homeless_ride_come_on_i_ll_chip_in_for_gas_next_time,"Come on, I'll chip in for gas. Next time.",3.16
+alex,cloned,homeless_ride,homeless_ride_you_got_room_in_there_i_just_need_a_ride,You got room in there? I just need a ride.,2.48
+alex,cloned,homeless_ride,homeless_ride_my_feet_are_killing_me_man_give_me_a_rid,"My feet are killing me, man. Give me a ride.",3.20
+alex,cloned,homeless_ride,homeless_ride_hey_you_going_my_way_i_don_t_even_care_w,"Hey, you going my way? I don't even care where. Just away from here.",4.10
+alex,cloned,homeless_ride,homeless_ride_nobody_ever_stops_nobody_ever_fucking_st,Nobody ever stops. Nobody ever fucking stops.,3.71
+alex,cloned,homeless_shelter,homeless_shelter_you_know_a_place_i_can_stay_tonight,You know a place I can stay tonight?,2.20
+alex,cloned,homeless_shelter,homeless_shelter_the_shelter_s_full_again_it_s_always_ful,The shelter's full again. It's always full.,2.86
+alex,cloned,homeless_shelter,homeless_shelter_can_i_crash_on_your_couch_just_one_night,Can I crash on your couch? Just one night.,2.89
+alex,cloned,homeless_shelter,homeless_shelter_man_i_just_need_somewhere_to_sleep,"Man, I just need somewhere to sleep.",2.56
+alex,cloned,homeless_shelter,homeless_shelter_it_s_supposed_to_get_cold_tonight_and_i_,"It's supposed to get cold tonight, and I got nowhere to go.",3.17
+alex,cloned,homeless_shelter,homeless_shelter_you_know_if_the_church_is_open_tonight,You know if the church is open tonight?,2.14
+alex,cloned,homeless_shelter,homeless_shelter_i_m_not_sleeping_on_that_bench_again_i_m,I'm not sleeping on that bench again. I'm not.,2.57
+alex,cloned,homeless_shelter,homeless_shelter_they_kicked_me_out_of_the_shelter_for_no,They kicked me out of the shelter. For nothing. For nothing!,3.83
+alex,cloned,homeless_shelter,homeless_shelter_you_got_a_garage_a_shed_anything,You got a garage? A shed? Anything?,3.33
+alex,cloned,homeless_shelter,homeless_shelter_i_just_need_a_roof_man_one_night,"I just need a roof, man. One night.",2.76
+alex,cloned,homeless_shelter,homeless_shelter_last_time_i_slept_inside_was_like_three_,Last time I slept inside was like three weeks ago.,3.16
+alex,cloned,homeless_shelter,homeless_shelter_somebody_stole_my_blanket_my_one_blanket,Somebody stole my blanket. My one blanket.,2.89
+alex,cloned,homeless_thanks,homeless_thanks_thank_you_man_seriously,"Thank you, man. Seriously.",2.59
+alex,cloned,homeless_thanks,homeless_thanks_god_bless_you_brother,"God bless you, brother.",1.94
+alex,cloned,homeless_thanks,homeless_thanks_hey_thanks_you_re_all_right,"Hey, thanks. You're all right.",2.56
+alex,cloned,homeless_thanks,homeless_thanks_see_that_wasn_t_so_hard,See? That wasn't so hard.,2.72
+alex,cloned,homeless_thanks,homeless_thanks_that_s_what_i_m_talking_about_thank_you,That's what I'm talking about. Thank you.,2.24
+alex,cloned,homeless_thanks,homeless_thanks_thanks_man_you_re_the_first_person_all_d,"Thanks, man. You're the first person all day.",2.73
+alex,cloned,homeless_thanks,homeless_thanks_you_re_a_good_person_you_know_that,You're a good person. You know that?,2.68
+alex,cloned,homeless_thanks,homeless_thanks_appreciate_you_i_really_do,Appreciate you. I really do.,2.00
+alex,cloned,homeless_thanks,homeless_thanks_oh_thank_you_thank_you,"Oh, thank you. Thank you.",2.40
+alex,cloned,homeless_thanks,homeless_thanks_that_s_it_okay_okay_thanks,"That's it? Okay. Okay, thanks.",2.55
+alex,cloned,homeless_thanks,homeless_thanks_hey_i_ll_remember_you_i_ll_remember_you,"Hey, I'll remember you. I'll remember you.",2.46
+alex,cloned,homeless_thanks,homeless_thanks_bless_you_man_bless_you,"Bless you, man. Bless you.",3.33
+alex,cloned,homeless_refused,homeless_refused_yeah_whatever_man,"Yeah, whatever, man.",1.37
+alex,cloned,homeless_refused,homeless_refused_fine_fuck_you_too,Fine. Fuck you too.,1.93
+alex,cloned,homeless_refused,homeless_refused_oh_you_don_t_got_a_dollar_sure_you_don_t,"Oh, you don't got a dollar? Sure you don't.",2.83
+alex,cloned,homeless_refused,homeless_refused_wow_okay_keep_walking_then,Wow. Okay. Keep walking then.,3.07
+alex,cloned,homeless_refused,homeless_refused_yeah_keep_walking_that_s_what_everybody_,"Yeah, keep walking. That's what everybody does.",2.80
+alex,cloned,homeless_refused,homeless_refused_cheap_ass,Cheap ass.,1.44
+alex,cloned,homeless_refused,homeless_refused_must_be_nice_man_must_be_fucking_nice,"Must be nice, man. Must be fucking nice.",3.06
+alex,cloned,homeless_refused,homeless_refused_don_t_look_at_me_like_i_m_a_piece_of_shi,Don't look at me like I'm a piece of shit!,2.41
+alex,cloned,homeless_refused,homeless_refused_i_m_a_person_man_i_m_a_fucking_person,"I'm a person, man! I'm a fucking person!",2.89
+alex,cloned,homeless_refused,homeless_refused_you_think_i_want_to_be_out_here,You think I want to be out here?,2.04
+alex,cloned,homeless_refused,homeless_refused_thanks_for_nothing_asshole,"Thanks for nothing, asshole.",2.36
+alex,cloned,homeless_refused,homeless_refused_oh_you_re_busy_i_m_busy_too_busy_starvin,"Oh, you're busy? I'm busy too. Busy starving.",3.94
+alex,cloned,homeless_refused,homeless_refused_yeah_go_on_get_in_your_nice_car,"Yeah, go on, get in your nice car.",2.66
+alex,cloned,homeless_refused,homeless_refused_one_day_it_s_gonna_be_you_out_here_you_l,One day it's gonna be you out here. You'll see.,3.24
+alex,cloned,homeless_refused,homeless_refused_i_didn_t_even_want_your_money_anyway,I didn't even want your money anyway.,2.09
+alex,cloned,homeless_refused,homeless_refused_nobody_fucking_cares_nobody,Nobody fucking cares. Nobody.,2.48
+alex,cloned,homeless_refused,homeless_refused_oh_so_you_can_t_even_look_at_me_now,"Oh, so you can't even look at me now?",2.61
+alex,cloned,homeless_refused,homeless_refused_same_to_you_buddy,"Same to you, buddy.",1.53
+alex,cloned,homeless_refused,homeless_refused_wow_you_re_cold_man,"Wow. You're cold, man.",2.40
+alex,cloned,homeless_refused,homeless_refused_whatever_next,Whatever. Next.,1.63
+alex,cloned,homeless_angry,homeless_angry_what_the_fuck_are_you_looking_at,What the fuck are you looking at?,2.08
+alex,cloned,homeless_angry,homeless_angry_get_the_fuck_away_from_me,Get the fuck away from me!,1.65
+alex,cloned,homeless_angry,homeless_angry_don_t_touch_my_stuff,Don't touch my stuff!,1.90
+alex,cloned,homeless_angry,homeless_angry_that_s_my_spot_that_s_my_fucking_spot,That's my spot! That's my fucking spot!,2.80
+alex,cloned,homeless_angry,homeless_angry_you_think_this_is_funny,You think this is funny?,1.71
+alex,cloned,homeless_angry,homeless_angry_stop_laughing_at_me,Stop laughing at me!,1.87
+alex,cloned,homeless_angry,homeless_angry_i_m_not_crazy_i_m_not_fucking_crazy,I'm not crazy! I'm not fucking crazy!,2.07
+alex,cloned,homeless_angry,homeless_angry_leave_me_alone_just_leave_me_alone,Leave me alone! Just leave me alone!,2.45
+alex,cloned,homeless_angry,homeless_angry_you_want_some_huh_you_want_some,You want some? Huh? You want some?,2.78
+alex,cloned,homeless_angry,homeless_angry_back_up_back_the_fuck_up,Back up! Back the fuck up!,2.74
+alex,cloned,homeless_angry,homeless_angry_i_swear_to_god_i_ll_break_something,"I swear to God, I'll break something.",2.26
+alex,cloned,homeless_angry,homeless_angry_don_t_you_ever_talk_to_me_like_that,Don't you ever talk to me like that!,2.28
+alex,cloned,homeless_angry,homeless_angry_everybody_thinks_they_re_better_than_me,Everybody thinks they're better than me!,2.35
+alex,cloned,homeless_angry,homeless_angry_i_m_sick_of_this_shit_i_m_sick_of_all_of,I'm sick of this shit! I'm sick of all of it!,2.80
+alex,cloned,homeless_angry,homeless_angry_who_took_my_cart_who_took_my_fucking_car,Who took my cart? Who took my fucking cart?,2.92
+alex,cloned,homeless_angry,homeless_angry_get_out_of_my_face,Get out of my face!,1.84
+alex,cloned,homeless_angry,homeless_angry_you_don_t_know_me_you_don_t_know_a_godda,You don't know me! You don't know a goddamn thing about me!,3.16
+alex,cloned,homeless_angry,homeless_angry_keep_walking_asshole,"Keep walking, asshole!",2.08
+alex,cloned,homeless_angry,homeless_angry_i_had_a_job_i_had_a_fucking_life,I had a job! I had a fucking life!,2.29
+alex,cloned,homeless_angry,homeless_angry_don_t_call_the_cops_on_me_i_didn_t_do_no,Don't call the cops on me! I didn't do nothing!,3.17
+alex,cloned,homeless_angry,homeless_angry_go_ahead_laugh_laugh_it_up,"Go ahead, laugh. Laugh it up.",2.59
+alex,cloned,homeless_angry,homeless_angry_every_single_day_every_single_goddamn_da,Every single day. Every single goddamn day!,2.85
+alex,cloned,homeless_angry,homeless_angry_you_wanna_take_a_picture_go_ahead_take_a,You wanna take a picture? Go ahead! Take a fucking picture!,3.39
+alex,cloned,homeless_angry,homeless_angry_i_m_talking_to_you_don_t_walk_away_from_,I'm talking to you! Don't walk away from me!,3.25
+alex,cloned,homeless_angry,homeless_angry_oh_i_ve_got_a_problem_yeah_you_re_my_pro,"Oh, I've got a problem? Yeah, you're my problem!",3.81
+alex,cloned,homeless_mutter,homeless_mutter_nobody_gives_a_damn,Nobody gives a damn.,2.09
+alex,cloned,homeless_mutter,homeless_mutter_fucking_people_man,"Fucking people, man.",1.71
+alex,cloned,homeless_mutter,homeless_mutter_i_just_need_one_break_one,I just need one break. One.,2.27
+alex,cloned,homeless_mutter,homeless_mutter_it_s_cold_it_s_so_fucking_cold,It's cold. It's so fucking cold.,3.39
+alex,cloned,homeless_mutter,homeless_mutter_where_d_i_put_my_bag_where_s_my_bag,Where'd I put my bag? Where's my bag?,2.64
+alex,cloned,homeless_mutter,homeless_mutter_they_don_t_care_none_of_them_care,They don't care. None of them care.,2.57
+alex,cloned,homeless_mutter,homeless_mutter_three_dollars_i_got_three_dollars,Three dollars. I got three dollars.,2.77
+alex,cloned,homeless_mutter,homeless_mutter_my_feet_man_my_feet_are_done,"My feet, man. My feet are done.",2.80
+alex,cloned,homeless_mutter,homeless_mutter_i_used_to_have_a_car_a_nice_one,I used to have a car. A nice one.,2.62
+alex,cloned,homeless_mutter,homeless_mutter_just_get_through_today_just_today,Just get through today. Just today.,2.90
+alex,cloned,homeless_mutter,homeless_mutter_that_guy_owes_me_twenty_bucks,That guy owes me twenty bucks.,2.28
+alex,cloned,homeless_mutter,homeless_mutter_don_t_cry_don_t_you_fucking_cry,Don't cry. Don't you fucking cry.,2.91
+alex,cloned,homeless_mutter,homeless_mutter_okay_okay_breathe,Okay. Okay. Breathe.,2.31
+alex,cloned,homeless_mutter,homeless_mutter_i_m_so_tired_man,"I'm so tired, man.",2.13
+alex,cloned,homeless_mutter,homeless_mutter_god_i_need_a_smoke,"God, I need a smoke.",2.37
+alex,cloned,homeless_mutter,homeless_mutter_where_am_i_supposed_to_go_where,Where am I supposed to go? Where?,2.41
+alex,cloned,homeless_mutter,homeless_mutter_shelter_opens_at_six_what_time_is_it,Shelter opens at six. What time is it?,2.54
+alex,cloned,homeless_mutter,homeless_mutter_nobody_looks_at_you_out_here_you_re_a_gh,Nobody looks at you out here. You're a ghost.,3.23
+alex,cloned,homeless_cops,homeless_cops_i_m_not_doing_nothing_officer,"I'm not doing nothing, officer!",2.45
+alex,cloned,homeless_cops,homeless_cops_i_m_just_sitting_here_is_that_a_crime_no,I'm just sitting here. Is that a crime now?,3.34
+alex,cloned,homeless_cops,homeless_cops_move_along_move_where_where_am_i_suppose,Move along? Move where? Where am I supposed to go?,3.58
+alex,cloned,homeless_cops,homeless_cops_fine_i_m_going_i_m_going,Fine! I'm going! I'm going!,2.99
+alex,cloned,homeless_cops,homeless_cops_don_t_touch_me_man_i_m_moving,"Don't touch me, man. I'm moving.",2.34
+alex,cloned,homeless_cops,homeless_cops_this_is_a_public_sidewalk,This is a public sidewalk!,2.17
+alex,cloned,homeless_cops,homeless_cops_yeah_i_know_the_rules,"Yeah, I know the rules.",2.43
+alex,cloned,homeless_cops,homeless_cops_can_i_at_least_get_my_stuff_first,Can I at least get my stuff first?,2.57
+alex,cloned,homeless_cops,homeless_cops_every_night_every_night_you_guys_do_this,Every night. Every night you guys do this.,2.75
+alex,cloned,homeless_cops,homeless_cops_i_got_rights_too_you_know,"I got rights too, you know!",1.81
+alex,cloned,homeless_cars,homeless_cars_hey_slow_down,Hey! Slow down!,1.80
+alex,cloned,homeless_cars,homeless_cars_watch_where_you_re_going_asshole,"Watch where you're going, asshole!",2.35
+alex,cloned,homeless_cars,homeless_cars_you_almost_hit_me,You almost hit me!,1.59
+alex,cloned,homeless_cars,homeless_cars_yeah_honk_at_me_real_nice,"Yeah, honk at me! Real nice!",2.88
+alex,cloned,homeless_cars,homeless_cars_hey_roll_your_window_down,Hey! Roll your window down!,2.32
+alex,cloned,homeless_cars,homeless_cars_i_m_walking_here,I'm walking here!,1.58
+alex,cloned,homeless_cars,homeless_cars_go_ahead_run_me_over_see_if_i_care,"Go ahead, run me over! See if I care!",2.95
+alex,cloned,homeless_cars,homeless_cars_nice_car_rich_boy,"Nice car, rich boy!",1.87
+alex,cloned,homeless_cars,homeless_cars_hey_you_got_a_dollar_hey_come_back,Hey! You got a dollar? Hey! Come back!,3.08
+alex,cloned,homeless_cars,homeless_cars_fucking_drivers_man,"Fucking drivers, man.",1.74
+alex,cloned,story,story_1_kettle,"You wanna know why I'm out here? I'll tell you. I had a place. Little apartment. Nothing fancy. And one morning I'm making coffee, pouring hot water straight off the stove, and I burn my hand bad. Real bad. So I'm yelling, right, because it hurts, and my roommates are just laughing at me. Laughing! And I lost it. I broke some stuff. Okay, I broke a lot of stuff. And that was it. They kicked me out. Over a damn kettle.",22.24
+alex,cloned,story,story_2_shelter,"Last night I get to the shelter at five thirty, right? Doors open at six. I'm first in line. First! And at six o'clock the guy comes out and says, sorry, we're full. Full! I was first in line! Turns out they saved beds for people who called ahead. Called ahead with what? I don't got a phone! So I slept behind the laundromat. At least the vent blows hot air. Smells like dryer sheets. Could be worse.",21.79
+alex,cloned,story,story_3_sandwich,"This lady comes up to me this morning, real nice, hands me a sandwich. I'm like, thank you, God bless you. I'm starving. I haven't eaten since yesterday. I open it up, and it's tuna. I hate tuna. I hate it. But you know what? I ate it. I ate the whole thing. Because when you're hungry enough, man, tuna tastes like a steak dinner. Don't tell her I hate tuna, though. She was nice.",20.00
+alex,cloned,story,story_4_cart,"Somebody stole my cart last week. My whole cart. Everything I own was in that cart. My blanket, my radio, my good shoes. I went to the bathroom for two minutes. Two minutes! And then yesterday I see this guy pushing it down the street like it's his. My cart! It's got my sticker on it! So I'm yelling, and he's yelling, and everybody's staring at me like I'm the crazy one. I'm not crazy. That's my cart.",22.07
+alex,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.44
+alex,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",1.27
+alex,cloned,greet,greet_hey_good_morning,"Hey, good morning.",1.86
+alex,cloned,greet,greet_morning,Morning.,0.92
+alex,cloned,greet,greet_good_morning,Good morning!,1.38
+alex,cloned,greet,greet_afternoon,Afternoon.,1.24
+alex,cloned,greet,greet_good_afternoon,Good afternoon.,1.33
+alex,cloned,greet,greet_evening,Evening.,1.14
+alex,cloned,greet,greet_good_evening,Good evening.,1.76
+alex,cloned,greet,greet_hey_there,Hey there.,1.13
+alex,cloned,greet,greet_hi,Hi.,0.87
+alex,cloned,greet,greet_hello,Hello.,1.12
+alex,cloned,greet,greet_hey,Hey.,0.60
+alex,cloned,greet,greet_how_are_you_doing,How are you doing?,1.31
+alex,cloned,greet,greet_how_you_doing,How you doing?,1.17
+alex,cloned,greet,greet_what_s_going_on,What's going on?,1.56
+alex,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.85
+alex,cloned,greet,greet_long_time_no_see,Long time no see!,1.96
+alex,cloned,greet,greet_hey_man,Hey man.,0.92
+alex,cloned,greet,greet_what_s_new,What's new?,1.36
+alex,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.81
+alex,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.39
+alex,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.80
+alex,cloned,greet,greet_looks_like_rain,Looks like rain.,1.28
+alex,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.73
+alex,cloned,greet,greet_can_i_help_you,Can I help you?,1.01
+alex,cloned,greet,greet_need_something,Need something?,1.61
+alex,cloned,greet,greet_hey_you,"Hey, you.",1.38
+alex,cloned,greet,greet_hiya,Hiya.,0.78
+alex,cloned,greet,greet_howdy,Howdy.,1.07
+alex,cloned,greet,greet_hey_how_are_ya,"Hey, how are ya?",1.73
+alex,cloned,greet,greet_how_s_your_day_going,How's your day going?,1.76
+alex,cloned,greet,greet_how_s_everything,How's everything?,1.37
+alex,cloned,greet,greet_how_have_you_been,How have you been?,1.60
+alex,cloned,greet,greet_hey_good_to_see_you,"Hey, good to see you.",2.44
+alex,cloned,greet,greet_well_look_who_it_is,"Well, look who it is.",1.63
+alex,cloned,greet,greet_there_he_is,There he is.,1.87
+alex,cloned,greet,greet_there_she_is,There she is.,1.42
+alex,cloned,greet,greet_hey_stranger,Hey stranger.,1.22
+alex,cloned,greet,greet_what_s_happening,What's happening?,1.56
+alex,cloned,greet,greet_what_s_good,What's good?,1.12
+alex,cloned,greet,greet_sup,Sup.,0.67
+alex,cloned,greet,greet_hey_buddy,Hey buddy.,1.36
+alex,cloned,greet,greet_hey_friend,"Hey, friend.",1.80
+alex,cloned,greet,greet_everything_good,Everything good?,1.22
+alex,cloned,greet,greet_you_doing_okay,You doing okay?,1.60
+alex,cloned,greet,greet_hello_there,Hello there.,1.25
+alex,cloned,greet,greet_hi_how_are_you,"Hi, how are you?",1.92
+alex,cloned,greet,greet_oh_hi,"Oh, hi!",1.39
+alex,cloned,greet,greet_hey_hey,Hey hey.,1.87
+alex,cloned,greet,greet_yo,Yo.,1.04
+alex,cloned,greet,greet_look_at_you,Look at you!,1.34
+alex,cloned,polite,polite_excuse_me,Excuse me.,1.00
+alex,cloned,polite,polite_pardon_me,Pardon me.,1.55
+alex,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.31
+alex,cloned,polite,polite_oh_sorry,"Oh, sorry.",0.96
+alex,cloned,polite,polite_watch_it,Watch it!,1.33
+alex,cloned,polite,polite_careful_there,Careful there.,1.18
+alex,cloned,polite,polite_thanks,Thanks.,1.20
+alex,cloned,polite,polite_thank_you,Thank you.,1.34
+alex,cloned,polite,polite_no_problem,No problem.,1.45
+alex,cloned,polite,polite_you_re_welcome,You're welcome.,1.13
+alex,cloned,polite,polite_sure_thing,Sure thing.,1.52
+alex,cloned,polite,polite_sorry_about_that,Sorry about that.,1.41
+alex,cloned,polite,polite_my_bad,My bad.,1.09
+alex,cloned,polite,polite_whoops_sorry,"Whoops, sorry.",1.65
+alex,cloned,polite,polite_oh_excuse_me,"Oh, excuse me.",1.70
+alex,cloned,polite,polite_sorry_didn_t_see_you,"Sorry, didn't see you.",2.04
+alex,cloned,polite,polite_coming_through,Coming through.,1.20
+alex,cloned,polite,polite_just_squeezing_by,Just squeezing by.,1.70
+alex,cloned,polite,polite_after_you,After you.,0.92
+alex,cloned,polite,polite_go_ahead,Go ahead.,0.75
+alex,cloned,polite,polite_no_you_go,"No, you go.",1.71
+alex,cloned,polite,polite_oh_my_fault,"Oh, my fault.",1.42
+alex,cloned,polite,polite_sorry_sorry,"Sorry, sorry.",1.53
+alex,cloned,polite,polite_pardon,Pardon.,1.08
+alex,cloned,polite,polite_i_m_so_sorry,I'm so sorry.,1.33
+alex,cloned,polite,polite_scuse_me,Scuse me.,1.17
+alex,cloned,polite,polite_thanks_appreciate_it,"Thanks, appreciate it.",1.43
+alex,cloned,polite,polite_thanks_a_lot,Thanks a lot.,1.54
+alex,cloned,polite,polite_much_appreciated,Much appreciated.,1.54
+alex,cloned,polite,polite_don_t_worry_about_it,Don't worry about it.,1.25
+alex,cloned,polite,polite_all_good,All good.,1.30
+alex,cloned,polite,polite_you_re_fine,You're fine.,1.20
+alex,cloned,polite,polite_no_worries,No worries.,1.47
+alex,cloned,bye,bye_have_a_good_one,Have a good one.,1.17
+alex,cloned,bye,bye_take_care,Take care.,1.21
+alex,cloned,bye,bye_see_you_later,See you later.,1.47
+alex,cloned,bye,bye_see_ya,See ya.,1.00
+alex,cloned,bye,bye_catch_you_later,Catch you later.,1.38
+alex,cloned,bye,bye_have_a_good_day,Have a good day.,1.35
+alex,cloned,bye,bye_have_a_nice_day,Have a nice day!,2.20
+alex,cloned,bye,bye_have_a_good_night,Have a good night.,1.40
+alex,cloned,bye,bye_take_it_easy,Take it easy.,1.41
+alex,cloned,bye,bye_bye_now,Bye now.,1.50
+alex,cloned,bye,bye_later,Later.,0.91
+alex,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,1.62
+alex,cloned,bye,bye_alright_see_you_around,"Alright, see you around.",1.38
+alex,cloned,bye,bye_talk_to_you_later,Talk to you later.,1.21
+alex,cloned,bye,bye_take_it_easy_man,"Take it easy, man.",1.55
+alex,cloned,bye,bye_catch_you_on_the_flip_side,Catch you on the flip side.,2.03
+alex,cloned,bye,bye_don_t_be_a_stranger,Don't be a stranger.,1.71
+alex,cloned,bye,bye_be_good,Be good.,1.16
+alex,cloned,bye,bye_later_man,"Later, man.",1.33
+alex,cloned,bye,bye_peace,Peace.,1.02
+alex,cloned,bye,bye_cheers,Cheers.,1.23
+alex,cloned,bye,bye_good_seeing_you,Good seeing you.,2.04
+alex,cloned,bye,bye_say_hi_to_everybody,Say hi to everybody.,1.92
+alex,cloned,bye,bye_until_next_time,Until next time.,1.40
+alex,cloned,bye,bye_i_ll_see_you,I'll see you.,1.22
+alex,cloned,bye,bye_alright_bye,"Alright, bye.",1.32
+alex,cloned,bye,bye_go_easy,Go easy.,1.49
+alex,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",2.20
+alex,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,2.64
+alex,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,1.96
+alex,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.53
+alex,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.92
+alex,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,2.57
+alex,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",2.99
+alex,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",2.04
+alex,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.90
+alex,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",2.52
+alex,cloned,chatter,chatter_mm_hmm,Mm-hmm.,1.94
+alex,cloned,chatter,chatter_uh_huh,Uh-huh.,1.15
+alex,cloned,chatter,chatter_right_right,"Right, right.",1.52
+alex,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.47
+alex,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,2.75
+alex,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.93
+alex,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,2.66
+alex,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,2.68
+alex,cloned,chatter,chatter_how_much_was_it,How much was it?,1.54
+alex,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.73
+alex,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",2.06
+alex,cloned,chatter,chatter_wait_up,Wait up!,1.33
+alex,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",2.41
+alex,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,1.54
+alex,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,1.60
+alex,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,2.16
+alex,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,2.20
+alex,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.70
+alex,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",2.30
+alex,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",2.25
+alex,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.79
+alex,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,1.86
+alex,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",2.04
+alex,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",2.48
+alex,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.71
+alex,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",2.32
+alex,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.60
+alex,cloned,chatter,chatter_what_time_is_it,What time is it?,1.77
+alex,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.69
+alex,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.53
+alex,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,1.40
+alex,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.90
+alex,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.68
+alex,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.85
+alex,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.80
+alex,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.52
+alex,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.89
+alex,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,2.24
+alex,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",2.30
+alex,cloned,chatter,chatter_no_the_other_one,"No, the other one.",1.78
+alex,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,1.27
+alex,cloned,chatter,chatter_that_s_crazy,That's crazy.,1.96
+alex,cloned,chatter,chatter_for_real,For real?,1.21
+alex,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",2.77
+alex,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",2.14
+alex,cloned,chatter,chatter_let_s_just_go,Let's just go.,1.45
+alex,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",2.21
+alex,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.77
+alex,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,2.25
+alex,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.89
+alex,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.16
+alex,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.84
+alex,cloned,chatter,chatter_we_should_head_back,We should head back.,1.38
+alex,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",2.70
+alex,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,1.39
+alex,cloned,chatter,chatter_exactly,Exactly.,1.38
+alex,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",2.47
+alex,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,1.55
+alex,cloned,greet_reply,greet_reply_good_you,"Good, you?",0.99
+alex,cloned,greet_reply,greet_reply_not_bad_not_bad,"Not bad, not bad.",2.52
+alex,cloned,greet_reply,greet_reply_doing_alright_thanks,"Doing alright, thanks.",1.92
+alex,cloned,greet_reply,greet_reply_can_t_complain,Can't complain.,1.61
+alex,cloned,greet_reply,greet_reply_hanging_in_there,Hanging in there.,1.27
+alex,cloned,greet_reply,greet_reply_oh_you_know_same_old,"Oh, you know. Same old.",1.79
+alex,cloned,greet_reply,greet_reply_pretty_good_thanks_for_asking,"Pretty good, thanks for asking.",2.67
+alex,cloned,greet_reply,greet_reply_surviving,Surviving.,1.54
+alex,cloned,greet_reply,greet_reply_better_now,Better now.,1.43
+alex,cloned,greet_reply,greet_reply_living_the_dream,Living the dream.,1.41
+alex,cloned,greet_reply,greet_reply_could_be_worse,Could be worse.,1.28
+alex,cloned,greet_reply,greet_reply_fine_thanks_and_you,"Fine, thanks. And you?",2.64
+alex,cloned,greet_reply,greet_reply_oh_hey_didn_t_see_you,"Oh, hey! Didn't see you.",2.69
+alex,cloned,annoyed,annoyed_are_you_serious,Are you serious?,1.59
+alex,cloned,annoyed,annoyed_oh_wow_okay_then,"Oh, wow. Okay then.",2.50
+alex,cloned,annoyed,annoyed_excuse_you,Excuse you.,1.43
+alex,cloned,annoyed,annoyed_look_where_you_re_going,Look where you're going.,1.37
+alex,cloned,annoyed,annoyed_hey_do_you_mind,"Hey, do you mind?",2.22
+alex,cloned,annoyed,annoyed_some_people,Some people.,1.12
+alex,cloned,annoyed,annoyed_unreal,Unreal.,1.13
+alex,cloned,annoyed,annoyed_real_nice,Real nice.,1.60
+alex,cloned,annoyed,annoyed_you_re_welcome_i_guess,"You're welcome, I guess.",2.03
+alex,cloned,annoyed,annoyed_rude,Rude.,0.93
+alex,cloned,annoyed,annoyed_heads_up_pal,"Heads up, pal.",1.69
+alex,cloned,annoyed,annoyed_watch_your_step,Watch your step.,1.64
+alex,cloned,mutter,mutter_okay_okay_okay,"Okay, okay, okay.",2.09
+alex,cloned,mutter,mutter_come_on_come_on,"Come on, come on.",2.19
+alex,cloned,mutter,mutter_what_was_i_doing,What was I doing?,1.38
+alex,cloned,mutter,mutter_why_do_i_always_do_this,Why do I always do this?,1.96
+alex,cloned,mutter,mutter_great_just_great,Great. Just great.,1.90
+alex,cloned,mutter,mutter_of_course,Of course.,1.12
+alex,cloned,mutter,mutter_unbelievable_honestly,"Unbelievable, honestly.",1.89
+alex,cloned,mutter,mutter_where_is_it,Where is it?,1.18
+alex,cloned,mutter,mutter_i_know_i_had_it,I know I had it.,1.47
+alex,cloned,mutter,mutter_just_five_more_minutes,Just five more minutes.,1.77
+alex,cloned,mutter,mutter_oh_for_crying_out_loud,"Oh, for crying out loud.",1.54
+alex,cloned,mutter,mutter_nope_not_today,Nope. Not today.,1.65
+alex,cloned,mutter,mutter_should_ve_worn_a_jacket,Should've worn a jacket.,1.73
+alex,cloned,mutter,mutter_why_is_everything_so_expensive,Why is everything so expensive?,2.52
+alex,cloned,mutter,mutter_why_is_it_always_me,Why is it always me?,1.70
+alex,cloned,mutter,mutter_ugh_my_feet,"Ugh, my feet.",1.95
+alex,cloned,mutter,mutter_alright_let_s_go,"Alright, let's go.",1.45
+alex,cloned,mutter,mutter_almost_there,Almost there.,1.15
+alex,cloned,mutter,mutter_left_or_right_left,Left or right? Left.,1.90
+alex,cloned,mutter,mutter_wait_this_isn_t_right,"Wait, this isn't right.",2.18
+alex,cloned,mutter,mutter_where_am_i_even_going,Where am I even going?,2.05
+alex,cloned,think_aloud,think_aloud_okay_what_s_next,"Okay, what's next?",2.32
+alex,cloned,think_aloud,think_aloud_twenty_thirty_forty_okay,"Twenty, thirty, forty. Okay.",2.40
+alex,cloned,think_aloud,think_aloud_i_ll_do_it_tomorrow,I'll do it tomorrow.,1.45
+alex,cloned,think_aloud,think_aloud_what_was_her_name_again,What was her name again?,1.45
+alex,cloned,think_aloud,think_aloud_it_s_on_the_tip_of_my_tongue,It's on the tip of my tongue.,2.26
+alex,cloned,think_aloud,think_aloud_let_me_think,Let me think.,1.17
+alex,cloned,think_aloud,think_aloud_do_i_have_time_for_coffee,Do I have time for coffee?,2.35
+alex,cloned,think_aloud,think_aloud_i_could_just_walk,I could just walk.,1.27
+alex,cloned,think_aloud,think_aloud_okay_that_works,"Okay, that works.",1.86
+alex,cloned,think_aloud,think_aloud_hmm_maybe_not,Hmm. Maybe not.,1.95
+alex,cloned,think_aloud,think_aloud_note_to_self,Note to self.,1.35
+alex,cloned,weather_rain,weather_rain_great_it_s_raining,"Great, it's raining.",1.84
+alex,cloned,weather_rain,weather_rain_of_course_it_s_raining,Of course it's raining.,1.47
+alex,cloned,weather_rain,weather_rain_i_left_my_umbrella_at_home,I left my umbrella at home.,1.74
+alex,cloned,weather_rain,weather_rain_i_m_soaked,I'm soaked.,1.34
+alex,cloned,weather_rain,weather_rain_it_s_really_coming_down,It's really coming down.,1.98
+alex,cloned,weather_rain,weather_rain_just_a_drizzle,Just a drizzle.,1.37
+alex,cloned,weather_rain,weather_rain_supposed_to_clear_up_later,Supposed to clear up later.,2.49
+alex,cloned,weather_rain,weather_rain_ugh_my_shoes_are_wet,"Ugh, my shoes are wet.",1.84
+alex,cloned,weather_storm,weather_storm_whoa_that_was_close,"Whoa, that was close.",1.94
+alex,cloned,weather_storm,weather_storm_did_you_hear_that_thunder,Did you hear that thunder?,1.56
+alex,cloned,weather_storm,weather_storm_let_s_get_inside,Let's get inside.,1.73
+alex,cloned,weather_storm,weather_storm_that_was_a_big_one,That was a big one.,1.42
+alex,cloned,weather_storm,weather_storm_i_hate_storms,I hate storms.,1.63
+alex,cloned,weather_storm,weather_storm_it_s_getting_nasty_out,It's getting nasty out.,2.08
+alex,cloned,weather_hot,weather_hot_it_s_so_hot,It's so hot.,1.62
+alex,cloned,weather_hot,weather_hot_i_m_melting,I'm melting.,1.56
+alex,cloned,weather_hot,weather_hot_need_some_shade,Need some shade.,1.68
+alex,cloned,weather_hot,weather_hot_could_really_use_a_cold_drink,Could really use a cold drink.,2.69
+alex,cloned,weather_hot,weather_hot_it_s_like_an_oven_out_here,It's like an oven out here.,2.24
+alex,cloned,weather_hot,weather_hot_too_hot_for_this,Too hot for this.,1.57
+alex,cloned,weather_cold,weather_cold_it_s_freezing,It's freezing.,1.40
+alex,cloned,weather_cold,weather_cold_i_can_t_feel_my_hands,I can't feel my hands.,1.64
+alex,cloned,weather_cold,weather_cold_brr,Brr.,1.35
+alex,cloned,weather_cold,weather_cold_should_ve_brought_gloves,Should've brought gloves.,2.12
+alex,cloned,weather_cold,weather_cold_it_s_bitter_out_here,It's bitter out here.,1.99
+alex,cloned,weather_cold,weather_cold_my_ears_are_frozen,My ears are frozen.,1.56
+alex,cloned,weather_wind,weather_wind_windy_today,Windy today.,1.29
+alex,cloned,weather_wind,weather_wind_hold_on_to_your_hat,Hold on to your hat.,1.46
+alex,cloned,weather_wind,weather_wind_this_wind_is_something_else,This wind is something else.,2.13
+alex,cloned,weather_wind,weather_wind_almost_blew_me_over,Almost blew me over.,1.69
+alex,cloned,weather_fog,weather_fog_can_t_see_a_thing_in_this_fog,Can't see a thing in this fog.,2.28
+alex,cloned,weather_fog,weather_fog_pretty_foggy_out,Pretty foggy out.,1.32
+alex,cloned,weather_fog,weather_fog_spooky_out_here,Spooky out here.,1.61
+alex,cloned,weather_snow,weather_snow_look_it_s_snowing,"Look, it's snowing.",1.46
+alex,cloned,weather_snow,weather_snow_careful_it_s_slippery,"Careful, it's slippery.",1.87
+alex,cloned,weather_snow,weather_snow_watch_the_ice,Watch the ice.,1.94
+alex,cloned,weather_snow,weather_snow_snow_already,Snow already?,1.39
+alex,cloned,weather_fine,weather_fine_gorgeous_out,Gorgeous out.,1.41
+alex,cloned,weather_fine,weather_fine_finally_some_sun,Finally some sun.,1.91
+alex,cloned,weather_fine,weather_fine_can_t_beat_this_weather,Can't beat this weather.,1.88
+alex,cloned,weather_fine,weather_fine_perfect_day_for_it,Perfect day for it.,1.81
+alex,cloned,time_morning,time_morning_too_early_for_this,Too early for this.,1.36
+alex,cloned,time_morning,time_morning_i_need_coffee,I need coffee.,1.41
+alex,cloned,time_morning,time_morning_not_a_morning_person,Not a morning person.,1.77
+alex,cloned,time_morning,time_morning_rise_and_shine,Rise and shine.,1.60
+alex,cloned,time_morning,time_morning_early_start_today,Early start today.,1.69
+alex,cloned,time_noon,time_noon_lunch_time,Lunch time.,1.42
+alex,cloned,time_noon,time_noon_is_it_noon_already,Is it noon already?,1.41
+alex,cloned,time_noon,time_noon_where_d_the_morning_go,Where'd the morning go?,1.72
+alex,cloned,time_evening,time_evening_getting_dark_early,Getting dark early.,1.70
+alex,cloned,time_evening,time_evening_long_day,Long day.,1.38
+alex,cloned,time_night,time_night_it_s_late,It's late.,1.09
+alex,cloned,time_night,time_night_quiet_tonight,Quiet tonight.,1.35
+alex,cloned,time_night,time_night_i_need_to_get_some_sleep,I need to get some sleep.,1.62
+alex,cloned,time_night,time_night_man_it_s_dark,"Man, it's dark.",1.76
+alex,cloned,time_night,time_night_stay_close,Stay close.,1.11
+alex,cloned,react_horn,react_horn_whoa,Whoa!,1.09
+alex,cloned,react_horn,react_horn_jeez_relax,"Jeez, relax.",1.59
+alex,cloned,react_horn,react_horn_alright_alright,"Alright, alright!",1.44
+alex,cloned,react_horn,react_horn_somebody_s_in_a_hurry,Somebody's in a hurry.,1.68
+alex,cloned,react_horn,react_horn_easy_buddy,"Easy, buddy.",1.30
+alex,cloned,react_horn,react_horn_what_s_that_about,What's that about?,1.68
+alex,cloned,react_siren,react_siren_somebody_s_in_trouble,Somebody's in trouble.,1.47
+alex,cloned,react_siren,react_siren_where_are_they_going,Where are they going?,1.01
+alex,cloned,react_siren,react_siren_hope_everyone_s_okay,Hope everyone's okay.,1.61
+alex,cloned,react_siren,react_siren_that_s_the_third_one_today,That's the third one today.,1.71
+alex,cloned,react_siren,react_siren_must_be_an_accident,Must be an accident.,2.10
+alex,cloned,react_siren,react_siren_pull_over_pull_over,"Pull over, pull over.",2.63
+alex,cloned,react_gunshot_far,react_gunshot_far_was_that_a_gunshot,Was that a gunshot?,1.41
+alex,cloned,react_gunshot_far,react_gunshot_far_did_you_hear_that,Did you hear that?,1.42
+alex,cloned,react_gunshot_far,react_gunshot_far_was_that_fireworks,Was that fireworks?,1.61
+alex,cloned,react_gunshot_far,react_gunshot_far_that_sounded_close,That sounded close.,1.84
+alex,cloned,react_gunshot_far,react_gunshot_far_let_s_go_the_other_way,Let's go the other way.,1.56
+alex,cloned,react_gunshot_far,react_gunshot_far_i_m_not_sticking_around,I'm not sticking around.,1.54
+alex,cloned,react_gunshot_far,react_gunshot_far_oh_no_not_again,Oh no. Not again.,1.77
+alex,cloned,react_gunshot_near,react_gunshot_near_get_down,Get down!,1.37
+alex,cloned,react_gunshot_near,react_gunshot_near_run,Run!,1.01
+alex,cloned,react_gunshot_near,react_gunshot_near_oh_my_god,Oh my God!,1.49
+alex,cloned,react_gunshot_near,react_gunshot_near_go_go_go,"Go, go, go!",2.33
+alex,cloned,react_gunshot_near,react_gunshot_near_he_s_got_a_gun,He's got a gun!,1.40
+alex,cloned,react_gunshot_near,react_gunshot_near_somebody_call_nine_one_one,Somebody call nine one one!,2.33
+alex,cloned,react_gunshot_near,react_gunshot_near_get_inside,Get inside!,1.47
+alex,cloned,react_crash,react_crash_oh_god_no,"Oh God, no!",1.30
+alex,cloned,react_crash,react_crash_did_you_see_that,Did you see that?,1.20
+alex,cloned,react_crash,react_crash_is_anybody_hurt,Is anybody hurt?,1.71
+alex,cloned,react_crash,react_crash_somebody_call_an_ambulance,Somebody call an ambulance!,2.41
+alex,cloned,react_crash,react_crash_that_s_gonna_leave_a_mark,That's gonna leave a mark.,1.41
+alex,cloned,react_crash,react_crash_jesus,Jesus!,1.02
+alex,cloned,react_loud,react_loud_what_was_that,What was that?,1.48
+alex,cloned,react_loud,react_loud_whoa_what,"Whoa, what?",1.77
+alex,cloned,react_loud,react_loud_that_scared_me,That scared me.,1.50
+alex,cloned,react_loud,react_loud_man_that_was_loud,"Man, that was loud.",2.44
+alex,cloned,react_loud,react_loud_seriously_what_was_that,"Seriously, what was that?",2.13
+alex,cloned,react_music,react_music_oh_i_like_this,"Oh, I like this.",1.73
+alex,cloned,react_music,react_music_turn_it_down,Turn it down!,1.31
+alex,cloned,react_music,react_music_somebody_s_having_a_party,Somebody's having a party.,2.27
+alex,cloned,ask_directions,ask_directions_excuse_me_do_you_know_where_the_bus_stop,"Excuse me, do you know where the bus stop is?",3.01
+alex,cloned,ask_directions,ask_directions_is_there_a_pharmacy_around_here,Is there a pharmacy around here?,2.41
+alex,cloned,ask_directions,ask_directions_sorry_which_way_is_downtown,"Sorry, which way is downtown?",2.05
+alex,cloned,ask_directions,ask_directions_do_you_know_if_there_s_a_bathroom_near_h,Do you know if there's a bathroom near here?,2.73
+alex,cloned,ask_directions,ask_directions_is_it_far_to_walk,Is it far to walk?,1.77
+alex,cloned,ask_directions,ask_directions_am_i_going_the_right_way,Am I going the right way?,1.62
+alex,cloned,ask_directions,ask_directions_is_the_station_this_way,Is the station this way?,1.80
+alex,cloned,ask_directions,ask_directions_any_good_place_to_eat_around_here,Any good place to eat around here?,2.25
+alex,cloned,ask_directions,ask_directions_do_you_know_this_area,Do you know this area?,1.95
+alex,cloned,give_directions,give_directions_keep_going_straight_you_can_t_miss_it,"Keep going straight, you can't miss it.",2.50
+alex,cloned,give_directions,give_directions_it_s_a_couple_of_blocks_that_way,It's a couple of blocks that way.,2.42
+alex,cloned,give_directions,give_directions_take_a_left_at_the_lights,Take a left at the lights.,1.66
+alex,cloned,give_directions,give_directions_take_a_right_at_the_corner,Take a right at the corner.,1.73
+alex,cloned,give_directions,give_directions_it_s_just_across_the_street,It's just across the street.,2.16
+alex,cloned,give_directions,give_directions_other_way_i_m_afraid,"Other way, I'm afraid.",1.69
+alex,cloned,give_directions,give_directions_about_a_ten_minute_walk,About a ten minute walk.,1.83
+alex,cloned,give_directions,give_directions_follow_this_road_it_s_on_your_right,"Follow this road, it's on your right.",2.60
+alex,cloned,give_directions,give_directions_sorry_i_m_not_from_around_here,"Sorry, I'm not from around here.",2.48
+alex,cloned,give_directions,give_directions_no_idea_sorry,"No idea, sorry.",1.61
+alex,cloned,give_directions,give_directions_go_past_the_lights_then_ask_again,"Go past the lights, then ask again.",2.91
+alex,cloned,give_directions,give_directions_it_s_right_behind_you,It's right behind you.,1.78
+alex,cloned,smalltalk_open,smalltalk_open_crazy_weather_lately_huh,"Crazy weather lately, huh?",2.24
+alex,cloned,smalltalk_open,smalltalk_open_busy_today,Busy today.,1.42
+alex,cloned,smalltalk_open,smalltalk_open_you_from_around_here,You from around here?,1.61
+alex,cloned,smalltalk_open,smalltalk_open_nice_dog,Nice dog.,1.08
+alex,cloned,smalltalk_open,smalltalk_open_love_your_jacket,Love your jacket.,1.54
+alex,cloned,smalltalk_open,smalltalk_open_been_waiting_long,Been waiting long?,1.41
+alex,cloned,smalltalk_open,smalltalk_open_is_this_line_for_the_bus,Is this line for the bus?,2.11
+alex,cloned,smalltalk_open,smalltalk_open_they_ever_fix_that_light,They ever fix that light?,3.35
+alex,cloned,smalltalk_open,smalltalk_open_seems_quiet_today,Seems quiet today.,1.65
+alex,cloned,smalltalk_open,smalltalk_open_some_day_huh,"Some day, huh?",1.39
+alex,cloned,smalltalk_reply,smalltalk_reply_tell_me_about_it,Tell me about it.,1.37
+alex,cloned,smalltalk_reply,smalltalk_reply_you_re_telling_me,You're telling me.,1.46
+alex,cloned,smalltalk_reply,smalltalk_reply_yeah_it_s_something,"Yeah, it's something.",1.20
+alex,cloned,smalltalk_reply,smalltalk_reply_oh_thanks,"Oh, thanks!",1.54
+alex,cloned,smalltalk_reply,smalltalk_reply_not_too_long,Not too long.,1.12
+alex,cloned,smalltalk_reply,smalltalk_reply_born_and_raised,Born and raised.,1.60
+alex,cloned,smalltalk_reply,smalltalk_reply_i_wish,I wish.,1.22
+alex,cloned,smalltalk_reply,smalltalk_reply_don_t_get_me_started,Don't get me started.,1.51
+alex,cloned,smalltalk_reply,smalltalk_reply_heh_yeah_right,"Heh. Yeah, right.",2.42
+alex,cloned,smalltalk_reply,smalltalk_reply_can_t_argue_with_that,Can't argue with that.,1.61
+alex,cloned,smalltalk_reply,smalltalk_reply_could_be,Could be.,0.95
+alex,cloned,body,body_excuse_me_sorry,"Excuse me, sorry.",1.73
+alex,cloned,body,body_bless_you,Bless you.,0.89
+alex,cloned,body,body_oh_thank_you,"Oh, thank you.",1.22
+alex,cloned,body,body_wrong_pipe_sorry,"Wrong pipe, sorry.",1.84
+alex,cloned,body,body_gesundheit,Gesundheit.,1.57
+alex,cloned,body,body_allergies,Allergies.,1.40
+alex,cloned,body,body_ow_my_back,"Ow, my back.",1.73
+alex,cloned,body,body_oof,Oof.,0.66
+alex,cloned,body,body_oh_my_knees,"Oh, my knees.",2.00
+alex,cloned,body,body_man_i_m_out_of_shape,"Man, I'm out of shape.",2.05
+alex,cloned,call_pet,call_pet_here_boy,"Here, boy!",1.29
+alex,cloned,call_pet,call_pet_come_here_girl,"Come here, girl!",1.28
+alex,cloned,call_pet,call_pet_come_on_buddy,"Come on, buddy!",1.43
+alex,cloned,call_pet,call_pet_leave_it,Leave it!,1.16
+alex,cloned,call_pet,call_pet_drop_it_drop_it,Drop it. Drop it!,2.27
+alex,cloned,call_pet,call_pet_good_dog,Good dog.,1.73
+alex,cloned,call_pet,call_pet_no_bad_dog,No! Bad dog.,1.29
+alex,cloned,call_pet,call_pet_sit_stay,Sit. Stay.,2.10
+alex,cloned,call_pet,call_pet_who_s_a_good_boy,Who's a good boy?,1.46
+alex,cloned,call_pet,call_pet_heel,Heel.,1.23
+alex,cloned,call_pet,call_pet_kitty_kitty_kitty,"Kitty, kitty, kitty.",2.39
+alex,cloned,call_pet,call_pet_don_t_eat_that,Don't eat that!,1.50
+alex,cloned,exclaim,exclaim_oh_wow,Oh wow.,1.18
+alex,cloned,exclaim,exclaim_no_kidding,No kidding.,1.27
+alex,cloned,exclaim,exclaim_huh,Huh.,0.59
+alex,cloned,exclaim,exclaim_weird,Weird.,1.09
+alex,cloned,exclaim,exclaim_nice,Nice!,1.20
+alex,cloned,exclaim,exclaim_oh_come_on,"Oh, come on.",1.35
+alex,cloned,exclaim,exclaim_yes,Yes!,0.63
+alex,cloned,exclaim,exclaim_damn,Damn.,0.84
+alex,cloned,exclaim,exclaim_oh_no_no_no,"Oh, no no no.",1.52
+alex,cloned,exclaim,exclaim_ugh,Ugh.,1.05
+alex,cloned,exclaim,exclaim_finally,Finally.,1.27
+alex,cloned,exclaim,exclaim_whatever,Whatever.,1.15
+alex,cloned,exclaim,exclaim_wait_what,"Wait, what?",1.56
+alex,cloned,exclaim,exclaim_hold_up,Hold up.,0.98
+alex,cloned,exclaim,exclaim_oh_boy,Oh boy.,1.42
+alex,cloned,exclaim,exclaim_you_re_kidding,You're kidding.,1.13
+alex,cloned,exclaim,exclaim_not_bad,Not bad.,1.53
+alex,cloned,exclaim,exclaim_seriously,Seriously.,1.16
+alex,cloned,exclaim,exclaim_ha,Ha!,1.03
+alex,cloned,exclaim,exclaim_wow,Wow.,1.38
+alex,cloned,waiting,waiting_come_on_change,"Come on, change.",1.18
+alex,cloned,waiting,waiting_any_minute_now,Any minute now.,1.41
+alex,cloned,waiting,waiting_this_is_taking_forever,This is taking forever.,2.03
+alex,cloned,waiting,waiting_is_it_even_coming,Is it even coming?,1.27
+alex,cloned,waiting,waiting_i_ve_been_standing_here_ages,I've been standing here ages.,2.23
+alex,cloned,waiting,waiting_where_is_everybody,Where is everybody?,1.60
+alex,cloned,waiting,waiting_should_ve_left_earlier,Should've left earlier.,1.58
+alex,cloned,waiting,waiting_okay_walk_sign,"Okay, walk sign.",1.79
+alex,cloned,waiting,waiting_here_it_comes,Here it comes.,1.05
+alex,cloned,ask_favour,ask_favour_got_the_time,Got the time?,1.96
+alex,cloned,ask_favour,ask_favour_do_you_have_a_light,Do you have a light?,1.49
+alex,cloned,ask_favour,ask_favour_mind_if_i_sit_here,Mind if I sit here?,2.10
+alex,cloned,ask_favour,ask_favour_can_you_hold_this_a_second,Can you hold this a second?,1.86
+alex,cloned,ask_favour,ask_favour_is_this_seat_taken,Is this seat taken?,1.80
+alex,cloned,ask_favour,ask_favour_could_you_watch_my_bag,Could you watch my bag?,1.81
+alex,cloned,ask_favour,ask_favour_do_you_know_what_time_it_is,Do you know what time it is?,1.71
+alex,cloned,refuse,refuse_sorry_can_t_help_you,"Sorry, can't help you.",2.05
+alex,cloned,refuse,refuse_not_today_sorry,"Not today, sorry.",2.05
+alex,cloned,refuse,refuse_no_thank_you,"No, thank you.",1.60
+alex,cloned,refuse,refuse_i_m_good,I'm good.,1.05
+alex,cloned,refuse,refuse_maybe_another_time,Maybe another time.,1.95
+alex,cloned,refuse,refuse_i_m_in_a_rush_sorry,"I'm in a rush, sorry.",2.32
 alec,cloned,story,story_1_toaster,"Here's something most people never think about. When you push down the lever on a toaster, it doesn't actually know when your toast is done. It's just running a timer, and it has no idea what's happening to the bread. That's why the same setting gives you perfect toast in the morning and charcoal an hour later. The toaster is already warm, so the bread browns faster, but the timer doesn't know that. Which, frankly, is a little bit silly.",23.18
 alec,cloned,story,story_2_dishwasher,"I want to talk about the little cup on the dishwasher door, the one that pops open halfway through the cycle. A lot of people don't realize there's a second, smaller spot right next to it, and it's there for a reason. That's for the pre-wash. If you leave it empty, the first part of the cycle is basically just splashing water around. Put a little detergent in there, and suddenly your dishwasher works a whole lot better. You're welcome.",20.62
 ben,cloned,story,story_1_groceries,"So I went to the grocery store this weekend, and I have to say, the prices are just, they're a lot. I picked up the same things I always get, right? Eggs, bread, coffee. Nothing crazy. And the total was about thirty percent higher than it was a couple of years ago. Now, you could argue, well, that's just inflation, and that's fair. But it does raise the question, where do we go from here? Because at some point, people are going to start buying less, right?",24.05

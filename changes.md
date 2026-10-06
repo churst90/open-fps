@@ -4,13 +4,288 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Door sounds are rendered once and kept. The client's door render cache is now named by the door
+  models' own fingerprint (`DoorModelFingerprint`, a hash of the door model sources listed in
+  OpenFPS.Common.csproj) instead of the whole OpenFPS.Common hash, so a change anywhere else no longer
+  throws the renders away and the next launch no longer spends a minute rendering them again. Linux
+  (`run-gtk-client.sh`) and the Windows zip (`publish-windows.sh`) both use it.
+- Wide sources (unheard). Trees, the fire pit, the fountain and the rain round you are heard from
+  several places across them, not from one point. Renders in inbox/wide-sources-2026-10-06, with a
+  README. Why: as one point through the HRTF both ears got the same noise (interaural correlation
+  0.9-1.0 in every band for a tree, a fire and a roof over the ear), which sounds narrow, inside the
+  head and harsh at the top (docs/AUDIO_QUALITY_2026-10-06.md item 8).
+  - A tree: the middle of its crown and one place per bough round it (seven). The fire pit: the
+    flames and three places round the bed. Each fountain tap: its middle and three places round
+    where its water lands. The roof over the ear in rain: four places round the point above you.
+    Each near rain quarter: two places 22.5 degrees either side of its middle.
+  - Each place is an independent stream of the one synth: every event (a leaf strike, a crackle, a
+    drop, a lump) goes to one place, and the continuous parts (the shedding off the twigs, the roar,
+    the fizz) have their own noise at each place. Never a copy, so nothing combs. A roof part or a
+    rain-quarter part renders its share of the patch's area with its own drops.
+  - The places' shares always sum to one, and one balance gain keeps them as loud as the source from
+    its middle under the mixer's own distance law. Tested at 1, 5 and 20 m (exact), and through the
+    game path from the voices' gains: within 0.5 dB.
+  - How much of a source its outer places carry follows the angle they fill from where you stand:
+    none under 2.5 degrees, all over 6, slewed over about 1.4 s. Merged sources let their outer
+    voices go.
+  - At most 36 outer place voices at once, nearest source first. Under mixer load they are the first
+    thing given up, six at a time, before a machine's front outlet; they come back last.
+  - A tree's boughs now stand round its crown (two-thirds of its radius, alternately a quarter of the
+    radius up and down) and read the wind there. They were a line along the wind.
+  - Measured (AudioLab `--wide-sources`, through the client, the mixer, the HRTF and the ear model;
+    `tools/interaural.py`, IACC per octave): a tree at 2 m went from 0.96 / 0.90 / 0.93 at 1 / 2 /
+    4 kHz to 0.24 / 0.11 / 0.32. Street rain at 2 kHz went from 0.55 to 0.08. A steel roof over the
+    ear went from 0.88 / 0.84 / 0.88 to 0.45 / 0.38 / 0.28. The fountain changes less (0.59 to 0.48
+    at 2 kHz at 2 m from the kerb): its five taps were already independent streams, and they sit
+    within 2.3 m of its middle.
+  - Cost: synthesis about the same for trees, fire and fountain (a tree 2.2 to 2.5 % of a core);
+    rain over a bus shelter 1.0 to 3.1 %, each near quarter 0.5 to 0.8 %. The HRTF is 0.08 % of a
+    core per voice; a second-order ambisonic field for the same seven streams costs more (0.9 %) and
+    would lose each place's own path, so each place is a voice.
+  - Traced echoes: a tree, a fire or a fountain takes at most two echo rigs, as a train does (the
+    fountain's five taps could take five).
+  - OPENFPS_WIDE_SOURCES=0 plays everything from one point; OPENFPS_PLACE_VOICES sets the budget.
+  - AudioLab `--wide-sources [set=measure|render|roofs|level|tree|cost] [wide=on|off]`, and
+    `tools/interaural.py files|segments|windows`.
+  - Open: the fountain's rim jets are heard from the rocks' taps, 2.3 m from its middle, though they
+    land near the kerb; a tree still has a floor of about 0.3 at 4-8 kHz with seven places; machines
+    with several radiators are still one point.
+- Alex, a homeless man, lives on the city (unheard). His voice is imported (629 lines, alex) and is
+  nobody else's: a voice with homeless_* lines is never handed to a walker, a driver, a pair or a
+  phone call.
+- His places are found from the map: the two bus shelters on Main Street, the pavement outside each
+  front entrance (the five towers and the terminal), the lobbies behind the towers' doors (the
+  stairwell on the ground floor), Market Square and Elm Park. There are no shops on the city yet;
+  a street door named as a shop's entrance would become one of his places by itself.
+- He stays at each for minutes (3-10 by day; a lobby 8-20 at night, in the cold or the wet) and
+  walks to the next along the pavements, round shelters and anything else standing on them, crossing
+  at corners. At night and in the cold or rain he mostly goes to a lobby; by day to the bus stops,
+  doorways and the square. A tower's front door is locked from the street: he waits at it until
+  somebody opens it, and after 45 s somebody inside lets him in. From a bus stop he sometimes waits
+  for the bus, gets on, rides and gets off at the other stop. His day is seeded by map, name and game
+  day.
+- What he says follows Cody's table: asks (money, smokes, food, weed, drugs, and somewhere to sleep at
+  night or in the cold) when a player or passer-by comes within 4.5 m; thanks after /hand; something
+  bitter when you walk past his ask; angry when bumped or crowded and now and then at nothing; cops
+  when a police car is within 30 m; cars when a car passes within 5 m or honks; ride when a car stops
+  beside him with somebody at it or in it; mutter or shelter lines to himself every minute or two; a
+  story to a player who stands with him ten seconds. Never two lines at once, 3 s after each line
+  (15 s walking), each player asked once in two minutes, passers-by at most one every 30-60 s. Lines
+  that name the hour or the weather only when true. Passers-by he asks sometimes say no.
+- /hand [thing] (or /offer) gives what you hold to the person beside you who will take it. /where alex
+  says where he is (x y height, for /tp) and what he is doing. The scope, a body and a hit call him by
+  name (IdentityComponent.Named, appended: a new Windows zip is needed).
+- A person who is not a player can sit in a seat (Alex on the bus): carried by OccupancySystem, and
+  no footsteps (RidingEntityId for anyone in a seat).
+- OPENFPS_GAME_HOUR and OPENFPS_TIME_MULTIPLIER set the server clock; OPENFPS_CHARACTER_PACE speeds
+  his day up for testing.
+
+- Rain round 2 (unheard). Renders in inbox/textures-round2-rain-2026-10-06, with a README.
+- Rain no longer crunches. A drop's click on a road, a roof or the ground rises smoothly instead of as
+  a one-sample spike, and its top end is the spray of its splash (2.5-14 kHz noise following every
+  drop, 15 % of its impact energy). Near drops share it. Inside 10 ms the street's 4-16 kHz band now
+  reads 3.0-3.3 (kurtosis), as recorded rain does (3.0-4.4); round 1 read 8-10. Levels and envelope
+  statistics unchanged.
+- Rain on a roof over you follows the rate again. The near drops (the loudest twenty-odd a second,
+  played one by one) are placed in the loudness frame of the rain they belong to, not by their own
+  peaks: under a steel shelter they had sat within 2 dB of the roof's drumming at every rate, so heavy
+  rain sounded like light. Now 8 dB under at light rain, 10-12 dB under at heavy.
+- tools/texture_stats.py `wave` and TextureStatistics.Waveform measure the 10 ms waveform; AudioLab
+  `--textures wave`; `--rain ... near=off|only`.
+- Open: in a car at moderate rain the 10 ms kurtosis is 4.5, just over the recordings; sleet and hail
+  stay sharp ticks (Hertz contact of 10-40 µs; no recording to compare).
+- The ear model (unheard; docs/EAR_MODEL.md). Sounds are placed by how loud they are to the ear,
+  not by their level in decibels: loudness by ISO 532-1 (Zwicker), from each sound's own spectrum,
+  measured from the sound itself (a recording from its samples the first time it plays, a live voice
+  from its own output, an engine from what it is making now). The law is the same (/levels 45 %, the
+  same pivot): a sound is turned into the speech line just as loud, the old law places the line, and
+  the sound plays as loud as it. Speech is placed exactly as before. A recording's real level is its
+  declared level plus where it sits in its buffer (its 125 ms gated RMS), so a click counts as the
+  ear hears it, not by its peak.
+- The idle lift is that law: an idling engine is mostly bass, so it is lifted more, and the 20 dB cap
+  is gone (kept only with the model off). The lift's level estimate starts from the first block it
+  hears, and below the threshold of hearing the lift holds.
+- Every world voice keeps its tone at the level it plays at: two shelves (200 Hz, 10 kHz) fitted to
+  the ISO 226:2023 contour difference between the level it really has at your ears and the level it
+  plays at, held to the standard's 20-90 phon, moving at most 6 dB a second. First in the voice's
+  chain, so its reverb send gets it too. The wind at your ears as well.
+- Measured in the game's output (inbox/ear-model-2026-10-06): speech, footsteps, the fountain and the
+  air conditioner within about 1 dB; the idling police car 10 dB louder, the idling diesel pickup 6,
+  the hatchback 1 to 2; cars passing slowly 1.5 to 3 dB louder with more bass; thunder at 3 km 2
+  with more rumble; rain 3; the door 2.6 dB quieter with more bass. The wind at your ears is lifted
+  most: +17 dB in a light breeze, +13 at 4.5 m/s, +8 at 7. From the log: bird calls about 8 dB quieter, near rain
+  drops about 12 louder, beacons (sine blips) an estimated 7 to 9 louder.
+- `/listening` tells the game how loud your headphones are: a person talks from one step in front;
+  Up and Down until they sound like a normal voice at arm's length; Enter saves (client.json,
+  ListeningLevelDb, default 62.35 dB: that voice as loud as life). `/listening 58` sets it directly.
+  It changes no volume, only the tone given back. `/ear off|on` switches the whole model for an A/B;
+  OPENFPS_EAR_MODEL=0 starts with it off. An `[EAR]` line in the log every 10 s gives the listening
+  level and the loudest voices' real and played levels, gain and shelves.
+- The voice budget ranks a voice by its loudness once its spectrum is known.
+- AudioLab `--game-levels`: `ear=on|off`, `listening=`, `set=ear` (the sources above, thunder at
+  3 km, moderate rain), `set=wind`. `tools/ear_loudness.py`: an independent ISO 532-1 port (annex B.2,
+  83.296 sone) and the before/after comparison of two captures.
+
+- Texture round 1: the fountain, rain, trees and fire refitted on the statistics listeners recognise
+  a texture by (unheard). Renders in inbox/textures-round1-2026-10-06, with a README and a table.
+- The Elm Park fountain is bigger and has rocks: an 11 m basin (was 8), a 2.8 m bowl with a 2 m jet,
+  eight boulders round the pedestal that the bowl's overflow falls onto and runs off, and twelve rim
+  jets. Rebuilt in tools/gen_city.py; city.json regenerated. The rocks are a new prefab, rock_boulder,
+  material Concrete (there is no Stone material).
+- The fountain is heard from five places, each its own voice: the bowl and the four sides of the
+  rocks. One synth per fountain feeds all five (WaterFeatureVoice), as one synth feeds a train's
+  bogies. Map emitters are "water:park_fountain/elm_park/0..4" (prefabs elm_fountain_water_0..4).
+  Each is placed by the whole fountain's level, so together they are as loud as one voice would be.
+  A plain "water:park_fountain" still plays the whole fountain from one point.
+- Fountain sound: every lump of water that hits the pool or the stone throws a 2-4 ms splash of
+  spray in its own band, as loud as the lump is big. Lumps are of all sizes. A lump's bubbles come in
+  a burst as its crater closes. Water on stone traps no bubbles and splashes harder. A drop's click
+  into the pool is 13.5 dB quieter; its click on a hard surface is unchanged, so rain on streets and
+  roofs keeps its level. Fountain level 75 dB at a metre (was 72; it moves 3.9 L/s, was 2.6).
+- Rain arrives in swells over seconds (clustered drop counts), the same for every patch round the
+  listener and for the near drops.
+- Trees: each leaf strike and each twig episode is driven by a heavy-tailed small-scale gust, not
+  the mean wind alone, so hard knocks stand out of the rustle. Park tree headroom 22 dB (was 20).
+- Fire: a steady fizz of gas through the char under the crackles; before, the fire was silent
+  between crackles above 2 kHz.
+- Statistics: tools/texture_stats.py, and its C# twin TextureStatistics (AudioLab `--textures stats`,
+  `compare`, `render`). Tests hold the fountain, street rain, a tree in a steady wind and the fire
+  inside the spread of the reference recordings.
+- RainSpike writes float WAVs.
+- Open: a tree in the game's wind field is still gustier than every recording over 20 s; the fire's
+  4-16 Hz movement is a little under the recordings'; fountain renders cost 7.6 % of a core (was
+  4.7 %).
+- New master limiter (unheard). It looks 2 ms ahead, measures true peak (ITU-R BS.1770-4, 4x
+  oversampled), puts both ears at one gain, and limits to -1 dBTP.
+  - The attack is smooth and spans the look-ahead. The release depends on what is playing: about
+    130 ms after a single shot, about 1 s after a 2 s roll.
+  - FMOD's limiter had no look-ahead and clipped the leading edge of shots and thunder flat at
+    -2 dBFS. Its peaks between samples reached +0.02 dBTP. A 50 Hz tone pushed over it had THD+N of
+    -26 dB; it is now -146 dB.
+  - The makeup gain is unchanged. The mix is 2.1 ms later (101-102 samples).
+  - OPENFPS_LIMITER=fmod puts the old limiter back. Renders are in
+    inbox/limiter-48k-2026-10-06 (README there).
+- The mixer runs at 48 kHz, which is what PipeWire, the devices and the renders already run at.
+  FMOD's stream reaches PipeWire as s16le 48000 Hz, so PipeWire no longer resamples it.
+  OPENFPS_MIXER_RATE=44100 goes back.
+- Everything that read 44100 now reads the mixer's rate:
+  - Steam Audio's HRTF, voices, traced reverb, traced echoes, late field and simulator.
+  - The tail's filters and velvet taps.
+  - Band shares, the ambisonic bed, the synth and granular processors.
+  - UI and scope sounds. The scope's held note is still 661.5 Hz.
+  - Engine benches and the lab spikes that use them.
+- Per-sample constants chosen at 44.1 kHz now keep their time or frequency at any rate (At44k):
+  tyre and squeal smoothing, the shift chirp, echo glides, air valves, rail clank and squeal, horn
+  and whistle jitter, the engine's knock and pink noise, and the own-voice fades.
+- One-shots carry the rate they were made at to registration. A door rendered before the mixer
+  started can no longer play at the wrong pitch.
+- A traced stage or echo rig traced at another rate than the mixer's is refused, with a log line,
+  instead of playing time-scaled.
+- Engine voices cost 7-12 % more CPU per second of audio, as expected. Mixer DSP on a street scene
+  went from 2.9 % to 3.2 %.
+- Tests: MasterLimiterTests and MixerRateTests. MixerRateTests checks for no 44100 default anywhere,
+  and the same engine order, siren sweep and horn note at either rate. AudioLab `--quality limiter`,
+  `scene=gunfire` and `scene=thunder km=`; `audio_quality.py limiter` and `flattops`.
+- Doors on the Linux client make their sound the first time. `run-gtk-client.sh` now renders every
+  door sound the client makes at start into the player's render cache for the build, as the Windows
+  zip ships them, once per build (about 80 s on all cores; a build that has them skips it). The cache
+  is named by the build, so it started empty whenever OpenFPS.Common changed, and a door opened
+  before its render was ready was silent.
+- Audio quality: what makes the synthesis sound grainy or static, measured (unheard). Report in
+  docs/AUDIO_QUALITY_2026-10-06.md, renders in inbox/audio-quality-2026-10-06.
+- The biggest cause is not fixed here: the fountain, trees and rain are tens of thousands of small
+  events a second, and their 4-16 kHz bands measure like Gaussian noise. Recordings move 1.5 to 5
+  times as much there. The report recommends refitting the models on band-envelope statistics.
+- FMOD's resampler is now spline instead of linear. It runs on every moving voice (Doppler) and on
+  every buffer not at 44.1 kHz. OPENFPS_RESAMPLER=linear|cubic|spline overrides it.
+- Synthesised one-shots (doors, guns, claps, speech) are kept in float, not truncated 16-bit, and
+  are brought to the mixer's rate on their render thread by a band-limited resampler. Thunder is
+  too. UI sounds, beacons and driving aids are float.
+- A car's reflection no longer skips 23 ms of sound whenever its channel's pitch makes FMOD take an
+  extra block. The front of a passing car no longer steps at nearly every block. Both read on a
+  continuous clock at the car's channel rate.
+- Smoothed per-block steps: the binaural stage's spatial blend, a traced echo's input gain, and the
+  ear wind's knee and buffeting rate.
+- Triangular dither on the master, because FMOD hands PulseAudio 16-bit audio. Off for the lab's
+  WAV writer, whose files are read for exact silence; OPENFPS_DITHER=0 or 1 overrides.
+- The boundary reflections run at the mixer's rate, not the sound card's (9 % off on 48 kHz
+  devices).
+- The "Mix loudness" log line's peak is the peak since the last line. It was the peak since start,
+  so it read -0.0 dBFS all session.
+- AudioLab `--quality` (resampler, orbit, echo, ceiling, quant, lsb, output, thunderfile, scenes)
+  and tools/audio_quality.py measure all of this. MasterTap can capture float
+  (OPENFPS_AUDIO_CAPTURE_FLOAT=1) and before the limiter (OPENFPS_AUDIO_CAPTURE_PRE).
+- The thunder lab's files are upsampled band-limited.
+- A granular read past the end of its buffer is clamped.
+- Weather can be set as what falls, how hard and how big. `/weather rain` takes a class (drizzle,
+  light, moderate, heavy, extreme), a rate (`/weather rain 12`), a radar reading
+  (`/weather rain 45 dBZ`) or a drop size (`/weather rain heavy drops 3 mm`); `/weather drizzle`,
+  `/weather freezing rain`, `/weather sleet`, `/weather snow` (light, moderate or heavy) and
+  `/weather hail` with a size (pea, marble, penny, quarter, golf, tennis, baseball, softball, or
+  millimetres) set the other kinds. The reply says it back with its colour on the radar: "Rain,
+  heavy, 25 millimetres an hour, drops 1.8 millimetres, orange on the radar." Drizzle is pale green,
+  light green, moderate yellow, heavy orange, extreme red, hail purple, snow blue. The drops are a
+  gamma spectrum of the given median size carrying the rate; a radar reading gives the rate by the
+  WSR-88D's Z-R and the median that has that reflectivity. Restart the server: the world state
+  message has three new fields (the kind, the drop size, the hail size), after the rate.
+- Snow is all but silent on the street and a faint thump on a sheet roof. Sleet is ice pellets:
+  hard ticks that bounce, louder than rain of the same water. Freezing rain sounds like rain. Hail is
+  ice spheres falling at their own speed (about 12 times the square root of the size in cm, m/s),
+  struck for the Hertz contact time against what they land on, and bouncing off hard ground; a
+  sheet roof takes at most half of a stone's energy. Golf-ball hail runs the master limiter 20 dB
+  down, as gunfire does.
+- Near drops are played one by one. Within 2.5 m, and on your own head and shoulders under the open
+  sky, the loudest drops are taken out of the rain's patches and each played where it lands, about
+  12 a second in all: more than that, the lab's `--rain resolve` found, are no longer heard as
+  separate impacts. On a car roof beside you, under a shelter's sheet, or in hail, they are every
+  ping and every stone.
+- Sitting in a car in the rain, the roof, windscreen and rear glass drum over your head through the
+  headliner, and the street comes in through the car's shell. Side windows take no rain until wind
+  drives it onto them, which is not modelled yet.
+- Renders of rain at every class, two drop sizes, a radar reading, freezing rain, sleet, snow and
+  three sizes of hail, on the street, in a park, under the bus shelter, beside and inside a parked
+  car, under a tree and by a pond, at the level the game plays them (through the master limiter),
+  are in inbox/rain-round3-2026-10-06 with a README.
+
 - The tests run on GitHub (`.github/workflows/tests.yml`): every push to main and every pull request,
   or by hand from the Actions tab. Eight runners each take an eighth of the test classes
   (`tools/ci/shard_tests.py`); results are kept for two weeks as artifacts. No FMOD or Steam Audio
-  is needed: no test loads the native audio engine.
+  is needed: no test loads the native audio engine. GitHub builds in Release (the audio tests
+  synthesise seconds of sound), and skips the six tests marked `Category=Timing`, which hold this
+  machine's speed or real time; run those here with `dotnet test OpenFPS.Tests --filter Category=Timing`.
 
 ## 2026-10-05
 
+- Rain can be heard. Nothing played before; now the drops are synthesised on whatever they land on
+  round you: a road clicks, grass is softer and lower, a pond adds the small ringing bubbles, a sheet
+  metal roof over you drums, a car beside you rings on its steel and glass, a tree patters and drips
+  big drops onto the ground under it. It comes from where the surfaces are: a near and a far patch in
+  each compass direction, and the roof over your head as its own voice. Indoors under a concrete roof
+  the roof is silent and the street is heard through the walls and windows (with a window shut it is
+  barely audible; an open one lets it in). The bus shelter's glass ends shade the street behind them,
+  and you hear round their edges. How hard it rains is the server's precipitation turned into a rain
+  rate: light (about 1.5 mm/h), moderate (Rain front, about 7), heavy, and violent (Storm, 60). It
+  builds up and dies away over a minute as the weather changes; snow makes no rain sound. To try it:
+  `/weather rain` or `/weather storm`, or a rate: `/weather rain light`, `moderate`, `heavy`,
+  `violent`, or a number of millimetres an hour (`/weather rain 12`). Rain set by hand stays rain
+  whatever the season. Then stand on Main Street, under the bus shelter on Main Street (x 8, y -60 in
+  player coordinates), in Elm Park under a tree, and indoors on a top floor. Restart the server: the
+  world state message has a new field. Moderate rain on an open street plays at about the level of
+  a window air conditioner three metres away. Renders of each case at four rates, at the level the
+  game plays them, are in inbox/rain-2026-10-05 with a README. Not done yet: rain blown onto
+  walls and windows by the wind (with no wind a vertical pane takes no drops, so there is no tapping
+  on glass), gutters, downpipes and run-off, and wet tyre noise.
+- The bus shelters' roofs are a 0.7 mm steel sheet (new prefab metal_roof) instead of a 10 cm steel
+  box. As a box they were a slab to anything that asked, so the rain on them was silent; the sheet
+  also lets a little more of the street through from above, as a real canopy does.
+- Rain on hard and soft ground is darker and smoother than in the first renders: each drop's click
+  now lasts as long as its water takes to spread on the ground, not just the time it takes to stop,
+  and its first contact is not a single-sample spike. Measured against recordings of rain on streets,
+  in a garden and in a wood, the street is now within a few dB in every octave and no grainier.
+- `--rain` in the AudioLab: `levels`, `render out=DIR` (at the game's level), `live` (through the
+  real provider, against an air conditioner, a fountain and a tree), `physics` (drop counts, the
+  kinetic energy against van Dijk 2002, the plate law for roofs and glazing), `survey map=city
+  ear=x,y,z` for a real place, and `compare=FILE.wav` for a recording.
 - Two maps of real places, made from open data: "magnolia tx" (magnolia_tx), a 3 km square south
   of Magnolia, Texas, starting on the drive of 31907 Bobcat Lane, and "albany or" (albany_or), a
   3 km square of southwest Albany, Oregon, starting in front of 1042 Belmont Avenue Southwest.
@@ -40,7 +315,20 @@ Recent work, newest first. `git log` has the rest.
   now), and the road network checks its junctions once per road. Same answers as before.
 - New prefabs: siding_wall (timber-framed wall in lap siding), shingle_roof (asphalt shingles on a
   deck) and gravel_floor.
-
+- A car close enough to be heard as two voices (its tailpipe and its front) now has each end placed
+  as a point. Both voices were also spread over the 3.3 m between the ends, so the car stopped
+  getting louder inside 3.3 m: 4 dB short 2 m behind a hatchback, 9 dB short at 1 m. Measured in the
+  game's output: +4.5 dB 1 m behind a hatchback, +5.1 dB behind the police car, +1.6 to +2.2 dB at
+  2 m; nothing changes beyond 3.3 m.
+- AudioLab `--game-levels` plays one thing at a time through the real client audio (the client's
+  audio system, the voice budget, the placement, the idle lift, the HRTF and the master) and
+  captures the output: cars idling and passing, your footsteps, a passer-by's speech, the fountain,
+  an air conditioner, a door, the wind at the ears. `spectra` measures how much of each engine is
+  bass, idling and at full load. `tools/game_levels.py` measures a capture (RMS, peak, LUFS, dB(A),
+  an equal-loudness view, the share below 100 Hz, gaps). Results and renders in
+  inbox/idle-loudness-2026-10-05. Found: idling cars are 4 to 12 dB(A) under where the loudness law
+  means them, because the law and the idle lift count an idling engine's bass, which is most of it
+  and barely heard. Not changed; the README gives Cody the numbers for a decision.
 - The front of a car is no longer silent. The engine's own noise (valve ticking, diesel clatter, the
   belt, the turbo, the intake) leaves only through the engine bay, and every car let out a flat 0.15
   of it, so an idling hatchback was louder behind than in front. The bay is now its openings (grille,

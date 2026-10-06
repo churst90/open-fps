@@ -28,7 +28,8 @@ Sections 1 to 7 are that session's record. The section below says what the map i
   Exit doors and front entrances swing out. Before this, half the flats' doors swung into the corridor
   and every entrance swung in.
 - **Elm Park.** The open ground north of the estate, x −400..−250, north 162..292. A lawn, asphalt
-  paths, a fountain in a brick square at `-325 227` (`water_fountain` over a `water_surface` pool), and
+  paths, a fountain in a brick square at `-325 227` (an 11 m `water_surface` pool, a bowl on a pedestal,
+  `rock_boulder` rocks round its foot, and five `elm_fountain_water_*` taps where the water lands), and
   fourteen trees (`tree_crown` in a `foliage_hedge` crown). Path in from the end of Sycamore Lane.
 - **58 Alder Street.** The house nearest the park's south side. Its back garden is fenced in timber
   (`fence_timber`) with a gate at `-330 148.8`, and a brick fire pit with a fire going at `-321 142.8`.

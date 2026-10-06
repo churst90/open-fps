@@ -55,6 +55,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// at 12 m/s), so the declared squeal level means what it meant.</summary>
     private const float SquealReferenceSpeed = 12f;
     private float _tyreChirp;
+    private float _chirpDecay = 0.99985f;   // a sample at 44.1 kHz: 150 ms
     private int _tyreGear;
 
     /// <summary>Road speed the world says the vehicle is doing, m/s. Game thread writes.</summary>
@@ -185,7 +186,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// coherent signal had (0.6 at each end, summed in phase: 1.2, so 0.6 x root 2 each). The squeal
     /// is still quoted against this; the rolling noise is anchored through it.</summary>
     private const float PerAxle = 0.6f * 1.41421356f;
-    public float SampleRate = 44100f;
+    public float SampleRate = MixerQuality.MixerRate;
 
     private float _speedSmooth;
 
@@ -241,6 +242,21 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
     /// <summary>Samples the mixer has taken — the position of "now" for anything reading back.</summary>
     public long Played => Volatile.Read(ref _played);
+
+    /// <summary>
+    /// How fast the mixer takes this voice, relative to the mixer's own rate: its channel's pitch,
+    /// which is its Doppler. The provider sets it whenever it pitches the channel.
+    ///
+    /// <see cref="Played"/> does NOT move at this rate, it moves in whole blocks. FMOD resamples a
+    /// pitched DSP channel by calling the DSP more or fewer times per mixer block, 1024 samples each
+    /// time (measured: a car closing at 60 km/h was called 4.9 % more often, never with a different
+    /// length). So a reader that sits a fixed distance behind Played jumps a whole block, 23 ms of
+    /// waveform, every time the source gets an extra call or misses one — about twice a second for a
+    /// car passing at 60 km/h, more for its front voice. Readers that must stay in step with this
+    /// voice keep a continuous clock that runs at this rate and leans only slowly on Played
+    /// (<see cref="SourceClock"/>).
+    /// </summary>
+    public volatile float ConsumeRate = 1f;
 
     /// <summary>How far ahead the producer is, in samples.</summary>
     public long Lead => Volatile.Read(ref _written) - Volatile.Read(ref _played);
@@ -503,6 +519,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         Vehicle = v;
         PascalsAtFullScale = v.PascalsAtFullScale;
         SampleRate = sampleRate;
+        _chirpDecay = OpenFPS.Client.AudioEngine.Core.At44k.Decay(0.99985f, sampleRate);
         Engine = new EngineSynth(v.Engine, sampleRate, seed);
         Driveline = new Driveline(v);
         Driver = new VirtualDriver(Driveline, Engine);
@@ -777,16 +794,67 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     public float LiftNow => _levelGain;
     private double _levelMs;
     private float _levelGain = 1f;
-    private const float LevelSeconds = 0.5f, MaxLiftDb = 20f;
+    private const float LevelSeconds = 0.5f;
+    /// <summary>The unweighted lift's cap, which only the ear model switched off still uses (see
+    /// <see cref="LiftDb(float, float)"/>). With the model on there is no cap: see the three-argument form.</summary>
+    private const float UnweightedMaxLiftDb = 20f;
 
-    /// <summary>How far to lift a voice running at <paramref name="runningDb"/> that is placed as a
-    /// source of <paramref name="declaredDb"/>, so it is heard as the law places a source of the level
-    /// it is actually running at. See Synthesize.</summary>
+    /// <summary>
+    /// The lift as it was before the ear model: the unweighted law applied to the deficit, held to
+    /// 0..20 dB. What runs with the model off (/ear off, OPENFPS_EAR_MODEL=0).
+    /// </summary>
     internal static float LiftDb(float runningDb, float declaredDb)
     {
         float running = MathF.Min(runningDb, declaredDb);
         float lift = Loudness.PlacedDb(running) - Loudness.PlacedDb(declaredDb) - (running - declaredDb);
-        return Math.Clamp(lift, 0f, MaxLiftDb);
+        return Math.Clamp(lift, 0f, UnweightedMaxLiftDb);
+    }
+
+    /// <summary>
+    /// How far to lift a voice placed as <paramref name="declaredDb"/> of the reference sound (the law's
+    /// placement of its declared level) that is actually running at <paramref name="runningDb"/> with
+    /// spectrum <paramref name="running"/>: so it is heard where the law, in loudness units, puts what
+    /// it is doing now, level and tone (docs/EAR_MODEL.md). An idling engine is mostly bass the ear
+    /// barely hears, and the unweighted law pulled it down for bass nobody hears.
+    ///
+    /// No cap: the 20 dB the unweighted lift was held to only bounded that law. Below the threshold of
+    /// hearing there is nothing to place, and the caller holds the lift where it was (NaN here).
+    /// </summary>
+    internal static float LiftDb(float runningDb, OpenFPS.Common.Hearing.Timbre? running, float declaredDb)
+    {
+        if (!OpenFPS.Common.Hearing.EarModel.Enabled) return LiftDb(runningDb, declaredDb);
+        var timbre = running ?? OpenFPS.Common.Hearing.Timbre.Speech;
+        if (timbre.Sones(runningDb) <= 0f) return float.NaN;
+        return Loudness.PlacedDb(runningDb, timbre) - Loudness.PlacedDb(declaredDb) - (runningDb - declaredDb);
+    }
+
+    // ── What the engine's own sound is made of, for the lift and the compensation ────────────
+    //
+    // Measured from `engineOnly` (the machine radiating, without the air brakes and the beeper and
+    // without the listener's angle to the pipe), on this voice's render thread: the shape of the
+    // spectrum, smoothed over about a second, analysed every quarter second.
+    private OpenFPS.Common.Hearing.LiveBands? _bands;
+    private readonly float[] _bandScratch = new float[1024];
+    private int _bandFill;
+    private OpenFPS.Common.Hearing.Timbre? _timbre, _liftTimbre;
+    private float _liftDb, _liftAtDb, _liftCompression;
+    private bool _liftKnown, _liftEar;
+
+    /// <summary>The spectrum the engine is making now (null until it has sounded).</summary>
+    public OpenFPS.Common.Hearing.Timbre? RunningTimbre => Volatile.Read(ref _timbre);
+
+    /// <summary>The level the machine is running at, dB SPL at a metre, smoothed over half a second.</summary>
+    public float RunningLevelDb => _levelMs > 0 ? 10f * MathF.Log10((float)_levelMs / (20e-6f * 20e-6f) + 1e-12f) : 0f;
+
+    /// <summary>The lift in force, dB: what the law in loudness units adds to this voice.</summary>
+    public float LiftDbNow => 20f * MathF.Log10(MathF.Max(1e-6f, _levelGain));
+
+    private void FlushBands()
+    {
+        if (_bandFill == 0) return;
+        _bands ??= new OpenFPS.Common.Hearing.LiveBands((int)SampleRate);
+        _bands.Write(new ReadOnlySpan<float>(_bandScratch, 0, _bandFill));
+        _bandFill = 0;
     }
 
     /// <summary>Pressure fraction through an open bus doorway: sqrt(2.4 m^2 / ~106 m^2) = 0.15.</summary>
@@ -1084,11 +1152,27 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         {
             float nowDb = 10f * MathF.Log10((float)_levelMs / (20e-6f * 20e-6f) + 1e-12f);
             // The voice is placed as a source of its DECLARED level; running below that, it should be
-            // heard as the law places a source of the level it is actually running at. The difference is
-            // the lift. Below the mix's ceiling that is (1 - compression) of the shortfall; above it
-            // the law is literal and the lift is nothing. A flat share there too would lift a loud car
-            // idling nearly nine decibels too far.
-            liftTarget = MathF.Pow(10f, LiftDb(nowDb, Vehicle.SourceLevelDb) / 20f);
+            // heard as the law places a source of the level it is actually running at, and of the
+            // spectrum it is actually making (an idle is mostly bass). The difference is the lift. Below
+            // the mix's ceiling that is about (1 - compression) of the shortfall in loudness; above it
+            // the law is literal. Worked out when the spectrum is re-measured or the level has moved,
+            // not every block: the level is a half-second average anyway.
+            if (_bands != null && _bands.Update(0.25f, 1.0f))
+                Volatile.Write(ref _timbre, OpenFPS.Common.Hearing.Timbre.FromBandPowers(_bands.BandPowers, "engine", live: true));
+            bool ear = OpenFPS.Common.Hearing.EarModel.Enabled;
+            float compression = Loudness.DynamicRangeCompression;
+            if (!_liftKnown || MathF.Abs(nowDb - _liftAtDb) > 0.25f || !ReferenceEquals(_liftTimbre, _timbre)
+                || ear != _liftEar || compression != _liftCompression)
+            {
+                float lift = LiftDb(nowDb, _timbre, Vehicle.SourceLevelDb);
+                // Silence has no place in the law: hold what the sound had while it could be heard.
+                if (!float.IsNaN(lift)) { _liftDb = lift; _liftKnown = true; }
+                _liftAtDb = nowDb;
+                _liftTimbre = _timbre;
+                _liftEar = ear;
+                _liftCompression = compression;
+            }
+            if (_liftKnown) liftTarget = MathF.Pow(10f, _liftDb / 20f);
         }
         // Either way: a floor on the step made a FALLING lift rise through the block and then snap down
         // to its target at the end of it, a step in the waveform every block while an engine revved.
@@ -1115,7 +1199,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                     _tyreChirp = MathF.Max(_tyreChirp, TyreFriction.ShiftChirp(from / to, Engine.Throttle));
             }
             _tyreGear = Driveline.Gear;
-            _tyreChirp *= 0.99985f;
+            _tyreChirp *= _chirpDecay;
             // Two axles, two tyre noises. They are different tyres on different patches of road, so
             // their noise is INDEPENDENT. One signal written to both ends would be the same roar
             // coming from two places a few metres apart, which combs against itself as the car goes
@@ -1259,6 +1343,11 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // part of it. Only the rear one is in `pa`, so the front one is added here.
             float engineOnly = pa - rearExtras + (_engineAtRear ? -fanOut : bayLevel) + frontTyre + (Engine.Exhaust - exhaustOut);
             blockSum += (double)engineOnly * engineOnly;
+            if (CompensateLevel)
+            {
+                _bandScratch[_bandFill++] = engineOnly;
+                if (_bandFill == _bandScratch.Length) FlushBands();
+            }
             tyreSum += (double)(rearTyre * rearTyre + frontTyre * frontTyre);
 
             // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.
@@ -1366,9 +1455,13 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             Ground.SetNear(_nearShare);
             _frontGround?.SetNear(_nearShare);
         }
+        FlushBands();
         float blockMs = (float)(blockSum / Math.Max(1, count));
         float a = 1f - MathF.Exp(-count / (LevelSeconds * SampleRate));
-        _levelMs += (blockMs - _levelMs) * a;
+        // From the first block it hears, not from zero: an average that starts at nothing reads a
+        // sounding engine as near silence for its first half second, and the lift chased that.
+        if (_levelMs <= 0 && blockMs > 0 && OpenFPS.Common.Hearing.EarModel.Enabled) _levelMs = blockMs;
+        else _levelMs += (blockMs - _levelMs) * a;
         if (envTarget <= 0f && _envelope <= 1e-4f) FadedOut = true;
     }
 }
@@ -1474,7 +1567,7 @@ public sealed class EngineEchoState : IGuardedUnit
     public volatile float TargetGain;
     private double _delay = -1;
     private float _gain;
-    public float SampleRate = 44100f;
+    public float SampleRate = MixerQuality.MixerRate;
     /// <summary>
     /// Floor on the echo's delay, as a MULTIPLE OF THE MIXER'S BLOCK, not as a time.
     ///
@@ -1560,7 +1653,17 @@ public sealed class EngineEchoState : IGuardedUnit
     /// it swells and dies over a few hundred milliseconds rather than switching. A borrowed voice
     /// keeps the old, fast rate: it is a car, and a car's level is the car's business.
     /// </summary>
-    private float GainSlew => Scattering >= 0f ? 1f / (0.18f * SampleRate) : 0.0015f;
+    private float GainSlew => Scattering >= 0f ? 1f / (0.18f * SampleRate) : _k.Gain;
+
+    /// <summary>The per-sample glides, chosen at 44.1 kHz, at this voice's rate (At44k): the gain's
+    /// (0.0015, 15 ms), the delay's (0.002, 11 ms) and the own cursor's pull (1e-5).</summary>
+    private (float Rate, float Gain, double Delay, double Pull) _k = (44100f, 0.0015f, 0.002, 1e-5);
+    private void Glides()
+    {
+        if (_k.Rate == SampleRate) return;
+        _k = (SampleRate, OpenFPS.Client.AudioEngine.Core.At44k.Step(0.0015f, SampleRate),
+              OpenFPS.Client.AudioEngine.Core.At44k.Step(0.002, SampleRate), OpenFPS.Client.AudioEngine.Core.At44k.Step(1e-5, SampleRate));
+    }
 
     public void Render(Span<float> mono)
     {
@@ -1568,6 +1671,7 @@ public sealed class EngineEchoState : IGuardedUnit
         // length means a short block (FMOD hands out partial ones) cannot shrink the margin.
         int slack = MinDelayBlocks * mono.Length;
         if (slack > _blockSlack) _blockSlack = slack;
+        Glides();
 
         double floorSamples = Math.Max(MinDelaySeconds * SampleRate, _blockSlack);
         double target = Math.Max(floorSamples, TargetDelaySeconds * SampleRate);
@@ -1577,21 +1681,28 @@ public sealed class EngineEchoState : IGuardedUnit
         if (OwnCursor) { RenderOwnCursor(mono, floorSamples, target, gTarget); return; }
         if (Scattering >= 0f && _diffuser == null) _diffuser = new EchoDiffuser(Scattering, Seed, SampleRate);
         float slew = GainSlew;
+        // The source's play position as a continuous clock, not Played itself: Played moves in whole
+        // blocks when the source's channel is pitched (EngineVoiceState.ConsumeRate), and an echo read
+        // a fixed distance behind it skipped or repeated 23 ms of the car at every extra call.
+        double rate = _clock.Begin(Source.Played, Source.ConsumeRate, mono.Length, SampleRate);
         // Slew: up to 12% per sample of drift, which covers the Doppler of a fast pass.
         for (int i = 0; i < mono.Length; i++)
         {
             double diff = target - _delay;
-            _delay += Math.Clamp(diff * 0.002, -0.12, 0.12);
+            _delay += Math.Clamp(diff * _k.Delay, -0.12, 0.12);
             _gain += (gTarget - _gain) * slew;
-            // Reading "back" from the source's current write position: the source rendered its
-            // block before or after this one; the minimum delay covers either order.
+            // Reading back from the source's play position: the source rendered its block before or
+            // after this one; the minimum delay covers either order.
             // Clamped to the slack as well as the target, so a delay that is being slewed downward
             // can never cross into the block the source may not have written yet.
-            double back = Math.Max(_delay, floorSamples) + (mono.Length - i);
-            float y = Source.ReadBack(back) * _gain;
+            double back = Math.Max(_delay, floorSamples) + mono.Length;
+            float y = Source.ReadAt(_clock.Position - back) * _gain;
+            _clock.Position += rate;
             mono[i] = _diffuser != null ? _diffuser.Process(y) : y;
         }
     }
+
+    private SourceClock _clock = SourceClock.Unset;
 
     /// <summary>
     /// The same audio, read at the rate it was synthesized.
@@ -1604,20 +1715,28 @@ public sealed class EngineEchoState : IGuardedUnit
     private void RenderOwnCursor(Span<float> mono, double floorSamples, double target, float gTarget)
     {
         long played = Source.Played;
-        double want = played - target;
+        // Where the source is, continuously (SourceClock): Played moves in whole blocks when the
+        // source's channel is pitched, and a cursor aimed at Played itself was pulled at that saw and
+        // clamped against it, a jump at the end of a block whenever the source missed a call. A block
+        // further back than the floor, too, so the saw's dips do not reach the ceiling below.
+        double rate = _clock.Begin(played, Source.ConsumeRate, mono.Length, SampleRate);
+        double where = _clock.Position;
+        double back = target + mono.Length;
         // Off the ring, or ahead of what the source has played at all: there is nothing to be
         // continuous with, so start again where we should be.
         if (_cursor < 0 || _cursor > played || played - _cursor > Source.RingLength - 4 * mono.Length)
-            _cursor = want;
+            _cursor = where - back;
 
         for (int i = 0; i < mono.Length; i++)
         {
-            _gain += (gTarget - _gain) * 0.0015f;
+            _gain += (gTarget - _gain) * _k.Gain;
             mono[i] = Source.ReadAt(_cursor) * _gain;
             // One sample per sample, plus an inaudible pull back toward where the cursor belongs.
-            double drift = (played - target) - _cursor;
-            _cursor += 1.0 + Math.Clamp(drift * 1e-5, -MaxRateCorrection, MaxRateCorrection);
+            double drift = (where - back) - _cursor;
+            _cursor += 1.0 + Math.Clamp(drift * _k.Pull, -MaxRateCorrection, MaxRateCorrection);
+            where += rate;
         }
+        _clock.Position = where;
         // Never let the cursor reach what the source has not played yet.
         double ceiling = played - floorSamples;
         if (_cursor > ceiling) _cursor = ceiling;
@@ -1660,7 +1779,6 @@ public sealed class EngineTapState : IGuardedUnit
     public volatile bool FadedOut;
 
     private float _gain;
-    private double _cursor = -1;
 
     public EngineTapState(EngineVoiceState source) { Source = source; Ground = new(source.SampleRate); source._frontGround = Ground; }
 
@@ -1674,29 +1792,64 @@ public sealed class EngineTapState : IGuardedUnit
         // prevent.
         if (!Source.Primed) { mono.Clear(); return; }
 
-        long played = Source.Played;
-        // Start in step with the voice we are the other half of, and resync outright only when there
-        // is no continuity left to keep — the source stopped, or we have fallen off the ring.
-        if (_cursor < 0 || Math.Abs(played - _cursor) > Source.RingLength - 4 * mono.Length)
-            _cursor = played;
+        // In step with the voice we are the other half of, on a continuous clock: the source's own
+        // rate over ours, leaning slowly on where the source has got to. It used to step up to ten
+        // samples once a block toward Played, and Played moves in whole blocks when either channel is
+        // pitched (EngineVoiceState.ConsumeRate), so a car going past had its front voice jump at
+        // nearly every block: 4-8 discontinuities a second, measured (--quality echo, "front").
+        float own = ChannelRate;
+        double rate = _clock.Begin(Source.Played, Source.ConsumeRate / (own > 0.05f ? own : 1f), mono.Length, Source.SampleRate);
 
         float gTarget = TargetGain;
         float step = 1f / (0.06f * MathF.Max(1f, Source.SampleRate));
         for (int i = 0; i < mono.Length; i++)
         {
             _gain += Math.Clamp(gTarget - _gain, -step, step);
-            mono[i] = Ground.Process(Source.ReadFrontAt(_cursor + i)) * _gain;
+            mono[i] = Ground.Process(Source.ReadFrontAt(_clock.Position)) * _gain;
+            _clock.Position += rate;
         }
 
-        // Wall clock, plus an inaudible pull back toward where the other half of this machine has
-        // got to. A hundredth of the block is about a sixth of a semitone, applied only while the
-        // two are out of step; what it is correcting is the difference between two channels' pitch,
-        // which for the two ends of one car is very nearly nothing.
-        double drift = played - _cursor;
-        double maxNudge = Math.Max(1.0, mono.Length * EngineEchoState.MaxRateCorrection);
-        _cursor += mono.Length + Math.Clamp(drift, -maxNudge, maxNudge);
-
         if (gTarget <= 0f && _gain <= 1e-4f) FadedOut = true;
+    }
+
+    /// <summary>This voice's own channel pitch (its Doppler), set by the provider with the pitch.</summary>
+    public volatile float ChannelRate = 1f;
+
+    private SourceClock _clock = SourceClock.Unset;
+}
+
+/// <summary>
+/// Where a live voice's play position IS, continuously, for a reader that has to stay in step with it.
+///
+/// The voice's <see cref="EngineVoiceState.Played"/> is only right on average: a pitched DSP channel is
+/// taken a whole block at a time, more or fewer times per mixer block (EngineVoiceState.ConsumeRate).
+/// This clock runs at the rate the reader is told, and leans on Played through an error averaged over
+/// half a second, applied as a rate of at most half a per cent (under a tenth of a semitone) — so the
+/// block-sized saw in Played never reaches the read, and a real drift is taken out within seconds.
+/// It restarts outright only when it has lost the source by more than a few blocks: the source
+/// stopped, restarted, or this reader was not called for a while.
+/// </summary>
+public struct SourceClock
+{
+    /// <summary>The source position this reader is at, samples.</summary>
+    public double Position;
+    private double _error;
+
+    public static SourceClock Unset => new() { Position = double.NaN };
+
+    /// <summary>Called once per block before reading; returns the per-sample advance for this block.</summary>
+    public double Begin(long played, float rate, int block, float sampleRate)
+    {
+        if (double.IsNaN(Position) || Math.Abs(played - Position) > 6.0 * Math.Max(256, block))
+        {
+            Position = played;
+            _error = 0;
+        }
+        double err = played - Position;
+        _error += (err - _error) * Math.Min(1.0, block / (0.5 * sampleRate));
+        double lean = Math.Clamp(_error / (2.0 * sampleRate), -0.005, 0.005);
+        float r = float.IsFinite(rate) && rate > 0.05f && rate < 20f ? rate : 1f;
+        return r + lean;
     }
 }
 

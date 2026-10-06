@@ -30,7 +30,7 @@ public static class PrerenderDoorsSpike
         var levels = new ConcurrentDictionary<string, float>();
         int done = 0, failed = 0;
         var clock = Stopwatch.StartNew();
-        Console.WriteLine($"Build {WireContract.Hash}: {keys.Count} door renders into {outDir}, {threads} at a time.");
+        Console.WriteLine($"Door models {DoorRenderCache.Name}: {keys.Count} door renders into {outDir}, {threads} at a time.");
         Parallel.ForEach(keys, new ParallelOptions { MaxDegreeOfParallelism = threads }, key =>
         {
             try

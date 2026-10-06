@@ -23,6 +23,10 @@ public sealed class MasterTap : IDisposable
     private readonly FileStream _file;
     private readonly BinaryWriter _writer;
     private readonly int _rate;
+    /// <summary>IEEE float samples rather than sixteen bits, unclamped: what the mixer made, including
+    /// anything over full scale, and quiet detail below the sixteenth bit (OPENFPS_AUDIO_CAPTURE_FLOAT=1,
+    /// and the lab's measurements).</summary>
+    private readonly bool _float;
     private int _channels;
     private long _frames;
     private readonly object _lock = new();
@@ -33,9 +37,10 @@ public sealed class MasterTap : IDisposable
     private ChannelGroup _group;   // the group it was added to, so it can be taken off again
     private GCHandle _handle;
 
-    private MasterTap(string path, int rate)
+    private MasterTap(string path, int rate, bool asFloat)
     {
         _rate = rate;
+        _float = asFloat;
         _file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
         _writer = new BinaryWriter(_file);
         // Header is written now with placeholder sizes and rewritten on close.
@@ -46,11 +51,14 @@ public sealed class MasterTap : IDisposable
     /// Attaches a tap to the master channel group. Returns null when no capture was asked for or the
     /// DSP could not be made — never throws, because a diagnostic must not be able to break playback.
     /// </summary>
-    public static MasterTap? Attach(FMOD.System system, ChannelGroup master, string path, int rate)
+    /// <param name="index">Where in the group's chain: the HEAD (last, what leaves the mixer) by
+    /// default; a number puts it at that position, e.g. just before the master limiter.</param>
+    public static MasterTap? Attach(FMOD.System system, ChannelGroup master, string path, int rate,
+                                    int index = CHANNELCONTROL_DSP_INDEX.HEAD, bool asFloat = false)
     {
         try
         {
-            var tap = new MasterTap(path, rate);
+            var tap = new MasterTap(path, rate, asFloat);
             _callback ??= ReadCallback;
             var desc = new DSP_DESCRIPTION
             {
@@ -62,7 +70,7 @@ public sealed class MasterTap : IDisposable
             if (system.createDSP(ref desc, out tap._dsp) != RESULT.OK) { tap.Dispose(); return null; }
             tap._handle = GCHandle.Alloc(tap);
             tap._dsp.setUserData(GCHandle.ToIntPtr(tap._handle));
-            master.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, tap._dsp);
+            master.addDSP(index, tap._dsp);
             tap._group = master;
             return tap;
         }
@@ -121,13 +129,16 @@ public sealed class MasterTap : IDisposable
         {
             if (_closed) return;
             _channels = channels;
-            for (int i = 0; i < total; i++)
-            {
-                // 16-bit is plenty to see a discontinuity and keeps the file small enough to pass around.
-                float v = src[i];
-                if (v > 1f) v = 1f; else if (v < -1f) v = -1f;
-                _writer.Write((short)(v * 32767f));
-            }
+            if (_float)
+                for (int i = 0; i < total; i++) _writer.Write(src[i]);
+            else
+                for (int i = 0; i < total; i++)
+                {
+                    // 16-bit is plenty to see a discontinuity and keeps the file small enough to pass around.
+                    float v = src[i];
+                    if (v > 1f) v = 1f; else if (v < -1f) v = -1f;
+                    _writer.Write((short)(v * 32767f));
+                }
             _frames += total / Math.Max(1, channels);
         }
     }
@@ -148,7 +159,8 @@ public sealed class MasterTap : IDisposable
                 if (_handle.IsAllocated) _handle.Free();
 
                 int ch = Math.Max(1, _channels);
-                long dataBytes = _frames * ch * 2;
+                int bytes = _float ? 4 : 2;
+                long dataBytes = _frames * ch * bytes;
                 _writer.Flush();
                 _file.Seek(0, SeekOrigin.Begin);
                 _writer.Write(new[] { (byte)'R', (byte)'I', (byte)'F', (byte)'F' });
@@ -156,12 +168,12 @@ public sealed class MasterTap : IDisposable
                 _writer.Write(new[] { (byte)'W', (byte)'A', (byte)'V', (byte)'E' });
                 _writer.Write(new[] { (byte)'f', (byte)'m', (byte)'t', (byte)' ' });
                 _writer.Write(16);
-                _writer.Write((short)1);
+                _writer.Write((short)(_float ? 3 : 1));   // IEEE float or PCM
                 _writer.Write((short)ch);
                 _writer.Write(_rate);
-                _writer.Write(_rate * ch * 2);
-                _writer.Write((short)(ch * 2));
-                _writer.Write((short)16);
+                _writer.Write(_rate * ch * bytes);
+                _writer.Write((short)(ch * bytes));
+                _writer.Write((short)(bytes * 8));
                 _writer.Write(new[] { (byte)'d', (byte)'a', (byte)'t', (byte)'a' });
                 _writer.Write((int)dataBytes);
                 _writer.Flush();

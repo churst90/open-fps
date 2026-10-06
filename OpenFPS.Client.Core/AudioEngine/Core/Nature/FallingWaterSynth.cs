@@ -4,7 +4,7 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
 
 /// <summary>
-/// Water falling into water, as the events it is made of.
+/// Water falling into water, and onto stone, as the events it is made of.
 ///
 /// WHAT MAKES THE SOUND. Almost none of it is the water itself. A drop hitting a pool makes a short
 /// click as it strikes — the impact — and sometimes, as the crater it opened closes, it traps a
@@ -31,15 +31,56 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// 2005 draws the factor as u^β with u uniform). That skew is the difference between water and a
 /// hiss: a few plinks stand out of a bed of faint ones.
 ///
-/// WHAT IS FITTED. Two constants and the plunge's air share, named here and nowhere else, fitted
-/// together on 2026-10-04 to a recording of a dozen jets falling back into their pool (its octaves
-/// 500 Hz-16 kHz within 4 dB) and then brought to 71 dB(A) at the kerb, from Watts et al. (2009):
-/// 1.1 L/s falling 30 cm into water measured 67 dB(A) at a metre, and this fountain moves 2.6 L/s
-/// over a metre or more. The constants are: how loud a bubble is for its size
-/// in air at a metre, and how loud an impact is for its size and speed. Their LAWS are physical — a
-/// bubble's first peak goes as its radius (ρ ω² R² ξ with ωR fixed and the wall's travel ξ a fixed
-/// fraction of R), an impact's as r v² (its energy as m v³, Franz 1959, delivered over r / v) — and
-/// the two numbers are set against measured fountains, not chosen. Re-fit them; never nudge them.
+/// THE LUMPS SPLASH, AND THEIR BUBBLES COME IN BURSTS (texture round 1, 2026-10-06). Measured on the
+/// cochlear statistics listeners recognise a texture by (McDermott and Simoncelli 2011; see
+/// <see cref="TextureStatistics"/>), recorded fountains have spiky band envelopes above 1 kHz: the
+/// loud moments at 4 and 8 kHz stand 4-15 times the median for 3-4 ms, and lift the bands an octave
+/// either side with them. Rounds 1-3 of this model made 87,000 similar events a second and summed to
+/// Gaussian noise (envelope spread 0.07 at 6-12 kHz against the recordings' 0.10-0.19, skew 0.1-0.2
+/// against 0.2-1.2, neighbouring bands moving together 0.20 against 0.26-0.52). Two things the
+/// physics has and the model did not:
+///   * A lump of coherent water striking the pool throws a crown, and the crown's rim tears into
+///     secondary droplets in the first few milliseconds (Worthington 1908; Engel 1966; Deegan, Brunet
+///     and Eggers 2008): a burst of tiny strikes and tiny bubbles too fast to tell apart, carrying the
+///     energy the crown took. One burst per lump, as loud as the lump is big — and the lumps of a
+///     coarse fragmentation are of every size (<see cref="WaterFallSpec.LumpSizeOrder"/>), so a few
+///     are loud. These are the spikes.
+///   * A plunging body of water does not make bubbles steadily: its cavity closes and pinches them
+///     off in a burst (Deane and Stokes 2002 found bubble creation in a breaking wave confined to the
+///     short "acoustically active" phase as the cavity collapses; Chanson 2004 for plunging jets). So
+///     a lump's share of the plunge's bubbles, as many as its volume carries, ring together within the
+///     few milliseconds of its cavity, and every band they reach rises at once.
+///
+/// ON STONE (<see cref="WaterSurface.Rock"/>). Water striking wet rock opens no crater and traps no
+/// air. A drop stops in its own length on the film and splashes flat, a sharper click than into a
+/// pool; a lump spreads into a lamella that lifts off the stone and breaks into spray — the "prompt
+/// splash" that a rough surface makes at far lower speeds than a smooth one (Xu, Zhang and Nagel 2005;
+/// Range and Feuillebois 1998) — and on a solid that sheet takes the energy a pool's crater would
+/// have held, so the splash is the larger share of what the lump brought (<see cref="RockCrownShare"/>).
+///
+/// TAPS. A feature metres across is heard from more than one place: each fall lands at one of the
+/// spec's <see cref="WaterFeatureSpec.Taps"/>, writes its events into that tap's own sum, and
+/// <see cref="NextTaps"/> hands each tap its own pressure. Different events at each, so the voices
+/// are decorrelated as the water is. <see cref="Next"/> is all of them at one point.
+///
+/// PLACES (2026-10-06). A tap is itself a metre and a half of rock face and rim jets, and was one point.
+/// With more than one place a tap (ExtendedSources), each drop's and each lump's sound (its impact, its
+/// splash, its bubbles) lands at one place of its tap: the tap's middle by the middle's share, otherwise
+/// one of the places round it, as the tap's spread says (<see cref="SetSpread"/>). Every event goes to
+/// one place, so the places add up to the tap. <see cref="NextPlaces"/> hands out every place;
+/// <see cref="NextTaps"/> sums each tap's. One place a tap is the fountain as it was.
+///
+/// WHAT IS FITTED. Three constants and the plunge's air share, named here and nowhere else. The
+/// first two were fitted together on 2026-10-04 to a recording of a dozen jets falling back into their
+/// pool (its octaves 500 Hz-16 kHz within 4 dB) and then brought to 71 dB(A) at the kerb, from Watts
+/// et al. (2009): 1.1 L/s falling 30 cm into water measured 67 dB(A) at a metre. They are: how loud a
+/// bubble is for its size in air at a metre, and how loud an impact is for its size and speed. Their
+/// LAWS are physical — a bubble's first peak goes as its radius (ρ ω² R² ξ with ωR fixed and the
+/// wall's travel ξ a fixed fraction of R), an impact's as r v² (its energy as m v³, Franz 1959,
+/// delivered over r / v) — and the numbers are set against measured fountains, not chosen. The third,
+/// <see cref="SplashEfficiency"/>, was fitted on 2026-10-06 to the three recorded fountains' envelope
+/// statistics with the spectrum held. Re-fit them; never nudge them. The rain shares the first two
+/// (RainSynth).
 /// </summary>
 public sealed class FallingWaterSynth
 {
@@ -51,9 +92,33 @@ public sealed class FallingWaterSynth
     /// they rang as a steady note.</summary>
     public const float BubblePascalsPerMm = 0.015f;
 
-    /// <summary>An impact's spike, Pa at a metre, for a 1 mm radius drop at 5 m/s. Its energy goes as
-    /// m v³ (Franz 1959) and a drop's rise is fixed, so its peak goes as (r v)^1.5.</summary>
-    public const float ImpactPascals = 0.0142f;
+    /// <summary>An impact's spike into a POOL, Pa at a metre in air, for a 1 mm radius drop at 5 m/s.
+    /// Its energy goes as m v³ (Franz 1959) and a drop's rise is fixed, so its peak goes as (r v)^1.5.
+    ///
+    /// Round 1 of the texture fit (2026-10-06) took it from 0.0142 to this (-13.5 dB), fitted with the splash. Off a pool, most of what
+    /// a drop's blow does goes into the crater, and in air the impact is quiet beside the bubble it
+    /// may trap: Phillips, Agarwal and Jordan (2018, Sci. Rep. 8, 9515), filming a drip into a pool
+    /// with the sound, found the airborne "plink" made by the trapped bubble driving the surface, not
+    /// by the impact or the cavity. At 0.0142 sixty thousand drop clicks a second were half the
+    /// fountain's top octaves and summed to Gaussian noise; the recordings' top end comes in loud
+    /// moments (the splashes). A drop on stone has no crater to take its blow, and its click is
+    /// <see cref="HardImpactPascals"/>, unchanged.</summary>
+    public const float ImpactPascals = 0.003f;
+
+    /// <summary>A drop's click on a HARD surface (stone, a road, a roof's top face), Pa at a metre for
+    /// 1 mm at 5 m/s: it stops in its own length on the film and splashes flat. 1.2 times the pool's
+    /// click as it stood until 2026-10-06, the figure the rain on streets and roofs was fitted with
+    /// (RainSynth), kept when the pool's was refitted.</summary>
+    public const float HardImpactPascals = 0.01704f;
+
+    /// <summary>
+    /// The share of the energy a lump's crown (or, on stone, its lamella) takes that leaves as sound:
+    /// the acoustic efficiency of a splash. FITTED 2026-10-06 (texture round 1) so the fountain's band
+    /// envelopes above 1 kHz move as the recordings' do while its octave balance stays within the
+    /// earlier fit. For scale: a drop's whole impact radiates 10⁻⁶ to 10⁻⁵ of its kinetic energy in
+    /// water (Franz 1959; Nystuen 1986), and only a small part of that crosses into air.
+    /// </summary>
+    public const float SplashEfficiency = 1.5e-5f;
 
     /// <summary>How fast a drop's impact force arrives, s: the first contact, microseconds.</summary>
     private const float ImpactRise = 16e-6f;
@@ -68,11 +133,46 @@ public sealed class FallingWaterSynth
     /// noise reads 2.96 and 9.9 dB on the same measure), and the octaves 500 Hz-8 kHz within 1.3 dB
     /// of the fountain the constants were fitted to, the top octave 2.2 dB under it. Anything from
     /// 0.05 to 0.12 measures the same texture; 0.07 is where the octaves fit best. Small lumps still
-    /// strike in the drop's own rise.</summary>
+    /// strike in the drop's own rise. (The lump's top end is not lost: it is in its splash, which
+    /// takes milliseconds, not microseconds — see the class summary.)</summary>
     private const float LumpCushion = 0.07f;
 
     /// <summary>β in the depth factor u^β: how skewed the bubbles' loudness is.</summary>
     public const float DepthSkew = 4f;
+
+    // ── The splash ───────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>The share of a lump's kinetic energy that goes into its crown on a pool. Most of it goes
+    /// into the crater: Engel (1966) found the crater's potential energy at its deepest to be about
+    /// half of the drop's kinetic energy, the rest spread over the crown, the surface waves and the
+    /// jet; a quarter for the crown is an estimate inside that.</summary>
+    public const float PoolCrownShare = 0.25f;
+
+    /// <summary>The same on wet stone: no crater, so the lamella takes nearly all of it (the
+    /// estimate is the rest less what the film's viscosity takes).</summary>
+    public const float RockCrownShare = 0.8f;
+
+    /// <summary>How long a crown sheds its spray, in units of the lump's r / v, plus a floor: the rim
+    /// breaks up while the crown rises, a couple of r / v (Deegan et al. 2008): 1.5-4 ms decay for a
+    /// fountain's lumps, as the recordings' loud moments last (3-4 ms wide at half height). Fitted
+    /// within that: 3 r / v and a 0.8 ms floor made the 3-6 kHz envelopes too smooth.</summary>
+    private const float SplashDurations = 1.5f;
+    private const float SplashFloorSeconds = 0.0004f;
+
+    /// <summary>The splash band's middle for a 5 mm lump at 4 m/s, Hz (<see cref="SplashCentreHz"/>):
+    /// secondary droplets of 0.05-0.5 mm striking in 10-250 µs and trapping bubbles of a few tenths of
+    /// a millimetre. FITTED with the efficiency to the recordings' 4-12 kHz balance.</summary>
+    private const float SplashCentreReferenceHz = 2700f;
+
+    /// <summary>How far one splash's band middle scatters about that, the standard deviation of its
+    /// natural log, and how far its band reaches either side of its middle (a factor; a resonant band,
+    /// EventSum.Burst steep). Fitted: one gentle band of 1-16 kHz for every splash moved the bands an
+    /// octave apart together (envelope correlation 0.35 against the recordings' 0.05-0.18); a band of
+    /// its own an octave wide, 0.13.</summary>
+    private const float SplashScatter = 0.7f, SplashBandHalfWidth = 1.6f;
+
+    /// <summary>ρ c of air, Pa s/m: the impedance a radiated power meets.</summary>
+    private const float RhoC = 413f;
 
     // ── Physical constants ───────────────────────────────────────────────────────────────────────
 
@@ -98,13 +198,25 @@ public sealed class FallingWaterSynth
     /// <summary>The chance a large drop's crater also sheds a weaker second bubble.</summary>
     private const float SecondaryShare = 0.3f;
 
-    /// <summary>The share of a coherent lump's craters that trap one.</summary>
-    private const float ChunkShare = 0.6f;
+    /// <summary>The share of a coherent lump's craters that trap one. Fitted, 2026-10-06: the lumps are
+    /// now drawn from a broad law (some three times the mean), and a trapped bubble goes up to the lump's
+    /// own size, so at the 0.6 that suited lumps all about one size the big ones' "glugs" stood 250-500 Hz
+    /// 5-8 dB over every recorded fountain. A lump lands in the aerated froth of the ones before it,
+    /// and a crater in bubbly water closes on a cloud more often than on one big bubble.</summary>
+    private const float ChunkShare = 0.2f;
 
     /// <summary>How much air a plunge drives under, per litre of water, at 3 m/s over the 1 m/s
     /// below which a falling sheet enters without entraining: about one per cent, fitted with the
     /// two constants above against a recorded fountain of jets falling back into their pool.</summary>
     private const float PlungeAirShare = 0.012f;
+
+    /// <summary>How long a lump's cavity takes to close and pinch off its bubbles, s, for a 5 mm lump:
+    /// the burst the plunge's bubbles come in. Scales with the lump's size.</summary>
+    private const float CavitySeconds = 0.012f;
+
+    /// <summary>The most bubbles of one lump's burst rendered; more are stood for, each carrying
+    /// √(real / rendered) of them.</summary>
+    private const int MaxPerBurst = 4;
 
     /// <summary>The most BUBBLES of one kind a fall renders per block; more are stood for, each
     /// carrying √(real / rendered) of them so the energy is kept. Bubbles ring for milliseconds and
@@ -128,7 +240,8 @@ public sealed class FallingWaterSynth
 
     public readonly WaterFeatureSpec Spec;
     private readonly float _rate;
-    private readonly EventSum _sum;
+    private readonly EventSum[] _sums;
+    private readonly EventSum _rng;
     private readonly FallState[] _falls;
     private int _untilBlock;
 
@@ -141,27 +254,76 @@ public sealed class FallingWaterSynth
     public float Wind;
 
     /// <summary>Each part's share, for the lab to take the sound apart by muting: the impacts, the
-    /// drops' bubbles, the lumps' bubbles and the plunge's. One in the game.</summary>
-    public float ImpactPart = 1f, DropBubblePart = 1f, LumpBubblePart = 1f, PlungePart = 1f;
+    /// drops' bubbles, the lumps' bubbles, the plunge's, and the lumps' splashes. One in the game.</summary>
+    public float ImpactPart = 1f, DropBubblePart = 1f, LumpBubblePart = 1f, PlungePart = 1f, SplashPart = 1f;
+
+    /// <summary>How many places the feature is heard from (<see cref="WaterFeatureSpec.Taps"/>).</summary>
+    public int TapCount => _taps;
+
+    /// <summary>How many places each tap is heard from (its middle first): one unless made with more.</summary>
+    public int PlacesPerTap => _placesPerTap;
+
+    private readonly int _taps, _placesPerTap;
+    private readonly float[] _tapSpread, _tapMiddle;
+
+    /// <summary>How much of tap <paramref name="tap"/> its outer places carry, 0 to 1
+    /// (ExtendedSources.Shares). Takes effect at the next control call.</summary>
+    public void SetSpread(int tap, float spread)
+    {
+        if (tap >= 0 && tap < _taps) _tapSpread[tap] = Math.Clamp(spread, 0f, 1f);
+    }
+
+    /// <summary>The place one event of fall <paramref name="f"/> lands at: its tap's middle by the
+    /// middle's share, otherwise one of the places round it.</summary>
+    private EventSum PlaceFor(FallState f)
+    {
+        if (_placesPerTap == 1) return f.Sum;
+        float middle = _tapMiddle[f.Tap];
+        float u = f.Sum.Uniform();
+        if (u >= middle && middle < 1f)
+        {
+            int outer = _placesPerTap - 1;
+            int k = 1 + Math.Min(outer - 1, (int)((u - middle) / (1f - middle) * outer));
+            return _sums[f.Tap * _placesPerTap + k];
+        }
+        return f.Sum;
+    }
 
     private sealed class FallState
     {
         public WaterFallSpec Spec = null!;
+        public EventSum Sum = null!;                      // the tap it lands at (its middle)
+        public int Tap;
+        public bool Rock;
         public float DropRate, ChunkRate, BubbleRate;   // per second, at full flow
         public float DropMean, DropMax;                  // m
+        public float ChunkMean, ChunkMax;                // m
+        public float ChunkMeanVolume;                     // m^3
         public float ChunkSpeed;                          // m/s
         public float BubbleMeanVolume;                    // m^3
         public float Wander, WanderTarget, WanderClock;  // the column's breakup moving about
         public float Clump = 1f, ClumpFrom = 1f, ClumpTo = 1f, ClumpLength = 1f, ClumpClock; // drops arriving in bunches
         public float Spread;                              // 1/√streams: how much of one jet's wobble is left in the sum
         public int Order;                                 // the drop sizes' gamma order
+        public int LumpOrder;                             // the lumps' gamma order
     }
 
-    public FallingWaterSynth(WaterFeatureSpec spec, float sampleRate, int seed)
+    public FallingWaterSynth(WaterFeatureSpec spec, float sampleRate, int seed, int placesPerTap = 1)
     {
         Spec = spec;
         _rate = sampleRate;
-        _sum = new EventSum(sampleRate, seed);
+        int taps = Math.Max(1, spec.Taps?.Length ?? 1);
+        _taps = taps;
+        _placesPerTap = Math.Max(1, placesPerTap);
+        _tapSpread = new float[taps];
+        _tapMiddle = new float[taps];
+        Array.Fill(_tapMiddle, 1f);
+        _sums = new EventSum[taps * _placesPerTap];
+        // A tap's middle keeps the seed it always had; its other places have their own.
+        for (int t = 0; t < taps; t++)
+            for (int k = 0; k < _placesPerTap; k++)
+                _sums[t * _placesPerTap + k] = new EventSum(sampleRate, seed * 7919 + t * 104729 + 1 + k * 15485863);
+        _rng = _sums[0];
         _falls = new FallState[spec.Falls.Length];
         for (int i = 0; i < _falls.Length; i++)
         {
@@ -169,18 +331,25 @@ public sealed class FallingWaterSynth
             var s = new FallState
             {
                 Spec = f,
+                Sum = _sums[Math.Clamp(f.Tap, 0, taps - 1) * _placesPerTap],
+                Tap = Math.Clamp(f.Tap, 0, taps - 1),
+                Rock = f.Onto == WaterSurface.Rock,
                 DropMean = f.MeanDropRadiusMm * 1e-3f,
                 DropMax = MathF.Max(f.MeanDropRadiusMm, f.MaxDropRadiusMm) * 1e-3f,
                 Spread = 1f / MathF.Sqrt(Math.Max(1, f.Streams)),
                 Order = Math.Clamp(f.DropSizeOrder, 1, 16),
+                LumpOrder = Math.Clamp(f.LumpSizeOrder, 1, 16),
             };
             float q = f.FlowLitresPerSecond * 1e-3f;                                  // m^3/s
             float meanVolume = 4f / 3f * MathF.PI * MeanCube(s.DropMean, MinDropRadius, s.DropMax, s.Order);
             s.DropRate = f.DropShare * q / meanVolume;
-            float chunk = f.ChunkRadiusMm * 1e-3f;
-            s.ChunkRate = (1f - f.DropShare) * q / (4f / 3f * MathF.PI * chunk * chunk * chunk);
+            // The lumps: a gamma law of their own order about the stated size, up to three times it.
+            s.ChunkMean = f.ChunkRadiusMm * 1e-3f;
+            s.ChunkMax = 3f * s.ChunkMean;
+            s.ChunkMeanVolume = 4f / 3f * MathF.PI * MeanCube(s.ChunkMean, MinDropRadius, s.ChunkMax, s.LumpOrder);
+            s.ChunkRate = (1f - f.DropShare) * q / s.ChunkMeanVolume;
             s.ChunkSpeed = MathF.Sqrt(2f * 9.81f * f.FallMetres);
-            float entrain = PlungeAirShare * MathF.Max(0f, s.ChunkSpeed - 1f) / 2f;
+            float entrain = s.Rock ? 0f : PlungeAirShare * MathF.Max(0f, s.ChunkSpeed - 1f) / 2f;
             s.BubbleMeanVolume = PlungeMeanVolume();
             s.BubbleRate = (1f - f.DropShare) * q * entrain / s.BubbleMeanVolume;
             _falls[i] = s;
@@ -214,18 +383,18 @@ public sealed class FallingWaterSynth
         return (float)(num / den);
     }
 
-    /// <summary>A drop's radius, m: over the smallest, a gamma law of the fall's order about its mean
-    /// (the sum of that many exponentials); the few over the largest are drawn again.</summary>
-    private float DrawDropRadius(FallState f)
+    /// <summary>A radius, m: over the smallest, a gamma law of this order about its mean (the sum of
+    /// that many exponentials); the few over the largest are drawn again.</summary>
+    private float DrawRadius(EventSum rng, float mean, float max, int order)
     {
         for (int tries = 0; tries < 32; tries++)
         {
             float x = 0f;
-            for (int j = 0; j < f.Order; j++) x -= MathF.Log(MathF.Max(1e-7f, 1f - _sum.Uniform()));
-            float r = MinDropRadius + f.DropMean / f.Order * x;
-            if (r <= f.DropMax) return r;
+            for (int j = 0; j < order; j++) x -= MathF.Log(MathF.Max(1e-7f, 1f - rng.Uniform()));
+            float r = MinDropRadius + mean / order * x;
+            if (r <= max) return r;
         }
-        return MinDropRadius + f.DropMean;
+        return MinDropRadius + mean;
     }
 
     /// <summary>The mean volume of a plunge bubble under the Deane-Stokes spectrum, m³.</summary>
@@ -256,14 +425,14 @@ public sealed class FallingWaterSynth
 
     /// <summary>A plunge bubble's radius, mm, drawn from the Deane-Stokes spectrum by rejection on a
     /// log-uniform proposal.</summary>
-    private float DrawPlungeBubbleMm()
+    private static float DrawPlungeBubbleMm(EventSum rng)
     {
         double lo = Math.Log(SmallestBubbleMm), hi = Math.Log(6.0);
         double peak = PlungeDensity(SmallestBubbleMm) * SmallestBubbleMm;
         for (int tries = 0; tries < 64; tries++)
         {
-            double rmm = Math.Exp(lo + (hi - lo) * _sum.Uniform());
-            if (_sum.Uniform() * peak <= PlungeDensity(rmm) * rmm) return (float)rmm;
+            double rmm = Math.Exp(lo + (hi - lo) * rng.Uniform());
+            if (rng.Uniform() * peak <= PlungeDensity(rmm) * rmm) return (float)rmm;
         }
         return SmallestBubbleMm;
     }
@@ -300,6 +469,34 @@ public sealed class FallingWaterSynth
         return MinnaertHzMetres / hz * 1e3f;
     }
 
+    /// <summary>
+    /// A splash's spray, as a burst of band noise at the rms its energy gives it: the lump's kinetic
+    /// energy E = ½ m v², the crown's share of it, and the splash's acoustic efficiency, radiated as
+    /// a monopole over the half-space above the surface for the burst's effective duration T
+    /// (p² = η E ρc / (2π T) at a metre). Rises in a fifth of a millisecond, decays over a few r / v.
+    /// </summary>
+    public static (float Rise, float Decay, float Pascals) Splash(float radius, float speed, float crownShare)
+    {
+        float mass = 1000f * 4f / 3f * MathF.PI * radius * radius * radius;
+        float energy = 0.5f * mass * speed * speed * crownShare * SplashEfficiency;
+        float rise = 0.0002f;
+        float decay = SplashFloorSeconds + SplashDurations * radius / MathF.Max(0.3f, speed);
+        float t = rise / 3f + decay / 2f;
+        return (rise, decay, MathF.Sqrt(energy * RhoC / (2f * MathF.PI * t)));
+    }
+
+    /// <summary>The middle of a splash's band, Hz. The crown's rim sheds droplets about as thick as the
+    /// rim, which thins as the impact's Reynolds number grows (r_s ∝ r Re^−½; Thoroddsen 2002, Deegan et
+    /// al. 2008), so the droplets' strikes and bubbles sit higher for a faster lump and lower for a
+    /// bigger one: f ∝ v / r_s ∝ v^1.5 r^−0.5. Which droplets a given crown throws varies from splash
+    /// to splash (the scatter drawn round this), so each splash lights its own octave or two, not all of
+    /// them at once.</summary>
+    public static float SplashCentreHz(float radius, float speed)
+        => SplashCentreReferenceHz * MathF.Pow(MathF.Max(0.3f, speed) / 4f, 1.5f) * MathF.Pow(radius / 5e-3f, -0.5f);
+
+    private static float Gauss(EventSum s)
+        => MathF.Sqrt(-2f * MathF.Log(MathF.Max(1e-7f, s.Uniform()))) * MathF.Cos(MathF.Tau * s.Uniform());
+
     /// <summary>Things that move on the scale of seconds: the jet's top breaking up now more, now
     /// less; the water being turned on or off.</summary>
     public void Control(float dt)
@@ -307,6 +504,15 @@ public sealed class FallingWaterSynth
         // A pump coming up to pressure or running down takes a couple of seconds.
         float target = Running ? 1f : 0f;
         _flow += Math.Clamp(target - _flow, -dt / 2f, dt / 2f);
+        if (_placesPerTap > 1)
+        {
+            Span<float> shares = stackalloc float[_placesPerTap];
+            for (int t = 0; t < _taps; t++)
+            {
+                ExtendedSources.Shares(_tapSpread[t], shares);
+                _tapMiddle[t] = shares[0];
+            }
+        }
         foreach (var f in _falls)
         {
             f.WanderClock -= dt;
@@ -316,22 +522,53 @@ public sealed class FallingWaterSynth
                 // and comes down as a column, sometimes it bursts into spray. Seconds at a time. Each
                 // jet or strand of a fall does it on its own, so the fall as a whole wanders by the
                 // square root of their count less.
-                f.WanderTarget = 0.18f * f.Spread * _sum.Signed();
-                f.WanderClock = 0.4f + 1.6f * _sum.Uniform();
+                f.WanderTarget = 0.18f * f.Spread * _rng.Signed();
+                f.WanderClock = 0.4f + 1.6f * _rng.Uniform();
             }
             f.Wander += (f.WanderTarget - f.Wander) * MathF.Min(1f, dt * 2f);
         }
     }
 
-    /// <summary>The next sample, pascals at a metre.</summary>
+    /// <summary>The next sample of the whole feature at one point, pascals at a metre.</summary>
     public float Next()
+    {
+        Step();
+        float sum = 0f;
+        for (int t = 0; t < _sums.Length; t++) sum += _sums[t].Next();
+        return sum;
+    }
+
+    /// <summary>The next sample of each tap, pascals at a metre from that tap: its places summed.</summary>
+    public void NextTaps(Span<float> taps)
+    {
+        Step();
+        for (int t = 0; t < _taps; t++)
+        {
+            float v = 0f;
+            for (int k = 0; k < _placesPerTap; k++) v += _sums[t * _placesPerTap + k].Next();
+            if (t < taps.Length) taps[t] = v;
+        }
+    }
+
+    /// <summary>The next sample of every place of every tap, tap by tap, its middle first:
+    /// <paramref name="places"/>[tap · PlacesPerTap + place].</summary>
+    public void NextPlaces(Span<float> places)
+    {
+        Step();
+        for (int i = 0; i < _sums.Length; i++)
+        {
+            float v = _sums[i].Next();
+            if (i < places.Length) places[i] = v;
+        }
+    }
+
+    private void Step()
     {
         if (--_untilBlock <= 0)
         {
             _untilBlock = Block;
             Schedule(Block / _rate);
         }
-        return _sum.Next();
     }
 
     private void Schedule(float dt)
@@ -356,26 +593,27 @@ public sealed class FallingWaterSynth
             // own. And a slug does not land in an instant — its drops are spread along it by their
             // different speeds — so the rate glides from one slug's to the next rather than
             // stepping; the steps, tens a second, were heard as a crackle in the hiss.
+            var rng = f.Sum;
             f.ClumpClock -= dt;
             if (f.ClumpClock <= 0f)
             {
-                float g = MathF.Sqrt(-2f * MathF.Log(MathF.Max(1e-6f, _sum.Uniform()))) * MathF.Cos(MathF.Tau * _sum.Uniform());
+                float g = MathF.Sqrt(-2f * MathF.Log(MathF.Max(1e-6f, rng.Uniform()))) * MathF.Cos(MathF.Tau * rng.Uniform());
                 float sigma = ClumpSigma * f.Spread;
                 f.ClumpFrom = f.Clump;
                 f.ClumpTo = MathF.Exp(sigma * g - 0.5f * sigma * sigma);
-                f.ClumpLength = 0.015f + 0.05f * _sum.Uniform();
+                f.ClumpLength = 0.015f + 0.05f * rng.Uniform();
                 f.ClumpClock = f.ClumpLength;
             }
             f.Clump = f.ClumpTo + (f.ClumpFrom - f.ClumpTo) * MathF.Max(0f, f.ClumpClock / f.ClumpLength);
             Drops(f, f.DropRate * dropScale * _flow * dt * f.Clump, drift);
             Chunks(f, f.ChunkRate * coherentScale * _flow * dt * f.Clump);
-            Plunge(f, f.BubbleRate * coherentScale * _flow * dt);
         }
     }
 
     private void Drops(FallState f, float mean, float drift)
     {
-        int real = _sum.Poisson(mean);
+        var sum = f.Sum;
+        int real = sum.Poisson(mean);
         if (real == 0) return;
         int n = Math.Min(real, MaxImpactsPerBlock);
         float weight = MathF.Sqrt(real / (float)n);
@@ -384,89 +622,107 @@ public sealed class FallingWaterSynth
         float ringWeight = weight * MathF.Sqrt(stride);
         for (int k = 0; k < n; k++)
         {
-            int at = (int)(_sum.Uniform() * Block);
-            float r = DrawDropRadius(f);
+            int at = (int)(sum.Uniform() * Block);
+            float r = DrawRadius(sum, f.DropMean, f.DropMax, f.Order);
             float v = ArrivalSpeed(r, f.Spec.FallMetres);
             // The impact: the force arrives as the drop's front meets the surface and goes over the
             // time the whole drop takes to bury itself.
             float tau = r / v;
             float impact = ImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart;
-            // Small drops falling far are the ones the wind takes to the paving: they click and
-            // trap nothing.
-            if (drift > 0f && r < 1e-3f && _sum.Uniform() < drift * (1f - r / 1e-3f))
+            var place = PlaceFor(f);
+            // On stone the drop stops in its own length and splashes flat: a shorter force, and
+            // nothing trapped. Small drops falling far are also the ones the wind takes to the
+            // paving round a pool.
+            if (f.Rock || (drift > 0f && r < 1e-3f && sum.Uniform() < drift * (1f - r / 1e-3f)))
             {
-                // On stone the drop stops in its own length and splashes flat: a shorter force.
-                _sum.Impact(at, ImpactRise, 0.4f * tau, impact * 1.2f);
+                place.Impact(at, ImpactRise, 0.4f * tau, impact * (HardImpactPascals / ImpactPascals));
                 continue;
             }
-            _sum.Impact(at, ImpactRise, tau, impact);
+            place.Impact(at, ImpactRise, tau, impact);
             if (k % stride != 0) continue;
 
             float rmm = r * 1e3f;
-            int later = at + (int)(0.003f * _rate * (0.5f + _sum.Uniform()));
+            int later = at + (int)(0.003f * _rate * (0.5f + sum.Uniform()));
             if (rmm >= 0.4f && rmm <= 0.55f && v > 0.8f * TerminalSpeed(r))
             {
                 // The regular bubble: always about the same size, rain on a lake.
-                if (_sum.Uniform() < RegularShare) Ring(later, 0.18f + 0.08f * _sum.Uniform(), ringWeight * DropBubblePart);
+                if (sum.Uniform() < RegularShare) Ring(place, later, 0.18f + 0.08f * sum.Uniform(), ringWeight * DropBubblePart);
             }
             else if (rmm >= 1.1f)
             {
-                if (_sum.Uniform() > IrregularShare) continue;
-                float b = TypeTwoBubbleMm(rmm) * (0.8f + 0.4f * _sum.Uniform());
-                Ring(later, b, ringWeight * DropBubblePart);
-                if (_sum.Uniform() < SecondaryShare)
-                    Ring(later + (int)(0.004f * _rate * _sum.Uniform()), b * (0.3f + 0.6f * _sum.Uniform()), 0.4f * ringWeight * DropBubblePart);
+                if (sum.Uniform() > IrregularShare) continue;
+                float b = TypeTwoBubbleMm(rmm) * (0.8f + 0.4f * sum.Uniform());
+                Ring(place, later, b, ringWeight * DropBubblePart);
+                if (sum.Uniform() < SecondaryShare)
+                    Ring(place, later + (int)(0.004f * _rate * sum.Uniform()), b * (0.3f + 0.6f * sum.Uniform()), 0.4f * ringWeight * DropBubblePart);
             }
         }
     }
 
     private void Chunks(FallState f, float mean)
     {
-        int real = _sum.Poisson(mean);
+        var sum = f.Sum;
+        int real = sum.Poisson(mean);
         if (real == 0) return;
         int n = Math.Min(real, MaxImpactsPerBlock);
         float weight = MathF.Sqrt(real / (float)n);
         int stride = (n + MaxPerBlock - 1) / MaxPerBlock;
         float ringWeight = weight * MathF.Sqrt(stride);
-        float r0 = f.Spec.ChunkRadiusMm * 1e-3f;
+        float crown = f.Rock ? RockCrownShare : PoolCrownShare;
+        // A lump's share of the plunge's bubbles goes as its volume; its mean count, for a lump of
+        // the mean volume, is the plunge's rate over the lumps'.
+        float bubblesPerVolume = f.ChunkRate > 0f ? f.BubbleRate / (f.ChunkRate * f.ChunkMeanVolume) : 0f;
         for (int k = 0; k < n; k++)
         {
-            int at = (int)(_sum.Uniform() * Block);
-            float r = r0 * (0.5f + _sum.Uniform());
-            float v = f.ChunkSpeed * (0.9f + 0.2f * _sum.Uniform());
+            int at = (int)(sum.Uniform() * Block);
+            float r = DrawRadius(sum, f.ChunkMean, f.ChunkMax, f.LumpOrder);
+            float v = f.ChunkSpeed * (0.9f + 0.2f * sum.Uniform());
             // A lump lands where the column before it landed, into its own crater and the froth that
             // left, so its force builds over a share of the time it takes to bury itself rather than
             // in the microseconds a drop's round front meets still water. Same energy (m v³), spread
             // over the longer rise, so the peak comes down as the root of it.
             float rise = MathF.Max(ImpactRise, LumpCushion * r / v);
-            _sum.Impact(at, rise, r / v, MathF.Sqrt(ImpactRise / rise) * ImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart);
-            if (k % stride != 0 || _sum.Uniform() > ChunkShare) continue;
+            var place = PlaceFor(f);
+            place.Impact(at, rise, (f.Rock ? 0.4f : 1f) * r / v,
+                       MathF.Sqrt(ImpactRise / rise) * ImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart);
+
+            // Its crown, or on stone its lamella, tearing into spray: every lump, as loud as it is big.
+            var (sr, sd, sp) = Splash(r, v, crown);
+            float fc = SplashCentreHz(r, v) * MathF.Exp(SplashScatter * Gauss(sum));
+            float spread = SplashBandHalfWidth;
+            place.Burst(at, sr, sd, sp * weight * SplashPart, fc / spread, MathF.Min(fc * spread, 0.45f * _rate), steep: true);
+
+            if (f.Rock) continue;
+
+            // The plunge's bubbles: pinched off in a burst as this lump's cavity closes.
+            float volume = 4f / 3f * MathF.PI * r * r * r;
+            int count = sum.Poisson(bubblesPerVolume * volume * weight * weight);
+            if (count > 0)
+            {
+                int rendered = Math.Min(count, MaxPerBurst);
+                float bw = MathF.Sqrt(count / (float)rendered) * PlungePart;
+                float cavity = CavitySeconds * r / 5e-3f * _rate;
+                for (int b = 0; b < rendered; b++)
+                    Ring(place, at + (int)(cavity * (0.2f + sum.Uniform())), DrawPlungeBubbleMm(sum), bw);
+            }
+
+            if (k % stride != 0 || sum.Uniform() > ChunkShare) continue;
             // A lump opens a crater too big to close in one: the bubble it traps is a large one, up to
             // the lump's own size — the low "glug" under a fountain. Smaller ones far more often.
-            float u = _sum.Uniform();
+            float u = sum.Uniform();
             float bubbleMm = r * 1e3f * (0.15f + 0.85f * u * u);
-            Ring(at + (int)(0.006f * _rate * (0.5f + _sum.Uniform())), bubbleMm, ringWeight * LumpBubblePart);
+            Ring(place, at + (int)(0.006f * _rate * (0.5f + sum.Uniform())), bubbleMm, ringWeight * LumpBubblePart);
         }
     }
 
-    private void Plunge(FallState f, float mean)
-    {
-        int real = _sum.Poisson(mean);
-        if (real == 0) return;
-        int n = Math.Min(real, MaxPerBlock);
-        float weight = MathF.Sqrt(real / (float)n);
-        for (int k = 0; k < n; k++)
-            Ring((int)(_sum.Uniform() * Block), DrawPlungeBubbleMm(), weight * PlungePart);
-    }
-
-    private void Ring(int at, float bubbleMm, float weight)
+    private static void Ring(EventSum sum, int at, float bubbleMm, float weight)
     {
         if (bubbleMm < SmallestBubbleMm || weight <= 0f) return;
         float hz = MinnaertHzMetres / (bubbleMm * 1e-3f);
-        float depth = MathF.Pow(_sum.Uniform(), DepthSkew);
+        float depth = MathF.Pow(sum.Uniform(), DepthSkew);
         // A bubble made at the surface is 40 dB under one made deep, and there are a lot of them:
         // their share of the power is under a ten-thousandth, and rendering them was most of the cost.
         if (depth < 0.01f) return;
-        _sum.Bubble(at, hz, BubbleDamping(bubbleMm), BubblePascalsPerMm * bubbleMm * depth * weight, BubbleRise);
+        sum.Bubble(at, hz, BubbleDamping(bubbleMm), BubblePascalsPerMm * bubbleMm * depth * weight, BubbleRise);
     }
 }
