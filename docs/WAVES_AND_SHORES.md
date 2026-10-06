@@ -282,7 +282,64 @@ line. Every event belongs to one place, heard there with the spread, otherwise a
 
 ## 8. Results
 
-(Filled in after the fit.)
+Recordings: 42, six of each kind (CC0, CC-BY), in `~/openfps-scratch-archive/waves-2026-10-06/refs` with
+`SOURCES.txt`: lake beaches, rocky lake edges, big river banks, sandy surf, shingle, boats at moorings,
+harbour walls. Binaural only for surf (3), shingle (3) and one rocky shore; none from inside a small
+boat with a good microphone. Their texture statistics (20 s pieces) are in `ShoreReferences`.
+
+The fitted constants (`ShoreSynth`, a coordinate search over all eight presets, each heard as its
+recordings were made: five stretches in a row from 2-15 m back, `--waves levels heard=D`):
+
+| constant | value | what it says |
+|---|---|---|
+| `PlumeShellMetres` | 0.05 m | the heard shell of a breaker's plume |
+| `SpillingAirShare` | 0.1 | a spiller's air against a plunger's |
+| `CloudEfficiency` | 1e-7 | the plume's collective ring, of the wave energy dissipated |
+| `FrontShare` | 0.01 | the share of the swash front that breaks like a creek's stone |
+| `SandVentShare` | 1e-4 | the air sand lets out, per volume of swash |
+| `StoneShare`, `StoneClosing` | 0.001, 0.05 | stones moving in the backwash, and how hard they meet |
+| `RunOffDrops` | 5 | drops running off a metre of wetted face |
+| `PopPascalsPerMm` | 0.01 Pa | a foam bubble bursting |
+| `Flicker`, `FlickerCommon` | 1.3, 0.5 | how unevenly crowds come, and how much every size shares it |
+
+Through the game (client, mixer, HRTF, ear model, loudness law), the statistics inside the recordings'
+spread of the same kind:
+
+| scene | statistics inside | 10 ms kurtosis | recordings' kurtosis |
+|---|---|---|---|
+| lake beach 2 m, 3 / 8 m/s; 8 m | 12 / 13; 13 | 4.00 / 3.27; 3.02 | 3.12-7.15 |
+| rocky lake edge 2 m, 5 / 9 m/s | 9 / 12 | 3.59 / 3.14 | 3.19-5.13 |
+| pond bank 2 m, 5 m/s | 11 (lake beaches) | 4.70 | 3.12-7.15 |
+| river bank 2 m, calm / 6 m/s | 2 / 5 | 6.63 / 4.48 | 4.56-5.03 |
+| surf 5 m / 40 m | 13 / 12 | 2.96 / 2.96 | 2.96-3.62 |
+| shingle 3 m / 15 m | 7 / 5 | 3.09 / 3.02 | 3.00-3.85 |
+| harbour wall 2 m | 9 | 5.37 | 2.98-7.60 |
+| boat 0.6 m / 3 m, wood | 9 / 8 | 6.38 / 7.14 | 3.04-4.71 |
+| boat 0.6 m / 3 m, aluminium | 9 / 8 | 6.08 / 6.41 | 3.04-4.71 |
+| walking 80 m of lake beach | 13 | 3.23 | 3.12-7.15 |
+
+No file clips or flat-tops; the stretches are heard wide (IACC 0.1-0.4 at 500 Hz-4 kHz from 2 m, ASW
+0.62-0.80). Renders and the full table: `inbox/waves-2026-10-06/README.txt`.
+
+What does not fit:
+
+- A big river's bank in a calm is nearly silent: the current's eddies (U² / 2g, an estimate) make waves
+  too gentle to break at the bank. With a wind it is 5 of 14: the recorded river banks are mostly ship
+  wakes and chop from further off, which the model does not have.
+- Shingle's band envelopes move more than the recordings' (5-7 of 14), and it is loud: at 3 m its peaks
+  reach the master limiter's ceiling.
+- The boats are more click-like inside 10 ms than the recordings (6-7 against 3.0-4.7), and the
+  planking's lowest modes stand 11-13 dB up at 125 Hz from inside.
+- The lakes' lowest two octaves are 15-25 dB under the recordings', which carry wind on the microphone.
+
+Levels at a metre from one stretch, at 5 m/s onshore (`SourceLevelDb`): lake beach 67 dB, rocky edge 64,
+pond bank 51.5, reedy edge 46, river bank 48.5, surf 85, shingle 93.5, harbour wall 64.5, boats 60-61.
+The surf heard 15 m back from 150 m of beach measures 62 dB, against 62 dB at 40 m quoted from Bolin and
+Åbom (wave height not read): about right, perhaps a little low.
+
+Cost of one core, one stretch: lake beach 3.2 %, rocky edge 3.3 %, pond 0.9 %, reedy edge 0.8 %, river
+bank 0.9 %, surf 11.1 %, shingle 5.9 %, harbour wall 1.7 %, boats 2.2-2.9 %. A near stretch takes 5 HRTF
+voices (surf 10).
 
 ## 9. Not modelled yet, and what comes next
 
