@@ -521,6 +521,60 @@ public sealed class TriangleWorld
         }
     }
 
+    /// <summary>
+    /// Every counted solid whose bounds, grown by <paramref name="grow"/>, stand over the ground between
+    /// <paramref name="a"/> and <paramref name="b"/> and reach up to <paramref name="fromY"/>: what the
+    /// vertical plane through the two points can cut above that height. Candidates for an exact test.
+    /// Unturned instances only (tiles); a turned one is asked by its bounds.
+    /// </summary>
+    public void Column<F>(Vector3 a, Vector3 b, float fromY, float grow, GeometryLayers layers, ref F filter, List<SolidRef> into)
+        where F : IGeometryFilter
+    {
+        if (_instances.Length == 0) return;
+        Span<int> stack = stackalloc int[BvhBuilder.MaxDepth + 2];
+        int sp = 0;
+        stack[sp++] = 0;
+        while (sp > 0)
+        {
+            ref readonly var n = ref _nodes[stack[--sp]];
+            if (!PieceColumns.Meets(n.Min, n.Max, a.X, a.Z, b.X, b.Z, fromY, grow)) continue;
+            if (n.Count > 0)
+            {
+                for (int i = n.LeftFirst; i < n.LeftFirst + n.Count; i++)
+                {
+                    int ii = _order[i];
+                    ref readonly var inst = ref _instances[ii];
+                    if (inst.Rotated)
+                    {
+                        // A door leaf: every solid of it whose world bounds meet the column.
+                        for (int s = 0; s < inst.Piece.SolidCount; s++)
+                        {
+                            var (mn, mx) = BoundsOf(new SolidRef(ii, s));
+                            if (!PieceColumns.Meets(mn, mx, a.X, a.Z, b.X, b.Z, fromY, grow)) continue;
+                            ref readonly var surface = ref inst.Piece.Surfaces[inst.Piece.Solids[s].Surface];
+                            if ((surface.Layers & layers) == 0) continue;
+                            if (!filter.Accept(inst.Owner >= 0 ? inst.Owner : inst.Piece.Solids[s].Owner, surface)) continue;
+                            into.Add(new SolidRef(ii, s));
+                        }
+                        continue;
+                    }
+                    var p = inst.Position;
+                    inst.Piece.Column(a.X - p.X, a.Z - p.Z, b.X - p.X, b.Z - p.Z, fromY - p.Y, grow, layers, ref filter, ii, inst.Owner, into);
+                }
+                continue;
+            }
+            stack[sp++] = n.LeftFirst + 1; stack[sp++] = n.LeftFirst;
+        }
+    }
+
+    /// <summary>Which instance holds the piece of a tile, or -1.</summary>
+    public int InstanceOfTile(TileKey key)
+    {
+        for (int i = 0; i < _instances.Length; i++)
+            if (_instances[i].Owner < 0 && _instances[i].Piece.Key == key) return i;
+        return -1;
+    }
+
     // ═══ The ground ═══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>

@@ -42,11 +42,13 @@ public sealed class AcousticGeometry
     private const float CoverCell = 16f;
 
     /// <summary>A one-off world from a box list (the parity harness, tests).</summary>
-    public static TriangleWorld FromBoxes(IReadOnlyList<SteamAudioScene.Box> boxes, float tileMetres)
-        => new AcousticGeometry(tileMetres).Update(boxes);
+    public static TriangleWorld FromBoxes(IReadOnlyList<SteamAudioScene.Box> boxes, float tileMetres, ISet<int>? leaves = null)
+        => new AcousticGeometry(tileMetres).Update(boxes, leaves);
 
     /// <summary>Brings the world up to <paramref name="boxes"/>, building only the tiles that changed.</summary>
-    public TriangleWorld Update(IReadOnlyList<SteamAudioScene.Box> boxes)
+    /// <param name="leaves">The door leaves among the boxes, by entity id: marked so (SurfaceFlags.DoorLeaf),
+    /// as the routes through openings need to know.</param>
+    public TriangleWorld Update(IReadOnlyList<SteamAudioScene.Box> boxes, ISet<int>? leaves = null)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         bool first = _tiles.Count == 0;
@@ -64,7 +66,7 @@ public sealed class AcousticGeometry
         foreach (var (k, list) in byTile)
         {
             long r = 17;
-            foreach (var b in list) r += Hash(b);      // order-free: boxes come from a dictionary of entities
+            foreach (var b in list) r += Hash(b) + (leaves != null && leaves.Contains(b.EntityId) ? 7919 : 0);   // order-free
             raw[k] = r;
         }
 
@@ -95,7 +97,8 @@ public sealed class AcousticGeometry
             {
                 var specs = new List<SolidSpec>(byTile[k].Count);
                 foreach (var b in byTile[k])
-                    specs.Add(SpecOf(b, SteamAudioScene.IsOpenGround(b, SteamAudioScene.WorldExtents(b), coveredAt)));
+                    specs.Add(SpecOf(b, SteamAudioScene.IsOpenGround(b, SteamAudioScene.WorldExtents(b), coveredAt),
+                                     leaves != null && b.EntityId != 0 && leaves.Contains(b.EntityId)));
                 rebuilt[k] = specs;
             }
         }
@@ -141,9 +144,9 @@ public sealed class AcousticGeometry
     }
 
     /// <summary>A scene box as a solid of the acoustic layer.</summary>
-    public static SolidSpec SpecOf(in SteamAudioScene.Box b, bool openGround)
+    public static SolidSpec SpecOf(in SteamAudioScene.Box b, bool openGround, bool leaf = false)
     {
-        var flags = openGround ? SurfaceFlags.OpenGround : SurfaceFlags.None;
+        var flags = (openGround ? SurfaceFlags.OpenGround : SurfaceFlags.None) | (leaf ? SurfaceFlags.DoorLeaf : SurfaceFlags.None);
         var surface = new Surface(b.Material ?? "", new Construction(b.Size, b.Build), GeometryLayers.Acoustics, flags);
         return new SolidSpec(b.EntityId, b.Center, b.Rotation, b.Size, surface);
     }

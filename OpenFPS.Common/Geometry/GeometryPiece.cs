@@ -455,6 +455,38 @@ public sealed class GeometryPiece
         }
     }
 
+    /// <summary>Every counted solid whose bounds, grown by <paramref name="grow"/>, reach up to
+    /// <paramref name="fromY"/> over the ground-plane segment (ax, az)-(bx, bz): what the vertical plane
+    /// through two points above that height can cut. In the piece's frame.</summary>
+    internal void Column<F>(float ax, float az, float bx, float bz, float fromY, float grow, GeometryLayers layers, ref F filter,
+                            int instance, int ownerOverride, List<SolidRef> into) where F : IGeometryFilter
+    {
+        if (Solids.Length == 0) return;
+        Span<int> stack = stackalloc int[BvhBuilder.MaxDepth + 2];
+        int sp = 0;
+        stack[sp++] = 0;
+        while (sp > 0)
+        {
+            ref readonly var n = ref SolidNodes[stack[--sp]];
+            if (!PieceColumns.Meets(n.Min, n.Max, ax, az, bx, bz, fromY, grow)) continue;
+            if (n.Count > 0)
+            {
+                for (int i = n.LeftFirst; i < n.LeftFirst + n.Count; i++)
+                {
+                    int s = SolidOrder[i];
+                    ref readonly var rec = ref Solids[s];
+                    if (!PieceColumns.Meets(rec.Min, rec.Max, ax, az, bx, bz, fromY, grow)) continue;
+                    ref readonly var surface = ref Surfaces[rec.Surface];
+                    if ((surface.Layers & layers) == 0) continue;
+                    if (!filter.Accept(ownerOverride >= 0 ? ownerOverride : rec.Owner, surface)) continue;
+                    into.Add(new SolidRef(instance, s));
+                }
+                continue;
+            }
+            stack[sp++] = n.LeftFirst + 1; stack[sp++] = n.LeftFirst;
+        }
+    }
+
     /// <summary>Every counted solid whose bounds a segment from <paramref name="o"/> along
     /// <paramref name="d"/> passes through within [0, tMax], the bounds grown by <paramref name="grow"/>.</summary>
     internal void Along<F>(Vector3 o, Vector3 d, Vector3 inv, float tMax, float grow, GeometryLayers layers, ref F filter,
@@ -487,6 +519,29 @@ public sealed class GeometryPiece
             }
             stack[sp++] = n.LeftFirst + 1; stack[sp++] = n.LeftFirst;
         }
+    }
+}
+
+public static class PieceColumns
+{
+    /// <summary>Whether a box (grown by <paramref name="grow"/>) reaches up to <paramref name="fromY"/> and
+    /// its footprint meets the ground-plane segment from (ax, az) to (bx, bz).</summary>
+    internal static bool Meets(Vector3 min, Vector3 max, float ax, float az, float bx, float bz, float fromY, float grow)
+    {
+        if (max.Y + grow < fromY) return false;
+        float t0 = 0f, t1 = 1f;
+        return Slab2(ax, bx - ax, min.X - grow, max.X + grow, ref t0, ref t1)
+            && Slab2(az, bz - az, min.Z - grow, max.Z + grow, ref t0, ref t1);
+    }
+
+    private static bool Slab2(float o, float d, float lo, float hi, ref float t0, ref float t1)
+    {
+        if (MathF.Abs(d) < 1e-12f) return o >= lo && o <= hi;
+        float a = (lo - o) / d, b = (hi - o) / d;
+        if (a > b) (a, b) = (b, a);
+        if (a > t0) t0 = a;
+        if (b < t1) t1 = b;
+        return t0 <= t1;
     }
 }
 

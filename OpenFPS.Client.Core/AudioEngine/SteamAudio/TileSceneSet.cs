@@ -96,10 +96,10 @@ internal sealed class TileSceneSet : IDisposable
     /// made now while nothing traces them), a tile with nothing left goes. Nothing changes in either pair
     /// of top scenes until <see cref="Assemble"/>.
     /// </summary>
-    public void Update(IReadOnlyList<SteamAudioScene.Box> boxes)
+    public void Update(IReadOnlyList<SteamAudioScene.Box> boxes, ISet<int>? leaves = null)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        var world = Store.Update(boxes);
+        var world = Store.Update(boxes, leaves);
         LastStoreMs = clock.Elapsed.TotalMilliseconds;
 
         int built = 0;

@@ -593,6 +593,10 @@ public static class GeometryParitySpike
             }
         }
 
+        // ── Routes through the openings ──────────────────────────────────────────────────────────
+        if (only.Contains("routes"))
+            RoutesParity(maps, mapId, ecs, lookup, data, mapSize, n, show, rng, tallies, args);
+
         // ── The report ───────────────────────────────────────────────────────────────────────────
         Console.WriteLine();
         Console.WriteLine($"{"what",-62} {"probes",8} {"same",8} {"ties",6} {"differ",7} {"max err",9} {"old us",9} {"new us",9}");
@@ -614,6 +618,158 @@ public static class GeometryParitySpike
                               + string.Join(", ", t.TiePairs.OrderByDescending(k => k.Value).Take(10).Select(k => $"{k.Key} x{k.Value}")));
         }
         return 0;
+    }
+
+    // ═══ Routes ════════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// The routes through openings as the acoustic worker builds them for a client at the spawn (the
+    /// tiles a medium detail setting holds, or the whole of a map sent whole): built whole from the box
+    /// grid (main's OpeningRoutes) and from the triangle store tile by tile, the same questions asked of
+    /// both, and what a tile changing costs each.
+    /// </summary>
+    private static void RoutesParity(MapManager maps, string mapId, World ecs, Dictionary<int, Entity> lookup, MapData data,
+                                     Vector3 mapSize, int n, int show, Random rng, List<Tally> tallies, string[] args)
+    {
+        var world = new WorldSnapshot();
+        var defs = new List<EntityDefinition>();
+        var spawn = maps.GetSpawnPoint(mapId).Position;
+        if (data.TileMetres > 0 && maps.TryGetTiles(mapId, out var tiles))
+        {
+            var interest = new TileInterest { Radii = StreamRadii.Default };
+            foreach (int id in TileStreamer.Begin(interest, tiles, spawn))
+                if (lookup.TryGetValue(id, out var e) || tiles.TryGetGlobal(id, out e)) defs.Add(EntityDefinitionFactory.From(ecs, e));
+        }
+        else defs = EntityDefinitionFactory.StaticDefinitions(ecs);
+        foreach (var def in defs)
+        {
+            world.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
+            if (def.Region.RoomSize.X > 0) world.RegionEntityIds.Add(def.EntityId);
+        }
+        world.TileMetres = data.TileMetres;
+        world.AcousticMap = ClientWorldState.BuildAcousticMap(defs, mapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor,
+                                                              streamed: data.TileMetres > 0, report: false);
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
+        Func<Vector3, int> regionAt = p => acoustics.GetRegionAt(world, p);
+        var boxes = SteamAudioScene.BoxesFromWorld(world);
+
+        // Warm both paths once (the first build of anything pays for the JIT).
+        OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, regionAt);
+        var leaves = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.LeavesOf(world);
+        OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, AcousticGeometry.FromBoxes(boxes, data.TileMetres, leaves), null, new OpeningRoutes.TileCache());
+
+        var clock = Stopwatch.StartNew();
+        var old = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, regionAt);
+        double oldMs = clock.Elapsed.TotalMilliseconds;
+        var t = old.BuildTimes;
+        Console.WriteLine($"  routes, whole from the box list: {old.Openings.Count} openings over {boxes.Count} boxes in {oldMs:F0} ms: index {t.IndexMs:F0}, "
+                        + $"boxes {t.SolidsMs:F0}, openings derived {t.DeriveMs:F0}, sides checked {t.SidesMs:F0} ms");
+
+        var store = new AcousticGeometry(data.TileMetres);
+        var cache = new OpeningRoutes.TileCache();
+        clock.Restart();
+        var scene = store.Update(boxes, leaves);
+        double storeMs = clock.Elapsed.TotalMilliseconds;
+        clock.Restart();
+        var tiled = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, scene, regionAt, cache);
+        double newMs = clock.Elapsed.TotalMilliseconds;
+        t = tiled.BuildTimes;
+        Console.WriteLine($"  routes, tile by tile from the store: {tiled.Openings.Count} openings in {newMs:F0} ms (the store itself {storeMs:F0} ms, "
+                        + $"shared with the Steam Audio tiles): boxes {t.SolidsMs:F0}, openings derived {t.DeriveMs:F0}, sides checked {t.SidesMs:F0} ms");
+
+        CompareRoutes("Routes through openings (a whole build each way)", old, tiled, world, regionAt, rng, n, show, tallies);
+
+        // One tile changes, as a door swinging or a tile arriving does: what each way costs, and the
+        // answers after it.
+        var changed = boxes.ToList();
+        int moved = changed.FindIndex(b => TileKey.Of(b.Center, store.TileMetres) == TileKey.Of(spawn, store.TileMetres) && b.Size.Y > 2f);
+        if (moved < 0) moved = 0;
+        changed[moved] = changed[moved] with { Center = changed[moved].Center + new Vector3(0.3f, 0, 0) };
+        clock.Restart();
+        var oldAfter = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, changed, null);
+        double oldOne = clock.Elapsed.TotalMilliseconds;
+        clock.Restart();
+        var sceneAfter = store.Update(changed, leaves);
+        double storeOne = clock.Elapsed.TotalMilliseconds;
+        clock.Restart();
+        var tiledAfter = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
+        double newOne = clock.Elapsed.TotalMilliseconds;
+        Console.WriteLine($"  one tile changed: whole build {oldOne:F0} ms (sides not checked, as the worker does after a change); tile build {newOne:F0} ms "
+                        + $"({cache.Derived} opening(s) derived again, {cache.Kept} kept) after the store's own {storeOne:F0} ms");
+        clock.Restart();
+        OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
+        Console.WriteLine($"  nothing changed: tile build {clock.Elapsed.TotalMilliseconds:F0} ms ({cache.Derived} derived, {cache.Kept} kept)");
+        CompareRoutes("Routes through openings (after one tile changed)", oldAfter, tiledAfter, world, regionAt, rng, n, show, tallies);
+    }
+
+    private static void CompareRoutes(string name, OpeningRoutes old, OpeningRoutes tiled, WorldSnapshot world, Func<Vector3, int> regionAt,
+                                      Random rng, int n, int show, List<Tally> tallies)
+    {
+        var openings = new Tally(name + ": openings");
+        var routes = new Tally(name + ": Route()");
+        var legs = new Tally(name + ": LegGains()");
+        var barriers = new Tally(name + ": BarrierPathDifference()");
+        tallies.Add(openings); tallies.Add(routes); tallies.Add(legs); tallies.Add(barriers);
+
+        var byId = tiled.Openings.ToDictionary(o => o.Id);
+        foreach (var o in old.Openings)
+        {
+            openings.Probes++;
+            if (!byId.TryGetValue(o.Id, out var p)) { openings.Differ("missing", $"{o.Kind} {o.Id}", show); continue; }
+            var oc = o.Contents.Select(i => (old.Solids[i].Center, old.Solids[i].Size)).OrderBy(x => x.Center.X).ThenBy(x => x.Center.Z).ToList();
+            var pc = p.Contents.Select(i => (tiled.Solids[i].Center, tiled.Solids[i].Size)).OrderBy(x => x.Center.X).ThenBy(x => x.Center.Z).ToList();
+            bool sameContents = oc.Count == pc.Count && oc.Zip(pc).All(z => Vector3.Distance(z.First.Center, z.Second.Center) < 1e-3f && Vector3.Distance(z.First.Size, z.Second.Size) < 1e-3f);
+            float geo = MathF.Max(Vector3.Distance(o.Centre, p.Centre), MathF.Max(MathF.Abs(o.HalfWidth - p.HalfWidth), MathF.Max(MathF.Abs(o.HalfHeight - p.HalfHeight), MathF.Abs(o.HalfDepth - p.HalfDepth))));
+            float tau = Vector3.Distance(o.Tau, p.Tau);
+            openings.MaxError = Math.Max(openings.MaxError, geo);
+            if (geo > 1e-3f || tau > 1e-4f || !sameContents || o.NodeA != p.NodeA || o.NodeB != p.NodeB)
+                openings.Differ("opening", $"{o.Kind} {o.Id} at {V(o.Centre)}: frame {geo * 1000:F2} mm apart, tau {V(o.Tau)} / {V(p.Tau)}, contents {oc.Count}/{pc.Count}", show);
+            else openings.Same++;
+        }
+        if (tiled.Openings.Count != old.Openings.Count) openings.Differ("count", $"old {old.Openings.Count}, tiled {tiled.Openings.Count}", show);
+
+        var near = old.Openings.Where(o => o.NodeA != OpeningRoutes.Outside || o.NodeB != OpeningRoutes.Outside).ToList();
+        if (near.Count == 0) near = old.Openings.ToList();
+        for (int i = 0; i < n / 4 && near.Count > 0; i++)
+        {
+            var o1 = near[rng.Next(near.Count)];
+            var o2 = near[rng.Next(near.Count)];
+            Vector3 Around(OpeningRoutes.Opening o) => o.Centre + o.Normal * ((float)rng.NextDouble() * 12f - 6f)
+                                                       + o.Across * ((float)rng.NextDouble() * 8f - 4f) + new Vector3(0, (float)rng.NextDouble() * 1.2f, 0);
+            var l = Around(o1);
+            var s = i % 3 == 0 ? Around(o1) : Around(o2);
+            if (Vector3.Distance(l, s) > 80f) s = l + Vector3.Normalize(s - l) * 80f;
+            int lr = regionAt(l), sr = regionAt(s);
+
+            bool r0 = old.Route(s, sr, l, lr, out var a0);
+            bool r1 = tiled.Route(s, sr, l, lr, out var a1);
+            routes.Probes++;
+            float diff = MathF.Max(Rel(a0.Low, a1.Low), MathF.Max(Rel(a0.Mid, a1.Mid), Rel(a0.High, a1.High)));
+            float lenDiff = MathF.Abs(a0.Length - a1.Length);
+            routes.MaxError = Math.Max(routes.MaxError, lenDiff);
+            if (r0 != r1 || (r0 && (diff > 1e-3f || lenDiff > 1e-3f || a0.Routes != a1.Routes)))
+                routes.Differ(a0.Via == a1.Via && lenDiff <= 1e-3f ? "the same openings, gains apart" : "other openings",
+                    $"{V(s)} (region {sr}) to {V(l)} (region {lr}): old {r0} {a0.Low:G4}/{a0.Mid:G4}/{a0.High:G4} {a0.Length:F3} m x{a0.Routes} via {a0.Via}; "
+                    + $"tiled {r1} {a1.Low:G4}/{a1.Mid:G4}/{a1.High:G4} {a1.Length:F3} m x{a1.Routes} via {a1.Via} (bands {diff:G3} apart)", show);
+            else routes.Same++;
+
+            var g0 = old.LegGains(s, l, Array.Empty<int>(), Array.Empty<int>());
+            var g1 = tiled.LegGains(s, l, Array.Empty<int>(), Array.Empty<int>());
+            legs.Probes++;
+            float gd = MathF.Max(Rel(g0.X, g1.X), MathF.Max(Rel(g0.Y, g1.Y), Rel(g0.Z, g1.Z)));
+            legs.MaxError = Math.Max(legs.MaxError, gd);
+            if (gd > 1e-3f) legs.Differ("leg", $"{V(s)} to {V(l)}: old {V(g0)} tiled {V(g1)}", show);
+            else legs.Same++;
+
+            float b0 = old.BarrierPathDifference(s, l, out var e0, out bool v0);
+            float b1 = tiled.BarrierPathDifference(s, l, out var e1, out bool v1);
+            barriers.Probes++;
+            barriers.MaxError = Math.Max(barriers.MaxError, MathF.Abs(b0 - b1));
+            if (MathF.Abs(b0 - b1) > 1e-3f || v0 != v1) barriers.Differ("barrier", $"{V(s)} to {V(l)}: old {b0:F4} {v0} at {V(e0)}; tiled {b1:F4} {v1} at {V(e1)}", show);
+            else barriers.Same++;
+        }
+
+        static float Rel(float x, float y) => MathF.Abs(x - y) / MathF.Max(1e-6f, MathF.Max(MathF.Abs(x), MathF.Abs(y)));
     }
 
     // ═══ Helpers ═══════════════════════════════════════════════════════════════════════════════
