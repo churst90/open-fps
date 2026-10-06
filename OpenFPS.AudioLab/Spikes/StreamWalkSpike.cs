@@ -138,7 +138,7 @@ public static class StreamWalkSpike
         int tick = 0, refreshesSeen = 0, scenesSeen = 0;
         double tileChangeUntil = 0;
         var cpuAtStart = Process.GetCurrentProcess().TotalProcessorTime;
-        double sceneMsAtStart = worker.SceneBuildMsTotal;
+        double sceneMsAtStart = worker.SceneBuildMsTotal, onlyAtStart = worker.SceneOnlyMsTotal, routesAtStart = worker.RoutesMsTotal;
         var loop = Stopwatch.StartNew();
         double frame = 1.0 / 30.0;
         Vector3 at = spawn;
@@ -186,7 +186,8 @@ public static class StreamWalkSpike
         Console.WriteLine($"  worker answer gaps, while tiles change: {Stats(gapsTiles)}");
         double wall = loop.Elapsed.TotalSeconds;
         double cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuAtStart).TotalSeconds;
-        Console.WriteLine($"  scene work {(worker.SceneBuildMsTotal - sceneMsAtStart) / wall:F0} ms a second ({worker.TileSceneBuilds} builds); " +
+        Console.WriteLine($"  scene work {(worker.SceneBuildMsTotal - sceneMsAtStart) / wall:F0} ms a second ({worker.TileSceneBuilds} builds): " +
+                          $"Steam Audio scenes {(worker.SceneOnlyMsTotal - onlyAtStart) / wall:F0} ms a second, routes {(worker.RoutesMsTotal - routesAtStart) / wall:F0}; " +
                           $"process CPU {cpu / wall * 100:F0} % of one core over {wall:F0} s");
         return 0;
     }

@@ -25,11 +25,8 @@ public sealed class SteamAudioScene : IDisposable
     private readonly IntPtr _context;
     private IntPtr _scene;
     private IntPtr _mesh;
-    /// <summary>The instances of an assembled scene (<see cref="Assembled"/>), released with it.</summary>
-    private List<IntPtr>? _instances;
-    /// <summary>The sub-scenes those instances are of, retained by this scene and released with it, so a
-    /// sub-scene lives exactly as long as the last scene that uses it.</summary>
-    private List<IntPtr>? _subScenes;
+    /// <summary>The handle is someone else's: see <see cref="Borrowed"/>.</summary>
+    private bool _borrowed;
 
     // ── Which ray tracer a context's scenes use ─────────────────────────────────────────────────
     //
@@ -69,16 +66,14 @@ public sealed class SteamAudioScene : IDisposable
     }
 
     /// <summary>
-    /// A scene made of instances of sub-scenes built elsewhere (TileSceneSet): it owns the top scene and
-    /// its instances, not the sub-scenes. <paramref name="boxes"/> are the boxes it holds, for
-    /// <see cref="Solids"/> and the bounds.
+    /// A scene whose handle belongs to someone else (TileSceneSet's top scenes, used in turn): this
+    /// object carries it to the simulators and the reflection search, and never releases it.
     /// </summary>
-    internal static SteamAudioScene Assembled(IntPtr context, IntPtr top, List<IntPtr> instances, IReadOnlyCollection<IntPtr> subScenes,
-                                              IReadOnlyList<Box> boxes)
+    internal static SteamAudioScene Borrowed(IntPtr context, IntPtr scene) => new(context) { _scene = scene, _borrowed = true };
+
+    /// <summary>The boxes a borrowed scene now holds, for <see cref="Solids"/> and the bounds.</summary>
+    internal void SetGeometry(IReadOnlyList<Box> boxes)
     {
-        var retained = new List<IntPtr>(subScenes.Count);
-        foreach (var sub in subScenes) retained.Add(Phonon.iplSceneRetain(sub));
-        var scene = new SteamAudioScene(context) { _scene = top, _instances = instances, _subScenes = retained };
         var solids = new List<EarlyReflections.Solid>(boxes.Count);
         var min = new Vector3(float.MaxValue); var max = new Vector3(float.MinValue);
         foreach (var b in boxes)
@@ -88,9 +83,8 @@ public sealed class SteamAudioScene : IDisposable
             var (lo, hi) = WorldExtents(b);
             min = Vector3.Min(min, lo); max = Vector3.Max(max, hi);
         }
-        scene.Solids = solids;
-        if (solids.Count > 0) { scene.BoundsMin = min; scene.BoundsMax = max; }
-        return scene;
+        Solids = solids;
+        if (solids.Count > 0) { BoundsMin = min; BoundsMax = max; }
     }
 
     public IntPtr Handle => _scene;
@@ -385,18 +379,9 @@ public sealed class SteamAudioScene : IDisposable
 
     private void Release()
     {
-        if (_instances != null)
-        {
-            for (int i = 0; i < _instances.Count; i++) { var m = _instances[i]; Phonon.iplInstancedMeshRelease(ref m); }
-            _instances = null;
-        }
+        if (_borrowed) return;
         if (_mesh != IntPtr.Zero) Phonon.iplStaticMeshRelease(ref _mesh);
         if (_scene != IntPtr.Zero) Phonon.iplSceneRelease(ref _scene);
-        if (_subScenes != null)
-        {
-            for (int i = 0; i < _subScenes.Count; i++) { var s = _subScenes[i]; Phonon.iplSceneRelease(ref s); }
-            _subScenes = null;
-        }
         _mesh = IntPtr.Zero; _scene = IntPtr.Zero;
     }
 

@@ -63,17 +63,15 @@ public static class TileScenesSpike
         double tEmbree = sw.Elapsed.TotalMilliseconds;
         var set = new TileSceneSet(ctxEmbree, tiles.TileMetres);
         sw.Restart();
-        set.Update(boxes, new HashSet<int>());
+        set.Update(boxes);
         double tTiles = sw.Elapsed.TotalMilliseconds;
         var assembles = new List<double>();
         (SteamAudioScene Full, SteamAudioScene Listener) tiled = default;
         for (int i = 0; i < 20; i++)
         {
-            if (i > 0) { tiled.Full.Dispose(); tiled.Listener.Dispose(); }
             sw.Restart();
             tiled = set.Assemble();
             assembles.Add(sw.Elapsed.TotalMilliseconds);
-            if (i < 3) Console.WriteLine($"    assemble {i}: instances {set.LastInstanceMs:F1} ms, all {set.LastAssembleMs:F1} ms");
         }
         assembles.Sort();
         // One tile changes: the cost of a door swinging in it, or of a tile arriving.
@@ -81,11 +79,16 @@ public static class TileScenesSpike
         int moved = changed.FindIndex(b => TileKey.Of(b.Center, tiles.TileMetres) == TileKey.Of(spawn, tiles.TileMetres) && b.Size.Y > 2f);
         changed[moved] = changed[moved] with { Center = changed[moved].Center + new Vector3(0.3f, 0, 0) };
         sw.Restart();
-        set.Update(changed, new HashSet<int>());
+        set.Update(changed);
         double tOne = sw.Elapsed.TotalMilliseconds;
-        set.Update(boxes, new HashSet<int>());
+        sw.Restart();
+        set.Assemble();
+        double tOneAssemble = sw.Elapsed.TotalMilliseconds;
+        set.Update(boxes);
+        set.Assemble();
+        tiled = set.Assemble();
         Console.WriteLine($"  build: default one mesh {tDefault:F0} ms; Embree one mesh {tEmbree:F0} ms; Embree, {set.TileCount} tiles {tTiles:F0} ms; " +
-                          $"one tile changed {tOne:F0} ms ({set.LastBuilt} rebuilt); assemble median {assembles[assembles.Count / 2]:F2} ms, worst {assembles[^1]:F2} ms");
+                          $"one tile changed {tOne:F0} ms ({set.LastBuilt} rebuilt) and {tOneAssemble:F2} ms to swap it in; assemble with nothing changed median {assembles[assembles.Count / 2]:F2} ms, worst {assembles[^1]:F2} ms");
 
         Console.WriteLine($"  listener scene: {tiled.Listener.Solids.Count} boxes tiled, {SteamAudioScene.WithoutOpenGround(boxes).Count} by the whole-map filter; full {tiled.Full.Solids.Count} of {boxes.Count}");
 
@@ -145,7 +148,7 @@ public static class TileScenesSpike
         double meanRt = d1.Reverb.Where(r => r.Rt60Mid > 0.01f).Select(r => (double)r.Rt60Mid).DefaultIfEmpty().Average();
         Console.WriteLine($"  (mean mid reverb time here {meanRt:F2} s; {d1.Direct.Count(d => d.Visibility < 0.5f)} of {sourceCount} sources mostly occluded)");
 
-        tiled.Full.Dispose(); tiled.Listener.Dispose(); set.Dispose();
+        set.Dispose();
         defaultWhole.Dispose(); embreeWhole.Dispose();
         return 0;
     }

@@ -1164,23 +1164,17 @@ public class AsyncAcousticWorker : IDisposable
     private long _routesBuiltTicks;
     /// <summary>The longest the routes go unmade while only walls and roads change, seconds.</summary>
     private const double RoutesEverySeconds = 3.0;
-    private readonly List<TileSceneSet> _retiredTileSets = new();
+    private readonly List<(TileSceneSet Set, long At)> _retiredTileSets = new();
 
-    /// <summary>The door leaves in a world, by entity: instanced at their pose (TileSceneSet).</summary>
-    private static HashSet<int> DoorLeafIds(WorldSnapshot world)
-    {
-        var ids = new HashSet<int>();
-        foreach (var snap in world.Entities.Values)
-            if (IsDoorLeaf(snap.Definition)) ids.Add(snap.Id);
-        return ids;
-    }
-
-    /// <summary>The tile sets of earlier maps, let go when no background build is using one.</summary>
+    /// <summary>The tile sets of earlier maps, let go as replaced scenes are: once no build uses one, no
+    /// tracer is still being handed over, and five seconds have passed.</summary>
     private void ReleaseRetiredTileSets()
     {
         if (_doorBuild != null || _retiredTileSets.Count == 0) return;
-        foreach (var set in _retiredTileSets) set.Dispose();
-        _retiredTileSets.Clear();
+        if (OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Reconfiguring) return;
+        long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
+        for (int i = _retiredTileSets.Count - 1; i >= 0; i--)
+            if (_retiredTileSets[i].At < cutoff) { _retiredTileSets[i].Set.Dispose(); _retiredTileSets.RemoveAt(i); }
     }
 
     /// <summary>The two scenes for a world: assembled from the tile set's sub-scenes (only the tiles
@@ -1190,7 +1184,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         if (set != null)
         {
-            set.Update(boxes, DoorLeafIds(world));
+            set.Update(boxes);
             return set.Assemble();
         }
         var full = new SteamAudioScene(ctx);
@@ -1206,6 +1200,8 @@ public class AsyncAcousticWorker : IDisposable
     public double LastTileSceneBuildMs { get; private set; }
     /// <summary>Every background scene build so far (tiles and doors), milliseconds of wall time in all.</summary>
     public double SceneBuildMsTotal { get; private set; }
+    /// <summary>Of those: making the Steam Audio scenes, and making the routes through openings, ms in all.</summary>
+    public double SceneOnlyMsTotal, RoutesMsTotal;
 
     private static System.Threading.Tasks.Task<T> RunLowered<T>(string name, Func<T> work)
     {
@@ -1245,7 +1241,7 @@ public class AsyncAcousticWorker : IDisposable
             LastTileSceneBuildMs = (DateTime.UtcNow.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
             Console.WriteLine($"[AcousticWorker] Tiles changed: the scene now has {boxes.Count} boxes ({LastTileSceneBuildMs:F0} ms, off this thread"
                 + $"; scenes {_lastScenesMs:F0} ms, routes {_lastRoutesMs:F0} ms"
-                + (_tileScenes != null ? $"; {_tileScenes.LastBuilt} sub-scene(s) built, update {_tileScenes.LastUpdateMs:F0} ms, assembled in {_tileScenes.LastAssembleMs:F1} ms)." : ")."));
+                + (_tileScenes != null ? $"; {_tileScenes.LastBuilt} tile(s) built, update {_tileScenes.LastUpdateMs:F0} ms, assembled in {_tileScenes.LastAssembleMs:F1} ms)." : ")."));
         }
         else Console.WriteLine("[AcousticWorker] A door moved: the scene now has the leaves where they are.");
     }
@@ -1270,6 +1266,9 @@ public class AsyncAcousticWorker : IDisposable
         if (!mapChanged)
         {
             if (_doorBuild != null) return;
+            // The tile set assembles into the pair of scenes not in use, which is only free once the last
+            // pair handed over has reached every tracer.
+            if (_tileScenes != null && OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Reconfiguring) return;
             bool tiles = world.GeometryVersion != _builtGeometryVersion;
             if (!tiles)
             {
@@ -1296,9 +1295,11 @@ public class AsyncAcousticWorker : IDisposable
                 var parts = System.Diagnostics.Stopwatch.StartNew();
                 var (full, listener) = ScenesFor(ctx, set, world, doorBoxes);
                 _lastScenesMs = parts.Elapsed.TotalMilliseconds;
+                SceneOnlyMsTotal += _lastScenesMs;
                 parts.Restart();
                 var routes = routesDue || keptRoutes == null ? BuildRoutes(world, doorBoxes, report: false) : keptRoutes;
                 _lastRoutesMs = parts.Elapsed.TotalMilliseconds;
+                RoutesMsTotal += _lastRoutesMs;
                 return (full, listener, doorBoxes, forMap, routes);
             };
             _doorBuild = tiles ? RunLowered("TileScene", build) : System.Threading.Tasks.Task.Run(build);
@@ -1327,7 +1328,7 @@ public class AsyncAcousticWorker : IDisposable
         if (_embree)
         {
             // A new map's own set of tiles; the last map's goes once no build is using it.
-            if (_tileScenes != null) _retiredTileSets.Add(_tileScenes);
+            if (_tileScenes != null) _retiredTileSets.Add((_tileScenes, DateTime.UtcNow.Ticks));
             _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres);
             var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, world, boxes);
             _saScene.Dispose();
@@ -1531,7 +1532,7 @@ public class AsyncAcousticWorker : IDisposable
         _retiredScenes.Clear();
         if (_saListenerScene != null) { _saListenerScene.Dispose(); _saListenerScene = null; }
         _tileScenes?.Dispose(); _tileScenes = null;
-        foreach (var set in _retiredTileSets) set.Dispose();
+        foreach (var (set, _) in _retiredTileSets) set.Dispose();
         _retiredTileSets.Clear();
         if (_saContext != IntPtr.Zero) Phonon.iplContextRelease(ref _saContext);
 

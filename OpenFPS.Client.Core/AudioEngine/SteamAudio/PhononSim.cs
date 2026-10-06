@@ -239,10 +239,10 @@ internal static partial class Phonon
     public struct IPLInstancedMeshSettings { public IntPtr subScene; public IPLMatrix4x4 transform; }
     [DllImport(Lib, CallingConvention = CC)] public static extern int iplEmbreeDeviceCreate(IntPtr context, ref IPLEmbreeDeviceSettings settings, out IntPtr device);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplEmbreeDeviceRelease(ref IntPtr device);
-    [DllImport(Lib, CallingConvention = CC)] public static extern IntPtr iplSceneRetain(IntPtr scene);
     [DllImport(Lib, CallingConvention = CC)] public static extern int iplInstancedMeshCreate(IntPtr scene, ref IPLInstancedMeshSettings settings, out IntPtr instancedMesh);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplInstancedMeshRelease(ref IntPtr instancedMesh);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplInstancedMeshAdd(IntPtr instancedMesh, IntPtr scene);
+    [DllImport(Lib, CallingConvention = CC)] public static extern void iplInstancedMeshRemove(IntPtr instancedMesh, IntPtr scene);
 
     [DllImport(Lib, CallingConvention = CC)] public static extern int iplSimulatorCreate(IntPtr context, ref IPLSimulationSettings settings, out IntPtr simulator);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSimulatorRelease(ref IntPtr simulator);
