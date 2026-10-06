@@ -1150,6 +1150,8 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>Tile rebuilds swapped in, and how long the last took, milliseconds. Diagnostic.</summary>
     public int TileSceneBuilds { get; private set; }
     public double LastTileSceneBuildMs { get; private set; }
+    /// <summary>Every background scene build so far (tiles and doors), milliseconds of wall time in all.</summary>
+    public double SceneBuildMsTotal { get; private set; }
 
     private static System.Threading.Tasks.Task<T> RunLowered<T>(string name, Func<T> work)
     {
@@ -1182,6 +1184,7 @@ public class AsyncAcousticWorker : IDisposable
         _barrierBoxes = boxes;
         _lastSceneBoxes = boxes.Count;
         PublishRoutes(routes);
+        SceneBuildMsTotal += (DateTime.UtcNow.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
         if (_buildIsForTiles)
         {
             TileSceneBuilds++;
