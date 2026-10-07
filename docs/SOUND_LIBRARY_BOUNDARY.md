@@ -110,7 +110,7 @@ of type declarations, comments included; a partial type counts all its parts.
   (`LineFollower`, `RaceLine`, `LaneRoutes`, `LaneGuide`), roads as map data, the scope, beacons,
   open-fps's recorded speech lines, and open-fps's adapters. Four integration types are host-side
   but split: `ClientAudioSystem`, `WorldAudioPlayer`, `SpatialService` and `BirdLife` each hold
-  library logic that moves out (section 7.6). `EntityGeometry` (in `TriangleWorldBuilder.cs`) is the
+  library logic that moves out (section 7.6). `EntityGeometry` (moved by geometry stage 2 to its own file, `OpenFPS.Common/EntityGeometry.cs`) is the
   adapter half of the new geometry.
 - **c, a value both need**: it lives in the library and the host builds it, stores it or sends it:
   `WheelState`, `TransientSound`, `SoundCharacter`, `PlaybackMode`, `WeatherType`, `ColliderShape`,
@@ -730,7 +730,7 @@ A session here is one working session of an agent, as in docs/GEOMETRY.md.
 
 ### Stage 2: `OpenFPS.Geometry` (1 session)
 
-- Move `EntityGeometry` out of `TriangleWorldBuilder.cs` into Common (host), next to its callers.
+- Done in geometry stage 2: `EntityGeometry` is now `OpenFPS.Common/EntityGeometry.cs` (host side); `Geometry/` reads no entities.
 - Move `BoxContainment` (from `SparseAcousticOctree.cs`) and `WallBuild` (from
   `WallTransmission.cs`) into Geometry; move `TileKey` out of `Tiles.cs` and `ColliderShape` out of
   `Components.cs`.
