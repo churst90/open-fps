@@ -85,7 +85,7 @@ public static class CommandCatalog
         E("Building", "removeseat", "/removeseat NAME", "remove a seat"),
         E("Building", "drivable", "/drivable PRESET", "make a group a vehicle"),
         E("Building", "savemap", "/savemap", "save the map"),
-        E("Building", "edit", "/edit [select nearest|NAME|#ID, select add NAME, move EAST NORTH UP, nudge DIRECTION, turn DEGREES, duplicate, row COUNT, delete, set FIELD VALUE, place PREFAB [at cursor], find WORDS, preview PREFAB, again, group NAME, spawn here, map set SETTING VALUE, model set|versions|pin|use|new|copy|replace|retire KIND ID ..., undo, redo]",
+        E("Building", "edit", "/edit [select nearest|NAME|#ID, select add NAME, select group, held move|nudge|turn ..., move EAST NORTH UP, nudge DIRECTION, turn DEGREES, duplicate, row COUNT, delete, set FIELD VALUE, place PREFAB [at cursor], find WORDS, preview PREFAB, again, group NAME, spawn here, map set SETTING VALUE, model set|add|remove|versions|pin|use|new|copy|replace|retire KIND ID ..., undo, redo]",
           "the world editor, also F12: select things and move, turn, copy, delete and change them, place, search and preview prefabs, group things, set the map's weather, time, ground and beacon rules, change, pin, copy and replace models; kept for the next start"),
         E("Building", "give", "/give [NAME] ITEM [COUNT], /give [NAME] [ammo] KIND [COUNT], or /give [NAME] vehicle PRESET", "give a player an item, spare rounds (9mm, .45, .357, 5.56, 7.62x39, .308, 12 gauge), or a vehicle parked beside them"),
         E("Sound tools", "set_sound", "/set_sound SOUND [VOLUME]", "change the sound of the object in front of you"),

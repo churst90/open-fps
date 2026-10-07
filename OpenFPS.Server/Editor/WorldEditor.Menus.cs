@@ -53,6 +53,8 @@ public sealed partial class WorldEditor
             "select.within" when parts.Length > 1 && float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float r)
                 => Listing(s, $"Within {Metres(r)}", Within(s, r)),
             "held" => HeldMenu(s),
+            "held.nudge" => HeldNudgeMenu(s),
+            "held.turn" => HeldTurnMenu(),
             "places" => PlacesMenu(s),
             "doors" => DoorsMenu(s),
             "selected" => SelectedMenu(s),
@@ -210,6 +212,12 @@ public sealed partial class WorldEditor
             Opens("Settings", "settings"),
         };
         if (!HandOf(s).Held.Contains(id)) items.Add(Act("Hold it as well, to group", $"edit select add #{id}"));
+        if (PlacementOf(s.CurrentMapId, id) is { } placement)
+        {
+            var parts = PartsOf(s.CurrentMapId, placement);
+            if (!parts.All(HandOf(s).Held.Contains))
+                items.Add(Act($"Hold its whole group, {GroupWord(placement)}: {Plural(parts.Count, "thing")}, to move as one", "edit select group"));
+        }
         if (world.Has<SoundEmitterComponent>(e) && ModelKinds.TryModelOfSound(world.Get<SoundEmitterComponent>(e).SoundId, out var kind, out var mid))
             items.Add(Opens($"Its model: {ModelKinds.Spoken(kind)} {mid}, version {VersionOn(s.CurrentMapId, kind, mid)}", $"model:{kind}:{mid}"));
         string prefab = PrefabOf(world, e);
@@ -226,10 +234,32 @@ public sealed partial class WorldEditor
             foreach (int id in hand.Held)
                 if (_maps.AuthoredEntities(s.CurrentMapId).TryGetValue(id, out var e) && Editable(world, e))
                     items.Add(Act($"{NameOf(world, e)}, {Where(world, e, feet, yaw)}", $"edit select #{id}"));
+        if (hand.Held.Count > 0)
+        {
+            items.Add(Typed("Move them together by numbers: east, north, up", "/edit held move "));
+            items.Add(Opens($"Nudge them together, step {Metres(hand.Step)}", "held.nudge"));
+            items.Add(Opens("Turn them together", "held.turn"));
+        }
         items.Add(Typed("Group them, typed: a name for the group", "/edit group "));
         items.Add(Act("Let go of them all", "edit select clear"));
         return Menu($"Held, {Plural(hand.Held.Count, "thing")}", items);
     }
+
+    private EditorMenu HeldNudgeMenu(UserSession s)
+    {
+        var items = new List<EditorMenuItem> { Typed($"Step, {Metres(HandOf(s).Step)}, typed", "/edit step ") };
+        foreach (var w in NudgeWords) items.Add(Act(Capital(w), $"edit held nudge {w}"));
+        return Menu("Nudge them together", items);
+    }
+
+    private static EditorMenu HeldTurnMenu() => Menu("Turn them together, about their middle", new[]
+    {
+        Act("15 degrees clockwise", "edit held turn 15"),
+        Act("15 degrees anticlockwise", "edit held turn -15"),
+        Act("90 degrees clockwise", "edit held turn 90"),
+        Act("90 degrees anticlockwise", "edit held turn -90"),
+        Typed("By degrees, typed", "/edit held turn "),
+    });
 
     private static readonly string[] NudgeWords = { "north", "south", "east", "west", "up", "down", "forward", "back", "left", "right" };
 
@@ -516,16 +546,32 @@ public sealed partial class WorldEditor
                          + (mayChange ? "" : ". Changing it needs edit-models")));
         }
 
-        // A list without an index: its items.
+        // A list without an index: its items, and a way to add one.
         if (at is { Kind: FieldNodeKind.List } && !groupPath.EndsWith(']'))
         {
-            if (ModelKinds.Get(root, groupPath) is JsonArray arr)
-                for (int i = 0; i < arr.Count; i++)
+            var arr = ModelKinds.Get(root, groupPath) as JsonArray;
+            for (int i = 0; arr != null && i < arr.Count; i++)
+            {
+                if (at.IsValueList)
                 {
-                    string named = arr[i] is JsonObject o && (o.TryGetPropertyValue("Name", out var n) || o.TryGetPropertyValue("PrefabId", out n))
-                                   && n is JsonValue v && v.TryGetValue(out string? nm) && !string.IsNullOrWhiteSpace(nm) ? $": {nm}" : "";
-                    items.Add(Opens($"{Capital(at.Label)} {i + 1}{named}", $"model:{kind.Kind}:{id}:{groupPath}[{i}]"));
+                    string? value = ModelKinds.GetValue(root, $"{groupPath}[{i}]", at);
+                    items.Add(Opens($"{Capital(at.Label)} {i + 1}, {(value == null ? "none" : at.Field!.Say(value))}", $"mfield:{kind.Kind}:{id}:{groupPath}[{i}]"));
+                    continue;
                 }
+                string named = arr[i] is JsonObject o && (o.TryGetPropertyValue("Name", out var n) || o.TryGetPropertyValue("PrefabId", out n))
+                               && n is JsonValue v && v.TryGetValue(out string? nm) && !string.IsNullOrWhiteSpace(nm) ? $": {nm}" : "";
+                items.Add(Opens($"{Capital(at.Label)} {i + 1}{named}", $"model:{kind.Kind}:{id}:{groupPath}[{i}]"));
+            }
+            if (arr == null || arr.Count == 0) items.Add(Info($"No {at.Label}"));
+            if (mayChange && !(at.Field?.ReadOnly ?? false))
+            {
+                string add = $"edit model add {kind.Kind} {id} {groupPath}";
+                if (!at.IsValueList) { if (arr is { Count: > 0 }) items.Add(Act("Add a copy of the last one, to change after", add)); }
+                else if (at.Field!.Type == FieldType.Choice && at.Field.Choices.Count <= 12)
+                    foreach (var c in at.Field.Choices) items.Add(Act($"Add {c}", $"{add} {c}"));
+                else items.Add(Typed("Add, typed: one or more values", $"/{add} "));
+            }
+            if (at.Field is { Help.Length: > 0 } f) items.Add(Info(f.Help));
             return Menu(Capital(at.Label), items);
         }
 
@@ -580,9 +626,13 @@ public sealed partial class WorldEditor
         field = field with { Label = FullLabel(kind.Fields, field.Path) };
         var root = JsonNode.Parse(kind.CurrentJson(id))!;
         string? value = ModelKinds.GetValue(root, field.Path, node);
-        return FieldMenu(field, value, $"/edit model set {kind.Kind} {id} {field.Path} ",
-                         $"edit model up {kind.Kind} {id} {field.Path}", $"edit model down {kind.Kind} {id} {field.Path}",
-                         mayChange: s.Can(Permissions.EditModels), choose: v => $"edit model set {kind.Kind} {id} {field.Path} {v}");
+        var menu = FieldMenu(field, value, $"/edit model set {kind.Kind} {id} {field.Path} ",
+                             $"edit model up {kind.Kind} {id} {field.Path}", $"edit model down {kind.Kind} {id} {field.Path}",
+                             mayChange: s.Can(Permissions.EditModels), choose: v => $"edit model set {kind.Kind} {id} {field.Path} {v}");
+        // An item of a list of values: it can be taken out.
+        if (node.IsValueList && s.Can(Permissions.EditModels) && !field.ReadOnly)
+            menu.Items = menu.Items.Append(Act("Take this one out of the list", $"edit model remove {kind.Kind} {id} {field.Path}")).ToArray();
+        return menu;
     }
 
     private EditorMenu? VersionsMenu(UserSession s, string kindId, string id)

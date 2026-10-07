@@ -50,6 +50,10 @@ public sealed class OverlayAddition
 {
     public EntityData Entity { get; set; } = new();
     public Dictionary<string, string>? Settings { get; set; }
+    /// <summary>The group placing it was put down by ("yard@900000004": the group, and the number of its
+    /// first part), shared by every part of that placing so they can be held and moved as one. Null for a
+    /// thing placed on its own.</summary>
+    public string? Placement { get; set; }
 }
 
 /// <summary>

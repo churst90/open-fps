@@ -23,7 +23,7 @@ public readonly record struct Pose(Vector3 Position, Quaternion Rotation, Vector
 
 /// <summary>Everything about a placed thing that is needed to put it back exactly.</summary>
 public sealed record Snapshot(int Id, EntityData Data, Dictionary<string, string>? Settings, bool Added,
-                              OverlayChange? Change, Vector3 Was);
+                              OverlayChange? Change, Vector3 Was, string? Placement = null);
 
 /// <summary>One operation of the world editor, as its undo stack keeps it (docs/WORLD_EDITOR.md section 6).</summary>
 public abstract record EditOp(string MapId)
@@ -217,7 +217,7 @@ public sealed partial class WorldEditor
                     return Restore(op.MapId, p.Thing, out why);
                 }
                 if (!there) { why = "it has been deleted already."; return false; }
-                if (!PoseOf(world, e).Near(PoseOf(p.Thing.Data))) { why = ChangedBy(p.Thing.Id, NameOf(world, e)); return false; }
+                if (!RestOf(world, e).Near(PoseOf(p.Thing.Data))) { why = ChangedBy(p.Thing.Id, NameOf(world, e)); return false; }
                 Remove(op.MapId, world, e, p.Thing.Id);
                 return true;
             }
@@ -232,7 +232,7 @@ public sealed partial class WorldEditor
                     return Restore(op.MapId, d.Thing, out why);
                 }
                 if (!there) { why = $"{d.Name} has been deleted already."; return false; }
-                if (!PoseOf(world, e).Near(PoseOf(d.Thing.Data))) { why = ChangedBy(d.Thing.Id, d.Name); return false; }
+                if (!RestOf(world, e).Near(PoseOf(d.Thing.Data))) { why = ChangedBy(d.Thing.Id, d.Name); return false; }
                 Remove(op.MapId, world, e, d.Thing.Id);
                 return true;
             }
@@ -291,6 +291,10 @@ public sealed partial class WorldEditor
 
     private static Pose PoseOf(EntityData d) => new(d.Position, d.Rotation, d.Scale);
 
+    /// <summary>Where a thing is kept as standing: its pose, but an open door's doorway rather than its
+    /// swung leaf, so it is made again shut where it was put.</summary>
+    private static Pose RestOf(World world, Entity e) => LiveState.Of(world, e).Rest(PoseOf(world, e));
+
     /// <summary>The size a prefab is at a scale, metres; zero if it has no body.</summary>
     private Vector3 SizeAt(string prefab, Vector3 scale)
         => _maps.Prefabs.TryGetValue(prefab.ToLowerInvariant(), out var t) && t.ColliderSize is { } size ? size * scale : Vector3.Zero;
@@ -304,6 +308,7 @@ public sealed partial class WorldEditor
     {
         ref var t = ref world.Get<Transform>(e);
         var oldScale = t.Scale;
+        var was = new Pose(t.Position, t.Rotation, t.Scale);
         t.Position = pose.Position;
         t.Rotation = pose.Rotation;
         t.Scale = pose.Scale;
@@ -315,12 +320,22 @@ public sealed partial class WorldEditor
             c.Size = size != Vector3.Zero ? size
                    : new Vector3(Ratio(c.Size.X, oldScale.X, pose.Scale.X), Ratio(c.Size.Y, oldScale.Y, pose.Scale.Y), Ratio(c.Size.Z, oldScale.Z, pose.Scale.Z));
         }
-        // A doorway's opening goes with its leaf.
+        // A door's doorway goes with its leaf, moved and turned as the leaf was: without it the leaf went
+        // back to the old doorway the next time it swung, and a new version made it there.
+        var opening = pose;
+        if (world.Has<DoorComponent>(e) && !world.Has<ParentComponent>(e) && world.Get<DoorComponent>(e).Captured)
+        {
+            ref var door = ref world.Get<DoorComponent>(e);
+            float turn = YawOf(pose.Rotation) - YawOf(was.Rotation);
+            door.ShutPosition = pose.Position + Vector3.Transform(door.ShutPosition - was.Position, Quaternion.CreateFromYawPitchRoll(turn, 0f, 0f));
+            door.ShutYaw += turn;
+            opening = pose with { Position = door.ShutPosition, Rotation = Quaternion.CreateFromYawPitchRoll(door.ShutYaw, 0f, 0f) };
+        }
         if (world.Has<PortalComponent>(e))
         {
             ref var p = ref world.Get<PortalComponent>(e);
-            p.OpeningCentre = pose.Position;
-            p.OpeningRotation = pose.Rotation;
+            p.OpeningCentre = opening.Position;
+            p.OpeningRotation = opening.Rotation;
         }
         _maps.RefreshGrid(mapId);
         _server.SyncAudioComponent(e.Id);
@@ -357,8 +372,9 @@ public sealed partial class WorldEditor
     /// Makes a thing again from its prefab where it stands, with its name and its own settings, under the
     /// same number: what a new version of its prefab, or a new model for its sound, needs for every
     /// client to hear it. What the map loader gave it beyond the prefab (a doorway's rooms, a door's sides,
-    /// a room's materials) is carried over, and doorways into a room made again are joined to it again.
-    /// Nothing in the overlay changes. The new entity, or Entity.Null if it could not be made.
+    /// a room's materials) is carried over, and so is what it is doing (<see cref="LiveState"/>); doorways
+    /// into a room made again are joined to it again. Nothing in the overlay changes. The new entity, or
+    /// Entity.Null if it could not be made.
     /// </summary>
     internal Entity Remake(string mapId, int id)
     {
@@ -373,12 +389,14 @@ public sealed partial class WorldEditor
         PortalComponent? portal = world.Has<PortalComponent>(e) ? world.Get<PortalComponent>(e) : null;
         DoorComponent? door = world.Has<DoorComponent>(e) ? world.Get<DoorComponent>(e) : null;
         RegionComponent? region = world.Has<RegionComponent>(e) ? world.Get<RegionComponent>(e) : null;
+        var live = LiveState.Of(world, e);
+        var rest = live.Rest(pose);
         int old = e.Id;
 
         _maps.DestroyEntity(mapId, e);
         _server.BroadcastRemoval(mapId, old);
         Entity made;
-        try { made = _maps.SpawnPrefab(mapId, prefab, pose.Position, pose.Rotation, pose.Scale, data?.Name); }
+        try { made = _maps.SpawnPrefab(mapId, prefab, rest.Position, rest.Rotation, rest.Scale, data?.Name); }
         catch (Exception) { made = Entity.Null; }
         if (made == Entity.Null) { authored.Remove(id); return Entity.Null; }
 
@@ -412,6 +430,7 @@ public sealed partial class WorldEditor
         }
         if (settings != null)
             foreach (var (path, value) in settings) EntitySettings.TrySet(world, made, path, value, out _);
+        live.OnTo(world, made);
         authored[id] = made;
         Restream(mapId, world, made, old);
         return made;
@@ -477,7 +496,7 @@ public sealed partial class WorldEditor
     /// <summary>Keeps where a thing is now: in its overlay entry (a change of a map-file thing, or the addition) and in the map's data.</summary>
     private void Record(string mapId, int id, World world, Entity e)
     {
-        var pose = PoseOf(world, e);
+        var pose = RestOf(world, e);
         var o = Overlays.Get(mapId);
         var data = DataOf(mapId);
         if (o.AdditionFor(id) is { } a)
@@ -534,7 +553,7 @@ public sealed partial class WorldEditor
     {
         var o = Overlays.Get(mapId);
         var data = DataOf(mapId);
-        var pose = PoseOf(world, e);
+        var pose = RestOf(world, e);
         data.TryGetValue(id, out var entry);
         var copy = entry != null ? MapOverlayStore.Clone(entry) : new EntityData { EntityId = id, PrefabId = PrefabOf(world, e) };
         copy.Position = pose.Position; copy.Rotation = pose.Rotation; copy.Scale = pose.Scale;
@@ -549,7 +568,7 @@ public sealed partial class WorldEditor
                                 Settings = change.Settings == null ? null : new Dictionary<string, string>(change.Settings),
                                 WasRotation = change.WasRotation, WasScale = change.WasScale,
                             },
-                            change?.Was ?? entry?.Position ?? pose.Position);
+                            change?.Was ?? entry?.Position ?? pose.Position, add?.Placement);
     }
 
     /// <summary>Takes a thing off the map: the world, every client, the overlay and the map's data.</summary>
@@ -600,7 +619,11 @@ public sealed partial class WorldEditor
         if (thing.Added)
         {
             o.Added.RemoveAll(a => a.Entity.EntityId == thing.Id);
-            o.Added.Add(new OverlayAddition { Entity = MapOverlayStore.Clone(d), Settings = thing.Settings == null ? null : new Dictionary<string, string>(thing.Settings) });
+            o.Added.Add(new OverlayAddition
+            {
+                Entity = MapOverlayStore.Clone(d), Settings = thing.Settings == null ? null : new Dictionary<string, string>(thing.Settings),
+                Placement = thing.Placement,
+            });
         }
         else
         {

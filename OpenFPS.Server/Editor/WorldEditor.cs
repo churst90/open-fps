@@ -95,7 +95,8 @@ public sealed partial class WorldEditor
 
     public const string Usage =
         "Usage: /edit on its own opens the menu. /edit select nearest|within METRES|NAME|#ID, /edit select add nearest|NAME|#ID, "
-        + "/edit select clear, /edit selected, /edit move EAST NORTH UP, /edit nudge DIRECTION [METRES], /edit turn DEGREES, "
+        + "/edit select group, /edit select clear, /edit held move|nudge|turn ..., /edit selected, /edit move EAST NORTH UP, "
+        + "/edit nudge DIRECTION [METRES], /edit turn DEGREES, "
         + "/edit face DIRECTION, /edit bring, /edit duplicate, /edit row COUNT [SPACING], /edit delete, /edit set FIELD VALUE, "
         + "/edit up FIELD, /edit down FIELD, /edit settings, /edit place PREFAB [at cursor], /edit place group ID, /edit again, "
         + "/edit find WORDS, /edit preview PREFAB, /edit prefabs [CATEGORY], /edit group NAME, /edit spawn here, /edit step METRES, "
@@ -121,6 +122,8 @@ public sealed partial class WorldEditor
                     "replace" => args.Any(a => a.Equals("everywhere", StringComparison.OrdinalIgnoreCase)) ? 10 : 5,
                     _ => 1,
                 };
+            case "held":
+                return 5;
             case "row":
                 return int.TryParse(Word(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)
                     ? 1 + Math.Clamp(n, 0, MaxRow) / 10.0 : 1;
@@ -155,6 +158,11 @@ public sealed partial class WorldEditor
                 SpawnHere(s, reply);
                 return;
             case "select":
+                if (rest.Length == 1 && rest[0].Equals("group", StringComparison.OrdinalIgnoreCase))
+                {
+                    HoldPlacement(s, reply);
+                    return;
+                }
                 if (rest.Length > 0 && rest[0].ToLowerInvariant() is "add" or "clear" or "hold")
                 {
                     Hold(s, rest[0].Equals("clear", StringComparison.OrdinalIgnoreCase) ? new[] { "clear" } : rest[1..], reply);
@@ -163,6 +171,7 @@ public sealed partial class WorldEditor
                 Select(s, rest, reply);
                 return;
             case "hold": Hold(s, rest, reply); return;
+            case "held": HeldCommand(s, rest, reply); return;
             case "row": Row(s, rest, reply); return;
             case "again": Again(s, reply); return;
             case "find":

@@ -91,13 +91,15 @@ public sealed partial class WorldEditor
         Refresh(s, reply);
     }
 
-    /// <summary>One new thing on the map, kept in its overlay as an addition.</summary>
-    private bool PlaceOne(string mapId, PrefabTemplate t, Pose pose, string? name, Dictionary<string, string>? settings, out Snapshot thing, out string why)
+    /// <summary>One new thing on the map, kept in its overlay as an addition; <paramref name="placement"/>
+    /// names the group placing it is part of.</summary>
+    private bool PlaceOne(string mapId, PrefabTemplate t, Pose pose, string? name, Dictionary<string, string>? settings, out Snapshot thing, out string why,
+                          string? placement = null)
     {
         var o = Overlays.Get(mapId);
         int id = o.NextId++;
         var data = new EntityData { EntityId = id, PrefabId = t.Id, Position = pose.Position, Rotation = pose.Rotation, Scale = pose.Scale, Name = name };
-        thing = new Snapshot(id, data, settings, Added: true, Change: null, Was: pose.Position);
+        thing = new Snapshot(id, data, settings, Added: true, Change: null, Was: pose.Position, Placement: placement);
         if (Restore(mapId, thing, out why)) return true;
         o.NextId--;
         return false;
