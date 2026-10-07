@@ -395,7 +395,8 @@ public sealed partial class PedestrianSpeech
             if (now < me.NextPhoneLine || now < me.BusyUntil) return;
             bool last = now + 6 > me.CallUntil;
             // Somebody with a story tells it, once a call at most: half a minute of their side.
-            var stories = Speech.LinesOf(me.Voice, "story");
+            var stories = Speech.LinesOf(me.Voice, "story")
+                .Where(l => Speech.Find(me.Voice, l) is { } t && HomelessLines.StoryTrueNow(t.Text, cond)).ToList();
             if (!last && !me.ToldStory && stories.Count > 0 && _rng.NextDouble() < StoryChance)
             {
                 me.ToldStory = true;
@@ -499,7 +500,11 @@ public sealed partial class PedestrianSpeech
         if (p.Speed < 0.2f && Speech.LinesOf(me.Voice, "waiting").Count > 0) cats.Add("waiting");
         if (cats.Count == 0) return;
         string cat = cats[_rng.Next(cats.Count)];
-        var lines = Speech.LinesOf(me.Voice, cat).Where(l => l != me.LastLine).ToList();
+        // The weather and hour categories are only offered when true; the rest can still name an hour.
+        bool offeredWhenTrue = cat.StartsWith("weather_", StringComparison.Ordinal) || cat.StartsWith("time_", StringComparison.Ordinal);
+        var lines = Speech.LinesOf(me.Voice, cat)
+            .Where(l => l != me.LastLine && (offeredWhenTrue || Speech.Find(me.Voice, l) is { } t && HomelessLines.TrueNow(t.Text, cond)))
+            .ToList();
         if (lines.Count == 0) return;
         float db = cat is "mutter" or "think_aloud" ? MutterDb : Speech.NormalDb;
         Say(p, me, lines[_rng.Next(lines.Count)], db, 0f, now, say);
