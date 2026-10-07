@@ -10,8 +10,8 @@ using Serilog;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Responsibility: The bridge between the high-level Game World and the low-level Audio Engine.
-/// It translates physical entity state (positions, materials) into acoustic emitters.
+/// Turns the world's entities into sounds: emitters, their acoustic paths, and the budgets that decide
+/// which of them get a voice.
 /// </summary>
 public class ClientAudioSystem
 {
@@ -28,21 +28,17 @@ public class ClientAudioSystem
     private readonly SpatialAcoustics _acoustics;
 
     /// <summary>
-    /// The short sounds the world reports — a door shutting, glass landing, a round striking a wall.
-    ///
-    /// Lives here rather than beside the network code because it needs this system's acoustics: a
-    /// transient has to be occluded, reverberated and placed by the same path as everything else, or
-    /// a door heard through a wall would be the one sound in the game that is not muffled by it.
+    /// The short sounds the world reports: a door shutting, glass landing, a round striking a wall.
+    /// Here rather than beside the network code because a transient takes the same occlusion, reverb
+    /// and placement as everything else.
     /// </summary>
     public WorldAudioPlayer WorldAudio { get; }
     private readonly AsyncAcousticWorker _acousticWorker;
     private readonly HashSet<string> _preloadedSounds = new();
 
-    /// <summary>
-    /// Set by the simulation system when the player spawns.
-    /// Propagates to the shared SpatialService so self-entity is excluded from occlusion raycasts.
-    /// </summary>
     private int _ownEntityId = -1;
+    /// <summary>The player's own entity, set at spawn; passed to the SpatialService so occlusion rays
+    /// ignore it.</summary>
     public int OwnEntityId
     {
         get => _ownEntityId;
@@ -82,74 +78,44 @@ public class ClientAudioSystem
     private double _lastEngineTime;
 
     /// <summary>
-    /// How much nearer a silent car has to be than a sounding one before it takes its voice.
-    ///
-    /// Pure ranking by distance churns: on an oval, two cars swap order several times a lap, and
-    /// every swap stops one engine and starts another — which is not a cross-fade, it is a synthesis
-    /// thrown away and restarted with cold pipes and a stopped crank, heard as a car stuttering in
-    /// and out. Ranking a car that is already sounding as if it were a quarter nearer
-    /// than it is makes it keep its voice until the challenger is decisively closer.
+    /// A sounding car ranks as if this much nearer, so a silent one must be decisively closer to take its
+    /// voice. Ranking by distance alone churns: on an oval two cars swap order several times a lap, and
+    /// each swap restarts a synth with cold pipes and a stopped crank, heard as a car stuttering.
     /// </summary>
     private const float EngineKeepBias = 0.75f;
 
-    /// <summary>And no engine is dropped within this long of being started, whatever the ranking
-    /// says, so a car that crosses the boundary at three hundred kilometres an hour cannot be
-    /// started and stopped inside the same second.</summary>
+    /// <summary>No engine is dropped within this long of being started, whatever the ranking says, so
+    /// a fast car crossing the boundary is not started and stopped inside a second.</summary>
     private const double EngineMinimumHoldSeconds = 2.5;
 
     /// <summary>
-    /// The audio update is capped here rather than in each head's game loop, so both are capped by the same
-    /// rule. The loop it hangs off polls the network as fast as it can — a 5 ms sleep, so roughly 200 Hz.
-    /// Uncapped, it would run the entire audio update at that rate: listener sync, region resolution, the
-    /// near-field radar's six raycasts, an acoustic request per active voice, and the FMOD tick. None of
-    /// that resolves faster than a frame, so two updates in three would be work nobody could hear, taken
-    /// from the thread that has to service the socket.
+    /// The audio update's cap, here so both heads share it. Their loop polls the network at about 200 Hz
+    /// (a 5 ms sleep); nothing in the update resolves faster than a frame, so uncapped two updates in
+    /// three would be unheard work on the thread that services the socket.
     /// </summary>
     public const double UpdateHz = 60.0;
     /// <summary>
-    /// What a loud exhaust measures at one metre under load — the fallback for a vehicle that does
-    /// not declare its own level.
-    ///
-    /// Every preset does declare one (<c>VehicleProfile.SourceLevelDb</c>, measured with
-    /// `--engine-levels`), and they run from 91 dB for a diesel pickup to 133 for an unsilenced V10.
-    /// Placing all of them at this one number put the race cars forty decibels of dynamic range out
-    /// and, worse, was also being used as the synthesis's clipping reference.
+    /// A loud exhaust at one metre under load: the fallback for a vehicle that declares no level. Every
+    /// preset declares one (<c>VehicleProfile.SourceLevelDb</c>, measured with `--engine-levels`), from
+    /// 91 dB for a diesel pickup to 133 for an unsilenced V10.
     /// </summary>
     public const float EngineSourceLevelDb = 116f;
 
     /// <summary>
-    /// How many vehicles may run a LIVE engine at once.
-    ///
-    /// Every one of them is a whole engine — cylinders, valves, waveguides — integrated sample by
-    /// sample on the engine render pool, and measured (`--engine-cost`) a V8 renders about nine
-    /// seconds of audio per second of one core in a release build. A field of cars can be any size
-    /// it likes on the server; the nearest few are the ones a listener can pick out anyway, and the
-    /// rest are voiced by borrowing a near car's ring (see the distant voices below).
-    ///
-    /// Overridable with OPENFPS_ENGINE_VOICES for anyone with a machine to spend.
+    /// How many vehicles may run a live engine at once (OPENFPS_ENGINE_VOICES overrides). Each is a whole
+    /// engine integrated sample by sample on the render pool; a V8 renders about nine seconds of audio per
+    /// core-second in a release build (`--engine-cost`). The rest borrow a near car's ring (distant voices).
     /// </summary>
     public static readonly int EngineVoiceBudget =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_ENGINE_VOICES"), out int budget) && budget > 0
             ? budget : 32;
 
     /// <summary>
-    /// The budget actually in force, which follows the MEASURED mixer load rather than a guess.
-    ///
-    /// A fixed number cannot be right. What one engine costs depends on the engine, and what is left
-    /// over depends on everything else in the map — reverb, reflections, footsteps, however many
-    /// sources a map nobody has seen yet decides to carry. What measures half a core on the bench can
-    /// peg the mixer in the game, because the game also has all of that. And a mixer at a hundred per
-    /// cent does not sound busy, it sounds broken: the callback
-    /// misses its deadline and the output tears, which is heard as crackling and is easy to mistake
-    /// for distortion.
-    ///
-    /// So the budget is a control loop, and it gives things up IN ORDER. Reflections first — a car's
-    /// second reflection, then its first — and only then a car. That order is not a detail: shedding
-    /// cars first makes the field sound like voices being swapped, because a car arriving pushes out
-    /// one that has not finished going past, and then the one that left comes back. A listener notices
-    /// a car vanishing and does not notice a wall stopping answering.
-    ///
-    /// The floor is two cars, not one. One engine on a racetrack is not a race.
+    /// The engine budget in force, steered by the measured mixer load: what an engine costs depends on
+    /// everything else in the map, and a mixer at 100 % misses its deadline and crackles. It gives things
+    /// up in order, a car's second reflection, then its first, and only then a car: shedding cars first
+    /// sounds like voices being swapped, while nobody notices a wall stop answering. The floor is two
+    /// cars; one engine on a racetrack is not a race.
     /// </summary>
     private int _adaptiveBudget = EngineVoiceBudget;
 
@@ -159,28 +125,16 @@ public class ClientAudioSystem
     private int _starvesSeen;
     private double _starveSampledAt = -1;
     /// <summary>
-    /// The ceiling on engine reflections, overridable with OPENFPS_ENGINE_ECHOES.
-    ///
-    /// It exists as a switch because echoes are BY FAR the highest-churn object in the audio system
-    /// and the only one that reaches into another voice's buffers: the city puts about 256 of them
-    /// through create-and-release in 98 seconds, each holding a reference to the engine voice it is an
-    /// echo of. When a fault lands on the mixer thread, taking the busiest subsystem out in one
-    /// run is the quickest way to clear or implicate it.
-    ///
-    ///     OPENFPS_ENGINE_ECHOES=0   no reflections of engines at all
-    ///     OPENFPS_ENGINE_ECHOES=1   one per engine instead of two
-    ///
-    /// Unset is the normal behaviour. This is a diagnostic lever, not a setting anybody should need.
+    /// Reflections per engine (OPENFPS_ENGINE_ECHOES: 0 none, 1 one; a diagnostic lever). Echoes churn
+    /// more than anything else in the audio system (about 256 created and released in 98 s on the city)
+    /// and are the only voices that read another voice's buffers, so taking them out is the quickest way
+    /// to clear or implicate them in a mixer-thread fault.
     /// </summary>
     /// <remarks>
-    /// An unsmeared engine echo would be a COHERENT copy of the engine — the same waveform, read
-    /// later, placed at a mirror point through the full HRTF. Against the direct sound that is a comb
-    /// filter that sweeps as either moves (phasing, a car heard inside out); on its own it is a point
-    /// source beamed from a wall, carrying, say, a bus's air hiss to wherever the mirror is. What a
-    /// street really sends back off a steady engine is many surfaces at once, incoherent. So each
-    /// echo is smeared by the roughness of the wall it came off (EngineEchoState.Scattering): the
-    /// same sound but not the same waveform, and it swells and fades over a few hundred milliseconds
-    /// instead of switching. OPENFPS_ENGINE_ECHOES=0 takes them out for an A/B.
+    /// An unsmeared echo is a coherent copy of the engine: against the direct sound a comb that sweeps as
+    /// either moves (a car heard inside out), alone a point beamed from a wall. So each echo is smeared by
+    /// the roughness of its wall (EngineEchoState.Scattering) and swells and fades over a few hundred
+    /// milliseconds instead of switching.
     /// </remarks>
     public static readonly int EchoCeiling =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_ENGINE_ECHOES"), out int ec) && ec >= 0
@@ -205,27 +159,21 @@ public class ClientAudioSystem
     internal const int SirenVoiceBase = -900000;
 
     /// <summary>
-    /// How many machines may have their front outlet voiced separately.
-    ///
-    /// A car close enough for its two ends to be told apart is a car going past you, and there are
-    /// never many of those at once — the geometry says so: inside about twenty metres for a car, and
-    /// a listener has one of those either side of them at worst. The budget exists for the case the
-    /// geometry does not cover, which is standing in the middle of a grid on a start line, and it is
-    /// the FIRST thing given up when the mixer runs short, before reflections: a second outlet is the
-    /// most expendable voice in the world, because the machine is still fully audible without it.
+    /// How many machines may have their front outlet voiced separately (OPENFPS_FRONT_VOICES=0 keeps
+    /// each on one voice, for an A/B). A car's ends are told apart only inside about 20 m, so few are
+    /// needed except on a start grid. The first thing given up when the mixer runs short, before
+    /// reflections: the machine stays fully audible without it.
     /// </summary>
-    /// <remarks>OPENFPS_FRONT_VOICES=0 keeps every machine on one voice, for an A/B of the split.</remarks>
     private static readonly int FrontVoiceBudget =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_FRONT_VOICES"), out int fv) && fv >= 0 ? fv : 6;
     private int _adaptiveFront = FrontVoiceBudget;
 
     /// <summary>
     /// How many outer places of trees, fires and fountain taps may have voices at once (ExtendedSources),
-    /// nearest source first. Like a machine's front outlet, a place costs nothing but geometry when it is
-    /// given up: the source merges to its middle at the same level. So places are the first thing the
-    /// mixer gives up when it runs short, a source's worth at a time, and the last it takes back.
+    /// nearest source first; OPENFPS_PLACE_VOICES=0 keeps each on its middle. A place given up costs only
+    /// geometry (the source merges to its middle at the same level), so places are the first thing the
+    /// mixer gives up and the last it takes back, a source's worth at a time.
     /// </summary>
-    /// <remarks>OPENFPS_PLACE_VOICES=0 keeps every extended source on its middle alone.</remarks>
     private static readonly int PlaceVoiceBudget =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_PLACE_VOICES"), out int pv) && pv >= 0 ? pv : 36;
     private int _adaptivePlaces = PlaceVoiceBudget;
@@ -241,23 +189,11 @@ public class ClientAudioSystem
     private const int NewEnginesPerUpdate = 2;
 
     /// <summary>
-    /// How many STANDING machines may run live at once — air conditioners, mowers, plant.
-    ///
-    /// Its own budget rather than a share of the engines', because the two are authored at completely
-    /// different densities. A map carries tens of vehicles and it carries HUNDREDS of small machines:
-    /// the city has a hundred and fourteen window units, one in the window of every street-side flat
-    /// on the lower five floors of five towers, which is what a city has. Authoring five of them and
-    /// calling it a city would hide the problem this budget exists to solve rather than pose it.
-    ///
-    /// The ranking underneath it is the part that matters, and it is NOT distance: it is what each
-    /// machine would actually SOUND like here (Loudness.RenderedGain). A rooftop condenser at 65 dB
-    /// eighty metres up the street beats a window unit at 59 dB behind a hedge, and a distance
-    /// ranking gets that backwards. See the audibility note on EngineReflections for the same rule
-    /// applied to reflections.
-    ///
-    /// Overridable with OPENFPS_MACHINE_VOICES, and ZERO IS A VALID ANSWER: 0 switches every machine
-    /// and aircraft voice off, which is what the lever is for (taking a subsystem out to see whether
-    /// it is the one at fault). Treating 0 as unset would make the lever useless.
+    /// How many standing machines (air conditioners, mowers, plant) may run live at once. Its own budget:
+    /// a map carries tens of vehicles but hundreds of small machines (the city has 114 window units).
+    /// Ranked not by distance but by how loud each would be here, at the ear (Loudness.RenderedGain, then
+    /// Loudness.HeardGain): a rooftop condenser at 65 dB 80 m away beats a 59 dB window unit behind a hedge.
+    /// OPENFPS_MACHINE_VOICES overrides, and 0 is a valid answer: every machine and aircraft voice off.
     /// </summary>
     public static readonly int MachineVoiceBudget =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MACHINE_VOICES"), out int mbudget) && mbudget >= 0
@@ -271,7 +207,7 @@ public class ClientAudioSystem
     /// <summary>Nothing at all, when the budget is zero: the adaptive floor must not put one back.</summary>
     private int MachineFloor => MachineVoiceBudget == 0 ? 0 : MinMachineVoices;
 
-    /// <summary>Which physical models currently have a live voice, and when each started.</summary>
+    /// <summary>Which physical models have a live voice now (and, below, when each started).</summary>
     private readonly HashSet<int> _liveMachines = new();
     /// <summary>The ids whose acoustic path is asked for this frame. See step 5.</summary>
     private readonly HashSet<int> _pathIds = new();
@@ -280,14 +216,9 @@ public class ClientAudioSystem
     private readonly List<(int Id, float Key, float Level)> _machineOrder = new();
 
     /// <summary>
-    /// How many borrowed voices may sound at once, beyond the synthesized ones.
-    ///
-    /// Borrowing makes a car cheap; it does not make it free. The engine is not run, but the voice is
-    /// still placed — HRTF, filtering, a channel — so thirty of them is thirty spatialised sources
-    /// and the saving is thrown away again. This is the second budget, and it is what actually lets a
-    /// map carry any number of cars: the field can be thirty or three hundred, a few are synthesized,
-    /// the nearest handful of the rest are voiced, and everything beyond that is genuinely too far
-    /// away to pick out of the pack.
+    /// How many borrowed voices may sound at once, beyond the synthesized ones. A borrowed voice runs no
+    /// engine but is still placed (HRTF, filters, a channel), so this second budget is what lets a map
+    /// carry any number of cars: the nearest handful are voiced, the rest are too far to pick out.
     /// </summary>
     private int _adaptiveDistant = MaxDistantVoices;
     private const int MaxDistantVoices = 12;
@@ -303,40 +234,27 @@ public class ClientAudioSystem
     private const double BudgetSettleSeconds = 1.0;
 
     /// <summary>
-    /// How long after a map load the budget is left alone, and how long the mixer must stay over the
-    /// ceiling before anything is given up.
-    ///
-    /// The control loop steers on FMOD's dsp percentage, and during a load that reading is a LIE. It
-    /// pins at a hundred per cent while the mixer thread is stalled — by a GC suspension, by a
-    /// producer it was waiting on — and a stall is not a mixer that is short of capacity, it is a
-    /// mixer that is not running. A loop that cannot tell the difference sheds echoes, then borrowed
-    /// voices, then cars, and a second later, the stall over and the load back to normal, adds them
-    /// all back. Every re-added engine is a NEW voice — a new synth, a tenth of a second of warm-up, a
-    /// quarter of a second of fill, an FMOD graph rebuild — so its response to a busy machine is to
-    /// make more work for it at the worst possible moment, heard as cars appearing and vanishing on
-    /// the first lap.
-    ///
-    /// So: nothing is given up for the first few seconds in a map, and after that the ceiling has to
-    /// be exceeded for three quarters of a second together, not in one sample.
+    /// The budget is left alone this long after a map load, and after that the load must stay over the
+    /// ceiling this long together before anything is given up. During a load FMOD's dsp percentage pins at
+    /// 100 % while the mixer is stalled (a GC, a producer it waits on), which is not a shortage: shedding
+    /// then and re-adding a second later builds new engines at the worst moment, heard as cars appearing
+    /// and vanishing on the first lap.
     /// </summary>
     private const double BudgetHoldSeconds = 3.0;
     private const double OverCeilingSeconds = 0.75;
     private double _budgetHeldUntil;
     private double _overCeilingSince = -1;
 
-    /// <summary>
-    /// Called when a map starts loading and again when the player is spawned into it. See
-    /// BudgetHoldSeconds: for the next few seconds the mixer's load reading cannot be trusted.
-    /// </summary>
+    /// <summary>Called when a map starts loading and again at spawn: the mixer's load reading cannot be
+    /// trusted for a few seconds (BudgetHoldSeconds).</summary>
     public void NoteSceneLoading() => _budgetHeldUntil = _now() + BudgetHoldSeconds;
     private readonly UpdateThrottle _throttle = new(UpdateHz);
     /// <summary>Seconds since this system was built. A stopwatch in the game; a test hands in its
     /// own, so it can tick the throttled update and step past the engine hold without sleeping.</summary>
     private readonly Func<double> _now;
 
-    // Near-field boundary probing. The directions are rebuilt each frame from the listener's rotation
-    // (BoundaryModel.ProbeDirections is head space), and every buffer here is owned and reused — this
-    // runs on every audio frame.
+    // Near-field boundary probes: rebuilt each frame from the listener's rotation (ProbeDirections is
+    // head space) into buffers owned and reused here, since this runs every audio frame.
     private readonly Vector3[] _boundaryRays = new Vector3[BoundaryModel.ProbeDirections.Length];
     private readonly float[] _boundaryDistances = new float[BoundaryModel.ProbeDirections.Length];
     private readonly float[] _boundaryAbsorptions = new float[BoundaryModel.ProbeDirections.Length];
@@ -349,20 +267,24 @@ public class ClientAudioSystem
     private string _regionAmbienceId = "";
     private int _ambienceRegionId = int.MinValue;
 
-    /// <param name="prewarm">Render the city's doors in the background at start. A session with no sound
-    /// has nothing to play them on.</param>
+    /// <summary>With <paramref name="prewarm"/> false the city's doors are not rendered in the background
+    /// at start: a session with no sound has nothing to play them on.</summary>
     public ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state, bool prewarm = true)
         : this(audio, sounds, state, StopwatchClock(), prewarm: prewarm) { }
 
     /// <summary>For tests: the same system on a clock the caller controls.</summary>
+    /// <param name="audio">The engine to play through.</param>
+    /// <param name="sounds">The recorded sounds by material and action.</param>
+    /// <param name="state">The local player.</param>
+    /// <param name="clock">Seconds, as the test steps them.</param>
     /// <param name="manualAcoustics">The acoustic worker runs no thread: the test steps it between
     /// updates (<see cref="AsyncAcousticWorker.StepForTest"/>), the rain survey runs in place, and no
-    /// door or thunder renders are started in the background. For the emitter-stream replay, which must
-    /// come out the same on every run.</param>
+    /// door or thunder renders start in the background. For the emitter-stream replay, which must come
+    /// out the same on every run.</param>
     /// <param name="seed">Seeds what the game leaves to chance (birds, near rain drops, a footstep's
     /// jitter). Null: unseeded, as in the game.</param>
-    /// <param name="prewarm">Render the city's doors in the background at start, as the game does
-    /// (<see cref="WorldAudioPlayer"/>). A test that plays no door has no use for minutes of a core.</param>
+    /// <param name="prewarm">Render the city's doors in the background at start (<see cref="WorldAudioPlayer"/>).
+    /// A test that plays no door has no use for minutes of a core.</param>
     internal ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state,
                                Func<double> clock, bool manualAcoustics = false, int? seed = null, bool prewarm = true)
     {
@@ -372,11 +294,10 @@ public class ClientAudioSystem
         _state = state;
         _drivingAids = new DrivingAids(audio);
         _spatial = new SpatialService();
-        _acoustics = new SpatialAcoustics(_spatial); // Share the same SpatialService instance
+        _acoustics = new SpatialAcoustics(_spatial);
         // After the acoustics, which it needs: a beacon behind a wall is not blipped.
         _beacons = new BeaconAids(audio, acoustics: _acoustics);
-        // The short sounds the world reports. Shares this system's acoustics so a rendered latch
-        // takes exactly the path a recorded one would.
+        // Shares this system's acoustics, so a rendered latch takes exactly the path a recorded one would.
         WorldAudio = new WorldAudioPlayer(_audio, _acoustics, prewarm: prewarm && !manualAcoustics);
         WorldAudio.HornReceived = StartHorn;
         WorldAudio.TrainSignalReceived = StartTrainSignal;
@@ -404,12 +325,6 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// Silences everything an entity was making sound with, after the server said it is gone.
-    /// A voice is keyed by entity id and keeps playing on its own once started, so a looping emitter on a
-    /// despawned object would otherwise sit in the world for the rest of the session. The reflection
-    /// voices derived from that id are stopped too — they carry synthetic ids, not the entity's own.
-    /// </summary>
-    /// <summary>
     /// A model was changed in the world editor (ModelUpdate): every voice playing it is stopped, and the
     /// next update starts it again from the new model, so the change is heard at once. The levels and
     /// headroom read from models are forgotten too, since they are the old model's. Returns the
@@ -431,6 +346,11 @@ public class ClientAudioSystem
         return restarted;
     }
 
+    /// <summary>
+    /// Silences everything an entity made sound with, once the server says it is gone. A voice keeps
+    /// playing on its own once started, so a looping emitter on a despawned object would otherwise stay
+    /// for the session; the voices derived from it (reflections, outlets, places) carry ids of their own.
+    /// </summary>
     public void ForgetEntity(int entityId)
     {
         _groundCache.Remove(entityId);
@@ -455,7 +375,6 @@ public class ClientAudioSystem
         if (_heldHorns.Remove(entityId)) _audio.StopSound(HeldHornVoiceBase - Math.Abs(entityId));
         _frontRetiring.Remove(entityId);
         _placed.Remove(entityId);
-        // Its image-source reflections: one voice per slot (see ReflectionVoiceId).
         for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
             _audio.StopSound(ReflectionVoiceId(entityId, slot));
 
@@ -463,8 +382,7 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// Silences the whole world, for leaving it: every entity forgotten, the ambience beds stopped,
-    /// and anything still playing stopped. Nothing here runs again until the next map, because
+    /// Silences the whole world, for leaving it. Nothing here runs again until the next map, because
     /// <see cref="Update"/> is only called in the world.
     /// </summary>
     public void LeaveWorld(IEnumerable<int> entityIds)
@@ -489,8 +407,8 @@ public class ClientAudioSystem
     private float _roadWaterMm;
 
     /// <summary>
-    /// Primary entry point called every frame from the Game Loop.
-    /// Uses the VisualPosition for the listener to ensure smooth audio during server corrections.
+    /// Called every frame from the game loop (throttled to <see cref="UpdateHz"/>). The listener is at the
+    /// smoothed VisualPosition, so a server correction is not heard as a jump.
     /// </summary>
     public void Update(WorldSnapshot world)
     {
@@ -498,17 +416,8 @@ public class ClientAudioSystem
 
         using var _perf = PerfProbe.Measure("audio.update");
 
-        // ── How long every source's position went unrefreshed ────────────────────────────────
-        //
-        // This is the only place an emitter's position is resubmitted. Between two runs of it, every
-        // sound in the world is placed where it was when the last one finished — so the gap between
-        // these calls IS the length of time a car's engine sits still in the air while the car keeps
-        // driving. It is not the audio thread (which holds 240 Hz and only re-reads what it was last
-        // given) and it is not the interpolator (which has already moved the car); it is this, so
-        // it is measured here.
-        //
-        // Thirty cars is roughly four times the per-source work of eight — acoustic paths, occlusion,
-        // reflections, emitter submission — all of it inside one game-loop iteration.
+        // This is the only place an emitter's position is resubmitted, so the gap between two runs is how
+        // long a car's engine sits still in the air while the car drives on. Measured here for that.
         double nowSec = _now();
         if (_lastUpdateAt > 0)
         {
@@ -522,19 +431,16 @@ public class ClientAudioSystem
         {
 
         _frameCount++;
-        // Keep the PREVIOUS snapshot to compare against: assigning first and then comparing `world` with
-        // `_lastSnapshot` compares it with itself, which is what silently disabled the moving-region check
-        // below. With the snapshot cache in place the two can also legitimately be the same object — a
-        // world that has not changed — and a zero delta is then exactly the right answer.
+        // The previous snapshot, kept before assigning: comparing `world` with `_lastSnapshot` after it
+        // compared it with itself and silently disabled the moving-region check below. The two may also be
+        // the same object (an unchanged world), and a zero delta is then right.
         var previous = _lastSnapshot;
         _lastSnapshot = world;
         _acousticWorker.UpdateWorld(world);
         
-        // --- Use smoothed VisualPosition for the listener ---
         Vector3 visualEyePos = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
         _groundEar = visualEyePos;
-        // The cabin you are sitting in, for the traced reverb: which vehicle, and where your ear is in
-        // its own frame.
+        // The cabin you sit in, for the traced reverb: which vehicle, and your ear in its frame.
         {
             string? preset = null; Vector3 local = default;
             if (_state.IsRiding && world.Entities.TryGetValue(_state.RidingEntityId, out var ride)
@@ -548,13 +454,10 @@ public class ClientAudioSystem
         }
         _groundWorld = world;
 
-        // 1. Resolve high-precision listener region (OBB check)
         int listenerRegionId = _acoustics.GetRegionAt(world, visualEyePos);
-        // Kept, because your own feet are submitted from the game thread between updates and have to
-        // know which room to reverberate in. See SubmitFootstep.
+        // Kept: your own feet are submitted from the game thread between updates and need the room to
+        // reverberate in (SubmitFootstep).
         _listenerRegion = listenerRegionId;
-
-        // 2. Synchronize the listener's smoothed physical state.
 
         // Not the wind: a uniform wind moves the source, the listener and the air together and shifts
         // no pitch. A share of it added here bent every pitch in the world with each gust.
@@ -565,13 +468,12 @@ public class ClientAudioSystem
         if (_state.IsRiding && world.Entities.TryGetValue(_state.RidingEntityId, out var carrying))
         {
             // ...and you move at its speed. A passenger is not predicted, so their own velocity reads
-            // zero — which against the vehicle's moving voice is a Doppler shift on your own bus.
+            // zero, which against the vehicle's moving voice is a Doppler shift on your own bus.
             listenerVelocity = carrying.Velocity;
         }
 
-        // The wind at your ears: the weather's wind where your head is, less your own movement through
-        // it, from the side it comes from. The mixer reads the field itself once a block (EarWindVoice);
-        // this is where the head is, which way it faces, and what is round it.
+        // The mixer reads the wind field itself once a block (EarWindVoice); this is where the head is,
+        // which way it faces and what is round it.
         var earListener = EarListener(world, visualEyePos, listenerVelocity, listenerRotation);
         _audio.SetEarWind(earListener);
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
@@ -580,20 +482,18 @@ public class ClientAudioSystem
         WorldAudio.Cabins = _cabins;
         WorldAudio.SelfId = OwnEntityId;
         WorldAudio.Self ??= () => (_state.Position, _state.Rotation);
-        // The doors, the things to pick up, the cars to get into and the people around you.
         _beacons.Update(world, visualEyePos, _now(), OwnEntityId);
-        // The lane lines, if you are the one driving.
         _drivingAids.Update(world, _state, _now());
-        // ...and the rest of the world through the glass, if you are sitting in anything with a roof.
+        // The rest of the world through the glass, if you sit in anything with a roof.
         var (encLow, encMid, encHigh) = CabinEnclosure(world);
-        // Now and then, the windows of vehicles that have gone.
+        // Now and then, forget the windows of vehicles that have gone.
         if (_frameCount % 600 == 0) _cabins.Forget(world.Entities.ContainsKey);
         _audio.SetListenerEnclosure(encLow, encMid, encHigh);
         // Temperature reaches the mix as the speed of sound: c = 331.3 + 0.606·T.
         _audio.SetAirTemperature(world.Temperature);
 
-        // Geometry-driven reverb (Phase 4d): drive the listener-region reverb decay from the Steam Audio
-        // reflection sim when available (replaces the Sabine estimate for the room the listener is in).
+        // The listener's reverb decay from the Steam Audio reflection sim, when there is one, in place of
+        // the Sabine estimate.
         if (_acousticWorker.TryGetListenerReverbDecayMs(out float simReverbMs))
         {
             _audio.SetSimulatedReverbDecay(simReverbMs, _acousticWorker.ListenerEnclosure,
@@ -601,7 +501,6 @@ public class ClientAudioSystem
                                            _acousticWorker.ListenerLfDecayRatio);
         }
         
-        // 3. Synchronize the acoustic map ONLY if it changed (optimization)
         if (world.AcousticMap != null)
         {
             if (world.AcousticMap != _lastAcousticMap)
@@ -611,11 +510,8 @@ public class ClientAudioSystem
             }
             else
             {
-                // 3.5 Check for moving regions within the same map (Dynamic Geometry Updates)
-                //
-                // Over the REGIONS, not over the world. Walking every entity to find the ones that
-                // declare a room is six thousand struct copies a frame on the city, for six hundred
-                // regions, almost none of which can move at all.
+                // Regions that moved. Over the region list, not the world: walking every entity is six
+                // thousand struct copies a frame on the city for six hundred regions, almost none movable.
                 foreach (int regionId in world.RegionEntityIds)
                 {
                     if (world.Entities.TryGetValue(regionId, out var snap))
@@ -633,69 +529,47 @@ public class ClientAudioSystem
             }
         }
         
-        // 4. Update the local player's environmental state
         UpdateAcousticState(world, visualEyePos, listenerRegionId);
-        // Through the echo system: a wall does not care what made the sound, so the grandstand that
-        // answers a car answers the people sitting on it too — and on the same terms, which means
-        // obstruction-tested.
+        // Through the echo system: the grandstand that answers a car answers the people on it too, on the
+        // same terms (obstruction-tested).
         WorldAudio.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now, _engineEchoes);
 
-        // 4.5. Near-field boundary probing.
-        //
-        // Six rays out of the listener's head — right, left, up, down, forward, back — turned into world
-        // space by the listener's own rotation, so what comes back is "there is concrete half a metre to
-        // my LEFT", not "there is concrete somewhere near". Each becomes its own early reflection in the
-        // mixer (see BoundaryModel / BoundaryProximityProcessor), which is what lets a player hear the
-        // difference between a corridor, a doorway and the open air, and hear it change as they turn.
+        // Six rays out of the head, turned by its rotation, so the answer is "concrete half a metre to my
+        // left"; each becomes its own early reflection (BoundaryModel, BoundaryProximityProcessor). This is
+        // what tells a corridor from a doorway from open air, and changes as you turn.
         UpdateBoundaryProbes(world, visualEyePos);
 
-        // 4.6. Ambience beds: the map's outdoor soundfield, ducked by shelter, plus whatever the
-        // listener's own region declares.
         UpdateAmbience(world, listenerRegionId);
 
         Stage(0, ref stageTicks);     // everything up to here: region, listener, map, probes, ambience
 
-        // 5. Update the acoustic path (occlusion/diffraction) for ALL active sounds in FMOD
-        //
-        // And for every car and machine that holds a live slot, even one the mixer is not playing.
-        // The voice manager silences a voice whose OCCLUDED level falls under the silence floor, and
-        // asking only about playing voices then stopped asking about it: after the worker's 5 s TTL
-        // its result was evicted, the emitter fell back to an unoccluded path, and the voice was
-        // rebuilt at full level until the next answer silenced it again. Heard as ambience that
-        // "stutters and cuts out" — an air conditioner behind a tower and a car round a corner,
-        // each bursting back every five seconds.
+        // The acoustic path of every playing sound, and of every car and machine holding a live slot even
+        // when the mixer is not playing it. Asking only about playing voices let an occluded-silent voice's
+        // result expire (the worker's 5 s TTL), fall back to an unoccluded path and burst back every five
+        // seconds: ambience that "stutters and cuts out".
         _pathIds.Clear();
         _pathIds.UnionWith(_audio.GetActiveSpatialSoundIds());
         _pathIds.UnionWith(_liveEngines);
         _pathIds.UnionWith(_liveMachines);
         _pathIds.UnionWith(_horns.Keys);      // a horn takes its vehicle's path, borrowed voice or not
         _pathIds.UnionWith(_sirenCars);       // and so does a siren
-        // ...and a car voiced from afar, whose borrowed voice id sits below the reflection range
-        // and so was never given a path of its own. Twelve of the city's cars, never occluded and
-        // never darkened by the air a kilometre away: the white-noise wash heard from the edge of
-        // the map, high band 10 dB under the low where every other far source had it 42 under.
+        // ...and a car voiced from afar, whose borrowed id sits below the reflection range and gets no path
+        // of its own. Without this, twelve city cars were never occluded or darkened by the air: the
+        // white-noise wash from the map's edge (high band 10 dB under the low, against 42 for the rest).
         _pathIds.UnionWith(_distantVoiced);
         foreach (var id in _pathIds)
         {
-            // --- CRITICAL FIX: Reflection Termination ---
-            // IDs below -5000 are the copies and the voices that work out their own paths (a wall's
-            // copy, your own voice and your room's answer to it, a talker, a horn, a siren). We MUST NOT
-            // calculate reflections for reflections, or we get an infinite feedback loop; and a copy
-            // asked about from its image is traced through the very wall that made it.
+            // Ids below -5000 are copies and voices that work out their own paths (a wall's copy, your
+            // voice and your room's answer, a talker, a horn, a siren). Never reflections of reflections:
+            // that feeds back for ever, and a copy asked about from its image is traced through its own wall.
             if (id < -5000)
             {
-                // Simple distance update for existing reflections to maintain panning, 
-                // but no recursive ray-tracing.
                 continue; 
             }
 
-            // ── Ask about the point the sound comes OUT of ───────────────────────────────────
-            //
-            // Not the entity's origin. The voice has always been placed at the emission point; the
-            // occlusion probe was left behind at the origin, so the engine was answering "what can be
-            // heard from here" about a place nothing was radiating from. For anything that drives,
-            // that origin is its contact patch on the ground and the probe sphere was half buried —
-            // about half the samples reporting blocked on open road, before any wall was considered.
+            // Asked about the point the sound comes out of, not the entity's origin: for anything that
+            // drives the origin is its contact patch, and a probe there was half buried (about half the
+            // samples blocked on open road).
             Vector3 sourcePos;
             float sourceRadius = OpenFPS.Common.AudioEmission.DefaultOcclusionRadius;
             if (world.Entities.TryGetValue(id, out var snap))
@@ -763,27 +637,15 @@ public class ClientAudioSystem
                         continue;
                     }
 
-                    // A reflection path is honoured wherever it came from. Both paths produce them now:
-                    // under Steam Audio simulation they are first-order image sources off the scene's own
-                    // surfaces (EarlyReflections), and on the fallback path they come from the hand-rolled
-                    // tracer. A reverb tail does not cover the same energy: without these a room
-                    // answers from everywhere at once and a doorway is inaudible from outside.
+                    // A reflection: an image source off the scene's surfaces (EarlyReflections) under Steam
+                    // Audio, the hand-rolled tracer's otherwise. The tail does not carry this energy: without
+                    // these a room answers from everywhere at once and a doorway is inaudible from outside.
                     if (!world.Entities.TryGetValue(id, out var originalSnap)) continue;
 
-                    // A SYNTHESISED source has no file to play a delayed copy of, and this is the
-                    // rule rather than a list of names.
-                    //
-                    // Its sound id names a model, not a sample, so asking the provider to play it as
-                    // one fails every frame — "not playing yet — Missing", once a frame per source,
-                    // for ever, with a deferred play queued behind each one. A hundred and twenty-one
-                    // window units retrying a file load every frame is most of a game loop.
-                    //
-                    // IsSynth is the property that actually decides it, and it is on the snapshot. A
-                    // list of sound-id prefixes is not enough: it misses whatever kind of synthesised
-                    // source was added after it was written.
-                    // Anything the mixer RENDERS rather than plays is answered by its own reflection
-                    // path — EngineReflections reads a car's walls out of the synthesis's own ring —
-                    // or by nothing, which is correct until one exists.
+                    // A synthesised source has no file to play a delayed copy of: its id names a model, and
+                    // playing it as a sample failed every frame per source (121 window units retrying a file
+                    // load is most of a game loop). Decided by IsSynth, not by a prefix list that misses new
+                    // kinds. A rendered source is answered by its own path (EngineReflections) or by nothing.
                     var sourceEmitter = originalSnap.Definition.SoundEmitter;
                     string sourceSound = sourceEmitter.SoundId ?? "";
                     if (sourceEmitter.IsSynth
@@ -794,12 +656,9 @@ public class ClientAudioSystem
                     // source's first bounces are these, indoors as out.
                     _slotLive[path.ReflectionIndex] = true;
 
-                    // One voice per slot, and the slots are ordered by the SURFACE each arrival
-                    // came off (see EarlyReflections), so a slot means the same wall from tick to
-                    // tick. The index cannot collide: it is 0..N-1 among the arrivals that are live
-                    // right now. A hash of the surface's identity (`ReflectionId % 100`) can, and a
-                    // collision is one voice handed two reflections from opposite sides of a room,
-                    // flickering between them.
+                    // One voice per slot; slots are ordered by surface (EarlyReflections), so a slot is
+                    // the same wall from tick to tick. Keyed by index, which cannot collide, not by a hash
+                    // of the surface id, which can: one voice flickering between two opposite walls.
                     int reflectId = ReflectionVoiceId(id, path.ReflectionIndex);
                     var placed = _placed.TryGetValue(id, out var p)
                         ? p : (originalSnap.Definition.SoundEmitter.Volume, originalSnap.Definition.SoundEmitter.MinDistance);
@@ -812,15 +671,13 @@ public class ClientAudioSystem
                         Mode = originalSnap.Definition.SoundEmitter.Mode,
                         Position = path.ApparentPosition,
                         ApparentPosition = path.ApparentPosition,
-                        // What the copy has left, per band, is the whole of what makes it a
-                        // reflection rather than a second source: the surface took some of it and
-                        // the extra distance took the rest (LoopEchoLevel).
+                        // What the surface and the extra distance left of it, per band (LoopEchoLevel).
                         Volume = echo.Volume,
                         MinDistance = echo.MinDistance,
                         Range = originalSnap.Definition.SoundEmitter.Range * 0.8f,
                         IsReflection = true,
-                        // The copy starts at the source voice's own playback position, so it is what
-                        // is being heard, arriving later — not the file again from the top.
+                        // Played from the source voice's own position, so it is what is being heard,
+                        // arriving later, not the file again from the top.
                         ReflectionOf = id,
                         DelayMs = path.ReflectionDelayMs,
                         Type = EmitterType.WorldLocked,
@@ -829,26 +686,22 @@ public class ClientAudioSystem
                         EqHigh = echo.EqHigh,
                         AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
                         ReflectionSpread = path.Spread,
-                        // Feed leftover energy into the reverb bus
+                        // Not a reverb send: the provider uses bleed only to pull an apparent position
+                        // toward the real one, and a copy's two are the same.
                         TransmissionBleed = path.MaterialAbsorption * 0.5f 
                     };
 
                     if (_audio.IsPlaying(reflectId))
                     {
-                        // Back within the fusion window's reach: a surface that had stopped answering
-                        // and started again keeps its voice rather than restarting it.
+                        // A surface that stopped answering and started again keeps its voice.
                         _audio.CancelFade(reflectId);
                         _audio.UpdateSpatialAttributes(reflectEmitter);
                     }
                     else _audio.PlayPhysicalSoundDirect(reflectEmitter);
                 }
 
-                // ── A surface that has stopped answering is let go with a fade, not left playing ──
-                //
-                // Left alone, a wall's copy would play on at its last position for as long as the
-                // source did, and a listener who walked out of a slapback's reach would keep hearing
-                // it from where the wall had been. A cut is a click, so the voice fades over the
-                // budget's own ramp and is stopped only once it is silent.
+                // A surface that stopped answering fades out (a cut is a click) rather than playing on
+                // from where the wall was after the listener has walked out of its reach.
                 for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
                 {
                     if (_slotLive[slot]) continue;
@@ -860,15 +713,10 @@ public class ClientAudioSystem
 
         Stage(1, ref stageTicks);     // 5: the acoustic paths of every active voice
 
-        // 5.5. Decide which vehicles get a live engine: the nearest EngineVoiceBudget of them.
-        //
-        // Done here, once, rather than inside the per-entity pass, because it is a decision ABOUT the
-        // set: the eighth-nearest car cannot know it is eighth. A car that loses its slot has its
-        // engine and its echoes stopped, which is a real cut rather than a fade — but it only ever
-        // happens to whichever car is furthest away and being drowned by three nearer ones.
+        // Once, outside the per-entity pass: who gets a voice is a decision about the set.
         ChooseLiveEngines(world, visualEyePos);
-        // The rain that has landed and is running off (gutters, drains, downpipes): fed before the
-        // machines are ranked, so a gutter that has run dry is not given a voice. Snow stays where it falls.
+        // The rain running off (gutters, drains, downpipes), fed before the machines are ranked so a dry
+        // gutter is not given a voice. Snow stays where it falls.
         {
             var p = world.Precipitation;
             float wet = p.Falling ? (p.Kind == OpenFPS.Common.PrecipitationKind.Snow ? 0f : p.RateMmPerHour) : world.RainRateMmPerHour;
@@ -883,14 +731,13 @@ public class ClientAudioSystem
 
         Stage(2, ref stageTicks);     // 5.5: who gets a voice
 
-        // 6. Process persistent audio emitters attached to world entities (NPCs, Beacons, Machines)
         foreach (var entityId in world.AudioEntityIds)
         {
             if (entityId == OwnEntityId) continue;
             if (world.Entities.TryGetValue(entityId, out var snap))
             {
-                // An authored beacon whose category is switched off — by the map or by you — is not
-                // heard. (Doors, items and cars are blipped by BeaconAids; this is the placed kind.)
+                // A placed beacon whose category is off (by the map or by you). Doors, items and cars
+                // are BeaconAids'.
                 if (snap.Definition.Type == EntityType.Beacon && !_beacons.IsOn(snap.Definition.Identity.BeaconCategory))
                 {
                     if (_audio.IsPlaying(entityId)) _audio.StopSound(entityId);
@@ -899,9 +746,7 @@ public class ClientAudioSystem
                 ProcessAudioEmitter(world, snap, visualEyePos, engineDt);
             }
         }
-        // The outer places of trees and fires that were not placed this frame (out of the budget, gone).
         RetireSpreading();
-        // The cabin's paths, if you are no longer sitting in what they were paths of.
         UpdateCabinVoices();
 
         long partAt = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -915,8 +760,8 @@ public class ClientAudioSystem
         _rain.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now, listenerRegionId, OwnEntityId, _state.RidingEntityId);
         _partMs[2] += Ms(partAt);
 
-        // Every source has now been offered to the reflection system; it can work out what the
-        // next frame will demand of a reflection to be worth a voice.
+        // Every source has been offered to the reflection system: it sets what next frame's reflections
+        // must reach to be worth a voice.
         _engineEchoes.EndFrame();
 
         {
@@ -926,7 +771,6 @@ public class ClientAudioSystem
         }
         Stage(3, ref stageTicks);     // 6: building an emitter for everything that has a voice
 
-        // 7. Execute the audio engine tick (mixing, DSP updates)
         _audio.Update();
         Stage(4, ref stageTicks);     // 7: handing it all to the mixer
         }
@@ -941,21 +785,15 @@ public class ClientAudioSystem
     private double _lastUpdateAt, _worstGapMs, _worstUpdateMs;
 
     /// <summary>
-    /// Where the audio update's time went, by stage, worst case over the reporting interval.
-    ///
-    /// It exists because "the pass itself took at most 74 ms" is a number you cannot act on. The
-    /// whole pass being four times its 17 ms budget says something is wrong and nothing about what,
-    /// and the candidates are not close together: a loop over every entity in the world, a per-voice
-    /// acoustic path, a ranking over every machine on the map, an emitter built per source, and the
-    /// mixer's own attribute pass. On a large map, guessing between those wastes a session.
+    /// Where the audio update's time went, by stage (<see cref="StageNames"/>), worst case over the
+    /// reporting interval: "the pass took 74 ms" names nothing to act on.
     /// </summary>
     private readonly double[] _stageWorstMs = new double[5];
 
     /// <summary>
-    /// Inside the emitter stage, the pass that cost most, by part: the engines' echoes, the ground
-    /// rays, the birds, the horns and sirens, and everything else. The emitter stage alone can run to
-    /// 150-250 ms on the city, and every source freezes for that long (heard as reflections stepping
-    /// away and catching up late); this names which part.
+    /// Inside the emitter stage, the costliest pass by part (<see cref="PartNames"/>). The stage alone
+    /// can run 150-250 ms on the city, and every source freezes that long (reflections stepping away and
+    /// catching up late).
     /// </summary>
     private readonly double[] _partMs = new double[4], _partWorstMs = new double[4];
     private double _partWorstPass;
@@ -976,13 +814,12 @@ public class ClientAudioSystem
     {
         _state.Temperature = world.Temperature;
 
-        // Scale down precipitation intensity based on local shelter
         _state.PrecipitationIntensity = world.PrecipitationIntensity * (1.0f - _state.ShelterFactor);
         // The water on the roads, for the vehicles whose wheels the server does not send.
         _roadWaterMm = world.RoadWaterMm;
 
-        // Update readable region for accessibility. Named by the boxes: in a doorway, which for sound is
-        // the room on your side of it, you are told you are in the doorway.
+        // The place's name, by the boxes: in a doorway (the room on your side of it, for sound) you are
+        // told you are in the doorway.
         int zone = _acoustics.GetZoneAt(world, eyePos);
         _state.CurrentRegionId = zone;
         _state.CurrentRoomId = _acoustics.GetRoomAt(world, eyePos);
@@ -1045,29 +882,17 @@ public class ClientAudioSystem
     private static readonly Vector3[] DoorwayProbeDirections =
         { Vector3.UnitX, -Vector3.UnitX, Vector3.UnitZ, -Vector3.UnitZ };
 
-    /// <summary>
-    /// What to call where the listener is standing.
-    ///
-    /// A NAMED place says its name. Everywhere else is named from WHAT YOU ARE STANDING ON.
-    ///
-    /// "Outside" is true and useless. A player working out where they are by ear needs to know they
-    /// have stepped off the kerb, and the ground already knows — the same probe that chooses the
-    /// footstep material. Concrete under the feet in the open air is a pavement; asphalt is the
-    /// road; and the difference between them is the single most navigationally important fact on a
-    /// city street.
-    ///
-    /// The map-wide outdoor region is NOT a named place, although it has a name. It is always in
-    /// the acoustic map — the generator puts it there so the outdoors has a reverb and a size — so a
-    /// region lookup alone always succeeds, and would announce every metre of open ground no author
-    /// had boxed as "Outside". Its name is kept only for ground the material table does not recognise.
-    ///
-    /// Derived, not authored: no map has to label a kerb, and a surface nobody has named still
-    /// announces itself correctly.
-    /// </summary>
     /// <summary>The name of a roofed spot no zone covers: a doorway between two rooms, a gap between
     /// two zones' boxes. A condition, not a place, so it is never announced on its own.</summary>
     internal const string UnderShelter = "Under Shelter";
 
+    /// <summary>
+    /// What to call where the listener stands. A named place says its name; everywhere else is named
+    /// from the ground underfoot (the footstep probe's material), because stepping off the kerb is the
+    /// most navigationally important fact on a city street and "outside" says nothing. The map-wide
+    /// outdoor region is always in the acoustic map and is not a named place: its name is used only for
+    /// ground the material table does not know.
+    /// </summary>
     internal static string NameOfPlace(AcousticMap? map, int regionId, string material, float shelter)
     {
         RegionComponent? global = null;
@@ -1083,10 +908,7 @@ public class ClientAudioSystem
         return ground;
     }
 
-    /// <summary>
-    /// What to call a patch of open ground, from the surface underfoot. Falls back to "outside"
-    /// for anything unrecognised.
-    /// </summary>
+    /// <summary>What to call open ground by its surface; <see cref="Outside"/> for anything unrecognised.</summary>
     internal static string OutdoorNameFor(string material) => material switch
     {
         "Concrete" => "sidewalk",
@@ -1105,49 +927,11 @@ public class ClientAudioSystem
     internal const string Outside = "outside";
 
     /// <summary>
-    /// Decides which physical models run live — standing machines and aircraft — by picking the ones
-    /// that would actually be LOUDEST here.
-    ///
-    /// Not the nearest, and that is the whole of the decision. A city authors small machines by the
-    /// hundred — sixty window air conditioners on five towers, a mower in every third garden, plant
-    /// on every roof — and the budget can afford ten of them. Ranking by distance answers "which is
-    /// closest", which is not the question a listener asks: a 92 dB mower three gardens away is
-    /// plainly audible where a 59 dB window unit at the same distance is not, and a rooftop
-    /// condenser eighty metres up the street beats both. What decides it is what each one would
-    /// SOUND like at the ear, which is the rendered gain the mixer is about to apply — its own
-    /// source level, placed, paid down for its own extent, rolled off over its own distance.
-    ///
-    /// Which is also why aircraft share this budget rather than getting one of their own. An
-    /// airliner at 142 dB half a kilometre up beats every air conditioner in the city and should;
-    /// the same airliner parked at the far end of its path at idle should not. One ranking on one
-    /// measure answers both, where two budgets would have meant deciding in advance how many
-    /// aeroplanes are worth how many machines — a question with no answer that does not depend on
-    /// where the listener is standing.
-    ///
-    /// Everything else here is the engine's discipline, for the engine's reasons: a machine that
-    /// holds a slot keeps a bias so the set does not churn as you walk, a new one is held for a
-    /// couple of seconds before it can be taken off again, and one that loses its slot FADES rather
-    /// than being cut, because a running synthesiser has no zero-crossing to stop at.
-    /// </summary>
-    /// <summary>
-    /// What a "machine:" or "aircraft:" id is worth, in the two numbers placement needs: how loud it
-    /// is at a metre, and how big it is.
-    ///
-    /// One lookup, used by BOTH the ranking and the emitter, because those two disagreeing is a
-    /// source that wins a voice on one set of numbers and is then played at another — audible as a
-    /// machine that is picked out of a crowd and then cannot be heard.
-    ///
-    /// MEMOISED BY NAME, and that is not an optimisation, it is the difference between the client
-    /// running and not. Behind ByName is ModelLibrary.Get, which CONSTRUCTS the model every call —
-    /// a governor, a deck, a blade row, a casing, a compressor, all nested records — and this is
-    /// asked once per machine per audio update. A city with a hundred and twenty-one of them on it
-    /// is seven thousand whole machines built and thrown away every second, on the thread that also
-    /// places every moving sound. Measured, in the game: gen2 collections with 57 ms pauses, the
-    /// game loop reporting 0 Hz and 88 ms iterations, and the placement pass holding every source
-    /// still for 106 ms — which is not heard as "slow", it is heard as the client hanging.
-    ///
-    /// VehicleProfile.ByName is memoised for the same reason. A cache here fixes the caller that has
-    /// the problem without changing what a model means for anyone who reloads an authored one.
+    /// A physical model's level at a metre and its size, memoised by sound id. One lookup for both the
+    /// ranking and the emitter, so a source is not picked on one set of numbers and played at another.
+    /// The memo is not optional: behind ByName, ModelLibrary.Get builds the whole model each call, and
+    /// asked per machine per update on the city (121 machines) that was gen2 pauses of 57 ms and the
+    /// placement pass holding every source still for 106 ms, heard as the client hanging.
     /// </summary>
     private readonly Dictionary<string, (float LevelDb, float Extent)?> _physicalLevels =
         new(StringComparer.OrdinalIgnoreCase);
@@ -1164,8 +948,8 @@ public class ClientAudioSystem
         return true;
     }
 
-    /// <summary>The headroom a physical voice renders with, dB: its spec's own for water, fire,
-    /// foliage and a struck bell, the shared one for everything else. Memoised for the same reason the level is.</summary>
+    /// <summary>The headroom a physical voice renders with, dB: its spec's own for water, fire, foliage
+    /// and bells, the shared one for the rest. Memoised like the level.</summary>
     private readonly Dictionary<string, float> _physicalHeadroom = new(StringComparer.OrdinalIgnoreCase);
 
     private float PhysicalHeadroom(string soundId)
@@ -1225,14 +1009,8 @@ public class ClientAudioSystem
             }
             if (soundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase))
             {
-                // A struck bell — a level crossing's gong. Without this the lookup returns null,
-                // PhysicalLevel says false, and the emitter is dropped by BOTH the ranking and the
-                // submit path: the bell is never ranked, never voiced, never heard. It rang
-                // perfectly on the server and did not exist on the client, which from the pavement
-                // is indistinguishable from a crossing that never closes.
-                //
-                // Its size is the bell itself. A gong is a quarter of a metre of bronze on a post
-                // and there is no sense in which you can stand inside one.
+                // A level crossing's gong. Without a level here a source is dropped by both the ranking
+                // and the submit path, and the bell was silent on the client. Its size is the bell.
                 var bell = OpenFPS.Common.ModelLibrary.Bell(soundId[5..]);
                 return (bell.ReferenceDb, MathF.Max(0.5f, bell.DiameterMetres));
             }
@@ -1243,14 +1021,10 @@ public class ClientAudioSystem
                 var gate = OpenFPS.Common.CrossingGateSpec.ByName(soundId[5..]);
                 return (gate.SourceLevelDb, 0.5f);
             }
-            // Water, fire and the wind in a tree: nobody made them, and they are placed like a
-            // machine all the same, at their declared level and their own size. A fountain's size
-            // is its basin, a fire's its hearth, a tree's its crown.
-            //
-            // One TAP of a water feature ("water:<preset>/<feature>/<tap>", WaterFeatureVoice) is placed
-            // by the WHOLE feature's level and its own landing place's size: its voice renders its own
-            // share of the water against the whole's full scale, so the taps sum to the feature at
-            // any distance, and near one tap that tap is a point you can walk up to.
+            // Water, fire and trees are placed like machines, by their declared level and size (basin,
+            // hearth, crown). One tap of a water feature ("water:<preset>/<feature>/<tap>") takes the
+            // whole feature's level and its own landing's size: each renders its share against the
+            // whole's scale, so the taps sum to the feature at any distance.
             if (OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(soundId, out string waterPreset, out _, out int waterTap))
             {
                 var feature = OpenFPS.Common.WaterFeatureSpec.ByName(waterPreset);
@@ -1296,16 +1070,9 @@ public class ClientAudioSystem
             if (soundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
             {
                 var p = OpenFPS.Common.AircraftProfile.ByName(soundId[9..]);
-                // What RADIATES is the disc or the nozzle, not the airframe: a listener is never
-                // inside an aeroplane's extent anyway, so the number only has to stop the inverse
-                // law running away at the one distance it could — directly underneath.
-                //
-                // Unless there is MORE THAN ONE of them, which for everything with a jet on it
-                // there is. A twin's two engines are eleven and a half metres apart under the
-                // wings, and that separation is the source's size in exactly the sense a bus's
-                // nose-to-tail is: walking a metre towards one walks you a metre away from the
-                // other, so the level is flat across the span and the far field is unchanged.
-                // Declared as AircraftProfile.EngineSpanMetres, not inferred from the wings.
+                // The size is what radiates (the disc or the nozzle), which only has to stop the inverse
+                // law running away directly underneath; with more than one engine it is their span
+                // (AircraftProfile.EngineSpanMetres, 11.5 m on a twin), as a bus's length is its size.
                 float span = p.EngineSpanMetres > 0f
                     ? p.EngineSpanMetres
                     : MathF.Max(2f, p.Propeller?.DiameterMetres
@@ -1319,18 +1086,6 @@ public class ClientAudioSystem
         return null;
     }
 
-    /// <summary>
-    /// The power lever, and a rotor's wake, from what the aircraft is DOING.
-    ///
-    /// Nothing scripts this and nothing on the wire carries it. An aeroplane climbing is at or near
-    /// full power; one holding height is at cruise, which is well under it; one coming down is at
-    /// idle with the air doing the work. That is the whole difference between an airliner going over
-    /// and the same airliner on approach, and reading it off the climb angle means a map that
-    /// declares a descending flight path gets an aeroplane on approach without saying so.
-    ///
-    /// A helicopter slaps when it is descending into its own downwash or moving fast forward, and
-    /// nothing else makes it slap — so that comes from the same two numbers.
-    /// </summary>
     private readonly Dictionary<int, (float Speed, double At)> _lastRailSpeed = new();
     private readonly Dictionary<int, (float Speed, double At)> _lastAirSpeed = new();
 
@@ -1350,14 +1105,18 @@ public class ClientAudioSystem
     /// engine has no reverser, so after touchdown it idles and its tyres are heard.</summary>
     internal const float GroundIdleLever = 0.06f;
 
+    /// <summary>
+    /// The power lever and a rotor's wake from what the aircraft is doing, which nothing on the wire
+    /// carries: climbing is full power, level is cruise, descending is idle, so a map's descending path
+    /// is an approach without saying so. A rotor slaps descending into its downwash or fast forward.
+    /// </summary>
     private static (float Lever, float Wake) FlightPower(Vector3 velocity)
     {
         float speed = velocity.Length();
         if (speed < 0.5f) return (0.25f, 0f);                  // sitting on the apron at idle
         float climb = velocity.Y / speed;                      // sine of the flight path angle
-        // Full power by about six degrees up, cruise level, idle by about four degrees down. The
-        // asymmetry is real: a climb needs everything the engines have and a descent needs nothing,
-        // so the lever falls away much faster than it rises.
+        // Full power by about six degrees up, idle by about four down: a climb needs everything and a
+        // descent nothing, so the lever falls faster than it rises.
         float lever = climb >= 0f
             ? Math.Clamp(0.62f + climb * 3.6f, 0f, 1f)
             : Math.Clamp(0.62f + climb * 8.0f, 0.06f, 1f);
@@ -1367,29 +1126,10 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// Is this aeroplane on its wheels?
-    ///
-    /// Read off the same two things everything else about a flight is — where it is and what it is
-    /// doing — and not scripted. An aeroplane whose belly is within a fraction of its own length of
-    /// the ground is on the runway; one higher than that is flying. The TRANSITION into it is the
-    /// touchdown, and the voice turns that into spinning wheels up from rest (see
-    /// AircraftSynth.Touchdown). Nothing has to declare a landing, and a map that draws a flight
-    /// path down to a runway gets one.
-    ///
-    /// The ground probe is a grid search, so it is asked only about an aeroplane that could
-    /// plausibly be near the ground at all: one more than sixty metres over the listener's head is
-    /// flying, and that is settled without touching the world.
-    /// </summary>
-    /// <summary>
-    /// Where the listener's head is, for the wind at the ears: its place, how it moves, which way it
-    /// faces, how much of the weather's wind reaches it, and what covers the ears.
-    ///
-    /// Exposure is one minus the enclosure the acoustic survey measures round the listener (the same
-    /// sphere of rays that decides how much reverb there is), and nothing at all inside a room: a
-    /// street between tall buildings takes a third off the wind, a walled yard half, a room all of
-    /// it. It takes your own movement off with the weather's: indoors no wind at the ears at all.
-    /// In a vehicle: a cabin lets in what its open windows let in, and a vehicle without one (a
-    /// motorcycle, a formula car) has a helmet on the rider.
+    /// The listener's head for the wind at the ears: place, motion, facing, exposure and cover. Exposure
+    /// is one minus the survey's enclosure (a street canyon takes a third off the wind, a walled yard
+    /// half) and zero in a room. A cabin lets in what its open windows do; a vehicle without one (a
+    /// motorcycle, a formula car) puts a helmet on the rider.
     /// </summary>
     private EarWindListener EarListener(WorldSnapshot world, Vector3 head, Vector3 velocity, Quaternion rotation)
     {
@@ -1421,29 +1161,28 @@ public class ClientAudioSystem
     private readonly OpenFPS.Client.AudioEngine.Acoustics.CabinWalls _cabins = new();
 
     /// <summary>
-    /// What the body of the vehicle you are sitting in takes off everything outside it, dB per band.
-    ///
-    /// The same paths the interior engine voice uses, the other way round: the windows by their mass
-    /// (transmission falls as rho*c / (pi*f*m)), the seals, which have no mass and let a little of
-    /// everything through, and whatever is open (CarWindow.CabinLossDb). At 150 Hz a hatchback's glass
-    /// passes about a hundredth of the power; by a kilohertz the seals are most of what gets in, so the
-    /// top end sits about thirty decibels down — which is the whole of "the traffic outside sounds like
-    /// it is outside". With the windows down a tenth of the wall is a hole, and the street comes in at
-    /// a tenth of its power, at every frequency.
-    /// Nothing when you are on foot, or on something with no cabin: a motorcycle keeps the street.
+    /// What the body of the vehicle you sit in takes off everything outside it, dB per band: the interior
+    /// engine voice's paths the other way round, the glass by its mass (transmission ~ rho*c / (pi*f*m)),
+    /// the seals, and whatever is open (CarWindow.CabinLossDb). At 150 Hz a hatchback's glass passes about
+    /// a hundredth of the power; by 1 kHz the seals dominate and the top sits about 30 dB down. Windows
+    /// down, a tenth of the wall is a hole. Nothing on foot or on something with no cabin.
     /// </summary>
     private (float Low, float Mid, float High) CabinEnclosure(WorldSnapshot world)
     {
         if (!_state.IsRiding || !world.Entities.TryGetValue(_state.RidingEntityId, out var ride)) return (0f, 0f, 0f);
         if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(ride) is not { } vehicle) return (0f, 0f, 0f);
-        // A bus at a stop with its doors open has a hole in its side: about 2.4 m^2 of doorway in a
-        // hundred-odd m^2 of cabin wall, which lets the street in at a couple of per cent of its
-        // power, at every frequency. The voice decides when the doors are open; ask it.
+        // A bus's open doors: about 2.4 m^2 in a hundred-odd m^2 of wall, the street at a couple of per
+        // cent of its power. The voice decides when the doors are open.
         float doorway = _audio.EngineDoorsOpen(_state.RidingEntityId) ? DoorwayPowerFraction : 0f;
         return OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(vehicle, _cabins.WindowsOpen(ride, _now()), doorway);
     }
 
-    /// <summary>...and how high it is over the ground, metres (infinity when that was not asked).</summary>
+    /// <summary>
+    /// Whether an aeroplane is on its wheels, and its height over the ground (infinity when not probed):
+    /// its belly within 15 % of its own length of the ground. The transition is the touchdown, which the
+    /// voice turns into wheels spinning up (AircraftSynth.Touchdown). Not probed at all more than 60 m
+    /// over the listener's head, since the ground probe is a grid search.
+    /// </summary>
     private bool OnTheWheels(EntitySnapshot snap, WorldSnapshot world, Vector3 eyePos, out float height)
     {
         var p = snap.Transform.Position;
@@ -1451,8 +1190,7 @@ public class ClientAudioSystem
         if (p.Y - eyePos.Y > 60f) return false;
         float groundY = OpenFPS.Common.PhysicsUtils.GetGroundHeight(world, p, snap.Id, out _);
         height = p.Y - groundY;
-        // Its own size sets how close counts: a jet sits five metres up on its gear and a light
-        // single one, so the same fraction of length serves both without either being told.
+        // A jet sits five metres up on its gear and a light single one: a fraction of length serves both.
         float sitsAt = 0.15f * (PhysicalAircraft(snap)?.LengthMetres ?? 8f);
         return p.Y - groundY <= sitsAt;
     }
@@ -1486,11 +1224,11 @@ public class ClientAudioSystem
         if (!soundId.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return false;
         try
         {
-            // Looked up once a sound id: this runs for every sink in every flat, every frame.
+            // Once per sound id: this runs for every sink in every flat, every frame.
             if (!_flowSpecs.TryGetValue(soundId, out var spec))
                 _flowSpecs[soundId] = spec = OpenFPS.Common.RunningWaterSpec.ByName(soundId[5..]);
-            // A tap: heard while it is on, and for as long after as its basin takes to empty. A shut tap
-            // nobody has opened since you arrived is an empty sink; a leaking one drips.
+            // A tap is heard while on and for as long after as its basin takes to empty. A shut tap nobody
+            // opened since you arrived is an empty sink; a leaking one drips.
             if (spec.Tap is { } tap)
             {
                 if (running) { _tapOnAt[entityId] = now; return false; }
@@ -1521,6 +1259,13 @@ public class ClientAudioSystem
         return _woodWeights.Individual.TryGetValue(entityId, out float g) ? g : 1f;
     }
 
+    /// <summary>
+    /// Decides which physical models (standing machines and aircraft) run live: the loudest here, not
+    /// the nearest. A 92 dB mower three gardens away is plain where a 59 dB window unit is not. Aircraft
+    /// share the budget so one measure answers both an airliner overhead (beats every air conditioner)
+    /// and the same airliner idling far off (does not). As for engines: a held slot keeps a bias, a new
+    /// one is held a couple of seconds, and a lost one fades, since a running synth has no zero to stop at.
+    /// </summary>
     private void ChooseLiveMachines(WorldSnapshot world, Vector3 eyePos)
     {
         double now = _now();
@@ -1530,12 +1275,8 @@ public class ClientAudioSystem
         if (world.Woods != null) world.Woods.Weigh(eyePos, _woodWeights, _isLiveMachine ??= id => _liveMachines.Contains(id));
         else { _woodWeights.Individual.Clear(); _woodWeights.Woods.Clear(); }
 
-        // A TRAIN IS ONE MACHINE. A light-rail set is up to nine taps — one per bogie and source
-        // along it, all reading one shared synth. Ranked tap by tap against every air conditioner and
-        // mower, its near taps would outrank the rest and its far ones fall below a window unit, so
-        // taps would drop and re-admit all the way along as it passed: a train cutting in and out
-        // beside you. So a train is ranked by its loudest tap, takes ONE place, and its taps come and
-        // go together.
+        // A train is one machine: up to nine taps on one synth, ranked by its loudest and admitted
+        // together. Ranked tap by tap, its taps dropped and came back all along it as it passed.
         foreach (int entityId in world.AudioEntityIds)
         {
             if (entityId == OwnEntityId) continue;
@@ -1543,12 +1284,11 @@ public class ClientAudioSystem
             var em = snap.Definition.SoundEmitter;
             if (!em.IsSynth || em.SoundId == null) continue;
             if (!PhysicalLevel(em.SoundId, out float levelDb, out float extent)) continue;
-            // A gutter, a drain or a downpipe with no rain running off into it is not there to be heard.
             if (Dry(em.SoundId, entityId, em.SynthRunning, now)) continue;
             // A train's horn or bell that nobody is sounding.
             if (SilentSignal(em.SoundId, now)) continue;
-            // A tree past the hand-over is heard in its wood, and a wood with no trees in it now is not
-            // heard; ranked by what each plays (a wood's trees in power, so its amplitude by their root).
+            // A tree past the hand-over is heard in its wood, an empty wood not at all; ranked by what each
+            // plays (a wood's trees add in power, so its amplitude by their root).
             float chorus = ChorusShare(entityId, out float chorusTrees);
             if (chorus <= 0f || chorusTrees <= 1e-3f) continue;
             chorus *= MathF.Sqrt(chorusTrees);
@@ -1556,11 +1296,9 @@ public class ClientAudioSystem
             float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
             float range = MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb));
-            // Ranked by how loud it is to the ear (docs/EAR_MODEL.md, Ranking), as VoiceManager.Audibility
-            // ranks every other voice: the gain the mixer will play it at, the law's correction for what
-            // it is made of included, turned into loudness by its measured spectrum. Not the corrected
-            // gain itself: the law plays a sound the ear hears less of louder, so a rumble would rank
-            // above a louder hum.
+            // Ranked by loudness at the ear (docs/EAR_MODEL.md, Ranking), as VoiceManager.Audibility ranks
+            // every voice: the gain the mixer plays it at, turned into loudness by its measured spectrum.
+            // Not the corrected gain itself, which plays what the ear hears less of louder.
             var timbre = OpenFPS.Client.AudioEngine.Core.EarTimbres.Find(em.SoundId);
             gain *= MathF.Pow(10f, OpenFPS.Common.Loudness.TimbreCorrectionDb(levelDb, timbre) / 20f);
             float level = OpenFPS.Common.Loudness.HeardGain(
@@ -1579,9 +1317,7 @@ public class ClientAudioSystem
         }
         foreach (var g in _machineGroups.Values)
         {
-            // Louder sorts first, so the key is negated. The hold and the keep bias work on the key
-            // exactly as they do for a car — a machine that already has a voice has to be beaten
-            // decisively, not merely matched.
+            // Louder sorts first, so negated; the hold and the keep bias as for a car.
             float key = g.Live ? -g.Level / (EngineKeepBias * EngineKeepBias) : -g.Level;
             if (g.Held) key = float.NegativeInfinity;
             g.Key = key;
@@ -1616,9 +1352,8 @@ public class ClientAudioSystem
             foreach (int id in g.Members) if (!_machineStarted.ContainsKey(id)) { isNew = true; break; }
             if (isNew)
             {
-                // Same reason as an engine: building one is a set of waveguides and resonators, and
-                // a map load presents all of them in the same instant. Counted per MACHINE: a train's
-                // taps share one synth and arrive together.
+                // A map load presents every machine at once; building one is a set of waveguides and
+                // resonators. Counted per machine: a train's taps share one synth.
                 if (admittedGroups >= NewEnginesPerUpdate) continue;
                 admittedGroups++;
             }
@@ -1642,28 +1377,20 @@ public class ClientAudioSystem
     private readonly HashSet<int> _wantedMachines = new();
 
     /// <summary>
-    /// Decides which cars get their own engine, and which borrow one.
-    ///
-    /// Every car in earshot gets its OWN engine, because the engines do not run inside the mixer
-    /// callback — a worker pool renders them ahead across all the machine's cores (see
-    /// EngineRenderPool), so no single thread has to integrate every engine before a deadline.
-    ///
-    /// The budget is a SAFETY NET. It follows measured mixer load, and what it protects against is
-    /// not the synthesis but the placement: thirty cars is still thirty spatialised
-    /// voices with HRTF and filtering, and that cost is the mixer's. If it ever runs short the order
-    /// of sacrifice is reflections, then borrowed voices, then engines — never the cars first.
-    /// </summary>
-    /// <summary>
-    /// What the engines' reflections cost the game thread, milliseconds a pass: this pass's running total
-    /// and a smoothed average of the passes before it. The budget below watched the mixer and the engine
-    /// threads and never this, so a machine whose mixer had room ran two reflections for every one of
-    /// thirty-two cars and spent 42 ms of each pass finding them: its game loop fell to 22 Hz and every
-    /// sound sat a tenth of a second behind what was making it (Sean's client, 2026-10-04). Over
-    /// <see cref="EchoPassCeilingMs"/> the reflections give way like anything else in the budget.
+    /// What the engines' reflections cost the game thread, ms a pass: this pass's total and a smoothed
+    /// average. Over <see cref="EchoPassCeilingMs"/> reflections give way. Watching only the mixer and the
+    /// engine threads, a machine with room in its mixer spent 42 ms a pass on 32 cars' reflections: its
+    /// game loop fell to 22 Hz and every sound lagged a tenth of a second (Sean's client, 2026-10-04).
     /// </summary>
     private double _echoPassMs, _echoMsSmoothed;
     private const double EchoPassCeilingMs = 6.0;
 
+    /// <summary>
+    /// Decides which cars get their own engine and which borrow one. Engines render ahead on a worker
+    /// pool across the machine's cores (EngineRenderPool), not in the mixer callback, so every car in
+    /// earshot can have one; the budget is a safety net for the placement (HRTF and filters per voice),
+    /// giving up reflections, then borrowed voices, then engines, never the cars first.
+    /// </summary>
     private void ChooseLiveEngines(WorldSnapshot world, Vector3 eyePos)
     {
         double now = _now();
@@ -1681,11 +1408,10 @@ public class ClientAudioSystem
         if (load > MixerLoadCeiling) { if (_overCeilingSince < 0) _overCeilingSince = now; }
         else _overCeilingSince = -1;
 
-        // THE PRODUCERS, as well as the mixer. Engines render on EngineRenderPool's threads, and when
-        // those cannot keep up a voice STARVES — its block is ramped to silence — which the mixer's
-        // load never sees. On the city a pool a core or two short gives 50-190 starves a second, and
-        // the car nearest you comes out chopped. Starving gives up machines and then cars, the same
-        // way an overloaded mixer does; reflections and front taps cost the producers nothing.
+        // The producers as well as the mixer: a render pool that cannot keep up starves voices (blocks
+        // ramped to silence), which the mixer's load never sees. On the city a pool a core or two short
+        // gave 50-190 starves a second and the nearest car came out chopped. Starving gives up machines,
+        // then cars; reflections and front taps cost the producers nothing.
         int starves = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.GlobalStarves + OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.GlobalStarves;
         if (_starveSampledAt > 0 && now > _starveSampledAt)
             _starveRate += ((starves - _starvesSeen) / (float)(now - _starveSampledAt) - _starveRate) * 0.3f;
@@ -1703,15 +1429,12 @@ public class ClientAudioSystem
         {
             if (load > MixerLoadCeiling && now - _overCeilingSince >= OverCeilingSeconds)
             {
-                // The places of extended sources go first, a source's worth at a time, and then a
-                // machine's second outlet: the only voices whose loss costs nothing but geometry —
-                // the source stays exactly as loud, because what they carried slews back into the
-                // voice that is still playing.
+                // Places of extended sources first, then a machine's second outlet: their loss costs only
+                // geometry, since what they carried slews back into the voice still playing.
                 if (_adaptivePlaces > 0) _adaptivePlaces = Math.Max(0, _adaptivePlaces - PlaceBudgetStep);
                 else if (_adaptiveFront > 0) _adaptiveFront--;
-                // Then a standing machine, before a reflection. A machine that drops out is one
-                // fewer air conditioner in a street of forty and is not missed; a car's first
-                // reflection is the wall of the building you are walking beside.
+                // Then a standing machine, before a reflection: one fewer air conditioner in a street of
+                // forty is not missed, the wall you walk beside answering a car is.
                 else if (_adaptiveMachines > MachineFloor) _adaptiveMachines--;
                 else if (_adaptiveEchoes > 0) _adaptiveEchoes--;
                 else if (_adaptiveDistant > MinDistantVoices) _adaptiveDistant--;
@@ -1751,9 +1474,7 @@ public class ClientAudioSystem
             _carPreset[entityId] = preset;
 
             float d2 = Vector3.DistanceSquared(snap.Transform.Position, eyePos);
-            // A car that already has an engine keeps it unless a silent one is decisively nearer;
-            // and one that has only just been given an engine is not taken off it at once. Both stop
-            // the set churning as cars trade places, which on a full grid happens constantly.
+            // The keep bias and the hold stop the set churning as cars trade places (EngineKeepBias).
             float key = _liveEngines.Contains(entityId) ? d2 * (EngineKeepBias * EngineKeepBias) : d2;
             if (_engineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds)
                 key = -1f;
@@ -1765,12 +1486,10 @@ public class ClientAudioSystem
 
         int keep = Math.Min(_adaptiveBudget, _engineDistances.Count);
 
-        // The cars kept outside the budget as their preset's only engine (see below). Found before
-        // anything is let go, so a donor that is still the donor keeps its engine and its start time.
-        // Let go and re-admitted, it was stamped as newly built every time its hold ran out: held
-        // again, ranked first, and given a slot INSIDE the budget, which turned out the car at the
-        // budget's edge — that car's engine faded and rebuilt from nothing every 2.5 s, and every
-        // borrowed voice restarted with it, for as long as the field stood still.
+        // The cars kept outside the budget as their preset's only engine (below), found before anything
+        // is let go so a donor keeps its engine and start time. Let go and re-admitted, a donor was held
+        // as new, took a slot inside the budget and turned out the car at its edge: that engine and every
+        // borrowed voice rebuilt from nothing every 2.5 s while the field stood still.
         _presetsKept.Clear();
         _presetDonors.Clear();
         for (int i = 0; i < _engineDistances.Count; i++)
@@ -1779,7 +1498,7 @@ public class ClientAudioSystem
             if (_presetsKept.Add(kept) && i >= keep) _presetDonors.Add(_engineDistances[i].Id);
         }
 
-        // Cars that have lost their engine fade it out rather than being cut mid-waveform.
+        // A car that lost its engine fades it out rather than being cut mid-waveform.
         foreach (int id in _liveEngines)
         {
             bool survives = _presetDonors.Contains(id);
@@ -1798,14 +1517,10 @@ public class ClientAudioSystem
             if (_audio.FadeOutEngine(id)) { _audio.StopSound(id); _engineRetiring.RemoveAt(i); }
         }
 
-        // New engines are let in a FEW AT A TIME.
-        //
-        // Building one is not free — a cylinder set, waveguides for every pipe, buffers for all of
-        // it — and a map load presents thirty cars in the same instant. Thirty constructions at once
-        // is an allocation spike on the thread that also services the mixer's queues, at the exact
-        // moment the scene, the geometry and the sample banks are all loading too: dropouts for the
-        // first second or two. Spread over a few frames it is inaudible: a car
-        // that arrives a sixteenth of a second late is a car that arrived.
+        // New engines are let in a few at a time. A map load presents thirty cars at once, and thirty
+        // constructions (cylinders, waveguides, buffers) on the thread that services the mixer's queues,
+        // while everything else loads, dropped out for a second or two. A car a sixteenth of a second
+        // late is a car that arrived.
         int admitted = 0;
         _liveEngines.Clear();
         _engineSourceByPreset.Clear();
@@ -1818,8 +1533,7 @@ public class ClientAudioSystem
                 admitted++;
             }
             _liveEngines.Add(id);
-            // Whatever happened to it before, a car that holds a slot is audible. Cheap and
-            // idempotent, and the only place that can undo a fade that was started and abandoned.
+            // A car that holds a slot is audible: cheap, idempotent, and the only undo for an abandoned fade.
             _audio.ReviveEngine(id);
             if (!_engineStarted.ContainsKey(id)) _engineStarted[id] = now;
             _engineSourceByPreset.TryAdd(_carPreset[id], id);
@@ -1828,18 +1542,10 @@ public class ClientAudioSystem
             if (_distantBoundTo.Remove(lent)) _audio.StopSound(lent);
         }
 
-        // ── Every preset on the map keeps one live engine ──────────────────────────────────────
-        //
-        // A car outside the budget borrows the ring of the nearest car OF ITS OWN PRESET, and if
-        // no car of that preset has a live engine there is nothing to borrow and the car is simply
-        // SILENT (DistantEngine returns on exactly that). That is fine for a preset the map has
-        // twenty of and fatal for one it has two of: the city carries two slip-on motorcycles, at
-        // their closest approach the loudest thing on that street, and the moment both fall out of
-        // the budget together they go silent.
-        //
-        // So the highest-ranked car of each distinct preset is admitted whatever the budget said.
-        // It costs at most one engine per preset the map actually uses (eleven on the city, against
-        // a budget of thirty-two) and it is what borrowing has always assumed was true.
+        // Every preset on the map keeps one live engine, whatever the budget said. A car outside the
+        // budget borrows the ring of the nearest car of its own preset, and with none live it is silent
+        // (DistantEngine): the city's two slip-on motorcycles, the loudest thing on their street, went
+        // silent together. At most one engine per preset in use (eleven on the city, budget 32).
         for (int i = keep; i < _engineDistances.Count; i++)
         {
             int id = _engineDistances[i].Id;
@@ -1856,7 +1562,7 @@ public class ClientAudioSystem
 
         ChooseFrontVoices();
 
-        // Whatever is left over, nearest first, borrows — a fallback now rather than the normal case.
+        // Whatever is left over, nearest first, borrows.
         _distantVoiced.Clear();
         for (int i = keep; i < _engineDistances.Count && i < keep + _adaptiveDistant; i++)
             _distantVoiced.Add(_engineDistances[i].Id);
@@ -1870,17 +1576,13 @@ public class ClientAudioSystem
             _distantBoundTo.Remove(voiceId);
         }
 
-        // A census, every five seconds. "Are there really thirty cars out there?" is not a question
-        // anybody should have to answer by counting engines with their ears, and the number that
-        // matters is not the map's — it is how many of the map's cars this machine is currently
-        // SYNTHESIZING, how many are borrowing a voice, and how many are past both budgets and
-        // therefore genuinely silent.
+        // A census every five seconds: how many cars this machine synthesizes, how many borrow, and how
+        // many are past both budgets and silent. Nobody should have to count engines by ear.
         if (now - _lastCensus >= 5.0)
         {
             _lastCensus = now;
             int cars = _engineDistances.Count;
-            // The list is sorted by the KEEP-BIASED key, not by distance, so [0] is not necessarily
-            // the nearest car. Ask the distances.
+            // Sorted by the keep-biased key, so [0] is not necessarily the nearest.
             float nearestD2 = float.MaxValue;
             foreach (var e in _engineDistances) if (e.D2 < nearestD2) nearestD2 = e.D2;
             float nearest = cars > 0 ? MathF.Sqrt(nearestD2) : 0f;
@@ -1894,9 +1596,8 @@ public class ClientAudioSystem
                             _engineEchoes.VoiceCount, _engineEchoes.MaxReflectionVoices, _engineEchoes.AudibilityFloor,
                             _audio.PendingSubmissions, WorldAudio.Pending_Count);
 
-            // The worst that every source in the world stood still for. Target is one 60 Hz period,
-            // 17 ms; anything over about 100 ms is long enough to hear a car passing in front of you
-            // stop dead and then carry on.
+            // The longest every source stood still. Target one 60 Hz period, 17 ms; over about 100 ms a
+            // car passing in front of you is heard to stop dead and carry on.
             string stages = string.Join(", ",
                 StageNames.Select((n, i) => $"{n} {_stageWorstMs[i]:F0}"))
                 + "; in the emitters' worst pass " + string.Join(", ", PartNames.Select((n, i) => $"{n} {_partWorstMs[i]:F0}"));
@@ -1911,12 +1612,9 @@ public class ClientAudioSystem
             Array.Clear(_stageWorstMs);
             Array.Clear(_partWorstMs); _partWorstPass = 0;
 
-            // And what the three nearest engines are actually DOING, which is the only way to tell
-            // apart the four things that sound identical from a chair: the cars really are slowing
-            // (an oval makes them lift twice a lap), the world is reporting a speed that is too low,
-            // the virtual driver is not holding the speed it was given, or it is shifting up. If
-            // "told" is steady and "own" or "rpm" sags, the fault is in the synthesis; if "told"
-            // itself falls, the car is genuinely slowing and the audio is right.
+            // What the three nearest engines are doing, to tell apart four things that sound the same: the
+            // car slowing, the world reporting too low a speed, the driver not holding it, or a shift up.
+            // "told" steady and "own" or "rpm" sagging: the synthesis; "told" falling: the car really is.
             _censusOrder.Clear();
             foreach (var e in _engineDistances) if (_liveEngines.Contains(e.Id)) _censusOrder.Add((e.D2, e.Id));
             _censusOrder.Sort(static (x, y) => x.D2.CompareTo(y.D2));
@@ -1931,11 +1629,9 @@ public class ClientAudioSystem
                 if (detail.Length > 0) Log.Information("    car {Id}: {Detail}", id, detail);
             }
 
-            // What actually reaches you loudest, and by which route: the answer to "why can I still
-            // hear that bus two streets over". Levels are dB full scale at the mixer, with distance,
-            // occlusion, air absorption, shelter and cone applied: the loudest band first, then each
-            // of low, mid and high. "round an edge" means the bearing has been moved to where the
-            // sound bends round something.
+            // What reaches you loudest and by which route ("why can I still hear that bus two streets
+            // over"): dBFS at the mixer with distance, occlusion, air, shelter and cone applied. "round an
+            // edge": the bearing was moved to where the sound bends round something.
             foreach (var v in _audio.LoudestVoices(5))
             {
                 string name = _carPreset.TryGetValue(v.EntityId, out var preset) ? preset : v.SoundId;
@@ -1952,14 +1648,14 @@ public class ClientAudioSystem
     /// <summary>When each repeating emitter is next due to speak. See RepeatIntervalSeconds.</summary>
     private readonly Dictionary<int, double> _repeatDue = new();
 
-    /// <summary>Each entity voice's own volume and reference distance as last submitted: what its walls' copies are
-    /// placed against.</summary>
+    /// <summary>Each entity voice's volume and reference distance as last submitted, which its walls'
+    /// copies are placed against.</summary>
     private readonly Dictionary<int, (float Volume, float MinDistance)> _placed = new();
 
     /// <summary>
-    /// A wall's copy of a recorded loop, as loud as the wall sends it back: the copy law at the loop's own reference
-    /// distance (EarlyReflections.PlacedCopyGain), so the copy's extra spreading is counted once, by the renderer at the
-    /// image; and its colour against its middle band, so the middle is counted once, in its volume.
+    /// A wall's copy of a recorded loop: the copy law at the loop's own reference distance
+    /// (EarlyReflections.PlacedCopyGain), so the extra spreading is counted once, by the renderer at the
+    /// image; and its colour relative to its middle band, so the middle is counted once, in its volume.
     /// </summary>
     internal static (float Volume, float MinDistance, float EqLow, float EqMid, float EqHigh) LoopEchoLevel(
         in AcousticPathData path, float sourceVolume, float sourceMinDistance, float directDistance)
@@ -1982,18 +1678,10 @@ public class ClientAudioSystem
     private readonly List<int> _engineRetiring = new();
 
     /// <summary>
-    /// Which machines are close enough for their two ends to be heard as two ends.
-    ///
-    /// The test is geometric and nothing about it knows what a car is: how far apart this machine's
-    /// outlets are, and what angle that separation subtends from here (see Localisation). A car is
-    /// three and a half metres from airbox to tailpipe, so it separates inside about twenty metres; a
-    /// motorcycle is one metre and separates inside six; an airliner would separate from half a
-    /// kilometre away. Nothing had to be authored for any of those.
-    ///
-    /// It costs one extra voice and NO extra synthesis — the engine is integrated once and its two
-    /// outlets are written to their own taps — and the machine's level is identical either way, so
-    /// crossing the threshold is a change in where the sound comes from and not in how much of it
-    /// there is.
+    /// Which machines are close enough for their two ends to be heard as two: the angle their outlets'
+    /// separation subtends from here (Localisation). A car (3.5 m) separates inside about 20 m, a
+    /// motorcycle (1 m) inside 6. One extra voice and no extra synthesis (the engine writes both taps),
+    /// at the same total level, so crossing the threshold moves the sound and does not change it.
     /// </summary>
     private void ChooseFrontVoices()
     {
@@ -2011,8 +1699,7 @@ public class ClientAudioSystem
         }
         _frontCandidates.Sort((a, b) => a.D2.CompareTo(b.D2));
 
-        // Anything that had a front voice and no longer wants one gives it back — faded, not cut:
-        // the tap is a running waveform like the engine it comes from.
+        // A front voice given back fades, not cut: the tap is a running waveform.
         foreach (int id in _frontVoiced)
         {
             bool survives = false;
@@ -2038,8 +1725,7 @@ public class ClientAudioSystem
 
     private readonly List<(int Id, float D2)> _frontCandidates = new();
 
-    /// <summary>How far apart a machine's outlets are, metres. Memoised: it is a property of the
-    /// machine, asked once per car per frame.</summary>
+    /// <summary>How far apart a machine's outlets are, metres; memoised, asked per car per frame.</summary>
     private static float OutletSeparation(string preset)
     {
         if (_outletSeparation.TryGetValue(preset, out float cached)) return cached;
@@ -2051,8 +1737,8 @@ public class ClientAudioSystem
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, float> _outletSeparation = new();
 
-    /// <summary>Where the gas leaves, in the machine's own frame — the TRUE tailpipe, not the
-    /// compromise position a single voice sits at (VehicleProfile.ExhaustEmitterBias).</summary>
+    /// <summary>Where the gas leaves, machine frame: the true tailpipe, not where a single voice sits
+    /// (VehicleProfile.ExhaustEmitterBias).</summary>
     private static Vector3 ExhaustSlot(OpenFPS.Common.VehicleProfile v) => v.ExhaustSlot;
 
     /// <summary>...and the other end: where it breathes, or its nose when the engine is in the back
@@ -2061,12 +1747,9 @@ public class ClientAudioSystem
         => new(0f, v.FrontTapHeight, v.FrontTapZ);
 
     /// <summary>
-    /// The front outlet of a machine, placed and kept up to date.
-    ///
-    /// It carries no engine of its own: the voice reads the front tap of the entity's live engine
-    /// (EngineTapState), so it costs a buffer read and an HRTF. Everything about it that is not the
-    /// position is the same as the machine's other voice, because it is the same machine — the same
-    /// level reference, the same range, the same region, the same sampled time.
+    /// A machine's front outlet, placed: it reads the front tap of the entity's live engine
+    /// (EngineTapState), so it costs a buffer read and an HRTF. All but the position is the machine's
+    /// other voice's: level reference, range, region, sampled time.
     /// </summary>
     private void FrontVoice(EntitySnapshot snap, OpenFPS.Common.VehicleProfile profile, in AcousticPathData path,
                             float volume, float minDistance, float range, double sampledAt)
@@ -2088,10 +1771,8 @@ public class ClientAudioSystem
             ApparentPosition = pos,
             Velocity = snap.Velocity,
             PositionSampledAt = sampledAt,
-            // The SAME level reference as the exhaust voice. The two taps already carry the
-            // difference between what an intake radiates and what a tailpipe does — that is what the
-            // synthesis is for — and applying a second, guessed difference on top of it here would
-            // be the taste constant this design is trying not to have.
+            // The exhaust voice's level reference: the taps already carry the difference between intake
+            // and tailpipe, and a second, guessed one here would be a taste constant.
             Volume = volume,
             MinDistance = minDistance,
             ExtentMetres = minDistance,
@@ -2159,8 +1840,8 @@ public class ClientAudioSystem
         }
     }
 
-    /// <summary>Called once a frame: the cabin's voices go when you are no longer sitting in that
-    /// vehicle, or its engine has no voice. Faded, then stopped.</summary>
+    /// <summary>Once a frame: the cabin's voices fade and stop when you leave that vehicle or its engine
+    /// loses its voice.</summary>
     private void UpdateCabinVoices()
     {
         if (_cabinVoiced != int.MinValue && _cabinSeenFrame != _frameCount) RetireCabinVoices();
@@ -2182,16 +1863,15 @@ public class ClientAudioSystem
 
     // ── Extended sources: a tree's crown, a fire's bed (ExtendedSources) ───────────────────────────
 
-    /// <summary>Voice ids for the outer places of an extended source: <see cref="ExtendedSources.MaxPlaces"/> a
-    /// source, place 1 up. Eight a source until 2026-10-06, when a surf beach had ten places and its ninth and
-    /// tenth took the next source's first two ids.</summary>
+    /// <summary>Voice ids for the outer places of an extended source, place 1 up,
+    /// <see cref="OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MaxPlaces"/> a source. At eight a
+    /// source a ten-place surf beach took the next source's first two ids (2026-10-06).</summary>
     internal const int PlaceVoiceBase = -5_000_000;
     internal const int PlaceIdsPerSource = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MaxPlaces;
     internal static int PlaceVoiceId(int sourceId, int place) => PlaceVoiceBase - Math.Abs(sourceId) * PlaceIdsPerSource - place;
 
-    /// <summary>After a source merges to its middle, its outer voices are kept this long, s: what was
-    /// already written to them (a twig's clatter, a crackle's rattle, up to the render lead ahead) rings
-    /// out rather than being cut.</summary>
+    /// <summary>After a source merges to its middle its outer voices are kept this long, s, so what was
+    /// already rendered into them (up to the render lead ahead) rings out rather than being cut.</summary>
     private const double MergeHoldSeconds = 2.0;
 
     private sealed class Spreading
@@ -2338,12 +2018,9 @@ public class ClientAudioSystem
     private readonly List<int> _sirensGone = new();
 
     /// <summary>
-    /// Every siren on the map, placed every frame, whatever its car's engine is doing.
-    ///
-    /// Not from inside the car's own emitter pass, which only runs for a car whose ENGINE won a voice:
-    /// a siren is thirty-five decibels louder than the engine under it, so it is exactly the sound
-    /// that must not depend on that. Placed from there, a patrol car that dropped out of the engine
-    /// budget would leave its siren wailing where the car had been, with nothing to stop it.
+    /// Every siren on the map, placed every frame whatever its car's engine is doing. Not from the car's
+    /// emitter pass, which runs only for an engine that won a voice: a siren is 35 dB louder than its
+    /// engine, and a car dropped from the budget left its siren wailing where it had been.
     /// </summary>
     private void UpdateSirens(WorldSnapshot world, Vector3 eyePos)
     {
@@ -2369,11 +2046,10 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// The path for a horn or a siren on a vehicle: the occlusion worker's answer for the vehicle. A
-    /// vehicle whose engine did not win a voice is not asked about by the per-voice pass, so it is asked
-    /// about here; and until an answer comes the one-shots' path stands in, which has the same walls and
-    /// the same routes by the openings. "No answer" is never "nothing in the way": that played a horn
-    /// behind three buildings at full level until the vehicle happened to be asked about.
+    /// The path for a horn or a siren: the occlusion worker's answer for the vehicle, asked here since a
+    /// vehicle whose engine has no voice is not asked by the per-voice pass. Until it answers, the
+    /// one-shots' path stands in: "no answer" read as "nothing in the way" played a horn behind three
+    /// buildings at full level.
     /// </summary>
     private AcousticPathData VehiclePath(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos)
     {
@@ -2391,13 +2067,10 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// The path for a sounding entity the occlusion worker has no answer for yet — a car that has just
-    /// won a live voice, whose last answer was dropped while nothing asked about it. It was built as an
-    /// unoccluded line, and the voice was STARTED with it: a car behind a building came in at full
-    /// level for the fifth of a second until the worker answered, and then eased down (2026-10-03).
-    /// The worker's answer for a source it heard near this one a moment ago, moved to this one; failing
-    /// that, the one-shots' path, which has the same walls and the same routes by the openings. And the
-    /// worker is asked now, so the next frame has its own.
+    /// The path for a sounding entity the worker has no answer for yet (a car that just won a voice): the
+    /// worker's answer for a source near this one, moved here, or failing that the one-shots' path; and
+    /// the worker is asked now. Started on an unoccluded line, a car behind a building came in at full
+    /// level for a fifth of a second (2026-10-03).
     /// </summary>
     private AcousticPathData FirstAnswer(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos)
     {
@@ -2426,15 +2099,13 @@ public class ClientAudioSystem
     /// <summary>Voice ids for a vehicle's horn, one per vehicle.</summary>
     internal const int HornVoiceBase = -1_200_000;
 
-    /// <summary>Trains sounding their horn or bell ("preset/train"), until when. A train's horn,
-    /// whistle and bell sources are given a voice only while it is: silent, they are nothing to hear,
-    /// and ranked at a horn's 139 dB they would hold a voice for the whole train from kilometres off.</summary>
+    /// <summary>Trains sounding their horn or bell ("preset/train"), until when. Signal sources get a
+    /// voice only meanwhile: ranked at a horn's 139 dB, a silent one would hold a voice from kilometres off.</summary>
     private readonly Dictionary<string, double> _trainSignals = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// A train sounds for a crossing. Its synth plays it on the train's own horn (or whistle) and bell
-    /// (TrainSignal); this keeps the signal sources ranked while it lasts. A synth that does not exist
-    /// yet takes the signal when it is made, the time already gone counted off.
+    /// A train sounds for a crossing on its own horn (or whistle) and bell (TrainSignal); this keeps the
+    /// signal sources ranked while it lasts. A synth made later takes the signal, less the time gone.
     /// </summary>
     private void StartTrainSignal(string train, float[] warning, float bellSeconds)
     {
@@ -2472,9 +2143,8 @@ public class ClientAudioSystem
     private readonly List<int> _hornsDone = new();
 
     /// <summary>
-    /// Somebody on the street sounded their horn. The voice is built on the next frame, on the
-    /// vehicle, where it stays for as long as the rhythm lasts. A second honk from the same car while
-    /// the first is still going replaces it — one horn, one hand.
+    /// Somebody on the street sounded their horn: the voice is built next frame on the vehicle and lasts
+    /// the rhythm. A second honk from the same car replaces the first (one horn, one hand).
     /// </summary>
     private void StartHorn(int entityId, string horn, float[] rhythm)
     {
@@ -2484,10 +2154,7 @@ public class ClientAudioSystem
                             OpenFPS.Common.AudioClock.Now + OpenFPS.Common.Honk.Duration(rhythm) + 1.0);
     }
 
-    /// <summary>
-    /// Places every horn that is sounding, at the front of its vehicle, through the vehicle's own
-    /// acoustic path — behind a building, a horn is behind the building too.
-    /// </summary>
+    /// <summary>Places every sounding horn at the front of its vehicle, through the vehicle's own path.</summary>
     private void UpdateHorns(WorldSnapshot world, Vector3 eyePos, double now)
     {
         UpdateHeldHorns(world, eyePos, _now());
@@ -2519,10 +2186,9 @@ public class ClientAudioSystem
                 Mode = PlaybackMode.LoopOne,
                 Type = EmitterType.EntityAttached,
                 Position = pos,
-                // Heard from the horn itself, where the car is NOW — only turned toward the edge the
-                // path goes round when something is in the way. Not the path's own point, which is
-                // the car's exhaust as of the worker's last answer (up to ten frames old at range):
-                // a moving car's horn would trail behind it, and come from its tailpipe.
+                // From the horn where the car is now, turned toward the path's edge only when blocked. The
+                // path's own point is the exhaust as of the worker's last answer (up to ten frames old):
+                // a moving car's horn would trail behind it, from its tailpipe.
                 ApparentPosition = SirenApparent(path, pos, eyePos),
                 Velocity = snap.Velocity,
                 PositionSampledAt = world.PositionsSampledAt,
@@ -2554,11 +2220,9 @@ public class ClientAudioSystem
 
     // ── Tyres over the rails ────────────────────────────────────────────────────────────────
     //
-    // A level crossing's rails, from the map's roads (MapRoads). Every vehicle with a voice of its own
-    // that is about to roll a wheel over one has the strike scheduled in its voice, at the moment the
-    // wheel reaches the rail (WheelStrikes): front wheels, a rail-gauge later the second rail, a
-    // wheelbase later the back wheels. Scheduled once a wheel is under a second from a rail, which is
-    // longer than any voice renders ahead; let go once it is well past, so the next pass strikes again.
+    // A level crossing's rails, from the map's roads. A voiced vehicle about to roll a wheel over one has
+    // the strike scheduled in its voice for the moment the wheel reaches the rail (WheelStrikes), once
+    // the wheel is under a second away (longer than any voice renders ahead); let go once well past.
 
     private IReadOnlyList<OpenFPS.Common.CrossingRails> _crossings = Array.Empty<OpenFPS.Common.CrossingRails>();
     private readonly Dictionary<(int Id, int Wheel, int Rail), double> _struck = new();
@@ -2668,10 +2332,9 @@ public class ClientAudioSystem
     private const double HornReleaseSeconds = 0.8;
 
     /// <summary>
-    /// The horn of every vehicle whose driver is holding H (EntityState.Signals): the vehicle's own horn
-    /// model (VehicleProfile.HornFor) blowing for as long as the wire says, at the grille. Let go, the
-    /// voice is told to stop and the model's own valve or relay ends the note; the voice goes a moment
-    /// later.
+    /// The horn of every vehicle whose driver holds H (EntityState.Signals): its own horn model
+    /// (VehicleProfile.HornFor) at the grille for as long as the wire says. Let go, the model's valve or
+    /// relay ends the note and the voice goes a moment later.
     /// </summary>
     private void UpdateHeldHorns(WorldSnapshot world, Vector3 eyePos, double now)
     {
@@ -2741,19 +2404,10 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// The siren on a vehicle that carries one — its own voice at its own level, at the grille.
-    ///
-    /// Everything about it is separate from the engine's voice except where it is, and that is the
-    /// point: a siren head is 130 dB at a metre where the car is 95, so it gets its own placement
-    /// and its own full-scale reference. Sharing the engine's would either square the siren or
-    /// bury the car. See SirenVoiceState.
-    ///
-    /// WHETHER IT IS SOUNDING is not decided here and is not scripted. A patrol car with its
-    /// lights on is one that is going somewhere, and on a track that is a car running above the
-    /// speed the rest of the traffic keeps — so the mode is read off what the car is DOING, the
-    /// same way an aeroplane's power lever is read off its climb angle. Standing still or rolling
-    /// with the traffic: off. Moving with purpose: wail. Hard on the brakes into a junction: yelp,
-    /// which is what a real crew switches to, because a fast sweep is far easier to place.
+    /// A vehicle's siren: its own voice at its own level, at the grille. A siren head is 130 dB at a metre
+    /// where the car is 95, so sharing the engine's reference would square the siren or bury the car
+    /// (SirenVoiceState). A driven vehicle sounds as switched; traffic's mode is read off what the car
+    /// does (<see cref="SirenModeFor"/>).
     /// </summary>
     private void SirenVoice(EntitySnapshot snap, string sirenKey, in AcousticPathData path, double sampledAt, Vector3 eyePos)
     {
@@ -2789,10 +2443,8 @@ public class ClientAudioSystem
             ApparentPosition = SirenApparent(path, pos, eyePos),
             Velocity = snap.Velocity,
             PositionSampledAt = sampledAt,
-            // Which way the horn points. Without it the machine frame falls back to the VELOCITY,
-            // which is the right answer while the car is moving and no answer at all when it slows
-            // for a junction — exactly when a siren matters most. The car's own rotation always
-            // knows.
+            // Which way the horn points. Without it the frame falls back to the velocity, which is no
+            // answer when the car slows for a junction, exactly when a siren matters most.
             Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
             Volume = gain,
             EarLevelDb = spec.SourceLevelDb,
@@ -2821,9 +2473,9 @@ public class ClientAudioSystem
         => snap.Transform.Position + Vector3.Transform(new Vector3(0f, 0.4f, Grille(snap)), snap.Transform.Rotation);
 
     /// <summary>
-    /// How far ahead of a vehicle's middle its grille is, metres: a quarter of a metre in from the nose
-    /// of the body its profile declares. Where the horns and a siren head are mounted. A vehicle the
-    /// client cannot name is taken as a car, whose grille is 1.9 m ahead of its middle.
+    /// How far ahead of a vehicle's middle its grille is, metres (where horns and a siren head sit): a
+    /// quarter of a metre in from the nose of its declared body, or 1.9 m for a vehicle the client cannot
+    /// name.
     /// </summary>
     internal static float Grille(in EntitySnapshot snap)
     {
@@ -2835,14 +2487,10 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// Where a siren is heard from: its own head, unless the car's path says the sound arrives round
-    /// something, in which case from that bearing at the head's distance.
-    ///
-    /// ONE answer, used by both things that place the voice: the siren's own update and the car's
-    /// acoustic path. With two answers (the grille, and the exhaust as of the last worker request or
-    /// the edge a blocked source is redirected to) the audio thread applies whichever arrived last,
-    /// and the image swings between two bearings every frame — 3.6 degrees for a car crossing 100 m
-    /// out in the open, the whole redirection behind a building. A far siren then flutters.
+    /// Where a siren (or horn) is heard from: its own head, or, when the car's path arrives round
+    /// something, that bearing at the head's distance. One answer for both writers (the siren's update and
+    /// the car's path): with two, the image swung between bearings every frame (3.6 degrees for a car
+    /// crossing 100 m out) and a far siren fluttered.
     /// </summary>
     internal static Vector3 SirenApparent(in AcousticPathData path, Vector3 mouth, Vector3 ear)
     {
@@ -2854,18 +2502,14 @@ public class ClientAudioSystem
         return ear + Vector3.Normalize(toApparent) * Vector3.Distance(ear, mouth);
     }
 
-    /// <summary>One mode decision per vehicle, kept between frames because the decision has
-    /// state in it — see SirenController.</summary>
+    /// <summary>One mode decision per vehicle, kept between frames: it has state (SirenController).</summary>
     private readonly Dictionary<int, (OpenFPS.Common.SirenController C, double At)> _sirenControl = new();
 
     /// <summary>
-    /// What a patrol car's siren is doing, from what the car is doing. Nothing on the wire carries
-    /// it and nothing scripts it, which is the same rule the power lever and the air brakes follow.
-    ///
-    /// The decision itself lives in <see cref="OpenFPS.Common.SirenController"/> rather than here,
-    /// because it has memory and hysteresis in it and a thing with memory is a thing a test can
-    /// drive. The instantaneous deceleration alone would flip between wail and yelp at every corner
-    /// of a city lap.
+    /// What a patrol car's siren is doing, from what the car does (nothing on the wire carries it): off
+    /// standing or with the traffic, wail moving with purpose, yelp braking hard into a junction. The
+    /// decision has hysteresis and lives in <see cref="OpenFPS.Common.SirenController"/>, where a test can
+    /// drive it; deceleration alone flipped wail and yelp at every corner.
     /// </summary>
     private OpenFPS.Common.SirenMode SirenModeFor(int entityId, float speed, double at)
     {
@@ -2878,22 +2522,11 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// A car too far away to be worth its own engine, voiced by BORROWING one that is near.
-    ///
-    /// This is what stops the number of cars a map may carry from being decided by the mixer. A full
-    /// engine is cylinders, valves and waveguides integrated per sample — about a tenth of a core —
-    /// so simulating fifty of them is five cores, and the answer is not a bigger machine. It is that
-    /// past a certain distance nobody can tell one engine from another of the same kind: what reaches
-    /// you is the pack.
-    ///
-    /// So a distant car reads the ring buffer of the NEAREST car of its own preset, at a fixed offset
-    /// of its own, and is placed at its own position with its own velocity. It costs a buffer read
-    /// and an HRTF, not an engine. Its revs are the lead car's rather than its own, which at two
-    /// hundred metres is a difference no listener has ever been able to name — and it means the
-    /// field keeps circulating instead of cars dropping out of the world as they go round the back.
-    ///
-    /// The offset per car matters: without it, every borrowed voice would be the same waveform at the
-    /// same instant and they would sum coherently into one loud car rather than spreading into traffic.
+    /// A car too far away for its own engine, voiced by borrowing a near one: it reads the ring of the
+    /// nearest live car of its preset at an offset of its own, placed at its own position with its own
+    /// velocity, for a buffer read and an HRTF instead of a tenth of a core. Past a couple of hundred
+    /// metres nobody can tell one engine of a kind from another. The per-car offset matters: without it
+    /// the borrowed voices are one waveform and sum into one loud car instead of traffic.
     /// </summary>
     private void DistantEngine(EntitySnapshot snap, OpenFPS.Common.Networking.EntityDefinition def, string preset, double sampledAt)
     {
@@ -2903,16 +2536,13 @@ public class ClientAudioSystem
 
         int voiceId = DistantVoiceBase - Math.Abs(snap.Id);
 
-        // Rebind if the car it was borrowing from has itself gone: the ring buffer it was reading no
-        // longer exists, and a voice pointed at a dead source is silence that never recovers.
+        // Rebind when the donor changes: a voice pointed at a dead source is silence that never recovers.
         if (_distantBoundTo.TryGetValue(voiceId, out int bound) && bound != sourceId)
             _audio.StopSound(voiceId);
         _distantBoundTo[voiceId] = sourceId;
 
         var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
         float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
-        // The same machine, the same size: a car does not become a point because it is far away and
-        // borrowing somebody else's engine.
         float extent = OutletSeparation(preset);
         var (gain, reference) = OpenFPS.Common.Loudness.Place(level, extent);
         Vector3 pos = OpenFPS.Common.AudioEmission.PointFor(snap);
@@ -2933,7 +2563,7 @@ public class ClientAudioSystem
             Type = EmitterType.WorldLocked,
             Position = pos,
             ApparentPosition = pos,
-            // Its OWN velocity, so it Dopplers as itself rather than as the car it borrowed from.
+            // Its own velocity, so it Dopplers as itself, not as its donor.
             Velocity = snap.Velocity,
             PositionSampledAt = sampledAt,
             Volume = gain * def.SoundEmitter.Volume,
@@ -2947,18 +2577,7 @@ public class ClientAudioSystem
         else _audio.PlayPhysicalSoundDirect(e);
     }
 
-    // ── How hard the road is working a moving thing's tyres ─────────────────────────────────────
-    //
-    // Derived from its OWN MOTION, which is the only way this can be general. Nothing here knows what
-    // a corner is, or that this map has a track on it: a source whose velocity is changing direction
-    // is turning, a source whose speed is changing is accelerating or braking, and the two combine as
-    // a vector because a tyre has one friction budget to spend on both. A car, a bus, a runaway
-    // trolley and a player-driven vehicle all get it on the same terms, and so will whatever the next
-    // map has on it.
-    //
-    // The lateral term is the interesting one and it needs no curvature, no racing line and no server
-    // support: if the velocity vector rotated by an angle in a time, the centripetal acceleration is
-    // speed times that rate. That is the definition, and it is true of anything that moves.
+    // TODO: nothing reads these two since TyreDemand went; only ForgetEntity touches them.
     private readonly Dictionary<int, (Vector3 Velocity, double At)> _motionHistory = new();
     private readonly Dictionary<int, float> _tyreDemand = new();
 
@@ -2967,23 +2586,15 @@ public class ClientAudioSystem
         double now = _now();
         var def = snap.Definition;
 
-        // A physical model outside the budget is not heard, so it is not WORKED OUT either.
-        //
-        // This bails before the acoustic path is read, and that is the whole point of where it sits.
-        // A city carries a hundred and twenty-six of these and ten of them get a voice; doing the
-        // occlusion, the diffraction and the placement for the other hundred and sixteen every
-        // frame, to throw all of it away at the branch that builds the emitter, is a hundred and
-        // sixteen sources' worth of work per frame for silence. The ranking in ChooseLiveMachines has already decided, on the measure that
-        // matters, and it ran this frame.
+        // A physical model outside the budget (ChooseLiveMachines, this frame) is not worked out either:
+        // this bails before the path is read, or the city's 116 unvoiced machines cost a frame's work each.
         if (def.SoundEmitter.IsSynth
             && def.SoundEmitter.SoundId is { } sid
             && PhysicalLevel(sid, out _, out _)
             && !_liveMachines.Contains(snap.Id))
             return;
 
-        // Use the async worker's last computed result rather than a synchronous per-frame calculation.
-        // Until it has one, the answer it gave a moment ago for a source near this one, or failing that
-        // the one-shots' path (FirstAnswer). Never "nothing in the way".
+        // The worker's last answer; until it has one, FirstAnswer. Never "nothing in the way".
         AcousticPathData acousticPath = _acousticWorker.TryGetResult(snap.Id, out var cachedPaths)
             ? cachedPaths.FirstOrDefault(p => !p.IsReflection)
             : FirstAnswer(world, snap, eyePos);
@@ -2997,8 +2608,7 @@ public class ClientAudioSystem
         string physicalKey = "";
         float powerLever = 1f, rotorWake = 0f;
         bool onGround = false;
-        // Where the sound comes out. One shared answer, so the voice and the occlusion probe in step 5
-        // can never again be asking about two different points in space.
+        // Where the sound comes out: the same point the occlusion probe in Update asks about.
         Vector3 emitterPosition = OpenFPS.Common.AudioEmission.PointFor(snap);
         float engineVolume = def.SoundEmitter.Volume;
         float engineMinDistance = def.SoundEmitter.MinDistance;
@@ -3007,48 +2617,37 @@ public class ClientAudioSystem
         // A tree or a fire: the places it is heard from across its extent (ExtendedSources).
         Vector3[]? extentLayout = null;
         float chorusTrees = 1f;
-        // The declared level the voice is placed by, for the ear model; an authored source with only a
-        // volume has none.
+        // The declared level, for the ear model; 0 for an authored source with only a volume.
         float earLevel = 0f;
-        // An authored source with a SIZE — a fountain, a grille, a waterfall. Same rule as a machine:
-        // the reference widens to the thing's own radius and the gain is paid down to match, so the
-        // far field is unchanged and only the near field goes flat.
+        // An authored source with a size (a fountain, a grille): as for a machine, the reference widens to
+        // its radius and the gain is paid down, so only the near field changes.
         if (engineExtent > 0f && !def.SoundEmitter.IsSynth)
             (engineVolume, engineMinDistance) =
                 OpenFPS.Common.Loudness.Widen(engineVolume, engineMinDistance, engineExtent);
         if (def.SoundEmitter.IsSynth)
         {
             resolvedSoundId = def.SoundEmitter.SoundId;
-            if (string.IsNullOrEmpty(resolvedSoundId)) resolvedSoundId = "SYNTH"; // Last resort dummy
-            // Asked of the SAME lookup the ranking uses, not a second list of prefixes. There were
-            // two lists: LookUpPhysicalLevel learned "bell:" and this one did not, so the crossing
-            // bell was ranked, won a voice, and then fell through to here as a nameless synth with
-            // no physical key — placed every frame, rendered by nothing. Every kind the lookup
-            // knows is a physical voice, and nothing else is.
+            if (string.IsNullOrEmpty(resolvedSoundId)) resolvedSoundId = "SYNTH";
+            // The ranking's own lookup, not a second prefix list: with two, the crossing bell won a voice
+            // and then fell through here as a nameless synth, placed every frame and rendered by nothing.
             if (PhysicalLevel(resolvedSoundId, out _, out _))
             {
-                // A physical model that is not a vehicle. Unlike a car it has no borrowed-voice
-                // fallback: one outside the budget is simply not heard, because there is no sense in
-                // which forty air conditioners are one air conditioner heard from further away —
-                // that is what aggregation will be for, and this is not it.
+                // Not a vehicle, so no borrowed voice: outside the budget it is not heard (forty air
+                // conditioners are not one heard from further away).
                 if (!_liveMachines.Contains(snap.Id)) return;
-                // The same memoised numbers the ranking used. Building a fresh spec here as well
-                // would be the same fault at a tenth of the scale, and would also let the two
-                // disagree if a model were ever reloaded between the two calls.
+                // The ranking's memoised numbers, so the two cannot disagree.
                 if (!PhysicalLevel(resolvedSoundId, out float levelDb, out float extent)) return;
                 physicalKey = resolvedSoundId;
-                // A stretch of shore carries its own geometry, its fetch and which way its water lies, in
-                // its box (tools/gen_osm.py): the voice reads it from the key.
+                // A stretch of shore carries its geometry (fetch, which way its water lies) in its box
+                // (tools/gen_osm.py); the voice reads it from the key.
                 if (physicalKey.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
                     physicalKey = OpenFPS.Common.ShoreSpec.KeyFor(physicalKey, def.Collider.Size, snap.Transform.Rotation);
-                // Placed on its own declared level and its own size, the same way a vehicle is.
-                // The extent is what stops a window unit being a point source you can walk into:
-                // inside its own half-metre the level is flat, and the gain is paid down to match so
-                // the far field is unchanged. See Loudness.Widen — widening without paying is how
-                // the engine once handed every quiet vehicle eight decibels it had not earned.
+                // Placed by its declared level and size: inside its extent the level is flat, and the
+                // gain is paid down so the far field is unchanged (Loudness.Widen; widening without
+                // paying once handed every quiet vehicle eight decibels).
                 var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
-                // A voice that renders with more room than the shared headroom — a fire's crackles —
-                // gets the difference back here, so it is placed by its level and not its peaks.
+                // A voice rendered with more headroom than the shared one (a fire's crackles) gets the
+                // difference back, so it is placed by its level and not its peaks.
                 engineVolume = gain * def.SoundEmitter.Volume
                              * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
                 // A tree's share of itself, or a wood's gain (its synth renders its trees: WoodChorus).
@@ -3062,20 +2661,17 @@ public class ClientAudioSystem
                 {
                     (powerLever, rotorWake) = FlightPower(snap.Velocity);
                     onGround = OnTheWheels(snap, world, eyePos, out float height);
-                    // On its wheels the climb angle says nothing; what it is doing does. Read off the
-                    // speed's change, the same way a train's notch is.
+                    // On its wheels the climb angle says nothing: the lever comes from the speed's change.
                     float groundSpeed = snap.Velocity.Length();
                     float accel = 0f;
                     if (_lastAirSpeed.TryGetValue(snap.Id, out var was) && world.PositionsSampledAt > was.At)
                         accel = (groundSpeed - was.Speed) / (float)Math.Max(0.02, world.PositionsSampledAt - was.At);
                     _lastAirSpeed[snap.Id] = (groundSpeed, world.PositionsSampledAt);
                     if (onGround) powerLever = GroundPower(groundSpeed, accel);
-                    // A piston aeroplane has no reversers: on the ground it is at idle unless it is
-                    // gathering speed for a takeoff. Coming down within a wingspan of the ground (the
-                    // flare, in ground effect) its throttle is closed, so it arrives at idle and its
-                    // tyres are heard. At approach power over the runway, its exhaust in the squeal's
-                    // band stood within 5 dB of a 109 dB touchdown at a metre; at idle, 10 to 15 dB
-                    // under it. Jets and turboprops keep GroundPower, reversers included.
+                    // A piston aeroplane has no reversers: on the ground it idles unless taking off, and in
+                    // the flare (within a wingspan of the ground) its throttle is closed, so its tyres are
+                    // heard. At approach power its exhaust stood within 5 dB of a 109 dB touchdown in the
+                    // squeal's band; at idle, 10 to 15 dB under. Jets and turboprops keep GroundPower.
                     if (PhysicalAircraft(snap) is { Power: OpenFPS.Common.AircraftPower.Piston } piston)
                     {
                         if (onGround) powerLever = powerLever >= 1f ? 1f : GroundIdleLever;
@@ -3084,10 +2680,8 @@ public class ClientAudioSystem
                 }
                 else if (physicalKey.StartsWith("rail:", StringComparison.OrdinalIgnoreCase))
                 {
-                    // A train's speed is the bogie's speed, and its notch is what the speed is
-                    // doing: pulling away is full effort, holding speed is a little, braking is none.
-                    // The lever carries the notch as a fraction of eight; the wake slot carries the
-                    // speed itself, which is what the rolling noise is made from.
+                    // The notch from what the speed does (pulling away full, holding a little, braking
+                    // none), carried in the lever slot; the wake slot carries the speed, for rolling noise.
                     float speed = snap.Velocity.Length();
                     float accel = 0f;
                     if (_lastRailSpeed.TryGetValue(snap.Id, out var prev) && world.PositionsSampledAt > prev.At)
@@ -3100,10 +2694,7 @@ public class ClientAudioSystem
             else if (resolvedSoundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
                 && OpenFPS.Common.MachineRegistry.Knows(resolvedSoundId[7..]))
             {
-                // A vehicle: the engine runs live in the mixer and follows the entity's speed. The
-                // voice sits toward the tailpipe, since that is where most of the sound comes from,
-                // and it is placed at the level a loud exhaust really has.
-                // Its own engine if it has one; a borrowed voice if the mixer is short. See DistantEngine.
+                // A vehicle: its own live engine, or a borrowed voice (DistantEngine).
                 if (!_liveEngines.Contains(snap.Id))
                 {
                     DistantEngine(snap, def, resolvedSoundId[7..], world.PositionsSampledAt);
@@ -3111,18 +2702,12 @@ public class ClientAudioSystem
                 }
                 engineKey = resolvedSoundId[7..];
                 var profile = OpenFPS.Common.MachineRegistry.VehicleFor(engineKey);
-                // This car's own measured level, not one number for every car. A stock car is
-                // fourteen decibels over a road car and a diesel pickup thirty under it.
+                // Its own measured level: a stock car is 14 dB over a road car, a diesel pickup 30 under.
                 float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
-                // How big the machine is, acoustically: the distance between the ends it radiates
-                // from. A car is three and a half metres of machine, a bus is ten, a motorcycle is
-                // one — and inside that the level is flat, because walking a metre nearer the intake
-                // walks you a metre further from the exhaust.
-                //
-                // This replaces `MathF.Max(reference, 3f)`, which widened the reference by hand and
-                // paid nothing back for it. That is not an extended source, it is a louder one: it
-                // was worth up to eight decibels to a quiet vehicle, which is most of the measured
-                // 3.6 dB error in the crowd-against-motorcycle balance.
+                // Its acoustic size is the distance between the ends it radiates from (a car 3.5 m, a bus
+                // 10, a motorcycle 1): inside it the level is flat, since a metre nearer the intake is a
+                // metre further from the exhaust. Widened by Loudness.Place, which pays the gain back;
+                // a bare MathF.Max(reference, 3f) handed a quiet vehicle up to 8 dB.
                 float extent = OutletSeparation(engineKey);
                 var (gain, reference) = OpenFPS.Common.Loudness.Place(level, extent);
                 engineVolume = gain * def.SoundEmitter.Volume;
@@ -3131,19 +2716,11 @@ public class ClientAudioSystem
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(level));
                 earLevel = level;
 
-                // Close enough to hear which end is which: this voice moves back to the TAILPIPE and
-                // the front of the machine gets a voice of its own at the airbox. Further away the
-                // voice stays where it has always been — between the two, biased toward the exhaust
-                // (VehicleProfile.ExhaustEmitterBias) — because that is the honest position for a
-                // machine being heard as one thing.
-                //
-                // And once the two ends are two voices, each is placed as the POINT it is. The extent
-                // above stands in for "a metre nearer the intake is a metre further from the exhaust"
-                // while the machine is one voice; with a voice at each end that geometry is modelled
-                // outright, and widening each of them as well counted the car's length twice: inside
-                // its 3.3 m a hatchback's tailpipe stopped getting louder as you approached, about
-                // 4 dB short at 2 m and 9 dB at 1 m. Beyond the extent the two placements are the same
-                // (Widen holds gain times reference), so the switch between them is seamless.
+                // Close enough to tell the ends apart: this voice moves to the tailpipe and the front gets
+                // its own (FrontVoice); further off it sits between them, biased to the exhaust
+                // (VehicleProfile.ExhaustEmitterBias). Two voices are each placed as points: widening them
+                // too counted the length twice (a hatchback's tailpipe 4 dB short at 2 m, 9 dB at 1 m).
+                // Beyond the extent both placements agree (Widen holds gain times reference).
                 if (_frontVoiced.Contains(snap.Id))
                 {
                     emitterPosition = snap.Transform.Position
@@ -3154,11 +2731,9 @@ public class ClientAudioSystem
                     engineExtent = 0f;
                 }
 
-                // ...unless you are SITTING in it. Then there is no distance and no direction to
-                // speak of: the whole machine arrives through the floor and the firewall, a little
-                // ahead of you and below, and the voice renders what gets through the body
-                // (EngineVoiceState.Interior). Its level is already pressure at the ear, so it is
-                // placed unwidened and played at the gain its reference distance would have had.
+                // Sitting in it, the machine arrives through the floor and firewall and the voice renders
+                // what gets through the body (EngineVoiceState.Interior). Its level is already pressure at
+                // the ear: unwidened, at the gain its reference distance would have had.
                 if (snap.Id == _state.RidingEntityId)
                 {
                     interior = true;
@@ -3166,8 +2741,7 @@ public class ClientAudioSystem
                     engineVolume = MathF.Min(1f, g0 * r0) * def.SoundEmitter.Volume;
                     engineMinDistance = 1f;
                     engineExtent = 0f;
-                    // ...and from where each way in IS, if it has a cabin (CabinPaths): this voice is the
-                    // bulkhead, and every other path gets a voice of its own below.
+                    // With a cabin (CabinPaths) this voice is the bulkhead; every other path gets its own.
                     cabinLayout = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(profile);
                     cabinEar = Vector3.Transform(eyePos - snap.Transform.Position, Quaternion.Inverse(snap.Transform.Rotation));
                 }
@@ -3178,8 +2752,7 @@ public class ClientAudioSystem
             resolvedSoundId = _sounds.ResolvePath(def.SoundEmitter.SoundId);
             if (string.IsNullOrEmpty(resolvedSoundId)) return;
 
-            // --- Phase 2: Granular Finalization ---
-            // If this is a granular emitter, ensure the sample is pre-decoded into RAM.
+            // A granular emitter needs its sample decoded into memory.
             if (def.SoundEmitter.IsGranular && !_preloadedSounds.Contains(resolvedSoundId))
             {
                 _audio.Preload(resolvedSoundId);
@@ -3191,16 +2764,15 @@ public class ClientAudioSystem
         {
             EntityId = snap.Id,
             SoundId = resolvedSoundId,
-            // Spin-up / spin-down sounds. VoiceManager has always known how to play these; nothing ever
-            // handed them to it, so an authored StartSoundId was dropped between the prefab and the voice.
+            // Spin-up and spin-down sounds, which VoiceManager plays.
             StartSoundId = def.SoundEmitter.StartSoundId ?? "",
             StopSoundId = def.SoundEmitter.StopSoundId ?? "",
             Mode = def.SoundEmitter.Mode,
             Position = emitterPosition,
             ApparentPosition = engineKey.Length > 0 || physicalKey.Length > 0
                              ? emitterPosition : acousticPath.ApparentPosition,
-            // Inside, the body IS the occluder, and the voice has already rendered what gets through
-            // it — the acoustic path would count the same panels twice.
+            // Inside, the voice has already rendered what gets through the body: the path would count
+            // the panels twice.
             EffectiveDistance = interior ? 0.7f : acousticPath.EffectiveDistance,
             Occlusion = interior ? 0f : acousticPath.Occlusion,
             EqLow = interior ? 1f : acousticPath.EqLow, EqMid = interior ? 1f : acousticPath.EqMid, EqHigh = interior ? 1f : acousticPath.EqHigh,
@@ -3209,8 +2781,7 @@ public class ClientAudioSystem
             TransmissionBleed = interior ? 0f : acousticPath.TransmissionBleed,
             Velocity = snap.Velocity,
             PositionSampledAt = world.PositionsSampledAt,
-            // The emitter aims along its own LOCAL direction, rotated into the world by the entity's
-            // rotation. Zero (the default) means "straight ahead".
+            // Its local aim turned by the entity; zero means straight ahead.
             Direction = Vector3.Transform(
                 def.SoundEmitter.Direction.LengthSquared() > 0f
                     ? Vector3.Normalize(def.SoundEmitter.Direction)
@@ -3222,7 +2793,7 @@ public class ClientAudioSystem
             Pitch = 1.0f,
             Type = EmitterType.EntityAttached,
             IsReflection = false,
-            // Inside, its room is yours — the cabin — whatever room the car's middle is in.
+            // Inside, its room is yours (the cabin), whatever room the car's middle is in.
             TargetRegionId = interior ? _listenerRegion : acousticPath.RegionId,
             ConeInside = def.SoundEmitter.ConeInsideAngle,
             ConeOutside = def.SoundEmitter.ConeOutsideAngle,
@@ -3231,10 +2802,9 @@ public class ClientAudioSystem
             ExtentMetres = engineExtent,
             EngineKey = engineKey,
             Interior = interior,
-            // Inside, the voice rides with your head, just ahead and below: where the firewall and
-            // the floor are. Turned with the car, so the engine stays in front of you through a corner.
+            // Inside, it rides with your head, ahead and below (firewall and floor, or the bulkhead with
+            // a cabin), turned with the car so the engine stays in front through a corner.
             FollowsListener = interior,
-            // With a cabin, the voice is the bulkhead, from where the firewall is.
             ListenerOffset = !interior ? Vector3.Zero
                            : cabinLayout != null ? Vector3.Transform(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Offset(cabinLayout, 0, cabinEar), snap.Transform.Rotation)
                            : Vector3.Transform(new Vector3(0f, -0.4f, 0.6f), snap.Transform.Rotation),
@@ -3245,23 +2815,15 @@ public class ClientAudioSystem
             RotorWake = rotorWake,
             OnGround = onGround,
             EngineSpeed = snap.Velocity.Length(),
-            // Whether a synthesised source is SOUNDING. Almost everything in this world decides
-            // that for itself from what the client can observe — an engine from its speed, a siren
-            // from the car's behaviour, an aeroplane's power from its climb angle. A level
-            // crossing's bell cannot: it rings because of where a train is on a line the listener
-            // may be a kilometre from. So that one comes down the wire, and it defaults to true for
-            // every other emitter.
+            // Whether a synthesised source is sounding. Nearly everything decides that from what the
+            // client sees; a crossing's bell rings for a train the listener may be a kilometre from, so
+            // it comes down the wire (true for everything else).
             EngineRunning = def.SoundEmitter.SynthRunning,
             ServingStop = def.SoundEmitter.ServingStop,
-            // How far down its windows are: sitting in it, the outside comes in through them.
             WindowsOpen = _cabins.WindowsOpen(snap, _now()),
-            // Straight from the server, which is the only thing that knows the corner.
-            //
-            // Not differentiated here from the interpolated velocity and divided by the tyre's
-            // FLAT-ground grip: a banked corner is indistinguishable from a flat one in a velocity,
-            // because the bank shows up in the normal load and not in the kinematics. On the speedway
-            // that reads 1.43 to 1.59 against a full-slide threshold of 1.45, so every car in every
-            // corner would render pure broadband skid, a white-noise tail travelling with the field.
+            // From the server, which knows the corner's banking. Differentiated here from the velocity
+            // against flat-ground grip, the speedway's banked corners read 1.43 to 1.59 against a
+            // full-slide threshold of 1.45: every car rendered a broadband skid in every corner.
             TyreSlip = snap.TyreDemand,
             Wheels = snap.Wheels,
             WheelStrikes = engineKey.Length > 0 ? RailStrikes(snap, engineKey, world.PositionsSampledAt) : null,
@@ -3286,21 +2848,15 @@ public class ClientAudioSystem
             SynthPulseWidth = def.SoundEmitter.SynthPulseWidth
         };
 
-        // ── A repeating one-shot: submitted only when its interval comes round ───────────────
-        //
-        // Any emitter may carry RepeatIntervalSeconds. It is not a mode of playback so much as a
-        // decision about WHEN to ask for one: the emitter is built as normal and then simply not
-        // handed over until the clock says so, which means everything else about it — placement,
-        // occlusion, reverb, the acoustic path — is whatever that emitter would always have got.
-        // A PA announcing a racetrack, a foghorn and a station bell are the same object.
+        // A repeating one-shot (RepeatIntervalSeconds: a PA, a foghorn, a station bell) is built as
+        // normal and handed over only when its interval comes round.
         float repeat = def.SoundEmitter.RepeatIntervalSeconds;
         if (repeat > 0f)
         {
             double due = _repeatDue.GetValueOrDefault(snap.Id, double.NegativeInfinity);
             if (double.IsNegativeInfinity(due))
             {
-                // First sight of it: stagger the first firing by the entity's own id so that two
-                // announcers on one map do not talk over each other for ever.
+                // Staggered by id, so two announcers on one map do not talk over each other for ever.
                 _repeatDue[snap.Id] = now + (Math.Abs(snap.Id) % 7) * 0.9;
                 return;
             }
@@ -3319,22 +2875,18 @@ public class ClientAudioSystem
         // ...and its other places, after its middle, so the synth they read already exists.
         if (spreading != null) PlaceOuter(snap.Id, spreading, emitter, world, now);
 
-        // The other end of the machine, when it is close enough to be a second thing. Placed after
-        // the machine's own voice, so an engine that has only just been built already exists for the
-        // tap to read.
+        // The front outlet, after the machine's own voice so a just-built engine exists for the tap.
         if (engineKey.Length > 0 && _frontVoiced.Contains(snap.Id))
             FrontVoice(snap, OpenFPS.Common.MachineRegistry.VehicleFor(engineKey), acousticPath,
                        engineVolume, engineMinDistance, Math.Max(1.0f, engineRange), world.PositionsSampledAt);
 
-        // ...and sitting in it, every other way into the cabin from where it comes in.
         if (interior && cabinLayout != null && engineKey.Length > 0)
             CabinVoices(snap, cabinLayout, cabinEar, emitter, eyePos);
 
-        // The siren is NOT placed here: see UpdateSirens.
+        // The siren is placed in UpdateSirens, not here.
 
-        // 6.1. The walls answering this engine. A live engine has no file to replay, so its
-        // reflections are read back out of the synthesis's own ring buffer at the delay the mirrored
-        // path implies — see EngineReflections.
+        // The walls answering this engine, read back out of its own ring at each mirrored path's delay
+        // (EngineReflections).
         if (engineKey.Length > 0)
         {
             long echoAt = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -3345,24 +2897,15 @@ public class ClientAudioSystem
             _echoPassMs += echoMs;
         }
 
-        // No floor slapback and no "cone reflection" here, on purpose.
-        //
-        // A second playback of the sound started at a ray hit (straight down, or along a directional
-        // source's beam) is another independent read of the same file at an unrelated position in it
-        // — for a looping announcement, the announcement again. And a ray that tests every collider,
-        // including the emitter's own, hits it at distance zero when it starts inside the box, so
-        // the copy sits AT the source, unoccluded (derived ids are skipped by the acoustic pass):
-        // heard as the sound repeating softer in the same place.
-        //
-        // The floor is a box face and so is the wall the beam points at. The image-source pass
-        // already mirrors the source through both, with the material's absorption and the extra
-        // path, and renders a copy only when the ear would hear one as a separate event.
+        // No floor slapback or "cone reflection" here, on purpose: a copy started at a ray hit is another
+        // read of the file (a looping announcement, again), and a ray from inside the emitter's own box
+        // hits it at distance zero, heard as the sound repeating softer in place. The image-source pass
+        // already mirrors the source through the floor and the wall.
     }
 
     /// <summary>
-    /// A packet of somebody talking, off the network: into their stream (TalkerStream), which a voice at
-    /// their mouth reads (UpdateTalkers). Nothing is played from here: a packet is 20 ms of a voice, not
-    /// a sound of its own.
+    /// A 20 ms packet of somebody talking, into their stream (TalkerStream), which a voice at their mouth
+    /// reads (UpdateTalkers).
     /// </summary>
     public void ReceiveVoice(int senderId, ushort sequence, byte[] opusData)
         => OpenFPS.Client.AudioEngine.Fmod.Talkers.For(senderId).Receive(sequence, opusData, OpenFPS.Common.AudioClock.Now);
@@ -3381,12 +2924,10 @@ public class ClientAudioSystem
     private double _talkersNextLog;
 
     /// <summary>
-    /// Everybody talking on voice chat, heard from their own mouth: at their head, facing the way they
-    /// face, at a person's speaking level, through whatever is between you (the occlusion worker's answer,
-    /// as for a siren), into the room they are in. Their usual level on their microphone is taken as normal
-    /// conversation (OwnVoiceRing.SpeechRmsDbfs, measured from what arrives), so a quiet microphone is not
-    /// a quiet person and a shout is still louder than talking. No ground reflection: a voice's ground
-    /// copy flanged (see the NPC speech), and speech has none.
+    /// Everybody talking on voice chat, from their own mouth: facing their way, through what is between
+    /// you, into their room. Their usual microphone level is taken as normal conversation
+    /// (OwnVoiceRing.SpeechRmsDbfs), so a quiet microphone is not a quiet person and a shout is still
+    /// louder. No ground reflection: a voice's ground copy flanged, as the NPC speech's did.
     /// </summary>
     private void UpdateTalkers(WorldSnapshot world, Vector3 eyePos, double now)
     {
@@ -3409,9 +2950,7 @@ public class ClientAudioSystem
             var facing = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation);
             facing.Y = 0f;
             facing = facing.LengthSquared() > 1e-6f ? Vector3.Normalize(facing) : Vector3.UnitZ;
-            // Sitting in a vehicle, their feet are on its floor and its cabin is round them: their mouth is
-            // a seated person's, and what they say reaches anyone outside through the glass, or through
-            // the windows if they are down.
+            // Seated in a vehicle: a seated mouth, heard outside through the glass or open windows.
             bool seated = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.TryFind(world, snap.Transform.Position,
                                                                                 out var cabin, out var cabinVehicle);
             float mouthHeight = seated ? SeatedMouthHeight : OpenFPS.Common.Speech.MouthHeight;
@@ -3458,7 +2997,7 @@ public class ClientAudioSystem
                 TransmissionBleed = path.TransmissionBleed,
                 EffectiveDistance = path.EffectiveDistance,
                 TargetRegionId = path.RegionId,
-                // Worked out afresh every frame, so the path, and the cabin round them, follow them.
+                // Worked out afresh every frame, so the path and the cabin round them follow them.
                 CarriesPath = true,
             };
             if (seated)
@@ -3477,9 +3016,7 @@ public class ClientAudioSystem
             if (_talkersVoiced.Contains(id) && _audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
             else { _audio.PlayPhysicalSoundDirect(e); _talkersVoiced.Add(id); }
 
-            // ...and the surfaces round them answering, from where they stand to where you do. Not from
-            // inside a cabin: what reaches you from there comes through its glass, and the street's
-            // surfaces never hear them directly.
+            // The surfaces round them answering; not from inside a cabin, where only its glass hears them.
             if (seated) StopTalkerRoom(id);
             else AnswerTalker(world, id, mouth, eyePos, gain, reference, e.Range, path.RegionId, now);
         }
@@ -3507,9 +3044,8 @@ public class ClientAudioSystem
     // ── The room answering somebody talking ─────────────────────────────────────────────────
 
     /// <summary>
-    /// The first voice id of the copies of another player's voice. Each talker answered at once holds a
-    /// block of <see cref="OwnVoiceCopies"/> ids from here down, below -5000 with every other copy, so
-    /// the acoustic-path pass never traces one from its image.
+    /// The first voice id of the copies of other players' voices: a block of <see cref="OwnVoiceCopies"/>
+    /// ids per talker from here down, below -5000 so the acoustic-path pass never traces one from its image.
     /// </summary>
     internal const int TalkerCopyBase = -1_700_000;
     /// <summary>How many talkers the surfaces answer at once. A search is a few milliseconds on the game
@@ -3530,13 +3066,10 @@ public class ClientAudioSystem
     private bool _talkerSearchedThisFrame;
 
     /// <summary>
-    /// The surfaces round somebody talking, answering them at your ear, as your own room answers you
-    /// (PlaceVoiceCopies): found from their mouth, a few times a second, and played from their own
-    /// images, each their voice read back its extra path behind it. Without this their voice was the
-    /// direct sound and the room's late tail and nothing between, which is a voice heard dry — and, as
-    /// they walked round you, a dry voice moving through a room that did not answer it (Cody, 2026-10-04:
-    /// "I can hear him but it's dry, his reflections don't follow him"). At most one search a frame,
-    /// shared out among the talkers.
+    /// The surfaces round somebody talking, answering at your ear as your own room answers you
+    /// (PlaceVoiceCopies): searched from their mouth a few times a second, at most one search a frame
+    /// among the talkers. Without it a voice was direct sound and late tail only (Cody, 2026-10-04: "I can
+    /// hear him but it's dry, his reflections don't follow him").
     /// </summary>
     private void AnswerTalker(WorldSnapshot world, int id, Vector3 mouth, Vector3 ear, float gain, float reference,
                               float range, int region, double now)
@@ -3571,29 +3104,20 @@ public class ClientAudioSystem
     }
 
     private int _footstepPoolIndex = 0;
-    // Larger pool so rapid footsteps rarely reuse an ID while the previous step is still playing — reusing
-    // an active voice hard-cuts it (click). 12 IDs gives plenty of headroom at running cadence.
+    // Reusing a playing voice's id hard-cuts it (a click); 12 ids is headroom at a running cadence.
     private const int FOOTSTEP_POOL_SIZE = 12;
     /// <summary>
-    /// The room the listener was last found in, for the sounds the BODY makes.
-    ///
-    /// A SpatialEmitter's TargetRegionId defaults to -1, which is the outdoors, and a footstep is
-    /// built between updates on the game thread where nothing has worked out a region. Left at the
-    /// default, every footfall would send its reverberation to the OUTDOOR bus and give the room the
-    /// player is standing in only the small cross-send meant for a sound in the NEXT room. The tail
-    /// would then be the same length wherever you are, because it is the same bus wherever you are.
+    /// The room the listener was last found in, for the sounds the body makes. A footstep is built on
+    /// the game thread between updates, and left at TargetRegionId's default (-1, outdoors) every footfall
+    /// reverberated on the outdoor bus, the same tail wherever you were.
     /// </summary>
     private int _listenerRegion = AcousticConstants.GlobalRegionId;
 
     private const int FOOTSTEP_BASE_ID = -100;
 
     /// <summary>
-    /// Everybody else's steps have voices of their own, apart from yours.
-    ///
-    /// Each step takes the next id round, and a submission under an id replaces whatever was waiting
-    /// there, so in one shared pool three hundred people walking the city would come round it faster
-    /// than your steps could start, and you would stop hearing your own. Nobody else's step can take
-    /// your slot.
+    /// Everybody else's steps have a pool apart from yours: a submission replaces whatever waits under its
+    /// id, and in one pool three hundred walkers came round it faster than your own steps could start.
     /// </summary>
     private const int OTHERS_FOOTSTEP_BASE_ID = -300;
     private const int OTHERS_FOOTSTEP_POOL_SIZE = 64;
@@ -3602,12 +3126,13 @@ public class ClientAudioSystem
     /// <summary>How far away another body's step can be heard at all, metres: a footstep's range.</summary>
     private const float FootstepRange = 15f;
 
-    /// <summary>Somebody else's step: a sound at a place in the world, left there as they walk on.
-    /// Only one close enough to hear is made at all. <paramref name="bodyId"/> is whose foot it was:
-    /// their own body is not a wall between their foot and you (see CarryThePath).</summary>
+    /// <summary>Somebody else's step: a sound left where it fell, and only one close enough to hear is
+    /// made at all.</summary>
     public void OnPlayerFootstep(Vector3 pos, string mat, string var, StepSlope slope = StepSlope.Level)
         => OnPlayerFootstep(pos, mat, var, slope, bodyId: -1);
 
+    /// <summary>...with <paramref name="bodyId"/>, whose foot it was: their own body is not a wall between
+    /// their foot and you (CarryThePath).</summary>
     public void OnPlayerFootstep(Vector3 pos, string mat, string var, StepSlope slope, int bodyId)
     {
         if (Vector3.Distance(pos, _state.VisualPosition) > FootstepRange) return;
@@ -3616,38 +3141,20 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// How much louder your OWN footstep is to you than the same footstep is to a bystander standing
-    /// where your ears are. A bystander hears it through the air only. You hear it through the air
-    /// AND through your skeleton — the heel strike travels up the leg and the spine into the skull,
-    /// which is why a footstep on a hard floor is felt as much as heard, and why your own steps
-    /// stay obvious in a street where a stranger's are not. This is that second path. It applies to
-    /// nothing but your own body; every other footstep in the world is the air path alone.
+    /// How much louder your own footstep is to you than to a bystander where your ears are: you also hear
+    /// it through your skeleton, the heel strike up the leg and spine into the skull. Your own body only.
     /// </summary>
     private const float OwnFootstepBoneConductionDb = 8f;
 
-    /// <summary>Tracing for OPENFPS_AUDIO_DEBUG=1 — what your own feet did, and when. A landing is a
-    /// heavier sound than a step and fires at most twice a second, so "periodic bangs" is a question
-    /// this line answers outright.</summary>
+    /// <summary>OPENFPS_AUDIO_DEBUG=1 logs what your own feet did and when: a landing is heavier than a
+    /// step, so this answers "periodic bangs" outright.</summary>
     private static readonly bool _footTrace = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
 
-    /// <summary>
-    /// Your OWN step. It is part of you, so it rides with you.
-    ///
-    /// Your feet are not somewhere in the world that you then walk away from; they are under your
-    /// head, and stay there. Placed as a world-locked sound at the physics position, a step would be
-    /// put down wherever the predicted position and the server's disagree at that instant — the
-    /// listener stands at the smoothed VisualPosition, the step at Position — and then left behind
-    /// as the listener moves on through its two or three hundred milliseconds: a single step's
-    /// bearing swings from straight down to thirty degrees behind while it plays, and the steps
-    /// trail and slide around you. So an own step is placed at a fixed offset from the listener's
-    /// head and follows it, whatever the network is doing to the position underneath.
-    /// </summary>
     // ── The listening-level calibration's voice (ListeningCalibration) ────────────────────────
     //
-    // A person one step in front, at a digital gain the calibration chooses: placed directly, not by
-    // the loudness law, and with no ear stage (no EarLevelDb), because it is meant to play at exactly
-    // the level a real voice has there, with its real tone. Two ids taken in turn, so a new saying
-    // never has to wait for the old one's voice to be released.
+    // A person one step in front at a gain the calibration chooses: placed directly, not by the loudness
+    // law, and with no ear stage, to play at exactly a real voice's level and tone there. Two ids in turn,
+    // so a new saying never waits for the old one's voice to be released.
     private const int ReferenceVoiceBase = -7_900_000;
     private int _referenceVoice;
 
@@ -3687,6 +3194,11 @@ public class ClientAudioSystem
         _audio.StopSoundImmediate(ReferenceVoiceBase - 1);
     }
 
+    /// <summary>
+    /// Your own step, which rides with you at a fixed offset from your head. Placed world-locked at the
+    /// physics position (the listener being at the smoothed VisualPosition), a step's bearing swung from
+    /// straight down to thirty degrees behind while it played, and the steps trailed and slid round you.
+    /// </summary>
     public void OnOwnFootstep(Vector3 pos, string mat, string var, StepSlope slope = StepSlope.Level)
     {
         if (_footTrace) Log.Information("[FOOT] step {Slope} on {Mat} at {Pos}", slope, mat, pos);
@@ -3710,22 +3222,13 @@ public class ClientAudioSystem
         string resolvedSoundId = _sounds.ResolvePath(_sounds.GetImpactSoundId(mat, 0f));
         if (string.IsNullOrEmpty(resolvedSoundId)) return;
 
-        // ── A footstep is a quiet sound, and it is placed as one ────────────────────────────
-        //
-        // Every engine and every transient in the world is placed by Loudness.Place from a source
-        // level in decibels; the footsteps were not — they played at full scale, which on this
-        // scale is a 112 dB source, a metre from the ear. A step is about 55 dB. Measured
-        // (AudioLab --room-walk): even with the master maximizer's makeup gain at zero a dry step
-        // peaked at −1.6 dBFS, so with the makeup on it hit the brick wall by nine decibels on
-        // every step and the limiter pumped everything under it for the next fifty milliseconds —
-        // "the footsteps are loud", and a pop on every one. The same law that places a rifle and a
-        // car places these, twenty-six decibels down, where a step belongs against a megaphone.
-        // ...and on stairs, a toe put down on the tread going up is lighter than a step on the level and
-        // a heel dropped onto the tread below is heavier: see StrideAccumulator.SlopeDb.
+        // Placed by Loudness.Place like every other sound. At full scale (a 112 dB source a metre away;
+        // a step is about 55) a dry step peaked at -1.6 dBFS with no makeup (--room-walk), hit the limiter
+        // by 9 dB with it and pumped the mix: "the footsteps are loud", a pop on each. On stairs a toe going
+        // up is lighter and a heel going down heavier (StrideAccumulator.SlopeDb).
         float slopeDb = StrideAccumulator.SlopeDb(slope), slopePitch = StrideAccumulator.SlopePitch(slope);
         var (stepGain, stepReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb);
 
-        // 1. Direct Sound (Will now undergo full acoustic pathing)
         var footstep = new SpatialEmitter
         {
             EntityId = id,
@@ -3734,19 +3237,16 @@ public class ClientAudioSystem
             FollowsListener = follows,
             ListenerOffset = offset,
             Type = EmitterType.WorldLocked,
-            // No two steps alike: a take is heard a hair higher or lower and a touch louder or softer
-            // each time, as the same foot never lands quite the same way twice.
+            // No two steps alike: a hair of pitch and a touch of level, at random.
             Volume = stepGain * MathF.Pow(10f, (float)(_stepRandom.NextDouble() * 2.0 - 1.0) * FootstepLevelJitterDb / 20f),
             Pitch = slopePitch * (1f + (float)(_stepRandom.NextDouble() * 2.0 - 1.0) * FootstepPitchJitter),
             Range = FootstepRange,
-            // Your own feet, pinned above the physics: they are how you know you are moving, and on
-            // a loud map the arithmetic would rightly bury them under everything else. Only yours:
-            // everybody else's compete for a voice by how loud they are, like any other sound.
+            // Your own feet are pinned (they are how you know you are moving); everybody else's compete
+            // by loudness like any other sound.
             Essential = own,
             IsEvent = true,
             MinDistance = stepReference,
             EarLevelDb = OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb,
-            // The room the body is standing in, so its reverberation is THAT room's.
             TargetRegionId = _listenerRegion,
         };
         if (!own) CarryThePath(ref footstep, nudgePos, bodyId);
@@ -3757,25 +3257,13 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// Somebody else's step starts with the wall between you already on it.
-    ///
-    /// A step is short. It is submitted with no occlusion, its pooled id is asked about on the
-    /// worker's next tick, and the answer comes back a tick or two later and is eased in over the
-    /// smoothing time — by which time the step is over. So every footfall outside a flat played its
-    /// attack through the brick unoccluded, and only its tail was dimmed: "I still hear people walking
-    /// outside through the wall" (2026-09-29), after the same fault had been fixed for every other
-    /// one-shot in WorldAudioPlayer, which this path never went through. The same answer as there: the
-    /// simulator's result for the nearest source it heard a moment ago (their voice, their last step),
-    /// moved to this one; failing that, the hand-rolled tracer. And the step reverberates in the room
-    /// the FOOT is in, not the room you are in.
-    ///
-    /// The tracer is told whose foot it is, so that it leaves their body out. A player's body is a
-    /// solid cylinder (it is what you bump into), and the foot is inside it: the rays from your ear
-    /// ended in it, three of the five went through a body-sized chord of whatever floor that player
-    /// was last standing on (MovementSystem writes it to the body's material), and every step of
-    /// every other player came out 8 dB down with occlusion 0.6, at four metres as at nine — lost
-    /// under a city street (Cody and Sean, 2026-10-05: "I cannot hear his footsteps while he's walking, only his
-    /// beacon"). The people walking the city are not solid, which is why theirs were heard.
+    /// Somebody else's step starts with the wall between you already on it: a step is over before the
+    /// worker's answer arrives, so it played its attack through the brick ("I still hear people walking
+    /// outside through the wall", 2026-09-29). It takes the worker's answer for the nearest source heard a
+    /// moment ago, moved here, or the tracer's, and reverberates in the room the foot is in. The tracer
+    /// leaves the walker's own solid body out: the foot is inside it, and every other player's step came
+    /// out 8 dB down at occlusion 0.6 (Cody and Sean, 2026-10-05: "I cannot hear his footsteps while he's
+    /// walking, only his beacon").
     /// </summary>
     private void CarryThePath(ref SpatialEmitter step, Vector3 at, int bodyId = -1)
     {
@@ -3807,43 +3295,17 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// Voices for the surfaces answering your own footfalls. Their own pool, so a wall's copy can never
-    /// take the slot of the step it is a copy of.
-    ///
-    /// Below -5000, with every other copy, where the acoustic-path pass leaves them alone. Each carries
-    /// its whole path, placed at its image behind the surface it came off; at -200 it was asked about
-    /// as if it were a source standing at that image, and the worker's answer — the image traced to
-    /// your ear THROUGH the wall that made it, -40 to -100 dB in a stairwell's brick and concrete, or
-    /// round by the openings, out of the ground-floor door and up the stair openings, heard from the
-    /// floor below — replaced it a frame or two after it started (Cody, 2026-10-04, Marlow Tower: "not
-    /// hearing my own reflections follow me, it's like they're left on the first floor").
+    /// Voices for the surfaces answering your own footfalls: their own pool, so a copy never takes its
+    /// step's slot, and below -5000, where the acoustic-path pass leaves them alone. Each carries its whole
+    /// path from its image. Asked about from the image, the worker traced it through its own wall (-40 to
+    /// -100 dB) or round by the stairwell (Cody, 2026-10-04, Marlow Tower: "it's like they're left on the
+    /// first floor").
     /// </summary>
     internal const int STEP_ECHO_BASE_ID = -1_800_000;
     private const int STEP_ECHO_POOL_SIZE = 48;
     private readonly List<OpenFPS.Common.EarlyReflections.Arrival> _stepArrivals = new();
     private int _stepEchoIndex;
 
-    /// <summary>
-    /// The walls answering your own footsteps.
-    ///
-    /// The reverb bus cannot give footsteps their indoor character on its own: a bus is DIFFUSE. With
-    /// only the direct sound and a diffuse tail, a parking garage sounds like a box that is reverberant
-    /// all round you, rather than walls answering from their own directions. The near-field probes
-    /// give the last three metres and the bus gives the tail; everything from three metres to the
-    /// size of the room comes from here, and in a twenty-one by twenty-eight metre garage that is the
-    /// whole room.
-    ///
-    /// What fills it is the machinery that already answers for world events and engines: image
-    /// sources off the surfaces actually there, each played from the mirrored position so it arrives
-    /// FROM ITS OWN WALL, delayed by its own extra path. A ceiling nine hundred millimetres over your
-    /// head answers in five milliseconds and is most of why a low garage sounds low; a wall ten metres
-    /// off answers in fifty-five and is the slap. Neither is a tail.
-    ///
-    /// Per-step reflections scatter the sound all over an enclosed room unless they are kept to a
-    /// handful of taps, with a level that is the SURFACE's loss alone — the distance is applied by
-    /// the engine when it places the copy at the image position, so a copy off a far wall is quiet
-    /// because it is far, not because anybody scaled it.
-    /// </summary>
     // ── Your own voice, as your room answers it ─────────────────────────────────────────────────
 
     /// <summary>True while the microphone is open (V). The session sets it.</summary>
@@ -3853,11 +3315,10 @@ public class ClientAudioSystem
     /// <summary>How many surfaces answer your voice at once: the room's first answers, as for a step.</summary>
     private const int OwnVoiceCopies = 8;
     /// <summary>
-    /// What the microphone path already adds before a copy can start: the capture's own buffer, its 20 ms
-    /// frame and the ring's margin, about 60 ms. A copy's delay is its extra path less this, so a surface
-    /// more than about ten metres of path away answers at its true time and a nearer one as soon as the
-    /// microphone allows. (Cody, 2026-10-03: "server lag is a given, that's ok. I want to hear myself in
-    /// the room I'm actually in.")
+    /// What the microphone path already adds before a copy can start (capture buffer, 20 ms frame, ring
+    /// margin): about 60 ms. A copy's delay is its extra path less this, so a surface over about ten metres
+    /// of path away answers on time and a nearer one as soon as it can (Cody, 2026-10-03: "I want to hear
+    /// myself in the room I'm actually in").
     /// </summary>
     private const float MicrophoneLatency = 0.06f;
     private readonly List<OpenFPS.Common.EarlyReflections.Arrival> _voiceArrivals = new();
@@ -3866,11 +3327,10 @@ public class ClientAudioSystem
     private double _voiceNextSearch, _voiceNextLog;
 
     /// <summary>
-    /// Your own voice, while the microphone is open, played into the room you are in and never dry: the
-    /// surfaces round you sending it back from their own directions after their own extra paths (found as
-    /// your footsteps' are, from your mouth to your ears), and the room's reverberation fed from you. Its
-    /// level is your voice's: the microphone's level while you talk is taken as normal conversation
-    /// (OwnVoiceRing.SpeechRmsDbfs), so shouting fills the room more than talking does.
+    /// Your own voice while the microphone is open, into your room and never dry: the surfaces answering
+    /// from their own directions (found as your footsteps' are) and the reverberation fed from you. Your
+    /// talking level on the microphone is normal conversation (OwnVoiceRing.SpeechRmsDbfs), so a shout
+    /// fills the room more.
     /// </summary>
     private void UpdateOwnVoice(Vector3 ear, double now)
     {
@@ -3881,14 +3341,12 @@ public class ClientAudioSystem
         }
         var facing = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(_state.Yaw, 0f, 0f));
         Vector3 mouth = ear + facing * 0.08f - new Vector3(0f, 0.1f, 0f);
-        // A world sound's level is its buffer's full scale at a metre (Speech.LevelDb): the voice's
-        // full scale sits as far above normal talking as the microphone's talking level sits below it.
+        // Full scale sits as far above normal talking as the microphone's talking level sits below it.
         float levelDb = OpenFPS.Common.Speech.NormalDb - OpenFPS.Client.AudioEngine.Fmod.OwnVoiceRing.Shared.SpeechRmsDbfs;
         var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
 
-        // The room's reverberation. Its own sound is silent (FmodAudioProvider._ownVoiceRoomGroup); it is
-        // placed at its reference distance, where a source's send to the room is what a source of that
-        // level gives (closer, the send falls with the distance while the level cannot rise).
+        // The room's reverberation; its own sound is silent (FmodAudioProvider._ownVoiceRoomGroup). At its
+        // reference distance, where the send to the room is a source of that level's.
         var room = new SpatialEmitter
         {
             EntityId = OwnVoiceBase,
@@ -3935,15 +3393,26 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// The surfaces round a talking mouth answering it at an ear: image sources to second order, inside
-    /// the window before the tail, the loudest <see cref="OwnVoiceCopies"/> placed and coloured exactly as
-    /// a footstep's copies are (SubmitRoomStepEchoes), each one the voice's ring read back at its own
-    /// path. One rule for your own voice and for anybody else's. Returns how many are answering.
+    /// The surfaces round a talking mouth answering it at an ear, for your own voice and anybody else's:
+    /// image sources to second order inside the window before the tail, the loudest
+    /// <see cref="OwnVoiceCopies"/> placed and coloured as a footstep's copies are (SubmitRoomStepEchoes),
+    /// each the voice's ring read back at its own path. Returns how many are answering.
     /// </summary>
+    /// <param name="world">The world to search.</param>
+    /// <param name="mouth">Where the voice comes from.</param>
+    /// <param name="ear">The listener's ear.</param>
+    /// <param name="arrivals">Scratch for the search, refilled.</param>
+    /// <param name="gain">The voice's placed gain.</param>
+    /// <param name="reference">The voice's reference distance.</param>
     /// <param name="alreadyLateSeconds">What the voice's own playback has already cost the copies: the
     /// microphone's latency for yours; for somebody else, the direct voice's flight time, which it is
     /// played without, so each copy comes its extra path behind it.</param>
     /// <param name="firstId">The first copy's voice id; the rest count down from it.</param>
+    /// <param name="on">Which slots have a voice, kept between calls.</param>
+    /// <param name="key">The physical key the copies read the voice's ring by.</param>
+    /// <param name="soundId">The copies' sound id, for the logs.</param>
+    /// <param name="regionId">The room the copies reverberate in.</param>
+    /// <param name="range">How far the copies are heard.</param>
     private int PlaceVoiceCopies(WorldSnapshot world, Vector3 mouth, Vector3 ear,
                                  List<OpenFPS.Common.EarlyReflections.Arrival> arrivals,
                                  float gain, float reference, float alreadyLateSeconds,
@@ -4015,22 +3484,25 @@ public class ClientAudioSystem
             if (_voiceCopyOn[k]) { _audio.StopSound(OwnVoiceBase - 1 - k); _voiceCopyOn[k] = false; }
     }
 
+    /// <summary>
+    /// The walls answering your own footsteps from their own directions. The tail is diffuse, so with
+    /// only it a garage is a box reverberant all round; the near-field probes give the last three metres,
+    /// and everything from there to the room's size is these image sources, each delayed by its extra path
+    /// (a ceiling 0.9 m up answers in 5 ms, a wall 10 m off in 55). Kept to a handful, at the surface's
+    /// loss alone: the renderer applies the distance at the image.
+    /// </summary>
     private void SubmitStepReflections(Vector3 stepPos, string soundId, float stepGain, float stepReference, float stepLevelDb)
     {
-        // The surfaces round your own footfall, placed as a clap's are (WorldAudioPlayer.QueueEarlyEchoes):
-        // mirrored through the walls to third order, the loudest first, inside the window before the
-        // tail. Everywhere: outdoors the floor is skipped (the voice has its own ground) and the
-        // facades within 27 m of extra path answer, as they do. In traced mode too: the listener's
-        // traced stage plays only the late tail, so without these your own steps would have a direct
-        // sound, a tail 50 ms later, and nothing from the walls between.
+        // Everywhere, traced mode included: the listener's traced stage plays only the late tail, so
+        // without these your steps had a direct sound, a tail 50 ms later and nothing between.
         Vector3 ear = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
         if (_groundWorld is not { } world) return;
         SubmitRoomStepEchoes(stepPos, ear, soundId, stepGain, stepReference, stepLevelDb, world);
     }
 
     /// <summary>The room's first answers to your own footfall, placed as WorldAudioPlayer.QueueRoomEchoes
-    /// places a clap's: mirrored through the walls to third order, the loudest first, inside the
-    /// window before the tail, each from its own wall's direction with that wall's colour.</summary>
+    /// places a clap's: image sources to second order, loudest first, inside the window before the tail,
+    /// each from its own wall with that wall's colour. The floor under the foot is skipped.</summary>
     private void SubmitRoomStepEchoes(Vector3 stepPos, Vector3 ear, string soundId, float stepGain, float stepReference, float stepLevelDb, WorldSnapshot world)
     {
         _acoustics.FindReflections(world, stepPos, ear, _stepArrivals, AudioPhysics.CurrentSpeedOfSound,
@@ -4045,8 +3517,8 @@ public class ClientAudioSystem
             // The floor the foot is on: the step is made of it already.
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(stepPos.Y, ear.Y) - 0.2f) continue;
             if (a.Order >= 2 && ++secondOrder > WorldAudioPlayer.MaxSecondOrderCopies) continue;
-            // The mirror share only (WorldAudioPlayer.MirrorShare). A step is a bank sample, not a
-            // synthesised sound, so its scattered share has no wash to go to yet.
+            // The mirror share only (WorldAudioPlayer.MirrorShare): a step is a bank sample, so its
+            // scattered share has no wash to go to yet.
             float gain = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, stepReference)
                        * WorldAudioPlayer.MirrorShare(a.Scattering, a.Order);
             if (gain < OpenFPS.Common.ImageSource.MinGain) continue;
@@ -4063,15 +3535,15 @@ public class ClientAudioSystem
                 Position = a.ImagePosition,
                 ApparentPosition = a.ImagePosition,
                 Type = EmitterType.WorldLocked,
-                // Placed as the step and scaled by what the surfaces and the longer path kept; the
-                // engine's 1/r at the image is undone in `gain`, as for every other copy.
+                // Scaled by what the surfaces and the longer path kept; the renderer's 1/r at the image
+                // is undone in `gain`, as for every copy.
                 Volume = stepGain * gain,
                 MinDistance = stepReference,
                 EarLevelDb = stepLevelDb,
                 EarCopyDb = 20f * MathF.Log10(MathF.Max(1e-6f, gain)),
                 Range = 25f,
-                // No DelayMs: the facade delays every submission by its distance, and the image is
-                // the whole path away.
+                // No DelayMs: the facade delays every submission by its distance, and the image is the
+                // whole path away.
                 IsReflection = true,
                 IsEvent = true,
                 // The path is this: clear both legs (checked when it was found), coloured by the walls.
@@ -4084,10 +3556,7 @@ public class ClientAudioSystem
         }
     }
 
-    /// <summary>
-    /// The map's outdoor ambience bed, from the manifest. Starting it is deferred to the audio update
-    /// so it happens on the audio thread with everything else.
-    /// </summary>
+    /// <summary>The map's outdoor ambience bed, from the manifest; started by the next audio update.</summary>
     public void SetMapAmbience(string ambienceId)
     {
         _mapAmbienceId = ambienceId ?? "";
@@ -4095,22 +3564,15 @@ public class ClientAudioSystem
     }
 
     /// <summary>
-    /// Keeps the ambience beds in step with where the listener is.
-    ///
-    /// The outdoor bed is never stopped while the map is loaded, only ducked: walking into a building
-    /// should take the world outside DOWN, not switch it off, because a room with a door in it is still
-    /// connected to outside. <see cref="LocalPlayerState.ShelterFactor"/> already measures exactly that
-    /// — it is the sky-visibility raycast plus the indoor-region flag — so it is what drives the duck.
-    ///
-    /// A region that declares its own AmbienceId (a hum, a machine room, running water) plays on top
-    /// while the listener is inside it, and cross-fades out on the way through the door because both
-    /// beds glide to their new levels rather than switching.
+    /// Keeps the ambience beds in step with the listener. The outdoor bed is only ducked indoors, never
+    /// stopped, by <see cref="LocalPlayerState.ShelterFactor"/> (sky rays and the indoor flag): a room
+    /// with a door is still connected to outside. A region's own AmbienceId plays on top inside it, and
+    /// both beds glide to their levels, so a doorway cross-fades.
     /// </summary>
     private void UpdateAmbience(WorldSnapshot world, int listenerRegionId)
     {
         if (_mapAmbienceId.Length > 0)
         {
-            // Ducked, not silenced. Even fully sheltered the world outside is still faintly there.
             float outdoor = AcousticConstants.OutdoorAmbienceLevel *
                             (1f - _state.ShelterFactor * AcousticConstants.ShelteredAmbienceDuck);
             _audio.PlayAmbientBed(_mapAmbienceId, AmbisonicFormat.GuessLayout(_mapAmbienceId), outdoor);
@@ -4136,10 +3598,6 @@ public class ClientAudioSystem
                                   AcousticConstants.RegionAmbienceLevel);
     }
 
-    /// <summary>
-    /// Probes the space around the listener's head and hands the result to the mixer. Head-relative,
-    /// so the picture turns with the player.
-    /// </summary>
     // ── The ground ─────────────────────────────────────────────────────────────────────────────
 
     private Vector3 _groundEar;
@@ -4151,26 +3609,17 @@ public class ClientAudioSystem
     private readonly string[] _groundMat = new string[1];
 
     /// <summary>
-    /// The ground reflection for one live voice: the source mirrored in the surface under the point
-    /// where its sound bounces on the way to the listener (GroundReflection has the why).
-    ///
-    /// Two rays straight down. The first finds the ground under the source, which fixes where the
-    /// bounce lands — the point between the two, in the ratio of their heights. The second is cast
-    /// from the direct path above that point, so it finds whatever is actually there to reflect off,
-    /// and what it is made of: a surface above the ground and below the line (a bonnet, a kerb, a
-    /// shelter roof) is what the sound bounces off, and anything higher would be in the way of the
-    /// direct sound, not under it. The surface's own absorption decides how much comes back.
+    /// The ground reflection for one live voice (GroundReflection has the why): the source mirrored in the
+    /// surface under its bounce point. One ray down finds the ground under the source, fixing the bounce
+    /// point in the ratio of the two heights; a second, from the direct path above that point, finds what
+    /// is really there to reflect off (a bonnet, a kerb, a shelter roof) and its material.
     /// </summary>
     private void ApplyGround(ref SpatialEmitter e, WorldSnapshot? world) => ApplyGround(ref e, world, true, 0f);
 
     /// <summary>
-    /// The same for a recorded sound, which WorldAudioPlayer plays under a fresh voice id each time, so
-    /// it asks once and keeps nothing.
-    ///
-    /// A recording made at the ground already has the ground in it. A footstep, a dropped can, a door
-    /// scraping — the microphone heard the bounce as part of the sound, a fraction of a millisecond
-    /// behind it, so adding it again would lift the whole thing six decibels. So a recorded sound
-    /// within <see cref="RecordedGroundMinHeight"/> of the surface under it gets none of its own.
+    /// The same for a recorded sound, under a fresh voice id each time, so nothing is cached. A recording
+    /// made at the ground already has its bounce in it (adding it again lifts it 6 dB), so one within
+    /// <see cref="RecordedGroundMinHeight"/> of the surface gets none.
     /// </summary>
     internal void ApplyRecordedGround(ref SpatialEmitter e, WorldSnapshot world)
         => ApplyGround(ref e, world, false, RecordedGroundMinHeight);
@@ -4185,9 +3634,8 @@ public class ClientAudioSystem
         Vector3 src = e.Position, ear = _groundEar;
         const float Reach = 30f;
 
-        // The rays are the cost; the geometry after them is not. The ground under a car does not
-        // change from one frame to the next, so they are cast again only once the source or the ear
-        // has moved a metre, or a quarter of a second has gone.
+        // The rays are the cost: cast again only once the source or the ear has moved a metre, or after
+        // a quarter of a second.
         double now = OpenFPS.Common.AudioClock.Now;
         if (!_groundCache.TryGetValue(e.EntityId, out var c)
             || Vector3.DistanceSquared(c.Src, src) > 1f || Vector3.DistanceSquared(c.Ear, ear) > 1f || now - c.At > 0.25)
@@ -4256,15 +3704,16 @@ public class ClientAudioSystem
         return x < 0 ? -y : y;
     }
 
+    /// <summary>Probes the space round the listener's head for the mixer, head-relative so the picture
+    /// turns with the player.</summary>
     private void UpdateBoundaryProbes(WorldSnapshot world, Vector3 visualEyePos)
     {
         var head = _state.Rotation;
         var directions = BoundaryModel.ProbeDirections;
 
-        // A passenger has no near field outside the vehicle. "The proximity to me from the outside
-        // objects isn't relevant" — a lamp post the bus brushes past is half a metre from the glass,
-        // not from your ear, and what the cabin does to sound is the interior model's (EngineVoiceState
-        // .Interior and the enclosure filter). So nothing is near while you ride.
+        // Nothing is near while you ride: a lamp post the bus brushes is half a metre from the glass, not
+        // your ear, and the cabin is the interior model's ("the proximity to me from the outside objects
+        // isn't relevant").
         if (_state.IsRiding)
         {
             for (int i = 0; i < directions.Length; i++)
@@ -4285,10 +3734,8 @@ public class ClientAudioSystem
         _audio.UpdateBoundaries(_boundaryProbes);
     }
 
-    /// <summary>
-    /// Called when the server reports a material change underfoot via StatsUpdate.
-    /// Passes the material's absorption index into the current region for reverb correction.
-    /// </summary>
+    /// <summary>The server reports a new material underfoot (StatsUpdate): it becomes the listener
+    /// region's floor material.</summary>
     public void NotifyMaterialChange(string material)
     {
         if (_lastAcousticMap == null) return;
@@ -4298,7 +3745,6 @@ public class ClientAudioSystem
         if (listenerRegionId == AcousticConstants.GlobalRegionId) return;
         if (!_lastAcousticMap.Regions.TryGetValue(listenerRegionId, out var region)) return;
 
-        // Override the floor material (index 0) with the server-reported underfoot material.
         int resonanceIndex = AcousticRegistry.GetProperties(material).ResonanceIndex;
         if (region.Materials == null || region.Materials.Length == 0 || region.Materials[0] == resonanceIndex)
             return;
@@ -4306,13 +3752,10 @@ public class ClientAudioSystem
         region.Materials[0] = resonanceIndex;
         _lastAcousticMap.Regions[listenerRegionId] = region;
 
-        // And that is all. The acoustic map is NOT rebuilt when the floor's Sabine estimate moves:
-        // that tears down every reverb bus on the map, every Steam Audio voice attached to them and
-        // every send into them, mid-tail — the loudest discontinuity the engine can make, on a
-        // footstep. It is not needed. The tail's time, colour and level are surveyed from the boxes
-        // round the listener every few ticks (Enclosure.Look), and the floor underfoot is one of
-        // those boxes, so what you are standing on already colours the room. The region's material
-        // is kept current here for anything that still reads the Sabine estimate at bus creation.
+        // The acoustic map is not rebuilt: that tears down every reverb bus and its sends mid-tail, the
+        // loudest discontinuity the engine can make, on a footstep. The tail is surveyed from the boxes
+        // round the listener (Enclosure.Look), the floor among them; the material is kept for whatever
+        // still reads the Sabine estimate at bus creation.
     }
 
     /// <summary>Your own landing: under your own head, and it stays there. See OnOwnFootstep.</summary>
@@ -4333,8 +3776,8 @@ public class ClientAudioSystem
         
         if (!string.IsNullOrEmpty(resolved))
         {
-            // Placed like a step (see SubmitFootstep); a landing is a heavier step, and its extra
-            // weight is in the sound the server chose for it, not in a louder scale.
+            // Placed like a step (SubmitFootstep), at a step's level.
+            // TODO: force 0 picks the FOOTSTEPS bank, so a landing plays a step take, never LANDING.
             var (landGain, landReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb);
             var landEmitter = new SpatialEmitter
             {
