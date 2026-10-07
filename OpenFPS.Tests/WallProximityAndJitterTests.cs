@@ -273,9 +273,10 @@ public class BoundaryReflectionTests
     }
 
     [Fact]
-    public void ColderAirMovesTheWholeCombUp()
+    public void ColderAirMovesTheWholeCombDown()
     {
-        // Slower sound in cold air: a longer round trip, so the notches move down (despite the name).
+        // c = 331.3 sqrt(1 + T / 273.15) m/s falls in cold air, so the same round trip takes longer and
+        // every notch of the comb, at (2k + 1) c / 2d, falls with it.
         var probe = new BoundaryProbe(Vector3.UnitZ, 1.0f, "Concrete");
         Assert.True(BoundaryModel.TryBuildTap(probe, AudioPhysics.SpeedOfSoundAt(-20f), SampleRate, out var cold));
         Assert.True(BoundaryModel.TryBuildTap(probe, AudioPhysics.SpeedOfSoundAt(40f), SampleRate, out var warm));

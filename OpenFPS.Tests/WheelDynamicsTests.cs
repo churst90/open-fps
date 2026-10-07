@@ -162,14 +162,16 @@ public class WheelDynamicsTests
         }
         Assert.True(frontAt > 0f, "the front never reached its limit");
         Assert.True(rearAt == 0f, $"the rear reached its limit (at {rearAt:F2} g) no later than the front ({frontAt:F2} g)");
-        _o.WriteLine($"front axle at its limit at {frontAt:F2} g; " + string.Join("  ", atLimit!.Select(w => $"[x {w.X:F2} y {w.Y:F2}: {w.Load:F0} N, Fy {w.Fy:F0}, demand {w.Demand:F2}]")));
+        // Set whenever frontAt is, and the assertion above has seen frontAt set.
+        var limit = atLimit!;
+        _o.WriteLine($"front axle at its limit at {frontAt:F2} g; " + string.Join("  ", limit.Select(w => $"[x {w.X:F2} y {w.Y:F2}: {w.Load:F0} N, Fy {w.Fy:F0}, demand {w.Demand:F2}]")));
 
-        var outsideFront = atLimit.First(w => w.Front && w.Y < 0f);
-        var insideFront = atLimit.First(w => w.Front && w.Y > 0f);
-        Assert.Equal(atLimit.Max(w => w.Load), outsideFront.Load);
-        Assert.Equal(atLimit.Max(w => MathF.Abs(w.Fy)), MathF.Abs(outsideFront.Fy));
+        var outsideFront = limit.First(w => w.Front && w.Y < 0f);
+        var insideFront = limit.First(w => w.Front && w.Y > 0f);
+        Assert.Equal(limit.Max(w => w.Load), outsideFront.Load);
+        Assert.Equal(limit.Max(w => MathF.Abs(w.Fy)), MathF.Abs(outsideFront.Fy));
         Assert.True(outsideFront.Load > insideFront.Load);
-        Assert.True(atLimit.Where(w => w.Y < 0f).All(w => w.Load > atLimit.First(o => o.Axle == w.Axle && o.Y > 0f).Load));
+        Assert.True(limit.Where(w => w.Y < 0f).All(w => w.Load > limit.First(o => o.Axle == w.Axle && o.Y > 0f).Load));
         Assert.True(outsideFront.Demand > 0.8f, $"the outside front is at {outsideFront.Demand:F2} of its grip when the axle lets go");
     }
 

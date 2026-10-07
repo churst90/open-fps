@@ -90,8 +90,11 @@ public static class EngineOrderSpike
             int eq = arg.IndexOf('=');
             if (eq > 0)
             {
-                string k = arg[..eq]; float val = float.Parse(arg[(eq + 1)..]);
-                if (k == "rpm") rpm = val; else if (k == "thr") thr = val; else if (k == "sec") seconds = val; else if (k == "dumpfrom") dumpFrom = val;
+                // Only this run's own keys are numbers; the rest are Override's (muffler=none, crank=even).
+                string k = arg[..eq];
+                if (k is not ("rpm" or "thr" or "sec" or "dumpfrom")) continue;
+                float val = float.Parse(arg[(eq + 1)..]);
+                if (k == "rpm") rpm = val; else if (k == "thr") thr = val; else if (k == "sec") seconds = val; else dumpFrom = val;
             }
             else if (VehicleProfile.Presets.ContainsKey(arg)) preset = arg;
         }

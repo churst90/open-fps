@@ -196,11 +196,14 @@ public class VehicleMotionTests : IDisposable
         float lapLength = rig.State.LapLength;
         for (int i = 0; i < 30 * 120; i++)
         {
-            float before = rig.State.Speed;
+            float lapBefore = rig.State.Lap;
+            int lapsBefore = rig.State.Laps;
             rig.Tick();
             travelled += rig.State.Speed * Dt;
             var s = rig.State;
             Assert.InRange(s.Lap, 0f, lapLength);
+            // A lap is counted on the tick the distance wraps, and on no other.
+            Assert.Equal(lapsBefore + (s.Lap < lapBefore ? 1 : 0), s.Laps);
         }
         Assert.Equal((int)(travelled / lapLength), rig.State.Laps);
         Assert.True(rig.State.Laps >= 4);

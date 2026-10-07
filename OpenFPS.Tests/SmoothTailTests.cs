@@ -92,6 +92,10 @@ public class SmoothTailTests
         }
         // A single trace swings up to 2.3 dB here (0.8 to 1.3); the average moves under 1 dB a trace.
         Assert.True(maxStep < 1.0, $"the average stepped {maxStep:F2} dB");
+        // And it settles where the traces are, not drifting off: the mean of these is 0.4 dB over the
+        // first, and the average after them 0.25 dB.
+        double settled = 10 * Math.Log10(prev / first);
+        Assert.True(Math.Abs(settled) < 0.5, $"the average ended {settled:F2} dB from the first trace");
         Assert.Equal(1, s.Resets);
 
         // The same trace again and again: the average converges on it and then does not move.

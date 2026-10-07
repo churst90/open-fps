@@ -305,16 +305,26 @@ public class TyreAndTurboTests
                                 brake: 8f, bankingDegrees: 0f);
 
         bool sawStraight = false, sawCorner = false;
+        float mostAsked = 0f;
         for (float d = 0; d < line.Length; d += line.Length / 200f)
         {
             line.Sample(d, out _, out _, out float speedLimit, out float corner);
             if (float.IsInfinity(corner)) { sawStraight = true; continue; }
 
-            // TODO: in a corner speedLimit and corner should agree (the grip limits the speed); nothing asserts it.
-            if (corner < 79f) { sawCorner = true; Assert.True(corner > 5f, $"absurd corner limit {corner}"); }
+            if (corner < 79f)
+            {
+                sawCorner = true;
+                Assert.True(corner > 5f, $"absurd corner limit {corner}");
+                // The tyres' share is (v / v_corner)²: the line never asks more than all of it.
+                float asked = (speedLimit / corner) * (speedLimit / corner);
+                Assert.True(asked <= 1.02f, $"{d:F0} m: limit {speedLimit:F1} m/s where the tyres hold {corner:F1}");
+                mostAsked = MathF.Max(mostAsked, asked);
+            }
         }
 
         Assert.True(sawStraight, "an oval with two straights should have somewhere asking nothing of the tyres");
         Assert.True(sawCorner, "...and somewhere that does");
+        // Round the bend the grip is the limit, not something short of it.
+        Assert.True(mostAsked > 0.95f, $"the line asked at most {mostAsked:F2} of the tyres in the bends");
     }
 }

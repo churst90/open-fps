@@ -118,7 +118,7 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
         var p = _maps.Get(id);
         var at = p.Data.SpawnPoint.Position;
         var eye = at + new Vector3(0, 1.6f, 0);
-        string place = CommandHandler.PlaceAt(p.Ecs, eye);
+        string? place = CommandHandler.PlaceAt(p.Ecs, eye);
         _o.WriteLine($"spawn ({at.X:F2}, {at.Z:F2}, {at.Y:F2}) /tp {at.X:F1} {at.Z:F1} {at.Y:F1}: '{place}'");
         Assert.Equal(expected, place);
         var acoustics = new SpatialAcoustics();

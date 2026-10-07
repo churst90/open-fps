@@ -34,12 +34,11 @@ public class ListeningCalibrationTests
     [Fact]
     public void TheReferenceIsTheGamesOwnVoiceAtArmsLength()
     {
-        float law = 20f * MathF.Log10(Loudness.Place(Speech.LevelDb(Speech.NormalDb)).Gain);
         float was = Loudness.DynamicRangeCompression;
         try
         {
             Loudness.DynamicRangeCompression = Loudness.DefaultCompression;
-            law = 20f * MathF.Log10(Loudness.Place(Speech.LevelDb(Speech.NormalDb)).Gain);
+            float law = 20f * MathF.Log10(Loudness.Place(Speech.LevelDb(Speech.NormalDb)).Gain);
             Assert.Equal(law, ListeningCalibration.ReferenceGainDb(EarModel.DefaultListeningLevelDb), 1);
             // Five decibels quieter headphones: the voice five decibels up.
             Assert.Equal(5f, ListeningCalibration.ReferenceGainDb(EarModel.DefaultListeningLevelDb - 5f)

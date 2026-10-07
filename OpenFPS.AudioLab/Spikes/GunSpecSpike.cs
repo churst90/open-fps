@@ -56,7 +56,7 @@ public static class GunSpecSpike
                 if (!File.Exists(real)) continue;
                 var rec = Cut(WeaponSynth.ReadWav16Mono(File.ReadAllBytes(real)), 0.080f);
                 var syn = Render(spec, angle, metres, 0.080f);
-                Console.WriteLine($"  {spec.Name} {file}");
+                Console.WriteLine($"  {spec.Name} {file} (directivity {20f * MathF.Log10(Directivity(angle)):F1} dB, then matched on energy)");
                 Console.WriteLine($"    real  {Describe(rec)}");
                 Console.WriteLine($"    synth {Describe(syn)}");
                 // Matched on the energy of their first 20 ms, so the pair differs in shape only.
@@ -106,11 +106,22 @@ public static class GunSpecSpike
         return x;
     }
 
-    /// <summary>What a listener hears at this distance in the open, before any room.</summary>
-    // TODO: angleDeg is not read; every angle renders as on axis.
+    /// <summary>How eccentric the blast is: amplitude (1 + e cos θ) / (1 + e), θ from downrange
+    /// (docs/RESEARCH_2026-10-02.md). Not measured, since the NIJ levels cannot be compared across
+    /// positions; 0.5 puts 90 degrees 3.5 dB and 180 degrees 9.5 dB under the muzzle's axis.</summary>
+    public const float Eccentricity = 0.5f;
+
+    /// <summary>The blast's amplitude at <paramref name="angleDeg"/> from downrange against on axis.</summary>
+    public static float Directivity(float angleDeg)
+        => (1f + Eccentricity * MathF.Cos(angleDeg * MathF.PI / 180f)) / (1f + Eccentricity);
+
+    /// <summary>What a listener hears at this distance and angle from downrange in the open, before any
+    /// room. The ground bounce leaves the muzzle at the same bearing, so one directivity scales both.</summary>
     public static float[] Render(BlastSpec s, float angleDeg, float metres, float seconds)
     {
         var src = Source(s, seconds);
+        float d = Directivity(angleDeg);
+        for (int i = 0; i < src.Length; i++) src[i] *= d;
         // Air: ISO 9613-1 at 20 C and 50% humidity, applied per frequency over the whole path.
         var direct = Air(src, metres);
         // Ground: source and listener 1.5 m up over hard ground, reflection coefficient 0.8.

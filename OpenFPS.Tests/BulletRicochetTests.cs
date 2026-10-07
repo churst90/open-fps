@@ -300,7 +300,7 @@ public class BulletRicochetTests : IDisposable
     public void AWaterStrikeSplashesRatherThanTinkles(string weaponId, float metres)
     {
         var w = WeaponRegistry.Get(weaponId)!;
-        float speed = w.MuzzleVelocity * 0.97f;
+        float speed = ExternalBallistics.Fly(w, metres, 0f, 0f, Air.Standard, Vector3.Zero).Speed;
         var hit = BulletImpact.From("Water", speed, w, MathF.PI / 4f, 0f, new Vector3(10f, 10f, 1f), "Water", 0f);
         var drops = BulletImpact.Splash(hit);
         Assert.InRange(drops.Count, 300, BulletImpact.MaxRenderedDrops);

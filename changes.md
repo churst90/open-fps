@@ -37,6 +37,29 @@ Recent work, newest first. `git log` has the rest.
     WorldEditorClientTests; 55 unused usings.
   - Left for Cody, as `// TODO:`: a hull's blow lands at the start of its block, not at the sample it
     is given (ShoreSynth.HullPlate.Blow, up to 2.7 ms early); `--waves levels heard=` ignores `parts=`.
+- The tests and lab instruments the housekeeping pass found checking nothing now check what they
+  say. Every one passes; no production behaviour changed.
+  - Walking into a wall for two seconds stops the body with its side on the face (the one step the
+    old test took reached neither the face nor the wall's middle).
+  - The turn keys are read from `ClientGameSession.TurnKeys` (now internal), not a copy of it.
+  - The map's ambience is checked on the manifest the server sends (`GameServer.SendManifest`).
+  - An aircraft is louder from some sides than others: airliner 9.7 dB between its quietest and
+    loudest direction, louder astern; helicopter 3.2; turboprop 2.8; piston single 0.9, loudest in
+    the disc plane by under a decibel. The comment that called a propeller strongly directional is
+    gone: the model does not make it so.
+  - Asserted where they were only computed: the smoothed tail ends 0.25 dB from its first trace; a
+    lap is counted on the tick the distance wraps; a stud wall's mid band is 41.4 dB, between the
+    published 36 (500 Hz) and 45 (2 kHz); in a bend the line asks the tyres for at most all their
+    grip, and somewhere for all of it.
+  - The water strike is at the round's speed after its metres of flight.
+  - Names: `ColderAirMovesTheWholeCombDown` (sound is slower in cold air, so a fixed path's notches
+    fall); `TheLeafSeatsFirstTheLatchAfterAndTheRingOutlastsTheBlow`.
+  - The nullability warnings in PlaceNameTests, RealPlaceMapTests and WheelDynamicsTests.
+  - Lab: `--gun-spec` renders its off-axis takes off axis, (1 + e cos θ) with e = 0.5, a guess the
+    NIJ levels cannot check; `--speedway probe|walk|noecho` keeps the speedway; `--engine-trace`
+    takes `muffler=` and `crank=`.
+  - A ClientAudioSystem comment said a passenger's own velocity reads zero; the server gives it the
+    vehicle's (docs/COMMON_NOTES.md, Walking).
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.AudioLab and OpenFPS.Tests, all but the water spikes
   and tests (Waves, RunningWater, Nature, Texture) and the world editor tests, being worked on
   elsewhere. Every spike kept. No test, assertion or tolerance changed, and no stored guard data
