@@ -1373,7 +1373,11 @@ public class AsyncAcousticWorker : IDisposable
         {
             // A new map's own set of tiles; the last map's goes once no build is using it.
             if (_tileScenes != null) _retiredTileSets.Add((_tileScenes, DateTime.UtcNow.Ticks));
-            _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres);
+            // Off unless OPENFPS_TILE_SCENES=1 (2026-10-06): the first door that moved swapped in the second
+            // pair of top scenes, which traced as empty, so every wall stopped occluding and the traced reverb
+            // and echoes lost their walls (Cody: traffic heard inside Selby House, reflections mono). The
+            // whole-scene build answers the same before and after a swing (AudioLab --path-probe door=).
+            _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") != "1" ? null : new TileSceneSet(_saContext, world.TileMetres);
             _acousticStore = _tileScenes == null ? new AcousticGeometry(world.TileMetres) : null;
             var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, world, boxes, mapLeaves);
             _saScene.Dispose();
