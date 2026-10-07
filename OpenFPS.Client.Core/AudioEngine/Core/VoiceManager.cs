@@ -101,6 +101,8 @@ public class VoiceManager
     private readonly HashSet<int> _topEntityIds = new();
     private readonly List<int> _keysToRemove = new();
     private readonly List<int> _voiceStatesToRemove = new();
+    /// <summary>Voices submitted again since the last pass while a play of them was under way.</summary>
+    private readonly HashSet<int> _askedAgain = new();
 
     public VoiceManager(IVoiceSink audio, AudioBank bank, int maxVoices = 64)
     {
@@ -119,17 +121,9 @@ public class VoiceManager
         if (_voiceStates.TryGetValue(emitter.EntityId, out var status))
         {
             status.StopRequested = false; // Reset if re-submitted
-            // A ONE-SHOT ASKED FOR AGAIN AFTER ITS LAST PLAY ENDED IS A NEW PLAY. If the end has not
-            // been seen yet (it came between two passes), the next pass would see the old play finish,
-            // mark it finished and throw this submission away with it: a repeating announcement whose
-            // last line ended in the frame its interval came round was silent for a whole interval.
-            // So the old play's bookkeeping goes now, and the submission starts afresh.
-            if (emitter.Mode == PlaybackMode.Single && status.State == InternalState.Playing
-                && status.IsPhysicallyPlaying && !_audio.IsPlaying(emitter.EntityId))
-            {
-                _voiceStates.Remove(emitter.EntityId);
-                if (_fading.Remove(emitter.EntityId)) _audio.CancelFade(emitter.EntityId);
-            }
+            // Asked for again while a play of it was under way: if that play turns out to have ended,
+            // this is a new one (Process).
+            if (status.IsPhysicallyPlaying) _askedAgain.Add(emitter.EntityId);
         }
         _activeSubmissions[emitter.EntityId] = emitter;
     }
@@ -220,6 +214,16 @@ public class VoiceManager
 
             if (status.State == InternalState.Finished)
             {
+                // A ONE-SHOT ASKED FOR AGAIN AS ITS LAST PLAY ENDED IS A NEW PLAY. Its end came between
+                // two passes, and the new submission with it: finishing the old play used to throw the
+                // new submission away too, so a repeating announcement whose last line ended in the
+                // frame its interval came round was silent for a whole interval. It starts afresh.
+                if (_askedAgain.Contains(id) && emitter.Mode == PlaybackMode.Single && !status.StopRequested)
+                {
+                    _voiceStates[id] = status = new VoiceStatus { Emitter = emitter };
+                    UpdateStateLogic(status);
+                    continue;
+                }
                 _keysToRemove.Add(id);
                 _voiceStatesToRemove.Add(id);
                 continue;
@@ -325,6 +329,7 @@ public class VoiceManager
         }
         foreach (var id in _keysToRemove) _activeSubmissions.Remove(id);
         foreach (var id in _voiceStatesToRemove) _voiceStates.Remove(id);
+        _askedAgain.Clear();
     }
 
     private void UpdateStateLogic(VoiceStatus status)
