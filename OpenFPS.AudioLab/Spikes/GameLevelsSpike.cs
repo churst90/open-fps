@@ -503,6 +503,11 @@ public static class GameLevelsSpike
             }
             // A day hot enough that both thermostats call (Thermostat): the two compressors together.
             if (set is "faults" or "faults-ac") TwoMachines("ac_window", 36f, 20.0);
+            if (set is "faults-landing")
+            {
+                Landing("piston_single", 40f, 7.0, 9.0);
+                Landing("airliner", 60f, 7.0, 9.0);
+            }
             var measureSpots = new List<(string, float)>();
             foreach (var side in new[] { "front", "side", "rear" })
                 foreach (var d in new[] { 1f, 2f, 5f, 10f })
