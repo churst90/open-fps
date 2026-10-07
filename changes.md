@@ -6,23 +6,25 @@ Recent work, newest first. `git log` has the rest.
 
 - Housekeeping (docs/HOUSEKEEPING.md) of the files the earlier passes left for others: the water synths
   (ShoreSynth, RunningWaterSynth and its Basin, EventSum, PowerLawNoise, Resonator, FallingWaterSynth),
-  the water spikes (WavesSpike, RunningWaterSpike, WaterCostSpike) and their tests, and the world editor
-  tests. No behaviour, sound or wire change: the render fingerprints, the emitter stream replay and the
+  the water and texture spikes (WavesSpike, RunningWaterSpike, WaterCostSpike, NatureSpike, TextureSpike)
+  and their tests (NatureTests among them), and the world editor tests. No behaviour, sound or wire change: the render fingerprints, the emitter stream replay and the
   library boundary pass unregenerated, and every comment edit was checked to leave the code's tokens as
   they were. Every performance note on the water's hot loops is kept.
-  - Comments: 1,550 lines to 1,387. FallingWaterSynth's physics, sources and fitting history (the
+  - Comments: 1,783 lines to 1,617. FallingWaterSynth's physics, sources and fitting history (the
     impact's refit, the lump cushion's three rounds, the glug share, the splash bands) moved to the new
     docs/RUNNING_WATER.md section 12, a sentence of each warning left on its constant; the shore's and
     the pipe's histories pointed at docs/WAVES_AND_SHORES.md and docs/RUNNING_WATER.md 11.1, where they
     already were. Corrected to what the code does: FlowScale (running water retunes its falls, it does
     not scale them), TapCount (taps, not places), a doc comment that sat on NoteShares put back on
     CloudShares, the pulse table's on the table. The build's doc warnings in these files are gone. The
-    spikes' usage lists name the modes and sets they have (`cycle`, `heard=`, `dry=1`, `noise=1`,
-    `set=downpipes|taps|roof|round2|overflow`), and `--water-cost` says to time on two cores or more.
-  - Dead code, 53 code lines: ShoreSynth.LineOffset, a copy of RunningWaterSynth.LineOffset, which it now
+    spikes' usage lists name the modes and arguments they read (`cycle`, `heard=`, `dry=1`, `noise=1`,
+    `set=downpipes|taps|roof|round2|overflow`, `--nature`'s `steady= turb= tap= parts=`, `--textures
+    wave`), `--water-cost` says to time on two cores or more, and the lab's `--help` lists `--waves`,
+    `--running-water` and `--water-cost`.
+  - Dead code, 66 code lines: ShoreSynth.LineOffset, a copy of RunningWaterSynth.LineOffset, which it now
     calls; parameters no body read (CloudOscillation's wave height, TapShape's spec); two fall fields set
     in FallingWaterSynth's constructor and set again by Tune before use; unused locals in
-    WorldEditorClientTests; 42 unused usings.
+    WorldEditorClientTests; 55 unused usings.
   - Left for Cody, as `// TODO:`: a hull's blow lands at the start of its block, not at the sample it
     is given (ShoreSynth.HullPlate.Blow, up to 2.7 ms early); `--waves levels heard=` ignores `parts=`.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.AudioLab and OpenFPS.Tests, all but the water spikes

@@ -65,7 +65,7 @@ string[] usage =
     "                                                one thing at a time through the real mixer, captured; spectra [preset ...] for an engine's bass",
     "  --wide-sources [out=DIR] [set=measure|roofs|tree|render|level|all] [wide=on|off] [sec=] [turbulence=] [collapse=on] [spread=] | cost",
     "                                                a tree, the fountain, the fire and rain through the game path, for interaural coherence; cost: what they cost the mixer",
-    "  --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]",
+    "  --textures stats FILE... | wave FILE... | compare REF... -- FILE... | render out=DIR [before=DIR] [sec=]",
     "                                                texture statistics and game-level texture files",
     "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
     "  --intake-ir [preset ...] [thr=] [sec=] [out=]",
@@ -94,10 +94,16 @@ string[] usage =
     "                                                a machine driving past, as one voice and as two",
     "  --yard [preset ...] [levels] [pass] [sec=] [dist=]",
     "                                                mowers and air conditioners, measured and walked past",
-    "  --nature [levels|render out=DIR] [preset ...]",
+    "  --nature [levels|render out=DIR|live] [preset ...] [sec= wind= turb= steady= tap= parts= dist=]",
     "                                                water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
     "  --fire [levels|render out=DIR [places=1]|game out=DIR set=|hrtf] [preset ...] [sec= wind= age= seed= heard= parts=]",
     "                                                fires from a campfire to a crown fire, from their model (docs/FIRE.md)",
+    "  --waves [levels|render out=DIR|sea|game out=DIR set=] [preset ...] [sec= wind= fetch= heard= parts=]",
+    "                                                shores from a pond's edge to surf, from their model (docs/WAVES_AND_SHORES.md)",
+    "  --running-water [levels|render out=DIR|runoff|cycle PRESET|game out=DIR set=] [preset ...] [sec= rain= flow= dry=1 parts=]",
+    "                                                creeks, gutters, drains, downpipes and taps, from their model (docs/RUNNING_WATER.md)",
+    "  --water-cost [shore|flow] [preset ...] [sec= reps= wind= out=DIR] | rain out=DIR | bubbles | null DIR_A DIR_B",
+    "                                                what each water preset costs a core, and a null test between builds",
     "  --weather-wind [out=DIR] [sec=] [ears|trees] [short] [live]",
     "                                                the wind at your ears by speed and heading, a 360 turn, and a tree under /weather",
     "  --thunder [out=DIR] [seed=] [city=x,z] [still] [nowav]",
@@ -541,8 +547,6 @@ if (args.Contains("--waves"))
 
 if (args.Contains("--water-cost"))
 {
-    // --water-cost [shore|flow] [preset ...] [sec= reps= wind= out=DIR] | bubbles | null DIR_A DIR_B: what
-    // each shore and running water preset costs a core as the game renders it, and a null test between builds.
     Environment.Exit(OpenFPS.AudioLab.Spikes.WaterCostSpike.Run(args));
 }
 
