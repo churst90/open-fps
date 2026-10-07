@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
@@ -41,66 +42,89 @@ public enum FireFuel
 /// </summary>
 public sealed record FireSpec
 {
+    [Tunable("", 0, 0, "What this fire is called.")]
     public string Name { get; init; } = "";
     /// <summary>What is burning.</summary>
+    [Tunable("", 0, 0, "What is burning: logs, a vehicle, a building, trees or a crown fire. Decides what is heard besides the flames.")]
     public FireFuel Fuel { get; init; } = FireFuel.Logs;
     /// <summary>The width of one body of fire that puffs as one, m: a hearth's bed, a bonfire's pile, a
     /// car, a tree's crown, the depth of a crown fire's flaming zone. Sets the puffing rate and the roar's
     /// pitch.</summary>
+    [Tunable("m", 0.1, 100, "The width of one body of fire that puffs as one. Sets the puffing rate and the pitch of the roar.", Label = "body width", Step = 0.1)]
     public required float BaseDiameterMetres { get; init; }
     /// <summary>How wide the burning area is, m, across (x). Zero is one body, <see cref="BaseDiameterMetres"/>.</summary>
+    [Tunable("m", 0, 1000, "How wide the burning area is across. Zero is one body.", Label = "area width", Step = 0.5)]
     public float WidthMetres { get; init; }
     /// <summary>How deep the burning area is, m, along (z). Zero is one body, <see cref="BaseDiameterMetres"/>.</summary>
+    [Tunable("m", 0, 1000, "How deep the burning area is. Zero is one body.", Label = "area depth", Step = 0.5)]
     public float DepthMetres { get; init; }
     /// <summary>How hard it is burning when fully developed, kW: the whole fire.</summary>
+    [Tunable("kW", 1, 20000000, "How hard the whole fire burns when fully developed. A garden fire pit is 50 to 150 kW.", Label = "heat release", Step = 10)]
     public required float HeatReleaseKw { get; init; }
     /// <summary>Moisture in the fuel, a fraction of its dry mass. Seasoned firewood is 0.15-0.20, green
     /// wood 0.4 and over; living foliage 0.8-1.2. More water is more crackle and more hiss.</summary>
+    [Tunable("", 0, 2, "Water in the fuel as a fraction of its dry mass: seasoned wood 0.15 to 0.2, green wood 0.4, living leaves 0.8 to 1.2. More water is more crackle and hiss.", Step = 0.01)]
     public float Moisture { get; init; } = 0.18f;
     /// <summary>How resinous the fuel is, 0 (a dense hardwood: oak, ash) to 1 (pine, spruce). Resin
     /// pockets are what pop loudest.</summary>
+    [Tunable("", 0, 1, "How resinous the fuel is, 0 for oak or ash to 1 for pine. Resin pockets pop loudest.", Step = 0.05)]
     public float Resin { get; init; } = 0.3f;
     /// <summary>How tall the flames stand, m: where the wind that fans them is taken.</summary>
+    [Tunable("m", 0.05, 100, "How tall the flames stand: where the wind that fans them is taken.", Label = "flame height", Step = 0.1)]
     public float FlameHeightMetres { get; init; } = 0.8f;
     /// <summary>How high the burning fuel stands, m: the top of a pile, a crown, a roof. What falls,
     /// falls from under it.</summary>
+    [Tunable("m", 0, 100, "How high the burning fuel stands. What falls, falls from under it.", Label = "fuel height", Step = 0.1)]
     public float FuelHeightMetres { get; init; } = 0.3f;
     /// <summary>What is round it and under it, by material name: what embers tick on and what falls
     /// lands on.</summary>
+    [Tunable("", 0, 0, "What is round it and under it: what embers tick on and what falls lands on.", Choices = "materials")]
     public string Surround { get; init; } = "Brick";
     /// <summary>How many places it is heard from, the middle included (ExtendedSources): at most 12. Nine
     /// stand for an area's spread at 1-4 kHz within 0.03 of a continuous one (docs/FIRE.md 7.2).</summary>
     public int Places { get; init; } = 9;
     /// <summary>Panes of glass in it (a building's windows, a car's side and rear windows): each cracks
     /// in the heat and, in a building, falls out later.</summary>
+    [Tunable("", 0, 500, "Panes of glass in it. Each cracks in the heat, and in a building falls out later.")]
     public int Panes { get; init; }
     /// <summary>A pane's width and height, m, and its thickness, mm.</summary>
+    [Tunable("m", 0.05, 5, "The width of one pane.", Label = "pane width", Step = 0.05)]
     public float PaneWidthMetres { get; init; } = 1f;
+    [Tunable("m", 0.05, 5, "The height of one pane.", Label = "pane height", Step = 0.05)]
     public float PaneHeightMetres { get; init; } = 1.2f;
+    [Tunable("mm", 1, 25, "The thickness of one pane.", Label = "pane thickness", Step = 0.5)]
     public float PaneThicknessMm { get; init; } = 4f;
     /// <summary>How far a pane's bottom edge is above the ground, m.</summary>
+    [Tunable("m", 0, 100, "How far a pane's bottom edge is above the ground: how far it falls.", Label = "pane drop", Step = 0.1)]
     public float PaneDropMetres { get; init; } = 1f;
     /// <summary>Sealed gas containers that burst in the heat: a car's gas struts and bumper absorbers, its
     /// tyres. Each bursts at most once.</summary>
+    [Tunable("", 0, 50, "Sealed gas struts and absorbers that burst in the heat, each once.")]
     public int Struts { get; init; }
+    [Tunable("", 0, 50, "Tyres that burst in the heat, each once.")]
     public int Tyres { get; init; }
 
     /// <summary>The fire's life, s, when it is lit at a known moment (<see cref="KeyFor"/>): growing as
     /// t² to its full heat release over <see cref="GrowthSeconds"/>, burning fully for
     /// <see cref="SteadySeconds"/>, dying over <see cref="DecaySeconds"/>, then smouldering. A fire with
     /// no known lighting (a map's) is always fully developed.</summary>
+    [Tunable("s", 1, 36000, "How long a fire lit at a known moment takes to grow to its full heat release.", Label = "growth time", Step = 10)]
     public float GrowthSeconds { get; init; } = 120f;
+    [Tunable("s", 0, 86400, "How long it then burns fully.", Label = "steady time", Step = 60)]
     public float SteadySeconds { get; init; } = 3600f;
+    [Tunable("s", 1, 86400, "How long it then takes to die down to smouldering.", Label = "decay time", Step = 60)]
     public float DecaySeconds { get; init; } = 600f;
 
     /// <summary>Overall level at one metre, dB, fully developed, every place summed. MEASURED with
     /// <c>--fire levels</c>.</summary>
+    [Tunable("dB", 10, 170, "Overall level at one metre, fully developed. Measured with --fire levels; change it only after measuring again.", Label = "level at one metre", Step = 0.5, Source = "MEASURED with --fire levels")]
     public required float SourceLevelDb { get; init; }
     /// <summary>How far its loudest moments stand over <see cref="SourceLevelDb"/>, dB: the room its
     /// voice renders with (the 99.9th percentile of its 10 ms peaks, measured with --fire levels).
     /// Never under the fleet's shared 16.</summary>
     public float PeakHeadroomDb { get; init; } = 16f;
     /// <summary>How big the source is, m: inside it the level is flat.</summary>
+    [Tunable("m", 0.05, 1000, "How big the source is: inside it the level is flat.", Label = "extent", Step = 0.1)]
     public float ExtentMetres { get; init; } = 0.6f;
 
     /// <summary>The burning area's width and depth, m.</summary>

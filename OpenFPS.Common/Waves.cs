@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using System.Text.Json.Serialization;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
@@ -64,26 +65,37 @@ public enum ShoreSediment
 /// </summary>
 public sealed record HullSpec
 {
+    [Tunable("", 0, 0, "What this hull is called.")]
     public string Name { get; init; } = "";
     /// <summary>The skin, kg/m³, GPa, and its own loss factor before it is fastened to anything.</summary>
+    [Tunable("kg/m³", 100, 9000, "The skin material's density.", Label = "density", Step = 10)]
     public float DensityKgM3 { get; init; } = 600f;
+    [Tunable("GPa", 0.1, 250, "The skin material's stiffness. Stiffer rings higher.", Label = "Young's modulus", Step = 0.5)]
     public float YoungsModulusGPa { get; init; } = 8f;
+    [Tunable("", 0.0001, 0.2, "The skin material's own loss factor, before it is fastened to anything.", Label = "material loss factor", Step = 0.001)]
     public float LossFactor { get; init; } = 0.02f;
     /// <summary>The skin's thickness, m.</summary>
+    [Tunable("m", 0.0005, 0.1, "The skin's thickness. Thinner rings lower.", Label = "skin thickness", Step = 0.0005)]
     public float SkinMetres { get; init; } = 0.012f;
     /// <summary>One bay between frames (along the hull) and between chine and gunwale (up it), m.</summary>
+    [Tunable("m", 0.05, 3, "One bay of skin between frames, along the hull.", Label = "bay length", Step = 0.01)]
     public float BayAlongMetres { get; init; } = 0.3f;
+    [Tunable("m", 0.05, 3, "One bay of skin between chine and gunwale, up the hull.", Label = "bay height", Step = 0.01)]
     public float BayUpMetres { get; init; } = 0.45f;
     /// <summary>The loss factor the frames, fastenings and joints add, as a built panel has
     /// (PanelAcoustics.MountedLoss).</summary>
+    [Tunable("", 0, 0.2, "The loss the frames, fastenings and joints add, as a built panel has.", Label = "mounted loss factor", Step = 0.005)]
     public float MountedLossFactor { get; init; } = PanelAcoustics.MountedLoss;
     /// <summary>How much of the bay is under water: the share loaded with the water's mass.</summary>
+    [Tunable("", 0, 1, "How much of the bay is under water. The water's mass lowers its notes.", Step = 0.05)]
     public float WettedShare { get; init; } = 0.4f;
     /// <summary>The bays along the waterline that one place's slaps strike.</summary>
+    [Tunable("", 1, 20, "The bays along the waterline that one place's slaps strike.", Step = 1)]
     public int Bays { get; init; } = 3;
     /// <summary>How far the hull's flare and the lands of its planks stand out over the water, m: the
     /// pocket of air a crest closes on under them is about this big, whatever the wave (a bow's flare
     /// several centimetres, a clinker plank's land one or two).</summary>
+    [Tunable("m", 0.005, 0.3, "How far the hull's flare and the lands of its planks stand out over the water: the size of the air pocket a crest closes on under them.", Label = "flare pocket size", Step = 0.005)]
     public float FlarePocketMetres { get; init; } = 0.04f;
 
     /// <summary>As a RainPlate, so the modes, the radiation efficiency and the loss are the rain's.</summary>
@@ -119,44 +131,60 @@ public readonly record struct ShoreGeometry(float FetchMetres, float WaterBearin
 /// <summary>Waves at an edge as a parts list. See the file's head and docs/WAVES_AND_SHORES.md.</summary>
 public sealed record ShoreSpec
 {
+    [Tunable("", 0, 0, "What this shore is called.")]
     public string Name { get; init; } = "";
 
     // ── The water ───────────────────────────────────────────────────────────────────────────────
 
+    [Tunable("", 0, 0, "The shape of the water: a round pond or lake, a strip such as a river, or the open sea. It decides how the fetch follows the wind's direction.", Label = "water body")]
     public WaterBody Body { get; init; } = WaterBody.Round;
     /// <summary>How far the water reaches straight out from this edge, m: the fetch of an onshore
     /// wind. The map's own (ShoreGeometry) wins where the map has one; this is the lab's.</summary>
+    [Tunable("m", 1, 200000, "How far the water reaches straight out from this edge: the fetch of an onshore wind. A longer fetch raises bigger waves. The map's own geometry wins where it has one.", Step = 10)]
     public float FetchMetres { get; init; } = 300f;
     /// <summary>A strip's length along the wind, m: how far a wind blowing along a river has to work.</summary>
+    [Tunable("m", 10, 200000, "A strip's length along the wind: how far a wind blowing along a river has to work.", Step = 100)]
     public float ReachMetres { get; init; } = 2000f;
     /// <summary>How deep the water is offshore, m: shallow water holds the waves down.</summary>
+    [Tunable("m", 0.1, 1000, "How deep the water is offshore. Shallow water holds the waves down.", Label = "water depth", Step = 0.5)]
     public float DepthMetres { get; init; } = 3f;
     /// <summary>A river's current past the bank, m/s.</summary>
+    [Tunable("m/s", 0, 5, "A river's current past the bank.", Label = "current", Step = 0.05)]
     public float CurrentMetresPerSecond { get; init; }
     /// <summary>The size of what stands out of the bank into the current (roots, snags, riprap), m:
     /// the eddies it sheds rock the water at the bank (a Strouhal number of 0.2).</summary>
+    [Tunable("m", 0.05, 10, "The size of what stands out of the bank into the current: roots, snags, riprap. The eddies it sheds rock the water at the bank.", Label = "bank feature size", Step = 0.05)]
     public float BankFeatureMetres { get; init; } = 0.5f;
     /// <summary>Swell from far away: its significant height (m) and peak period (s) as it arrives, and
     /// the angle its crests make with the shore (degrees off straight onshore). Zero: none.</summary>
+    [Tunable("m", 0, 10, "The significant height of swell arriving from far away. Zero: none.", Label = "swell height", Step = 0.05)]
     public float SwellHeightMetres { get; init; }
+    [Tunable("s", 2, 25, "The swell's peak period as it arrives.", Label = "swell period", Step = 0.5)]
     public float SwellPeriodSeconds { get; init; } = 9f;
+    [Tunable("degrees", -85, 85, "The angle the swell's crests make with the shore, off straight onshore.", Label = "swell angle", Step = 1)]
     public float SwellAngleDegrees { get; init; } = 10f;
 
     // ── The edge ────────────────────────────────────────────────────────────────────────────────
 
+    [Tunable("", 0, 0, "What the waves meet: a sloping beach, a steep face of rock or concrete, or a boat's side.")]
     public ShoreFace Face { get; init; } = ShoreFace.Beach;
+    [Tunable("", 0, 0, "What a beach is made of: sand, mud, gravel, shingle, or rock.")]
     public ShoreSediment Sediment { get; init; } = ShoreSediment.Sand;
     /// <summary>The beach's slope, tan β: about 0.02 for a wide sandy sea beach, 0.1 for a lake's, 0.15
     /// for shingle, 0.3 for a steep bank.</summary>
+    [Tunable("", 0.005, 1, "The beach's slope, rise over run: about 0.02 for a wide sandy sea beach, 0.1 for a lake's, 0.15 for shingle, 0.3 for a steep bank. On a steeper beach waves plunge rather than spill.", Step = 0.005)]
     public float BeachSlope { get; init; } = 0.08f;
     /// <summary>The middling stone's diameter, mm (gravel, shingle; the boulders of a rocky edge).</summary>
+    [Tunable("mm", 0.5, 3000, "The middling stone's diameter: gravel, shingle, or the boulders of a rocky edge.", Label = "stone size", Step = 1)]
     public float StoneMm { get; init; } = 30f;
     /// <summary>How wide a belt of reeds stands in the water before the edge, m: the stems take the
     /// waves' energy before they arrive.</summary>
+    [Tunable("m", 0, 100, "How wide a belt of reeds stands in the water before the edge. The stems take the waves' energy before they arrive.", Label = "reed belt width", Step = 0.5)]
     public float ReedBeltMetres { get; init; }
     /// <summary>The share of crests that close on a pocket of air where they meet the edge: cracks,
     /// gaps between boulders, an overhang, the flare of a hull. A smooth wall a few in a hundred; a
     /// jumble of rocks or a boat's bow most of them.</summary>
+    [Tunable("", 0, 1, "The share of crests that close on a pocket of air where they meet the edge: a few in a hundred for a smooth wall, most of them for a jumble of rocks or a boat's bow.", Label = "air trap share", Step = 0.01)]
     public float TrapShare { get; init; } = 0.1f;
     /// <summary>The boat's side, for <see cref="ShoreFace.Hull"/>.</summary>
     public HullSpec? Hull { get; init; }
@@ -165,20 +193,25 @@ public sealed record ShoreSpec
 
     /// <summary>The wind its level was measured at, m/s at 10 m, blowing straight onshore over
     /// <see cref="FetchMetres"/>.</summary>
+    [Tunable("m/s", 1.5, 30, "The wind the source level was measured at, at 10 m, blowing straight onshore over the fetch. Change it only with a new measurement.", Label = "reference wind", Step = 0.5)]
     public float ReferenceWind { get; init; } = 5f;
     /// <summary>Overall level at one metre, dB, the whole source as if at one point: MEASURED with
     /// <c>--waves levels</c> at <see cref="ReferenceWind"/>.</summary>
+    [Tunable("dB", 10, 130, "Overall level at one metre, the whole source as if at one point, measured with --waves levels at the reference wind. Change it only after measuring the model again.", Step = 0.5, Source = "MEASURED with --waves levels")]
     public required float SourceLevelDb { get; init; }
     /// <summary>How far its loudest moments stand over the level, dB (99.9th percentile of 10 ms peaks).</summary>
     public float PeakHeadroomDb { get; init; } = 16f;
     /// <summary>How long a stretch of the edge one source is, m (the map's own wins).</summary>
+    [Tunable("m", 1, 1000, "How long a stretch of the edge one source is. The map's own geometry wins where it has one.", Label = "edge length", Step = 1)]
     public float LengthMetres { get; init; } = 20f;
     /// <summary>How many places along it it is heard from (ExtendedSources), its middle included.</summary>
     public int Places { get; init; } = 5;
     /// <summary>Where the waves break, m out from the edge, at the reference sea: surf breaking that far
     /// out is heard from a second row of places out there. Zero: they break at the edge.</summary>
+    [Tunable("m", 0, 500, "Where the waves break, out from the edge, at the reference sea. Surf breaking that far out is also heard from a row of places out there. Zero: they break at the edge.", Label = "break line distance", Step = 1)]
     public float BreakRowMetres { get; init; }
     /// <summary>How big it is, m: the voice is flat inside it.</summary>
+    [Tunable("m", 0.2, 50, "How big it is. Inside it the sound is flat.", Step = 0.5)]
     public float ExtentMetres { get; init; } = 4f;
 
     /// <summary>Every place: along the edge, and as many again on the break line if it has one.</summary>

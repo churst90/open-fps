@@ -266,6 +266,8 @@ public static class MachineRegistry
     public static MachineDefinition? Find(string id)
     {
         if (string.IsNullOrEmpty(id)) return null;
+        // Changed in the world editor: the vehicle as it is now, taken apart.
+        if (ModelLibrary.IsAuthored(ModelLibrary.Kinds.Vehicle, id)) return Describe(VehicleFor(id), id);
         if (_authored.TryGetValue(id, out var authored)) return authored;
         if (VehicleProfile.Presets.ContainsKey(id)) return Describe(VehicleProfile.ByName(id), id);
         return null;
@@ -273,11 +275,14 @@ public static class MachineRegistry
 
     /// <summary>Is there a machine of this name at all — authored, or in the built-in library?</summary>
     public static bool Knows(string id)
-        => !string.IsNullOrEmpty(id) && (_authored.ContainsKey(id) || VehicleProfile.Presets.ContainsKey(id));
+        => !string.IsNullOrEmpty(id) && (_authored.ContainsKey(id) || VehicleProfile.Presets.ContainsKey(id)
+                                         || ModelLibrary.IsAuthored(ModelLibrary.Kinds.Vehicle, id));
 
-    /// <summary>Every machine there is, built-in and authored.</summary>
+    /// <summary>Every machine there is, built-in and authored, and those made in the world editor.</summary>
     public static IEnumerable<string> Ids
-        => VehicleProfile.Presets.Keys.Concat(_authored.Keys.Where(k => !VehicleProfile.Presets.ContainsKey(k)));
+        => VehicleProfile.Presets.Keys.Concat(_authored.Keys.Where(k => !VehicleProfile.Presets.ContainsKey(k)))
+               .Concat(ModelLibrary.Ids(ModelLibrary.Kinds.Vehicle)
+                   .Where(k => !VehicleProfile.Presets.ContainsKey(k) && !_authored.ContainsKey(k)));
 
     /// <summary>
     /// The vehicle a machine names, assembled — authored parts if the machine is authored, and the
@@ -287,11 +292,67 @@ public static class MachineRegistry
     /// audio path, per car per frame, and assembling one builds a whole engine.
     /// </summary>
     public static VehicleProfile VehicleFor(string id)
-        => _assembled.GetOrAdd(id, static k =>
+    {
+        // A model changed in the world editor (a vehicle, or an engine some vehicle has) makes every
+        // assembled vehicle stale: forgotten, and built again as each is next asked for.
+        int generation = ModelLibrary.Generation;
+        if (generation != _seenGeneration)
         {
-            var def = Find(k) ?? throw new ArgumentException($"No machine '{k}'.");
-            return _authored.ContainsKey(k) ? Assemble(def) : VehicleProfile.ByName(k);
+            _assembled.Clear();
+            _seenGeneration = generation;
+        }
+        return _assembled.GetOrAdd(id, static k =>
+        {
+            if (ModelLibrary.IsAuthored(ModelLibrary.Kinds.Vehicle, k))
+            {
+                _assembling ??= new List<string>();
+                if (_assembling.Contains(k, StringComparer.OrdinalIgnoreCase))
+                    throw new ArgumentException($"Vehicles are built on each other in a circle: {string.Join(" -> ", _assembling)} -> {k}.");
+                _assembling.Add(k);
+                try { return ModelLibrary.Get<VehicleSpec>(ModelLibrary.Kinds.Vehicle, k).Build(k); }
+                finally { _assembling.Remove(k); }
+            }
+            return WithEditedEngine(Unedited(k));
         });
+    }
+
+    private static volatile int _seenGeneration = int.MinValue;
+
+    /// <summary>
+    /// A vehicle as it is without the world editor: an authored parts list assembled, or the built-in
+    /// preset. What a vehicle model's version 0 is.
+    /// </summary>
+    public static VehicleProfile Unedited(string id)
+    {
+        if (_authored.TryGetValue(id, out var def)) return Assemble(def);
+        if (VehicleProfile.Presets.ContainsKey(id)) return VehicleProfile.ByName(id);
+        throw new ArgumentException($"No machine '{id}'.");
+    }
+
+    /// <summary>An engine by its preset name, as changed in the world editor if it has been.</summary>
+    public static EngineProfile EngineFor(string key)
+        => ModelLibrary.IsAuthored(ModelLibrary.Kinds.Engine, key)
+            ? ModelLibrary.Get<EngineProfile>(ModelLibrary.Kinds.Engine, key)
+            : EngineProfile.ByName(key);
+
+    /// <summary>A vehicle with its engine as changed in the world editor, if it has been.</summary>
+    private static VehicleProfile WithEditedEngine(VehicleProfile v)
+    {
+        string key = EngineKeyOf(v.Engine);
+        return key.Length > 0 && ModelLibrary.IsAuthored(ModelLibrary.Kinds.Engine, key) ? v with { Engine = EngineFor(key) } : v;
+    }
+
+    /// <summary>The engine preset a vehicle (by id) is built on, or "".</summary>
+    public static string EngineKeyFor(string vehicleId)
+    {
+        try
+        {
+            if (ModelLibrary.IsAuthored(ModelLibrary.Kinds.Vehicle, vehicleId))
+                return ModelLibrary.Get<VehicleSpec>(ModelLibrary.Kinds.Vehicle, vehicleId).Engine;
+            return Knows(vehicleId) ? EngineKeyOf(Unedited(vehicleId).Engine) : "";
+        }
+        catch (ArgumentException) { return ""; }
+    }
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, VehicleProfile> _assembled =
         new(StringComparer.OrdinalIgnoreCase);
@@ -313,7 +374,7 @@ public static class MachineRegistry
 
         var enginePart = def.Part(MachineModels.Engine);
         EngineProfile engine = enginePart is { Profile.Length: > 0 }
-            ? EngineProfile.ByName(enginePart.Profile)
+            ? EngineFor(enginePart.Profile)
             : b?.Engine ?? throw new ArgumentException(
                 $"Machine '{def.Id}' has no engine and no base to take one from.");
 
@@ -547,12 +608,18 @@ public static class MachineRegistry
     /// VEHICLE's key, which is not always the engine's (the school bus runs a "diesel_bus"). The
     /// engine's Name is unique across the library and a test holds it that way.
     /// </summary>
-    private static string EngineKeyOf(EngineProfile engine)
+    public static string EngineKeyOf(EngineProfile engine)
     {
-        foreach (var kv in EngineProfile.Presets)
-            if (kv.Value().Name == engine.Name) return kv.Key;
+        var byName = _engineKeys ??= EngineProfile.Presets.ToDictionary(kv => kv.Value().Name, kv => kv.Key);
+        if (byName.TryGetValue(engine.Name, out var key)) return key;
+        // An engine changed in the world editor may have been renamed: the edited one, by its name.
+        foreach (var id in ModelLibrary.Ids(ModelLibrary.Kinds.Engine))
+            if (ModelLibrary.IsAuthored(ModelLibrary.Kinds.Engine, id)
+                && ModelLibrary.Get<EngineProfile>(ModelLibrary.Kinds.Engine, id).Name == engine.Name) return id;
         return "";
     }
+
+    private static Dictionary<string, string>? _engineKeys;
 
     /// <summary>Which tyre this is. A TyreProfile is all scalars, so the record's own equality is
     /// the whole answer — and the settings above carry every field anyway, so a miss costs nothing.</summary>

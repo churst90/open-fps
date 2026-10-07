@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
@@ -55,16 +56,20 @@ public sealed record CamLobe
 {
     /// <summary>Seat-to-seat ("advertised") duration in crank degrees. Stock cars run 250-280, a mild
     /// street cam 280-295, a big lumpy one 300-320.</summary>
+    [Tunable("degrees", 90, 360, "How long the valve is open, seat to seat, in crank degrees. Longer holds the valve open into the next stroke: more top end, rougher idle.", Step = 2)]
     public required float DurationDegrees { get; init; }
     /// <summary>Peak valve lift, millimetres. Typical 9-14 mm.</summary>
+    [Tunable("mm", 2, 50, "How far the valve opens at the top of the lobe. More lift lets more gas through.", Label = "peak lift", Step = 0.1)]
     public float MaxLiftMm { get; init; } = 12f;
     /// <summary>How much of the duration is spent in the slow opening and closing ramps rather than on
     /// the main lobe, 0..0.5. Aggressive roller cams have short ramps and reach lift fast.</summary>
+    [Tunable("", 0, 0.5, "Share of the duration spent on the slow opening and closing ramps. Short ramps open the valve faster.", Step = 0.01)]
     public float RampFraction { get; init; } = 0.22f;
     /// <summary>Lobe centreline, crank degrees from TDC of the firing stroke: BEFORE for exhaust
     /// (positive means the exhaust lobe centres before BDC... expressed as degrees ATDC-firing, so an
     /// exhaust lobe centred 110 degrees before overlap TDC sits at 250 ATDC-firing), AFTER for intake
     /// (an intake lobe centred 106 ATDC of the overlap TDC sits at 466).</summary>
+    [Tunable("degrees", 90, 540, "Where the lobe is centred, in crank degrees after the firing top dead centre. Moving the two lobes closer together adds overlap.", Label = "lobe centre", Step = 1)]
     public required float CentrelineDegrees { get; init; }
 
     /// <summary>Opening angle, crank degrees ATDC-firing.</summary>
@@ -76,33 +81,43 @@ public sealed record CamLobe
 /// <summary>The valves for one function (all exhaust valves, or all intake valves) on one cylinder.</summary>
 public sealed record ValveSpec
 {
+    [Tunable("", 1, 6, "How many valves of this kind each cylinder has.", Label = "valves per cylinder")]
     public int Count { get; init; } = 1;
+    [Tunable("mm", 10, 200, "Head diameter of each valve. A bigger valve flows more gas at the same lift.", Label = "diameter", Step = 0.5)]
     public required float DiameterMm { get; init; }
     /// <summary>Discharge coefficient of the port at full lift. Real heads run 0.55-0.75.</summary>
+    [Tunable("", 0.4, 0.85, "How well the port flows at full lift, against a perfect hole of the same size. Real heads are 0.55 to 0.75.", Step = 0.01)]
     public float DischargeCoefficient { get; init; } = 0.62f;
 }
 
 /// <summary>A muffler, as the things inside the can.</summary>
 public sealed record MufflerSpec
 {
+    [Tunable("", 0, 0, "What is inside the can: nothing, chambers, packing, or a stock baffled muffler.", Label = "muffler type")]
     public MufflerKind Kind { get; init; } = MufflerKind.Chambered;
     /// <summary>Chamber lengths, metres, in flow order. Each is an expansion of the pipe into the
     /// can's cross-section and back, so each cancels around c/2L and its multiples.</summary>
     public float[] ChamberLengthsMetres { get; init; } = { 0.10f, 0.14f, 0.18f };
     /// <summary>Can cross-section over pipe cross-section. 4-9 for a typical oval can on a 2.5 inch pipe.
     /// The larger it is, the deeper the chambers cancel.</summary>
+    [Tunable("", 1, 20, "Cross-section of the can over that of the pipe. Larger makes each chamber cancel more deeply.", Step = 0.5)]
     public float ExpansionRatio { get; init; } = 6f;
     /// <summary>How much of each chamber's internal reflection is lost to baffles and deflectors, 0..1.
     /// Zero is a clean expansion chamber, which rings; a Flowmaster's deflectors are around 0.3.</summary>
+    [Tunable("", 0, 1, "Share of each chamber's internal reflection lost to baffles and deflectors. Zero is a clean chamber that rings.", Step = 0.01)]
     public float BaffleLoss { get; init; } = 0.3f;
     /// <summary>Acoustic absorption of the packing, 0..1, applied to the top of the band on every pass.
     /// A fresh glasspack is 0.6-0.8, a blown-out one 0.2, a chambered muffler 0.</summary>
+    [Tunable("", 0, 1, "Acoustic absorption of the packing, taken from the top of the band. A fresh glasspack is 0.6 to 0.8, a chambered muffler 0.", Label = "packing absorption", Step = 0.01)]
     public float Absorption { get; init; } = 0f;
     /// <summary>Length of the absorptive section, metres.</summary>
+    [Tunable("m", 0, 1.5, "Length of the packed section. Longer takes more of the top off.", Label = "packed length", Step = 0.01)]
     public float AbsorptiveLengthMetres { get; init; } = 0.45f;
     /// <summary>A Helmholtz resonator tuned to a drone frequency, Hz. 0 for none.</summary>
+    [Tunable("Hz", 0, 500, "Frequency of the side resonator that cancels a drone. Zero for none.", Label = "resonator tuning", Step = 5)]
     public float ResonatorHz { get; init; } = 0f;
     /// <summary>How sharply the resonator is tuned. Q of 4-8 is a real one.</summary>
+    [Tunable("", 1, 20, "How narrowly the resonator is tuned. A real one is 4 to 8.", Label = "resonator sharpness", Step = 0.5)]
     public float ResonatorQ { get; init; } = 5f;
 
     /// <summary>
@@ -187,35 +202,45 @@ public sealed record ExhaustSpec
     /// Null means every cylinder gets <see cref="PrimaryLengthMetres"/> spread by
     /// <see cref="PrimarySpread"/>, front to back down each bank.</summary>
     public float[]? PrimaryLengthsMetres { get; init; }
+    [Tunable("m", 0.05, 2.5, "Length of each primary pipe from the valve to the collector, when the lengths are not listed one by one.", Label = "primary length", Step = 0.01)]
     public float PrimaryLengthMetres { get; init; } = 0.80f;
     /// <summary>How unequal the primaries are, as a fraction of their length. A fabricated header
     /// holds them within 0.05-0.15; a cast log manifold is 0.4 and up — and the manifold sounds
     /// coarser and burblier for it, because eight pipes at eight pitches is a band and eight at one
     /// pitch is a tube.</summary>
+    [Tunable("", 0, 0.8, "How unequal the primaries are, as a share of their length. A fabricated header is 0.05 to 0.15, a cast log manifold 0.4 and up.", Label = "primary length spread", Step = 0.01)]
     public float PrimarySpread { get; init; } = 0.12f;
+    [Tunable("mm", 15, 150, "Inside diameter of each primary pipe.", Label = "primary diameter", Step = 0.5)]
     public float PrimaryDiameterMm { get; init; } = 44f;
 
     /// <summary>Which cylinders join which collector, as lists of cylinder indices. Null means one
     /// collector per bank. An inline-6 with two 3-into-1 headers is {{0,1,2},{3,4,5}}; a 4-2-1 header
     /// on an inline-4 is {{0,3},{1,2}} — and that grouping is most of why those sound the way they do.</summary>
     public int[][]? CollectorGroups { get; init; }
+    [Tunable("mm", 15, 250, "Inside diameter of the collector and the pipe after it.", Label = "collector diameter", Step = 1)]
     public float CollectorDiameterMm { get; init; } = 63f;
     /// <summary>From each collector to where the systems meet (or to the muffler if they never do), metres.</summary>
+    [Tunable("m", 0, 3, "Pipe from each collector to where the systems meet, or to the muffler if they never do.", Label = "collector pipe length", Step = 0.01)]
     public float CollectorPipeMetres { get; init; } = 1.10f;
 
+    [Tunable("", 0, 0, "How the two banks' pipes meet: not at all, by an H balance tube, by an X, or merged into one system.")]
     public CrossoverKind Crossover { get; init; } = CrossoverKind.HPipe;
     /// <summary>Length of the balance tube for an H-pipe, metres. Its own quarter-wave is audible.</summary>
+    [Tunable("m", 0.05, 1.5, "Length of the H-pipe balance tube. Its own quarter wave is audible.", Label = "balance tube length", Step = 0.01)]
     public float CrossoverTubeMetres { get; init; } = 0.35f;
     /// <summary>Cross-section of the balance tube relative to the system pipe, 0..1.5.</summary>
+    [Tunable("", 0, 1.5, "Cross-section of the balance tube over that of the system pipe. Bigger couples the banks more.", Label = "balance tube area", Step = 0.05)]
     public float CrossoverArea { get; init; } = 0.6f;
 
     /// <summary>From the crossover (or collector pipe) to the muffler inlet, metres.</summary>
+    [Tunable("m", 0, 8, "Pipe from the crossover or collector pipe to the muffler inlet.", Label = "mid pipe length", Step = 0.05)]
     public float MidPipeMetres { get; init; } = 1.20f;
     public MufflerSpec Muffler { get; init; } = MufflerSpec.Chambered40;
     /// <summary>Tailpipe from the muffler to the open air, metres. Two branches get two lengths; if
     /// only one is given the second is 9% longer, because two equal tailpipes let the banks arrive in
     /// step and cancel each other's unevenness.</summary>
     public float[] TailpipeMetres { get; init; } = { 0.60f };
+    [Tunable("mm", 15, 350, "Inside diameter of the tailpipe. A wider open end radiates the low notes better.", Label = "tailpipe diameter", Step = 1)]
     public float TailpipeDiameterMm { get; init; } = 63f;
 
     /// <summary>
@@ -243,14 +268,18 @@ public sealed record ExhaustSpec
     /// <summary>Exhaust gas temperature at the port, Celsius, idling and at full load. The speed of
     /// sound in every pipe follows the square root of the absolute temperature, so the whole system
     /// speaks nearly half an octave higher working than idling.</summary>
+    [Tunable("°C", 50, 700, "Exhaust gas temperature at the port when idling. Hotter gas raises every pipe resonance.", Label = "gas temperature at idle", Step = 10)]
     public float GasCelsiusIdle { get; init; } = 330f;
+    [Tunable("°C", 300, 1100, "Exhaust gas temperature at the port at full load.", Label = "gas temperature at full load", Step = 10)]
     public float GasCelsiusFull { get; init; } = 820f;
     /// <summary>What fraction of the port's temperature rise survives to the tailpipe.</summary>
+    [Tunable("", 0, 1, "Share of the port's temperature rise still left in the gas at the tailpipe.", Label = "heat kept to the tailpipe", Step = 0.05)]
     public float TailCooling { get; init; } = 0.45f;
 
     /// <summary>Multiplier on the viscothermal wall loss, to stand in for bends, joints, flex sections
     /// and rust that a straight smooth pipe does not have. 1 is a straight smooth pipe; 2-3 is a
     /// production system with four bends and two flanges.</summary>
+    [Tunable("", 0.5, 4, "Wall loss against a straight smooth pipe, for bends, joints and flex sections. 1 is a straight smooth pipe; 2 to 3 is a production system with four bends and two flanges.", Label = "wall loss", Step = 0.05)]
     public float WallLossMultiplier { get; init; } = 1.8f;
     /// <summary>Scale on the finite-amplitude steepening of the wave fronts, 0..1. 1 is the physics —
     /// a half-bar pulse arrives noticeably sharper than it left. It is the mechanism behind the rasp
@@ -271,6 +300,7 @@ public sealed record ExhaustSpec
     public float PortNoiseLevel { get; init; } = 1f;
 
     /// <summary>Chance per second of unburnt fuel lighting in the hot pipe on the overrun.</summary>
+    [Tunable("per second", 0, 30, "How often unburnt fuel lights in the hot pipe with the throttle shut. Zero for an engine that cuts its fuel.", Label = "overrun pops", Step = 0.5)]
     public float OverrunPopRate { get; init; } = 6f;
 
     public int TailpipeCount(int collectors)
@@ -280,14 +310,22 @@ public sealed record ExhaustSpec
 /// <summary>The intake tract: valve, runner, plenum, throttle, airbox, snorkel.</summary>
 public sealed record IntakeSpec
 {
+    [Tunable("m", 0.02, 1, "Length of each intake runner from the plenum to the valve. It tunes where the engine breathes best.", Label = "runner length", Step = 0.01)]
     public float RunnerLengthMetres { get; init; } = 0.30f;
+    [Tunable("mm", 10, 200, "Inside diameter of each intake runner.", Label = "runner diameter", Step = 1)]
     public float RunnerDiameterMm { get; init; } = 42f;
+    [Tunable("litres", 0.05, 400, "Volume of the plenum the runners draw from.", Label = "plenum volume", Step = 0.1)]
     public float PlenumLitres { get; init; } = 4.5f;
+    [Tunable("mm", 10, 400, "Bore of the throttle. Several throttles count as one of the same total area.", Label = "throttle diameter", Step = 1)]
     public float ThrottleDiameterMm { get; init; } = 80f;
+    [Tunable("litres", 0.5, 1500, "Volume of the airbox. A big box on a small snorkel silences the intake.", Label = "airbox volume", Step = 0.5)]
     public float AirboxLitres { get; init; } = 8f;
+    [Tunable("m", 0.02, 3, "Length of the snorkel from the open air to the airbox.", Label = "snorkel length", Step = 0.01)]
     public float SnorkelLengthMetres { get; init; } = 0.45f;
+    [Tunable("mm", 10, 400, "Inside diameter of the snorkel.", Label = "snorkel diameter", Step = 1)]
     public float SnorkelDiameterMm { get; init; } = 70f;
     /// <summary>Acoustic absorption of the airbox lining and filter, 0..1.</summary>
+    [Tunable("", 0, 1, "Acoustic absorption of the airbox lining and filter.", Label = "airbox absorption", Step = 0.01)]
     public float Absorption { get; init; } = 0.35f;
     /// <summary>How much of the intake noise reaches the outside of the car. An open filter under the
     /// bonnet is 1; a factory airbox with a resonator in the snorkel is 0.25.</summary>
@@ -367,13 +405,16 @@ public sealed record MechanicalSpec
     public float CombustionKnock { get; init; } = 0.05f;
     /// <summary>Alternator (or any accessory) whine: engine order and level. Order = pulley ratio times
     /// pole pairs; a 12-pole alternator on a 2.8:1 pulley whines at order 16.8.</summary>
+    [Tunable("", 0, 40, "Alternator whine as an engine order: pulley ratio times pole pairs. A 12-pole alternator on a 2.8 to 1 pulley is 16.8. Zero for none.", Label = "alternator whine order", Step = 0.1)]
     public float AccessoryWhineOrder { get; init; } = 16.8f;
     public float AccessoryWhineLevel { get; init; } = 0.15f;
     /// <summary>Supercharger rotor whine (Roots/twin-screw): order = lobes times drive ratio.</summary>
+    [Tunable("", 0, 30, "Supercharger rotor whine as an engine order: lobes times drive ratio. Zero for no blower.", Label = "blower whine order", Step = 0.1)]
     public float BlowerWhineOrder { get; init; } = 0f;
     public float BlowerWhineLevel { get; init; } = 0f;
     /// <summary>Turbocharger: whistle level under boost and the lag of the shaft, seconds.</summary>
     public float TurboWhistleLevel { get; init; } = 0f;
+    [Tunable("s", 0.05, 6, "How long the turbo shaft takes to spool up to boost.", Label = "turbo lag", Step = 0.05)]
     public float TurboLagSeconds { get; init; } = 0.8f;
     /// <summary>
     /// How fast the turbo's shaft turns at idle, as a fraction of its speed at full boost. A turbine
@@ -382,6 +423,7 @@ public sealed record MechanicalSpec
     /// third of its speed, and that whistle is heard with the truck sitting still ("even at idle you
     /// could hear the whistle from the turbos"). Zero keeps the spool on the throttle alone.
     /// </summary>
+    [Tunable("", 0, 0.8, "Turbo shaft speed at idle as a share of its speed at full boost. A big turbo freewheels at a third.", Label = "turbo speed at idle", Step = 0.05)]
     public float TurboIdleSpool { get; init; } = 0f;
 }
 
@@ -391,12 +433,18 @@ public sealed record MechanicalSpec
 /// </summary>
 public sealed record EngineProfile
 {
+    [Tunable("", 0, 0, "What this engine is called.", Label = "name")]
     public required string Name { get; init; }
+    [Tunable("", 0, 0, "How the cylinders are arranged: in a line, in a vee, or flat.")]
     public EngineLayout Layout { get; init; } = EngineLayout.Vee;
+    [Tunable("", 2, 4, "Strokes per cycle: 4 fires each cylinder every other turn, 2 every turn.", Label = "strokes per cycle", Step = 2)]
     public int Strokes { get; init; } = 4;
+    [Tunable("", 0, 0, "Petrol is lit by a spark; diesel lights by compression and knocks.")]
     public FuelType Fuel { get; init; } = FuelType.Petrol;
+    [Tunable("", 0, 0, "How the air gets in: drawn by the pistons, pushed by a turbo, or pushed by a supercharger.")]
     public Induction Induction { get; init; } = Induction.NaturallyAspirated;
     /// <summary>Peak boost, bar gauge, for a turbo or blower.</summary>
+    [Tunable("bar", 0, 4, "Peak boost pressure above the atmosphere, for a turbo or a supercharger.", Label = "peak boost", Step = 0.05)]
     public float BoostBar { get; init; } = 0f;
 
     /// <summary>Crank angle at which each cylinder fires (its combustion TDC), degrees, cylinder order.</summary>
@@ -407,10 +455,14 @@ public sealed record EngineProfile
     public float CycleDegrees => Strokes == 2 ? 360f : 720f;
 
     // ── Geometry ────────────────────────────────────────────────────────────────────────────────
+    [Tunable("mm", 30, 250, "Cylinder diameter. A wider bore makes a bigger, lower knock and a bigger charge.", Label = "bore", Step = 0.5)]
     public required float BoreMm { get; init; }
+    [Tunable("mm", 30, 300, "How far the piston travels. With the bore, this sets the displacement.", Label = "stroke", Step = 0.5)]
     public required float StrokeMm { get; init; }
     /// <summary>Connecting rod length over crank radius. 1.5-1.8 for road engines.</summary>
+    [Tunable("", 1.3, 3, "Connecting rod length over crank radius. Road engines are 1.5 to 1.8.", Step = 0.01)]
     public float RodRatio { get; init; } = 1.7f;
+    [Tunable("", 6, 23, "Cylinder volume at the bottom of the stroke over the volume at the top.", Step = 0.1)]
     public float CompressionRatio { get; init; } = 10f;
 
     public float CylinderDisplacementLitres
@@ -437,22 +489,28 @@ public sealed record EngineProfile
 
     // ── Combustion ──────────────────────────────────────────────────────────────────────────────
     /// <summary>Gas temperature in the cylinder at exhaust valve opening, at full load, Kelvin.</summary>
+    [Tunable("K", 800, 1600, "Gas temperature in the cylinder when the exhaust valve opens at full load.", Label = "gas temperature at exhaust opening", Step = 10)]
     public float EvoTemperatureK { get; init; } = 1150f;
     /// <summary>Manifold absolute pressure at idle, bar. A big cam idles at 0.5-0.6 because it cannot
     /// pull a vacuum; a stock engine idles at 0.3.</summary>
+    [Tunable("bar", 0.15, 2, "Absolute manifold pressure at idle. A stock engine is 0.3; a big cam cannot pull a vacuum and sits at 0.5 to 0.6; a diesel has no throttle and sits near 1.", Label = "manifold pressure at idle", Step = 0.01)]
     public float IdleMapBar { get; init; } = 0.35f;
     /// <summary>Cycle-to-cycle combustion variation at full load under clean conditions, as a
     /// fraction (a healthy engine measures 2-4% COV of IMEP). Idle variation is derived from overlap.</summary>
+    [Tunable("", 0, 0.15, "Cycle to cycle variation of combustion at full load, as a fraction. A healthy engine is 0.02 to 0.04.", Label = "cycle to cycle variation", Step = 0.005)]
     public float CombustionVariation { get; init; } = 0.03f;
     /// <summary>Extra idle roughness on top of what overlap predicts, 0..1. A carburetted engine
     /// with a lumpy cam and no idle control is up near 1; fuel injection with closed-loop idle is 0.</summary>
     public float IdleRoughness { get; init; } = 0.3f;
 
     // ── Rotating assembly and the way it is driven ──────────────────────────────────────────────
+    [Tunable("rpm", 200, 5000, "The speed the engine settles at with the throttle shut.", Label = "idle speed", Step = 10)]
     public required float IdleRpm { get; init; }
+    [Tunable("rpm", 500, 20000, "The highest speed the engine is run to.", Label = "redline", Step = 100)]
     public required float RedlineRpm { get; init; }
     /// <summary>The speed the starter turns it at, rpm: 150-250 for a diesel, 200-300 for a petrol
     /// engine (Pearson, Diesel Engine Starting Systems); six recorded starts beat at 150-225.</summary>
+    [Tunable("rpm", 50, 1000, "How fast the starter turns the engine: 150 to 250 for a diesel, 200 to 300 for petrol.", Label = "cranking speed", Step = 10, Source = "Pearson, Diesel Engine Starting Systems; six recorded starts at 150 to 225")]
     public float CrankingRpm { get; init; } = 200f;
     /// <summary>
     /// Crank revolutions the starter turns before the first cylinder fires. An engine computer
@@ -469,16 +527,22 @@ public sealed record EngineProfile
     /// <summary>Rotating inertia of crank, flywheel, clutch and damper, kg m^2. A heavy flywheel
     /// is 0.35-0.5, a race one 0.1. It decides how fast a free rev climbs and how much the crank
     /// speed ripples between firings.</summary>
+    [Tunable("kg m²", 0.005, 250, "Rotating inertia of crank, flywheel, clutch and damper. Less makes the revs climb and fall faster.", Label = "inertia", Step = 0.01)]
     public float InertiaKgM2 { get; init; } = 0.30f;
     /// <summary>Mechanical friction torque, Nm, at rest and per 1000 rpm. About 0.95 bar of friction
     /// mean effective pressure at idle for a petrol engine (7.6 Nm per litre), 1.5 bar for a diesel,
     /// rising 0.35 bar per 1000 rpm. Pumping loss is not in here: the cylinders compute it.</summary>
+    [Tunable("Nm", 0, 4000, "Mechanical friction torque at rest, not counting pumping.", Label = "friction torque", Step = 0.5)]
     public float FrictionNm { get; init; } = 20f;
+    [Tunable("Nm per 1000 rpm", 0, 1500, "How much the friction torque rises for each thousand rpm.", Label = "friction rise", Step = 0.1)]
     public float FrictionNmPerKrpm { get; init; } = 9f;
+    [Tunable("Nm", 1, 40000, "The most torque the engine makes.", Label = "peak torque", Step = 1)]
     public float PeakTorqueNm { get; init; } = 500f;
+    [Tunable("rpm", 200, 18000, "The speed at which the engine makes its peak torque.", Label = "peak torque speed", Step = 50)]
     public float PeakTorqueRpm { get; init; } = 4200f;
     /// <summary>How the idle control fights the engine's own unevenness: the gain of the governor, 1/s.
     /// Electronic throttle idle control is quick (3-5); a carburettor's idle screw is zero.</summary>
+    [Tunable("per second", 0, 20, "How hard the idle control corrects the speed. Electronic idle control is 3 to 5; a carburettor's idle screw is 0.", Label = "idle control gain", Step = 0.1)]
     public float IdleGovernorGain { get; init; } = 2.5f;
 
     public ExhaustSpec Exhaust { get; init; } = new();
@@ -2380,7 +2444,11 @@ public sealed record EngineProfile
             ["emd_645e3"] = () => Emd645E3,
         };
 
+    /// <summary>An engine by its preset name: as changed in the world editor if it has been (it is a
+    /// library kind, ModelLibrary.Kinds.Engine), otherwise as built. Every vehicle, small machine,
+    /// train and aircraft that names it has the change.</summary>
     public static EngineProfile ByName(string key)
-        => Presets.TryGetValue(key, out var make) ? make()
+        => ModelLibrary.IsAuthored(ModelLibrary.Kinds.Engine, key) ? ModelLibrary.Get<EngineProfile>(ModelLibrary.Kinds.Engine, key)
+         : Presets.TryGetValue(key, out var make) ? make()
          : throw new ArgumentException($"No engine preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
 }

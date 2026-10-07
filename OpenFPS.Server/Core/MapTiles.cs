@@ -159,6 +159,29 @@ public sealed class MapTiles
         return (t.Position - half, t.Position + half);
     }
 
+    /// <summary>
+    /// A thing from the map file that the world editor moved, or made again under a new id
+    /// (<paramref name="wasId"/>): its tiles worked out again from where it stands now, at the detail it
+    /// needed before, so a client holding the tile it is in now is sent it. Nothing for a thing that was
+    /// not tiled.
+    /// </summary>
+    public bool Place(World world, Entity e, int wasId)
+    {
+        if (!_members.Remove(wasId, out var m)) return false;
+        foreach (var k in m.Tiles)
+            if (_byTile.TryGetValue(k, out var list)) list.Remove(wasId);
+        if (!world.IsAlive(e) || !world.Has<Transform>(e)) return false;
+        var (lo, hi) = Footprint(world, e, world.Get<Transform>(e));
+        var a = TileKey.Of(lo, TileMetres);
+        var b = TileKey.Of(hi, TileMetres);
+        var keys = new List<TileKey>();
+        for (int x = Math.Clamp(a.X, Min.X, Max.X); x <= Math.Clamp(b.X, Min.X, Max.X); x++)
+            for (int z = Math.Clamp(a.Z, Min.Z, Max.Z); z <= Math.Clamp(b.Z, Min.Z, Max.Z); z++)
+                keys.Add(new TileKey(x, z));
+        Add(e, keys.ToArray(), m.Needs);
+        return true;
+    }
+
     internal void Add(Entity e, TileKey[] keys, TileDetail needs)
     {
         int id = e.Id;

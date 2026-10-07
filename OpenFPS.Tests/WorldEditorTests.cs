@@ -579,7 +579,7 @@ public class WorldEditorTests : IDisposable
         rig.On("mine");
         var root = rig.Menu("menu")!;
         Assert.Equal("World editor, mine", root.Title);
-        Assert.Equal(new[] { "Map", "Place", "Select", "Library", "Test tools", "Nothing to undo", "Nothing to redo" }, root.Items.Select(i => i.Label));
+        Assert.Equal(new[] { "Map", "Place", "Select", "Places and rooms", "Library", "Test tools", "Nothing to undo", "Nothing to redo" }, root.Items.Select(i => i.Label));
 
         var place = rig.Menu("menu", "place")!;
         Assert.Contains(place.Items, i => i.Label.StartsWith("Walls and fences, ") && i.Kind == EditorItemKind.Menu && i.Command == "place.cat:Walls and fences");
@@ -593,7 +593,7 @@ public class WorldEditorTests : IDisposable
         Assert.Contains(selected.Items, i => i.Kind == EditorItemKind.Input && i.Command == "/edit move ");
 
         var settings = rig.Menu("menu", "settings")!;
-        Assert.Equal(new[] { "Name, Condensing unit", "Width, 0.95 m", "Height, 0.9 m", "Depth, 0.95 m", "Volume, 1", "Range, 160 m", "Minimum distance, 1.8 m" },
+        Assert.Equal(new[] { "Name, Condensing unit", "Width, 0.95 m", "Height, 0.9 m", "Depth, 0.95 m", "Model, ac_condenser", "Volume, 1", "Range, 160 m", "Minimum distance, 1.8 m" },
                      settings.Items.Select(i => i.Label));
 
         var model = rig.Menu("menu", $"model:small_machine:{id}")!;
@@ -657,7 +657,7 @@ public class WorldEditorTests : IDisposable
     /// Three flat maps (the tester's, other's, and an open one with no owner), the real command handler,
     /// the tester and other standing on the tester's map. Overlays are kept in maps/overlays.
     /// </summary>
-    private sealed class Rig
+    internal sealed class Rig
     {
         public readonly MapManager Maps;
         public readonly PrefabRepository Prefabs;
@@ -763,6 +763,9 @@ public class WorldEditorTests : IDisposable
         }
 
         public EditorMenu? LastMenu { get; private set; }
+
+        /// <summary>The editor the command handler made.</summary>
+        public WorldEditor Editor => _commands.Editor;
 
         /// <summary>/edit with these words, and the menu it answered with.</summary>
         public EditorMenu? Menu(params string[] args)

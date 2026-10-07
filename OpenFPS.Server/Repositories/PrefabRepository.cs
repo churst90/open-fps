@@ -48,6 +48,46 @@ public class PrefabRepository
         }
     };
 
+    /// <summary>The folder the prefabs are read from (prefab-schema.json is there too).</summary>
+    public string Folder => _directory;
+
+    private static readonly JsonSerializerOptions WriteOptions = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        Converters =
+        {
+            new System.Text.Json.Serialization.JsonStringEnumConverter(),
+            new OpenFPS.Common.Networking.Vector3Converter(),
+            new OpenFPS.Common.Networking.QuaternionConverter()
+        }
+    };
+
+    /// <summary>A prefab as its file would have it: enums by name, nothing written for an omitted field.</summary>
+    public static string ToJson(PrefabTemplate t) => JsonSerializer.Serialize(t, WriteOptions);
+
+    /// <summary>
+    /// A prefab read from JSON and checked as the loader checks a file. Throws, saying what is wrong, if
+    /// it is not a prefab the engine can honour.
+    /// </summary>
+    public static PrefabTemplate FromJson(string json)
+    {
+        List<string> keys;
+        using (var doc = JsonDocument.Parse(json))
+        {
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) throw new ArgumentException("A prefab is a JSON object.");
+            keys = doc.RootElement.EnumerateObject().Select(p => p.Name).ToList();
+        }
+        var t = JsonSerializer.Deserialize<PrefabTemplate>(json, ReadOptions()) ?? throw new ArgumentException("The prefab is empty.");
+        var result = PrefabValidator.Validate(t, keys);
+        if (!result.IsValid) throw new ArgumentException(string.Join(" ", result.Errors.Take(3)));
+        return t;
+    }
+
+    /// <summary>Puts a prefab in use in memory, replacing one of the same id (the world editor's versions;
+    /// no file is written).</summary>
+    public void Put(PrefabTemplate t) => _prefabs[t.Id.ToLowerInvariant()] = t;
+
     public void LoadAll()
     {
         _prefabs.Clear();

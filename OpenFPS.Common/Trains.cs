@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
@@ -55,60 +56,79 @@ public enum SleeperKind { Timber, Concrete, SlabTrack }
 /// <summary>A wheelset: two steel wheels pressed on an axle, and how rough they are.</summary>
 public sealed record WheelsetSpec
 {
+    [Tunable("m", 0.3, 2.2, "Wheel diameter on the tread. A small wheel rings higher.", Label = "diameter", Step = 0.005)]
     public required float DiameterMetres { get; init; }
     /// <summary>The rim, metres: how thick radially and how wide across the tread. These two and the
     /// diameter are the wheel's NOTE — an out-of-plane ring's modes go as n(n^2-1)/sqrt(n^2+1) times
     /// the square root of its bending stiffness over its mass, divided by the square of its radius,
     /// so a tram's small wheel rings a good deal higher than a locomotive's.</summary>
+    [Tunable("m", 0.01, 0.1, "Radial thickness of the rim. With the width and diameter it sets the wheel's ring.", Label = "rim thickness", Step = 0.001)]
     public float RimThicknessMetres { get; init; } = 0.030f;
+    [Tunable("m", 0.05, 0.2, "Width of the rim across the tread.", Label = "rim width", Step = 0.001)]
     public float RimWidthMetres { get; init; } = 0.135f;
     /// <summary>Unsprung mass per wheel, kg: the wheel, its share of the axle and of the gear. This
     /// is what meets the rail at a joint, and with the Hertzian contact stiffness it sets both how
     /// hard and how LONG the blow is.</summary>
+    [Tunable("kg", 100, 4000, "Unsprung mass per wheel: the wheel, its share of the axle and the gear. More mass hits a rail joint harder and longer.", Label = "unsprung mass per wheel", Step = 10)]
     public float UnsprungKg { get; init; } = 900f;
+    [Tunable("t", 1, 40, "Weight carried by one axle.", Label = "axle load", Step = 0.5)]
     public float AxleLoadTonnes { get; init; } = 16f;
     /// <summary>Braked on the tread by a cast-iron block, which corrugates it. Worth eight to ten
     /// decibels over a disc-braked wheel and it is the single biggest difference between a freight
     /// train and a passenger train.</summary>
+    [Tunable("", 0, 1, "Braked by a cast-iron block on the tread, which roughens it: eight to ten decibels louder than a disc-braked wheel.", Label = "tread braked")]
     public bool TreadBraked { get; init; }
     /// <summary>Damping in the wheel. Bare steel is about 1e-4 — nothing at all, which is why wheels
     /// squeal; a ring damper or a resilient wheel takes it to 1e-2 and they stop.</summary>
+    [Tunable("", 0.00001, 0.05, "Damping in the wheel. Bare steel is about 0.0001 and squeals; a damped or resilient wheel is about 0.01 and does not.", Label = "wheel loss factor", Step = 0.00001)]
     public float LossFactor { get; init; } = 1.2e-4f;
     /// <summary>A flat spot worn on the tread, metres. It bangs once a revolution. Zero for a wheel
     /// in good order.</summary>
+    [Tunable("m", 0, 0.1, "Length of a flat spot worn on the tread. It bangs once a revolution. Zero for a wheel in good order.", Label = "wheel flat length", Step = 0.005)]
     public float FlatLengthMetres { get; init; }
 }
 
 /// <summary>The track: what the wheels are running on, and how it is put together.</summary>
 public sealed record TrackSpec
 {
+    [Tunable("", 0, 0, "The track's name as it is said.")]
     public required string Name { get; init; }
     /// <summary>Rail mass per metre, kg. 60 for a heavy main line, 45 for a branch, 35 for a tramway
     /// groove rail.</summary>
+    [Tunable("kg/m", 20, 80, "Rail mass per metre. 60 for a heavy main line, 45 for a branch, 35 for tramway groove rail.", Label = "rail mass per metre", Step = 1)]
     public float RailKgPerMetre { get; init; } = 60f;
     /// <summary>Second moment of area of the rail section, m^4. 3.055e-5 for UIC60.</summary>
+    [Tunable("m⁴", 0.000001, 0.00006, "Second moment of area of the rail section: its bending stiffness. With the sleeper spacing it sets the pinned-pinned peak.", Label = "rail second moment of area", Step = 0.0000001, Source = "UIC60 rail section: 3.055e-5")]
     public float RailInertiaM4 { get; init; } = 3.055e-5f;
+    [Tunable("m", 0.3, 1.5, "Distance between sleepers. Closer sleepers raise the pinned-pinned peak and the sleeper-passing flutter.", Label = "sleeper spacing", Step = 0.01)]
     public float SleeperSpacingMetres { get; init; } = 0.60f;
+    [Tunable("", 0, 0, "What the rail is laid on: timber, concrete or slab.")]
     public SleeperKind Sleepers { get; init; } = SleeperKind.Concrete;
     /// <summary>Rail length between joints, metres. ZERO means continuous welded rail and no
     /// clatter at all — which is most modern main line, and is why a train on good track is a hiss
     /// and a roar rather than the sound everybody thinks a train makes.</summary>
+    [Tunable("m", 0, 50, "Rail length between joints. Zero is continuous welded rail with no clatter.", Label = "joint spacing", Step = 0.1)]
     public float JointSpacingMetres { get; init; }
     /// <summary>The dip at a joint, radians of angle the wheel drops through. A tight new joint is
     /// 3 milliradians, a hammered old one 15. This times the speed IS the impact velocity.</summary>
+    [Tunable("rad", 0, 0.03, "Angle the wheel drops through at a joint. A tight new joint is 0.003, a hammered old one 0.015.", Label = "joint dip", Step = 0.001)]
     public float JointDipRadians { get; init; } = 0.008f;
     /// <summary>Joints on the two rails offset by half a rail length, so the bangs come twice as
     /// often and singly rather than in pairs. American practice staggers; British squares them up.</summary>
+    [Tunable("", 0, 1, "Joints on the two rails offset by half a rail, so the bangs come singly and twice as often.", Label = "staggered joints")]
     public bool StaggeredJoints { get; init; } = true;
     /// <summary>How rough the railhead is against a reference, dB. Ground rail is -6, ordinary
     /// main line 0, and rail that has not been ground in twenty years +8.</summary>
+    [Tunable("dB", -10, 15, "Railhead roughness against a reference. Ground rail is -6, ordinary main line 0, rail not ground for twenty years +8.", Label = "rail roughness", Step = 1)]
     public float RoughnessDb { get; init; }
     /// <summary>Curve radius, metres. Zero is straight. Below about four hundred metres a rigid
     /// wheelset has to creep sideways enough to squeal.</summary>
+    [Tunable("m", 0, 5000, "Curve radius. Zero is straight. Below about 400 m a rigid wheelset creeps sideways enough to squeal.", Label = "curve radius", Step = 5)]
     public float CurveRadiusMetres { get; init; }
     /// <summary>A rail bolted to a bridge deck, or a train in a cutting or a tunnel, radiates into
     /// something. This is the extra, dB, and it is the reason a bridge is audible from a mile off.
     /// </summary>
+    [Tunable("dB", 0, 20, "Extra level from a structure the rail radiates into: a bridge deck, a cutting or a tunnel. Zero on open ground.", Label = "bridge or tunnel extra", Step = 1)]
     public float StructureDb { get; init; }
 
     /// <summary>
@@ -178,17 +198,23 @@ public sealed record ElectricDriveSpec
     /// <summary>Teeth on the pinion and on the gearwheel. Their ratio is the gearing and the PINION
     /// COUNT times the motor's revolutions is the mesh frequency — the whine that rises smoothly
     /// with speed and is the most recognisable thing about an electric train.</summary>
+    [Tunable("", 8, 40, "Teeth on the motor pinion. Pinion teeth times motor revolutions is the gear whine.", Label = "pinion teeth")]
     public int PinionTeeth { get; init; } = 17;
+    [Tunable("", 30, 150, "Teeth on the axle gearwheel. With the pinion this is the gear ratio.", Label = "gearwheel teeth")]
     public int GearTeeth { get; init; } = 96;
     /// <summary>Pole PAIRS. The magnetic pull in the air gap goes round at the electrical frequency
     /// and pulses at twice it, so a four-pole motor at 3,000 rpm hums at 200 Hz.</summary>
+    [Tunable("", 1, 6, "Pole pairs of the traction motor. The magnetic hum is at twice the electrical frequency.", Label = "pole pairs")]
     public int PolePairs { get; init; } = 2;
     /// <summary>Stator slots. The rotor's teeth going past them is a much higher tone and it is the
     /// thin edge on top of the hum.</summary>
+    [Tunable("", 12, 120, "Slots in the stator. The rotor passing them is the thin high tone over the hum.", Label = "stator slots")]
     public int StatorSlots { get; init; } = 48;
+    [Tunable("rpm", 1000, 8000, "Motor speed at the vehicle's top speed.", Label = "motor top speed", Step = 100)]
     public float MotorMaxRpm { get; init; } = 4200f;
     /// <summary>The inverter's carrier, Hz, while it is modulating asynchronously — the FIXED tone
     /// at a standstill and at low speed, before it locks to the motor.</summary>
+    [Tunable("Hz", 0, 5000, "The inverter's fixed switching tone at a standstill and low speed. Zero for no inverter.", Label = "inverter carrier", Step = 10)]
     public float CarrierHz { get; init; } = 1050f;
     /// <summary>Pulse counts the inverter steps down through as the output frequency rises. In each
     /// mode the carrier is that many times the motor's electrical frequency, so the tone RISES
@@ -197,42 +223,59 @@ public sealed record ElectricDriveSpec
     public int[] PulseModes { get; init; } = { 27, 15, 9, 5, 3, 1 };
     /// <summary>Motor output frequency at which asynchronous modulation gives way, Hz.</summary>
     public float SyncFromHz { get; init; } = 20f;
+    [Tunable("dB", 0, 120, "Level at one metre of the inverter's switching tone. Zero for no inverter.", Label = "inverter level", Step = 1)]
     public float InverterLevelDb { get; init; } = 84f;
+    [Tunable("dB", 50, 120, "Level at one metre of the gear whine.", Label = "gear whine level", Step = 1)]
     public float GearLevelDb { get; init; } = 88f;
+    [Tunable("dB", 50, 120, "Level at one metre of the motor's magnetic hum.", Label = "motor hum level", Step = 1)]
     public float MotorHumDb { get; init; } = 80f;
     /// <summary>Forced-ventilation blower: broadband, and on all the time the train is alive.</summary>
+    [Tunable("dB", 40, 110, "Level at one metre of the motor cooling blower, which runs whenever the train is alive.", Label = "blower level", Step = 1)]
     public float BlowerDb { get; init; } = 74f;
 }
 
 /// <summary>A steam locomotive's front end: what happens between the cylinders and the chimney.</summary>
 public sealed record SteamLocoSpec
 {
+    [Tunable("m", 0.8, 2.4, "Diameter of the driving wheels. With the speed it sets how fast the engine barks.", Label = "driving wheel diameter", Step = 0.01)]
     public required float DriverDiameterMetres { get; init; }
     /// <summary>Cylinders. Two is the usual; each is double-acting, so each gives TWO exhaust beats
     /// per revolution of the drivers and a two-cylinder engine barks four times a turn.</summary>
+    [Tunable("", 1, 4, "Cylinders. Each is double acting, so a two-cylinder engine barks four times a turn.")]
     public int Cylinders { get; init; } = 2;
+    [Tunable("m", 0.2, 1, "Cylinder bore.", Label = "cylinder bore", Step = 0.005)]
     public float CylinderBoreMetres { get; init; } = 0.635f;
+    [Tunable("m", 0.3, 1.1, "Piston stroke.", Label = "cylinder stroke", Step = 0.005)]
     public float CylinderStrokeMetres { get; init; } = 0.762f;
     /// <summary>The blast nozzle at the top of the exhaust pipe, metres. Small nozzle, fast jet,
     /// sharp bark and a fierce draught on the fire; big nozzle, soft exhaust, lazy fire. Draughting
     /// a locomotive was the whole art, and it is audible.</summary>
+    [Tunable("m", 0.05, 0.3, "Diameter of the blast nozzle under the chimney. Smaller is a faster jet and a sharper bark.", Label = "blast nozzle diameter", Step = 0.005)]
     public float BlastNozzleMetres { get; init; } = 0.135f;
     /// <summary>The chimney above it: a pipe open at both ends, so the chuff is tuned to c/2L of it.
     /// A tall thin stack rings; a short wide one barks.</summary>
+    [Tunable("m", 0.2, 1, "Inside diameter of the chimney. A short wide stack barks; a tall thin one rings.", Label = "chimney diameter", Step = 0.01)]
     public float StackDiameterMetres { get; init; } = 0.48f;
+    [Tunable("m", 0.3, 3, "Length of the chimney. It is open at both ends, so the chuff is tuned to a half wave of it.", Label = "chimney length", Step = 0.01)]
     public float StackLengthMetres { get; init; } = 0.95f;
+    [Tunable("kPa", 500, 2200, "Boiler pressure, gauge.", Label = "boiler pressure", Step = 10)]
     public float BoilerKPa { get; init; } = 1550f;
     /// <summary>How far the valve gear is out of square, as a fraction of a beat. No locomotive was
     /// ever perfect and the uneven beat is most of the character — a engine with a bad setting limps
     /// audibly at every revolution.</summary>
+    [Tunable("", 0, 0.2, "How far the valve gear is out of square, as a fraction of a beat. Larger makes the engine limp at every turn.", Label = "valve setting error", Step = 0.005)]
     public float ValveSettingError { get; init; } = 0.035f;
     /// <summary>The blower, and every joint in the thing: a continuous hiss that is there even when
     /// the regulator is shut, which is why a steam locomotive drifting is not silent.</summary>
+    [Tunable("dB", 50, 110, "Level at one metre of the blower and leaking joints: a hiss that is there even with the regulator shut.", Label = "steam leak level", Step = 1)]
     public float LeakageDb { get; init; } = 86f;
     /// <summary>Rods, crossheads and axleboxes, all with play in them: a metallic clank at the
     /// driver rate and a general clatter over it.</summary>
+    [Tunable("dB", 60, 115, "Level at one metre of the rods, crossheads and axleboxes clanking.", Label = "motion clank level", Step = 1)]
     public float MotionDb { get; init; } = 92f;
+    [Tunable("", 0, 0, "The whistle this engine carries.", Label = "whistle", Choices = "models:whistle")]
     public string WhistleKey { get; init; } = "three_chime";
+    [Tunable("", 0, 0, "The bell this engine carries.", Label = "bell", Choices = "models:bell")]
     public string BellKey { get; init; } = "loco_bell";
 
     /// <summary>Exhaust beats a second at this speed. Two cylinders, double acting: four a turn.</summary>
@@ -245,44 +288,60 @@ public sealed record SteamLocoSpec
 /// <summary>What a vehicle is driven by, if anything.</summary>
 public sealed record RailTractionSpec
 {
+    [Tunable("", 0, 0, "What drives the vehicle: nothing, diesel-electric, electric or steam.", Label = "traction")]
     public required RailTraction Kind { get; init; }
     /// <summary>Diesel-electric: the prime mover, as an ordinary EngineProfile key. A locomotive
     /// diesel is a diesel — very big, very slow and governed to fixed notches, and the same cylinder
     /// model runs it.</summary>
+    [Tunable("", 0, 0, "The diesel prime mover, as an engine model.", Label = "engine", Choices = "models:engine")]
     public string? EngineKey { get; init; }
     /// <summary>The notches the governor will hold, rpm. A diesel-electric does not have a throttle,
     /// it has eight steps, and that is why it changes speed in audible jumps.</summary>
     public float[] NotchRpm { get; init; } = Array.Empty<float>();
     /// <summary>Radiator fans: how many blades, how fast, and how loud. On a big locomotive these
     /// are a metre and a half across and they are most of what you hear at idle.</summary>
+    [Tunable("", 2, 20, "Blades on each radiator fan. Blades times fan speed is the blade tone.", Label = "radiator fan blades")]
     public int FanBlades { get; init; } = 10;
+    [Tunable("rpm", 200, 3000, "Radiator fan speed.", Label = "radiator fan speed", Step = 10)]
     public float FanRpm { get; init; } = 900f;
+    [Tunable("dB", 60, 115, "Level at one metre of the radiator fans. On a big locomotive they are most of what you hear at idle.", Label = "radiator fan level", Step = 1)]
     public float FanDb { get; init; } = 96f;
     public ElectricDriveSpec? Drive { get; init; }
     public SteamLocoSpec? Steam { get; init; }
+    [Tunable("", 0, 0, "The horn this vehicle carries.", Label = "horn", Choices = "models:horn")]
     public string? HornKey { get; init; }
+    [Tunable("", 0, 0, "The bell this vehicle carries.", Label = "bell", Choices = "models:bell")]
     public string? BellKey { get; init; }
 }
 
 /// <summary>One vehicle in a train: a locomotive, a coach, a wagon, a tram section.</summary>
 public sealed record RailVehicleSpec
 {
+    [Tunable("", 0, 0, "The vehicle's name as it is said.")]
     public required string Name { get; init; }
+    [Tunable("m", 3, 40, "Length over the couplers.", Label = "length", Step = 0.1)]
     public required float LengthMetres { get; init; }
     /// <summary>Distance between the two bogie centres. With the length this is the whole rhythm of
     /// a passing train.</summary>
+    [Tunable("m", 1, 30, "Distance between the two bogie centres. With the length this sets the rhythm of a passing train.", Label = "bogie centres", Step = 0.1)]
     public required float BogieCentresMetres { get; init; }
     /// <summary>Axle spacing within a bogie. This is the "clack-CLACK" — the two axles of one bogie
     /// hitting the same joint a tenth of a second apart.</summary>
+    [Tunable("m", 0.8, 8, "Axle spacing within a bogie: the gap between the two clacks of one bogie at a joint.", Label = "bogie wheelbase", Step = 0.05)]
     public float BogieWheelbaseMetres { get; init; } = 2.56f;
+    [Tunable("", 1, 6, "Bogies under the vehicle.")]
     public int Bogies { get; init; } = 2;
+    [Tunable("", 1, 4, "Axles in each bogie.", Label = "axles per bogie")]
     public int AxlesPerBogie { get; init; } = 2;
     public required WheelsetSpec Wheels { get; init; }
+    [Tunable("t", 5, 300, "Mass of the whole vehicle.", Label = "mass", Step = 1)]
     public float MassTonnes { get; init; } = 45f;
     public RailTractionSpec? Traction { get; init; }
     /// <summary>An empty steel box drums; a loaded one does not. This is the level of the body's own
     /// ring, dB, excited by everything the bogies do.</summary>
+    [Tunable("dB", 0, 100, "Level at one metre of the body's own ring. An empty steel box drums; zero for none.", Label = "body drum level", Step = 1)]
     public float BodyDrumDb { get; init; }
+    [Tunable("Hz", 20, 200, "Where the body rings when it drums.", Label = "body drum pitch", Step = 1)]
     public float BodyDrumHz { get; init; } = 70f;
 
     [JsonIgnore]
@@ -295,6 +354,7 @@ public sealed record RailVehicleSpec
 public sealed record ConsistEntry
 {
     public required RailVehicleSpec Vehicle { get; init; }
+    [Tunable("", 1, 200, "How many of this vehicle in a row.")]
     public int Count { get; init; } = 1;
     public void Deconstruct(out RailVehicleSpec vehicle, out int count) { vehicle = Vehicle; count = Count; }
 }
@@ -409,10 +469,12 @@ public static class TrainLayout
 
 public sealed record TrainProfile
 {
+    [Tunable("", 0, 0, "The train's name as it is said.")]
     public required string Name { get; init; }
     /// <summary>The consist, head to tail.</summary>
     public required ConsistEntry[] Consist { get; init; }
     public required TrackSpec Track { get; init; }
+    [Tunable("m/s", 1, 90, "The speed the train usually runs at. Rolling noise rises with it.", Label = "typical speed", Step = 0.5)]
     public float TypicalSpeedMps { get; init; } = 25f;
     /// <summary>
     /// Per wheelset at one metre at 100 km/h on reference-rough rail, disc braked.
@@ -428,6 +490,7 @@ public sealed record TrainProfile
     /// forward again put it twelve decibels light, which is what a line of sources does to anybody
     /// who reasons about one of them.
     /// </summary>
+    [Tunable("dB", 80, 120, "Rolling noise per wheelset at one metre at 100 km/h on reference rail, disc braked. The one level anchor of the rail model.", Label = "rolling noise per wheelset", Step = 1, Source = "pass-by measurement: 82 dBA at 7.5 m from a disc-braked passenger train at 80 km/h")]
     public float RollingReferenceDb { get; init; } = 104f;
 
     [JsonIgnore]

@@ -450,21 +450,52 @@ command line with the start of the command typed for you; type the number and pr
 
 | Menu | What is in it |
 |---|---|
-| Map | Name, owner, size, tiles, how many things, the spawn point; Set spawn here; the editors |
-| Place | The prefabs by category (walls, floors, doors, machines, water, fire, trees, sounds, places, things to carry). Choosing one places it: a solid thing just in front of you, anything else at your feet |
-| Select | Nearest things; things within 5, 10 or 20 metres; by name; by number. Choosing one selects it and opens its menu |
-| Selected | What it is and where; move by numbers (east, north, up); nudge by the step (north, south, east, west, up, down, forward, back, left, right); turn 15 or 90 degrees or face a direction; bring to you; duplicate; delete; settings; its model |
-| Library | Every kind of model (machines, water features, fire, trees, horns, bells, trains, ...) and each model's values |
+| Map | Name, owner, size, tiles, how many things, the spawn point; Set spawn here; Settings (weather, time of day, natural ground); Beacon rules; the models this map pins; the editors |
+| Place | What choosing a prefab does (place it at your feet, at the build cursor, or play a preview to you); Search; Again; the prefabs by category (walls, floors, doors, machines, water, fire, trees, sounds, places, things to carry); Groups |
+| Select | Nearest things; things within 5, 10 or 20 metres; doors near you; places and rooms; by name; by number; hold one as well (for a group). Choosing one selects it and opens its menu |
+| Selected | What it is and where; move by numbers (east, north, up); nudge by the step (north, south, east, west, up, down, forward, back, left, right); turn 15 or 90 degrees or face a direction; bring to you; duplicate; a row of copies; delete; settings; its model; its prefab |
+| Held | The things you hold together; group them; let go |
+| Places and rooms | The rooms and named places on the map, nearest first, to select and set |
+| Library | Every kind of model (machines, water features, fire, trees, shores, running water, horns, whistles, bells, air systems, trains, rail vehicles, track, engines, vehicles, prefabs, groups): each model's values, its versions, where it is used, replace it, copy it, retire it, and new models from a template |
 | Test tools | What is around me; map information |
 | Undo, Redo | Say what they would undo or redo |
 
-- Settings of a placed thing: name, width, height, depth, and for a thing that makes a sound its
-  volume, range and minimum distance. A value outside the sensible range is refused and the range is
-  said.
+- Settings of a placed thing: name, width, height, depth; for a thing that makes a sound its model,
+  volume, range and minimum distance; for a door the side that needs a key and the side you push it
+  from; for a room or named place whether it is indoors and what each of its six faces is made of. A
+  value outside the sensible range is refused and the range is said. A thing's model is chosen from the
+  other models of its kind.
 - A model's values are listed with their units. Values that are described can be changed: typed, or
   a step up or down. Changing a model changes it on every map and needs the `edit-models`
   permission (developers and the administrator). Each change is a new version; Versions lists them.
   Everyone hears the change at once.
+- Versions: each model's menu has Versions. Choose one to use it on every map (edit-models), or to
+  pin it on this map: then this map's players hear that version, whatever the others use. Pinning is a
+  setting of the map, so a map's owner may do it. What the server simulates with a model (a vehicle's
+  mass and gearbox, say) is the current version on every map; a pin is for what is heard.
+- New models: "New from a template" starts from a built-in model as built; "Copy it" starts from a model
+  as it is now. Type the new model's id (letters, digits, _ and -). A new prefab can be placed at once;
+  give a thing a new sound model with its model setting, or replace one model with another.
+- Replace it with another: every thing on this map (or every loaded map, with edit-models) that uses
+  one model uses another. One undo puts them all back.
+- Retire: a retired model is no longer offered for new things; things that use it keep it.
+- Engines and vehicles are models too. Changing an engine changes every vehicle, machine and train that
+  has it. A vehicle's mass, drag, axles, size, tyres, body, gearbox and where its exhaust and intake are
+  can be changed; the rest (its siren, its air system) comes from the vehicle it is built on.
+- Prefabs are models. Their fields come from prefab-schema.json, with its ranges; a new version makes
+  every thing made from that prefab again, where it stands.
+- Search finds prefabs whose name has every word you type. Preview plays a prefab's sound two metres in
+  front of you for six seconds, to you alone; nothing is placed. Again places the last prefab again
+  where you stand. A row makes copies of the selected thing in a line the way you face.
+- The build cursor: `/origin` sets it where you stand, `/at` moves it. With Place set to the build
+  cursor, choosing a prefab puts it there, for places you cannot walk to (a roof).
+- Groups: hold some things (Select, hold one as well), then Group them and give the group a name. The
+  group is a model; Place, Groups puts its things down in front of you, turned the way you face. A
+  placed group is its things, each its own. A group's parts can be moved or taken out in the Library.
+- Map settings: the weather (the server's, or always clear, rain, snow or storm), the time of day (the
+  server's clock, or an hour the map keeps), the natural ground laid where the map has none of its
+  own, and the beacon rules (each kind of beacon on unless a player turns it off, off unless turned
+  on, always, or never). The players on the map hear the change at once.
 - Undo and redo are your own. An undo is refused if somebody else has changed the thing since, and
   says who.
 - A solid thing is never placed or moved into a player.
@@ -485,12 +516,29 @@ command for each:
 | `/edit nudge DIRECTION [METRES]`, `/edit step METRES` | Move by the step (0.5 m to start with) |
 | `/edit turn DEGREES`, `/edit face DIRECTION` | Turn clockwise (negative: anticlockwise), or to a compass direction |
 | `/edit bring`, `/edit duplicate`, `/edit delete` | Bring to you, copy, delete |
-| `/edit set FIELD VALUE`, `/edit up FIELD`, `/edit down FIELD` | A setting: Name, Width, Height, Depth, Volume, Range, MinDistance |
-| `/edit place PREFAB`, `/edit prefabs [CATEGORY]` | Place a prefab; list them |
+| `/edit set FIELD VALUE`, `/edit up FIELD`, `/edit down FIELD` | A setting: Name, Width, Height, Depth, Model, Volume, Range, MinDistance, KeyedSide (neither, front, back), PushSide (front, back), Indoor, Floor, Ceiling, North, South, East, West |
+| `/edit place PREFAB [at cursor]`, `/edit prefabs [CATEGORY]` | Place a prefab, at your feet or at the build cursor; list them |
+| `/edit find WORDS`, `/edit preview PREFAB`, `/edit again` | Search; hear a prefab; place the last one again |
+| `/edit row COUNT [SPACING]` | Copies of the selected thing in a line the way you face |
+| `/edit select add nearest\|NAME\|#ID`, `/edit select clear` | Hold things together; let go |
+| `/edit group NAME`, `/edit place group NAME` | Make a group of what you hold; place one |
+| `/edit map settings`, `/edit map set weather server\|clear\|rain\|snow\|storm`, `/edit map set time server\|HOUR`, `/edit map set ground PREFAB`, `/edit map set beacon CATEGORY on\|off\|always\|never` | The map's own settings |
 | `/edit spawn here`, `/edit info` | Move the map's spawn point to you; map information |
 | `/edit model show KIND ID`, `/edit model versions KIND ID` | A model and its versions |
 | `/edit model set KIND ID FIELD VALUE`, `/edit model up KIND ID FIELD`, `/edit model down KIND ID FIELD` | Change a model: `/edit model set machine ac_condenser Compressor.HumDb 66` |
+| `/edit model where KIND ID` | Where a model is used, map by map |
+| `/edit model use KIND ID VERSION`, `/edit model pin KIND ID VERSION`, `/edit model unpin KIND ID` | Use a version everywhere; pin one on this map; lift the pin |
+| `/edit model new KIND TEMPLATE NEWID`, `/edit model copy KIND ID NEWID` | A new model from a built-in as built, or a copy of one as it is |
+| `/edit model replace KIND ID with OTHER [here\|everywhere]` | Every thing using one model uses another |
+| `/edit model retire KIND ID`, `/edit model restore KIND ID` | Offer a model no longer for new things, or again |
+| `/edit model remove KIND ID LIST[N]` | Take an item out of a model's list: `/edit model remove group yard Parts[1]` |
 | `/edit undo`, `/edit redo` | Undo and redo |
+
+Direct keys (off unless you turn them on with `/editorkeys on`; they are new and have not been tried
+with a screen reader yet): while an editor list is open, Shift with an arrow nudges the selected thing
+forward, back, left or right; Shift with a bracket nudges it up or down; Shift with comma or period
+turns it 15 degrees; Shift slash says where it is; Shift D duplicates; Shift Delete asks to delete it;
+Shift Z undoes and Shift Y redoes. `/editorkeys off` turns them off again.
 
 ## Stairs
 
@@ -841,7 +889,8 @@ generated map stays what its generator wrote.
   it is gone, the entry is skipped and the log says so.
 - Things the editor places are numbered from 900,000,000.
 - Models changed in the editor are kept in `OpenFPS.Server/model_versions/KIND.ID.json`, every
-  version, and loaded at start.
+  version, and loaded at start. New models, prefab versions and groups are kept there too.
+- A map's pins and its settings (weather, time, ground, beacon rules) are in its overlay file.
 - To undo every edit on a map, stop the server and delete its overlay file.
 
 ### What a map file contains
