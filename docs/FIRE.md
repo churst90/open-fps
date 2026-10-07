@@ -109,8 +109,9 @@ made here. Section 11 lists the sources.
 - Crackle at 28 a second per 100 kW times moisture and resin factors, sizes on a power law of exponent 2.2.
 - A fizz of gas through the char.
 - Steam jets that sometimes whistle; a log settling every minute or two with a flare.
-- Fitted to three campfire recordings (texture round 1, 2026-10-06). It keeps all of that; its roar's
-  power is kept and its spectrum is now the f^−α tail, refitted in section 8.
+- Fitted to three campfire recordings (texture round 1, 2026-10-06). It keeps all of that except the
+  roar, which is now the f^−α tail with its swing fitted (section 8): 9 dB more unweighted, nearly all of
+  it under 125 Hz, and 3 dB more A-weighted.
 
 ## 3. Sizes, heat release and life
 
@@ -203,6 +204,13 @@ Where the numbers come from:
   The rest of the law is that place's crackle noise: the crackles' own band, its power their summed energy
   (each size's energy measured by rendering one), its level following the rate as it clusters. The same
   device is used for the surf's bubbles (docs/WAVES_AND_SHORES.md 5.3).
+- How many crackles a bigger body of fire makes: the recordings say fewer per kilowatt than its heat
+  release, and as loud in total. Bonfires, house fires and burning trees all have more distinct pops in
+  their 3-12 kHz bands (kurtosis 5-70) than a fire pit's rate scaled up by heat release would give
+  (about 3, a steady noise), and as much energy up there.
+- So a body's crackles come at (Q / 80 kW)^β of the pit's rate, β = 0.5 (fitted). Each is
+  (Q / 80 kW)^((1 − β) / 2) louder, so their energy still goes as what burns. Bigger fuel holds its water
+  and resin in fewer, bigger pockets [estimate: the reading of the fit]. The fire pit is unchanged by it.
 
 ## 5. Big fires
 
@@ -353,7 +361,11 @@ The model:
 
 - Roar: per place, noise shaped by `PowerLawNoise` (f^−α above 20 Hz), its power the sum of its bodies'
   roar at 100 Hz times each body's puff.
+- Flicker: between the puffs each body's burning flickers. Noise above the puffing rate, flat to three
+  times it and falling as f^−2 to ten times it (about the f^−1.4 measured over that decade). Its rms is
+  20 % of the burning (fitted). The roar and the fizz follow it.
 - Fizz: gas and steam through the char, 5 kHz, its power the heat release (as before at the fire pit).
+  A car's is ten times wood's in power: molten plastics boiling and their gas jetting (fitted).
 - Crackle: drawn singly and as noise (section 4.1). Big pops throw embers that tick where they land.
 - Logs: steam jets, which sometimes whistle; a log settling; more of both in a bigger fire.
 - Trees and crown: torching, falls through the crown.
@@ -369,7 +381,112 @@ The model:
 
 ## 8. Fitting and results
 
-To be written with the fit.
+### 8.1 Recordings
+
+- 31 yardstick recordings, never shipped: `~/openfps-scratch-archive/fire-2026-10-06/refs`, with
+  `SOURCES.txt`. All are CC0, CC-BY or public domain.
+  - 8 campfires (the three of round 1 among them)
+  - 7 bonfires and burn piles
+  - 7 trees and brush burning (two from the National Park Service's Maple Fire, Yellowstone)
+  - 4 "wildfire": three prescribed burns of grass and litter, heard close; one forest fire heard across
+    a drainage (Maple Fire, 12 pm)
+  - 4 house fires
+  - 2 cars
+- Most are Freesound HQ previews (MP3 VBR, low-passed by the encoder at 16-19 kHz). The rest are NPS
+  MP3s and Commons files, also lossy.
+- Their texture statistics (20 s pieces), 10 ms kurtosis and octave ranges are in `FireReferences`.
+
+### 8.2 How it was fitted
+
+- As the fountain, the rain, the creeks and the shores were: the 14 cochlear band-envelope statistics
+  (McDermott and Simoncelli 2011; `tools/texture_stats.py`, `TextureStatistics`), the 10 ms 4-16 kHz
+  waveform kurtosis, and the octave balance.
+- Each preset is heard as its kind's recordings were made (`--fire levels heard=D`): each place by its
+  own distance, 1/r and ISO 9613-1 air. Campfire and pit at 2 m, bonfire 6 m, car 10 m, house 30 m,
+  trees 20 m, crown fire 60 and 150 m.
+
+| constant | value | what it says |
+|---|---|---|
+| `PuffSwing` | 0.35 | the share of a body's heat release that swings with its puffs (research: 20-40 %) |
+| `RoarTailExponent` | 2.5 | α, the roar's PSD ∝ f^−α (research: 2.1-3.4; 5/2 from Kolmogorov) |
+| `Flicker` | 0.2 | the burning's flicker between puffs, rms over its mean |
+| `CrackleHeatExponent` | 0.5 | β: a body's crackle count goes as (Q / 80 kW)^β, each louder to keep the energy |
+| `TreeCrackle` | 0.12 | burning foliage's crackles per kW over seasoned logs' |
+| `CrownCrackle` | 0.03 | a crown fire's front's |
+| `StructureCrackle` | 2 | a burning building's |
+| `VehicleCrackle`, `VehicleFizz` | 0.3, 10 | a car's crackles, and its fizz in power |
+
+- The fire pit's fitted crackle and fizz constants (round 1) are unchanged.
+- The roar's swing and tail were fitted on the pit against round 1's three campfires (13 of 14 inside),
+  then checked against the eight.
+- Scans: α 1.8-2.5 against swing 0.09-0.35; β 1, 0.75, 0.5, 0.35; each fuel's factor at two or three
+  values.
+- Tried and left out: crackle avalanches (each crackle setting off others within 60 ms, branching 0.3-0.85)
+  did not raise the 4-16 Hz modulation and cost kurtosis.
+
+### 8.3 Results
+
+Dry, heard as recorded, statistics inside the recordings' spread (of 14) and octaves inside (of 8):
+
+| preset | statistics | octaves | 10 ms kurtosis | recordings' |
+|---|---|---|---|---|
+| campfire (2 m) | 12-14 | 7-8 | 5.5-5.9 | 3.37-7.08 |
+| fire pit (2 m) | 13 | 8 | 7.0 | 3.37-7.08 |
+| bonfire (6 m) | 14 | 8 | 10.9 | 3.10-10.23 |
+| burning car (10 m) | 7 | 4 | 4.1 | 3.69-4.73 (2 recordings) |
+| house (30 m) | 9 | 7 | 12.5 | 4.25-9.10 |
+| stand of trees (20 m) | 14 | 8 | 9.5 | 3.75-31.08 |
+| crown fire (60 m / 150 m) | 8 / 5 | 4 / 3 | 6.3 / 6.1 | 3.15-4.53 |
+
+Through the game (client, mixer, HRTF, ear model, loudness law; `--fire game`), every file without
+clipping, flat tops or gaps:
+- campfire 2 m 14/14, fire pit 2 m 13/14, bonfire 5 m 14/14
+- car 10 m 5/14, house 30 m 9/14, house 150 m 11/14
+- trees 50 m 14/14, walking up to them 14/14
+- crown fire 300 m 6/14, 1 km 8/14
+- Full table: `inbox/fire-2026-10-06/README.txt`.
+
+What does not fit:
+- The crown fire: the recordings are mostly not crown fires.
+  - Against the one forest fire (Maple Fire, across a drainage), its 63-250 Hz stand 5-10 dB higher over
+    1 kHz.
+  - Its 3-12 kHz crackle is steadier than the prescribed burns' (band kurtosis 4-5 against 6-15).
+  - Zhang et al. (2019) put a crown fire's sound mostly under 400 Hz, as the model has it. No calibrated
+    recording of a crown fire at a distance was found.
+- The car: two recordings only. Its high bands move more than theirs (cv 0.17-0.19 against 0.12-0.17),
+  it is too alike across bands (corr near 0.56 against 0.47), and 2-3 dB dark at 2-4 kHz.
+- The house: corr octave just over and slow modulation just under the recordings'.
+- The 4-16 Hz envelope modulation of most presets is a little under the recordings' (the fire pit's was
+  before too).
+
+### 8.4 Levels
+
+At a metre, fully developed, every place summed (`SourceLevelDb`, measured; see each preset):
+
+| preset | dB | dB(A) | headroom |
+|---|---|---|---|
+| campfire | 63 | 56 | 45 |
+| fire pit | 67 | 60 | 45 |
+| bonfire | 91 | 79 | 30 |
+| burning car | 93 | 78 | 36 (its bursts) |
+| house | 98 | 87 | 24 |
+| stand of trees | 93 | 81 | 27 |
+| crown fire's front | 123 | 107 | 17 |
+
+- The fire pit was 59.5 dB (57.2 dB(A)). Its roar is now the f^−2.5 tail, whose bottom octaves carry
+  the difference; A-weighted it is 3 dB more.
+- In the game: the crown fire at 300 m plays about as loud as the bonfire at 5 m; the house at 30 m
+  about 6 dB under that.
+- No measured level of a big fire's audible sound was found to check against. The 3 m log pile's
+  infrasound (under 0.1 Pa at 50 m) agrees with the 35 % swing [derived].
+
+### 8.5 Cost
+
+- One fire, every place, one core: campfire 1.3 %, fire pit 0.6 %, bonfire 1.4 %, car 1 %,
+  house 2-2.7 %, stand of trees 2-2.4 %, crown fire 1.7-2 %.
+- In the game: one HRTF voice when far away, 4-7 when it is heard as wide. Mixer DSP load in the renders
+  was 2.5-11 %.
+- Nothing allocates while a fire burns (`FireTests`).
 
 ## 9. On the maps and in the game
 

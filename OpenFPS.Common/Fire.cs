@@ -124,10 +124,11 @@ public sealed record FireSpec
         Resin = 0.35f,
         FlameHeightMetres = 0.8f,
         Surround = "Brick",
-        // MEASURED with `--nature levels fire`, 2026-10-04: Leq 59.4 dB, 57.2 dB(A). Its loud crackles
-        // stand 43 dB over that (the 99.9th percentile of its 10 ms peaks), and the voice renders with
-        // that room so they are not squared off.
-        SourceLevelDb = 59.5f,
+        // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed: Leq 68.6 dB, 60.0 dB(A)
+        // over ten minutes at 3 m/s, 66.0 dB in the field's wind (NatureTests); its 10 ms peaks' 99.9th percentile
+        // 37 dB over, crest 42. Was 59.5 dB (57.2 dB(A)) with the roar a band at 70 / √D Hz; the roar is now dQ/dt's
+        // tail from 20 Hz up, whose bottom octaves carry most of the difference.
+        SourceLevelDb = 67f,
         PeakHeadroomDb = 45f,
         ExtentMetres = 0.5f,
     };
@@ -146,7 +147,9 @@ public sealed record FireSpec
         GrowthSeconds = 300f,
         SteadySeconds = 3600f,
         DecaySeconds = 1200f,
-        SourceLevelDb = 55f,
+        // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed (wind 3 m/s): Leq 63.1 dB,
+        // 56.4 dB(A); peaks 39 dB over, crest 44.
+        SourceLevelDb = 63f,
         PeakHeadroomDb = 45f,
         ExtentMetres = 0.4f,
     };
@@ -166,8 +169,10 @@ public sealed record FireSpec
         GrowthSeconds = 600f,
         SteadySeconds = 3600f,
         DecaySeconds = 1800f,
-        SourceLevelDb = 80f,
-        PeakHeadroomDb = 40f,
+        // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed (wind 3 m/s): Leq 90.7 dB,
+        // 79.4 dB(A); peaks 28 dB over, crest 28.
+        SourceLevelDb = 91f,
+        PeakHeadroomDb = 30f,
         ExtentMetres = 1.8f,
     };
 
@@ -197,8 +202,11 @@ public sealed record FireSpec
         GrowthSeconds = 1200f,
         SteadySeconds = 600f,
         DecaySeconds = 4200f,
-        SourceLevelDb = 85f,
-        PeakHeadroomDb = 45f,
+        // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed (wind 3 m/s): Leq 93.2 dB,
+        // 77.8 dB(A);
+        // ten minutes from 700 s after lighting, its struts, tyres and windows going, crest 34 dB.
+        SourceLevelDb = 93f,
+        PeakHeadroomDb = 36f,
         ExtentMetres = 2.2f,
     };
 
@@ -225,8 +233,11 @@ public sealed record FireSpec
         GrowthSeconds = 900f,
         SteadySeconds = 3600f,
         DecaySeconds = 7200f,
-        SourceLevelDb = 95f,
-        PeakHeadroomDb = 40f,
+        // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed (wind 3 m/s): Leq 97.8 dB,
+        // 87.4 dB(A);
+        // ten minutes from 1200 s after lighting, windows and a collapse, crest 23 dB.
+        SourceLevelDb = 98f,
+        PeakHeadroomDb = 24f,
         ExtentMetres = 6f,
     };
 
@@ -249,8 +260,10 @@ public sealed record FireSpec
         GrowthSeconds = 300f,
         SteadySeconds = 1800f,
         DecaySeconds = 1800f,
-        SourceLevelDb = 95f,
-        PeakHeadroomDb = 40f,
+        // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed (wind 3 m/s), over ten
+        // minutes (its trees torch in turn): Leq 92.7 dB, 81.3 dB(A); peaks 24 dB over, crest 26.
+        SourceLevelDb = 93f,
+        PeakHeadroomDb = 27f,
         ExtentMetres = 7.5f,
     };
 
@@ -270,8 +283,10 @@ public sealed record FireSpec
         FuelHeightMetres = 20f,
         Surround = "Dirt",
         Places = 7,
-        SourceLevelDb = 130f,
-        PeakHeadroomDb = 30f,
+        // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed, in the field's own
+        // wind (4.5 m/s at 10 m, so 5.8 GW): Leq 123.0 dB, 107.3 dB(A); peaks 13 dB over, crest 15.
+        SourceLevelDb = 123f,
+        PeakHeadroomDb = 17f,
         ExtentMetres = 150f,
     };
 

@@ -102,16 +102,6 @@ public sealed class FireSynth
     private const float CrackleRange = 150f;
     /// <summary>How many crackles a second seasoned wood makes per 100 kW burning well, before clustering.</summary>
     private const float CracklesPer100Kw = 28f;
-    /// <summary>
-    /// How many more a crackle sets off, on average: a pocket giving way loads the cells round it, and
-    /// some of them go a moment later (an avalanche, as crackling noise in any brittle material comes
-    /// in: Sethna, Dahmen and Myers 2001; wood under load, Mäkinen et al. 2015). The rate the fire's
-    /// burning sets is the whole, avalanches included. FITTED to the recordings' 4-16 Hz envelope
-    /// modulation (section 8).
-    /// </summary>
-    public static float CrackleBranching = 0f;
-    /// <summary>How long after its parent a set-off crackle goes, on average, s.</summary>
-    private const float AvalancheSeconds = 0.06f;
     /// <summary>A crackle this many times the smallest throws an ember.</summary>
     private const float EmberSize = 60f;
     /// <summary>The most crackles a place draws one by one in a second; the rest are its crackle noise.</summary>
@@ -199,6 +189,10 @@ public sealed class FireSynth
     private readonly float _roarUnit, _fizzNorm, _bedNorm, _bedA1, _bedA2;
     private readonly float _roarPsdPerKw2;   // the roar's PSD at 100 Hz per kW² of one cell, Pa²/Hz at a metre
     private readonly float _puffHz;
+    /// <summary>How much bigger this fire's pockets are than the fire pit's, in pressure: a body of fire's
+    /// crackle energy goes as what it burns, its count as that to the β (<see cref="CrackleHeatExponent"/>),
+    /// so each is (Q / 80 kW)^((1 − β) / 2) louder. Bigger fuel holds its water in fewer, bigger pockets.</summary>
+    private readonly float _pocketScale;
     private readonly float _flickA, _flickB, _flickC, _flickNorm;
     private readonly float _glide;
 
@@ -224,8 +218,6 @@ public sealed class FireSynth
     private readonly Jet[] _jets = new Jet[3];
 
     // Embers in the air, landing later.
-    private struct Follower { public float In; public int Place; public float Size; public bool Live; }
-    private readonly Follower[] _followers = new Follower[64];
     private readonly float[] _emberAt = new float[24];
     private readonly float[] _emberSize = new float[24];
     private readonly int[] _emberPlace = new int[24];
@@ -361,6 +353,7 @@ public sealed class FireSynth
         _placeOut = new float[places];
 
         _energyLogSize = CrackleEnergies(sampleRate);
+        _pocketScale = MathF.Pow(MathF.Max(1f, spec.HeatReleaseKw / _cells.Length / 80f), 0.5f * (1f - CrackleHeatExponent));
         // The flicker: noise above the puffing rate, flat to three times it and falling as f^−2 from there
         // to ten times it (about the f^−1.4 measured over that decade), sampled every Sub samples.
         {
@@ -494,24 +487,38 @@ public sealed class FireSynth
     }
 
     /// <summary>Crackles a second at this moment for the whole fire, before clustering, for the lab and tests.</summary>
-    public float CrackleRate => _crackleNow >= 0f ? _crackleNow : CracklesPer100Kw * Spec.HeatReleaseKw / 100f * FuelCrackle * _life * _burn;
+    public float CrackleRate => _crackleNow >= 0f ? _crackleNow
+        : _cells.Length * CracklesPer100Kw * 0.8f * MathF.Pow(Spec.HeatReleaseKw / _cells.Length / 80f, CrackleHeatExponent) * FuelCrackle * _life * _burn;
     private float _crackleNow = -1f;
 
     /// <summary>How a fuel's moisture and resin, and what it is, set its crackles per kW (docs/FIRE.md 4).</summary>
     private float FuelCrackle => (0.4f + 3f * MathF.Min(0.4f, Spec.Moisture)) * (0.6f + 0.8f * Spec.Resin) * Spec.Fuel switch
     {
-        FireFuel.Trees or FireFuel.Crown => TreeCrackle,
+        FireFuel.Trees => TreeCrackle,
+        FireFuel.Crown => CrownCrackle,
         FireFuel.Structure => StructureCrackle,
         FireFuel.Vehicle => VehicleCrackle,
         _ => 1f,
     };
 
     /// <summary>Crackles per kW of burning foliage and twigs, over seasoned logs'. FITTED (section 8).</summary>
-    public const float TreeCrackle = 0.03f;
+    public static float TreeCrackle = 0.12f;
+    /// <summary>The same for a crown fire's front. FITTED (section 8).</summary>
+    public static float CrownCrackle = 0.03f;
+    /// <summary>
+    /// How a body of fire's crackles grow with its heat release: as (Q / 80 kW)^β, so the fire pit is as it
+    /// was fitted. FITTED (section 8): a bigger body's crackles are fewer per kW than its heat release
+    /// says (heard crackles come from the fuel's outer layer, where a big pile's or a crown's fuel is a
+    /// smaller share of what burns).
+    /// </summary>
+    public static float CrackleHeatExponent = 0.5f;
     /// <summary>Crackles per kW of a burning building's timber, over seasoned logs'. FITTED (section 8).</summary>
-    public const float StructureCrackle = 1f;
+    public static float StructureCrackle = 2f;
     /// <summary>Crackles (spitting plastics and the car's own timber-free fuel) per kW, over logs'. FITTED.</summary>
-    public const float VehicleCrackle = 1f;
+    public static float VehicleCrackle = 0.3f;
+    /// <summary>A car's fizz over wood's, in power: molten plastics boiling and their gas jetting, where wood
+    /// has its water. FITTED (section 8).</summary>
+    public static float VehicleFizz = 10f;
 
     /// <summary>The share of the full heat release a fire lit <paramref name="age"/> seconds ago burns at:
     /// t² growth, full, linear decay, then a smoulder.</summary>
@@ -613,9 +620,10 @@ public sealed class FireSynth
             cell.Roar = heat * MathF.Sqrt(_roarPsdPerKw2) * MathF.Sqrt(cell.Vigour * (1f + _flare)) * gust * RoarPart;
             // The fizz follows how hard the fuel is gassing: what is burning, how wet, and the clusters of
             // pockets reaching temperature together that the crackles come in.
-            float fizz = FizzPascals * FizzPascals * (heat / 80f) * MathF.Min(2f, Spec.Moisture / 0.2f) * cell.Cluster;
+            float fizz = FizzPascals * FizzPascals * (heat / 80f) * MathF.Min(2f, Spec.Moisture / 0.2f) * cell.Cluster
+                       * (Spec.Fuel == FireFuel.Vehicle ? VehicleFizz : 1f);
             cell.Fizz = fizz;
-            float crackles = CracklesPer100Kw * heat / 100f * FuelCrackle * cell.Vigour * cell.Cluster * (1f + 1.5f * _flare)
+            float crackles = CracklesPer100Kw * 0.8f * MathF.Pow(MathF.Max(0f, heat) / 80f, CrackleHeatExponent) * FuelCrackle * cell.Vigour * cell.Cluster * (1f + 1.5f * _flare)
                            * (1f + 2f * cell.Torch) * (1f + 0.2f * MathF.Max(0f, cell.Wind - 2f));
             rateTotal += crackles / MathF.Max(1e-3f, cell.Cluster);
             for (int p = 0; p < places; p++)
@@ -634,7 +642,7 @@ public sealed class FireSynth
             // The share of this place's crackles too many to draw is its crackle noise.
             float rate = _crackleRateAt[p];
             float cut = DrawnFrom(rate);
-            _bedTarget[p] = MathF.Sqrt(rate * EnergyBelow(cut)) * _burn * CracklePart;
+            _bedTarget[p] = MathF.Sqrt(rate * EnergyBelow(cut)) * _pocketScale * _burn * CracklePart;
         }
 
         // Steam jets come and go, more of them for wetter wood (logs).
@@ -949,18 +957,8 @@ public sealed class FireSynth
                 if (rate <= 0f) continue;
                 float cut = DrawnFrom(rate);
                 float drawn = rate * TailShare(cut);
-                // The avalanches' first crackles; what they set off makes up the rest of the rate.
-                int count = _sum.Poisson(drawn * (1f - CrackleBranching) * dt);
+                int count = _sum.Poisson(drawn * dt);
                 for (int k = 0; k < count; k++) Crackle(_sums[p], p, (int)(_sum.Uniform() * Block), cut, 0f);
-            }
-            for (int i = 0; i < _followers.Length; i++)
-            {
-                ref var f = ref _followers[i];
-                if (!f.Live) continue;
-                f.In -= dt;
-                if (f.In > 0f) continue;
-                f.Live = false;
-                Crackle(_sums[Math.Min(f.Place, places - 1)], f.Place, (int)(_sum.Uniform() * Block), 1f, f.Size);
             }
         }
 
@@ -1072,24 +1070,7 @@ public sealed class FireSynth
             float u = lo + (hi - lo) * _sum.Uniform();
             size = Math.Clamp(MathF.Pow(u, -1f / a), 1f, CrackleRange);
         }
-        // What it sets off: crackles of the same law over the same cut, a moment later.
-        int set = _sum.Poisson(CrackleBranching);
-        for (int k = 0; k < set; k++)
-        {
-            for (int i = 0; i < _followers.Length; i++)
-            {
-                if (_followers[i].Live) continue;
-                float lo = MathF.Pow(MathF.Max(1f, from), -a), hi = MathF.Pow(CrackleRange, -a);
-                float child = Math.Clamp(MathF.Pow(lo + (hi - lo) * _sum.Uniform(), -1f / a), 1f, CrackleRange);
-                _followers[i] = new Follower
-                {
-                    In = -AvalancheSeconds * MathF.Log(MathF.Max(1e-6f, _sum.Uniform())),
-                    Place = placeIndex, Size = child, Live = true,
-                };
-                break;
-            }
-        }
-        float p = SmallestCracklePascals * size * _burn * CracklePart;
+        float p = SmallestCracklePascals * _pocketScale * size * _burn * CracklePart;
         // A pocket bursting is a volume of gas let out at once: the pressure is the rate of change of
         // the outflow, a spike as the wall gives and a tail as the pocket empties. A bigger pocket
         // empties for longer, so a big pop has a body under its crack.

@@ -51,8 +51,13 @@ public static class FireSpike
         // For fitting: the roar's swing and tail, and the crackle rates by fuel.
         FireSynth.PuffSwing = Arg(args, "swing=", FireSynth.PuffSwing);
         FireSynth.RoarTailExponent = Arg(args, "alpha=", FireSynth.RoarTailExponent);
-        FireSynth.CrackleBranching = Arg(args, "branch=", FireSynth.CrackleBranching);
         FireSynth.Flicker = Arg(args, "flicker=", FireSynth.Flicker);
+        FireSynth.CrackleHeatExponent = Arg(args, "beta=", FireSynth.CrackleHeatExponent);
+        FireSynth.TreeCrackle = Arg(args, "trees=", FireSynth.TreeCrackle);
+        FireSynth.CrownCrackle = Arg(args, "crown=", FireSynth.CrownCrackle);
+        FireSynth.StructureCrackle = Arg(args, "structure=", FireSynth.StructureCrackle);
+        FireSynth.VehicleCrackle = Arg(args, "vehicle=", FireSynth.VehicleCrackle);
+        FireSynth.VehicleFizz = Arg(args, "vfizz=", FireSynth.VehicleFizz);
         string[]? parts = args.FirstOrDefault(a => a.StartsWith("parts=", StringComparison.Ordinal))?[6..].Split(',');
         string? dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..];
         if (dir != null) Directory.CreateDirectory(dir);
@@ -194,7 +199,7 @@ public static class FireSpike
     /// moment its own events are going (a car's struts, a house's windows and ceilings).</summary>
     private static double GameAge(FireSpec spec) => spec.Fuel switch
     {
-        FireFuel.Vehicle => spec.GrowthSeconds * 0.9,
+        FireFuel.Vehicle => 900,
         FireFuel.Structure => spec.GrowthSeconds + 120,
         _ => double.NaN,
     };
