@@ -66,7 +66,8 @@ public class PlayerPersistenceTests : IDisposable
         public async Task<UserSession> Arrive(string name)
         {
             int connection = ++_connection;
-            await Server.Login(connection, new LoginRequest { Username = name, Password = "correct horse" }, _ => { });
+            await Server.Login(connection, new LoginRequest { Username = name, Password = "correct horse" }, _ => { })
+                .Within(TestDeadline.Login, $"{name}'s login");
             Server.DrainCommandBuffer();
             Assert.True(Sessions.TryGetSession(connection, out var session), $"{name} did not log in");
             Server.HandlePlayerReady(connection);
