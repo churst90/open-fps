@@ -3,18 +3,11 @@ using System.Collections.Generic;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// Beacons: a short blip that says "there is a door here", "there is something to pick up here".
-///
-/// Every beacon belongs to a CATEGORY, and whether a category is heard is decided by two people.
-/// The map's author sets a policy for each one — forced on, on by default, off by default, or
-/// forbidden — and within that each player switches the categories they want. A tutorial map can
-/// force door beacons on; a competitive one can forbid item beacons; a player who has learned the
-/// map can turn doors off.
-///
-/// Most beacons are not placed by anybody. A door is a door beacon because it is a door, an item
-/// because it is an item, a parked car because somebody can get into it — so a map with doors in it
-/// has door beacons without its author knowing the feature exists. An authored beacon (a prefab of
-/// Type Beacon) says its own category, and defaults to a waypoint.
+/// Beacons: a short blip that says there is a door here, something to pick up here. Each is in a
+/// category; the map sets a policy per category (forced on, on or off by default, forbidden) and each
+/// player switches within it. Most are not placed: a door is a door beacon by being a door, a parked car
+/// by being something to get into. An authored beacon (a prefab of Type Beacon) names its category,
+/// a waypoint by default.
 /// </summary>
 public static class Beacons
 {
@@ -47,11 +40,8 @@ public static class Beacons
         }
     }
 
-    /// <summary>
-    /// Whether a category is heard: the map's policy, and within it the player's choice. A forced
-    /// category is on whatever the player said, a forbidden one off; otherwise the player's word
-    /// wins, and with no word the map's default.
-    /// </summary>
+    /// <summary>Whether a category is heard: forced and forbidden are the map's; otherwise the player's
+    /// choice, or the map's default.</summary>
     public static bool IsOn(Policy policy, bool? playerChoice) => policy switch
     {
         Policy.ForcedOn => true,
@@ -63,10 +53,8 @@ public static class Beacons
     /// <summary>Whether the player is allowed to change a category at all on this map.</summary>
     public static bool PlayerMayChange(Policy policy) => policy is Policy.DefaultOn or Policy.DefaultOff;
 
-    /// <summary>
-    /// A map's policies from the form they travel in — "category=policy" strings — with anything it
-    /// does not mention left at <see cref="Unset"/>.
-    /// </summary>
+    /// <summary>A map's policies from "category=policy" strings; anything not mentioned is
+    /// <see cref="Unset"/>.</summary>
     public static Dictionary<string, Policy> ReadPolicies(IEnumerable<string>? entries)
     {
         var map = new Dictionary<string, Policy>(StringComparer.OrdinalIgnoreCase);

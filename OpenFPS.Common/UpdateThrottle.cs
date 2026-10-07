@@ -1,15 +1,9 @@
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A fixed-rate gate: "has enough time passed to do this again?"
-///
-/// The client's game loop runs as fast as it can poll the network — a sleep of 5 ms between iterations, so
-/// roughly 200 Hz — and it drove the whole audio update from that loop. Occlusion queries, listener sync,
-/// reverb routing and the FMOD tick therefore ran three times more often than any of it can be heard, on the
-/// same thread that has to service the socket. Nothing in the audio path resolves faster than a frame at
-/// 60 Hz, so this caps it there and hands the rest of the loop back to the network.
-///
-/// The clock is passed in rather than read here so the rule is testable without sleeping.
+/// A fixed-rate gate: has enough time passed to do this again? The client's loop polls the network at
+/// about 200 Hz, and the audio update ran there, three times more often than anything in it can be heard,
+/// on the socket's thread; this holds it to 60 Hz. The clock is passed in so tests need not sleep.
 /// </summary>
 public sealed class UpdateThrottle
 {
@@ -31,10 +25,8 @@ public sealed class UpdateThrottle
     }
 
     /// <summary>
-    /// True when <paramref name="nowSeconds"/> is at or past the next due time, in which case the gate is
-    /// re-armed for one interval from NOW (not from the due time). Re-arming from now means a loop that
-    /// stalls does not then burn several catch-up updates in a row to "repay" the gap — for audio there is
-    /// nothing to repay, the missed frames are simply gone.
+    /// True when <paramref name="nowSeconds"/> is at or past the next due time, re-arming one interval from
+    /// now rather than from the due time: after a stall there is nothing to catch up on.
     /// </summary>
     public bool ShouldRun(double nowSeconds)
     {

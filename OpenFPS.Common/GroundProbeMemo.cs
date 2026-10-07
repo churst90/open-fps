@@ -3,22 +3,15 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// One player's memory of where the floor was.
+/// One player's memory of where the floor was. The server probes the ground once per input, each probe
+/// walking every grid cell within 50 m, and between sub-tick inputs the answer does not change. It is
+/// handed back while the static geometry is unchanged (<see cref="SpatialGrid{T}.StaticVersion"/>), the
+/// point has moved less than <see cref="ToleranceMetres"/> and the answer is younger than
+/// <see cref="MaxAgeMs"/>.
 ///
-/// The server probes the ground once per INPUT, not once per tick: a client that sends four sub-tick inputs
-/// in a tick pays for four vertical probes, and each probe walks every grid cell within 50 m and tests five
-/// points against every collider it finds. Standing still costs exactly as much as sprinting. Yet between
-/// two sub-tick inputs the player has moved centimetres and the geometry has not moved at all, so the four
-/// answers are the same answer.
-///
-/// This remembers the last one and hands it back while three things hold: the static geometry has not
-/// changed (<see cref="SpatialGrid{T}.StaticVersion"/>), the probe position has not moved beyond
-/// <see cref="ToleranceMetres"/>, and the answer is younger than <see cref="MaxAgeMs"/>.
-///
-/// The age bound is the honest part. Dynamic colliders — an NPC, a spawned crate — are not in the version
-/// count, so an entry that never expired could describe a floor that walked away. 150 ms is under a fifth of
-/// the interpolation delay a client already tolerates, and it still removes the great majority of the
-/// probes: a player standing still drops from thirty-plus probes a second to under seven.
+/// The age bound is there because dynamic colliders (an NPC, a crate) are not in the version: 150 ms is
+/// under a fifth of the interpolation delay, and a player standing still still drops from thirty-plus
+/// probes a second to under seven.
 /// </summary>
 public struct GroundProbeMemo
 {

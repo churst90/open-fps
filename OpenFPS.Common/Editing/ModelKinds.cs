@@ -27,13 +27,10 @@ public sealed class FieldNode
 }
 
 /// <summary>
-/// Every kind of model describes itself, and this reads the description: the properties of the
-/// model's type, with what <see cref="TunableAttribute"/> says about each. The editor's menus are made
-/// from it, so a kind added to <see cref="ModelLibrary"/> is in the editor with no code of its own
-/// (docs/WORLD_EDITOR.md section 4).
-///
-/// Values are read and changed on the model's JSON, the same round trip ModelLibrary already tests for
-/// every built-in model: write it out, set the one value at its path, read it back.
+/// Reads a model's description of itself: its type's properties, with what <see cref="TunableAttribute"/>
+/// says about each. The editor's menus are made from it, so a kind added to <see cref="ModelLibrary"/>
+/// needs no editor code (docs/WORLD_EDITOR.md section 4). Values are changed on the model's JSON, the
+/// round trip ModelLibrary tests for every built-in model.
 /// </summary>
 public static class ModelKinds
 {

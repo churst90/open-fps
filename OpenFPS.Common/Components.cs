@@ -66,40 +66,24 @@ public partial struct IdentityComponent
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
 
-    /// <summary>Whether the client should SAY this thing as the player walks up to it.
-    ///
-    /// Not every named entity is an interactable. The acoustic scaffolding — portals, region volumes —
-    /// and the architecture itself (walls, floors, the auto-injected foundation) all carry names so that
-    /// authors and logs can refer to them, and announcing those meant that crossing a doorway read the
-    /// portal prefab's AUTHORING NOTES aloud, mid-stride. Default false: a thing earns its announcement.
-    /// The prefab's `Announce` field sets it (see PrefabTemplate), defaulting to true only for the
-    /// types a player can actually encounter: Item, NPC, Beacon.</summary>
+    /// <summary>Whether the client says this thing as the player walks up to it. Walls, portals and
+    /// region volumes carry names too, and announcing them read a portal prefab's authoring notes aloud
+    /// mid-stride. Set by the prefab's `Announce` (PrefabTemplate), true by default only for Item, NPC
+    /// and Beacon.</summary>
     public bool Announce { get; set; } = false;
 
-    // APPEND ONLY below this line — see SoundEmitterComponent for why the order of a component is a
-    // network protocol.
+    // APPEND ONLY below this line: the order of a component is a network protocol (SoundEmitterComponent).
 
-    /// <summary>
-    /// The prefab this entity is an instance OF, or empty if it was built by hand.
-    ///
-    /// Identity in the literal sense: what kind of thing this is, as opposed to what it is called.
-    /// Nothing recorded it before, and the cost of that only becomes visible when you try to go the
-    /// other way — saving a house somebody built back out to a template needs to know that this wall
-    /// is a `concrete_wall`, and an entity that cannot say so cannot be rebuilt.
-    /// </summary>
+    /// <summary>The prefab this entity is an instance of, or empty if built by hand. Saving a built
+    /// house back out to a template needs to know that this wall is a `concrete_wall`.</summary>
     public string PrefabId { get; set; } = "";
 
-    /// <summary>
-    /// Which beacon category this thing belongs to — "door", "item", "vehicle"... — or empty for
-    /// none. See <see cref="OpenFPS.Common.Beacons"/>. Appended: the wire format is positional.
-    /// </summary>
+    /// <summary>The beacon category ("door", "item", "vehicle"...), or empty for none
+    /// (<see cref="OpenFPS.Common.Beacons"/>).</summary>
     public string BeaconCategory { get; set; } = "";
 
-    /// <summary>
-    /// A person with a name of their own (a character such as Alex, not a passer-by): the scope and
-    /// everything else that names people says <see cref="Name"/>, as it says a player's, where a walker
-    /// is "person" or "someone". Appended: the wire format is positional.
-    /// </summary>
+    /// <summary>A person with a name of their own (a character such as Alex, not a passer-by): whatever
+    /// names people says <see cref="Name"/>, where a walker is "person" or "someone".</summary>
     public bool Named { get; set; } = false;
 
     public IdentityComponent() { }
@@ -131,15 +115,9 @@ public partial struct SoundEmitterComponent
     public float MinDistance { get; set; } = 3.0f;
 
     /// <summary>
-    /// Replay this sound every N seconds. Zero (the default) means it is not a repeater.
-    ///
-    /// Deliberately a property of ANY emitter rather than of a public-address system: a repeating
-    /// one-shot from a fixed point is a PA announcement, and also a foghorn, a station bell, a level-crossing, a dripping tap and a klaxon. Nothing
-    /// about it should know what a racetrack is.
-    ///
-    /// Distinct from LoopOne, which restarts the instant the sample ends and so has no gap. This is
-    /// for a sound with SILENCE around it, where the silence is most of the point — the gap is what
-    /// makes an announcement a landmark you can wait for rather than a drone you stop hearing.
+    /// Replay this sound every N seconds; zero is not a repeater. Any emitter's, not a PA system's: a
+    /// foghorn, a station bell and a dripping tap repeat too. Unlike LoopOne it leaves a gap, and the gap
+    /// is what makes an announcement a landmark you can wait for rather than a drone you stop hearing.
     /// </summary>
     public float RepeatIntervalSeconds { get; set; }
 
@@ -164,73 +142,37 @@ public partial struct SoundEmitterComponent
 
     // ── APPEND ONLY BELOW THIS LINE ─────────────────────────────────────────────────────────────
     //
-    // MemoryPack serialises these members POSITIONALLY, in declaration order, with no names on the
-    // wire. That makes the order of this struct a network protocol: inserting a member in the middle
-    // does not add a field, it renumbers every field after it.
-    //
-    // Which is not a hypothetical. Offset went in after MinDistance, and against a server that had
-    // not been restarted the client read a Vector3 where a float had been written, lost twelve bytes
-    // of alignment, and came out the other side with IsSynth false on every vehicle in the world.
-    // Thirty cars turned into thirty attempts to play a sample called "engine:nascar_v8", and the
-    // speedway went completely silent. Nothing threw; the numbers were simply the wrong numbers.
-    //
-    // Appended, the worst an out-of-date peer can do is not send it, and a member nobody sent reads
-    // back as its default — which for an emitter offset is the origin, exactly the old behaviour.
+    // MemoryPack serialises members positionally, in declaration order, with no names on the wire:
+    // inserting a member renumbers every member after it. Offset once went in after MinDistance, a
+    // stale server's emitters read back with IsSynth false and the speedway went silent with nothing
+    // thrown (docs/AUDIO_GHOSTS_AND_STUTTERS.md). Appended, a member an old peer does not send reads
+    // back as its default.
 
     /// <summary>
-    /// Where the sound comes OUT, relative to the entity's origin and in its own frame
-    /// (x right, y up, z forward). Zero — the default — means the origin itself.
-    ///
-    /// The emission point, not the object's position, is what every acoustic question is about: what
-    /// is in the way of the sound, how far it has come, which direction it arrives from. Asking those
-    /// about the origin was worth a whole class of fault. A vehicle's origin is its contact patch on
-    /// the road, so the occlusion probe — a half-metre sphere — sat HALF UNDERGROUND on every level
-    /// stretch of every track, and roughly half its samples reported "blocked" before any wall was
-    /// considered. Six decibels down and forty off the top, permanently, for being a car on a road.
-    ///
-    /// Authored per emitter rather than corrected per case, because the answer is different for every
-    /// object and known for all of them: a tailpipe is a third of a metre up and a metre or two back,
-    /// a chimney is on the roof, a drain is at ground level, a speaker is where it was bolted. A fixed
-    /// height added to everything would be the same mistake pointing the other way.
+    /// Where the sound comes out, in the entity's own frame (x right, y up, z forward); zero is the
+    /// origin. Every acoustic question is about the emission point: a vehicle's origin is its contact
+    /// patch, and an occlusion probe there sat half underground, about half its samples "blocked" before
+    /// any wall: six decibels down and forty off the top, permanently. Authored per emitter (a tailpipe,
+    /// a chimney, a drain); a fixed height for everything would be the same mistake the other way.
     /// </summary>
     public Vector3 Offset { get; set; }
 
     /// <summary>
-    /// How big the thing making the sound is, metres. Zero — the default — means a point.
-    ///
-    /// A fountain is about three metres across, a ventilation grille half a metre, a waterfall
-    /// twenty, a motorway is as long as you can see. Inside a source's own size the inverse law does
-    /// not hold, because stepping a metre nearer one part of it steps you a metre further from
-    /// another: the level is flat across the thing and only starts falling once the whole of it is in
-    /// front of you.
-    ///
-    /// <see cref="OpenFPS.Common.Loudness.Widen"/> does the arithmetic, and the half that is easy to
-    /// get wrong is that the gain comes DOWN as the reference widens — beyond the patch, an extended
-    /// source and a point source of the same power are identical, so the far field must not change.
-    /// An author who sets this is saying how big the thing is, not asking for it to be louder.
+    /// How big the thing making the sound is, metres; zero is a point. Inside a source's own size the
+    /// level is flat, and it falls only once the whole of it is in front of you. The gain comes down as
+    /// the reference widens (<see cref="OpenFPS.Common.Loudness.Widen(float, float, float)"/>):
+    /// beyond the patch an extended source and a point of the same power are identical, so setting this
+    /// says how big the thing is, not that it is louder.
     /// </summary>
     public float ExtentMetres { get; set; }
 
     public SoundEmitterComponent() { }
 
     /// <summary>
-    /// Does this emitter make sound BY ITSELF, or only when something triggers it?
-    ///
-    /// A method rather than a property on purpose: MemoryPack serialises properties, and this is a
-    /// question ABOUT the data, not part of it. See the APPEND ONLY note above.
-    ///
-    /// The client registers an entity for per-frame audio processing on the strength of this, so it
-    /// must be a rule and not a list of cases ("is the mode LoopOne, or is it a synth"). Anything not
-    /// registered is never processed at all: no voice, no occlusion, no reverb, no log line. A
-    /// public-address horn that plays a single announcement every twenty seconds would not be in the
-    /// world as far as the audio system is concerned, nor would Sequential and LoopFolder emitters.
-    ///
-    /// The rule is about RESPONSIBILITY. A looping, folder-looping, sequential or synthesised emitter
-    /// is producing sound continuously; a repeater is producing it on a schedule of its own. All of
-    /// those own their own voice and have to be looked at every frame. A plain Single with no repeat
-    /// interval is a one-shot waiting for something to fire it — a door, a footstep, a gunshot — and
-    /// registering one would make it retrigger endlessly, which is the fault the old narrow test was
-    /// really guarding against.
+    /// Whether this emitter makes sound by itself (a loop, a sequence, a synth, a repeater) rather than
+    /// waiting to be fired. A method because MemoryPack serialises properties. The client processes
+    /// only what this says yes to, so it must be a rule, not a list of cases: an emitter it misses has
+    /// no voice, no occlusion and no log line, and a one-shot it wrongly takes retriggers endlessly.
     /// </summary>
     public readonly bool RunsOnItsOwn()
         => IsSynth
@@ -238,36 +180,22 @@ public partial struct SoundEmitterComponent
         || (RepeatIntervalSeconds > 0f && !string.IsNullOrEmpty(SoundId));
 
     /// <summary>
-    /// Whether a synthesised source is currently SOUNDING, as against merely existing.
-    ///
-    /// Everything that makes a noise on its own has so far decided that for itself from what it
-    /// could see — an engine from the vehicle's speed, a siren from the car's behaviour, an
-    /// aircraft's power from its climb angle — and that has been the right rule, because a client
-    /// that can work something out does not need to be told it.
-    ///
-    /// A level crossing's bell is the first thing that CANNOT be worked out client-side. It rings
-    /// because of where a train is on a line the listener may be a kilometre from and cannot see;
-    /// there is no local observation that implies it. So the server says, and this is how.
-    ///
-    /// Defaults to TRUE so that every existing emitter means exactly what it meant before, and so
-    /// that a peer which does not send it reads back as "sounding" rather than falling silent.
+    /// Whether a synthesised source is sounding now, for what a client cannot work out for itself: a
+    /// level crossing's bell rings for a train the listener may be a kilometre from. True by default,
+    /// so every other emitter, and a peer that does not send it, reads as sounding.
     /// </summary>
     public bool SynthRunning { get; set; } = true;
 
     /// <summary>
-    /// Standing at a stop that takes passengers. A bus that stops at a junction holds its service
-    /// brake and goes again; at a bus stop it sets the spring brakes, kneels and opens its doors —
-    /// and the voice cannot tell the two apart from its speed, so the server says. APPENDED: the
-    /// wire format is positional (component-wire-format).
+    /// Standing at a stop that takes passengers. At a junction a bus holds its service brake; at a bus
+    /// stop it sets the spring brakes, kneels and opens its doors, and its speed cannot tell the two apart.
     /// </summary>
     public bool ServingStop { get; set; }
 
     /// <summary>
-    /// Where a vehicle's side windows are GOING, 0 shut to 1 fully down. The glass travels there at its
-    /// motor's own pace (<see cref="OpenFPS.Common.CarWindow.Glide"/>), on the server and on every client
-    /// from this one number, so it is sent once per press rather than every tick while the glass moves.
-    /// Zero, the default, is shut: a parked car has its windows up. APPENDED: the wire format is
-    /// positional (component-wire-format).
+    /// Where a vehicle's side windows are going, 0 shut to 1 fully down; shut by default. The glass gets
+    /// there at its motor's pace (<see cref="OpenFPS.Common.CarWindow.Glide"/>) on the server and every
+    /// client from this one number, so it is sent once per press, not every tick.
     /// </summary>
     public float WindowsOpen { get; set; }
 }
@@ -280,12 +208,11 @@ public partial struct ColliderComponent
     public bool IsSolid { get; set; }
     public ColliderComponent() { }
 
-    // APPENDED (component-wire-format: positional, append only).
+    // APPEND ONLY below this line: components serialise positionally.
 
     /// <summary>
-    /// The solid's form from the shape library (docs/GEOMETRY.md 2.6, stage 2): a ramp, a flight of stairs,
-    /// an arch, filling the box of <see cref="Size"/>. Null for a plain box, which is every entity that
-    /// names none. Code that reads boxes still sees the box of <see cref="Size"/>.
+    /// The solid's form from the shape library (docs/GEOMETRY.md 2.6): a ramp, stairs, an arch, filling
+    /// the box of <see cref="Size"/>; null for a plain box. Code that reads boxes still sees the box.
     /// </summary>
     public OpenFPS.Common.Geometry.ShapeSpec? Form { get; set; }
 }
@@ -306,7 +233,7 @@ public partial struct AcousticComponent
     /// </summary>
     public int FaceMask { get; set; }
 
-    // APPENDED (component-wire-format: positional, append only).
+    // APPEND ONLY below this line: components serialise positionally.
 
     /// <summary>How the wall is built: the thickness of each of its two leaves, metres, with the rest of
     /// the box's thickness the cavity between them. Zero for a solid panel. A door's skins are its
@@ -336,9 +263,8 @@ public partial struct WorldEnvironmentComponent
     public float GameTime { get; set; }
     public int DayOfYear { get; set; }
 
-    // Defaulted to a still, temperate, sea-level day, because a default-constructed instance is what
-    // the client's world state starts at and hands to the acoustics until the first WorldStateUpdate
-    // arrives. Zeros would describe a freezing near-vacuum with no air absorption.
+    // A still, temperate, sea-level day: the client's acoustics use the default until the first
+    // WorldStateUpdate, and zeros would be a freezing near-vacuum with no air absorption.
     public float Temperature { get; set; } = 20.0f;
     public float Humidity { get; set; } = 0.5f;
     /// <summary>Millibars. Sea level is 1013.25.</summary>
@@ -365,18 +291,10 @@ public partial struct VehicleComponent
 public partial struct Velocity { public Vector3 Linear { get; set; } public Velocity() { } }
 
 /// <summary>
-/// What a player has slung on them rather than in their hands.
-///
-/// ENTITY IDS: a rifle on your back is the
-/// same entity the rifle on the floor was, still with a mass, a material and a position — it just
-/// happens to be parented to you at shoulder height. Which is why dropping it makes the noise that
-/// mass and that material make meeting that floor, from the height it actually fell from, through a
-/// calculation that already existed and knows nothing about rifles. A list of item NAMES would have
-/// needed every bit of that inventing again, and inventing it worse.
-///
-/// The limit on this is a MASS and not a number of slots (see <c>HandsService.CarryCapacityKg</c>),
-/// because two rifles and a crowbar is a load and six torches is not, and a count cannot tell those
-/// apart.
+/// What a player has slung on them rather than in their hands, as entity ids: a rifle on your back is
+/// the same entity it was on the floor, so dropping it makes the noise its mass and material make.
+/// The limit is a mass, not a count of slots (<c>HandsService.CarryCapacityKg</c>): two rifles and a
+/// crowbar is a load and six torches is not.
 /// </summary>
 [MemoryPackable]
 public partial struct InventoryComponent { public List<int> ItemEntityIds { get; set; } = new(); public InventoryComponent() { } }
@@ -402,13 +320,12 @@ public partial struct PortalComponent
     public int RegionBId { get; set; }
     public float ApertureSize { get; set; } 
 
-    // APPEND ONLY BELOW THIS LINE. MemoryPack writes these positionally with no names on the wire.
+    // APPEND ONLY below this line: components serialise positionally.
 
     /// <summary>
-    /// Where the doorway is, in the world, and which way it faces: the leaf's pose when shut (its X
-    /// across the opening, Y up, its thin axis through). A door's own transform swings with the leaf,
-    /// so on its own it says where the LEAF is, not where the hole is; this is the hole. The default
-    /// (all-zero) rotation means not known — a portal with no leaf, which is placed where it stands.
+    /// Where the doorway is in the world and which way it faces: the leaf's pose when shut (X across the
+    /// opening, Y up). A door's transform swings with the leaf; this is the hole. An all-zero rotation
+    /// means not known: a portal with no leaf, placed where it stands.
     /// </summary>
     public Vector3 OpeningCentre { get; set; }
     /// <inheritdoc cref="OpeningCentre"/>
@@ -418,47 +335,30 @@ public partial struct PortalComponent
 }
 
 /// <summary>
-/// A named group of entities that is ONE THING: a house, a vehicle, a market stall, a barricade.
-///
-/// The realisation this exists to act on is that a map, a house, a car and a thing somebody invented
-/// from scratch are the same idea at four scales. All of them are "a set of entities with a local
-/// origin, which can be saved, placed again, owned, and entered". Building that once means placing a
-/// house and driving a car stop being separate features.
-///
-/// It carries almost nothing, because almost nothing is needed: the members are ordinary entities
-/// wearing a <see cref="ParentComponent"/> that points here, and ParentSystem — which has existed and
-/// run every tick all along — already carries them with the root. A composite that never moves and a
-/// composite you can drive away differ only in whether anything is allowed to move the root.
+/// A named group of entities that is one thing: a house, a vehicle, a market stall, a barricade
+/// (docs/SERVER_NOTES.md, Composites). The members are ordinary entities whose
+/// <see cref="ParentComponent"/> points here, and ParentSystem carries them with the root.
 /// </summary>
 [MemoryPackable]
 public partial struct CompositeComponent
 {
-    /// <summary>The template this was placed from, or empty when it was grouped in place and has not
-    /// been saved as anything. Saving it later fills this in; that is the whole of "build it out of
-    /// parts, then classify it as an object".</summary>
+    /// <summary>The template this was placed from, or empty when it was grouped in place and not yet
+    /// saved; saving it fills this in.</summary>
     public string TemplateId { get; set; }
 
     /// <summary>What it is called when a player walks up to it.</summary>
     public string Name { get; set; }
 
-    /// <summary>
-    /// Whether this is fixed to the world.
-    ///
-    /// The ONLY difference between a house and a caravan, and it is deliberately not a difference of
-    /// kind. A house is anchored because houses are; unanchor the same set of walls and it is
-    /// something you can tow. Nothing else in the model changes.
-    /// </summary>
+    /// <summary>Whether this is fixed to the world: the only difference between a house and a
+    /// caravan.</summary>
     public bool Anchored { get; set; }
 
-    // APPEND ONLY BELOW THIS LINE — members serialise positionally; inserting one renumbers the rest.
+    // APPEND ONLY below this line: members serialise positionally.
 
     /// <summary>
-    /// Who this belongs to, or empty for public property.
-    ///
-    /// Recorded by whoever grouped or placed it. What it gates is deliberately narrow: taking a thing
-    /// APART, saving it out as your own, changing what it is, and driving it. Standing in someone
-    /// else's house, or riding in their passenger seat, is not trespass — it is how a world with
-    /// other people in it works.
+    /// Who this belongs to, or empty for public property. It gates only taking it apart, saving it as
+    /// your own, changing what it is and driving it; standing in someone's house or riding in their
+    /// passenger seat is not trespass.
     /// </summary>
     public string Owner { get; set; }
 
@@ -474,17 +374,10 @@ public partial struct ParentComponent
     public ParentComponent() { ParentEntityId = -1; LocalPosition = Vector3.Zero; LocalRotation = Quaternion.Identity; }
 }
 
-// ── Occupancy ───────────────────────────────────────────────────────────────────────────────────
-//
-// Getting INSIDE a composite, which is the last of the four things a composite is for: a set of
-// entities with a local origin, which can be saved, placed again, owned, and ENTERED.
-//
-// A seat is where in a composite's own frame a person sits and which way they face, and whether
-// sitting there drives the thing. That last flag is the whole of the difference between a kitchen
-// chair and a driver's seat — not a difference of kind, the same as a house and a caravan differ
-// only by <see cref="CompositeComponent.Anchored"/>.
+// ── Occupancy: getting inside a composite ───────────────────────────────────────────────────────
 
-/// <summary>One place a person can be inside a composite, in the composite's OWN frame.</summary>
+/// <summary>One place a person can be inside a composite, in the composite's own frame. A kitchen chair
+/// and a driver's seat differ only by <see cref="Controls"/>.</summary>
 [MemoryPackable]
 public partial struct Seat
 {
@@ -500,9 +393,8 @@ public partial struct Seat
 }
 
 /// <summary>
-/// The seats a composite has. Carried by the ROOT, because a seat is a property of the thing, not of
-/// whoever happens to be in it — who is in it is on the occupant (see <see cref="OccupantComponent"/>),
-/// so there is exactly one place that knows, and nothing to keep in step.
+/// The seats a composite has, on the root. Who sits in one is on the occupant
+/// (<see cref="OccupantComponent"/>), so only one place knows.
 /// </summary>
 [MemoryPackable]
 public partial struct OccupancyComponent
@@ -512,12 +404,8 @@ public partial struct OccupancyComponent
 }
 
 /// <summary>
-/// On a PLAYER: which composite they are inside, and which seat.
-///
-/// While this is worn, the body's position is not its own — it belongs to the seat, and the root
-/// carries it. What stays the player's own is where they are LOOKING, which is why the occupant's
-/// rotation is restored after the carry rather than being taken from the seat: a passenger can turn
-/// their head, and for a player who navigates by ear that is most of what a passenger does.
+/// On a player: which composite they are inside, and which seat. The seat carries the body, but where
+/// they look stays their own (restored after the carry): a passenger who navigates by ear turns their head.
 /// </summary>
 [MemoryPackable]
 public partial struct OccupantComponent
@@ -532,16 +420,9 @@ public partial struct OccupantComponent
 }
 
 /// <summary>
-/// A composite that a person can drive, and what its driver is asking of it right now.
-///
-/// The controls are held, not sampled: a driver who stops sending packets for a moment does not lift
-/// off, because a real one would not. They do decay — <see cref="ControlAge"/> — so a client that
-/// dies mid-corner coasts to a stop instead of driving away forever.
-///
-/// Everything about HOW it then moves comes out of <see cref="OpenFPS.Common.VehicleProfile"/>: the
-/// engine's torque through the gearbox for what it pulls, the tyres' peak grip for what it can
-/// corner and brake at, the mass and drag area for what it cannot. There are no handling numbers
-/// here, because a car's handling is not a property of the act of driving.
+/// A composite a person can drive, and what its driver is asking of it now. The controls are held
+/// between packets but decay with <see cref="ControlAge"/>, so a client that dies mid-corner coasts to a
+/// stop. How it moves comes from <see cref="OpenFPS.Common.VehicleProfile"/>, not from here.
 /// </summary>
 [MemoryPackable]
 public partial struct DriveComponent
@@ -560,37 +441,24 @@ public partial struct DriveComponent
     public float Heading { get; set; }
     /// <summary>Seconds since the driver last said anything. Held controls decay once this grows.</summary>
     public float ControlAge { get; set; }
-    /// <summary>
-    /// Where the driver's hands are asking the wheel to go, -1..1. <see cref="Steer"/> follows it at
-    /// the speed a pair of hands turns a wheel, so a key is a hand on the wheel rather than a switch
-    /// that throws it to full lock and back.
-    /// </summary>
+    /// <summary>Where the driver's hands are asking the wheel to go, -1..1. <see cref="Steer"/> follows
+    /// at the speed hands turn a wheel, so a key does not throw it to full lock.</summary>
     public float SteerTarget { get; set; }
     /// <summary>How much of the tyres' grip this tick asked for, before the friction circle cut it
     /// back; over 1 is sliding. The same number traffic reports, and what the client squeals on.</summary>
     public float TyreDemand { get; set; }
     /// <summary>Whether the ignition is on. A parked car's is not: it starts with the key.</summary>
     public bool EngineOn { get; set; }
-    /// <summary>Seconds since the key was turned. The engine is cranking, not pulling, for the first
-    /// second or so — the client hears the same cranking the server is waiting out.</summary>
+    /// <summary>Seconds since the key was turned: the engine cranks for the first second or so, and the
+    /// client hears the cranking the server is waiting out.</summary>
     public float EngineOnFor { get; set; }
     public DriveComponent() { Preset = ""; }
 }
 
 /// <summary>
-/// Marks the region entity a composite DERIVED for itself, rather than one somebody authored.
-///
-/// A composite that encloses space grows a room: an ordinary entity, parented to the root like every
-/// other part, carrying the <see cref="RegionComponent"/> and sitting at the middle of the space
-/// rather than at the origin — because a composite's origin is where it meets the GROUND, and a
-/// room's centre is half its height above that. Putting the volume at the origin would leave its
-/// ceiling at your knees.
-///
-/// Doing it as a part rather than as a component on the root means ParentSystem carries it with the
-/// thing for free, and it is exactly what a person authoring a building by hand is already told to do
-/// (see the `building_box` prefab: "place an acoustic_region inside it if the interior is
-/// enterable"). The marker is what tells the derived one apart from the authored one, so a rebuild
-/// replaces what it produced last time and never touches what a person put there.
+/// Marks the region a composite derived for itself, so a rebuild replaces what it made last time and
+/// never what a person authored. The room is a part at the middle of the enclosed space, not at the
+/// origin, which is where the composite meets the ground: there its ceiling would be at your knees.
 /// </summary>
 [MemoryPackable]
 public partial struct DerivedRoomComponent
@@ -599,25 +467,10 @@ public partial struct DerivedRoomComponent
 }
 
 /// <summary>
-/// A door: a part that swings or slides out of its own doorway.
-///
-/// What kind of door it is (a knob, a push bar, a glass front door, an automatic slider, a patio
-/// slider, a lift's doors) is <see cref="Kind"/>, with the behaviour that comes with it in data:
-/// <see cref="Slides"/>, <see cref="Powered"/>, <see cref="SensorMetres"/>, <see cref="CloseAfterSeconds"/>.
-///
-/// It is an ordinary part of a composite — a leaf like a wall is a leaf — and everything that makes
-/// it a door rather than a wall is here. Two things happen when it opens, and only one of them is
-/// the obvious one.
-///
-/// The leaf SWINGS ASIDE. It is always solid; what changes is where it is. A door that went
-/// non-solid to let you through would be a door you could walk through while it was shut and standing
-/// in front of you, and one whose open leaf was not in the way of anything — which is wrong twice.
-///
-/// And the OPENING appears. A <see cref="PortalComponent"/> on the same part has its aperture driven
-/// by how far the leaf has swung, so the room beyond opens up gradually as it moves. That is the half
-/// that matters to somebody listening: a door is not a thing you hear, it is a thing that changes
-/// what you can hear through it, and the existing portal machinery already knows how to do that. No
-/// new acoustics were needed, only something to move the number.
+/// A door: a part that swings or slides out of its own doorway. Its kind (<see cref="Kind"/>) comes with
+/// its behaviour in data: <see cref="Slides"/>, <see cref="Powered"/>, <see cref="SensorMetres"/>,
+/// <see cref="CloseAfterSeconds"/>. The leaf is always solid; opening moves it, and a
+/// <see cref="PortalComponent"/> on the same part opens with it, so the room beyond is heard gradually.
 /// </summary>
 [MemoryPackable]
 public partial struct DoorComponent
@@ -625,8 +478,7 @@ public partial struct DoorComponent
     /// <summary>0 is shut, 1 is as far as it goes.</summary>
     public float Openness { get; set; }
 
-    /// <summary>What it is swinging toward. The difference between this and <see cref="Openness"/> is
-    /// what makes a door take a moment rather than teleporting between two states.</summary>
+    /// <summary>What it is swinging toward; <see cref="Openness"/> follows over the swing.</summary>
     public float Target { get; set; }
 
     /// <summary>How long the full swing takes, seconds.</summary>
@@ -635,17 +487,12 @@ public partial struct DoorComponent
     /// <summary>How far it opens, radians. A quarter turn for nearly everything.</summary>
     public float SwingRadians { get; set; }
 
-    /// <summary>
-    /// Which edge it is hinged on: -1 for the left edge, +1 for the right.
-    ///
-    /// Not cosmetic. It decides which way the leaf sweeps, and therefore which side of the doorway is
-    /// blocked while it is moving — and for somebody who navigates by ear, an open door heard on your
-    /// left is a different piece of information from one heard on your right.
-    /// </summary>
+    /// <summary>Which edge it is hinged on: -1 left, +1 right. It decides which side of the doorway the
+    /// leaf blocks, and which side an open door is heard on.</summary>
     public float HingeSide { get; set; }
 
-    /// <summary>How wide the opening is when the leaf is out of the way, metres. Derived from the
-    /// leaf itself at capture: a door makes a hole exactly its own size.</summary>
+    /// <summary>How wide the opening is with the leaf out of the way, metres: the leaf's own width,
+    /// taken at capture.</summary>
     public float Aperture { get; set; }
 
     /// <summary>Where the leaf sits when shut, in whatever frame it lives in — parent-local for a
@@ -655,17 +502,16 @@ public partial struct DoorComponent
     /// <summary>...and which way it faces when shut, in that same frame.</summary>
     public float ShutYaw { get; set; }
 
-    /// <summary>Whether the shut pose above has been taken yet. A door records where "shut" is the
-    /// first time it is looked at, so a door placed anywhere by anything is shut where it was put.</summary>
+    /// <summary>Whether the shut pose has been taken: a door records it the first time it is looked at,
+    /// so a door placed anywhere is shut where it was put.</summary>
     public bool Captured { get; set; }
 
     /// <summary>For a hollow door, the thickness of each of its two skins, metres; zero for a solid
-    /// leaf. A steel door is sheet over a core, and reckoned as a solid slab it weighs tonnes.
-    /// Appended last: components serialise positionally.</summary>
+    /// leaf. A steel door is sheet over a core; reckoned as a solid slab it weighs tonnes.</summary>
     public float SkinMetres { get; set; }
 
-    // ── What kind of door it is, and how it moves. Appended: components serialise positionally,
-    // so these go after SkinMetres and new fields go after them. See docs/DOOR_TYPES_EVENTS.md.
+    // ── What kind of door it is, and how it moves (docs/DOOR_TYPES_EVENTS.md). APPEND ONLY:
+    // components serialise positionally, so new fields go at the end.
 
     /// <summary>The hardware: a <see cref="OpenFPS.Common.DoorKind"/> as an int. 0 is a hinged door
     /// with a knob or lever, which is what every door saved before kinds existed was.</summary>
@@ -708,15 +554,12 @@ public partial struct DoorComponent
     /// <summary>Running state: the last opening was from the keyed side, so a key was turned.</summary>
     public bool KeyTurned { get; set; }
 
-    // ── Push and pull, the key and who has hold of it (2026-10-05). Appended: components serialise
-    // positionally. See docs/DOOR_TYPES_EVENTS.md.
+    // ── Push and pull, the key and who has hold of it (docs/DOOR_TYPES_EVENTS.md). Appended.
 
     /// <summary>
-    /// Which face of a hinged leaf you PUSH it open from: +1 its own +Z face, -1 the other. It swings
-    /// away from that face, so from the other face it is PULLED. 0 (a door saved before sides
-    /// existed) is +1, which is the way every door swung then. A door's +Z face is its outside: a room
-    /// door is pushed from outside and swings into the room (+1); an exit door is pushed from inside
-    /// and swings out toward the street (-1), and its push bar, where it has one, is on that inside face.
+    /// Which face of a hinged leaf you push it open from: +1 its own +Z face (its outside), -1 the other;
+    /// from the other face it is pulled. 0, a door saved before sides existed, is +1. A room door is
+    /// pushed from outside (+1); an exit door from inside (-1), where its push bar is.
     /// </summary>
     public float PushSide { get; set; }
 
@@ -743,45 +586,28 @@ public partial struct DoorComponent
 
 // ── Holding things ──────────────────────────────────────────────────────────────────────────────
 //
-// An item in your hands is the SAME ENTITY as one on the ground. That is already what
-// InventoryComponent says it believes, and it is the right belief: a rifle you are carrying has a
-// material, a mass and a position, and dropping it should make the noise that mass and that material
-// make when they meet that floor — which is a calculation that already exists and knows nothing about
-// rifles. Items as rows in a table would need all of that inventing again, wrongly.
+// An item in your hands is the same entity as one on the ground, with its mass and material, so
+// dropping it makes the noise they make meeting that floor.
 
-/// <summary>
-/// Something that can be picked up, carried and put down.
-/// </summary>
+/// <summary>Something that can be picked up, carried and put down.</summary>
 [MemoryPackable]
 public partial struct ItemComponent
 {
-    /// <summary>What it weighs. Not bookkeeping: it is what you hear when it lands, and what makes
-    /// carrying a thing different from not carrying it.</summary>
+    /// <summary>What it weighs: what you hear when it lands, and what you carry.</summary>
     public float MassKg { get; set; }
 
-    /// <summary>
-    /// How many hands it takes. One or two.
-    ///
-    /// The constraint that makes an inventory a spatial thing you reason about by ear rather than a
-    /// menu. A rifle takes both hands, so a rifle and a torch is a decision — and a decision a
-    /// player has to make out loud, in the moment, is worth more than a list they can scroll.
-    /// </summary>
+    /// <summary>How many hands it takes, one or two. A rifle takes both, so a rifle and a torch is a
+    /// decision made in the moment, not a list to scroll.</summary>
     public int Hands { get; set; }
 
-    /// <summary>The weapon this IS, or empty. A key into <see cref="OpenFPS.Common.WeaponRegistry"/>,
-    /// so a thing you are holding can be fired without anything knowing what a weapon is.</summary>
+    /// <summary>The weapon this is, or empty: a key into <see cref="OpenFPS.Common.WeaponRegistry"/>.</summary>
     public string WeaponId { get; set; }
 
     public ItemComponent() { MassKg = 1f; Hands = 1; WeaponId = ""; }
 }
 
-/// <summary>
-/// What a player has hold of.
-///
-/// Two slots, and something needing both is recorded in BOTH of them — the same entity id twice.
-/// That way "have I a hand free" is one question with one answer, rather than a rule about a flag
-/// that some code remembers to check and some does not.
-/// </summary>
+/// <summary>What a player has hold of. A two-handed thing is in both slots, the same id twice, so "is a
+/// hand free" is one question with one answer.</summary>
 [MemoryPackable]
 public partial struct HandsComponent
 {
@@ -791,14 +617,9 @@ public partial struct HandsComponent
 }
 
 /// <summary>
-/// On the item: who has it, and whether it is filling both their hands.
-///
-/// "Has it" and not "is holding it" — this is on a thing slung on a back exactly as it is on a thing
-/// in a fist, and it is the one question anything reaching for an item needs to ask: nobody can lift
-/// a thing off the floor, or off your shoulder, while this is set. WHICH of the two it is gets
-/// answered by <see cref="HandsComponent"/> and <see cref="InventoryComponent"/>, each of which
-/// names the ids it owns — so there are three places a thing can be, and each is one question with
-/// one answer rather than a flag some code remembers to check.
+/// On the item: who has it, in hand or slung, and whether it fills both their hands. Nobody can take a
+/// thing while this is set. Which of the two is answered by <see cref="HandsComponent"/> and
+/// <see cref="InventoryComponent"/>.
 /// </summary>
 [MemoryPackable]
 public partial struct HeldComponent
@@ -809,16 +630,10 @@ public partial struct HeldComponent
 }
 
 /// <summary>
-/// People, in a place, who react to what happens in front of them.
-///
-/// A crowd is not scenery and it is not an ambience bed. It is a source with a POSITION and a SIZE,
-/// and both of those are information: where the noise comes from tells a listener which way the
-/// grandstand is, and how loud it is tells them how many are in it. Independent sources sum in
-/// power, so a crowd twice the size is three decibels louder and not twice as loud — see
-/// <see cref="Applause"/>, which is why this carries a head count rather than a volume.
-///
-/// It reacts rather than loops. A loop of applause is audibly a loop within seconds, and a crowd
-/// that loops is the clearest possible signal that a place is not real.
+/// People in a place who react to what happens in front of them: a source with a position and a size,
+/// not an ambience bed. It carries a head count, not a volume: independent voices sum in power, so
+/// twice the crowd is three decibels louder (<see cref="Applause"/>). It reacts rather than loops; a
+/// loop of applause is heard as one within seconds.
 /// </summary>
 [MemoryPackable]
 public partial struct CrowdComponent
@@ -846,10 +661,8 @@ public partial struct CrowdComponent
 // Server-side state, never sent: a client learns what it needs about its own gun from StatsUpdate,
 // and about everybody else's from the sounds the guns make.
 
-/// <summary>
-/// The rounds in a weapon, on the weapon's own entity: put a loaded rifle down and the next person to
-/// pick it up gets those thirty rounds, because they are in the rifle and not in a list somewhere.
-/// </summary>
+/// <summary>The rounds in a weapon, on the weapon's own entity: whoever picks up a loaded rifle gets its
+/// rounds.</summary>
 [MemoryPackable]
 public partial struct AmmoComponent
 {
@@ -874,11 +687,8 @@ public partial struct AmmoReserveComponent
     public AmmoReserveComponent() { }
 }
 
-/// <summary>
-/// Somebody who has been killed, and when. A dead person does not walk, talk, shoot or get shot
-/// again; a player gets up again at the spawn a few seconds later, and a person in the street is
-/// taken away and somebody else comes along.
-/// </summary>
+/// <summary>Somebody who has been killed, and when. A player gets up again at the spawn later; a person
+/// in the street is taken away and somebody else comes along.</summary>
 [MemoryPackable]
 public partial struct DeadComponent
 {

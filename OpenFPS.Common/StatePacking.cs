@@ -5,33 +5,26 @@ using System.Runtime.InteropServices;
 namespace OpenFPS.Common.Networking;
 
 /// <summary>
-/// The per-tick entity states as they go over the wire: packed by hand, about half the size MemoryPack
-/// made them, with nothing a listener can hear thrown away.
-///
-/// MemoryPack wrote every state at full width whatever it held: four bytes of id, sixteen bits for each
-/// of the four quaternion components, three raw floats of velocity — twelve bytes of zeros for a person
-/// standing at a crossing — and four bytes saying "no wheels". On the city that was about fifty bytes a
-/// walker, five hundred of them a tick, and most of what each player downloaded.
+/// The per-tick entity states as they go over the wire: packed by hand to about half MemoryPack's size
+/// (about fifty bytes a walker at full width, five hundred walkers a tick on the city), with nothing a
+/// listener can hear thrown away.
 ///
 /// Per state, in order:
 /// <list type="bullet">
 /// <item>the entity id, as a variable-length integer (two bytes for any id under 16,384);</item>
 /// <item>one byte of flags: how the velocity is carried, and whether a tyre demand and wheels follow;</item>
-/// <item>the position, three 32-bit millimetre counts, exactly as before;</item>
-/// <item>the rotation as "smallest three": which component is largest, and the other three in 15 bits
-/// each — six bytes, and finer than the four 16-bit components it replaces;</item>
-/// <item>the velocity: nothing for none, three 16-bit millimetres a second for anything slower than
-/// 32.7 m/s in every axis, else three full floats. A millimetre a second is a Doppler shift of three
-/// parts in a million, and when the client differentiates it (a train's notch, a tyre's demand) the
-/// step is 0.03 m/s² — under every threshold that reads it. Fast things (a car on the speedway, an
-/// aircraft, a bullet) keep their floats, so nothing there changes at all;</item>
+/// <item>the position, three 32-bit millimetre counts;</item>
+/// <item>the rotation as "smallest three", six bytes (below);</item>
+/// <item>the velocity: nothing for none, three 16-bit millimetres a second below 32.7 m/s in every
+/// axis, else three floats. A millimetre a second is a Doppler shift of three parts in a million, and
+/// differentiated (a train's notch, a tyre's demand) a step of 0.03 m/s², under every threshold;</item>
 /// <item>the tyre demand byte, when it is not zero;</item>
 /// <item>the horn and siren byte (EntityState.Signals), when it is not zero;</item>
-/// <item>the wheels, a count and eight bytes each, when they are sent.</item>
+/// <item>the wheels, a count and <see cref="WheelBytes"/> each, when they are sent.</item>
 /// </list>
 ///
-/// Leaving the wheels out does not mean "no wheels": the client keeps the last it was sent, which it
-/// always did for a state without them. The server leaves them out while they are the same.
+/// No wheels sent does not mean no wheels: the client keeps the last, and the server leaves them out
+/// while they are the same.
 /// </summary>
 public static class StatePacking
 {
@@ -50,9 +43,8 @@ public static class StatePacking
     private const int MaxFixedBytes = 5 + 1 + 12 + 6 + 12 + 1 + 1 + 1;
 
     /// <summary>
-    /// The velocity the client will be given for this one: what the wire carries, so that the server can
-    /// compare what it is about to send against what it last sent and find them the same when the client
-    /// would. Rounded to the millimetre a second below <see cref="MillimetreRange"/>, exact above it.
+    /// The velocity the client will be given, so the server compares what it sends with what it last
+    /// sent as the client would. Rounded to the millimetre a second below <see cref="MillimetreRange"/>.
     /// </summary>
     public static Vector3 WireVelocity(Vector3 v)
     {
@@ -188,13 +180,9 @@ public static class StatePacking
 
     // ── Rotation: smallest three ──────────────────────────────────────────────────────────────────
     //
-    // A unit quaternion's components square-sum to one, so the largest can be worked out from the
-    // other three, and those three can be no bigger than 1/√2. Two bits say which was dropped and 15
-    // bits each carry the rest, a step of 4.3e-5 — the 16-bit components this replaces had steps of
-    // 3.1e-5 over twice the range, and four of them to carry. Under a hundredth of a degree either way.
-    // The dropped one is made positive to be worked out (q and -q are the same rotation), and the
-    // forty-eighth bit says whether it was negative, so the client gets back the same sign it was sent:
-    // nothing downstream has to know that q and -q are one rotation.
+    // The largest component is worked out from the other three, which are no bigger than 1/√2: two
+    // bits say which was dropped and 15 bits each carry the rest, a step of 4.3e-5, under a hundredth
+    // of a degree. The 48th bit keeps the sign, so the client gets back the q it was sent, not -q.
 
     private const float Root2 = 1.41421356f;
     private const float StepsPerUnit = 16383f;

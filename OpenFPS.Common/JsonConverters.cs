@@ -42,7 +42,7 @@ public class QuaternionConverter : JsonConverter<Quaternion>
 {
     public override Quaternion Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        float x = 0, y = 0, z = 0, w = 0; // Default to 0 to detect if W was provided
+        float x = 0, y = 0, z = 0, w = 0; // W defaults to 1 when absent (wSet)
         bool wSet = false;
 
         if (reader.TokenType != JsonTokenType.StartObject) throw new JsonException();
@@ -52,7 +52,7 @@ public class QuaternionConverter : JsonConverter<Quaternion>
             if (reader.TokenType == JsonTokenType.EndObject) 
             {
                 var q = new Quaternion(x, y, z, wSet ? w : 1.0f);
-                // DEFENSIVE: Never return an all-zero quaternion.
+                // Never an all-zero quaternion.
                 if (q.LengthSquared() < 0.001f) return Quaternion.Identity;
                 return q;
             }

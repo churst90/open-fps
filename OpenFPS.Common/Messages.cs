@@ -229,21 +229,17 @@ public partial class MapManifest : IMessage
     public string OwnerId = "";
     public bool IsPublic = false;
 
-    // Atmospheric & Physics. The map's authored atmosphere, applied by the client the moment the
-    // manifest lands so the world sounds right before the first WorldStateUpdate arrives a second later.
-    // AirPressure is MILLIBARS (sea level 1013.25).
+    // The map's atmosphere, applied when the manifest lands so the world sounds right before the first
+    // WorldStateUpdate. AirPressure is millibars (sea level 1013.25).
     public float Gravity = PhysicsConstants.Gravity;
     public float Temperature = 20.0f;
     public float Humidity = 0.5f;
     public float AirPressure = 1013.25f;
     public float AirAbsorptionMultiplier = 1.0f;
 
-    /// <summary>The map's OUTDOOR ambience bed — an ambisonic recording under ASSETS/SOUNDS, e.g.
-    /// "AMBIENCE/woods_mid_day". Empty for a map with no outdoor sound of its own.
-    ///
-    /// It belongs to the map rather than to a region because outdoors is not a region: it is everywhere
-    /// a region is not. The client keeps it playing the whole time and ducks it by the listener's
-    /// shelter, so walking into a building takes the world outside down rather than switching it off.</summary>
+    /// <summary>The map's outdoor ambience bed, an ambisonic recording under ASSETS/SOUNDS (e.g.
+    /// "AMBIENCE/woods_mid_day"), or empty. The map's, because outdoors is everywhere a region is not;
+    /// the client ducks it by the listener's shelter rather than switching it off.</summary>
     public string AmbienceId = "";
 
     /// <summary>The map's beacon policies, as "category=policy" — see Beacons.ReadPolicies. A
@@ -310,11 +306,8 @@ public partial class TileStreamUpdate : IMessage
 public partial class MapLoadComplete : IMessage { public MapLoadComplete() { } }
 
 /// <summary>
-/// Many entity definitions in one reliable message, for the map load.
-///
-/// One message per definition made the load bound by round trips, not bytes: a reliable channel
-/// keeps only so many packets in flight, and 6,408 small ones to a VPS took eight seconds. A batch
-/// fills each packet instead. The client files each definition exactly as if it had come alone.
+/// Many entity definitions in one reliable message, for the map load. One message each was bound by
+/// round trips, not bytes: 6,408 small ones to a VPS took eight seconds.
 /// </summary>
 [MemoryPackable]
 public partial class EntityDefinitionBatch : IMessage
@@ -327,11 +320,9 @@ public partial class EntityDefinitionBatch : IMessage
 }
 
 /// <summary>
-/// An <see cref="EntityDefinitionBatch"/>, Brotli-compressed: what the map load and the tile streamer
-/// send. A definition is about 700 bytes, most of it its prefab's description and sound settings, the
-/// same for every wall of a kind; a batch of 256 packs about sixteen to one (Magnolia's join at medium
-/// detail: 8.1 MB as batches, 0.5 MB packed, 14 ms to pack). The client unpacks it and files it as the
-/// batch it was.
+/// An <see cref="EntityDefinitionBatch"/>, Brotli-compressed, as the map load and tile streamer send it.
+/// A definition is about 700 bytes, mostly the same for every wall of a kind, so a batch of 256 packs
+/// about sixteen to one (Magnolia's join at medium detail: 8.1 MB as batches, 0.5 MB packed, 14 ms).
 /// </summary>
 [MemoryPackable]
 public partial class EntityDefinitionPack : IMessage
@@ -377,10 +368,9 @@ public partial class EntityDefinitionPack : IMessage
 }
 
 /// <summary>
-/// Tells a client that entities it was told about are gone — destroyed, or left its area of interest.
-/// Sent reliably: a client that misses this keeps a ghost forever, because every other message about an
-/// entity is additive. The client must purge the id from definitions, transforms, velocities, audio ids
-/// and any voice currently playing on it.
+/// Entities a client was told about are gone (destroyed, or out of its area). Reliable: every other
+/// message about an entity is additive, so a client that misses this keeps a ghost forever. The client
+/// purges the id from definitions, transforms, velocities, audio ids and any voice playing on it.
 /// </summary>
 [MemoryPackable]
 public partial class EntityRemoved : IMessage
@@ -411,31 +401,23 @@ public partial class EntityDefinition : IMessage
     public RegionComponent Region;
     public PortalComponent Portal;
     public Transform Transform;
+    // APPEND ONLY below this line: the wire format is positional.
+
     /// <summary>
-    /// Whether this thing can move — the server's Velocity component, which its TYPE does not say.
-    ///
-    /// A car's panels are StaticObjects, because they are the same walls a house is built from, and
-    /// the client took the type at its word: it filed them in the static collision grid and baked
-    /// them into the acoustic scene where they stood at load. Driven away, they left their ghost
-    /// behind in both — a car-shaped box of glass and steel in an empty parking bay — and the car
-    /// itself was nothing to walk into. Appended last: the wire format is positional.
+    /// Whether this thing can move (the server's Velocity component), which its type does not say: a
+    /// car's panels are StaticObjects, and filed as static they left a car-shaped ghost in the collision
+    /// grid and the acoustic scene when it drove away.
     /// </summary>
     public bool Moves;
 
-    /// <summary>
-    /// For a player, the team they are in, or "". Carried in the definition because that is the one
-    /// thing a client is told about another player besides where they are; a change of team re-sends
-    /// the definition (GameServer.SyncAudioComponent). Appended last: the wire format is positional.
-    /// </summary>
+    /// <summary>For a player, their team, or "". A change of team re-sends the definition
+    /// (GameServer.SyncAudioComponent).</summary>
     public string Team = "";
 
     /// <summary>
-    /// For a player, what they are sitting in (its root's entity id), or -1 on their own feet. A seated
-    /// body moves with its seat and is given the seat's velocity, which is the vehicle's, so to a client
-    /// it looks exactly like somebody running down the road: it has to be told, or it hears footsteps
-    /// at the vehicle's speed (Cody, 2026-10-05: "when I'm a passenger in a car and he's driving, I hear
-    /// footsteps like his footsteps"). Getting in and getting out re-send the definition
-    /// (GameServer.BroadcastWorldState). Appended last: the wire format is positional.
+    /// For a player, the root entity they sit in, or -1 on their own feet. A seated body has the
+    /// vehicle's velocity, so a client not told this hears footsteps at the vehicle's speed (Cody,
+    /// 2026-10-05). Getting in and out re-sends the definition (GameServer.BroadcastWorldState).
     /// </summary>
     public int RidingEntityId = -1;
 
@@ -493,35 +475,22 @@ public partial struct EntityState
     // APPEND ONLY BELOW THIS LINE. MemoryPack writes these positionally with no names on the wire.
 
     /// <summary>
-    /// How hard this vehicle is working its tyres, as a fraction of what they have, over the range
-    /// 0 to 2 with 1.0 the limit. One byte, so the resolution is about 0.008 — far finer than the
-    /// gap between singing and sliding, which is the only distinction it has to carry.
-    ///
-    /// It is sent rather than worked out by the listener, and that is the whole point of it. A
-    /// listener can differentiate a velocity and get an acceleration, but it CANNOT tell a banked
-    /// corner from a flat one: a constant-radius turn at constant speed has a purely horizontal
-    /// acceleration either way, and the bank shows up in the normal load, not in the kinematics. So
-    /// a client dividing lateral acceleration by flat-ground grip reads a banked oval as though every
-    /// car were sliding — measured on the speedway it comes out at 1.43 to 1.59 against a full-slide
-    /// threshold of 1.45, which is every car in every corner rendering pure broadband skid noise for
-    /// the length of both turns: a long white-noise tail travelling with the vehicles.
-    ///
-    /// One byte per dynamic entity per tick, and no numerical differentiation of an interpolated
-    /// velocity, which is fragile for its own reasons.
+    /// How hard this vehicle is working its tyres, 0 to 2 with 1 the limit, in steps of about 0.008.
+    /// Sent, because a client cannot tell a banked corner from a flat one from the kinematics: dividing
+    /// lateral acceleration by flat-ground grip read the speedway's banked turns at 1.43 to 1.59 against
+    /// a full-slide threshold of 1.45, every car in every corner a white-noise skid.
     /// </summary>
     public byte TyreDemand;
 
     /// <summary>
-    /// Each wheel of a vehicle, front axle first and left before right; null for anything without
-    /// wheels. What the server's wheel model (WheelDynamics) worked out this tick: the load on it,
-    /// its slip, how fast it turns, what it is standing on and the water on it. Ten bytes a wheel.
+    /// Each wheel, front axle first and left before right, as WheelDynamics worked it out this tick;
+    /// null for anything without wheels. Ten bytes a wheel.
     /// </summary>
     public WheelState[]? Wheels;
 
     /// <summary>
-    /// A vehicle's horn and siren, as the driver has them switched (<see cref="OpenFPS.Common.VehicleSignalBits"/>):
-    /// the horn held, the siren on, which tone. Zero for anything that is not a player's vehicle. Sent
-    /// because nothing the client can observe says a hand is on the horn. Packed only when not zero.
+    /// A vehicle's horn and siren as the driver has them switched (<see cref="OpenFPS.Common.VehicleSignalBits"/>);
+    /// zero for anything not a player's vehicle. Nothing a client observes says a hand is on the horn.
     /// </summary>
     public byte Signals;
 
@@ -624,14 +593,6 @@ public partial class HitConfirm : IMessage
     public HitConfirm() { }
 }
 
-/// <summary>
-/// A shot taken through a scope: client to server, in place of the "fire" command.
-///
-/// It carries the aim because the aim is the whole of the shot. The look keys travel as inputs that
-/// the server spends a tick at a time, so when the trigger arrives the server's copy of the heading
-/// can be a tick or two behind; through a 12-power scope that is a body's width at 600 m. The server
-/// takes this aim if it is within a few degrees of its own, and its own if not.
-/// </summary>
 /// <summary>Asks for what you are carrying, as a list to choose from (the I key).</summary>
 [MemoryPackable]
 public partial class InventoryRequest : IMessage { }
@@ -649,6 +610,11 @@ public partial class InventoryList : IMessage
     public string[] Places = Array.Empty<string>();
 }
 
+/// <summary>
+/// A shot taken through a scope: client to server, in place of the "fire" command. It carries the aim
+/// because the server's heading can be a tick or two behind the look keys, a body's width at 600 m
+/// through a 12-power scope. The server takes this aim if it is within a few degrees of its own.
+/// </summary>
 [MemoryPackable]
 public partial class ScopedShot : IMessage
 {
@@ -673,13 +639,8 @@ public partial class ServerStateUpdate : IMessage
     // APPEND ONLY BELOW THIS LINE — members serialise positionally.
 
     /// <summary>
-    /// The composite this client is riding in, or -1 for standing on their own two feet.
-    ///
-    /// The client stops predicting its own movement while this is set, because there is nothing of
-    /// its own to predict: a passenger's position belongs to the seat, and the seat belongs to
-    /// something the client cannot simulate. Guessing would only produce a correction every tick.
-    /// It also stops generating footsteps, which a person sitting down does not make and a person
-    /// sitting down travelling at ninety miles an hour would make a great many of.
+    /// The composite this client is riding in, or -1 on their own feet. While set, the client neither
+    /// predicts its movement (the seat's, which it cannot simulate) nor makes footsteps.
     /// </summary>
     public int RidingEntityId = -1;
 
@@ -688,9 +649,9 @@ public partial class ServerStateUpdate : IMessage
     public bool RidingControls;
 
     /// <summary>
-    /// The states, packed by <see cref="StatePacking"/> — how the server sends them, at about half the
-    /// size <see cref="States"/> took. Unpacked onto the end of <see cref="States"/> as the message is
-    /// read, and cleared, so nothing past the socket ever sees this field set.
+    /// The states as the server sends them, packed by <see cref="StatePacking"/> to about half the size.
+    /// Unpacked onto <see cref="States"/> as the message is read and cleared, so nothing past the socket
+    /// sees it set.
     /// </summary>
     public byte[]? Packed;
 
@@ -718,11 +679,10 @@ public partial class ClientInputUpdate : IMessage
     public float DeltaTime;
 
     // APPEND ONLY BELOW THIS LINE. MemoryPack writes these positionally with no names on the wire,
-    // so inserting a member in the middle renumbers every one after it — silently.
+    // so inserting a member renumbers every one after it, silently.
 
-    /// <summary>Running rather than walking. The speed is the server's to apply; this is only the
-    /// claim that the key was held, and prediction and the authority must read it the same way or
-    /// every stride mispredicts.</summary>
+    /// <summary>The run key was held. The server applies the speed; prediction must read it the same way
+    /// or every stride mispredicts.</summary>
     public bool Sprint;
 
     /// <summary>The horn key is down. Only a driver's counts; the server sounds the horn of the vehicle
@@ -748,9 +708,8 @@ public enum ChatChannel : byte
 }
 
 /// <summary>
-/// What a presence notice says happened to somebody. The words are in the message's text; this is
-/// what the client plays a sound by, and what lets a player turn those sounds off without losing the
-/// words.
+/// What a presence notice says happened to somebody: the client plays a sound by it, which a player can
+/// turn off without losing the words.
 /// </summary>
 public enum PresenceKind : byte
 {
@@ -779,10 +738,8 @@ public partial class ChatMessage : IMessage
     public bool FromStaff;
     /// <summary>For a private message YOU sent: who it went to. Empty otherwise.</summary>
     public string To = string.Empty;
-    /// <summary>
-    /// Set when this is the server saying somebody came, went, or is away, rather than somebody
-    /// talking. The Sender is then the person it is about, and the Text the whole notice.
-    /// </summary>
+    /// <summary>Set when the server says somebody came, went or is away: the Sender is then the person it
+    /// is about, and the Text the whole notice.</summary>
     public PresenceKind Presence;
 }
 
@@ -834,9 +791,8 @@ public partial class VoiceData : IMessage
     public int SenderId;
     public byte[] OpusData = Array.Empty<byte>();
     // APPEND ONLY BELOW THIS LINE: members are serialised by position.
-    /// <summary>The sender's frame count, wrapping. A listener puts frames back in order with it, and
-    /// knows a frame went missing (to rebuild or conceal) rather than simply playing the next one early.
-    /// Zero means none: a client from before it existed, whose frames are played as they come.</summary>
+    /// <summary>The sender's frame count, wrapping: a listener reorders frames by it and knows when one
+    /// went missing. Zero, from a client before it existed, plays frames as they come.</summary>
     public ushort Sequence;
 }
 
@@ -854,10 +810,9 @@ public partial class WorldStateUpdate : IMessage
     public float WindGustiness; // 0.0 - 1.0
     public float PrecipitationIntensity; // 0.0 - 1.0
     // APPEND ONLY BELOW THIS LINE: members are serialised by position.
-    /// <summary>The server's wind clock (WindField.Now) when this was sent, and how far the air had
-    /// carried the wind's eddy pattern by then, metres east and north. With them every client displaces
-    /// the same gusts by the same amount, so a gust reaches the same tree at the same moment for
-    /// everybody. Zero clock: a server from before it existed.</summary>
+    /// <summary>The server's wind clock (WindField.Now) and how far the eddy pattern had travelled,
+    /// metres east and north, so a gust reaches the same tree at the same moment for every client. Zero
+    /// clock: a server from before it existed.</summary>
     public double WindClock;
     public double WindTravelEast;
     public double WindTravelNorth;

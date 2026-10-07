@@ -4,14 +4,10 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// Coordinates as a PLAYER reads and types them: x east-west, y north-south, z height.
-///
-/// The engine is Y-up — +X east, +Y up, +Z north — which is FMOD's native layout and the one every
-/// map, prefab and system is written in, so it stays. But players think of the ground as x and y and
-/// of z as height, the way a map, a surveyor or Blender does, and hearing "150, 0.1, 27" they took
-/// the middle number for north. So the swap happens here, at the edge, in one place: everything that
-/// SPEAKS a position formats it through this, and everything that READS one from a player parses it
-/// through this, so what C says can be typed straight back into /tp.
+/// Coordinates as a player reads and types them: x east-west, y north-south, z height. The engine is
+/// Y-up (+X east, +Y up, +Z north, FMOD's layout), but players took the middle number for north. So
+/// everything that says a position, or reads one from a player, goes through this, and what C says can
+/// be typed back into /tp.
 /// </summary>
 public static class PlayerCoordinates
 {

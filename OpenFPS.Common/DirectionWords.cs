@@ -3,12 +3,9 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// Where something is from the way you face, in words: in front, right in front, right, right behind,
-/// behind, left behind, left, left in front. Cody, 2026-10-04: a clock face made him work out that
-/// 5 o'clock was behind him; the words say it.
-///
-/// One copy for the server (/scan, /where, the nearest things) and the client (comma and period, the
-/// things on the map), so the two never say the same place in different words.
+/// Where something is from the way you face, in words rather than a clock face (Cody, 2026-10-04: he
+/// had to work out that 5 o'clock was behind him). Shared by the server's /scan and /where and the
+/// client's comma and period, so the two never word one place differently.
 /// </summary>
 public static class DirectionWords
 {

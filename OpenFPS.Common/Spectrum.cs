@@ -3,23 +3,13 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// What is in a buffer, by frequency band.
+/// What is in a buffer, by frequency band: a band balance a test can hold where a listening test cannot
+/// ("eighteen decibels too much between thirty and sixty hertz"). Octave-ish bands across hearing,
+/// normalised, so a sound's shape is compared and not its level (<see cref="Loudness"/>).
 ///
-/// It exists because a listening test cannot be automated and a band balance can. "It does not sound
-/// right" is where every audio fault starts and it is not something a test can hold; "it has eighteen
-/// decibels too much between thirty and sixty hertz" is, and it is usually the same fault said
-/// precisely.
-///
-/// The bands are the ones the ear roughly works in — octave-ish, from where hearing starts to where
-/// it stops — and the result is NORMALISED, so what is compared is the SHAPE of a sound and not how
-/// loud somebody recorded it. Loudness is a separate question with its own answer (see
-/// <see cref="Loudness"/>); this is about whether a thing has the right amount of bass.
-///
-/// A warning worth writing down, because it cost a wrong conclusion once: a measurement that has not
-/// itself been checked is not evidence. The first version of this analysis decimated inside its own
-/// transform to go faster, which aliases everything above an eighth of the sample rate back down the
-/// spectrum, and it produced a confident and completely wrong diagnosis of the footstep synthesiser.
-/// Hence a real FFT, a window, and no shortcuts.
+/// A measurement not itself checked is not evidence: the first version decimated inside its transform,
+/// aliasing everything above an eighth of the sample rate, and confidently misdiagnosed the footstep
+/// synthesiser. Hence a real FFT, a window, and no shortcuts.
 /// </summary>
 public static class Spectrum
 {
@@ -32,14 +22,8 @@ public static class Spectrum
     /// <summary>A readable name for each band, for a report or an assertion message.</summary>
     public static string BandName(int i) => $"{BandEdges[i]:F0}-{BandEdges[i + 1]:F0} Hz";
 
-    /// <summary>
-    /// The energy in each band, as decibels relative to the TOTAL across all of them.
-    ///
-    /// Relative, so two recordings made at different levels can be compared at all, and so the
-    /// question being asked is "does this have the right shape" rather than "is this the right
-    /// volume". The two are genuinely separate and conflating them is how a correct level ends up
-    /// being blamed for a wrong timbre.
-    /// </summary>
+    /// <summary>The energy in each band, dB relative to the total, so recordings at different levels
+    /// compare by shape.</summary>
     public static float[] BandsDb(ReadOnlySpan<float> samples, int sampleRate, int fftSize = 4096)
     {
         var energy = BandEnergy(samples, sampleRate, fftSize);
@@ -60,8 +44,7 @@ public static class Spectrum
         var buf = new Complex[n];
         int take = Math.Min(n, samples.Length);
 
-        // Hann. Without a window, a transient sitting anywhere but the exact centre smears across
-        // every bin and the answer is the window's spectrum rather than the sound's.
+        // Hann: unwindowed, an off-centre transient gives the window's spectrum, not the sound's.
         for (int i = 0; i < take; i++)
         {
             float w = 0.5f - 0.5f * MathF.Cos(2f * MathF.PI * i / (n - 1));
@@ -87,14 +70,8 @@ public static class Spectrum
         return energy;
     }
 
-    /// <summary>
-    /// The average band shape over several windows — for a sound made of repeated events.
-    ///
-    /// One footstep is one sample of a random process: the grit it happens to land on varies, and a
-    /// spectrum taken from a single step says as much about that step's luck as about the model.
-    /// Averaging several is the difference between measuring the thing and measuring one instance
-    /// of it.
-    /// </summary>
+    /// <summary>The average band shape over several windows, for a sound of repeated events: one footstep
+    /// is one draw of a random process.</summary>
     public static float[] AverageBandsDb(ReadOnlySpan<float> samples, int sampleRate,
                                          ReadOnlySpan<int> startOffsets, int fftSize = 4096)
     {

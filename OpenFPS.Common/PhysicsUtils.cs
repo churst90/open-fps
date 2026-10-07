@@ -5,9 +5,7 @@ using OpenFPS.Common.Components;
 
 namespace OpenFPS.Common;
 
-/// <summary>
-/// Shared physics utilities to ensure client-server parity for grounding and collision.
-/// </summary>
+/// <summary>The ground probes, shared so the client and the server agree where the floor is.</summary>
 public static class PhysicsUtils
 {
     // The candidate gather runs on the server tick thread, the client game thread and the acoustic worker
@@ -19,24 +17,16 @@ public static class PhysicsUtils
     [ThreadStatic] private static List<EntitySnapshot>? _snapshotScratch;
 
     /// <summary>
-    /// Performs a standardized vertical probe to find the floor height at a given position.
-    /// Uses a "Thin Probe" (0.1m footprint) to prevent standing on walls.
-    /// Version for Server (using Arch World).
-    ///
-    /// This is the single most-run query on the server — once per input, not once per tick — so callers
-    /// with a <see cref="GroundProbeMemo"/> should go through
-    /// <see cref="GetGroundHeight(World, SpatialGrid{Entity}, Vector3, ref GroundProbeMemo, out string)"/>
-    /// instead and pay for it only when the answer can actually have changed.
+    /// The floor height under a point, on the server. The most-run query on the server (once per
+    /// input), so callers with a <see cref="GroundProbeMemo"/> go through
+    /// <see cref="GetGroundHeight(World, SpatialGrid{Entity}, Vector3, ref GroundProbeMemo, out string)"/>.
     /// </summary>
     public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos, out string material)
         => GetGroundHeight(world, grid, pos, null, out material);
 
     /// <summary>
-    /// The ground under a point, not counting <paramref name="ignore"/>.
-    ///
-    /// A driven vehicle asks where the road is under it, and its own floor is standing right there,
-    /// a quarter of a metre up and inside the step height. Counted, it is "ground": the car steps up
-    /// onto its own floor, and does it again the next tick from there, and climbs out of the world.
+    /// The ground under a point, not counting <paramref name="ignore"/>: a driven vehicle's own floor is
+    /// inside the step height, and counted it climbs onto it every tick and out of the world.
     /// </summary>
     public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos,
                                         ICollection<Entity>? ignore, out string material)
@@ -46,9 +36,7 @@ public static class PhysicsUtils
         if (grid.Geometry != null && Geometry.TriangleGeometry.Enabled)
             return GroundFromGeometry(world, grid, pos, ignore, stepHeight, out material);
 
-        // 1. Optimized Grid Search. CollectInRadius walks the cells ONCE and yields each candidate once;
-        //    the old ToList() over the iterator handed a multi-cell floor back as many times as it spanned
-        //    cells, and every one of those repeats was then tested against all five probe points.
+        // Each candidate once: a floor spanning many cells is tested against five probe points.
         var candidates = _entityScratch ??= new List<Entity>(64);
         var seen = _entitySeen ??= new HashSet<Entity>();
         grid.CollectInRadius(pos, 50.0f, candidates, seen);
@@ -56,9 +44,7 @@ public static class PhysicsUtils
 
         float ground = CalculateHeightFromCandidates(world, candidates, pos, stepHeight, out material);
 
-        // 2. REAL SOLUTION: Exhaustive Fallback
-        // If the grid search missed the floor (e.g. edge case or grid stale),
-        // perform a global scan of all solid entities to guarantee grounding.
+        // The grid missed the floor (an edge case, a stale grid): scan every solid.
         if (ground < -900f)
         {
             var allStatic = new List<Entity>();
@@ -71,7 +57,7 @@ public static class PhysicsUtils
         return ground;
     }
 
-    /// <summary>Counts every solid but those of the entities in <paramref name="Ignore"/>.</summary>
+    /// <summary>Counts every solid but those of the entities it was given to ignore.</summary>
     private readonly struct IgnoreEntities : Geometry.IGeometryFilter
     {
         private readonly ICollection<Entity>? _ignore;
@@ -120,9 +106,8 @@ public static class PhysicsUtils
     private static string GroundMaterial(string material) => material;
 
     /// <summary>
-    /// The memoized form of the server ground probe: recomputes only when the static geometry has changed,
-    /// the probe point has moved, or the remembered answer has aged out. See <see cref="GroundProbeMemo"/>
-    /// for why each of those three is a condition and what the age bound costs.
+    /// The server ground probe, remembered: recomputed only when the static geometry changed, the point
+    /// moved or the answer aged out (<see cref="GroundProbeMemo"/>).
     /// </summary>
     public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos,
         ref GroundProbeMemo memo, out string material)
@@ -148,7 +133,7 @@ public static class PhysicsUtils
         material = "Generic";
         string bestMat = "Generic";
 
-        // Probing points: Center + 4 points at the edge of the player radius
+        // The centre and four points on the body's radius.
         const float radius = PhysicsConstants.PlayerRadius;
         Span<Vector3> probes = stackalloc Vector3[5];
         probes[0] = pos;
@@ -170,7 +155,6 @@ public static class PhysicsUtils
             float objTop = t.Position.Y + (c.Size.Y / 2f);
             if (objTop > pos.Y + stepHeight) continue;
 
-            // Check if any of our probe points are within this object's footprint
             bool hit = false;
             foreach (var p in probes)
             {
@@ -192,10 +176,7 @@ public static class PhysicsUtils
         return bestY;
     }
 
-    /// <summary>
-    /// Performs a standardized vertical probe to find the floor height at a given position.
-    /// Version for Client (using WorldSnapshot).
-    /// </summary>
+    /// <summary>The floor height under a point, on the client.</summary>
     public static float GetGroundHeight(WorldSnapshot snapshot, Vector3 pos, int ownEntityId, out string material)
     {
         const float stepHeight = 0.4f;
@@ -224,7 +205,6 @@ public static class PhysicsUtils
             return y;
         }
 
-        // 1. Optimized Grid Search — one walk of the cells, each candidate once (see the server version).
         var candidates = _snapshotScratch ??= new List<EntitySnapshot>(64);
         candidates.Clear();
 
@@ -241,7 +221,6 @@ public static class PhysicsUtils
             ? CalculateHeightFromSnapshots(candidates, pos, stepHeight, ownEntityId, out material)
             : CalculateHeightFromSnapshots(snapshot.Entities.Values, pos, stepHeight, ownEntityId, out material);
 
-        // 2. REAL SOLUTION: Exhaustive Fallback
         if (ground < -900f && snapshot.Entities.Count > 0)
         {
             ground = CalculateHeightFromSnapshots(snapshot.Entities.Values, pos, stepHeight, ownEntityId, out material);
@@ -251,13 +230,11 @@ public static class PhysicsUtils
     }
 
     /// <summary>
-    /// Where a foot goes down, and on what (docs/GEOMETRY.md 3.8): the floor under the foot, not the body's.
-    /// The body stands at the highest floor anywhere under its footprint, so on a flight it is already at
-    /// the next tread's height while its middle is over the one below, and a foot put down under its middle
-    /// was in the air over the lower tread. The foot goes on the floor the body is standing on: under the
-    /// foot if that is the body's height, or a body's radius ahead along <paramref name="way"/> (the tread
-    /// it is stepping up onto). Nothing found at the body's height (a body on a vehicle's floor, a floor the
-    /// triangles do not hold) leaves the foot where it was and <paramref name="material"/> null.
+    /// Where a foot goes down, and on what (docs/GEOMETRY.md 3.8). The body stands at the highest floor
+    /// under its footprint, so on a flight a foot under its middle was in the air over the lower tread.
+    /// The foot goes on the floor the body stands on: under the foot, or a body's radius ahead along
+    /// <paramref name="way"/>. Nothing at the body's height (a vehicle's floor) leaves the foot where it
+    /// was and <paramref name="material"/> null.
     /// </summary>
     public static Vector3 FootOnFloor(WorldSnapshot snapshot, Vector3 foot, Vector3 feet, Vector3 way, int ownEntityId, out string? material)
     {
@@ -287,9 +264,8 @@ public static class PhysicsUtils
             float y = geo.FloorAt(at.X, at.Z, top, Geometry.GeometryLayers.Ground, ref filter, out var hit);
             if (y > -1000f && MathF.Abs(y - feet.Y) <= FootOnFloorTolerance) return On(geo, at, y, hit, out material);
         }
-        // ...or whatever is under the foot, within a step of the feet: going down a flight the body is held
-        // at the tread it is leaving until its whole footprint is past it, and the foot is already on the
-        // one below; stepping up, the body is lifted for a moment and the foot is still on the tread under it.
+        // ...or whatever is under the foot within a step: going down, the body is held on the tread it is
+        // leaving while the foot is already on the one below.
         if (under > -1000f && MathF.Abs(under - feet.Y) <= PhysicsConstants.StepHeight + 0.01f) return On(geo, foot, under, underHit, out material);
         return foot;
 
