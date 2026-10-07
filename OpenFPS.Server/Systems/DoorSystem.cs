@@ -1,10 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Networking;
 using Serilog;
 
 namespace OpenFPS.Server.Systems;

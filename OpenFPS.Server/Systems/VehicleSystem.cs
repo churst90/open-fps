@@ -1,6 +1,3 @@
-using System;
-using System.Linq;
-using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -202,7 +199,6 @@ public sealed partial class VehicleSystem
         _maps = maps;
         foreach (var entry in maps.GetAllMaps())
         {
-            int routeIndex = 0;
             string mapId = entry.Key;
             var data = entry.Value.data;
             if (onlyMap != null && !mapId.Equals(onlyMap, StringComparison.OrdinalIgnoreCase)) continue;
@@ -294,7 +290,7 @@ public sealed partial class VehicleSystem
                 }
                 else if (vd.Route != null)
                 {
-                    route = BuildRoute(maps, mapId, vd, routeIndex++);
+                    route = BuildRoute(maps, mapId, vd);
                     if (route == null) continue;
                     float topSpeed = (vd.TopSpeedKmh > 0 ? vd.TopSpeedKmh : 200f) / 3.6f;
                     float grip = vd.CorneringG > 0 ? vd.CorneringG : 1.0f;

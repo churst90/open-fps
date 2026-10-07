@@ -27,8 +27,6 @@ public class FriendRepository
         Load();
     }
 
-    public string PathOnDisk => _path;
-
     private static string Key(string username) => username.Trim().ToLowerInvariant();
 
     private void Load()

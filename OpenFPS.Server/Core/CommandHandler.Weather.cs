@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using OpenFPS.Common;
@@ -26,7 +24,7 @@ public partial class CommandHandler
     private const string WeatherUsage =
         "Usage: /weather, /weather clear, rain, snow or storm, /weather drizzle, /weather rain light, moderate, heavy or extreme, or a rate in millimetres an hour, or dBZ, and drops then a size, /weather freezing rain, /weather sleet, /weather snow light, moderate or heavy, /weather hail pea, marble, quarter, golf or baseball, /weather wind SPEED [DIRECTION] [steady, gusty or very gusty], or /weather auto.";
 
-    private void HandleWeather(UserSession session, string[] args, Action<IMessage> reply)
+    private void HandleWeather(string[] args, Action<IMessage> reply)
     {
         var env = _server.WorldEnvironment;
         if (args.Length == 0)

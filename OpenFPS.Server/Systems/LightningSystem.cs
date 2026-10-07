@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using Serilog;

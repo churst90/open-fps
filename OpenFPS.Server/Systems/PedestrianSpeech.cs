@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -243,7 +240,7 @@ public sealed partial class PedestrianSpeech
             me.LastPosition = p.At;
             foreach (var q in players)
                 Meet(mapId, p, me, q, now, cond, say);
-            Phone(mapId, p, me, players, now, cond, say);
+            Phone(p, me, players, now, cond, say);
             Remark(p, me, players, now, cond, say);
         }
         foreach (var ch in characters)
@@ -448,7 +445,7 @@ public sealed partial class PedestrianSpeech
         me.NextPhoneLine = now + LengthOf(me.Voice, hello) + Uniform(2, 5);
     }
 
-    private void Phone(string mapId, (int Id, Vector3 At, Vector3 Forward, float Speed, string Voice) p, Person me,
+    private void Phone((int Id, Vector3 At, Vector3 Forward, float Speed, string Voice) p, Person me,
                        List<(int Id, Vector3 At, float Speed)> players, double now, SpeechConditions cond,
                        Action<int, string, TransientSound> say)
     {

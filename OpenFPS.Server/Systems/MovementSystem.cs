@@ -4,8 +4,6 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using System.Numerics;
-using System.Collections.Generic;
-using System;
 using System.Buffers;
 using Serilog;
 using static OpenFPS.Common.PhysicsConstants;
@@ -38,7 +36,7 @@ public static class MovementSystem
     /// 2026-10-04: Sean, on a roof beside him, was half a kilometre west at the map's edge 46 s later,
     /// and nothing the server logged said how. Once a second at most, with where and what it had to go on.
     /// </summary>
-    private static void NoteFling(UserSession session, string user, Vector3 from, Vector3 to, float dt,
+    private static void NoteFling(string user, Vector3 from, Vector3 to, float dt,
                                   ClientInputUpdate input, float groundY, int colliders)
     {
         if (dt <= 0f) return;
@@ -246,7 +244,7 @@ public static class MovementSystem
                             System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_solidScratch));
                     }
                     var result = SharedMovementEngine.Step(ctx, obstacles, out _);
-                    NoteFling(session, player.Username, transform.Position, result.NewPosition, stepDt, input, groundY, colliderCount);
+                    NoteFling(player.Username, transform.Position, result.NewPosition, stepDt, input, groundY, colliderCount);
 
                     transform.Position = result.NewPosition;
                     velocity.Linear = result.NewVelocity;

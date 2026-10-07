@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -1488,7 +1485,7 @@ public sealed partial class CombatService
     {
         FlyBullets(mapId);
         UpdateAutomatic(mapId, world);
-        Thaw(mapId, world);
+        Thaw(world);
         double now = Clock();
         if (_reloads.Count > 0)
             foreach (var (session, r) in _reloads.Where(kv => kv.Value.MapId == mapId && now >= kv.Value.DoneAt).ToList())
@@ -1536,9 +1533,6 @@ public sealed partial class CombatService
             _server.BroadcastRemoval(mapId, id);
         }
     }
-
-    /// <summary>For tests: how many walkers are waiting to be replaced.</summary>
-    internal int WalkersComingBack => _comingBack.Count;
 
     /// <summary>A dead player up again at the spawn, whole.</summary>
     private void Respawn(string mapId, World world, Entity e)

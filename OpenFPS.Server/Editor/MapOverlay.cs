@@ -1,7 +1,6 @@
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Arch.Core;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
@@ -80,7 +79,6 @@ public sealed class MapOverlay
 
     public OverlayChange? ChangeFor(int id) => Changed.FirstOrDefault(c => c.Id == id);
     public OverlayAddition? AdditionFor(int id) => Added.FirstOrDefault(a => a.Entity.EntityId == id);
-    public bool IsAdded(int id) => id >= FirstAddedId && AdditionFor(id) != null;
 }
 
 /// <summary>

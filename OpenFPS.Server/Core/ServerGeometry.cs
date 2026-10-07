@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -28,9 +26,6 @@ public sealed class ServerGeometry
     public int LastBuilt => _builder.LastBuilt;
     /// <summary>Of the last rebuild, reading the world's solids, milliseconds.</summary>
     public double LastCollectMs { get; private set; }
-
-    /// <summary>A static was added outside a rebuild: take it in at the next <see cref="Sync"/>.</summary>
-    public void MarkDirty() => _dirty = true;
 
     /// <summary>
     /// A fixed thing put in the grid's static half outside a refresh (MapManager.IndexEntity). The next

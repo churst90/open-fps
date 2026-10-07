@@ -1,7 +1,5 @@
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
-using Arch.Core.Extensions;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Systems;

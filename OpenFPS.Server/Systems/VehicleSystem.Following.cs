@@ -146,12 +146,4 @@ public sealed partial class VehicleSystem
             if (v.MapId == mapId && v.Wheels != null)
                 yield return (v.DisplayName, v.Preset, v.Speed, v.Lap, v.TyreDemand, v.Wheels, v.Driver, v.Entity, v.Line, v.CorneringG, v.KerbShift);
     }
-
-    /// <summary>Tests: every lane's vehicles in order, with their positions round it.</summary>
-    internal IEnumerable<(string Track, float Lane, float Lap, float Length, float LapLength, float Speed)> RacersForTest(string mapId)
-    {
-        foreach (var v in _vehicles)
-            if (v.MapId == mapId && v.Line != null && InLane(v))
-                yield return (v.TrackId, v.LaneOffset, v.Lap, v.LengthMetres, v.Line.Length, v.Speed);
-    }
 }

@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;

@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -158,7 +155,7 @@ public sealed class CharacterSystem
                 }
                 if (c.Entity == Entity.Null || now >= c.GoneUntil)
                 {
-                    Begin(c, world, now, cond, awayFrom: c.Entity == Entity.Null ? null : c.LastSeen);
+                    Begin(c, now, cond, awayFrom: c.Entity == Entity.Null ? null : c.LastSeen);
                     c.GoneUntil = double.NaN;
                 }
                 continue;
@@ -189,7 +186,7 @@ public sealed class CharacterSystem
     }
 
     /// <summary>Starts (or restarts) a character's day at the place it has them at this hour.</summary>
-    private void Begin(Character c, World world, double now, SpeechConditions cond, Vector3? awayFrom)
+    private void Begin(Character c, double now, SpeechConditions cond, Vector3? awayFrom)
     {
         var rng = Draw(c);
         var choices = awayFrom is { } dead
@@ -244,7 +241,7 @@ public sealed class CharacterSystem
                     if (!DoorSystem.OpenEnough(world, c.At?.Door ?? Entity.Null) && now - c.DoorSince < 6) break;
                     c.OpeningDoor = false;
                 }
-                if (Walk(c, ref t, ref vel, dt)) Arrive(c, world, now, cond);
+                if (Walk(c, ref t, ref vel, dt)) Arrive(c, now, cond);
                 break;
 
             case Doing.AtDoor:
@@ -295,7 +292,7 @@ public sealed class CharacterSystem
                 else if (now - c.BusSince >= BusWaitSeconds)          // the bus keeps real time, whatever his pace
                 {
                     Log.Information("CHARACTER {Name}: no bus at {Place}; walking to {To} instead.", c.Data.Name, c.At.Name, c.RideTo!.Name);
-                    WalkTo(c, world, t.Position, c.RideTo!, now, cond);
+                    WalkTo(c, world, t.Position, c.RideTo!, now);
                     c.RideTo = null;
                 }
                 break;
@@ -333,7 +330,7 @@ public sealed class CharacterSystem
                 if (!world.IsAlive(c.Bus))
                 {
                     CompositeService.Disembark(world, c.Entity);
-                    WalkTo(c, world, t.Position with { Y = Ground(world, grid, t.Position) }, c.RideTo!, now, cond);
+                    WalkTo(c, world, t.Position with { Y = Ground(world, grid, t.Position) }, c.RideTo!, now);
                     break;
                 }
                 bool atStop = world.Has<SoundEmitterComponent>(c.Bus) && world.Get<SoundEmitterComponent>(c.Bus).ServingStop;
@@ -378,12 +375,12 @@ public sealed class CharacterSystem
             return;
         }
         var next = Choose(c.Haunts, at, new Vector2(here.X, here.Z), cond, rng);
-        WalkTo(c, world, here, next, now, cond);
+        WalkTo(c, world, here, next, now);
     }
 
     /// <summary>Sets off on foot for a place: out of a lobby by its door if he is in one, along the pavements,
     /// and to its door if it is a lobby.</summary>
-    private void WalkTo(Character c, World world, Vector3 from, Haunt to, double now, SpeechConditions cond)
+    private void WalkTo(Character c, World world, Vector3 from, Haunt to, double now)
     {
         var start = new List<Vector2> { new(from.X, from.Z) };
         bool leavingLobby = c.Now != Doing.Riding && c.Now != Doing.WaitingForBus && c.At is { Kind: HauntKind.Lobby } lobby
@@ -426,7 +423,7 @@ public sealed class CharacterSystem
     }
 
     /// <summary>Reached the end of a walk: a lobby's door, or the place itself.</summary>
-    private void Arrive(Character c, World world, double now, SpeechConditions cond)
+    private void Arrive(Character c, double now, SpeechConditions cond)
     {
         var to = c.Target!;
         if (to.Kind == HauntKind.Lobby && !c.EnteringLobby)
@@ -657,10 +654,6 @@ public sealed class CharacterSystem
                 c.FaceUntil = _clocks.GetValueOrDefault(mapId) + seconds;
             }
     }
-
-    /// <summary>The places a character goes, for tests and /where.</summary>
-    internal IReadOnlyList<Haunt> HauntsOf(string name)
-        => _all.FirstOrDefault(c => c.Data.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Haunts ?? new List<Haunt>();
 
     // ── Small things ────────────────────────────────────────────────────────────────────────────
 

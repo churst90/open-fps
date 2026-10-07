@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
-using LiteNetLib.Utils;
 using MemoryPack;
 using OpenFPS.Common.Networking;
 using Serilog;

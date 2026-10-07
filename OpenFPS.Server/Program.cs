@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
-using System.Threading;
 using System.Runtime.InteropServices;
 using LiteNetLib;
 using Serilog;
@@ -219,13 +216,6 @@ public class GameServer
     /// <summary>The models the world editor has changed, every version kept (model_versions/). In memory
     /// only until <see cref="Start"/> gives it its folder.</summary>
     public OpenFPS.Server.Editor.ModelStore Models { get; set; } = new(null);
-
-    /// <summary>A model's new version, to every game client on every map: the change is heard at once.</summary>
-    public void BroadcastModel(ModelUpdate update)
-    {
-        foreach (var session in _sessions.GetAllSessions().ToList())
-            if (!session.IsTextClient) SendToSession(session, update);
-    }
 
     /// <summary>The entities whose definitions go out again at the next broadcast. For tests.</summary>
     internal IReadOnlyCollection<int> PendingDefinitionResends => _dirtyAudioEntities.ToArray();

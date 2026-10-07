@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
@@ -154,7 +153,7 @@ public partial class CommandHandler
                 HandleGroup(session, args, reply);
                 break;
             case "ungroup":
-                HandleUngroup(session, args, reply);
+                HandleUngroup(session, reply);
                 break;
             case "saveas":
                 HandleSaveAs(session, args, reply);
@@ -188,7 +187,7 @@ public partial class CommandHandler
                 break;
             // The whole server's weather, for testing: developers and administrators (Permissions).
             case "weather":
-                HandleWeather(session, args, reply);
+                HandleWeather(args, reply);
                 break;
             case "prefabs":
                 HandleListPrefabs(reply);
@@ -844,7 +843,7 @@ public partial class CommandHandler
     }
 
     /// <summary>/ungroup — takes the nearest composite apart, leaving its parts exactly where they are.</summary>
-    private void HandleUngroup(UserSession session, string[] args, Action<IMessage> reply)
+    private void HandleUngroup(UserSession session, Action<IMessage> reply)
     {
         var svc = Composites(reply); if (svc == null) return;
         if (!TryGetBody(session, reply, out _, out _, out var position)) return;

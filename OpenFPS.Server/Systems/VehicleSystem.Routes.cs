@@ -21,7 +21,7 @@ public sealed partial class VehicleSystem
     /// <summary>A level crossing on a vehicle's way: this close to it, metres; it waits this far short.</summary>
     private const float CrossingReachMetres = 6f, CrossingStandOffMetres = 12f;
 
-    private LaneRoute? BuildRoute(MapManager maps, string mapId, VehicleData vd, int index)
+    private LaneRoute? BuildRoute(MapManager maps, string mapId, VehicleData vd)
     {
         if (!maps.TryGetRoads(mapId, out var net))
         {

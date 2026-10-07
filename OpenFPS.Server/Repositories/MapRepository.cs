@@ -4,7 +4,6 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using System.Security.Cryptography;
-using System.Text;
 using Serilog;
 
 namespace OpenFPS.Server.Repositories;
@@ -701,9 +700,6 @@ public class MapRepository
 
     private static readonly HashSet<string> EntityFields = new(
         typeof(EntityData).GetProperties().Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>The folder the shipped maps are in, as resolved.</summary>
-    public string DirectoryPath => _directory;
 
     /// <summary>Where the world editor keeps each map's edits (docs/WORLD_EDITOR.md section 7). Not read as maps.</summary>
     public string OverlayDirectory => Path.Combine(_directory, "overlays");

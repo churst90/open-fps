@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;

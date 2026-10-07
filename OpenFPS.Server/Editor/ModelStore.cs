@@ -1,7 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
-using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using Serilog;
 

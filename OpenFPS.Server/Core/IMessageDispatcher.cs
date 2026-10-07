@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Server.Core;

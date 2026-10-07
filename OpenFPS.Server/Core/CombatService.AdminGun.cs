@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -293,7 +290,7 @@ public sealed partial class CombatService
             }
 
             default:
-                Vaporize(f, world, grid, lookup, hit, body, at, metres, Tell);
+                Vaporize(f, world, grid, lookup, hit, body, at, Tell);
                 return true;
         }
     }
@@ -334,7 +331,7 @@ public sealed partial class CombatService
     }
 
     /// <summary>Lets go of everything on this map whose time is up; a player is told.</summary>
-    private void Thaw(string mapId, World world)
+    private void Thaw(World world)
     {
         double now = Clock();
         List<Entity>? due = null;
@@ -362,7 +359,7 @@ public sealed partial class CombatService
     /// only until the server restarts, unless the map is saved after.
     /// </summary>
     private void Vaporize(Flight f, World world, SpatialGrid<Entity> grid, Dictionary<int, Entity> lookup,
-                          Entity hit, bool body, Vector3 at, float metres, Action<string> tell)
+                          Entity hit, bool body, Vector3 at, Action<string> tell)
     {
         string mapId = f.MapId;
         var shooter = f.Shooter;

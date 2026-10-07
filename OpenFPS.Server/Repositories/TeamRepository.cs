@@ -46,8 +46,6 @@ public class TeamRepository
         Load();
     }
 
-    public string PathOnDisk => _path;
-
     private void Load()
     {
         try
