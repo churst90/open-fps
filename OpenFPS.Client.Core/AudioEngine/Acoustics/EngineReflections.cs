@@ -150,8 +150,16 @@ public sealed class EngineReflections
     /// game has one yet, and rebuilding two hundred surfaces every frame to catch a case that does
     /// not exist would be the more expensive mistake.
     /// </summary>
-    public void SyncGeometry(WorldSnapshot world)
+    public void SyncGeometry(WorldSnapshot world) => SyncGeometry(world, null);
+
+    /// <summary>
+    /// The same, with the scene's acoustic triangle world when there is one (SpatialAcoustics.ReflectionWorldFor):
+    /// a leg of a mirrored path is then asked of its tree (geometry stage 2) instead of being tested
+    /// against every solid box on the map.
+    /// </summary>
+    public void SyncGeometry(WorldSnapshot world, OpenFPS.Common.Geometry.TriangleWorld? acoustic)
     {
+        _world = acoustic;
         // Cheap test FIRST. BoxesFromWorld walks every entity and allocates a list; doing that sixty
         // times a second to discover nothing had changed is pure garbage on the game thread.
         if (world.Entities.Count == _lastEntityCount) return;
@@ -188,6 +196,55 @@ public sealed class EngineReflections
                 _surfaces.Add(f with { SurfaceId = PlaneId(f) });
             }
         }
+        BuildFaceTree();
+    }
+
+    // ── The faces in a tree ─────────────────────────────────────────────────────────────────────
+    //
+    // A search mirrors through the faces near the path: within SurfaceSearchRadius of its middle. Every
+    // face on the map was measured for that, six a box (130,000 on Magnolia), for every one-off sound and
+    // every engine's echo: a tree over their extents hands back the ones whose extents come within the
+    // radius, and only those are measured (geometry stage 2).
+    private OpenFPS.Common.Geometry.BvhNode[]? _faceNodes;
+    private int[] _faceOrder = Array.Empty<int>();
+    private readonly List<int> _faceHits = new();
+
+    private void BuildFaceTree()
+    {
+        if (_surfaces.Count == 0) { _faceNodes = null; return; }
+        var lo = new Vector3[_surfaces.Count]; var hi = new Vector3[_surfaces.Count];
+        for (int i = 0; i < _surfaces.Count; i++)
+        {
+            var s = _surfaces[i];
+            var e = Vector3.Abs(s.HalfU) + Vector3.Abs(s.HalfV);
+            lo[i] = s.Centre - e; hi[i] = s.Centre + e;
+        }
+        _faceNodes = OpenFPS.Common.Geometry.BvhBuilder.Build(lo, hi, _surfaces.Count, 4, out _faceOrder);
+    }
+
+    /// <summary>The faces whose extents come within <paramref name="radius"/> of <paramref name="at"/>, in
+    /// the order the list holds them.</summary>
+    private void FacesNear(Vector3 at, float radius, List<int> into)
+    {
+        into.Clear();
+        var nodes = _faceNodes;
+        if (nodes == null) return;
+        var min = at - new Vector3(radius); var max = at + new Vector3(radius);
+        Span<int> stack = stackalloc int[OpenFPS.Common.Geometry.BvhBuilder.MaxDepth + 2];
+        int sp = 0;
+        stack[sp++] = 0;
+        while (sp > 0)
+        {
+            ref readonly var n = ref nodes[stack[--sp]];
+            if (n.Max.X < min.X || n.Min.X > max.X || n.Max.Y < min.Y || n.Min.Y > max.Y || n.Max.Z < min.Z || n.Min.Z > max.Z) continue;
+            if (n.Count > 0)
+            {
+                for (int i = n.LeftFirst; i < n.LeftFirst + n.Count; i++) into.Add(_faceOrder[i]);
+                continue;
+            }
+            stack[sp++] = n.LeftFirst + 1; stack[sp++] = n.LeftFirst;
+        }
+        into.Sort();
     }
 
     /// <summary>
@@ -366,13 +423,33 @@ public sealed class EngineReflections
         Vector3 mid = (source + listener) * 0.5f;
         float r2 = SurfaceSearchRadius * SurfaceSearchRadius;
         _near.Clear();
-        foreach (var s in _surfaces)
+        FacesNear(mid, SurfaceSearchRadius, _faceHits);
+        foreach (int i in _faceHits)
+        {
+            var s = _surfaces[i];
             if ((nearestPart ? DistanceSquaredToFace(s, mid) : Vector3.DistanceSquared(s.Centre, mid)) <= r2) _near.Add(s);
+        }
         return ImageSource.FirstOrder(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_near),
                                       source, listener, speedOfSound, into, Blocked, diffuseTaps);
     }
 
     private readonly List<ReflectingSurface> _near = new();
+
+    /// <summary>The scene's acoustic triangle world, when there is one: legs are asked of it.</summary>
+    private OpenFPS.Common.Geometry.TriangleWorld? _world;
+
+    /// <summary>Whether a leg starts inside a solid (the box test counted a segment wholly inside a box as
+    /// crossing it).</summary>
+    private static bool Inside(OpenFPS.Common.Geometry.TriangleWorld world, Vector3 p)
+    {
+        var inside = _inside ??= new List<OpenFPS.Common.Geometry.SolidRef>(4);
+        inside.Clear();
+        var all = new OpenFPS.Common.Geometry.AcceptAll();
+        world.Containing(p, OpenFPS.Common.Geometry.GeometryLayers.Acoustics, ref all, inside);
+        return inside.Count > 0;
+    }
+
+    [ThreadStatic] private static List<OpenFPS.Common.Geometry.SolidRef>? _inside;
 
     /// <summary>
     /// Is there anything standing in this leg of the mirrored path?
@@ -395,6 +472,15 @@ public sealed class EngineReflections
         if (len < 1e-3f) return false;
         Vector3 unit = d / len;
         const float Skin = 0.05f;   // stand clear of the surfaces at either end
+        if (_world is { } world)
+        {
+            // The same boxes as triangles (the acoustic scene), asked of the tree.
+            if (len <= 2f * Skin) return false;
+            var all = new OpenFPS.Common.Geometry.AcceptAll();
+            return world.Any(a + unit * Skin, unit, len - 2f * Skin, OpenFPS.Common.Geometry.GeometryLayers.Acoustics,
+                             OpenFPS.Common.Geometry.RayFaces.Both, ref all)
+                   || Inside(world, a + unit * Skin);
+        }
         Vector3 from = a + unit * Skin, to = b - unit * Skin;
         for (int i = 0; i < boxes.Count; i++)
         {

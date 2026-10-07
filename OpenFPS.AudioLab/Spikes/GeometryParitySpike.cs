@@ -538,6 +538,39 @@ public static class GeometryParitySpike
                               + (travel.Count > 0 ? $"distance walked, capsule over cylinder: median {travel[travel.Count / 2]:F3}, lowest {travel[0]:F3}, highest {travel[^1]:F3}" : ""));
         }
 
+        // ── The echoes of one-off sounds and engines (EngineReflections): legs against every box, and the tree ──
+        if (only.Contains("engineechoes"))
+        {
+            var t = new Tally("EngineReflections.FindReflections (a shot's echoes off faces near the path)");
+            tallies.Add(t);
+            var boxes = SteamAudioScene.BoxesFromWorld(newSnap);
+            var acoustic = AcousticGeometry.FromBoxes(boxes, data.TileMetres);
+            var oldEchoes = new OpenFPS.Client.AudioEngine.Acoustics.EngineReflections();
+            var newEchoes = new OpenFPS.Client.AudioEngine.Acoustics.EngineReflections();
+            oldEchoes.SyncGeometry(newSnap); newEchoes.SyncGeometry(newSnap, acoustic);
+            var r0 = new Reflection[16]; var r1 = new Reflection[16];
+            double worstOld = 0, worstNew = 0;
+            for (int i = 0; i < Math.Max(100, n / 10); i++)
+            {
+                var from = NearSomething(3f); from.Y = MathF.Max(1.2f, from.Y);
+                var way = Direction(); way.Y = 0f; if (way.LengthSquared() < 1e-4f) way = Vector3.UnitX;
+                var ear = from + Vector3.Normalize(way) * (5f + (float)rng.NextDouble() * 60f);
+                var c = Stopwatch.StartNew();
+                int n0 = oldEchoes.FindReflections(from, ear, 343f, r0);
+                double o = c.Elapsed.TotalMilliseconds; c.Restart();
+                int n1 = newEchoes.FindReflections(from, ear, 343f, r1);
+                double w = c.Elapsed.TotalMilliseconds;
+                t.OldMs += o; t.NewMs += w; worstOld = Math.Max(worstOld, o); worstNew = Math.Max(worstNew, w);
+                t.Probes++;
+                bool same = n0 == n1;
+                for (int k = 0; same && k < n0; k++)
+                    same = Vector3.Distance(r0[k].ApparentPosition, r1[k].ApparentPosition) < 1e-3f;
+                if (same) { t.Same++; continue; }
+                t.Differ("reflections", $"{V(from)} to {V(ear)}: {n0} with every box, {n1} with the tree", show);
+            }
+            Console.WriteLine($"  engine echoes: worst {worstOld:F1} ms with every box, {worstNew:F1} ms with the tree");
+        }
+
         // ── The sight's index (SightGrid): its own grid of boxes, and the triangle world's ────────────
         if (only.Contains("sightgrid"))
         {

@@ -848,7 +848,7 @@ public class ClientAudioSystem
         ChooseLiveMachines(world, visualEyePos);
         ChoosePlaces(world, visualEyePos);
         _engineEchoes.EchoesPerEngine = _adaptiveEchoes;
-        _engineEchoes.SyncGeometry(world);
+        _engineEchoes.SyncGeometry(world, _acoustics.ReflectionWorldFor(world));
         float engineDt = (float)Math.Max(1e-3, _now() - _lastEngineTime);
         _lastEngineTime = _now();
 
