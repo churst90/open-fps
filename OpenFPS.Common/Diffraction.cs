@@ -4,55 +4,25 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// What a barrier actually does to a sound, as opposed to whether it is in the way.
-///
-/// A line-of-sight test answers a yes/no question, and a yes/no question has no place in the level of
-/// anything. Sound does not stop at an edge; it bends round it, and how much of it arrives depends on
-/// how far out of its way it had to go — the PATH DIFFERENCE between going round the obstacle and
-/// going straight through it — measured against the wavelength. That single number, and nothing about
-/// what the obstacle is, decides whether a wall is a wall or a nuisance.
-///
-/// The fault this exists to fix: a knee-high pit wall between a listener and a car reported "blocked",
-/// the engine took that literally, and a 130 dB engine twenty metres away went to twenty-six decibels
-/// down with its top three octaves removed — which is to say, gone. Over a 0.9 m wall the real path
-/// difference is a few centimetres: five to eight decibels, and mostly at the top end. The wall should
-/// have sounded like a wall you can see over, because that is what it is.
-///
-/// Maekawa's empirical curve is the model, because it is the one that matches measurement across the
-/// whole useful range from "barely blocked" to "deep shadow", it needs only the path difference and
-/// the frequency, and it has the two properties the fault above lacked: it is CONTINUOUS (a source
-/// drifting behind an edge fades rather than switches) and it has a CEILING (a single screen cannot
-/// take more than about 24 dB, however tall, because the sound goes round the ends and over the top
-/// and comes back off everything else).
-///
-/// Nothing here knows what a wall, a car, a track or a map is. It takes two points and a box.
+/// What a barrier does to a sound, by Maekawa's curve on the path difference round it against the
+/// wavelength: continuous (a source drifting behind an edge fades) and capped (a single screen takes at
+/// most about 24 dB). A yes/no line of sight once took a 130 dB engine 20 m beyond a knee-high pit wall
+/// 26 dB down with its top three octaves gone; over a 0.9 m wall the path difference is a few
+/// centimetres, five to eight decibels, mostly at the top.
 /// </summary>
 public static class Diffraction
 {
-    /// <summary>
-    /// Most a single barrier may take, dB.
-    ///
-    /// Not a fudge — a measured limit. Past about this, the energy arriving has stopped coming over
-    /// the screen at all and is arriving by paths the screen does not control: round its ends, off the
-    /// ground, off everything else in the scene. Barrier design handbooks stop at 24 dB for exactly
-    /// this reason, and a model without the ceiling will happily silence a source behind a tall fence.
-    /// </summary>
+    /// <summary>Most a single barrier may take, dB: past it the energy arrives round the ends and off
+    /// everything else. Barrier design handbooks stop at 24 dB for that reason.</summary>
     public const float MaxInsertionLossDb = 24.0f;
 
-    /// <summary>
-    /// Least a barrier takes once it blocks the line at all, dB.
-    ///
-    /// Falls out of the curve rather than being imposed: at a path difference of zero — the source
-    /// exactly grazing the edge — Maekawa gives 5 dB, which is the well-known "on the shadow boundary"
-    /// value. It is here as a named constant only so the tests can say what they are checking.
-    /// </summary>
+    /// <summary>Least a barrier takes once it blocks the line, dB: Maekawa at a path difference of zero,
+    /// the shadow boundary. Named for the tests; the curve gives it.</summary>
     public const float GrazingInsertionLossDb = 5.0f;
 
     /// <summary>
-    /// Insertion loss of a single screen, dB, for one frequency.
-    ///
-    /// <paramref name="pathDifference"/> is metres of extra path the sound had to take to get round the
-    /// obstacle. Zero means it just grazes the edge. Negative (the line is clear) means no loss at all.
+    /// Insertion loss of a single screen, dB, at one frequency. <paramref name="pathDifference"/> is the
+    /// extra path round the obstacle, metres: zero grazes the edge, negative is a clear line and no loss.
     /// </summary>
     public static float InsertionLossDb(float pathDifference, float frequencyHz, float speedOfSound = 343.0f)
     {
@@ -64,24 +34,19 @@ public static class Diffraction
         float n = 2f * pathDifference / lambda;
 
         double root = Math.Sqrt(2.0 * Math.PI * n);
-        // tanh(x)/x -> 1 as x -> 0, so the ratio -> 1 and the loss -> 5 dB. Guarded because tanh(0) is
-        // zero and the division is not defined there.
+        // x/tanh(x) -> 1 as x -> 0 (the loss -> 5 dB); guarded, tanh(0) is zero.
         double ratio = root < 1e-6 ? 1.0 : root / Math.Tanh(root);
         double db = 5.0 + 20.0 * Math.Log10(ratio);
         return (float)Math.Clamp(db, 0.0, MaxInsertionLossDb);
     }
 
-    /// <summary>The same thing as a linear gain, 0..1, which is what a mixer wants.</summary>
+    /// <summary>The same as a linear gain, 0..1.</summary>
     public static float BandGain(float pathDifference, float frequencyHz, float speedOfSound = 343.0f)
         => MathF.Pow(10f, -InsertionLossDb(pathDifference, frequencyHz, speedOfSound) / 20f);
 
-    // ── Representative frequencies for the engine's three bands ─────────────────────────────────
-    //
-    // The mixer filters in three bands split at 400 Hz and 4 kHz (FMOD's THREE_EQ crossovers), so a
-    // per-band diffraction gain has to be evaluated SOMEWHERE in each band. These are the geometric
-    // middles of what each band actually covers for the sounds this engine makes. They matter: the
-    // whole character of a barrier is that it takes the top off and leaves the bottom, and that is
-    // entirely a consequence of evaluating the same path difference at 200 Hz and at 8 kHz.
+    // Where each of the mixer's three bands (FMOD's THREE_EQ, split at 400 Hz and 4 kHz) is evaluated:
+    // the geometric middles of what each covers for this game's sounds. The same path difference at
+    // 200 Hz and at 8 kHz is what takes a barrier's top off and leaves its bottom.
     public const float LowBandHz = 200.0f;
     public const float MidBandHz = 1250.0f;
     public const float HighBandHz = 8000.0f;
@@ -94,39 +59,19 @@ public static class Diffraction
 
     /// <summary>
     /// How far out of its way sound had to go to get past one box, metres, or false if the box is not
-    /// in the way at all.
-    ///
-    /// The shortest route past a convex obstacle runs over its silhouette, and on a box that means it
-    /// crosses either ONE edge — the case of a thin wall, where the sound simply bends over the top —
-    /// or TWO, when the obstacle has depth and the route has to climb one edge, run across the face
-    /// and drop off the far one. Both are searched, because a model with only the first cannot answer
-    /// for anything thicker than a fence: every over-the-top candidate for a sixteen-metre-deep
-    /// grandstand passes through the building itself and is correctly thrown out, leaving no route at
-    /// all and a barrier that is once again a boolean.
-    ///
-    /// The best crossing of one edge has a closed form (MinimiseOnEdge); the two-edge case searches the
-    /// first crossing, which is convex, with the second solved exactly for each. Candidates whose legs would
-    /// pass THROUGH the box are thrown out — without that test the shortest answer for a wall standing
-    /// on the ground is always its buried bottom edge, which is a route sound cannot take.
+    /// in the way. The route crosses one edge (a thin wall) or two (over a face and down the far side):
+    /// with one only, every route over a 16 m deep grandstand went through it. Legs through the box are
+    /// thrown out, or a wall's buried bottom edge always won.
     /// </summary>
     public static bool PathDifferenceAroundBox(Vector3 centre, Vector3 size, Quaternion rotation,
                                                Vector3 source, Vector3 listener, out float pathDifference)
         => PathDifferenceAroundBox(centre, size, rotation, source, listener, out pathDifference, out _);
 
     /// <summary>
-    /// The same search, also reporting WHERE the sound left the obstacle on its way to the ear.
-    ///
-    /// The extra output is the whole of a diffracted source's direction. A screen does not merely
-    /// attenuate what passes it — the edge becomes the thing you hear, and it is a secondary source at
-    /// a place, which is why a voice behind a doorway comes from the doorway and a car behind a
-    /// kerb-high wall still comes from the car. Both fall out of the same point: for a low wall the
-    /// crossing sits almost on the straight line and the bearing barely moves, and for a wall with a
-    /// gap in it the crossing is the jamb.
-    ///
-    /// It is the LISTENER-side crossing, not the source-side one — the last leg is the one arriving at
-    /// the ear. For a thin barrier those are the same point; for anything with depth they are the two
-    /// ends of the run across its face, and taking the far one would put a grandstand's sound at the
-    /// corner the sound entered rather than the one it left.
+    /// The same search, also reporting the listener-side crossing: the edge the sound is heard from (a
+    /// voice behind a doorway comes from the jamb; a car behind a kerb-high wall barely moves). The
+    /// listener side, because the last leg arrives at the ear: the other end of a grandstand's run would
+    /// place it at the corner the sound entered.
     /// </summary>
     public static bool PathDifferenceAroundBox(Vector3 centre, Vector3 size, Quaternion rotation,
                                                Vector3 source, Vector3 listener, out float pathDifference,
@@ -134,12 +79,10 @@ public static class Diffraction
         => PathDifferenceAroundBox(centre, size, rotation, source, listener, out pathDifference, out listenerSideEdge, null);
 
     /// <summary>
-    /// The same search, and every way round that clears this box added to <paramref name="routes"/>
-    /// (path difference, source-side crossing, listener-side crossing — the same point for one edge),
-    /// shortest or not. The shortest round one box can run
-    /// straight into the next: over the top of a storey-high wall and into the floor slab above, while
-    /// round the jamb of the open door beside it — a few centimetres longer — is clear. Only the
-    /// caller, who has the rest of the scene, can tell which of them exists.
+    /// The same search, adding every way round that clears this box to <paramref name="routes"/> (path
+    /// difference, source-side and listener-side crossing), shortest or not: the shortest can run into
+    /// the next box (over a storey-high wall into the slab above) while the jamb beside it is clear, and
+    /// only the caller has the rest of the scene.
     /// </summary>
     public static bool PathDifferenceAroundBox(Vector3 centre, Vector3 size, Quaternion rotation,
                                                Vector3 source, Vector3 listener, out float pathDifference,
@@ -153,7 +96,6 @@ public static class Diffraction
         float direct = Vector3.Distance(source, listener);
         float best = float.MaxValue;
 
-        // The eight corners, in the box's own frame, rotated back into the world once each.
         Span<Vector3> corner = stackalloc Vector3[8];
         for (int i = 0; i < 8; i++)
         {
@@ -176,10 +118,8 @@ public static class Diffraction
         Span<Vector3> b = stackalloc Vector3[12];
         for (int e = 0; e < 12; e++) { a[e] = corner[edges[e * 2]]; b[e] = corner[edges[e * 2 + 1]]; }
 
-        // Sound does not tunnel. A candidate that dips below BOTH endpoints is a route underneath
-        // something that is standing on the ground, and the ground is not part of this box's search —
-        // so without this an obstacle's buried bottom edge always wins, and a thirty-six-metre tower
-        // measures as costing nothing. Below one endpoint is fine: that is going under a bridge.
+        // Below both endpoints is under something standing on the ground: without this a 36 m tower
+        // cost nothing by its buried bottom edge. Below one is fine: under a bridge.
         float floorY = MathF.Min(source.Y, listener.Y) - 0.05f;
 
         // ── One edge: a thin barrier, bent over ────────────────────────────────────────────
@@ -199,27 +139,21 @@ public static class Diffraction
         }
 
         // ── Two edges: over a face and down the other side ─────────────────────────────────
-        //
-        // The pairs are the parallel edges that bound a common face — within each axis group, the
-        // two whose signs differ in exactly one place. Four per axis, twelve in all.
+        // The parallel edges bounding a common face: within each axis group, the two whose signs
+        // differ in exactly one place.
         ReadOnlySpan<byte> pairs = stackalloc byte[24]
         {
             0,1, 0,2, 1,3, 2,3,
             4,5, 4,6, 5,7, 6,7,
             8,9, 8,10, 9,11, 10,11,
         };
-        //
-        // Each pair both ways round: the route crosses the SOURCE's edge first, and which of the two that
-        // is depends on which side of the box the source stands. One order only made the answer depend on
-        // it: round a grandstand 5.1 m one way and 46.4 m the other, through a doorway's jamb 0.81 m one
-        // way and over its top corner 5.44 m the other.
+        // Each pair both ways round: in one order only, a grandstand measured 5.1 m one way and 46.4 m
+        // the other, a doorway's jamb 0.81 m and its top corner 5.44 m.
         for (int k = 0; k < 24; k++)
         {
             int e1 = pairs[(k >> 1) * 2 + (k & 1)], e2 = pairs[(k >> 1) * 2 + 1 - (k & 1)];
-            // Nested, not alternating. The length is jointly convex in the two crossings, so the best
-            // second crossing for each first is convex too and nested ternary searches are exact.
-            // Alternating stalls when the edges are close — on an 11 cm wall it stopped at 5.6 m of
-            // detour where the answer is 0.77.
+            // Nested, not alternating (the length is jointly convex): alternating stalled on an 11 cm
+            // wall at 5.6 m of detour where the answer is 0.77.
             MinimiseOnPair(a[e1], b[e1], a[e2], b[e2], source, listener, out float t, out float u);
             Vector3 p = Vector3.Lerp(a[e1], b[e1], t);
             Vector3 r = Vector3.Lerp(a[e2], b[e2], u);
@@ -230,9 +164,7 @@ public static class Diffraction
             if (!LegIsClear(listener, r, centre, size, rotation)) continue;
             routes?.Add((MathF.Max(0f, around - direct), p, r));
             if (around >= best) continue;
-            // The run between the two crossings needs no test: the pairs are the edges that bound a
-            // common face, a face is planar and convex, and the straight line between two points on
-            // one stays on it. Testing it would fail every time for exactly that reason.
+            // The run between the crossings lies on a face and needs no test (it would always fail).
             best = around;
             listenerSideEdge = r;   // r is the crossing the last leg leaves from
         }
@@ -244,14 +176,9 @@ public static class Diffraction
 
     /// <summary>
     /// Where on the edge the detour from one point to the other is shortest, as a fraction along it.
-    ///
-    /// Exact, by unfolding. Each leg's length depends only on how far along the edge's line the
-    /// crossing is and how far each point stands off that line, so rotating one point about the line
-    /// into the plane of the other changes neither leg, and the shortest route is then the straight
-    /// line between them: it meets the edge at the point dividing the two along-line positions in the
-    /// ratio of the two off-line distances. The length is convex along the edge, so the best point on
-    /// the segment is that one clamped to its ends. This replaced a 24-step ternary search, which
-    /// the two-edge search below runs once per step of its own, 24 times over.
+    /// Exact by unfolding: rotate one point about the edge's line into the other's plane and the route
+    /// is straight, dividing the along-line positions in the ratio of the off-line distances; convex,
+    /// so clamped to the segment. The two-edge search calls it twice in each of its 24 steps.
     /// </summary>
     internal static float MinimiseOnEdge(Vector3 a, Vector3 b, Vector3 from, Vector3 to)
     {
@@ -294,18 +221,12 @@ public static class Diffraction
         return Vector3.Distance(from, p) + Vector3.Distance(p, to);
     }
 
-    /// <summary>
-    /// How far short of a surface point a leg stops before it is tested, metres.
-    ///
-    /// Absolute, and deliberately not a percentage of the box. Shrinking the BOX instead lifts its
-    /// base off the ground, and a route that dives under a building then reports itself clear — which
-    /// is how a thirty-six-metre tower first measured as costing nothing at all.
-    /// </summary>
+    /// <summary>How far short of a surface point a leg stops before it is tested, metres. Not a shrunk
+    /// box: that lifts its base off the ground, and a route under a 36 m tower read clear.</summary>
     private const float EdgeSkin = 0.02f;
 
-    /// <summary>True if the straight run from a point to a point ON the box's surface stays outside
-    /// it. The surface end is pulled back by <see cref="EdgeSkin"/> so that a leg which correctly
-    /// arrives at the edge it is bending around is not reported as passing through it.</summary>
+    /// <summary>Whether the run from a point to a point on the box's surface stays outside it, the
+    /// surface end pulled back by <see cref="EdgeSkin"/> so a leg arriving at its edge is not inside.</summary>
     private static bool LegIsClear(Vector3 from, Vector3 surfacePoint, Vector3 centre, Vector3 size, Quaternion rotation)
     {
         Vector3 d = surfacePoint - from;

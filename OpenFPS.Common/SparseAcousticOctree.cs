@@ -3,10 +3,7 @@ using MemoryPack;
 
 namespace OpenFPS.Common;
 
-/// <summary>
-/// A high-performance Sparse Voxel Octree (SVO) for acoustic regions.
-/// Compresses large empty or solid volumes to save RAM and speed up lookups.
-/// </summary>
+/// <summary>A sparse voxel octree of acoustic region ids: a uniform volume is one node.</summary>
 [MemoryPackable]
 public partial class SparseAcousticOctree
 {
@@ -25,8 +22,8 @@ public partial class SparseAcousticOctree
     private float _size;
     private float _minVoxel;
 
-    // Guards tree structure against concurrent read (acoustic worker thread) vs write (game thread).
-    // Private + no public property => MemoryPack ignores it; reinitialized by the parameterless ctor.
+    // The acoustic worker reads while the game thread writes. Private with no property, so MemoryPack
+    // ignores it; the parameterless constructor makes it again.
     private readonly object _treeLock = new();
 
     [MemoryPackConstructor]
@@ -38,15 +35,14 @@ public partial class SparseAcousticOctree
     public SparseAcousticOctree(Vector3 min, Vector3 size, float minVoxelSize = 0.5f)
     {
         _min = min;
-        // The Octree must be a cube for simplicity, so find the largest dimension
+        // A cube, its side a power of two so halving stays exact.
         _size = Math.Max(size.X, Math.Max(size.Y, size.Z));
-        // Round up to power of two to avoid precision issues
         _size = MathF.Pow(2, MathF.Ceiling(MathF.Log2(_size)));
         _minVoxel = minVoxelSize;
         _root = new OctreeNode();
     }
 
-    // Properties for serialization
+    // For MemoryPack.
     public OctreeNode Root { get => _root; set => _root = value; }
     public Vector3 Min { get => _min; set => _min = value; }
     public float Size { get => _size; set => _size = value; }
@@ -61,8 +57,7 @@ public partial class SparseAcousticOctree
     {
         Vector3 nodeCenter = nodeMin + new Vector3(nodeSize / 2f);
 
-        // Check node AABB vs OBB intersection
-        // Approximation: if node is fully inside, set all. If outside, return. If partial, split.
+        // Fully inside: set it all; outside: nothing; partly: split.
         var containment = GeometryUtils.GetBoxContainmentInOBB(nodeCenter, new Vector3(nodeSize), obbCenter, obbSize, obbRot);
 
         if (containment == BoxContainment.Outside) return;

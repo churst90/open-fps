@@ -4,19 +4,14 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// How sound gets from one place to another through the OPENINGS between them: doorways, open faces
-/// and the outdoors, as a graph, and the few shortest routes through it.
+/// How sound gets from one place to another through the openings between them (doorways, open faces,
+/// the outdoors), as a graph, and the few shortest routes through it: the way from the street to a
+/// corridor by a front door, a stairwell and a doorway, which neither a wall's transmission
+/// (<see cref="WallTransmission"/>) nor one edge's diffraction (<see cref="Diffraction"/>) reaches.
 ///
-/// Through a wall, a sound is what the wall lets through (<see cref="WallTransmission"/>). Round an
-/// obstacle in the open, it is what bends over the one edge in the way (<see cref="Diffraction"/>).
-/// Neither reaches a corridor from the street when the way in is a front door, a stairwell and a
-/// doorway: that route turns two or more corners, and through rooms rather than round one box. This
-/// is that route.
-///
-/// A ROUTE is a sequence of openings from the source to the listener. Every opening is a rectangle in a
-/// wall with what fills it (an open doorway passes everything; a shut leaf passes what its construction
-/// lets through, <see cref="WallTransmission"/>), and the route crosses each at the point that makes the
-/// whole path shortest. Two things arrive by it, and they are added as energies:
+/// A route is a sequence of openings from the source to the listener, each a rectangle in a wall with
+/// what fills it (a shut leaf passes what its construction lets through), crossed where the whole path is
+/// shortest. Two things arrive by it, added as energies:
 ///
 /// THE DIFFRACTED RAY. Each opening is a rectangular aperture, and what it passes of a wave from the
 /// previous crossing point to the next is the Fresnel–Kirchhoff result for a rectangle: the product
@@ -38,15 +33,9 @@ namespace OpenFPS.Common;
 /// field radiates like a Lambert surface, W·cosθ/(πr²). A room's absorption area is its surveyed surfaces'
 /// Σ S·α per band, every open face counted at α = 1 and every opening's leak at its own S·τ.
 ///
-/// Only the rooms BETWEEN the two ends are counted so. The source's own room and the listener's own room
-/// have reverberant fields too, and those are the reverb's: the source's room bus, heard through its
-/// doorway, and the listener's room bus, fed by the voice itself. Counted here as well they would be
-/// heard twice, and the second time as a dry voice from the doorway. What arrives at the ear by a route
-/// is then its direct sound: the diffracted ray, and what the last room between radiates out of the last
-/// opening. Both ends are treated alike, so the route gives the same answer both ways round.
-///
-/// Nothing here is a constant of a map, a building or a door: what passes is decided by where the
-/// openings are, how big they are, what stands in them and what the rooms are made of.
+/// Only the rooms between the two ends are counted so. The source's and the listener's own rooms are the
+/// reverb's (their room buses); counted here too they would be heard twice, the second time as a dry
+/// voice from the doorway. Both ends are treated alike, so a route gives the same answer both ways round.
 /// </summary>
 public sealed class OpeningRoutes
 {
@@ -59,7 +48,7 @@ public sealed class OpeningRoutes
     /// An opening as the map declares it. <paramref name="Rotation"/> is the doorway's frame when known
     /// (a door's leaf, shut: local X across, Y up, the thin axis through) and the default quaternion when
     /// not; <paramref name="Size"/> the leaf's extent when known, otherwise zero; <paramref name="Aperture"/>
-    /// the authored width, otherwise zero. The geometry decides the rest (<see cref="Build"/>).
+    /// the authored width, otherwise zero. The geometry decides the rest.
     /// </summary>
     public readonly record struct Declared(int Id, string Kind, Vector3 Centre, Quaternion Rotation, Vector3 Size,
                                            float Aperture, int RegionA, int RegionB);
@@ -90,9 +79,8 @@ public sealed class OpeningRoutes
         public Opening Copy() => (Opening)MemberwiseClone();
     }
 
-    /// <summary>The node every unbounded place belongs to: the global region, and any named patch of
-    /// ground with no surfaces (<see cref="RoomAcoustics.IsEnclosure"/> is about a boundary; a street has
-    /// none). There is no reverberant field in it to relay anything.</summary>
+    /// <summary>The node every unbounded place belongs to: the global region and any named patch of
+    /// ground with no surfaces. No reverberant field in it relays anything.</summary>
     public const int Outside = int.MinValue;
 
     /// <summary>How many of the shortest routes are evaluated and summed.</summary>
@@ -182,12 +170,9 @@ public sealed class OpeningRoutes
 
     // ═══ Built tile by tile (docs/GEOMETRY.md stage 1) ════════════════════════════════════════════
     //
-    // The acoustic triangle store already holds the scene a tile at a time, its pieces kept while their
-    // boxes stay the same. The graph is made from it in the same way: the boxes are asked of the store's
-    // trees instead of a grid built over all of them, each tile's boxes keep their frames and
-    // transmissions while its piece does, and an opening is derived again only when a tile its walls
-    // could be in has changed. What a route answers is the same as a whole rebuild's (AudioLab
-    // --geometry-parity only=routes): the same boxes, met by the same tests.
+    // Boxes asked of the triangle store's trees; a tile's boxes keep their frames and transmissions while
+    // its piece does, and an opening is derived again only when a tile its walls could be in changed.
+    // Routes answer the same as a whole rebuild's (AudioLab --geometry-parity only=routes).
 
     /// <summary>What a tile-by-tile build keeps from one build to the next. One per map; not shared
     /// between threads (one build at a time, as the worker has it).</summary>
@@ -211,10 +196,9 @@ public sealed class OpeningRoutes
     }
 
     /// <summary>
-    /// The graph for the scene the acoustic triangle store holds (its tiles' boxes, door leaves where
-    /// they stand and marked as leaves), as <see cref="Build(IReadOnlyList{Solid}, AcousticMap?, IEnumerable{Declared}, Func{Vector3, int}?)"/>
-    /// makes it from a box list, with what did not change since the last build kept in
-    /// <paramref name="cache"/>.
+    /// The graph for the scene the acoustic triangle store holds, as
+    /// <see cref="Build(IReadOnlyList{Solid}, AcousticMap?, IEnumerable{Declared}, Func{Vector3, int}?)"/>
+    /// makes it from a box list, keeping what did not change in <paramref name="cache"/>.
     /// </summary>
     public static OpeningRoutes Build(Geometry.TriangleWorld scene, AcousticMap? map, IEnumerable<Declared> declared,
                                       Func<Vector3, int>? regionAt, TileCache cache)
@@ -406,11 +390,8 @@ public sealed class OpeningRoutes
         }
     }
 
-    /// <summary>
-    /// For the parity harness only: the box grid hands its boxes back in the reverse of its walk order,
-    /// so the harness can measure how far the answers depend on the order the boxes are met in (the
-    /// barrier search tries a bounded number of ways round). Never set in the game.
-    /// </summary>
+    /// <summary>For the parity harness only: the box grid hands its boxes back in reverse walk order, to
+    /// measure how far the answers depend on the order boxes are met in. Never set in the game.</summary>
     public static bool ReverseGridOrderForParity;
 
     /// <summary>For the parity harness only: told every box the over-the-top search crosses.</summary>
@@ -507,9 +488,8 @@ public sealed class OpeningRoutes
     /// tunnel mouth, a doorway with no door in it.</summary>
     public const string FaceKind = "open face";
 
-    /// <summary>How far past an opening's declared size the geometry is searched for its jambs, floor
-    /// and lintel, metres: a doorway's leaf laps its frame by a few centimetres and an authored portal is
-    /// placed by hand, so the walls are near but not exactly where the numbers say.</summary>
+    /// <summary>How far past an opening's declared size its jambs, floor and lintel are searched for,
+    /// metres: a leaf laps its frame and an authored portal is placed by hand.</summary>
     private const float FrameSearchMetres = 0.5f;
 
     /// <summary>How far short of an opening's frame a route may cross it, metres. A leg run exactly along
@@ -522,10 +502,8 @@ public sealed class OpeningRoutes
         bool haveFrame = d.Rotation != default;
         if (haveFrame && d.Kind == FaceKind)
         {
-            // A gap measured from the walls round it (FaceOpenings): its rectangle is the geometry's
-            // already, to the edge of every box beside it, so there is nothing to search for. Its thin
-            // axis is the one through it whatever its proportions: a slot in a thick wall is deeper than
-            // it is wide and is still a slot.
+            // A gap measured from its walls (FaceOpenings): nothing to search for. Z is through it whatever
+            // its proportions: a slot in a thick wall is deeper than it is wide.
             var fq = Quaternion.Normalize(d.Rotation);
             o.Across = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, fq));
             o.Up = Vector3.Normalize(Vector3.Transform(Vector3.UnitY, fq));
@@ -556,7 +534,7 @@ public sealed class OpeningRoutes
         }
         else
         {
-            // No frame given: the face of the room it belongs to that it sits on says which way it faces.
+            // No frame: the room face it sits on says which way it faces.
             if (!FaceOfRoom(map, d, out o.Normal, out float faceHalfW, out float faceHalfH, out o.Up))
             {
                 o.Normal = Vector3.UnitX; o.Up = Vector3.UnitY;
@@ -573,8 +551,7 @@ public sealed class OpeningRoutes
         }
 
         // ── The frame, from the walls round it ──────────────────────────────────────────────────
-        // Each side is searched outward from the centre, and the first wall met is that side of the
-        // frame. Leaves are not walls. A side with nothing within reach keeps its declared extent.
+        // Each side is the first wall (not leaf) met outward from the centre, or the declared extent.
         float right = Reach(o.Centre, o.Across, searchW, out int jambR);
         float left = Reach(o.Centre, -o.Across, searchW, out int jambL);
         float top = Reach(o.Centre, o.Up, searchH, out int lintel);
@@ -586,11 +563,9 @@ public sealed class OpeningRoutes
         o.Centre += o.Across * (right - left) * 0.5f + o.Up * (top - bottom) * 0.5f;
         o.HalfWidth = MathF.Max(0.05f, (right + left) * 0.5f);
         o.HalfHeight = MathF.Max(0.05f, (top + bottom) * 0.5f);
-        // As deep as the wall it is cut through. A box that runs THROUGH the opening rather than across
-        // it — a tunnel's side wall at its open end, a corridor wall beside an open side — is not that
-        // wall: its length along the normal is not a depth. Counted as one it was: the tunnel's openings
-        // were fifty metres deep, so the check of their sides and the test of what stands in them reached
-        // two sections away (2026-10-02).
+        // As deep as the wall it is cut through, not a box running through it (a tunnel's side wall):
+        // counted, the tunnel's openings were fifty metres deep and their checks reached two sections
+        // away (2026-10-02).
         foreach (int j in new[] { jambR, jambL, lintel })
         {
             if (j < 0) continue;
@@ -606,7 +581,7 @@ public sealed class OpeningRoutes
         {
             bool onlyLeaves = true;
             foreach (int i in o.Contents) onlyLeaves &= _solids[i].IsLeaf;
-            // Said over anything else found: it is the reason nothing else about it matters.
+            // Over anything else found: nothing else about it matters.
             if (!onlyLeaves) o.Problem = "a wall stands in it: it is not an opening";
         }
         return o;
@@ -813,10 +788,9 @@ public sealed class OpeningRoutes
     }
 
     /// <summary>
-    /// Whether a chain goes through one opening twice. A route "by the outdoors" between two rooms of
-    /// one building can leave by the front door and come straight back in by it: no way round at all,
-    /// only the doorway crossed twice, and its crossings line up better than the true route's through
-    /// the doorway between the rooms, so it won, and the next room was heard from the front door.
+    /// Whether a chain goes through one opening twice: "by the outdoors" between two rooms of one building
+    /// it can leave by the front door and come straight back in, and its crossings line up better than
+    /// the true route's, so the next room was heard from the front door.
     /// </summary>
     private static bool CrossesTwice(List<(int, int)> chain)
     {
@@ -827,18 +801,13 @@ public sealed class OpeningRoutes
     }
 
     /// <summary>
-    /// How strong a place's reverberant field is at <paramref name="listener"/>, as an amplitude
-    /// against standing in it, and where the strongest part of it arrives from.
-    ///
-    /// A diffuse field of energy density E pushes E c S / 4 watts out of an opening of area S. Out of
-    /// the opening it spreads over a half space, so at r metres its pressure squared is S / (8 pi r^2)
-    /// of the field's inside: that, per opening, with the opening's own transmission (a shut leaf, a
-    /// door ajar). An opening into the listener's own place is heard straight; one into anywhere else
-    /// is followed by the routes through openings, as any other sound there would be. Summed over
-    /// every opening of the place within <paramref name="range"/>.
-    ///
-    /// It replaced (aperture / 2) / distance through the single nearest opening joining the two
-    /// places, which gave a room two openings away nothing and a lobby none of the street.
+    /// How strong a place's reverberant field is at <paramref name="listener"/>, as an amplitude against
+    /// standing in it, and where the strongest part arrives from. A diffuse field of energy density E
+    /// pushes E c S / 4 watts out of an opening of area S, which over a half space at r metres is
+    /// S / (8 pi r^2) of the field's pressure squared, times the opening's transmission: heard straight
+    /// into the listener's place, by the routes into anywhere else, summed over every opening within
+    /// <paramref name="range"/>. Through only the nearest opening, a room two openings away got nothing
+    /// and a lobby none of the street.
     /// </summary>
     public float FieldAt(int regionId, Vector3 listener, int listenerRegion, float range, out Vector3 via)
         => FieldAt(regionId, listener, listenerRegion, range, out via, out _);
@@ -852,11 +821,8 @@ public sealed class OpeningRoutes
         via = listener; inField = listener;
         if (node == lNode) return 1f;
         double energy = FieldEnergy(node, listener, listenerRegion, lNode, range, ref via, ref inField);
-        // And what comes in builds the listener's own room's field, which they are standing in: the
-        // field just outside each of its openings times what that opening lets in, over the room's
-        // absorption (the transmission-room equation, E_room = sum E_out S tau / A). Down a corridor
-        // two openings from the street this is most of it; the openings' direct radiation is a
-        // little of it near each one.
+        // What comes in builds the listener's own room's field: E_room = sum E_out S tau / A, the
+        // transmission-room equation. Down a corridor two openings from the street this is most of it.
         if (lNode != Outside && TryGetAbsorption(lNode, out var absorption) && absorption.Y > 0f)
         {
             double into = 0;
@@ -882,7 +848,7 @@ public sealed class OpeningRoutes
         return MathF.Min(1f, MathF.Sqrt((float)energy));
     }
 
-    /// <summary>The direct part of <see cref="FieldAt"/>: each opening of the place radiating its field
+    /// <summary>The direct part of <see cref="FieldAt(int, Vector3, int, float, out Vector3)"/>: each opening of the place radiating its field
     /// at <paramref name="listener"/>, straight or by the routes.</summary>
     private double FieldEnergy(int node, Vector3 listener, int listenerRegion, int lNode, float range,
                                ref Vector3 via, ref Vector3 inField)
@@ -1001,8 +967,7 @@ public sealed class OpeningRoutes
     /// <summary>The route as (opening, the node it leads into) from the source's side to the listener's.</summary>
     private void BuildChain(in Candidate c, SideTree lTree, SideTree sTree, List<(int, int)> chain)
     {
-        // The source's half, from the source outward: its tree's states run from the source, so walking
-        // back from the exit gives them exit-first; reversed, source-first.
+        // The source's half: walking back from the exit gives it exit-first, so reversed.
         int start = chain.Count;
         for (int s = c.SourceState; s >= 0; s = sTree.Prev[s])
         {
@@ -1010,8 +975,7 @@ public sealed class OpeningRoutes
             chain.Add((o, _openings[o].Other(sTree.From(s))));
         }
         chain.Reverse(start, chain.Count - start);
-        // The listener's half, from where it meets the source's side inward: the tree's states run from
-        // the listener, so walking back from the meeting state gives them in source-to-listener order.
+        // The listener's half: walking back from the meeting state is already source to listener.
         for (int s = c.ListenerState; s >= 0; s = lTree.Prev[s])
         {
             int o = s >> 1;
@@ -1031,9 +995,8 @@ public sealed class OpeningRoutes
         foreach (var (o, _) in chain) x.Add(_openings[o].Centre);
         x.Add(listener);
 
-        // Where the route crosses each opening: the shortest path through the rectangles. The length is
-        // convex in all the crossings together and each rectangle is convex, so improving one crossing at
-        // a time with its neighbours fixed converges on the shortest route.
+        // The shortest path through the rectangles: convex in all the crossings together, so improving one
+        // at a time with its neighbours fixed converges.
         for (int pass = 0; pass < 4; pass++)
             for (int k = 1; k <= n; k++)
                 x[k] = Crossing(_openings[chain[k - 1].Opening], x[k - 1], x[k + 1]);
@@ -1045,23 +1008,19 @@ public sealed class OpeningRoutes
         // ── The legs: what stands between one crossing and the next ───────────────────────────────
         var legs = scratch.Legs;
         legs.Clear();
-        // An opening is as deep as its wall, and a leg runs to the FACE of it that it arrives at, not to
-        // the middle of the wall: a car up the street sees a front door almost edge-on, and a line to the
-        // door's mid-plane runs through the facade beside it for metres.
+        // A leg runs to the face of the opening it arrives at, not the wall's middle: a car up the street
+        // sees a front door almost edge-on, and a line to the mid-plane runs through the facade for metres.
         for (int k = 0; k <= n; k++)
         {
             int[] ignoreA = k > 0 ? _openings[chain[k - 1].Opening].Contents : Array.Empty<int>();
             int[] ignoreB = k < n ? _openings[chain[k].Opening].Contents : Array.Empty<int>();
-            // Inside the opening's edges, not on them: a crossing hugs the edge it bends round, and that
-            // bend is the aperture's to charge (Aperture, below). A leg ending AT the jamb ends in the
-            // corner between the jamb and an open leaf hinged on it, with no way round the leaf.
+            // Inside the edges, not on them: the bend is the aperture's to charge, and a leg ending at the
+            // jamb ends in the corner with an open leaf hinged on it, with no way round the leaf.
             Vector3 from = k > 0 ? Face(_openings[chain[k - 1].Opening], Inset(_openings[chain[k - 1].Opening], x[k]), x[k + 1]) : x[k];
             Vector3 to = k < n ? Face(_openings[chain[k].Opening], Inset(_openings[chain[k].Opening], x[k + 1]), x[k]) : x[k + 1];
-            // Off the face, not on it. A leg ending ON the wall's surface touches the wall beside the
-            // doorway, and the clearance check pads every other box by a joint's width: every way round
-            // whatever stood in front of the door (its own leaf, swung open) was refused, and the leaf
-            // was charged as solid steel. A car down the street from an open front door came in at the
-            // shut-door level ("sound struggles through the door only when loud things pass").
+            // Off the face: a leg ending on it touched the wall, the padded clearance refused every way
+            // round the open leaf, and the leaf was charged as solid steel ("sound struggles through the
+            // door only when loud things pass").
             Vector3 along = to - from;
             float span = along.Length();
             if (span > 4f * FaceClearance)
@@ -1084,8 +1043,7 @@ public sealed class OpeningRoutes
         }
 
         // ── The field of the rooms between, relayed opening to opening ────────────────────────────
-        // Only when there is a room between: with one opening, the two rooms are the source's and the
-        // listener's, and their fields are the reverb's.
+        // Only with a room between: with one opening the two rooms' fields are the reverb's.
         if (n < 2) return geo;
         // Free-field reference: W = 1 at d, so a mean-square pressure p²/ρc is compared with 1/(4πd²).
         float free = 1f / (4f * MathF.PI * d * d);
@@ -1094,8 +1052,7 @@ public sealed class OpeningRoutes
         float cos1 = MathF.Abs(Vector3.Dot(Vector3.Normalize(x[1] - source), first.Normal));
         // Into the first room between: the source's direct sound on the opening's projected area.
         Vector3 power = legs[0] * legs[0] * (cos1 / (4f * MathF.PI * r1 * r1)) * first.Area * first.Tau;
-        // Through each room between: its field on the next opening. The outdoors is no room: a route
-        // that leaves one building for another carries only its ray across.
+        // Through each room between: its field on the next opening. Across the outdoors only the ray.
         for (int k = 1; k < n; k++)
         {
             if (!TryGetAbsorption(chain[k - 1].IntoNode, out var ak)) return geo;
@@ -1168,8 +1125,7 @@ public sealed class OpeningRoutes
     public static Vector3 Aperture(Opening o, Vector3 prev, Vector3 next)
     {
         float straight = Vector3.Distance(prev, next);
-        // Where the straight line meets the aperture's plane, in its two axes; a line parallel to the
-        // plane is placed by its midpoint.
+        // Where the straight line meets the plane (a parallel line by its midpoint).
         Vector3 dir = next - prev;
         float den = Vector3.Dot(dir, o.Normal);
         Vector3 at = MathF.Abs(den) > 1e-6f
@@ -1206,8 +1162,7 @@ public sealed class OpeningRoutes
     /// <summary>The extra path from one point to another by the nearest point of an infinite edge line.</summary>
     private static float EdgeDetour(Vector3 point, Vector3 along, Vector3 from, Vector3 to, float straight)
     {
-        // Unfold about the line (Diffraction.MinimiseOnEdge): the shortest route by it divides the two
-        // points' positions along it in the ratio of their distances from it.
+        // Unfolded about the line, as Diffraction.MinimiseOnEdge.
         float sF = Vector3.Dot(from - point, along), sT = Vector3.Dot(to - point, along);
         float rF = Vector3.Distance(from, point + along * sF), rT = Vector3.Distance(to, point + along * sT);
         float s = rF + rT > 1e-9f ? sF + (sT - sF) * rF / (rF + rT) : 0.5f * (sF + sT);
@@ -1235,13 +1190,9 @@ public sealed class OpeningRoutes
     // ═══ Legs: what stands between two points ════════════════════════════════════════════════════
 
     /// <summary>
-    /// What a leg loses, kept for the next query whose ends fall in the same cells. A leg can run for
-    /// hundreds of metres through a city — from a car up the street to the front door, or across a square
-    /// from one building's door to another's — and when it is blocked, the search round each box in its
-    /// way costs milliseconds. The answer does not change while both ends stay inside cells a fiftieth of
-    /// the leg's length across (a quarter of a metre at a doorway, four metres three hundred away), so it
-    /// is asked once per pair of cells. The key does not care which end is which, so a route and its
-    /// reverse share it.
+    /// What a leg loses, kept per pair of end cells a fiftieth of its length across (a quarter of a metre
+    /// at a doorway, four metres 300 m away): a blocked leg hundreds of metres long costs milliseconds to
+    /// search round. Either way round, so a route and its reverse share it.
     /// </summary>
     private Vector3 Leg(int openingA, Vector3 a, int openingB, Vector3 b, int[] ignoreA, int[] ignoreB)
     {
@@ -1313,18 +1264,12 @@ public sealed class OpeningRoutes
     // ═══ Round one obstacle ═══════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// How far out of its way sound had to go to get from the source to the listener, metres, or -1 if
-    /// nothing is in the way at all, and the edge the last leg leaves from.
-    ///
-    /// Barriers do not add up: two screens in a row are not twice one screen, because the second stands in
-    /// the first one's shadow. What governs is the single worst detour (the standards' single-worst-screen
-    /// rule), searched round each box in the way (<see cref="Diffraction.PathDifferenceAroundBox"/>).
-    ///
-    /// <paramref name="edgeVerified"/> says a route of that length exists: both legs clear of every OTHER
-    /// box, and the shortest such route is the one believed — sound takes the way that exists. Round the
-    /// end of one wall and straight into the next is a good answer to "how far past THIS box" and a wrong
-    /// one to "which way did it come". A route clear of every box is at least as long as the worst box's
-    /// own shortest way round, so nothing shorter can be it.
+    /// How far out of its way sound had to go from the source to the listener, metres, or -1 if nothing is
+    /// in the way, and the edge the last leg leaves from. The single worst detour governs (the standards'
+    /// single-worst-screen rule: a second screen stands in the first's shadow), searched round each box
+    /// (Diffraction.PathDifferenceAroundBox). <paramref name="edgeVerified"/> says a route of that length
+    /// exists clear of every other box; the shortest such is believed, and none can be shorter than the
+    /// worst box's own way round.
     /// </summary>
     public float BarrierPathDifference(Vector3 source, Vector3 listener, out Vector3 edge, out bool edgeVerified,
                                        int[]? ignoreA = null, int[]? ignoreB = null)
@@ -1362,18 +1307,16 @@ public sealed class OpeningRoutes
             // Sorted, and bending round more boxes only ever adds: nothing after this can beat it.
             if (dd >= best) break;
             if (++tried > MaxRoutesTried) break;
-            // Round a door leaf is through its doorway: believed only clear as it stands, as it always
-            // was, never bent on round the rest of the street (ClearedLeg). That found the crack over
-            // a shut glass front door and played the street through it at -21 dB.
+            // Round a door leaf is through its doorway: believed only clear as it stands, never bent on
+            // round the street (ClearedLeg), which found the crack over a shut glass door at -21 dB.
             int chain = _solids[i].IsLeaf ? 0 : MaxChainedBoxes;
             float extra = ClearedRoute(source, ps, p, listener, i, chain, ignoreA, ignoreB, best - dd, out Vector3 last);
             if (extra < 0f || dd + extra >= best) continue;
             best = dd + extra;
             bestEdge = last;
         }
-        // Over the top of everything, as the standards draw it (ISO 9613-2, CNOSSOS-EU): the tight string
-        // over every obstacle in the vertical plane through the two points. It exists whenever neither end
-        // has something over its head, whatever the search round the sides found or missed.
+        // Over the top of everything (ISO 9613-2, CNOSSOS-EU), whenever neither end has something over
+        // its head, whatever the search round the sides found.
         if (worst >= 0f)
         {
             float over = OverTheTop(source, listener, ignoreA, ignoreB, out Vector3 overEdge);
@@ -1381,9 +1324,8 @@ public sealed class OpeningRoutes
         }
         if (best == float.MaxValue) return worst;
         edge = bestEdge; edgeVerified = true;
-        // Something IS in the way, so the least this can be is grazing it: Maekawa's 5 dB, not the
-        // nothing that a path difference of exactly zero reads as (Diffraction.InsertionLossDb). A car
-        // whose line just clipped a wall top came out at 0 dB at one position and -5 at the next.
+        // Something is in the way, so at least grazing (Maekawa's 5 dB): a path difference of zero reads
+        // as nothing, and a car whose line clipped a wall top came out 0 dB at one position, -5 the next.
         return MathF.Max(best, GrazingMetres);
     }
 
@@ -1392,19 +1334,13 @@ public sealed class OpeningRoutes
     private const float GrazingMetres = 1e-5f;
 
     /// <summary>
-    /// The path difference of the way over every box between the two points, in the vertical plane through
-    /// them: the upper convex hull of the boxes' tops where the plane crosses them, from one point to the
-    /// other — the string pulled tight over the profile, which is how road-traffic noise standards (ISO
-    /// 9613-2, CNOSSOS-EU) find the path over several screens. Each leg is then checked against the whole
-    /// scene: a box it cuts through joins the profile and the string is pulled again. -1 when there is no
-    /// way over — an end has a roof over it, so the string can only leave it upward through something.
-    /// <paramref name="lastEdge"/> is the top the last leg leaves from for the ear.
-    ///
-    /// Why it is here: the search round one box at a time (with ClearedLeg's bending) is bounded, and a
-    /// bounded search that finds the way round a building for one position of a car and misses it two
-    /// metres on hands the car -13 dB and then -76 (through the whole building) a third of a second
-    /// apart. Out in the open there is always a way over the roofs, and its level only changes as fast
-    /// as the profile does.
+    /// The path difference of the way over every box between the two points in their vertical plane: the
+    /// string pulled tight over the profile (upper convex hull), as road-traffic standards (ISO 9613-2,
+    /// CNOSSOS-EU) go over several screens. A box a leg cuts through joins the profile and the string is
+    /// pulled again. -1 when an end has a roof over it. <paramref name="lastEdge"/> is the top the last leg
+    /// leaves from. The bounded search round the sides found a way round a building at one car position and
+    /// missed it two metres on: -13 dB, then -76, a third of a second apart; the way over changes only as
+    /// fast as the profile.
     /// </summary>
     private float OverTheTop(Vector3 source, Vector3 listener, int[]? ignoreA, int[]? ignoreB, out Vector3 lastEdge)
         => OverTheTop(source, listener, ignoreA, ignoreB, out lastEdge, null);
@@ -1422,11 +1358,9 @@ public sealed class OpeningRoutes
 
         // ── The profile: what stands up from the ground in the plane ─────────────────────────
         //
-        // A box is part of the profile if it reaches down to the straight line, or down onto the top of
-        // something that does: a building's storeys stacked one on another are one obstacle to go over,
-        // and a sign hung over the street that nothing holds up from below is not (the string passes
-        // under it unless something else lifts it there, which the leg test finds). Swept bottom-up
-        // through one-metre bins along the ground, so it costs one pass over what the plane cuts.
+        // A box is in the profile if it reaches down to the line or onto the top of one that does
+        // (stacked storeys are one obstacle; a sign hung over the street is not). Swept bottom-up through
+        // one-metre bins along the ground.
         var crossings = scratch.Crossings;
         crossings.Clear();
         foreach (int i in cand)
@@ -1451,10 +1385,8 @@ public sealed class OpeningRoutes
         }
         var included = scratch.Included;
         included.Clear();
-        // Swept again until nothing more is held up: two slabs side by side at the same height (two roofs
-        // of one house) hold each other up whichever is met first. A single sweep took the one met second
-        // and left the other out, so which boxes the string went over depended on the order the index
-        // happened to list them in (found by the geometry parity harness, 2026-10-06).
+        // Until nothing more is held up: two roofs side by side hold each other up, and one sweep made the
+        // result depend on the index's order (the geometry parity harness, 2026-10-06).
         for (bool more = true; more;)
         {
             more = false;
@@ -1474,9 +1406,8 @@ public sealed class OpeningRoutes
             foreach (var c in crossings)
                 DebugOverTheTop($"crossing {_solids[c.Box].Center} size {_solids[c.Box].Size} s {c.S0:F3}-{c.S1:F3} y {c.Bottom:F3}-{c.Top:F3} included {included.Contains(c.Box)}");
         if (included.Count == 0) return -1f;
-        // Something over an end's own head — a ceiling, a canopy, a balcony — and the string could only
-        // leave that end straight up through it. From under a roof the way out is sideways first, which
-        // is the search round the sides and the openings' business, not this.
+        // Something over an end's head (a ceiling, a canopy): the way out is sideways first, the side
+        // search's and the openings' business.
         bool OverAnEnd(float s0, float s1, float bottom)
             => (s0 <= EndColumnMetres && bottom > source.Y) || (s1 >= run - EndColumnMetres && bottom > listener.Y);
         foreach (var c in crossings)
@@ -1498,8 +1429,7 @@ public sealed class OpeningRoutes
                 pts.Add((MathF.Max(c.S0, 1e-3f), c.Top + RouteJointMetres, c.Box));
                 pts.Add((MathF.Min(c.S1, run - 1e-3f), c.Top + RouteJointMetres, c.Box));
             }
-            // By distance along, then height: the monotone chain wants them in that order, and two at the
-            // same distance (two boxes ending at one place) otherwise came in whatever order the index gave.
+            // Then by height too: two at one distance otherwise came in the index's order.
             pts.Sort((x, y) => x.S != y.S ? x.S.CompareTo(y.S) : x.Y.CompareTo(y.Y));
             // Upper hull, left to right (Andrew's monotone chain).
             hull.Clear();
@@ -1607,8 +1537,6 @@ public sealed class OpeningRoutes
         return t0 <= t1;
     }
 
-    /// <summary>For the lab: the barrier search spelled out — every box on the line with its shortest way
-    /// round, and for the routes tried, which other box (if any) each one ran into.</summary>
     /// <summary>The boxes a straight leg runs through, with what each lets through (the parity harness's
     /// look at a leg).</summary>
     public List<(Solid Box, Vector3 Gains)> LegBoxes(Vector3 a, Vector3 b)
@@ -1631,6 +1559,8 @@ public sealed class OpeningRoutes
         return list;
     }
 
+    /// <summary>For the lab: the barrier search spelled out, every box on the line with its shortest way
+    /// round, and for the routes tried, which other box (if any) each ran into.</summary>
     public string ExplainBarrier(Vector3 source, Vector3 listener)
     {
         var sb = new System.Text.StringBuilder();
@@ -1675,23 +1605,16 @@ public sealed class OpeningRoutes
     /// shortest, the rest are ways round walls deeper in.</summary>
     private const int MaxRoutesTried = 6;
 
-    /// <summary>
-    /// How much larger every other box is taken to be when a route round one box is checked against it,
-    /// metres. An edge flush against its neighbour — a wall's top under the slab it holds up — is not an
-    /// edge, and a route along the joint is a crack between two boxes that the building does not have.
-    /// </summary>
+    /// <summary>How much larger every other box is taken to be when a route round one box is checked
+    /// against it, metres: a route along the joint of a wall top and its slab is a crack the building does
+    /// not have.</summary>
     private const float RouteJointMetres = 0.05f;
 
     /// <summary>
-    /// How many more boxes a route round one box may bend round on its way, when one of its legs runs into
-    /// them. "Pops" heard from the Main Street pavement (2026-10-03): a park's 1.1 m wall with a 0.5 m pier
-    /// every few metres along its top, a car 160 m beyond it. Over the wall is a few millimetres of
-    /// detour; whether that route was believed depended on whether its leg to the ear crossed the wall
-    /// line at a pier or between two, so as the car drove the answer flipped between -7 dB (over the
-    /// wall) and -80 (through the wall and everything after it) for a third of a second at a time. A
-    /// pier on a wall the sound is already bending over costs it a few millimetres more, not the route.
-    /// A box the leg is still blocked by after this many is a building, and its answer is what comes
-    /// through it.
+    /// How many more boxes a route round one box may bend round when its legs run into them. "Pops" from
+    /// the Main Street pavement (2026-10-03): a park's 1.1 m wall with a 0.5 m pier every few metres, a car
+    /// 160 m beyond; as the leg to the ear crossed at a pier or between two, the car flipped between -7 dB
+    /// and -80 for a third of a second at a time. Still blocked after this many, it is a building.
     /// </summary>
     internal const int MaxChainedBoxes = 2;
 
@@ -1743,8 +1666,8 @@ public sealed class OpeningRoutes
         if (hit < 0) return 0f;
         var scratch = Scratch.Get(this);
         if (chain <= 0 || scratch.ChainBudget <= 0 || limit <= 0f) return -1f;
-        // Round a door leaf is through its doorway, which is the openings' business (Route), with what
-        // the leaf passes. Bent round here it was a crack beside a shut glass door at -12 dB.
+        // Round a door leaf is through its doorway, the openings' business (Route): bent round here it
+        // was a crack beside a shut glass door at -12 dB.
         if (_solids[hit].IsLeaf) return -1f;
         scratch.ChainBudget--;
         ref readonly var box = ref _solids[hit];

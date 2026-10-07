@@ -12,18 +12,8 @@ public struct MaterialProperties
     public float TransmissionHigh { get; set; }
     public int ResonanceIndex { get; set; }
 
-    // -- What the stuff IS, as opposed to how it treats sound arriving at it ----------------------
-    //
-    // Everything above describes a material as a SURFACE: what it absorbs, what it lets through.
-    // That is enough for a wall between you and a noise, and not nearly enough for a wall that IS
-    // the noise. A panel struck by a door latch, by a hailstone, or by another car rings at its own
-    // modes, and where those modes are is a matter of how stiff and how heavy the panel is.
-    //
-    // Two numbers do it. A flat panel's fundamental goes as sqrt(E / rho), times its thickness over
-    // its span squared - so steel rings high and hard, glass higher still because it is stiff for
-    // its weight, and a carpet does not ring at all. They live here rather than in any one caller
-    // because a door panel, a windscreen in hail and two cars meeting are the same calculation asked
-    // three times.
+    // What the stuff is, for a struck panel that is itself the noise (a latch, hail, a collision): a
+    // flat panel's fundamental goes as sqrt(E / rho) times its thickness over its span squared.
 
     /// <summary>Density, kg/m^3.</summary>
     public float DensityKgM3 { get; set; }
@@ -31,38 +21,30 @@ public struct MaterialProperties
     /// <summary>Young's modulus, GPa. With density, this is the note it rings at.</summary>
     public float YoungsModulusGPa { get; set; }
 
-    /// <summary>
-    /// How fast that ring dies away: roughly the fraction of energy lost per cycle.
-    ///
-    /// NOT the same number as <see cref="Absorption"/>, which is about sound ARRIVING at the surface
-    /// out of the air. This is internal damping - a struck bell and a struck lump of putty differ
-    /// here by orders of magnitude and absorb airborne sound about the same.
-    /// </summary>
+    /// <summary>Internal damping, roughly the fraction of energy lost per cycle. Not
+    /// <see cref="Absorption"/>: a bell and putty differ here by orders of magnitude and absorb airborne
+    /// sound about the same.</summary>
     public float LossFactor { get; set; }
 
     /// <summary>
-    /// Sound gets through it by its OPENINGS rather than by moving it: a fence, a hedge, a crowd, a
-    /// carpet. For these the Transmission figures are what leaks through the holes and stand as they
-    /// are. Everything else is an airtight panel, and what gets through one is decided by how heavy
-    /// it is per square metre, how stiff, how damped and how it is built (<see cref="WallTransmission"/>), so a
-    /// map's 35 cm brick wall and a 10 cm one are not the same wall.
+    /// Sound gets through by its openings, not by moving it (a fence, a hedge, a crowd, a carpet), so the
+    /// Transmission figures stand. Anything else is an airtight panel, and its mass, stiffness, damping
+    /// and build decide (<see cref="WallTransmission"/>): a 35 cm brick wall is not a 10 cm one.
     /// </summary>
     public bool Porous { get; set; }
 }
 
 public static class AcousticRegistry
 {
-    // Volatile + build-then-swap: the registry is read from many threads (game loop, audio worker, FMOD
-    // audio thread) while Initialize() may run on any of them. We build a fresh dictionary and atomically
-    // publish it, and serialize writers with a lock, so readers never observe a dictionary mid-mutation
-    // (which throws "operations that change non-concurrent collections must have exclusive access").
+    // Read from the game loop, the audio worker and FMOD's thread while Initialize may run on any of
+    // them: built fresh and published atomically, writers locked, so no reader sees one mid-mutation
+    // ("operations that change non-concurrent collections must have exclusive access").
     private static volatile Dictionary<string, MaterialProperties> _registry = new(System.StringComparer.OrdinalIgnoreCase);
     private static readonly object _initLock = new();
 
     public static void Initialize()
     {
-        // Build into a LOCAL dictionary, then publish it atomically (see _registry note). Never mutate the
-        // currently-published dictionary in place — other threads may be reading it.
+        // Never mutate the published dictionary in place.
         lock (_initLock)
         {
             var reg = new Dictionary<string, MaterialProperties>(System.StringComparer.OrdinalIgnoreCase);
@@ -70,19 +52,10 @@ public static class AcousticRegistry
             reg["Generic"] = new MaterialProperties { Absorption = 0.2f, AbsorptionLow = 0.1f, AbsorptionMid = 0.2f, AbsorptionHigh = 0.3f, Scattering = 0.2f, TransmissionLow = 0.4f, TransmissionMid = 0.3f, TransmissionHigh = 0.2f, ResonanceIndex = 22, DensityKgM3 = 1200f, YoungsModulusGPa = 5f, LossFactor = 0.02f };
             reg["Wood"] = new MaterialProperties { Absorption = 0.15f, AbsorptionLow = 0.1f, AbsorptionMid = 0.15f, AbsorptionHigh = 0.2f, Scattering = 0.4f, TransmissionLow = 0.6f, TransmissionMid = 0.4f, TransmissionHigh = 0.2f, ResonanceIndex = 21, DensityKgM3 = 650f, YoungsModulusGPa = 11f, LossFactor = 0.03f };
             reg["Metal"] = new MaterialProperties { Absorption = 0.05f, AbsorptionLow = 0.05f, AbsorptionMid = 0.05f, AbsorptionHigh = 0.1f, Scattering = 0.1f, TransmissionLow = 0.1f, TransmissionMid = 0.05f, TransmissionHigh = 0.02f, ResonanceIndex = 13, DensityKgM3 = 7850f, YoungsModulusGPa = 200f, LossFactor = 0.0002f };
-            // A PALISADE FENCE, and it is a material rather than a thin wall of metal.
-            //
-            // The Steam Audio scene keys its materials by NAME and takes their properties from this
-            // registry — a per-prefab transmission override never reaches it. So a fence built as
-            // "Metal with the numbers changed" is, to the acoustics, sheet steel: two per cent
-            // transmission at the top end, opaque. Two hundred panels of that along a railway
-            // silenced every vehicle behind them, reported as engines cutting out "like it is going
-            // under a bridge".
-            //
-            // What a palisade actually is, acoustically, is AIR with some steel in it. Half to two
-            // thirds of the area is gap, so most of the sound goes straight through; the pales
-            // scatter the top end, which is why a fence takes the edge off without taking the sound
-            // away. It stops a body and not a wave, and those are different jobs.
+            // A palisade fence is air with some steel in it: half to two thirds gap, the pales scattering
+            // the top end. A material of its own because the Steam Audio scene keys materials by name and
+            // never sees a prefab's override: 200 panels of "Metal with the numbers changed" along a
+            // railway silenced every vehicle behind them ("like it is going under a bridge").
             reg["Fence"] = new MaterialProperties { Absorption = 0.08f, AbsorptionLow = 0.05f, AbsorptionMid = 0.08f, AbsorptionHigh = 0.12f, Scattering = 0.55f, TransmissionLow = 0.94f, TransmissionMid = 0.88f, TransmissionHigh = 0.72f, ResonanceIndex = 29, DensityKgM3 = 7850f, YoungsModulusGPa = 200f, LossFactor = 0.0004f };   // 29: its own, not Metal's 13
             reg["Concrete"] = new MaterialProperties { Absorption = 0.02f, AbsorptionLow = 0.01f, AbsorptionMid = 0.02f, AbsorptionHigh = 0.02f, Scattering = 0.1f, TransmissionLow = 0.05f, TransmissionMid = 0.02f, TransmissionHigh = 0.01f, ResonanceIndex = 18, DensityKgM3 = 2400f, YoungsModulusGPa = 30f, LossFactor = 0.015f };
             reg["Marble"] = new MaterialProperties { Absorption = 0.01f, AbsorptionLow = 0.01f, AbsorptionMid = 0.01f, AbsorptionHigh = 0.01f, Scattering = 0.05f, TransmissionLow = 0.05f, TransmissionMid = 0.02f, TransmissionHigh = 0.01f, ResonanceIndex = 12, DensityKgM3 = 2700f, YoungsModulusGPa = 60f, LossFactor = 0.002f };
@@ -91,121 +64,69 @@ public static class AcousticRegistry
             reg["None"] = new MaterialProperties { Absorption = 0.0f, AbsorptionLow = 0.0f, AbsorptionMid = 0.0f, AbsorptionHigh = 0.0f, Scattering = 0.0f, TransmissionLow = 1.0f, TransmissionMid = 1.0f, TransmissionHigh = 1.0f, ResonanceIndex = 0, DensityKgM3 = 0f, YoungsModulusGPa = 0f, LossFactor = 1f };
             reg["Plastic"] = new MaterialProperties { Absorption = 0.1f, AbsorptionLow = 0.05f, AbsorptionMid = 0.1f, AbsorptionHigh = 0.2f, Scattering = 0.2f, TransmissionLow = 0.5f, TransmissionMid = 0.4f, TransmissionHigh = 0.2f, ResonanceIndex = 15, DensityKgM3 = 1100f, YoungsModulusGPa = 2.5f, LossFactor = 0.05f };
             reg["Grass"] = new MaterialProperties { Absorption = 0.75f, AbsorptionLow = 0.5f, AbsorptionMid = 0.7f, AbsorptionHigh = 0.9f, Scattering = 0.9f, TransmissionLow = 0.4f, TransmissionMid = 0.6f, TransmissionHigh = 0.8f, ResonanceIndex = 2, DensityKgM3 = 400f, YoungsModulusGPa = 0.005f, LossFactor = 0.6f };
-            // A grandstand full of people, which is a MATERIAL and not a special case: it is the
-            // most absorbent and the most scattering thing in ordinary acoustics — an occupied seating
-            // area takes about three quarters of what reaches it, and what it does return leaves in
-            // every direction at once, because it is seats, steps, railings and people rather than a
-            // surface. It is why a full house deadens a hall and an empty one rings. Modelled here so
-            // a map can say "the face this stand presents to the track is a crowd, not a slab", which
-            // is the difference between a crisp copy of the applause coming back and a wash.
+            // A grandstand full of people: occupied seating takes about three quarters of what reaches
+            // it and scatters the rest, so applause comes back as a wash, not a crisp copy.
             reg["Audience"] = new MaterialProperties { Absorption = 0.72f, AbsorptionLow = 0.5f, AbsorptionMid = 0.75f, AbsorptionHigh = 0.85f, Scattering = 0.8f, TransmissionLow = 0.3f, TransmissionMid = 0.15f, TransmissionHigh = 0.05f, ResonanceIndex = 5, DensityKgM3 = 300f, YoungsModulusGPa = 0.01f, LossFactor = 0.5f };
             reg["Dirt"] = new MaterialProperties { Absorption = 0.60f, AbsorptionLow = 0.4f, AbsorptionMid = 0.5f, AbsorptionHigh = 0.6f, Scattering = 0.8f, TransmissionLow = 0.3f, TransmissionMid = 0.4f, TransmissionHigh = 0.5f, ResonanceIndex = 4, DensityKgM3 = 1600f, YoungsModulusGPa = 0.05f, LossFactor = 0.5f };
 
 
-            // ── Things you walk on, and things you walk in ───────────────────────────────────────
-            //
-            // Gravel is not a surface, it is a HEAP: very absorbent because the sound goes down into
-            // the voids between the stones and does not come back, and almost entirely scattering
-            // because there is no flat face anywhere in it. Which is also why a gravel drive is the
-            // quietest hard ground there is to stand on and the loudest to walk on.
+            // Gravel is a heap: sound goes into the voids and does not come back, and no face is flat.
             reg["Gravel"] = new MaterialProperties { Absorption = 0.65f, AbsorptionLow = 0.35f, AbsorptionMid = 0.65f, AbsorptionHigh = 0.80f, Scattering = 0.95f, TransmissionLow = 0.35f, TransmissionMid = 0.45f, TransmissionHigh = 0.55f, ResonanceIndex = 7, DensityKgM3 = 1700f, YoungsModulusGPa = 0.35f, LossFactor = 0.55f };
 
-            // ── A city is made of four things the table did not have ─────────────────────────────
-            //
-            // Written for the city block, and each of them is a difference a listener can hear
-            // against the Concrete that was standing in for all of them.
-
-            // BRICK. Acoustically close to concrete in how much it takes — masonry absorbs almost
-            // nothing — and quite different in what it does with the rest. A brick wall is courses
-            // and raked mortar joints, a centimetre of relief every seventy millimetres, which is a
-            // quarter wavelength at 8 kHz and a sixteenth at 2: it SCATTERS where a poured concrete
-            // wall mirrors. That is why a brick street is a wash and a concrete underpass is a
-            // slapback, and it is one number apart. Fired clay is also much less stiff than
-            // concrete and far lossier, so a brick wall does not ring when something hits it.
+            // Brick absorbs as little as concrete but scatters: a centimetre of mortar relief every
+            // 70 mm is a quarter wavelength at 8 kHz, so a brick street is a wash where a concrete
+            // underpass slaps back. Fired clay is less stiff and far lossier: it does not ring.
             reg["Brick"] = new MaterialProperties { Absorption = 0.04f, AbsorptionLow = 0.03f, AbsorptionMid = 0.04f, AbsorptionHigh = 0.07f, Scattering = 0.45f, TransmissionLow = 0.06f, TransmissionMid = 0.03f, TransmissionHigh = 0.015f, ResonanceIndex = 23, DensityKgM3 = 1900f, YoungsModulusGPa = 15f, LossFactor = 0.02f };
 
-            // ASPHALT. The reason a concrete motorway is louder than a bituminous one, and it is not
-            // a small effect: dense-graded asphalt is POROUS, so sound at grazing incidence goes into
-            // the voids between the aggregate and does not all come back. Three to four times
-            // concrete's absorption, most of it at the top of the band. And bitumen is a viscous
-            // solid — a loss factor two orders up on concrete's — so a road surface is the one hard
-            // ground that does not ring at all: a dropped bolt on asphalt thuds, on concrete it
-            // rings.
+            // Asphalt is porous at grazing incidence: three to four times concrete's absorption, mostly
+            // at the top, which is why a concrete motorway is louder. Bitumen's loss factor is two
+            // orders up on concrete's: a dropped bolt thuds.
             reg["Asphalt"] = new MaterialProperties { Absorption = 0.09f, AbsorptionLow = 0.04f, AbsorptionMid = 0.08f, AbsorptionHigh = 0.16f, Scattering = 0.35f, TransmissionLow = 0.1f, TransmissionMid = 0.05f, TransmissionHigh = 0.02f, ResonanceIndex = 24, DensityKgM3 = 2300f, YoungsModulusGPa = 3f, LossFactor = 0.18f };
 
-            // TILE. The hardest, flattest, least absorbent surface in ordinary life — glazed ceramic
-            // on a solid bed takes about one per cent and returns the rest as a mirror. It is why a
-            // tiled station concourse or a public lavatory is the most reverberant room most people
-            // ever stand in, far more so than a concrete one. It also RINGS: fired glaze is stiff
-            // and almost lossless, a hundredth of concrete's damping, which is the tick under a
-            // heel on a station floor.
+            // Glazed tile on a solid bed takes about one per cent and mirrors the rest, the most
+            // reverberant room most people stand in; a hundredth of concrete's damping, so it rings
+            // (the tick under a heel on a station floor).
             reg["Tile"] = new MaterialProperties { Absorption = 0.015f, AbsorptionLow = 0.01f, AbsorptionMid = 0.015f, AbsorptionHigh = 0.02f, Scattering = 0.06f, TransmissionLow = 0.15f, TransmissionMid = 0.08f, TransmissionHigh = 0.03f, ResonanceIndex = 25, DensityKgM3 = 2300f, YoungsModulusGPa = 60f, LossFactor = 0.005f };
 
-            // FOLIAGE. A street tree or a hedge is not a surface at all, it is a VOLUME of thousands
-            // of small scatterers, so it is the extreme of the same pair of numbers the Audience is:
-            // nearly everything that goes in comes back out in every direction, and the higher the
-            // frequency the less of it comes back out at all. A row of trees between a road and a
-            // house is worth a few decibels of traffic and takes the edge off all of it, which is
-            // what people mean when they say a treed street is quieter.
+            // Foliage is a volume of small scatterers: nearly all of it scattered, less coming back the
+            // higher the frequency. A row of trees is worth a few decibels of traffic.
             reg["Foliage"] = new MaterialProperties { Absorption = 0.55f, AbsorptionLow = 0.2f, AbsorptionMid = 0.5f, AbsorptionHigh = 0.8f, Scattering = 0.92f, TransmissionLow = 0.85f, TransmissionMid = 0.6f, TransmissionHigh = 0.3f, ResonanceIndex = 26, DensityKgM3 = 500f, YoungsModulusGPa = 0.01f, LossFactor = 0.6f };
 
-            // PLASTER — plasterboard on studs, which is what the inside of a building is made of, and
-            // the only common material whose absorption goes DOWN with frequency.
-            //
-            // It is a membrane: a light sheet with an air cavity behind it, so a long wavelength
-            // flexes it and loses energy while a short one bounces off. That is the exact opposite of
-            // carpet, and it is why the two together make a room sound like a room. A carpeted flat
-            // with SOLID walls keeps a two-second bass tail over a 600 ms middle — measured on the
-            // city map, and reported as "the carpeted flat sounds reverby like it's a reflective room
-            // not carpet". The carpet was working; nothing in the room was taking the bottom out,
-            // because nothing in it was a membrane.
-            //
-            // 0.28 at the bottom against 0.05 at the top is the published curve for 12 mm board on
-            // studs, and it is a fact about the construction rather than a preference.
+            // Plasterboard on studs is a membrane, the one common material whose absorption falls with
+            // frequency: carpet takes the top, the walls the bass. With solid walls a carpeted flat on
+            // the city map kept a two-second bass tail over a 600 ms middle ("sounds reverby like it's a
+            // reflective room not carpet"). 0.28 low, 0.05 high: the published curve for 12 mm board.
             reg["Plaster"] = new MaterialProperties { Absorption = 0.12f, AbsorptionLow = 0.28f, AbsorptionMid = 0.10f, AbsorptionHigh = 0.05f, Scattering = 0.15f, TransmissionLow = 0.35f, TransmissionMid = 0.18f, TransmissionHigh = 0.08f, ResonanceIndex = 27, DensityKgM3 = 800f, YoungsModulusGPa = 3f, LossFactor = 0.03f };
 
-            // A suspended acoustic ceiling: mineral-fibre tiles on a grid, a void above. What keeps a
-            // concourse, an office or a shop from ringing like the concrete box it is built as. The
-            // published curve for a 16-19 mm tile (NRC 0.70): 0.35-0.40 at the bottom, 0.80-0.85
-            // through the middle and top. A light, porous panel, so the bass goes through into the
-            // void; flat, so it hardly scatters. The airport terminal was bare concrete overhead and
-            // rang for 7-10 s where a real one is 2-3 (2026-09-29).
+            // A suspended mineral-fibre ceiling, a void above: the published curve for a 16-19 mm tile
+            // (NRC 0.70) is 0.35-0.40 low and 0.80-0.85 mid and high; porous, so the bass passes into the
+            // void, and flat. Bare concrete overhead rang the airport terminal 7-10 s where a real one
+            // is 2-3 (2026-09-29).
             reg["AcousticTile"] = new MaterialProperties { Absorption = 0.70f, AbsorptionLow = 0.38f, AbsorptionMid = 0.80f, AbsorptionHigh = 0.82f, Scattering = 0.10f, TransmissionLow = 0.55f, TransmissionMid = 0.35f, TransmissionHigh = 0.15f, ResonanceIndex = 30, DensityKgM3 = 250f, YoungsModulusGPa = 0.05f, LossFactor = 0.3f };
 
-            // ── Soles ───────────────────────────────────────────────────────────────────────────
-            //
-            // A sole is a material like any other, and putting it in the same table as the ground is
-            // the whole reason a shoe does not need a sound of its own: what a footstep sounds like
-            // falls out of the SOFTER of the two things that meet, and these are the soft ones.
-            // Their moduli span four decades, which is two octaves of contact brightness — see
-            // Footsteps.ContactSeconds — and that single span is most of the difference between
-            // every kind of footwear there is.
+            // Soles: a footstep falls out of the softer of the two things that meet. Their moduli span
+            // four decades, two octaves of contact brightness (Footsteps.ContactSeconds).
 
-            /// Soft trainer sole: EVA foam and soft rubber, around 20 MPa.
+            // Soft trainer sole: EVA foam and soft rubber, around 20 MPa.
             reg["Rubber"] = new MaterialProperties { Absorption = 0.20f, AbsorptionLow = 0.10f, AbsorptionMid = 0.20f, AbsorptionHigh = 0.35f, Scattering = 0.35f, TransmissionLow = 0.5f, TransmissionMid = 0.35f, TransmissionHigh = 0.2f, ResonanceIndex = 8, DensityKgM3 = 1100f, YoungsModulusGPa = 0.02f, LossFactor = 0.25f };
 
-            // A leather board sole: two orders of magnitude stiffer than a trainer's, which is why it
-            // is the one kind of shoe that can make a click.
+            // Leather board: two orders stiffer than a trainer's, the one sole that clicks.
             reg["Leather"] = new MaterialProperties { Absorption = 0.12f, AbsorptionLow = 0.08f, AbsorptionMid = 0.12f, AbsorptionHigh = 0.18f, Scattering = 0.15f, TransmissionLow = 0.5f, TransmissionMid = 0.4f, TransmissionHigh = 0.25f, ResonanceIndex = 9, DensityKgM3 = 900f, YoungsModulusGPa = 0.45f, LossFactor = 0.12f };
 
             // A work boot's sole: hard vulcanised rubber, ten times a trainer's and a tenth of leather.
             reg["BootRubber"] = new MaterialProperties { Absorption = 0.15f, AbsorptionLow = 0.08f, AbsorptionMid = 0.15f, AbsorptionHigh = 0.25f, Scattering = 0.30f, TransmissionLow = 0.5f, TransmissionMid = 0.35f, TransmissionHigh = 0.2f, ResonanceIndex = 10, DensityKgM3 = 1250f, YoungsModulusGPa = 0.20f, LossFactor = 0.20f };
 
-            // A bare foot. Softer than any sole ever made, which is exactly why it slaps rather than
-            // clicks on everything, however hard the floor is.
+            // A bare foot, softer than any sole: it slaps on everything.
             reg["Skin"] = new MaterialProperties { Absorption = 0.30f, AbsorptionLow = 0.15f, AbsorptionMid = 0.30f, AbsorptionHigh = 0.45f, Scattering = 0.45f, TransmissionLow = 0.6f, TransmissionMid = 0.45f, TransmissionHigh = 0.3f, ResonanceIndex = 11, DensityKgM3 = 1050f, YoungsModulusGPa = 0.0015f, LossFactor = 0.45f };
 
-            // Open water: a still surface is as hard a reflector as the air ever meets (its impedance is
-            // 3,500 times air's), absorbing a per cent or two, and almost nothing passes into it. A round
-            // skips off it below Birkhoff's angle and splashes into it above (Ricochet, BulletImpact).
-            // Its "Young's modulus" is its bulk modulus, 2.2 GPa; it does not ring.
+            // Still water: impedance 3,500 times air's, absorbing a per cent or two. A round skips below
+            // Birkhoff's angle (Ricochet, BulletImpact). Its modulus is the bulk modulus, 2.2 GPa.
             reg["Water"] = new MaterialProperties { Absorption = 0.015f, AbsorptionLow = 0.01f, AbsorptionMid = 0.015f, AbsorptionHigh = 0.02f, Scattering = 0.05f, TransmissionLow = 0.01f, TransmissionMid = 0.005f, TransmissionHigh = 0.002f, ResonanceIndex = 31, DensityKgM3 = 1000f, YoungsModulusGPa = 2.2f, LossFactor = 0.5f };
 
-            // Porous: sound passes through the holes, not by moving the stuff. See MaterialProperties.Porous.
             foreach (var porous in new[] { "Fence", "Foliage", "Grass", "Audience", "Dirt", "Gravel", "Carpet", "AcousticTile", "None" })
                 if (reg.TryGetValue(porous, out var pp)) { pp.Porous = true; reg[porous] = pp; }
 
-            // Every material needs its own ResonanceIndex; report any two that share one.
+            // Every material needs its own ResonanceIndex.
             var seen = new Dictionary<int, string>();
             foreach (var kvp in reg)
             {
@@ -221,28 +142,23 @@ public static class AcousticRegistry
         }
     }
 
-    /// <summary>
-    /// Initializes the table if nothing has yet — the server never called <see cref="Initialize"/>, so
-    /// anything on the server side that needs to know what a material *is* (prefab validation, name to
-    /// resonance-index resolution) would otherwise read an empty registry and reject every material name.
-    /// Idempotent.
-    /// </summary>
+    /// <summary>Initializes the table if nothing has: the server never calls <see cref="Initialize"/>, and
+    /// its prefab validation would otherwise reject every material name.</summary>
     public static void EnsureInitialized()
     {
         if (_registry.Count == 0) Initialize();
     }
 
-    /// <summary>True if <paramref name="type"/> names a material the registry actually knows about.
-    /// <see cref="GetProperties"/> substitutes "Generic" for anything else, which is the right runtime
-    /// behaviour and the wrong authoring behaviour — a typo'd material must be reported, not guessed.</summary>
+    /// <summary>Whether <paramref name="type"/> names a known material. <see cref="GetProperties"/> falls
+    /// back to "Generic", right at run time and wrong when authoring: a typo must be reported.</summary>
     public static bool IsKnown(string type)
     {
         EnsureInitialized();
         return !string.IsNullOrEmpty(type) && _registry.ContainsKey(type);
     }
 
-    /// <summary>Resolves a material NAME to the ResonanceIndex that region face arrays are stored as.
-    /// Authoring by raw index (`"Materials": [18, 18, ...]`) is unreadable and unverifiable.</summary>
+    /// <summary>A material name's ResonanceIndex, as region face arrays store it, so maps can be authored
+    /// by name.</summary>
     public static bool TryGetResonanceIndex(string type, out int index)
     {
         EnsureInitialized();
@@ -280,9 +196,7 @@ public static class AcousticRegistry
 
     public static MaterialProperties GetProperties(string type)
     {
-        // Every other accessor does this; this one did not, and so the one call that reached the
-        // registry before anything had initialised it threw KeyNotFoundException on "Generic"
-        // instead of returning the fallback it advertises.
+        // Without it a call before initialisation threw KeyNotFoundException on "Generic".
         EnsureInitialized();
         if (string.IsNullOrEmpty(type)) return _registry["Generic"];
         if (_registry.TryGetValue(type, out var props)) return props;

@@ -4,90 +4,38 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// How much of the sound leaving a place comes back to it — the one number that says whether there is
-/// a reverberant field here at all.
-///
-/// A decay TIME cannot answer that question, and finding out why cost a session. Steam Audio's
-/// parametric estimator fits an exponential to the energy its rays bring home, and the fit knows
-/// nothing about how much energy that was: in the open, a handful of rays returning off two hard walls
-/// decay slowly, because concrete is nearly lossless, and a slow decay of almost nothing is reported as
-/// a long reverb. Measured (AudioLab --sim-reverbfield): a walled yard with NO CEILING fitted 1.0 s
-/// where the SAME walls with a roof on fitted 0.6 s. The roofless one read as the more reverberant of
-/// the two. On the speedway's front straight that put a 1.1 s tail at -22 dB over a race in open air.
-///
-/// So the level of a reverberant field is not a function of its decay time, and it never was. It is a
-/// function of how enclosed you are, which is a property of the geometry standing around you and can
-/// simply be measured: fire rays in every direction, see what each one meets, and add up the energy
-/// that would come back. Nothing here knows what a room, a street or a racetrack is — a field scores
-/// low because the sky takes half of it and the grass takes most of the rest, a concrete box scores
-/// high because concrete returns 98% of what hits it, and a stand of trees lands in between because
-/// foliage is absorbent. The same arithmetic on any map.
+/// How much of the sound leaving a place comes back to it: whether there is a reverberant field here
+/// at all, measured from the geometry, never read off a decay time. Steam Audio's estimator fits a
+/// curve to whatever energy its rays bring home: a walled yard with no ceiling fitted 1.0 s where the
+/// same walls roofed fitted 0.6 s (AudioLab --sim-reverbfield), and the speedway's front straight got a
+/// 1.1 s tail at -22 dB in open air. See docs/COMMON_NOTES.md, Reverberation.
 /// </summary>
 public static class Enclosure
 {
-    /// <summary>
-    /// A box of scene geometry: where it is, how big, how it is turned, and what it is made of.
-    /// Deliberately the same shape the acoustic scene is built from, so the caller passes what it has.
-    /// </summary>
+    /// <summary>A box of scene geometry, in the shape the acoustic scene is built from.</summary>
     public readonly record struct Solid(Vector3 Center, Vector3 Size, Quaternion Rotation, string Material);
 
-    /// <summary>
-    /// Directions sampled. A Fibonacci sphere, so they are near-uniform without a random number in
-    /// sight — the measure has to be the same every tick for the same geometry, or a listener standing
-    /// still would hear the room breathe.
-    /// </summary>
+    /// <summary>Directions sampled, on a Fibonacci sphere: no random numbers, or a listener standing still
+    /// would hear the room breathe.</summary>
     public const int Rays = 192;
 
     /// <summary>
-    /// How far a surface can be and still be part of the room rather than an echo off something in the
-    /// distance, metres.
-    ///
-    /// The one constant here, and it is a time in disguise: 60 m is about 350 ms for the round trip,
-    /// which is the outer edge of what fuses into a reverberant tail instead of arriving as a separate
-    /// slap. Beyond it a wall still reflects — that is what the discrete reflection path is for — but
-    /// it is not what makes a space sound enclosed.
+    /// How far a surface can be and still be part of the room, metres: 60 m is about 350 ms for the
+    /// round trip, the outer edge of what fuses into a tail rather than arriving as a separate slap
+    /// (which the discrete reflections are for).
     /// </summary>
     public const float ReverberantRangeMetres = 60f;
 
     /// <summary>
-    /// The fraction of emitted energy that is still bouncing around here after it has left and come
-    /// back — 0 for an open field, 1 for the inside of a mirror-walled box.
-    ///
-    /// TWO bounces, and the second one is the whole point. One bounce cannot tell a plane from a room:
-    /// standing on bare concrete, half of every direction ends in concrete, which returns 98% of what
-    /// hits it, and a single-bounce measure calls that half-enclosed. It is not — the ground reflects
-    /// sound AWAY, once, and that energy never comes back. Measured on the battle spike's concrete
-    /// street, bare open ground scored 48% on one bounce, which would have put a plaza most of the way
-    /// to a room. Following each ray past its first surface is what separates them: off flat ground it
-    /// goes up and is gone, while in a street it crosses to the facade opposite and stays.
-    ///
-    /// So a ray is worth what survives BOTH surfaces, and only if there is a second one. Nothing here
-    /// knows what a room, a street or a racetrack is: a field scores low because the sky takes the sound
-    /// and the ground sends the rest of it there, a concrete box scores high because every direction
-    /// leads to another wall, and a stand of trees lands between them because foliage absorbs.
-    /// </summary>
-    /// <summary>
-    /// The boxes near enough to matter, gathered once instead of rejected once per ray.
-    ///
-    /// Every cast below walks the whole solid list and rejects what is out of range by a distance
-    /// test. That is the right test and it is cheap, but it is done 192 times for the outward rays
-    /// and 192 more for the bounces, so on a map with four thousand boxes on it the survey does one
-    /// and a half million distance tests to look at the two hundred boxes that are actually within
-    /// reach. Measured: 7.5 ms on the 390-box block, 32 ms on the 4,165-box city — for the same
-    /// question asked of the same room.
-    ///
-    /// So it is asked once. A solid is in reach if its bounding sphere is, which is exactly the test
-    /// the casts were doing; the two bounces can travel further than one, so the radius is doubled.
-    /// Nothing about the measurement changes — the same boxes are hit in the same order — and the
-    /// sphere it is worth keeping is generous rather than tight, because a box wrongly dropped is a
-    /// wall that stops existing.
+    /// The boxes in reach, gathered once instead of rejected once per ray: 384 casts over a 4,165-box
+    /// city cost 32 ms against 7.5 on the 390-box block, for the same room. In reach is the casts' own
+    /// bounding-sphere test at twice the range (two bounces), so the same boxes are hit in the same
+    /// order; generous, because a box wrongly dropped is a wall that stops existing.
     /// </summary>
     private static List<Solid> Nearby(Vector3 listener, IReadOnlyList<Solid> solids)
     {
         var near = _nearby ??= new List<Solid>(256);
         near.Clear();
-        // Two bounces: out to a surface and on to another. A ray can therefore be twice the range
-        // from the listener when it strikes, and the second surface is still this room's.
         const float reach = 2f * ReverberantRangeMetres;
         for (int i = 0; i < solids.Count; i++)
         {
@@ -98,10 +46,15 @@ public static class Enclosure
         return near;
     }
 
-    /// <summary>One scratch list per thread. The survey runs on the acoustic worker and on whatever
-    /// thread a spike calls it from, and two of them sharing a list would interleave.</summary>
+    /// <summary>Per thread: the survey runs on the acoustic worker and on any thread a spike calls it from.</summary>
     [ThreadStatic] private static List<Solid>? _nearby;
 
+    /// <summary>
+    /// The fraction of emitted energy still here after it has left and come back: 0 for an open field,
+    /// 1 inside a mirror-walled box. Two bounces, because one cannot tell a plane from a room: bare open
+    /// concrete scored 48 % on one bounce (the battle spike's street), but off flat ground the second
+    /// ray goes up and is gone, while in a street it crosses to the opposite facade.
+    /// </summary>
     public static float Measure(Vector3 listener, IReadOnlyList<Solid> solids)
     {
         if (solids == null || solids.Count == 0) return 0f;
@@ -114,12 +67,10 @@ public static class Enclosure
             Vector3 dir = SphereDirection(k, Rays);
             if (!Cast(listener, dir, solids, out float d1, out Vector3 n1, out float keep1)) continue;
 
-            // Where it goes next. A mirror bounce off the face it struck — the specular direction is
-            // the one a ray actually takes, and it is what makes a surface that faces away from
-            // everything (the ground) behave differently from one that faces another surface.
+            // On by the mirror direction: what makes the ground, facing away from everything, differ
+            // from a wall facing another. Lifted off so the same box is not struck at zero distance.
             Vector3 hit = listener + dir * d1;
             Vector3 onward = Vector3.Reflect(dir, n1);
-            // Lift off the surface so the box it just hit is not struck again at zero distance.
             if (!Cast(hit + onward * 0.01f, onward, solids, out _, out _, out float keep2)) continue;
 
             returned += keep1 * keep2;
@@ -150,12 +101,9 @@ public static class Enclosure
             for (int i = 0; i < solids.Count; i++)
             {
                 var s = solids[i];
-                // Cheap rejects first, both on the box's bounding sphere. Out of range cannot be struck
-                // within it. And — the one that matters in a city — a sphere the ray's LINE does not pass
-                // through cannot be struck at all: every interior floor, partition and sofa of a tower
-                // sixty metres away is in range of every ray, and only a handful are anywhere near any
-                // one of them. Testing the range alone left the OBB test running against nearly every
-                // box for every ray, which is how the survey on Main Street drifted to 55 ms.
+                // Cheap rejects on the bounding sphere. Off the ray's line is the one that matters in a
+                // city: every floor and sofa of a tower 60 m away is in range of every ray, and range
+                // alone let the survey on Main Street drift to 55 ms.
                 float radiusSq = s.Size.LengthSquared() * 0.25f;
                 Vector3 toCentre = s.Center - origin;
                 float along = Vector3.Dot(toCentre, direction);
@@ -173,11 +121,8 @@ public static class Enclosure
         }
     }
 
-    /// <summary>
-    /// The triangle world's acoustic layer: the nearest face a ray enters by within range. A ray that
-    /// starts inside a solid passes out of it unseen and goes on, as the box test's did (it has no face
-    /// to enter by).
-    /// </summary>
+    /// <summary>The triangle world's acoustic layer: the nearest face a ray enters by within range. A ray
+    /// starting inside a solid passes out of it unseen, as with boxes.</summary>
     public readonly struct TriangleSurroundings : ISurroundings
     {
         private readonly Geometry.TriangleWorld _world;
@@ -214,7 +159,6 @@ public static class Enclosure
         keep = 0f;
         if (!surroundings.Nearest(origin, direction, out distance, out normal, out string material))
         {
-            // this direction is open: the energy is gone
             distance = float.MaxValue; normal = Vector3.Zero;
             props = AcousticRegistry.GetProperties("Generic");
             return false;
@@ -225,17 +169,13 @@ public static class Enclosure
         return true;
     }
 
-    /// <summary>
-    /// What the surroundings are, as one measurement: how enclosed, how far sound travels between
-    /// surfaces, and what those surfaces take out of it per band.
-    /// </summary>
+    /// <summary>The surroundings as one measurement: how enclosed, how far sound travels between
+    /// surfaces, and what they take out of it per band.</summary>
     /// <param name="Enclosure">Fraction of emitted energy still here after leaving and coming back.</param>
-    /// <param name="OpenFraction">Fraction of directions with nothing in them — the sky, and the open
-    /// sides of the world. An opening is a perfect absorber: what goes out of it does not come back.</param>
-    /// <param name="MeanFreePathMetres">Mean distance to the first surface, over the directions that
-    /// FOUND one. Four times the volume over the surface area, measured rather than assumed — and the
-    /// directions that met nothing are excluded, because a direction with no surface in it has no
-    /// distance between surfaces to contribute.</param>
+    /// <param name="OpenFraction">Fraction of directions with nothing in them: an opening is a perfect
+    /// absorber.</param>
+    /// <param name="MeanFreePathMetres">Mean distance to the first surface over the directions that found
+    /// one (4V/S, measured).</param>
     public readonly record struct Survey(float Enclosure, float OpenFraction, float MeanFreePathMetres,
                                          float AbsorptionLow, float AbsorptionMid, float AbsorptionHigh,
                                          Vector3 ReturnDirection, float Anisotropy,
@@ -248,20 +188,10 @@ public static class Enclosure
     }
 
     /// <summary>
-    /// Which way the returned energy came from, and how much it came from one way.
-    ///
-    /// The reverberant field is not the same in every direction, and a listener can tell. Stand on
-    /// the carpeted half of a hall facing the concrete half: the carpet behind you sends almost
-    /// nothing back, the concrete in front sends nearly everything, and the wash is heard IN FRONT.
-    /// Reported as exactly that: "if I turn to face the wood/concrete half, I should hear a wash of
-    /// reverb coming ONLY from that half of the room, as if the reflections are in front of me."
-    ///
-    /// <see cref="Survey.ReturnDirection"/> is the energy-weighted mean of the directions the rays
-    /// went out in and came back from, in world space, unit length — or zero when nothing came back.
-    /// <see cref="Survey.Anisotropy"/> is how concentrated it is: the length of that mean before
-    /// normalising, over the total returned. A sealed uniform room scores near 0 (energy from
-    /// everywhere cancels); one hard wall in an open field scores near 1. Nothing here knows what a
-    /// carpet or a gym is; the materials and the boxes decide, as they decide the level.
+    /// Which way the returned energy came from, unit length in world space (zero when nothing came
+    /// back), and in <paramref name="anisotropy"/> how much from one way: near 0 in a sealed uniform
+    /// room, near 1 for one hard wall in a field. Cody, facing the hard half of a half-carpeted hall: "I
+    /// should hear a wash of reverb coming ONLY from that half of the room".
     /// </summary>
     public static Vector3 ReturnCentroid(Vector3 weightedSum, float returned, out float anisotropy)
     {
@@ -271,15 +201,9 @@ public static class Enclosure
     }
 
     /// <summary>
-    /// The same sphere of rays as <see cref="Measure"/>, reporting everything it saw rather than only
-    /// the number that comes out of it.
-    ///
-    /// This is what makes a room's character a consequence of its materials instead of a setting. The
-    /// mean free path and the mean absorption are the two things a decay time is made of, and both are
-    /// here for the asking once the rays have been cast — including, and this is the part a room model
-    /// built from a box list normally misses, the directions that meet NOTHING. An opening absorbs
-    /// everything that reaches it, so a room with no ceiling has most of its absorption in the sky, and
-    /// that is why it is a courtyard rather than a reverberation chamber.
+    /// The same sphere of rays as <see cref="Measure"/>, reporting everything it saw: the mean free path
+    /// and absorption a decay time is made of, counting the directions that meet nothing as perfect
+    /// absorbers, which is why a room with no ceiling is a courtyard and not a reverberation chamber.
     /// </summary>
     public static Survey Look(Vector3 listener, IReadOnlyList<Solid> solids)
     {
@@ -293,10 +217,8 @@ public static class Enclosure
         return Look(listener, ref boxes, scene);
     }
 
-    /// <summary>
-    /// The same survey against the triangle world (docs/GEOMETRY.md 3.4): the same rays, each asked of
-    /// the BVH instead of every box within reach. Measured 14 to 21 times faster.
-    /// </summary>
+    /// <summary>The same survey against the triangle world's BVH (docs/GEOMETRY.md 3.4): 14 to 21 times
+    /// faster.</summary>
     public static Survey Look(Vector3 listener, Geometry.TriangleWorld world)
     {
         if (world == null || world.InstanceCount == 0)
@@ -308,25 +230,11 @@ public static class Enclosure
     /// <summary>The survey against any surroundings; <paramref name="scene"/> keys the openness cache.</summary>
     public static Survey Look<S>(Vector3 listener, ref S surroundings, object scene) where S : ISurroundings
     {
-
-        // ── Where the room ENDS ────────────────────────────────────────────────────────────────
-        //
-        // A ray that meets a surface is counted as this room's surface, however far away it is. For
-        // a small place in the open that is wrong: under a bus shelter the rays leave through the open
-        // front, cross the road, hit the building opposite, and come back recorded as the shelter's own
-        // hard walls — 612 m² of surface for a 65 m² box, and a two-second tail under a sheet of glass.
-        //
-        // Three distance-keyed fixes failed (see the a-small-room-inside-a-big-one note): anything that
-        // says "far means gone" also cuts a big flat room's own far wall. What actually marks the edge
-        // of a room is that the OPENNESS changes across it. So for every ray that goes a fair way before
-        // it strikes, the openness halfway along it is compared with the listener's own: a jump means
-        // the ray crossed out of this place into a much more open one, and it counts as escaped. Under
-        // the shelter (0 % open) a ray out of the front reaches the road (a third open) — gone. In the
-        // garage (1 %) a ray to its far wall stays in the garage (1 %) — kept. In the street (a third)
-        // a ray to a facade stays in the street — kept.
-        //
-        // Known limit, and it is the honest one: a small room opening onto a big ENCLOSED hall reads
-        // closed on both sides, so nothing jumps and it is surveyed as the hall.
+        // Where the room ends: a ray whose path is much more open halfway along than where the listener
+        // stands has left this place and counts as escaped. Without it a bus shelter's rays crossed the
+        // road to the building opposite and read 612 m² of surface for a 65 m² box, a two-second tail.
+        // Distance-keyed rules also cut a big room's own far wall (docs/COMMON_NOTES.md, Where a room
+        // ends). Known limit: a small room onto a big enclosed hall is surveyed as the hall.
         var casts = _casts ??= new RayHit[Rays];
         int misses = 0;
         for (int k = 0; k < Rays; k++)
@@ -349,9 +257,8 @@ public static class Enclosure
         int hits = 0;
         float pathSum = 0f;
         float aLow = 0f, aMid = 0f, aHigh = 0f;
-        // The two integrals that give the room's VOLUME and its SURFACE AREA from one point inside
-        // it. For a convex room both are exact: the cone swept by each ray has volume d³dω/3, and the
-        // solid angle a patch of wall subtends is dS·cosθ/d², so ∮(d²/cosθ)dω is the whole of S.
+        // Volume and surface area from one point inside, exact for a convex room: each ray's cone has
+        // volume d³dω/3, and a patch of wall subtends dS·cosθ/d², so ∮(d²/cosθ)dω is the whole of S.
         double volSum = 0, areaSum = 0;
 
         for (int k = 0; k < Rays; k++)
@@ -363,13 +270,9 @@ public static class Enclosure
             var props = c.Props;
             if (!c.Hit)
             {
-                // Open in this direction: an opening absorbs everything that reaches it, and that is the
-                // whole of its contribution. It does NOT count toward the mean free path — the mean free
-                // path is the distance between SURFACES, and a direction with no surface in it has no
-                // such distance. Letting escapes contribute the horizon put the mean free path of a
-                // ten-metre room at twenty-one metres, because a third of the sphere was answering
-                // "sixty", and a decay time built on that reads two seconds where a courtyard has a
-                // third of one.
+                // An opening absorbs all that reaches it and has no distance between surfaces: counting
+                // the horizon put a ten-metre room's mean free path at 21 m and a courtyard's decay at two
+                // seconds where it has a third of one.
                 aLow += 1f; aMid += 1f; aHigh += 1f;
                 continue;
             }
@@ -377,9 +280,8 @@ public static class Enclosure
             hits++;
             pathSum += d1;
             volSum += (double)d1 * d1 * d1;
-            // Grazing rays make d²/cosθ diverge, and a sphere of 192 directions cannot integrate a
-            // divergence. Floored at a twentieth, which numerically lands within a few per cent of
-            // 4V/S for every room shape tried (see EnclosureTests).
+            // Grazing rays make d²/cosθ diverge; floored at a twentieth, within a few per cent of 4V/S
+            // for every room shape tried (EnclosureTests).
             areaSum += (double)d1 * d1 / MathF.Max(MathF.Abs(Vector3.Dot(dir, n1)), 0.05f);
             aLow += Math.Clamp(props.AbsorptionLow, 0f, 1f);
             aMid += Math.Clamp(props.AbsorptionMid, 0f, 1f);
@@ -394,9 +296,7 @@ public static class Enclosure
         }
 
         Vector3 centroid = ReturnCentroid(returnedFrom, returned, out float anisotropy);
-        // S = 4π·mean(d²/cosθ) over the directions that found a surface. The mean is over HITS rather
-        // than over the sphere, so a room with an opening in it reports the area of the surface it
-        // does have rather than being scaled down by the hole.
+        // S = 4π·mean(d²/cosθ) over the hits, so a room with an opening reports the surface it has.
         float surface = hits > 0 ? (float)(4.0 * Math.PI * areaSum / hits) : 0f;
         return new Survey(
             Math.Clamp(returned / Rays, 0f, 1f),
@@ -413,40 +313,32 @@ public static class Enclosure
     /// surface within three metres of you is your own.</summary>
     private const float BoundaryMinMetres = 3f;
 
-    /// <summary>
-    /// How much more open the middle of a ray's path has to be than where you stand before the ray
-    /// counts as having left. The places it has to tell apart are a closed box (0-2 % open), a street
-    /// (about a third) and a field (a half), so a jump of fifteen points separates them with room to
-    /// spare either way.
-    /// </summary>
+    /// <summary>How much more open the middle of a ray's path must be than where you stand for the ray to
+    /// have left: it separates a closed box (0-2 % open), a street (about a third) and a field (a half).</summary>
     private const float BoundaryJump = 0.15f;
 
-    /// <summary>Rays per openness probe: a coarse sphere, because the question is "about how open",
-    /// and it is asked at up to a couple of hundred points per survey.</summary>
+    /// <summary>Rays per openness probe: coarse, asked at up to a couple of hundred points a survey.</summary>
     private const int OpennessRays = 14;
 
-    /// <summary>A listener this open is not inside anything small: most of the sky is already theirs,
-    /// and there is no room here to leave. The boundary is not looked for.</summary>
+    /// <summary>A listener this open is not inside anything small, and the boundary is not looked for.</summary>
     private const float AlreadyOutside = 0.35f;
 
     /// <summary>
-    /// Openness probes are cached on a half-metre grid: the map does not move. The probe itself is
-    /// cast from the point that asked, never from the centre of its cell — a two-metre cell centred
-    /// three metres up put the probe for a 2.5 m garage inside its ceiling slab and above its roof,
-    /// in the open sky, and eleven per cent of a sealed garage read as having left it.
+    /// Openness probes are cached in cells half a metre high: the map does not move. The probe is cast
+    /// from the point that asked, never the cell's centre: a cell centred three metres up probed a
+    /// 2.5 m garage from above its roof, and eleven per cent of a sealed garage read as having left it.
     /// </summary>
     private const float OpennessCell = 0.5f;
 
-    /// <summary>...and two metres across. Openness changes quickly with height (a floor, a ceiling,
-    /// a roofline) and slowly across the ground, and a listener walking down a street asks about
-    /// nearly the same points every survey: a half-metre cell in every direction missed the cache on
-    /// almost every probe and made the survey five times as costly as it had been.</summary>
+    /// <summary>...and two metres across: openness changes fast with height and slowly across the
+    /// ground, and half-metre cells every way missed the cache almost every probe (a survey five times
+    /// as costly).</summary>
     private const float OpennessCellAcross = 2f;
 
     [ThreadStatic] private static Dictionary<(int, int, int), float>? _openness;
     [ThreadStatic] private static object? _opennessScene;
 
-    /// <summary>The fraction of directions from a point that meet nothing — how open a place is.</summary>
+    /// <summary>The fraction of directions from a point that meet nothing.</summary>
     private static float Openness<S>(Vector3 at, object scene, ref S surroundings) where S : ISurroundings
     {
         if (!ReferenceEquals(_opennessScene, scene) || _openness == null)
@@ -465,17 +357,10 @@ public static class Enclosure
     }
 
     /// <summary>
-    /// How long the tail lasts, per band, seconds — Eyring from what the rays measured.
-    ///
-    /// <c>RT60 = 0.161 · (MFP/4) / -ln(1 - a)</c>, which is the classical formula with the volume over
-    /// surface area replaced by the mean free path that was actually measured. Eyring rather than
-    /// Sabine because these rooms are absorbent: Sabine assumes a small amount of absorption spread
-    /// evenly and goes badly wrong once a face of the room is missing, which is the normal case here.
-    ///
-    /// The openings do the work. A sealed box of bare concrete really does ring for seconds — that is
-    /// a reverberation chamber and the number is not wrong — but take its ceiling off and most of the
-    /// absorption becomes sky, and it turns into the third of a second a courtyard actually has. So
-    /// the difference between a room and a yard falls out of the same arithmetic, unprompted.
+    /// How long the tail lasts per band, seconds, by Eyring with the measured mean free path for V/S:
+    /// <c>RT60 = 0.161 · (MFP/4) / -ln(1 - a)</c>. Eyring, not Sabine, because Sabine goes badly wrong
+    /// once a face of the room is missing, the normal case here; the sky's absorption is what turns a
+    /// concrete box into a courtyard's third of a second.
     /// </summary>
     public static (float Low, float Mid, float High) DecaySeconds(in Survey survey)
     {
@@ -490,44 +375,12 @@ public static class Enclosure
     }
 
     /// <summary>
-    /// The steady-state level of the reverberant field, dB, for a given enclosure.
-    ///
-    /// Sound does not come back once. What returns off the walls leaves again, and some of THAT comes
-    /// back too, and the reverberant field is the sum of every generation of it — a geometric series,
-    /// <c>e + e^2 + e^3 + ... = e / (1 - e)</c>. That sum is the whole difference between a wall and a
-    /// room, and it is why a one-bounce measure understates a room so badly: at 98% enclosure the
-    /// series is worth fifty-eight, at 47% it is worth less than one.
-    ///
-    /// This is the classical room equation in the form the geometry hands us, and it needs no tuning.
-    /// The ladder it produces is printed by AudioLab --sim-reverbfield, which is the instrument to run
-    /// if any of this is ever in doubt: it walks the same listener from an open field to a sealed box
-    /// and prints what each place measures, beside what the decay time alone would have said.
-    /// </summary>
-    /// <summary>
-    /// How loud the diffuse field is next to the direct sound of a source <paramref name="distanceMetres"/>
-    /// away — as a POWER ratio, reverberant over direct. This is the room equation with the room's
-    /// two unknowns replaced by what the rays measured.
-    ///
-    /// Classically the ratio at distance r is (r / r_c)², where the critical distance r_c is
-    /// sqrt(R / 16π) and the room constant R is S·ā/(1−ā): S the surface area, ā the mean absorption.
-    /// The survey knows ā through what came back — the enclosure e is what a round of returns keeps,
-    /// so e/(1−e) stands for (1−ā)/ā — and knows the room's SIZE through the mean free path, which
-    /// is 4V/S; for the box a room approximately is, S comes to about 13.5·MFP². Put together:
-    ///
-    ///   reverberant / direct  =  16π r² e / (S (1−e))  ≈  3.7 · (r / MFP)² · e / (1−e)
-    ///
-    /// Every term is measured and every consequence is the right one. A source at your own feet in
-    /// a roofless hall reads a few decibels under its direct sound; the same step in a sealed concrete
-    /// cell reads well over it, which is what a cell does; open ground, where e is nought, reads
-    /// nothing however close the source. And the field is INDEPENDENT of how far the source is: what
-    /// grows with distance is the ratio, because the direct sound is what falls.
-    ///
-    /// Before this the send was one constant for every source at every distance (0.35, post-fader),
-    /// so the reverberant field of a footstep at 1.6 m and of a car at 60 m were the same fraction
-    /// of each — no critical distance anywhere — and the unit's own gain on top of that put a
-    /// footstep's reverberation 12 dB OVER the step, onto the master limiter: "footsteps loud, pop pop
-    /// pop, piling up". The unit's gain is normalised separately (FmodAudioProvider metering); this is
-    /// the law.
+    /// The reverberant field next to the direct sound of a source <paramref name="distanceMetres"/> away,
+    /// as a power ratio: the room equation, (r / r_c)² with r_c = sqrt(R / 16π) and R = S·ā/(1−ā), with
+    /// e/(1−e) standing for (1−ā)/ā and S ≈ 13.5·MFP² for a cube:
+    /// <c>16π r² e / (S (1−e)) ≈ 3.7 · (r / MFP)² · e / (1−e)</c>. A constant send in its place (0.35 for
+    /// every source) put a footstep's reverberation 12 dB over the step, onto the limiter: "footsteps
+    /// loud, pop pop pop, piling up".
     /// </summary>
     public static float ReverberantToDirectPower(float enclosure, float meanFreePathMetres, float distanceMetres)
         => ReverberantToDirectPower(enclosure, meanFreePathMetres,
@@ -535,21 +388,10 @@ public static class Enclosure
                                     distanceMetres);
 
     /// <summary>
-    /// The same ratio, with the room's surface area MEASURED rather than assumed to be a cube's.
-    ///
-    /// The cube assumption is the one term above that is not a measurement, and on a city it is the
-    /// one that is furthest wrong. S ≈ 13.5·MFP² is exact for a cube and hopeless for anything flat
-    /// or long: a car park 21 by 28 metres and 2.5 high has a mean free path of 4.3 m, which a cube
-    /// would give 246 m² of surface — and it really has 1,390. A room with five times the surface
-    /// absorbs five times as much, so the reverberant field the cube form predicted was nine
-    /// decibels too loud, and every footstep in that garage went to the master limiter's ceiling and
-    /// stayed there (measured: `--enclosure map=city at=-20,1.6,30` read a 298 % send where the
-    /// classical room equation says 170 %).
-    ///
-    /// Slabs and tubes are what a city is made of — garages, corridors, tunnels, streets — so this is
-    /// not a corner case. <see cref="Look"/> measures S from the same sphere of rays that measures
-    /// everything else: ∮(d²/cosθ)dω is the surface area of any convex room seen from any point
-    /// inside it.
+    /// The same ratio with the surface area measured (Look) rather than a cube's. The cube is hopeless
+    /// for anything flat or long: a car park 21 by 28 m and 2.5 m high (MFP 4.3 m) would have 246 m²
+    /// and has 1,390, so its field read 9 dB too loud and every footstep sat on the limiter
+    /// (`--enclosure map=city at=-20,1.6,30` read a 298 % send where the room equation says 170 %).
     /// </summary>
     public static float ReverberantToDirectPower(float enclosure, float meanFreePathMetres,
                                                  float surfaceAreaSquareMetres, float distanceMetres)
@@ -559,19 +401,23 @@ public static class Enclosure
         float mfp = MathF.Max(0.5f, meanFreePathMetres);
         float s = surfaceAreaSquareMetres > 1f
             ? surfaceAreaSquareMetres
-            : CubeSurfaceOverMfpSquared * mfp * mfp;    // nothing measured: the old cube
-        // A source further off than the room is wide is not IN this room in the sense the diffuse
-        // field assumes; its share stops growing there.
+            : CubeSurfaceOverMfpSquared * mfp * mfp;    // nothing measured: a cube
+        // A source further off than the room is wide is not in it as the diffuse field assumes.
         float r = MathF.Min(MathF.Max(0.1f, distanceMetres), 3f * mfp);
         return 16f * MathF.PI * r * r * e / (s * (1f - e));
     }
 
-    /// <summary>The surface a CUBE has per square metre of its mean free path: S = 6L² and
-    /// MFP = 2L/3, so S = 13.5·MFP². This is the assumption <see cref="ReverberantToDirectPower"/>
-    /// falls back on when nothing measured the real surface — and the assumption that was wrong by a
-    /// factor of five on anything flat or long.</summary>
+    /// <summary>A cube's surface per square metre of its mean free path: S = 6L², MFP = 2L/3, so
+    /// S = 13.5·MFP². The fallback when nothing measured the surface; five times wrong on anything flat
+    /// or long.</summary>
     private const float CubeSurfaceOverMfpSquared = 13.5f;
 
+    /// <summary>
+    /// The steady-state level of the reverberant field, dB: every generation of returns, a geometric
+    /// series <c>e + e² + ... = e / (1 - e)</c>, which is why one bounce understates a room (worth 58 at
+    /// 98 % enclosure, under one at 47 %). AudioLab --sim-reverbfield prints the ladder from an open
+    /// field to a sealed box.
+    /// </summary>
     public static float ReverberantGainDb(float enclosure)
     {
         float e = Math.Clamp(enclosure, 0f, 0.999f);
@@ -579,14 +425,10 @@ public static class Enclosure
         return 10f * MathF.Log10(e / (1f - e));
     }
 
-    /// <summary>
-    /// Evenly spread directions on the sphere, by the golden angle. Deterministic and stable: the same
-    /// index always gives the same direction, so two measurements of the same place agree exactly.
-    /// </summary>
+    /// <summary>Evenly spread directions on the sphere by the golden angle, the same for the same index.</summary>
     public static Vector3 SphereDirection(int index, int count)
     {
-        // y walks the sphere's height uniformly — equal bands of height are equal areas on a sphere —
-        // and the golden angle spaces the longitudes so no two rays line up.
+        // Equal bands of height are equal areas on a sphere.
         float y = 1f - 2f * (index + 0.5f) / count;
         float r = MathF.Sqrt(MathF.Max(0f, 1f - y * y));
         float theta = index * 2.399963f;   // golden angle, radians

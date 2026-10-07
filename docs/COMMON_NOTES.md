@@ -47,6 +47,47 @@ as "early reflections off", 0 means early reflections only: the unit renders its
 whatever, in every room. Measured with AudioLab --tailcheck, one footstep in a room set for six seconds: at
 0 the mixer is at the noise floor 500 ms later; at 100 it is still 28 dB up two seconds later.
 
+## Where a room ends
+
+A ray that meets a surface is counted as the room's surface, however far away it is. For a small place
+in the open that is wrong: under a bus shelter the rays leave through the open front, cross the road,
+hit the building opposite and come back recorded as the shelter's own hard walls: 612 m² of surface for
+a 65 m² box, and a two-second tail under a sheet of glass.
+
+Three distance-keyed fixes failed: anything that says "far means gone" also cuts a big flat room's own
+far wall. What marks the edge of a room is that the openness changes across it. So for every ray that
+goes a fair way (3 m) before it strikes, the openness halfway along it is compared with the listener's
+own; a jump of more than fifteen points means the ray crossed into a much more open place and counts as
+escaped. Under the shelter (0 % open) a ray out of the front reaches the road (a third open): gone. In
+the garage (1 %) a ray to its far wall stays in the garage (1 %): kept. In the street (a third) a ray to
+a facade stays in the street: kept. A listener already more than 35 % open is not inside anything small,
+and the boundary is not looked for.
+
+Known limit: a small room opening onto a big enclosed hall reads closed on both sides, so nothing jumps
+and it is surveyed as the hall.
+
+## A region is not a room
+
+A region is a named volume, not a room. The distinction did not exist until a map needed both: the
+speedway names Front straight, Turns one and two, Infield and Grandstand so that a blind player standing
+on two kilometres of identical asphalt knows where they are, and the moment it did, the whole map started
+sounding like the inside of a building. Every open-air behaviour in the engine (the muted reverb bus, the
+ray-traced outdoor decay and its wet gate, the outdoor air absorption, the absence of a small-room gain)
+was keyed on "the listener is in the global region id", that is, on the map not having named the place.
+Name the place and you were indoors.
+
+So those questions are answered from the boundary itself: a face whose material is "None" is no surface;
+sound that reaches it leaves and does not come back.
+
+That reading fixed the estimate as well. Sabine reads absorption zero as a perfect mirror, so six open
+faces came out as a sealed box of infinite reverberation, and because the total then fell under the "did
+anything absorb?" guard, the code quietly substituted a 500 ms default room: an unbounded 277,000 m³
+infield was handed a 500 ms room, and then the ray tracer wrote a longer decay over it at full wet.
+Sabine's V/A describes a diffuse field in a closed enclosure; open one face and there is no such field.
+An unclosed region gets no statistical estimate; what reverberation it has (a grandstand at your back, a
+street with facades on both sides) comes from the ray tracer. The 500 ms fallback is gone: a closed
+boundary that absorbs nothing rings as long as the clamp allows.
+
 ## Car windows
 
 Four window characters were rendered on 2026-10-03; Cody chose the old one on 10-04 ("the car window v3

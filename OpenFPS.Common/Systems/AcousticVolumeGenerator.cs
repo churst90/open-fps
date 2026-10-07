@@ -6,35 +6,24 @@ using System.Linq;
 
 namespace OpenFPS.Common.Systems;
 
-/// <summary>
-/// Responsibility: Generates an AcousticMap from a list of world entities.
-/// Optimized Strategy: "Region-First" - only voxelizes explicit room volumes to save CPU/Memory.
-/// </summary>
+/// <summary>Builds an AcousticMap from the world's entities, voxelising only the regions' own volumes.</summary>
 public static class AcousticVolumeGenerator
 {
-    /// <param name="autoDiscoverPortals">
-    /// When true, any region boundary the map did not describe gets a synthesized portal at the centre of
-    /// that face. This is OFF by default: the placement is a guess, and a guessed portal puts a room's
-    /// reverb and its doorway-localized arrival direction on the wrong wall — which sounds worse than an
-    /// unopened boundary, because walls still transmit and occlude correctly on their own. Undescribed
-    /// boundaries are always reported either way, with the exact portal the map is missing.
-    /// </param>
-    /// <param name="report">
-    /// Whether to write what was found, and what the map is missing, to the console. A streamed map
-    /// rebuilds this every time tiles arrive, and says it once, at the first build.
-    /// </param>
+    /// <param name="autoDiscoverPortals">Give every boundary the map did not describe a portal at the face's
+    /// centre. Off by default: a guessed portal puts a room's reverb and its doorway direction on the wrong
+    /// wall, worse than none (walls still transmit and occlude). Undescribed boundaries are always reported.</param>
+    /// <param name="report">Write what was found and what is missing to the console: a streamed map rebuilds
+    /// this as tiles arrive and says it once, at the first build.</param>
     public static AcousticMap GenerateRegions(IEnumerable<EntityDefinition> entities, Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false, bool report = true)
     {
         var console = report ? Console.Out : System.IO.TextWriter.Null;
-        // 1. Initialize the map with the full map bounds
         var acousticMap = new AcousticMap(mapSize, minBound, voxelResolution);
         acousticMap.OcclusionFloor = occlusionFloor;
         
         var grid = acousticMap.VoxelGrid;
         Vector3 offset = minBound;
 
-        // 2. Pre-fill the grid with "Outside" (GlobalEnvironmentId)
-        // This avoids the expensive flood-fill of the outdoor void.
+        // Everything not in a region is "Outside": no flood fill of the outdoor void.
         int outsideRegionId = AcousticConstants.GlobalRegionId;
         var globalDef = entities.FirstOrDefault(e => e.EntityId == outsideRegionId && e.Region.RoomSize.X > 0);
         
@@ -50,22 +39,16 @@ public static class AcousticVolumeGenerator
                 IsIndoor = false,
                 RoomSize = mapSize,
                 ReverbTimeScale = 0.0f, // Default to dry unless a GlobalEnvironment entity exists
-                // Six open faces, because that is what outdoors IS: the map-sized box has no surfaces
-                // on it and nothing that leaves through one comes back. It used to be given six real
-                // materials, which made the whole outdoors read as a sealed map-sized room to anything
-                // that asked its boundary a question — and the only reason that never sounded like one
-                // was a separate test for this region's id. See RoomAcoustics.
+                // Six open faces: six real materials made the outdoors a sealed map-sized room to anything
+                // that asked its boundary (RoomAcoustics).
                 Materials = new int[6]
             };
             acousticMap.RegionPositions[outsideRegionId] = Vector3.Zero;
         }
         acousticMap.GlobalEnvironmentId = outsideRegionId;
 
-        // 3. Process Explicit Regions
-        // We only voxelize the space INSIDE your defined rooms. Largest first, so where two overlap
-        // the smaller one is written last and holds the overlap: a named spot inside a bigger zone, a
-        // room inside a hall. The same rule SpatialService.GetRegionAt applies to the boxes themselves;
-        // in entity order it was whichever the map happened to list last.
+        // Largest first, so where two overlap the smaller holds the overlap (a room inside a hall), the
+        // rule SpatialService.GetRegionAt applies; in entity order the map's last listed won.
         foreach (var def in entities.Where(d => d.Region.RoomSize.X > 0)
                                     .OrderByDescending(d => d.Region.RoomSize.X * d.Region.RoomSize.Y * d.Region.RoomSize.Z))
         {
@@ -76,36 +59,24 @@ public static class AcousticVolumeGenerator
                 acousticMap.RegionPositions[regionId] = def.Transform.Position;
                 acousticMap.RegionRotations[regionId] = def.Transform.Rotation;
 
-                // A region that says it is indoors and names no surfaces is a contradiction, and the
-                // consequence of it is silence: no closed boundary means no reverberation estimate, so
-                // the room the map thinks it placed would be as dry as the field outside it and nothing
-                // would say so. Exactly the shape of fault that let the speedway go without regions for
-                // weeks — "not configured" and "working" look the same from everywhere else.
+                // Indoors with no surfaces is as dry as the field outside, and nothing else would say so.
                 if (def.Region.IsIndoor && RoomAcoustics.OpenFaceCount(def.Region) == 6)
                     console.WriteLine(
                         $"[WARNING] AcousticVolumeGenerator: region '{def.Region.FriendlyName}' (entity {regionId}) " +
                         "is marked indoors but declares no RoomMaterials, so it has no surfaces and cannot reverberate.");
 
-                // Voxelize using the high-performance hierarchical OBB method
                 grid.SetRegionOBB(def.Transform.Position, def.Region.RoomSize, def.Transform.Rotation, regionId);
             }
         }
 
-        // A map that names nowhere is not broken, and it is not finished either.
-        //
-        // Regions are OPTIONAL: since a region's acoustics come from its own boundary rather than from
-        // its existence, naming a place costs nothing and changes nothing, and a map with none of them
-        // is simply one where everywhere is "Outside". That is fine for a test rig and useless for a
-        // player who cannot see, which is the fault the speedway had for weeks without anything
-        // noticing — a two-kilometre loop that answered "where am I" once and then never again.
+        // Regions are optional, but a map with none answers "where am I" with "Outside" everywhere: the
+        // speedway went weeks like that with nothing noticing.
         if (acousticMap.Regions.Count <= 1)
             console.WriteLine(
                 "[WARNING] AcousticVolumeGenerator: this map has no named regions, so every place in it " +
                 "answers to 'Outside'. Nothing else will report this.");
 
-        // 4. AUTHORED PORTALS — the primary source of truth.
-        // A portal entity carries the two regions it joins and the size of the opening. These are placed
-        // by hand at the actual doorway, so they must be processed BEFORE any automatic guessing.
+        // Authored portals first: placed by hand at the real doorway, before anything is found or guessed.
         int authoredCount = 0;
         foreach (var def in entities)
         {
@@ -114,9 +85,7 @@ public static class AcousticVolumeGenerator
             int rA = def.Portal.RegionAId;
             int rB = def.Portal.RegionBId;
 
-            // Unlinked portal (both ends identical — typically the prefab default, or an author who
-            // dropped a portal in a doorway without naming the rooms): probe the voxel grid outward
-            // from the opening and take the first two distinct regions found.
+            // Unlinked (the prefab default): take the first two regions found just past the opening.
             if (rA == rB)
             {
                 Vector3 forward = Vector3.Transform(Vector3.UnitZ, def.Transform.Rotation);
@@ -125,8 +94,6 @@ public static class AcousticVolumeGenerator
                 var foundRegions = new List<int>();
                 foreach (var dir in searchDirs)
                 {
-                    // One sample just past the opening on each side. The octree answers GlobalRegionId
-                    // for anything outside a room, so a single sample is enough and is deterministic.
                     int r = grid.GetRegionAt(def.Transform.Position + dir * 0.5f);
                     if (!foundRegions.Contains(r)) foundRegions.Add(r);
                     if (foundRegions.Count >= 2) break;
@@ -149,30 +116,17 @@ public static class AcousticVolumeGenerator
             authoredCount++;
         }
 
-        // 4b. OPENINGS FROM THE GEOMETRY — every side of a room that is not closed in.
-        // The walls round a room are real boxes, and wherever they leave a gap in one of its faces there
-        // is an opening, exactly where the gap is and exactly its size: a tunnel's open ends, a building's
-        // open side, a doorway with no door in it, a window with no glass. A door is the same opening with
-        // a leaf in it, and its leaf stands shut in the gap here, so it is the door's (an authored portal)
-        // and not found twice. See FaceOpenings.
-        //
-        // One opening per GAP, not one per pair of rooms. A lobby with a front door and an open side onto
-        // the same street has both, and the street is heard through each from where each is (2026-10-02).
-        // Until then only the first opening between two places was kept, so a building with a door to the
-        // outdoors lost its open side.
-        //
-        // Only for STRUCTURES: a region with at least one wall. A named stretch of street is never
-        // surveyed, so all six of its faces read open, and coupling every patch of open ground to its
-        // neighbours is not what an opening is. Never the floor: that is the ground.
+        // Openings from the geometry: every gap the walls leave in a room's faces, where it is and its size
+        // (a tunnel mouth, an open side, a doorway with no door). A door's leaf stands shut in its gap, so
+        // it is not found twice. One per gap, not per pair of rooms: a lobby with a front door and an open
+        // side onto one street is heard through both (2026-10-02). Only for regions with a wall, never the
+        // floor (FaceOpenings).
         int openingCount = AddFaceOpenings(acousticMap, entities);
         if (openingCount > 0)
             console.WriteLine($"[AcousticMap] {openingCount} opening(s) from the gaps in rooms' faces (open sides, tunnel mouths, doorways with no door).");
 
-        // 5. UNDESCRIBED BOUNDARY AUDIT (and, only on request, synthesis).
-        // Report every region boundary the map did not describe. Optionally fill it with a guessed portal
-        // at the centre of the face — see the autoDiscoverPortals remarks: the guess is almost never where
-        // the real doorway is, and a portal on the wrong wall is exactly what makes a room's reverb arrive
-        // from the wrong direction. Reporting is unconditional; synthesizing is not.
+        // Report every boundary the map did not describe; guess a portal only when asked
+        // (autoDiscoverPortals).
         var linkedPairs = new HashSet<(int, int)>();
         foreach (var p in acousticMap.Portals.Values)
             linkedPairs.Add(PairKey(p.Portal.RegionAId, p.Portal.RegionBId));
@@ -186,10 +140,8 @@ public static class AcousticVolumeGenerator
             if (!acousticMap.RegionPositions.TryGetValue(r1, out var pos1)) continue;
             var size1 = acousticMap.Regions[r1].RoomSize;
 
-            // D: Use rotation-aware face normals so buildings rotated away from cardinal axes
-            // have their actual wall faces probed, not just the world-axis directions.
-            // Each face is probed just beyond ITS OWN half-extent — using the largest dimension for all
-            // six faces (as this did previously) puts the probe metres past a thin room's short faces.
+            // The room's own face normals, each probed just past its own half-extent: the largest for
+            // all six put the probe metres past a thin room's short faces.
             Quaternion regionRot = acousticMap.RegionRotations.GetValueOrDefault(r1, Quaternion.Identity);
             (Vector3 dir, float halfExtent)[] faces =
             {
@@ -245,11 +197,9 @@ public static class AcousticVolumeGenerator
     /// <summary>
     /// Puts on the map an opening for every gap in the faces of its structures (or of only
     /// <paramref name="rooms"/>, replacing what those rooms had), from the solid boxes in
-    /// <paramref name="entities"/>. Returns how many it added.
-    ///
-    /// The aperture is the width of a square of the gap's area: the bus's leak goes as aperture over
-    /// distance, and the pressure through an opening goes as the square root of its area. The gap's own
-    /// rectangle is in <see cref="AcousticMap.OpeningFrames"/>.
+    /// <paramref name="entities"/>. Returns how many it added. The aperture is the side of a square of the
+    /// gap's area (pressure through an opening goes as the root of its area); the gap's own rectangle is
+    /// in <see cref="AcousticMap.OpeningFrames"/>.
     /// </summary>
     public static int AddFaceOpenings(AcousticMap map, IEnumerable<EntityDefinition> entities, IReadOnlyCollection<int>? rooms = null)
     {
@@ -303,8 +253,8 @@ public static class AcousticVolumeGenerator
         int added = 0;
         var nearSolids = new List<FaceOpenings.Box>();
         var nearPlaces = new List<FaceOpenings.Place>();
-        // The walls and the places filed by where they stand, so each room asks about its neighbours
-        // and not the whole map (BoxColumns): the same ones, in the same order, as a scan of all.
+        // Filed by where they stand (BoxColumns): each room asks only its neighbours, in the same order
+        // as a scan of all.
         var solidColumns = new BoxColumns();
         for (int i = 0; i < solids.Count; i++) solidColumns.Add(i, solids[i].Min, solids[i].Max);
         var placeColumns = new BoxColumns();
@@ -379,17 +329,13 @@ public static class AcousticVolumeGenerator
     /// <summary>Order-independent key for a region boundary, so A→B and B→A are the same pair.</summary>
     private static (int, int) PairKey(int a, int b) => a <= b ? (a, b) : (b, a);
 
-    /// <summary>
-    /// Performs a delta update for a single region entity that has moved or changed.
-    /// </summary>
+    /// <summary>Updates one region that has moved or changed.</summary>
     public static void UpdateRegion(AcousticMap map, int regionId, Vector3 pos, Quaternion rot, RegionComponent reg)
     {
         var grid = map.VoxelGrid;
-        
-        // 1. Re-voxelize at NEW position/rotation (Octree handles overwriting)
+
         grid.SetRegionOBB(pos, reg.RoomSize, rot, regionId);
-        
-        // 2. Update metadata
+
         map.RegionPositions[regionId] = pos;
         map.RegionRotations[regionId] = rot;
         map.Regions[regionId] = reg;
