@@ -208,6 +208,52 @@ public class AdminGunTests : IDisposable
         Assert.Contains("You can move again.", r.SaidTo(r.Other));
     }
 
+    /// <summary>A frozen player's own state says so, every tick until the freeze wears off.</summary>
+    [Fact]
+    public void AFrozenPlayersStateSaysTheyAreHeld()
+    {
+        var r = new Rig(_dir);
+        r.ArmAdmin();
+        r.Run(r.Shooter, "selector", "freeze");
+        r.Place(r.Other, r.Feet + new Vector3(0, 0, 8));
+        var held = new List<bool>();
+        r.Server.Broadcasted = (to, m) => { if (to == r.Other && m is ServerStateUpdate u) held.Add(u.Held); };
+
+        r.Server.BroadcastForTest(1);
+        Assert.False(held[^1]);
+        r.Run(r.Shooter, "fire");
+        r.Tick(0.2);
+        r.Server.BroadcastForTest(2);
+        Assert.True(held[^1]);
+        Assert.True(NetworkService.Piece(new ServerStateUpdate { Held = true }, Array.Empty<byte>()).Held);
+
+        r.Tick(AdminGun.FreezeSeconds);
+        r.Server.BroadcastForTest(3);
+        Assert.False(held[^1]);
+    }
+
+    /// <summary>A client the server holds neither walks nor turns, and walks again once let go.</summary>
+    [Fact]
+    public void AHeldClientDoesNotPredictMovement()
+    {
+        var (session, sent) = NewClient();
+        session.HandleMessage(new PlayerSpawned { EntityId = 1 });
+        session.HandleMessage(new ServerStateUpdate { Held = true });
+        var from = session.PlayerState.Position;
+        float yaw = session.PlayerState.Yaw;
+
+        session.Input.SetKey(GameKey.W, true);
+        session.Input.SetKey(GameKey.L, true);
+        for (int i = 0; i < 5; i++) session.SimStep(PhysicsConstants.FixedDeltaTime);
+        Assert.Equal(from, session.PlayerState.Position);
+        Assert.Equal(yaw, session.PlayerState.Yaw);
+        Assert.DoesNotContain(sent.OfType<ClientInputUpdate>(), i => i.MoveDirection != Vector3.Zero || i.LookDelta != Vector2.Zero);
+
+        session.HandleMessage(new ServerStateUpdate { Held = false });
+        session.SimStep(PhysicsConstants.FixedDeltaTime);
+        Assert.NotEqual(from, session.PlayerState.Position);
+    }
+
     [Fact]
     public void FreezeRefusesWhatDoesNotMove()
     {

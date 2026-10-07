@@ -591,7 +591,7 @@ public sealed partial class ClientGameSession : IDisposable
         _simTime += dt;
         UpdateScope(held, dt, gameplayActive);
         var input = GatherInput(held, justPressed, dt);
-        if (!gameplayActive)
+        if (!gameplayActive || _reconciler.Held)
         {
             input.MoveDirection = Vector3.Zero;
             input.Jump = false;
@@ -1133,6 +1133,7 @@ public sealed partial class ClientGameSession : IDisposable
                 _world.SyncState(update);
                 NoteRiding(update.RidingEntityId);
                 _state.RidingControls = update.RidingEntityId >= 0 && update.RidingControls;
+                _reconciler.Held = update.Held;
                 foreach (var s in update.States)
                     if (s.EntityId == _ownEntityId)
                         if (_reconciler.ApplyServerCorrection(s, update.LastProcessedSequenceId, _world.GetSnapshot()))

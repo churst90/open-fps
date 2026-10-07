@@ -1616,20 +1616,23 @@ public class GameServer
                     if (peer == null && Broadcasted == null) continue;
 
                     // What the client needs to know about itself that is not in its transform: whether
-                    // its position is its own to predict, or a seat's to decide.
+                    // its position is its own to predict, a seat's to decide, or held still.
                     int riding = world.Has<OccupantComponent>(session.Entity)
                         ? world.Get<OccupantComponent>(session.Entity).RootEntityId : -1;
                     bool driving = riding >= 0 && world.Get<OccupantComponent>(session.Entity).Controls;
+                    bool heldStill = world.Has<FrozenComponent>(session.Entity) || world.Has<DeadComponent>(session.Entity);
 
                     _reusableBroadcast.Tick = tick;
                     _reusableBroadcast.LastProcessedSequenceId = session.LastProcessedSequenceId;
                     _reusableBroadcast.RidingEntityId = riding;
                     _reusableBroadcast.RidingControls = driving;
+                    _reusableBroadcast.Held = heldStill;
                     _reusableBroadcast.States.Clear();
                     _reliableBroadcast.Tick = tick;
                     _reliableBroadcast.LastProcessedSequenceId = session.LastProcessedSequenceId;
                     _reliableBroadcast.RidingEntityId = riding;
                     _reliableBroadcast.RidingControls = driving;
+                    _reliableBroadcast.Held = heldStill;
                     _reliableBroadcast.States.Clear();
                     _visibleDynamicBuffer.Clear();
                     float reach = earshot + BroadcastCellMetres;
