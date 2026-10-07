@@ -4,6 +4,21 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Tests for the audio code that had none (docs/COVERAGE_2026-10-06.md). 104 new test cases: what
+  ClientAudioSystem voices (engines, borrowed voices, front voices, the cabin you sit in, every kind
+  of physical source at its declared level, the machine ranking, the budget under load, woods, rain,
+  repeating emitters, beacons, sirens), VehicleShadow.Apply, EngineReflections, the acoustic worker
+  without Steam Audio, and every DSP callback run without FMOD (finite, no allocation, silence where
+  it holds, levels where a law states them). Line coverage of AudioEngine over the audio test slice
+  35% to 51%; ClientAudioSystem 66% to 83%; EngineReflections 51% to 99.5%; the processors from 0-59%
+  to 54-98%.
+  - Fixed (unheard): the nearest car of a preset kept outside the engine budget, so its preset can
+    borrow, was let go and re-admitted every 2.5 s, and each time took a slot inside the budget: the
+    furthest live engine was rebuilt from nothing and every borrowed voice restarted, every 2.5 s, on
+    any map with more cars than the budget (the city's motorcycles, a lone bus).
+  - Open, for Cody: the ear model's correction raises the rank of a sound the ear hears less of (a
+    25 Hz rumble ranks 20 dB up); a shore voice is silent for its first 11 s or so.
+
 - Inside a vehicle, its sound comes from where it gets in (unheard). Cody: "the inside of the cab of
   the cars sounds mono". It was one voice from one point ahead of you and below; the ears matched 0.97
   to 1.00 from 125 Hz to 1 kHz at a cruise. The interior model is now split into its paths, each played
