@@ -713,6 +713,7 @@ public class ClientAudioSystem
                         _audio.SetAcousticPath(id, shadowed);
                         // A horn or a siren on this vehicle is behind the same bus.
                         if (_horns.ContainsKey(id)) _audio.SetAcousticPath(HornVoiceBase - Math.Abs(id), shadowed);
+                        if (_heldHorns.ContainsKey(id)) _audio.SetAcousticPath(HeldHornVoiceBase - Math.Abs(id), shadowed);
                         // Placed where the siren's own update places it, or the two writers pull
                         // the image between two bearings every frame (see SirenApparent).
                         if (_sirenVoiced.Contains(id) && world.Entities.TryGetValue(id, out var sirenCar))

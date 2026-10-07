@@ -165,7 +165,7 @@ public sealed class DrivingAids
     private static readonly float[] BrakeHz = { 0f, 330f, 440f, 587f, 784f };
     /// <summary>Seconds between notes at the bottom and top of each band.</summary>
     private static readonly (float Slow, float Fast)[] BrakeEvery = { (1f, 1f), (0.9f, 0.6f), (0.55f, 0.3f), (0.28f, 0.14f), (0.11f, 0.09f) };
-    private const float BrakeVolume = 0.3f;
+    private const float BrakeVolume = 0.24f;
 
     // ── The speed limit ──────────────────────────────────────────────────────────────────────
     private double _nextOverSpeed;
@@ -416,7 +416,8 @@ public sealed class DrivingAids
                 {
                     _announcedJunction = jId;
                     string giveWay = Plan is { GivesWay: true } ? (Plan.StopControl ? ", stop" : ", give way") : "";
-                    string turning = TurnWords();
+                    // Said already if the indicator went on before the junction was announced.
+                    string turning = Plan?.Junction != null && ReferenceEquals(Plan.Junction, _announcedTurnAt) ? "" : TurnWords();
                     if (turning.Length > 0) _announcedTurnAt = Plan?.Junction;
                     Say($"Junction in {Round(d)} metres{giveWay}. {Exits(world, jRoad, forward, right, _roadName)}{turning}");
                 }

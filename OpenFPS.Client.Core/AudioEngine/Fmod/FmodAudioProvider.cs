@@ -116,8 +116,14 @@ internal class FmodResourceManager : IDisposable
             return false;
         }
         _cache[soundId] = sound;
+        _registeredPcm.Add(soundId);
         return true;
     }
+
+    /// <summary>Sounds made in memory (RegisterPcmFloat). One of these asked for as a loop is the same
+    /// sound with its channel set to loop: there is no file to load a looping copy from.</summary>
+    private readonly HashSet<string> _registeredPcm = new();
+    public bool IsRegisteredPcm(string soundId) => _registeredPcm.Contains(soundId);
 
     public bool RegisterPcm(string soundId, byte[] pcm16Mono, int sampleRate)
     {
@@ -171,6 +177,7 @@ internal class FmodResourceManager : IDisposable
         if (string.IsNullOrEmpty(soundId)) return SoundLoadState.Missing;
 
         string cacheKey = soundId + (loop ? "_L" : "");
+        if (loop && _registeredPcm.Contains(soundId)) cacheKey = soundId;
         if (_cache.TryGetValue(cacheKey, out sound))
         {
             // NONBLOCKING loads complete asynchronously — verify the sound is ready before use.
@@ -3044,6 +3051,12 @@ public partial class FmodAudioProvider : IAudioProvider
                 return;
             }
             channel.setMode(MODE._3D | Rolloff.Mode);
+            // A sound made in memory has no looping copy: its channel loops instead.
+            if (loopNative && _resources.IsRegisteredPcm(emitter.SoundId))
+            {
+                channel.setMode(MODE.LOOP_NORMAL);
+                channel.setLoopCount(-1);
+            }
         }
 
         if (_audioDebug && emitter.Mode == PlaybackMode.LoopOne)

@@ -528,6 +528,14 @@ if (args.Contains("--wet-roads"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.WetRoadSpike.Run(args));
 }
 
+if (args.Contains("--driving"))
+{
+    // --driving out=DIR [set=all|horn|siren|bend|rails|gates|aircraft]: the driving controls and aids
+    // (docs/DRIVING_AIDS.md) through the game: horns, siren, a turn with and without the brake cue, the
+    // rails, the gates, an aeroplane's roll-out.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.DrivingSpike.Run(args));
+}
+
 if (args.Contains("--cabin"))
 {
     // --cabin [game out=DIR paths=on|off set=all|car|bus|police | model out=DIR]: sitting in a vehicle,

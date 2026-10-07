@@ -178,3 +178,56 @@ Traffic already waits at a closed crossing; the gates do not change that.
 1. Horn and siren. 2. Road data on the client and the planner. 3. The cue sounds, keys, settings.
 4. Crossings: strikes, then gates. 5. Aircraft roll-out. 6. Renders in
 `inbox/driving-2026-10-06/` with a README and measurements; MANUAL and changes.
+
+## As built (2026-10-06)
+
+Built as designed, with these differences and findings:
+
+- **Keys.** As in the table above, plus J/L for the indicators and Shift+K for all driving sounds.
+  J, K and L were already idle in a seat (they turn and look on foot, which a seat ignores), so the
+  three right-hand keys are the indicator and lane-assist cluster.
+- **The turn.** Traffic drives the quadratic curve between lane ends (LaneRoutes.Connector). At the
+  near corner of a city junction, kerb lane into kerb lane, that curve has a radius of a metre or
+  two, which no car can make, and its comfortable speed (10 km/h) made the brake cue ask for far more
+  than a driver needs. The planner's turn (DrivingCuePlanner.TurnCurve) is an arc tangent to both
+  lanes no tighter than the car turns (6 m; 1.6 times wheelbase over the tangent of full lock for a
+  long vehicle), starting before the lane's end when the junction is too small for it. Traffic is
+  unchanged.
+- **The guide in a turn.** The guide at its straight-road distance (8 m + 0.8 s of travel) cut a
+  6 m turn by five metres in the drill. Round a tight turn it now sits no further along the line
+  than 0.7 of the turn's radius.
+- **The turn under the car.** How hard the turn the car is already in is working the tyres comes
+  from the car's yaw rate, not from the planned line: a car a metre off the middle of its lane put a
+  kink in the first metre of the line and the cue read it as a hairpin.
+- **Bands.** Lift from 0.12 of the grip, brake from 0.25 (about 0.24 g dry, ordinary braking for a
+  junction), hard from 0.5, near the limit from 0.85 (DrivingCueBands).
+- **The drill** (DrivingCueDrillTests): a driver who hears only the cues, into the right turn from
+  Main Street onto Central Street, indicator on.
+
+  | Approach, road | Speech only: into the turn, grip used, over the centre line | Brake cue |
+  |---|---|---|
+  | 40 km/h dry | 25 km/h, 93 %, 0 m | 21 km/h, 60 %, 0 m |
+  | 40 km/h wet | 25 km/h, 100 %, 0.3 m | 20 km/h, 72 %, 0 m |
+  | 50 km/h dry | 25 km/h, 93 %, 0 m | 23 km/h, 53 %, 0 m |
+  | 50 km/h wet | 25 km/h, 100 %, 0.3 m | 19 km/h, 55 %, 0 m |
+  | 65 km/h dry | 40 km/h, 100 %, 1.8 m | 21 km/h, 61 %, 0 m |
+  | 65 km/h wet | 40 km/h, 100 %, 25.8 m | 19 km/h, 53 %, 0 m |
+
+  "Speech only" brakes at 0.2 g down to 25 km/h a second after "Junction in N metres". It is a model
+  of a driver: it shows the cue carries what is needed, not how a person will use it.
+- **Rails.** Strikes are scheduled by the client for every vehicle with a voice of its own, from
+  the crossings in MapRoads; a rail is a step of 6 mm (an assumption: no measured figure for a tyre
+  over a crossing was found), 100 dB peak at a metre for a car wheel at 30 km/h.
+- **Gates.** The motor (62 dB at a metre) and the clunk (86 dB peak) are assumptions to be judged by
+  ear. The gate is a sound and a point; it has no arm in the world and does not block a player's car.
+- **Main Street** crossed the rails at grade with no crossing declared. It has one now.
+- **Aircraft.** No aircraft are on the city map at present (Cody, 2026-09-25). Its runway is 588 m:
+  enough for the light single (lands in 175 m, needs 293 m to take off), not for the turboprop
+  (600 m and 1,000 m) or the airliner (1,100 m and 1,800 m).
+
+### Heard in the renders, not changed here
+- A car's electric horn rises about 7 dB over the first second and a half it is held, from the kerb;
+  the street-life honk does the same. It is the approved horn model (2026-09-24).
+- From the driver's seat a horn's first 0.15 to 0.3 s comes through about 16 dB louder than the rest,
+  across the spectrum; the street-life honk does it too, for half as long. It looks like the mixer
+  catching a very loud close source late, not the horn.
