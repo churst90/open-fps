@@ -343,7 +343,8 @@ public sealed class AircraftSynth
                    + $", {p.WingspanMetres:F1} m span, {p.SourceLevelDb:F0} dB at 1 m";
         if (p.Gear is { } gr)
             yield return $"gear: {gr.Wheels} main wheels of {gr.WheelRadiusMetres:F2} m, {gr.LandingMassKg / 1000f:F0} t on them; "
-                       + $"spin-up {gr.SpinUpSeconds(p.CruiseSpeedMps * 0.6f) * 1000f:F0} ms at touchdown";
+                       + $"{gr.WeightOnWheelsAtTouchdown * 100f:F0} % of it on them at touchdown, spin-up "
+                       + $"{gr.SpinUpSeconds(p.ApproachSpeedMps > 0f ? p.ApproachSpeedMps : p.CruiseSpeedMps * 0.6f) * 1000f:F0} ms";
         if (p.Propeller is { } r)
             yield return $"{(p.Power == AircraftPower.Turboshaft ? "main rotor" : "propeller")}: {r.Blades} blades x {r.DiameterMetres:F2} m, "
                        + $"{r.RpmMax:F0} rpm -> blade-pass {r.BladePassHz(r.RpmMax):F0} Hz, tip {r.TipSpeed(r.RpmMax):F0} m/s (Mach {r.TipSpeed(r.RpmMax) / 340f:F2})";

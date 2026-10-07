@@ -141,10 +141,11 @@ public sealed record GasTurbineSpec
 ///
 ///     I = ½ m r²  ·  ω = v / r  ·  T = μ W r  ·  t = I ω / T
 ///
-/// which for an airliner's main wheel — a hundred and ten kilos, half a metre of radius, sixteen
-/// kilonewtons on it — is about four tenths of a second, and for a light single's little wheel a
-/// twentieth of that. That is the whole difference between a jet's long scrub and a Cessna's chirp,
-/// and neither is declared.
+/// which for an airliner's main wheel — a hundred and ten kilos, half a metre of radius, twenty-three
+/// kilonewtons on it — is about three tenths of a second, and for a light single's little wheel a
+/// twentieth of a second. That is the whole difference between a jet's long scrub and a Cessna's
+/// chirp, and neither is declared: the load W is what the gear takes in stopping the sink
+/// (<see cref="WeightOnWheelsAtTouchdown"/>), so it comes from the gear's own stroke.
 /// </summary>
 public sealed record LandingGearSpec
 {
@@ -164,18 +165,48 @@ public sealed record LandingGearSpec
     public float SlidingMu { get; init; } = 0.55f;
 
     /// <summary>
-    /// How much of the aeroplane's weight is actually ON the wheels at the instant they touch, as a
-    /// fraction.
-    ///
-    /// Almost none of it, and that is the whole reason a touchdown is a long scrub and not a click.
-    /// An aeroplane that has just landed is still FLYING: the wing is carrying it at very nearly one
-    /// g, and all the tyres have on them is whatever the sink rate puts through the oleos. The load
-    /// arrives over the next second or two, as the speed bleeds off, the lift goes and the nose
-    /// comes down. Put the full landing weight on the wheels at contact and the model spins them up
-    /// in ninety milliseconds — a chirp — where a real jet smokes its mains for the better part of a
-    /// second, and that difference is entirely this number.
+    /// How fast the aeroplane is still sinking when the wheels meet the runway, m/s. Three feet a
+    /// second is a normal, firm arrival for anything from a trainer to an airliner; the design case
+    /// both are certified to is ten (14 CFR 23.473, 25.473).
     /// </summary>
-    public float WeightOnWheelsAtTouchdown { get; init; } = 0.15f;
+    public float TouchdownSinkMps { get; init; } = 0.9f;
+
+    /// <summary>
+    /// How far the undercarriage gives in stopping that sink, metres: an airliner's oleo strokes a
+    /// third of a metre, a light single's spring-steel leg bends about ten centimetres.
+    /// </summary>
+    public float StrokeMetres { get; init; } = 0.35f;
+
+    /// <summary>
+    /// How square the gear's force is over its stroke: the energy it takes up over the stroke times
+    /// its peak force. An oleo-pneumatic strut holds nearly its peak force all the way down, 0.75-0.9;
+    /// a steel spring's force rises from nothing, 0.5 (Currey, Aircraft Landing Gear Design, table 2.2).
+    /// </summary>
+    public float StrokeEfficiency { get; init; } = 0.8f;
+
+    /// <summary>
+    /// How much of the aeroplane's weight is on the wheels while they are being spun up, as a
+    /// fraction: n = v^2 / (2 g eta s), the gear's own stroke equation read for the load.
+    ///
+    /// The aeroplane that has just landed is still FLYING: the wing is carrying it at very nearly one
+    /// g, and all the tyres have on them is what stopping the sink puts through the gear. An airliner
+    /// arriving at three feet a second on a third of a metre of oleo has about a seventh of its weight
+    /// on its mains, and smokes them for a third of a second. A light single arriving the same way on
+    /// ten centimetres of spring steel has four fifths of its on two small wheels, and they are up to
+    /// speed in a twentieth of a second: the chirp. Neither number is declared; both fall out of the
+    /// gear. The load is taken as the stroke's (the peak's, for a spring), which is the load the gear
+    /// is built round; a spring leg reaches it a little after the wheels first touch, so a light
+    /// single's chirp is, if anything, a little shorter here than in life.
+    /// </summary>
+    public float WeightOnWheelsAtTouchdown
+    {
+        get
+        {
+            float v = MathF.Max(0f, TouchdownSinkMps);
+            float n = v * v / (2f * 9.81f * Math.Clamp(StrokeEfficiency, 0.1f, 1f) * MathF.Max(0.01f, StrokeMetres));
+            return Math.Clamp(n, 0.01f, 1f);
+        }
+    }
 
     /// <summary>
     /// How long the wheels take to come up to speed, seconds, from the mechanism above. Never less
@@ -293,12 +324,15 @@ public sealed record AircraftProfile
         ApproachSpeedMps = 31f,      // 60 knots over the fence
         Engines = 1,
         WingspanMetres = 11.0f, LengthMetres = 8.3f,
-        // Two little wheels with almost nothing on them: they are up to speed in a twentieth of a
-        // second, which is why a light aircraft's arrival is a chirp and not a scrub.
+        // Two little wheels on two spring-steel legs. The legs give about ten centimetres, so
+        // stopping a three-foot-a-second sink puts most of the aeroplane's weight on the wheels, and
+        // they are up to speed in a twentieth of a second: why a light aircraft's arrival is a
+        // chirp and not a scrub.
         Gear = new LandingGearSpec
         {
             Tyre = TyreProfile.SportsOnAsphalt with { TreadBlocks = 0, SquealHz = 1250f, SquealQ = 9f, SquealDb = 88f, PeakGripG = 0.7f },
             Wheels = 2, WheelRadiusMetres = 0.20f, WheelMassKg = 9f, LandingMassKg = 1100f,
+            StrokeMetres = 0.10f, StrokeEfficiency = 0.5f,
         },
         // 116.5 measured — the one that was already right.
         SourceLevelDb = 117f,
@@ -342,6 +376,7 @@ public sealed record AircraftProfile
         {
             Tyre = TyreProfile.TruckOnAsphalt with { TreadBlocks = 0, SquealHz = 620f, SquealQ = 7f, SquealDb = 98f, PeakGripG = 0.65f },
             Wheels = 4, WheelRadiusMetres = 0.40f, WheelMassKg = 48f, LandingMassKg = 20000f,
+            StrokeMetres = 0.35f, StrokeEfficiency = 0.8f,     // oleo-pneumatic main legs
         },
         // 120, measured with `--spool`, not 129. The declaration sets both the placement AND the
         // voice's full-scale reference, and they pull opposite ways, so over-declaring by nine
@@ -389,11 +424,13 @@ public sealed record AircraftProfile
         EngineSpanMetres = 11.6f,
         WingspanMetres = 35.8f, LengthMetres = 39.5f,
         // Four main wheels, a hundred and ten kilos each, sixty-five tonnes arriving on them at a
-        // hundred and thirty knots. Four tenths of a second of sliding rubber: the touchdown.
+        // hundred and thirty-eight knots, on a third of a metre of oleo. Three tenths of a second of
+        // sliding rubber: the touchdown.
         Gear = new LandingGearSpec
         {
             Tyre = TyreProfile.TruckOnAsphalt with { TreadBlocks = 0, SquealHz = 430f, SquealQ = 6f, SquealDb = 108f, PeakGripG = 0.6f },
             Wheels = 4, WheelRadiusMetres = 0.56f, WheelMassKg = 110f, LandingMassKg = 65000f,
+            StrokeMetres = 0.35f, StrokeEfficiency = 0.8f,
         },
         // 138, measured at the loudest bearing at full power. The old 145 was an estimate made
         // before AircraftSynth existed to measure, and it is why an airliner had to be almost on
