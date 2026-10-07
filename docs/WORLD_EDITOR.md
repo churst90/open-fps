@@ -620,3 +620,8 @@ here has been tried in the game client yet, only by tests and through the MUD ga
 3. **Direct keys stay off until tried.** Recommendation: try `/editorkeys on` with Orca first, then
    NVDA on the Windows client; if either takes a key, move that key, and only then mention them in
    the manual as ready.
+
+Phase 2 decided (Cody, 2026-10-07): "go with your recommendations on the editor phase". Pins change what players
+hear; the server's simulation uses the current version on every map. Groups place as separate things until
+building houses shows one-piece composites are needed. Direct keys stay off until Cody has tried them with Orca
+and then NVDA, and any key a screen reader takes is moved first.
