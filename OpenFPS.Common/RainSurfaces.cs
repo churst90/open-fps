@@ -21,20 +21,14 @@ public enum RainSurfaceKind
 }
 
 /// <summary>
-/// How rain sounds on each kind of surface, from what the surface is made of.
-///
-/// The material registry already says what a surface IS — how dense, how stiff, how lossy, whether
-/// it is porous — and that decides the kind: a skin thinner than <see cref="PlateMaxSkinMetres"/> of
-/// anything stiff is a plate the drops ring, anything stiff and thicker is ground the drops splash
-/// on, anything soft and porous yields. Two materials are named because no property tells them apart
-/// from their neighbours: Water (a pool, which is a fluid, not a stiff solid) and Foliage (leaves in
-/// the air, which a lawn's grass blades are not).
+/// How rain sounds on each kind of surface, from the material's properties: a thin stiff skin is a plate
+/// the drops ring, thicker is ground they splash on, soft yields. Water and Foliage are named because no
+/// property tells them from their neighbours (a fluid; leaves in the air, which grass blades are not).
 /// </summary>
 public static class RainSurfaces
 {
-    /// <summary>A skin thinner than this is a plate the drops set ringing, m. Sheet steel, a car's
-    /// panels, glazing, polycarbonate and a timber board are all under it; a concrete slab, a road or
-    /// a brick wall is far over it.</summary>
+    /// <summary>A skin thinner than this is a plate the drops set ringing, m: sheet steel, glazing, a
+    /// timber board are under it; a slab, a road or a brick wall far over it.</summary>
     public const float PlateMaxSkinMetres = 0.02f;
 
     /// <summary>Under this Young's modulus a material yields under a drop rather than stopping it, GPa:
@@ -46,8 +40,7 @@ public static class RainSurfaces
     {
         if (string.Equals(material, "Water", StringComparison.OrdinalIgnoreCase)) return RainSurfaceKind.Pool;
         if (string.Equals(material, "Foliage", StringComparison.OrdinalIgnoreCase)) return RainSurfaceKind.Canopy;
-        // An unknown name would fall back to Generic with a warning per call; Generic it is, quietly,
-        // since a surveyor asks about every box round the listener.
+        // Generic quietly: the registry's fallback warns per call, and a surveyor asks about every box.
         var p = AcousticRegistry.GetProperties(AcousticRegistry.IsKnown(material) ? material : "Generic");
         if (p.DensityKgM3 <= 0f) return RainSurfaceKind.None;
         if (p.YoungsModulusGPa < SoftBelowGPa) return RainSurfaceKind.Soft;
@@ -58,16 +51,11 @@ public static class RainSurfaces
     // ── Hard ground ──────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The share of a hard surface standing in puddles, for a rain rate.
-    ///
-    /// A road sheds its water sideways as a film far thinner than a drop — the kinematic-wave depth
-    /// on a 2 % crossfall five metres wide is about a third of a millimetre at 10 mm/h, inside the
-    /// texture of the surfacing — and a drop on a film that thin splashes without making a bubble
-    /// (a drop needs a pool about as deep as itself to open a crater that closes on air). What does
-    /// hold water is the low places: ruts, dips, the gutter, a cracked flag. How much of a street
-    /// that is, is not in the map, so this is an ASSUMPTION, written as one: a few per cent in light
-    /// rain, rising toward <see cref="PuddleMaxShare"/> as the rain gets heavier and the low places
-    /// fill. To be judged by ear and replaced by the ground's own data when the map carries it.
+    /// The share of a hard surface standing in puddles, for a rain rate. A road's film is far thinner
+    /// than a drop (about a third of a millimetre at 10 mm/h on a 2 % crossfall five metres wide), and a
+    /// drop makes a bubble only in a pool about as deep as itself; so only the low places count. How much
+    /// of a street that is is not in the map: an ASSUMPTION, a few per cent in light rain rising toward
+    /// <see cref="PuddleMaxShare"/>, to be replaced by the ground's own data when the map carries it.
     /// </summary>
     public static float PuddleShare(float rate)
         => rate > 0f ? PuddleMaxShare * rate / (rate + PuddleHalfRate) : 0f;
@@ -81,16 +69,10 @@ public static class RainSurfaces
     // ── The splash ─────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// How long a drop's water takes to go from a falling sphere to a sheet at its widest on the
-    /// ground, s: the time over which the splash pushes the air, and so the time scale of the click
-    /// the air hears (RainSynth.Click).
-    ///
-    /// The kinematic estimate of the time to maximum spreading is t = 8/3 · D / v (Pasandideh-Fard,
-    /// Qiao, Chandra and Mostaghimi 1996, "Capillary effects during droplet impact on a solid
-    /// surface", Phys. Fluids 8, 650-659), which their photographs and later measurements put in the
-    /// right range for water drops at raindrop speeds: about 2-3 D / v, against the D / v the drop's
-    /// centre takes to stop. On a wet road the sheet spreads into the film and lifts a crown, which
-    /// lives about as long (Cossali, Coghe and Marengo 1997, Exp. Fluids 22, 463-472).
+    /// How long a drop takes to spread to its widest, s: the time scale of the click (RainSynth.Click).
+    /// t = 8/3 · D / v (Pasandideh-Fard, Qiao, Chandra and Mostaghimi 1996, Phys. Fluids 8, 650-659),
+    /// about 2-3 D / v measured at raindrop speeds. On a wet road the crown the sheet lifts lives about as
+    /// long (Cossali, Coghe and Marengo 1997, Exp. Fluids 22, 463-472).
     /// </summary>
     public static float SplashSeconds(float diameterMm, float speed) => SpreadFactor * diameterMm * 1e-3f / MathF.Max(0.1f, speed);
 
@@ -100,16 +82,11 @@ public static class RainSurfaces
     // ── Soft ground ──────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// How many times longer a drop takes to stop on this material than on something rigid.
-    ///
-    /// For the drop itself almost everything is rigid: its dynamic pressure, ρ v², is a few tens of
-    /// kilopascals, and even turf is a few megapascals stiff. What a lawn or a bed of soil changes is
-    /// what the drop meets first — a blade of grass that bends away under it, a crumb of soil that
-    /// gives, no film of water to splash on — and that spreads the same momentum over a little more
-    /// time, which takes the top off the click. The law used is a quarter of a drop-transit time
-    /// longer for each decade the material is softer than <see cref="SoftBelowGPa"/>: grass 1.6, soil
-    /// 1.3, gravel 1.1, leaves 1.5. An ASSUMPTION on the size of the effect, flagged as one; the lab
-    /// sets the result beside recordings of rain on grass and in woods, and it is for the ear to judge.
+    /// How many times longer a drop takes to stop on this material than on something rigid. To a drop
+    /// (ρ v² a few tens of kPa) even turf is rigid; what changes is what it meets first, a blade that
+    /// bends or a crumb that gives, spreading the momentum and taking the top off the click. A quarter of
+    /// a transit time longer per decade softer than <see cref="SoftBelowGPa"/>: grass 1.6, soil 1.3,
+    /// gravel 1.1, leaves 1.5. An ASSUMPTION on the size, for the ear to judge against recordings.
     /// </summary>
     public static float ContactStretch(MaterialProperties p)
     {
@@ -134,10 +111,9 @@ public static class RainSurfaces
     public const float DefaultLeafAreaIndex = 4f;
 
     /// <summary>
-    /// The diameter the water a canopy catches leaves it at, mm: drips off leaf tips. Throughfall
-    /// under broadleaf trees carries drops of 4-6 mm that rain itself almost never has (Nanko,
-    /// Hotta and Suzuki 2006, J. Hydrology 329, 422-431), and they fall from the crown to the ground at
-    /// whatever speed that height gives them — the slow, heavy "plop" under a tree.
+    /// The diameter the water a canopy catches drips off it at, mm. Throughfall under broadleaf trees
+    /// carries 4-6 mm drops that rain almost never has (Nanko, Hotta and Suzuki 2006, J. Hydrology 329,
+    /// 422-431): the slow, heavy plop under a tree.
     /// </summary>
     public const float DripDiameterMm = 4.5f;
 
@@ -154,26 +130,20 @@ public static class RainSurfaces
     public const float CarGlassLoss = 0.05f;
 
     /// <summary>
-    /// What a car's headliner — the 5-10 mm of foam and fabric bonded under its roof — takes off the
-    /// roof's sound on its way into the cabin, per mixer band as amplitude: nothing in the low band,
-    /// a few dB in the middle, more above 4 kHz, the shape a porous lining that thin has (its
-    /// absorption is small below a quarter wavelength of its own thickness and rises to most of the
-    /// sound by 4-8 kHz). An ASSUMPTION on the figures, flagged as one.
+    /// What a car's headliner (5-10 mm of foam and fabric) takes off the roof's sound into the cabin, per
+    /// mixer band as amplitude: the shape of a thin porous lining, little below a quarter wavelength of
+    /// its thickness, most of the sound by 4-8 kHz. An ASSUMPTION on the figures.
     /// </summary>
     public static readonly (float Low, float Mid, float High) HeadlinerGains = (1f, 0.75f, 0.45f);
 
     // ── The listener's own body ──────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Under the open sky the rain lands on you too: on your head a hand's breadth from your ears and
-    /// on your shoulders a little further. Those drops are ten times nearer than the nearest ground,
-    /// so each is a hundred times the energy at the ear of one at your feet, and they are the drops
-    /// that stand out one by one. The figures are a body's, adult and upright: a head about 15 cm
-    /// across and 20 cm front to back (π/4 · 0.15 · 0.2 ≈ 0.024 m²), its crown about 12 cm above the
-    /// ear canal; shoulders 40 cm across and 25 cm deep less the neck (about 0.08 m²), 15-25 cm out
-    /// from the ears and 18 cm below them. The material is <see cref="BodyMaterial"/>: the map knows
-    /// no clothing, so hair and a coat are both a soft surface. ASSUMPTION, flagged: no hood, no hat,
-    /// no umbrella.
+    /// The rain on your own head and shoulders: ten times nearer than the ground, so each drop is a
+    /// hundred times the energy at the ear and stands out one by one. An adult's head is about 15 by
+    /// 20 cm (π/4 · 0.15 · 0.2 ≈ 0.024 m²), its crown 12 cm above the ear canal; shoulders 40 by 25 cm
+    /// less the neck (about 0.08 m²), 15-25 cm out and 18 cm below the ears. Hair and a coat are both
+    /// <see cref="BodyMaterial"/>. ASSUMPTION: no hood, no hat, no umbrella.
     /// </summary>
     public const float HeadSquareMetres = 0.024f, HeadRadiusMetres = 0.09f, CrownAboveEarMetres = 0.12f;
 
@@ -187,9 +157,8 @@ public static class RainSurfaces
 
     // ── Built panels ─────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>The free span of a built panel between its supports, m: purlins under a roof sheet,
-    /// the glazing bars of a curtain wall. A box in the map is a whole roof or a whole run of
-    /// glazing; what rings is one bay of it.</summary>
+    /// <summary>The free span of a built panel between its supports (purlins, glazing bars), m: a map's
+    /// box is a whole roof, but what rings is one bay of it.</summary>
     public const float BuiltBayMetres = 1.2f;
 }
 
@@ -197,34 +166,23 @@ public static class RainSurfaces
 /// A thin sheet the rain lands on, as the physics of a plate: what a drop's blow puts into it and
 /// what it gives back to the air.
 ///
-/// THE BLOW. A drop landing on a rigid surface does not rebound; it spreads, and hands the surface
-/// its momentum m v over about the time it takes to travel its own diameter, τ = D / v. The force
-/// rises as the square root of time from first contact (Philippi, Lagrée and Antkowiak 2016, J. Fluid
-/// Mech. 795, 96-135), peaks at about 0.8 ρ v² D² at about a fifth of τ (Gordillo, Sun and Cheng 2018,
-/// "Dynamics of drop impact on solid surfaces: evolution of impact force and self-similar spreading",
-/// J. Fluid Mech. 840, 190-214; Mitchell et al. 2019, J. Fluid Mech. 867, 300-322, measure the same),
-/// and dies away over the rest of the spreading. Taken here as exactly that: √t to the peak at 0.2 τ,
-/// then an exponential whose length makes the whole pulse carry m v (0.52 τ). The √t onset is what
-/// keeps energy in the top octaves (it falls 9 dB an octave above 1/τ, where a smooth pulse would fall
-/// off a cliff): for a 2 mm drop at 6.5 m/s τ is 0.3 ms, the blow's energy peaks near a kilohertz,
-/// and 8 kHz is 10 dB under it.
+/// The blow: a drop spreads rather than rebounds, handing over m v over about τ = D / v. The force rises
+/// as √t (Philippi, Lagrée and Antkowiak 2016, J. Fluid Mech. 795, 96-135) to about 0.8 ρ v² D² at a
+/// fifth of τ (Gordillo, Sun and Cheng 2018, J. Fluid Mech. 840, 190-214; Mitchell et al. 2019, J. Fluid
+/// Mech. 867, 300-322), then an exponential whose length makes the pulse carry m v (0.52 τ). The √t
+/// onset keeps the top octaves (9 dB an octave above 1/τ): a 2 mm drop at 6.5 m/s has τ 0.3 ms, its
+/// energy peaks near a kilohertz and 8 kHz is 10 dB under it.
 ///
-/// WHAT GOES IN. An infinite plate driven at a point takes power through its point mobility, which is
-/// real and flat: Y = 1 / (8 √(B m″)) (Cremer, Heckl and Petersson, Structure-Borne Sound, ch. 5),
-/// B the bending stiffness and m″ the mass per square metre. So the energy a blow puts into the plate
-/// in a band is Y times the blow's energy spectrum in that band — and a light thin sheet takes in
+/// What goes in: the infinite plate's point mobility, real and flat, Y = 1 / (8 √(B m″)) (Cremer, Heckl
+/// and Petersson, Structure-Borne Sound, ch. 5), times the blow's energy in the band. A light sheet takes
 /// orders of magnitude more than a slab (0.8 mm steel against 150 mm concrete: 40 dB).
 ///
-/// WHAT COMES OUT. Two things. The plate's own field rings on, decaying at its total loss factor —
-/// internal, mounting and radiation (<see cref="WallTransmission.TotalLossFactor"/> for a built
-/// panel, the body's own figure for a car) — and radiates P = ρ0 c0 S σ ⟨v²⟩, σ the radiation
-/// efficiency: a thin steel sheet is far below its coincidence frequency and radiates mostly from its
-/// edges, a pane of glass is at coincidence by 2 kHz and radiates well above it (the brighter tick).
-/// Below the frequency where its modes stop overlapping a bay rings at its own notes, which is the
-/// drumming of a pane or a car roof; above it the modes are a continuum and the field is a band of
-/// noise rising and decaying with each blow. And the struck spot itself pushes the air as the blow
-/// lands: the volume acceleration of an infinite plate under a point force is F / m″, so the near
-/// field is p = ρ0 F(t) / (2π m″ r), a thud with the blow's own shape.
+/// What comes out: the plate's field decays at its total loss factor
+/// (<see cref="WallTransmission.TotalLossFactor"/> for a built panel) and radiates P = ρ0 c0 S σ ⟨v²⟩. Thin
+/// steel is far below coincidence and radiates from its edges; glass is at coincidence by 2 kHz (the
+/// brighter tick). Below the modal overlap a bay rings at its own notes (the drumming of a pane or a car
+/// roof), above it the field is noise. And the struck spot's near field is p = ρ0 F(t) / (2π m″ r), a
+/// thud with the blow's own shape.
 /// </summary>
 public readonly record struct RainPlate
 {
@@ -297,13 +255,10 @@ public readonly record struct RainPlate
     }
 
     /// <summary>
-    /// The radiation efficiency of one bay, at a frequency.
-    ///
-    /// Below coincidence a finite plate radiates from a strip along its edges (Maidanik 1962, J. Acoust.
-    /// Soc. Am. 34, 809; the edge-mode term as Bies and Hansen's Engineering Noise Control gives it):
-    /// σ = U c / (π² S fc) · √(f / fc), U the perimeter. Above it, every mode radiates:
-    /// σ = 1 / √(1 − fc / f), held under <see cref="MaxRadiationEfficiency"/> where that runs away at
-    /// coincidence itself. Accurate to a few decibels, which is the model's grain anyway.
+    /// The radiation efficiency of one bay. Below coincidence a plate radiates from its edges (Maidanik
+    /// 1962, J. Acoust. Soc. Am. 34, 809; the edge-mode term as in Bies and Hansen's Engineering Noise
+    /// Control): σ = U c / (π² S fc) · √(f / fc), U the perimeter. Above it σ = 1 / √(1 − fc / f), held
+    /// under <see cref="MaxRadiationEfficiency"/>. Accurate to a few decibels, the model's grain.
     /// </summary>
     public float RadiationEfficiency(float hz)
     {
@@ -447,13 +402,11 @@ public readonly record struct RainPlate
         return f * f * BlowSeconds(diameterMm, speed) * BlowShapeEnergy;
     }
 
-
     /// <summary>
-    /// The steady mean-square pressure, Pa², that rain at this rate makes on one face of a large
-    /// plate of this kind, at a listener whose view of the plate is <paramref name="viewFactor"/>
-    /// (∫ dA / r² over the plate, the same factor every surface source uses): the ringing field in
-    /// octave bands from 31.5 Hz to 16 kHz, plus the near-field thuds. Analytic — the synthesiser
-    /// renders the same physics event by event, and the tests hold the two together.
+    /// The steady mean-square pressure, Pa², of rain at this rate on one face of a large plate, for a
+    /// listener whose view of it is <paramref name="viewFactor"/> (∫ dA / r²): the ringing field in
+    /// octaves from 31.5 Hz to 16 kHz plus the near-field thuds. The synthesiser renders the same physics
+    /// event by event, and the tests hold the two together.
     /// </summary>
     public float MeanSquarePressure(float rate, float viewFactor, bool includeForced = true)
     {

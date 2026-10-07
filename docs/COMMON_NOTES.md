@@ -130,3 +130,40 @@ Why machines are data (Machines.cs):
 - MachinePart.ExtentMetres: a 40 m airliner and a tailpipe are not the same thing at ten metres. Nothing
   reads it yet; replacing ClientAudioSystem's car-sized MathF.Max(reference, 3f) with it is the step,
   with extent and audibility ranking done together (left as a TODO in the code).
+
+## Loudness: the ceiling and the pivot
+
+The level that renders at full scale is a level at the listener, not a source level. Set to a source
+level (165, a rifle at one metre), a gunshot is full scale only at the muzzle; at any real range the
+inverse law has already taken 30 dB off it. At a 130 dB ceiling (where loud becomes pain) a rifle at
+thirty metres arrived at 129 dB and played at full scale, at ten metres 139 and clipped, as an ear
+does, but nothing except gunfire ever reached full scale: a door slam at 88 dB rendered at -28 dBFS and
+glass across a street at -41, weak and dull though the physics was right. Everyday sounds are 60 to 95
+dB, so the mix spends itself there.
+
+With the compression a player setting, a fixed 112 dB ceiling would make "real" (1.0) put everything
+below a jackhammer as far under the volume knob as it is under one: a street scene 40 dB down. So the
+compression turns about an everyday level: a sound 70 dB at its reference distance (the 1.2 m minimum,
+for anything that quiet) plays at the same level at every setting, and the full-scale level follows:
+112 dB at the shipped 0.45, about 89 dB at 1.0, where a V8 floored beside you runs into the ceiling as
+it does into an ear while a door, a footstep and a beacon stay where they were.
+
+## The park tree
+
+FoliageSpec.ParkTree (NatureModels.cs).
+
+Vogel exponent. At −0.7 (taken before for every tree) the crown grew 10.8 dB from 3 to 6 m/s, Fégeant's
+birch, and the gusts in an ordinary breeze swung it 4.4 dB (the standard deviation of its 400 ms level
+within a minute, over ten minutes) against 1.3-4.2 dB in recordings of leaves in wind; Cody heard the
+swings as too obvious. At −0.9 it grows 9.5 dB (32 dB a decade, between Fégeant's oak at 30 and birch at
+36) and swings 4.0 dB.
+
+Its level, measured with `--nature levels park_tree sec=600`:
+
+- 2026-10-04, ten minutes of the field (4.1 m/s mean at the crown): Leq 48.2 dB, 46.7 dB(A); the
+  gustiest second 7.5 dB over. A minute is not enough to measure it by: a minute of gusts read 2.3 dB high.
+- 2026-10-05, the boughs reading the wind across the crown and the field's turbulence at 0.25: Leq
+  47.9 dB, 46.3 dB(A), the gustiest second 6.6 dB over.
+- Round 3 (Vogel −0.9, strikes by contact angle): 47.8 dB, 46.2 dB(A), the gustiest second 6.7 dB over.
+- Texture round 1 (2026-10-06: strikes and twig episodes from exponential-tailed turbulent increments),
+  five minutes: 47.4 dB, 45.7 dB(A), 10 ms peaks' 99.9th percentile 21.1 dB over, so 22 of room.

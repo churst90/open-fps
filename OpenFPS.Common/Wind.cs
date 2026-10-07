@@ -3,36 +3,21 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// The wind over the map: how fast the air is moving at a place and a moment.
+/// The wind over the map: how fast the air moves at a place and a moment. One field read by everything
+/// the wind moves (leaves, flames, spray, your ears), so a gust is one event that arrives at each in
+/// turn: in a park it is heard coming through the trees upwind first.
 ///
-/// One field, read by everything the wind moves — the leaves on a tree, the flames of a fire, the
-/// spray off a fountain, the air past your own ears — so a gust is ONE event that arrives at each of
-/// them in turn rather than a random wobble each of them makes up for itself. That is the whole reason
-/// it is a field and not a per-source noise generator: stand in a park and a gust is heard coming,
-/// through the trees upwind first, then the ones round you, then away downwind.
+/// The mean grows with height by the log law, u(z) = u* / κ ln(z / z0), so a fire on the ground feels
+/// about half of what a tree's crown does. The turbulence is a pattern of eddies carried by the mean flow
+/// (Taylor's frozen turbulence); its intensity near the ground is about 0.1 in open country on a quiet
+/// day and 0.3 to 0.4 in a gale over buildings and trees, its eddies 180 m down to 5 m with less energy
+/// in the short ones, as a Kolmogorov spectrum has.
 ///
-/// THE MODEL. Near the ground the wind is a mean speed with turbulence on top of it. The mean grows
-/// with height as the log of it (the surface layer: u(z) = u* / κ ln(z / z0)), so a fire on the
-/// ground feels about half of what the crown of a tree does. The turbulence is a pattern of eddies
-/// carried along by the mean flow (Taylor's frozen turbulence): what a place feels at time t is what
-/// a place upwind of it felt a little earlier. Its size is the turbulence intensity, the standard
-/// deviation over the mean, which near the ground is about 0.1 in open country on a quiet day and
-/// 0.3 to 0.4 in a gusty gale over buildings and trees; its eddies run from about 180 m (the gusts
-/// you notice) down to 5 m (the flutter inside one), with less energy in the short ones, as a
-/// Kolmogorov spectrum has.
-///
-/// WHERE THE WEATHER COMES IN. The mean wind, its direction and its gustiness are the server's
-/// weather (WorldEnvironmentSystem), broadcast once a second, and <see cref="WindWeather"/> is what a
-/// client makes of them: the latest broadcast, reached from the one before by a one-second ramp so a
-/// broadcast never lands as a step. The eddy pattern is displaced by how far the air has TRAVELLED
-/// (the integral of the wind over time), which the server keeps and broadcasts too. That is what lets
-/// the wind turn and strengthen without the gusts racing: an eddy pattern fixed to a direction would
-/// swing round the map's origin as the wind veered, and a tree a kilometre out would hear a minute
-/// of gusts in ten seconds.
-///
-/// DETERMINISTIC. The eddies are hashed from a lattice in (position on the travelled pattern, slow
-/// time), so two clients asking about the same place and second, with the same broadcast, get the
-/// same answer, and a test can hold it. The clock is the caller's: UTC seconds keep clients together.
+/// The server's weather (WorldEnvironmentSystem) is broadcast once a second and <see cref="WindWeather"/>
+/// ramps to each. The pattern is displaced by how far the air has travelled, which the server keeps and
+/// sends too: a pattern fixed to a direction would swing round the map's origin as the wind veered, and
+/// a tree a kilometre out would hear a minute of gusts in ten seconds. Hashed from a lattice, so two
+/// clients with the same broadcast and UTC second get the same answer.
 /// </summary>
 public static class WindField
 {
@@ -46,11 +31,10 @@ public static class WindField
     private static WindWeather _weather = WindWeather.Default;
 
     /// <summary>
-    /// Holds a weather for the calling flow only (a test, a lab render) until the returned handle is
-    /// disposed. The shared weather is one global that a game session writes on every broadcast, so a
-    /// test reading the wind while a session test runs beside it heard that session's weather change
-    /// under it (WideSourcesTests.ATreesPlaceVoicesAddUpToItsOneVoice failed now and then in a mixed
-    /// run, 2026-10-06). The game never holds one: on the mixer thread this is one AsyncLocal read.
+    /// Holds a weather for the calling flow only (a test, a lab render) until the handle is disposed.
+    /// The shared weather is a global every session writes, and a test beside a session test heard it
+    /// change under it (WideSourcesTests.ATreesPlaceVoicesAddUpToItsOneVoice, 2026-10-06). The game never
+    /// holds one: on the mixer thread this is one AsyncLocal read.
     /// </summary>
     public static IDisposable Hold(WindWeather weather)
     {
@@ -80,13 +64,11 @@ public static class WindField
         set { var a = Weather.At(Now()); Weather = WindWeather.Steady(a.Speed, value, a.Turbulence); }
     }
 
-    /// <summary>Standard deviation of the speed over its mean, now. Over ground of roughness z0 the
-    /// surface layer gives about 1 / ln(z / z0) (EN 1991-1-4 with its turbulence factor 1): with the
-    /// <see cref="RoughnessMetres"/> here, 0.24 at ten metres and 0.26 at a park tree's crown. The
-    /// built-in wind uses 0.25; it was 0.3, the top of that range, and since a crown's sound goes as
-    /// the wind to the 3.6, the lulls took the trees nearly silent and the gusts were heard as someone
-    /// turning them up and down. The server's gustiness moves it a little either side of that
-    /// (<see cref="WindAir.TurbulenceFor"/>).</summary>
+    /// <summary>Standard deviation of the speed over its mean, now: about 1 / ln(z / z0) (EN 1991-1-4,
+    /// turbulence factor 1), 0.24 at ten metres and 0.26 at a park tree's crown with this
+    /// <see cref="RoughnessMetres"/>. Not 0.3: a crown's sound goes as the wind to the 3.6, so the lulls
+    /// silenced the trees and the gusts sounded like someone turning them up and down. The server's
+    /// gustiness moves it a little (<see cref="WindAir.TurbulenceFor"/>).</summary>
     public static float Turbulence
     {
         get => Weather.At(Now()).Turbulence;
@@ -282,13 +264,10 @@ public readonly record struct WindAir(float East, float North, float Turbulence,
         return new WindAir(-MathF.Sin(a) * speed, -MathF.Cos(a) * speed, turbulence, anchorSeconds, travelEast, travelNorth);
     }
 
-    /// <summary>The turbulence intensity for the server's gustiness (0..1): 0.18 for a steady wind,
-    /// 0.24 at the middle, 0.30 for the gustiest. Turbulence intensity near the ground is set mostly
-    /// by the ground (1 / ln(z / z0), 0.24 at ten metres here, see <see cref="WindField.Turbulence"/>),
-    /// not by the weather, so the weather only moves it a little either side; 0.3 is the top of the
-    /// range, where the trees were heard as somebody turning them up and down. Over land a gust
-    /// factor (the three-second peak over the mean) is about one plus three times this: 1.55 on a
-    /// steady day to 1.9 in a squally storm.</summary>
+    /// <summary>The turbulence intensity for the server's gustiness (0..1): 0.18 steady to 0.30 gustiest.
+    /// Near the ground it is set mostly by the ground (<see cref="WindField.Turbulence"/>), so the weather
+    /// only moves it a little. Over land the gust factor (three-second peak over the mean) is about one
+    /// plus three times this: 1.55 on a steady day to 1.9 in a squally storm.</summary>
     public static float TurbulenceFor(float gustiness) => 0.18f + 0.12f * Math.Clamp(gustiness, 0f, 1f);
 
     /// <summary>The air as a weather broadcast describes it. <paramref name="windVelocity"/> is the
@@ -304,13 +283,9 @@ public readonly record struct WindAir(float East, float North, float Turbulence,
 }
 
 /// <summary>
-/// The air a client hears: the weather it last received, reached from the one before by a ramp.
-///
-/// The server broadcasts once a second. Applying each broadcast as it lands would step the mean
-/// wind every second, and every tree, fire and ear on the map would step with it. So each broadcast
-/// becomes the end of a one-second ramp that starts wherever the air was when it arrived; the eddy
-/// pattern's travel is blended the same way, from where it had got to toward the server's account of
-/// it, so the gusts neither jump nor race.
+/// The air a client hears: each broadcast (once a second) is the end of a one-second ramp from wherever
+/// the air was, its travel blended the same way, so every tree, fire and ear does not step each second
+/// and the gusts neither jump nor race.
 /// </summary>
 public sealed class WindWeather
 {
@@ -382,7 +357,6 @@ public sealed class WindWeather
                                + (theirs.North - travelled.North) * (theirs.North - travelled.North));
         if (apart > SnapMetres) return new WindWeather(incoming, incoming, now, 0, false);
 
-        // Where the air is now, carried on as it is going, is where the ramp starts.
         var here = At(now) with { AnchorSeconds = now, TravelEast = travelled.East, TravelNorth = travelled.North };
         return new WindWeather(here, incoming, now, rampSeconds, false);
     }

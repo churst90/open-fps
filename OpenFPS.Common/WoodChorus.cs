@@ -5,25 +5,17 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// The wind in a wood, heard from further than the wind in one tree.
+/// The wind in a wood, heard further than the wind in one tree. A crown is heard to about 90 m; a wood of
+/// N is 10 log N dB louder, and played tree by tree every tree past 90 m was culled and the wood went
+/// silent. So past <see cref="ChorusMetres"/> the trees of each wood (200 m cell and species) are one
+/// source over the wood's real extent (key "wood:"), rendering as many trees as it stands for
+/// (FoliageSynth.Trees) and reading the wind across the wood.
 ///
-/// One tree's crown is heard to about 90 m (FoliageSpec's level, Loudness.AudibleRange). A wood of N of
-/// them is N independent streams of leaf strikes and shedding noise: the same sound, N times the power,
-/// 10 log N dB louder, and so heard much further than any one of its trees. Played tree by tree, every
-/// tree past 90 m was culled as inaudible and the wood went silent with them. So past
-/// <see cref="ChorusMetres"/> a tree is not a voice of its own: the trees of each wood (by 200 m cell and
-/// species) are one source, placed over the wood's real extent (ExtendedSources, key "wood:"), whose synth
-/// renders as many trees as it stands for (FoliageSynth.Trees) and reads the wind across the wood, so a
-/// gust crosses it as it crosses the trees.
-///
-/// HANDOVER. Between <see cref="IndividualMetres"/> and <see cref="ChorusMetres"/> a tree is in both, its
-/// power split between its own voice and the wood's by a smooth weight, so walking into a wood nothing
-/// steps: the shares always add to the tree. The wood's gain is set from its trees' own distances (each
-/// as 1/d from its own place), not from the wood's middle, so the wood renders exactly the power its trees
-/// would at their own distances, whatever the wood's shape and wherever the listener stands.
-///
-/// Built from the crowns the client holds (ClientWorldState.RefreshWoods); <see cref="Weigh"/> runs every
-/// audio frame. Pure: the lab and the tests use it as the game does. docs/WORLD_STREAMING.md.
+/// Between <see cref="IndividualMetres"/> and <see cref="ChorusMetres"/> a tree's power is split between
+/// its own voice and the wood's, the shares always adding to the tree, so nothing steps. The wood's gain
+/// comes from each tree's own distance, not the wood's middle, so it renders exactly its trees' power
+/// whatever its shape. Built from ClientWorldState.RefreshWoods; <see cref="Weigh"/> runs every audio
+/// frame (docs/WORLD_STREAMING.md).
 /// </summary>
 public sealed class WoodChorus
 {
@@ -149,11 +141,9 @@ public sealed class WoodChorus
     }
 
     /// <summary>
-    /// The shares for a listener at <paramref name="ear"/>. <paramref name="voiced"/> says which trees have
-    /// a voice of their own now (the audio system's budget holds standing sources to a few): a tree that
-    /// has none is heard in its wood whatever its distance, so a wood within the hand-over does not lose
-    /// the trees the budget left out. Its own share is still given (<see cref="Weights.Individual"/>), so it
-    /// can be ranked for a voice; once it has one, it leaves the wood.
+    /// The shares for a listener at <paramref name="ear"/>. A tree <paramref name="voiced"/> says has no
+    /// voice of its own (the budget holds standing sources to a few) is heard in its wood whatever its
+    /// distance; its own share is still given so it can be ranked for a voice.
     /// </summary>
     public void Weigh(Vector3 ear, Weights into, Func<int, bool>? voiced = null)
     {

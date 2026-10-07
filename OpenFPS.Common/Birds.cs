@@ -7,15 +7,11 @@ namespace OpenFPS.Common;
 public enum BirdHabitat { Foliage, Roof, Sky }
 
 /// <summary>
-/// One kind of bird: what it sounds like, how loud, and the rhythm it calls in.
-///
-/// The calls are recordings — one bird, one call per file, under ASSETS/SOUNDS/BIRDS/&lt;Folder&gt; —
-/// and a group is NEVER a recording of a group. A hedge of sparrows is a dozen sparrows, each in its
-/// own place in the hedge, each with its own voice (a fixed pitch of its own) and its own rhythm,
-/// which is what makes a hedge you can walk along rather than a loop hung in the air.
-///
-/// Birds call in BOUTS: a run of calls a second or so apart, then quiet for a while. That is most of
-/// what separates a bird from a beeping machine, and the numbers below are the species' own.
+/// One kind of bird: what it sounds like, how loud, and the rhythm it calls in. The calls are one bird,
+/// one call per file (ASSETS/SOUNDS/BIRDS/&lt;Folder&gt;), and a group is never a recording of a group: a
+/// hedge of sparrows is a dozen sparrows, each in its own place with its own pitch and rhythm, a hedge you
+/// can walk along rather than a loop hung in the air. Birds call in bouts, a run of calls then quiet:
+/// most of what separates a bird from a beeping machine.
 /// </summary>
 public sealed record BirdSpecies
 {
@@ -41,9 +37,8 @@ public sealed record BirdSpecies
     public float BoutGapMin { get; init; } = 10f;
     public float BoutGapMax { get; init; } = 40f;
 
-    /// <summary>How far one bird's voice sits from the next, as a fraction of pitch either way. Two
-    /// sparrows are not the same sparrow, and a playback rate a few percent apart is heard as two
-    /// birds rather than as one recording.</summary>
+    /// <summary>How far one bird's voice sits from the next, a fraction of pitch either way: a few per
+    /// cent apart is heard as two birds rather than one recording.</summary>
     public float PitchSpread { get; init; } = 0.04f;
 
     /// <summary>How much a neighbour calling shortens this bird's wait, 0..1 — the contagion that
