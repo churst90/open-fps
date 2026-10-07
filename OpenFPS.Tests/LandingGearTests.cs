@@ -1,3 +1,4 @@
+using System.Linq;
 using OpenFPS.Common;
 using Xunit;
 using Xunit.Abstractions;
@@ -27,6 +28,38 @@ public class LandingGearTests
         Assert.InRange(tSingle, 0.03f, 0.08f);
         // As approved by ear before the load was worked out: 297 ms.
         Assert.InRange(tAirliner, 0.25f, 0.35f);
+    }
+
+    /// <summary>
+    /// The touchdown is heard, and for as long as the wheels slide. The tyre model is asked how much
+    /// of its grip is in use; the slip ratio was handed to it as that, so a slip of one sat in its
+    /// squeal window for the first fifth of the spin-up, and a light single's 57 ms went through the
+    /// window faster than the tyre's own attack: its touchdown made no sound at all.
+    /// </summary>
+    [Theory]
+    [InlineData("piston_single", 0.03, 0.09)]
+    [InlineData("airliner", 0.22, 0.36)]
+    public void A_touchdown_slides_for_as_long_as_the_wheels_take_to_spin_up(string preset, double atLeast, double atMost)
+    {
+        var p = AircraftProfile.ByName(preset);
+        var s = new OpenFPS.Client.AudioEngine.Core.Aircraft.AircraftSynth(p, 48000f, 5);
+        s.SetListener(new System.Numerics.Vector3(-40f, 0f, 0f));
+        s.PlaceAtLever(0.12f);
+        for (int i = 0; i < 48000; i++) s.Step();
+        s.Touchdown(p.ApproachSpeedMps);
+        var frames = new System.Collections.Generic.List<double>();
+        double e = 0; int n = 0;
+        for (int i = 0; i < 48000; i++)
+        {
+            s.GroundSpeed = p.ApproachSpeedMps;
+            s.Step();
+            e += s.Gear * (double)s.Gear;
+            if (++n == 480) { frames.Add(10 * System.Math.Log10(e / n / 4e-10)); e = 0; n = 0; }
+        }
+        double rolling = frames.Skip(70).Average();
+        int sliding = frames.TakeWhile(f => f > rolling + 10).Count();
+        _o.WriteLine($"{preset}: {frames.Take(sliding).DefaultIfEmpty(0).Max():F0} dB at a metre for {sliding * 10} ms, then rolling at {rolling:F0}");
+        Assert.InRange(sliding * 0.01, atLeast, atMost);
     }
 
     [Fact]

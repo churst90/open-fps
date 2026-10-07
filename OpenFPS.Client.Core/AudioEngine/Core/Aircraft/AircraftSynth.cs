@@ -65,11 +65,12 @@ public sealed class AircraftSynth
     private int _slowTick;
 
     // ── The undercarriage ──────────────────────────────────────────────────────────────────────
-    // Silent for the whole flight and then, for four tenths of a second, the loudest thing on the
-    // aeroplane. See LandingGearSpec: the wheels are not turning and the runway spins them up.
+    // Silent for the whole flight and then, for as long as the wheels take to spin up (a third of a
+    // second on an airliner, a twentieth on a light single), the loudest thing on the aeroplane. See
+    // LandingGearSpec: the wheels are not turning and the runway spins them up.
     private readonly Random? _gearRng;
     private VehicleSynth.TyreVoice _gearVoice;
-    private float _groundSpeed, _wheelSpeed, _spinUpRate;
+    private float _groundSpeed, _wheelSpeed, _spinUpRate, _patchDemand;
     private bool _onGround;
     private const int SlowEvery = 64;
 
@@ -166,6 +167,7 @@ public sealed class AircraftSynth
         if (Profile.Gear is not { } g) return;
         _groundSpeed = MathF.Max(0f, groundSpeedMps);
         _wheelSpeed = 0f;                                   // a wheel in the air is not turning
+        _patchDemand = 0f;
         _onGround = true;
         // Metres per second of rim speed gained per second, from the wheel and the load on it.
         _spinUpRate = _groundSpeed / MathF.Max(0.001f, g.SpinUpSeconds(_groundSpeed));
@@ -321,12 +323,27 @@ public sealed class AircraftSynth
             // The runway spins the wheel up at the rate its own inertia and the load on it allow.
             // Until it is there, the difference between the two is being scrubbed off as rubber.
             if (_wheelSpeed < _groundSpeed) _wheelSpeed = MathF.Min(_groundSpeed, _wheelSpeed + _spinUpRate * _dt);
-            // Slip as the tyre model means it: the fraction of the contact patch's speed that is
-            // sliding rather than rolling. One at the instant of touchdown, zero once it is up.
+            // The slip ratio: the fraction of the contact patch's speed that is sliding rather than
+            // rolling. One at the instant of touchdown, zero once it is up.
             float slip = _groundSpeed > 0.5f ? (_groundSpeed - _wheelSpeed) / _groundSpeed : 0f;
+            // The tyre model is asked how much of its GRIP is in use, not the slip ratio. A tyre makes
+            // its most force at a slip ratio of about 12 % (RoadWaterLaw.PeakSlip, Pacejka); past that it
+            // is sliding, as WheelDynamics reads a slip angle past its peak. So a wheel meeting the
+            // runway at rest is a full skid, the scrub, and the squeal is the last of the spin-up as
+            // the slip falls through the peak: the chirp. Read as the demand itself, a slip of one sat
+            // in the squeal window for the first fifth of the spin-up, a jet chirped and a light
+            // single's 57 ms passed through the window faster than the tyre's own attack and was silent.
+            float demand = slip / RoadWaterLaw.PeakSlip;
+            // The contact patch follows its slip over a relaxation length, about the tyre's own
+            // radius (Pacejka): a few milliseconds at a landing speed. The tyre model's own smoothing
+            // is a driver's demand settling (a car's squeal dying away over a fifth of a second) and
+            // would hold a light single's 57 ms slide for three times as long; it is stood aside here.
+            float relax = 1f - MathF.Exp(-_groundSpeed * _dt / MathF.Max(0.05f, g.WheelRadiusMetres));
+            _patchDemand += (demand - _patchDemand) * relax;
+            _gearVoice.SlipSmooth = _patchDemand;
             // The model works in one tyre; there are several, side by side, and they are not in
             // step with one another, so they add as power.
-            gear = VehicleSynth.Tyre(g.Tyre, _groundSpeed, slip, _gearRng, ref _gearVoice, sampleRate: _rate)
+            gear = VehicleSynth.Tyre(g.Tyre, _groundSpeed, _patchDemand, _gearRng, ref _gearVoice, sampleRate: _rate)
                  * MathF.Sqrt(MathF.Max(1, g.Wheels));
         }
 
