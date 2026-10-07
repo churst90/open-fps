@@ -1195,6 +1195,10 @@ public sealed partial class ClientGameSession : IDisposable
                 ApplyModelUpdate(model);
                 break;
 
+            case MapSettingsUpdate mapSettings:
+                ApplyMapSettings(mapSettings);
+                break;
+
             case TextEvent tEvent:
                 _chat.AddServerMessage(tEvent.Text);
                 break;

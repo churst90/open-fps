@@ -63,6 +63,29 @@ public sealed record ModelOp(string MapId, string Kind, string Id, string Label,
     public override string What => $"changed {Label} of the {ModelKinds.Spoken(Kind)} {Id}";
 }
 
+/// <summary>A map pinning a model at a version (null: no pin).</summary>
+public sealed record PinOp(string MapId, string Kind, string Id, int? Before, int? After) : EditOp(MapId)
+{
+    public override string What => After is int v ? $"pinned the {ModelKinds.Spoken(Kind)} {Id} at version {v}" : $"lifted the pin on the {ModelKinds.Spoken(Kind)} {Id}";
+}
+
+/// <summary>A model made in the editor. Versions are never deleted, so its undo retires it.</summary>
+public sealed record CreateOp(string MapId, string Kind, string Id) : EditOp(MapId)
+{
+    public override string What => $"made the {ModelKinds.Spoken(Kind)} {Id}";
+}
+
+public sealed record RetireOp(string MapId, string Kind, string Id, bool Retired) : EditOp(MapId)
+{
+    public override string What => $"{(Retired ? "retired" : "brought back")} the {ModelKinds.Spoken(Kind)} {Id}";
+}
+
+/// <summary>Several operations done as one (a row, a replacement on every map): one undo takes them all back.</summary>
+public sealed record BatchOp(string MapId, IReadOnlyList<EditOp> Ops, string Text) : EditOp(MapId)
+{
+    public override string What => Text;
+}
+
 public sealed partial class WorldEditor
 {
     // ── The stack ───────────────────────────────────────────────────────────────────────────────
@@ -78,6 +101,7 @@ public sealed partial class WorldEditor
 
     private void Touch(UserSession s, EditOp op)
     {
+        if (op is BatchOp batch) { foreach (var o in batch.Ops) Touch(s, o); return; }
         int? id = op switch { PoseOp p => p.Id, PlaceOp p => p.Thing.Id, DeleteOp d => d.Thing.Id, SetOp t => t.Id, _ => null };
         if (id is int i) _touchedBy[(op.MapId, i)] = s.Username;
     }
@@ -119,10 +143,51 @@ public sealed partial class WorldEditor
     /// the operation, or its undo, left it. If somebody has changed it since, nothing happens and
     /// <paramref name="why"/> says who.
     /// </summary>
-    private bool Reverse(UserSession s, EditOp op, bool forward, out string why)
+    private bool Reverse(UserSession s, EditOp op, bool forward, out string why, bool nested = false)
     {
         why = "";
-        if (!op.MapId.Equals(s.CurrentMapId, StringComparison.OrdinalIgnoreCase)) { why = "that was on another map."; return false; }
+        if (!nested && !op.MapId.Equals(s.CurrentMapId, StringComparison.OrdinalIgnoreCase)) { why = "that was on another map."; return false; }
+        switch (op)
+        {
+            case BatchOp b:
+            {
+                // In turn, the last first when taking back; if one cannot be, those already done are done again.
+                var done = new List<EditOp>();
+                foreach (var part in forward ? b.Ops : b.Ops.Reverse())
+                {
+                    if (Reverse(s, part, forward, out why, nested: true)) { done.Add(part); continue; }
+                    for (int i = done.Count - 1; i >= 0; i--) Reverse(s, done[i], !forward, out _, nested: true);
+                    return false;
+                }
+                return true;
+            }
+            case PinOp p:
+            {
+                if (PinOf(p.MapId, p.Kind, p.Id) != (forward ? p.Before : p.After)) { why = $"the pin on the {ModelKinds.Spoken(p.Kind)} {p.Id} has been changed since."; return false; }
+                ApplyPin(p.MapId, p.Kind, p.Id, forward ? p.After : p.Before);
+                return true;
+            }
+            case CreateOp c:
+            {
+                if (!s.Can(Permissions.EditModels)) { why = "changing models needs edit-models."; return false; }
+                if (!Models.SetRetired(c.Kind, c.Id, !forward)) { why = $"the {ModelKinds.Spoken(c.Kind)} {c.Id} has been {(forward ? "brought back" : "retired")} since."; return false; }
+                return true;
+            }
+            case MapSetOp ms:
+            {
+                var settings = Overlays.Get(ms.MapId).Settings;
+                string? now = settings != null && settings.TryGetValue(ms.Path, out var v) ? v : null;
+                if (now != (forward ? ms.Before : ms.After)) { why = $"the map's {ms.Label} has been changed since."; return false; }
+                ApplyMapSetting(ms.MapId, ms.Path, forward ? ms.After : ms.Before);
+                return true;
+            }
+            case RetireOp r:
+            {
+                if (!s.Can(Permissions.EditModels)) { why = "changing models needs edit-models."; return false; }
+                if (!Models.SetRetired(r.Kind, r.Id, forward ? r.Retired : !r.Retired)) { why = $"the {ModelKinds.Spoken(r.Kind)} {r.Id} has been changed since."; return false; }
+                return true;
+            }
+        }
         if (!_maps.TryGetMap(op.MapId, out var world, out _, out _, out _)) { why = "the map is not loaded."; return false; }
         var authored = _maps.AuthoredEntities(op.MapId);
         string ChangedBy(int id, string name)
@@ -177,9 +242,7 @@ public sealed partial class WorldEditor
                 string expect = forward ? (t.Before ?? now) : t.After;
                 if (!SameValue(now, expect)) { why = ChangedBy(t.Id, t.Name); return false; }
                 string to = forward ? t.After : (t.Before ?? now);
-                setting.Set(world, e, to);
-                KeepSetting(op.MapId, t.Id, world, e, t.Path, to);
-                _server.SyncAudioComponent(e.Id);
+                ApplySetting(op.MapId, t.Id, world, e, setting, to);
                 return true;
             }
             case SpawnOp sp:
@@ -199,7 +262,7 @@ public sealed partial class WorldEditor
                 if (!s.Can(Permissions.EditModels)) { why = "changing models needs edit-models."; return false; }
                 var update = Models.SetCurrent(m.Kind, m.Id, forward ? m.After : m.Before);
                 if (update == null) { why = "that version is not kept."; return false; }
-                _server.BroadcastModel(update);
+                Publish(update);
                 return true;
             }
         }
@@ -258,6 +321,108 @@ public sealed partial class WorldEditor
         }
         _maps.RefreshGrid(mapId);
         _server.SyncAudioComponent(e.Id);
+        Restream(mapId, world, e, e.Id);
+    }
+
+    /// <summary>
+    /// A thing from the map file on a map streamed in tiles, moved or made again: its tiles worked out
+    /// again (MapTiles.Place), and sent to every player on the map who holds a tile it is now in and has
+    /// not got it (docs/WORLD_STREAMING.md: the server streams by tile).
+    /// </summary>
+    private void Restream(string mapId, World world, Entity e, int wasId)
+    {
+        if (!_maps.TryGetTiles(mapId, out var tiles) || !tiles.Place(world, e, wasId)) return;
+        foreach (var session in _sessions.GetSessionsInMap(mapId).ToList())
+        {
+            if (session.IsTextClient || session.KnownEntities.Contains(e.Id) || !tiles.Wanted(e.Id, session.Tiles.Levels)) continue;
+            session.KnownEntities.Add(e.Id);
+            _server.SendToSession(session, EntityDefinitionFactory.From(world, e));
+        }
+    }
+
+    /// <summary>Puts a setting on a thing and keeps it; a setting that changes what the thing is (its
+    /// model) makes it again, so every client hears the new one at once.</summary>
+    private void ApplySetting(string mapId, int id, World world, Entity e, EntitySettings.Setting setting, string value)
+    {
+        setting.Set(world, e, value);
+        KeepSetting(mapId, id, world, e, setting.Field.Path, value);
+        if (setting.Remakes) Remake(mapId, id);
+        else _server.SyncAudioComponent(e.Id);
+    }
+
+    /// <summary>
+    /// Makes a thing again from its prefab where it stands, with its name and its own settings, under the
+    /// same number: what a new version of its prefab, or a new model for its sound, needs for every
+    /// client to hear it. What the map loader gave it beyond the prefab (a doorway's rooms, a door's sides,
+    /// a room's materials) is carried over, and doorways into a room made again are joined to it again.
+    /// Nothing in the overlay changes. The new entity, or Entity.Null if it could not be made.
+    /// </summary>
+    internal Entity Remake(string mapId, int id)
+    {
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return Entity.Null;
+        var authored = _maps.AuthoredEntities(mapId);
+        if (!authored.TryGetValue(id, out var e) || !world.IsAlive(e)) return Entity.Null;
+        var pose = PoseOf(world, e);
+        string prefab = PrefabOf(world, e);
+        DataOf(mapId).TryGetValue(id, out var data);
+        var o = Overlays.Get(mapId);
+        var settings = o.AdditionFor(id)?.Settings ?? o.ChangeFor(id)?.Settings;
+        PortalComponent? portal = world.Has<PortalComponent>(e) ? world.Get<PortalComponent>(e) : null;
+        DoorComponent? door = world.Has<DoorComponent>(e) ? world.Get<DoorComponent>(e) : null;
+        RegionComponent? region = world.Has<RegionComponent>(e) ? world.Get<RegionComponent>(e) : null;
+        int old = e.Id;
+
+        _maps.DestroyEntity(mapId, e);
+        _server.BroadcastRemoval(mapId, old);
+        Entity made;
+        try { made = _maps.SpawnPrefab(mapId, prefab, pose.Position, pose.Rotation, pose.Scale, data?.Name); }
+        catch (Exception) { made = Entity.Null; }
+        if (made == Entity.Null) { authored.Remove(id); return Entity.Null; }
+
+        if (portal is { } p)
+        {
+            if (world.Has<PortalComponent>(made)) world.Get<PortalComponent>(made) = p;
+            else world.Add(made, p);
+        }
+        if (door is { } d && world.Has<DoorComponent>(made))
+        {
+            ref var nd = ref world.Get<DoorComponent>(made);
+            nd.KeyedSide = d.KeyedSide;
+            nd.PushSide = d.PushSide;
+        }
+        if (region is { } r && world.Has<RegionComponent>(made))
+        {
+            ref var nr = ref world.Get<RegionComponent>(made);
+            nr.Materials = r.Materials;
+            nr.IsIndoor = r.IsIndoor;
+            if (!string.IsNullOrEmpty(r.FriendlyName)) nr.FriendlyName = r.FriendlyName;
+            // The doorways into the room it was: into the room it is now.
+            var relinked = new List<int>();
+            world.Query(new QueryDescription().WithAll<PortalComponent>(), (Entity pe, ref PortalComponent pc) =>
+            {
+                bool changed = false;
+                if (pc.RegionAId == old) { pc.RegionAId = made.Id; changed = true; }
+                if (pc.RegionBId == old) { pc.RegionBId = made.Id; changed = true; }
+                if (changed) relinked.Add(pe.Id);
+            });
+            foreach (int pid in relinked) _server.SyncAudioComponent(pid);
+        }
+        if (settings != null)
+            foreach (var (path, value) in settings) EntitySettings.TrySet(world, made, path, value, out _);
+        authored[id] = made;
+        Restream(mapId, world, made, old);
+        return made;
+    }
+
+    /// <summary>Every thing made from a prefab, on every loaded map, made again: a new version of it is in use.</summary>
+    private int RemakeAll(string prefabId)
+    {
+        int n = 0;
+        foreach (var (mapId, entry) in _maps.GetAllMaps().ToList())
+            foreach (var (id, e) in _maps.AuthoredEntities(mapId).ToList())
+                if (entry.world.IsAlive(e) && prefabId.Equals(PrefabOf(entry.world, e), StringComparison.OrdinalIgnoreCase)
+                    && Remake(mapId, id) != Entity.Null) n++;
+        return n;
     }
 
     private static float Ratio(float size, float from, float to) => MathF.Abs(from) > 1e-6f ? size / from * to : size;
@@ -571,7 +736,7 @@ public sealed partial class WorldEditor
     {
         if (!TryBody(s, reply, out _, out _, out float yaw)) return;
         if (!TrySelected(s, reply, out var world, out var e, out int id)) return;
-        if (Full(s, out string full)) { Say(reply, full); return; }
+        if (Full(s, 1, out string full)) { Say(reply, full); return; }
         var source = Take(s.CurrentMapId, world, e, id);
         var dir = Compass4[Quarter(yaw)];
         var (lo, hi) = Box(world, e);
@@ -605,37 +770,15 @@ public sealed partial class WorldEditor
         if (!s.IsTextClient) SendMenu(s, "root", reply, refresh: true);
     }
 
-    private void Place(UserSession s, string[] args, Action<IMessage> reply)
-    {
-        if (args.Length == 0) { Say(reply, "Say /edit place PREFAB. /edit prefabs lists them."); return; }
-        if (!TryBody(s, reply, out var world, out var feet, out float yaw)) return;
-        string prefab = args[0].ToLowerInvariant();
-        if (!_maps.Prefabs.TryGetValue(prefab, out var t)) { Say(reply, $"There is no prefab called {args[0]}. /edit prefabs lists them."); return; }
-        if (!MayPlace(s, t, out string refusal) || Full(s, out refusal)) { Say(reply, refusal); return; }
-        var size = t.ColliderSize ?? Vector3.Zero;
-        bool solid = t.ColliderSize.HasValue && (t.IsSolid ?? true);
-        var pose = InFront(feet, yaw, size, solid, new Pose(feet, Quaternion.Identity, Vector3.One));
-        var o = Overlays.Get(s.CurrentMapId);
-        int id = o.NextId++;
-        var data = new EntityData { EntityId = id, PrefabId = t.Id, Position = pose.Position, Rotation = pose.Rotation, Scale = Vector3.One };
-        var thing = new Snapshot(id, data, null, Added: true, Change: null, Was: pose.Position);
-        if (!Restore(s.CurrentMapId, thing, out string why)) { o.NextId--; Say(reply, $"Not placed: {why}"); return; }
-        Push(s, new PlaceOp(s.CurrentMapId, thing, "placed", t.Name));
-        HandOf(s).Selected = id;
-        string where = solid ? $"{Metres(PhysicsConstants.PlayerRadius + size.Z * 0.5f + 0.1f)} in front of you" : "at your feet";
-        Say(reply, $"Placed {t.Name} {where}, facing {Compass4Names[Quarter(yaw)]}. It is selected.");
-        Notify(s, $"{s.Username} placed {t.Name}.");
-        Refresh(s, reply);
-    }
-
     /// <summary>How many things an owner or a named editor may place on a map with the editor. Staff are not
     /// held to it: a city is theirs to build.</summary>
     public const int MaxPlacedByOwners = 5000;
 
-    private bool Full(UserSession s, out string refusal)
+    /// <summary>Whether placing <paramref name="adding"/> more would take an owner's map past the cap.</summary>
+    private bool Full(UserSession s, int adding, out string refusal)
     {
         refusal = "";
-        if (s.Can(Permissions.Edit) || Overlays.Get(s.CurrentMapId).Added.Count < MaxPlacedByOwners) return false;
+        if (s.Can(Permissions.Edit) || Overlays.Get(s.CurrentMapId).Added.Count + adding <= MaxPlacedByOwners) return false;
         refusal = $"This map has {MaxPlacedByOwners} things placed with the editor, the most a player's map may have.";
         return true;
     }
@@ -692,9 +835,12 @@ public sealed partial class WorldEditor
             return;
         }
 
-        setting.Set(world, e, value);
-        KeepSetting(s.CurrentMapId, id, world, e, field.Path, value);
-        _server.SyncAudioComponent(e.Id);
+        if (setting.Refuse?.Invoke(world, e, value) is { } refusal) { Say(reply, refusal); return; }
+        if (setting.Field.Path == EntitySettings.ModelPath && world.Has<SoundEmitterComponent>(e)
+            && ModelKinds.TryModelOfSound(world.Get<SoundEmitterComponent>(e).SoundId, out var modelKind, out _)
+            && Models.IsRetired(modelKind, value))
+        { Say(reply, $"The {ModelKinds.Spoken(modelKind)} {value} is retired, so it is not offered for new things."); return; }
+        ApplySetting(s.CurrentMapId, id, world, e, setting, value);
         Push(s, new SetOp(s.CurrentMapId, id, name, field.Path, field.Label, before, value));
         Say(reply, $"{Capital(field.Label)}, {field.Say(value)}.");
         Notify(s, $"{s.Username} set the {field.Label} of {name}.");

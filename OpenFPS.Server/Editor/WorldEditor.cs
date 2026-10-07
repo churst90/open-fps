@@ -48,6 +48,13 @@ public sealed partial class WorldEditor
         public int? Selected;
         public float Step = DefaultStep;
         public string LastMenu = "root";
+        /// <summary>Things held together, for a group (phase 2).</summary>
+        public readonly List<int> Held = new();
+        /// <summary>What choosing a prefab from Place does.</summary>
+        public PlaceMode Mode = PlaceMode.Feet;
+        /// <summary>The last prefab placed, for /edit again, and whether it went to the build cursor.</summary>
+        public string? LastPlaced;
+        public bool LastAtCursor;
     }
 
     private readonly Dictionary<string, Hand> _hands = new(StringComparer.OrdinalIgnoreCase);
@@ -62,6 +69,7 @@ public sealed partial class WorldEditor
         {
             h.MapId = s.CurrentMapId;
             h.Selected = null;
+            h.Held.Clear();
             h.LastMenu = "root";
         }
         return h;
@@ -86,11 +94,13 @@ public sealed partial class WorldEditor
     // ── The commands ────────────────────────────────────────────────────────────────────────────
 
     public const string Usage =
-        "Usage: /edit on its own opens the menu. /edit select nearest|within METRES|NAME|#ID, /edit selected, "
-        + "/edit move EAST NORTH UP, /edit nudge DIRECTION [METRES], /edit turn DEGREES, /edit face DIRECTION, /edit bring, "
-        + "/edit duplicate, /edit delete, /edit set FIELD VALUE, /edit up FIELD, /edit down FIELD, /edit settings, "
-        + "/edit place PREFAB, /edit prefabs [CATEGORY], /edit spawn here, /edit step METRES, /edit info, "
-        + "/edit model show|set|up|down|versions KIND ID [FIELD] [VALUE], /edit undo, /edit redo.";
+        "Usage: /edit on its own opens the menu. /edit select nearest|within METRES|NAME|#ID, /edit select add nearest|NAME|#ID, "
+        + "/edit select clear, /edit selected, /edit move EAST NORTH UP, /edit nudge DIRECTION [METRES], /edit turn DEGREES, "
+        + "/edit face DIRECTION, /edit bring, /edit duplicate, /edit row COUNT [SPACING], /edit delete, /edit set FIELD VALUE, "
+        + "/edit up FIELD, /edit down FIELD, /edit settings, /edit place PREFAB [at cursor], /edit place group ID, /edit again, "
+        + "/edit find WORDS, /edit preview PREFAB, /edit prefabs [CATEGORY], /edit group NAME, /edit spawn here, /edit step METRES, "
+        + "/edit info, /edit map settings, /edit map set weather|time|ground|beacon CATEGORY VALUE, "
+        + "/edit model show|set|up|down|versions|where|use|pin|unpin|new|copy|replace|retire|restore|remove KIND ID ..., /edit undo, /edit redo.";
 
     /// <summary>Everything /edit does. The caller has checked the player may edit here.</summary>
     public void Handle(UserSession s, string[] args, Action<IMessage> reply)
@@ -108,7 +118,31 @@ public sealed partial class WorldEditor
                 if (rest.Length == 0 || !rest[0].Equals("here", StringComparison.OrdinalIgnoreCase)) { Say(reply, "Say /edit spawn here."); return; }
                 SpawnHere(s, reply);
                 return;
-            case "select": Select(s, rest, reply); return;
+            case "select":
+                if (rest.Length > 0 && rest[0].ToLowerInvariant() is "add" or "clear" or "hold")
+                {
+                    Hold(s, rest[0].Equals("clear", StringComparison.OrdinalIgnoreCase) ? new[] { "clear" } : rest[1..], reply);
+                    return;
+                }
+                Select(s, rest, reply);
+                return;
+            case "hold": Hold(s, rest, reply); return;
+            case "row": Row(s, rest, reply); return;
+            case "again": Again(s, reply); return;
+            case "find":
+            case "search":
+                if (rest.Length == 0) { Say(reply, "Say /edit find WORDS: prefabs whose name has every word."); return; }
+                if (s.IsTextClient)
+                {
+                    var found = Find(s, string.Join(" ", rest));
+                    Say(reply, found.Count == 0 ? $"Nothing is called {string.Join(" ", rest)}."
+                        : $"Found {found.Count}: " + string.Join("; ", found.Select(t => $"{t.Id}, {t.Name}")) + ". /edit place PREFAB puts one down.");
+                }
+                else SendMenu(s, "find:" + string.Join(" ", rest), reply, refresh: false);
+                return;
+            case "preview": Preview(s, rest, reply); return;
+            case "group": MakeGroup(s, rest, reply); return;
+            case "map": MapCommand(s, rest, reply); return;
             case "selected":
                 if (TrySelected(s, reply, out var w, out var e, out int id)) Say(reply, Summary(s, w, e, id));
                 return;
@@ -126,7 +160,7 @@ public sealed partial class WorldEditor
             case "down": SetField(s, rest, reply, -1); return;
             case "settings":
             case "fields": SaySettings(s, reply); return;
-            case "place": Place(s, rest, reply); return;
+            case "place": PlaceCommand(s, rest, reply); return;
             case "prefabs": SayPrefabs(s, rest, reply); return;
             case "step": SetStep(s, rest, reply); return;
             case "model": ModelCommand(s, rest, reply); return;

@@ -356,10 +356,13 @@ public class GameServer
         // cars, a composite made drivable, and /drivable all resolve through the registry.
         OpenFPS.Common.MachineRegistry.EnsureLoaded();
         OpenFPS.Common.ModelLibrary.EnsureLoaded();
-        // The world editor's changed models, over the library, before anything asks what a model is.
-        Models = new OpenFPS.Server.Editor.ModelStore("model_versions");
-        Models.LoadAll();
         var prefabRepo = new PrefabRepository("prefabs");
+        // The world editor's changed models, over the library and the prefabs, before anything asks what
+        // a model is or a map is built from them. Prefabs and groups are kinds of the server's own.
+        Models = new OpenFPS.Server.Editor.ModelStore("model_versions");
+        Models.Catalog.Add(new OpenFPS.Server.Editor.PrefabKind(prefabRepo));
+        Models.Catalog.Add(new OpenFPS.Server.Editor.GroupKind(Models, prefabRepo));
+        Models.LoadAll();
         _mapRepo = new MapRepository("maps");
         // Who owns each map, whether it is public and who is invited: beside teams.json, and laid over
         // each map's own file as it loads (MapAccessRepository). The world editor's edits are laid over
@@ -419,7 +422,7 @@ public class GameServer
         combat.Weather = mapId =>
         {
             var state = _environment.GetStateForMap(_maps.TryGetMapData(mapId, out var m)
-                ? new MapAtmosphere(m.Temperature, m.Humidity, m.AirPressure, m.AirAbsorptionMultiplier)
+                ? MapAtmosphere.Of(m)
                 : MapAtmosphere.Default);
             return (state.Temperature, state.AirPressure, state.WindVelocity, state.WindGustiness);
         };
@@ -821,7 +824,7 @@ public class GameServer
                     stage = PerfProbe.Measure("server.traffic");
                     // The water on the roads first: traffic reads it under every wheel.
                     var roadWeather = _environment.GetStateForMap(_maps.TryGetMapData(entry.Key, out var waterMap)
-                        ? new MapAtmosphere(waterMap.Temperature, waterMap.Humidity, waterMap.AirPressure, waterMap.AirAbsorptionMultiplier)
+                        ? MapAtmosphere.Of(waterMap)
                         : MapAtmosphere.Default);
                     RoadWaterSystem.Update(entry.Key, roadWeather, _environment.RainRate(roadWeather),
                                            _maps.TryGetRoads(entry.Key, out var waterRoads) ? waterRoads : null, dt);
@@ -830,7 +833,7 @@ public class GameServer
                     if (_characters.Count > 0)
                     {
                         var day = _environment.GetStateForMap(_maps.TryGetMapData(entry.Key, out var dayMap)
-                            ? new MapAtmosphere(dayMap.Temperature, dayMap.Humidity, dayMap.AirPressure, dayMap.AirAbsorptionMultiplier)
+                            ? MapAtmosphere.Of(dayMap)
                             : MapAtmosphere.Default);
                         _characters.Update(entry.Key, world, grid, dt, day, _environment.CurrentScenario);
                     }
@@ -845,7 +848,7 @@ public class GameServer
                     stage = PerfProbe.Measure("server.speech+crowd");
                     // People in the street saying things to whoever they pass.
                     var weather = _environment.GetStateForMap(_maps.TryGetMapData(entry.Key, out var speechMap)
-                        ? new MapAtmosphere(speechMap.Temperature, speechMap.Humidity, speechMap.AirPressure, speechMap.AirAbsorptionMultiplier)
+                        ? MapAtmosphere.Of(speechMap)
                         : MapAtmosphere.Default);
                     _speech.Update(entry.Key, world, AudioClock.Now,
                                    SpeechConditions.From(weather, _environment.CurrentScenario),
@@ -1151,7 +1154,9 @@ public class GameServer
         }
 
         // The models changed in the world editor, before anything on the map is heard with them.
-        foreach (var model in Models.Updates()) SendToSession(session, model);
+        // At the versions this map uses: its pins, else the current ones. Every changed model is sent, so
+        // one pinned on the map just left is put back to what this map uses.
+        foreach (var model in Models.UpdatesFor(_maps.Overlays?.Get(mapId).Pins)) SendToSession(session, model);
 
         int staticCount = 0;
         bool streamed = _maps.TryGetTiles(mapId, out var tiles);
@@ -2166,7 +2171,7 @@ public class GameServer
             if (!perMap.TryGetValue(session.CurrentMapId, out var update))
             {
                 var atmosphere = _maps.TryGetMapData(session.CurrentMapId, out var mapData)
-                    ? new MapAtmosphere(mapData.Temperature, mapData.Humidity, mapData.AirPressure, mapData.AirAbsorptionMultiplier)
+                    ? MapAtmosphere.Of(mapData)
                     : MapAtmosphere.Default;
 
                 var state = _environment.GetStateForMap(atmosphere);

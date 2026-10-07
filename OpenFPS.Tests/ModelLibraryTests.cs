@@ -53,6 +53,8 @@ public class ModelLibraryTests : IDisposable
                     ModelLibrary.Kinds.Foliage => ModelLibrary.Foliage(id),
                     ModelLibrary.Kinds.Flow => ModelLibrary.Flow(id),
                     ModelLibrary.Kinds.Shore => ModelLibrary.Shore(id),
+                    ModelLibrary.Kinds.Engine => ModelLibrary.Get<EngineProfile>(kind, id),
+                    ModelLibrary.Kinds.Vehicle => ModelLibrary.Get<VehicleSpec>(kind, id),
                     _ => throw new InvalidOperationException($"no accessor for kind '{kind}'"),
                 };
                 bool ok = ModelLibrary.RoundTrips(kind, spec, out string before, out string after);
@@ -67,7 +69,9 @@ public class ModelLibraryTests : IDisposable
                 // The text agreeing is not enough: a field the writer skips is missing from both
                 // sides of it. What the model READ BACK reports must be what the library's does,
                 // every property, the ones worked out from the others included.
-                var back = JsonSerializer.Deserialize(before, spec.GetType())!;
+                // An engine's "worked out from the rest" is NaN, which JSON writes as a named literal.
+                var back = JsonSerializer.Deserialize(before, spec.GetType(),
+                    new JsonSerializerOptions { NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals })!;
                 var lost = Readings(spec).Except(Readings(back)).ToList();
                 foreach (var l in lost) _o.WriteLine($"{kind}:{id} lost {l}");
                 Assert.True(lost.Count == 0, $"{kind}:{id} read back differently: {string.Join("; ", lost.Take(4))}");

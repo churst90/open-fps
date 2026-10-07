@@ -497,7 +497,9 @@ public class MapManager
             // origin: the speedway's bounds are not centred on 0, nor the city's, and a foundation
             // centred on 0 left a strip along one edge with no floor — walk into it and you fell.
             Vector3 centre = (m.MinBound + m.MaxBound) * 0.5f;
-            var foundation = _prefabRepo.Spawn(world, NaturalGroundPrefab, new Vector3(centre.X, -0.05f, centre.Z), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
+            // The map's own choice of natural ground (world editor map settings), where the server has it.
+            string ground = m.GroundPrefab is { } g && _prefabRepo.Prefabs.ContainsKey(g.ToLowerInvariant()) ? g : NaturalGroundPrefab;
+            var foundation = _prefabRepo.Spawn(world, ground, new Vector3(centre.X, -0.05f, centre.Z), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
             // It is the ground, and is called so: a round that ends in it was "Hit Concrete Floor at 9
             // metres", out on the city's open grass.
             if (world.Has<IdentityComponent>(foundation)) world.Get<IdentityComponent>(foundation).Name = "Ground";
@@ -801,6 +803,8 @@ public class MapManager
     /// </summary>
     /// <summary>The prefabs this server knows, by id.</summary>
     public IReadOnlyDictionary<string, OpenFPS.Server.Repositories.PrefabTemplate> Prefabs => _prefabRepo.Prefabs;
+    /// <summary>The prefab library itself: the world editor puts new versions of prefabs in it.</summary>
+    public OpenFPS.Server.Repositories.PrefabRepository PrefabRepository => _prefabRepo;
 
     /// <summary>A prefab made into a live entity on a map, through <see cref="SpawnEntity"/>.</summary>
     public Entity SpawnPrefab(string mapId, string prefabId, Vector3 position)

@@ -84,6 +84,9 @@ public static class ModelLibrary
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
         // An engine says "derived" with NaN (RevolutionsBeforeFiring); JSON has no NaN of its own.
         NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
+        // A Vector3 keeps its numbers in fields, which the serializer does not write: an engine's
+        // tailpipe exits came back as the origin.
+        Converters = { new OpenFPS.Common.Networking.Vector3Converter() },
     };
 
     private static volatile Dictionary<string, object> _authored = new(StringComparer.OrdinalIgnoreCase);
