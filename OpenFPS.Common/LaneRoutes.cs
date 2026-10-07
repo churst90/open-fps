@@ -47,7 +47,7 @@ public static class LaneRoutes
         for (int i = 1; i <= via.Count; i++)
         {
             var target = via[i % via.Count];
-            var path = Shortest(net, from, s => s.To == target);
+            var path = Shortest(from, s => s.To == target);
             if (path == null) return null;
             legs.AddRange(path);
             from = path[^1].Next.Select(n => n.Next);
@@ -55,7 +55,7 @@ public static class LaneRoutes
         // Close it: from the last leg into the first, which must be one of its next lanes.
         if (!legs[^1].Next.Any(n => n.Next == legs[0]))
         {
-            var bridge = Shortest(net, legs[^1].Next.Select(n => n.Next), s => s.Next.Any(n => n.Next == legs[0]));
+            var bridge = Shortest(legs[^1].Next.Select(n => n.Next), s => s.Next.Any(n => n.Next == legs[0]));
             if (bridge == null) return null;
             legs.AddRange(bridge);
         }
@@ -137,7 +137,7 @@ public static class LaneRoutes
 
     /// <summary>Shortest chain of lanes, by length, from any of <paramref name="starts"/> to one that
     /// satisfies <paramref name="done"/>, both included.</summary>
-    private static List<RoadNetwork.LaneSegment>? Shortest(RoadNetwork net, IEnumerable<RoadNetwork.LaneSegment> starts,
+    private static List<RoadNetwork.LaneSegment>? Shortest(IEnumerable<RoadNetwork.LaneSegment> starts,
                                                           Func<RoadNetwork.LaneSegment, bool> done)
     {
         var dist = new Dictionary<int, float>();

@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace OpenFPS.Common;
 
 public struct MaterialProperties

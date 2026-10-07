@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace OpenFPS.Common;
@@ -350,7 +349,6 @@ internal static class DoorPhysics
     internal static double SmallPlateGain(double area, double volumeShare) => Rho0 / (2 * Math.PI) * area * volumeShare;
 
     internal static double MinJerk(double u) => u * u * u * (10 - 15 * u + 6 * u * u);
-    internal static double MinJerkRate(double u) => 30 * u * u * (1 - u) * (1 - u);
 
     internal static (double P, double V) Hermite(double u, double p0, double v0, double p1, double v1)
     {

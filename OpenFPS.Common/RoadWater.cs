@@ -459,7 +459,6 @@ public sealed class PuddleField
     }
 
     public IReadOnlyList<Puddle> PuddlesOn(int road) => road >= 0 && road < _puddles.Length ? _puddles[road] : Array.Empty<Puddle>();
-    public int RoadCount => _roads.Count;
 
     private List<Puddle> Draw(int r, float length)
     {

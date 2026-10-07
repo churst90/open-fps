@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Common;
 
 /// <summary>How hard it is raining, by the usual classes of rain rate.</summary>
@@ -85,23 +83,6 @@ public static class Rainfall
         if (rate <= DrizzleRate) return DrizzleIntensity * rate / DrizzleRate;
         float k = MathF.Log(FullIntensityRate / DrizzleRate) / (1f - DrizzleIntensity);
         return MathF.Min(1f, DrizzleIntensity + MathF.Log(rate / DrizzleRate) / k);
-    }
-
-    /// <summary>A rate by its class's word (light, moderate, heavy, violent), or a number of mm/h.</summary>
-    public static bool TryParseRate(string word, out float rate)
-    {
-        rate = word.ToLowerInvariant() switch
-        {
-            "light" or "drizzle" => LightRate,
-            "moderate" => ModerateRate,
-            "heavy" => HeavyRate,
-            "violent" or "torrential" => ViolentRate,
-            _ => float.NaN,
-        };
-        if (!float.IsNaN(rate)) return true;
-        string n = word.ToLowerInvariant().Replace("mm/h", "").Replace("mm", "");
-        return float.TryParse(n, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out rate)
-               && float.IsFinite(rate) && rate > 0f && rate <= FullIntensityRate;
     }
 
     /// <summary>The class's word, for saying.</summary>

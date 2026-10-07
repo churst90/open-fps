@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -310,21 +309,14 @@ public static class CarWindow
     private readonly record struct Character(double ChannelN, double ChannelMuS, double ChannelMuK,
         double LipN, double LipMuS, double LipMuK, double ToothM, double BarStepM);
 
-    /// <summary>
-    /// Every window is the old one now: Cody, 2026-10-04, of the four characters rendered on 10-03,
-    /// "the car window v3 sounds the best, use that". The variant still seeds the random detail (Sim's
-    /// rng), so two windows rolling together are two windows and never one sound copied to two places.
-    /// The other three are kept here for the record: new, standard, worn.
-    /// </summary>
-    private static Character Of(int variant) => Old;
-
+    /// <summary>Every window has the old window's character: Cody, 2026-10-04, "the car window v3 sounds
+    /// the best, use that" (the other three are in docs/COMMON_NOTES.md). The variant still seeds the
+    /// random detail, so two windows rolling together are never one sound copied to two places.</summary>
     private static readonly Character Old = new(65, 0.62, 0.48, 5.0, 1.00, 0.62, 18e-6, 8e-6);
-    // Not used since 2026-10-04: new (45, 0.42, 0.36, 3.0, 0.40, 0.36, 6e-6, 3e-6), standard (50, 0.48,
-    // 0.40, 3.5, 0.50, 0.42, 9e-6, 4e-6), worn (55, 0.55, 0.44, 4.5, 0.85, 0.55, 12e-6, 5e-6).
 
     private sealed class Sim
     {
-        private readonly int sampleRate, rate;
+        private readonly int rate;
         private readonly double dt;
         private readonly bool quiet;
         private readonly Report? report;
@@ -364,15 +356,15 @@ public static class CarWindow
         private readonly HighPass? carrierHigh;
         private readonly double[] toothError = new double[(int)Ratio];
         private readonly double[] profilePhase = new double[8];
-        private double meshTurns, lastBar, brushLeft, brushPeak, trimLow, flock, cableForce;
+        private double meshTurns, lastBar, brushLeft, brushPeak, trimLow, flock;
         private double peakGlass, peakDoor, peakMotor;
 
         public Sim(int variant, int sampleRate, Report? report, bool quiet)
         {
-            this.sampleRate = sampleRate; this.report = report; this.quiet = quiet;
+            this.report = report; this.quiet = quiet;
             rate = sampleRate * Over; dt = 1.0 / rate;
             rng = new Random(1 + ((variant % Variants) + Variants) % Variants);
-            ch = Of(variant);
+            ch = Old;
             glassKg = PaneW * PaneH * PaneT * GlassRho + CarrierKg;
             wFree = (Volts - Ohms * BrushDragNm / MotorK) / MotorK;
 
@@ -544,7 +536,6 @@ public static class CarWindow
             double drumRate = w / Ratio * DrumR;
             double cableC = 2 * CableZeta * Math.Sqrt(CableK * glassKg);
             double cable = CableK * (drum - x) + cableC * (drumRate - v);
-            cableForce = cable;
 
             // ── The rotor, through a self-locking worm ──
             // What the cable asks of the drum, seen at the worm: divided by the ratio and the efficiency when

@@ -78,7 +78,7 @@ public static class HeardLevelsSpike
         if (KnobDoor.TryParseKey(key, out bool closing, out var kd, out float swing, out var how))
             return closing ? KnobDoor.RenderGameClose(kd, rate, how) : KnobDoor.RenderOpen(kd, rate, swing);
         if (PushBarDoor.TryParseKey(key, out closing, out var pd, out swing))
-            return closing ? PushBarDoor.RenderClose(pd, rate, swing) : PushBarDoor.RenderOpen(pd, rate, swing);
+            return closing ? PushBarDoor.RenderClose(pd, rate) : PushBarDoor.RenderOpen(pd, rate, swing);
         if (SlidingDoor.TryParseKey(key, out closing, out var sd, out swing))
             return closing ? SlidingDoor.RenderClose(sd, rate, swing) : SlidingDoor.RenderOpen(sd, rate, swing);
         throw new ArgumentException(key);

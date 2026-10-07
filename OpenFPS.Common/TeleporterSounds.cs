@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using static OpenFPS.Common.DesignedSoundKit;
 
@@ -39,9 +38,6 @@ public static class TeleporterSounds
         kind = key[Prefix.Length..];
         return kind is Charge or Leave or Arrive or Ready;
     }
-
-    /// <summary>The volume of air that moves, litres: a person.</summary>
-    public const float BodyLitres = 75f;
 
     /// <summary>How long the charge takes, seconds.</summary>
     public const float ChargeSeconds = 2f;

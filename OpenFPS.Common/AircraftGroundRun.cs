@@ -180,7 +180,6 @@ public sealed class AircraftGroundRun
         return Vector3.Lerp(_path[i - 1], _path[i], Math.Clamp(f, 0f, 1f));
     }
 
-    /// <summary>How far along the ground path, metres, and how long it is.</summary>
+    /// <summary>How far along the ground path, metres.</summary>
     public float Along => _s;
-    public float TotalMetres => _end;
 }

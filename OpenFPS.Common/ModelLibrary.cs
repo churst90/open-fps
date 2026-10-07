@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -254,10 +253,6 @@ public static class ModelLibrary
     /// <summary>Whether a model of this kind and name has been put in from data (a file, a map, the world
     /// editor) rather than being only the built-in.</summary>
     public static bool IsAuthored(string kind, string id) => !string.IsNullOrEmpty(id) && _authored.ContainsKey(Key(kind, id));
-
-    /// <summary>Whether a model of this kind and name ships in C#.</summary>
-    public static bool IsBuiltIn(string kind, string id)
-        => !string.IsNullOrEmpty(id) && BuiltIn.TryGetValue(kind, out var lib) && lib.ContainsKey(id);
 
     /// <summary>The built-in model of this kind and name, as it ships (never an authored one), or null.</summary>
     public static object? BuiltInModel(string kind, string id)

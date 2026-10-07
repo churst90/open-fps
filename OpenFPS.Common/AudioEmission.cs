@@ -1,6 +1,4 @@
-using System;
 using System.Numerics;
-using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Common;

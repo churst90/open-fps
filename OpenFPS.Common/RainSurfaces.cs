@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Common;
 
 /// <summary>What a drop does when it lands on something: the five kinds of surface rain sounds
@@ -449,13 +447,6 @@ public readonly record struct RainPlate
         return f * f * BlowSeconds(diameterMm, speed) * BlowShapeEnergy;
     }
 
-    /// <summary>The energy one blow puts into the plate between two frequencies, J.</summary>
-    public float EnergyIn(float diameterMm, float speed, float loHz, float hiHz)
-        => Mobility * BlowEnergy(diameterMm, speed) * BlowShare(BlowSeconds(diameterMm, speed), loHz, hiHz);
-
-    /// <summary>The near-field thud's peak at r from the struck spot, Pa: ρ0 F / (2π m″ r).</summary>
-    public float ForcedPeak(float diameterMm, float speed, float r)
-        => WallTransmission.AirDensity * PeakForce(diameterMm, speed) / (2f * MathF.PI * SurfaceDensity * MathF.Max(0.05f, r));
 
     /// <summary>
     /// The steady mean-square pressure, Pa², that rain at this rate makes on one face of a large

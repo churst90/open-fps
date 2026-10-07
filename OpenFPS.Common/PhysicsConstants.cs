@@ -83,7 +83,6 @@ public static class PhysicsConstants
     /// <summary>How far E reaches for something on the ground, metres: an arm and a step. The client
     /// chooses which thing within it (PickUp); the server counts what is left within it.</summary>
     public const float PickUpReach = 2.0f;
-    public const float EarshotRange = 200.0f;
     public const float CollisionSearchRadius = 5.0f;
 
     // --- Simulation Timing ---

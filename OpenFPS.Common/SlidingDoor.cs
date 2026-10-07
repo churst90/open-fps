@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -113,7 +112,7 @@ public static class SlidingDoor
     public static float[] RenderOpen(Door door, int sampleRate, double travelSeconds = 1.4, Report? report = null)
     {
         var sim = new Sim(door, sampleRate, report);
-        if (door.Kind == Kind.Patio) sim.ScriptPatio(true, travelSeconds); else sim.ScriptAutomatic(true, travelSeconds);
+        if (door.Kind == Kind.Patio) sim.ScriptPatio(true, travelSeconds); else sim.ScriptAutomatic(true);
         return sim.Output();
     }
 
@@ -122,7 +121,7 @@ public static class SlidingDoor
     public static float[] RenderClose(Door door, int sampleRate, double travelSeconds = 1.4, Report? report = null)
     {
         var sim = new Sim(door, sampleRate, report);
-        if (door.Kind == Kind.Patio) sim.ScriptPatio(false, travelSeconds); else sim.ScriptAutomatic(false, travelSeconds);
+        if (door.Kind == Kind.Patio) sim.ScriptPatio(false, travelSeconds); else sim.ScriptAutomatic(false);
         return sim.Output();
     }
 
@@ -642,7 +641,7 @@ public static class SlidingDoor
         private readonly SmallRadiator escutcheonSound;
         private readonly double[] handleHit;
         // Drive (automatic).
-        private double motorA, motorX, motorU, beltPhase, meshPhase, motorPhase;
+        private double motorA, motorX, motorU, meshPhase, motorPhase;
         private readonly Mount drive;
         private readonly double[] toothError = new double[(int)(GearRatio * WormStarts)];
         private readonly double[] profilePhase = new double[10];
@@ -875,7 +874,7 @@ public static class SlidingDoor
 
         /// <summary>The height the wheel's contact meets: the rail's roughness under it, or a grain's top as
         /// the wheel's curve meets it, whichever is higher; and the wheel's own roughness where it touches.</summary>
-        private double Surface(int i) => Rail(x + arm[i], i, out _) + WheelAt(i);
+        private double Surface(int i) => Rail(x + arm[i], out _) + WheelAt(i);
 
         private double WheelAt(int i)
         {
@@ -895,7 +894,7 @@ public static class SlidingDoor
         private static double Smooth(double p0, double p1, double p2, double p3, double t)
             => p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
 
-        private double Rail(double at, int wheel, out Grain? on)
+        private double Rail(double at, out Grain? on)
         {
             on = null;
             double f = (at + 0.1) / railStep;
@@ -1019,7 +1018,7 @@ public static class SlidingDoor
             }
         }
 
-        public void ScriptAutomatic(bool opening, double travelSeconds)
+        public void ScriptAutomatic(bool opening)
         {
             // The controller: the lock lifted, then a run at its speed with a check zone into the end. The
             // motor follows its profile; the belt carries the leaf after it. Shutting, the lock drops a
@@ -1124,7 +1123,7 @@ public static class SlidingDoor
             for (int i = 0; i < Wheels; i++)
             {
                 double at = x + arm[i];
-                double rail = Rail(at, i, out var grain);
+                double rail = Rail(at, out var grain);
                 double h = rail + WheelAt(i) - trackPort[i].X;
                 double hRate = (h + trackPort[i].X - lastH[i]) / dt;
                 lastH[i] = h + trackPort[i].X;
@@ -1174,7 +1173,7 @@ public static class SlidingDoor
                 double glassDrive = glassPort[i].Step(gasket + GasketK * glassPort[i].X, dt, out _);
                 glassField.Modes.Push(glassHit[i], glassDrive);
                 // Rolling resistance, and a grain's slope pushing back.
-                double slope = (Rail(at + 1e-4, i, out _) - rail) / 1e-4;
+                double slope = (Rail(at + 1e-4, out _) - rail) / 1e-4;
                 sideForce -= ch.Roll * f * Math.Tanh(u / 0.002) + f * slope;
             }
             foreach (var g in grit)
@@ -1287,7 +1286,6 @@ public static class SlidingDoor
             {
                 double pulleyRev = motorU / (Math.PI * PulleyD);
                 double motorRev = pulleyRev * GearRatio;
-                beltPhase += motorU / BeltPitch * dt;
                 meshPhase += motorRev * WormStarts * dt;             // a tooth of the wheel for each start, each turn
                 motorPhase += motorRev * MotorSlots * dt;
                 // The worm's transmission error: its tooth shape, and each tooth's own error blended across the

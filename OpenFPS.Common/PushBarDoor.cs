@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -65,25 +64,24 @@ public static class PushBarDoor
 
     /// <summary>
     /// Each character: how far its silencers stand proud of the stop, how hard the pad's plastic sides strike
-    /// its guide rails (Hertz stiffness, N/m^1.5: new and resilient up to old and brittle), how much of a
-    /// metal blow comes back. (Round 8 of 2026-10-04 put the pad's landings on its steel lever tabs; the
+    /// its guide rails (Hertz stiffness, N/m^1.5: new and resilient up to old and brittle). (Round 8 of 2026-10-04 put the pad's landings on its steel lever tabs; the
     /// plastic is now only what knocks on the rails.)
     /// Round 1 put every bar on soft urethane and Cody heard no push at all; bare metal on every one rang
     /// the case's walls at 134 dBA. A new device, nylon; a standard one, acetal; a worn one with its
     /// silencers half gone and its slider worn thin; an old one with no silencers and its slider worn to
     /// almost nothing (bare metal rang the case at 134 dBA: even old devices keep a slider).
     /// </summary>
-    /// The fourth figure is the closer's latch-zone speed at the latch edge, m/s. The ADA setting (0.05-0.08)
+    /// The third figure is the closer's latch-zone speed at the latch edge, m/s. The ADA setting (0.05-0.08)
     /// creeps; a fire door in use is set to shut itself firmly and comes in at 0.25-0.8, and that clunk is
     /// what Cody expects of one ("they should close on their own and clunk, not sound thin").
     /// The last two are how loose the bar is, mm: the play in the cranks between pad and drive bar, and the
     /// pad's play either side on its guide rails. Wear opens both: a new device is tight, an old one rattles.
-    private static (double SilencerMm, double Bumper, double MetalLambda, double LatchSpeed, double CrankPlayMm, double GuidePlayMm) Character(int variant) => (variant % Variants) switch
+    private static (double SilencerMm, double Bumper, double LatchSpeed, double CrankPlayMm, double GuidePlayMm) Character(int variant) => (variant % Variants) switch
     {
-        0 => (2.5, 1.5e8, 0.3, 0.25, 0.5, 0.15),
-        1 => (2.5, 2e8, 0.3, 0.35, 1.0, 0.25),
-        2 => (1.2, 3e8, 0.2, 0.5, 1.5, 0.35),
-        _ => (0.0, 8e8, 0.1, 0.8, 2.0, 0.5),
+        0 => (2.5, 1.5e8, 0.25, 0.5, 0.15),
+        1 => (2.5, 2e8, 0.35, 1.0, 0.25),
+        2 => (1.2, 3e8, 0.5, 1.5, 0.35),
+        _ => (0.0, 8e8, 0.8, 2.0, 0.5),
     };
 
     /// <summary>Opening: shove the bar, the bolt draws back, the door goes, the bar is let go at 20 degrees. With
@@ -98,11 +96,11 @@ public static class PushBarDoor
     }
 
     /// <summary>
-    /// Shutting on the closer: the last few degrees at the latch valve's speed (the whole swing would take
-    /// <paramref name="latchSwingSeconds"/>), into the latch and the silencers. It starts a few hundredths
-    /// of a second before the bolt touches, so the server sends it when the leaf arrives.
+    /// Shutting on the closer: the last few degrees at the latch valve's speed, into the latch and the
+    /// silencers. It starts a few hundredths of a second before the bolt touches, so the server sends it
+    /// when the leaf arrives.
     /// </summary>
-    public static float[] RenderClose(Door door, int sampleRate, double latchSwingSeconds = 1.4, Report? report = null)
+    public static float[] RenderClose(Door door, int sampleRate, Report? report = null)
     {
         var sim = new Sim(door, sampleRate, report);
         sim.ScriptCloserLatch();
@@ -172,7 +170,7 @@ public static class PushBarDoor
     {
         fullScaleDb = 0f;
         if (!TryParseKey(key, out bool closing, out var door, out float swing, out bool pull)) return new float[16];
-        float[] pcm = closing ? RenderClose(door, sampleRate, swing) : RenderOpen(door, sampleRate, swing, null, pull);
+        float[] pcm = closing ? RenderClose(door, sampleRate) : RenderOpen(door, sampleRate, swing, null, pull);
         return KnobDoor.PeakToFullScale(pcm, PascalsAtFullScale, out fullScaleDb);
     }
 
@@ -194,8 +192,6 @@ public static class PushBarDoor
     /// bending waves in 1.2 mm steel cover about 16 mm in the 50 us of a steel contact, so about 10 g,
     /// on the leaf through the skin's own bending, a resonance near 8 kHz.</summary>
     private const double SkinPatchMass = 0.01, SkinPatchStiffness = 2.5e7, SkinPatchTravel = 0.0001;
-    /// <summary>The skin between the edge channel and the first stiffener, and its loss: bonded steel.</summary>
-    private const double SkinPanelWidth = 0.15, SkinLoss = 0.01;
 
     // Silencers: neoprene domes 12 mm across, E about 5 MPa; three on the strike jamb.
     private static readonly double[] SilencerHeights = { 0.35, 1.05, 1.75 };
@@ -273,8 +269,6 @@ public static class PushBarDoor
     private const double LinkStiffness = 1e6, LinkDamping = 80;
     /// <summary>The case's two end brackets across the leaf, and how far across its push acts.</summary>
     private const double MountNear = 0.3, MountFar = 0.9;
-    // The case: a 0.75 m pressed steel channel between screws 0.25 m apart; the bar an aluminium extrusion.
-    private const double CaseLoss = 0.02, BarLoss = 0.01;
 
     // The frame: pressed 1.5 mm steel channel, about 2e-7 m^4, 2.9 kg/m, anchored every 0.7 m; it radiates
     // as its 0.1 m face.
@@ -309,13 +303,12 @@ public static class PushBarDoor
 
     private sealed class Sim
     {
-        private readonly Door door;
         private readonly int rate;
         private readonly double dt;
         private readonly Report? report;
         private readonly Random rng;
         private readonly double width, height, mass, inertia;
-        private readonly double silencer, bumper, metalLambda, keeperPlay, latchSpeed, crankPlay, guidePlay;
+        private readonly double silencer, bumper, keeperPlay, latchSpeed, crankPlay, guidePlay;
         private double theta, omega;
 
         private readonly Modes leaf, frame, strike, caseAir;
@@ -327,7 +320,6 @@ public static class PushBarDoor
         private double[] padSideHit = Array.Empty<double>(), railHit = Array.Empty<double>();
         private AccelerationNoise padSideNoise = null!;
         private Port padSidePort = null!;
-        private readonly SmallRadiator slotSound;
         private readonly Port padPort, casePad, caseDrive2, rimStop;
         private readonly double[] rimHit;
         private readonly HighPass[] skinHigh;
@@ -368,11 +360,11 @@ public static class PushBarDoor
 
         public Sim(Door door, int sampleRate, Report? report)
         {
-            this.door = door; this.report = report;
+            this.report = report;
             rate = sampleRate * Oversample; dt = 1.0 / rate;
             rng = new Random(door.Seed);
             width = door.Width; height = door.Height;
-            (double silencerMm, bumper, metalLambda, latchSpeed, double crankPlayMm, double guidePlayMm) = Character(door.Variant);
+            (double silencerMm, bumper, latchSpeed, double crankPlayMm, double guidePlayMm) = Character(door.Variant);
             silencer = silencerMm / 1000;
             crankPlay = crankPlayMm / 1000; guidePlay = guidePlayMm / 1000;
             // The strike is set so the bolt drops in as the silencers take the closer's push.
@@ -434,7 +426,6 @@ public static class PushBarDoor
             driveNoise = new AccelerationNoise(DriveBarMass / 7850, dt);
             boltNoise = new AccelerationNoise(BoltMass / 7850, dt);
             strikeNoise = new AccelerationNoise(StrikeMass / 7850, dt);
-            slotSound = new SmallRadiator(CaseSlotArea, dt);
             padPort = new Port(padField.PatchMass, PortStiffness, padField.Impedance);
             // The stops are tabs pressed out of the device's steel chassis: what a blow moves first is the tab.
             casePad = new Port(StopTab, PortStiffness, caseField.Impedance);
@@ -466,23 +457,6 @@ public static class PushBarDoor
             for (int i = 0; i < skinHigh.Length; i++) skinHigh[i] = new HighPass(SkinCrossoverHz, rate);
             handK = 170 * inertia;
             handC = 2 * 0.7 * Math.Sqrt(handK * inertia);
-        }
-
-        /// <summary>A bar or channel standing in the open: it radiates as its swept area only where it is
-        /// a wavelength across; below that air slips round its edges, as it does round the frame's face.</summary>
-        private static Modes BeamModes(double[] betaL, double span, double ei, double mu, double loss, double area, double dt)
-        {
-            double halfWidth = area / span / 2;
-            var hz = new double[betaL.Length]; var m = new double[betaL.Length];
-            var l = new double[betaL.Length]; var g = new double[betaL.Length];
-            for (int i = 0; i < betaL.Length; i++)
-            {
-                hz[i] = betaL[i] * betaL[i] / (2 * Math.PI * span * span) * Math.Sqrt(ei / mu);
-                m[i] = 0.4 * mu * span; l[i] = loss;
-                double ka = 2 * Math.PI * hz[i] / C0 * halfWidth;
-                g[i] = SmallPlateGain(area, 0.4 / (i + 1)) * ka / Math.Sqrt(1 + ka * ka);
-            }
-            return new Modes(hz, l, m, g, dt);
         }
 
         /// <summary>The frame channel between anchors, as a clamped beam radiating as its face.</summary>

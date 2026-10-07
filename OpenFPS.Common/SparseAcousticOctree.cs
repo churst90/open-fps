@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using MemoryPack;
 
@@ -60,7 +59,6 @@ public partial class SparseAcousticOctree
 
     private void SetRegionOBBRecursive(OctreeNode node, Vector3 nodeMin, float nodeSize, Vector3 obbCenter, Vector3 obbSize, Quaternion obbRot, int regionId)
     {
-        Vector3 nodeMax = nodeMin + new Vector3(nodeSize);
         Vector3 nodeCenter = nodeMin + new Vector3(nodeSize / 2f);
 
         // Check node AABB vs OBB intersection

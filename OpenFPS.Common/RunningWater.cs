@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using OpenFPS.Common.Editing;
 
@@ -691,8 +690,6 @@ public static class Hydraulics
     public readonly record struct State(float DepthMetres, float SpeedMetresPerSecond, float WettedWidthMetres)
     {
         public float Froude => DepthMetres > 0f ? SpeedMetresPerSecond / MathF.Sqrt(Gravity * DepthMetres) : 0f;
-        /// <summary>Flow per metre of width, m²/s.</summary>
-        public float UnitFlow => DepthMetres * SpeedMetresPerSecond;
     }
 
     /// <summary>The state of <paramref name="litresPerSecond"/> in this channel.</summary>

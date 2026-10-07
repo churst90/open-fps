@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 
@@ -213,8 +212,6 @@ public sealed class ScopeSway
 
     /// <summary>Whether the breath is being held now.</summary>
     public bool Holding => _holdFor > 0f;
-    /// <summary>Seconds the current hold has lasted.</summary>
-    public float HeldFor => _holdFor;
 
     /// <summary>The sway at the top of a breath, milliradians, for how hard the body is working.</summary>
     public static float Amplitude(float exertion, float speed)

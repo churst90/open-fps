@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using static OpenFPS.Common.DesignedSoundKit;
 

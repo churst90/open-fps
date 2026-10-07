@@ -1,4 +1,3 @@
-using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -840,19 +839,6 @@ public static class EarlyReflections
         uAxis = Vector3.Transform(lu, s.Rotation);
         vAxis = Vector3.Transform(lv, s.Rotation);
         centre = s.Center + normal * offset;
-        return true;
-    }
-
-    /// <summary>Is the straight run between two points clear of every solid except the one being
-    /// reflected off? Its own face is the thing the sound is touching, so it cannot block itself.</summary>
-    private static bool LegIsClear(Vector3 a, Vector3 b, IReadOnlyList<Solid> solids, int skip, int skip2 = -1)
-    {
-        for (int i = 0; i < solids.Count; i++)
-        {
-            if (i == skip || i == skip2) continue;
-            var s = solids[i];
-            if (GeometryUtils.LineIntersectsOBB(a, b, s.Center, s.Size, s.Rotation)) return false;
-        }
         return true;
     }
 }

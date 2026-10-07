@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Common;
 
 /// <summary>What a body just did with its lungs, if anything.</summary>

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
@@ -301,10 +300,6 @@ public sealed class LightningSchedule
     public float CellLife { get; private set; }
 
     public LightningSchedule(int seed) { _rng = new Random(seed); }
-
-    /// <summary>The expected flash rate now, flashes per second.</summary>
-    public float RateNow(in StormSky sky)
-        => HasCell ? LightningPhysics.PeakFlashRate(sky.Scenario, sky.Precipitation) * LightningPhysics.CellActivity(CellAge, CellLife) : 0f;
 
     /// <summary>
     /// Moves the storm on by <paramref name="dt"/> seconds and adds any flashes in that time to

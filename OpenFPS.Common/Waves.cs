@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
@@ -280,17 +279,6 @@ public sealed record ShoreSpec
         var (hs, tp) = WindWaves.FetchLimited(windSpeed, MathF.Max(1f, fetch), DepthMetres);
         hs *= MathF.Sqrt(cos) * WindWaves.ReedDamping(ReedBeltMetres, hs);
         return (hs, tp, cos);
-    }
-
-    /// <summary>The sea's height at the reference wind, straight onshore, over the spec's fetch.</summary>
-    [JsonIgnore]
-    public (float Hs, float Tp) ReferenceSea
-    {
-        get
-        {
-            var (hs, tp, _) = WindSea(DefaultGeometry, ReferenceWind, 0f);
-            return (hs, tp);
-        }
     }
 
     /// <summary>Calm water: no wind to raise waves, no swell and no current. Gives no voice.</summary>
@@ -660,14 +648,4 @@ public static class WindWaves
     /// </summary>
     public static float ReedDamping(float beltMetres, float heightMetres)
         => beltMetres <= 0f ? 1f : 1f / (1f + 4f * MathF.Max(0f, heightMetres) * beltMetres);
-
-    /// <summary>A wave's phase speed in water of depth d, m/s, from the dispersion relation (Fenton and
-    /// McKee's explicit approximation to ω² = g k tanh k d).</summary>
-    public static float PhaseSpeed(float periodSeconds, float depthMetres)
-    {
-        float l0 = DeepWavelength(MathF.Max(0.05f, periodSeconds));
-        float kd0 = 2f * MathF.PI * MathF.Max(0.01f, depthMetres) / l0;
-        float l = l0 * MathF.Pow(MathF.Tanh(MathF.Pow(kd0, 0.75f)), 2f / 3f);
-        return l / MathF.Max(0.05f, periodSeconds);
-    }
 }

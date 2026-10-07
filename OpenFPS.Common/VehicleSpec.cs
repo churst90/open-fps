@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;

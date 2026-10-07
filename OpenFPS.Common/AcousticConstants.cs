@@ -1,67 +1,47 @@
-using System;
-
 namespace OpenFPS.Common;
 
-/// <summary>
-/// Global tuning parameters for the Acoustic Engine.
-/// Moving these here allows for unified balance between client and server.
-/// </summary>
+/// <summary>Tuning for the acoustics, shared so the client and the server agree.</summary>
 public static class AcousticConstants
 {
     // --- Architecture & Hierarchy ---
     public const int GlobalRegionId = -1; // The Global Environment world ID
     public const float DefaultVoxelResolution = 0.5f;
 
-    // --- Propagation Settings ---
-    public const float AirAbsorptionReferenceDist = 200.0f;
-    public const float AirAbsorptionMinDist = 15.0f;
-    public const float AirAbsorptionMaxMuffle = 0.8f;
-    
     // --- Occlusion Settings ---
     public const float OcclusionCap = 0.95f;
-    
+
     // --- Reverb & Reflections ---
     //
-    // No reflection order or merge distance: an image source produces exactly one arrival per
-    // surface, so there is nothing to merge and no order to cap. What a surface returns and
-    // how wide it reads are properties of the surface — see OpenFPS.Common.EarlyReflections.
-    public const float ReflectionEnergyThreshold = 0.05f; 
-    public const float ReflectionMinSpread = 15.0f; // Minimum degrees of spread for a reflection
-    public const float ReflectionMaxSpread = 120.0f; 
+    // An image source gives one arrival per surface, so there is no reflection order or merge distance;
+    // what a surface returns is the surface's business (EarlyReflections).
     public const float ActiveRegionRadius = 50.0f;
-    public const float ReverbFadeSpeed = 0.15f;
-    /// <summary>How much of a source is sent into its OWN room's reverb bus. The bus is a pure send
-    /// (its dry path is muted) and its level is gated per-portal by the bus fader, so this is the one
-    /// knob for "how wet is a room". Deliberately constant with distance — a send that grows with range
-    /// makes the room follow the listener.</summary>
+    /// <summary>How much of a source is sent into its own room's reverb bus: the one knob for how wet a
+    /// room is. Constant with distance: a send that grows with range makes the room follow the
+    /// listener.</summary>
     public const float ReverbSendMix = 0.35f;
 
-    /// <summary>The cross-send into the room the LISTENER is standing in, as a fraction of
-    /// <see cref="ReverbSendMix"/>. Small on purpose: a sound in the next room should reverberate in
-    /// THAT room and arrive through the doorway, not smear the listener's own room from all sides.</summary>
+    /// <summary>The cross-send into the listener's room, as a fraction of <see cref="ReverbSendMix"/>.
+    /// Small: a sound in the next room should ring there and arrive through the doorway.</summary>
     public const float ReverbCrossSendScale = 0.25f;
 
-    /// <summary>Per audio update (60 Hz), how far a region bus's HRTF stage moves toward being fully
-    /// localized to its doorway or fully filling the room. ~0.2 s end to end; a hard switch clicks.</summary>
+    /// <summary>Per audio update (60 Hz), how far a region bus's HRTF stage moves between localised at
+    /// its doorway and filling the room. About 0.2 s end to end; a hard switch clicks.</summary>
     public const float ReverbBlendSpeed = 0.08f;
 
-    /// <summary>Per audio update, how far a region bus's apparent doorway direction moves toward the
-    /// current nearest portal. Stops a change of nearest portal from snapping the reverb across the head.</summary>
+    /// <summary>Per audio update, how far a region bus's doorway direction moves toward the nearest
+    /// portal, so a change of nearest portal does not snap the reverb across the head.</summary>
     public const float ReverbDirectionSmoothing = 0.12f;
 
-    /// <summary>Ceiling on the SUM of the near-field boundary reflections' gains. A corner, a narrow
-    /// corridor or a stairwell can put a surface in every probed direction at once; each reflection is
-    /// individually correct but six of them together would swamp the direct sound. Above this the whole
-    /// set is trimmed proportionally, so the balance between the surfaces — which is the actual cue —
-    /// is kept while the total stays sane.</summary>
+    /// <summary>Ceiling on the sum of the near-field boundary reflections' gains. A corner or a stairwell
+    /// puts a surface in every direction at once; above this the set is trimmed in proportion, keeping
+    /// the balance between surfaces, which is the cue.</summary>
     public const float MaxBoundaryReflectionSum = 1.2f;
 
     /// <summary>Level of the map's outdoor ambience bed in the open air.</summary>
     public const float OutdoorAmbienceLevel = 0.55f;
 
     /// <summary>How much of the outdoor bed a fully sheltered listener loses. Not all of it: a room
-    /// with a door in it is still connected to outside, and a building that silences the world
-    /// completely is a building that feels like a loading screen.</summary>
+    /// with a door is still connected to outside.</summary>
     public const float ShelteredAmbienceDuck = 0.75f;
 
     /// <summary>Level of a region's own ambience bed while the listener is inside it.</summary>
@@ -71,117 +51,17 @@ public static class AcousticConstants
     public const float MinReverbDecayMs = 100.0f;
     public const float MaxReverbDecayMs = 10000.0f;
 
-    // ── Outdoor reverberation, from geometry ────────────────────────────────────────────────────
-    //
-    // "Outdoors is dry" is true in a field and false in a street. A concrete canyon between two rows
-    // of tall buildings has a measurable reverberation time — that slapback off a facade a hundred
-    // metres away is the single most useful thing a blind player can hear in a city, because it tells
-    // them the street has sides and roughly where they are. What is NOT true is the Sabine estimate
-    // for "the outdoors", which takes the whole map as one room, returns an enormous number, and
-    // washes the entire world in undirected reverb; that estimate is why the outdoor bus is muted.
-    //
-    // Steam Audio's ray-traced RT60 does not have that problem for the TIME. It does for the LEVEL:
-    // the level must not be read off the decay (no "dry below this decay, full wet at that one"),
-    // because the estimator fits a curve to whatever energy its rays bring home
-    // and cannot report that there was hardly any, so a roofless yard fits a LONGER tail than the same
-    // walls with a roof on (1.00 s against 0.60 s, AudioLab --sim-reverbfield). No threshold can
-    // separate places that sit on the same side of it. How loud the tail is comes from how enclosed
-    // the place is, measured directly — see OpenFPS.Common.Enclosure.
-    /// <summary>
-    /// Loudest the reverb bus may get, dB — full wet, which is where a sealed hard room belongs.
-    ///
-    /// Zero, not a trim: the surfaces answer individually (EarlyReflections), so this is only the
-    /// diffuse remainder behind them, and the LEVEL of that remainder is measured rather than chosen —
-    /// it is the fraction of emitted energy that comes back, which for open ground is one percent and
-    /// for a sealed hard box is nearly all of it. Holding the top of that scale 16 dB down puts a
-    /// hard-walled courtyard at -35 dB, which is audible in a meter and not in the ear.
-    /// </summary>
-    public const float OutdoorMaxWetDb = 0.0f;
-
-    /// <summary>
-    /// Longest reverberation time the outdoors is allowed, milliseconds.
-    ///
-    /// The ray tracer measured 1.7 to 2.8 seconds for a concrete street canyon, and taken literally
-    /// that is not wrong — concrete absorbs almost nothing and a canyon traps sound between two
-    /// parallel faces. But a two-second decay is a cathedral, and applying one to an outdoor space
-    /// makes every shot in the open sound like it was fired indoors. Real streets measure nearer a
-    /// second, because the sky is an infinite absorber and the tracer's rays do not all find it.
-    /// </summary>
-    public const float OutdoorMaxDecayMs = 1100.0f;
-
-    /// <summary>
-    /// How enclosed a place may be and still have <see cref="OutdoorMaxDecayMs"/> applied to it.
-    ///
-    /// The cap above is for a ray tracer whose rays do not all find the sky. Enclosure.Look treats a direction that hits nothing as a perfect
-    /// absorber, so the sky is IN the measurement: a street on the city map reads 525 ms and a
-    /// pavement 627, with no cap involved at all. Nothing genuinely outdoors comes near 1,100.
-    ///
-    /// Applied to every region with no Sabine estimate, the cap would silence the places that are
-    /// supposed to ring: a roofed tunnel has none, so a tunnel measuring three seconds would be served
-    /// 1.1 and sound dry. A car park's upper deck measures 4.5 s, a tiled stairwell 2.
-    ///
-    /// So the cap asks whether the place is actually open. Below this it is outdoors and the cap
-    /// is the safety net it was meant to be; above it, the rays found walls and a roof, and what they
-    /// measured is what a listener should get.
-    /// </summary>
-    public const float OutdoorEnclosureCeiling = 0.45f;
-
-    /// <summary>
-    /// The reverberation unit's own wet level, dB — a constant, because the room is carried by the
-    /// two things that ARE the room.
-    ///
-    /// How much reverberant field a source raises is the send's business (the room equation, with the
-    /// distance and the absorption in it). How long it rings is the decay's. What is left for the
-    /// unit is the difference between FMOD's internal scaling and unity, which is a property of the
-    /// DSP and not of the place — so it is one number and does not move.
-    ///
-    /// Never a loop that meters the unit and holds its gain at unity: that cancels the rooms. A
-    /// reverberation unit accumulates energy in proportion to its decay, so a long tail measures a
-    /// higher output and would be trimmed back down by exactly as much as it is live: six decibels for
-    /// a corridor against thirteen for a seven-second hall. See the note in
-    /// FmodAudioProvider.ApplySimulatedReverb for the measurements.
-    ///
-    /// Minus six is where such a loop settles for a mid-sized room, the one place it gives the right
-    /// answer.
-    /// </summary>
-    public const float ReverbUnitWetDb = -6.0f;
-
-    // ── What the reverb unit is for ─────────────────────────────────────────────────────────────
-    //
-    // The unit's own synthetic early reflections are OFF. Early reflections are a fact about the
-    // geometry — which wall, how far, what it is made of — and the image-source pass measures them
-    // per source; a reverb unit's are a fixed pattern of copies stamped onto every transient a tenth
-    // of a millisecond after it, whatever the room. Measured on a footstep in the wood room: with
-    // them the step peaks 9 dB louder than dry and sits on the master limiter's ceiling on every step,
-    // heard as four or five copies piling up on every step. The unit renders the diffuse tail only, starting after the mean free path
-    // has been crossed a couple of times, which is when reflections become too dense to have a
-    // direction (see FmodAudioProvider.ApplySimulatedReverb).
-    //
-    // ── AND THE NUMBER THAT SAYS SO IS NOT THE ONE IT LOOKS LIKE ────────────────────────────────
-    //
-    // FMOD's EARLYLATEMIX is the blend of LATE REVERB TO EARLY REFLECTIONS: 0 is all early, 100 is
-    // all late. 0 reads like "early reflections off", and it means early reflections ONLY — the unit
-    // renders its fixed stamped pattern and no tail whatever, in every room, however long that room's
-    // decay. Measured with AudioLab --tailcheck, one footstep in a room configured for six seconds: at
-    // 0 the mixer is at the noise floor 500 ms later; at 100 it is still 28 dB up two seconds later.
-    // At 0 every place sounds like the same metallic box: a fixed early-reflection pattern with the
-    // room removed from behind it.
-    //
-    // So it is named after the parameter it writes, because the trap is the name.
+    /// <summary>FMOD's EARLYLATEMIX, the blend of late reverb to early reflections: 0 means early
+    /// reflections only and no tail at all, in every room (AudioLab --tailcheck). Named after the
+    /// parameter it writes because the trap is the name. The unit's own early reflections are not
+    /// wanted: the image-source pass measures the real ones (docs/COMMON_NOTES.md, Reverberation).</summary>
     public const float ReverbLateToEarlyMixPercent = 100.0f;
-    public const float ReverbLateDelayMeanFreePaths = 2.0f;
-    public const float ReverbLateDelayMaxMs = 100.0f;   // the unit's own ceiling for the parameter
-    /// <summary>How fast the outdoor wet level moves toward its target, per audio update. Stepping it
-    /// in one frame is a step change in the signal, which is a click.</summary>
-    public const float OutdoorWetBlendSpeed = 0.06f;
-    
+
     // --- Panning & Volumetric ---
     public const float SpreadGrowthFactor = 5.0f; // Degrees per meter
     public const float VolumetricSpreadMax = 120.0f; // Tighter spread for better directionality
-    public const float Min3DDistance = 3.0f; // Sounds stay at 100% volume for 3 meters
-    public const float Volumetric3DLevelMin = 0.6f; // More 3D presence even for indirect sound
     public const float ParameterSmoothingTimeConstant = 0.1f;
-    
+
     // --- Shelter & Environment ---
     public const float ShelterRayDistance = 15.0f; // Check up to 15m for a roof
     public const float ShelterFadeSpeed = 4.0f; // Speed at which shelter effects fade in/out

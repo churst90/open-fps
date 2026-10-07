@@ -1,8 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 using MemoryPack;
-using OpenFPS.Common;
 
 
 namespace OpenFPS.Common

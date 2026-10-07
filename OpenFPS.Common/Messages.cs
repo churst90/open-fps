@@ -1,7 +1,6 @@
 using MemoryPack;
 using System.Numerics;
 using OpenFPS.Common.Components;
-using System;
 
 namespace OpenFPS.Common.Networking;
 

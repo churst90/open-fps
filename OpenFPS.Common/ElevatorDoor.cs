@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -167,7 +166,7 @@ public static class ElevatorDoor
     /// <summary>The coupler's vane closing on the landing rollers: 0.25 kg of vane at 0.15 m/s onto rubber
     /// tyres; the landing lock's hook, 40 g, lifted 6 mm and dropped back onto its steel keeper.</summary>
     private const double VaneKg = 0.25, VaneSpeed = 0.15, RollerK = 3e7, RollerLambda = 1.0, HookKg = 0.04, HookDrop = 0.006;
-    private const double HookK = 4e9, HookLambda = 0.3, HookLower = 0.1;
+    private const double HookK = 4e9, HookLower = 0.1;
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -183,7 +182,7 @@ public static class ElevatorDoor
         private double time;
 
         // Motion along the track and the controller.
-        private double x, v, motorX, motorV, motorA;
+        private double x, v, motorX, motorV;
         // Each roller: its vertical place and speed on its bracket; the panel's heave.
         private readonly double[] wz = new double[2], wv = new double[2], wArm = new double[2];
         private double heave, heaveRate;
@@ -319,10 +318,10 @@ public static class ElevatorDoor
                 // The vane closes on the landing door's rollers, and lifts the hook.
                 vaneOn = true; vaneX = -0.003; vaneV = VaneSpeed;
                 hook = 0;
-                while (time < 0.18) Tick(opening, 0);
+                while (time < 0.18) Tick();
                 start = time;
             }
-            double profU = 0, profA = 0; bool arrived = false; double arrivedAt = -1;
+            double profU = 0, profA = 0; bool arrived = false;
             while (time < end)
             {
                 if (!arrived)
@@ -337,11 +336,11 @@ public static class ElevatorDoor
                     double aWant = Math.Clamp((want - profU) / 0.05, -Accel, Accel);
                     profA += Math.Clamp(aWant - profA, -Jerk * dt, Jerk * dt);
                     profU = Math.Max(0, profU + profA * dt);
-                    motorV = dir * profU; motorA = dir * profA;
+                    motorV = dir * profU;
                     motorX += motorV * dt;
                     if ((opening && motorX >= to - 0.002) || (!opening && motorX <= to + 0.001))
                     {
-                        arrived = true; arrivedAt = time; motorV = 0; motorA = 0;
+                        arrived = true; motorV = 0;
                         Log($"{time * 1000:F0} ms  the operator at its end ({(time - start):F2} s of travel), leaf edge {x * 1000:F1} mm, {v:F3} m/s");
                         end = time + (opening ? 0.6 : 1.4);
                         // Shut: the operator leans on the leaves with about 60 N through its belt, and a moment later
@@ -350,7 +349,7 @@ public static class ElevatorDoor
                     }
                 }
                 if (hookAt > 0 && time >= hookAt) { hookAt = -1; hookFalling = true; hook = HookDrop; Log($"{time * 1000:F0} ms  the hook falls"); }
-                Tick(opening, motorV);
+                Tick();
             }
         }
         private double hookAt = -1;
@@ -374,7 +373,7 @@ public static class ElevatorDoor
 
         // ── One step ─────────────────────────────────────────────────────────────────────────────
 
-        private void Tick(bool opening, double motorSpeed)
+        private void Tick()
         {
             double fx = 0, pLock = 0, pOp = 0;
 

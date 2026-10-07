@@ -1,10 +1,6 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace OpenFPS.Common.Editing;
@@ -312,20 +308,6 @@ public static class ModelKinds
         id = key;
         return kind.Length > 0 && ModelLibrary.Knows(kind, id);
     }
-
-    /// <summary>The sound-id prefix a kind's things carry, for counting where a model is used.</summary>
-    public static string? SoundPrefix(string kind) => kind switch
-    {
-        ModelLibrary.Kinds.SmallMachine => "machine:",
-        ModelLibrary.Kinds.Water => "water:",
-        ModelLibrary.Kinds.Fire => "fire:",
-        ModelLibrary.Kinds.Foliage => "foliage:",
-        ModelLibrary.Kinds.Flow => "flow:",
-        ModelLibrary.Kinds.Bell => "bell:",
-        ModelLibrary.Kinds.Shore => "shore:",
-        ModelLibrary.Kinds.Vehicle => "engine:",
-        _ => null,
-    };
 
     /// <summary>A sound id with the model it names changed to another of the same kind:
     /// "water:park_fountain/elm_park/0" with "pond_jet" is "water:pond_jet/elm_park/0". Null if the

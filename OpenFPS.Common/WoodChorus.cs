@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
@@ -57,7 +56,6 @@ public sealed class WoodChorus
 
     private readonly Crown[] _crowns;
     private readonly Wood[] _woods;
-    private readonly Dictionary<int, float> _treeReference = new();
 
     public IReadOnlyList<Wood> Woods => _woods;
     public IReadOnlyList<Crown> Crowns => _crowns;

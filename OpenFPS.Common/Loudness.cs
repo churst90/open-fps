@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Common;
 
 /// <summary>
@@ -52,18 +50,8 @@ public static class Loudness
     /// reference the mix was set against; this is the one thing louder.</summary>
     public const float Rifle308Db = 167f;
 
-    /// <summary>A round striking concrete a few metres away.</summary>
-    public const float BulletImpactDb = 120f;
-    /// <summary>A pane failing. Loud, but nothing like a gunshot.</summary>
-    public const float GlassShatterDb = 105f;
-    /// <summary>Fragments landing.</summary>
-    public const float GlassFragmentDb = 72f;
     /// <summary>A case bouncing on concrete. Quiet, close, and very informative.</summary>
     public const float CasingDb = 75f;
-    /// <summary>Working a bolt, a magazine, a selector. Quiet enough that hearing it means someone is
-    /// CLOSE, which is most of why it matters.</summary>
-    public const float WeaponHandlingDb = 78f;
-    public const float SpeechDb = 60f;
 
     /// <summary>
     /// A footfall, at one metre — YOUR OWN, which is the case that matters, because your feet are the
@@ -82,7 +70,6 @@ public static class Loudness
     /// -26 LUFS against the -18 to -23 a game mix belongs at.
     /// </summary>
     public const float FootstepDb = 68f;
-    public const float AmbienceBedDb = 48f;
 
     /// <summary>
     /// The sound pressure level that renders at full scale, dB SPL.

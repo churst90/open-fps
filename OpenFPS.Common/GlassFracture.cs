@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Globalization;
 
 namespace OpenFPS.Common;
@@ -607,7 +605,7 @@ public static class GlassFracture
     {
         var s = sim.S;
         var r = sim.Rng;
-        double w = s.Width, hgt = s.Height, h = s.Thickness;
+        double w = s.Width, hgt = s.Height;
         double deposited = 0.5 * s.BulletKg * Math.Max(1, s.Pellets) * Sq(s.BulletSpeed) * (1 - 0.81);
         // Estimate: more radial cracks for more energy (no measured count was found); four to sixteen.
         int radial = (int)Math.Clamp(Math.Round(4 + 3 * Math.Log2(Math.Max(1, deposited / 50)) + U(r, -1, 1)), 4, 16);
@@ -1034,7 +1032,6 @@ public static class GlassFracture
 
     private static void Fall(Sim sim)
     {
-        var r = sim.Rng;
         double drop = QuantiseDrop(sim.S.Drop);
         foreach (var f in sim.Frags)
         {

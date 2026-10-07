@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -171,7 +170,7 @@ public static class LockCylinder
     /// <summary>A pin stack: brass key pin and driver, 0.115 in across, about 0.7 g; its spring about 0.6 N at
     /// rest and 120 N/m more as it is lifted.</summary>
     private const double PinKg = 0.0007, PinPreload = 0.6, PinRate = 120;
-    private const double PinContactK = 3e9, PinContactLambda = 0.2;
+    private const double PinContactK = 3e9;
     /// <summary>The blade slides on the keyway's wards and the pins' tips: brass on brass, a little grease.</summary>
     private const double BladeFriction = 0.15;
     /// <summary>The plug and shell, brass, about 60 g together, held in the lock body by its set screw: how
@@ -189,7 +188,6 @@ public static class LockCylinder
 
     private sealed class Sim
     {
-        private readonly Host host;
         private readonly int rate;
         private readonly double dt;
         private readonly Report? report;
@@ -204,8 +202,6 @@ public static class LockCylinder
         private readonly double[] kx, kz, kvx, kvz, hang;    // each hanging key's offset from below the ring
         private readonly Modes[] keyModes;
         private readonly Modes ring;
-        private readonly double[] keyApproach;
-        private readonly double[] doorApproach;
 
         // The key in the lock and the pins.
         private double depth, depthRate;
@@ -217,7 +213,7 @@ public static class LockCylinder
         private readonly AccelerationNoise[] pinNoise;
 
         // The turn.
-        private double turn, turnRate, hub, hubRate, turnAim, camApproach, stopApproach;
+        private double turn, turnRate, hub, hubRate, turnAim;
         private bool turning, drawn;
 
         // The host.
@@ -233,11 +229,10 @@ public static class LockCylinder
         private static readonly string[] PeakNames = { "keys", "ring", "pins", "cylinder", "door" };
         private readonly double[] peaks = new double[PeakNames.Length];
         private List<float>[]? stems;
-        private readonly double[] one = { 1 };
 
         public Sim(Host host, int variant, int sampleRate, Report? report)
         {
-            this.host = host; this.report = report;
+            this.report = report;
             rate = sampleRate * Oversample; dt = 1.0 / rate;
             rng = new Random(7001 + 13 * (((variant % Variants) + Variants) % Variants) + (int)host);
             (keys, reach, insert, double wearMm, bitting) = Character(variant);
@@ -246,7 +241,6 @@ public static class LockCylinder
             // The hanging keys: each a free plate, its bending modes along its length and one across.
             kx = new double[keys]; kz = new double[keys]; hang = new double[keys]; kvx = new double[keys]; kvz = new double[keys];
             keyModes = new Modes[keys];
-            keyApproach = new double[keys]; doorApproach = new double[keys];
             for (int i = 0; i < keys; i++)
             {
                 double len = KeyLength * (0.85 + 0.3 * rng.NextDouble()), t = KeyT * (0.9 + 0.2 * rng.NextDouble());
@@ -461,9 +455,9 @@ public static class LockCylinder
             for (int k = 0; k < Pins; k++)
             {
                 double s = depth - pinAt[k];                  // how far along the key from its tip this pin sits
-                double top = s < 0 ? 0 : Profile(s, k);
+                double top = s < 0 ? 0 : Profile(s);
                 double over = top - pinY[k];
-                double rateTop = s < 0 ? 0 : (Profile(s + depthRate * dt, k) - top) / dt;
+                double rateTop = s < 0 ? 0 : (Profile(s + depthRate * dt) - top) / dt;
                 double f = ContactRestitution(PinContactK, 0.5, over, rateTop - pinV[k], ref pinApproach[k]);
                 double spring = PinPreload + PinRate * Math.Max(0, pinY[k]);
                 double acc = (f - spring) / PinKg;
@@ -556,11 +550,11 @@ public static class LockCylinder
         private readonly double[] keyPoint = { 1, -0.8, 0.6, 0.5 };
 
         /// <summary>
-        /// The blade's top edge under pin <paramref name="k"/>, s metres back from the tip: the tip's ramp, then
+        /// The blade's top edge s metres back from the tip: the tip's ramp, then
         /// V cuts to the bitting at each pin's place, their crests and troughs rounded by wear and by the pin's
         /// own tip. Where the cut under this pin is, the edge comes down to it.
         /// </summary>
-        private double Profile(double s, int k)
+        private double Profile(double s)
         {
             double ramp = Math.Min(1, s / TipRamp) * BladeTop;
             // The cuts are at the pins' places when the key is home: cut j is at KeyInDepth - pinAt[j] from the tip.

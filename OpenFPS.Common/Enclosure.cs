@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 
@@ -579,15 +578,6 @@ public static class Enclosure
         if (e <= 1e-6f) return -80f;
         return 10f * MathF.Log10(e / (1f - e));
     }
-
-    /// <summary>
-    /// What <see cref="ReverberantGainDb"/> reads inside a room that is closed on every side and made
-    /// of something hard — the top of the scale, and the reference everything else is quieter than.
-    ///
-    /// 0.98 rather than 1.0 because a real sealed room has a door, a window and some furniture in it;
-    /// at 1.0 the series diverges, which is a room with no losses at all and does not exist.
-    /// </summary>
-    public static readonly float SealedRoomGainDb = ReverberantGainDb(0.98f);
 
     /// <summary>
     /// Evenly spread directions on the sphere, by the golden angle. Deterministic and stable: the same

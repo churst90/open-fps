@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
-using OpenFPS.Common.Components;
 
 namespace OpenFPS.Common;
 
@@ -793,7 +791,7 @@ public sealed class OpeningRoutes
         {
             if (used >= RoutesPerQuery) break;
             chain.Clear();
-            BuildChain(c, lTree, sTree, sNode, chain);
+            BuildChain(c, lTree, sTree, chain);
             if (chain.Count == 0 || CrossesTwice(chain)) continue;
             long key = 17;
             foreach (var (o, _) in chain) key = key * 1_000_003 + o;
@@ -1001,7 +999,7 @@ public sealed class OpeningRoutes
     }
 
     /// <summary>The route as (opening, the node it leads into) from the source's side to the listener's.</summary>
-    private void BuildChain(in Candidate c, SideTree lTree, SideTree sTree, int sNode, List<(int, int)> chain)
+    private void BuildChain(in Candidate c, SideTree lTree, SideTree sTree, List<(int, int)> chain)
     {
         // The source's half, from the source outward: its tree's states run from the source, so walking
         // back from the exit gives them exit-first; reversed, source-first.

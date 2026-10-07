@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -207,7 +206,6 @@ public static class GlassDoor
 
     // ── Constants, each a property of a part ─────────────────────────────────────────────────────
 
-    private const double G = 9.81;
     private const double AlE = 70e9, AlRho = 2700, GlassE = 70e9, GlassRho = 2500, GlassPoisson = 0.22;
     /// <summary>The leaf's sections: stiles and top rail 89 by 44.5 mm, bottom rail 254 by 44.5 mm, 3.2 mm
     /// (0.125 in) walls: 2.2 and 5.4 kg a metre.</summary>
@@ -312,7 +310,6 @@ public static class GlassDoor
 
     private sealed class Sim
     {
-        private readonly Door door;
         private readonly int rate;
         private readonly double dt;
         private readonly Report? report;
@@ -387,11 +384,10 @@ public static class GlassDoor
         private static readonly string[] PeakNames = { "frame", "pane", "walls", "jamb", "latch", "bar", "handle", "piston" };
         private readonly double[] peaks = new double[PeakNames.Length];
         private List<float>[]? stems;
-        private readonly double[] ones = { 1 };
 
         public Sim(Door door, int sampleRate, Report? report)
         {
-            this.door = door; this.report = report;
+            this.report = report;
             rate = sampleRate * Oversample; dt = 1.0 / rate;
             rng = new Random(door.Seed);
             width = door.Width; height = door.Height;

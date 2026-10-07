@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -478,7 +477,7 @@ public static class KnobDoor
     private sealed class Sim
     {
         private readonly Door door;
-        private readonly int outRate, rate;
+        private readonly int rate;
         private readonly double dt;
         private readonly Report? report;
         private readonly Random rng;
@@ -544,7 +543,7 @@ public static class KnobDoor
         public Sim(Door door, int sampleRate, Report? report)
         {
             this.door = door; this.report = report;
-            outRate = sampleRate; rate = sampleRate * Oversample; dt = 1.0 / rate;
+            rate = sampleRate * Oversample; dt = 1.0 / rate;
             rng = new Random(door.Seed);
             width = door.Width; height = door.Height;
 
@@ -942,10 +941,6 @@ public static class KnobDoor
 
         private double[]? frameAtLatch, frameAtHead;
         private double[][]? frameAtStops, frameAtHinges;
-
-        /// <summary>A contact through a spring: the compliance of what holds the parts, not of the parts.</summary>
-        private static double Sprung(double k, double c, double depth, double rate)
-            => depth > 0 ? Math.Max(0, k * depth + c * rate) : 0;
 
         private void Tick()
         {
