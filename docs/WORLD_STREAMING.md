@@ -278,6 +278,28 @@ Built (stage 1b, 2026-10-06), following docs/GEOMETRY.md 2.4 and its measurement
   next change waits until the last pair has reached every tracer (`TracedReverbSet.Reconfiguring`).
   Every instance is made when its sub-scene is new, before anything traces it; making one of a
   sub-scene being traced waited for the trace (up to 0.66 s measured).
+- **What Steam Audio's Embree scenes do with instances** (read from Steam Audio 4.8.1's source,
+  2026-10-06, after the first door that swung handed over a pair that traced as empty; Cody heard
+  traffic inside Selby House and the reflections go mono). Both held by `TileSceneSetTests`:
+  - An instance is in its top scene's Embree scene from the moment it is made, *enabled*, and only a
+    commit that finds it on the scene's list (`iplInstancedMeshAdd`) commits it. Embree will not build a
+    scene holding an enabled geometry that was never committed ("geometry not committed"; Steam Audio
+    does not report it), and the scene keeps its last build, or none. Instances made for the pair in use,
+    or for a pair that a replaced tile never reached, were exactly that. Each instance is now disabled
+    the moment it is made (added and taken out again), and enabled only by being added for a commit.
+  - Releasing an instance gives its geometry id back to the top scene, but the geometry is never
+    detached from the Embree scene, so the next instance given that id cannot be attached and is
+    silently not there: the third swing of a door lost the tile it stood in. An instance now lives as
+    long as its top scene (disabled once its tile is replaced), and with it the replaced tile's
+    sub-scenes. When a pair holds more replaced geometry than it traces (`TileSceneSet.RecycleShare`),
+    it is made afresh the next time it is idle: new top scenes, an instance of every tile in use, and
+    the old pair let go with everything it held. That makes instances of sub-scenes being traced, so it
+    can wait: 15 to 60 ms on the city, 0.4 to 0.9 s on Magnolia while streaming, once every twenty-odd
+    tile changes, on the build's own thread (sources keep their answers meanwhile).
+  - Measured against the whole scene (`OPENFPS_TILE_SCENES=0`): AudioLab `--path-probe ... door=
+    swings=N` (open, shut, open... each a swap; `traced` adds the traced reverb and echoes at the ear,
+    binaural) and `--stream-walk ... stops=M` (stops every M metres once everything has settled and
+    asks twenty sources afresh) answer the same at every swing and every stop.
 - The routes through openings are made again when the openings change (a door, rooms coming or
   going) and otherwise at most every 3 s while only walls and roads change.
 

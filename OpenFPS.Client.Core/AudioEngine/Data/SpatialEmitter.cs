@@ -245,6 +245,9 @@ public struct SpatialEmitter
     /// <summary>Each wheel as the server sent it, front axle first, or null. The tyre voices take
     /// each axle's share of <see cref="TyreSlip"/> from it.</summary>
     public OpenFPS.Common.Networking.WheelState[]? Wheels;
+    /// <summary>Wheels about to strike a step in the road (a rail), with when: handed to the vehicle's
+    /// voice the once they are carried, and null otherwise. See WheelStrikes.</summary>
+    public OpenFPS.Client.AudioEngine.Core.WheelStrike[]? WheelStrikes;
     /// <summary>The road's water under a vehicle whose wheels are not sent, mm (WorldSnapshot.RoadWaterMm).</summary>
     public float RoadWaterMm;
     public SynthWaveType SynthWave;

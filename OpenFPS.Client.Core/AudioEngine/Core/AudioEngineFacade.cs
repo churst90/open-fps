@@ -308,6 +308,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
 
     public bool EngineDoorsOpen(int entityId) => _isInitialized && _provider.EngineDoorsOpen(entityId);
 
+    /// <summary>See IAudioProvider.SignalTrain.</summary>
+    public void SignalTrain(string train, float[] warning, float bellSeconds, double secondsAgo)
+    {
+        if (_isInitialized) _provider.SignalTrain(train, warning, bellSeconds, secondsAgo);
+    }
+
     public void SetListenerEnclosure(float lowDb, float midDb, float highDb)
     {
         if (_isInitialized) _provider.SetListenerEnclosure(lowDb, midDb, highDb);

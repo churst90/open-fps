@@ -200,8 +200,7 @@ public class BulletFlightTests : IDisposable
     public void ARoundThatEndsInTheGroundOrARoofSaysWhereByName()
     {
         var g = new Range(_dir, "city");
-        // Open ground at the west edge of the city. It is concrete there, which a round meeting it at
-        // 10 degrees skips off (BulletRicochetTests); at 25 it goes in.
+        // Open ground at the west edge of the city: the map's own dirt. At 25 degrees a round goes in.
         var a = g.Player("a", new Vector3(-400f, 0f, 300f));
         a.AimAssist = false;
         g.Arm(a, "akm");
@@ -210,10 +209,9 @@ public class BulletFlightTests : IDisposable
         g.Run(0.2);
         Assert.Equal("Hit the ground at 4 metres.", Assert.Single(g.Said(a)));
         // ...and at 10 degrees a round skips off concrete: the airport's apron. (This shot used to be
-        // made at the west edge too, where the map's own ground is Dirt and the loader's concrete
-        // foundation lies flush under it. Of two surfaces in the same place the server's box grid met
-        // whichever its cell listed first, the foundation, and the client's met the map's ground; the
-        // triangle world meets the smaller of the two, the ground, on both: docs/GEOMETRY.md stage 1.)
+        // made at the west edge too, where the loader once laid a concrete foundation flush under the
+        // map's own dirt, and the server met the concrete. The loader lays nothing under a map with its
+        // own ground now, and lays dirt where it does: docs/GEOMETRY.md.)
         var skip = g.Player("skip", new Vector3(258f, 0.08f, 40f));
         skip.AimAssist = false;
         g.Arm(skip, "akm");

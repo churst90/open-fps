@@ -214,6 +214,17 @@ public class GameServer
         _dirtyAudioEntities.Enqueue(entityId);
     }
 
+    /// <summary>The models the world editor has changed, every version kept (model_versions/). In memory
+    /// only until <see cref="Start"/> gives it its folder.</summary>
+    public OpenFPS.Server.Editor.ModelStore Models { get; set; } = new(null);
+
+    /// <summary>A model's new version, to every game client on every map: the change is heard at once.</summary>
+    public void BroadcastModel(ModelUpdate update)
+    {
+        foreach (var session in _sessions.GetAllSessions().ToList())
+            if (!session.IsTextClient) SendToSession(session, update);
+    }
+
     /// <summary>The entities whose definitions go out again at the next broadcast. For tests.</summary>
     internal IReadOnlyCollection<int> PendingDefinitionResends => _dirtyAudioEntities.ToArray();
 
@@ -345,14 +356,19 @@ public class GameServer
         // cars, a composite made drivable, and /drivable all resolve through the registry.
         OpenFPS.Common.MachineRegistry.EnsureLoaded();
         OpenFPS.Common.ModelLibrary.EnsureLoaded();
+        // The world editor's changed models, over the library, before anything asks what a model is.
+        Models = new OpenFPS.Server.Editor.ModelStore("model_versions");
+        Models.LoadAll();
         var prefabRepo = new PrefabRepository("prefabs");
         _mapRepo = new MapRepository("maps");
         // Who owns each map, whether it is public and who is invited: beside teams.json, and laid over
-        // each map's own file as it loads (MapAccessRepository).
+        // each map's own file as it loads (MapAccessRepository). The world editor's edits are laid over
+        // it too, from maps/overlays (docs/WORLD_EDITOR.md section 7).
         _maps = new MapManager(_mapRepo, prefabRepo)
         {
             RequestedMapId = RequestedMapId,
             Access = new MapAccessRepository("map_access.json"),
+            Overlays = new OpenFPS.Server.Editor.MapOverlayStore(_mapRepo.OverlayDirectory),
         };
         _maps.Initialize();
         // Composites BEFORE vehicles and before the earshot pass: a placed building is geometry that
@@ -779,6 +795,8 @@ public class GameServer
             float dt = FixedDeltaTime;
             _environment.Update(dt);
             _lightning.Update(dt, _environment.CurrentScenario, _environment.GetCurrentState(), EmitStrike);
+            // Horns whose key has not been reported down for a few ticks are let go.
+            VehicleSignals.Update(dt);
 
             foreach (var entry in _maps.GetAllMaps())
             {
@@ -1132,6 +1150,9 @@ public class GameServer
             return;
         }
 
+        // The models changed in the world editor, before anything on the map is heard with them.
+        foreach (var model in Models.Updates()) SendToSession(session, model);
+
         int staticCount = 0;
         bool streamed = _maps.TryGetTiles(mapId, out var tiles);
         if (streamed)
@@ -1267,7 +1288,16 @@ public class GameServer
         }
         else Log.Information("Join of {Map} for {User}: {Count} entities, {KB:F0} KB, {Ms} ms.",
                              session.CurrentMapId, session.Username, staticEntities.Count, bytes / 1024.0, started.ElapsedMilliseconds);
+        bytes += SendCounted(session, RoadsFor(session.CurrentMapId));
         SendToSession(session, new MapLoadComplete());
+    }
+
+    /// <summary>The map's roads, junctions, level crossings and drivable tracks, for a driver's cues.</summary>
+    internal MapRoads RoadsFor(string mapId)
+    {
+        _maps.TryGetMapData(mapId, out var map);
+        var data = MapRoadsBuilder.Build(map, _crossings.Rails(mapId));
+        return new MapRoads { MapName = mapId, Json = data.IsEmpty ? "" : data.ToJson() };
     }
 
     /// <summary>
@@ -1640,6 +1670,9 @@ public class GameServer
                         // Each wheel: its load, slip, speed and the surface under it (WheelDynamics).
                         if (_vehicles.TryGetWheels(e.Id, out var wheels) || DrivingSystem.TryGetWheels(e.Id, out wheels))
                             state.Wheels = wheels;
+                        // A driven vehicle's horn and siren switches: nothing a listener can observe
+                        // says a hand is on the horn.
+                        if (isDynamic) state.Signals = VehicleSignals.WireByte(world, e);
 
                         // A dynamic entity is corrected by the next tick's packet, so losing one costs
                         // nothing. A static entity that moved is a one-off event that nothing will ever

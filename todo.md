@@ -385,10 +385,14 @@ Some may already be fixed; confirm before fixing again.
 - Saving world state across restarts (vaporized and spawned things come back or vanish).
 
 ### Vehicles
-- No horn key and no siren key when driving.
-- Driving cues need a design: Cody overshoots the road; something like Forza's.
-- Aircraft roll out after landing instead of reversing at the end of the runway.
-- Level crossings: tyre thump over the rails, and gates.
+- Driving controls and aids built 2026-10-06, not yet heard (docs/DRIVING_AIDS.md, inbox/driving-2026-10-06):
+  horn (H) and siren (U, Shift+U), indicators (J, L), the brake cue, rumble on the lines, the speed
+  limit, rails and gates, aircraft that land and roll out. To judge by ear: the brake cue's notes and
+  bands, the rail strike level (an assumption), the gate motor and clunk (assumptions).
+- Crossing gates are sounds only: no arm in the world, nothing stops a player's car.
+- From the driver's seat a horn's first 0.15-0.3 s is about 16 dB louder than the rest (street-life
+  honks too): find what lets a loud close source through late.
+- The city's runway is 588 m: only the light single can land and take off on it.
 - In a car seat, cranking carries sub-20 Hz pressure 13-16 dB over everything audible. Decide with
   the cabin model.
 - From the 2026-09-30 set-aside (they sound good):

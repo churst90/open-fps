@@ -18,8 +18,9 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --game-levels [out=DIR] [set=measure|render|compare|all] [cars=a,b,..]: what the game's own mixer puts out
-/// for one thing at a time, captured from the real output.
+/// --game-levels [out=DIR] [set=measure|render|compare|all|faults] [cars=a,b,..]: what the game's own mixer puts out
+/// for one thing at a time, captured from the real output. set=faults is the Resonance faults of 2026-10-06:
+/// a light single and an airliner landing, a train blowing for a crossing, two window units side by side.
 ///
 /// The whole client path, not a model of it: a ClientAudioSystem over an AudioEngineFacade over the
 /// FmodAudioProvider, its output replaced by FMOD's WAV writer (OPENFPS_FMOD_WAV). Cars are entities in
@@ -348,10 +349,160 @@ public static class GameLevelsSpike
             Pump(3.0);
         }
 
+        // ── The Resonance faults (inbox/fault-fixes-2026-10-06) ───────────────────────────────────
+        //
+        // An aeroplane arriving on a runway 40 m in front of you, flown as the server flies one: down a
+        // three-degree slope at its approach speed, the wheels on the ground the instant the path
+        // reaches it (ClientAudioSystem.OnTheWheels), then the rollout slowing at a quarter of a g.
+        void Landing(string preset, float offset, double approach, double rollout)
+        {
+            var p = AircraftProfile.ByName(preset);
+            float vApp = p.ApproachSpeedMps, slope = MathF.Tan(3f * MathF.PI / 180f), wheels = 1.0f;
+            Stand(new Vector3(0f, 0f, -offset), 0f);                // facing the runway (+Z), which runs along X
+            double tTouch = clock.Elapsed.TotalSeconds + 1.5 + approach;
+            var rot = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
+            (Vector3 At, Vector3 Vel) Path(double t)
+            {
+                float before = (float)(t - tTouch);
+                if (before < 0f)
+                    return (new Vector3(before * vApp, wheels - before * vApp * slope, 0f), new Vector3(vApp, -vApp * slope, 0f));
+                float v = MathF.Max(6f, vApp - 2.5f * before);
+                float x = before < (vApp - 6f) / 2.5f ? vApp * before - 1.25f * before * before
+                        : (vApp * vApp - 36f) / 5f + 6f * (before - (vApp - 6f) / 2.5f);
+                return (new Vector3(x, wheels, 0f), new Vector3(v, 0f, 0f));
+            }
+            int id = nextId++;
+            var (at0, vel0) = Path(clock.Elapsed.TotalSeconds);
+            var def = new EntityDefinition
+            {
+                EntityId = id, Type = EntityType.NPC, Moves = true,
+                Transform = new Transform { Position = at0, Rotation = rot },
+            };
+            def.SoundEmitter = new SoundEmitterComponent();
+            def.SoundEmitter.IsSynth = true;
+            def.SoundEmitter.SoundId = "aircraft:" + preset;
+            def.SoundEmitter.Mode = PlaybackMode.LoopOne;
+            def.SoundEmitter.Volume = 1f;
+            def.SoundEmitter.Range = Loudness.AudibleRange(p.SourceLevelDb);
+            def.SoundEmitter.MinDistance = 3f;
+            world.RegisterDefinition(def);
+            Move(id, at0, rot, vel0);
+            perFrame = t => { var (a, v) = Path(t); Move(id, a, rot, v); };
+            Pump(1.5);
+            Console.WriteLine($"    {preset}: approach {vApp:F0} m/s, spin-up {p.Gear?.SpinUpSeconds(vApp) * 1000f:F0} ms at touchdown");
+            Record($"landing {preset} {offset:0}m", approach + rollout);
+            perFrame = null;
+            Remove(id);
+            Pump(1.5);
+        }
+
+        // A train blowing for a level crossing you are standing beside, `lateral` metres from the
+        // track. Its sources are placed as RailSystem places them (TrainLayout, head minus along) and
+        // the crossing is sounded as RailSystem.SoundForCrossings sounds it, eighteen seconds out.
+        void TrainCrossing(string preset, float speed, float lateral, double seconds)
+        {
+            var profile = TrainProfile.ByName(preset);
+            var layout = TrainLayout.Sources(profile);
+            const string trainKey = "fault_train";
+            const float hornLead = 18f;
+            Stand(new Vector3(0f, 0f, -lateral), 0f);               // the track runs along X, the crossing at x = 0
+            double start = clock.Elapsed.TotalSeconds + 1.5;
+            float headAtStart = -speed * (hornLead + 1.5f);          // the horn starts 1.5 s into the recording
+            var rot = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
+            var vel = new Vector3(speed, 0f, 0f);
+            float Head(double t) => headAtStart + speed * (float)(t - start);
+            var ids = new int?[layout.Count];
+            for (int i = 0; i < layout.Count; i++)
+            {
+                var src = layout[i];
+                int id = nextId++;
+                ids[i] = id;
+                var at = new Vector3(Head(clock.Elapsed.TotalSeconds) - src.AlongMetres, src.HeightMetres, 0f);
+                var def = new EntityDefinition
+                {
+                    EntityId = id, Type = EntityType.NPC, Moves = true,
+                    Transform = new Transform { Position = at, Rotation = rot },
+                };
+                def.SoundEmitter = new SoundEmitterComponent();
+                def.SoundEmitter.IsSynth = true;
+                def.SoundEmitter.SoundId = $"rail:{preset}/{trainKey}/{src.Index}";
+                def.SoundEmitter.Mode = PlaybackMode.LoopOne;
+                def.SoundEmitter.Volume = 1f;
+                def.SoundEmitter.Range = Loudness.AudibleRange(src.LevelDb);
+                def.SoundEmitter.MinDistance = 3f;
+                world.RegisterDefinition(def);
+                Move(id, at, rot, vel);
+            }
+            bool sounded = false;
+            perFrame = t =>
+            {
+                float head = Head(t);
+                for (int i = 0; i < layout.Count; i++)
+                    if (ids[i] is int id) Move(id, new Vector3(head - layout[i].AlongMetres, layout[i].HeightMetres, 0f), rot, vel);
+                float eta = -head / speed;
+                if (!sounded && eta <= hornLead)
+                {
+                    sounded = true;
+                    SoundForCrossing(preset, trainKey, layout, ids, eta);
+                }
+            };
+            Pump(1.5);
+            Record($"train {preset} crossing {lateral:0}m", seconds);
+            perFrame = null;
+            foreach (var id in ids) if (id is int i) Remove(i);
+            Pump(1.5);
+        }
+        // What RailSystem.SoundForCrossings sends: the train's own horn (or whistle) in the crossing
+        // rhythm and its bell until it is on the crossing (TrainSignal), from its warning source.
+        // (Before 2026-10-06 it sent the road vehicle's horn, Honk, on the train's first entity, and
+        // the signal sources were not spawned.)
+        void SoundForCrossing(string preset, string trainKey, IReadOnlyList<TrainLayout.Entry> layout, int?[] ids, float eta)
+        {
+            int warn = TrainSignal.WarningSource(layout), bellAt = TrainSignal.BellSource(layout);
+            if (warn < 0 && bellAt < 0) return;
+            var (warning, bell) = TrainSignal.ForCrossing(eta);
+            if (warn < 0) warning = Array.Empty<float>();
+            if (bellAt < 0) bell = 0f;
+            int from = warn >= 0 ? warn : bellAt;
+            audio.WorldAudio.Receive(new WorldAudioEvent
+            {
+                SourceEntityId = ids[from]!.Value, Label = "horn", Seed = 1,
+                Sounds = new List<TransientSound> { new TransientSound
+                {
+                    Character = SoundCharacter.Ring, Position = Vector3.Zero, LevelDb = layout[from].LevelDb,
+                    DecaySeconds = TrainSignal.Duration(warning, bell), SynthKey = TrainSignal.Key(preset, trainKey, warning, bell),
+                } },
+            }, AudioClock.Now);
+        }
+
+        // Two of the same machine side by side, 1.8 m apart, 3 m in front of you, on a warm day.
+        void TwoMachines(string preset, float celsius, double seconds)
+        {
+            Stand(new Vector3(-60f, 0f, -60f), 0f);
+            world.UpdateAtmosphere(new WorldStateUpdate { Temperature = celsius, Humidity = 0.6f, AirPressure = 101325f, AirAbsorptionMultiplier = 1f });
+            var spec = SmallMachineSpec.ByName(preset);
+            int a = AddEmitter("machine:" + preset, player.Position + new Vector3(-0.9f, 1.7f, 3f), Loudness.AudibleRange(spec.SourceLevelDb), 1.2f);
+            int b = AddEmitter("machine:" + preset, player.Position + new Vector3(0.9f, 1.7f, 3f), Loudness.AudibleRange(spec.SourceLevelDb), 1.2f);
+            Pump(4.0);
+            Record($"two {preset} {celsius:0}C", seconds);
+            Remove(a); Remove(b);
+            world.UpdateAtmosphere(new WorldStateUpdate { Temperature = 15f, Humidity = 0.6f, AirPressure = 101325f, AirAbsorptionMultiplier = 1f });
+            Pump(1.5);
+        }
+
         try
         {
             Pump(2.0);
             Record("silence", 2.0);
+            if (set is "faults")
+            {
+                Landing("piston_single", 40f, 7.0, 9.0);
+                Landing("airliner", 60f, 7.0, 9.0);
+                TrainCrossing("amtrak", 25f, 15f, 30.0);
+                TwoMachines("ac_window", 30f, 20.0);
+            }
+            // A day hot enough that both thermostats call (Thermostat): the two compressors together.
+            if (set is "faults" or "faults-ac") TwoMachines("ac_window", 36f, 20.0);
             var measureSpots = new List<(string, float)>();
             foreach (var side in new[] { "front", "side", "rear" })
                 foreach (var d in new[] { 1f, 2f, 5f, 10f })

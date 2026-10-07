@@ -20,6 +20,11 @@ namespace OpenFPS.Client.Core;
 ///
 /// The answers are <see cref="SpatialService.RaycastSingle"/>'s, to the same thing at the same
 /// distance; only the cost differs.
+///
+/// <para>With a triangle world (geometry stage 2) the fixed boxes are its: the solid ones in its physical
+/// layers, the ones said by name but not solid in its sight-only layer (GeometryLayers.Announced), and a
+/// look asks its tree. The index keeps only what the triangles do not hold: a fixed thing that is not a
+/// box, and anything whose solid changed since the last build.</para>
 /// </summary>
 public sealed class SightGrid
 {
@@ -47,18 +52,32 @@ public sealed class SightGrid
     /// <summary>How many fixed things the index holds, and how many of them are slabs.</summary>
     public (int Things, int Slabs) Size => (_entries.Length, _slabs.Count);
 
-    /// <summary>Whether a thing is indexed: fixed, a solid or an announced thing, and not a door leaf.</summary>
-    private static bool Indexed(in EntitySnapshot e)
+    /// <summary>Whether a thing is one a look can find among the fixed things: fixed, a solid or an
+    /// announced thing, and not a door leaf.</summary>
+    private static bool Seen(in EntitySnapshot e)
         => e.Definition.Type == OpenFPS.Common.Components.EntityType.StaticObject && !e.Definition.Moves
            && (e.Definition.Collider.IsSolid || e.Definition.Identity.Announce)
            && e.Definition.Collider.Size.X > 0f
            && !OpeningGraph.IsDoorLeaf(e.Definition);
 
+    /// <summary>Whether the triangle world holds a thing (EntityGeometry), so a look asks its tree for it.</summary>
+    private static bool InTriangles(in EntitySnapshot e)
+        => EntityGeometry.RoleOf(e.Definition) is GeometryRole.Static or GeometryRole.SightOnly or GeometryRole.Mover;
+
+    /// <summary>Whether this index holds a thing: one a look can find that the triangles do not hold, or
+    /// every one of them when there are no triangles.</summary>
+    private bool Indexed(in EntitySnapshot e) => Seen(e) && !(_triangles && InTriangles(e));
+
+    /// <summary>Whether the index was built for a world with triangles.</summary>
+    private bool _triangles;
+
     /// <summary>Rebuilds the index if the world's fixed things have changed. Counted at most every
     /// <see cref="CheckSeconds"/>, and only when the number of things in the world has changed.</summary>
     public void Refresh(WorldSnapshot world, double now)
     {
-        if (world.Entities.Count == _checkedCount && _entries.Length > 0) return;
+        bool triangles = SpatialService.UsesTriangles(world);
+        if (triangles != _triangles) { _triangles = triangles; _signature = long.MinValue; _checkedCount = -1; }
+        if (world.Entities.Count == _checkedCount && (_entries.Length > 0 || _triangles)) return;
         if (_checkedCount >= 0 && now - _checkedAt < CheckSeconds) return;
         _checkedCount = world.Entities.Count;
         _checkedAt = now;
@@ -122,6 +141,12 @@ public sealed class SightGrid
         foreach (var e in world.DynamicEntities)
             if (Vector3.DistanceSquared(e.Transform.Position, at) <= r2 + e.Definition.Collider.Size.LengthSquared())
                 _nearLoose.Add(e);
+        // A fixed thing whose solid changed since the triangles were built is looked at the old way until
+        // they catch up.
+        if (_triangles && world.GeometryStale is { Count: > 0 } stale)
+            foreach (int id in stale)
+                if (world.Entities.TryGetValue(id, out var e) && Seen(e) && Vector3.DistanceSquared(e.Transform.Position, at) <= r2 + e.Definition.Collider.Size.LengthSquared())
+                    _nearLoose.Add(e);
         for (int i = 0; i < doors.Count; i++)
         {
             var d = doors[i];
@@ -142,6 +167,19 @@ public sealed class SightGrid
         distance = range;
         bool found = false;
         if (++_stampNow == int.MaxValue) { Array.Clear(_stamp); _stampNow = 1; }
+
+        // The fixed boxes, from the triangle world: where the ray enters the first one the look stops at, or
+        // at once if it starts inside one, as the box test had it.
+        if (_triangles && world.Geometry is { } geo)
+        {
+            var look = new Looks { World = world, Stops = accept, Stale = world.GeometryStale };
+            if (geo.Enter(origin, dir, range, OpenFPS.Common.Geometry.GeometryLayers.Sight | OpenFPS.Common.Geometry.GeometryLayers.Announced,
+                          ref look, out var h)
+                && h.T < distance && world.Entities.TryGetValue(h.Owner, out var e))
+            {
+                distance = h.T; hit = e; found = true;
+            }
+        }
 
         foreach (int s in _nearSlabs) TestEntry(world, s, origin, dir, accept, ref hit, ref distance, ref found);
         for (int i = 0; i < _nearLoose.Count; i++)
@@ -176,6 +214,16 @@ public sealed class SightGrid
             else { cz += stepZ; nextZ += tDeltaZ; }
         }
         return found;
+    }
+
+    /// <summary>What a look stops at, asked of a triangle's owner.</summary>
+    private struct Looks : OpenFPS.Common.Geometry.IGeometryFilter
+    {
+        public WorldSnapshot World;
+        public Func<EntitySnapshot, bool> Stops;
+        public IReadOnlySet<int>? Stale;
+        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
+            => (Stale == null || !Stale.Contains(owner)) && World.Entities.TryGetValue(owner, out var e) && Seen(e) && Stops(e);
     }
 
     private void TestEntry(WorldSnapshot world, int idx, Vector3 origin, Vector3 dir, Func<EntitySnapshot, bool> accept,

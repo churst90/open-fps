@@ -1,0 +1,16 @@
+{
+  "Id": "brick_arch",
+  "Name": "Brick Arch",
+  "Description": "A brick arch 3 m wide, 3.5 m high and 60 cm deep: a half-elliptical opening 2 m wide and 3 m high through it along Z, half a metre of brick over it and on either side.",
+  "Material": "Brick",
+  "ColliderSize": {
+    "X": 3.0,
+    "Y": 3.5,
+    "Z": 0.6
+  },
+  "Form": {
+    "Kind": "Arch",
+    "Thickness": 0.5
+  },
+  "Type": "StaticObject"
+}

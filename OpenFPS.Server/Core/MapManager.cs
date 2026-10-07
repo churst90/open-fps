@@ -77,6 +77,96 @@ public class MapManager
     /// is the difference between a fifteen-minute fix and a session spent believing the audio engine
     /// has gone wrong.
     /// </summary>
+    /// <summary>
+    /// A map entity's form over its prefab's (a ramp, a flight of stairs, an arch), and either one checked
+    /// against the box it must fill: a form that cannot be made is said, and the entity is a box.
+    /// </summary>
+    private static void ApplyForm(World world, Entity entity, Repositories.EntityData entityData, string mapId)
+    {
+        if (!world.Has<ColliderComponent>(entity)) return;
+        ref var col = ref world.Get<ColliderComponent>(entity);
+        if (entityData.Form != null) col.Form = entityData.Form;
+        if (col.Form == null) return;
+        if (col.Form.Kind == OpenFPS.Common.Geometry.ShapeKind.Box) { col.Form = null; return; }
+        if (OpenFPS.Common.Geometry.Shapes.Problem(col.Form, col.Size, PhysicsConstants.StepHeight) is { } problem)
+        {
+            Log.Warning("MapManager: '{Map}' entity {Id} ({Prefab}): its form ({Form}) cannot be made: {Problem}. It is a box.",
+                        mapId, entityData.EntityId, entityData.PrefabId, col.Form, problem);
+            col.Form = null;
+        }
+    }
+
+    /// <summary>The prefab the loader lays as a map's ground where it has none: dirt, ten metres square,
+    /// scaled to the bounds. Later the top of a soil profile (docs/GEOMETRY.md, stage 5).</summary>
+    public const string NaturalGroundPrefab = "dirt_floor";
+
+    /// <summary>Every entity's turn made unit length, a zero turn the identity. Once per load.</summary>
+    internal static void NormaliseTurns(MapData m)
+    {
+        foreach (var e in m.Entities)
+        {
+            var q = e.Rotation;
+            float l2 = q.LengthSquared();
+            if (l2 < 1e-12f || !float.IsFinite(l2)) e.Rotation = Quaternion.Identity;
+            else if (l2 != 1f) e.Rotation = Quaternion.Normalize(q);
+        }
+    }
+
+    /// <summary>
+    /// Whether the solid floors at ground level (a top between a metre below and half a metre above 0)
+    /// cover the whole of [min, max] seen from above, sampled at cell centres no more than 2 m apart
+    /// (at most 128 a side). A ground made of many slabs counts as well as one.
+    /// </summary>
+    internal static bool GroundCovers(World world, Vector3 min, Vector3 max)
+    {
+        var floors = new List<(Vector3 Centre, Vector2 Half, Quaternion Inverse, Vector2 Lo, Vector2 Hi)>();
+        var q = new QueryDescription().WithAll<Transform, ColliderComponent>();
+        world.Query(in q, (Entity e, ref Transform t, ref ColliderComponent c) =>
+        {
+            if (!c.IsSolid || c.Shape != ColliderShape.Box) return;
+            if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<DoorComponent>(e)) return;
+            if (world.Has<EntityType>(e) && world.Get<EntityType>(e) != EntityType.StaticObject) return;
+            float top = t.Position.Y + c.Size.Y / 2f;
+            if (top < -1f || top > 0.5f) return;
+            var rot = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(t.Rotation);
+            var half = OpenFPS.Common.Systems.FaceOpenings.AxisAlignedHalfExtents(c.Size * 0.5f, rot);
+            floors.Add((t.Position, new Vector2(c.Size.X / 2f, c.Size.Z / 2f), Quaternion.Inverse(rot),
+                        new Vector2(t.Position.X - half.X, t.Position.Z - half.Z), new Vector2(t.Position.X + half.X, t.Position.Z + half.Z)));
+        });
+        if (floors.Count == 0) return false;
+
+        float w = max.X - min.X, d = max.Z - min.Z;
+        if (w <= 0f || d <= 0f) return true;
+        int nx = Math.Clamp((int)MathF.Ceiling(w / 2f), 1, 128), nz = Math.Clamp((int)MathF.Ceiling(d / 2f), 1, 128);
+        // Bucket the floors by the sample columns they can cover, so a town of slabs is not a scan of
+        // all of them at every point.
+        var buckets = new List<int>[nx * nz];
+        for (int i = 0; i < floors.Count; i++)
+        {
+            var f = floors[i];
+            int x0 = Math.Max(0, (int)MathF.Floor((f.Lo.X - min.X) / w * nx)), x1 = Math.Min(nx - 1, (int)MathF.Floor((f.Hi.X - min.X) / w * nx));
+            int z0 = Math.Max(0, (int)MathF.Floor((f.Lo.Y - min.Z) / d * nz)), z1 = Math.Min(nz - 1, (int)MathF.Floor((f.Hi.Y - min.Z) / d * nz));
+            for (int z = z0; z <= z1; z++)
+                for (int x = x0; x <= x1; x++)
+                    (buckets[z * nx + x] ??= new List<int>()).Add(i);
+        }
+        for (int z = 0; z < nz; z++)
+            for (int x = 0; x < nx; x++)
+            {
+                var p = new Vector3(min.X + (x + 0.5f) * w / nx, 0f, min.Z + (z + 0.5f) * d / nz);
+                bool covered = false;
+                if (buckets[z * nx + x] is { } list)
+                    foreach (int i in list)
+                    {
+                        var f = floors[i];
+                        var local = Vector3.Transform(new Vector3(p.X - f.Centre.X, 0f, p.Z - f.Centre.Z), f.Inverse);
+                        if (MathF.Abs(local.X) <= f.Half.X + 1e-3f && MathF.Abs(local.Z) <= f.Half.Y + 1e-3f) { covered = true; break; }
+                    }
+                if (!covered) return false;
+            }
+        return true;
+    }
+
     private void ValidateTracks(MapData m, World world)
     {
         if (m.Tracks == null || m.Tracks.Count == 0) return;
@@ -176,12 +266,32 @@ public class MapManager
     /// test rig that does not keep them; the access then lives in memory only.</summary>
     public MapAccessRepository? Access { get; set; }
 
+    /// <summary>The world editor's edits, one overlay file per map, laid over each map's own data as it
+    /// loads (docs/WORLD_EDITOR.md section 7). Null in a test rig that keeps none.</summary>
+    public Editor.MapOverlayStore? Overlays { get; set; }
+
+    /// <summary>
+    /// Each map's authored entity ids (the EntityId in the map file, or the one its overlay gave) to the
+    /// runtime entity made from it. The world editor names things by the authored id, which is the same
+    /// every load; the runtime id is not.
+    /// </summary>
+    private readonly Dictionary<string, Dictionary<int, Entity>> _authored = new();
+
+    /// <summary>The authored ids of a map's things, and the entities made from them (the editor's index).</summary>
+    public Dictionary<int, Entity> AuthoredEntities(string mapId)
+    {
+        if (!_authored.TryGetValue(mapId, out var map)) _authored[mapId] = map = new Dictionary<int, Entity>();
+        return map;
+    }
+
     public void Initialize()
     {
         foreach (var m in _mapRepo.LoadAll())
         {
             Access?.ApplyTo(m);
+            Overlays?.ApplyBefore(m);
             CreateMapInstance(m);
+            Overlays?.ApplyAfter(this, m.Id);
         }
 
         // After the maps are in, not before: asking for one that does not exist has to be a named
@@ -230,8 +340,13 @@ public class MapManager
         // On a map streamed in tiles, the layer of everything that came from the file (MapTiles).
         var layers = m.TileMetres > 0f ? new Dictionary<int, string?>() : null;
 
-        bool foundationExists = false;
-        
+        // Every turn made unit length before anything reads it. Maps write quaternions in six digits
+        // (0.707082, 0.707131 is not unit length), and code that turns a box by such a quaternion with
+        // Vector3.Transform scales it by the length squared: a slab's top a float's last bit low on
+        // one path and not on another. Once, here, so the server, its triangles, its boxes and every
+        // client (sent the same floats) all read the same turn.
+        NormaliseTurns(m);
+
         // 1st Pass: Spawn everything
         foreach (var entityData in m.Entities)
         {
@@ -253,6 +368,7 @@ public class MapManager
                 }
 
                 ApplyRoomMaterials(world, entity, entityData, m.Id);
+                ApplyForm(world, entity, entityData, m.Id);
 
                 // Which side of THIS door is locked, and which way it is pushed: where a door is put
                 // decides both, so the map may say, over the prefab.
@@ -271,12 +387,6 @@ public class MapManager
                     ref var r = ref world.Get<RegionComponent>(entity);
                     r.IsIndoor = entityData.IsIndoor.Value;
                     indoorAuthored.Add(entity.Id);
-                }
-
-                if (entityData.PrefabId.Equals("concrete_floor", StringComparison.OrdinalIgnoreCase) && 
-                    Vector3.Distance(entityData.Position, Vector3.Zero) < 0.1f)
-                {
-                    foundationExists = true;
                 }
 
                 // Track minimum Y for safety floor
@@ -375,16 +485,19 @@ public class MapManager
 
         SurveyRegions(world, m, materialsAuthored, indoorAuthored);
 
-        // AUTO-GENERATE FOUNDATION if missing
-        if (!foundationExists)
+        // The ground, where the map has none of its own. A new world is dirt: natural ground, on which
+        // concrete, grass and asphalt are laid (Cody, 2026-10-06). A map whose own ground covers the
+        // whole of where people can walk gets nothing: the city, Magnolia and Albany each lay their
+        // own, and a concrete slab added flush under it was met wherever ties went its way.
+        if (!GroundCovers(world, m.WalkMin, m.WalkMax))
         {
-            Log.Information("MapManager: No foundation detected for '{Id}'. Injecting auto-scaled foundation.", m.Id);
+            Log.Information("MapManager: '{Id}' has no ground of its own under all of its play area. Laying natural ground (Dirt) under its bounds.", m.Id);
             Vector3 mapSize = m.MaxBound - m.MinBound;
             // Under the whole of the bounds, top surface at Y=0. Centred on the bounds, not on the
             // origin: the speedway's bounds are not centred on 0, nor the city's, and a foundation
             // centred on 0 left a strip along one edge with no floor — walk into it and you fell.
             Vector3 centre = (m.MinBound + m.MaxBound) * 0.5f;
-            var foundation = _prefabRepo.Spawn(world, "concrete_floor", new Vector3(centre.X, -0.05f, centre.Z), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
+            var foundation = _prefabRepo.Spawn(world, NaturalGroundPrefab, new Vector3(centre.X, -0.05f, centre.Z), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
             // It is the ground, and is called so: a round that ends in it was "Hit Concrete Floor at 9
             // metres", out on the city's open grass.
             if (world.Has<IdentityComponent>(foundation)) world.Get<IdentityComponent>(foundation).Name = "Ground";
@@ -420,6 +533,7 @@ public class MapManager
         Log.Information("MapManager: Loaded map '{Id}' with {Count} entities. Void Plane (MinimumY): {MinY}", m.Id, m.Entities.Count, m.MinimumY);
         
         _maps[m.Id] = (world, m.Size, grid, lookup, m);
+        _authored[m.Id] = new Dictionary<int, Entity>(authored);
         if (layers != null)
         {
             var tiles = MapTiles.Build(world, m.TileMetres, m.MinBound, m.MaxBound, layers);
@@ -692,6 +806,20 @@ public class MapManager
     public Entity SpawnPrefab(string mapId, string prefabId, Vector3 position)
         => SpawnEntity(mapId, w => _prefabRepo.Spawn(w, prefabId, position));
 
+    /// <summary>A prefab made into a live entity on a map, turned, scaled and named as a map file would
+    /// have it (the world editor's way in).</summary>
+    public Entity SpawnPrefab(string mapId, string prefabId, Vector3 position, Quaternion rotation, Vector3 scale, string? name)
+        => SpawnEntity(mapId, w =>
+        {
+            var e = _prefabRepo.Spawn(w, prefabId, position, rotation, scale, name);
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                if (w.Has<NameComponent>(e)) w.Get<NameComponent>(e).Name = name;
+                if (w.Has<IdentityComponent>(e)) w.Get<IdentityComponent>(e).Name = name;
+            }
+            return e;
+        });
+
     public Entity SpawnEntity(string mapId, Func<World, Entity> create)
     {
         if (!_maps.TryGetValue(mapId, out var data))
@@ -731,7 +859,7 @@ public class MapManager
             if (_geometry.TryGetValue(mapId, out var geometry))
             {
                 data.grid.AddUnindexed(entity);
-                geometry.MarkDirty();
+                geometry.NoteIndexed(entity);
             }
         }
     }
@@ -775,20 +903,18 @@ public class MapManager
     public void RefreshGrid(string mapId)
     {
         if (!_maps.TryGetValue(mapId, out var data)) return;
-        data.grid.ClearAll();
-        int gridCount = 0;
-        
-        data.world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) =>
+        // Only what changed, once the map's fixed things have been filed whole (ServerGeometry.Refresh).
+        if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled && OpenFPS.Common.Geometry.TriangleGeometry.Incremental
+            && _geometry.TryGetValue(mapId, out var known) && known.Primed)
         {
-            // Only geometry that stays put. The same test IndexEntity uses, and it has to be the same
-            // one: anything that moves is rebuilt into the dynamic half every tick, so a static entry
-            // for it is a permanent ghost of wherever it happened to be when this ran. That was
-            // harmless while nothing but players and traffic moved — both spawned after the last
-            // refresh — and stops being harmless the moment a building can drive away.
-            if (data.world.Has<Velocity>(e) || data.world.Has<PlayerComponent>(e)) return;
-            data.grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, isStatic: true);
-            gridCount++;
-        });
+            known.Refresh(data.world, data.grid, g => FileStatics(data.world, g));
+            if (known.LastChanged > 0)
+                Log.Information("MapManager: '{Id}': {Changed} fixed thing(s) changed, filed again in {Ms:F1} ms ({Built} tile(s) built).",
+                                mapId, known.LastChanged, known.LastRefreshMs, known.LastBuilt);
+            return;
+        }
+        data.grid.ClearAll();
+        int gridCount = FileStatics(data.world, data.grid);
 
         // The same static geometry as triangles: only the tiles whose solids changed are built again.
         if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled)
@@ -809,6 +935,24 @@ public class MapManager
         {
             Log.Information("MapManager: Refreshed static spatial grid for '{Id}'. Entities indexed: {Count}", mapId, gridCount);
         }
+    }
+
+    /// <summary>Every fixed thing of a world into a grid's static half; how many.</summary>
+    internal static int FileStatics(World world, SpatialGrid<Entity> grid)
+    {
+        int gridCount = 0;
+        world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) =>
+        {
+            // Only geometry that stays put. The same test IndexEntity uses, and it has to be the same
+            // one: anything that moves is rebuilt into the dynamic half every tick, so a static entry
+            // for it is a permanent ghost of wherever it happened to be when this ran. That was
+            // harmless while nothing but players and traffic moved — both spawned after the last
+            // refresh — and stops being harmless the moment a building can drive away.
+            if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e)) return;
+            grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, isStatic: true);
+            gridCount++;
+        });
+        return gridCount;
     }
 
     public bool TryGetMap(string id, out World world, out Vector3 size, out SpatialGrid<Entity> grid, out Dictionary<int, Entity> lookup)
@@ -878,6 +1022,11 @@ public class MapManager
     public bool IsOwner(string mapId, string username)
         => TryGetMapData(mapId, out var data) && !string.IsNullOrWhiteSpace(data.OwnerId)
         && data.OwnerId.Equals(username, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether the owner of a loaded map has made a username one of its editors (/map editor add).</summary>
+    public bool IsEditor(string mapId, string username)
+        => TryGetMapData(mapId, out var data)
+        && data.Editors.Any(n => n.Equals(username, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The loaded maps a username owns.</summary>
     public List<string> OwnedBy(string username)

@@ -68,7 +68,7 @@ string[] usage =
     "  --tap-balance                                 each machine's rear voice against its front voice",
     "  --car-fronts [preset ...] [out= tag= ambient=] the whole voice from in front, behind, and passing at 10 km/h",
     "  --binaural-input                              a mono voice through the binaural stage in FMOD against the HRTF alone",
-    "  --game-levels [out=DIR] [set=measure|render|compare|all] [cars=a,b]  one thing at a time through the real mixer, captured",
+    "  --game-levels [out=DIR] [set=measure|render|compare|all|faults] [cars=a,b]  one thing at a time through the real mixer, captured",
     "  --wide-sources [out=DIR] [set=measure|render|level|all] [wide=on|off] [sec=]  a tree, the fountain, the fire and rain through the game path, for interaural coherence",
     "  --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]  texture statistics and game-level texture files",
     "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
@@ -129,7 +129,7 @@ string[] usage =
     "  --room-walk                                   the wood room walked with the megaphone on, captured",
     "  --walk [map= from= to= via= y= trace sprint]  the real movement and ground probe over a real map",
     "  --enclosure [map= at= walk=]                  what the room round a listener measures, and its send",
-    "  --path-probe [map=city] ear=x,y,z src=x,y,z   what the occlusion worker hands the mixer",
+    "  --path-probe [map=city] ear=x,y,z src=x,y,z   what the occlusion worker hands the mixer (door= open= swings= traced)",
     "  --siren-route [map= track= at=]               a car's path to a fixed listener, frame by frame",
     "  --pop-hunt [map=city] ear=x,y,z [sec= cars=]  cars driving the streets; paths that jump and come back",
     "  --room-echoes [map=city] ear= src=            the placed reflections a one-off sound gets",
@@ -144,7 +144,7 @@ string[] usage =
     "  --scene-cost [map=city]                       what rebuilding the Steam Audio scenes costs",
     "  --distant-woods [set=sum|walk|all] [out=DIR]   a wood from 300-800 m: the sum of its trees against the wood heard as one; the walk up to it",
     "  --tile-scenes [map=magnolia_tx]                Steam Audio scene per tile on Embree against one mesh: cost and answers",
-    "  --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium]  a streamed map walked: tile costs, worker gaps",
+    "  --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [stops=M]  a streamed map walked: tile costs, worker gaps",
     "  --geometry [map=magnolia_tx] [terrain=5] [sa=1] the world as triangles: BVH and Steam Audio costs (docs/GEOMETRY.md)",
     "  --geometry-parity [map=city] [n=4000] [only=rays,ground,...] old box path and triangle world side by side, every difference",
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
@@ -535,6 +535,14 @@ if (args.Contains("--wet-roads"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.WetRoadSpike.Run(args));
 }
 
+if (args.Contains("--driving"))
+{
+    // --driving out=DIR [set=all|horn|siren|bend|rails|gates|aircraft]: the driving controls and aids
+    // (docs/DRIVING_AIDS.md) through the game: horns, siren, a turn with and without the brake cue, the
+    // rails, the gates, an aeroplane's roll-out.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.DrivingSpike.Run(args));
+}
+
 if (args.Contains("--cabin"))
 {
     // --cabin [game out=DIR paths=on|off set=all|car|bus|police | model out=DIR]: sitting in a vehicle,
@@ -772,6 +780,11 @@ if (args.Contains("--stream-walk"))
 {
     // --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [heading=east]: tiles streamed as you move.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.StreamWalkSpike.Run(args));
+}
+if (args.Contains("--stair-walk"))
+{
+    // --stair-walk [scene=shapes|city] [sprint] [trace]: up and down real treads, every footfall checked (docs/GEOMETRY.md stage 2).
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.StairWalkSpike.Run(args));
 }
 if (args.Contains("--geometry-parity"))
 {

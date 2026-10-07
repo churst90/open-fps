@@ -4,6 +4,7 @@ using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
+using OpenFPS.Common.Geometry;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using Serilog;
@@ -107,6 +108,10 @@ public static class DrivingSystem
         public required WheelDynamics Body;
         public required WheelState[] Wire;
         public byte Surface = RoadSurfaces.IndexOf(RoadData.DefaultSurface);
+        /// <summary>The surface under each wheel from the last tick's wheel rays, when the map has a
+        /// triangle world; null leaves every wheel on <see cref="Surface"/>.</summary>
+        public byte[]? WheelSurfaces;
+        public WheelContact[]? Contacts;
     }
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, Running> _running = new();
@@ -289,7 +294,9 @@ public static class DrivingSystem
         // lets go first. The same model the traffic is driven on.
         body.Vx = v;
         body.ForwardOnly = false;
-        body.SetSurface(running.Surface);
+        if (running.WheelSurfaces is { } under && under.Length == body.Wheels.Length)
+            for (int i = 0; i < under.Length; i++) body.SetSurface(i, under[i]);
+        else body.SetSurface(running.Surface);
         // The water under each wheel, where that wheel is: a puddle at the kerb is under the kerb-side
         // wheels and not the others.
         if (_mapId != null)
@@ -335,6 +342,36 @@ public static class DrivingSystem
         aboard.AddRange(CompositeService.OccupantsOf(world, root.Id));
         wanted.Y = PhysicsUtils.GetGroundHeight(world, grid, wanted, aboard, out string ground);
         running.Surface = RoadSurfaces.IndexOf(ground);
+        // On its wheels (docs/GEOMETRY.md 3.11): a ray down at each, its own height, normal and surface. The
+        // car sits at their mean height and pitches and rolls with them: a wheel off a kerb drops that
+        // corner, a slope tilts the whole car. The box path's car sat level on the floor under its middle.
+        float pitch = 0f, roll = 0f;
+        var geometry = TriangleGeometry.Enabled ? grid.Geometry : null;
+        if (geometry != null && body.Wheels.Length > 0 && body.Wheels.Length <= 16)
+        {
+            Span<Vector3> at = stackalloc Vector3[body.Wheels.Length];
+            Span<float> along = stackalloc float[body.Wheels.Length], across = stackalloc float[body.Wheels.Length];
+            var contacts = running.Contacts ??= new WheelContact[body.Wheels.Length];
+            float cog = body.Chassis.CentreOfGravityZ;
+            for (int i = 0; i < body.Wheels.Length; i++)
+            {
+                ref var w = ref body.Wheels[i];
+                along[i] = w.X + cog; across[i] = w.Y;
+                at[i] = wanted + heading * along[i] + right * across[i];
+                at[i].Y = transform.Position.Y;
+            }
+            var mine = new WheelFilter(aboard, root.Id);
+            WheelRays.Contacts(geometry, ref mine, at, PhysicsConstants.StepHeight, contacts);
+            var (h, p, r) = WheelRays.Rest(contacts, along, across);
+            if (!float.IsNaN(h) && MathF.Abs(h - wanted.Y) <= PhysicsConstants.StepHeight + 0.01f)
+            {
+                wanted.Y = h; pitch = p; roll = r;
+                var surfaces = running.WheelSurfaces ??= new byte[body.Wheels.Length];
+                for (int i = 0; i < contacts.Length; i++)
+                    surfaces[i] = contacts[i].Found ? RoadSurfaces.IndexOf(contacts[i].Material) : running.Surface;
+            }
+            else running.WheelSurfaces = null;
+        }
         wanted = Vector3.Clamp(wanted, mapMin, mapMax);
 
         // Hitting something stops it, and now it is audible. The IMPULSE and the damage are still to
@@ -354,7 +391,9 @@ public static class DrivingSystem
             transform.Position = wanted;
         }
 
-        transform.Rotation = Quaternion.CreateFromYawPitchRoll(drive.Heading, 0f, 0f);
+        // Pitch about the car's own right, nose up positive; roll about its own forward, right side up. A
+        // positive pitch in CreateFromYawPitchRoll tips the nose down, so the nose-up pitch goes in negated.
+        transform.Rotation = Quaternion.CreateFromYawPitchRoll(drive.Heading, -pitch, roll);
         transform.IsDirty = true;
 
         ref var velocity = ref world.Get<Velocity>(root);
@@ -372,6 +411,20 @@ public static class DrivingSystem
         {
             ref var vehicle = ref world.Get<VehicleComponent>(root);
             vehicle.Speed = drive.Speed;
+        }
+    }
+
+    /// <summary>The ground a car's wheels stand on: not its own parts, not who is aboard it.</summary>
+    private readonly struct WheelFilter : IGeometryFilter
+    {
+        private readonly List<Entity> _skip;
+        private readonly int _root;
+        public WheelFilter(List<Entity> skip, int root) { _skip = skip; _root = root; }
+        public bool Accept(int owner, in Surface surface)
+        {
+            if (owner == _root) return false;
+            foreach (var e in _skip) if (e.Id == owner) return false;
+            return true;
         }
     }
 

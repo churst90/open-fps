@@ -625,6 +625,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         var wheelAxle = new int[nw];
         for (int i = 0; i < nw; i++) { wheelAxle[i] = body.Wheels[i].Axle; _wheelWetSqueal[i] = 1f; _wheelGain[i] = 1f; }
         _wet = new OpenFPS.Client.AudioEngine.Core.WetTyres(v, body.Wheels.Select(w => w.Front).ToArray(), wheelAxle, sampleRate, seed + 131);
+        _strikes = new OpenFPS.Client.AudioEngine.Core.WheelStrikes(body.Wheels.Select(w => w.Radius).ToArray(), sampleRate);
+        _strikeNow = new float[nw];
         float cogZ = chassis.CentreOfGravityZ;
         for (int i = 0; i < nw; i++)
         {
@@ -1316,9 +1318,19 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
     /// <summary>Integrates <paramref name="count"/> samples of engine into the ring.</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    /// <summary>Each wheel struck by a step in the road (a rail): see WheelStrikes. Game thread.</summary>
+    public void QueueStrikes(IReadOnlyList<OpenFPS.Client.AudioEngine.Core.WheelStrike> strikes) => _strikes.Queue(strikes);
+
+    private readonly OpenFPS.Client.AudioEngine.Core.WheelStrikes _strikes;
+    /// <summary>This sample's strike on each wheel, pascals at a metre, for the cabin's paths.</summary>
+    private readonly float[] _strikeNow;
+    private bool _strikesLeftOver;
+
     private void Synthesize(int count)
     {
         float dt = 1f / SampleRate;
+        _strikes.Drain(_written, Volatile.Read(ref _played), OpenFPS.Common.AudioClock.Now, SampleRate, ConsumeRate);
+        long strikeBase = _written;
         float gain = 1f / MathF.Max(1f, PascalsAtFullScale);
         float target = TargetSpeed;
         Driver.Running = Running;
@@ -1444,6 +1456,22 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             }
             float rearTyre = tyreRear * PerAxle * TyreMix;
             float frontTyre = tyreFront * PerAxle * TyreMix;
+            // A wheel over a rail: its strike out through its end's tap, with its own distance gain.
+            if (_strikes.Busy)
+            {
+                _strikes.Advance(strikeBase + i);
+                float sf = 0f, sr = 0f;
+                for (int k = 0; k < _strikeNow.Length; k++)
+                {
+                    float x = _strikes.Out(k);
+                    _strikeNow[k] = x;
+                    if (_wheelFront[k]) sf += x * _wheelGain[k]; else sr += x * _wheelGain[k];
+                }
+                frontTyre += sf * (TyreMix / DefaultTyreMix);
+                rearTyre += sr * (TyreMix / DefaultTyreMix);
+                _strikesLeftOver = true;
+            }
+            else if (_strikesLeftOver) { Array.Clear(_strikeNow); _strikesLeftOver = false; }
             // The water: already pascals at a metre, each end's wheels at that end's tap.
             _wet.Step();
             rearTyre += _wet.Rear * wetMix;
@@ -1604,6 +1632,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                         : VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, (_wheelFront[q] ? frontSlip : rearSlip) + _tyreChirp, _rng,
                                             ref _cornerTyre[q], _cornerPa[q], _cornerRadius[q], sampleRate: SampleRate,
                                             squealScale: 1f / MathF.Sqrt(lay.GroupWheels[q]), toneScale: 0f);
+                    // A rail under this wheel comes in through its arch with the rest of it.
+                    if (q < _strikeNow.Length) corner += _strikeNow[q] / (PerAxle * DefaultTyreMix);
                     int pq = lay.PathOfWheel[q];
                     float src = corner * TyreToPanels * TyreMix;
                     _pathLp[pq] += (src - _pathLp[pq]) * panelA;

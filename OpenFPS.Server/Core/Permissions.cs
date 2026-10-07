@@ -52,11 +52,25 @@ public static class Permissions
     /// <summary>Holding and firing the admin gun, and setting it: /calibre, /admingun. The admin's alone.</summary>
     public const string AdminGun = "admin-gun";
 
+    /// <summary>The world editor (F12, /edit): on any map with it, on your own map without it, and on a
+    /// map whose owner made you one of its editors (<see cref="ForMapEditors"/>). docs/WORLD_EDITOR.md.</summary>
+    public const string Edit = "edit";
+    /// <summary>Changing a model in the library (a machine, a fountain), which changes it on every map.</summary>
+    public const string EditModels = "edit-models";
+
     /// <summary>The permissions that are powers within a command rather than commands of their own.</summary>
     public static readonly IReadOnlyList<string> Powers = new[]
     {
         FireAny, JoinPrivate, EditAny, MovePlayer, GivePremium, TeleportFree, GrantAny, PermsAny, Protected, MapsAny, AdminGun,
+        EditModels,
     };
+
+    /// <summary>
+    /// Whether a permission is also held on a map whose owner made you one of its editors
+    /// (/map editor add NAME). Only the world editor: an invited editor may change the map with it and
+    /// do nothing else an owner may (no /spawn, no /savemap).
+    /// </summary>
+    public static bool ForMapEditors(string permission) => permission == Edit;
 
     private static readonly UserRole[] Mod = { UserRole.Moderator }, Dev = { UserRole.Dev },
         ModDev = { UserRole.Moderator, UserRole.Dev }, AdminOnly = Array.Empty<UserRole>();
@@ -94,6 +108,8 @@ public static class Permissions
         ["removeseat"] = (Dev, "remove a seat, on any map", true),
         ["drivable"] = (Dev, "make a group drivable, on any map", true),
         ["savemap"] = (Dev, "save the map, on any map", true),
+        [Edit] = (Dev, "edit the world with the world editor, F12, on any map", true),
+        [EditModels] = (Dev, "change a model in the library, which changes it on every map", false),
         ["weather"] = (Dev, "set the weather and the wind for the whole server", false),
         [EditAny] = (Dev, "change things other people built", false),
         ["grant"] = (Dev, "give a player a single permission you have yourself", false),

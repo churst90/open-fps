@@ -189,11 +189,86 @@ public static class EarlyReflections
     {
         into.Clear();
         if (solids == null || solids.Count == 0) return;
+        FindIn(new Scene(solids, null), source, listener, into, speedOfSound, maxOrder, separateFirst, flutter, keep, maxExtraPathMetres);
+    }
+
+    /// <summary>
+    /// The same, asked of a triangle world's acoustic solids (geometry stage 2): the surfaces near the path
+    /// found by its tree rather than by a pass over every solid, and each leg asked of the tree rather than
+    /// of every near solid, so the cost no longer grows with the square of what is near (a call in dense
+    /// woods). The mirrors are each solid's box faces, as before; a surface's identity is its owner's.
+    /// </summary>
+    public static void Find(Vector3 source, Vector3 listener, Geometry.TriangleWorld world,
+                            List<Arrival> into, float speedOfSound = 343.0f,
+                            int maxOrder = 1, bool separateFirst = false, bool flutter = false, int keep = 0,
+                            float maxExtraPathMetres = RangeMetres)
+    {
+        into.Clear();
+        if (world == null || world.InstanceCount == 0) return;
+        FindIn(new Scene(null, world), source, listener, into, speedOfSound, maxOrder, separateFirst, flutter, keep, maxExtraPathMetres);
+    }
+
+    /// <summary>
+    /// Where the surfaces come from: a list of boxes (each known by its index in it), or a triangle world's
+    /// acoustic layer (each known by its owner). Either way the near ones are handed back as boxes.
+    /// </summary>
+    private readonly struct Scene
+    {
+        public readonly IReadOnlyList<Solid>? List;
+        public readonly Geometry.TriangleWorld? World;
+        public Scene(IReadOnlyList<Solid>? list, Geometry.TriangleWorld? world) { List = list; World = world; }
+
+        /// <summary>Every solid whose bounds meet the box [lo, hi], as a box and its id: the candidates a
+        /// caller then tests exactly.</summary>
+        public void Within(Vector3 lo, Vector3 hi, List<Solid> into, List<int> ids)
+        {
+            into.Clear(); ids.Clear();
+            if (World != null)
+            {
+                var refs = _refs ??= new List<Geometry.SolidRef>(256);
+                refs.Clear();
+                var all = new Geometry.AcceptAll();
+                World.Overlapping(lo, hi, Geometry.GeometryLayers.Acoustics, ref all, refs);
+                foreach (var r in refs)
+                {
+                    var (c, size, rot) = World.BoxOf(r);
+                    if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) continue;
+                    into.Add(new Solid(c, size, rot, World.SurfaceOf(r).Material));
+                    ids.Add(World.OwnerOf(r));
+                }
+                return;
+            }
+            for (int i = 0; i < List!.Count; i++) { into.Add(List[i]); ids.Add(i); }
+        }
+
+        /// <summary>Whether the straight run a-b is clear of everything but the two solids named (an id
+        /// of -1 names none), among <paramref name="local"/> for a list.</summary>
+        public bool Clear(Vector3 a, Vector3 b, List<Solid> local, List<int> ids, int skip, int skip2)
+        {
+            if (World == null) return LegIsClearAmong(a, b, local, ids, skip, skip2);
+            var d = b - a;
+            float len = d.Length();
+            if (len < 2f * LegEndSlack) return true;
+            var except = new Geometry.ExceptOwners(skip, skip2);
+            // A leg begins and ends on a face (the one reflecting, and the source or the ear): a face it
+            // only touches at an end is not in its way, as the box test did not count a touch.
+            return !World.Any(a, d / len, len - LegEndSlack, Geometry.GeometryLayers.Acoustics, Geometry.RayFaces.Both, ref except,
+                              tMin: LegEndSlack);
+        }
+    }
+
+    /// <summary>How near a leg's ends a face is taken to be touching it rather than in its way, metres.</summary>
+    private const float LegEndSlack = 1e-4f;
+
+    private static void FindIn(Scene scene, Vector3 source, Vector3 listener, List<Arrival> into, float speedOfSound,
+                               int maxOrder, bool separateFirst, bool flutter, int keep, float maxExtraPathMetres)
+    {
 
         float direct = Vector3.Distance(source, listener);
         if (direct < 1e-3f) return;
         float heard = HeardReference(direct);
-        (_mirrors ??= new List<(int, int, float)>()).Clear();
+        (_mirrors ??= new List<(Solid, int, int, float)>()).Clear();
+        (_footprints ??= new List<float>()).Clear();
 
         // The solids that can matter, once. Any surface on a path no longer than direct + extra
         // lies inside the ellipsoid with the source and the listener at its foci, and that sits
@@ -202,16 +277,19 @@ public static class EarlyReflections
         // every leg test below walks this list and not the city: 73 ms a footstep down to about 1.
         var near = _local ??= new List<Solid>(256);
         var nearIndex = _localIndex ??= new List<int>(256);
+        var candidates = _candidates ??= new List<Solid>(256);
+        var candidateIds = _candidateIds ??= new List<int>(256);
         near.Clear(); nearIndex.Clear();
         Vector3 mid = (source + listener) * 0.5f;
         float half = (direct + maxExtraPathMetres) * 0.5f;
-        for (int i = 0; i < solids.Count; i++)
+        scene.Within(mid - new Vector3(half), mid + new Vector3(half), candidates, candidateIds);
+        for (int c = 0; c < candidates.Count; c++)
         {
-            var s = solids[i];
+            var s = candidates[c];
             if (s.Size.X <= 0f || s.Size.Y <= 0f || s.Size.Z <= 0f) continue;
             float reach = half + s.Size.Length() * 0.5f;
             if (Vector3.DistanceSquared(mid, s.Center) > reach * reach) continue;
-            near.Add(s); nearIndex.Add(i);
+            near.Add(s); nearIndex.Add(candidateIds[c]);
         }
 
         for (int li = 0; li < near.Count; li++)
@@ -264,24 +342,41 @@ public static class EarlyReflections
 
                 // Both legs have to be clear of everything else, or this is a reflection off a wall
                 // with a building in front of it.
-                if (!LegIsClearAmong(source, hit, near, nearIndex, i, -1)) continue;
-                if (!LegIsClearAmong(hit, listener, near, nearIndex, i, -1)) continue;
+                if (!scene.Clear(source, hit, near, nearIndex, i, -1)) continue;
+                if (!scene.Clear(hit, listener, near, nearIndex, i, -1)) continue;
 
-
-                into.Add(new Arrival(
+                var arrival = new Arrival(
                     image, hit, pathLength,
                     (pathLength - direct) / MathF.Max(1f, speedOfSound),
                     gLow, gMid, gHigh,
                     Math.Clamp(p.Scattering, 0f, 1f),
-                    SurfaceId(i, f)));
-                (_mirrors ??= new List<(int, int, float)>()).Add((i, f, gMid));
+                    SurfaceId(i, f));
+                // Two faces in the same place (a lawn laid flush on the ground, a slab on a slab) are one
+                // surface, and send one copy back: the smaller patch's, the one a ray meets (Geometry.Ties),
+                // then the lower id's. Both used to be kept, a second coherent copy of the same reflection.
+                float footprint = s.Size.X * s.Size.Z;
+                int same = -1;
+                for (int k = 0; k < into.Count; k++)
+                    if (Vector3.DistanceSquared(into[k].ImagePosition, image) < SameSurfaceSq && Vector3.DistanceSquared(into[k].HitPoint, hit) < SameSurfaceSq)
+                    { same = k; break; }
+                var mirrors = _mirrors ??= new List<(Solid, int, int, float)>();
+                var footprints = _footprints ??= new List<float>();
+                if (same >= 0)
+                {
+                    if (!new Geometry.Ties(footprints[same], mirrors[same].Solid).Beats(footprint, i)) continue;
+                    into[same] = arrival; mirrors[same] = (s, i, f, gMid); footprints[same] = footprint;
+                    continue;
+                }
+                into.Add(arrival);
+                mirrors.Add((s, i, f, gMid));
+                footprints.Add(footprint);
             }
         }
 
         if (Math.Min(maxOrder, MaxOrder) >= 2)
-            FindHigherOrders(source, listener, direct, solids, near, nearIndex, into, speedOfSound, Math.Min(maxOrder, MaxOrder), maxExtraPathMetres);
+            FindHigherOrders(scene, source, listener, direct, near, nearIndex, into, speedOfSound, Math.Min(maxOrder, MaxOrder), maxExtraPathMetres);
         if (flutter)
-            FindFlutter(source, listener, direct, solids, into, speedOfSound);
+            FindFlutter(scene, source, listener, direct, into, speedOfSound);
 
         // Only as many as a listener can tell apart, and the ones they CAN tell apart first.
         //
@@ -321,9 +416,15 @@ public static class EarlyReflections
     [ThreadStatic] private static List<(Mirror M, float Score)>? _mirrorScratch;
     [ThreadStatic] private static Vector3[]? _images, _hits;
     [ThreadStatic] private static int[]? _chain;
-    [ThreadStatic] private static List<(int Solid, int Face, float Gain)>? _mirrors;
-    [ThreadStatic] private static List<Solid>? _local;
-    [ThreadStatic] private static List<int>? _localIndex;
+    [ThreadStatic] private static List<(Solid Box, int Solid, int Face, float Gain)>? _mirrors;
+    [ThreadStatic] private static List<Solid>? _local, _candidates;
+    [ThreadStatic] private static List<Geometry.SolidRef>? _refs;
+    [ThreadStatic] private static List<float>? _footprints;
+
+    /// <summary>Two copies whose images and points of reflection are within a millimetre came off the same
+    /// place: squared, metres.</summary>
+    private const float SameSurfaceSq = 1e-6f;
+    [ThreadStatic] private static List<int>? _localIndex, _candidateIds;
 
     /// <summary>
     /// The copies of copies: every chain of two or three surfaces, drawn from the nearest dozen, that
@@ -333,8 +434,8 @@ public static class EarlyReflections
     /// step whose crossing point falls off its face, or whose leg is blocked, and the chain is not a
     /// path.
     /// </summary>
-    private static void FindHigherOrders(Vector3 source, Vector3 listener, float direct,
-                                         IReadOnlyList<Solid> solids, List<Solid> local, List<int> index,
+    private static void FindHigherOrders(Scene scene, Vector3 source, Vector3 listener, float direct,
+                                         List<Solid> local, List<int> index,
                                          List<Arrival> into, float speedOfSound,
                                          int maxOrder, float maxExtraPathMetres)
     {
@@ -346,9 +447,8 @@ public static class EarlyReflections
         // facing away, and a chain through it is very nearly always one or the other too.
         var cand = _mirrorScratch ??= new List<(Mirror, float)>(64);
         cand.Clear();
-        foreach (var (si, f, gain) in _mirrors ?? new List<(int, int, float)>())
+        foreach (var (s, si, f, gain) in _mirrors ?? new List<(Solid, int, int, float)>())
         {
-            var s = solids[si];
             if (!FacePlane(s, f, out var c, out var n, out var u, out var v, out float hu, out float hv)) continue;
             var p = AcousticRegistry.GetProperties(s.Material);
             cand.Add((new Mirror(si, f, c, n, u, v, hu, hv,
@@ -409,7 +509,7 @@ public static class EarlyReflections
                 Vector3 next = j < order ? hits[j] : listener;
                 int skipA = j > 0 ? cand[chain[j - 1]].M.Solid : -1;
                 int skipB = j < order ? cand[chain[j]].M.Solid : -1;
-                if (!LegIsClearAmong(prev, next, local, index, skipA, skipB)) return;
+                if (!scene.Clear(prev, next, local, index, skipA, skipB)) return;
                 prev = next;
             }
 
@@ -474,15 +574,22 @@ public static class EarlyReflections
     /// is the building it actually hit. Each crossing also scatters: the copy is made a little more
     /// diffuse per bounce, which is what turns a train of cracks into a wash.
     /// </summary>
-    private static void FindFlutter(Vector3 source, Vector3 listener, float direct,
-                                    IReadOnlyList<Solid> solids, List<Arrival> into, float speedOfSound)
+    private static void FindFlutter(Scene scene, Vector3 source, Vector3 listener, float direct,
+                                    List<Arrival> into, float speedOfSound)
     {
         // Every vertical face with both ends in front of it, by the way it faces.
         var byNormal = _planes ??= new Dictionary<long, List<(Mirror M, float Offset)>>();
         foreach (var l in byNormal.Values) l.Clear();
-        for (int i = 0; i < solids.Count; i++)
+        var solids = _flutterSolids ??= new List<Solid>(256);
+        var solidIds = _flutterIds ??= new List<int>(256);
+        // Within the widest street's half (60 m) of the line from the source to the ear, and a solid's
+        // own size: what the bounds of the line, grown by that, can meet.
+        scene.Within(Vector3.Min(source, listener) - new Vector3(60f + MaxSolidReach), Vector3.Max(source, listener) + new Vector3(60f + MaxSolidReach),
+                     solids, solidIds);
+        for (int si = 0; si < solids.Count; si++)
         {
-            var s = solids[i];
+            int i = solidIds[si];
+            var s = solids[si];
             if (s.Size.X <= 0f || s.Size.Y <= 0f || s.Size.Z <= 0f) continue;
             // A wall of the street the sound is in lies within half the widest street of the line
             // from the source to the ear.
@@ -564,6 +671,8 @@ public static class EarlyReflections
         // against every solid within range cost 30 ms a shot on Main Street, 160 at worst.
         var legSolids = _legSolids ??= new List<Solid>();
         var localIndex = _legIndex ??= new List<int>();
+        var streetSolids = _streetSolids ??= new List<Solid>();
+        var streetIds = _streetIds ??= new List<int>();
         for (int pi = 0; pi < Math.Min(2, pairList.Count); pi++)
         {
             int a = pairList[pi].A, b = pairList[pi].B;
@@ -575,14 +684,16 @@ public static class EarlyReflections
             legSolids.Clear(); localIndex.Clear();
             {
                 var wa = groups[a][0].M; var wb = groups[b][0].M;
-                for (int i = 0; i < solids.Count; i++)
+                scene.Within(Vector3.Min(source, listener) - new Vector3(width + MaxSolidReach), Vector3.Max(source, listener) + new Vector3(width + MaxSolidReach),
+                             streetSolids, streetIds);
+                for (int si = 0; si < streetSolids.Count; si++)
                 {
-                    var sd = solids[i];
+                    var sd = streetSolids[si];
                     if (Vector3.Dot(sd.Center - wa.Centre, wa.Normal) <= 0.3f) continue;
                     if (Vector3.Dot(sd.Center - wb.Centre, wb.Normal) <= 0.3f) continue;
                     float r = sd.Size.Length() * 0.5f + width;
                     if (DistanceSquaredToSegment(sd.Center, source, listener) > r * r) continue;
-                    legSolids.Add(sd); localIndex.Add(i);
+                    legSolids.Add(sd); localIndex.Add(streetIds[si]);
                 }
             }
             FlutterTrace?.Invoke($"pair {a}/{b}: width {width:F1}, faces {groups[a].Count}/{groups[b].Count}, normal {na}");
@@ -665,8 +776,13 @@ public static class EarlyReflections
     [ThreadStatic] private static Dictionary<long, List<(Mirror M, float Offset)>>? _planes;
     [ThreadStatic] private static List<List<(Mirror M, float Offset)>>? _planeList;
     [ThreadStatic] private static List<(int A, int B, float Width)>? _pairScratch;
-    [ThreadStatic] private static List<Solid>? _legSolids;
-    [ThreadStatic] private static List<int>? _legIndex;
+    [ThreadStatic] private static List<Solid>? _legSolids, _flutterSolids, _streetSolids;
+    [ThreadStatic] private static List<int>? _legIndex, _flutterIds, _streetIds;
+
+    /// <summary>How far a solid's centre can lie from its nearest point, at most, for the bounds a search
+    /// asks the tree with: half the diagonal of the biggest solid a map holds that is not ground (a
+    /// 300 m slab). A solid bigger than that is only ever ground, which has no wall faces.</summary>
+    private const float MaxSolidReach = 220f;
 
     private static float DistanceSquaredToSegment(Vector3 p, Vector3 a, Vector3 b)
     {

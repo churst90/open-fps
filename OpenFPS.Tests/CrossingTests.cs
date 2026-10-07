@@ -74,6 +74,7 @@ public class CrossingTests
     /// </summary>
     [Theory]
     [InlineData("bell:crossing_gong")]
+    [InlineData("gate:crossing_gate")]
     [InlineData("machine:ac_window")]
     [InlineData("aircraft:airliner")]
     public void TheClientCanPriceEverySynthPrefix(string soundId)
@@ -86,6 +87,7 @@ public class CrossingTests
             "bell" => ModelLibrary.Bell(preset),
             "machine" => SmallMachineSpec.ByName(preset),
             "aircraft" => AircraftProfile.ByName(preset),
+            "gate" => CrossingGateSpec.ByName(preset),
             _ => null,
         };
         Assert.NotNull(spec);

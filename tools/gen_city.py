@@ -1735,11 +1735,17 @@ ROAD_STOPS = [
      "Kind": "bus_stop", "DwellSeconds": BUS_STOP_DWELL, "ForPreset": "bus"},
 ]
 
-# The two level crossings, where Southgate's streets cross the railway's south side.
+# The level crossings, where Southgate's streets cross the railway's south side, and where Main Street
+# does (it is planked across the rails at grade, on_the_crossing, and had no crossing declared: its
+# traffic drove through the trams, and nothing rang). Main Street's is appended, so the two that were
+# there keep their place.
 CROSSINGS = [
     {"Name": f"Southgate {side} crossing", "Position": v3(cx, 0.95, RAIL_Z_S),
      "WarningSeconds": 20.0, "ClearMetres": 35.0, "Bell": "crossing_gong"}
     for side, cx in (("west", SG_X0), ("east", SG_X1))
+] + [
+    {"Name": "Main Street crossing", "Position": v3(0.0, 0.95, RAIL_Z_S),
+     "WarningSeconds": 20.0, "ClearMetres": 35.0, "Bell": "crossing_gong"},
 ]
 
 # Mean seconds between events, map-wide; 0 is off. See MapData.StreetLife.

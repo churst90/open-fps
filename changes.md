@@ -35,6 +35,122 @@ Recent work, newest first. `git log` has the rest.
   - The fire pit's declared level is now 67 dB (was 59.5): the new roar is 9 dB more unweighted, nearly
     all under 125 Hz, and 3 dB more A-weighted.
   - Renders and measurements: inbox/fire-2026-10-06 with a README. AudioLab `--fire levels|render|game`.
+- Tile scenes fixed and on again (`OPENFPS_TILE_SCENES=0` turns them off). After the first door swung
+  near you, every wall stopped occluding and the traced reverb and echoes lost their walls (traffic
+  heard inside Selby House, reflections mono). Steam Audio puts each instance of a tile in its top
+  scene, enabled, the moment it is made, and Embree then refuses to build that scene until the instance
+  is committed; and a released instance leaves its geometry behind, so the next tile given its id was
+  missing. Instances are now disabled when made and kept as long as their scene, and a pair of scenes
+  that holds too many replaced tiles is made again from scratch while it is idle (docs/WORLD_STREAMING.md,
+  "Steam Audio scene"). Measured the same as the whole-scene build across door swings on the city and
+  600 m of streaming on Magnolia; the traced reverb at the ear in Selby House went from silent after a
+  swing to the same level and IACC as the whole scene. New lab options: `--path-probe ... swings=N
+  traced`, `--stream-walk ... stops=M`. Regression test `TileSceneSetTests` (runs only with
+  `OPENFPS_STEAMAUDIO_TESTS=1`, since it needs the Steam Audio library). Unheard.
+- Geometry stage 2 (docs/GEOMETRY.md, "Stage 2 as built"; unheard, unplayed):
+  - Stage 1's decisions: the loader no longer lays a concrete foundation under a map that has its own
+    ground; where a map needs one it is dirt (the speedway). `/map new` starts on dirt. Every turn in a
+    map is made unit length at load, on the server and the client, so the routes agree with the old box
+    grid exactly. A ricochet skips off the face's own normal.
+  - Shapes: a solid can be a wedge (a ramp), a flight of stairs with real treads, or an arch, as well as a
+    box (`Form` on a collider; prefabs `concrete_ramp`, `concrete_stairs`, `wooden_stairs`, `brick_arch`).
+    The ground probe follows a slope, walking slows uphill and down a flight by the grade, and stairs are
+    climbed by the step rule with W alone, up or down.
+  - The body is the old cylinder's foot and trunk under a rounded head: a head meets a beam's or lintel's
+    edge on its curve, and standing on a sofa under a low ceiling no longer throws you through a wall.
+    On box maps it walks as before except at those edges (city: 31 single steps in 4,000; 3 walks in 400).
+  - Footsteps on stairs land on the tread under the foot, at its height and of its material, one footfall
+    every two treads at the game's speeds (AudioLab `--stair-walk`: 154 of 154 on a city stairwell).
+  - A driven car sits on four wheel rays: it pitches on a slope, rolls with a wheel on a kerb, and each
+    wheel grips by the surface under it.
+  - Cheaper: a one-off sound's echoes (the worst on the city 55 ms to 14 ms on the game thread), engine
+    echoes 2.4 to 0.3 ms, the server's grid refresh after a pick-up 104 to 25 ms on Magnolia.
+  - Memory: a stopped voice no longer keeps old route graphs and their tiles alive; 160 MB to 86 MB at
+    the end of a 2 km drive across Magnolia.
+- World editor, phase 1 (docs/WORLD_EDITOR.md; unheard). F12 opens it on a map you may edit:
+  developers and the administrator anywhere, a map's owner on that map, and the people the owner names
+  with `/map editor add NAME`. Others are told who it is for. You edit while you play; there is no
+  build mode.
+  - Menus: Map (information, set spawn here, editors), Place (prefabs by category, placed at your feet
+    or just in front of you if solid), Select (nearest, within 5, 10 or 20 metres, by name, by number),
+    the selected thing (move by numbers, nudge, turn, face, bring, duplicate, delete, settings, its
+    model), Library (every kind of model and its values), Test tools, Undo and Redo.
+  - The server builds every menu and the client only shows it, on the same lists as F5, F6 and F8.
+    Every item sends an `/edit` command, so the command line and the MUD do the same things; a text
+    player gets the menus as numbered lines.
+  - Kinds of model describe themselves: a `Tunable` attribute gives each value its spoken name, unit,
+    range, step, help and source, and the menus are made from it. Small machines (the condenser and
+    window AC units, the mowers) are described in full; the other kinds list their values read only
+    until described. A placed thing's own settings: name, width, height, depth, and a sound's volume,
+    range and minimum distance. Values outside the range are refused with the range said.
+  - Changing a model (needs `edit-models`) makes a new version in `model_versions/`, puts it in use on
+    every map, and sends it to every client, which restarts that model's voices.
+  - Undo and redo per editor; an undo is refused if somebody else has changed the thing since. A solid
+    thing is never placed or moved into a player. Other editors on the map are told of each change.
+  - Edits are kept in `maps/overlays/MAP.json` and laid over the map file at load. The map file is
+    never written, so city.json stays byte for byte what gen_city.py writes; an entry finds its thing
+    again by prefab and place if the generator renumbers.
+  - New messages EditorMenu (40) and ModelUpdate (41): the server and clients must be rebuilt together.
+- Four faults the Resonance team listed (unheard; renders and a README in inbox/fault-fixes-2026-10-06):
+  - A light single's wheels spun up at touchdown in 313 ms, as an airliner's do. The load on the
+    wheels is now what the gear takes stopping a 0.9 m/s sink over its own stroke (LandingGearSpec:
+    StrokeMetres, StrokeEfficiency, TouchdownSinkMps): the light single's spring legs put 83 % of its
+    weight on its wheels, 57 ms; the airliner's oleos 15 %, 302 ms (was 297). The tyre is now told the
+    grip in use (slip over the 12 % slip at peak grip) instead of the slip ratio, which had left the
+    light single's touchdown silent: a touchdown is a skid that ends in the squeal. At a metre the
+    light single slides at 116 dB for 60 ms and the airliner at 127 dB for 290 ms (was an 80 ms squeal).
+  - Trains sound their own horn, whistle and bell. The signal sources are placed on the train now;
+    a crossing is sounded with a TrainSignal key (long, long, short, long held to the crossing, the
+    bell until it is reached) that the train's one synth plays on its own outlets, instead of the road
+    vehicle's horn on the lead bogie. Signal sources take a voice only while sounding; their levels are
+    their models' (the tram's two-chime 124 dB, the loco bell 110); the bell renders with its own
+    headroom.
+  - Small machines answer to the weather: an air conditioner's thermostat runs the compressor for the
+    share of the time the outdoor air asks (18 C balance, 35 C design, each house its own within 2 C,
+    at most three cycles an hour), and the pump's motor slows with the lift the weather sets. Each fan
+    and pump turns at its own speed, so two of one model are two machines. Found on the way: half of
+    all blade-row seeds stacked pulses on one blade, which ran a condenser's fan 11 dB over its level.
+  - tools/gen_osm.py tags everything a building is made of with the tile of its middle. 156 of
+    Magnolia's buildings and 138 of Albany's stood across a 250 m edge; both maps regenerated (only
+    Tile tags moved). The server's MapTiles works from geometry and is unchanged.
+  - AudioLab `--game-levels set=faults|faults-ac` renders the scenes.
+- Driving controls and aids (docs/DRIVING_AIDS.md). Not yet heard by Cody.
+  - Horn: hold H in the driver's seat. The vehicle's own horn (electric on cars, air on trucks and
+    buses) sounds for as long as the key is down, from the front of the vehicle, for everyone near.
+    `/horn` gives a half-second blast. H on foot still says your health; Shift+H says it in a seat.
+  - Siren: U switches it on or off, Shift+U steps wail, yelp, phaser. `/siren` takes a tone by name
+    (and `hilo`). It stays on when you get out. Traffic police cars still decide for themselves.
+  - Horns and siren heads sit a quarter of a metre in from the nose of the body, not 1.9 m ahead of
+    the middle of every vehicle: a bus's horn was 3.8 m inside the bus.
+  - The map's roads, junctions, level crossings and drivable tracks now go to the client (a new
+    MapRoads message), and the driving sounds plan from them:
+    - J and L are the indicators in the driver's seat, with a flasher relay in the dash. The
+      indicator says which way you will turn at the next junction; it switches itself off after the
+      turn.
+    - The guide beep follows the line through bends and into the indicated turn, closer in on a
+      tight turn.
+    - The brake cue: a falling note toward what you must slow for (a bend or turn, a give-way line,
+      a closed crossing, the end of the road), faster and higher as the braking needed nears the
+      tyres' grip, sooner on a wet road.
+    - A wheel on the centre line clacks over raised markers; on the edge, a rumble strip.
+    - The speed limit is spoken with the road name; two notes play when you are 5 km/h over.
+    - "Give way" and "Turning right onto ..." with the junction; "Level crossing in N metres", and
+      "closed" while its bells ring.
+    - Shift+K switches every driving sound; `/drivecues` and the settings switch each one.
+  - A scripted drive (DrivingCueDrillTests) into a right turn at 40, 50 and 65 km/h, dry and wet:
+    braking on the spoken junction alone ran 1.8 m (dry) and 25.8 m (wet) over the centre line from
+    65 km/h; braking on the brake cue it never crossed it and used at most 72 % of the grip.
+  - Level crossings: each tyre strikes each rail (a tread and cavity thump through the wheel's own
+    tyre path, inside and out). A gate on each road approach goes down 4 s after the bells, in 12 s,
+    and rises in 9 s, with its motor and the clunk at each end.
+  - Main Street crossed the rail line at grade with no crossing declared; it has one now, with bells
+    and gates, and its traffic stops for the trams.
+  - Aircraft land: an approach flies down to the runway at its approach speed, touches down, rolls
+    out on its type's landing roll, turns round on the runway, holds, and takes off back up the line
+    (piston single, turboprop, airliner; the helicopter as before). On the ground the power follows
+    what the aeroplane is doing: take-off power, reversers, idle.
+  - AudioLab `--driving out=DIR [set=horn|siren|bend|rails|gates|aircraft]`. Renders and
+    measurements: inbox/driving-2026-10-06 with a README.
 
 - Inside a vehicle, its sound comes from where it gets in (unheard). Cody: "the inside of the cab of
   the cars sounds mono". It was one voice from one point ahead of you and below; the ears matched 0.97

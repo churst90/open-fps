@@ -251,6 +251,60 @@ public static class PhysicsUtils
         return ground;
     }
 
+    /// <summary>
+    /// Where a foot goes down, and on what (docs/GEOMETRY.md 3.8): the floor under the foot, not the body's.
+    /// The body stands at the highest floor anywhere under its footprint, so on a flight it is already at
+    /// the next tread's height while its middle is over the one below, and a foot put down under its middle
+    /// was in the air over the lower tread. The foot goes on the floor the body is standing on: under the
+    /// foot if that is the body's height, or a body's radius ahead along <paramref name="way"/> (the tread
+    /// it is stepping up onto). Nothing found at the body's height (a body on a vehicle's floor, a floor the
+    /// triangles do not hold) leaves the foot where it was and <paramref name="material"/> null.
+    /// </summary>
+    public static Vector3 FootOnFloor(WorldSnapshot snapshot, Vector3 foot, Vector3 feet, Vector3 way, int ownEntityId, out string? material)
+    {
+        material = null;
+        var geo = snapshot.Geometry;
+        if (geo == null || !Geometry.TriangleGeometry.Enabled) return foot;
+        var filter = new SnapshotGround { Stale = snapshot.GeometryStale, Own = ownEntityId };
+        return FootOnFloor(geo, ref filter, foot, feet, way, out material);
+    }
+
+    /// <summary><see cref="FootOnFloor(WorldSnapshot, Vector3, Vector3, Vector3, int, out string?)"/> asked of a
+    /// triangle world directly (the server's, a lab's).</summary>
+    public static Vector3 FootOnFloor<F>(Geometry.TriangleWorld geo, ref F filter, Vector3 foot, Vector3 feet, Vector3 way, out string? material)
+        where F : Geometry.IGeometryFilter
+    {
+        material = null;
+        float top = feet.Y + PhysicsConstants.StepHeight;
+        var ahead = new Vector3(way.X, 0f, way.Z);
+        ahead = ahead.LengthSquared() > 1e-8f ? Vector3.Normalize(ahead) * PhysicsConstants.PlayerRadius : Vector3.Zero;
+        float under = geo.FloorAt(foot.X, foot.Z, top, Geometry.GeometryLayers.Ground, ref filter, out var underHit);
+        // On the floor the body stands on, under the foot...
+        if (under > -1000f && MathF.Abs(under - feet.Y) <= FootOnFloorTolerance) return On(geo, foot, under, underHit, out material);
+        // ...or a stride ahead, the tread a body climbing a flight is stepping up onto...
+        if (ahead != Vector3.Zero)
+        {
+            var at = foot + ahead;
+            float y = geo.FloorAt(at.X, at.Z, top, Geometry.GeometryLayers.Ground, ref filter, out var hit);
+            if (y > -1000f && MathF.Abs(y - feet.Y) <= FootOnFloorTolerance) return On(geo, at, y, hit, out material);
+        }
+        // ...or whatever is under the foot, within a step of the feet: going down a flight the body is held
+        // at the tread it is leaving until its whole footprint is past it, and the foot is already on the
+        // one below; stepping up, the body is lifted for a moment and the foot is still on the tread under it.
+        if (under > -1000f && MathF.Abs(under - feet.Y) <= PhysicsConstants.StepHeight + 0.01f) return On(geo, foot, under, underHit, out material);
+        return foot;
+
+        static Vector3 On(Geometry.TriangleWorld geo, Vector3 at, float y, in Geometry.GeometryHit hit, out string? material)
+        {
+            var raw = geo.SurfaceOf(hit).Material;
+            material = string.IsNullOrEmpty(raw) ? "Generic" : raw;
+            return new Vector3(at.X, y, at.Z);
+        }
+    }
+
+    /// <summary>How near the body's height a floor is to be the one it stands on, metres.</summary>
+    public const float FootOnFloorTolerance = 0.002f;
+
     private struct SnapshotGround : Geometry.IGeometryFilter
     {
         public IReadOnlySet<int>? Stale;

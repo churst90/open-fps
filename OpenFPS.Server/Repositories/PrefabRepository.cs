@@ -197,7 +197,8 @@ public class PrefabRepository
             {
                 Size = finalSize,
                 IsSolid = t.IsSolid ?? true,
-                Shape = t.Shape ?? ColliderShape.Box
+                Shape = t.Shape ?? ColliderShape.Box,
+                Form = t.Form,
             });
         }
 

@@ -85,7 +85,14 @@ public partial class CommandHandler
         // single ones. docs/SERVER_SECURITY.md has the table; keep it in step. One check, here, for
         // every gated command, so a new case cannot forget its own. Building, spawning, moving
         // yourself, saving and the sound tools are everybody's on a map they own (the scope half).
-        if (!MayHere(session, Permissions.Canonical(commandName))) { DenyCommand(reply); return; }
+        if (!MayHere(session, Permissions.Canonical(commandName)))
+        {
+            // F12 is answered in words of its own: who the editor is for.
+            if (commandName == Permissions.Edit && OpenFPS.Server.Editor.WorldEditor.AsksForMenu(args))
+                Say(reply, OpenFPS.Server.Editor.WorldEditor.Refusal);
+            else DenyCommand(reply);
+            return;
+        }
         switch (commandName)
         {
             case "scan": HandleScan(session, reply); break;
@@ -173,6 +180,11 @@ public partial class CommandHandler
                 break;
             case "room":
                 HandleRoom(session, args, reply);
+                break;
+            // The world editor: F12 and /edit (docs/WORLD_EDITOR.md). Gated above: the edit permission,
+            // the map's owner, or an editor the owner named.
+            case "edit":
+                Editor.Handle(session, args, reply);
                 break;
             // The whole server's weather, for testing: developers and administrators (Permissions).
             case "weather":
@@ -264,6 +276,12 @@ public partial class CommandHandler
             case "ignition":
             case "key":
                 HandleIgnition(session, args, reply);
+                break;
+            case "siren":
+                HandleSiren(session, args, reply);
+                break;
+            case "horn":
+                HandleHorn(session, reply);
                 break;
             case "window":
             case "windows":
@@ -1608,6 +1626,37 @@ public partial class CommandHandler
         bool on = world.Has<DriveComponent>(root) && !world.Get<DriveComponent>(root).EngineOn;
         if (args.Length > 0) on = !args[0].Equals("off", StringComparison.OrdinalIgnoreCase);
         Say(reply, DrivingSystem.SetIgnition(world, root, on, _server.SyncAudioComponent));
+    }
+
+    /// <summary>The vehicle whose driving seat this session is in, or why not.</summary>
+    private bool DrivenVehicle(UserSession session, Action<IMessage> reply, out World world, out Entity root)
+    {
+        root = Entity.Null;
+        if (!_maps.TryGetMap(session.CurrentMapId, out world!, out _, out _, out var lookup)
+            || session.Entity == Entity.Null || !world.IsAlive(session.Entity))
+        { Say(reply, "You are not in the world yet."); return false; }
+        if (!world.Has<OccupantComponent>(session.Entity))
+        { Say(reply, "You are not sitting in anything."); return false; }
+        var occupant = world.Get<OccupantComponent>(session.Entity);
+        if (!occupant.Controls) { Say(reply, "Only the driver can do that."); return false; }
+        if (!lookup.TryGetValue(occupant.RootEntityId, out root) || !world.IsAlive(root))
+        { Say(reply, "There is nothing here to drive."); return false; }
+        return true;
+    }
+
+    /// <summary>/siren [on|off|wail|yelp|phaser|hilo|next] — U and Shift+U in the driver's seat.</summary>
+    private void HandleSiren(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (!DrivenVehicle(session, reply, out var world, out var root)) return;
+        Say(reply, VehicleSignals.SirenCommand(world, root, args));
+    }
+
+    /// <summary>/horn — a short blast, for a session that cannot hold H down.</summary>
+    private void HandleHorn(UserSession session, Action<IMessage> reply)
+    {
+        if (!DrivenVehicle(session, reply, out var world, out var root)) return;
+        if (!world.Has<DriveComponent>(root)) { Say(reply, "This has no horn."); return; }
+        VehicleSignals.Tap(root.Id);
     }
 
     /// <summary>

@@ -84,6 +84,11 @@ public static class ModelLibrary
 
     private static string Key(string kind, string id) => kind + ":" + id;
 
+    /// <summary>Changes each time a model is added, so a reader holding a model built from an older one
+    /// (a client's cached level) can tell it is out of date.</summary>
+    public static int Generation => _generation;
+    private static int _generation;
+
     // ── The built-in library ────────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -216,6 +221,7 @@ public static class ModelLibrary
         {
             _authored = new Dictionary<string, object>(_authored, StringComparer.OrdinalIgnoreCase)
             { [Key(kind, id)] = spec };
+            System.Threading.Interlocked.Increment(ref _generation);
         }
     }
 
@@ -239,6 +245,40 @@ public static class ModelLibrary
 
     /// <summary>Every kind there is.</summary>
     public static IEnumerable<string> AllKinds => Types.Keys;
+
+    /// <summary>The type a kind's models are, or null for a kind that is not one.</summary>
+    public static Type? TypeOf(string kind) => Types.TryGetValue(kind, out var t) ? t : null;
+
+    /// <summary>A model as JSON, the way the library reads and writes one (the spec alone, no wrapper).</summary>
+    public static string SpecJson(object spec) => JsonSerializer.Serialize(spec, spec.GetType(), Json);
+
+    /// <summary>A model of a kind read from its JSON, as <see cref="SpecJson"/> writes it. Throws if it
+    /// does not read as that kind.</summary>
+    public static object FromSpecJson(string kind, string json)
+    {
+        if (!Types.TryGetValue(kind, out var type)) throw new ArgumentException($"'{kind}' is not a kind of model.");
+        return JsonSerializer.Deserialize(json, type, Json) ?? throw new ArgumentException($"The {kind} model is empty.");
+    }
+
+    /// <summary>
+    /// Puts a model sent as JSON into the library, as an authored one: what the world editor's changes
+    /// arrive as (ModelUpdate). False, and nothing changed, if it does not read as that kind.
+    /// </summary>
+    public static bool AddJson(string kind, string id, string json)
+    {
+        try
+        {
+            Add(kind, id, FromSpecJson(kind, json));
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>A model by kind and name as the base type, for code that does not know the kind's type.</summary>
+    public static object Model(string kind, string id) => Get<object>(kind, id);
 
     /// <summary>
     /// A model by kind and name. Authored first, always: that is what lets a map replace one without

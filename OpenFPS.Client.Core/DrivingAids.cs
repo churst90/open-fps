@@ -97,6 +97,104 @@ public sealed class DrivingAids
 
     public DrivingAids(AudioEngineFacade audio) => _audio = audio;
 
+    // ── The road ahead (docs/DRIVING_AIDS.md) ────────────────────────────────────────────────
+    //
+    // From the map's roads as the server sent them (MapRoads): the line ahead through the next
+    // junction, the speed limit, the give-way line, a closed level crossing, the end of the road, and
+    // how hard the car will have to brake for whichever of them comes first. Null on a map without roads,
+    // where the asphalt boxes answer what they can, as before.
+    private DrivingCuePlanner? _planner;
+
+    /// <summary>The last plan, for the readout and the tests. Null when there is none.</summary>
+    public DrivingCuePlan? Plan { get; private set; }
+
+    /// <summary>The map's roads arrived (or the map changed): plan from them.</summary>
+    public void SetRoads(RoadMapData? roads)
+    {
+        _planner = roads is { IsEmpty: false } ? new DrivingCuePlanner(roads) : null;
+        Plan = null;
+        _indicator = 0;
+    }
+
+    // ── Indicators ───────────────────────────────────────────────────────────────────────────
+    //
+    // J and L in the driver's seat. Which way you are going to turn is the one thing about the line
+    // ahead the road cannot say, so the planner takes it from the indicator: the guide leads into that
+    // turn, and the brake cue is for it. The flasher relay ticks in the dash, on and off at 1.5 Hz (SAE
+    // J590: 60 to 120 flashes a minute), and it cancels itself once the car has turned through 45 degrees
+    // and straightened, the way a steering column's cam throws it off.
+    private int _indicator;
+    private double _nextFlash;
+    private bool _flashOn;
+    private float _indicatorFrom;          // heading when it was switched on, radians
+    private float _indicatorMost;          // the most the car has turned since, degrees
+    private float _steadyFor;              // seconds the heading has held still
+    private float _lastHeading = float.NaN;
+    private const float FlashSeconds = 1f / 3f;
+    private const float CancelAfterDegrees = 45f;
+    private const int RelayId = -966010;
+    private const string TickSound = "SYNTH/drive_relay_on", TockSound = "SYNTH/drive_relay_off";
+
+    /// <summary>-1 left, +1 right, 0 off.</summary>
+    public int Indicator => _indicator;
+
+    /// <summary>J (-1) or L (+1): that side's indicator on, or off if it already was. What to say.</summary>
+    public string ToggleIndicator(int side)
+    {
+        _indicator = _indicator == side ? 0 : side;
+        if (_planner != null) _planner.Indicator = _indicator;
+        _indicatorMost = 0f;
+        _indicatorFrom = _lastHeading;
+        _steadyFor = 0f;
+        _nextFlash = 0;
+        if (_indicator == 0) { Flash(false); return "Indicator off."; }
+        return _indicator < 0 ? "Left indicator." : "Right indicator.";
+    }
+
+    // ── How hard to brake ────────────────────────────────────────────────────────────────────
+    //
+    // A falling note — "come down" — toward whatever the braking is for. Silent while nothing ahead
+    // needs more than coasting; then the notes come faster and higher as the braking needed grows
+    // toward what the tyres can give (DrivingCueBands): lift, brake, brake hard, and at the limit a
+    // run of them so close together they are one sound. On a wet road the tyres give less, so the
+    // same corner calls for it sooner.
+    private double _nextBrake;
+    private int _brakeIdx;
+    private const int BrakeBaseId = -967100;
+    private static readonly string[] BrakeSounds = { "", "SYNTH/drive_brake_1", "SYNTH/drive_brake_2", "SYNTH/drive_brake_3", "SYNTH/drive_brake_4" };
+    private static readonly float[] BrakeHz = { 0f, 330f, 440f, 587f, 784f };
+    /// <summary>Seconds between notes at the bottom and top of each band.</summary>
+    private static readonly (float Slow, float Fast)[] BrakeEvery = { (1f, 1f), (0.9f, 0.6f), (0.55f, 0.3f), (0.28f, 0.14f), (0.11f, 0.09f) };
+    private const float BrakeVolume = 0.24f;
+
+    // ── The speed limit ──────────────────────────────────────────────────────────────────────
+    private double _nextOverSpeed;
+    private bool _wasOver;
+    private const int OverSpeedId = -966011;
+    private const string OverSpeedSound = "SYNTH/drive_overspeed";
+    /// <summary>Over the limit by this much before it says so, m/s (5 km/h): a speedometer's own error.</summary>
+    private const float OverSpeedMargin = 5f / 3.6f;
+    private const double OverSpeedRepeat = 10.0;
+    private float _announcedLimit = -1f;
+
+    // ── A wheel on a line ────────────────────────────────────────────────────────────────────
+    //
+    // What a real road does to a car that strays: the tyres run over the raised markers on a centre
+    // line, and over the milled rumble strip at the edge. Each is a loop of strikes, played from that
+    // side at the front wheel, at a rate that is the speed over the spacing — Botts' dots every 1.2 m,
+    // a rumble strip's grooves every 0.3 m. It replaces the steady "over the line" tone.
+    private const int CentreRumbleId = -964003, KerbRumbleId = -964004;
+    private const string DotsSound = "SYNTH/drive_dots", StripSound = "SYNTH/drive_strip";
+    private const float DotSpacing = 1.2f, GrooveSpacing = 0.3f;
+    /// <summary>Strikes per second in each loop as it is made: the pitch is the speed's rate over this.</summary>
+    private const float DotsLoopHz = 8f, StripLoopHz = 50f;
+    private const float RumbleVolume = 0.3f;
+
+    /// <summary>The crossing a driver was last told about, so it is said once.</summary>
+    private string _announcedCrossing = "";
+    private bool _announcedCrossingClosed;
+    private JunctionData? _announcedTurnAt;
+
     public void Update(WorldSnapshot world, LocalPlayerState state, double now)
     {
         _now = now;
@@ -111,6 +209,9 @@ public sealed class DrivingAids
             _wasOnRoad = false; _roadName = ""; _offRoadSince = -1;
             _announcedJunction = int.MinValue; _announcedDeadEnd = false;
             _lastClickSector = int.MinValue; _aligned = false; AssistSteer = null;
+            Plan = null;
+            if (_indicator != 0) { _indicator = 0; if (_planner != null) _planner.Indicator = 0; }
+            _announcedLimit = -1f; _wasOver = false; _announcedCrossing = ""; _announcedTurnAt = null;
             return;
         }
         EnsureSounds();
@@ -120,9 +221,34 @@ public sealed class DrivingAids
         float speed = car.Velocity.Length();
 
         float halfWidth = 0.95f;
+        VehicleProfile? profile = null;
         if (car.Definition.SoundEmitter.SoundId is { } sid && sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
             && MachineRegistry.Knows(sid[7..]))
-            halfWidth = MachineRegistry.VehicleFor(sid[7..]).WidthMetres * 0.5f;
+        {
+            profile = MachineRegistry.VehicleFor(sid[7..]);
+            halfWidth = profile.WidthMetres * 0.5f;
+        }
+
+        float heading = MathF.Atan2(forward.X, forward.Z);
+        Indicators(heading, speed);
+        // How fast the car is turning, smoothed over a few updates: with the speed, what the turn it is
+        // in already asks of its tyres.
+        double since = _now - _lastPlanAt;
+        if (!float.IsNaN(_lastHeading) && since > 1e-3 && since < 0.5)
+        {
+            float rate = MathF.IEEERemainder(heading - _lastHeading, 2f * MathF.PI) / (float)since;
+            _yawRate += (rate - _yawRate) * MathF.Min(1f, (float)since / 0.15f);
+        }
+        _lastPlanAt = _now;
+        _lastHeading = heading;
+        if (_planner != null && profile != null)
+            _planner.MinTurnRadius = MathF.Max(6f, 1.6f * profile.Running.Wheelbase / MathF.Tan(MathF.Max(0.1f, profile.Running.MaxSteerAngleRad)));
+        Plan = _planner?.Update(at, forward, speed, AvailableDecel(car, profile, speed),
+                                (profile?.LengthMetres ?? 4.4f) * 0.5f, c => CrossingClosed(world, c), _yawRate);
+        if (Plan is { Located: false }) Plan = null;
+        SpeedLimit(speed);
+        BrakeCue(at, speed);
+        AheadSpeech();
 
         TurnClicks(forward);
         AssistSteer = null;
@@ -145,6 +271,7 @@ public sealed class DrivingAids
             // how a whole drive was spent crossing open ground at seventy with no idea where any
             // road was.
             StopTones();
+            StopRumble();
             string where = "no road nearby";
             if (NearestRoad(world, at, out var point, out string nearName, out float dist))
             {
@@ -167,8 +294,9 @@ public sealed class DrivingAids
             // In the middle of a junction there are no lanes: the guide points the way you are
             // going, and the sensors are quiet until you are on a road again.
             StopTones();
-            Guide(forward * GuideDistance(speed), speed);
-            Readout = $"In a junction, heading {Compass(forward)}, {Kmh(speed)}.";
+            StopRumble();
+            Guide(PlanAim(at) ?? forward * GuideDistance(speed), speed);
+            Readout = $"In a junction, heading {Compass(forward)}, {Kmh(speed)}.{AheadWords()}";
             Trace(at, forward, speed, "junction", 0f, 0, 0f, 0f);
             return;
         }
@@ -185,14 +313,16 @@ public sealed class DrivingAids
         float target = LaneCentreFor(p, laneWidth, mySide);
         float lookAhead = GuideDistance(speed);
         var aim = dirAlong * lookAhead + driverRight * ((target - p.Across) * p.Facing);
-        Guide(aim, speed);
+        // The guide on the planned line when there is one: it follows the road's bends and leads into
+        // the turn the indicator asks for. Lane assist keeps to the lane (below).
+        Guide(PlanAim(at) ?? aim, speed);
 
         // In line with the road? Signed: positive is pointing to the right of it.
         float offRoadLine = SignedDegrees(dirAlong, forward);
         if (!_aligned && MathF.Abs(offRoadLine) < AlignedDegrees)
         {
             _aligned = true;
-            Play(AlignSound, AlignId, forward * 3f, SensorVolume);
+            if (DrivingCues.Enabled && DrivingCues.TurnClicks) Play(AlignSound, AlignId, forward * 3f, SensorVolume);
         }
         else if (_aligned && MathF.Abs(offRoadLine) > UnalignedDegrees) _aligned = false;
 
@@ -214,8 +344,8 @@ public sealed class DrivingAids
         }
 
         var (left, rightSide) = LaneGuide.Sides(p, halfWidth);
-        Sensor(left, driverRight);
-        Sensor(rightSide, driverRight);
+        Sensor(left, driverRight, speed, profile);
+        Sensor(rightSide, driverRight, speed, profile);
 
         // Lanes counted from the DRIVER'S left: on a two-way road that is from the centre line out.
         int lanesMySide = p.TwoWay ? p.Lanes / 2 : p.Lanes;
@@ -230,7 +360,7 @@ public sealed class DrivingAids
                     : $"in lane {laneNumber} of {lanesMySide} from the left";
         string line = MathF.Abs(offRoadLine) < AlignedDegrees ? "in line with the road"
                     : $"pointing {MathF.Round(MathF.Abs(offRoadLine))} degrees {(offRoadLine > 0 ? "right" : "left")} of the road";
-        Readout = $"{_roadName}, heading {Compass(forward)}, {line}, {lane}, {Kmh(speed)}.";
+        Readout = $"{_roadName}, heading {Compass(forward)}, {line}, {lane}, {Kmh(speed)}{LimitWords()}.{AheadWords()}";
         Trace(at, forward, speed, _roadName, p.Across, laneNumber, left.Gap, rightSide.Gap);
     }
 
@@ -258,7 +388,9 @@ public sealed class DrivingAids
         if (!junction && name != _roadName)
         {
             _roadName = name;
-            Say($"{name}, heading {Compass(forward)}.");
+            float limit = Plan?.SpeedLimitMps ?? 0f;
+            Say(limit > 0f ? $"{name}, heading {Compass(forward)}, limit {MathF.Round(limit * 3.6f)}." : $"{name}, heading {Compass(forward)}.");
+            _announcedLimit = limit;
             _announcedDeadEnd = false;
         }
 
@@ -283,7 +415,11 @@ public sealed class DrivingAids
                 if (jId != _announcedJunction)
                 {
                     _announcedJunction = jId;
-                    Say($"Junction in {Round(d)} metres. {Exits(world, jRoad, forward, right, _roadName)}");
+                    string giveWay = Plan is { GivesWay: true } ? (Plan.StopControl ? ", stop" : ", give way") : "";
+                    // Said already if the indicator went on before the junction was announced.
+                    string turning = Plan?.Junction != null && ReferenceEquals(Plan.Junction, _announcedTurnAt) ? "" : TurnWords();
+                    if (turning.Length > 0) _announcedTurnAt = Plan?.Junction;
+                    Say($"Junction in {Round(d)} metres{giveWay}. {Exits(world, jRoad, forward, right, _roadName)}{turning}");
                 }
                 return;
             }
@@ -373,7 +509,7 @@ public sealed class DrivingAids
     {
         float yaw = MathF.Atan2(forward.X, forward.Z) * 180f / MathF.PI;
         int sector = (int)MathF.Floor(yaw / TurnClickDegrees);
-        if (_lastClickSector != int.MinValue && sector != _lastClickSector)
+        if (_lastClickSector != int.MinValue && sector != _lastClickSector && DrivingCues.Enabled && DrivingCues.TurnClicks)
             Play(TurnSound, TurnBaseId - (_turnIdx++ % Pool), forward * 2f, SensorVolume * 0.7f);
         _lastClickSector = sector;
     }
@@ -384,26 +520,50 @@ public sealed class DrivingAids
 
     private void Guide(Vector3 offset, float speed)
     {
+        if (!DrivingCues.Enabled || !DrivingCues.Guide) return;
         if (_now < _nextGuide) return;
         // A beep every 0.6 s crawling, every 0.2 s at motorway speed: the rate is the speed.
         _nextGuide = _now + Math.Clamp(6f / MathF.Max(speed, 0.1f), 0.2f, 0.6f);
         Play(GuideSound, GuideBaseId - (_guideIdx++ % Pool), offset, GuideVolume);
     }
 
-    private void Sensor((float Gap, LaneGuide.Line Kind, float Offset) side, Vector3 driverRight)
+    private void Sensor((float Gap, LaneGuide.Line Kind, float Offset) side, Vector3 driverRight, float speed, VehicleProfile? profile)
     {
         if (side.Kind == LaneGuide.Line.Lane || side.Gap == float.MaxValue) return;
         bool centre = side.Kind == LaneGuide.Line.Centre;
         int toneId = centre ? CentreToneId : KerbToneId;
+        int rumbleId = centre ? CentreRumbleId : KerbRumbleId;
         var offset = driverRight * side.Offset;
+        if (!DrivingCues.Enabled || !DrivingCues.LineSensors)
+        {
+            if (_audio.IsPlaying(toneId)) _audio.StopSound(toneId);
+            if (_audio.IsPlaying(rumbleId)) _audio.StopSound(rumbleId);
+            return;
+        }
 
         if (side.Gap <= 0f)
         {
-            // Over it: a steady tone, which no beep can be mistaken for.
-            Tone(toneId, offset, centre ? 660f : 220f, centre ? SynthWaveType.Sine : SynthWaveType.Triangle);
+            // Over it: the wheels on the markers, from that side at the front wheel — or, standing
+            // still where there is nothing to roll over, the steady tone no beep can be mistaken for.
+            float rate = speed / (centre ? DotSpacing : GrooveSpacing);
+            if (speed > 0.5f)
+            {
+                if (_audio.IsPlaying(toneId)) _audio.StopSound(toneId);
+                // The front wheel on that side: a front overhang of about 0.9 m behind the nose.
+                float frontAxle = MathF.Max(0.5f, (profile?.LengthMetres ?? 4.4f) * 0.5f - 0.9f);
+                var wheelSide = driverRight * (MathF.Sign(side.Offset) * (profile?.WidthMetres ?? 1.8f) * 0.5f);
+                Rumble(rumbleId, centre ? DotsSound : StripSound, wheelSide + ForwardOf(driverRight) * frontAxle,
+                       rate / (centre ? DotsLoopHz : StripLoopHz));
+            }
+            else
+            {
+                if (_audio.IsPlaying(rumbleId)) _audio.StopSound(rumbleId);
+                Tone(toneId, offset, centre ? 660f : 220f, centre ? SynthWaveType.Sine : SynthWaveType.Triangle);
+            }
             return;
         }
         if (_audio.IsPlaying(toneId)) _audio.StopSound(toneId);
+        if (_audio.IsPlaying(rumbleId)) _audio.StopSound(rumbleId);
         if (side.Gap > SensorRangeMetres) return;
 
         ref double next = ref centre ? ref _nextCentre : ref _nextKerb;
@@ -463,7 +623,231 @@ public sealed class DrivingAids
         if (_audio.IsPlaying(KerbToneId)) _audio.StopSound(KerbToneId);
     }
 
-    private void Silence() => StopTones();
+    private void Silence()
+    {
+        StopTones();
+        StopRumble();
+    }
+
+    private void StopRumble()
+    {
+        if (_audio.IsPlaying(CentreRumbleId)) _audio.StopSound(CentreRumbleId);
+        if (_audio.IsPlaying(KerbRumbleId)) _audio.StopSound(KerbRumbleId);
+    }
+
+    /// <summary>The way a car faces, from the direction to its right.</summary>
+    private static Vector3 ForwardOf(Vector3 right) => new(-right.Z, 0f, right.X);
+
+    /// <summary>A loop of strikes from one side, at the rate the speed rolls them.</summary>
+    private void Rumble(int id, string sound, Vector3 offset, float pitch)
+    {
+        if (!_registered) return;
+        var e = new SpatialEmitter
+        {
+            EntityId = id,
+            SoundId = sound,
+            Mode = OpenFPS.Common.Components.PlaybackMode.LoopOne,
+            FollowsListener = true,
+            ListenerOffset = offset,
+            Position = _ear + offset,
+            Volume = RumbleVolume,
+            Pitch = Math.Clamp(pitch, 0.1f, 4f),
+            MinDistance = 40f,
+            Range = 80f,
+            Essential = true,
+            Type = EmitterType.UI,
+        };
+        if (_audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
+        else _audio.Submit(e);
+    }
+
+    // ── The road ahead ───────────────────────────────────────────────────────────────────────
+
+    /// <summary>Where the guide sits on the planned line, from the listener's car; null without a plan.</summary>
+    private Vector3? PlanAim(Vector3 at)
+    {
+        if (Plan is not { Located: true } plan || plan.Path.Count < 2) return null;
+        var d = plan.GuidePoint - at;
+        d.Y = 0f;
+        return d.LengthSquared() < 1f ? null : d;
+    }
+
+    /// <summary>
+    /// What the tyres can give on this road now, m/s²: the car's peak grip, less what the water under
+    /// its wheels takes (RoadWaterLaw.GripFactor), the worst wheel. Without wheels on the wire, dry.
+    /// </summary>
+    private static float AvailableDecel(EntitySnapshot car, VehicleProfile? profile, float speed)
+    {
+        float grip = (profile?.Tyres.PeakGripG ?? 0.95f) * WheelDynamics.G;
+        float factor = 1f;
+        if (car.Wheels is { Length: > 0 } wheels && profile != null)
+            foreach (var w in wheels)
+                factor = MathF.Min(factor, RoadWaterLaw.GripFactor(w.Surface, w.WaterMm, speed,
+                                                                     profile.Tyres.InflationKPa, profile.Tyres.TreadDepthMm));
+        return grip * factor;
+    }
+
+    /// <summary>Whether a crossing's bells are ringing: its bell is an emitter above the crossing whose
+    /// SynthRunning the server sets while it is closed (CrossingSystem).</summary>
+    private static bool CrossingClosed(WorldSnapshot world, CrossingRails c)
+    {
+        if (world.StaticGrid == null) return false;
+        foreach (int id in world.StaticGrid.GetItemsInRadius(c.Centre, 12f))
+        {
+            if (!world.Entities.TryGetValue(id, out var e)) continue;
+            var em = e.Definition.SoundEmitter;
+            if (em.SoundId != null && em.SoundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase)
+                && Vector3.DistanceSquared(new Vector3(e.Transform.Position.X, 0f, e.Transform.Position.Z),
+                                           new Vector3(c.Centre.X, 0f, c.Centre.Z)) < 100f)
+                return em.SynthRunning;
+        }
+        return false;
+    }
+
+    /// <summary>The flasher, and the indicator throwing itself off after the turn.</summary>
+    private void Indicators(float heading, float speed)
+    {
+        if (_indicator == 0) return;
+        if (float.IsNaN(_indicatorFrom)) _indicatorFrom = heading;
+        float turned = MathF.IEEERemainder(heading - _indicatorFrom, 2f * MathF.PI) * 180f / MathF.PI;
+        _indicatorMost = MathF.Max(_indicatorMost, MathF.Abs(turned));
+        float dt = (float)Math.Clamp(_now - _lastIndicatorAt, 0.0, 0.25);
+        _lastIndicatorAt = _now;
+        if (!float.IsNaN(_lastHeading) && dt > 0f)
+        {
+            float rate = MathF.Abs(MathF.IEEERemainder(heading - _lastHeading, 2f * MathF.PI)) * 180f / MathF.PI / dt;
+            _steadyFor = rate < 6f ? _steadyFor + dt : 0f;
+        }
+        // Through the turn and straight again: the column throws it off.
+        if (_indicatorMost >= CancelAfterDegrees && _steadyFor > 0.6f && speed > 0.5f)
+        {
+            _indicator = 0;
+            if (_planner != null) _planner.Indicator = 0;
+            Flash(false);
+            Log.Information("[DRIVE] indicator cancelled after {Deg:F0} degrees", _indicatorMost);
+            return;
+        }
+        if (_now < _nextFlash) return;
+        _nextFlash = _now + FlashSeconds;
+        _flashOn = !_flashOn;
+        Flash(_flashOn);
+    }
+    private double _lastIndicatorAt;
+    private double _lastPlanAt;
+    private float _yawRate;
+
+    /// <summary>The relay closing (tick) or opening (tock), in the dash a little ahead.</summary>
+    private void Flash(bool on)
+    {
+        if (!_registered) return;
+        if (!on) _flashOn = false;
+        float h = float.IsNaN(_lastHeading) ? 0f : _lastHeading;
+        var ahead = Vector3.Transform(new Vector3(0f, -0.35f, 0.6f), Quaternion.CreateFromYawPitchRoll(h, 0f, 0f));
+        Play(on ? TickSound : TockSound, RelayId, ahead, 0.22f);
+    }
+
+    /// <summary>The limit when you join a road with a different one, and the two notes when over it.</summary>
+    private void SpeedLimit(float speed)
+    {
+        if (Plan is not { SpeedLimitMps: > 0f } plan) { _wasOver = false; return; }
+        if (_announcedLimit >= 0f && MathF.Abs(plan.SpeedLimitMps - _announcedLimit) > 0.5f && !plan.InJunction)
+        {
+            Say($"Limit {MathF.Round(plan.SpeedLimitMps * 3.6f)}.");
+            _announcedLimit = plan.SpeedLimitMps;
+        }
+        bool over = speed > plan.SpeedLimitMps + OverSpeedMargin;
+        if (over && (!_wasOver || _now >= _nextOverSpeed))
+        {
+            _nextOverSpeed = _now + OverSpeedRepeat;
+            if (DrivingCues.Enabled && DrivingCues.SpeedWarning)
+                Play(OverSpeedSound, OverSpeedId, Vector3.Transform(new Vector3(0f, -0.2f, 0.7f), Quaternion.CreateFromYawPitchRoll(_lastHeading, 0f, 0f)), 0.2f);
+            if (!_wasOver) Log.Information("[DRIVE] over the limit: {Kmh:F0} in a {Limit:F0}", speed * 3.6f, plan.SpeedLimitMps * 3.6f);
+        }
+        _wasOver = over;
+    }
+
+    /// <summary>The brake cue: toward what the braking is for, faster and higher as it nears the grip.</summary>
+    private void BrakeCue(Vector3 at, float speed)
+    {
+        if (Plan is not { } plan || !DrivingCues.Enabled || !DrivingCues.BrakeCue || speed < 1f) return;
+        float ratio = plan.BrakeRatio;
+        int band = DrivingCueBands.Of(ratio);
+        if (band == 0 || _now < _nextBrake) return;
+        float lo = band switch { 1 => DrivingCueBands.Lift, 2 => DrivingCueBands.Brake, 3 => DrivingCueBands.Hard, _ => DrivingCueBands.Limit };
+        float hi = band switch { 1 => DrivingCueBands.Brake, 2 => DrivingCueBands.Hard, 3 => DrivingCueBands.Limit, _ => 1.2f };
+        float f = Math.Clamp((ratio - lo) / (hi - lo), 0f, 1f);
+        var (slow, fast) = BrakeEvery[band];
+        _nextBrake = _now + slow + (fast - slow) * f;
+        // Toward the hazard, at arm's length: where, not how far.
+        var toward = plan.HazardPoint - at;
+        toward.Y = 0f;
+        var dir = toward.LengthSquared() > 1f ? Vector3.Normalize(toward) : Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(_lastHeading, 0f, 0f));
+        Play(BrakeSounds[band], BrakeBaseId - (_brakeIdx++ % Pool), dir * 2.5f, BrakeVolume);
+        TracePlan(plan, speed);
+    }
+
+    private double _nextPlanTrace;
+    private void TracePlan(DrivingCuePlan plan, float speed)
+    {
+        if (_now < _nextPlanTrace) return;
+        _nextPlanTrace = _now + 1.0;
+        Log.Information("[DRIVE-CUE] {Kmh:F0} km/h, brake {Ratio:F2} ({Band}) for {Hazard} at {D:F0} m to {To:F0} km/h, need {Need:F1} of {Have:F1} m/s2",
+                        speed * 3.6f, plan.BrakeRatio, DrivingCueBands.Of(plan.BrakeRatio), plan.Hazard, plan.HazardDistance,
+                        plan.HazardSpeed * 3.6f, plan.NeededDecel, plan.AvailableDecel);
+    }
+
+    /// <summary>A level crossing on the line ahead: said once, and again if it closes as you come.</summary>
+    private void AheadSpeech()
+    {
+        if (Plan is not { } plan) return;
+        if (plan.Crossing is { } c && plan.CrossingDistance < MathF.Max(40f, plan.Path.Count * 0.8f))
+        {
+            if (c.Name != _announcedCrossing || (plan.CrossingClosed && !_announcedCrossingClosed))
+            {
+                Say(plan.CrossingClosed
+                    ? $"Level crossing in {Round(plan.CrossingDistance)} metres, closed. Stop before it."
+                    : $"Level crossing in {Round(plan.CrossingDistance)} metres.");
+                _announcedCrossing = c.Name;
+                _announcedCrossingClosed = plan.CrossingClosed;
+            }
+        }
+        else if (plan.Crossing == null && _announcedCrossing.Length > 0 && !plan.InJunction)
+        {
+            _announcedCrossing = "";
+            _announcedCrossingClosed = false;
+        }
+        // The indicator set after the junction was announced: say which way it now goes.
+        if (_indicator != 0 && plan.Junction != null && !ReferenceEquals(plan.Junction, _announcedTurnAt)
+            && plan.NextTurn is Turn.Left or Turn.Right && plan.JunctionDistance < 120f)
+        {
+            _announcedTurnAt = plan.Junction;
+            Say($"Turning {(plan.NextTurn == Turn.Left ? "left" : "right")} onto {plan.NextRoad}.");
+        }
+    }
+
+    private string LimitWords()
+        => Plan is { SpeedLimitMps: > 0f } p ? $", limit {MathF.Round(p.SpeedLimitMps * 3.6f)}" : "";
+
+    /// <summary>What the line ahead holds, for Z: the next junction and the way through it, a crossing.</summary>
+    private string AheadWords()
+    {
+        if (Plan is not { } p) return "";
+        var parts = new List<string>();
+        if (p.Junction != null && p.JunctionDistance < 250f)
+        {
+            string way = p.NextTurn switch { Turn.Left => $", turning left onto {p.NextRoad}", Turn.Right => $", turning right onto {p.NextRoad}", _ => "" };
+            parts.Add($"Junction in {Round(p.JunctionDistance)} metres{(p.GivesWay ? ", give way" : "")}{way}");
+        }
+        if (p.Crossing != null)
+            parts.Add($"Level crossing in {Round(p.CrossingDistance)} metres{(p.CrossingClosed ? ", closed" : "")}");
+        if (_indicator != 0) parts.Add(_indicator < 0 ? "Left indicator on" : "Right indicator on");
+        return parts.Count == 0 ? "" : " " + string.Join(". ", parts) + ".";
+    }
+
+    private string TurnWords()
+        => _indicator != 0 && Plan?.NextTurn is Turn.Left or Turn.Right
+            ? $" Turning {(Plan!.NextTurn == Turn.Left ? "left" : "right")} onto {Plan.NextRoad}."
+            : "";
 
     // ── The sounds themselves ────────────────────────────────────────────────────────────────
 
@@ -476,7 +860,14 @@ public sealed class DrivingAids
             & _audio.RegisterSynthesisedSoundFloat(CentreSound, Beep(rate, 660f, 0.06f, 0.3f), rate)
             & _audio.RegisterSynthesisedSoundFloat(KerbSound, Beep(rate, 220f, 0.08f, 0.6f), rate)
             & _audio.RegisterSynthesisedSoundFloat(TurnSound, Beep(rate, 1800f, 0.018f, 0f), rate)
-            & _audio.RegisterSynthesisedSoundFloat(AlignSound, Chime(rate), rate);
+            & _audio.RegisterSynthesisedSoundFloat(AlignSound, Chime(rate), rate)
+            & _audio.RegisterSynthesisedSoundFloat(TickSound, DrivingCueSounds.Relay(rate, closing: true), rate)
+            & _audio.RegisterSynthesisedSoundFloat(TockSound, DrivingCueSounds.Relay(rate, closing: false), rate)
+            & _audio.RegisterSynthesisedSoundFloat(OverSpeedSound, DrivingCueSounds.OverSpeed(rate), rate)
+            & _audio.RegisterSynthesisedSoundFloat(DotsSound, DrivingCueSounds.Dots(rate, DotsLoopHz), rate)
+            & _audio.RegisterSynthesisedSoundFloat(StripSound, DrivingCueSounds.Strip(rate, StripLoopHz), rate);
+        for (int b = 1; b < BrakeSounds.Length; b++)
+            _registered &= _audio.RegisterSynthesisedSoundFloat(BrakeSounds[b], DrivingCueSounds.Brake(rate, BrakeHz[b], b), rate);
     }
 
     /// <summary>A beep: a tone with soft edges so it does not click, and some odd harmonics to make it

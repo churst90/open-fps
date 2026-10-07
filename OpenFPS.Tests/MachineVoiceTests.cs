@@ -37,6 +37,8 @@ public class MachineVoiceTests
         // A mower's declared level is the machine WORKING, which is a mower being pushed. 0.95 m/s is
         // the speed every mower ran at when the levels were measured, back when it was a constant.
         if (spec.Cutting != null) voice.TargetGroundSpeed = 0.95f;
+        // An air conditioner's is the machine on a hot day, its compressor running (Thermostat).
+        if (spec.Compressor != null) voice.AmbientCelsius = 36f;
         int n = (int)(Rate * seconds);
         var buf = new float[n];
 

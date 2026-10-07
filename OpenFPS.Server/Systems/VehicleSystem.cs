@@ -55,6 +55,12 @@ public sealed partial class VehicleSystem
         public State Current = State.Waiting;
         public float Progress;                 // metres along From -> To
 
+        /// <summary>An aeroplane that lands: how it rolls out, turns round and takes off (from its
+        /// preset), and the run it is on while its wheels are on the runway. Null for anything else.</summary>
+        public GroundRunSpec? Ground;
+        public float ApproachSpeed;
+        public AircraftGroundRun? Run;
+
         // Racing. Null for a shuttling vehicle.
         public RaceLine? Line;
         /// <summary>The tour of lanes it drives, for a vehicle on a map's roads; null on a track.</summary>
@@ -164,7 +170,7 @@ public sealed partial class VehicleSystem
         public Func<float, float>? CornerSpeed;
     }
 
-    private enum State { Waiting, Driving, Turning }
+    private enum State { Waiting, Driving, Turning, Ground }
 
     private readonly List<DemoVehicle> _vehicles = new();
     private readonly Dictionary<int, DemoVehicle> _byEntity = new();
@@ -408,6 +414,8 @@ public sealed partial class VehicleSystem
                     // The friction circle, which is NOT the cornering number unless the map says so.
                     Grip = vd.GripG > 0 ? vd.GripG : (vd.CorneringG > 0 ? vd.CorneringG : 1.0f),
                     CorneringG = corneringG,
+                    Ground = air?.Ground,
+                    ApproachSpeed = air?.ApproachSpeedMps ?? 0f,
                 };
 
                 // Where this vehicle stops on its route. A stop names who uses it — a bus stop is
@@ -596,6 +604,16 @@ public sealed partial class VehicleSystem
                     float remaining = MathF.Max(0f, total - v.Progress);
                     // The speed the brakes allow with this much road left.
                     float allowed = MathF.Sqrt(MathF.Max(0f, 2f * v.Brake * remaining));
+                    // An aeroplane coming down onto a runway does not stop in the air: it flies the
+                    // approach at its approach speed, bleeds off to touchdown speed in the flare, and
+                    // lands (AircraftGroundRun).
+                    bool landing = Landing(v);
+                    if (landing)
+                    {
+                        float vtd = v.Ground!.TouchdownSpeedMps;
+                        if (v.ApproachSpeed > 0f) target = v.ApproachSpeed;
+                        allowed = MathF.Sqrt(vtd * vtd + 2f * FlareDecel * remaining);
+                    }
                     float want = MathF.Min(target, allowed);
                     if (v.Crossings.Length > 0) want = MathF.Min(want, KerbHold(v, total, dt));
                     if (want > v.Speed) v.Speed = MathF.Min(want, v.Speed + v.Accel * dt);
@@ -604,6 +622,14 @@ public sealed partial class VehicleSystem
                     var dir = Vector3.Normalize(v.To - v.From);
                     t.Position = v.From + dir * MathF.Min(v.Progress, total);
                     vel.Linear = dir * v.Speed;
+                    if (landing && v.Progress >= total - 0.05f)
+                    {
+                        v.Run = new AircraftGroundRun(v.Ground!, v.To, dir, v.Speed, v.WaitSeconds);
+                        v.Current = State.Ground;
+                        v.Phase = 0f;
+                        Log.Information("{Name} touched down at {Speed:F0} m/s.", v.DisplayName, v.Speed);
+                        break;
+                    }
                     // Checked AFTER this tick's braking, so it waits for the brake to reach zero:
                     // with no road left the target is nought and the speed gets there on its own.
                     if (v.Progress >= total - 0.05f && v.Speed <= 1e-3f)
@@ -618,6 +644,29 @@ public sealed partial class VehicleSystem
                         v.Pass++;
                         v.ClearedFor = v.WaitingFor = null;
                         v.KerbWait = 0f;
+                    }
+                    break;
+                }
+
+                case State.Ground:
+                {
+                    // On the runway: the landing roll, the turn round, the hold and the take-off roll.
+                    var run = v.Run!;
+                    run.Update(dt);
+                    t.Position = run.Position;
+                    v.Heading = run.Heading;
+                    v.Speed = run.Speed;
+                    vel.Linear = run.Velocity;
+                    if (run.State == AircraftGroundRun.Phase.Done)
+                    {
+                        // Wheels off at the touchdown point: the climb-out is the approach flown back.
+                        (v.From, v.To) = (v.To, v.From);
+                        v.Pass++;
+                        v.Progress = 0f;
+                        v.Run = null;
+                        v.Current = State.Driving;
+                        v.Phase = 0f;
+                        Log.Information("{Name} lifted off at {Speed:F0} m/s.", v.DisplayName, v.Speed);
                     }
                     break;
                 }
@@ -654,6 +703,18 @@ public sealed partial class VehicleSystem
             }
         }
     }
+
+    /// <summary>The flare's deceleration from approach speed to touchdown speed, m/s²: the last few
+    /// hundred metres of an approach, with the power coming off.</summary>
+    private const float FlareDecel = 0.6f;
+
+    /// <summary>
+    /// Whether this leg is an aeroplane landing: one that rolls (its preset has a ground run), on a leg
+    /// that comes down by more than ten metres to within a few metres of the ground plane. A level
+    /// overflight, or a helicopter, keeps the old turn at the end.
+    /// </summary>
+    private static bool Landing(DemoVehicle v)
+        => v.Ground != null && v.To.Y < v.From.Y - 10f && v.To.Y < 5f;
 
     /// <summary>
     /// One tick of a car on a circuit: chase the speed the line allows here, and move that far.

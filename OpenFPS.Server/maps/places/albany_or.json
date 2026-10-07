@@ -165216,7 +165216,7 @@
     "Z": 50.5359
    },
    "Name": "2316 53rd Avenue Southwest east wall",
-   "Tile": "-5,2",
+   "Tile": "-6,2",
    "Layer": "structure"
   },
   {
@@ -168966,7 +168966,7 @@
     "Z": 1.6983
    },
    "Name": "4834 Caribou Drive Southwest floor",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -168989,7 +168989,7 @@
     "Z": 1.3486
    },
    "Name": "4834 Caribou Drive Southwest floor",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -169012,7 +169012,7 @@
     "Z": 1.6983
    },
    "Name": "4834 Caribou Drive Southwest roof",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -169035,7 +169035,7 @@
     "Z": 1.3486
    },
    "Name": "4834 Caribou Drive Southwest roof",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -169058,7 +169058,7 @@
     "Z": 137.3581
    },
    "Name": "4834 Caribou Drive Southwest ceiling",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -169081,7 +169081,7 @@
     "Z": 108.2207
    },
    "Name": "4834 Caribou Drive Southwest ceiling",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -169104,7 +169104,7 @@
     "Z": 1.6483
    },
    "Name": "4834 Caribou Drive Southwest, house",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "rooms"
   },
   {
@@ -169127,7 +169127,7 @@
     "Z": 1.2986
    },
    "Name": "4834 Caribou Drive Southwest, house",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "rooms"
   },
   {
@@ -169150,7 +169150,7 @@
     "Z": 0.7143
    },
    "Name": "4834 Caribou Drive Southwest south wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -169219,7 +169219,7 @@
     "Z": 48.5228
    },
    "Name": "4834 Caribou Drive Southwest west wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -169265,7 +169265,7 @@
     "Z": 17.9093
    },
    "Name": "4834 Caribou Drive Southwest east wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -169288,7 +169288,7 @@
     "Z": 2.7143
    },
    "Name": "4834 Caribou Drive Southwest east wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -169336,7 +169336,7 @@
     "Z": 1
    },
    "Name": "4834 Caribou Drive Southwest front door",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -178337,7 +178337,7 @@
     "Z": 1.25
    },
    "Name": "4827 Caribou Drive Southwest south wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -186479,7 +186479,7 @@
     "Z": 1.25
    },
    "Name": "4894 Chinook Drive Southwest south wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -186872,7 +186872,7 @@
     "Z": 1.25
    },
    "Name": "2106 Cougar Avenue Southwest south wall",
-   "Tile": "-5,4",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -186895,7 +186895,7 @@
     "Z": 1.25
    },
    "Name": "2106 Cougar Avenue Southwest south wall",
-   "Tile": "-5,4",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -187033,7 +187033,7 @@
     "Z": 30.4341
    },
    "Name": "2106 Cougar Avenue Southwest east wall",
-   "Tile": "-5,4",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -194019,7 +194019,7 @@
     "Z": 0.7459
    },
    "Name": "2100 Cougar Avenue Southwest floor",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -194065,7 +194065,7 @@
     "Z": 0.7459
    },
    "Name": "2100 Cougar Avenue Southwest roof",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -194111,7 +194111,7 @@
     "Z": 57.9942
    },
    "Name": "2100 Cougar Avenue Southwest ceiling",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -194157,7 +194157,7 @@
     "Z": 0.6959
    },
    "Name": "2100 Cougar Avenue Southwest, house",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "rooms"
   },
   {
@@ -194249,7 +194249,7 @@
     "Z": 1.25
    },
    "Name": "2100 Cougar Avenue Southwest west wall",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -194341,7 +194341,7 @@
     "Z": 16.2733
    },
    "Name": "2100 Cougar Avenue Southwest north wall",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -194364,7 +194364,7 @@
     "Z": 4.75
    },
    "Name": "2100 Cougar Avenue Southwest north wall",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -194387,7 +194387,7 @@
     "Z": 16.2733
    },
    "Name": "2100 Cougar Avenue Southwest north wall",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -194412,7 +194412,7 @@
     "Z": 1
    },
    "Name": "2100 Cougar Avenue Southwest front door",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -198578,7 +198578,7 @@
     "Z": 67.347
    },
    "Name": "2025 Black Bear Avenue Southwest north wall",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -205171,7 +205171,7 @@
     "Z": 1.1553
    },
    "Name": "2013 Black Bear Avenue Southwest floor",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -205217,7 +205217,7 @@
     "Z": 1.1553
    },
    "Name": "2013 Black Bear Avenue Southwest roof",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -205263,7 +205263,7 @@
     "Z": 92.1124
    },
    "Name": "2013 Black Bear Avenue Southwest ceiling",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -205309,7 +205309,7 @@
     "Z": 1.1053
    },
    "Name": "2013 Black Bear Avenue Southwest, house",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "rooms"
   },
   {
@@ -205355,7 +205355,7 @@
     "Z": 1.25
    },
    "Name": "2013 Black Bear Avenue Southwest west wall",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -205424,7 +205424,7 @@
     "Z": 57.7674
    },
    "Name": "2013 Black Bear Avenue Southwest north wall",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -209521,7 +209521,7 @@
     "Z": 1.1589
    },
    "Name": "2001 Black Bear Avenue Southwest floor",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -209567,7 +209567,7 @@
     "Z": 1.1589
    },
    "Name": "2001 Black Bear Avenue Southwest roof",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -209613,7 +209613,7 @@
     "Z": 92.4105
    },
    "Name": "2001 Black Bear Avenue Southwest ceiling",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -209659,7 +209659,7 @@
     "Z": 1.1089
    },
    "Name": "2001 Black Bear Avenue Southwest, house",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "rooms"
   },
   {
@@ -209797,7 +209797,7 @@
     "Z": 1.25
    },
    "Name": "2001 Black Bear Avenue Southwest north wall",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -209820,7 +209820,7 @@
     "Z": 57.9463
    },
    "Name": "2001 Black Bear Avenue Southwest west wall",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -211856,7 +211856,7 @@
     "Z": 0.7892
    },
    "Name": "2011 Cougar Avenue Southwest floor",
-   "Tile": "-5,4",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -211902,7 +211902,7 @@
     "Z": 0.7892
    },
    "Name": "2011 Cougar Avenue Southwest roof",
-   "Tile": "-5,4",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -211948,7 +211948,7 @@
     "Z": 61.5973
    },
    "Name": "2011 Cougar Avenue Southwest ceiling",
-   "Tile": "-5,4",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -211994,7 +211994,7 @@
     "Z": 0.7392
    },
    "Name": "2011 Cougar Avenue Southwest, house",
-   "Tile": "-5,4",
+   "Tile": "-5,5",
    "Layer": "rooms"
   },
   {
@@ -212040,7 +212040,7 @@
     "Z": 1.25
    },
    "Name": "2011 Cougar Avenue Southwest northwest wall",
-   "Tile": "-5,4",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -212086,7 +212086,7 @@
     "Z": 39.4584
    },
    "Name": "2011 Cougar Avenue Southwest southwest wall",
-   "Tile": "-5,4",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -217500,7 +217500,7 @@
     "Z": 0.6897
    },
    "Name": "1989 Black Bear Avenue Southwest floor",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -217546,7 +217546,7 @@
     "Z": 0.6897
    },
    "Name": "1989 Black Bear Avenue Southwest roof",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -217592,7 +217592,7 @@
     "Z": 53.3055
    },
    "Name": "1989 Black Bear Avenue Southwest ceiling",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -217638,7 +217638,7 @@
     "Z": 0.6397
    },
    "Name": "1989 Black Bear Avenue Southwest, house",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "rooms"
   },
   {
@@ -217684,7 +217684,7 @@
     "Z": 1.25
    },
    "Name": "1989 Black Bear Avenue Southwest east wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -217753,7 +217753,7 @@
     "Z": 19.7928
    },
    "Name": "1989 Black Bear Avenue Southwest south wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -217776,7 +217776,7 @@
     "Z": 4.75
    },
    "Name": "1989 Black Bear Avenue Southwest south wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -217799,7 +217799,7 @@
     "Z": 19.7928
    },
    "Name": "1989 Black Bear Avenue Southwest south wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -217822,7 +217822,7 @@
     "Z": 34.4833
    },
    "Name": "1989 Black Bear Avenue Southwest south wall",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -217847,7 +217847,7 @@
     "Z": 1
    },
    "Name": "1989 Black Bear Avenue Southwest front door",
-   "Tile": "-5,3",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -218493,7 +218493,7 @@
     "Z": 1.25
    },
    "Name": "1997 Cougar Avenue Southwest west wall",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -218608,7 +218608,7 @@
     "Z": 82.3926
    },
    "Name": "1997 Cougar Avenue Southwest north wall",
-   "Tile": "-5,5",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -221547,7 +221547,7 @@
     "Z": 1.608
    },
    "Name": "1977 Black Bear Avenue Southwest floor",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -221593,7 +221593,7 @@
     "Z": 1.608
    },
    "Name": "1977 Black Bear Avenue Southwest roof",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -221639,7 +221639,7 @@
     "Z": 129.8322
    },
    "Name": "1977 Black Bear Avenue Southwest ceiling",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -221685,7 +221685,7 @@
     "Z": 1.558
    },
    "Name": "1977 Black Bear Avenue Southwest, house",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "rooms"
   },
   {
@@ -221731,7 +221731,7 @@
     "Z": 1.25
    },
    "Name": "1977 Black Bear Avenue Southwest west wall",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -221777,7 +221777,7 @@
     "Z": 1.25
    },
    "Name": "1977 Black Bear Avenue Southwest east wall",
-   "Tile": "-4,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -221800,7 +221800,7 @@
     "Z": 80.3993
    },
    "Name": "1977 Black Bear Avenue Southwest north wall",
-   "Tile": "-5,4",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -222124,7 +222124,7 @@
     "Z": 1.25
    },
    "Name": "1978 Coho Avenue Southwest east wall",
-   "Tile": "-4,4",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -222216,7 +222216,7 @@
     "Z": 21.4651
    },
    "Name": "1978 Coho Avenue Southwest north wall",
-   "Tile": "-4,4",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -222425,7 +222425,7 @@
     "Z": 1.25
    },
    "Name": "1979 Coho Avenue Southwest east wall",
-   "Tile": "-4,4",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -222680,7 +222680,7 @@
     "Z": 1.25
    },
    "Name": "1980 Lynx Avenue Southwest east wall",
-   "Tile": "-4,4",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -223027,7 +223027,7 @@
     "Z": 1.25
    },
    "Name": "1981 Lynx Avenue Southwest east wall",
-   "Tile": "-4,4",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -223119,7 +223119,7 @@
     "Z": 19.9165
    },
    "Name": "1981 Lynx Avenue Southwest south wall",
-   "Tile": "-4,4",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -223512,7 +223512,7 @@
     "Z": 0.7143
    },
    "Name": "1999 Marten Avenue Southwest northeast wall",
-   "Tile": "-4,5",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -223604,7 +223604,7 @@
     "Z": 11.4747
    },
    "Name": "1999 Marten Avenue Southwest southeast wall",
-   "Tile": "-4,5",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -224020,7 +224020,7 @@
     "Z": 87.6259
    },
    "Name": "1984 Cougar Avenue Southwest east wall",
-   "Tile": "-4,4",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -224160,7 +224160,7 @@
     "Z": 1.25
    },
    "Name": "1990 Marten Avenue Southwest east wall",
-   "Tile": "-4,5",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -224229,7 +224229,7 @@
     "Z": 31.7413
    },
    "Name": "1990 Marten Avenue Southwest north wall",
-   "Tile": "-4,5",
+   "Tile": "-5,5",
    "Layer": "structure"
   },
   {
@@ -224346,7 +224346,7 @@
     "Z": 0.2466
    },
    "Name": "1985 Cougar Avenue Southwest floor",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -224392,7 +224392,7 @@
     "Z": 0.2466
    },
    "Name": "1985 Cougar Avenue Southwest roof",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -224438,7 +224438,7 @@
     "Z": 16.3799
    },
    "Name": "1985 Cougar Avenue Southwest ceiling",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -224484,7 +224484,7 @@
     "Z": 0.1966
    },
    "Name": "1985 Cougar Avenue Southwest, house",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "rooms"
   },
   {
@@ -224530,7 +224530,7 @@
     "Z": 1.25
    },
    "Name": "1985 Cougar Avenue Southwest east wall",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -224553,7 +224553,7 @@
     "Z": 1.25
    },
    "Name": "1985 Cougar Avenue Southwest west wall",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -224576,7 +224576,7 @@
     "Z": 1.25
    },
    "Name": "1985 Cougar Avenue Southwest west wall",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -224599,7 +224599,7 @@
     "Z": 12.3279
    },
    "Name": "1985 Cougar Avenue Southwest south wall",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -224668,7 +224668,7 @@
     "Z": 27.212
    },
    "Name": "1985 Cougar Avenue Southwest south wall",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -224691,7 +224691,7 @@
     "Z": 12.3279
    },
    "Name": "1985 Cougar Avenue Southwest north wall",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -225038,7 +225038,7 @@
     "Z": 80.4229
    },
    "Name": "5208 Mallard Circle Southwest west wall",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -225201,7 +225201,7 @@
     "Z": 0.7065
    },
    "Name": "1974 Black Bear Avenue Southwest floor",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -225247,7 +225247,7 @@
     "Z": 0.7065
    },
    "Name": "1974 Black Bear Avenue Southwest roof",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -225293,7 +225293,7 @@
     "Z": 54.7119
    },
    "Name": "1974 Black Bear Avenue Southwest ceiling",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -225339,7 +225339,7 @@
     "Z": 0.6565
    },
    "Name": "1974 Black Bear Avenue Southwest, house",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "rooms"
   },
   {
@@ -225408,7 +225408,7 @@
     "Z": 1.25
    },
    "Name": "1974 Black Bear Avenue Southwest west wall",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -225523,7 +225523,7 @@
     "Z": 35.3271
    },
    "Name": "1974 Black Bear Avenue Southwest north wall",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -225824,7 +225824,7 @@
     "Z": 82.7884
    },
    "Name": "5204 Mallard Circle Southwest west wall",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -225987,7 +225987,7 @@
     "Z": 0.7031
    },
    "Name": "1993 Kodiak Avenue Southwest floor",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -226033,7 +226033,7 @@
     "Z": 0.7031
    },
    "Name": "1993 Kodiak Avenue Southwest roof",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -226079,7 +226079,7 @@
     "Z": 54.421
    },
    "Name": "1993 Kodiak Avenue Southwest ceiling",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -226125,7 +226125,7 @@
     "Z": 0.6531
    },
    "Name": "1993 Kodiak Avenue Southwest, house",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "rooms"
   },
   {
@@ -226194,7 +226194,7 @@
     "Z": 1.25
    },
    "Name": "1993 Kodiak Avenue Southwest west wall",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -226217,7 +226217,7 @@
     "Z": 35.1526
    },
    "Name": "1993 Kodiak Avenue Southwest south wall",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -226541,7 +226541,7 @@
     "Z": 1.25
    },
    "Name": "5220 Mallard Circle Southwest south wall",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -226656,7 +226656,7 @@
     "Z": 82.5874
    },
    "Name": "5220 Mallard Circle Southwest west wall",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -226865,7 +226865,7 @@
     "Z": 1.25
    },
    "Name": "2001 Bobcat Avenue Southwest northwest wall",
-   "Tile": "-5,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -226934,7 +226934,7 @@
     "Z": 30.1868
    },
    "Name": "2001 Bobcat Avenue Southwest southwest wall",
-   "Tile": "-5,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -227120,7 +227120,7 @@
     "Z": 1.25
    },
    "Name": "1994 Bobcat Avenue Southwest west wall",
-   "Tile": "-5,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -227745,7 +227745,7 @@
     "Z": 30.6554
    },
    "Name": "2107 Salmon Court Southwest southwest wall",
-   "Tile": "-5,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -228069,7 +228069,7 @@
     "Z": 1.25
    },
    "Name": "5250 Mallard Circle Southwest west wall",
-   "Tile": "-5,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -229760,7 +229760,7 @@
     "Z": 1.015
    },
    "Name": "1965 Black Bear Avenue Southwest floor",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -229806,7 +229806,7 @@
     "Z": 1.015
    },
    "Name": "1965 Black Bear Avenue Southwest roof",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -229852,7 +229852,7 @@
     "Z": 80.4167
    },
    "Name": "1965 Black Bear Avenue Southwest ceiling",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -229898,7 +229898,7 @@
     "Z": 0.965
    },
    "Name": "1965 Black Bear Avenue Southwest, house",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "rooms"
   },
   {
@@ -229944,7 +229944,7 @@
     "Z": 1.25
    },
    "Name": "1965 Black Bear Avenue Southwest east wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -230013,7 +230013,7 @@
     "Z": 30.45
    },
    "Name": "1965 Black Bear Avenue Southwest south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -230036,7 +230036,7 @@
     "Z": 23.0
    },
    "Name": "1965 Black Bear Avenue Southwest south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -230059,7 +230059,7 @@
     "Z": 4.75
    },
    "Name": "1965 Black Bear Avenue Southwest south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -230082,7 +230082,7 @@
     "Z": 23.0
    },
    "Name": "1965 Black Bear Avenue Southwest south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -230107,7 +230107,7 @@
     "Z": 1
    },
    "Name": "1965 Black Bear Avenue Southwest front door",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -236144,7 +236144,7 @@
     "Z": 0.6923
    },
    "Name": "1953 Black Bear Avenue Southwest floor",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -236190,7 +236190,7 @@
     "Z": 0.6923
    },
    "Name": "1953 Black Bear Avenue Southwest roof",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -236236,7 +236236,7 @@
     "Z": 53.5267
    },
    "Name": "1953 Black Bear Avenue Southwest ceiling",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -236282,7 +236282,7 @@
     "Z": 0.6423
    },
    "Name": "1953 Black Bear Avenue Southwest, house",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "rooms"
   },
   {
@@ -236328,7 +236328,7 @@
     "Z": 1.25
    },
    "Name": "1953 Black Bear Avenue Southwest west wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -236374,7 +236374,7 @@
     "Z": 14.933
    },
    "Name": "1953 Black Bear Avenue Southwest south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -236397,7 +236397,7 @@
     "Z": 4.75
    },
    "Name": "1953 Black Bear Avenue Southwest south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -236420,7 +236420,7 @@
     "Z": 14.933
    },
    "Name": "1953 Black Bear Avenue Southwest south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -236443,7 +236443,7 @@
     "Z": 34.616
    },
    "Name": "1953 Black Bear Avenue Southwest south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -236491,7 +236491,7 @@
     "Z": 1
    },
    "Name": "1953 Black Bear Avenue Southwest front door",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -243824,7 +243824,7 @@
     "Z": 1.603
    },
    "Name": "1941 Black Bear Avenue Southwest floor",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -243870,7 +243870,7 @@
     "Z": 1.603
    },
    "Name": "1941 Black Bear Avenue Southwest roof",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -243916,7 +243916,7 @@
     "Z": 129.4171
    },
    "Name": "1941 Black Bear Avenue Southwest ceiling",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -243962,7 +243962,7 @@
     "Z": 1.553
    },
    "Name": "1941 Black Bear Avenue Southwest, house",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "rooms"
   },
   {
@@ -244008,7 +244008,7 @@
     "Z": 1.25
    },
    "Name": "1941 Black Bear Avenue Southwest west wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -244054,7 +244054,7 @@
     "Z": 1.25
    },
    "Name": "1941 Black Bear Avenue Southwest east wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -244077,7 +244077,7 @@
     "Z": 80.1503
    },
    "Name": "1941 Black Bear Avenue Southwest north wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -255829,7 +255829,7 @@
     "Z": 0.7921
    },
    "Name": "4896 Falcon Street Southwest floor",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -255875,7 +255875,7 @@
     "Z": 0.7921
    },
    "Name": "4896 Falcon Street Southwest roof",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -255921,7 +255921,7 @@
     "Z": 61.8375
    },
    "Name": "4896 Falcon Street Southwest ceiling",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -255967,7 +255967,7 @@
     "Z": 0.7421
    },
    "Name": "4896 Falcon Street Southwest, house",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "rooms"
   },
   {
@@ -255990,7 +255990,7 @@
     "Z": 1.25
    },
    "Name": "4896 Falcon Street Southwest east wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -256082,7 +256082,7 @@
     "Z": 1.25
    },
    "Name": "4896 Falcon Street Southwest west wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -256151,7 +256151,7 @@
     "Z": 14.8509
    },
    "Name": "4896 Falcon Street Southwest south wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -256174,7 +256174,7 @@
     "Z": 29.7019
    },
    "Name": "4896 Falcon Street Southwest north wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -256197,7 +256197,7 @@
     "Z": 39.6025
    },
    "Name": "4896 Falcon Street Southwest north wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -263856,7 +263856,7 @@
     "Z": 1.25
    },
    "Name": "4895 Falcon Street Southwest north wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -263925,7 +263925,7 @@
     "Z": 38.7888
    },
    "Name": "4895 Falcon Street Southwest west wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -281591,7 +281591,7 @@
     "Z": 0.8081
    },
    "Name": "1846 Antelope Circle Southwest floor",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -281637,7 +281637,7 @@
     "Z": 0.8081
    },
    "Name": "1846 Antelope Circle Southwest roof",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -281683,7 +281683,7 @@
     "Z": 63.1713
    },
    "Name": "1846 Antelope Circle Southwest ceiling",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -281729,7 +281729,7 @@
     "Z": 0.7581
    },
    "Name": "1846 Antelope Circle Southwest, house",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "rooms"
   },
   {
@@ -281775,7 +281775,7 @@
     "Z": 1.25
    },
    "Name": "1846 Antelope Circle Southwest west wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -281867,7 +281867,7 @@
     "Z": 1.25
    },
    "Name": "1846 Antelope Circle Southwest east wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -281890,7 +281890,7 @@
     "Z": 40.4028
    },
    "Name": "1846 Antelope Circle Southwest north wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -281913,7 +281913,7 @@
     "Z": 27.7769
    },
    "Name": "1846 Antelope Circle Southwest north wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -281936,7 +281936,7 @@
     "Z": 12.6259
    },
    "Name": "1846 Antelope Circle Southwest south wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -287415,7 +287415,7 @@
     "Z": 68.1307
    },
    "Name": "6188 Nelson Place Southwest northeast wall",
-   "Tile": "-4,0",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -297478,7 +297478,7 @@
     "Z": 0.6393
    },
    "Name": "1849 Antelope Circle Southwest floor",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -297524,7 +297524,7 @@
     "Z": 0.6393
    },
    "Name": "1849 Antelope Circle Southwest roof",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -297570,7 +297570,7 @@
     "Z": 49.1052
    },
    "Name": "1849 Antelope Circle Southwest ceiling",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -297616,7 +297616,7 @@
     "Z": 0.5893
    },
    "Name": "1849 Antelope Circle Southwest, house",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "rooms"
   },
   {
@@ -297685,7 +297685,7 @@
     "Z": 1.25
    },
    "Name": "1849 Antelope Circle Southwest north wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -297708,7 +297708,7 @@
     "Z": 31.9631
    },
    "Name": "1849 Antelope Circle Southwest west wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -309717,7 +309717,7 @@
     "Z": 1.6076
    },
    "Name": "1741 Black Bear Avenue Southwest floor",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -309763,7 +309763,7 @@
     "Z": 1.6076
    },
    "Name": "1741 Black Bear Avenue Southwest roof",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -309809,7 +309809,7 @@
     "Z": 129.8028
    },
    "Name": "1741 Black Bear Avenue Southwest ceiling",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -309855,7 +309855,7 @@
     "Z": 1.5576
    },
    "Name": "1741 Black Bear Avenue Southwest, house",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "rooms"
   },
   {
@@ -309901,7 +309901,7 @@
     "Z": 1.25
    },
    "Name": "1741 Black Bear Avenue Southwest west wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -309970,7 +309970,7 @@
     "Z": 80.3817
    },
    "Name": "1741 Black Bear Avenue Southwest north wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -313693,7 +313693,7 @@
     "Z": 54.6467
    },
    "Name": "6235 Nelson Loop Southwest north wall",
-   "Tile": "-4,0",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -317949,7 +317949,7 @@
     "Z": 1.25
    },
    "Name": "1696 Bobcat Avenue Southwest east wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -318064,7 +318064,7 @@
     "Z": 20.1156
    },
    "Name": "1696 Bobcat Avenue Southwest south wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -319197,7 +319197,7 @@
     "Z": 0.7143
    },
    "Name": "6104 Nelson Place Southwest east wall",
-   "Tile": "-3,0",
+   "Tile": "-4,0",
    "Layer": "structure"
   },
   {
@@ -319613,7 +319613,7 @@
     "Z": 76.8639
    },
    "Name": "1681 Marten Avenue Southwest east wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -319822,7 +319822,7 @@
     "Z": 1.25
    },
    "Name": "1700 Salmon Run Southwest north wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -319868,7 +319868,7 @@
     "Z": 76.4614
    },
    "Name": "1700 Salmon Run Southwest east wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -320100,7 +320100,7 @@
     "Z": 1.25
    },
    "Name": "1722 Belmont Avenue Southwest east wall",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -320261,7 +320261,7 @@
     "Z": 23.6884
    },
    "Name": "1722 Belmont Avenue Southwest north wall",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -320284,7 +320284,7 @@
     "Z": 4.75
    },
    "Name": "1722 Belmont Avenue Southwest north wall",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -320332,7 +320332,7 @@
     "Z": 1
    },
    "Name": "1722 Belmont Avenue Southwest front door",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -320700,7 +320700,7 @@
     "Z": 74.2645
    },
    "Name": "1675 Antelope Circle Southwest east wall",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -320955,7 +320955,7 @@
     "Z": 1.25
    },
    "Name": "1770 53rd Avenue Southwest south wall",
-   "Tile": "-3,2",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -321024,7 +321024,7 @@
     "Z": 1.25
    },
    "Name": "1770 53rd Avenue Southwest north wall",
-   "Tile": "-3,2",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -321093,7 +321093,7 @@
     "Z": 47.4015
    },
    "Name": "1770 53rd Avenue Southwest east wall",
-   "Tile": "-3,2",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -321141,7 +321141,7 @@
     "Z": 1.398
    },
    "Name": "1740 Cougar Avenue Southwest floor",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -321164,7 +321164,7 @@
     "Z": 1.398
    },
    "Name": "1740 Cougar Avenue Southwest roof",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -321187,7 +321187,7 @@
     "Z": 112.3318
    },
    "Name": "1740 Cougar Avenue Southwest ceiling",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -321210,7 +321210,7 @@
     "Z": 1.348
    },
    "Name": "1740 Cougar Avenue Southwest, house",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "rooms"
   },
   {
@@ -321233,7 +321233,7 @@
     "Z": 1.25
    },
    "Name": "1740 Cougar Avenue Southwest south wall",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -321279,7 +321279,7 @@
     "Z": 1.25
    },
    "Name": "1740 Cougar Avenue Southwest north wall",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -321302,7 +321302,7 @@
     "Z": 1.25
    },
    "Name": "1740 Cougar Avenue Southwest north wall",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -321348,7 +321348,7 @@
     "Z": 69.8991
    },
    "Name": "1740 Cougar Avenue Southwest east wall",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -321373,7 +321373,7 @@
     "Z": 1
    },
    "Name": "1740 Cougar Avenue Southwest front door",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -321511,7 +321511,7 @@
     "Z": 1.25
    },
    "Name": "1733 Black Bear Avenue Southwest east wall",
-   "Tile": "-3,3",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -321534,7 +321534,7 @@
     "Z": 69.512
    },
    "Name": "1733 Black Bear Avenue Southwest north wall",
-   "Tile": "-4,4",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -321812,7 +321812,7 @@
     "Z": 37.5465
    },
    "Name": "4142 Elk Run Drive Southwest east wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -321835,7 +321835,7 @@
     "Z": 4.75
    },
    "Name": "4142 Elk Run Drive Southwest east wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -321858,7 +321858,7 @@
     "Z": 37.5465
    },
    "Name": "4142 Elk Run Drive Southwest east wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -321883,7 +321883,7 @@
     "Z": 1
    },
    "Name": "4142 Elk Run Drive Southwest front door",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -322044,7 +322044,7 @@
     "Z": 1.25
    },
    "Name": "1691 Bobcat Avenue Southwest south wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -322113,7 +322113,7 @@
     "Z": 47.5058
    },
    "Name": "1691 Bobcat Avenue Southwest east wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -322253,7 +322253,7 @@
     "Z": 1.25
    },
    "Name": "1701 Salmon Run Southwest east wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -322299,7 +322299,7 @@
     "Z": 37.8425
    },
    "Name": "1701 Salmon Run Southwest south wall",
-   "Tile": "-3,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -322646,7 +322646,7 @@
     "Z": 1.25
    },
    "Name": "1725 Cougar Avenue Southwest east wall",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -322692,7 +322692,7 @@
     "Z": 20.2748
    },
    "Name": "1725 Cougar Avenue Southwest south wall",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -322715,7 +322715,7 @@
     "Z": 4.75
    },
    "Name": "1725 Cougar Avenue Southwest south wall",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -322738,7 +322738,7 @@
     "Z": 20.2748
    },
    "Name": "1725 Cougar Avenue Southwest south wall",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -322786,7 +322786,7 @@
     "Z": 1
    },
    "Name": "1725 Cougar Avenue Southwest front door",
-   "Tile": "-3,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -322832,7 +322832,7 @@
     "Z": 0.7579
    },
    "Name": "1713 Belmont Avenue Southwest floor",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -322878,7 +322878,7 @@
     "Z": 0.7579
    },
    "Name": "1713 Belmont Avenue Southwest roof",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -322924,7 +322924,7 @@
     "Z": 58.9885
    },
    "Name": "1713 Belmont Avenue Southwest ceiling",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -322970,7 +322970,7 @@
     "Z": 0.7079
    },
    "Name": "1713 Belmont Avenue Southwest, house",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "rooms"
   },
   {
@@ -323016,7 +323016,7 @@
     "Z": 1.25
    },
    "Name": "1713 Belmont Avenue Southwest west wall",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -323039,7 +323039,7 @@
     "Z": 1.25
    },
    "Name": "1713 Belmont Avenue Southwest east wall",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -323154,7 +323154,7 @@
     "Z": 37.8931
    },
    "Name": "1713 Belmont Avenue Southwest south wall",
-   "Tile": "-3,-1",
+   "Tile": "-4,-1",
    "Layer": "structure"
   },
   {
@@ -323294,7 +323294,7 @@
     "Z": 0.7143
    },
    "Name": "1676 Marten Avenue Southwest west wall",
-   "Tile": "-4,5",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -323340,7 +323340,7 @@
     "Z": 20.9192
    },
    "Name": "1676 Marten Avenue Southwest north wall",
-   "Tile": "-4,5",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -323503,7 +323503,7 @@
     "Z": 0.691
    },
    "Name": "6249 Nelson Loop Southwest floor",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -323549,7 +323549,7 @@
     "Z": 0.691
    },
    "Name": "6249 Nelson Loop Southwest roof",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -323595,7 +323595,7 @@
     "Z": 53.4143
    },
    "Name": "6249 Nelson Loop Southwest ceiling",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -323641,7 +323641,7 @@
     "Z": 0.641
    },
    "Name": "6249 Nelson Loop Southwest, house",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "rooms"
   },
   {
@@ -323710,7 +323710,7 @@
     "Z": 0.7143
    },
    "Name": "6249 Nelson Loop Southwest west wall",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -323733,7 +323733,7 @@
     "Z": 8.5139
    },
    "Name": "6249 Nelson Loop Southwest south wall",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -323756,7 +323756,7 @@
     "Z": 2.7143
    },
    "Name": "6249 Nelson Loop Southwest south wall",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -323779,7 +323779,7 @@
     "Z": 8.5139
    },
    "Name": "6249 Nelson Loop Southwest south wall",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -323825,7 +323825,7 @@
     "Z": 36.6638
    },
    "Name": "6249 Nelson Loop Southwest north wall",
-   "Tile": "-3,0",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -323850,7 +323850,7 @@
     "Z": 1
    },
    "Name": "6249 Nelson Loop Southwest front door",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -324080,7 +324080,7 @@
     "Z": 1.25
    },
    "Name": "1737 Elk Circle Southwest west wall",
-   "Tile": "-4,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -324172,7 +324172,7 @@
     "Z": 21.2696
    },
    "Name": "1737 Elk Circle Southwest south wall",
-   "Tile": "-4,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -361849,7 +361849,7 @@
     "Z": 7.9374
    },
    "Name": "6215 Chapman Place Southwest south wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -361872,7 +361872,7 @@
     "Z": 2.7143
    },
    "Name": "6215 Chapman Place Southwest south wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -361895,7 +361895,7 @@
     "Z": 7.9374
    },
    "Name": "6215 Chapman Place Southwest south wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -361920,7 +361920,7 @@
     "Z": 1
    },
    "Name": "6215 Chapman Place Southwest front door",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -372393,7 +372393,7 @@
     "Z": 0.7516
    },
    "Name": "6237 Chapman Place Southwest floor",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -372439,7 +372439,7 @@
     "Z": 0.7516
    },
    "Name": "6237 Chapman Place Southwest roof",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -372485,7 +372485,7 @@
     "Z": 58.466
    },
    "Name": "6237 Chapman Place Southwest ceiling",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -372531,7 +372531,7 @@
     "Z": 0.7016
    },
    "Name": "6237 Chapman Place Southwest, house",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "rooms"
   },
   {
@@ -372554,7 +372554,7 @@
     "Z": 1.25
    },
    "Name": "6237 Chapman Place Southwest southeast wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -372600,7 +372600,7 @@
     "Z": 1.25
    },
    "Name": "6237 Chapman Place Southwest northwest wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -372646,7 +372646,7 @@
     "Z": 16.4148
    },
    "Name": "6237 Chapman Place Southwest southwest wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -372669,7 +372669,7 @@
     "Z": 4.75
    },
    "Name": "6237 Chapman Place Southwest southwest wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -372692,7 +372692,7 @@
     "Z": 16.4148
    },
    "Name": "6237 Chapman Place Southwest southwest wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -372715,7 +372715,7 @@
     "Z": 15.0318
    },
    "Name": "6237 Chapman Place Southwest northeast wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -372786,7 +372786,7 @@
     "Z": 1
    },
    "Name": "6237 Chapman Place Southwest front door",
-   "Tile": "-3,-1",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -389208,7 +389208,7 @@
     "Z": 1.25
    },
    "Name": "4850 Elk Run Drive Southwest north wall",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -389277,7 +389277,7 @@
     "Z": 4.75
    },
    "Name": "4850 Elk Run Drive Southwest east wall",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -389300,7 +389300,7 @@
     "Z": 17.3267
    },
    "Name": "4850 Elk Run Drive Southwest east wall",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -389348,7 +389348,7 @@
     "Z": 1
    },
    "Name": "4850 Elk Run Drive Southwest front door",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -429333,7 +429333,7 @@
     "Z": 0.7143
    },
    "Name": "1575 Cougar Court Southwest northwest wall",
-   "Tile": "-3,5",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -429471,7 +429471,7 @@
     "Z": 46.0248
    },
    "Name": "1575 Cougar Court Southwest northeast wall",
-   "Tile": "-3,5",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -439691,7 +439691,7 @@
     "Z": 1.25
    },
    "Name": "1561 Otter Court Southwest southeast wall",
-   "Tile": "-3,3",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -439737,7 +439737,7 @@
     "Z": 30.9245
    },
    "Name": "1561 Otter Court Southwest southwest wall",
-   "Tile": "-3,3",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -439760,7 +439760,7 @@
     "Z": 4.75
    },
    "Name": "1561 Otter Court Southwest southwest wall",
-   "Tile": "-3,3",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -439831,7 +439831,7 @@
     "Z": 1
    },
    "Name": "1561 Otter Court Southwest front door",
-   "Tile": "-3,3",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -441148,7 +441148,7 @@
     "Z": 1.25
    },
    "Name": "1554 Otter Court Southwest east wall",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -442210,7 +442210,7 @@
     "Z": 44.8503
    },
    "Name": "1559 Salmon Run Southwest east wall",
-   "Tile": "-2,5",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -442442,7 +442442,7 @@
     "Z": 1.25
    },
    "Name": "1542 Beaver Court Southwest southeast wall",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -442674,7 +442674,7 @@
     "Z": 1.0576
    },
    "Name": "1562 Beaver Court Southwest floor",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -442720,7 +442720,7 @@
     "Z": 1.0576
    },
    "Name": "1562 Beaver Court Southwest roof",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -442766,7 +442766,7 @@
     "Z": 83.9704
    },
    "Name": "1562 Beaver Court Southwest ceiling",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -442812,7 +442812,7 @@
     "Z": 1.0076
    },
    "Name": "1562 Beaver Court Southwest, house",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "rooms"
   },
   {
@@ -442904,7 +442904,7 @@
     "Z": 1.25
    },
    "Name": "1562 Beaver Court Southwest northeast wall",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -443019,7 +443019,7 @@
     "Z": 15.1092
    },
    "Name": "1562 Beaver Court Southwest northwest wall",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -443042,7 +443042,7 @@
     "Z": 52.8822
    },
    "Name": "1562 Beaver Court Southwest southeast wall",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -443113,7 +443113,7 @@
     "Z": 0.655
    },
    "Name": "1569 Cougar Court Southwest floor",
-   "Tile": "-3,4",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -443159,7 +443159,7 @@
     "Z": 0.655
    },
    "Name": "1569 Cougar Court Southwest roof",
-   "Tile": "-3,4",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -443205,7 +443205,7 @@
     "Z": 50.4202
    },
    "Name": "1569 Cougar Court Southwest ceiling",
-   "Tile": "-3,4",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -443251,7 +443251,7 @@
     "Z": 0.605
    },
    "Name": "1569 Cougar Court Southwest, house",
-   "Tile": "-3,4",
+   "Tile": "-3,5",
    "Layer": "rooms"
   },
   {
@@ -443274,7 +443274,7 @@
     "Z": 1.25
    },
    "Name": "1569 Cougar Court Southwest south wall",
-   "Tile": "-3,4",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -443297,7 +443297,7 @@
     "Z": 1.25
    },
    "Name": "1569 Cougar Court Southwest south wall",
-   "Tile": "-3,4",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -443320,7 +443320,7 @@
     "Z": 1.25
    },
    "Name": "1569 Cougar Court Southwest south wall",
-   "Tile": "-3,4",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -443389,7 +443389,7 @@
     "Z": 32.7521
    },
    "Name": "1569 Cougar Court Southwest west wall",
-   "Tile": "-3,4",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -443435,7 +443435,7 @@
     "Z": 75.5818
    },
    "Name": "1569 Cougar Court Southwest east wall",
-   "Tile": "-2,5",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -443460,7 +443460,7 @@
     "Z": 1
    },
    "Name": "1569 Cougar Court Southwest front door",
-   "Tile": "-3,4",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -443828,7 +443828,7 @@
     "Z": 79.2343
    },
    "Name": "1553 Salmon Run Southwest east wall",
-   "Tile": "-2,5",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -443876,7 +443876,7 @@
     "Z": 0.9364
    },
    "Name": "6029 Bethel Loop Southwest floor",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -443922,7 +443922,7 @@
     "Z": 0.9364
    },
    "Name": "6029 Bethel Loop Southwest roof",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -443968,7 +443968,7 @@
     "Z": 73.8649
    },
    "Name": "6029 Bethel Loop Southwest ceiling",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444014,7 +444014,7 @@
     "Z": 0.8864
    },
    "Name": "6029 Bethel Loop Southwest, house",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "rooms"
   },
   {
@@ -444060,7 +444060,7 @@
     "Z": 1.25
    },
    "Name": "6029 Bethel Loop Southwest south wall",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444106,7 +444106,7 @@
     "Z": 1.25
    },
    "Name": "6029 Bethel Loop Southwest north wall",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444267,7 +444267,7 @@
     "Z": 46.8189
    },
    "Name": "6029 Bethel Loop Southwest east wall",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444315,7 +444315,7 @@
     "Z": 0.9873
    },
    "Name": "1555 Otter Court Southwest floor",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -444361,7 +444361,7 @@
     "Z": 0.9873
    },
    "Name": "1555 Otter Court Southwest roof",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -444407,7 +444407,7 @@
     "Z": 78.106
    },
    "Name": "1555 Otter Court Southwest ceiling",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -444453,7 +444453,7 @@
     "Z": 0.9373
    },
    "Name": "1555 Otter Court Southwest, house",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "rooms"
   },
   {
@@ -444568,7 +444568,7 @@
     "Z": 1.25
    },
    "Name": "1555 Otter Court Southwest southwest wall",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -444591,7 +444591,7 @@
     "Z": 1.25
    },
    "Name": "1555 Otter Court Southwest southwest wall",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -444614,7 +444614,7 @@
     "Z": 1.25
    },
    "Name": "1555 Otter Court Southwest northeast wall",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -444706,7 +444706,7 @@
     "Z": 49.3636
    },
    "Name": "1555 Otter Court Southwest southeast wall",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -444731,7 +444731,7 @@
     "Z": 1
    },
    "Name": "1555 Otter Court Southwest front door",
-   "Tile": "-2,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -444754,7 +444754,7 @@
     "Z": 1.1527
    },
    "Name": "1480 Morse Lane Southwest floor",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444777,7 +444777,7 @@
     "Z": 1.1527
    },
    "Name": "1480 Morse Lane Southwest roof",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444800,7 +444800,7 @@
     "Z": 91.8927
    },
    "Name": "1480 Morse Lane Southwest ceiling",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444823,7 +444823,7 @@
     "Z": 1.1027
    },
    "Name": "1480 Morse Lane Southwest, house",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "rooms"
   },
   {
@@ -444846,7 +444846,7 @@
     "Z": 1.25
    },
    "Name": "1480 Morse Lane Southwest south wall",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444892,7 +444892,7 @@
     "Z": 1.25
    },
    "Name": "1480 Morse Lane Southwest north wall",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444915,7 +444915,7 @@
     "Z": 1.25
    },
    "Name": "1480 Morse Lane Southwest north wall",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444961,7 +444961,7 @@
     "Z": 57.6356
    },
    "Name": "1480 Morse Lane Southwest east wall",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -444986,7 +444986,7 @@
     "Z": 1
    },
    "Name": "1480 Morse Lane Southwest front door",
-   "Tile": "-2,0",
+   "Tile": "-3,0",
    "Layer": "structure"
   },
   {
@@ -445101,7 +445101,7 @@
     "Z": 1.25
    },
    "Name": "1545 Salmon Run Southwest west wall",
-   "Tile": "-3,5",
+   "Tile": "-2,5",
    "Layer": "structure"
   },
   {
@@ -445124,7 +445124,7 @@
     "Z": 1.25
    },
    "Name": "1545 Salmon Run Southwest west wall",
-   "Tile": "-3,5",
+   "Tile": "-2,5",
    "Layer": "structure"
   },
   {
@@ -445147,7 +445147,7 @@
     "Z": 1.25
    },
    "Name": "1545 Salmon Run Southwest west wall",
-   "Tile": "-3,5",
+   "Tile": "-2,5",
    "Layer": "structure"
   },
   {
@@ -445241,7 +445241,7 @@
     "Z": 1
    },
    "Name": "1545 Salmon Run Southwest front door",
-   "Tile": "-3,5",
+   "Tile": "-2,5",
    "Layer": "structure"
   },
   {
@@ -445264,7 +445264,7 @@
     "Z": 1.1508
    },
    "Name": "1554 Beaver Court Southwest floor",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445287,7 +445287,7 @@
     "Z": 1.1508
    },
    "Name": "1554 Beaver Court Southwest roof",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445310,7 +445310,7 @@
     "Z": 91.7361
    },
    "Name": "1554 Beaver Court Southwest ceiling",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445333,7 +445333,7 @@
     "Z": 1.1008
    },
    "Name": "1554 Beaver Court Southwest, house",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "rooms"
   },
   {
@@ -445379,7 +445379,7 @@
     "Z": 1.25
    },
    "Name": "1554 Beaver Court Southwest west wall",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445402,7 +445402,7 @@
     "Z": 1.25
    },
    "Name": "1554 Beaver Court Southwest west wall",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445425,7 +445425,7 @@
     "Z": 1.25
    },
    "Name": "1554 Beaver Court Southwest west wall",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445448,7 +445448,7 @@
     "Z": 57.5417
    },
    "Name": "1554 Beaver Court Southwest south wall",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445496,7 +445496,7 @@
     "Z": 1
    },
    "Name": "1554 Beaver Court Southwest front door",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445542,7 +445542,7 @@
     "Z": 1.3071
    },
    "Name": "1558 Beaver Court Southwest floor",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445565,7 +445565,7 @@
     "Z": 1.3071
    },
    "Name": "1558 Beaver Court Southwest roof",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445588,7 +445588,7 @@
     "Z": 104.7574
    },
    "Name": "1558 Beaver Court Southwest ceiling",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445611,7 +445611,7 @@
     "Z": 1.2571
    },
    "Name": "1558 Beaver Court Southwest, house",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "rooms"
   },
   {
@@ -445634,7 +445634,7 @@
     "Z": 1.25
    },
    "Name": "1558 Beaver Court Southwest south wall",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445680,7 +445680,7 @@
     "Z": 30.3022
    },
    "Name": "1558 Beaver Court Southwest west wall",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445703,7 +445703,7 @@
     "Z": 4.75
    },
    "Name": "1558 Beaver Court Southwest west wall",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445726,7 +445726,7 @@
     "Z": 30.3022
    },
    "Name": "1558 Beaver Court Southwest west wall",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -445774,7 +445774,7 @@
     "Z": 1
    },
    "Name": "1558 Beaver Court Southwest front door",
-   "Tile": "-3,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -446004,7 +446004,7 @@
     "Z": 1.25
    },
    "Name": "6051 Bethel Loop Southwest north wall",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -446050,7 +446050,7 @@
     "Z": 22.8592
    },
    "Name": "6051 Bethel Loop Southwest west wall",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -446073,7 +446073,7 @@
     "Z": 4.75
    },
    "Name": "6051 Bethel Loop Southwest west wall",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -446096,7 +446096,7 @@
     "Z": 22.8592
    },
    "Name": "6051 Bethel Loop Southwest west wall",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -446167,7 +446167,7 @@
     "Z": 1
    },
    "Name": "6051 Bethel Loop Southwest front door",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -446374,7 +446374,7 @@
     "Z": 1.25
    },
    "Name": "6165 Bethel Loop Southwest west wall",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -446466,7 +446466,7 @@
     "Z": 20.0497
    },
    "Name": "6165 Bethel Loop Southwest north wall",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -446489,7 +446489,7 @@
     "Z": 4.75
    },
    "Name": "6165 Bethel Loop Southwest north wall",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -446606,7 +446606,7 @@
     "Z": 1
    },
    "Name": "6165 Bethel Loop Southwest front door",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -446882,7 +446882,7 @@
     "Z": 1.25
    },
    "Name": "1324 Tamarack Court Southwest west wall",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -446951,7 +446951,7 @@
     "Z": 9.9161
    },
    "Name": "1324 Tamarack Court Southwest north wall",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -447321,7 +447321,7 @@
     "Z": 1.25
    },
    "Name": "6073 Bethel Loop Southwest north wall",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -447344,7 +447344,7 @@
     "Z": 17.9279
    },
    "Name": "6073 Bethel Loop Southwest west wall",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -447367,7 +447367,7 @@
     "Z": 4.75
    },
    "Name": "6073 Bethel Loop Southwest west wall",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -447390,7 +447390,7 @@
     "Z": 17.9279
    },
    "Name": "6073 Bethel Loop Southwest west wall",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -447484,7 +447484,7 @@
     "Z": 1
    },
    "Name": "6073 Bethel Loop Southwest front door",
-   "Tile": "-3,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -452664,7 +452664,7 @@
     "Z": 1.25
    },
    "Name": "6153 Bethel Loop Southwest northwest wall",
-   "Tile": "-2,0",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -452687,7 +452687,7 @@
     "Z": 1.25
    },
    "Name": "6153 Bethel Loop Southwest northwest wall",
-   "Tile": "-2,0",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -452733,7 +452733,7 @@
     "Z": 47.3442
    },
    "Name": "6153 Bethel Loop Southwest northeast wall",
-   "Tile": "-2,0",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -452758,7 +452758,7 @@
     "Z": 1
    },
    "Name": "6153 Bethel Loop Southwest front door",
-   "Tile": "-2,0",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -460315,7 +460315,7 @@
     "Z": 1.25
    },
    "Name": "6174 Piedmont Place Southwest east wall",
-   "Tile": "-2,0",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -460384,7 +460384,7 @@
     "Z": 66.0899
    },
    "Name": "6174 Piedmont Place Southwest north wall",
-   "Tile": "-2,0",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -477519,7 +477519,7 @@
     "Z": 1.25
    },
    "Name": "1345 Belmont Avenue Southwest southeast wall",
-   "Tile": "-2,-1",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -477542,7 +477542,7 @@
     "Z": 1.25
    },
    "Name": "1345 Belmont Avenue Southwest southeast wall",
-   "Tile": "-2,-1",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -477565,7 +477565,7 @@
     "Z": 1.25
    },
    "Name": "1345 Belmont Avenue Southwest southeast wall",
-   "Tile": "-2,-1",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -477588,7 +477588,7 @@
     "Z": 1.25
    },
    "Name": "1345 Belmont Avenue Southwest southeast wall",
-   "Tile": "-2,-1",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -477634,7 +477634,7 @@
     "Z": 50.2812
    },
    "Name": "1345 Belmont Avenue Southwest southwest wall",
-   "Tile": "-2,-1",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -477657,7 +477657,7 @@
     "Z": 15.0844
    },
    "Name": "1345 Belmont Avenue Southwest southwest wall",
-   "Tile": "-2,-1",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -477705,7 +477705,7 @@
     "Z": 1
    },
    "Name": "1345 Belmont Avenue Southwest front door",
-   "Tile": "-2,-1",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -480895,7 +480895,7 @@
     "Z": 1.25
    },
    "Name": "5937 Ponderosa Drive Southwest north wall",
-   "Tile": "-2,1",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -490053,7 +490053,7 @@
     "Z": 16.4031
    },
    "Name": "5986 Mike Street Southwest east wall",
-   "Tile": "-1,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -490076,7 +490076,7 @@
     "Z": 2.7143
    },
    "Name": "5986 Mike Street Southwest east wall",
-   "Tile": "-1,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -490099,7 +490099,7 @@
     "Z": 16.4031
    },
    "Name": "5986 Mike Street Southwest east wall",
-   "Tile": "-1,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -490124,7 +490124,7 @@
     "Z": 1
    },
    "Name": "5986 Mike Street Southwest front door",
-   "Tile": "-1,0",
+   "Tile": "-2,0",
    "Layer": "structure"
   },
   {
@@ -492829,7 +492829,7 @@
     "Z": 33.1337
    },
    "Name": "5790 Mike Street Southwest east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -492852,7 +492852,7 @@
     "Z": 4.75
    },
    "Name": "5790 Mike Street Southwest east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -492875,7 +492875,7 @@
     "Z": 33.1337
    },
    "Name": "5790 Mike Street Southwest east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -492900,7 +492900,7 @@
     "Z": 1
    },
    "Name": "5790 Mike Street Southwest front door",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493107,7 +493107,7 @@
     "Z": 1.25
    },
    "Name": "5924 Mike Street Southwest east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493130,7 +493130,7 @@
     "Z": 1.25
    },
    "Name": "5924 Mike Street Southwest east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493153,7 +493153,7 @@
     "Z": 1.25
    },
    "Name": "5924 Mike Street Southwest east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493245,7 +493245,7 @@
     "Z": 60.1322
    },
    "Name": "5924 Mike Street Southwest south wall",
-   "Tile": "-2,0",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493339,7 +493339,7 @@
     "Z": 1
    },
    "Name": "5924 Mike Street Southwest front door",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493362,7 +493362,7 @@
     "Z": 2.911
    },
    "Name": "1240 Alandale Avenue Southwest floor",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493408,7 +493408,7 @@
     "Z": 2.911
    },
    "Name": "1240 Alandale Avenue Southwest roof",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493454,7 +493454,7 @@
     "Z": 238.4133
    },
    "Name": "1240 Alandale Avenue Southwest ceiling",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493500,7 +493500,7 @@
     "Z": 2.861
    },
    "Name": "1240 Alandale Avenue Southwest, house",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "rooms"
   },
   {
@@ -493546,7 +493546,7 @@
     "Z": 1.25
    },
    "Name": "1240 Alandale Avenue Southwest south wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493592,7 +493592,7 @@
     "Z": 1.25
    },
    "Name": "1240 Alandale Avenue Southwest north wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493753,7 +493753,7 @@
     "Z": 145.548
    },
    "Name": "1240 Alandale Avenue Southwest east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -493985,7 +493985,7 @@
     "Z": 1.25
    },
    "Name": "1239 Alandale Avenue Southwest south wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -494054,7 +494054,7 @@
     "Z": 40.2432
    },
    "Name": "1239 Alandale Avenue Southwest east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -494125,7 +494125,7 @@
     "Z": 0.8575
    },
    "Name": "6291 Wilford Court Southwest floor",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -494171,7 +494171,7 @@
     "Z": 0.8575
    },
    "Name": "6291 Wilford Court Southwest roof",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -494217,7 +494217,7 @@
     "Z": 67.2898
    },
    "Name": "6291 Wilford Court Southwest ceiling",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -494263,7 +494263,7 @@
     "Z": 0.8075
    },
    "Name": "6291 Wilford Court Southwest, house",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "rooms"
   },
   {
@@ -494332,7 +494332,7 @@
     "Z": 1.25
    },
    "Name": "6291 Wilford Court Southwest west wall",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -494355,7 +494355,7 @@
     "Z": 1.25
    },
    "Name": "6291 Wilford Court Southwest west wall",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -494424,7 +494424,7 @@
     "Z": 7.566
    },
    "Name": "6291 Wilford Court Southwest south wall",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -494447,7 +494447,7 @@
     "Z": 19.0619
    },
    "Name": "6291 Wilford Court Southwest north wall",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -494470,7 +494470,7 @@
     "Z": 4.75
    },
    "Name": "6291 Wilford Court Southwest north wall",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -494493,7 +494493,7 @@
     "Z": 19.0619
    },
    "Name": "6291 Wilford Court Southwest north wall",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -494518,7 +494518,7 @@
     "Z": 1
    },
    "Name": "6291 Wilford Court Southwest front door",
-   "Tile": "-2,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -494702,7 +494702,7 @@
     "Z": 1.25
    },
    "Name": "5830 Mike Street Southwest west wall",
-   "Tile": "-2,1",
+   "Tile": "-1,1",
    "Layer": "structure"
   },
   {
@@ -494725,7 +494725,7 @@
     "Z": 50.7909
    },
    "Name": "5830 Mike Street Southwest south wall",
-   "Tile": "-2,1",
+   "Tile": "-1,1",
    "Layer": "structure"
   },
   {
@@ -494819,7 +494819,7 @@
     "Z": 0.8089
    },
    "Name": "1250 Morse Lane Southwest floor",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -494865,7 +494865,7 @@
     "Z": 0.8089
    },
    "Name": "1250 Morse Lane Southwest roof",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -494911,7 +494911,7 @@
     "Z": 63.2398
    },
    "Name": "1250 Morse Lane Southwest ceiling",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -494957,7 +494957,7 @@
     "Z": 0.7589
    },
    "Name": "1250 Morse Lane Southwest, house",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "rooms"
   },
   {
@@ -495003,7 +495003,7 @@
     "Z": 1.25
    },
    "Name": "1250 Morse Lane Southwest south wall",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -495026,7 +495026,7 @@
     "Z": 1.25
    },
    "Name": "1250 Morse Lane Southwest north wall",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -495095,7 +495095,7 @@
     "Z": 40.4439
    },
    "Name": "1250 Morse Lane Southwest west wall",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -495465,7 +495465,7 @@
     "Z": 34.4486
    },
    "Name": "6199 Wilford Place Southwest west wall",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -495927,7 +495927,7 @@
     "Z": 37.936
    },
    "Name": "6111 Wilford Place Southwest west wall",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -496529,7 +496529,7 @@
     "Z": 17.6091
    },
    "Name": "6155 Wilford Place Southwest west wall",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -496552,7 +496552,7 @@
     "Z": 4.75
    },
    "Name": "6155 Wilford Place Southwest west wall",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -496575,7 +496575,7 @@
     "Z": 17.6091
    },
    "Name": "6155 Wilford Place Southwest west wall",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -496646,7 +496646,7 @@
     "Z": 1
    },
    "Name": "6155 Wilford Place Southwest front door",
-   "Tile": "-2,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -499213,7 +499213,7 @@
     "Z": 121.6257
    },
    "Name": "7150 Supra Drive Southwest west wall",
-   "Tile": "-2,-3",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -516145,7 +516145,7 @@
     "Z": 0.7143
    },
    "Name": "4888 Willetta Street Southwest east wall",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -516168,7 +516168,7 @@
     "Z": 0.7143
    },
    "Name": "4888 Willetta Street Southwest east wall",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -516191,7 +516191,7 @@
     "Z": 0.7143
    },
    "Name": "4888 Willetta Street Southwest east wall",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -516306,7 +516306,7 @@
     "Z": 30.0013
    },
    "Name": "4888 Willetta Street Southwest south wall",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -516331,7 +516331,7 @@
     "Z": 1
    },
    "Name": "4888 Willetta Street Southwest front door",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -520523,7 +520523,7 @@
     "Z": 24.6843
    },
    "Name": "1124 Lawrence Avenue Southwest, building north wall",
-   "Tile": "-1,1",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -520546,7 +520546,7 @@
     "Z": 4.75
    },
    "Name": "1124 Lawrence Avenue Southwest, building north wall",
-   "Tile": "-1,1",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -520569,7 +520569,7 @@
     "Z": 24.6843
    },
    "Name": "1124 Lawrence Avenue Southwest, building north wall",
-   "Tile": "-1,1",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -520594,7 +520594,7 @@
     "Z": 1
    },
    "Name": "1124 Lawrence Avenue Southwest, building door",
-   "Tile": "-1,1",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -561703,7 +561703,7 @@
     "Z": 565.7384
    },
    "Name": "Industrial C south wall",
-   "Tile": "-1,-2",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -564453,7 +564453,7 @@
     "Z": 1.2899
    },
    "Name": "4640 Pacific Boulevard Southwest floor",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "structure"
   },
   {
@@ -564499,7 +564499,7 @@
     "Z": 1.2899
    },
    "Name": "4640 Pacific Boulevard Southwest roof",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "structure"
   },
   {
@@ -564545,7 +564545,7 @@
     "Z": 103.3214
    },
    "Name": "4640 Pacific Boulevard Southwest ceiling",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "structure"
   },
   {
@@ -564591,7 +564591,7 @@
     "Z": 1.2399
    },
    "Name": "4640 Pacific Boulevard Southwest, house",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "rooms"
   },
   {
@@ -564637,7 +564637,7 @@
     "Z": 1.25
    },
    "Name": "4640 Pacific Boulevard Southwest east wall",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "structure"
   },
   {
@@ -564660,7 +564660,7 @@
     "Z": 1.25
    },
    "Name": "4640 Pacific Boulevard Southwest east wall",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "structure"
   },
   {
@@ -564683,7 +564683,7 @@
     "Z": 1.25
    },
    "Name": "4640 Pacific Boulevard Southwest east wall",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "structure"
   },
   {
@@ -564706,7 +564706,7 @@
     "Z": 1.25
    },
    "Name": "4640 Pacific Boulevard Southwest west wall",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "structure"
   },
   {
@@ -564775,7 +564775,7 @@
     "Z": 64.4928
    },
    "Name": "4640 Pacific Boulevard Southwest south wall",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "structure"
   },
   {
@@ -564798,7 +564798,7 @@
     "Z": 62.0123
    },
    "Name": "4640 Pacific Boulevard Southwest south wall",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "structure"
   },
   {
@@ -564869,7 +564869,7 @@
     "Z": 1
    },
    "Name": "4640 Pacific Boulevard Southwest front door",
-   "Tile": "-1,4",
+   "Tile": "-1,5",
    "Layer": "structure"
   },
   {
@@ -566714,7 +566714,7 @@
     "Z": 15.9917
    },
    "Name": "34414 Highway 99e floor",
-   "Tile": "0,-5",
+   "Tile": "-1,-5",
    "Layer": "structure"
   },
   {
@@ -566760,7 +566760,7 @@
     "Z": 15.9917
    },
    "Name": "34414 Highway 99e roof",
-   "Tile": "0,-5",
+   "Tile": "-1,-5",
    "Layer": "structure"
   },
   {
@@ -566806,7 +566806,7 @@
     "Z": 1328.4737
    },
    "Name": "34414 Highway 99e ceiling",
-   "Tile": "0,-5",
+   "Tile": "-1,-5",
    "Layer": "structure"
   },
   {
@@ -566852,7 +566852,7 @@
     "Z": 15.9417
    },
    "Name": "34414 Highway 99e, house",
-   "Tile": "0,-5",
+   "Tile": "-1,-5",
    "Layer": "rooms"
   },
   {
@@ -566875,7 +566875,7 @@
     "Z": 0.7143
    },
    "Name": "34414 Highway 99e south wall",
-   "Tile": "-1,-6",
+   "Tile": "-1,-5",
    "Layer": "structure"
   },
   {
@@ -566898,7 +566898,7 @@
     "Z": 0.7143
    },
    "Name": "34414 Highway 99e north wall",
-   "Tile": "-2,-5",
+   "Tile": "-1,-5",
    "Layer": "structure"
   },
   {
@@ -566967,7 +566967,7 @@
     "Z": 0.7143
    },
    "Name": "34414 Highway 99e north wall",
-   "Tile": "0,-4",
+   "Tile": "-1,-5",
    "Layer": "structure"
   },
   {
@@ -566990,7 +566990,7 @@
     "Z": 553.9976
    },
    "Name": "34414 Highway 99e west wall",
-   "Tile": "-3,-5",
+   "Tile": "-1,-5",
    "Layer": "structure"
   },
   {
@@ -567013,7 +567013,7 @@
     "Z": 456.9053
    },
    "Name": "34414 Highway 99e west wall",
-   "Tile": "0,-5",
+   "Tile": "-1,-5",
    "Layer": "structure"
   },
   {
@@ -567036,7 +567036,7 @@
     "Z": 1010.9029
    },
    "Name": "34414 Highway 99e east wall",
-   "Tile": "0,-5",
+   "Tile": "-1,-5",
    "Layer": "structure"
   },
   {
@@ -600958,7 +600958,7 @@
     "Z": 1.25
    },
    "Name": "Building off Private road north wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -603150,7 +603150,7 @@
     "Z": 1.25
    },
    "Name": "7101 Supra Drive Southwest southwest wall",
-   "Tile": "-1,-4",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -603357,7 +603357,7 @@
     "Z": 185.5271
    },
    "Name": "7101 Supra Drive Southwest southeast wall",
-   "Tile": "-1,-4",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -611247,7 +611247,7 @@
     "Z": 0.4992
    },
    "Name": "4880 Pacific Boulevard Southwest floor",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -611293,7 +611293,7 @@
     "Z": 0.4992
    },
    "Name": "4880 Pacific Boulevard Southwest roof",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -611339,7 +611339,7 @@
     "Z": 37.4325
    },
    "Name": "4880 Pacific Boulevard Southwest ceiling",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -611385,7 +611385,7 @@
     "Z": 0.4492
    },
    "Name": "4880 Pacific Boulevard Southwest, house",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "rooms"
   },
   {
@@ -611500,7 +611500,7 @@
     "Z": 1.25
    },
    "Name": "4880 Pacific Boulevard Southwest east wall",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -611569,7 +611569,7 @@
     "Z": 72.3825
    },
    "Name": "4880 Pacific Boulevard Southwest south wall",
-   "Tile": "-1,3",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -612150,7 +612150,7 @@
     "Z": 1.0077
    },
    "Name": "1026 Lawrence Avenue Southwest floor",
-   "Tile": "-1,0",
+   "Tile": "-1,1",
    "Layer": "structure"
   },
   {
@@ -612196,7 +612196,7 @@
     "Z": 1.0077
    },
    "Name": "1026 Lawrence Avenue Southwest roof",
-   "Tile": "-1,0",
+   "Tile": "-1,1",
    "Layer": "structure"
   },
   {
@@ -612242,7 +612242,7 @@
     "Z": 79.8095
    },
    "Name": "1026 Lawrence Avenue Southwest ceiling",
-   "Tile": "-1,0",
+   "Tile": "-1,1",
    "Layer": "structure"
   },
   {
@@ -612288,7 +612288,7 @@
     "Z": 0.9577
    },
    "Name": "1026 Lawrence Avenue Southwest, house",
-   "Tile": "-1,0",
+   "Tile": "-1,1",
    "Layer": "rooms"
   },
   {
@@ -612311,7 +612311,7 @@
     "Z": 1.25
    },
    "Name": "1026 Lawrence Avenue Southwest south wall",
-   "Tile": "-1,0",
+   "Tile": "-1,1",
    "Layer": "structure"
   },
   {
@@ -612449,7 +612449,7 @@
     "Z": 50.3857
    },
    "Name": "1026 Lawrence Avenue Southwest west wall",
-   "Tile": "-1,0",
+   "Tile": "-1,1",
    "Layer": "structure"
   },
   {
@@ -616638,7 +616638,7 @@
     "Z": 9.9218
    },
    "Name": "Linn-Benton Community College Cafeteria floor",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -616684,7 +616684,7 @@
     "Z": 1984.3514
    },
    "Name": "Linn-Benton Community College Cafeteria roof",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -616730,7 +616730,7 @@
     "Z": 9.8718
    },
    "Name": "Linn-Benton Community College Cafeteria",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "rooms"
   },
   {
@@ -616753,7 +616753,7 @@
     "Z": 5.0
    },
    "Name": "Linn-Benton Community College Cafeteria south wall",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -616799,7 +616799,7 @@
     "Z": 5.0
    },
    "Name": "Linn-Benton Community College Cafeteria north wall",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -616868,7 +616868,7 @@
     "Z": 400.8791
    },
    "Name": "Linn-Benton Community College Cafeteria west wall",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -616891,7 +616891,7 @@
     "Z": 440.967
    },
    "Name": "Linn-Benton Community College Cafeteria east wall",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -616914,7 +616914,7 @@
     "Z": 982.1757
    },
    "Name": "Linn-Benton Community College Cafeteria east wall",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -616937,7 +616937,7 @@
     "Z": 20.0
    },
    "Name": "Linn-Benton Community College Cafeteria east wall",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -616960,7 +616960,7 @@
     "Z": 982.1757
    },
    "Name": "Linn-Benton Community College Cafeteria east wall",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -616985,7 +616985,7 @@
     "Z": 1
    },
    "Name": "Linn-Benton Community College Cafeteria entrance",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -633261,7 +633261,7 @@
     "Z": 0.098
    },
    "Name": "1042 Belmont Avenue Southwest, hall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "rooms"
   },
   {
@@ -633284,7 +633284,7 @@
     "Z": 0.098
    },
    "Name": "1042 Belmont Avenue Southwest hall floor",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -633307,7 +633307,7 @@
     "Z": 0.4574
    },
    "Name": "1042 Belmont Avenue Southwest, bedroom 2",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "rooms"
   },
   {
@@ -633330,7 +633330,7 @@
     "Z": 0.4574
    },
    "Name": "1042 Belmont Avenue Southwest bedroom 2 floor",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -633353,7 +633353,7 @@
     "Z": 0.4574
    },
    "Name": "1042 Belmont Avenue Southwest, bedroom 3",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "rooms"
   },
   {
@@ -633376,7 +633376,7 @@
     "Z": 0.4574
    },
    "Name": "1042 Belmont Avenue Southwest bedroom 3 floor",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -633445,7 +633445,7 @@
     "Z": 0.4574
    },
    "Name": "1042 Belmont Avenue Southwest, main bedroom",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "rooms"
   },
   {
@@ -633468,7 +633468,7 @@
     "Z": 0.4574
    },
    "Name": "1042 Belmont Avenue Southwest main bedroom floor",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -633537,7 +633537,7 @@
     "Z": 2.2222
    },
    "Name": "1042 Belmont Avenue Southwest bed",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -633560,7 +633560,7 @@
     "Z": 2.2222
    },
    "Name": "1042 Belmont Avenue Southwest bed",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -633583,7 +633583,7 @@
     "Z": 2.2222
    },
    "Name": "1042 Belmont Avenue Southwest bed",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -633974,7 +633974,7 @@
     "Z": 1.0
    },
    "Name": "1042 Belmont Avenue Southwest hall wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -633997,7 +633997,7 @@
     "Z": 1.0
    },
    "Name": "1042 Belmont Avenue Southwest hall wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634020,7 +634020,7 @@
     "Z": 1.0
    },
    "Name": "1042 Belmont Avenue Southwest hall wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634066,7 +634066,7 @@
     "Z": 1.0
    },
    "Name": "1042 Belmont Avenue Southwest hall wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634089,7 +634089,7 @@
     "Z": 1.0
    },
    "Name": "1042 Belmont Avenue Southwest hall wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634181,7 +634181,7 @@
     "Z": 1.0
    },
    "Name": "1042 Belmont Avenue Southwest hall wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634204,7 +634204,7 @@
     "Z": 1.0
    },
    "Name": "1042 Belmont Avenue Southwest hall wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634227,7 +634227,7 @@
     "Z": 1.0
    },
    "Name": "1042 Belmont Avenue Southwest hall wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634250,7 +634250,7 @@
     "Z": 40.7027
    },
    "Name": "1042 Belmont Avenue Southwest bedroom 2 wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634342,7 +634342,7 @@
     "Z": 1.25
    },
    "Name": "1042 Belmont Avenue Southwest south wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -634411,7 +634411,7 @@
     "Z": 0.25
    },
    "Name": "1042 Belmont Avenue Southwest south wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634526,7 +634526,7 @@
     "Z": 1.25
    },
    "Name": "1042 Belmont Avenue Southwest north wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -634641,7 +634641,7 @@
     "Z": 0.25
    },
    "Name": "1042 Belmont Avenue Southwest north wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634710,7 +634710,7 @@
     "Z": 54.3432
    },
    "Name": "1042 Belmont Avenue Southwest east wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -634733,7 +634733,7 @@
     "Z": 90.5721
    },
    "Name": "1042 Belmont Avenue Southwest east wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634909,7 +634909,7 @@
     "Z": 1
    },
    "Name": "1042 Belmont Avenue Southwest bedroom 2 door",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634934,7 +634934,7 @@
     "Z": 1
    },
    "Name": "1042 Belmont Avenue Southwest bedroom 3 door",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -634984,7 +634984,7 @@
     "Z": 1
    },
    "Name": "1042 Belmont Avenue Southwest main bedroom door",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -635007,7 +635007,7 @@
     "Z": 0.6962
    },
    "Name": "1035 Tyson Place Southwest floor",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -635053,7 +635053,7 @@
     "Z": 0.6962
    },
    "Name": "1035 Tyson Place Southwest roof",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -635076,7 +635076,7 @@
     "Z": 0.3481
    },
    "Name": "1035 Tyson Place Southwest roof",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -635145,7 +635145,7 @@
     "Z": 53.8496
    },
    "Name": "1035 Tyson Place Southwest ceiling",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -635191,7 +635191,7 @@
     "Z": 0.6462
    },
    "Name": "1035 Tyson Place Southwest, living room",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "rooms"
   },
   {
@@ -635214,7 +635214,7 @@
     "Z": 0.6462
    },
    "Name": "1035 Tyson Place Southwest living room floor",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635237,7 +635237,7 @@
     "Z": 0.6462
    },
    "Name": "1035 Tyson Place Southwest, kitchen",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "rooms"
   },
   {
@@ -635260,7 +635260,7 @@
     "Z": 0.6462
    },
    "Name": "1035 Tyson Place Southwest kitchen floor",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635306,7 +635306,7 @@
     "Z": 1.0
    },
    "Name": "1035 Tyson Place Southwest sofa",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635329,7 +635329,7 @@
     "Z": 19.2065
    },
    "Name": "1035 Tyson Place Southwest kitchen counter",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635352,7 +635352,7 @@
     "Z": 22.3415
    },
    "Name": "1035 Tyson Place Southwest living room wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635375,7 +635375,7 @@
     "Z": 13.3333
    },
    "Name": "1035 Tyson Place Southwest living room wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635398,7 +635398,7 @@
     "Z": 22.3415
    },
    "Name": "1035 Tyson Place Southwest living room wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635582,7 +635582,7 @@
     "Z": 1.25
    },
    "Name": "1035 Tyson Place Southwest east wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -635605,7 +635605,7 @@
     "Z": 0.25
    },
    "Name": "1035 Tyson Place Southwest east wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635651,7 +635651,7 @@
     "Z": 4.5
    },
    "Name": "1035 Tyson Place Southwest north wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -635674,7 +635674,7 @@
     "Z": 15.1549
    },
    "Name": "1035 Tyson Place Southwest north wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -635720,7 +635720,7 @@
     "Z": 7.5
    },
    "Name": "1035 Tyson Place Southwest north wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635743,7 +635743,7 @@
     "Z": 25.2581
    },
    "Name": "1035 Tyson Place Southwest north wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635904,7 +635904,7 @@
     "Z": 15.0299
    },
    "Name": "1035 Tyson Place Southwest south wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -635927,7 +635927,7 @@
     "Z": 4.75
    },
    "Name": "1035 Tyson Place Southwest south wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -635950,7 +635950,7 @@
     "Z": 15.0299
    },
    "Name": "1035 Tyson Place Southwest south wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -635973,7 +635973,7 @@
     "Z": 25.0498
    },
    "Name": "1035 Tyson Place Southwest south wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -635996,7 +635996,7 @@
     "Z": 7.9167
    },
    "Name": "1035 Tyson Place Southwest south wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -636019,7 +636019,7 @@
     "Z": 25.0498
    },
    "Name": "1035 Tyson Place Southwest south wall",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -636044,7 +636044,7 @@
     "Z": 1
    },
    "Name": "1035 Tyson Place Southwest front door",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -636069,7 +636069,7 @@
     "Z": 1
    },
    "Name": "1035 Tyson Place Southwest back door",
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "structure"
   },
   {
@@ -636106,7 +636106,7 @@
    "RegionAId": 27781,
    "RegionBId": 27783,
    "ApertureSize": 1.6,
-   "Tile": "0,0",
+   "Tile": "-1,0",
    "Layer": "interiors"
   },
   {
@@ -636177,7 +636177,7 @@
     "Z": 0.9454
    },
    "Name": "Building off Service road floor",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "structure"
   },
   {
@@ -636223,7 +636223,7 @@
     "Z": 0.9454
    },
    "Name": "Building off Service road roof",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "structure"
   },
   {
@@ -636269,7 +636269,7 @@
     "Z": 0.8954
    },
    "Name": "Building off Service road",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "rooms"
   },
   {
@@ -636338,7 +636338,7 @@
     "Z": 1.25
    },
    "Name": "Building off Service road west wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "structure"
   },
   {
@@ -636361,7 +636361,7 @@
     "Z": 1.25
    },
    "Name": "Building off Service road west wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "structure"
   },
   {
@@ -636476,7 +636476,7 @@
     "Z": 9.952
    },
    "Name": "Building off Service road north wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "structure"
   },
   {
@@ -636499,7 +636499,7 @@
     "Z": 47.272
    },
    "Name": "Building off Service road north wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "structure"
   },
   {
@@ -636915,7 +636915,7 @@
     "Z": 0.7978
    },
    "Name": "1014 Morse Lane Southwest, main bedroom",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "rooms"
   },
   {
@@ -636938,7 +636938,7 @@
     "Z": 0.7978
    },
    "Name": "1014 Morse Lane Southwest main bedroom floor",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -637053,7 +637053,7 @@
     "Z": 2.2222
    },
    "Name": "1014 Morse Lane Southwest bed",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -637444,7 +637444,7 @@
     "Z": 31.9924
    },
    "Name": "1014 Morse Lane Southwest bathroom wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -637467,7 +637467,7 @@
     "Z": 6.6667
    },
    "Name": "1014 Morse Lane Southwest bathroom wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -637490,7 +637490,7 @@
     "Z": 31.9924
    },
    "Name": "1014 Morse Lane Southwest bathroom wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -637536,7 +637536,7 @@
     "Z": 1.0
    },
    "Name": "1014 Morse Lane Southwest main bedroom wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -637605,7 +637605,7 @@
     "Z": 1.25
    },
    "Name": "1014 Morse Lane Southwest south wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -637628,7 +637628,7 @@
     "Z": 0.25
    },
    "Name": "1014 Morse Lane Southwest south wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -637697,7 +637697,7 @@
     "Z": 1.25
    },
    "Name": "1014 Morse Lane Southwest north wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -637812,7 +637812,7 @@
     "Z": 0.25
    },
    "Name": "1014 Morse Lane Southwest north wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -637927,7 +637927,7 @@
     "Z": 42.3909
    },
    "Name": "1014 Morse Lane Southwest west wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -637950,7 +637950,7 @@
     "Z": 70.6516
    },
    "Name": "1014 Morse Lane Southwest west wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -637973,7 +637973,7 @@
     "Z": 17.4551
    },
    "Name": "1014 Morse Lane Southwest west wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -637996,7 +637996,7 @@
     "Z": 29.0918
    },
    "Name": "1014 Morse Lane Southwest west wall",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -638275,7 +638275,7 @@
     "Z": 1
    },
    "Name": "1014 Morse Lane Southwest bathroom door",
-   "Tile": "-1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -643783,7 +643783,7 @@
     "Z": 0.098
    },
    "Name": "1034 Belmont Avenue Southwest, hall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "rooms"
   },
   {
@@ -643806,7 +643806,7 @@
     "Z": 0.098
    },
    "Name": "1034 Belmont Avenue Southwest hall floor",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -643875,7 +643875,7 @@
     "Z": 0.4591
    },
    "Name": "1034 Belmont Avenue Southwest, bedroom 3",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "rooms"
   },
   {
@@ -643898,7 +643898,7 @@
     "Z": 0.4591
    },
    "Name": "1034 Belmont Avenue Southwest bedroom 3 floor",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -643967,7 +643967,7 @@
     "Z": 0.4591
    },
    "Name": "1034 Belmont Avenue Southwest, main bedroom",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "rooms"
   },
   {
@@ -643990,7 +643990,7 @@
     "Z": 0.4591
    },
    "Name": "1034 Belmont Avenue Southwest main bedroom floor",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -644082,7 +644082,7 @@
     "Z": 2.2222
    },
    "Name": "1034 Belmont Avenue Southwest bed",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -644105,7 +644105,7 @@
     "Z": 2.2222
    },
    "Name": "1034 Belmont Avenue Southwest bed",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -644565,7 +644565,7 @@
     "Z": 1.0
    },
    "Name": "1034 Belmont Avenue Southwest hall wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -644588,7 +644588,7 @@
     "Z": 1.0
    },
    "Name": "1034 Belmont Avenue Southwest hall wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -644611,7 +644611,7 @@
     "Z": 1.0
    },
    "Name": "1034 Belmont Avenue Southwest hall wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -644703,7 +644703,7 @@
     "Z": 1.0
    },
    "Name": "1034 Belmont Avenue Southwest hall wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -644726,7 +644726,7 @@
     "Z": 1.0
    },
    "Name": "1034 Belmont Avenue Southwest hall wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -644772,7 +644772,7 @@
     "Z": 40.8393
    },
    "Name": "1034 Belmont Avenue Southwest bedroom 2 wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -645186,7 +645186,7 @@
     "Z": 54.5071
    },
    "Name": "1034 Belmont Avenue Southwest west wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "structure"
   },
   {
@@ -645209,7 +645209,7 @@
     "Z": 90.8452
    },
    "Name": "1034 Belmont Avenue Southwest west wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -645456,7 +645456,7 @@
     "Z": 1
    },
    "Name": "1034 Belmont Avenue Southwest bedroom 3 door",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -645506,7 +645506,7 @@
     "Z": 1
    },
    "Name": "1034 Belmont Avenue Southwest main bedroom door",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "interiors"
   },
   {
@@ -645713,7 +645713,7 @@
     "Z": 53.4512
    },
    "Name": "1042 Belmont Avenue Southwest, building west wall",
-   "Tile": "-1,-1",
+   "Tile": "0,-1",
    "Layer": "structure"
   },
   {
@@ -659161,7 +659161,7 @@
     "Z": 1.2548
    },
    "Name": "777 College Park Drive Southwest, building floor",
-   "Tile": "0,3",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -659184,7 +659184,7 @@
     "Z": 1.2548
    },
    "Name": "777 College Park Drive Southwest, building roof",
-   "Tile": "0,3",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -659207,7 +659207,7 @@
     "Z": 1.2048
    },
    "Name": "777 College Park Drive Southwest, building",
-   "Tile": "0,3",
+   "Tile": "0,4",
    "Layer": "rooms"
   },
   {
@@ -659230,7 +659230,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "0,3",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -659253,7 +659253,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "0,3",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -659276,7 +659276,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "0,3",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -659322,7 +659322,7 @@
     "Z": 62.7408
    },
    "Name": "777 College Park Drive Southwest, building west wall",
-   "Tile": "0,3",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -659370,7 +659370,7 @@
     "Z": 1
    },
    "Name": "777 College Park Drive Southwest, building door",
-   "Tile": "0,3",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -659416,7 +659416,7 @@
     "Z": 0.3023
    },
    "Name": "975 Morse Avenue Southwest floor",
-   "Tile": "0,0",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -659462,7 +659462,7 @@
     "Z": 0.3023
    },
    "Name": "975 Morse Avenue Southwest roof",
-   "Tile": "0,0",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -659508,7 +659508,7 @@
     "Z": 21.0285
    },
    "Name": "975 Morse Avenue Southwest ceiling",
-   "Tile": "0,0",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -659554,7 +659554,7 @@
     "Z": 0.2523
    },
    "Name": "975 Morse Avenue Southwest, house",
-   "Tile": "0,0",
+   "Tile": "0,1",
    "Layer": "rooms"
   },
   {
@@ -659577,7 +659577,7 @@
     "Z": 0.7143
    },
    "Name": "975 Morse Avenue Southwest south wall",
-   "Tile": "0,0",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -659600,7 +659600,7 @@
     "Z": 0.7143
    },
    "Name": "975 Morse Avenue Southwest south wall",
-   "Tile": "0,0",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -659623,7 +659623,7 @@
     "Z": 0.7143
    },
    "Name": "975 Morse Avenue Southwest south wall",
-   "Tile": "0,0",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -659646,7 +659646,7 @@
     "Z": 0.7143
    },
    "Name": "975 Morse Avenue Southwest south wall",
-   "Tile": "0,0",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -659715,7 +659715,7 @@
     "Z": 8.6383
    },
    "Name": "975 Morse Avenue Southwest east wall",
-   "Tile": "0,0",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -659763,7 +659763,7 @@
     "Z": 1
    },
    "Name": "975 Morse Avenue Southwest front door",
-   "Tile": "0,0",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -667309,7 +667309,7 @@
     "Z": 1.25
    },
    "Name": "5592 Pacific Boulevard Southwest northeast wall",
-   "Tile": "0,1",
+   "Tile": "0,2",
    "Layer": "structure"
   },
   {
@@ -667401,7 +667401,7 @@
     "Z": 17.3779
    },
    "Name": "5592 Pacific Boulevard Southwest southeast wall",
-   "Tile": "0,1",
+   "Tile": "0,2",
    "Layer": "structure"
   },
   {
@@ -729802,7 +729802,7 @@
     "Z": 1.25
    },
    "Name": "Building off Private road west wall",
-   "Tile": "0,-5",
+   "Tile": "0,-6",
    "Layer": "structure"
   },
   {
@@ -729848,7 +729848,7 @@
     "Z": 94.2026
    },
    "Name": "Building off Private road north wall",
-   "Tile": "0,-5",
+   "Tile": "0,-6",
    "Layer": "structure"
   },
   {
@@ -741151,7 +741151,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building southeast wall",
-   "Tile": "0,3",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -741220,7 +741220,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building southeast wall",
-   "Tile": "0,3",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -744458,7 +744458,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building northwest wall",
-   "Tile": "0,4",
+   "Tile": "0,3",
    "Layer": "structure"
   },
   {
@@ -744550,7 +744550,7 @@
     "Z": 42.177
    },
    "Name": "777 College Park Drive Southwest, building northeast wall",
-   "Tile": "0,4",
+   "Tile": "0,3",
    "Layer": "structure"
   },
   {
@@ -746354,7 +746354,7 @@
     "Z": 60.9103
    },
    "Name": "6246 Pacific Boulevard Southwest east wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -746377,7 +746377,7 @@
     "Z": 4.75
    },
    "Name": "6246 Pacific Boulevard Southwest east wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -746400,7 +746400,7 @@
     "Z": 60.9103
    },
    "Name": "6246 Pacific Boulevard Southwest east wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -746425,7 +746425,7 @@
     "Z": 1
    },
    "Name": "6246 Pacific Boulevard Southwest front door",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -749362,7 +749362,7 @@
     "Z": 0.9049
    },
    "Name": "777 College Park Drive Southwest, building floor",
-   "Tile": "1,4",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -749408,7 +749408,7 @@
     "Z": 0.9049
    },
    "Name": "777 College Park Drive Southwest, building roof",
-   "Tile": "1,4",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -749454,7 +749454,7 @@
     "Z": 0.8549
    },
    "Name": "777 College Park Drive Southwest, building",
-   "Tile": "1,4",
+   "Tile": "0,4",
    "Layer": "rooms"
   },
   {
@@ -749546,7 +749546,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building east wall",
-   "Tile": "1,4",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -749569,7 +749569,7 @@
     "Z": 45.2461
    },
    "Name": "777 College Park Drive Southwest, building north wall",
-   "Tile": "1,4",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -749661,7 +749661,7 @@
     "Z": 32.8164
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "1,4",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -749709,7 +749709,7 @@
     "Z": 0.8927
    },
    "Name": "777 College Park Drive Southwest, building floor",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -749755,7 +749755,7 @@
     "Z": 0.8927
    },
    "Name": "777 College Park Drive Southwest, building roof",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -749801,7 +749801,7 @@
     "Z": 0.8427
    },
    "Name": "777 College Park Drive Southwest, building",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "rooms"
   },
   {
@@ -749916,7 +749916,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building west wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -749939,7 +749939,7 @@
     "Z": 19.9427
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -749962,7 +749962,7 @@
     "Z": 4.75
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -749985,7 +749985,7 @@
     "Z": 19.9427
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -750031,7 +750031,7 @@
     "Z": 44.6353
    },
    "Name": "777 College Park Drive Southwest, building north wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -750079,7 +750079,7 @@
     "Z": 1
    },
    "Name": "777 College Park Drive Southwest, building door",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -750148,7 +750148,7 @@
     "Z": 0.6043
    },
    "Name": "707 College Park Drive Southwest floor",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -750194,7 +750194,7 @@
     "Z": 0.6043
    },
    "Name": "707 College Park Drive Southwest roof",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -750240,7 +750240,7 @@
     "Z": 46.1911
    },
    "Name": "707 College Park Drive Southwest ceiling",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -750286,7 +750286,7 @@
     "Z": 0.5543
    },
    "Name": "707 College Park Drive Southwest, house",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "rooms"
   },
   {
@@ -750309,7 +750309,7 @@
     "Z": 0.7143
    },
    "Name": "707 College Park Drive Southwest south wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -750355,7 +750355,7 @@
     "Z": 0.7143
    },
    "Name": "707 College Park Drive Southwest north wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -750424,7 +750424,7 @@
     "Z": 37.4086
    },
    "Name": "707 College Park Drive Southwest west wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -750447,7 +750447,7 @@
     "Z": 17.2655
    },
    "Name": "707 College Park Drive Southwest east wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -750518,7 +750518,7 @@
     "Z": 0.839
    },
    "Name": "777 College Park Drive Southwest, building floor",
-   "Tile": "0,4",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -750564,7 +750564,7 @@
     "Z": 0.839
    },
    "Name": "777 College Park Drive Southwest, building roof",
-   "Tile": "0,4",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -750610,7 +750610,7 @@
     "Z": 0.789
    },
    "Name": "777 College Park Drive Southwest, building",
-   "Tile": "0,4",
+   "Tile": "1,4",
    "Layer": "rooms"
   },
   {
@@ -750656,7 +750656,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building west wall",
-   "Tile": "0,4",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -750748,7 +750748,7 @@
     "Z": 41.95
    },
    "Name": "777 College Park Drive Southwest, building north wall",
-   "Tile": "0,4",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -750817,7 +750817,7 @@
     "Z": 18.6
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "0,4",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -750840,7 +750840,7 @@
     "Z": 4.75
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "0,4",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -750888,7 +750888,7 @@
     "Z": 1
    },
    "Name": "777 College Park Drive Southwest, building door",
-   "Tile": "0,4",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -750980,7 +750980,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building west wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -751026,7 +751026,7 @@
     "Z": 45.1462
    },
    "Name": "777 College Park Drive Southwest, building north wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -751350,7 +751350,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building north wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -751419,7 +751419,7 @@
     "Z": 42.3856
    },
    "Name": "777 College Park Drive Southwest, building west wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -751442,7 +751442,7 @@
     "Z": 17.4529
    },
    "Name": "777 College Park Drive Southwest, building west wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -753407,7 +753407,7 @@
     "Z": 35.0352
    },
    "Name": "711 College Park Drive Southwest west wall",
-   "Tile": "0,3",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -754055,7 +754055,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building east wall",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -754101,7 +754101,7 @@
     "Z": 42.3673
    },
    "Name": "777 College Park Drive Southwest, building north wall",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -758217,7 +758217,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building west wall",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -758286,7 +758286,7 @@
     "Z": 17.5922
    },
    "Name": "777 College Park Drive Southwest, building north wall",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -765989,7 +765989,7 @@
     "Z": 0.356
    },
    "Name": "777 College Park Drive Southwest, building floor",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -766035,7 +766035,7 @@
     "Z": 0.356
    },
    "Name": "777 College Park Drive Southwest, building roof",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -766081,7 +766081,7 @@
     "Z": 0.306
    },
    "Name": "777 College Park Drive Southwest, building",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "rooms"
   },
   {
@@ -766127,7 +766127,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building west wall",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -766173,7 +766173,7 @@
     "Z": 1.25
    },
    "Name": "777 College Park Drive Southwest, building east wall",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -766196,7 +766196,7 @@
     "Z": 17.8021
    },
    "Name": "777 College Park Drive Southwest, building north wall",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -766219,7 +766219,7 @@
     "Z": 45.7768
    },
    "Name": "777 College Park Drive Southwest, building north wall",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -770314,7 +770314,7 @@
     "Z": 29.8911
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "1,3",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -770337,7 +770337,7 @@
     "Z": 4.75
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "1,3",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -770360,7 +770360,7 @@
     "Z": 29.8911
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "1,3",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -770385,7 +770385,7 @@
     "Z": 1
    },
    "Name": "777 College Park Drive Southwest, building door",
-   "Tile": "1,3",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -770638,7 +770638,7 @@
     "Z": 48.1288
    },
    "Name": "34453 State Hwy 99e north wall",
-   "Tile": "1,-4",
+   "Tile": "1,-5",
    "Layer": "structure"
   },
   {
@@ -772931,7 +772931,7 @@
     "Z": 19.4212
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "1,3",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -772954,7 +772954,7 @@
     "Z": 4.75
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "1,3",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -772977,7 +772977,7 @@
     "Z": 19.4212
    },
    "Name": "777 College Park Drive Southwest, building south wall",
-   "Tile": "1,3",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -773025,7 +773025,7 @@
     "Z": 1
    },
    "Name": "777 College Park Drive Southwest, building door",
-   "Tile": "1,3",
+   "Tile": "1,4",
    "Layer": "structure"
   },
   {
@@ -777513,7 +777513,7 @@
     "Z": 45.3557
    },
    "Name": "777 College Park Drive Southwest, building north wall",
-   "Tile": "1,4",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -781428,7 +781428,7 @@
     "Z": 124.8255
    },
    "Name": "124 41st Avenue Southeast south wall",
-   "Tile": "3,4",
+   "Tile": "3,5",
    "Layer": "structure"
   },
   {
@@ -782379,7 +782379,7 @@
     "Z": 0.7143
    },
    "Name": "148 41st Avenue Southeast southeast wall",
-   "Tile": "4,4",
+   "Tile": "4,5",
    "Layer": "structure"
   },
   {
@@ -782425,7 +782425,7 @@
     "Z": 91.3017
    },
    "Name": "148 41st Avenue Southeast southwest wall",
-   "Tile": "4,4",
+   "Tile": "4,5",
    "Layer": "structure"
   },
   {
@@ -783004,7 +783004,7 @@
     "Z": 2.7143
    },
    "Name": "162 41st Avenue Southeast northeast wall",
-   "Tile": "4,5",
+   "Tile": "4,4",
    "Layer": "structure"
   },
   {
@@ -783027,7 +783027,7 @@
     "Z": 18.3713
    },
    "Name": "162 41st Avenue Southeast northeast wall",
-   "Tile": "4,5",
+   "Tile": "4,4",
    "Layer": "structure"
   },
   {
@@ -783052,7 +783052,7 @@
     "Z": 1
    },
    "Name": "162 41st Avenue Southeast front door",
-   "Tile": "4,5",
+   "Tile": "4,4",
    "Layer": "structure"
   },
   {
@@ -785947,7 +785947,7 @@
     "Z": 1.417
    },
    "Name": "4505 Marion Street Southeast floor",
-   "Tile": "4,4",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -785993,7 +785993,7 @@
     "Z": 1.417
    },
    "Name": "4505 Marion Street Southeast roof",
-   "Tile": "4,4",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -786039,7 +786039,7 @@
     "Z": 113.9132
    },
    "Name": "4505 Marion Street Southeast ceiling",
-   "Tile": "4,4",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -786085,7 +786085,7 @@
     "Z": 1.367
    },
    "Name": "4505 Marion Street Southeast, house",
-   "Tile": "4,4",
+   "Tile": "5,4",
    "Layer": "rooms"
   },
   {
@@ -786154,7 +786154,7 @@
     "Z": 1.25
    },
    "Name": "4505 Marion Street Southeast south wall",
-   "Tile": "4,4",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -786246,7 +786246,7 @@
     "Z": 1.25
    },
    "Name": "4505 Marion Street Southeast north wall",
-   "Tile": "4,4",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -786269,7 +786269,7 @@
     "Z": 70.8479
    },
    "Name": "4505 Marion Street Southeast west wall",
-   "Tile": "4,4",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -786292,7 +786292,7 @@
     "Z": 70.8479
    },
    "Name": "4505 Marion Street Southeast east wall",
-   "Tile": "4,4",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -786802,7 +786802,7 @@
     "Z": 1.8173
    },
    "Name": "4455 Marion Street Southeast floor",
-   "Tile": "5,5",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -786848,7 +786848,7 @@
     "Z": 1.8173
    },
    "Name": "4455 Marion Street Southeast roof",
-   "Tile": "5,5",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -786894,7 +786894,7 @@
     "Z": 147.2744
    },
    "Name": "4455 Marion Street Southeast ceiling",
-   "Tile": "5,5",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -786940,7 +786940,7 @@
     "Z": 1.7673
    },
    "Name": "4455 Marion Street Southeast, house",
-   "Tile": "5,5",
+   "Tile": "5,4",
    "Layer": "rooms"
   },
   {
@@ -787009,7 +787009,7 @@
     "Z": 1.25
    },
    "Name": "4455 Marion Street Southeast south wall",
-   "Tile": "4,4",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -787055,7 +787055,7 @@
     "Z": 1.25
    },
    "Name": "4455 Marion Street Southeast north wall",
-   "Tile": "5,5",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -787078,7 +787078,7 @@
     "Z": 43.0573
    },
    "Name": "4455 Marion Street Southeast west wall",
-   "Tile": "4,5",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -787101,7 +787101,7 @@
     "Z": 4.75
    },
    "Name": "4455 Marion Street Southeast west wall",
-   "Tile": "4,5",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -787124,7 +787124,7 @@
     "Z": 43.0573
    },
    "Name": "4455 Marion Street Southeast west wall",
-   "Tile": "4,5",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -787147,7 +787147,7 @@
     "Z": 30.2882
    },
    "Name": "4455 Marion Street Southeast west wall",
-   "Tile": "4,4",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -787193,7 +787193,7 @@
     "Z": 90.8647
    },
    "Name": "4455 Marion Street Southeast east wall",
-   "Tile": "5,5",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -787218,7 +787218,7 @@
     "Z": 1
    },
    "Name": "4455 Marion Street Southeast front door",
-   "Tile": "4,5",
+   "Tile": "5,4",
    "Layer": "structure"
   },
   {
@@ -789902,7 +789902,7 @@
     "Z": 78.2802
    },
    "Name": "Building off Private road south wall",
-   "Tile": "5,4",
+   "Tile": "5,5",
    "Layer": "structure"
   },
   {
@@ -791639,7 +791639,7 @@
     "Z": 5.0
    },
    "Name": "Linn County Juvenile Detention southwest wall",
-   "Tile": "5,4",
+   "Tile": "5,5",
    "Layer": "structure"
   },
   {

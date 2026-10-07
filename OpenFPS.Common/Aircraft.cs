@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 
+using OpenFPS.Common.Editing;
+
 namespace OpenFPS.Common;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -43,17 +45,24 @@ public enum AircraftPower { Piston, Turboprop, Turbofan, Turboshaft }
 /// <summary>A row of blades in rotation: a propeller, a fan, a main rotor or a tail rotor.</summary>
 public sealed record BladeRowSpec
 {
+    [Tunable("", 1, 16, "How many blades in the row.", Label = "blades")]
     public required int Blades { get; init; }
+    [Tunable("m", 0.05, 20, "Tip to tip.", Label = "diameter", Step = 0.01)]
     public required float DiameterMetres { get; init; }
     /// <summary>Blade chord near the tip, metres. Sets the pulse width: chord over tip speed.</summary>
+    [Tunable("m", 0.01, 1, "Blade chord near the tip; sets the pulse width.", Label = "chord", Step = 0.005)]
     public float ChordMetres { get; init; } = 0.15f;
     /// <summary>Thickness to chord of the tip section. Thickness noise scales with it.</summary>
+    [Tunable("", 0.02, 0.4, "Thickness to chord of the tip section. Thickness noise scales with it.", Label = "thickness ratio", Step = 0.01)]
     public float ThicknessRatio { get; init; } = 0.08f;
+    [Tunable("rpm", 50, 30000, "The fastest the row turns.", Label = "top speed", Step = 10)]
     public required float RpmMax { get; init; }
     /// <summary>The slowest the row turns while it is turning at all.</summary>
+    [Tunable("rpm", 0, 30000, "The slowest the row turns while it is turning at all.", Label = "idle speed", Step = 10)]
     public float RpmIdle { get; init; }
     /// <summary>Sound pressure level at one metre, in the plane of the disc, at RpmMax and full
     /// loading. The anchor; everything else is relative to it.</summary>
+    [Tunable("dB", 30, 160, "Level at one metre in the plane of the disc, at top speed and full loading.", Label = "tone level", Step = 1)]
     public float ReferenceDb { get; init; } = 110f;
     /// <summary>How hard the blades meet the tip vortices of the blades ahead of them, 0..1. A rotor
     /// in a descent or fast forward flight slaps; a propeller or a hovering rotor does not.</summary>
@@ -64,6 +73,7 @@ public sealed record BladeRowSpec
     /// <summary>Per-blade differences in pitch and track, as a fraction, fixed for the life of the
     /// machine. Real rows are never identical, and the difference is the once-per-revolution "wow"
     /// under a propeller's note and the whole of the buzz-saw comb on a supersonic fan.</summary>
+    [Tunable("", 0, 0.2, "Per-blade differences in pitch and track, as a fraction.", Label = "blade scatter", Step = 0.005)]
     public float BladeScatter { get; init; } = 0.015f;
 
     /// <summary>
@@ -85,6 +95,7 @@ public sealed record BladeRowSpec
     /// vortices are shed on: f = 0.2 U / t. That is why a thin fast fan hisses and a blunt slow
     /// mower blade roars, and neither is an equaliser setting.
     /// </summary>
+    [Tunable("dB", 0, 160, "Broadband self-noise at one metre at top speed; 0 for none.", Label = "rush level", Step = 1)]
     public float SelfNoiseDb { get; init; }
 
 
@@ -141,10 +152,11 @@ public sealed record GasTurbineSpec
 ///
 ///     I = ½ m r²  ·  ω = v / r  ·  T = μ W r  ·  t = I ω / T
 ///
-/// which for an airliner's main wheel — a hundred and ten kilos, half a metre of radius, sixteen
-/// kilonewtons on it — is about four tenths of a second, and for a light single's little wheel a
-/// twentieth of that. That is the whole difference between a jet's long scrub and a Cessna's chirp,
-/// and neither is declared.
+/// which for an airliner's main wheel — a hundred and ten kilos, half a metre of radius, twenty-three
+/// kilonewtons on it — is about three tenths of a second, and for a light single's little wheel a
+/// twentieth of a second. That is the whole difference between a jet's long scrub and a Cessna's
+/// chirp, and neither is declared: the load W is what the gear takes in stopping the sink
+/// (<see cref="WeightOnWheelsAtTouchdown"/>), so it comes from the gear's own stroke.
 /// </summary>
 public sealed record LandingGearSpec
 {
@@ -164,18 +176,48 @@ public sealed record LandingGearSpec
     public float SlidingMu { get; init; } = 0.55f;
 
     /// <summary>
-    /// How much of the aeroplane's weight is actually ON the wheels at the instant they touch, as a
-    /// fraction.
-    ///
-    /// Almost none of it, and that is the whole reason a touchdown is a long scrub and not a click.
-    /// An aeroplane that has just landed is still FLYING: the wing is carrying it at very nearly one
-    /// g, and all the tyres have on them is whatever the sink rate puts through the oleos. The load
-    /// arrives over the next second or two, as the speed bleeds off, the lift goes and the nose
-    /// comes down. Put the full landing weight on the wheels at contact and the model spins them up
-    /// in ninety milliseconds — a chirp — where a real jet smokes its mains for the better part of a
-    /// second, and that difference is entirely this number.
+    /// How fast the aeroplane is still sinking when the wheels meet the runway, m/s. Three feet a
+    /// second is a normal, firm arrival for anything from a trainer to an airliner; the design case
+    /// both are certified to is ten (14 CFR 23.473, 25.473).
     /// </summary>
-    public float WeightOnWheelsAtTouchdown { get; init; } = 0.15f;
+    public float TouchdownSinkMps { get; init; } = 0.9f;
+
+    /// <summary>
+    /// How far the undercarriage gives in stopping that sink, metres: an airliner's oleo strokes a
+    /// third of a metre, a light single's spring-steel leg bends about ten centimetres.
+    /// </summary>
+    public float StrokeMetres { get; init; } = 0.35f;
+
+    /// <summary>
+    /// How square the gear's force is over its stroke: the energy it takes up over the stroke times
+    /// its peak force. An oleo-pneumatic strut holds nearly its peak force all the way down, 0.75-0.9;
+    /// a steel spring's force rises from nothing, 0.5 (Currey, Aircraft Landing Gear Design, table 2.2).
+    /// </summary>
+    public float StrokeEfficiency { get; init; } = 0.8f;
+
+    /// <summary>
+    /// How much of the aeroplane's weight is on the wheels while they are being spun up, as a
+    /// fraction: n = v^2 / (2 g eta s), the gear's own stroke equation read for the load.
+    ///
+    /// The aeroplane that has just landed is still FLYING: the wing is carrying it at very nearly one
+    /// g, and all the tyres have on them is what stopping the sink puts through the gear. An airliner
+    /// arriving at three feet a second on a third of a metre of oleo has about a seventh of its weight
+    /// on its mains, and smokes them for a third of a second. A light single arriving the same way on
+    /// ten centimetres of spring steel has four fifths of its on two small wheels, and they are up to
+    /// speed in a twentieth of a second: the chirp. Neither number is declared; both fall out of the
+    /// gear. The load is taken as the stroke's (the peak's, for a spring), which is the load the gear
+    /// is built round; a spring leg reaches it a little after the wheels first touch, so a light
+    /// single's chirp is, if anything, a little shorter here than in life.
+    /// </summary>
+    public float WeightOnWheelsAtTouchdown
+    {
+        get
+        {
+            float v = MathF.Max(0f, TouchdownSinkMps);
+            float n = v * v / (2f * 9.81f * Math.Clamp(StrokeEfficiency, 0.1f, 1f) * MathF.Max(0.01f, StrokeMetres));
+            return Math.Clamp(n, 0.01f, 1f);
+        }
+    }
 
     /// <summary>
     /// How long the wheels take to come up to speed, seconds, from the mechanism above. Never less
@@ -267,6 +309,10 @@ public sealed record AircraftProfile
     /// <summary>The undercarriage, if this aeroplane's is modelled. Only heard on arrival.</summary>
     public LandingGearSpec? Gear { get; init; }
 
+    /// <summary>How it lands, turns round and takes off on a runway (AircraftGroundRun); null for an
+    /// aircraft that does not roll (a helicopter).</summary>
+    public GroundRunSpec? Ground { get; init; }
+
     /// <summary>Overall level at one metre at full power, for placing the voice.</summary>
     public required float SourceLevelDb { get; init; }
 
@@ -293,12 +339,24 @@ public sealed record AircraftProfile
         ApproachSpeedMps = 31f,      // 60 knots over the fence
         Engines = 1,
         WingspanMetres = 11.0f, LengthMetres = 8.3f,
-        // Two little wheels with almost nothing on them: they are up to speed in a twentieth of a
-        // second, which is why a light aircraft's arrival is a chirp and not a scrub.
+        // Two little wheels on two spring-steel legs. The legs give about ten centimetres, so
+        // stopping a three-foot-a-second sink puts most of the aeroplane's weight on the wheels, and
+        // they are up to speed in a twentieth of a second: why a light aircraft's arrival is a
+        // chirp and not a scrub.
+        // Cessna 172S Information Manual, sections 4 and 5, at sea level and gross weight: touchdown
+        // about 50 KIAS after a 61 KIAS approach, landing ground roll 575 ft with flaps 30 and maximum
+        // braking; take-off ground roll 960 ft, rotating at 55 KIAS. Taxied at a brisk walk.
+        Ground = new GroundRunSpec
+        {
+            TouchdownSpeedMps = 26f, LandingRollMetres = 175f,
+            RotateSpeedMps = 28f, TakeoffRollMetres = 293f,
+            TaxiSpeedMps = 5f, TurnRadiusMetres = 5f,
+        },
         Gear = new LandingGearSpec
         {
             Tyre = TyreProfile.SportsOnAsphalt with { TreadBlocks = 0, SquealHz = 1250f, SquealQ = 9f, SquealDb = 88f, PeakGripG = 0.7f },
             Wheels = 2, WheelRadiusMetres = 0.20f, WheelMassKg = 9f, LandingMassKg = 1100f,
+            StrokeMetres = 0.10f, StrokeEfficiency = 0.5f,
         },
         // 116.5 measured — the one that was already right.
         SourceLevelDb = 117f,
@@ -338,10 +396,21 @@ public sealed record AircraftProfile
         Synchrophased = true,
         EngineSpanMetres = 8.1f,
         WingspanMetres = 27.05f, LengthMetres = 25.7f,
+        // ATR 72-600 (ATR airport planning manual and type figures, sea level, typical weights):
+        // touchdown about 105 kt after a 117 kt approach, landing ground roll about 600 m on the
+        // brakes with ground idle; rotation about 110 kt and a take-off ground roll of about 1,000 m.
+        // Taxied at 15 kt; a 180-degree turn needs about 25 m of pavement.
+        Ground = new GroundRunSpec
+        {
+            TouchdownSpeedMps = 54f, LandingRollMetres = 600f,
+            RotateSpeedMps = 57f, TakeoffRollMetres = 1000f,
+            TaxiSpeedMps = 8f, TurnRadiusMetres = 12f,
+        },
         Gear = new LandingGearSpec
         {
             Tyre = TyreProfile.TruckOnAsphalt with { TreadBlocks = 0, SquealHz = 620f, SquealQ = 7f, SquealDb = 98f, PeakGripG = 0.65f },
             Wheels = 4, WheelRadiusMetres = 0.40f, WheelMassKg = 48f, LandingMassKg = 20000f,
+            StrokeMetres = 0.35f, StrokeEfficiency = 0.8f,     // oleo-pneumatic main legs
         },
         // 120, measured with `--spool`, not 129. The declaration sets both the placement AND the
         // voice's full-scale reference, and they pull opposite ways, so over-declaring by nine
@@ -389,11 +458,24 @@ public sealed record AircraftProfile
         EngineSpanMetres = 11.6f,
         WingspanMetres = 35.8f, LengthMetres = 39.5f,
         // Four main wheels, a hundred and ten kilos each, sixty-five tonnes arriving on them at a
-        // hundred and thirty knots. Four tenths of a second of sliding rubber: the touchdown.
+        // hundred and thirty-eight knots, on a third of a metre of oleo. Three tenths of a second of
+        // sliding rubber: the touchdown.
+        // A320 (Airbus aircraft characteristics for airport planning, sea level, typical weights):
+        // touchdown about 130 kt after a 138 kt approach, landing ground roll about 1,100 m with
+        // autobrake low and idle reverse (about 0.2 g); rotation about 145 kt and a take-off ground
+        // roll of about 1,800 m. Taxied at 20 kt; a 180-degree turn needs about 23 m of pavement
+        // either side of the nose wheel's path.
+        Ground = new GroundRunSpec
+        {
+            TouchdownSpeedMps = 67f, LandingRollMetres = 1100f,
+            RotateSpeedMps = 75f, TakeoffRollMetres = 1800f,
+            TaxiSpeedMps = 10f, TurnRadiusMetres = 15f,
+        },
         Gear = new LandingGearSpec
         {
             Tyre = TyreProfile.TruckOnAsphalt with { TreadBlocks = 0, SquealHz = 430f, SquealQ = 6f, SquealDb = 108f, PeakGripG = 0.6f },
             Wheels = 4, WheelRadiusMetres = 0.56f, WheelMassKg = 110f, LandingMassKg = 65000f,
+            StrokeMetres = 0.35f, StrokeEfficiency = 0.8f,
         },
         // 138, measured at the loudest bearing at full power. The old 145 was an estimate made
         // before AircraftSynth existed to measure, and it is why an airliner had to be almost on
@@ -450,4 +532,32 @@ public sealed record AircraftProfile
     public static AircraftProfile ByName(string key)
         => Presets.TryGetValue(key, out var make) ? make()
          : throw new ArgumentException($"No aircraft preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
+}
+
+/// <summary>
+/// What an aeroplane does on a runway: how fast it touches down and how far it rolls stopping, how
+/// fast it rotates and how far it runs to get there, the pace it taxis at and how tight it turns.
+/// From each type's published performance; the decelerations and accelerations follow from them
+/// (v^2 / 2s), so nothing about the motion is tuned.
+/// </summary>
+public sealed record GroundRunSpec
+{
+    /// <summary>At the wheels touching, m/s: a little under the approach speed, after the flare.</summary>
+    public required float TouchdownSpeedMps { get; init; }
+    /// <summary>From touchdown to taxi speed, metres.</summary>
+    public required float LandingRollMetres { get; init; }
+    /// <summary>Where the nose comes up and the wheels leave, m/s.</summary>
+    public required float RotateSpeedMps { get; init; }
+    /// <summary>From standing to rotation, metres.</summary>
+    public required float TakeoffRollMetres { get; init; }
+    public float TaxiSpeedMps { get; init; } = 8f;
+    /// <summary>The path of its middle in a 180-degree turn, metres.</summary>
+    public float TurnRadiusMetres { get; init; } = 10f;
+
+    /// <summary>The landing roll's steady deceleration, m/s².</summary>
+    public float LandingDecel => (TouchdownSpeedMps * TouchdownSpeedMps - TaxiSpeedMps * TaxiSpeedMps) / (2f * MathF.Max(1f, LandingRollMetres));
+    /// <summary>The take-off roll's mean acceleration, m/s².</summary>
+    public float TakeoffAccel => RotateSpeedMps * RotateSpeedMps / (2f * MathF.Max(1f, TakeoffRollMetres));
+    /// <summary>The speed it takes the turn at: no more than taxi speed, and no more than a tenth of a g sideways.</summary>
+    public float TurnSpeedMps => MathF.Min(TaxiSpeedMps, MathF.Sqrt(0.1f * 9.80665f * TurnRadiusMetres));
 }

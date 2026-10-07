@@ -32,7 +32,7 @@ public sealed class RailSystem
     {
         public required string MapId, Name, Preset, Track;
         public required RaceLine Line;
-        public required Entity[] Entities;     // Entity.Null for the signal sources, which are not spawned
+        public required Entity[] Entities;     // one per source, TrainLayout's order
         public required float[] Along;
         /// <summary>Each source's own height above the rail, metres.</summary>
         public required float[] Heights;
@@ -50,8 +50,13 @@ public sealed class RailSystem
         /// not one to stop at again: on a line with one stop the next stop after it is itself.</summary>
         public float SinceStop = float.PositiveInfinity;
 
-        /// <summary>The horn on the leading unit, as "air:&lt;preset&gt;", or "" for a train with none.</summary>
-        public string Horn = "";
+        /// <summary>The train's name in its sources' SoundIds ("rail:&lt;preset&gt;/&lt;key&gt;/&lt;i&gt;").</summary>
+        public string Key = "";
+        /// <summary>Which source sounds its warning (the horn, or a steam engine's whistle) and which is
+        /// its bell, TrainLayout indices; -1 for none.</summary>
+        public int Warning = -1, Bell = -1;
+        /// <summary>The warning's level at a metre, for who is in earshot of it.</summary>
+        public float WarningDb;
         /// <summary>Crossings this train has already sounded for on its way in, by where they are
         /// round the line; forgotten once it is past them.</summary>
         public readonly HashSet<float> Sounded = new();
@@ -127,7 +132,6 @@ public sealed class RailSystem
                     var src = layout[i];
                     along[i] = src.AlongMetres;
                     heights[i] = src.HeightMetres;
-                    if (src.IsSignal) { ents[i] = Entity.Null; continue; }
                     line.Sample(td.StartOffsetMetres - src.AlongMetres, out var pos, out float heading, out _);
                     pos.Y += src.HeightMetres;
                     string soundId = $"rail:{td.Preset}/{trainKey}/{src.Index}";
@@ -159,8 +163,11 @@ public sealed class RailSystem
                         .Select(sp => (At: sp.AtMetres, Dwell: sp.DwellSeconds, Kind: sp.Kind ?? "platform"))
                         .ToArray(),
                     Track = td.Track,
-                    Horn = profile.Consist.Select(c => c.Vehicle.Traction?.HornKey).FirstOrDefault(h => h != null) is { } hk
-                        ? "air:" + hk : "",
+                    Key = trainKey,
+                    Warning = TrainSignal.WarningSource(layout),
+                    Bell = TrainSignal.BellSource(layout),
+                    WarningDb = TrainSignal.WarningSource(layout) is int w and >= 0 ? layout[w].LevelDb
+                              : TrainSignal.BellSource(layout) is int b and >= 0 ? layout[b].LevelDb : 0f,
                     Head = td.StartOffsetMetres, Speed = MathF.Min(v0, top), TopSpeed = top,
                     LengthMetres = profile.LengthMetres,
                     Accel = td.AccelerationMps2 > 0 ? td.AccelerationMps2 : 0.9f, Brake = brake,
@@ -225,8 +232,9 @@ public sealed class RailSystem
             tr.SinceStop += tr.Speed * dt;
             if (tr.Head > tr.Line.Length) tr.Head -= tr.Line.Length;
 
-            SoundForCrossings(tr, world);
+            // Placed first, so a signal is sent from where its horn is this tick.
             PlaceConsist(tr, world);
+            SoundForCrossings(tr, world);
         }
     }
 
@@ -252,12 +260,14 @@ public sealed class RailSystem
     /// <summary>
     /// Long, long, short, long for every level crossing ahead, begun eighteen seconds out and held
     /// until the train is on it — the pattern every North American train sounds, and the reason a
-    /// listener hears the train before the bells have told them anything. Worked out here because
-    /// this is where the train's speed and the distance to the crossing are both known.
+    /// listener hears the train before the bells have told them anything — with the bell rung until
+    /// the crossing is reached. Worked out here because this is where the train's speed and the
+    /// distance to the crossing are both known; sounded on the train's own horn (or whistle) and bell,
+    /// which the client's synth for the train plays from where they are on it (TrainSignal).
     /// </summary>
     private void SoundForCrossings(Consist tr, World world)
     {
-        if (tr.Horn.Length == 0 || Heard == null || CrossingsOn == null || tr.Speed < 2f) return;
+        if ((tr.Warning < 0 && tr.Bell < 0) || Heard == null || CrossingsOn == null || tr.Speed < 2f) return;
         foreach (float at in CrossingsOn(tr.MapId, tr.Track))
         {
             float toGo = at - tr.Head;
@@ -266,23 +276,22 @@ public sealed class RailSystem
             float eta = toGo / tr.Speed;
             if (eta > HornLeadSeconds || tr.Sounded.Contains(at)) continue;
             tr.Sounded.Add(at);
-            // FindIndex and not Find: Find misses with default(Entity), id 0, which is not Entity.Null.
-            int leadAt = Array.FindIndex(tr.Entities, e => e != Entity.Null);
-            if (leadAt < 0) continue;
-            var lead = tr.Entities[leadAt];
-            if (!world.IsAlive(lead)) continue;
+            var source = tr.Entities[tr.Warning >= 0 ? tr.Warning : tr.Bell];
+            if (!world.IsAlive(source)) continue;
             // The first three blasts and their gaps take ten seconds; the last is held to arrival.
-            var pattern = Honk.Crossing(eta - 10f);
+            var (warning, bell) = TrainSignal.ForCrossing(eta);
+            if (tr.Warning < 0) warning = Array.Empty<float>();
+            if (tr.Bell < 0) bell = 0f;
             Log.Information("Rail: {Name} sounds for the crossing {ToGo:F0} m ahead ({Eta:F0} s).", tr.Name, toGo, eta);
-            Heard(tr.MapId, lead.Id, "horn", new[]
+            Heard(tr.MapId, source.Id, "horn", new[]
             {
                 new TransientSound
                 {
                     Character = SoundCharacter.Ring,
-                    Position = world.Get<Transform>(lead).Position + Vector3.UnitY * 4.5f,
-                    LevelDb = Honk.LevelDb(tr.Horn),
-                    DecaySeconds = Honk.Duration(pattern),
-                    SynthKey = Honk.Key(tr.Horn, pattern),
+                    Position = world.Get<Transform>(source).Position,
+                    LevelDb = tr.WarningDb,
+                    DecaySeconds = TrainSignal.Duration(warning, bell),
+                    SynthKey = TrainSignal.Key(tr.Preset, tr.Key, warning, bell),
                 },
             });
         }

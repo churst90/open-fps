@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
@@ -22,17 +23,21 @@ namespace OpenFPS.Common;
 public sealed record GovernorSpec
 {
     /// <summary>Where the spring is set: the speed with nothing to do, rpm.</summary>
+    [Tunable("rpm", 1000, 6000, "Where the governor spring is set: the speed with nothing to do.", Label = "governed speed", Step = 50)]
     public required float SettingRpm { get; init; }
 
     /// <summary>Speed given up between no load and full throttle, as a fraction of the setting.
     /// Mechanical governors droop 5-10 %; an electronic one on a generator droops almost nothing.</summary>
+    [Tunable("", 0, 0.3, "Speed given up from no load to full throttle, as a fraction of the setting. Mechanical governors droop 0.05 to 0.1.", Step = 0.01, Source = "mechanical governor droop, 5 to 10 per cent")]
     public float Droop { get; init; } = 0.07f;
 
     /// <summary>How fast the flyweights and the spring get there, Hz. Small and light: a mower
     /// governor is audibly hunting at a few hertz when it is badly adjusted.</summary>
+    [Tunable("Hz", 0.5, 20, "How fast the flyweights and spring respond. A badly adjusted mower hunts at a few hertz.", Label = "response", Step = 0.5)]
     public float ResponseHz { get; init; } = 6f;
 
     /// <summary>Smallest throttle the linkage will close to while it is running.</summary>
+    [Tunable("", 0, 0.5, "The smallest throttle the linkage closes to while running.", Label = "minimum throttle", Step = 0.01)]
     public float MinThrottle { get; init; } = 0.08f;
 
     /// <summary>The throttle this governor asks for at a speed, given the load it is carrying.</summary>
@@ -59,19 +64,25 @@ public sealed record GovernorSpec
 /// </summary>
 public sealed record MowerDeckSpec
 {
+    [Tunable("m", 0.2, 2, "Diameter of the deck pan. The width mode is a half wave across it.", Label = "diameter", Step = 0.01)]
     public required float DiameterMetres { get; init; }
+    [Tunable("m", 0.03, 0.3, "Depth of the deck pan. The depth mode is a quarter wave of it.", Label = "depth", Step = 0.005)]
     public required float DepthMetres { get; init; }
     /// <summary>Pan thickness, millimetres.</summary>
+    [Tunable("mm", 0.5, 6, "Pan thickness: a cheap stamped deck rings more than a cast one.", Label = "thickness", Step = 0.1)]
     public float ThicknessMm { get; init; } = 1.5f;
     /// <summary>A material in the <see cref="AcousticRegistry"/>. Steel is spelled "Metal" there,
     /// and asking for "Steel" gets Generic — 1,200 kg/m^3 and 5 GPa, which is a plastic — without
     /// complaining. That cost an hour: the deck came out with the modes of a bucket.</summary>
+    [Tunable("", 0, 0, "What it is made of. Steel is Metal.", Choices = "materials")]
     public string Material { get; init; } = "Metal";
     /// <summary>How sharply the cavity modes stand out. An open-bottomed pan leaks badly, so these
     /// are low Qs: a resonance you can hear the shape of, not a note.</summary>
+    [Tunable("", 0.5, 20, "How sharply the deck cavity modes stand out. An open-bottomed pan leaks, so these are low.", Label = "cavity sharpness", Step = 0.5)]
     public float CavityQ { get; init; } = 3.5f;
     /// <summary>How much of the blade's noise goes out through the pan rather than straight out of
     /// the bottom, 0..1.</summary>
+    [Tunable("", 0, 1, "How much of the blade noise leaves through the pan rather than straight out of the bottom.", Label = "pan share", Step = 0.05)]
     public float PanShare { get; init; } = 0.45f;
 
     /// <summary>The depth mode: a quarter wave in a cavity stopped at one end.</summary>
@@ -95,15 +106,19 @@ public sealed record MowerDeckSpec
 public sealed record CuttingSpec
 {
     /// <summary>Standing shoots per square metre. A mown lawn is ten to twenty thousand.</summary>
+    [Tunable("per m²", 0, 50000, "Standing shoots per square metre. A mown lawn is ten to twenty thousand.", Label = "stalks per square metre", Step = 1000)]
     public float StalksPerSquareMetre { get; init; } = 15000f;
 
     /// <summary>What one clipping weighs, milligrams. This and the tip speed are the whole of how
     /// loud the cutting is: see <see cref="ImpactDb"/>.</summary>
+    [Tunable("mg", 0.5, 50, "What one clipping weighs. With the tip speed, this is how loud the cutting is.", Label = "clipping weight", Step = 0.5)]
     public float ClippingMilligrams { get; init; } = 5f;
 
     /// <summary>Where a clipping hitting the pan puts its energy, Hz — short and high, the same
     /// place a footstep on leaves sits.</summary>
+    [Tunable("Hz", 500, 10000, "Where a clipping hitting the pan puts its energy.", Label = "clipping pitch", Step = 100)]
     public float CentreHz { get; init; } = 3200f;
+    [Tunable("", 0.3, 10, "How narrow the clipping band is.", Label = "clipping sharpness", Step = 0.1)]
     public float Q { get; init; } = 1.1f;
 
     /// <summary>
@@ -152,38 +167,104 @@ public sealed record CompressorSpec
 {
     /// <summary>Mains frequency, Hz. The hum is at twice this, and it is the whole reason a European
     /// air conditioner hums a tone lower than an American one.</summary>
+    [Tunable("Hz", 45, 65, "Mains frequency. The hum is twice this: 120 Hz in North America, 100 Hz in Europe.", Label = "mains frequency", Step = 1, Source = "the magnetic pull pulses at twice the line frequency")]
     public float LineHz { get; init; } = 60f;
     /// <summary>Pole PAIRS. One pair is a nominal 3,600 rpm on 60 Hz.</summary>
+    [Tunable("", 1, 4, "Pole pairs of the motor. One pair is a nominal 3,600 rpm on 60 Hz.", Label = "pole pairs")]
     public int PolePairs { get; init; } = 1;
     /// <summary>How far the rotor falls behind the field under load, as a fraction. A few per cent.</summary>
+    [Tunable("", 0, 0.2, "How far the rotor falls behind the field under load, as a fraction. A few per cent.", Step = 0.005)]
     public float Slip { get; init; } = 0.04f;
 
     /// <summary>Compression events per revolution: 1 for a scroll or a rotary, one per cylinder for
     /// a reciprocating machine.</summary>
+    [Tunable("", 1, 6, "Compressions per revolution: 1 for a scroll or rotary, one per cylinder for a reciprocating pump.", Label = "compressions per revolution")]
     public int EventsPerRevolution { get; init; } = 1;
 
     /// <summary>The magnetic hum at one metre, dB, with the can around it.</summary>
+    [Tunable("dB", 30, 90, "The magnetic hum at one metre, with the can around it.", Label = "hum level", Step = 1)]
     public float HumDb { get; init; } = 62f;
     /// <summary>The gas pulsation at one metre, dB.</summary>
+    [Tunable("dB", 30, 90, "The gas pulsation of the pump at one metre.", Label = "pumping level", Step = 1)]
     public float PulsationDb { get; init; } = 58f;
     /// <summary>Gas rushing in the discharge line: broadband, and the only part of a compressor that
     /// is not a tone.</summary>
+    [Tunable("dB", 20, 80, "Gas rushing in the discharge line: the broadband part.", Label = "gas flow level", Step = 1)]
     public float FlowDb { get; init; } = 48f;
 
     /// <summary>The can's shell ring, Hz, and how sharp it is.</summary>
+    [Tunable("Hz", 100, 3000, "Where the compressor can rings.", Label = "shell ring", Step = 10)]
     public float ShellHz { get; init; } = 520f;
+    [Tunable("", 0.5, 30, "How sharply the can rings.", Label = "shell ring sharpness", Step = 0.5)]
     public float ShellQ { get; init; } = 6f;
 
     /// <summary>How long the motor takes to come up to speed against the pump, seconds. This is the
     /// growl you hear a second before the hum settles.</summary>
+    [Tunable("s", 0, 5, "How long the motor takes to come up to speed: the growl before the hum settles.", Label = "start time", Step = 0.05)]
     public float StartSeconds { get; init; } = 0.55f;
 
     /// <summary>The shaft speed under load, rpm.</summary>
-    public float ShaftRpm => LineHz * 60f / MathF.Max(1, PolePairs) * (1f - Math.Clamp(Slip, 0f, 0.5f));
+    public float ShaftRpm => ShaftRpmAt(1f);
     /// <summary>The hum: twice the LINE frequency, not twice the shaft.</summary>
     public float HumHz => 2f * LineHz;
     /// <summary>The pumping series' fundamental.</summary>
-    public float PulsationHz => ShaftRpm / 60f * MathF.Max(1, EventsPerRevolution);
+    public float PulsationHz => PulsationHzAt(1f);
+
+    /// <summary>
+    /// The shaft speed at a load (1 = the rating), rpm. An induction motor's slip is in proportion to
+    /// the torque asked of it, so a compressor pumping against a hotter condenser turns slower, and
+    /// two compressors on two houses never turn at quite the same speed.
+    /// </summary>
+    public float ShaftRpmAt(float load)
+        => LineHz * 60f / MathF.Max(1, PolePairs) * (1f - Math.Clamp(Slip * MathF.Max(0f, load), 0f, 0.5f));
+
+    /// <summary>The pumping series' fundamental at a load.</summary>
+    public float PulsationHzAt(float load) => ShaftRpmAt(load) / 60f * MathF.Max(1, EventsPerRevolution);
+
+    /// <summary>
+    /// How hard the pump is working with the outdoor air at this temperature, against its rating
+    /// (1). What it works against is the lift, condensing less evaporating temperature: the coil
+    /// evaporates near 7 °C whatever the weather, and the condenser runs about 11 K over the air
+    /// round it, so at the 35 °C rating point (AHRI 210/240) the lift is 39 K and on a 25 °C evening
+    /// 29. The pump's torque goes with the lift.
+    /// </summary>
+    public static float LoadAt(float outdoorCelsius) => Math.Clamp((outdoorCelsius + 11f - 7f) / 39f, 0.2f, 1.4f);
+}
+
+/// <summary>
+/// The house an air conditioner cools, as its thermostat sees it.
+///
+/// A thermostat does not run a compressor "now and then": it runs it for as much of the time as the
+/// house needs cooling, and the house needs cooling in proportion to how far the outdoor air is over
+/// the temperature at which what the people, the lights and the appliances put in is all it needs to
+/// lose. So the share of the time it runs follows the weather: nothing on a cool day, all of it at the
+/// temperature the machine was sized for, and in between, in proportion. How OFTEN it cycles comes
+/// from the thermostat's dead band: a cycle a quarter of an hour at most, at half duty, and fewer
+/// either side of it (NEMA DC 3: N = Nmax 4 D (1 - D), Nmax = 3 an hour for cooling).
+/// </summary>
+public sealed record ThermostatSpec
+{
+    /// <summary>The outdoor temperature at which the house needs no cooling, °C: the setpoint (24) less
+    /// what the house's own heat is worth.</summary>
+    public float BalanceCelsius { get; init; } = 18f;
+    /// <summary>The outdoor temperature it was sized to keep up with running flat out, °C (a 1 % cooling
+    /// design day in the southern half of the US).</summary>
+    public float DesignCelsius { get; init; } = 35f;
+    /// <summary>Cycles an hour at half duty, the most there are.</summary>
+    public float MaxCyclesPerHour { get; init; } = 3f;
+    /// <summary>How far one house's balance point is from the next, ±°C: insulation, shade, how many
+    /// people are in.</summary>
+    public float BalanceSpreadCelsius { get; init; } = 2f;
+
+    /// <summary>The share of the time the compressor runs at an outdoor temperature.</summary>
+    public float Duty(float outdoorCelsius, float balanceOffset = 0f)
+    {
+        float balance = BalanceCelsius + balanceOffset;
+        return Math.Clamp((outdoorCelsius - balance) / MathF.Max(1f, DesignCelsius - balance), 0f, 1f);
+    }
+
+    /// <summary>On-off cycles an hour at a duty.</summary>
+    public float CyclesPerHour(float duty) => MaxCyclesPerHour * 4f * Math.Clamp(duty, 0f, 1f) * (1f - Math.Clamp(duty, 0f, 1f));
 }
 
 /// <summary>
@@ -196,13 +277,18 @@ public sealed record CompressorSpec
 /// </summary>
 public sealed record CasingSpec
 {
+    [Tunable("m", 0.1, 3, "Width of the cabinet panel.", Label = "width", Step = 0.05)]
     public required float WidthMetres { get; init; }
+    [Tunable("m", 0.1, 3, "Height of the cabinet panel.", Label = "height", Step = 0.05)]
     public required float HeightMetres { get; init; }
+    [Tunable("mm", 0.3, 5, "Sheet thickness of the cabinet. Thin and big booms; small and thick knocks.", Label = "thickness", Step = 0.1)]
     public float ThicknessMm { get; init; } = 0.8f;
     /// <summary>A material in the <see cref="AcousticRegistry"/>; steel is "Metal" there.</summary>
+    [Tunable("", 0, 0, "What it is made of. Steel is Metal.", Choices = "materials")]
     public string Material { get; init; } = "Metal";
     /// <summary>How much of the machine's vibration gets into the panel, 0..1. Rubber grommets
     /// under a compressor are there precisely to make this small.</summary>
+    [Tunable("", 0, 1, "How much of the machine's vibration gets into the panel. Rubber grommets keep it small.", Step = 0.05)]
     public float Coupling { get; init; } = 0.25f;
 
     public float RingHz => PanelAcoustics.RingHz(
@@ -221,6 +307,7 @@ public sealed record CasingSpec
 /// </summary>
 public sealed record SmallMachineSpec
 {
+    [Tunable("", 0, 0, "What this machine is called.", Label = "name")]
     public required string Name { get; init; }
 
     /// <summary>An <see cref="EngineProfile"/> preset key, for a machine with a piston engine.</summary>
@@ -229,14 +316,17 @@ public sealed record SmallMachineSpec
     /// with nobody's foot on it.</summary>
     public GovernorSpec? Governor { get; init; }
     /// <summary>Rotating inertia the crank sees through whatever it drives, kg m^2.</summary>
+    [Tunable("kg m²", 0.001, 1, "Rotating inertia the crank sees through what it drives. A mower blade is the flywheel.", Label = "driven inertia", Step = 0.001)]
     public float DrivenInertiaKgM2 { get; init; } = 0.01f;
 
     /// <summary>A row of blades: a mower blade, a condenser fan, a blower. The same
     /// <see cref="BladeRowSpec"/> a propeller uses.</summary>
     public BladeRowSpec? Blade { get; init; }
     /// <summary>How many such rows. A 42 inch mower deck is two 21 inch blades side by side.</summary>
+    [Tunable("", 1, 4, "How many rows of blades. A 42 inch deck is two 21 inch blades.", Label = "blade rows")]
     public int BladeRows { get; init; } = 1;
     /// <summary>Blade speed over crank speed. A mower blade is bolted to the crankshaft: 1.</summary>
+    [Tunable("", 0.1, 10, "Blade speed over crank speed. A mower blade bolted to the crankshaft is 1.", Label = "blade gear ratio", Step = 0.05)]
     public float BladeGearRatio { get; init; } = 1f;
 
     public MowerDeckSpec? Deck { get; init; }
@@ -245,15 +335,20 @@ public sealed record SmallMachineSpec
     /// <summary>The compressor, for a machine that is refrigeration rather than combustion.</summary>
     public CompressorSpec? Compressor { get; init; }
 
+    /// <summary>What calls for the compressor: the house it cools. Defaults when a compressor has none.</summary>
+    public ThermostatSpec? Thermostat { get; init; }
+
     public CasingSpec? Casing { get; init; }
 
     /// <summary>Overall level at one metre, for placing the voice. MEASURED, with
     /// <c>--yard levels</c>, not chosen.</summary>
+    [Tunable("dB", 30, 120, "Overall level at one metre, used to place the voice. Measured with --yard levels, not chosen.", Label = "source level", Step = 1, Source = "measured with AudioLab --yard levels")]
     public required float SourceLevelDb { get; init; }
 
     /// <summary>How big the machine is acoustically — the distance between the parts it radiates
     /// from. Inside it the level is flat, because a step nearer the engine is a step further from
     /// the deck. Same rule as a car's outlet separation.</summary>
+    [Tunable("m", 0.1, 10, "How big the machine is acoustically: inside this the level is flat.", Label = "size", Step = 0.1)]
     public float ExtentMetres { get; init; } = 0.8f;
 
     // ── Presets ─────────────────────────────────────────────────────────────────────────────────
@@ -356,6 +451,7 @@ public sealed record SmallMachineSpec
             HumDb = 63f, PulsationDb = 57f, FlowDb = 47f,
             ShellHz = 520f, ShellQ = 6f, StartSeconds = 0.6f,
         },
+        Thermostat = new ThermostatSpec(),
         Casing = new CasingSpec { WidthMetres = 0.8f, HeightMetres = 0.9f, ThicknessMm = 0.8f, Coupling = 0.3f },
         // MEASURED at 65 dB at one metre, which is a modern quiet unit: manufacturers quote these as
         // a sound POWER near 72 dB(A), and 72 less ten log of a hemisphere at a metre is 64.
@@ -384,6 +480,7 @@ public sealed record SmallMachineSpec
             HumDb = 58f, PulsationDb = 54f, FlowDb = 44f,
             ShellHz = 700f, ShellQ = 7f, StartSeconds = 0.4f,
         },
+        Thermostat = new ThermostatSpec(),
         Casing = new CasingSpec { WidthMetres = 0.56f, HeightMetres = 0.4f, ThicknessMm = 0.6f, Coupling = 0.4f },
         SourceLevelDb = 59f,
         ExtentMetres = 0.5f,

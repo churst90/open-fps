@@ -44,7 +44,74 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(37, typeof(InventoryList))]
 [MemoryPackUnion(38, typeof(TileStreamUpdate))]
 [MemoryPackUnion(39, typeof(EntityDefinitionPack))]
+// The world editor (docs/WORLD_EDITOR.md section 6).
+[MemoryPackUnion(40, typeof(EditorMenu))]
+[MemoryPackUnion(41, typeof(ModelUpdate))]
+// 42-43 are free; 44 is the driving aids'.
+[MemoryPackUnion(44, typeof(MapRoads))]
 public partial interface IMessage { }
+
+/// <summary>What choosing an item of the world editor's menu does.</summary>
+public enum EditorItemKind : byte
+{
+    /// <summary>Nothing: choosing it says it again.</summary>
+    Info = 0,
+    /// <summary>Opens another menu: <see cref="EditorMenuItem.Command"/> is its path, asked for with `edit menu PATH`.</summary>
+    Menu = 1,
+    /// <summary>Sends <see cref="EditorMenuItem.Command"/>, the text of an /edit command, as if typed.</summary>
+    Action = 2,
+    /// <summary>Puts <see cref="EditorMenuItem.Command"/> on the command line for the player to finish (a number).</summary>
+    Input = 3,
+}
+
+/// <summary>One item of a world editor menu.</summary>
+[MemoryPackable]
+public partial struct EditorMenuItem
+{
+    public string Label;
+    public EditorItemKind Kind;
+    public string Command;
+    /// <summary>The menu stays open after the action, for something done again and again (a nudge).</summary>
+    public bool Stay;
+
+    public EditorMenuItem()
+    {
+        Label = "";
+        Command = "";
+    }
+}
+
+/// <summary>
+/// A world editor menu, built by the server: the client only shows it (MenuStack), so it knows nothing
+/// about kinds of model or their fields, and a text player is sent the same menu as numbered lines.
+/// </summary>
+[MemoryPackable]
+public partial class EditorMenu : IMessage
+{
+    /// <summary>Which menu this is ("root", "selected", "model:small_machine:ac_condenser").</summary>
+    public string Path = "";
+    public string Title = "";
+    public EditorMenuItem[] Items = Array.Empty<EditorMenuItem>();
+    /// <summary>A new copy of a menu already open: it replaces that one where it stands, without being
+    /// said, so a value in a label is current after it was changed. Ignored if that menu is not open.</summary>
+    public bool Refresh;
+    public EditorMenu() { }
+}
+
+/// <summary>
+/// A model's version in use now, sent when it is changed in the world editor and to each player as
+/// they arrive on a map. The client puts it into its ModelLibrary and restarts that model's voices.
+/// </summary>
+[MemoryPackable]
+public partial class ModelUpdate : IMessage
+{
+    public string Kind = "";
+    public string Id = "";
+    public int Version;
+    /// <summary>The model as ModelLibrary.SpecJson writes it.</summary>
+    public string SpecJson = "";
+    public ModelUpdate() { }
+}
 
 public enum PlayerListScope
 {
@@ -179,6 +246,19 @@ public partial class MapManifest : IMessage
     public float TileMetres;
 
     public MapManifest() { }
+}
+
+/// <summary>
+/// The map's roads, junctions, level crossings and drivable tracks (<see cref="OpenFPS.Common.RoadMapData"/>
+/// as JSON), sent with the map's data before MapLoadComplete. A driver's client plans its cues from them:
+/// the lane ahead, the turn, the give-way line, the speed limit, the rails. Empty for a map without.
+/// </summary>
+[MemoryPackable]
+public partial class MapRoads : IMessage
+{
+    public string MapName = "";
+    public string Json = "";
+    public MapRoads() { }
 }
 
 [MemoryPackable]
@@ -423,6 +503,13 @@ public partial struct EntityState
     /// </summary>
     public WheelState[]? Wheels;
 
+    /// <summary>
+    /// A vehicle's horn and siren, as the driver has them switched (<see cref="OpenFPS.Common.VehicleSignalBits"/>):
+    /// the horn held, the siren on, which tone. Zero for anything that is not a player's vehicle. Sent
+    /// because nothing the client can observe says a hand is on the horn. Packed only when not zero.
+    /// </summary>
+    public byte Signals;
+
     public EntityState()
     {
         EntityId = 0;
@@ -618,6 +705,10 @@ public partial class ClientInputUpdate : IMessage
     /// claim that the key was held, and prediction and the authority must read it the same way or
     /// every stride mispredicts.</summary>
     public bool Sprint;
+
+    /// <summary>The horn key is down. Only a driver's counts; the server sounds the horn of the vehicle
+    /// they are driving for as long as it stays down.</summary>
+    public bool Horn;
 }
 
 /// <summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Geometry;
 using OpenFPS.Common.Networking;
@@ -97,8 +98,8 @@ public sealed class ClientGeometry
             if (ra == GeometryRole.Unindexed) _unindexedRole.Add(id); else _unindexedRole.Remove(id);
             if (ra == GeometryRole.Mover) _moverIds.Add(id); else _moverIds.Remove(id);
             System.Threading.Volatile.Write(ref _moverCount, _moverIds.Count);
-            bool inBefore = rb is GeometryRole.Static or GeometryRole.Mover;
-            bool inAfter = ra is GeometryRole.Static or GeometryRole.Mover;
+            bool inBefore = rb is GeometryRole.Static or GeometryRole.Mover or GeometryRole.SightOnly;
+            bool inAfter = ra is GeometryRole.Static or GeometryRole.Mover or GeometryRole.SightOnly;
             bool same = rb == ra && inAfter && SameSolid(before!, after!, ra);
             if (ra == GeometryRole.Mover && same) _movedMovers.Add(id);
             if ((inBefore || inAfter) && !same) _dirty.Add(id);
@@ -190,7 +191,7 @@ public sealed class ClientGeometry
                 foreach (var (def, t) in collect())
                 {
                     var role = EntityGeometry.RoleOf(def);
-                    if (role == GeometryRole.Static) statics.Add(EntityGeometry.SpecOf(def, t, role));
+                    if (role is GeometryRole.Static or GeometryRole.SightOnly) statics.Add(EntityGeometry.SpecOf(def, t, role));
                     else if (role == GeometryRole.Mover) movers.Add(EntityGeometry.SpecOf(def, t, role));
                 }
                 // The first build of a map (at join) on every core; after that a tile or two on this niced thread.

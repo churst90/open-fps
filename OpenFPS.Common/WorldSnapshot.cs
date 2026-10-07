@@ -111,4 +111,8 @@ public struct EntitySnapshot
     /// <summary>Each wheel as the server last sent it (load, slip, speed, surface), front axle
     /// first; null for anything without wheels.</summary>
     public WheelState[]? Wheels;
+
+    /// <summary>A vehicle's horn and siren switches as the server last sent them
+    /// (<see cref="OpenFPS.Common.VehicleSignalBits"/>); zero for anything without.</summary>
+    public byte Signals;
 }

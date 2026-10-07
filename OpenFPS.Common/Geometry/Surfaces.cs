@@ -26,6 +26,9 @@ public enum GeometryLayers : byte
     /// <summary>Everything physical: what a static solid box is today.</summary>
     Physical = Movement | Bullets | Sight | Ground,
     All = Movement | Bullets | Sight | Acoustics | Ground,
+    /// <summary>What a look finds that nothing else meets: a thing that is said by name but is not solid
+    /// (a sign, a counter's front, a place's marker). In no other layer, so no other query sees it.</summary>
+    Announced = 32,
 }
 
 /// <summary>What a surface is, beyond its material, for the queries that need to know.</summary>

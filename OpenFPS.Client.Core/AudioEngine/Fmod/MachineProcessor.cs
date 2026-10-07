@@ -295,34 +295,52 @@ public sealed class MachineVoiceState : PhysicalVoiceState
     // driven here, from a seed taken from the ENTITY ID. Two clients hearing the same mower hear the
     // same walk through the same grass, and forty window units on one wall are forty machines rather
     // than one machine forty times, which is what a chorus of identical waveforms would be.
+    //
+    // An air conditioner's is the WEATHER: its thermostat runs it for the share of the time the
+    // outdoor air asks (Thermostat), and its compressor pumps harder, and so turns slower, the hotter
+    // the air its condenser rejects heat into (CompressorSpec.LoadAt). What is its own: where in its
+    // cycle it is, how well its house holds the cool, a refrigerant charge a few per cent either way
+    // (the pump's load wanders slowly with it), and a fan motor a per cent or two off its nameplate.
     private readonly float _loadBase, _loadSwing, _loadHz, _loadPhase;
-    private readonly float _dutyOn, _dutyOff, _dutyPhase;
-    private readonly bool _cycles;
+    private readonly Thermostat? _thermostat;
+    private readonly float _fanTrim, _wanderHz1, _wanderHz2, _wanderPhase1, _wanderPhase2;
+
+    /// <summary>
+    /// The air round the machine, °C: what its thermostat and its condenser answer to. NaN (the
+    /// default) takes the world's, AudioPhysics.CurrentAirCelsius, which the provider keeps from the
+    /// server's weather; an instrument or a test sets it outright.
+    /// </summary>
+    public float AmbientCelsius = float.NaN;
+
+    /// <summary>Whether the thermostat is calling for the compressor, after the last render.</summary>
+    public bool CompressorCalled => _thermostat?.Calling ?? false;
 
     public MachineVoiceState(SmallMachineSpec spec, float sampleRate, int entityId, int seed)
         : base(spec.SourceLevelDb, sampleRate)
     {
         Spec = spec;
-        Machine = new SmallMachineSynth(spec, sampleRate, seed);
+        // Its noise is its own too: two of one model given one seed are still two machines.
+        Machine = new SmallMachineSynth(spec, sampleRate, unchecked(seed * 31 + entityId));
 
         var rng = new Random(entityId * 2654435761u.GetHashCode());
-        _cycles = spec.Compressor != null;
-        if (_cycles)
+        if (spec.Compressor != null)
         {
-            // A thermostat. Real cycles are minutes long; these are 100-220 s on and 60-140 s off,
-            // which is short enough that a walk down a street crosses several and long enough that
-            // none of them reads as a stutter. The phase is spread, so a wall of them is a wall.
-            _dutyOn = 100f + (float)rng.NextDouble() * 120f;
-            _dutyOff = 60f + (float)rng.NextDouble() * 80f;
-            _dutyPhase = (float)rng.NextDouble() * (_dutyOn + _dutyOff);
+            _thermostat = new Thermostat(spec.Thermostat ?? new ThermostatSpec(), rng.Next());
+            // A few per cent of load either way, over a minute or two: charge, a dirty coil, the sun
+            // coming off the cabinet. Two incommensurate swings, so it never repeats.
+            _wanderHz1 = 0.008f + (float)rng.NextDouble() * 0.006f;
+            _wanderHz2 = 0.019f + (float)rng.NextDouble() * 0.011f;
+            _wanderPhase1 = (float)rng.NextDouble() * MathF.Tau;
+            _wanderPhase2 = (float)rng.NextDouble() * MathF.Tau;
         }
-        // How hard it is working, and how much that wanders. A condenser's load is the weather and
-        // barely moves; a mower's is the grass and moves a lot, which is what the governor's droop
-        // is FOR — the bog going into a thick patch and the recovery out of it.
-        bool mows = spec.Cutting != null;
-        _loadBase = mows ? 0.42f : 0.55f;
-        _loadSwing = mows ? 0.34f : 0.06f;
-        _loadHz = mows ? 0.19f + (float)rng.NextDouble() * 0.12f : 0.03f;
+        // A permanent-split-capacitor fan motor of one model turns within a per cent or two of its
+        // nameplate, and no two at the same speed.
+        _fanTrim = 1f + ((float)rng.NextDouble() * 2f - 1f) * 0.015f;
+        // How hard a mower is working, and how much that wanders: the grass, which moves a lot, and is
+        // what the governor's droop is FOR — the bog going into a thick patch and the recovery out of it.
+        _loadBase = 0.42f;
+        _loadSwing = 0.34f;
+        _loadHz = 0.19f + (float)rng.NextDouble() * 0.12f;
         _loadPhase = (float)rng.NextDouble() * MathF.Tau;
     }
 
@@ -351,13 +369,17 @@ public sealed class MachineVoiceState : PhysicalVoiceState
         // staircase of speeds would hunt on it. A second to get going is about what a push takes.
         _groundSpeed += Math.Clamp(TargetGroundSpeed - _groundSpeed, -1.5f * dt, 1.5f * dt);
         Machine.GroundSpeed = _groundSpeed;
-        Machine.Load = Math.Clamp(
-            _loadBase + _loadSwing * MathF.Sin(_loadPhase + MathF.Tau * _loadHz * seconds), 0f, 1f);
-        if (_cycles)
+        if (Spec.Cutting != null)
+            Machine.Load = Math.Clamp(
+                _loadBase + _loadSwing * MathF.Sin(_loadPhase + MathF.Tau * _loadHz * seconds), 0f, 1f);
+        Machine.FanSpeedFraction = _fanTrim;
+        if (_thermostat != null)
         {
-            float period = _dutyOn + _dutyOff;
-            float phase = (seconds + _dutyPhase) % period;
-            Machine.CompressorOn = phase < _dutyOn;
+            float air = float.IsNaN(AmbientCelsius) ? OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius : AmbientCelsius;
+            Machine.CompressorOn = _thermostat.Step(dt, air, AudioClock.Now);
+            float wander = 0.6f * MathF.Sin(_wanderPhase1 + MathF.Tau * _wanderHz1 * seconds)
+                         + 0.4f * MathF.Sin(_wanderPhase2 + MathF.Tau * _wanderHz2 * seconds);
+            Machine.CompressorLoad = CompressorSpec.LoadAt(air) * (1f + 0.04f * wander);
         }
     }
 
@@ -528,7 +550,7 @@ public sealed class HornVoiceState : PhysicalVoiceState
     }
 
     /// <summary>Seconds from the first audible sample to the last sound of the horn dying away.</summary>
-    public float Seconds => Honk.Duration(Pattern) + 0.3f;
+    public float Seconds => Honk.Held(Pattern) ? float.PositiveInfinity : Honk.Duration(Pattern) + 0.3f;
 
     protected override void PushListener(Vector3 frame)
     {
@@ -586,6 +608,102 @@ public sealed class BellVoiceState : PhysicalVoiceState
     {
         Bell.Step();
         return Bell.Out;
+    }
+}
+
+/// <summary>
+/// A level crossing's gate mechanism (CrossingGateSpec): the arm going down under its own weight with
+/// the motor braking it, the motor driving it back up, and the clunk at each end. Like the bell, its
+/// Running flag is the server's word that the crossing is closed (SoundEmitterComponent.SynthRunning),
+/// and the arm's motion follows from that one signal by the same rules a real gate keeps (GateArm).
+///
+/// The motor is a small DC gear motor in a steel case: a commutator buzz (a pulse per segment per turn)
+/// and the pinion's mesh, eleven teeth against twelve segments so the two beat, brush noise, all
+/// following the motor's speed, through the case's resonance. Driving the arm up it works; braking the
+/// arm on the way down it whirs more quietly. Allocation-free once built.
+/// </summary>
+public sealed class GateVoiceState : PhysicalVoiceState
+{
+    public readonly CrossingGateSpec Spec;
+    public readonly GateArm Arm;
+    private readonly float _rate;
+    private readonly float _motorPa, _clunkPa;
+    private double _phase;
+    private float _speed, _speedTarget, _work;
+    private uint _noise = 0x2545F491u;
+    private float _bpX1, _bpX2, _bpY1, _bpY2;
+    private readonly float _b0, _b2, _a1, _a2;
+    // The clunk: three struck modes of the mast, the arm's hub and the case.
+    private float _clunkT = -1f, _clunkAmp;
+
+    public GateVoiceState(CrossingGateSpec spec, float sampleRate, bool closed)
+        : base(spec.MotorDb, sampleRate, spec.ClunkDb - spec.MotorDb + 6f)
+    {
+        Spec = spec;
+        Arm = new GateArm(spec, closed);
+        _rate = sampleRate;
+        _motorPa = 20e-6f * MathF.Pow(10f, spec.MotorDb / 20f);
+        _clunkPa = 20e-6f * MathF.Pow(10f, spec.ClunkDb / 20f);
+        // The case: a two-pole band-pass at its resonance, Q 3 (RBJ cookbook, constant peak gain).
+        float w0 = MathF.Tau * spec.CaseHz / sampleRate, alpha = MathF.Sin(w0) / (2f * 3f), a0 = 1f + alpha;
+        _b0 = alpha / a0; _b2 = -alpha / a0; _a1 = -2f * MathF.Cos(w0) / a0; _a2 = (1f - alpha) / a0;
+    }
+
+    protected override void PushListener(Vector3 frame) { }
+
+    protected override void Control(float seconds, float dt)
+    {
+        Arm.Update(Running, dt);
+        _speedTarget = Arm.MotorSpeed;
+        _work = Arm.Driving ? 1f : 0.45f;
+        if (Arm.Arrived is { } down)
+        {
+            // Landing on the rest is the heavier blow: the arm's whole weight. Reaching the top, the
+            // counterweights take most of it.
+            _clunkT = 0f;
+            _clunkAmp = _clunkPa * (down ? 1f : 0.6f);
+        }
+    }
+
+    protected override float StepSynth()
+    {
+        float dt = 1f / _rate;
+        // The motor spins up and down with its own inertia, about 50 ms.
+        _speed += (_speedTarget - _speed) * MathF.Min(1f, dt / 0.05f);
+        float outPa = 0f;
+        if (_speed > 1e-3f)
+        {
+            float rps = Spec.MotorRpm / 60f * _speed;
+            _phase += rps * dt;
+            if (_phase > 1e6) _phase -= 1e6;
+            float turn = (float)(_phase - Math.Floor(_phase)) * MathF.Tau;
+            float bars = Spec.CommutatorBars, teeth = Spec.PinionTeeth;
+            float comm = MathF.Sin(bars * turn) + 0.5f * MathF.Sin(2f * bars * turn) + 0.33f * MathF.Sin(3f * bars * turn)
+                       + 0.25f * MathF.Sin(4f * bars * turn);
+            float mesh = 0.5f * MathF.Sin(teeth * turn);
+            _noise = _noise * 1664525u + 1013904223u;
+            float brush = ((_noise >> 8) / 8388608f - 1f) * 0.3f;
+            float raw = comm + mesh + brush;
+            // Through the case's resonance, and a little straight out of the louvres.
+            float y = _b0 * raw + _b2 * _bpX2 - _a1 * _bpY1 - _a2 * _bpY2;
+            _bpX2 = _bpX1; _bpX1 = raw; _bpY2 = _bpY1; _bpY1 = y;
+            // About 1 RMS at full speed for the raw sum: the motor's level, as hard as it is working.
+            outPa = _motorPa * _speed * _work * (0.7f * y * 2.2f + 0.3f * raw);
+        }
+        if (_clunkT >= 0f)
+        {
+            float t = _clunkT;
+            _clunkT += dt;
+            if (t > 0.4f) _clunkT = -1f;
+            _noise = _noise * 1664525u + 1013904223u;
+            float n = (_noise >> 8) / 8388608f - 1f;
+            float s = 0.55f * MathF.Sin(MathF.Tau * 140f * t) * MathF.Exp(-t / 0.06f)
+                    + 0.35f * MathF.Sin(MathF.Tau * 420f * t) * MathF.Exp(-t / 0.025f)
+                    + 0.25f * MathF.Sin(MathF.Tau * 1600f * t) * MathF.Exp(-t / 0.008f)
+                    + 0.3f * n * MathF.Exp(-t / 0.003f);
+            outPa += _clunkAmp * s * MathF.Min(1f, t / 0.0005f);
+        }
+        return outPa;
     }
 }
 
