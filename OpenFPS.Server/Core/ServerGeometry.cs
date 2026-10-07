@@ -32,6 +32,19 @@ public sealed class ServerGeometry
     /// <summary>A static was added outside a rebuild: take it in at the next <see cref="Sync"/>.</summary>
     public void MarkDirty() => _dirty = true;
 
+    /// <summary>
+    /// A fixed thing put in the grid's static half outside a refresh (MapManager.IndexEntity). The next
+    /// incremental refresh files it, or, if it is gone or moves by then, takes it out of the grid again:
+    /// it has no record to be found missing by.
+    /// </summary>
+    public void NoteIndexed(Entity e)
+    {
+        _dirty = true;
+        _indexedSince.Add(e);
+    }
+
+    private readonly List<Entity> _indexedSince = new();
+
     // ── What the grid and the triangles hold, entity by entity (an incremental RefreshGrid) ─────────
     //
     // A refresh read every fixed thing on the map and filed every one of them in the grid again, and
@@ -108,6 +121,10 @@ public sealed class ServerGeometry
                 grid.RemoveStatic(_filed[id].Entity);
                 Unfile(id, ref moversChanged, ref unindexedChanged, dirtyTiles);
             }
+        // Put in the grid since the last refresh and gone again before it (or moving now): no record says so.
+        foreach (var e in _indexedSince)
+            if (!(_filed.TryGetValue(e.Id, out var fi) && fi.Entity == e) && grid.RemoveStatic(e)) dropped++;
+        _indexedSince.Clear();
         changed += dropped;
         if (dirtyTiles.Count > 0 || moversChanged)
         {
@@ -235,7 +252,7 @@ public sealed class ServerGeometry
     /// <summary>Every fixed thing's record, as the grid and the triangles now hold it.</summary>
     private void Prime(World world)
     {
-        _filed.Clear(); _byTile.Clear(); _moverSpecs.Clear(); _unindexedById.Clear();
+        _filed.Clear(); _byTile.Clear(); _moverSpecs.Clear(); _unindexedById.Clear(); _indexedSince.Clear();
         bool m = false, u = false;
         var dirty = new HashSet<TileKey>();
         world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) =>

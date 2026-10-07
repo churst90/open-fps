@@ -824,7 +824,7 @@ public class MapManager
             if (_geometry.TryGetValue(mapId, out var geometry))
             {
                 data.grid.AddUnindexed(entity);
-                geometry.MarkDirty();
+                geometry.NoteIndexed(entity);
             }
         }
     }
