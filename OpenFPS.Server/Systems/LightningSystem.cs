@@ -5,13 +5,9 @@ using Serilog;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// Lightning, on the server: when and where the storm flashes. The thunder is the client's to work
-/// out (OpenFPS.Client.AudioEngine.Core.Thunder), from the strike this hands it, for wherever each
-/// listener is standing; all the server decides is the flash.
-///
-/// It reads the weather and nothing else: a Storm has a cell drifting with the wind and flashing a
-/// few times a minute, heavy Rain now and then makes one too, and anything else is quiet. The
-/// physics of it is in <see cref="LightningSchedule"/> and <see cref="LightningPhysics"/>.
+/// When and where the storm flashes, from the weather alone; the client works out the thunder for each
+/// listener (OpenFPS.Client.AudioEngine.Core.Thunder). The physics is in <see cref="LightningSchedule"/>
+/// and <see cref="LightningPhysics"/>.
 /// </summary>
 public sealed class LightningSystem
 {

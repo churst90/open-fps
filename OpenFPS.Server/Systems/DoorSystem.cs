@@ -9,35 +9,24 @@ namespace OpenFPS.Server.Systems;
 /// <summary>
 /// Swings and slides doors, works their closers and sensors, and opens up what you can hear through them.
 ///
-/// Runs BEFORE <see cref="ParentSystem"/> and writes the leaf's pose into the door's
-/// <see cref="ParentComponent"/> rather than its transform, because a door in a building is a part of
-/// that building: ParentSystem places every part from its local pose every tick, so a system that
-/// moved the transform directly would have its work overwritten before anybody saw it. A door
-/// standing on its own has no parent and is moved directly.
+/// Runs BEFORE <see cref="ParentSystem"/> and writes a door in a building into its
+/// <see cref="ParentComponent"/>, not its transform: ParentSystem places every part from its local pose
+/// each tick and would overwrite a moved transform. A door on its own has no parent and is moved directly.
 ///
-/// The leaf is ALWAYS SOLID. What opening does is move it out of the doorway, which is what a door
-/// does: a hinged leaf turns about its hinged edge, a sliding one moves along its own width.
+/// The leaf is always solid; opening moves it out of the doorway. What a listener hears is the portal's
+/// aperture, which follows the leaf and is re-sent when it has moved enough to matter.
 ///
-/// The half that matters to a listener is the aperture. A door is not really a thing you hear, it is
-/// a thing that changes what you can hear through it, and the portal machinery already knows how to
-/// do that — so all this does is move the number, gradually, as the leaf moves. The client is told
-/// when the number has moved enough to be worth hearing about, over the same path that already
-/// re-sends an entity whose audio changed.
-///
-/// What a door does by itself comes from its <see cref="DoorComponent"/>: a closer shuts it once the
-/// doorway has been clear for a while, never on anybody standing in it; a sensor opens it for anyone
-/// who comes up to it; a motor reverses for anyone in the doorway. Each mechanical event is sent as
-/// "door:KIND:EVENT" (<see cref="DoorEvents"/>, docs/DOOR_TYPES_EVENTS.md).
+/// Closers, sensors and motors come from the <see cref="DoorComponent"/>. Each mechanical event is sent
+/// as "door:KIND:EVENT" (<see cref="DoorEvents"/>, docs/DOOR_TYPES_EVENTS.md).
 /// </summary>
 public sealed class DoorSystem
 {
-    /// <summary>How much of its full aperture a door must have moved before the client is told again.
-    /// Every tick would be thirty definitions a second for a thing that takes one second to open.</summary>
+    /// <summary>How much of its full aperture a door must have moved before the client is told again;
+    /// every tick would be thirty definitions a second.</summary>
     private const float AnnounceStep = 0.15f;
 
-    /// <summary>The last part of a closer's travel, as a fraction of fully open, that it runs at latch
-    /// speed rather than sweep speed: about the last ten degrees of a quarter turn, which is where a
-    /// closer's latch valve takes over to carry the bolt over the strike.</summary>
+    /// <summary>The last part of a closer's travel, as a fraction of fully open, run at latch speed:
+    /// about the last ten degrees, where a closer's latch valve takes over.</summary>
     public const float LatchZone = 0.12f;
 
     /// <summary>How far either side of a doorway a person counts as standing in it, metres, when the
@@ -51,20 +40,16 @@ public sealed class DoorSystem
     /// enough for anyone on its own floor, not enough for anyone on the next.</summary>
     private const float SameFloorMetres = 1.8f;
 
-    /// <summary>What we last told the client about each door.</summary>
+    /// <summary>The aperture each door was last announced at.</summary>
     private readonly Dictionary<int, float> _announced = new();
     private readonly List<Entity> _doors = new();
     private readonly List<(Entity Who, Vector3 At)> _people = new();
     private bool _peopleFound;
 
     /// <summary>
-    /// One tick of every door on a map.
-    ///
-    /// <paramref name="announce"/> is handed the id of any door whose opening has changed enough to
-    /// matter, so the caller can re-send its definition; the acoustic map on the other end is built
-    /// from definitions, and an aperture nobody was told about is a door that opens silently and
-    /// changes nothing. <paramref name="heard"/> is handed every mechanical event with its key and its
-    /// sounds; an event with no sound yet comes with an empty list.
+    /// One tick of every door on a map. <paramref name="announce"/> gets each door whose aperture has
+    /// changed enough to re-send (the client's acoustics are built from definitions); <paramref name="heard"/>
+    /// gets every mechanical event with its key and sounds, an empty list when it has none.
     /// </summary>
     public void Update(World world, float dt, Action<int> announce,
                        Action<int, string, IReadOnlyList<TransientSound>>? heard = null)
@@ -91,8 +76,6 @@ public sealed class DoorSystem
         // A key going into the lock and turning: the leaf does not move until it has.
         bool held = door.KeySeconds > 0f && TurnTheKey(world, entity, ref door, dt, heard);
 
-        // What it does by itself: only a door with a sensor, a closer or a motor, and only while it
-        // could do something.
         if (!held && (door.SensorMetres > 0f
             || ((door.CloseAfterSeconds > 0f || door.Powered) && (door.Target > 0f || door.Openness > 0f))))
             held = Behave(world, entity, ref door, dt);
@@ -100,9 +83,8 @@ public sealed class DoorSystem
         float before = door.Openness;
         int travel = door.Target > door.Openness ? 1 : door.Target < door.Openness ? -1 : 0;
 
-        // Nobody is swept aside, whatever is moving the leaf: it comes up against them and stops there,
-        // and a motor closing on them opens again. Asked of this tick's step, so the leaf goes as far as
-        // the person and no further.
+        // Nobody is swept aside: the leaf stops at them, and a motor closing on them opens again.
+        // Asked of this tick's step, so the leaf goes as far as the person and no further.
         if (!held && travel != 0 && FirstInTheWay(world, entity, door, NextOpenness(door, travel, dt), People(world)) != null)
         {
             if (door.Powered && travel < 0)
@@ -126,7 +108,6 @@ public sealed class DoorSystem
             Events(world, entity, ref door, before, travel, seconds, heard);
         }
 
-        // The opening, which is the half anyone listening cares about.
         if (world.Has<PortalComponent>(entity))
         {
             ref var portal = ref world.Get<PortalComponent>(entity);
@@ -160,7 +141,6 @@ public sealed class DoorSystem
             if (inDoorway && (sensed || door.SensorMetres <= 0f)) break;
         }
 
-        // Somebody coming up to it: open, from wherever it was.
         if (sensed && door.Target < 1f)
         {
             door.Target = 1f;
@@ -177,7 +157,6 @@ public sealed class DoorSystem
             door.SelfClosing = false;
         }
 
-        // Fully open and nobody there for long enough: it closes itself.
         if (door.CloseAfterSeconds > 0f && door.Target >= 1f)
         {
             if (inDoorway || sensed || door.Openness < 1f) door.ClearSeconds = 0f;
@@ -232,7 +211,7 @@ public sealed class DoorSystem
         }
         else if (travel < 0 && door.Travel != -1)
         {
-            // A sliding door's close is one simulation of its whole run, so it is sent as the run starts:
+            // A sliding door's close is one simulation of its whole run, so it goes as the run starts;
             // sent on arrival, its roll played on after the leaf had shut.
             if (door.Powered)
             {
@@ -257,11 +236,8 @@ public sealed class DoorSystem
                                          : DoorAcoustics.EdgeSpeed(width, door.SwingRadians, seconds);
                 Emit(heard, entity, kind, door.Powered ? DoorEvents.Shut : DoorEvents.Latch,
                      heard == null ? none
-                     // The knob door's close is one simulation of a hand shutting it, sent as it arrives.
                      : kind == DoorKind.Hinged ? KnobDoorSound(world, entity, door, closing: true)
-                     // The push-bar door's close is the closer bringing it into its latch.
                      : kind == DoorKind.PushBar ? PushBarSound(world, entity, door, closing: true)
-                     // The glass doors' close is their closer bringing them onto the seal (and the latch).
                      : kind is DoorKind.GlassPushBar or DoorKind.GlassPull ? GlassDoorSound(world, entity, door, closing: true)
                      // A sliding door's or a lift's arrival is already in the run it sent as it set off.
                      : kind is DoorKind.PatioSliding or DoorKind.AutoSliding or DoorKind.Elevator ? none
@@ -298,11 +274,9 @@ public sealed class DoorSystem
             Emit(heard, entity, kind, DoorEvents.Rollers, none);
             return;
         }
-        // Each kind's first sound is its own mechanism letting go of the frame, and which mechanism
-        // that is depends on the side: a push bar is only on the push side, and from the other side a
-        // pull handle's trim draws the same latch. Then the hand: "push" or "pull". From a keyed side
-        // the key has already drawn the latch (TurnTheKey), so only the hand follows, except on a knob
-        // door, whose knob is still turned after the key.
+        // First the mechanism that lets go of the frame, which depends on the side (a push bar is on the
+        // push side only; from the other, the pull trim draws the same latch), then the hand. From a keyed
+        // side the key has already drawn the latch (TurnTheKey), except on a knob door, whose knob still turns.
         if (heard != null)
         {
             bool pulled = door.OpenedFrom < 0;
@@ -314,8 +288,7 @@ public sealed class DoorSystem
                 Emit(heard, entity, kind, DoorEvents.Rollers, none);
             }
             else if (door.KeyTurned && kind != DoorKind.Hinged)
-                // The key has drawn the latch (LockCylinder, at key-insert); a glass front door is then pulled on
-                // its handle with the key held, and the key let go once the leaf is clear (GlassDoor).
+                // A glass front door is pulled on its handle with the key still held (GlassDoor).
                 Emit(heard, entity, kind, hand,
                      kind == DoorKind.GlassPushBar ? GlassDoorSound(world, entity, door, closing: false, GlassDoor.Opening.Key) : none);
             else
@@ -361,10 +334,8 @@ public sealed class DoorSystem
     public const float UnlockSeconds = 0.7f;
 
     /// <summary>
-    /// One tick of a key in a lock, from the keyed side of a shut door: in, turned, the latch drawn
-    /// back, each sent as its own event at its own moment. True while the key is still being worked,
-    /// so the leaf waits for it. The unlock carries what that kind's latch sounds like being drawn from
-    /// the pull side, so nothing goes quiet while the key's own sounds are being made.
+    /// One tick of a key in a lock on the keyed side of a shut door: in, turned, the latch drawn, each
+    /// sent as its own event. True while the key is still being worked, so the leaf waits.
     /// </summary>
     private static bool TurnTheKey(World world, Entity entity, ref DoorComponent door, float dt,
                                    Action<int, string, IReadOnlyList<TransientSound>>? heard)
@@ -377,8 +348,8 @@ public sealed class DoorSystem
         bool done = door.KeySeconds <= 0f;
         bool At(float t) => was <= t && (t < now || done);
 
-        // The key's whole working is one simulation (LockCylinder): in at key-insert, turned at KeyTurnSeconds, the
-        // latch drawn by UnlockSeconds, its pace set to these; the turn and the unlock are its moments, silent here.
+        // The key's whole working is one LockCylinder sound sent at key-insert and paced to these
+        // constants; the turn and the unlock are its moments, silent here.
         if (At(0f)) Emit(heard, entity, kind, DoorEvents.KeyInsert, heard == null || door.Slides ? none : KeySound(world, entity, door));
         if (At(KeyTurnSeconds)) Emit(heard, entity, kind, DoorEvents.KeyTurn, none);
         if (At(UnlockSeconds)) Emit(heard, entity, kind, DoorEvents.Unlock, none);
@@ -392,12 +363,8 @@ public sealed class DoorSystem
     // ── Where things are ────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Records where "shut" is, the first time a door is looked at.
-    ///
-    /// Taken from wherever the door actually is rather than from anything authored, so a door placed
-    /// by a prefab, dropped by a build cursor or rebuilt from a saved template is shut where it was
-    /// put — and a template that carries a door does not need to carry a second copy of its pose that
-    /// could disagree with the first.
+    /// Records where "shut" is, the first time a door is looked at: wherever it actually stands, so a
+    /// door from a prefab, the build cursor or a template is shut where it was put.
     /// </summary>
     private static void Capture(World world, Entity entity, ref DoorComponent door, bool parented)
     {
@@ -416,16 +383,14 @@ public sealed class DoorSystem
             door.ShutYaw = yaw;
         }
 
-        // A door makes a hole exactly its own size, so the opening is the leaf's own width — no
-        // authored number to disagree with the thing it describes.
+        // The opening is the leaf's own width.
         if (door.Aperture <= 0f && world.Has<ColliderComponent>(entity))
         {
             var size = world.Get<ColliderComponent>(entity).Size;
             door.Aperture = MathF.Max(0.1f, MathF.Max(size.X, size.Z));
         }
-        // Where the hole is: the leaf's world pose now, shut, before anything has moved it. The client
-        // hears through the doorway, and the leaf's own transform stops saying where that is the moment
-        // it opens.
+        // The doorway is the leaf's pose now, shut: once it opens, its transform no longer says where
+        // the hole is.
         if (world.Has<PortalComponent>(entity))
         {
             var shut = world.Get<Transform>(entity);
@@ -448,13 +413,9 @@ public sealed class DoorSystem
     }
 
     /// <summary>
-    /// Puts the leaf where its current openness says it should be.
-    ///
-    /// A hinged leaf turns about its hinged EDGE, not its middle — swinging about the centre would
-    /// sweep the leaf through the doorway in both directions and leave half of it still in the way at
-    /// ninety degrees. A sliding leaf moves along its own width, toward <see cref="DoorComponent.HingeSide"/>,
-    /// by as much as it is wide: fully open, it stands clear beside the doorway, in the wall's pocket
-    /// or on its own track past the next panel.
+    /// Puts the leaf where its openness says. A hinged leaf turns about its hinged edge (about its
+    /// middle, half of it would still block the doorway at ninety degrees); a sliding leaf moves its own
+    /// width toward <see cref="DoorComponent.HingeSide"/>.
     /// </summary>
     private static void Place(World world, Entity entity, DoorComponent door, bool parented)
     {
@@ -474,12 +435,10 @@ public sealed class DoorSystem
         {
             float swung = shut + door.Openness * door.SwingRadians * SwingSign(door);
 
-            // Where the hinged edge is: half a leaf along the shut leaf's own width, on the hinge side.
             var alongShut = Vector3.Transform(new Vector3(halfWidth * door.HingeSide, 0f, 0f),
                                               Quaternion.CreateFromYawPitchRoll(shut, 0f, 0f));
             var hinge = door.ShutPosition + alongShut;
 
-            // ...and where the centre of the leaf ends up once it has turned about that edge.
             var alongSwung = Vector3.Transform(new Vector3(halfWidth * door.HingeSide, 0f, 0f),
                                                Quaternion.CreateFromYawPitchRoll(swung, 0f, 0f));
             position = hinge - alongSwung;
@@ -499,7 +458,7 @@ public sealed class DoorSystem
             t.Rotation = rotation;
             t.IsDirty = true;
         }
-        // The triangle world places the leaf again before its next answer (geometry stage 1).
+        // So the triangle world places the leaf again before its next answer.
         OpenFPS.Common.MoverPoses.Moved();
     }
 
@@ -589,11 +548,9 @@ public sealed class DoorSystem
     public const float BodyRadiusMetres = PhysicsConstants.PlayerRadius;
 
     /// <summary>
-    /// The first person in the way of the leaf going from where it is now to <paramref name="to"/>
-    /// (0 shut, 1 open), or null. <paramref name="hand"/> is whoever is moving it by hand, who walks
-    /// with it: never in the way of a leaf they are opening (a pulled leaf comes toward the hand, and
-    /// the hand steps back with it), and in the way of one they are shutting only when they stand in
-    /// the doorway it shuts into.
+    /// The first person in the way of the leaf going from where it is to <paramref name="to"/> (0 shut,
+    /// 1 open), or null. <paramref name="hand"/>, whoever moves it by hand, walks with it: never in the
+    /// way of a leaf they open, and in the way of one they shut only when standing in its doorway.
     /// </summary>
     public static Entity? InTheWay(World world, Entity entity, float to, Entity? hand = null)
     {
@@ -616,7 +573,6 @@ public sealed class DoorSystem
             bool theHand = door.HandId != 0 && who.Id == door.HandId - 1;
             if (theHand)
             {
-                // Walking it shut, they are only in the way standing where it shuts.
                 if (to < from && Sweeps(world, entity, door, from, MathF.Min(to, door.Target), at, onlyTheDoorway: true)) return who;
                 continue;
             }
@@ -626,16 +582,11 @@ public sealed class DoorSystem
     }
 
     /// <summary>
-    /// Whether somebody standing at <paramref name="p"/> is in the way of the leaf moving from
-    /// <paramref name="from"/> to <paramref name="to"/>: within a body's radius of the ground it is
-    /// about to sweep, on its own floor.
-    ///
-    /// A hinged leaf sweeps a slice of a disc about its hinge, as wide as the leaf, between the angle it
-    /// is at and the angle it is going to. Only what is AHEAD of it counts: somebody behind an open leaf,
-    /// between it and the wall, is not in the way of it shutting, though somebody in front of it is, and
-    /// so is anybody within a body's radius of where it ends up (the doorway, shutting; the wall,
-    /// opening). A sliding leaf sweeps the strip its leading edge runs along, as thick as the leaf and a
-    /// body either side. <paramref name="onlyTheDoorway"/> asks only about where the leaf ends up.
+    /// Whether somebody at <paramref name="p"/> is within a body's radius of the ground the leaf sweeps
+    /// from <paramref name="from"/> to <paramref name="to"/>, on its floor. A hinged leaf sweeps a slice of
+    /// disc about its hinge, and only what is ahead of it counts (somebody behind an open leaf is not in
+    /// the way of it shutting); a sliding leaf sweeps the strip its leading edge runs along.
+    /// <paramref name="onlyTheDoorway"/> asks only about where the leaf ends up.
     /// </summary>
     internal static bool Sweeps(World world, Entity entity, in DoorComponent door, float from, float to, Vector3 p,
                                 bool onlyTheDoorway = false)
@@ -647,8 +598,7 @@ public sealed class DoorSystem
         float halfWidth = HalfWidth(world, entity, door);
         float halfThick = world.Has<ColliderComponent>(entity) ? world.Get<ColliderComponent>(entity).Size.Z * 0.5f : 0.03f;
         float reach = BodyRadiusMetres + halfThick;
-        // Nothing a leaf does reaches further from its doorway's middle than three half-widths (a
-        // hinged leaf's free edge, a slider's far edge) and a body: the street at large is not asked.
+        // No leaf reaches further from its doorway's middle than three half-widths and a body.
         float far = 3f * halfWidth + reach;
         if (d.X * d.X + d.Z * d.Z > far * far) return false;
 
@@ -690,16 +640,15 @@ public sealed class DoorSystem
 
     /// <summary>
     /// How far in from the leaf's free edge its handle and latch are, metres: a lockset's backset, 60
-    /// or 70 mm. It is also what keeps a door's sound out of the wall — a leaf laps each jamb by 50 mm,
-    /// and a sound placed on the leaf's edge was inside the brick.
+    /// or 70 mm. It also keeps door sounds out of the wall: a leaf laps each jamb by 50 mm, and a sound
+    /// on the leaf's edge was inside the brick.
     /// </summary>
     public const float HandleBacksetMetres = 0.07f;
 
     /// <summary>
-    /// How far off the leaf a door's sound is placed, on the listener's side, beyond the leaf's own
-    /// half-thickness: clear of the reveal of a wall up to 30 cm thick and of the 10 cm sphere the
-    /// occlusion probe tests, so the doorway is heard as the open air either side of the leaf is and
-    /// not through the leaf and the jamb.
+    /// How far off the leaf, beyond its half-thickness, a door's sound is placed on the listener's side:
+    /// clear of a 30 cm wall's reveal and of the occlusion probe's 10 cm sphere, so it is not heard
+    /// through the leaf and the jamb.
     /// </summary>
     public const float FaceStandoffMetres = 0.25f;
 
@@ -737,15 +686,10 @@ public sealed class DoorSystem
     }
 
     /// <summary>
-    /// A door's sounds, placed in its doorway: each kept inside the opening by the handle's backset (a
-    /// latch is never in the jamb), in the plane of the shut leaf, and given the leaf's faces to be heard
-    /// from. Every door sound goes out through here.
-    ///
-    /// The SHUT doorway, not the leaf as it is. A hinged door's sounds are its latch letting go and
-    /// meeting the strike, both with the leaf shut — but the leaf has already moved a tick when its
-    /// opening is announced, and its sound was placed on a leaf three degrees open. A slider's leaf ends
-    /// its run with its edge flush to the far jamb, and the handle, set back from that edge, behind it:
-    /// in the wall again.
+    /// A door's sounds placed in its doorway: inside the opening by the handle's backset, in the plane of
+    /// the SHUT leaf, and given the leaf's faces to be heard from. Every door sound goes out through here.
+    /// The shut leaf, because the leaf has already moved a tick when its opening is announced, and a
+    /// slider's handle ends its run behind the far jamb, in the wall.
     /// </summary>
     private static IReadOnlyList<TransientSound> OnTheLeaf(World world, Entity entity, in DoorComponent door,
                                                            IReadOnlyList<TransientSound> sounds)
@@ -777,11 +721,8 @@ public sealed class DoorSystem
     // ── What it sounds like ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// What the leaf and its latch sound like as it leaves the frame and as it meets it.
-    ///
-    /// Everything the model needs is already on the leaf: what it is made of, how big it is, how
-    /// thick, and how fast its latch edge was travelling. So a door somebody builds out of a material
-    /// somebody else invented is audible the first time it shuts, with nobody having recorded anything.
+    /// The leaf and its latch leaving the frame and meeting it, from the leaf's material, size,
+    /// thickness and latch-edge speed: the generic door model, for kinds without one of their own.
     /// </summary>
     private static IReadOnlyList<TransientSound> Opening(World world, Entity entity, in DoorComponent door)
         => OnTheLeaf(world, entity, door, Sounds(world, entity, door, opening: true, edgeSpeed: 0f));
@@ -803,17 +744,12 @@ public sealed class DoorSystem
         var latchEdge = transform.Position + acrossLeaf;
         var hinge = transform.Position - acrossLeaf;
 
-        // Mass from the leaf's own volume and the density of what it is made of. A steel door is
-        // heavy because steel is heavy, not because somebody typed a number.
         float massKg = MathF.Max(2f, size.X * size.Y * size.Z * MathF.Max(100f, material.DensityKgM3));
         float ringThickness = size.Z;
 
-        // ...unless it is not solid. A steel door is two skins of sheet folded over a core — 1.2 mm
-        // of steel either side of forty-odd millimetres of honeycomb — and reckoned as a solid slab it
-        // weighed 2.4 tonnes and slammed seventeen decibels too hard. The prefab says so the way any
-        // door does, with its skin thickness. The skins weigh what they weigh; and bonded to a
-        // core they bend as a sandwich, stiff for their mass, so the note is that of a solid plate
-        // with the same stiffness-to-mass ratio: t = sqrt(6 rho s (d - s)^2 / m).
+        // A hollow door (1.2 mm steel skins over a honeycomb core) reckoned as a solid slab weighed
+        // 2.4 t and slammed 17 dB too hard. Bonded skins bend as a sandwich, so the note is a solid
+        // plate's of the same stiffness-to-mass ratio: t = sqrt(6 rho s (d - s)^2 / m).
         if (door.SkinMetres > 0f)
         {
             float skin = MathF.Min(door.SkinMetres, size.Z * 0.5f);
@@ -824,15 +760,11 @@ public sealed class DoorSystem
             ringThickness = MathF.Sqrt(6f * rho * skin * (size.Z - skin) * (size.Z - skin) / perArea);
         }
 
-        // A seal is a property of what the thing is FOR: anything that keeps weather or noise out has
-        // one, and the material is the best evidence available. Metal and glass doors are sealed;
-        // a wooden one in a shed is not.
+        // The material is the only evidence of a seal: metal and glass doors are sealed, wooden ones not.
         bool hasSeal = material.DensityKgM3 > 2000f;
 
         var sounds = opening
-            // Hinges silent by default. A creak is a FAULT — a dry pin in a dry knuckle — and most
-            // doors do not have one; rendering three quarters of a second of stick-slip on every
-            // door made every door sound like a haunted house, which a listener heard as an
+            // Hinges silent: a creak is a fault, and stick-slip on every door was heard as an
             // unexplained hiss either side of the thud. A gate or a cellar door can ask for it.
             ? DoorAcoustics.Opening(material, latchEdge, hinge, size.X, size.Y, ringThickness, massKg,
                                     door.SwingSeconds, hingeDryness: 0f, hasSeal)
@@ -844,10 +776,6 @@ public sealed class DoorSystem
         return transients;
     }
 
-    /// <summary>
-    /// The knob door as a physical model (<see cref="KnobDoor"/>): the server names it, the client
-    /// renders it. The door's id picks its character, so each door keeps its own hinges.
-    /// </summary>
     private static readonly Random _shutDice = new();
 
     /// <summary>The push-bar door as a physical model (<see cref="PushBarDoor"/>); its id picks its
@@ -882,8 +810,7 @@ public sealed class DoorSystem
             : new Vector3(kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f, 0.02f);
         float travel = closing && door.CloseSeconds > 0f ? door.CloseSeconds : door.SwingSeconds;
         int variant = entity.Id;
-        // The run is one sound, and the leaf goes the width of the doorway while it plays: it comes from
-        // the handle, which travels with the leaf from where it is now to where it is going.
+        // The run is one sound, so it comes from the handle travelling with the leaf.
         float to = closing ? 0f : 1f;
         return OnTheLeaf(world, entity, door, new[]
         {
@@ -961,17 +888,16 @@ public sealed class DoorSystem
         });
     }
 
-    /// <summary><paramref name="pulled"/>: opened from its pull side, the leaf drawn toward the hand (the approved
-    /// "grip, turn, pull"). From its push side the knob is turned and the leaf pushed away; from a side nobody
-    /// knows, it is the pull.</summary>
+    /// <summary>The knob door as a physical model (<see cref="KnobDoor"/>); its id picks its character, so
+    /// each door keeps its own hinges. <paramref name="pulled"/>: opened from the pull side (the approved
+    /// "grip, turn, pull"); a side nobody knows is the pull too.</summary>
     private static IReadOnlyList<TransientSound> KnobDoorSound(World world, Entity entity, in DoorComponent door, bool closing,
                                                                bool pulled = false)
     {
         var size = world.Has<ColliderComponent>(entity)
             ? world.Get<ColliderComponent>(entity).Size
             : new Vector3(0.9f, 2.1f, 0.05f);
-        // Wooden knob doors are interior doors, and interior doors are hollow-core.
-        // People shut a door differently each time: mostly guided in, sometimes eased, sometimes pushed.
+        // Knob doors are interior doors, which are hollow-core. People shut one differently each time.
         var how = !closing ? KnobDoor.Shut.Normal : _shutDice.NextDouble() switch
         {
             < 0.25 => KnobDoor.Shut.Gentle,
@@ -999,19 +925,13 @@ public sealed class DoorSystem
     // ── Asking a door to move ───────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Asks a door to open or shut. Returns false if it is already going that way, or if it is being
-    /// shut and somebody other than <paramref name="who"/> is in the way of the leaf (or
-    /// <paramref name="who"/> is standing in the doorway itself): a hand never sweeps a leaf through
-    /// anybody. <see cref="InTheWay"/> says who.
+    /// Asks a door to open or shut. False if it is already going that way, or if shutting it would sweep
+    /// somebody (<see cref="InTheWay"/> says who).
     ///
-    /// <paramref name="by"/> is where whoever is moving it is standing, when there is somebody, and
-    /// <paramref name="who"/> is that somebody (their position, if <paramref name="by"/> is not given).
-    /// The side they stand on decides how a hinged door opens: pushed from its push side
-    /// (<see cref="DoorComponent.PushSide"/>), and by its bar if it has one; pulled from the other. Not
-    /// knowing the side is the push side. From a keyed side (<see cref="DoorComponent.KeyedSide"/>) a
-    /// shut door is locked, and opening it is the key going in and turning before the hand: every player
-    /// and every resident has the key; a lock that keeps somebody out needs a key to be an item, which
-    /// does not exist yet (docs/DOOR_TYPES_EVENTS.md). Shut again, it is locked again.
+    /// <paramref name="by"/> (else <paramref name="who"/>'s position) decides how a hinged door opens:
+    /// pushed from <see cref="DoorComponent.PushSide"/>, by its bar if it has one, pulled from the other;
+    /// an unknown side is the push side. From <see cref="DoorComponent.KeyedSide"/> a shut door is locked
+    /// and the key turns first; everybody has the key until keys are items (docs/DOOR_TYPES_EVENTS.md).
     /// </summary>
     public static bool Set(World world, Entity entity, bool open, Vector3? by = null, Entity? who = null)
     {
@@ -1072,8 +992,7 @@ public sealed class DoorSystem
         => who is { } w && blocker == w ? $"You are in the way of the {name}. Step out of the doorway first."
                                         : $"Someone is in the way of the {name}.";
 
-    /// <summary>Whether a person opens and shuts it with their hand. A motor's doors open for you or
-    /// for the lift, never by hand.</summary>
+    /// <summary>Whether a person moves it by hand: never a motor's door.</summary>
     public static bool OpensByHand(in DoorComponent door) => !door.Powered;
 
     /// <summary>"swings" or "slides", for saying what a door just did.</summary>
@@ -1083,6 +1002,6 @@ public sealed class DoorSystem
     public static bool OpenEnough(World world, Entity entity)
         => !world.IsAlive(entity) || !world.Has<DoorComponent>(entity) || world.Get<DoorComponent>(entity).Openness >= 0.9f;
 
-    /// <summary>Forgets a door that no longer exists, so the announcement memory does not grow forever.</summary>
+    /// <summary>Forgets a door that no longer exists.</summary>
     public void Forget(int entityId) => _announced.Remove(entityId);
 }

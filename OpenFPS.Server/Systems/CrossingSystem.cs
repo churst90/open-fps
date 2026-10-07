@@ -8,20 +8,10 @@ using Serilog;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// Level crossings: the bells, and the road holding while a train goes through.
-///
-/// A crossing is the one place on a map where the railway and the road have to know about each
-/// other, and it is worth being careful about WHICH way that knowledge flows. The train does not
-/// know there is a crossing; it does not slow down, it does not signal, it simply comes. The ROAD
-/// is what changes: a circuit up the line notices the train, the bells start, and the traffic that
-/// would have driven across stops instead. So everything here reads the trains and writes to the
-/// road, and the rail system is untouched.
-///
-/// The geometry is DERIVED. A crossing declares a point and nothing else; which rail line runs
-/// through it, which roads run through it, and how far round each of those it sits are all worked
-/// out from the tracks the map already has. A declared offset is a number that silently rots the
-/// first time somebody moves a waypoint, and a crossing whose offset has rotted rings for nothing
-/// and stops nobody.
+/// Level crossings: the bells, the gates, and the road holding while a train goes through. Everything
+/// here reads the trains and writes to the road; the trains know nothing of crossings. A crossing
+/// declares only a point: its rails, roads and offsets are derived from the map's tracks, because a
+/// declared offset rots the first time a waypoint moves.
 /// </summary>
 public sealed class CrossingSystem
 {
@@ -50,19 +40,16 @@ public sealed class CrossingSystem
 
     private readonly Action<int>? _resendDefinition;
 
-    /// <param name="resendDefinition">
-    /// Asks the server to send an entity's DEFINITION again. A crossing is the only thing here
-    /// whose sound state lives in the definition rather than in its transform, so it is the only
-    /// thing that needs this — see where SynthRunning is set.
-    /// </param>
+    /// <param name="resendDefinition">Asks the server to send an entity's definition again: the bell's
+    /// and gates' state (SynthRunning) lives there, not in the transform.</param>
     public CrossingSystem(RailSystem rail, Action<int>? resendDefinition = null)
     {
         _rail = rail;
         _resendDefinition = resendDefinition;
     }
 
-    /// <summary>How near the centre counts as "on this track". A crossing is a few metres of road,
-    /// not a point, and a waypoint polyline only samples the curve it stands for.</summary>
+    /// <summary>How near the centre counts as "on this track": a crossing is a few metres of road, and
+    /// a waypoint polyline only samples its curve.</summary>
     private const float OnTrackMetres = 14f;
 
     public void Spawn(MapManager maps)
@@ -103,16 +90,9 @@ public sealed class CrossingSystem
                     continue;
                 }
 
-                // The bell, as an entity of its own so it is placed, occluded and reverberated like
-                // anything else that makes a noise. It is silent until Update rings it.
-                // STATIC, and with no Velocity on it — which is not a tidiness point.
-                //
-                // "Static" in this server means exactly "no PlayerComponent and no Velocity", and
-                // that set is what EntityDefinitionFactory.StaticEntities streams in answer to a
-                // map-data request. A bell on a post does not move; giving it a velocity took it
-                // out of the bulk map stream and put it in the per-tick dynamic path, which is a
-                // different route to the client for no reason. Every other fixed emitter on this
-                // map — every air conditioner, every mower — is static, and they all work.
+                // The bell, an entity of its own, silent until Update rings it. No Velocity: static
+                // means "no PlayerComponent and no Velocity" (EntityDefinitionFactory.StaticEntities),
+                // and a velocity moved it from the map stream to the per-tick dynamic path.
                 c.Bell = maps.SpawnEntity(mapId, w => w.Create(
                     EntityType.StaticObject,
                     new Transform { Position = cd.Position + new Vector3(0f, 2.6f, 0f), Rotation = Quaternion.Identity },
@@ -145,11 +125,9 @@ public sealed class CrossingSystem
     public const float GateFromRail = 3.7f;
 
     /// <summary>
-    /// A gate on each road approach to the crossing: on the right of the traffic coming toward the
-    /// rails, its mast just off the carriageway, GateFromRail short of the nearest rail. Derived from the
-    /// roads through the crossing, nothing declared, the same way the bell's rails are derived. Each is an
-    /// emitter whose SynthRunning is the crossing's closed state, as the bell's is; the client moves the
-    /// arm and runs its motor from that (GateArm).
+    /// A gate on each road approach, derived from the roads through the crossing: on the right of the
+    /// traffic coming toward the rails, its mast just off the carriageway, GateFromRail short of the
+    /// nearest rail. Its SynthRunning is the crossing's closed state; the client moves the arm (GateArm).
     /// </summary>
     private void SpawnGates(MapManager maps, string mapId, Crossing c)
     {
@@ -218,10 +196,6 @@ public sealed class CrossingSystem
         }
     }
 
-    /// <summary>
-    /// Whether the road at this point is being held. Asked by VehicleSystem for a stop of kind
-    /// "crossing", which is the whole of how traffic learns about trains.
-    /// </summary>
     /// <summary>Where this map's crossings are round a rail track, metres.</summary>
     public IEnumerable<float> PositionsOn(string mapId, string track)
     {
@@ -233,6 +207,10 @@ public sealed class CrossingSystem
         }
     }
 
+    /// <summary>
+    /// Whether the road at this point is being held. Asked by VehicleSystem for a stop of kind
+    /// "crossing", which is the whole of how traffic learns about trains.
+    /// </summary>
     public bool IsClosedAt(string mapId, Vector3 where, float withinMetres = OnTrackMetres)
     {
         foreach (var c in _crossings)
@@ -255,14 +233,12 @@ public sealed class CrossingSystem
             {
                 foreach (var (head, length) in _rail.TrainsOn(mapId, track, out float lapLength))
                 {
-                    // How far the train still has to come. Round the loop, so a train just past
-                    // the crossing is a whole lap away and not a metre behind.
+                    // Round the loop: a train just past is a whole lap away, not a metre behind.
                     float toGo = at - head;
                     if (toGo < 0f) toGo += lapLength;
                     if (toGo <= c.WarningMetres) { wants = true; break; }
-                    // And the tail: still closed until it is clear on the far side. The tail is a
-                    // train's length behind the head; measuring the head against the clearance
-                    // reopened the road with 20 m of a 55 m tram still on it.
+                    // Closed until the tail is clear: measuring the head reopened the road with 20 m
+                    // of a 55 m tram still on it.
                     float past = head - at;
                     if (past < 0f) past += lapLength;
                     if (past <= length + c.ClearMetres) { wants = true; break; }
@@ -277,10 +253,8 @@ public sealed class CrossingSystem
                 if (c.ClosedFor >= MinimumClosedSeconds) c.Closed = false;
             }
 
-            // What the crossing is doing, once a second, for one named by a substring:
-            //   OPENFPS_TRACE_CROSSING=Southgate ./run-server.sh city
-            // A crossing that never closes and one whose bell never reaches the client sound
-            // identical from the pavement, and this tells them apart.
+            // Once a second, for a crossing named by a substring: OPENFPS_TRACE_CROSSING=Southgate.
+            // Tells a crossing that never closes from a bell that never reaches the client.
             if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_CROSSING") is { } tr
                 && c.Name.Contains(tr, StringComparison.OrdinalIgnoreCase))
             {
@@ -311,14 +285,8 @@ public sealed class CrossingSystem
                 if (em.SynthRunning != c.Closed)
                 {
                     em.SynthRunning = c.Closed;
-                    // The DEFINITION has to go out again, and Transform.IsDirty does not do that.
-                    //
-                    // A dirty transform re-sends a STATE message — a position and a velocity. The
-                    // emitter, with SynthRunning on it, lives in the definition, and definitions
-                    // are sent once per entity per client unless something asks for another. So
-                    // the bell rang perfectly on the server, the flag flipped every time, and the
-                    // client was still holding the definition it was handed at map load, in which
-                    // the bell was silent. Nothing failed; the news simply never left the building.
+                    // The definition must go out again: a dirty transform sends only position and
+                    // velocity, and without this the bell rang on the server and nowhere else.
                     _resendDefinition?.Invoke(c.Bell.Id);
                 }
             }
@@ -342,8 +310,7 @@ public sealed class CrossingSystem
 
     /// <summary>
     /// This map's crossings as the rails lie across the road: the middle of the track at each, from the
-    /// rail line itself rather than the declared point, and the direction the rails run there. What a
-    /// client needs to put a tyre's thump on each rail and a crossing in a driver's path.
+    /// rail line rather than the declared point, and the direction the rails run there.
     /// </summary>
     public IEnumerable<CrossingRails> Rails(string mapId)
     {

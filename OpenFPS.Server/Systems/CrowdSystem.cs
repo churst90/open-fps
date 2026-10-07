@@ -6,22 +6,16 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// People reacting to what goes past them.
-///
-/// The crowd is a SOURCE, not a bed. It has a place, so a listener can tell which way the grandstand
-/// is; it has a size, so they can tell how full it is; and it only makes a noise when something
-/// happens, because a crowd that is always making a noise is an ambience loop wearing a hat.
-///
-/// What it reacts to is deliberately not "a car": it is anything moving fast enough, close enough, to
-/// be worth reacting to. A crowd that knew what a car was would need teaching about the next thing
-/// somebody puts on a track.
+/// Crowds reacting to what goes past them. A crowd is a source, not a bed: it has a place and a size,
+/// and it only makes a noise when something happens. It reacts to anything with a velocity that is
+/// fast and close enough, not to "a car".
 /// </summary>
 public static class CrowdSystem
 {
     /// <summary>Below this a thing going past is not an event. 25 m/s is 90 km/h.</summary>
     public const float NoticeableSpeed = 25f;
 
-    /// <summary>How much of the crowd is actually clapping. Even a good pass does not get everybody.</summary>
+    /// <summary>The least share of a crowd that claps at anything it reacts to.</summary>
     public const float ParticipationFloor = 0.25f;
 
     /// <summary>When each crowd last reacted, by map and entity id: every map is its own world, and
@@ -36,8 +30,6 @@ public static class CrowdSystem
             (Entity e, ref Transform t, ref CrowdComponent c) => crowds.Add((e.Id, t.Position, c)));
         if (crowds.Count == 0) return;
 
-        // What is going past, and how fast. Anything with a velocity counts — the crowd does not know
-        // what a car is and should not have to.
         var movers = new List<(Vector3 At, float Speed)>();
         world.Query(new QueryDescription().WithAll<Transform, Velocity>(), (Entity e, ref Transform t, ref Velocity v) =>
         {
@@ -62,24 +54,20 @@ public static class CrowdSystem
             }
             if (near == 0) continue;
 
-            // How worked up they are: more things at once and faster is more of an event. Both
-            // saturate, because a crowd has a ceiling and it is not very high.
+            // More things at once and faster is more of an event; both saturate.
             float density = MathF.Min(1f, near / 6f);
             float pace = MathF.Min(1f, (fastest - NoticeableSpeed) / 45f);
             float intensity = Math.Clamp(0.25f + 0.45f * density + 0.4f * pace, 0f, 1f);
 
-            // ...and how many of them bother. A quiet moment gets a quarter of the stand; something
-            // worth watching gets most of it.
             int clapping = Math.Max(1, (int)(c.People * (ParticipationFloor + (1f - ParticipationFloor) * intensity)));
 
             _lastReaction[(mapId, id)] = now;
-            // Quantised, because a rendered crowd is a cached BUFFER and two crowds whose numbers
-            // differ by a person are the same sound. Unquantised, every reaction on the speedway was a
-            // fresh render and a fresh sound registered with the mixer — ninety a minute, for ever.
+            // Quantised: a rendered crowd is a cached buffer, and unquantised every reaction on the
+            // speedway was a fresh render registered with the mixer, ninety a minute, for ever.
             react(id, at, Applause.Quantise(new CrowdApplause(clapping, intensity, 2.0f + 2.5f * intensity)));
         }
     }
 
-    /// <summary>Forgets when each crowd last reacted — for a map being torn down or reloaded.</summary>
+    /// <summary>Forgets when each crowd last reacted, for a map torn down or reloaded.</summary>
     public static void Reset() => _lastReaction.Clear();
 }

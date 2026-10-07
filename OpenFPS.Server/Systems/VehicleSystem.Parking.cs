@@ -46,13 +46,9 @@ internal sealed class ParkState
 }
 
 /// <summary>
-/// Somebody parking, going in somewhere, and coming back.
-///
-/// Every sound in it is one the world already makes for its own reasons: the engine running down
-/// because it has been switched off, a car door that is the same steel-skin-and-seal door a player's
-/// car has, footsteps because a body is walking, a building's door because it was opened. What is new
-/// is only the order a person does them in. Where it can happen is found from the map, not placed:
-/// a stretch of road with a street-level door beside it and nothing solid in between.
+/// Somebody parking, going in somewhere, and coming back. Every sound is one the world already makes
+/// (engine off, car door, footsteps, a building's door); only the order is new. The places are found
+/// from the map: a street-level door beside a route with nothing solid between.
 /// </summary>
 public sealed partial class VehicleSystem
 {
@@ -77,9 +73,9 @@ public sealed partial class VehicleSystem
     // ── Finding the places ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Every street-level door each car's route passes within a few metres of, on the kerb side,
-    /// with a clear walk between them. Done once, a couple of seconds in, because a building's door is
-    /// one of its parts and has no world position until the parts have been placed.
+    /// Every street-level door each car's route passes within a few metres of, on the kerb side, with a
+    /// clear walk between. Done once, a couple of seconds in: a building's door has no world position
+    /// until its parts are placed.
     /// </summary>
     private void FindSpots(string mapId, World world)
     {
@@ -261,9 +257,8 @@ public sealed partial class VehicleSystem
                 if (Walk(world, pk, dt)) { pk.Clock = 0f; pk.Step++; }
                 break;
             case 6 when pk.Clock >= 1.0f:                      // shut it behind them, and they are in
-                // As they found it: a door somebody else had open stays open, and nobody shuts a
-                // door on a person standing in it. A rider once shut Brandt Court's front door on
-                // Cody, who had opened it, and the street went to the shut-door level (2026-10-02).
+                // As they found it, and never on a person standing in it: a rider once shut a door
+                // Cody had opened (2026-10-02).
                 if (!pk.FoundOpen && !ClosesItself(world, pk.Spot.Door) && !SomeoneAt(world, pk.Spot.Door))
                     DoorSystem.Set(world, pk.Spot.Door, false, who: pk.Driver);
                 RemovePerson(v, pk);
@@ -368,11 +363,9 @@ public sealed partial class VehicleSystem
     private void Say(DemoVehicle v, string label, IReadOnlyList<TransientSound> sounds)
         => Heard?.Invoke(v.MapId, v.Entity.Id, label, sounds);
 
-    /// <summary>A lot of cars answer the lock button with a touch of the horn.</summary>
     /// <summary>
-    /// A factory alarm: the car's own horn, pulsed half a second on and half off, for about twenty-
-    /// five seconds, which is how most of them sound — the horn you already know that car by, not a
-    /// siren from somewhere else. Only a car standing empty at the kerb.
+    /// A factory alarm: the car's own horn, pulsed half a second on and half off for about twenty-five
+    /// seconds. Only a car standing empty at the kerb.
     /// </summary>
     internal static float[] AlarmPattern(Random rng)
     {
@@ -382,6 +375,7 @@ public sealed partial class VehicleSystem
         return p;
     }
 
+    /// <summary>A lot of cars answer the lock button with a touch of the horn.</summary>
     private void ChirpLock(World world, DemoVehicle v)
     {
         if (v.Horn.Length == 0) return;

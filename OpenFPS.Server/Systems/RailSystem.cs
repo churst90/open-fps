@@ -9,19 +9,11 @@ using Serilog;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// Trains on a map's rail tracks.
-///
-/// A train is the one physical model that is not one pressure at one point: it is a line of
-/// bogies, drives and a body drum spread over the length of the consist (docs/TRAINS.md). So a
-/// train here is not one entity but one per sound source, each placed by sampling the track at
-/// <c>head − along</c> — which is what makes a 55 m set wrap a 26 m corner correctly, where a
-/// straight line behind the head would put the tail through the buildings. The client runs ONE
-/// synth for the whole train and gives each entity the source its index names; the SoundId carries
-/// that index: "rail:&lt;preset&gt;/&lt;train&gt;/&lt;index&gt;". The order is <see cref="TrainLayout"/>'s,
-/// and it is the client's too.
-///
-/// Speed comes from the track the way a car's does: the curvature at each point sets a limit, the
-/// brakes pull it down ahead of the corner, and the head accelerates toward it. Nothing scripts it.
+/// Trains on a map's rail tracks (docs/TRAINS.md). A train is one entity per sound source, each
+/// placed by sampling the track at <c>head − along</c> so a long set follows a corner. The client runs
+/// one synth per train and gives each entity the source its SoundId names,
+/// "rail:&lt;preset&gt;/&lt;train&gt;/&lt;index&gt;", in <see cref="TrainLayout"/>'s order on both sides.
+/// Speed comes from the track's curvature and the brakes, as a car's does.
 /// </summary>
 public sealed class RailSystem
 {
@@ -37,9 +29,7 @@ public sealed class RailSystem
         /// <summary>Head to tail, metres: the sum of the vehicles' lengths.</summary>
         public float LengthMetres;
 
-        /// <summary>Platforms on this route, in order round it. Same description a bus stop uses:
-        /// a train halting at a platform and a bus halting at a kerb are the same fact about a
-        /// route, and the sounds are each vehicle's own.</summary>
+        /// <summary>Platforms on this route, in order round it, described as a bus stop is.</summary>
         public (float At, float Dwell, string Kind)[] Stops = System.Array.Empty<(float, float, string)>();
         public int NextStop;
         public float DwellLeft;
@@ -183,9 +173,8 @@ public sealed class RailSystem
         foreach (var tr in _trains)
         {
             if (tr.MapId != mapId) continue;
-            // Standing at a platform. Held at a dead stop, because everything a stopped train
-            // makes — the brakes blowing off, the compressor catching up, the doors — is read off
-            // its speed being zero and staying there.
+            // At a platform: held at exactly zero, because the brakes, compressor and doors are read
+            // off the speed staying there.
             if (tr.DwellLeft > 0f)
             {
                 tr.DwellLeft -= dt;
@@ -203,12 +192,8 @@ public sealed class RailSystem
             // The slowest of the whole stretch ahead, not its far end: see RaceLine.SlowestWithin.
             float want = MathF.Min(tr.TopSpeed, tr.Line.SlowestWithin(tr.Head, lookahead));
 
-            // Coming up on a platform. A train's braking rate is a tenth of a car's and its
-            // approach is correspondingly long — which is most of why a train arriving sounds
-            // like an event rather than like a vehicle turning up.
-            // Until it has run clear of the stop it just left, which on a line with one stop is the
-            // next stop too: standing within a metre and a half of it at zero speed, it would start
-            // dwelling again and never leave.
+            // Coming up on a platform, once clear of the one it just left: on a line with one stop
+            // that is the next stop too, and it would dwell there for ever.
             if (tr.Stops.Length > 0 && tr.SinceStop > StopClearMetres)
             {
                 float d = tr.Stops[tr.NextStop].At - tr.Head;
@@ -243,8 +228,7 @@ public sealed class RailSystem
 
     /// <summary>
     /// The first stop at or ahead of a place round the line: where a train put there stops first.
-    /// Index 0 for every train ran one placed past the first platform a lap round to it, through
-    /// every platform on the way.
+    /// Not index 0, or a train placed past the first platform runs a lap through every other one.
     /// </summary>
     private static int FirstStopAhead((float At, float Dwell, string Kind)[] stops, float head)
     {
@@ -256,11 +240,8 @@ public sealed class RailSystem
 
     /// <summary>
     /// Long, long, short, long for every level crossing ahead, begun eighteen seconds out and held
-    /// until the train is on it — the pattern every North American train sounds, and the reason a
-    /// listener hears the train before the bells have told them anything — with the bell rung until
-    /// the crossing is reached. Worked out here because this is where the train's speed and the
-    /// distance to the crossing are both known; sounded on the train's own horn (or whistle) and bell,
-    /// which the client's synth for the train plays from where they are on it (TrainSignal).
+    /// until the train is on it, with the bell rung until then. Sounded on the train's own horn (or
+    /// whistle) and bell, which the client's synth plays from where they are on it (TrainSignal).
     /// </summary>
     private void SoundForCrossings(Consist tr, World world)
     {
@@ -295,10 +276,8 @@ public sealed class RailSystem
     }
 
     /// <summary>
-    /// Puts every source of a consist where its own place in the train says it is. Factored out
-    /// because a train standing at a platform still has to be PLACED — it is not moving, but its
-    /// bogies, its compressor and its brakes are all still somewhere, and a stopped train that
-    /// stopped being positioned would stop being audible.
+    /// Puts every source of a consist where its place in the train says it is. A standing train is
+    /// placed too, or it stops being audible.
     /// </summary>
     private static void PlaceConsist(Consist tr, World world)
     {
@@ -309,10 +288,8 @@ public sealed class RailSystem
             tr.Line.Sample(tr.Head - tr.Along[i], out var pos, out float heading, out _);
             ref var t = ref world.Get<Transform>(e);
             ref var vel = ref world.Get<Velocity>(e);
-            // The source's own height above the rail, wherever the rail goes. This used to be read
-            // back off the transform as "the old height less the rail's height here" and added to
-            // the rail's height, which is the old height again: on a slope the source stayed where
-            // it had been until it was six metres out.
+            // From the declared height, never read back off the transform: that kept a source at its
+            // old height on a slope until it was six metres out.
             pos.Y += tr.Heights[i];
             t.Position = pos;
             t.Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
@@ -322,9 +299,8 @@ public sealed class RailSystem
     }
 
     /// <summary>
-    /// The distinct rail lines on a map, by track id — so anything that needs to know where a
-    /// railway RUNS can ask the system that owns it rather than re-reading the map and building a
-    /// second copy of the same geometry. Two copies of a track is two things to get out of step.
+    /// The distinct rail lines on a map, by track id: ask here rather than build a second copy of a
+    /// track that can get out of step.
     /// </summary>
     public IEnumerable<(string Track, RaceLine Line)> Lines(string mapId)
     {
@@ -354,9 +330,8 @@ public sealed class RailSystem
     }
 
     /// <summary>
-    /// Each train on a line: how far round its leading end is, and how long it is, metres. Both,
-    /// because a crossing starts ringing for the front of a train and stops ringing for the back of
-    /// it, and those are a train's length apart.
+    /// Each train on a line: how far round its leading end is, and how long it is, metres. A crossing
+    /// rings from the front of a train to the back of it.
     /// </summary>
     public List<(float Head, float Length)> TrainsOn(string mapId, string track, out float lapLength)
     {

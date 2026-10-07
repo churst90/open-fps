@@ -11,18 +11,14 @@ using static OpenFPS.Common.PhysicsConstants;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// Authoritative system responsible for calculating entity movement.
-/// Uses a stateless SharedMovementEngine to ensure deterministic parity with the client.
-/// Optimized for zero-allocation performance and sub-tick input precision.
+/// Moves players from their queued inputs, through the same SharedMovementEngine the client predicts with.
 /// </summary>
 public static class MovementSystem
 {
     private static MapManager _maps = null!;
 
-    // The tick runs on one thread; these are reused across every player and every sub-tick input so the
-    // collision gather allocates nothing. CollectInRadius also walks the grid cells once and yields each
-    // obstacle once — the previous Count()-then-foreach walked them twice, and a wall spanning four cells
-    // was copied into the collider array four times, quadrupling the work the physics step then did.
+    // Tick thread only: reused for every player and input so the collision gather allocates nothing.
+    // CollectInRadius yields each obstacle once; a wall spanning four cells was once copied in four times.
     private static readonly List<Entity> _nearbyScratch = new(64);
     private static readonly HashSet<Entity> _nearbySeen = new();
     private static readonly List<OpenFPS.Common.Geometry.SolidRef> _solidScratch = new(32);
@@ -32,9 +28,8 @@ public static class MovementSystem
     private static readonly Dictionary<string, DateTime> _lastFlingLog = new();
 
     /// <summary>
-    /// Says so when a player on foot is moved across the ground faster than anybody can run. Cody,
-    /// 2026-10-04: Sean, on a roof beside him, was half a kilometre west at the map's edge 46 s later,
-    /// and nothing the server logged said how. Once a second at most, with where and what it had to go on.
+    /// Logs a player on foot moved faster than anybody can run, at most once a second. Cody, 2026-10-04:
+    /// Sean went from a roof to the map's edge, half a kilometre, and nothing in the log said how.
     /// </summary>
     private static void NoteFling(string user, Vector3 from, Vector3 to, float dt,
                                   ClientInputUpdate input, float groundY, int colliders)
@@ -50,8 +45,8 @@ public static class MovementSystem
                     user, flat, from, to, input.MoveDirection, input.Jump, groundY, colliders);
     }
 
-    /// <summary>A yaw turned by a look input, kept within one turn.</summary>
-    // In double: a huge finite look times the turn rate overflows a float to infinity, and the yaw to NaN.
+    /// <summary>A yaw turned by a look input, kept within one turn. In double: a huge finite look times
+    /// the turn rate overflows a float to infinity, and the yaw to NaN.</summary>
     private static float Turned(float yaw, float look, float dt)
         => (float)Math.IEEERemainder(yaw - (double)look * RotationSpeed * dt, 2.0 * Math.PI);
 
@@ -68,28 +63,24 @@ public static class MovementSystem
             mapGravity = zone.Gravity;
         });
 
-        // Add a safety buffer below the map minimum to allow for natural falls before respawn.
+        // A margin below the map's floor, so a fall is not cut short by the respawn.
         float voidThreshold = mapMinimumY - 5.0f;
 
         world.Query(new QueryDescription().WithAll<PlayerComponent, Transform, Velocity, MaterialComponent>(), (Entity e, ref PlayerComponent player, ref Transform transform, ref Velocity velocity, ref MaterialComponent material) =>
         {
             if (!sessions.TryGetSession(player.ConnectionId, out var session)) return;
 
-            // Sub-tick simulation with a real-time budget. The tick grants exactly one tick of
-            // simulated time (plus a small backlog for lag), and each input spends what it claims.
-            // Inputs that outrun the budget stay queued for a later tick rather than being
-            // integrated now, which is what closes the "send inputs faster than real time" speed
-            // hack: extra packets buy latency, never distance.
+            // Each tick grants one tick of simulated time (plus a small backlog) and each input spends
+            // what it claims; inputs beyond the budget wait for a later tick. That closes the speed hack
+            // of sending inputs faster than real time: extra packets buy latency, never distance.
             session.InputBudget = MathF.Min(session.InputBudget + dt, FixedDeltaTime * MaxInputBudgetTicks);
 
             int processedInputs = 0;
             while (processedInputs < MaxInputsPerTick && session.InputQueue.TryPeek(out var next))
             {
-                // The client's claimed step is advisory: clamped. An input the budget cannot pay for
-                // IN FULL stays queued. It used to be trimmed to what was left and acknowledged, so
-                // the rest of that step was simply lost — and rounding left a sliver of budget after
-                // every whole tick's worth, so a second input arriving in the same tick was taken for
-                // almost no time and the client, which had predicted all of it, was pulled back.
+                // The client's claimed step is clamped. An input the budget cannot pay for in full stays
+                // queued: trimmed to the budget, the rest of the step was lost and the client, which had
+                // predicted all of it, was pulled back.
                 float stepDt = next.DeltaTime > 0f ? MathF.Min(next.DeltaTime, MaxInputDeltaTime) : dt;
                 if (stepDt > session.InputBudget + 1e-5f) break;
                 session.InputQueue.TryDequeue(out var input);
@@ -97,30 +88,21 @@ public static class MovementSystem
                 session.LastProcessedSequenceId = input.SequenceId;
                 session.InputBudget = MathF.Max(0f, session.InputBudget - stepDt);
 
-                // 0. SITTING DOWN
-                //
-                // An occupant's body is not theirs to move. The seat owns where they are — OccupancySystem
-                // puts them in it once everything that could have moved the vehicle has run — so none of
-                // the walking below applies: no input direction, no gravity, no ground probe, no
-                // collision gather. Two things are still theirs. Where they are LOOKING, always; and in a
-                // control seat, what the thing they are sitting in is being asked to do. That second one
-                // is the whole of driving, and it is deliberately fed from the same input queue, budget
-                // and sequence numbering as walking: a driver cannot outrun the speed limiter by sending
-                // packets faster any more than a pedestrian can.
-                // 0. DEAD: the body lies where it fell until it is got up again at the spawn. The input
-                // is still taken and acknowledged, so the client is not left waiting on it; it just
-                // moves nothing.
+                // Dead or frozen: the input is still acknowledged, so the client is not left waiting,
+                // but it moves nothing.
                 if (world.Has<DeadComponent>(e))
                 {
                     velocity.Linear = Vector3.Zero;
                     continue;
                 }
-                // FROZEN by the admin gun: held where they stand, as the dead are, until it wears off.
                 if (world.Has<OpenFPS.Server.Core.FrozenComponent>(e))
                 {
                     velocity.Linear = Vector3.Zero;
                     continue;
                 }
+                // Seated: the seat owns the body (OccupancySystem places it after the vehicles move), so
+                // only the look and, in a control seat, the controls are theirs. Driving comes through
+                // this same input budget, so a driver cannot outrun it by sending packets faster either.
                 if (world.Has<OccupantComponent>(e))
                 {
                     if (input.LookDelta != Vector2.Zero)
@@ -140,7 +122,6 @@ public static class MovementSystem
                     continue;
                 }
 
-                // 1. VOID CHECK (Safety Net)
                 if (transform.Position.Y < voidThreshold)
                 {
                     Log.Warning("MovementSystem: Player {User} fell into void at Y={Y}. Respawning.", player.Username, transform.Position.Y);
@@ -150,15 +131,13 @@ public static class MovementSystem
                     velocity.Linear = Vector3.Zero;
                     transform.IsDirty = true;
                     
-                    // CLEAR INPUT QUEUE: After a respawn, we discard the rest of the sub-tick inputs
-                    // to prevent the player from instantly walking away from the spawn point 
-                    // before the client acknowledges the teleport.
+                    // The rest of the queue goes, or the player walks off the spawn point before the
+                    // client has acknowledged the teleport.
                     while (session.InputQueue.TryDequeue(out _)) { }
                     session.GroundProbe.Invalidate(); // the remembered floor is at the old position
                     break; 
                 }
 
-                // 2. ROTATION
                 if (input.LookDelta != Vector2.Zero)
                 {
                     player.Yaw = Turned(player.Yaw, input.LookDelta.X, stepDt);
@@ -167,9 +146,8 @@ public static class MovementSystem
                     transform.IsDirty = true;
                 }
 
-                // The floor's material is the floor's: it used to be written into the player's own
-                // MaterialComponent, so a person on a concrete roof WAS concrete to anything that met
-                // them. Nothing read it as the floor; footsteps probe the ground themselves.
+                // Never write the floor's material into the player's: a person on a concrete roof was
+                // concrete to anything that met them. Footsteps probe the ground themselves.
                 float groundY = PhysicsUtils.GetGroundHeight(world, grid, transform.Position, ref session.GroundProbe, out _);
 
                 Vector3 inputDir = Vector3.Zero;
@@ -182,8 +160,7 @@ public static class MovementSystem
                     inputDir = Vector3.Transform(move, Quaternion.CreateFromYawPitchRoll(player.Yaw, 0, 0));
                 }
 
-                // 3. COLLISION GATHERING
-                // With a triangle world, the static solids come from it (GatherSolids, below) and the grid
+                // With a triangle world the static solids come from it (GatherSolids, below) and the grid
                 // is asked only for what moves and the statics the triangles do not hold.
                 var geometry = OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
                 if (geometry != null) grid.CollectDynamicInRadius(transform.Position, CollisionSearchRadius, _nearbyScratch, _nearbySeen);
@@ -230,7 +207,6 @@ public static class MovementSystem
                         MapMax = mapMax
                     };
 
-                    // 4. PHYSICS STEP
                     var obstacles = new SharedMovementEngine.Obstacles(collidersSlice);
                     if (geometry != null)
                     {
@@ -259,10 +235,8 @@ public static class MovementSystem
         });
     }
 
-    /// <summary>
-    /// Checks if a cylinder at 'pos' with 'radius' and 'height' overlaps with any solid geometry in the world.
-    /// Used by server commands for safe teleportation.
-    /// </summary>
+    /// <summary>Whether a body-sized cylinder standing at <paramref name="pos"/> overlaps anything solid:
+    /// the check before a teleport.</summary>
     public static bool CheckCollision(World world, SpatialGrid<Entity> grid, Vector3 pos, float radius, float height, Entity? ignoreEntity = null)
     {
         float footPadding = 0.4f;
@@ -273,7 +247,6 @@ public static class MovementSystem
         var geometry = OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
         if (geometry != null)
         {
-            // The static solids from the triangle world; the grid for what moves and what it does not hold.
             var near = new List<OpenFPS.Common.Geometry.SolidRef>();
             var filter = new OpenFPS.Common.Geometry.ExceptOwners(ignoreEntity?.Id ?? int.MinValue);
             var reach = new Vector3(radius, checkHeight * 0.5f, radius);

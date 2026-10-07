@@ -95,10 +95,8 @@ public sealed partial class VehicleSystem
 
     // ── Following, by lane ─────────────────────────────────────────────────────────────────────
     //
-    // Vehicles on different tours share lanes, so who is in front is a question about the lane, not
-    // the tour. Each is filed under the lane its tour has it on (or heading into, while it is still
-    // in the junction before it), with how far along; the one in front is the next along that lane,
-    // or the last on the next lane of its own tour.
+    // Tours share lanes, so who is in front is asked of the lane: each vehicle is filed under the lane
+    // it is on (or heading into from the junction before it), with how far along.
 
     private readonly Dictionary<(string Map, int Segment), List<(DemoVehicle V, float Along)>> _onSegment = new();
 
@@ -117,11 +115,9 @@ public sealed partial class VehicleSystem
     }
 
     /// <summary>
-    /// Which leg of its route a vehicle is on, and how far along that lane it is, measured from where
-    /// it actually is. Distance round its own route is not good enough: the line it drives is smoothed,
-    /// which shortens corners more than straights, so two vehicles on different routes would disagree
-    /// by metres about who is in front on a lane they share. Negative while still in the junction
-    /// before the lane: the distance to the lane's first point.
+    /// Which leg of its route a vehicle is on, and how far along that lane, measured from where it is:
+    /// distance round the smoothed line differs by metres between routes sharing a lane. Negative while
+    /// still in the junction before the lane.
     /// </summary>
     private static (int Leg, float Along) WhereOnLane(DemoVehicle v)
     {
@@ -143,8 +139,7 @@ public sealed partial class VehicleSystem
             float d = route.Legs[li].From - route.Legs[leg].From;
             return d < 0f ? d + route.Length : d;
         }
-        // Whatever left this lane into the junction ahead is in front of it, wherever it is turning; but
-        // only when nothing is between them on the lane itself.
+        // Whatever left this lane into the junction ahead is in front, unless something on the lane is nearer.
         var lane = route.Legs[leg].Segment;
         bool clearToTheLine = !_onSegment.TryGetValue((v.MapId, lane.Index), out var onLane)
                               || !onLane.Any(x => x.V != v && (x.Along > along || (x.Along == along && x.V.Entity.Id < v.Entity.Id)));
@@ -172,8 +167,7 @@ public sealed partial class VehicleSystem
                 foreach (var (o, a) in list)
                 {
                     if (o == v) continue;
-                    // Behind it, or dead level: level, the one with the lower id leads, so that two
-                    // that arrive side by side do not both decide the other is not in front.
+                    // Dead level, the lower id leads, or two side by side both think the other is behind.
                     if (k == 0 && (a < along || (a == along && o.Entity.Id > v.Entity.Id))) continue;
                     if (a < leadAlong) { leadAlong = a; lead = o; }
                 }

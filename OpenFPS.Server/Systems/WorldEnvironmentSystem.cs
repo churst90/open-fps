@@ -6,14 +6,9 @@ using Serilog;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// Authoritatively simulates game time, seasons, and atmospheric weather.
-///
-/// What this owns is <b>sky</b>: time of day, season, temperature, humidity, precipitation, and the
-/// sustained wind plus its gustiness. Those are the same everywhere on the server, so one instance
-/// drives every map. What it deliberately does NOT own is the two properties that belong to a
-/// <i>place</i> rather than to the weather — air pressure (altitude) and the authored air-absorption
-/// multiplier. Those come off the map's zone and are overlaid per map when the state is broadcast;
-/// see <see cref="GetStateForMap"/>.
+/// Game time, seasons and weather: the sky, one instance for every map. What belongs to a place (air
+/// pressure, air absorption, a map's offsets and held sky) is overlaid per map in
+/// <see cref="GetStateForMap"/>.
 /// </summary>
 public class WorldEnvironmentSystem
 {
@@ -42,10 +37,8 @@ public class WorldEnvironmentSystem
 
     private float _timeMultiplier = 60.0f; // 1 real second = 1 game minute
 
-    // Scenario targets. Temperature is expressed as an OFFSET from the seasonal/daily curve plus an
-    // optional ceiling, not as an absolute target: the previous `_targetTemp -= 2` both never reached
-    // the temperature (nothing read the field) and compounded — two rain fronts in a row would have
-    // cooled the world by 4 degrees and never given them back.
+    // Scenario targets. Temperature is an offset from the seasonal and daily curve plus an optional
+    // ceiling, so two fronts in a row do not compound.
     private float _targetHumidity = BaselineHumidity;
     private float _targetPrecipitation = 0.0f;
     private Vector3 _targetWind = new Vector3(2.0f, 0.0f, 1.0f);
@@ -61,9 +54,8 @@ public class WorldEnvironmentSystem
     /// the same pattern by the same amount and hears the same gust at the same tree.</summary>
     private double _travelEast, _travelNorth;
 
-    /// <summary>How much faster than a front the weather moves after somebody set it by hand. A front
-    /// takes a minute to arrive; a tester who has typed /weather storm wants to hear it within
-    /// seconds, and still without a step.</summary>
+    /// <summary>How much faster than a front the weather moves when set by hand: seconds rather than a
+    /// minute, still without a step.</summary>
     private float _weatherRate = 1f;
     private const float SetByHandRate = 5f;
 
@@ -114,17 +106,9 @@ public class WorldEnvironmentSystem
     }
 
     /// <summary>
-    /// Pins the weather from OPENFPS_WEATHER, and stops fronts rolling in while it is set.
-    ///
-    /// Weather is not decoration here: precipitation and temperature swap the material under the
-    /// player's feet (see SoundMappingService — rain turns Concrete into Wet_Concrete, freezing turns
-    /// everything into Snow). That is correct, and it is also the last thing you want happening on its
-    /// own in the middle of testing something else, because the ground changing underfoot reads as a
-    /// bug in whatever you were actually listening to.
-    ///
-    ///     OPENFPS_WEATHER=Clear   ./run-server.sh
-    ///
-    /// Accepts any WeatherType name — Clear, Rain, Snow, Storm. Unset, the weather rolls as before.
+    /// Pins the weather from OPENFPS_WEATHER (any WeatherType name: OPENFPS_WEATHER=Clear ./run-server.sh)
+    /// and stops fronts rolling in. Weather changes the ground underfoot, which reads as a bug in
+    /// whatever else is being listened to.
     /// </summary>
     private void ApplyPinnedWeather()
     {
@@ -156,44 +140,35 @@ public class WorldEnvironmentSystem
             if (_env.DayOfYear > 365) _env.DayOfYear = 1;
         }
 
-        // --- SEASONAL CALCULATION ---
-        // Seasonal Temperature: 15C base, +/- 20C variance over the year.
-        // Deep winter around day 355 (late Dec), Peak summer around day 172 (late June)
+        // 15 C plus or minus 20 over the year: summer peaks at day 172, winter at day 355.
         float seasonalFactor = (float)Math.Cos((_env.DayOfYear - 172.0f) / 365.0f * Math.PI * 2.0f);
         float seasonalBaseTemp = 15.0f + (seasonalFactor * 20.0f);
 
-        // --- DAILY CALCULATION ---
-        // Daily Temperature Cycle (Coldest at 4AM, Hottest at 2PM)
+        // Plus or minus 5 C over the day: coldest at 2 AM, hottest at 2 PM.
         float dailyFactor = (float)Math.Sin((_env.GameTime - 8.0f) / 24.0f * Math.PI * 2.0f);
 
-        // --- SCENARIO ---
-        // The front's contribution: rain cools, a storm cools harder, snow caps the air below freezing.
         float targetTemp = seasonalBaseTemp + (dailyFactor * 5.0f) + _scenarioTempOffset;
         if (targetTemp > _scenarioTempCeiling) targetTemp = _scenarioTempCeiling;
 
-        // --- WEATHER INTERPOLATION ---
         _env.Temperature = MathHelper.Lerp(_env.Temperature, targetTemp, dt * 0.1f);
         float rate = dt * _weatherRate;
         _env.Humidity = MathHelper.Lerp(_env.Humidity, _targetHumidity, MathF.Min(1f, rate * 0.05f));
         _env.PrecipitationIntensity = MathHelper.Lerp(_env.PrecipitationIntensity, _targetPrecipitation, MathF.Min(1f, rate * 0.02f));
         _env.WindVelocity = Vector3.Lerp(_env.WindVelocity, _targetWind, MathF.Min(1f, rate * 0.05f));
-        // Gustiness used to be assigned straight onto the state, so a front snapped the air from calm to
-        // a gale between one tick and the next. It fades like everything else it travels with.
+        // Gustiness fades too: set straight, a front snapped calm to a gale in one tick.
         _env.WindGustiness = MathHelper.Lerp(_env.WindGustiness, _targetGustiness, MathF.Min(1f, rate * 0.05f));
 
-        // The air carries the eddy pattern on at the wind it has now.
         var (carryEast, carryNorth) = WindField.Carry(_env.WindVelocity.X, _env.WindVelocity.Z);
         _travelEast += carryEast * (double)dt;
         _travelNorth += carryNorth * (double)dt;
 
-        // Check for Freezing (affects precipitation type). Rain asked for by hand at a rate stays rain.
+        // Freezing turns rain to snow; rain asked for by hand stays rain.
         if (_env.Temperature < 0 && _currentScenario == WeatherType.Rain && _held == null)
         {
             Log.Information("WorldEnvironment: Rain turning to Snow due to freezing temperatures.");
             SetScenario(WeatherType.Snow);
         }
 
-        // Random Weather Fronts (Simplified Scenario Engine)
         if (FrontProbabilityPerTick > 0 && _random.NextDouble() < FrontProbabilityPerTick)
         {
             var next = (WeatherType)_random.Next(0, 4);
@@ -338,11 +313,7 @@ public class WorldEnvironmentSystem
     /// <summary>How far the air has carried the eddy pattern, metres east and north.</summary>
     public (double East, double North) WindTravel => (_travelEast, _travelNorth);
 
-    /// <summary>
-    /// Sets the world clock. The season is the largest single term in the temperature curve — day 1 is
-    /// deep winter and day 172 is high summer — so anything reasoning about the weather (an admin
-    /// command, a test) needs to be able to say when it is.
-    /// </summary>
+    /// <summary>Sets the world clock; the season is the largest term in the temperature curve.</summary>
     public void SetDate(float gameTimeHours, int dayOfYear)
     {
         _env.GameTime = Math.Clamp(gameTimeHours, 0f, 23.999f);
@@ -362,14 +333,9 @@ public class WorldEnvironmentSystem
     public WorldEnvironmentComponent GetCurrentState() => _env;
 
     /// <summary>
-    /// The world state as it is experienced on one map: the global weather, with the map's own
-    /// physical properties overlaid.
-    ///
-    /// A map's authored <c>Temperature</c> / <c>Humidity</c> are read as offsets from the baselines
-    /// (<see cref="BaselineTemperature"/> / <see cref="BaselineHumidity"/>), so a map that authors
-    /// nothing behaves exactly as the global sim while a map authored at 35 C stays 15 degrees hotter
-    /// than the season all year. <c>AirPressure</c> and <c>AirAbsorptionMultiplier</c> are static
-    /// properties of the place and are taken as authored — the sim has no opinion about altitude.
+    /// The world state on one map: the global weather with the map's properties overlaid. Authored
+    /// temperature and humidity are offsets from <see cref="BaselineTemperature"/> and
+    /// <see cref="BaselineHumidity"/>; air pressure and air absorption are taken as authored.
     /// </summary>
     public WorldEnvironmentComponent GetStateForMap(in MapAtmosphere map)
     {
@@ -404,11 +370,7 @@ public class WorldEnvironmentSystem
     };
 }
 
-/// <summary>
-/// The atmospheric properties a map authors, as the environment system reads them. Kept separate
-/// from <c>MapData</c> so the system does not need the whole map record (and so tests can hand it
-/// one without loading a file).
-/// </summary>
+/// <summary>The atmospheric properties a map authors, without the whole map record.</summary>
 public readonly record struct MapAtmosphere(
     float Temperature,
     float Humidity,
@@ -430,7 +392,5 @@ public readonly record struct MapAtmosphere(
         1.0f);
 }
 
-// The local MathHelper that used to live here was a byte-for-byte copy of OpenFPS.Common.MathHelper.Lerp,
-// and being in this namespace it SHADOWED the shared one for every file in OpenFPS.Server.Systems —
-// so anything here reaching for WrapAngle or ToYawPitch found a class with neither. Deleted; the
-// shared one is in scope through `using OpenFPS.Common` above and does the same arithmetic.
+// No MathHelper of its own here: one in this namespace shadowed OpenFPS.Common.MathHelper for every
+// file in OpenFPS.Server.Systems.

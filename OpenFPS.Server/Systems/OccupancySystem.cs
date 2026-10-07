@@ -8,23 +8,12 @@ using Serilog;
 namespace OpenFPS.Server.Systems;
 
 /// <summary>
-/// Carries everybody who is inside something.
+/// Carries everybody who is inside something. Runs last, after every system that could move a root.
 ///
-/// Runs last, after every system that could have moved a root: the seat is where the occupant is,
-/// so the seat has to have finished moving before anyone is put in it.
-///
-/// Two things are carried, and they are carried differently. POSITION belongs to the seat outright —
-/// a passenger does not walk about, so there is nothing of theirs to preserve. HEADING is theirs,
-/// but the rotation of the vehicle is added to it: turn a car ninety degrees and its driver is now
-/// facing ninety degrees further round, having turned their own head not at all. That distinction is
-/// the whole of the difference between a person riding in something and a wall bolted to it, and it
-/// is why occupants are NOT given a <see cref="ParentComponent"/> like the parts are. A wall keeps
-/// no opinion of its own about which way it is pointing.
-///
-/// Adding the delta to the player's own yaw rather than overwriting it is also what makes this
-/// survive the trip to the client: the client reconciles its heading against the server's, so a yaw
-/// the server turned arrives as an ordinary correction and the listener turns with the car. Anything
-/// else would leave a driver hearing the world spin around them through every corner.
+/// Position belongs to the seat. Heading is the occupant's own, with the vehicle's turn added to it,
+/// which is why occupants get no <see cref="ParentComponent"/> as parts do. Adding the turn rather than
+/// overwriting the yaw reaches the client as an ordinary heading correction, so the listener turns with
+/// the car instead of hearing the world spin through every corner.
 /// </summary>
 public sealed class OccupancySystem
 {
@@ -44,8 +33,7 @@ public sealed class OccupancySystem
                 || !world.Has<OccupancyComponent>(root)
                 || !world.Has<Transform>(root))
             {
-                // Whatever they were in has stopped existing. Leave them exactly where it left them —
-                // this is not getting out, it is the floor disappearing.
+                // What they were in is gone: they are put out where it left them.
                 _stranded.Add((e, occupant.RootEntityId));
                 return;
             }
@@ -77,9 +65,8 @@ public sealed class OccupancySystem
             }
             player.IsGrounded = true;
 
-            // A passenger is moving at the speed of what they are in. Anything that reads a player's
-            // velocity — the client's own footstep generation most of all — has to see that rather
-            // than a person standing still at a hundred miles an hour.
+            // A passenger moves at the vehicle's speed; anything reading their velocity (the client's
+            // footsteps most of all) must see that.
             if (world.Has<Velocity>(e) && world.Has<Velocity>(root))
                 world.Get<Velocity>(e).Linear = world.Get<Velocity>(root).Linear;
         });
@@ -115,8 +102,7 @@ public sealed class OccupancySystem
             Log.Information("Entity {Id} was put out: composite {Root} is gone.", occupant.Id, rootId);
         }
 
-        // Remember every carrying root's heading for next tick, and forget the ones that no longer
-        // carry anyone, or this grows for the life of the server.
+        // Rebuilt each tick, so roots that no longer carry anyone are forgotten.
         _headings.Clear();
         var carrying = new QueryDescription().WithAll<OccupantComponent>();
         world.Query(in carrying, (ref OccupantComponent o) =>
