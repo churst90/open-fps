@@ -70,7 +70,15 @@ public sealed class AircraftSynth
     // LandingGearSpec: the wheels are not turning and the runway spins them up.
     private readonly Random? _gearRng;
     private VehicleSynth.TyreVoice _gearVoice;
-    private float _groundSpeed, _wheelSpeed, _spinUpRate, _patchDemand;
+    private float _groundSpeed, _wheelSpeed, _spinUpRate, _patchDemand, _patchSlipVelocity;
+    private VehicleSynth.WheelSquealVoice _gearSqueal;
+    /// <summary>Pascals per unit of the squeal model's output, so a full squeal at the reference slip
+    /// velocity is the tyre's declared <see cref="TyreProfile.SquealDb"/> at a metre (see SquealAnchor).</summary>
+    private readonly float _squealPascals;
+    /// <summary>The slip velocity at which one tyre squeals at its declared level (TyreProfile.SquealDb):
+    /// a tyre at its peak slip ratio at 12 m/s, the road speed the declared squeal levels were set at
+    /// (EngineProcessor.SquealReferenceSpeed).</summary>
+    private const float SquealReferenceSlipVelocity = 12f * RoadWaterLaw.PeakSlip;
     private bool _onGround;
     private const int SlowEvery = 64;
 
@@ -101,7 +109,11 @@ public sealed class AircraftSynth
         }
         if (p.TailRotor != null)
             _tail = new BladeRow(p.TailRotor, rate, Vector3.UnitX, seed + 2);
-        if (p.Gear != null) _gearRng = new Random(seed + 77);
+        if (p.Gear != null)
+        {
+            _gearRng = new Random(seed + 77);
+            _squealPascals = SquealAnchor(p.Gear.Tyre, rate);
+        }
         if (p.Turbine != null)
         {
             var t = p.Turbine;
@@ -167,7 +179,7 @@ public sealed class AircraftSynth
         if (Profile.Gear is not { } g) return;
         _groundSpeed = MathF.Max(0f, groundSpeedMps);
         _wheelSpeed = 0f;                                   // a wheel in the air is not turning
-        _patchDemand = 0f;
+        _patchDemand = 0f; _patchSlipVelocity = 0f;
         _onGround = true;
         // Metres per second of rim speed gained per second, from the wheel and the load on it.
         _spinUpRate = _groundSpeed / MathF.Max(0.001f, g.SpinUpSeconds(_groundSpeed));
@@ -340,15 +352,58 @@ public sealed class AircraftSynth
             // would hold a light single's 57 ms slide for three times as long; it is stood aside here.
             float relax = 1f - MathF.Exp(-_groundSpeed * _dt / MathF.Max(0.05f, g.WheelRadiusMetres));
             _patchDemand += (demand - _patchDemand) * relax;
-            _gearVoice.SlipSmooth = _patchDemand;
+            _patchSlipVelocity += (_groundSpeed * slip - _patchSlipVelocity) * relax;
+            // The sliding, as a car's wheels make it (VehicleSynth.WheelSqueal): tread elements that
+            // stick, deflect and snap back, a squeal at the tread's own note whose power follows the
+            // friction work in the sliding patch, the load on it times how fast it is dragged. On a
+            // runway, as on any dry coherent surface (RoadSurfaces), a tyre sliding flat out keeps
+            // its stick-slip note: the screech. It was made by the axle model before, which on a full
+            // slide gives the note up to a broadband skid (a locked wheel on gravel), and Cody heard
+            // white noise where a touchdown screeches. It is loudest at the instant of contact, when
+            // the rubber is dragged at the whole landing speed, and ends as the wheel comes up to it.
+            _gearSqueal.Demand = _patchDemand;
+            _gearSqueal.SlipVelocity = _patchSlipVelocity;
+            float sliding = VehicleSynth.WheelSqueal(g.Tyre, _patchDemand, _patchSlipVelocity, g.WeightOnWheelsAtTouchdown,
+                                                     SquealReferenceSlipVelocity, 2, _gearRng, ref _gearSqueal,
+                                                     RoadSurfaces.StickSlipOf(RoadSurfaces.IndexOf("Asphalt")), _rate);
+            // The rolling goes out through the tyre's own output stage; the squeal beside it, in
+            // pascals (SquealAnchor). That stage is a soft limit for a car's squeal, and a touchdown,
+            // the tread dragged at the whole landing speed, is far past where it bends: through it the
+            // note was squared off into a band of harmonics (the airliner's line fell from 41 to 26 dB
+            // over the spectrum's median). The voice keeps its own ceiling above.
             // The model works in one tyre; there are several, side by side, and they are not in
             // step with one another, so they add as power.
-            gear = VehicleSynth.Tyre(g.Tyre, _groundSpeed, _patchDemand, _gearRng, ref _gearVoice, sampleRate: _rate)
+            gear = (VehicleSynth.Tyre(g.Tyre, _groundSpeed, 0f, _gearRng, ref _gearVoice, sampleRate: _rate)
+                    + sliding * _squealPascals)
                  * MathF.Sqrt(MathF.Max(1, g.Wheels));
         }
 
         Blades = blades; Jet = jet; Core = core; Engine = engine; Gear = gear;
         Total = blades + jet + core + engine + gear;
+    }
+
+    /// <summary>
+    /// The squeal model's units, measured. VehicleSynth.WheelSqueal is scaled for a car's mix (its
+    /// declared level times a prominence of 15 for the band the engine voice under-weights, and its
+    /// own output stage to keep it in bounds); here it is anchored on what the tyre declares instead:
+    /// a full stick-slip squeal at the reference slip velocity, load and one wheel's share is
+    /// <see cref="TyreProfile.SquealDb"/> at a metre, measured on a probe as BladeRow measures its band.
+    /// What a touchdown adds to that is the friction work alone: the load on the tyre and how fast it
+    /// is dragged.
+    /// </summary>
+    private static float SquealAnchor(TyreProfile tyre, float rate)
+    {
+        var v = new VehicleSynth.WheelSquealVoice();
+        var rng = new Random(7);
+        double sum = 0; int n = 0;
+        for (int i = 0; i < 16384; i++)
+        {
+            v.Demand = 1.2f; v.SlipVelocity = SquealReferenceSlipVelocity;
+            float y = VehicleSynth.WheelSqueal(tyre, 1.2f, SquealReferenceSlipVelocity, 1f, SquealReferenceSlipVelocity, 2, rng, ref v, 1f, rate);
+            if (i >= 4096) { sum += (double)y * y; n++; }
+        }
+        float rms = (float)Math.Sqrt(sum / Math.Max(1, n));
+        return 20e-6f * MathF.Pow(10f, tyre.SquealDb / 20f) / MathF.Max(1e-9f, rms);
     }
 
     /// <summary>Console lines about what was built.</summary>

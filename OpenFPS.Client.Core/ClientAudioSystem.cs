@@ -1348,6 +1348,9 @@ public class ClientAudioSystem
         if (speed > 0.5f) return 0.3f;
         return 0.25f;
     }
+    /// <summary>A piston aeroplane's lever rolling out or taxiing: idle, FlightPower's own floor. A piston
+    /// engine has no reverser, so after touchdown it idles and its tyres are heard.</summary>
+    internal const float GroundIdleLever = 0.06f;
 
     private static (float Lever, float Wake) FlightPower(Vector3 velocity)
     {
@@ -1443,10 +1446,16 @@ public class ClientAudioSystem
     }
 
     private bool OnTheWheels(EntitySnapshot snap, WorldSnapshot world, Vector3 eyePos)
+        => OnTheWheels(snap, world, eyePos, out _);
+
+    /// <summary>...and how high it is over the ground, metres (infinity when that was not asked).</summary>
+    private bool OnTheWheels(EntitySnapshot snap, WorldSnapshot world, Vector3 eyePos, out float height)
     {
         var p = snap.Transform.Position;
+        height = float.PositiveInfinity;
         if (p.Y - eyePos.Y > 60f) return false;
         float groundY = OpenFPS.Common.PhysicsUtils.GetGroundHeight(world, p, snap.Id, out _);
+        height = p.Y - groundY;
         // Its own size sets how close counts: a jet sits five metres up on its gear and a light
         // single one, so the same fraction of length serves both without either being told.
         float sitsAt = 0.15f * (PhysicalAircraft(snap)?.LengthMetres ?? 8f);
@@ -3071,7 +3080,7 @@ public class ClientAudioSystem
                 if (physicalKey.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
                 {
                     (powerLever, rotorWake) = FlightPower(snap.Velocity);
-                    onGround = OnTheWheels(snap, world, eyePos);
+                    onGround = OnTheWheels(snap, world, eyePos, out float height);
                     // On its wheels the climb angle says nothing; what it is doing does. Read off the
                     // speed's change, the same way a train's notch is.
                     float groundSpeed = snap.Velocity.Length();
@@ -3080,6 +3089,17 @@ public class ClientAudioSystem
                         accel = (groundSpeed - was.Speed) / (float)Math.Max(0.02, world.PositionsSampledAt - was.At);
                     _lastAirSpeed[snap.Id] = (groundSpeed, world.PositionsSampledAt);
                     if (onGround) powerLever = GroundPower(groundSpeed, accel);
+                    // A piston aeroplane has no reversers: on the ground it is at idle unless it is
+                    // gathering speed for a takeoff. Coming down within a wingspan of the ground (the
+                    // flare, in ground effect) its throttle is closed, so it arrives at idle and its
+                    // tyres are heard. At approach power over the runway, its exhaust in the squeal's
+                    // band stood within 5 dB of a 109 dB touchdown at a metre; at idle, 10 to 15 dB
+                    // under it. Jets and turboprops keep GroundPower, reversers included.
+                    if (PhysicalAircraft(snap) is { Power: OpenFPS.Common.AircraftPower.Piston } piston)
+                    {
+                        if (onGround) powerLever = powerLever >= 1f ? 1f : GroundIdleLever;
+                        else if (height < piston.WingspanMetres && snap.Velocity.Y < -0.2f) powerLever = GroundIdleLever;
+                    }
                 }
                 else if (physicalKey.StartsWith("rail:", StringComparison.OrdinalIgnoreCase))
                 {

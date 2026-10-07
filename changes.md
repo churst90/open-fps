@@ -66,8 +66,19 @@ Recent work, newest first. `git log` has the rest.
     StrokeMetres, StrokeEfficiency, TouchdownSinkMps): the light single's spring legs put 83 % of its
     weight on its wheels, 57 ms; the airliner's oleos 15 %, 302 ms (was 297). The tyre is now told the
     grip in use (slip over the 12 % slip at peak grip) instead of the slip ratio, which had left the
-    light single's touchdown silent: a touchdown is a skid that ends in the squeal. At a metre the
-    light single slides at 116 dB for 60 ms and the airliner at 127 dB for 290 ms (was an 80 ms squeal).
+    light single's touchdown silent. Round 1 made the touchdown a broadband skid, which Cody heard as
+    white noise; the gear now slides as a car's wheels do, keeping the stick-slip note on a runway
+    (the car's axle voice gives it up past the limit, as on gravel), at the tyre's declared squeal
+    level raised by the friction work, outside the tyre's soft limiter. At a metre the airliner
+    screeches at 126 dB for 280 ms (line 520 Hz, flatness 0.019), the light single at 102 dB for 60 ms
+    (1630 Hz); round 2 renders in inbox/fault-fixes-2026-10-06/round2.
+  - Round 3 (Cody: the airliner "sounds like gravel ... kind of like the cars, they need to squeal";
+    the light single's touchdown could not be heard). Every tyre's squeal, cars and aircraft, is now a
+    stick-slip note with harmonics whose pitch wanders, over the noise it used to be (a tenth of the
+    power), at the same level; it was a band of noise whose level jumped every few milliseconds. A
+    piston aeroplane is at idle in the flare and on the runway (it had gone to cruise power at
+    touchdown), and the light single's tyre squeal level follows the load law the airliner's does
+    (94 dB, not 88; the turboprop 103). Renders in inbox/fault-fixes-2026-10-06/round3.
   - Trains sound their own horn, whistle and bell. The signal sources are placed on the train now;
     a crossing is sounded with a TrainSignal key (long, long, short, long held to the crossing, the
     bell until it is reached) that the train's one synth plays on its own outlets, instead of the road

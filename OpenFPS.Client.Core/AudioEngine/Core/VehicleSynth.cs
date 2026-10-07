@@ -228,6 +228,78 @@ public static class VehicleSynth
         public float RollLp;
         /// <summary>The rolling path's filters at the rate this voice runs at, found on its first sample.</summary>
         internal RollingFilters? Rolling;
+        /// <summary>The squeal's note itself (see <see cref="StickSlipVoice"/>).</summary>
+        public StickSlipVoice Tone;
+    }
+
+    /// <summary>
+    /// The squeal as the oscillation it is. Tread elements in the sliding part of the patch stick,
+    /// load up, let go and snap back, and a patch of them pulls itself into step: a limit cycle, one
+    /// note with its harmonics, whose pitch wanders as the load, the slip speed and the rubber's heat
+    /// move under it. It was made as noise through a resonance, which is the note's colour without its
+    /// coherence: a band of noise 40 to 100 Hz wide whose amplitude jumps at that rate (a modulation
+    /// index of 0.49 on the airliner's touchdown, where a steady tone is near 0), heard on an
+    /// airliner's low note as gravel and on a car's as a hiss with a pitch (Cody, 2026-10-07:
+    /// "airliner sounds like gravel, not a squeal ... kind of like the cars, they need to squeal").
+    ///
+    /// Shaped on the one real screech there is to measure (a car, "car screech sound effect", Cody's
+    /// trash, 3.0-4.3 s): the fundamental near 1 kHz wanders with a standard deviation of 7 % from one
+    /// 25 ms step to the next; the harmonics stand 10, 21, 28 and 32 dB under it. The noise through the
+    /// resonances stays under it at a tenth of the power: the part of the patch that slides without
+    /// locking, the scrub.
+    /// </summary>
+    public struct StickSlipVoice
+    {
+        public double Phase;
+        public float W1, W2;
+        /// <summary>The noise resonators' RMS at the last pitch, per unit of input, which the tone is
+        /// made to equal, so a squeal is as loud as it always was.</summary>
+        public float Norm;
+        public int Tick;
+    }
+
+    /// <summary>The tone's share of the squeal's power is ToneShare squared; the scrub's ScrubShare squared.</summary>
+    private const float ToneShare = 0.954f, ScrubShare = 0.3f;
+    /// <summary>The harmonics re the fundamental (measured: -10, -21, -28, -32 dB).</summary>
+    private const float H2 = 0.316f, H3 = 0.089f, H4 = 0.040f, H5 = 0.025f;
+    /// <summary>The unit tone's RMS.</summary>
+    private static readonly float ToneRms = MathF.Sqrt((1f + H2 * H2 + H3 * H3 + H4 * H4 + H5 * H5) / 2f);
+
+    /// <summary>
+    /// One sample of the stick-slip note at <paramref name="hz"/>, unit RMS. The pitch wanders on the
+    /// tyre's own noise, low-passed twice at <see cref="RollingFilters.WanderHz"/>.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static float StickSlipTone(ref StickSlipVoice s, float hz, float noise, RollingFilters rates)
+    {
+        s.W1 += rates.WanderStep * (noise - s.W1);
+        s.W2 += rates.WanderStep * (s.W1 - s.W2);
+        float f = hz * (1f + rates.WanderGain * s.W2);
+        s.Phase += f / rates.Rate;
+        if (s.Phase >= 1.0) s.Phase -= Math.Floor(s.Phase);
+        float th = (float)(s.Phase * 2.0 * Math.PI);
+        float nyq = rates.Rate * 0.45f;
+        float y = MathF.Sin(th);
+        if (2f * f < nyq) y += H2 * MathF.Sin(2f * th);
+        if (3f * f < nyq) y += H3 * MathF.Sin(3f * th);
+        if (4f * f < nyq) y += H4 * MathF.Sin(4f * th);
+        if (5f * f < nyq) y += H5 * MathF.Sin(5f * th);
+        return y / ToneRms;
+    }
+
+    /// <summary>
+    /// The RMS of the noise squeal (noise of variance 1/3 through the resonator at the note, and 0.45 of
+    /// the one at its octave), from the two-pole resonators' own variance:
+    /// g^2 s^2 (1 + c2) / ((1 - c2) ((1 + c2)^2 - c1^2)).
+    /// </summary>
+    private static float ResonatorRms(float hz, float q, float rate)
+    {
+        static float Var(float hz, float q, float rate)
+        {
+            Coefficients(hz, q, rate, out float c1, out float c2, out float g);
+            return g * g / 3f * (1f + c2) / MathF.Max(1e-12f, (1f - c2) * ((1f + c2) * (1f + c2) - c1 * c1));
+        }
+        return MathF.Sqrt(Var(hz, q, rate) + 0.45f * 0.45f * Var(hz * 2f, q * 0.7f, rate));
     }
 
     /// <summary>
@@ -280,6 +352,12 @@ public static class VehicleSynth
         /// wheel's low-pass (0.10) and the output's DC high-pass pole (0.992).</summary>
         public readonly float Attack, Release, SlipStep, SlideStep, HpPole;
 
+        /// <summary>How fast a squeal's pitch wanders, Hz, and how far: the step of the twice
+        /// low-passed noise it wanders on, and the gain that makes its standard deviation
+        /// <see cref="WanderStd"/> (measured here rather than assumed).</summary>
+        public const float WanderHz = 6f, WanderStd = 0.05f;
+        public readonly float WanderStep, WanderGain;
+
         private RollingFilters(float rate)
         {
             Rate = rate;
@@ -294,6 +372,16 @@ public static class VehicleSynth
             Attack = At44k.Step(0.0016f, rate); Release = At44k.Step(0.00035f, rate);
             SlipStep = At44k.Step(0.0016f, rate); SlideStep = At44k.Step(0.10f, rate);
             HpPole = At44k.Decay(0.992f, rate);
+            WanderStep = 1f - MathF.Exp(-2f * MathF.PI * WanderHz / rate);
+            var rng = new Random(1);
+            double w1 = 0, w2 = 0, sum = 0; int n = 0;
+            for (int i = 0; i < (int)(rate * 20); i++)
+            {
+                w1 += WanderStep * ((rng.NextDouble() * 2 - 1) - w1);
+                w2 += WanderStep * (w1 - w2);
+                if (i > rate) { sum += w2 * w2; n++; }
+            }
+            WanderGain = WanderStd / (float)Math.Max(1e-9, Math.Sqrt(sum / Math.Max(1, n)));
         }
 
         /// <summary>The roar low-pass's step at this rate for a step quoted at 44.1 kHz.</summary>
@@ -427,12 +515,13 @@ public static class VehicleSynth
             {
                 float hz = t.SquealHz * TyreFriction.SquealPitch(demand);
                 float amp = Level(t.SquealDb) * squeal * rub * SquealProminence * squealScale;
-                // Two poles at the fundamental and one at the second harmonic. Real squeal is rich —
-                // the release is a snap, not a sine — and the octave is most of what makes it read as
-                // rubber rather than as a test tone.
+                // The note (StickSlipTone) over the scrub: the noise through two poles at the
+                // fundamental and one at the second harmonic, a tenth of the power.
                 float sq = Resonate(ref v.R1, ref v.R2, noise, hz, t.SquealQ, sampleRate)
                          + Resonate(ref v.R1b, ref v.R2b, noise, hz * 2f, t.SquealQ * 0.7f, sampleRate) * 0.45f;
-                mix += sq * amp;
+                if ((v.Tone.Tick++ & 63) == 0) v.Tone.Norm = ResonatorRms(hz, t.SquealQ, sampleRate);
+                float note = StickSlipTone(ref v.Tone, hz, noise, rates);
+                mix += (ScrubShare * sq + ToneShare * v.Tone.Norm * note) * amp;
             }
 
             if (skid > 1e-3f)
@@ -514,6 +603,8 @@ public static class VehicleSynth
         // which is smoothed over tens of milliseconds, so per-sample exp and cos buy nothing.
         public float C1, C2, G, C1b, C2b, Gb;
         public int Tick;
+        /// <summary>The squeal's note itself (see <see cref="StickSlipVoice"/>).</summary>
+        public StickSlipVoice Tone;
         /// <summary>The per-sample coefficients at this voice's rate, found on its first sample.</summary>
         internal RollingFilters? Rates;
     }
@@ -576,17 +667,20 @@ public static class VehicleSynth
         float mix = 0f;
         if (squeal > 1e-3f)
         {
+            float hz = t.SquealHz * TyreFriction.SquealPitch(d);
             if ((v.Tick++ & 63) == 0)
             {
-                float hz = t.SquealHz * TyreFriction.SquealPitch(d);
                 Coefficients(hz, t.SquealQ, sampleRate, out v.C1, out v.C2, out v.G);
                 Coefficients(hz * 2f, t.SquealQ * 0.7f, sampleRate, out v.C1b, out v.C2b, out v.Gb);
+                v.Tone.Norm = ResonatorRms(hz, t.SquealQ, sampleRate);
             }
             float y1 = noise * v.G + v.C1 * v.R1 - v.C2 * v.R2;
             v.R2 = v.R1; v.R1 = y1;
             float y2 = noise * v.Gb + v.C1b * v.R1b - v.C2b * v.R2b;
             v.R2b = v.R1b; v.R1b = y2;
-            mix += (y1 + y2 * 0.45f) * amp * squeal;
+            // The note (StickSlipTone) over the scrub, a tenth of the power.
+            float tone = StickSlipTone(ref v.Tone, hz, noise, rates);
+            mix += (ScrubShare * (y1 + y2 * 0.45f) + ToneShare * v.Tone.Norm * tone) * amp * squeal;
         }
         if (skid > 1e-3f)
         {

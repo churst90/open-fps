@@ -352,9 +352,14 @@ public sealed record AircraftProfile
             RotateSpeedMps = 28f, TakeoffRollMetres = 293f,
             TaxiSpeedMps = 5f, TurnRadiusMetres = 5f,
         },
+        // Its squeal level at the reference slip velocity follows the friction work, the load on the
+        // tyre: a car's tyre declares 92 dB on about 3.7 kN, so 5.4 kN (1,100 kg on two mains) is 94,
+        // where 88 had been written down with nothing behind it. The airliner's 108 on 160 kN and the
+        // turboprop's 103 on 49 kN are the same law (2026-10-07; the 88 left its touchdown inaudible
+        // under the idling propeller).
         Gear = new LandingGearSpec
         {
-            Tyre = TyreProfile.SportsOnAsphalt with { TreadBlocks = 0, SquealHz = 1250f, SquealQ = 9f, SquealDb = 88f, PeakGripG = 0.7f },
+            Tyre = TyreProfile.SportsOnAsphalt with { TreadBlocks = 0, SquealHz = 1250f, SquealQ = 9f, SquealDb = 94f, PeakGripG = 0.7f },
             Wheels = 2, WheelRadiusMetres = 0.20f, WheelMassKg = 9f, LandingMassKg = 1100f,
             StrokeMetres = 0.10f, StrokeEfficiency = 0.5f,
         },
@@ -408,7 +413,7 @@ public sealed record AircraftProfile
         },
         Gear = new LandingGearSpec
         {
-            Tyre = TyreProfile.TruckOnAsphalt with { TreadBlocks = 0, SquealHz = 620f, SquealQ = 7f, SquealDb = 98f, PeakGripG = 0.65f },
+            Tyre = TyreProfile.TruckOnAsphalt with { TreadBlocks = 0, SquealHz = 620f, SquealQ = 7f, SquealDb = 103f, PeakGripG = 0.65f },
             Wheels = 4, WheelRadiusMetres = 0.40f, WheelMassKg = 48f, LandingMassKg = 20000f,
             StrokeMetres = 0.35f, StrokeEfficiency = 0.8f,     // oleo-pneumatic main legs
         },
