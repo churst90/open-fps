@@ -85,11 +85,15 @@ public sealed class ClientSettings
     public bool DriveTurnClicks { get; set; } = true;
     public bool DriveBrakeCue { get; set; } = true;
     public bool DriveSpeedWarning { get; set; } = true;
+    /// <summary>The world editor's direct keys (/editorkeys). Off: they are to be tried with Orca and NVDA
+    /// before anybody has them on (docs/WORLD_EDITOR.md section 11.8).</summary>
+    public bool EditorDirectKeys { get; set; }
 
     /// <summary>Puts this file's navigation aids into play. Each head calls it once, after loading.</summary>
     public void ApplyNavigationAids()
     {
         NavigationAids.TurnNarration = TurnNarration;
+        EditorKeys.Enabled = EditorDirectKeys;
         NavigationAids.WallBumps = WallBumps;
         NavigationAids.AimAssist = AimAssist;
         NavigationAids.Track = MapTracker.Parse(TrackCategory) ?? Core.TrackCategory.Doors;
@@ -165,6 +169,7 @@ public sealed class ClientSettings
             ListeningLevelDb = OpenFPS.Common.Hearing.EarModel.ListeningLevelDb;
         // ...and the navigation aids as they are now: a key in game turns them, not this copy.
         TurnNarration = NavigationAids.TurnNarration;
+        EditorDirectKeys = EditorKeys.Enabled;
         WallBumps = NavigationAids.WallBumps;
         AimAssist = NavigationAids.AimAssist;
         TrackCategory = NavigationAids.Track.ToString();

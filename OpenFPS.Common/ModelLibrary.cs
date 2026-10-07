@@ -202,6 +202,7 @@ public static class ModelLibrary
                 }
             }
             _authored = next;
+            System.Threading.Interlocked.Increment(ref _generation);
             return loaded;
         }
     }
@@ -226,6 +227,8 @@ public static class ModelLibrary
         {
             _authored = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             _loadedFrom = null;
+            // Whatever was built from a model just forgotten (MachineRegistry's vehicles) is stale too.
+            System.Threading.Interlocked.Increment(ref _generation);
         }
     }
 

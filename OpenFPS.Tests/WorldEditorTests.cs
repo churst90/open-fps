@@ -657,7 +657,7 @@ public class WorldEditorTests : IDisposable
     /// Three flat maps (the tester's, other's, and an open one with no owner), the real command handler,
     /// the tester and other standing on the tester's map. Overlays are kept in maps/overlays.
     /// </summary>
-    private sealed class Rig
+    internal sealed class Rig
     {
         public readonly MapManager Maps;
         public readonly PrefabRepository Prefabs;
@@ -763,6 +763,9 @@ public class WorldEditorTests : IDisposable
         }
 
         public EditorMenu? LastMenu { get; private set; }
+
+        /// <summary>The editor the command handler made.</summary>
+        public WorldEditor Editor => _commands.Editor;
 
         /// <summary>/edit with these words, and the menu it answered with.</summary>
         public EditorMenu? Menu(params string[] args)

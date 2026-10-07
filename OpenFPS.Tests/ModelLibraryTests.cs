@@ -71,7 +71,7 @@ public class ModelLibraryTests : IDisposable
                 // every property, the ones worked out from the others included.
                 // An engine's "worked out from the rest" is NaN, which JSON writes as a named literal.
                 var back = JsonSerializer.Deserialize(before, spec.GetType(),
-                    new JsonSerializerOptions { NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals })!;
+                    new JsonSerializerOptions { NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals, Converters = { new OpenFPS.Common.Networking.Vector3Converter() } })!;
                 var lost = Readings(spec).Except(Readings(back)).ToList();
                 foreach (var l in lost) _o.WriteLine($"{kind}:{id} lost {l}");
                 Assert.True(lost.Count == 0, $"{kind}:{id} read back differently: {string.Join("; ", lost.Take(4))}");

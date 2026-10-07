@@ -87,6 +87,19 @@ public partial class ClientGameSession
         }
     }
 
+    /// <summary>/editorkeys [on|off]: the world editor's direct keys, saved. Off by default.</summary>
+    internal static string EditorKeysCommand(string[] args, Action? save = null)
+    {
+        string word = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+        if (word is not ("on" or "off"))
+            return $"The editor's direct keys are {(EditorKeys.Enabled ? "on" : "off")}. /editorkeys on or off. With an editor list open: {EditorKeys.Said}";
+        EditorKeys.Enabled = word == "on";
+        (save ?? SaveSettings)();
+        return EditorKeys.Enabled
+            ? "Editor direct keys on, while an editor list is open: " + EditorKeys.Said + " They are new: say if a screen reader takes any of them."
+            : "Editor direct keys off.";
+    }
+
     /// <summary>A map's settings changed while we are on it: its beacon rules, at once.</summary>
     internal void ApplyMapSettings(MapSettingsUpdate update)
     {

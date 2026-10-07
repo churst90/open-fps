@@ -209,6 +209,39 @@ public class WorldEditorClientTests
         Assert.Empty(h.Audio.ModelChanged(ModelLibrary.Kinds.SmallMachine, "ac_window", h.World.GetSnapshot()));
     }
 
+    [Fact]
+    public void TheDirectKeysAreOffByDefaultShiftOnlyAndSaid()
+    {
+        Assert.False(new ClientSettings().EditorDirectKeys);
+        bool was = EditorKeys.Enabled;
+        try
+        {
+            EditorKeys.Enabled = false;
+            Assert.StartsWith("The editor's direct keys are off.", ClientGameSession.EditorKeysCommand(Array.Empty<string>(), () => { }));
+            int saved = 0;
+            Assert.StartsWith("Editor direct keys on", ClientGameSession.EditorKeysCommand(new[] { "on" }, () => saved++));
+            Assert.True(EditorKeys.Enabled);
+            Assert.Equal(1, saved);
+            // Nothing a screen reader owns: no modifier but Shift is read, and the keypad, Insert,
+            // Control and Alt send nothing.
+            foreach (var key in new[] { GameKey.ControlLeft, GameKey.AltLeft, GameKey.Numpad5, GameKey.Numpad8, GameKey.Enter, GameKey.Escape })
+                Assert.Null(EditorKeys.CommandFor(key));
+            Assert.Equal("edit nudge forward", EditorKeys.CommandFor(GameKey.Up));
+            Assert.Equal("edit menu delete", EditorKeys.CommandFor(GameKey.Delete));
+        }
+        finally { EditorKeys.Enabled = was; }
+    }
+
+    [Fact]
+    public void AVehiclesSoundNamesTheVehicleModelAndAShoreItsShore()
+    {
+        Assert.True(OpenFPS.Common.Editing.ModelKinds.TryModelOfSound("engine:school_bus", out var kind, out var id));
+        Assert.Equal((ModelLibrary.Kinds.Vehicle, "school_bus"), (kind, id));
+        Assert.True(OpenFPS.Common.Editing.ModelKinds.TryModelOfSound("shore:lake_rock", out kind, out _));
+        Assert.Equal(ModelLibrary.Kinds.Shore, kind);
+        Assert.Equal("water:pond/elm_park/0", OpenFPS.Common.Editing.ModelKinds.WithModel("water:park_fountain/elm_park/0", "pond"));
+    }
+
     private static string Typed(IMessage m)
     {
         var c = Assert.IsType<TextCommand>(m);

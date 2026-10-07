@@ -180,7 +180,9 @@ public sealed partial class WorldEditor
         ApplyMapSetting(s.CurrentMapId, path, stored);
         string label = MapSettings.Field(path, GroundChoices()).Label;
         Push(s, new MapSetOp(s.CurrentMapId, path, label, keptBefore, stored));
-        Say(reply, $"This map's {label}: {MapSettings.Say(path, MapSettings.Get(map, path))}.");
+        string note = path == MapSettings.Ground && !HasNaturalGround(s.CurrentMapId)
+            ? " This map lays its own ground everywhere people walk, so nothing is laid; it applies if that ground is taken away and the map loads again." : "";
+        Say(reply, $"This map's {label}: {MapSettings.Say(path, MapSettings.Get(map, path))}.{note}");
         Notify(s, $"{s.Username} set the map's {label}.");
         Refresh(s, reply);
     }
@@ -247,16 +249,16 @@ public sealed partial class WorldEditor
     }
 
     /// <summary>The natural ground laid again as another prefab, where the old one was.</summary>
-    private void RelayGround(string mapId, string prefab)
+    private bool RelayGround(string mapId, string prefab)
     {
-        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return;
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return false;
         var authored = _maps.AuthoredEntities(mapId).Values.Select(e => e.Id).ToHashSet();
         Entity old = Entity.Null;
         world.Query(new QueryDescription().WithAll<IdentityComponent, Transform>(), (Entity e, ref IdentityComponent ident) =>
         {
             if (old == Entity.Null && !authored.Contains(e.Id) && ident.Name == "Ground" && MapSettings.GroundPrefabs.Contains(ident.PrefabId ?? "")) old = e;
         });
-        if (old == Entity.Null) return;   // the map lays its own ground
+        if (old == Entity.Null) return false;   // the map lays its own ground
         var t = world.Get<Transform>(old);
         int oldId = old.Id;
         _maps.DestroyEntity(mapId, old);
@@ -264,6 +266,20 @@ public sealed partial class WorldEditor
         var made = _maps.SpawnPrefab(mapId, prefab, t.Position, t.Rotation, t.Scale, "Ground");
         _maps.RefreshGrid(mapId);
         if (made != Entity.Null) _server.SyncAudioComponent(made.Id);
+        return true;
+    }
+
+    /// <summary>Whether the map has natural ground the loader laid (it has no ground of its own under all of it).</summary>
+    private bool HasNaturalGround(string mapId)
+    {
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return false;
+        var authored = _maps.AuthoredEntities(mapId).Values.Select(e => e.Id).ToHashSet();
+        bool found = false;
+        world.Query(new QueryDescription().WithAll<IdentityComponent>(), (Entity e, ref IdentityComponent ident) =>
+        {
+            if (!authored.Contains(e.Id) && ident.Name == "Ground" && MapSettings.GroundPrefabs.Contains(ident.PrefabId ?? "")) found = true;
+        });
+        return found;
     }
 
     private EditorMenu MapSettingsMenu(UserSession s)

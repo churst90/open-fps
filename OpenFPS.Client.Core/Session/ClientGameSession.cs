@@ -576,6 +576,10 @@ public sealed partial class ClientGameSession : IDisposable
         foreach (var key in justPressed)
         {
             if (calibrating) { _listening.HandleKey(key, _shiftHeldThisStep, _simTime); continue; }
+            // The world editor's direct keys, if a player turned them on (off by default; section 11.8).
+            if (menuOpen && EditorKeys.Enabled && _shiftHeldThisStep
+                && _menus.Current?.Tag.StartsWith(EditorTagPrefix, StringComparison.Ordinal) == true
+                && EditorKeys.CommandFor(key) is { } editorCommand) { SendTyped(editorCommand); continue; }
             if (menuOpen && key is not (GameKey.F5 or GameKey.F6 or GameKey.F8 or GameKey.F12)) { _menus.HandleKey(key); continue; }
             _bindings.Execute(context, key, modifiers);
         }
@@ -1882,6 +1886,12 @@ public sealed partial class ClientGameSession : IDisposable
             if (parts[0].Equals("drivecues", StringComparison.OrdinalIgnoreCase))
             {
                 Say(DriveCuesCommand(parts.Skip(1).ToArray()));
+                return;
+            }
+            // So are the world editor's direct keys (off unless turned on; docs/WORLD_EDITOR.md 11.8).
+            if (parts[0].Equals("editorkeys", StringComparison.OrdinalIgnoreCase))
+            {
+                Say(EditorKeysCommand(parts.Skip(1).ToArray()));
                 return;
             }
             // So are the navigation aids.
