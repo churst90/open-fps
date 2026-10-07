@@ -222,8 +222,11 @@ internal sealed class BogieVoice
     }
 
     /// <summary>The rolling part on its own: roughness, contact filter, three radiators.</summary>
+    private float Roll(float speed) => Radiate(RollForce(speed));
+
+    /// <summary>The force the roughness puts into the contact, before anything radiates it.</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private float Roll(float speed)
+    private float RollForce(float speed)
     {
         float v = MathF.Max(0.05f, speed);
         // Roughness, white in frequency, scaled by the speed to the roughness spectrum's slope: the
@@ -236,9 +239,7 @@ internal sealed class BogieVoice
         float a = OnePole.AlphaFor(fc, _rate);
         _contactLp1 += a * (excite - _contactLp1);
         _contactLp2 += a * (_contactLp1 - _contactLp2);
-        float force = _contactLp2 * 30f * _axleGain;
-
-        return Radiate(force);
+        return _contactLp2 * 30f * _axleGain;
     }
 
     /// <summary>A force at the contact: the rail, the sleepers and the wheel, and what each of them
@@ -265,7 +266,11 @@ internal sealed class BogieVoice
         float v = MathF.Max(0f, speed);
         _distance += v * _dt;
 
-        float y = Roll(v);
+        // Every force at the contact this sample, summed, and radiated once. The rail, the sleepers and
+        // the wheel are filters with state: radiating the roll and each live blow separately stepped
+        // them two or three times a sample while a blow lasted, which put every mode an octave or more
+        // up for those milliseconds.
+        float force = RollForce(v);
 
         // Each axle has its own place on the rail: two quick bangs, and the next bogie's after the
         // car's length.
@@ -297,10 +302,10 @@ internal sealed class BogieVoice
             if (!im.Live) continue;
             float x = (float)(im.T / im.Tau);
             if (x >= 1f) { im.Live = false; continue; }
-            float f = MathF.Sin(MathF.PI * x) * im.Peak;
+            force += MathF.Sin(MathF.PI * x) * im.Peak;
             im.T += _dt;
-            y += Radiate(f);
         }
+        float y = Radiate(force);
 
         float creep = MathF.Abs(curveDemand);
         // Lateral creepage saturates at about five milliradians; below it the contact grips, which

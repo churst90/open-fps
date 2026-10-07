@@ -547,6 +547,11 @@ if (args.Contains("--waves"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.WavesSpike.Run(args));
 }
 
+if (args.Contains("--rail-cost"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.RailCostSpike.Run(args));
+}
+
 if (args.Contains("--water-cost"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.WaterCostSpike.Run(args));

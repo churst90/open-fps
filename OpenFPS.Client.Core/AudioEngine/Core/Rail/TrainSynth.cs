@@ -94,7 +94,11 @@ public sealed class TrainSynth
             float creep = Profile.Track.CurveRadiusMetres > 1f
                 ? 0.5f * v.BogieWheelbaseMetres / Profile.Track.CurveRadiusMetres
                 : 0f;
-            var voice = new BogieVoice(v.Wheels, Profile.Track, _track, Profile.RollingReferenceDb,
+            // Its own stretch of track. The rail's response to a wheel dies away within a few metres, so
+            // two bogies eighteen metres apart do not share one; and a filter with state shared by every
+            // bogie was stepped once per bogie per sample: on a fifty-wagon freight the rail's modes ran
+            // at a hundred times the rate and folded back as a hiss.
+            var voice = new BogieVoice(v.Wheels, Profile.Track, new TrackResponse(Profile.Track, _rate), Profile.RollingReferenceDb,
                                        v.AxlesPerBogie, v.BogieWheelbaseMetres, _rate, seed++);
             _bogies.Add((voice, at));
             var captured = voice;
