@@ -64,11 +64,11 @@ internal sealed class SteamAudioVoiceState
     /// An equaliser on what this stage places, ahead of the HRTF and after the room's send (which leaves
     /// the channel before any of its stages): what the HRTF does to the level at the ears in this
     /// direction, taken back to another direction's. For the paths into a cabin (CabinPaths), which
-    /// keep the one interior voice's level and change only where they come from; see HrtfOctaves.
+    /// keep the one interior voice's level and change only where they come from; see HrtfBands.
     /// Null for every other voice. Swapped in whole from the game thread; its state is the stage's.
     /// </summary>
-    public volatile OpenFPS.Client.AudioEngine.Core.Engine.OctaveEq? PreEq;
-    public readonly float[] PreEqState = OpenFPS.Client.AudioEngine.Core.Engine.OctaveEq.State();
+    public volatile OpenFPS.Client.AudioEngine.Core.Engine.BandEq? PreEq;
+    public readonly float[] PreEqState = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.State();
 
     /// <summary>The sound this stage places, for the [NONFINITE] line (NonFinite); set when it is
     /// handed to a sound. Its flags: reported for its output, for its input.</summary>

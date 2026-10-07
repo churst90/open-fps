@@ -4,22 +4,23 @@ using System.Numerics;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// What an HRTF does to the level at the ears, octave by octave, for one direction: the two ears' mean
-/// power through Steam Audio's binaural effect, per octave of <see cref="OpenFPS.Client.AudioEngine.Core.Engine.OctaveEq.Centres"/>.
+/// What an HRTF does to the level at the ears, band by band, for one direction: the two ears' mean
+/// power through Steam Audio's binaural effect, per third of an octave of
+/// <see cref="OpenFPS.Client.AudioEngine.Core.Engine.BandEq.Centres"/>.
 ///
 /// For the cabin's paths (CabinPaths): the interior model works out the pressure at the ear, and the one
 /// interior voice was played from a little ahead and below. Played from where each path comes in, the
-/// HRTF's own colouring of each direction would change the level at the ears by up to seven decibels an
-/// octave (more from the side at 4 kHz, more from below at 63 Hz in Steam Audio's set, measured with
+/// HRTF's own colouring of each direction would change the level at the ears by up to seven decibels in
+/// an octave (more from the side at 4 kHz, more from below at 63 Hz in Steam Audio's set, measured with
 /// AudioLab --cabin hrtf), which is the HRTF, not the cabin. Each path is equalised by the difference
 /// between its direction and the one voice's, so the two ears hear the model's level and the path's own
 /// interaural differences.
 /// </summary>
-internal static class HrtfOctaves
+internal static class HrtfBands
 {
-    private const int Blocks = 4, PointsPerOctave = 24;
+    private const int Blocks = 4, PointsPerBand = 16;
 
-    /// <summary>The ears' mean power per octave, dB, through <paramref name="hrtf"/> from
+    /// <summary>The ears' mean power per band, dB, through <paramref name="hrtf"/> from
     /// <paramref name="direction"/> (Steam Audio's frame: x right, y up, z back). Null if Steam Audio
     /// would not make an effect. Allocates; game thread.</summary>
     public static float[]? Measure(IntPtr context, IntPtr hrtf, int rate, int frame, Vector3 direction)
@@ -61,17 +62,18 @@ internal static class HrtfOctaves
             Phonon.iplBinauralEffectRelease(ref effect);
         }
 
-        var centres = OpenFPS.Client.AudioEngine.Core.Engine.OctaveEq.Centres;
+        var centres = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.Centres;
+        double half = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.HalfWidth;
         var db = new float[centres.Length];
         for (int k = 0; k < centres.Length; k++)
         {
-            double lo = centres[k] / Math.Sqrt(2), hi = Math.Min(centres[k] * Math.Sqrt(2), 0.49 * rate), sum = 0;
-            for (int j = 0; j < PointsPerOctave; j++)
+            double lo = centres[k] / half, hi = Math.Min(centres[k] * half, 0.49 * rate), sum = 0;
+            for (int j = 0; j < PointsPerBand; j++)
             {
-                double f = lo + (hi - lo) * (j + 0.5) / PointsPerOctave;
+                double f = lo + (hi - lo) * (j + 0.5) / PointsPerBand;
                 sum += 0.5 * (Power(left, f, rate) + Power(right, f, rate));
             }
-            db[k] = (float)(10 * Math.Log10(sum / PointsPerOctave + 1e-30));
+            db[k] = (float)(10 * Math.Log10(sum / PointsPerBand + 1e-30));
         }
         return db;
     }

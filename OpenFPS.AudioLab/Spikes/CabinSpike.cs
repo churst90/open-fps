@@ -22,7 +22,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// <summary>
 /// --cabin: sitting in a vehicle, heard through the game (CabinPaths).
 ///
-///   --cabin game out=DIR [paths=on|off] [set=all|car|bus|police] [sec=10]
+///   --cabin game out=DIR [paths=on|off] [set=all|car|bus|police|rain] [sec=10] [roof=world]
 ///        the game's own path: ClientAudioSystem over the FMOD provider, the HRTF, the ear model, the
 ///        loudness law, the cabin's traced reverberation (TracedReverbSet.RideIn; the vehicle's room,
 ///        a trigger moving with it, as the server sends a vehicle shell's), on a street between brick
@@ -415,6 +415,18 @@ public static class CabinSpike
             Weather(0f, Settled(0f));
             Pump(2.0);
             Record("silence", 2.0, "");
+            if (set is "rain")
+            {
+                // The rain ride alone, for as long as asked: the rain's level wanders a decibel or more
+                // over ten seconds (the survey, the drops), so a level check on it wants longer.
+                var road = Settled(Rainfall.HeavyRate);
+                // falling=0: the same wet road with nothing falling, to tell the rain from the road.
+                Weather(Arg(args, "falling=") is "0" ? 0f : Rainfall.HeavyRate, road);
+                Pump(2.0);
+                float water = road.WaterMm(Asphalt, 1.75f - 0.75f, 3.5f - 1.0f, 3.5f, 0f);
+                Ride("i4_economy", "driver", _ => 50f / 3.6f, sec, "car driver 50 kmh heavy rain",
+                     $"heavy rain {Rainfall.HeavyRate:0.#} mm/h on the roof and the road, {water:F2} mm under the wheels", water);
+            }
             if (set is "all" or "car")
             {
                 Ride("i4_economy", "driver", _ => 0f, sec, "car driver idle", "engine idling, standing");

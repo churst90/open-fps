@@ -824,6 +824,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     private readonly float[] _cornerPa = Array.Empty<float>(), _cornerRadius = Array.Empty<float>(), _wheelSq = Array.Empty<float>();
     /// <summary>Per path, the panels' mass-law low-pass, and this sample's pressure on the path.</summary>
     private readonly float[] _pathLp = Array.Empty<float>(), _pathNow = Array.Empty<float>();
+    /// <summary>The front and rear axles' tread tone phases, for the cabin's tread path.</summary>
+    private double _treadFront, _treadRear;
     /// <summary>The right-hand wind's own noise through the same filters as the left's.</summary>
     private float _windLpR, _windHpR, _windHpInR;
     /// <summary>Samples of the rings still to be cleared after getting out, so a ring read later
@@ -1595,21 +1597,28 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                 const float TyreToPanels = 0.6f * 0.70710678f;
                 for (int q = 0; q < _cornerTyre.Length; q++)
                 {
-                    // The tread tone is one tone in phase on every wheel of a size (VehicleSynth.Tyre's
-                    // toneScale): each wheel carries its share of it in amplitude, its roar in power.
-                    float toneShare = MathF.Sqrt(lay.RollingShare[q]);
+                    // Its roar and its squeal: the tread tone is played once, below (CabinPaths.Kind.Tread).
                     float corner = perWheel
                         ? VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _cornerTyre[q], _cornerPa[q], _cornerRadius[q], _wheelSq[q], SampleRate,
-                                            toneScale: toneShare)
+                                            toneScale: 0f)
                         : VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, (_wheelFront[q] ? frontSlip : rearSlip) + _tyreChirp, _rng,
                                             ref _cornerTyre[q], _cornerPa[q], _cornerRadius[q], sampleRate: SampleRate,
-                                            squealScale: 1f / MathF.Sqrt(lay.GroupWheels[q]), toneScale: toneShare);
+                                            squealScale: 1f / MathF.Sqrt(lay.GroupWheels[q]), toneScale: 0f);
                     int pq = lay.PathOfWheel[q];
                     float src = corner * TyreToPanels * TyreMix;
                     _pathLp[pq] += (src - _pathLp[pq]) * panelA;
                     _pathNow[pq] += _pathLp[pq] + _sealLeak * src + _wet.CabinWheel(q) * wetMix;
                 }
                 if (lay.PathOfWheel.Length > 0) _pathNow[lay.PathOfWheel[0]] += _wet.CabinTail * wetMix;
+                // The tread tone of both ends, as the axles make it, from under the floor.
+                {
+                    float tone = (VehicleSynth.TreadTone(Vehicle.Tyres, Driveline.Speed, _rollingFrontPa, _frontRadius, ref _treadFront, SampleRate)
+                                + VehicleSynth.TreadTone(Vehicle.Tyres, Driveline.Speed, _rollingRearPa, _rearRadius, ref _treadRear, SampleRate))
+                                * TyreToPanels * TyreMix;
+                    int tp = lay.Tread;
+                    _pathLp[tp] += (tone - _pathLp[tp]) * panelA;
+                    _pathNow[tp] += _pathLp[tp] + _sealLeak * tone;
+                }
                 // The starter through the mounts and the floor of the footwell.
                 _starterLp1 += (Engine.StarterOut * _starterPath - _starterLp1) * starterA;
                 _starterLp2 += (_starterLp1 - _starterLp2) * starterA;

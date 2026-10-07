@@ -22,7 +22,8 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// WHAT. The same model, split into those paths (<see cref="Kind"/>), each rendered from its own
 /// sources through its own panels (the mass law and the seals of the interior model, per path), and
 /// played from where it comes in. Nothing is a copy of anything else: the tyres are a noise per
-/// wheel, the wind a noise per side. The paths' powers add to what the single signal had, so the
+/// wheel (their tread tone, one tone on every wheel, once, from under the floor), the wind a noise per
+/// side. The paths' powers add to what the single signal had, so the
 /// level at the ear is the model's; only where it comes from changes.
 ///
 /// WHERE. In the vehicle's own frame (x right, y up from the road, z forward from the middle of the
@@ -45,6 +46,11 @@ public static class CabinPaths
         Exhaust,
         /// <summary>One wheel's tyre, squeal and spray, through its arch and the floor at that corner.</summary>
         Wheel,
+        /// <summary>The tread tone: one tone, in phase on every tyre of a size (the blocks of each meet the
+        /// road at the same rate, from the same start), so one source, under the floor between the axles.
+        /// Shared out over the wheels it was four copies of one tone from four places, which beat against
+        /// each other at the ears and lost a decibel in the tone's octave.</summary>
+        Tread,
         /// <summary>The wind over the body at the A-pillar and the mirror on one side, and whatever
         /// comes in through that side's open windows.</summary>
         Wind,
@@ -61,7 +67,7 @@ public static class CabinPaths
         /// <summary>Per wheel in the server's order (WheelDynamics), the path it comes in by.</summary>
         public readonly int[] PathOfWheel;
         /// <summary>The paths of the wind on the left and right, and the door's, or -1.</summary>
-        public readonly int WindLeft, WindRight, Door, Exhaust;
+        public readonly int WindLeft, WindRight, Door, Exhaust, Tread;
         /// <summary>Per wheel: its share of its axle group's rolling power (the tyres it carries over
         /// the tyres the group carries), so the wheels together roll as loud as the two axles did.</summary>
         public readonly float[] RollingShare;
@@ -69,11 +75,11 @@ public static class CabinPaths
         /// does not send the wheels (the axle's slip drives each).</summary>
         public readonly int[] GroupWheels;
 
-        internal Layout(Path[] paths, int[] pathOfWheel, int windLeft, int windRight, int door, int exhaust,
+        internal Layout(Path[] paths, int[] pathOfWheel, int windLeft, int windRight, int door, int exhaust, int tread,
                         float[] rollingShare, int[] groupWheels)
         {
             Paths = paths; PathOfWheel = pathOfWheel; WindLeft = windLeft; WindRight = windRight; Door = door;
-            Exhaust = exhaust; RollingShare = rollingShare; GroupWheels = groupWheels;
+            Exhaust = exhaust; Tread = tread; RollingShare = rollingShare; GroupWheels = groupWheels;
         }
 
         public int Count => Paths.Length;
@@ -138,6 +144,11 @@ public static class CabinPaths
             pathOfWheel[i] = paths.Count;
             paths.Add(new Path(Kind.Wheel, new Vector3(Math.Clamp(w.Y, -halfW, halfW), g.FloorTop, w.X + cogZ), i, MathF.Sign(w.Y)));
         }
+        // The tread tone under the floor, midway between the axles.
+        float wheelsZ = 0f;
+        for (int i = 0; i < n; i++) wheelsZ += body.Wheels[i].X + cogZ;
+        int tread = paths.Count;
+        paths.Add(new Path(Kind.Tread, new Vector3(0f, g.FloorTop, Math.Clamp(n > 0 ? wheelsZ / n : g.Cz, g.Back, g.Front)), -1, 0));
         var share = new float[n];
         for (int i = 0; i < n; i++)
         {
@@ -176,7 +187,7 @@ public static class CabinPaths
             door = paths.Count;
             paths.Add(new Path(Kind.Door, new Vector3(side * halfW, g.RoofUnder - 0.2f, z), -1, (int)side));
         }
-        return new Layout(paths.ToArray(), pathOfWheel, windLeft, windRight, door, exhaust, share, groupWheels);
+        return new Layout(paths.ToArray(), pathOfWheel, windLeft, windRight, door, exhaust, tread, share, groupWheels);
     }
 
     /// <summary>

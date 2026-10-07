@@ -1839,6 +1839,10 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             if (a.IsReflection || a.FadeTarget <= 0f || a.TargetRegionId != _listenerRegionId) continue;
             if (!a.SourceReverbConnection.hasHandle()) continue;
+            // The paths into the cabin you sit in send at the interior voice's own send, so they need no
+            // trace of their own; given slots, they pushed the rain on the roof out of them (+2 dB, the
+            // rain falling back on the stand-in law).
+            if (a.TapState is { CabinPath: > 0 }) continue;
             float dist = Vector3.Distance(_listenerPos, a.Position);
             _lateCandidates.Add((a, a.BaseVolume * Loudness.RenderedGain(1f, a.MinDistance, a.Range, dist)));
         }
@@ -4605,21 +4609,21 @@ public partial class FmodAudioProvider : IAudioProvider
     /// Direction — which for an engine is the entity's own heading — or, failing that, the way it is
     /// moving. A machine standing still with no heading has nothing to say, and says so.
     /// </summary>
-    // ── The cabin's paths, equalised for their directions (CabinPaths, HrtfOctaves) ────────────────
+    // ── The cabin's paths, equalised for their directions (CabinPaths, HrtfBands) ──────────────────
 
-    /// <summary>The ears' mean power per octave in each direction asked about, by direction to a degree
+    /// <summary>The ears' mean power per band in each direction asked about, by direction to a degree
     /// or so, and in the one interior voice's direction.</summary>
-    private readonly Dictionary<(int, int, int), float[]?> _hrtfOctaves = new();
+    private readonly Dictionary<(int, int, int), float[]?> _hrtfBands = new();
     private float[]? _hrtfOnePlace;
 
-    private float[]? HrtfOctavesAt(Vector3 dir)
+    private float[]? HrtfBandsAt(Vector3 dir)
     {
         var key = ((int)MathF.Round(dir.X * 50f), (int)MathF.Round(dir.Y * 50f), (int)MathF.Round(dir.Z * 50f));
-        if (!_hrtfOctaves.TryGetValue(key, out var db))
+        if (!_hrtfBands.TryGetValue(key, out var db))
         {
-            db = HrtfOctaves.Measure(_saContext, _saHrtf, MixerQuality.MixerRate, _saFrameSize, dir);
-            if (_hrtfOctaves.Count > 512) _hrtfOctaves.Clear();
-            _hrtfOctaves[key] = db;
+            db = HrtfBands.Measure(_saContext, _saHrtf, MixerQuality.MixerRate, _saFrameSize, dir);
+            if (_hrtfBands.Count > 512) _hrtfBands.Clear();
+            _hrtfBands[key] = db;
         }
         return db;
     }
@@ -4635,15 +4639,15 @@ public partial class FmodAudioProvider : IAudioProvider
         if (active.CabinTrimDir != Vector3.Zero && Vector3.Dot(dir, active.CabinTrimDir) > 0.9994f) return;   // 2 degrees
         active.CabinTrimDir = dir;
         var one = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.OnePlace;
-        _hrtfOnePlace ??= HrtfOctavesAt(Vector3.Normalize(new Vector3(one.X, one.Y, -one.Z)));
-        var here = HrtfOctavesAt(dir);
+        _hrtfOnePlace ??= HrtfBandsAt(Vector3.Normalize(new Vector3(one.X, one.Y, -one.Z)));
+        var here = HrtfBandsAt(dir);
         if (_hrtfOnePlace == null || here == null) return;
         Span<float> trim = stackalloc float[here.Length];
         for (int k = 0; k < trim.Length; k++) trim[k] = Math.Clamp(_hrtfOnePlace[k] - here[k], -12f, 12f);
         // On the binaural stage, after the room's send: the HRTF colours only what reaches the ears
         // directly, and the cabin's response is fed what the path really is. Put on the path itself, it
         // took the low end's correction off the send too, and the cabin's boom fell 1-2 dB.
-        if (active.SaState != null) active.SaState.PreEq = OpenFPS.Client.AudioEngine.Core.Engine.OctaveEq.Design(trim, MixerQuality.MixerRate);
+        if (active.SaState != null) active.SaState.PreEq = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.Design(trim, MixerQuality.MixerRate);
     }
 
     private bool ListenerInMachineFrame(Vector3 position, Vector3 direction, Vector3 velocity, out Vector3 local)

@@ -36,6 +36,9 @@ public class CabinPathsTests
         Assert.Equal(1, kinds.Count(k => k == CabinPaths.Kind.Exhaust));
         Assert.Equal(4, kinds.Count(k => k == CabinPaths.Kind.Wheel));
         Assert.Equal(2, kinds.Count(k => k == CabinPaths.Kind.Wind));
+        // The tread tone once, under the floor between the axles.
+        Assert.Equal(1, kinds.Count(k => k == CabinPaths.Kind.Tread));
+        Assert.Equal(0f, lay.Paths[lay.Tread].At.X);
         Assert.Equal(-1, lay.Door);
         // The engine is in front, so the firewall is the front of the cabin; the pipe comes in behind.
         Assert.Equal(g.Front, lay.Paths[0].At.Z, 3);
@@ -170,19 +173,19 @@ public class CabinPathsTests
     }
 
     [Fact]
-    public void TheEqualiserMakesTheGainAskedForInEveryOctave()
+    public void TheEqualiserMakesTheGainAskedForInEveryBand()
     {
         var rng = new Random(3);
         for (int trial = 0; trial < 5; trial++)
         {
-            var want = Enumerable.Range(0, OctaveEq.Bands).Select(_ => (float)(rng.NextDouble() * 16 - 8)).ToArray();
-            var eq = OctaveEq.Design(want, Rate);
-            for (int k = 0; k < OctaveEq.Bands; k++)
-                Assert.InRange(eq.OctaveDb(k, Rate) - want[k], -0.25f, 0.25f);
+            var want = Enumerable.Range(0, BandEq.Bands).Select(_ => (float)(rng.NextDouble() * 12 - 6)).ToArray();
+            var eq = BandEq.Design(want, Rate);
+            for (int k = 0; k < BandEq.Bands; k++)
+                Assert.InRange(eq.BandDb(k, Rate) - want[k], -0.25f, 0.25f);
         }
         // Flat asked, flat given.
-        var flat = OctaveEq.Design(new float[OctaveEq.Bands], Rate);
-        var z = OctaveEq.State();
+        var flat = BandEq.Design(new float[BandEq.Bands], Rate);
+        var z = BandEq.State();
         Assert.Equal(0.5f, flat.Process(0.5f, z), 5);
     }
 

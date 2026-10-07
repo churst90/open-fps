@@ -350,11 +350,9 @@ public static class VehicleSynth
     /// <param name="squealScale">The share of the <paramref name="slip"/>'s squeal and slide this call
     /// makes, as pressure: one wheel of an axle whose slip is all that is known (CabinPaths' corners,
     /// each 1/sqrt(wheels) so the axle's wheels together squeal as loud as the axle did).</param>
-    /// <param name="toneScale">The share of the tread tone this call makes, as amplitude. The tread tone
-    /// is one tone: every tyre of a size turns at the same rate from the same phase, so the wheels' tones
-    /// add as amplitudes, not powers. A wheel standing for its share of an axle (CabinPaths' corners,
-    /// whose noise is its share in power) passes the square root of that share here, so the wheels'
-    /// tones together are the axle's tone and their roar the axle's roar.</param>
+    /// <param name="toneScale">How much of the tread tone this call makes, as amplitude. Zero leaves it
+    /// out: CabinPaths' wheels each roll and squeal for themselves, and the tread tone, one tone in phase
+    /// on every tyre of a size, is played once from under the floor (<see cref="TreadTone"/>).</param>
     public static float Tyre(TyreProfile t, float speed, float slip, Random rng, ref TyreVoice v, float rollingPa = 0f,
                              float rollingRadius = 0.337f, float sliding = 0f, float sampleRate = SampleRate,
                              float squealScale = 1f, float toneScale = 1f)
@@ -462,6 +460,26 @@ public static class VehicleSynth
         // the tanh for what it is for, which is catching the rare extreme rather than shaping the
         // normal case.
         return MathF.Tanh(y * 0.05f) * 26f;
+    }
+
+    /// <summary>
+    /// The tread tone of an anchored <see cref="Tyre"/> call alone, as it leaves that call (its output
+    /// stage is linear at rolling levels): the same tone, phase and weight, for <paramref name="rollingPa"/>
+    /// at <paramref name="speed"/>. For a voice that plays an axle's tread tone apart from its roar.
+    /// </summary>
+    public static float TreadTone(TyreProfile t, float speed, float rollingPa, float rollingRadius, ref double phase,
+                                  float sampleRate = SampleRate)
+    {
+        if (t.TreadBlocks <= 0 || rollingPa <= 0f || speed < 0.3f) return 0f;
+        float level = MathF.Pow(MathF.Max(speed, 0.3f) / 20f, 1.5f);
+        float blockHz = speed / (2f * MathF.PI * MathF.Max(0.05f, rollingRadius)) * t.TreadBlocks;
+        phase += 2.0 * Math.PI * blockHz / sampleRate;
+        if (phase > 2.0 * Math.PI) phase -= 2.0 * Math.PI;
+        float tone = (float)(Math.Sin(phase) * 0.34 + Math.Sin(phase * 2) * 0.16) * (1f - t.SurfaceRoughness * 0.55f);
+        float roarW = 1.4f * (0.55f + 0.45f * t.SurfaceRoughness) * 0.19f;
+        float toneW = 0.2657f * (1f - t.SurfaceRoughness * 0.55f);
+        float norm = MathF.Sqrt(roarW * roarW + toneW * toneW);
+        return (toneW / norm) * tone / toneW * rollingPa * level;
     }
 
     /// <summary>The output stage's gain for small signals: tanh(0.05 y) x 26.</summary>
