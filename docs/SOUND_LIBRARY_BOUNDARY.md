@@ -1581,3 +1581,15 @@ EarlyReflections._chain, EarlyReflections._flFaces, EarlyReflections._flHits, Ea
 | Common/PerfProbe.cs | OPENFPS_PROFILE |
 
 37 variables in 16 files.
+
+## Decisions (Cody, 2026-10-06)
+
+- Five projects: Geometry, Acoustics, Sound, Native (FMOD and Steam Audio bindings), Audio (the runtime and
+  the host-neutral world). FMOD stays out of the server.
+- Vehicle physics goes in Sound, as Resonance did, on the condition that it stays physical: no shortcut
+  that trades realism for convenience moves with it.
+- Start stages 0 to 2 (guards, Native, Geometry) right after geometry stage 2 lands, so the two do not
+  collide.
+- Resonance takes the library as a git submodule pinned to tagged versions.
+- The other defaults stand: namespaces unchanged during the moves, Serilog kept, a library SourceSpec
+  that mirrors SoundEmitterComponent.
