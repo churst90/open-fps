@@ -184,11 +184,12 @@ Results: [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md),
 - Client (`VoiceManager`, `VehicleShadow`, `BeaconAids`, `BirdLife`): 39.2 %, survivors not yet done.
 
 ### 15. Tests for the untested audio code
-From [docs/COVERAGE_2026-09-24.md](docs/COVERAGE_2026-09-24.md):
-- `ClientAudioSystem`: which vehicles get a live voice, at what level, and which get an acoustic path.
-- `VehicleShadow.Apply` and `EngineReflections`.
-- One test per DSP callback processor.
-- `AsyncAcousticWorker` paths that do not need Steam Audio.
+Done 2026-10-06 ([docs/COVERAGE_2026-10-06.md](docs/COVERAGE_2026-10-06.md)). Left:
+- Cody to decide: the ear model's correction raises the rank of a sound the ear hears less of (a
+  25 Hz rumble ranks 20 dB up), in the machine ranking and VoiceManager.Audibility.
+- A shore voice is silent for its first 11 s or so.
+- In ClientAudioSystem: the starvation path, PlayReferenceVoice, TyreDemand, SubmitLanding, OnBreath,
+  NameOfGap.
 
 ### 16. Zones (waiting on Cody)
 - Today a zone is a named box in the map; the smallest box you stand in is the one said.
