@@ -68,6 +68,25 @@ public class ProbableBugsTests
         Assert.Equal(0, h.Audio.WorldAudio.Outstanding);
     }
 
+    // ── 6. The engine's per-sample loop skips tier 0 ─────────────────────────────────────────────
+
+    /// <summary>
+    /// The attribute was on QueueStrikes, a one-line game-thread call, instead of the loop it was
+    /// written for. Measured with --engine-cost, tiering pinned at tier 0 (DOTNET_TC_CallCountingDelayMs):
+    /// 1-2 % off a block; the rest of the tier-0 penalty is in what the loop calls.
+    /// </summary>
+    [Fact]
+    public void TheEngineLoopNotTheStrikeQueueIsCompiledFullyAtOnce()
+    {
+        const System.Reflection.BindingFlags Any = System.Reflection.BindingFlags.Instance
+            | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+        var t = typeof(OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState);
+        var synthesize = t.GetMethod("Synthesize", Any)!;
+        var queue = t.GetMethod("QueueStrikes", Any)!;
+        Assert.True(synthesize.MethodImplementationFlags.HasFlag(System.Reflection.MethodImplAttributes.AggressiveOptimization));
+        Assert.False(queue.MethodImplementationFlags.HasFlag(System.Reflection.MethodImplAttributes.AggressiveOptimization));
+    }
+
     // ── Harness ─────────────────────────────────────────────────────────────────────────────────
 
     private sealed class QuietSpeech : ISpeechOutput

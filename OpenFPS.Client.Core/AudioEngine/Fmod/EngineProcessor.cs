@@ -1122,8 +1122,6 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     }
 
     /// <summary>Each wheel struck by a step in the road (a rail): see WheelStrikes. Game thread.</summary>
-    // TODO: this AggressiveOptimization was meant for Synthesize below; it landed on QueueStrikes.
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public void QueueStrikes(IReadOnlyList<OpenFPS.Client.AudioEngine.Core.WheelStrike> strikes) => _strikes.Queue(strikes);
 
     private readonly OpenFPS.Client.AudioEngine.Core.WheelStrikes _strikes;
@@ -1132,6 +1130,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     private bool _strikesLeftOver;
 
     /// <summary>Integrates <paramref name="count"/> samples of engine into the rings. Producer thread.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private void Synthesize(int count)
     {
         float dt = 1f / SampleRate;
