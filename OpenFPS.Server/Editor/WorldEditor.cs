@@ -137,6 +137,7 @@ public sealed partial class WorldEditor
     public void Handle(UserSession s, string[] args, Action<IMessage> reply)
     {
         using var saving = Overlays.Defer();
+        using var filing = _maps.DeferGrid();
         Run(s, args, reply);
     }
 

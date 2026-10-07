@@ -904,8 +904,37 @@ public class MapManager
         _maps.Clear();
     }
 
+    private int _gridDeferred;
+    /// <summary>Grid refreshes run, for the tests.</summary>
+    internal int GridRefreshes { get; private set; }
+    private readonly HashSet<string> _gridDirty = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Holds every RefreshGrid until the scope ends, then refreshes each map once.</summary>
+    // Undoing a row of fifty refiled the map fifty times, ~2 ms and a log line each, on the tick thread.
+    public IDisposable DeferGrid()
+    {
+        _gridDeferred++;
+        return new GridScope(this);
+    }
+
+    private sealed class GridScope(MapManager maps) : IDisposable
+    {
+        private bool _done;
+        public void Dispose()
+        {
+            if (_done) return;
+            _done = true;
+            if (--maps._gridDeferred > 0) return;
+            var dirty = maps._gridDirty.ToList();
+            maps._gridDirty.Clear();
+            foreach (var mapId in dirty) maps.RefreshGrid(mapId);
+        }
+    }
+
     public void RefreshGrid(string mapId)
     {
+        if (_gridDeferred > 0) { _gridDirty.Add(mapId); return; }
+        GridRefreshes++;
         if (!_maps.TryGetValue(mapId, out var data)) return;
         // Only what changed, once the map's fixed things have been filed whole (ServerGeometry.Refresh).
         if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled && OpenFPS.Common.Geometry.TriangleGeometry.Incremental

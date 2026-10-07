@@ -241,6 +241,18 @@ public class ServerHardeningTests : IDisposable
         Assert.Equal(1, rig.Maps.Overlays.Writes - before);
     }
 
+    [Fact]
+    public void UndoingARowRefilesTheMapOnceNotOncePerThing()
+    {
+        var rig = new WorldEditorTests.Rig(_dir, UserRole.Player);
+        rig.On("mine");
+        Assert.StartsWith("Placed", rig.Run("edit", "place", "concrete_wall"));
+        Assert.StartsWith("A row of 20", rig.Run("edit", "row", "20", "2"));
+        int before = rig.Maps.GridRefreshes;
+        Assert.StartsWith("Undid", rig.Run("edit", "undo"));
+        Assert.Equal(1, rig.Maps.GridRefreshes - before);
+    }
+
     // ── Map data: once per manifest ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -593,6 +605,51 @@ public class ServerHardeningTests : IDisposable
             {
                 server.PollEvents();
                 client.Poll();
+                if (done()) return true;
+                Thread.Sleep(5);
+            }
+            return done();
+        }
+    }
+
+    [Fact]
+    public void AMalformedLoginOverTheWireIsDroppedAndTheServerCarriesOn()
+    {
+        // Before the wire check this one packet ended the test host (AccessViolationException in MemoryPack).
+        var server = new NetworkService();
+        server.Start(0);
+        var listener = new LiteNetLib.EventBasedNetListener();
+        var client = new LiteNetLib.NetManager(listener) { AutoRecycle = true };
+        client.Start();
+        try
+        {
+            var peer = client.Connect("127.0.0.1", server.LocalPort, "OpenFPS_Key");
+            Assert.True(Pump(() => peer.ConnectionState == LiteNetLib.ConnectionState.Connected), "no connection");
+            byte[] bad = MemoryPackSerializer.Serialize<IMessage>(new LoginRequest { Username = "aaaa", Password = "bbbb" });
+            BitConverter.TryWriteBytes(bad.AsSpan(2), int.MinValue);
+            peer.Send(bad, LiteNetLib.DeliveryMethod.ReliableOrdered);
+            peer.Send(MemoryPackSerializer.Serialize<IMessage>(new TextCommand { Command = "scan" }), LiteNetLib.DeliveryMethod.ReliableOrdered);
+            var got = new List<IMessage>();
+            Assert.True(Pump(() =>
+            {
+                while (server.TryDequeueMessage(out var item)) got.Add(item.message);
+                return got.Count >= 1;
+            }));
+            Assert.IsType<TextCommand>(Assert.Single(got));
+        }
+        finally
+        {
+            client.Stop();
+            server.Stop();
+        }
+
+        bool Pump(Func<bool> done)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                server.PollEvents();
+                client.PollEvents();
                 if (done()) return true;
                 Thread.Sleep(5);
             }
