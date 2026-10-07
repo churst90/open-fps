@@ -59,6 +59,10 @@ public static class ExtendedSources
     /// <summary>How many places each tap of a water feature is heard from round its middle.</summary>
     public const int WaterTapPlaces = 3;
 
+    /// <summary>The most places a source is heard from, its middle included: the voice ids the client gives a
+    /// source (ClientAudioSystem.PlaceVoiceId). A layout with more is heard from its middle alone.</summary>
+    public const int MaxPlaces = 12;
+
     /// <summary>For the lab: how far out the places are, as a share of where they belong. Zero puts every
     /// place on the middle, which leaves the streams independent and changes only where they are heard
     /// from (AudioLab --wide-sources collapse=1). Read when a layout is first made.</summary>
@@ -77,87 +81,90 @@ public static class ExtendedSources
     public static Vector3[]? Layout(string? physicalKey)
     {
         if (!Enabled || string.IsNullOrEmpty(physicalKey)) return null;
-        return _layouts.GetOrAdd(physicalKey, static key =>
+        var layout = _layouts.GetOrAdd(physicalKey, static key => Make(key));
+        return layout != null && layout.Length <= MaxPlaces ? layout : null;
+    }
+
+    private static Vector3[]? Make(string key)
+    {
+        try
         {
-            try
+            if (key.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
             {
-                if (key.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase))
+                var spec = FoliageSpec.ByName(key[8..]);
+                int n = TreePlaces;
+                var places = new Vector3[1 + n];
+                for (int j = 0; j < n; j++)
                 {
-                    var spec = FoliageSpec.ByName(key[8..]);
-                    int n = TreePlaces;
-                    var places = new Vector3[1 + n];
-                    for (int j = 0; j < n; j++)
-                    {
-                        // The middle of the boughs this place stands for.
-                        Vector3 sum = Vector3.Zero;
-                        int count = 0;
-                        for (int b = 0; b < FoliageSynth.Boughs; b++)
-                            if (FoliageSynth.PlaceOfBough(b, n) == j) { sum += FoliageSynth.BoughOffset(spec, b); count++; }
-                        places[1 + j] = count > 0 ? sum / count * LayoutScale : Vector3.Zero;
-                    }
-                    return places;
+                    // The middle of the boughs this place stands for.
+                    Vector3 sum = Vector3.Zero;
+                    int count = 0;
+                    for (int b = 0; b < FoliageSynth.Boughs; b++)
+                        if (FoliageSynth.PlaceOfBough(b, n) == j) { sum += FoliageSynth.BoughOffset(spec, b); count++; }
+                    places[1 + j] = count > 0 ? sum / count * LayoutScale : Vector3.Zero;
                 }
-                // One tap of a water feature ("water:<preset>/<feature>/<tap>"): round the place its water
-                // lands, at half its extent. The whole feature at one point ("water:<preset>") is not spread.
-                if (key.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
-                {
-                    var parts = key[6..].Split('/');
-                    if (parts.Length != 3 || !int.TryParse(parts[2], out int tap)) return null;
-                    var spec = WaterFeatureSpec.ByName(parts[0]);
-                    if (tap < 0 || tap >= spec.Taps.Length) return null;
-                    float r = 0.5f * spec.Taps[tap].ExtentMetres * LayoutScale;
-                    var places = new Vector3[1 + WaterTapPlaces];
-                    for (int j = 0; j < WaterTapPlaces; j++)
-                    {
-                        float a = MathF.Tau * (j + 0.25f) / WaterTapPlaces;
-                        places[1 + j] = new Vector3(MathF.Cos(a) * r, 0f, MathF.Sin(a) * r);
-                    }
-                    return places;
-                }
-                // Running water: along its length, or round where it lands (RunningWaterSynth.Layout).
-                if (key.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
-                {
-                    var spec = RunningWaterSpec.ByName(key[5..]);
-                    if (spec.Places <= 1) return null;
-                    var places = RunningWaterSynth.Layout(spec);
-                    for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
-                    return places;
-                }
-                // Waves at an edge: along it, and on its break line (ShoreSynth.Layout), its length the map's.
-                if (key.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
-                {
-                    ShoreSpec.ParseKey(key, out string preset, out var geometry);
-                    var spec = ShoreSpec.ByName(preset);
-                    if (spec.TotalPlaces <= 1) return null;
-                    var places = ShoreSynth.Layout(spec, geometry?.LengthMetres ?? spec.LengthMetres);
-                    for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
-                    return places;
-                }
-                // A wood heard as one (WoodChorus): a place a bough's worth of it, six round the wood at
-                // two-thirds of its half-widths, where its trees' wind is read as well (FoliageSynth.ReadWindAt).
-                if (WoodChorus.ParseKey(key, out _, out float rx, out float rz))
-                {
-                    int n = FoliageSynth.Boughs;
-                    var places = new Vector3[1 + n];
-                    for (int j = 0; j < n; j++)
-                    {
-                        float a = MathF.Tau * (j + 0.5f) / n;
-                        places[1 + j] = new Vector3(MathF.Cos(a) * rx, 0f, MathF.Sin(a) * rz) * (2f / 3f) * LayoutScale;
-                    }
-                    return places;
-                }
-                if (key.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
-                {
-                    var spec = FireSpec.ByName(key[5..]);
-                    var places = FireSynth.Layout(spec);
-                    if (places.Length <= 1) return null;
-                    for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
-                    return places;
-                }
+                return places;
             }
-            catch (Exception) { }
-            return null;
-        });
+            // One tap of a water feature ("water:<preset>/<feature>/<tap>"): round the place its water
+            // lands, at half its extent. The whole feature at one point ("water:<preset>") is not spread.
+            if (key.StartsWith("water:", StringComparison.OrdinalIgnoreCase))
+            {
+                var parts = key[6..].Split('/');
+                if (parts.Length != 3 || !int.TryParse(parts[2], out int tap)) return null;
+                var spec = WaterFeatureSpec.ByName(parts[0]);
+                if (tap < 0 || tap >= spec.Taps.Length) return null;
+                float r = 0.5f * spec.Taps[tap].ExtentMetres * LayoutScale;
+                var places = new Vector3[1 + WaterTapPlaces];
+                for (int j = 0; j < WaterTapPlaces; j++)
+                {
+                    float a = MathF.Tau * (j + 0.25f) / WaterTapPlaces;
+                    places[1 + j] = new Vector3(MathF.Cos(a) * r, 0f, MathF.Sin(a) * r);
+                }
+                return places;
+            }
+            // Running water: along its length, or round where it lands (RunningWaterSynth.Layout).
+            if (key.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
+            {
+                var spec = RunningWaterSpec.ByName(key[5..]);
+                if (spec.Places <= 1) return null;
+                var places = RunningWaterSynth.Layout(spec);
+                for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
+                return places;
+            }
+            // Waves at an edge: along it, and on its break line (ShoreSynth.Layout), its length the map's.
+            if (key.StartsWith("shore:", StringComparison.OrdinalIgnoreCase))
+            {
+                ShoreSpec.ParseKey(key, out string preset, out var geometry);
+                var spec = ShoreSpec.ByName(preset);
+                if (spec.TotalPlaces <= 1) return null;
+                var places = ShoreSynth.Layout(spec, geometry?.LengthMetres ?? spec.LengthMetres);
+                for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
+                return places;
+            }
+            // A wood heard as one (WoodChorus): a place a bough's worth of it, six round the wood at
+            // two-thirds of its half-widths, where its trees' wind is read as well (FoliageSynth.ReadWindAt).
+            if (WoodChorus.ParseKey(key, out _, out float rx, out float rz))
+            {
+                int n = FoliageSynth.Boughs;
+                var places = new Vector3[1 + n];
+                for (int j = 0; j < n; j++)
+                {
+                    float a = MathF.Tau * (j + 0.5f) / n;
+                    places[1 + j] = new Vector3(MathF.Cos(a) * rx, 0f, MathF.Sin(a) * rz) * (2f / 3f) * LayoutScale;
+                }
+                return places;
+            }
+            if (key.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
+            {
+                var spec = FireSpec.ByName(key[5..]);
+                var places = FireSynth.Layout(spec);
+                if (places.Length <= 1) return null;
+                for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
+                return places;
+            }
+        }
+        catch (Exception) { }
+        return null;
     }
 
     /// <summary>How far the outer places reach from the middle, m.</summary>
