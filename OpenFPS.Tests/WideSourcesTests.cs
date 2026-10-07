@@ -348,11 +348,21 @@ public class WideSourcesTests
     {
         var falling = new Precipitation(PrecipitationKind.Rain, 10f);
         var wholeFeed = new RainFeed { Patch = SteelRoof(), Falling = falling };
-        double whole = Render(new RainVoiceState(wholeFeed, Rate, 9), 8f);
+        // Every voice on one clock from zero, as every rain voice in the game shares one: each takes
+        // the wall clock when it is made, so the whole roof and its parts, made one after the other,
+        // started in different swells of the rain's clustering and published levels up to 1.2 dB
+        // apart (GitHub run 37553074003). And 24 s, not 8, for the heavy-tailed drops.
+        var wholeVoice = new RainVoiceState(wholeFeed, Rate, 9);
+        wholeVoice.Synth.Clock = 0;
+        double whole = Render(wholeVoice, 24f);
         var partFeed = new RainFeed { Patch = SteelRoof(), Falling = falling };
         double parts = 0;
         for (int k = 0; k < RainFeeds.RoofParts; k++)
-            parts += Render(new RainVoiceState(partFeed, Rate, 9 + k * 7919, k, RainFeeds.RoofParts), 8f);
+        {
+            var part = new RainVoiceState(partFeed, Rate, 9 + k * 7919, k, RainFeeds.RoofParts);
+            part.Synth.Clock = 0;
+            parts += Render(part, 24f);
+        }
         _o.WriteLine($"roof as one voice {Db(whole):F2} dB ({wholeFeed.LevelDb:F1} published), as {RainFeeds.RoofParts} parts {Db(parts):F2} dB ({partFeed.LevelDb:F1} published)");
         Assert.InRange(Db(parts) - Db(whole), -0.5, 0.5);
         Assert.InRange(partFeed.LevelDb - wholeFeed.LevelDb, -1f, 1f);

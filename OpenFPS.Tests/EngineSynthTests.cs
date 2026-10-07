@@ -817,6 +817,7 @@ public class EngineSynthTests
         Assert.InRange(dl.Speed, 0f, 1.5f);
     }
 
+    [Trait("Category", "Timing")] // depends on this machine's speed; not run on CI
     [Fact]
     public void EngineProcessor_RendersFiniteAudio_InRealTimeBudget()
     {
