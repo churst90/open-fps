@@ -48,6 +48,11 @@ public static class FireSpike
         float age = Arg(args, "age=", float.NaN);
         float heard = Arg(args, "heard=", 0f);
         int seed = (int)Arg(args, "seed=", 7f);
+        // For fitting: the roar's swing and tail, and the crackle rates by fuel.
+        FireSynth.PuffSwing = Arg(args, "swing=", FireSynth.PuffSwing);
+        FireSynth.RoarTailExponent = Arg(args, "alpha=", FireSynth.RoarTailExponent);
+        FireSynth.CrackleBranching = Arg(args, "branch=", FireSynth.CrackleBranching);
+        FireSynth.Flicker = Arg(args, "flicker=", FireSynth.Flicker);
         string[]? parts = args.FirstOrDefault(a => a.StartsWith("parts=", StringComparison.Ordinal))?[6..].Split(',');
         string? dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..];
         if (dir != null) Directory.CreateDirectory(dir);
@@ -71,13 +76,14 @@ public static class FireSpike
             Console.WriteLine("  octaves re 1 kHz, 63 Hz-16 kHz: " + string.Join(" ", oct.Select(v => $"{v:F1}")));
             var tex = TextureStatistics.Analyse(pa).Summary();
             string kind = FireReferences.KindFor(key);
-            if (FireReferences.Has(kind))
+            bool old = !FireReferences.Has(kind) && kind == "campfire";
+            if (FireReferences.Has(kind) || old)
             {
                 int inside = 0;
                 var outside = new List<string>();
                 foreach (var k in FireReferences.FittedKeys)
                 {
-                    var (lo, hi) = FireReferences.Range(kind, k);
+                    var (lo, hi) = old ? TextureStatistics.Range("fire", k) : FireReferences.Range(kind, k);
                     if (tex[k] >= lo && tex[k] <= hi) inside++;
                     else outside.Add($"{k} {tex[k]:F3} [{lo:F3}, {hi:F3}]");
                 }

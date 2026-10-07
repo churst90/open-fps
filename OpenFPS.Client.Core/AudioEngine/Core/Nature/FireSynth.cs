@@ -59,12 +59,20 @@ public sealed class FireSynth
     /// puffing rate (infrasound), falls as f^−1.4 to ten times it (Marcillo et al. 2025) and as f^−α
     /// (<see cref="RoarTailExponent"/>) above, through everything that is heard. FITTED (section 8).
     /// </summary>
-    public static float PuffSwing = 0.092f;
+    public static float PuffSwing = 0.35f;
 
     /// <summary>α, how fast the roar's spectrum falls above ten times the puffing rate: PSD ∝ f^−α. Measured
     /// 2.1-3.4 on turbulent flames (Rajaram and Lieuwen 2009), 5/2 from Kolmogorov turbulence (Clavin and
     /// Siggia 1991), about 2.2-2.9 on vegetation fires (Viegas et al. 2008). FITTED (section 8).</summary>
     public static float RoarTailExponent = 2.5f;
+
+    /// <summary>
+    /// How far a body of fire's burning flickers between its puffs, rms over its mean: the heat release's
+    /// own spectrum runs on from the puffing rate to ten times it (f^−1.4, Marcillo et al. 2025), and the
+    /// roar and the gas let out of the fuel follow it. FITTED to the recordings' 4-16 Hz envelope
+    /// modulation (section 8).
+    /// </summary>
+    public static float Flicker = 0.2f;
 
     /// <summary>Where the roar's spectrum turns from f^−1.4 to f^−α, over the puffing rate.</summary>
     private const float KneeOverPuff = 10f;
@@ -94,6 +102,16 @@ public sealed class FireSynth
     private const float CrackleRange = 150f;
     /// <summary>How many crackles a second seasoned wood makes per 100 kW burning well, before clustering.</summary>
     private const float CracklesPer100Kw = 28f;
+    /// <summary>
+    /// How many more a crackle sets off, on average: a pocket giving way loads the cells round it, and
+    /// some of them go a moment later (an avalanche, as crackling noise in any brittle material comes
+    /// in: Sethna, Dahmen and Myers 2001; wood under load, Mäkinen et al. 2015). The rate the fire's
+    /// burning sets is the whole, avalanches included. FITTED to the recordings' 4-16 Hz envelope
+    /// modulation (section 8).
+    /// </summary>
+    public static float CrackleBranching = 0f;
+    /// <summary>How long after its parent a set-off crackle goes, on average, s.</summary>
+    private const float AvalancheSeconds = 0.06f;
     /// <summary>A crackle this many times the smallest throws an ember.</summary>
     private const float EmberSize = 60f;
     /// <summary>The most crackles a place draws one by one in a second; the rest are its crackle noise.</summary>
@@ -154,6 +172,9 @@ public sealed class FireSynth
         public float Share;          // of the whole heat release
         public float CatchAt;        // a share of the growth time at which it catches
         public float PuffHz, Phase, Jitter, Depth, Env;
+        public float FlickHp, FlickX, FlickLo, FlickHi;   // the flicker's filter states
+        public float Flick;                       // the burning now over its mean, from the flicker
+        public float Fizz;                        // its fizz's power, Pa² at a metre, before the flicker
         public float Vigour, VigourTarget, VigourClock;
         public float Cluster, ClusterClock;
         public float Torch, TorchPeak, TorchAge, TorchLife;
@@ -170,7 +191,7 @@ public sealed class FireSynth
     private readonly PowerLawNoise[] _roar;
     private readonly Resonator[] _fizz;
     private readonly float[] _bedLp0, _bedLp, _bedHp;
-    private readonly float[] _roarAmp, _roarTarget, _roarStep;
+    private readonly float[] _roarAmp, _roarStep;
     private readonly float[] _fizzAmp, _fizzTarget;
     private readonly float[] _bedAmp, _bedTarget;
     private readonly float[] _crackleRateAt;
@@ -178,6 +199,7 @@ public sealed class FireSynth
     private readonly float _roarUnit, _fizzNorm, _bedNorm, _bedA1, _bedA2;
     private readonly float _roarPsdPerKw2;   // the roar's PSD at 100 Hz per kW² of one cell, Pa²/Hz at a metre
     private readonly float _puffHz;
+    private readonly float _flickA, _flickB, _flickC, _flickNorm;
     private readonly float _glide;
 
     private float _burn = 1f;        // how lit: 1 burning, 0 out
@@ -202,6 +224,8 @@ public sealed class FireSynth
     private readonly Jet[] _jets = new Jet[3];
 
     // Embers in the air, landing later.
+    private struct Follower { public float In; public int Place; public float Size; public bool Live; }
+    private readonly Follower[] _followers = new Follower[64];
     private readonly float[] _emberAt = new float[24];
     private readonly float[] _emberSize = new float[24];
     private readonly int[] _emberPlace = new int[24];
@@ -330,13 +354,34 @@ public sealed class FireSynth
             _bedNorm = 1f / MathF.Sqrt((float)(e / 48000));
         }
         _bedLp0 = new float[places]; _bedLp = new float[places]; _bedHp = new float[places];
-        _roarAmp = new float[places]; _roarTarget = new float[places]; _roarStep = new float[places];
+        _roarAmp = new float[places]; _roarStep = new float[places];
         _fizzAmp = new float[places]; _fizzTarget = new float[places];
         _bedAmp = new float[places]; _bedTarget = new float[places];
         _crackleRateAt = new float[places];
         _placeOut = new float[places];
 
         _energyLogSize = CrackleEnergies(sampleRate);
+        // The flicker: noise above the puffing rate, flat to three times it and falling as f^−2 from there
+        // to ten times it (about the f^−1.4 measured over that decade), sampled every Sub samples.
+        {
+            float step = Sub / sampleRate;
+            _flickA = MathF.Exp(-MathF.Tau * _puffHz * step);
+            _flickB = MathF.Exp(-MathF.Tau * 3f * _puffHz * step);
+            _flickC = MathF.Exp(-MathF.Tau * MathF.Min(KneeOverPuff * _puffHz, 0.2f / step) * step);
+            float hp = 0f, lo = 0f, hi = 0f, xPrev = 0f;
+            var rng = new Random(5);
+            double e = 0;
+            int n = 200000;
+            for (int i = 0; i < n; i++)
+            {
+                float x = (float)rng.NextDouble() * 2f - 1f;
+                hp = _flickA * (hp + x - xPrev); xPrev = x;
+                lo = (1f - _flickB) * hp + _flickB * lo;
+                hi = (1f - _flickC) * lo + _flickC * hi;
+                e += hi * hi;
+            }
+            _flickNorm = 1f / MathF.Sqrt((float)(e / n));
+        }
         _glide = 1f - MathF.Exp(-1f / (0.005f * sampleRate));
 
         _settleClock = 30f + 60f * _sum.Uniform();
@@ -462,7 +507,7 @@ public sealed class FireSynth
     };
 
     /// <summary>Crackles per kW of burning foliage and twigs, over seasoned logs'. FITTED (section 8).</summary>
-    public const float TreeCrackle = 1f;
+    public const float TreeCrackle = 0.03f;
     /// <summary>Crackles per kW of a burning building's timber, over seasoned logs'. FITTED (section 8).</summary>
     public const float StructureCrackle = 1f;
     /// <summary>Crackles (spitting plastics and the car's own timber-free fuel) per kW, over logs'. FITTED.</summary>
@@ -506,7 +551,7 @@ public sealed class FireSynth
 
         // The places' share of what is not theirs: merged, everything is heard from the middle.
         float s = Math.Clamp(Spread, 0f, 1f);
-        for (int p = 0; p < places; p++) { _roarTarget[p] = 0f; _fizzTarget[p] = 0f; _crackleRateAt[p] = 0f; }
+        for (int p = 0; p < places; p++) _crackleRateAt[p] = 0f;
 
         float total = 0f;
         float rateTotal = 0f;
@@ -569,6 +614,7 @@ public sealed class FireSynth
             // The fizz follows how hard the fuel is gassing: what is burning, how wet, and the clusters of
             // pockets reaching temperature together that the crackles come in.
             float fizz = FizzPascals * FizzPascals * (heat / 80f) * MathF.Min(2f, Spec.Moisture / 0.2f) * cell.Cluster;
+            cell.Fizz = fizz;
             float crackles = CracklesPer100Kw * heat / 100f * FuelCrackle * cell.Vigour * cell.Cluster * (1f + 1.5f * _flare)
                            * (1f + 2f * cell.Torch) * (1f + 0.2f * MathF.Max(0f, cell.Wind - 2f));
             rateTotal += crackles / MathF.Max(1e-3f, cell.Cluster);
@@ -576,7 +622,7 @@ public sealed class FireSynth
             {
                 float wgt = _weights[c * places + p];
                 float here = p == 0 ? (1f - s) + s * wgt : s * wgt;
-                _fizzTarget[p] += here * fizz;
+
                 _crackleRateAt[p] += here * crackles;
             }
         }
@@ -584,7 +630,7 @@ public sealed class FireSynth
         HeatNowKw = total;
         for (int p = 0; p < places; p++)
         {
-            _fizzTarget[p] = MathF.Sqrt(_fizzTarget[p]) * CracklePart;
+
             // The share of this place's crackles too many to draw is its crackle noise.
             float rate = _crackleRateAt[p];
             float cut = DrawnFrom(rate);
@@ -814,6 +860,7 @@ public sealed class FireSynth
         int places = _sums.Length;
         float s = Math.Clamp(Spread, 0f, 1f);
         Span<float> power = stackalloc float[places];
+        Span<float> fizzPower = stackalloc float[places];
         for (int c = 0; c < _cells.Length; c++)
         {
             ref var cell = ref _cells[c];
@@ -824,18 +871,35 @@ public sealed class FireSynth
                 cell.Jitter = _sum.Signed();               // no two puffs alike, in length...
                 cell.Depth = 0.1f + 0.25f * _sum.Uniform(); // ...or in strength
             }
+            // Between the puffs the burning flickers: noise, high-passed at the puffing rate and
+            // low-passed at three and ten times it.
+            float x = _sum.Signed();
+            float hp = _flickA * (cell.FlickHp + x - cell.FlickX);
+            cell.FlickHp = hp;
+            cell.FlickX = x;
+            cell.FlickLo = (1f - _flickB) * hp + _flickB * cell.FlickLo;
+            cell.FlickHi = (1f - _flickC) * cell.FlickLo + _flickC * cell.FlickHi;
+            float flick = Flicker * cell.FlickHi * _flickNorm;
             // A puff swells the roar rather than switching it: the flames never stop burning between them.
-            cell.Env = 1f + cell.Depth * MathF.Sin(MathF.Tau * cell.Phase);
+            cell.Env = MathF.Max(0.05f, 1f + cell.Depth * MathF.Sin(MathF.Tau * cell.Phase) + flick);
+            cell.Flick = MathF.Max(0.05f, 1f + flick);
             float pr = cell.Roar * cell.Env;
             float pw = pr * pr;
+            // The gas let out of the fuel follows the flames' flicker: the heat on it does.
+            float fz = cell.Fizz * cell.Flick * cell.Flick;
             for (int p = 0; p < places; p++)
             {
                 float wgt = _weights[c * places + p];
-                power[p] += (p == 0 ? (1f - s) + s * wgt : s * wgt) * pw;
+                float here = p == 0 ? (1f - s) + s * wgt : s * wgt;
+                power[p] += here * pw;
+                fizzPower[p] += here * fz;
             }
         }
         for (int p = 0; p < places; p++)
+        {
             _roarStep[p] = (MathF.Sqrt(power[p]) - _roarAmp[p]) / Sub;
+            _fizzTarget[p] = MathF.Sqrt(fizzPower[p]) * CracklePart;
+        }
     }
 
     /// <summary>The steam jets, at the middle.</summary>
@@ -885,9 +949,18 @@ public sealed class FireSynth
                 if (rate <= 0f) continue;
                 float cut = DrawnFrom(rate);
                 float drawn = rate * TailShare(cut);
-                int count = _sum.Poisson(drawn * dt);
-                DrawnCrackles += count;
-                for (int k = 0; k < count; k++) Crackle(_sums[p], p, (int)(_sum.Uniform() * Block), cut);
+                // The avalanches' first crackles; what they set off makes up the rest of the rate.
+                int count = _sum.Poisson(drawn * (1f - CrackleBranching) * dt);
+                for (int k = 0; k < count; k++) Crackle(_sums[p], p, (int)(_sum.Uniform() * Block), cut, 0f);
+            }
+            for (int i = 0; i < _followers.Length; i++)
+            {
+                ref var f = ref _followers[i];
+                if (!f.Live) continue;
+                f.In -= dt;
+                if (f.In > 0f) continue;
+                f.Live = false;
+                Crackle(_sums[Math.Min(f.Place, places - 1)], f.Place, (int)(_sum.Uniform() * Block), 1f, f.Size);
             }
         }
 
@@ -987,13 +1060,35 @@ public sealed class FireSynth
         return table;
     }
 
-    private void Crackle(EventSum place, int placeIndex, int at, float from)
+    private void Crackle(EventSum place, int placeIndex, int at, float from, float given)
     {
+        DrawnCrackles++;
         // Size on the power law over `from`: P(size > s) ∝ s^-(α-1), cut at the range.
         float a = CrackleExponent - 1f;
-        float lo = MathF.Pow(MathF.Max(1f, from), -a), hi = MathF.Pow(CrackleRange, -a);
-        float u = lo + (hi - lo) * _sum.Uniform();
-        float size = Math.Clamp(MathF.Pow(u, -1f / a), 1f, CrackleRange);
+        float size = given;
+        if (size <= 0f)
+        {
+            float lo = MathF.Pow(MathF.Max(1f, from), -a), hi = MathF.Pow(CrackleRange, -a);
+            float u = lo + (hi - lo) * _sum.Uniform();
+            size = Math.Clamp(MathF.Pow(u, -1f / a), 1f, CrackleRange);
+        }
+        // What it sets off: crackles of the same law over the same cut, a moment later.
+        int set = _sum.Poisson(CrackleBranching);
+        for (int k = 0; k < set; k++)
+        {
+            for (int i = 0; i < _followers.Length; i++)
+            {
+                if (_followers[i].Live) continue;
+                float lo = MathF.Pow(MathF.Max(1f, from), -a), hi = MathF.Pow(CrackleRange, -a);
+                float child = Math.Clamp(MathF.Pow(lo + (hi - lo) * _sum.Uniform(), -1f / a), 1f, CrackleRange);
+                _followers[i] = new Follower
+                {
+                    In = -AvalancheSeconds * MathF.Log(MathF.Max(1e-6f, _sum.Uniform())),
+                    Place = placeIndex, Size = child, Live = true,
+                };
+                break;
+            }
+        }
         float p = SmallestCracklePascals * size * _burn * CracklePart;
         // A pocket bursting is a volume of gas let out at once: the pressure is the rate of change of
         // the outflow, a spike as the wall gives and a tail as the pocket empties. A bigger pocket
