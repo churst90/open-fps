@@ -2,6 +2,33 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-07
+
+- World editor, phase 2 (unheard; tests and a MUD walk only). The plan and what was built:
+  docs/WORLD_EDITOR.md sections 11 and 12.
+  - Every kind describes its physical parameters: water, fire, foliage, running water, shores, horns,
+    whistles, bells, air systems, trains, rail vehicles, track, engines, and a vehicle's tyres, body
+    and gearbox, about 460 fields with units, ranges that hold every built-in value, help, and the source
+    where the code names one. Render trims, headroom and seeds stay read only.
+  - Engines and vehicles are library kinds. An edited engine is in every vehicle, machine and train
+    that has it; an edited vehicle is what MachineRegistry gives, on the server and every client.
+  - Prefabs are a kind, described from prefab-schema.json. A new version makes every thing made from the
+    prefab again where it stands.
+  - Versions: use one on every map, or pin one on a map (a map setting: an owner may). Each map's players
+    are sent the versions it uses. Where a model is used, map by map.
+  - Library: new from a template, copy, replace one model with another on this map or every map (one
+    undo), retire and restore, take an item out of a list.
+  - Place: search, preview by ear (to you alone, six seconds), rows, again, at the build cursor.
+  - Groups: hold things, group them as a model, place the group as its things.
+  - Settings of a placed thing: its model, a door's locked and push sides, a room's six materials and
+    whether it is indoors, a place's name. A thing moved into another tile of a streamed map is in that
+    tile.
+  - Map settings: hold the weather or the hour, the natural ground, the beacon rules (sent to the map's
+    players at once).
+  - Direct keys on Shift while an editor list is open, off by default (`/editorkeys on`); to be tried
+    with Orca and NVDA first.
+  - Wire: MapSettingsUpdate, union tag 42. Rebuild client and server together.
+
 ## 2026-10-06
 
 - Fire at any size (unheard). Cody: "does the sound of the fire scale with the size? a bonfire in the
