@@ -6,13 +6,8 @@ using Serilog;
 namespace OpenFPS.Server.Repositories;
 
 /// <summary>
-/// One part of a composite, in the composite's OWN frame.
-///
-/// Deliberately the same shape as <see cref="EntityData"/>, which is what a map entry already is.
-/// That is not laziness: it means a composite can contain anything a map can contain — a wall with
-/// authored room materials, a portal with an aperture, a sound emitter with a slot offset — and none
-/// of it needs a second code path to be placed. A house saved from a map and a house placed into one
-/// are the same list of entries read in two directions.
+/// One part of a composite, in the composite's own frame. The same shape as <see cref="EntityData"/>
+/// on purpose, so a composite holds anything a map can and places it by the same path.
 /// </summary>
 public class CompositePart
 {
@@ -26,20 +21,14 @@ public class CompositePart
     public float? ApertureSize { get; set; }
 }
 
-/// <summary>
-/// One seat, in the composite's own frame. The saved form of <see cref="Seat"/>.
-///
-/// Seats are part of what a thing IS, so they travel in the template rather than being re-authored
-/// on every instance: place a bus twice and both have the same seats, the same as both have the same
-/// walls.
-/// </summary>
+/// <summary>One seat, in the composite's own frame: the saved form of <see cref="Seat"/>. Seats travel
+/// in the template, so every instance has the same ones.</summary>
 public class SeatDefinition
 {
     public string Name { get; set; } = string.Empty;
     /// <summary>Where the occupant's feet go, relative to the composite's origin.</summary>
     public Vector3 Position { get; set; }
-    /// <summary>Which way the seat faces within the composite, DEGREES — this is a file a person may
-    /// end up reading, and radians in a file are a small cruelty.</summary>
+    /// <summary>Which way the seat faces within the composite, degrees: people read these files.</summary>
     public float YawDegrees { get; set; }
     /// <summary>Whether sitting here drives it.</summary>
     public bool Controls { get; set; }
@@ -58,23 +47,13 @@ public class CompositeTemplate
     /// <summary>Where people can sit in it. Empty for a thing nobody gets inside, like a barricade.</summary>
     public List<SeatDefinition> Seats { get; set; } = new();
 
-    /// <summary>
-    /// The vehicle profile this drives as, or empty for something that does not drive.
-    ///
-    /// A key into <see cref="OpenFPS.Common.VehicleProfile.Presets"/> — the same profiles the map's own
-    /// traffic uses, so a composite somebody built out of walls and a hatchback the map spawned are
-    /// the same kind of thing to the engine, the tyres and the client that has to make them audible.
-    /// </summary>
+    /// <summary>The vehicle this drives as (a <see cref="OpenFPS.Common.MachineRegistry"/> id, the same
+    /// ones the map's traffic uses), or empty for something that does not drive.</summary>
     public string VehiclePreset { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// Where a composite was PUT. A map carries a list of these the way it carries a list of vehicles:
-/// what to place, where, and which way round.
-///
-/// This is what makes a house permanent. Without it, building one is a thing that happens until the
-/// server is restarted, which is not a house, it is a rehearsal.
-/// </summary>
+/// <summary>Where a composite was put on a map: what, where and which way round. What makes a built
+/// house outlast a restart.</summary>
 public class CompositePlacement
 {
     public string TemplateId { get; set; } = string.Empty;
@@ -86,13 +65,8 @@ public class CompositePlacement
     public string Owner { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// The composites available to place, loaded from JSON on disk and saved back the same way.
-///
-/// Mirrors <see cref="PrefabRepository"/> on purpose — same directory-of-files shape, same reader
-/// options, same "rejected" reporting — because a composite IS a prefab, just one made of more than
-/// one entity. Anyone who can author the one can author the other.
-/// </summary>
+/// <summary>The composites there are to place, a folder of JSON files read and written the way
+/// <see cref="PrefabRepository"/> reads prefabs.</summary>
 public class CompositeRepository
 {
     private readonly string _directory;
@@ -104,8 +78,7 @@ public class CompositeRepository
 
     public CompositeRepository(string directory)
     {
-        // Same path discovery as the other repositories: run from the repo root or from the server's
-        // own directory and either finds its data.
+        // Found from the repo root or from the server's own folder.
         if (!Directory.Exists(directory) && Directory.Exists(Path.Combine("OpenFPS.Server", directory)))
             _directory = Path.GetFullPath(Path.Combine("OpenFPS.Server", directory));
         else
@@ -139,8 +112,7 @@ public class CompositeRepository
                 if (!string.IsNullOrWhiteSpace(t.VehiclePreset)
                     && !OpenFPS.Common.MachineRegistry.Knows(t.VehiclePreset))
                 { _rejected[t.Id] = $"unknown vehicle preset '{t.VehiclePreset}'"; continue; }
-                // A vehicle nobody can drive is a shed with an engine in it. Caught here as well as
-                // at /drivable, because a file on disk can be edited by hand and this is the door.
+                // Checked here as well as at /drivable: a file can be edited by hand.
                 if (!string.IsNullOrWhiteSpace(t.VehiclePreset) && !t.Seats.Exists(s => s.Controls))
                 { _rejected[t.Id] = "it drives but has no seat that drives"; continue; }
                 if (t.Seats.Exists(s => string.IsNullOrWhiteSpace(s.Name)))
@@ -157,8 +129,7 @@ public class CompositeRepository
             Log.Information("CompositeRepository: {Loaded} composite(s) loaded.", _templates.Count);
     }
 
-    /// <summary>Writes a composite to disk and makes it immediately placeable. This is the moment a
-    /// thing somebody built out of parts becomes a thing anybody can place again.</summary>
+    /// <summary>Writes a composite to disk and makes it placeable at once.</summary>
     public void Save(CompositeTemplate template)
     {
         if (!OpenFPS.Server.Core.SafeText.IsFileName(template.Id))

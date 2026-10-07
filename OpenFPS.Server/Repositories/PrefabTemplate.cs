@@ -4,12 +4,9 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Server.Repositories;
 
 /// <summary>
-/// The prefab format. This class *is* the spec: every key a prefab JSON file may carry is a property here,
-/// nothing else is accepted, and <see cref="PrefabValidator"/> rejects a file whose values cannot produce a
-/// coherent entity. `prefabs/prefab-schema.json` and `docs/AUTHORING.md` are written against this type;
-/// before they were, they described two formats the loader had never read (a nested
-/// `Collider`/`SoundEmitter`/`Acoustics` shape and an integer `Type`), so an author following either
-/// produced a file that deserialized into all-defaults and spawned an invisible, silent, materialless cube.
+/// The prefab format, and the spec of it: every key a prefab file may carry is a property here, and
+/// <see cref="PrefabValidator"/> rejects values that cannot make a coherent entity.
+/// `prefabs/prefab-schema.json` and `docs/AUTHORING.md` are written against this type; keep them in step.
 ///
 /// Every field is optional except <see cref="Id"/> and <see cref="Name"/>; an omitted field means "do not
 /// attach this behaviour", not "attach it with a zero". <see cref="PrefabRepository.Spawn"/> is the only
@@ -22,21 +19,17 @@ public class PrefabTemplate
     /// <summary>Unique id, and the name a map's `PrefabId` refers to. Should match the file name.</summary>
     public string Id { get; set; } = string.Empty;
 
-    /// <summary>Spoken name of the entity. Becomes NameComponent/IdentityComponent.Name — in a game played
-    /// by ear this is the only way the thing can be referred to at all, so it is required.</summary>
+    /// <summary>Spoken name of the entity (NameComponent and IdentityComponent.Name). Required: by ear it
+    /// is the only way to refer to the thing.</summary>
     public string Name { get; set; } = string.Empty;
 
     /// <summary>Longer description, read out on examine. Becomes IdentityComponent.Description.</summary>
     public string Description { get; set; } = string.Empty;
 
-    /// <summary>Whether the client SPEAKS this entity's name (and description) as the player walks within
-    /// interaction range. Omit it and the default follows <see cref="Type"/>: true for Item, NPC and
-    /// Beacon — the things a player encounters — and false for StaticObject, Trigger and Projectile.
-    ///
-    /// Set it false on a named landmark you do not want narrated, or true on a piece of architecture that
-    /// should be (a staircase, a door). The default exists because the acoustic scaffolding is all
-    /// StaticObject: before it, walking through a doorway announced the portal prefab — including the
-    /// paragraph of authoring instructions in its Description — in the middle of the step.</summary>
+    /// <summary>Whether the client speaks this entity's name (and description) as the player walks within
+    /// interaction range. Omitted, it follows <see cref="Type"/>: true for Item, NPC and Beacon, false
+    /// for StaticObject, Trigger and Projectile, so portals and regions are not read out mid-step. Set it
+    /// false on a landmark you do not want narrated, or true on architecture that should be.</summary>
     public bool? Announce { get; set; }
 
     /// <summary>EntityType by NAME ("StaticObject", "Beacon", "Item", "NPC", ...). Defaults to StaticObject.</summary>
@@ -92,16 +85,10 @@ public class PrefabTemplate
     /// <summary>What it weighs, kilograms. Not bookkeeping — it is what you hear when it lands.</summary>
     public float? ItemWeight { get; set; }
 
-    /// <summary>
-    /// How many hands it takes: one or two. Defaults to one.
-    ///
-    /// The constraint that makes carrying things a spatial decision rather than a menu. A rifle takes
-    /// both, so a rifle and a torch is a choice somebody has to make in the moment.
-    /// </summary>
+    /// <summary>How many hands it takes: one or two. Defaults to one.</summary>
     public int? Hands { get; set; }
 
-    /// <summary>The weapon this IS, if it is one — a key into the weapon registry, so a thing you are
-    /// holding can be fired without anything here knowing what a weapon is.</summary>
+    /// <summary>The weapon this is, if it is one: a key into the weapon registry.</summary>
     public string? WeaponId { get; set; }
 
     /// <summary>A premium item: hard to come by, so only somebody with the give-premium permission can
@@ -189,13 +176,10 @@ public class PrefabTemplate
     public Vector3? EmitterDirection { get; set; }
 
     /// <summary>
-    /// Where the sound comes OUT, in the entity's LOCAL space: the emitter slot. Omit for the origin.
-    ///
-    /// Worth authoring for anything whose sound does not come from its own base. Everything acoustic
-    /// is asked about this point — what is in the way of it, how far it is, which way it arrives from —
-    /// and asking about the origin instead is what put a vehicle's occlusion probe half inside the
-    /// road surface on every level stretch of every track. A tailpipe is a third of a metre up and a
-    /// metre or two back; a chimney is on the roof; a drain is at ground level.
+    /// Where the sound comes out, in the entity's local space: the emitter slot. Omit for the origin.
+    /// Every acoustic question (occlusion, distance, bearing) is asked about this point, so author it for
+    /// anything that does not sound from its base: an origin on the road put a vehicle's occlusion probe
+    /// inside the road surface.
     /// </summary>
     public Vector3? EmitterOffset { get; set; }
 
@@ -208,12 +192,8 @@ public class PrefabTemplate
     /// <inheritdoc cref="ConeInsideAngle"/>
     public float? ConeOutsideVolume { get; set; }
 
-    /// <summary>
-    /// Replay this emitter's sound every N seconds, with silence in between. Zero is not a repeater.
-    ///
-    /// Not the same as LoopOne, which restarts the instant the sample ends. The GAP is the point: an
-    /// announcement you can wait for is a landmark, and a drone is furniture.
-    /// </summary>
+    /// <summary>Replays the sound every N seconds with silence between, unlike LoopOne, which restarts
+    /// at once. Zero is not a repeater.</summary>
     public float? RepeatIntervalSeconds { get; set; }
 
     // --- Granular synthesis (SoundEmitterComponent) --------------------------------------------------
@@ -268,10 +248,9 @@ public class PrefabTemplate
     /// <summary>Multiplier on the computed reverb time (&gt; 0).</summary>
     public float? ReverbScale { get; set; }
 
-    /// <summary>The six interior surfaces by MATERIAL NAME, in the order the reverb math reads them:
-    /// Floor, Ceiling, North, South, East, West. Exactly six entries. (This is the readable form of
-    /// RegionComponent.Materials, which stores resonance indices — authoring by raw index is unverifiable.)
-    /// Note this order is NOT the <see cref="FaceMask"/> bit order.</summary>
+    /// <summary>The six interior surfaces by material name, in the order the reverb reads them: Floor,
+    /// Ceiling, North, South, East, West (not the <see cref="FaceMask"/> bit order). The readable form of
+    /// RegionComponent.Materials.</summary>
     public string[]? RoomMaterials { get; set; }
 
     // --- Acoustic portal (PortalComponent) -------------------------------------------------------------
@@ -289,28 +268,20 @@ public class PrefabTemplate
     // --- Door (DoorComponent) --------------------------------------------------------------------
 
     /// <summary>
-    /// Declares the entity a DOOR: a leaf that swings out of its own doorway.
-    ///
-    /// A door is the one thing that is legitimately a portal AND solid. The leaf blocks the opening
-    /// while it is shut — that is what a door is for — and opening it moves the leaf aside rather
-    /// than making it insubstantial. Everything else that is both is a mistake and is still rejected.
-    ///
-    /// A door needs a collider, because the leaf's own width is both what it blocks and the size of
-    /// the hole it leaves.
+    /// Declares the entity a door: a leaf that swings out of its own doorway. The one thing that may be a
+    /// portal and solid at once. It needs a collider: the leaf's width is both what it blocks and the
+    /// size of the hole it leaves.
     /// </summary>
     public bool? IsDoor { get; set; }
 
-    /// <summary>
-    /// The beacon category, for a prefab that is a beacon: "exit", "stairs", "waypoint"... Doors and
-    /// items need not say — they are door and item beacons by being doors and items. A Beacon that
-    /// says nothing is a waypoint. See OpenFPS.Common.Beacons.
-    /// </summary>
+    /// <summary>The beacon category of a Beacon: "exit", "stairs", "waypoint"... (a waypoint if absent).
+    /// Doors and items are door and item beacons without saying. See OpenFPS.Common.Beacons.</summary>
     public string? BeaconCategory { get; set; }
 
     /// <summary>How long the full swing takes, seconds. Defaults to a little under a second.</summary>
     public float? SwingSeconds { get; set; }
 
-    /// <summary>How far it opens, DEGREES — this is a file people read. A quarter turn by default.</summary>
+    /// <summary>How far it opens, degrees. A quarter turn by default.</summary>
     public float? SwingDegrees { get; set; }
 
     /// <summary>Which edge it is hinged on: -1 the left, +1 the right. Decides which way it sweeps,

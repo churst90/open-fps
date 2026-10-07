@@ -8,13 +8,9 @@ using Serilog;
 namespace OpenFPS.Server.Repositories;
 
 /// <summary>
-/// Loads <see cref="PrefabTemplate"/> files and turns one into an entity. The template class is the format;
-/// this is the only reader of it.
-///
-/// Loading is not just deserialization: every file is checked against <see cref="PrefabValidator"/> and a
-/// prefab whose description the engine cannot honour is REJECTED with the reasons named, rather than
-/// spawning something that quietly lacks whatever was wrong. Rejected ids are remembered, so the map that
-/// references one is told the prefab was rejected instead of that it does not exist.
+/// Loads <see cref="PrefabTemplate"/> files, the only reader of them, and turns one into an entity.
+/// Every file is checked by <see cref="PrefabValidator"/>; one the engine cannot honour is rejected with
+/// the reasons named, and a map that places a rejected id is told so rather than "not found".
 /// </summary>
 public class PrefabRepository
 {
@@ -105,9 +101,8 @@ public class PrefabRepository
             try
             {
                 string json = File.ReadAllText(file);
-                // Parsed twice on purpose: once for the values, once for the KEYS. System.Text.Json drops a
-                // property it does not recognise without a word, so a mistyped field is a setting that never
-                // applies and never complains. The validator needs the names to say so.
+                // Parsed twice: System.Text.Json drops an unknown key without a word, and the validator
+                // needs the keys to name a mistyped field.
                 using (var doc = JsonDocument.Parse(json, new JsonDocumentOptions
                 {
                     AllowTrailingCommas = true,
@@ -186,18 +181,12 @@ public class PrefabRepository
     }
 
     /// <summary>Whether this prefab is spoken as the player walks up to it. An explicit `Announce` wins;
-    /// otherwise only the types a player actually encounters are announced, which keeps the acoustic
-    /// scaffolding (portals, region volumes) and the architecture silent.</summary>
+    /// otherwise only items, NPCs and beacons are, which keeps portals, regions and walls silent.</summary>
     internal static bool AnnouncesByDefault(PrefabTemplate t) =>
         t.Announce ?? t.Type is EntityType.Item or EntityType.NPC or EntityType.Beacon;
 
-    /// <param name="regionName">What to call the region this spawns, if it declares one. A prefab
-    /// names a KIND of room ("Acoustic Region"); the map that places one names THAT room ("Pit lane").
-    /// Without this every region in a map answers to its prefab's name, which is no name at all.</param>
-    /// <summary>
-    /// What kind of beacon a thing is by being what it is: a door is a door beacon, an item an item
-    /// beacon, and a Beacon says its own category or is a waypoint. Everything else is not a beacon.
-    /// </summary>
+    /// <summary>A thing's beacon category by what it is: a door, an item, or a Beacon's own category
+    /// (a waypoint if it names none). Empty for anything else.</summary>
     public static string BeaconCategoryOf(PrefabTemplate t)
     {
         if (!string.IsNullOrWhiteSpace(t.BeaconCategory) && OpenFPS.Common.Beacons.IsCategory(t.BeaconCategory))
@@ -208,6 +197,9 @@ public class PrefabRepository
         return "";
     }
 
+    /// <summary>A prefab made into an entity.</summary>
+    /// <param name="regionName">What to call the region this spawns, if it declares one: a prefab names
+    /// a kind of room ("Acoustic Region"), the map that places it names that room ("Pit lane").</param>
     public Entity Spawn(World world, string prefabId, Vector3 position, Quaternion? rotation = null,
                         Vector3? scale = null, string? regionName = null)
     {
@@ -222,8 +214,7 @@ public class PrefabRepository
         {
             new Transform { Position = position, Rotation = rotation ?? Quaternion.Identity, Scale = scale ?? Vector3.One },
             new NameComponent { Name = t.Name },
-            // PrefabId recorded on the instance so it can be written back out again: a composite saved
-            // from a house somebody built has to know that this wall is a `concrete_wall`.
+            // PrefabId on the instance, so a composite saved from it can be written back out.
             new IdentityComponent { Name = t.Name, Description = t.Description, Announce = AnnouncesByDefault(t), PrefabId = t.Id,
                                     BeaconCategory = BeaconCategoryOf(t) },
             t.Type
@@ -306,11 +297,9 @@ public class PrefabRepository
                 Volume = t.Volume ?? 1.0f,
                 Range = t.Range ?? 50.0f,
                 Mode = t.Mode ?? PlaybackMode.Single,
-                // Local-space aim, rotated into the world by the entity's own rotation on the client.
-                // Zero means "use the entity's forward", which is what every emitter did implicitly before.
+                // Local-space aim, rotated by the entity on the client; zero means the entity's forward.
                 Direction = t.EmitterDirection ?? Vector3.Zero,
-                // The emitter slot: where the sound comes out, in the entity's own frame. Zero means
-                // the origin, which is what every emitter did implicitly before. See AudioEmission.
+                // Where the sound comes out, in the entity's own frame; zero is the origin. See AudioEmission.
                 Offset = t.EmitterOffset ?? Vector3.Zero,
                 ConeInsideAngle = t.ConeInsideAngle ?? 360f,
                 ConeOutsideAngle = t.ConeOutsideAngle ?? 360f,
@@ -349,9 +338,7 @@ public class PrefabRepository
             });
         }
 
-        // ANY region field declares a region. This used to key off IsIndoor/RoomSize alone, so a prefab
-        // that named only an AmbienceId got no RegionComponent at all and the setting vanished; the
-        // validator now also insists such a prefab carries the RoomSize the reverb needs.
+        // Any region field declares a region; the validator insists on the RoomSize the reverb needs.
         if (t.IsIndoor.HasValue || t.RoomSize.HasValue ||
             !string.IsNullOrEmpty(t.AmbienceId) || t.ReverbScale.HasValue || t.RoomMaterials != null)
         {
@@ -359,9 +346,7 @@ public class PrefabRepository
             {
                 FriendlyName = string.IsNullOrWhiteSpace(regionName) ? t.Name : regionName,
                 IsIndoor = t.IsIndoor ?? true,
-                // The ROOM follows the entity's scale, the same way the collider above already does.
-                // It did not, so a map could place a region of exactly one size — the prefab's — and
-                // scaling one gave you a big collider around a small room.
+                // The room scales with the entity, as the collider does.
                 RoomSize = (t.RoomSize ?? Vector3.Zero) * (scale ?? Vector3.One),
                 AmbienceId = t.AmbienceId ?? "",
                 ReverbTimeScale = t.ReverbScale ?? 1.0f,
@@ -382,17 +367,15 @@ public class PrefabRepository
 
         bool isDoor = t.IsDoor == true;
 
-        // A door is always a portal, whether or not the prefab said so: the opening it makes when it
-        // swings aside is the entire point of it, and an aperture with nothing to join joins the
-        // outside, which is right for a front door and harmless for any other.
+        // A door is always a portal. One with no regions named joins the outside, which is right for a
+        // front door and harmless for any other.
         if (t.RegionAId.HasValue || t.RegionBId.HasValue || isDoor)
         {
             components.Add(new PortalComponent
             {
                 RegionAId = t.RegionAId ?? AcousticConstants.GlobalRegionId,
                 RegionBId = t.RegionBId ?? AcousticConstants.GlobalRegionId,
-                // Shut. A door's aperture is not authored — it is however far the leaf has swung, and
-                // at rest the leaf has not.
+                // A door's aperture is however far its leaf has swung: none at rest.
                 ApertureSize = isDoor ? 0f : t.ApertureSize ?? 0f
             });
         }
@@ -414,8 +397,7 @@ public class PrefabRepository
                 SwingRadians = (t.SwingDegrees ?? 90f) * (MathF.PI / 180f),
                 HingeSide = t.HingeSide is < 0 ? -1f : 1f,
                 SkinMetres = MathF.Max(0f, t.DoorSkinMetres ?? 0f),
-                // Left at zero so DoorSystem takes it from the leaf itself: a door makes a hole
-                // exactly its own size, and a second authored copy of that could only disagree.
+                // Zero: DoorSystem takes the hole's size from the leaf itself.
                 Aperture = 0f,
             });
         }
@@ -428,11 +410,9 @@ public class PrefabRepository
         return entity;
     }
 
-    /// <summary>
-    /// Turns the six face MATERIAL NAMES into the resonance indices RegionComponent stores.
-    /// Order is Floor, Ceiling, North, South, East, West — the order the Sabine reverb math reads them,
-    /// which is deliberately not the FaceMask bit order.
-    /// </summary>
+    /// <summary>The six face material names as the resonance indices RegionComponent stores, in the
+    /// order the Sabine reverb reads them (Floor, Ceiling, North, South, East, West), which is not the
+    /// FaceMask bit order.</summary>
     internal static int[] ResolveRoomMaterials(string[]? names)
     {
         var indices = new int[6];

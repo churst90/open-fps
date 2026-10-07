@@ -55,11 +55,9 @@ public class GameServer
     // docs/SERVER_SECURITY.md.
     private readonly AuthService _auth;
 
-    /// <summary>
-    /// Logins being checked off the tick thread right now. Past <see cref="MaxPendingLogins"/> a new
-    /// one is told the server is busy rather than queued: bcrypt is slow on purpose, and a queue
-    /// that grows with the number of addresses asking is a queue an attacker can fill.
-    /// </summary>
+    /// <summary>Logins being checked off the tick thread now. Past <see cref="MaxPendingLogins"/> a new one
+    /// is told the server is busy, not queued: bcrypt is slow on purpose, and a queue is something an
+    /// attacker can fill.</summary>
     private int _pendingLogins;
     public const int MaxPendingLogins = 8;
 
@@ -132,10 +130,8 @@ public class GameServer
         return due;
     }
 
-    /// <summary>
-    /// Gives an UNSTARTED server the maps and sessions a test built, so the paths that need the
-    /// world — <see cref="MoveToMap"/>, spawning — can run without a socket. Start() builds its own.
-    /// </summary>
+    /// <summary>Gives an unstarted server the maps and sessions a test built, so <see cref="MoveToMap"/>
+    /// and spawning run without a socket.</summary>
     public void Attach(MapManager maps, SessionManager sessions, OccupancyService? seats = null, HandsService? hands = null)
     {
         _maps = maps;
@@ -145,11 +141,8 @@ public class GameServer
         _store = new PlayerStore(_userRepo, maps, hands ?? new HandsService(maps));
     }
 
-    /// <summary>
-    /// Runs everything queued for the tick thread. This is the only place world mutations from other
-    /// threads — the MUD gateway's TCP tasks, command handlers, despawns — are allowed to happen.
-    /// Returns how many ran.
-    /// </summary>
+    /// <summary>Runs everything queued for the tick thread, the only place other threads' world changes
+    /// (the MUD gateway, commands, despawns) may happen. Returns how many ran.</summary>
     public int DrainCommandBuffer()
     {
         int ran = 0;
@@ -175,10 +168,8 @@ public class GameServer
         return ran;
     }
 
-    /// <summary>
-    /// Caps banked simulation time. Returns the accumulator to keep, and reports how many ticks' worth
-    /// were thrown away — see <see cref="RunLoop"/> for why they must be.
-    /// </summary>
+    /// <summary>Caps banked simulation time: the accumulator to keep, and how many ticks were thrown away
+    /// (<see cref="RunLoop"/> says why they must be).</summary>
     public static double ClampAccumulatorMs(double accumulatorMs, out int droppedTicks)
     {
         const double maxMs = MaxCatchUpSeconds * 1000.0;
@@ -187,10 +178,8 @@ public class GameServer
         return maxMs;
     }
 
-    /// <summary>
-    /// The area-of-interest diff: what a client could see last broadcast and cannot see now. Those ids
-    /// are ghosts on its side until it is told, because everything else about an entity is additive.
-    /// </summary>
+    /// <summary>What a client could see last broadcast and cannot now: ghosts on its side until it is told,
+    /// since everything else about an entity is additive.</summary>
     public static void CollectDeparted(HashSet<int> previouslyVisible, HashSet<int> visibleNow, List<int> into)
     {
         into.Clear();
@@ -201,11 +190,8 @@ public class GameServer
     private volatile bool _isRunning = true;
     private long _currentTick = 0;
 
-    /// <summary>
-    /// Asks the loop to finish the current tick and shut down. Safe to call from a signal handler on any
-    /// thread; teardown itself happens on the loop thread once it has left the tick, so nothing is
-    /// disposed underneath a simulation step.
-    /// </summary>
+    /// <summary>Asks the loop to finish the tick and shut down. Safe from a signal handler on any thread:
+    /// teardown runs on the loop thread, so nothing is disposed under a simulation step.</summary>
     public void Stop() => _isRunning = false;
 
     public void SyncAudioComponent(int entityId)
@@ -221,11 +207,9 @@ public class GameServer
     internal IReadOnlyCollection<int> PendingDefinitionResends => _dirtyAudioEntities.ToArray();
 
     /// <summary>
-    /// Puts a player's team on their body, if they are in the world, and has everybody who can see them
-    /// told again. A client hears a teammate's beacon in its own tone by comparing the team on that
-    /// body with the team on its own, and both travel in the entity definition, which is sent once —
-    /// so a change of team that did not re-send it would go unheard until the player left and came back.
-    /// Runs on the tick thread.
+    /// Puts a player's team on their body and re-sends its definition, which carries the team and is
+    /// otherwise sent once: without it a teammate's beacon would keep its old tone until they rejoined.
+    /// On the tick thread.
     /// </summary>
     public void RefreshTeam(string username)
     {
@@ -242,19 +226,9 @@ public class GameServer
     }
 
     /// <summary>
-    /// Tells everyone who could hear it that something just happened.
-    ///
-    /// The one channel for every short sound the world makes. Until this existed the server's entire
-    /// vocabulary for sound was "this entity carries a looping emitter", which is why glass breakage,
-    /// gunfire and collisions are all written, tested and completely silent: there was no way to say
-    /// "that just happened", only "that is always happening".
-    ///
-    /// Sent RELIABLY, because a transient is a one-off event that nothing will ever resend. A dropped
-    /// state packet costs nothing — the next tick corrects it — and a dropped door is a door that
-    /// opened in silence, which the player then walks into.
-    ///
-    /// Earshot is the map's own broadcast radius, which is sized from how far the loudest thing on it
-    /// actually carries, so nothing needs a per-event range.
+    /// Tells everyone in earshot that something just happened: the one channel for every short sound.
+    /// Sent reliably, because nothing resends a one-off event (a dropped door is a door that opened in
+    /// silence). Earshot is the map's broadcast radius, sized from its loudest source.
     /// </summary>
     public void EmitWorldAudio(string mapId, int sourceEntityId, string label,
                                IReadOnlyList<TransientSound> sounds)
@@ -292,13 +266,9 @@ public class GameServer
     }
 
     /// <summary>
-    /// A lightning flash, told to everyone on every map, wherever they are on it.
-    ///
-    /// Not through <see cref="EmitWorldAudio"/>: its earshot is the map's broadcast radius, a few
-    /// hundred metres to three kilometres, and thunder is heard from twenty. The storm is drawn round
-    /// each map's centre, so every map has the same storm in its own frame. Each client works out
-    /// the thunder for where its listener stands (Thunder.Render); a text player has nothing to render
-    /// it with and is not sent it.
+    /// A lightning flash, told to everyone on every map. Not through <see cref="EmitWorldAudio"/>: thunder
+    /// carries twenty kilometres, far past any broadcast radius. The storm is drawn round each map's
+    /// centre; each client renders the thunder where its listener stands, and a text player is not sent it.
     /// </summary>
     private void EmitStrike(LightningStrike strike)
     {
@@ -327,13 +297,8 @@ public class GameServer
         }
     }
 
-    /// <summary>
-    /// Travels with every event so two of the same thing do not render bit-identically.
-    ///
-    /// Twenty rounds from one rifle that are the same twenty samples read as a recording, which is
-    /// the one thing this engine exists not to sound like. It is shared rather than per-client so
-    /// that two players standing together hear the same variation of the same event.
-    /// </summary>
+    /// <summary>Travels with every event so two of the same thing do not render bit-identically (twenty
+    /// identical rounds read as a recording). One for all clients, so players together hear the same.</summary>
     private int _audioEventSeed = 1;
 
     // The tick rate lives in PhysicsConstants — the client predicts against the same number.
@@ -426,7 +391,7 @@ public class GameServer
         
         RegisterHandlers();
 
-        // Start MUD Gateway on port + 1 (e.g. 33289)
+        // The MUD gateway listens on the next port up.
         _mudGateway = new MudGateway(port + 1, _dispatcher);
         _mudGateway.OnDisconnected = HandleMudDisconnected;
         _mudGateway.Start();
@@ -445,10 +410,8 @@ public class GameServer
         Shutdown();
     }
 
-    /// <summary>
-    /// Ordered teardown, on the loop thread after the last tick: tell the players first, then close the
-    /// sockets, then destroy the worlds. Previously Ctrl-C tore all three down at once, mid-tick.
-    /// </summary>
+    /// <summary>Ordered teardown, on the loop thread after the last tick: store and tell the players, then
+    /// close the sockets, then destroy the worlds.</summary>
     private void Shutdown()
     {
         Log.Information("Server shutting down: {Count} session(s) connected.", _sessions.Count);
@@ -481,10 +444,6 @@ public class GameServer
         Log.Information("Server stopped cleanly.");
     }
 
-    /// <summary>
-    /// Sends to a session over whichever transport it actually has. A MUD session has no UDP peer, so a
-    /// reply sent only by UDP would vanish for telnet players — including chat aimed at them.
-    /// </summary>
     /// <summary>
     /// Somebody saying something: to their own map, which is what plain typing does, or to everyone
     /// on the server with /all. Private messages and the server's own announcements go elsewhere.
@@ -588,6 +547,7 @@ public class GameServer
 
     public static void WriteMotd(string text) => File.WriteAllText(MotdPath, text.Trim() + Environment.NewLine);
 
+    /// <summary>Sends to a session over whichever transport it has: a MUD session has no UDP peer.</summary>
     public void SendToSession(UserSession session, IMessage message, DeliveryMethod delivery = DeliveryMethod.ReliableOrdered)
     {
         Sent?.Invoke(session, message);
@@ -655,8 +615,7 @@ public class GameServer
             // A client sends input every frame whether or not anyone is at the keys; only input that
             // asks for something counts as the player being there.
             if (req.MoveDirection != Vector3.Zero || req.LookDelta != Vector2.Zero || req.Jump) Touch(id);
-            // Bound the backlog: a client that floods inputs cannot grow the queue without limit,
-            // and gains nothing by trying — MovementSystem spends real time, not queue depth.
+            // Bounded: MovementSystem spends real time, not queue depth, so a flood gains nothing.
             if (s.InputQueue.Count >= MaxQueuedInputs)
             {
                 s.DroppedInputs++;
@@ -666,9 +625,7 @@ public class GameServer
             s.InputQueue.Enqueue(req);
         });
         _dispatcher.RegisterHandler<TextCommand>((id, req, reply) => {
-            // No UDP peer lookup here: a MUD session has none, so such a guard would drop every MUD
-            // command silently. Commands run on the tick thread whatever the transport, so a telnet
-            // client is just another session.
+            // No UDP peer lookup: a MUD session has none, and the guard would drop its every command.
             if (req.Command.TrimStart('/').Equals("ready", StringComparison.OrdinalIgnoreCase)) HandlePlayerReady(id);
             else _commands.HandleTextCommand(id, req, reply);
         });
@@ -695,9 +652,8 @@ public class GameServer
         });
         _dispatcher.RegisterHandler<VoiceData>((id, req, reply) => {
             if (!_sessions.TryGetSession(id, out var senderSession)) return;
-            // The sender is who sent it, not who the packet says sent it: the client fills SenderId
-            // with its own entity id and the listeners place the voice at that entity, so a forged id
-            // would put your words in somebody else's mouth.
+            // The sender is the session, not the packet's SenderId: listeners place the voice at that
+            // entity, and a forged id would put your words in somebody else's mouth.
             if (senderSession.Entity == Entity.Null || req.OpusData.Length > MaxVoiceBytes) return;
             req.SenderId = senderSession.Entity.Id;
             Touch(id);
@@ -705,7 +661,7 @@ public class GameServer
             int relayed = 0;
             foreach (var s in _sessions.GetAllSessions())
             {
-                if (s.ConnectionId == id) continue; // don't echo back to sender
+                if (s.ConnectionId == id) continue;
                 if (s.CurrentMapId != senderSession.CurrentMapId) continue;
                 var peer = _network.GetPeer(s.ConnectionId);
                 if (peer != null)
@@ -719,11 +675,8 @@ public class GameServer
         });
     }
 
-    /// <summary>
-    /// Voice traffic per sender, logged every ten seconds while they talk: "Voice: sean sent 500 frames
-    /// (24 kbit/s) on city, relayed to 1 player". Without it, "he could not hear me" had nothing on the
-    /// server to say whether the frames ever arrived (2026-10-04).
-    /// </summary>
+    /// <summary>Voice traffic per sender, logged every ten seconds while they talk, so "he could not hear
+    /// me" can be checked against whether the frames arrived.</summary>
     private readonly Dictionary<string, (int Frames, long Bytes, int RelayedTo, DateTime Since)> _voiceTally = new();
 
     private void NoteVoice(UserSession sender, int bytes, int relayedTo)
@@ -755,11 +708,8 @@ public class GameServer
             stopwatch.Restart();
             accumulator += elapsed;
 
-            // A GC pause, a debugger break or a suspended host hands us an arbitrarily large elapsed
-            // time. Unclamped, the loop then runs every banked tick back to back with no network poll
-            // between them: players teleport, inputs arrive for ticks already simulated, and the catch-up
-            // itself takes long enough to bank more time. Drop the excess and say so — the simulation
-            // loses a few ticks of wall clock, which is the honest outcome, instead of fast-forwarding.
+            // A GC pause or a suspended host banks any amount of time. Run back to back with no network
+            // poll between, the catch-up teleports players and banks more time itself: drop the excess.
             accumulator = ClampAccumulatorMs(accumulator, out int droppedTicks);
             if (droppedTicks > 0)
                 Log.Warning("Server loop fell behind; dropped {Dropped} catch-up tick(s).", droppedTicks);
@@ -778,14 +728,12 @@ public class GameServer
         using var _perf = PerfProbe.Measure("server.tick");
         try
         {
-            // 1. Process Commands & Network Messages
             DrainCommandBuffer();
             while (_network.TryDequeueMessage(out var item))
             {
                 _dispatcher.Dispatch(item.peer.Id, item.message, msg => _network.SendMessage(item.peer, msg, DeliveryMethod.ReliableOrdered));
             }
 
-            // 2. Update Environment
             float dt = FixedDeltaTime;
             _environment.Update(dt);
             _lightning.Update(dt, _environment.CurrentScenario, _environment.GetCurrentState(), EmitStrike);
@@ -800,7 +748,6 @@ public class GameServer
                     var grid = entry.Value.grid;
                     var lookup = entry.Value.lookup;
 
-                    // 3. Refresh Spatial Grid (Dynamic items)
                     var stage = PerfProbe.Measure("server.grid");
                     grid.Clear();
                     world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>().WithAny<Velocity, PlayerComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) => {
@@ -808,7 +755,6 @@ public class GameServer
                     });
 
                     stage.Dispose();
-                    // 4. Update Simulation (Movement)
                     stage = PerfProbe.Measure("server.movement");
                     MovementSystem.Update(world, entry.Value.data.WalkMin, entry.Value.data.WalkMax, grid, lookup, _sessions, _maps, dt);
                     stage.Dispose();
@@ -845,8 +791,7 @@ public class GameServer
                                    SpeechConditions.From(weather, _environment.CurrentScenario),
                                    (id, label, sound) => EmitWorldAudio(entry.Key, id, label, new[] { sound }));
 
-                    // ...and the people watching them. Only a source with a place and a size: no
-                    // loop, no bed, and nothing in it that knows what a car is.
+                    // ...and the people watching them: a source with a place and a size, no loop.
                     CrowdSystem.Update(entry.Key, world, AudioClock.Now, (crowdId, at, spec) =>
                         EmitWorldAudio(entry.Key, crowdId, "crowd", new[]
                         {
@@ -858,27 +803,23 @@ public class GameServer
                                 SynthKey = Applause.Key(spec),
                                 DecaySeconds = spec.Seconds,
                                 Noisiness = 1f,
-                                // How far across they are. A stand is not a firework: inside the patch
-                                // the people fill, moving does not change the level, and the falling
-                                // off only starts once the whole crowd is in front of you.
+                                // How far across they are: inside the patch the people fill, the level
+                                // does not change as you move.
                                 ExtentMetres = Applause.SpreadRadiusMetres(spec.Clappers),
                             },
                         }));
-                    // Driven composites move AFTER the players who are steering them have had their
-                    // say, and BEFORE anything is carried: the order here is the whole contract.
-                    // Parts are bolted to the root and follow it exactly; occupants are carried by it
-                    // but keep their own heads, so they come last of all.
+                    // Order matters: driven composites move after the players steering them and before
+                    // anything is carried; parts follow the root exactly; occupants keep their own
+                    // heads, so they come last.
                     stage.Dispose();
                     stage = PerfProbe.Measure("server.driving+doors+parents");
                     DrivingSystem.Update(world, grid, entry.Value.data.WalkMin, entry.Value.data.WalkMax, dt,
                                          (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds), entry.Key);
                     // The glass in every car's windows, toward wherever it was last sent.
                     WindowSystem.Update(world, dt);
-                    // Doors swing BEFORE the parts are placed: a door in a building is one of its
-                    // parts, and ParentSystem writes every part's world transform from its local one
-                    // each tick, so a swing applied after it would be overwritten before anyone saw
-                    // it. The announcement re-sends the door's definition, which is how the aperture
-                    // reaches the client's acoustic map.
+                    // Doors swing before ParentSystem places the parts, or the swing of a door in a
+                    // building is overwritten. Re-sending the door's definition carries its aperture to
+                    // the client.
                     _doors.Update(world, dt, SyncAudioComponent,
                                   (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds));
                     ParentSystem.Update(world, lookup);
@@ -901,7 +842,6 @@ public class GameServer
                 UpdatePresenceForAll(DateTime.UtcNow);
             }
 
-            // 5. Broadcast World State
             using (PerfProbe.Measure("server.broadcast")) BroadcastWorldState(tick);
         }
         catch (Exception ex)
@@ -914,20 +854,15 @@ public class GameServer
         => _ = Login(connectionId, request, reply);
 
     /// <summary>
-    /// A login, from either transport. The cheap refusals happen here and now; the password is checked
-    /// on the thread pool, and the session is made back on the tick thread through the command buffer.
-    /// The returned task completes once that last step has been queued, which is what a test waits on.
-    ///
-    /// bcrypt used to run inline on the tick thread, so every login stalled the whole world for a
-    /// tenth of a second — and a few hundred addresses each spending their allowed burst could stall it
-    /// for minutes.
+    /// A login, from either transport. The cheap refusals happen here; the password is checked on the
+    /// thread pool (bcrypt on the tick thread stalled the world a tenth of a second a login), and the
+    /// session is made on the tick thread. The task completes once that last step is queued.
     /// </summary>
     internal Task Login(int connectionId, LoginRequest request, Action<IMessage> reply)
     {
         if (_sessions.TryGetSession(connectionId, out var already))
         {
-            // A second login on a live session used to replace it, and the first body stayed in the
-            // world with nobody attached to it.
+            // Replacing a live session here left its body in the world with nobody attached.
             reply(new LoginResponse { Success = false, Message = $"You are already logged in as {already.Username}." });
             return Task.CompletedTask;
         }
@@ -939,9 +874,8 @@ public class GameServer
             return Task.CompletedTask;
         }
 
-        // A network client built from a different OpenFPS.Common reads every message after this one
-        // wrongly, and nothing downstream can say so: it spawns into nonsense. Refuse it here, by name.
-        // The MUD gateway speaks text, not MemoryPack, so it has no contract to match.
+        // A client built from a different OpenFPS.Common misreads every message after this one and
+        // spawns into nonsense, so refuse it by name. The MUD gateway speaks text and has no contract.
         var peer = _network.GetPeer(connectionId);
         if (peer != null && request.Build != WireContract.Hash)
         {
@@ -1000,10 +934,8 @@ public class GameServer
 
         var user = outcome.User!;
 
-        // One session per account, and the newest wins. A dropped connection takes LiteNetLib several
-        // seconds to notice, and the player reconnecting in that time must not be told they are
-        // already here; and two bodies with one name make every command that finds a player by name
-        // pick one of them.
+        // One session per account, the newest winning: LiteNetLib takes seconds to notice a dropped
+        // connection, and two bodies with one name confuse every command that finds a player by name.
         bool replacing = false;
         foreach (var old in _sessions.GetAllSessions()
                      .Where(s => s.Username.Equals(user.Username, StringComparison.OrdinalIgnoreCase)).ToList())
@@ -1031,10 +963,9 @@ public class GameServer
             LoggedInUtc = now,
             LastActivityUtc = now,
         };
-        // Back where they left from: the map now, the place on it when the body is made (HandlePlayerReady).
-        // Read here, on the tick thread, and not from the record the password check fetched: a body of
-        // this account leaving in between (the takeover above, or a lost connection queued before this)
-        // has written a newer one.
+        // Back where they left from: the map now, the place when the body is made (HandlePlayerReady).
+        // Read here on the tick thread, not from the record the password check fetched: a body of this
+        // account leaving in between has written a newer one.
         if (_store != null)
         {
             session.Saved = _store.Load(user.Username);
@@ -1044,8 +975,7 @@ public class GameServer
 
         Log.Information("User {User} authenticated ({Transport}) from {Address}, landing on map '{Map}'.",
                         user.Username, peer == null ? "MUD" : "UDP", address, session.CurrentMapId);
-        // Somebody taking over their own session from another machine has not arrived: they were
-        // here all along, and saying they left and came back would be two notices about nothing.
+        // Taking over your own session is not arriving: no notice.
         if (!replacing) AnnouncePresence(session, PresenceKind.LoggedIn);
 
         reply(new LoginResponse
@@ -1066,11 +996,8 @@ public class GameServer
         SendManifest(session);
     }
 
-    /// <summary>
-    /// Leaving on purpose: the same clean-up as a dropped connection, now rather than at the timeout.
-    /// The session goes here rather than when the transport notices, so that everyone is told it
-    /// logged out and not that its connection was lost.
-    /// </summary>
+    /// <summary>Leaving on purpose: the clean-up of a dropped connection, now rather than at the timeout,
+    /// so everyone is told they logged out rather than lost the connection.</summary>
     internal void LogOut(int connectionId)
     {
         if (!_sessions.TryRemoveSession(connectionId, out var s)) return;
@@ -1087,10 +1014,9 @@ public class GameServer
         => EndSession(session, reason, $"{session.Username} was removed from the server.");
 
     /// <summary>
-    /// Ends a session from the server's side: tells the player why, takes their body out of the world
-    /// the way a disconnect does, and closes the connection. The transport's own disconnect event then
-    /// finds no session and does nothing more. Everyone else hears the notice if there is one; a
-    /// session replaced by a new login of the same account has none, since nobody has gone.
+    /// Ends a session from the server's side: tells the player why, takes their body out as a disconnect
+    /// does, and closes the connection (whose own disconnect event then finds no session). Everyone else
+    /// hears the notice if there is one; a session replaced by a new login has none.
     /// </summary>
     private void EndSession(UserSession session, string reason, string? notice = null)
     {
@@ -1103,10 +1029,8 @@ public class GameServer
         _mudGateway?.Disconnect(session.ConnectionId);
     }
 
-    /// <summary>
-    /// Closes connections, by either transport, that have been open for <see cref="LoginTimeout"/>
-    /// without logging in. A connection costs memory and a slot whether or not it ever says anything.
-    /// </summary>
+    /// <summary>Closes connections, by either transport, open for <see cref="LoginTimeout"/> without
+    /// logging in.</summary>
     private void CloseConnectionsThatNeverLoggedIn()
     {
         var now = DateTime.UtcNow;
@@ -1144,17 +1068,16 @@ public class GameServer
             return;
         }
 
-        // The models changed in the world editor, before anything on the map is heard with them.
-        // At the versions this map uses: its pins, else the current ones. Every changed model is sent, so
-        // one pinned on the map just left is put back to what this map uses.
+        // The world editor's changed models first, at this map's pins or else current: every one is sent,
+        // so a model pinned on the map just left is put back.
         foreach (var model in Models.UpdatesFor(_maps.Overlays?.Get(mapId).Pins)) SendToSession(session, model);
 
         int staticCount = 0;
         bool streamed = _maps.TryGetTiles(mapId, out var tiles);
         if (streamed)
         {
-            // What the join will send: the tiles round where they will stand. Worked out again when the
-            // data is asked for, with the client's own detail setting; this is the count it waits for.
+            // The count the client waits for: the tiles round where they will stand (worked out again,
+            // with its own detail setting, when the data is asked for).
             var probe = new TileInterest { Radii = session.Tiles.Radii };
             staticCount = TileStreamer.Begin(probe, tiles, ArrivalPoint(session, mapId)).Count;
         }
@@ -1174,7 +1097,6 @@ public class GameServer
             TileMetres = streamed ? tiles.TileMetres : 0f,
         };
 
-        // Straight from the loaded map rather than re-reading every map file from disk per login.
         if (_maps.TryGetMapData(mapId, out var mapData))
         {
             manifest.VoxelResolution = mapData.VoxelResolution;
@@ -1233,15 +1155,12 @@ public class GameServer
     /// </summary>
     internal void SendMapData(UserSession session, MapDataRequest request)
     {
-        // Only the map you are on. Any loaded map could be asked for by name, and a private one would
-        // have streamed its whole layout to somebody it refuses at the door.
+        // Only the map you are on, or a private map's layout goes to somebody it refuses at the door.
         if (!string.Equals(request.MapName, session.CurrentMapId, StringComparison.OrdinalIgnoreCase)) return;
         if (!_maps.TryGetMap(session.CurrentMapId, out var world, out var _, out var _, out var lookup)) return;
         var started = Stopwatch.StartNew();
 
-        // The client clears its world on the manifest, so the server's record of what it knows starts
-        // over here too — otherwise a re-request would leave the two disagreeing about a set the removal
-        // logic is driven from.
+        // The client cleared its world on the manifest; the record of what it knows starts over with it.
         session.KnownEntities.Clear();
         session.VisibleDynamicEntities.Clear();
         session.SentStates.Clear();
@@ -1425,16 +1344,10 @@ public class GameServer
     }
 
     /// <summary>
-    /// Takes a player off the map they are on and puts them on another loaded one, at its spawn point,
-    /// or where they were on it when they last left it if that is still somewhere to stand.
-    ///
-    /// Runs on the tick thread. The old body is got out of any seat, stored with what it was carrying
-    /// (which comes with it to the new map, and the place it left is kept for coming back to this one),
-    /// destroyed and announced as gone; everything the server remembers having sent the client is forgotten, so the new map's entities all go
-    /// out fresh. Then the new map is sent exactly as login sends one: a graphical client gets a
-    /// MapManifest and goes through map data, MapLoadComplete and 'ready' again; a text client has
-    /// no geometry to load and is spawned straight away. Access is checked by the caller
-    /// (see <see cref="DiscoveryService.CanEnter"/>).
+    /// Moves a player to another loaded map, at its spawn or where they last left it. Queued for the tick
+    /// thread. The old body leaves its seat, is stored with what it carried (which comes along) and is
+    /// destroyed; what the client was sent is forgotten, and the new map goes out as at login. Access is
+    /// the caller's to check (<see cref="DiscoveryService.CanEnter"/>).
     /// </summary>
     public void MoveToMap(UserSession session, string mapId, Action<IMessage>? reply = null)
     {
@@ -1490,17 +1403,16 @@ public class GameServer
         else HandlePlayerReady(session.ConnectionId); // a text session has nothing to load
     }
 
-    // Definition building lives in EntityDefinitionFactory so the streaming path and the map/acoustics
-    // tests share one implementation — the client builds its acoustic map (regions AND portals) from
-    // these, so any divergence would only surface as a wrong-sounding room.
+    // One implementation for the broadcast, the streamer and the tests: a divergence would only show as a
+    // wrong-sounding room.
     private EntityDefinition CreateDefinition(World world, Entity e) => EntityDefinitionFactory.From(world, e);
 
     private readonly HashSet<int> _visibleDynamicBuffer = new();
     /// <summary>What a tick's broadcast chooses from, gathered once for the map rather than once for
     /// every player: each collidable entity, whether it moves, and whether it moved this tick.</summary>
     private readonly List<(Entity Entity, bool Dynamic, bool Dirty)> _broadcastCandidates = new();
-    /// <summary>The spatial grid's cell (MapManager makes it 10 m). The grid answered a radius with
-    /// every cell that touched it, so a thing up to a cell beyond earshot was sent; this keeps that.</summary>
+    /// <summary>The spatial grid's cell (MapManager makes it 10 m): things up to a cell beyond earshot are
+    /// sent, as when the broadcast asked the grid.</summary>
     private const float BroadcastCellMetres = 10f;
     private readonly HashSet<int> _dirtyAudioBuffer = new();
     private readonly List<int> _removedBuffer = new();
@@ -1529,14 +1441,9 @@ public class GameServer
     }
 
     /// <summary>
-    /// What one tick's broadcast chooses from on a map: every entity that has a collider, and every item.
-    ///
-    /// The items because they have no collider — you walk over a gun on the floor, and a shot does not
-    /// stop on it — and a broadcast that chose only from the collidable never once mentioned one. An item
-    /// /give made, or one picked up and put down, never reached a client at all: the client did not know
-    /// the gun was on the floor, so its item beacon had nothing to sound from (Cody, 2026-10-04: "when I
-    /// drop items I still don't hear them"). An item is the one thing that changes hands after the map is
-    /// streamed, so it is the one colliderless thing the broadcast has to carry.
+    /// What one tick's broadcast chooses from on a map: every entity with a collider, and every item,
+    /// which has none and must still reach the client or its beacon has nothing to sound from. See
+    /// docs/WORLD_STREAMING.md, "What the broadcast chooses from".
     /// </summary>
     internal static void GatherBroadcastCandidates(World world, List<(Entity Entity, bool Dynamic, bool Dirty)> into)
     {
@@ -1547,12 +1454,8 @@ public class GameServer
             into.Add((e, Moves(world, e), t.IsDirty)));
     }
 
-    /// <summary>
-    /// Sent every tick, unreliably, like a body: anything with a velocity, a player, and a thing somebody
-    /// is carrying. A carried gun moves whenever its holder does; as a static that moved it went out on
-    /// the reliable channel every tick anyone walked with one, and a lost packet then held up every chat
-    /// line and definition behind it.
-    /// </summary>
+    /// <summary>Sent every tick, unreliably: anything with a velocity, a player, and a carried thing (as a
+    /// moved static it went reliably every tick and a lost packet held up everything behind it).</summary>
     private static bool Moves(World world, Entity e)
         => world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<HeldComponent>(e);
 
@@ -1582,12 +1485,9 @@ public class GameServer
             var sessionsInMap = _sessions.GetSessionsInMap(mapEntry.Key).ToList();
             if (sessionsInMap.Count == 0) goto ClearDirty;
 
-            // Every player used to ask the spatial grid for everything within earshot, and on the city
-            // earshot is the whole map: 86,000 grid entries a player a tick (a wall is filed in every
-            // cell it crosses) to find 7,500 entities, 16 ms each on a desktop. Two players overran the
-            // 33 ms tick on the VPS, the loop fell behind every few ticks, and everything anyone heard
-            // trailed what it belonged to. The grid holds exactly the collidable entities, so one pass
-            // over the world finds the same set once, with no repeats; each player then filters it.
+            // One pass over the world for the map, then each player filters it. A grid query per player
+            // overran the VPS tick with two players on the city: docs/WORLD_STREAMING.md, "What the
+            // broadcast chooses from".
             using (PerfProbe.Measure("server.broadcast.gather"))
                 GatherBroadcastCandidates(world, _broadcastCandidates);
             // A map streamed in tiles: each client is sent the tiles near it, and only what stands in them.
@@ -1605,8 +1505,7 @@ public class GameServer
                     var peer = _network.GetPeer(session.ConnectionId);
                     if (peer == null && Broadcasted == null) continue;
 
-                    // What the client needs to know about itself that is not in its transform: whether
-                    // its position is its own to predict, a seat's to decide, or held still.
+                    // Whether the client's position is its own to predict, a seat's, or held still.
                     int riding = world.Has<OccupantComponent>(session.Entity)
                         ? world.Get<OccupantComponent>(session.Entity).RootEntityId : -1;
                     bool driving = riding >= 0 && world.Get<OccupantComponent>(session.Entity).Controls;
@@ -1634,35 +1533,28 @@ public class GameServer
                     var scan = PerfProbe.Measure("server.broadcast.scan");
                     foreach (var (e, isDynamic, isDirty) in _broadcastCandidates)
                     {
-                        // Geometry that stays put, has not moved, and this client already has (the whole
-                        // map was streamed to it on arrival) has nothing to say: most of the city, every
-                        // tick, settled by one lookup.
+                        // Unmoved geometry this client already has: most of the city, settled by one lookup.
                         bool known = session.KnownEntities.Contains(e.Id);
                         if (!isDynamic && !isDirty && known && !_dirtyAudioBuffer.Contains(e.Id)) continue;
-                        // On a streamed map the map's own geometry is the tile streamer's to send, with
-                        // its tile: not here, one wall at a time, because it is in earshot.
+                        // On a streamed map the map's own geometry is the tile streamer's to send.
                         if (!isDynamic && !known && tiles != null && tiles.IsTiled(e.Id)) continue;
-                        // Anything taken, killed or removed earlier in this tick: asking a dead entity
-                        // what it has throws, which used to skip this player's whole update.
+                        // Removed earlier this tick: asking a dead entity anything throws and would skip
+                        // this player's whole update.
                         if (!world.IsAlive(e)) continue;
                         ref var t = ref world.Get<Transform>(e);
                         if (MathF.Abs(t.Position.X - pPos.X) > reach || MathF.Abs(t.Position.Z - pPos.Z) > reach) continue;
-                        // ...and everything else only while it stands in a tile this client has: a car
-                        // that drives out of them goes as anything leaving earshot does.
+                        // ...and everything else only while it stands in a tile this client has.
                         if (tiles != null && e != session.Entity && !tiles.IsTiled(e.Id) && !tiles.IsGlobal(e.Id)
                             && !tiles.Holds(t.Position, session.Tiles.Levels)) continue;
 
                         if (isDynamic) _visibleDynamicBuffer.Add(e.Id);
 
-                        // A state message names an entity the client may never have heard of — every
-                        // remote player, and anything spawned at runtime. Send the definition first, and
-                        // only once: KnownEntities is what makes it once rather than every tick.
+                        // The definition before the first state, once: KnownEntities keeps it to once.
                         bool isNew = session.KnownEntities.Add(e.Id);
                         bool defined = isNew || _dirtyAudioBuffer.Contains(e.Id);
-                        // Somebody getting into or out of a seat: the definition says which, and it is
-                        // the only thing that tells a client a body moving at a car's speed is not
-                        // running (EntityDefinition.RidingEntityId). Noticed here rather than at each
-                        // way in and out of a seat, of which there are many.
+                        // Into or out of a seat: the definition says which (EntityDefinition.RidingEntityId),
+                        // or a body moving at a car's speed sounds as if it is running. Noticed here
+                        // rather than at each of the many ways in and out of a seat.
                         int seatedIn = isDynamic && world.Has<OccupantComponent>(e) ? world.Get<OccupantComponent>(e).RootEntityId : -1;
                         if (isDynamic && !defined && session.SentStates.TryGetValue(e.Id, out var told) && told.Riding != seatedIn)
                             defined = true;
@@ -1676,14 +1568,11 @@ public class GameServer
                             Transform = QuantizedTransform.FromTransform(t)
                         };
                         if (world.Has<Velocity>(e)) state.LinearVelocity = world.Get<Velocity>(e).Linear;
-                        // How hard it is working its tyres. Sent because only the server can know it:
-                        // a banked corner and a flat one look identical in a velocity, and a listener
-                        // dividing lateral acceleration by flat grip reads every car on a banked oval
-                        // as sliding. See EntityState.TyreDemand.
+                        // How hard it works its tyres, which only the server knows: from a velocity alone
+                        // every car on a banked oval reads as sliding. See EntityState.TyreDemand.
                         if (_vehicles.TryGetTyreDemand(e.Id, out float tyreDemand))
                             state.TyreDemand = NetworkEntityState.EncodeTyreDemand(tyreDemand);
-                        // ...and a car somebody is driving, which is not traffic and was never asked:
-                        // its tyres never squealed, however hard it was thrown into a corner.
+                        // ...and a car somebody is driving, which is not traffic.
                         else if (world.Has<DriveComponent>(e))
                             state.TyreDemand = NetworkEntityState.EncodeTyreDemand(world.Get<DriveComponent>(e).TyreDemand);
                         // Each wheel: its load, slip, speed and the surface under it (WheelDynamics).
@@ -1693,14 +1582,10 @@ public class GameServer
                         // says a hand is on the horn.
                         if (isDynamic) state.Signals = VehicleSignals.WireByte(world, e);
 
-                        // A dynamic entity is corrected by the next tick's packet, so losing one costs
-                        // nothing. A static entity that moved is a one-off event that nothing will ever
-                        // resend — on the unreliable channel a single dropped packet leaves that client
-                        // colliding with a wall that is no longer there. Reliable delivery IS the
-                        // acknowledgement; there is no separate ack to wait for.
-                        //
-                        // A dynamic entity that has not moved is not sent at all, past a few repeats and
-                        // a keep-alive a second (RestingStates): two thirds of the city, every tick.
+                        // A dynamic entity is corrected by the next tick, so unreliable; a moved static is
+                        // never resent, so reliable, or a dropped packet leaves a wall where none is. A
+                        // dynamic entity at rest goes only as a few repeats and a keep-alive a second
+                        // (RestingStates): two thirds of the city.
                         if (isDynamic)
                         {
                             if (RestingStates.ShouldSend(session.SentStates, ref state, tick, force: defined || e == session.Entity))
@@ -1715,13 +1600,10 @@ public class GameServer
                     PerfProbe.Count("server.broadcast.states", _reusableBroadcast.States.Count);
                     PerfProbe.Count("server.broadcast.reliable-states", _reliableBroadcast.States.Count);
                     var send = PerfProbe.Measure("server.broadcast.send");
-                    // Anything dynamic this client could see and now cannot is a ghost on their side.
-                    // Static geometry is never evicted: the client's acoustic map is built from the whole
-                    // streamed map, so dropping a distant wall would change how the world sounds.
+                    // Static geometry is never evicted: the client's acoustic map is built from all of it.
                     CollectDeparted(session.VisibleDynamicEntities, _visibleDynamicBuffer, _removedBuffer);
-                    // A thing that was being carried and has just been put down has stopped moving, not gone:
-                    // it stays known as the fixed thing it now is, rather than being taken off the client
-                    // and sent again a tick later, which would blink its beacon out as it landed.
+                    // A thing just put down has stopped moving, not gone: removing it would blink its beacon
+                    // out as it landed.
                     var lookup = mapEntry.Value.lookup;
                     for (int i = _removedBuffer.Count - 1; i >= 0; i--)
                         if (lookup.TryGetValue(_removedBuffer[i], out var put) && world.IsAlive(put)
@@ -1760,9 +1642,7 @@ public class GameServer
                     // The gun in your hands, which the client's keys need: Enter fires only a gun,
                     // and R reloads one.
                     var held = CombatService.Held(world, session.Entity, mapEntry.Value.lookup);
-                    // Only when something in it has changed. It went every tick, reliably, to say the
-                    // same health and the same floor thirty times a second; it is reliable, so the one
-                    // that says something new cannot be lost.
+                    // Sent only when something in it changes; reliable, so the change cannot be lost.
                     var statsNow = new StatsUpdate {
                         Health = health, MaxHealth = maxHealth,
                         CurrentMaterial = stats.matType, CurrentVariant = stats.variant,
@@ -1784,7 +1664,6 @@ public class GameServer
             }
 
             ClearDirty:
-            // Cleanup dirty flags after broadcast
             world.Query(new QueryDescription().WithAll<Transform>(), (ref Transform t) => { t.IsDirty = false; });
         }
     }
@@ -1802,10 +1681,7 @@ public class GameServer
         return (floorMat ?? "Generic", "0");
     }
 
-    /// <summary>
-    /// A telnet connection closed. Closing it is how a text player leaves, since there is no logout
-    /// for them to send first, so it is announced as logging out.
-    /// </summary>
+    /// <summary>A telnet connection closed: how a text player leaves, so it is announced as logging out.</summary>
     internal void HandleMudDisconnected(int connectionId)
     {
         if (!_sessions.TryRemoveSession(connectionId, out var s)) return;
@@ -1826,40 +1702,28 @@ public class GameServer
         DespawnSession(s);
     }
 
-    /// <summary>
-    /// What a dropped connection tells everyone. A client that closed its own connection (the window
-    /// shut without going through the menu) left on purpose. Anything else is a lost connection, which
-    /// is worth telling apart, because that player is probably on their way back.
-    /// </summary>
+    /// <summary>What a dropped connection tells everyone: a client that closed its own connection left on
+    /// purpose; anything else is a lost connection, and that player is probably on their way back.</summary>
     internal static PresenceKind PresenceFor(DisconnectReason reason)
         => reason is DisconnectReason.RemoteConnectionClose or DisconnectReason.DisconnectPeerCalled
             ? PresenceKind.LoggedOut
             : PresenceKind.WentOffline;
 
-    /// <summary>
-    /// Takes a disconnected session's body out of the world, on the tick thread.
-    ///
-    /// Queued even when the session has no body yet: a 'ready' queued just before the disconnect
-    /// spawns one when the buffer drains, and this runs after it and takes it away again.
-    /// </summary>
+    /// <summary>Takes a disconnected session's body out of the world, on the tick thread. Queued even with no
+    /// body yet: a 'ready' queued just before the disconnect spawns one first.</summary>
     internal void DespawnSession(UserSession session)
     {
         _commandBuffer.Enqueue(() => LeaveWorld(session));
     }
 
     /// <summary>
-    /// Takes a session's body off the map it is on: out of any seat, stored (where it stood, its
-    /// health, and its things, which leave the world with it: PlayerStore), destroyed, and announced
-    /// as gone. Runs on the tick thread. Changing map, logging out, a lost connection, a kick and a
-    /// shutdown all come through here, so a player who leaves any way comes back the same way.
+    /// Takes a session's body off its map: out of any seat, stored with its place, health and things
+    /// (PlayerStore), destroyed and announced as gone. On the tick thread. Every way of leaving comes
+    /// through here, so a player comes back the same way whichever it was.
     ///
-    /// The seat and the things go first, while the body is still there to be got out and to drop
-    /// from. Anything the store would not keep (no prefab to make it from again, or a store that
-    /// cannot keep things) is put down where the body stood. Destroyed while carrying, the things kept
-    /// a HeldComponent naming a dead holder, so nobody could pick them up again, and a ParentComponent
-    /// naming an id Arch would reuse.
-    /// Without the announcement every other client keeps the corpse forever: it still occupies
-    /// space, still answers scans, and still plays whatever sound it carried.
+    /// The seat and the things go first, while there is a body: destroyed while carrying, the things kept
+    /// a holder that no longer exists and a parent id Arch would reuse. What the store will not keep is
+    /// put down where the body stood. Unannounced, every other client keeps the corpse forever.
     /// </summary>
     private void LeaveWorld(UserSession session)
     {
@@ -1871,13 +1735,11 @@ public class GameServer
         {
             if (world.IsAlive(body))
             {
-                // Out of the seat first, standing beside the vehicle wherever it is: leaving the map is
-                // not a request, so a moving vehicle or shut doors do not refuse it. Without the seat
-                // service (a test rig), unseated where they sit.
+                // Leaving the map is not a request: a moving vehicle or shut doors do not refuse it.
+                // Without the seat service (a test rig), unseated where they sit.
                 if (world.Has<OccupantComponent>(body) && (_seats == null || !_seats.Exit(session, out _, leavingWorld: true)))
                     CompositeService.Disembark(world, body);
-                // Where they stand now, their health and their things into the store, and the things out
-                // of the world with it. Whatever the store would not keep is put down, as everything was.
+                // Whatever the store will not keep is put down.
                 if (_store != null && _maps.TryGetMap(mapId, out _, out _, out _, out var lookup))
                     foreach (int gone in _store.Leave(session, mapId, world, body, lookup))
                         BroadcastEntityRemoved(mapId, gone);
@@ -1890,13 +1752,9 @@ public class GameServer
         session.Entity = Entity.Null;
     }
 
-    /// <summary>
-    /// Tells every session on a map that an entity is gone, and forgets it on their behalf.
-    ///
-    /// Public because /undo destroys things too, and an entity destroyed without this stays on every
-    /// client forever: still in their acoustic map, still occluding, still answering a scan. Every
-    /// other message about an entity is additive, so this is the only thing that can take one back.
-    /// </summary>
+    /// <summary>Tells every session on a map that an entity is gone, and forgets it for them. Anything that
+    /// destroys an entity must call it: every other message is additive, and without this the entity
+    /// stays on every client, occluding and answering scans.</summary>
     public void BroadcastRemoval(string mapId, int entityId) => BroadcastEntityRemoved(mapId, entityId);
 
     private void BroadcastEntityRemoved(string mapId, int entityId)
@@ -1911,15 +1769,8 @@ public class GameServer
     }
 
     /// <summary>
-    /// The interact key, which is mostly a door handle.
-    ///
-    /// Getting into and out of things is what "interact" means almost every time anyone presses it
-    /// near a composite, so it is what the key does: press it beside a car and you are in it, press
-    /// it again and you are out. That the same key does both is not a shortcut — from inside the
-    /// thing, the only interaction there is IS getting out.
-    ///
-    /// Runs on the tick thread through the command buffer, like every other world-touching handler.
-    /// Reading the Arch world from the network thread raced the simulation.
+    /// The interact key: a tap, a door, getting in or out, picking up, shutting a door, in that order.
+    /// Queued for the tick thread: reading the Arch world from the network thread raced the simulation.
     /// </summary>
     private void HandleInteract(NetPeer peer, InteractRequest interact)
     {
@@ -1939,15 +1790,12 @@ public class GameServer
 
             var position = world.Get<Transform>(session.Entity).Position;
 
-            // A door in reach comes first, and from a seat that means the door beside YOU. The
-            // sequence a person expects falls straight out of it: press it once beside a car and the
-            // door opens, press it again and you are in; sitting in one, press it once and your door
-            // opens, again and you are out. Climbing in through a shut door would be the alternative,
-            // and it is not one.
-            // A tap you are standing at, first: it needs you right beside it (TapReach), so it never takes
+            // A tap you are standing at first: it needs you right beside it (TapReach), so it never takes
             // the key from a door across the room, and a door five metres off would otherwise always win.
             if (ToggleTapInReach(world, position, Say)) return;
 
+            // Then a shut door in reach, from a seat the one beside you: once to open it, again to get
+            // in or out.
             if (OpenDoorInReach(world, position, session.Entity, Say)) return;
 
             if (world.Has<OccupantComponent>(session.Entity))
@@ -1956,8 +1804,7 @@ public class GameServer
                 Say(leaving);
                 return;
             }
-            // The client points at the nearest entity it knows about, which beside a car is usually
-            // one of its doors rather than the car. Either names the thing.
+            // Beside a car the client usually points at one of its doors; either names the car.
             int root = -1;
             if (interact.TargetEntityId.HasValue) root = RootOf(session.CurrentMapId, interact.TargetEntityId.Value);
             if (root < 0) root = _seats.NearestEnterable(session.CurrentMapId, position, OccupancyService.BoardingRange);
@@ -1969,14 +1816,11 @@ public class GameServer
                 return;
             }
 
-            // Something lying at your feet: pick it up. Before shutting a door, because an item within
-            // two metres is far likelier to be what you meant (Cody, 2026-10-04: a dropped gun could not
-            // be picked up with E, only with G).
+            // Something at your feet, before shutting a door: it is far likelier what you meant (Cody,
+            // 2026-10-04: a dropped gun could not be picked up with E).
             if (_hands.TakeWithin(session, PhysicsConstants.PickUpReach, out string took)) { Say(took); return; }
 
-            // Nothing to get into, and an open door within reach: shut it. So beside a house, E opens
-            // the door and E again shuts it, the way a handle does; beside a car the sequence is still
-            // door, then in. Shutting is the loud half of a door, and it was only reachable by typing.
+            // Last, an open door in reach is shut: beside a house E opens it and E again shuts it.
             if (CloseDoorInReach(world, position, session.Entity, Say)) return;
 
             if (interact.TargetEntityId.HasValue
@@ -1992,13 +1836,8 @@ public class GameServer
         });
     }
 
-    /// <summary>
-    /// Opens the shut door within arm's length, if there is one. Says so, and says nothing otherwise.
-    ///
-    /// Only SHUT doors count, which is what turns the interact key into a SEQUENCE rather than a
-    /// toggle that fights you: once the door is open, the key moves on to meaning "get in" or "get
-    /// out". Somebody who wants it shut again says so.
-    /// </summary>
+    /// <summary>Opens the shut door within arm's length, if there is one, and says so. Only shut doors, so
+    /// once one is open the key moves on to getting in or out.</summary>
     private static bool OpenDoorInReach(World world, Vector3 position, Entity who, Action<string> say)
     {
         Entity? nearest = null;
@@ -2077,9 +1916,8 @@ public class GameServer
         {
             if (d.Target <= 0f) return;                   // already shut, or on its way
             if (!DoorSystem.OpensByHand(d)) return;
-            // Measured to where the door SHUTS, not where the leaf has swung to: that is the doorway,
-            // which is what somebody standing in front of it is next to. In the world's frame: a door
-            // in a building keeps its shut pose in the building's.
+            // Measured to where the door shuts (the doorway), not to the swung leaf; in the world's frame,
+            // since a door in a building keeps its shut pose in the building's.
             DoorSystem.Doorway(world, e, out var doorway, out _);
             float distance = MathF.Min(Vector3.Distance(position, t.Position), Vector3.Distance(position, doorway));
             if (distance > best) return;
@@ -2098,13 +1936,8 @@ public class GameServer
         return true;
     }
 
-    /// <summary>
-    /// The composite an entity belongs to, if it is one or is part of one, else -1.
-    ///
-    /// Pointing at a door is pointing at the car. Nothing a player can pick out by proximity is
-    /// reliably the root — the root is an origin on the ground in the middle of the thing, which is
-    /// exactly where nobody is standing.
-    /// </summary>
+    /// <summary>The composite an entity is or is part of, else -1: pointing at a door is pointing at the car,
+    /// whose root is in the middle where nobody stands.</summary>
     private int RootOf(string mapId, int entityId)
     {
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) return -1;
@@ -2154,21 +1987,15 @@ public class GameServer
                 ? checking.Result
                 : new AuthOutcome(false, "The server could not create that account. Try again.");
             if (checking.IsFaulted) Log.Error(checking.Exception, "Registration check for {Address} failed.", address);
-            // The reply follows what the store did: a duplicate username must not be told its account
-            // was created.
+            // A duplicate username must not be told its account was created.
             EnqueueCommand(() => reply(new RegisterResponse { Success = outcome.Success, Message = outcome.Message }));
         }, TaskScheduler.Default);
     }
 
     /// <summary>
-    /// Sends the world state to every graphical session, built PER MAP.
-    ///
-    /// The weather is global, but two of the fields in the message are not: air pressure is altitude
-    /// and the air-absorption multiplier is authored tuning, and both belong to the map the player is
-    /// standing on. Sending one message to everybody meant a player on a mountain map heard sea-level
-    /// air — and, worse, <c>AirAbsorptionMultiplier</c> was never assigned at all, so it arrived as 0
-    /// and the client's `distance / max(0.1, multiplier)` guard silently multiplied the absorption
-    /// distance by ten, switching air absorption off for the whole game.
+    /// Sends the world state to every graphical session, built per map: the weather is global, but air
+    /// pressure and the air-absorption multiplier are the map's. Leave <c>AirAbsorptionMultiplier</c>
+    /// unset and it arrives as 0, and the client's guard turns air absorption off.
     /// </summary>
     public void BroadcastEnvironment()
     {
@@ -2214,7 +2041,7 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        // Bootstrap Serilog first so startup errors are captured.
+        // Serilog first, so startup errors are captured.
         Log.Logger = new LoggerConfiguration()
             .WriteTo.Console()
             .WriteTo.File("logs/server.log", rollingInterval: RollingInterval.Day)
@@ -2225,9 +2052,8 @@ public class Program
             using var serviceProvider = ConfigureServices().BuildServiceProvider();
             var server = serviceProvider.GetRequiredService<GameServer>();
 
-            // Ctrl-C and SIGTERM both ask the loop to finish its tick and tear down in order. Cancelling
-            // the signal is the point: the default action kills the process where it stands, with sockets
-            // open, ECS worlds live and SQLite mid-write.
+            // Ctrl-C and SIGTERM ask the loop to finish its tick and tear down in order; cancelled, because
+            // the default kills the process with sockets open and SQLite mid-write.
             Console.CancelKeyPress += (_, e) =>
             {
                 e.Cancel = true;
@@ -2241,10 +2067,8 @@ public class Program
                 server.Stop();
             });
 
-            // --port lets a second server be brought up beside a running one, to smoke-test a change
-            // without taking someone's session down.
-            // --map picks the landing map, where every player arrives at login. Without it the map
-            // claiming IsDefault is the landing map; players reach the others with /join.
+            // --port brings a second server up beside a running one. --map picks the landing map; without
+            // it the map claiming IsDefault is.
             int port = 33288;
             for (int i = 0; i < args.Length - 1; i++)
             {

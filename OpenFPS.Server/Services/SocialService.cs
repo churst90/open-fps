@@ -4,11 +4,8 @@ using OpenFPS.Server.Repositories;
 
 namespace OpenFPS.Server.Services;
 
-/// <summary>
-/// Service responsible for social interactions: the friends list. Adding and removing friends are
-/// text commands (/friend add, /friend remove) in <see cref="CommandHandler"/>; this answers the
-/// list, with who of them is on now.
-/// </summary>
+/// <summary>The friends list, with who of them is on. Adding and removing are /friend in
+/// <see cref="CommandHandler"/>.</summary>
 public class SocialService
 {
     private readonly SessionManager _sessions;

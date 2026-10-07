@@ -3,20 +3,12 @@ using OpenFPS.Server.Core;
 
 namespace OpenFPS.Server.Services;
 
-/// <summary>
-/// Service responsible for player discovery and information queries.
-/// Handles requests for online player lists across different scopes (Server-wide or Map-local).
-/// </summary>
+/// <summary>Who is online and which maps there are: the player list and the map chooser.</summary>
 public class DiscoveryService
 {
     private readonly SessionManager _sessions;
     private readonly MapManager _maps;
 
-    /// <summary>
-    /// Initializes the service and registers message handlers with the dispatcher.
-    /// </summary>
-    /// <param name="dispatcher">The message dispatcher for routing requests.</param>
-    /// <param name="sessions">The session manager for player data lookup.</param>
     public DiscoveryService(IMessageDispatcher dispatcher, SessionManager sessions, MapManager maps)
     {
         _sessions = sessions;
@@ -25,27 +17,18 @@ public class DiscoveryService
         dispatcher.RegisterHandler<MapListRequest>(HandleMapListRequest);
     }
 
-    /// <summary>
-    /// Processes a request for the list of online players.
-    /// </summary>
-    /// <param name="connectionId">Source connection ID.</param>
-    /// <param name="request">The request parameters (Scope).</param>
-    /// <param name="reply">Callback to return the list response.</param>
     private void HandlePlayerListRequest(int connectionId, PlayerListRequest request, Action<IMessage> reply)
     {
         if (!_sessions.TryGetSession(connectionId, out var session)) return;
 
         IEnumerable<UserSession> targets;
-        
-        // Scope resolution: Should we show everyone, or just people in the requester's current map?
+
         if (request.Scope == PlayerListScope.Map)
             targets = _sessions.GetSessionsInMap(session.CurrentMapId);
         else
             targets = _sessions.GetAllSessions();
 
-        // A name on its own is not a status. Where somebody is, is the whole reason for asking:
-        // a list of eight names tells you nothing, and "four of them are on the map you are on"
-        // tells you where the game is.
+        // Your own map first: where somebody is, is the reason for asking.
         var ordered = targets
             .OrderBy(s => s.CurrentMapId != session.CurrentMapId)
             .ThenBy(s => s.Username, StringComparer.OrdinalIgnoreCase)
@@ -54,8 +37,7 @@ public class DiscoveryService
         reply(new PlayerListResponse
         {
             Players = ordered.Select(s => Describe(s, session)).ToArray(),
-            // The same people in the same order, as names a menu can act on: the sentences above
-            // are for reading out, and parsing a name back out of one is guessing.
+            // The same people, in the same order, as names a menu can act on.
             Usernames = ordered.Select(s => s.Username).ToArray(),
         });
     }
@@ -81,13 +63,8 @@ public class DiscoveryService
         return data.Invited.Any(n => n.Equals(session.Username, StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>
-    /// The maps this server has, and who is on them.
-    ///
-    /// Answered from the LOADED maps rather than from the map directory, because a map file the
-    /// server has not loaded is not somewhere a player can go, and a chooser that offers places you
-    /// cannot reach is worse than no chooser.
-    /// </summary>
+    /// <summary>The loaded maps and how many are on each. Only loaded ones: a map file the server has
+    /// not loaded is nowhere a player can go.</summary>
     private void HandleMapListRequest(int connectionId, MapListRequest request, Action<IMessage> reply)
     {
         if (!_sessions.TryGetSession(connectionId, out var session)) return;

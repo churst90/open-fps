@@ -4,18 +4,12 @@ using Serilog;
 namespace OpenFPS.Server.Repositories;
 
 /// <summary>
-/// The teams players have made, kept in teams.json beside friends.json, openfps.db and motd.txt.
+/// The teams players have made, in teams.json (a file, not a table, for the reason
+/// <see cref="FriendRepository"/> gives).
 ///
-/// A JSON file and not a table for the reason <see cref="FriendRepository"/> gives: the user store is
-/// built once with EnsureCreated and would never grow a new table on a server already running.
-///
-/// A team is a name, a leader, its members in the order they joined, and the names it has invited.
-/// A player is in one team at most, so whose side somebody is on has one answer. A team is closed by
-/// default — you join by invitation — and its leader can open it to anybody. The leader leaving hands
-/// the team to whoever has been in it longest; the last member leaving ends it.
-///
-/// Thread-safe: commands run on the tick thread, but a spawn and a command can arrive from different
-/// paths, and every write goes to disk under the same lock.
+/// A player is in one team at most. A team is closed by default and its leader can open it; the leader
+/// leaving hands it to whoever has been in it longest, and the last member leaving ends it. Locked: a
+/// spawn and a command can arrive from different paths.
 /// </summary>
 public class TeamRepository
 {
@@ -59,7 +53,7 @@ public class TeamRepository
         }
         catch (Exception ex)
         {
-            // As with friends: a damaged file must neither take the server down nor be overwritten.
+            // A damaged file must neither take the server down nor be overwritten.
             Log.Error(ex, "TeamRepository: could not read {Path}; starting with no teams and keeping the file as .bad.", _path);
             try { File.Copy(_path, _path + ".bad", overwrite: true); } catch { }
         }
@@ -161,11 +155,8 @@ public class TeamRepository
         }
     }
 
-    /// <summary>
-    /// Takes a player out of whatever team they are in. Returns the team as it was before, or null if
-    /// they were in none; <paramref name="newLeader"/> is who leads it now if the leader left, and
-    /// <paramref name="ended"/> says the team is gone because nobody is left in it.
-    /// </summary>
+    /// <summary>Takes a player out of their team. The team as it was, or null if they were in none;
+    /// <paramref name="newLeader"/> if the leader left, <paramref name="ended"/> if nobody is left.</summary>
     public Team? Leave(string username, out string? newLeader, out bool ended)
     {
         newLeader = null; ended = false;

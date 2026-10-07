@@ -3,9 +3,7 @@ using OpenFPS.Common.Components;
 
 namespace OpenFPS.Server.Repositories;
 
-/// <summary>
-/// EF Core context for server-side persistence (users, future: player progress).
-/// </summary>
+/// <summary>The accounts database (SQLite, through EF Core).</summary>
 public class AppDbContext : DbContext
 {
     public DbSet<UserRecord> Users => Set<UserRecord>();
@@ -27,17 +25,15 @@ public class AppDbContext : DbContext
     }
 }
 
-/// <summary>
-/// Persistent user record stored in SQLite.
-/// </summary>
+/// <summary>A row of the accounts table. The fields are described on <see cref="UserData"/>.</summary>
 public class UserRecord
 {
     public string Username { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; } = UserRole.Player;
 
-    // Added 2026-10-02. EnsureCreated does not alter a table that already exists, so an older
-    // database gets these columns from SqliteUserRepository.UpgradeSchema; keep the two in step.
+    // EnsureCreated does not alter a table that already exists: every column below reaches an older
+    // database through SqliteUserRepository.UpgradeSchema. Keep the two in step.
     public DateTime? CreatedUtc { get; set; }
     public DateTime? LastLoginUtc { get; set; }
     public string? LastLoginAddress { get; set; }
@@ -45,13 +41,8 @@ public class UserRecord
     public DateTime? LastFailedUtc { get; set; }
     public string? LastFailedAddress { get; set; }
     public string? RealName { get; set; }
-    // Added 2026-10-03: single permissions granted on top of the role, comma separated (Permissions).
     public string? Permissions { get; set; }
-    // Added 2026-10-03: a role an administrator made (RoleRepository), on top of Player. Null for none.
     public string? CustomRole { get; set; }
-    // Added 2026-10-04: where the player was, their health and their stats, as JSON (PlayerState).
     public string? PlayerState { get; set; }
-    // Added 2026-10-04: what they were carrying when they left the world, as JSON (Belongings). Taken
-    // (read and cleared) when they come back, so a thing is either here or in the world, never both.
     public string? Belongings { get; set; }
 }
