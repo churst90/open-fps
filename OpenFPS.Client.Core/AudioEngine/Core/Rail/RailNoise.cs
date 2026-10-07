@@ -111,7 +111,7 @@ internal sealed class BogieVoice
 
     // Blows in progress: a six-wheel bogie on staggered joints can have two at once.
     private struct Blow { public double T; public float Peak, Tau; public bool Live; }
-    private readonly Blow[] _impact = new Blow[6];
+    private readonly Blow[] _impact;
     private readonly float _contactHz, _impactScale;
 
     // Squeal.
@@ -122,26 +122,24 @@ internal sealed class BogieVoice
 
     // The axles share the track's radiators and one roughness process scaled by their count; each
     // meets each joint at its own moment, and that is the whole of the rhythm.
-    private readonly double[] _axleOffset;
-    private readonly double[] _nextJoint, _nextFlat;
+    private readonly AxleSchedule _schedule;
     private readonly float _axleGain;
-    private double _distance;             // metres the bogie centre has travelled
+    private readonly float[] _struck = new float[AxleSchedule.MaxPerSample];
 
     public IReadOnlyList<float> WheelModeHz => _modeHz;
     public float SquealHz => _squealHz;
     public float ContactResonanceHz => _contactHz;
 
+    /// <param name="blows">How many blows may ring at once: six for one bogie (a six-wheel bogie on
+    /// staggered joints can have two at once), more for a chain carrying many (StepShared).</param>
     public BogieVoice(WheelsetSpec w, TrackSpec t, TrackResponse track, float referenceDb,
-                      int axles, float wheelbase, float rate, int seed)
+                      int axles, float wheelbase, float rate, int seed, int blows = 6)
     {
         _w = w; _t = t; _track = track; _rate = rate; _dt = 1f / rate; _squealRelease = At44k.Decay(0.999f, rate);
         _rng = new Random(seed);
         int na = Math.Max(1, axles);
-        _axleOffset = new double[na];
-        _nextJoint = new double[na];
-        _nextFlat = new double[na];
-        for (int i = 0; i < na; i++)
-            _axleOffset[i] = na == 1 ? 0.0 : (i - (na - 1) * 0.5) * (wheelbase / (na - 1));
+        _schedule = new AxleSchedule(w, t, na, wheelbase, _rng);
+        _impact = new Blow[blows];
         // Independent roughness under each axle: n times the energy, not the pressure.
         _axleGain = MathF.Sqrt(na);
 
@@ -206,20 +204,7 @@ internal sealed class BogieVoice
     }
 
     /// <summary>Puts the bogie at a place on the track and works out when each axle next meets something.</summary>
-    public void Place(double position)
-    {
-        _distance = position;
-        double period = _t.JointSpacingMetres > 0.1f
-            ? (_t.StaggeredJoints ? _t.JointSpacingMetres * 0.5 : _t.JointSpacingMetres)
-            : 0.0;
-        double circ = Math.PI * _w.DiameterMetres;
-        for (int i = 0; i < _axleOffset.Length; i++)
-        {
-            double at = position + _axleOffset[i];
-            _nextJoint[i] = period > 0.0 ? Math.Ceiling(at / period) * period : double.MaxValue;
-            _nextFlat[i] = _w.FlatLengthMetres > 1e-3f ? Math.Ceiling(at / circ) * circ : double.MaxValue;
-        }
-    }
+    public void Place(double position) => _schedule.Place(position);
 
     /// <summary>The rolling part on its own: roughness, contact filter, three radiators.</summary>
     private float Roll(float speed) => Radiate(RollForce(speed));
@@ -264,7 +249,6 @@ internal sealed class BogieVoice
     public float Step(float speed, float curveDemand)
     {
         float v = MathF.Max(0f, speed);
-        _distance += v * _dt;
 
         // Every force at the contact this sample, summed, and radiated once. The rail, the sleepers and
         // the wheel are filters with state: radiating the roll and each live blow separately stepped
@@ -274,28 +258,36 @@ internal sealed class BogieVoice
 
         // Each axle has its own place on the rail: two quick bangs, and the next bogie's after the
         // car's length.
-        double period = _t.JointSpacingMetres > 0.1f
-            ? (_t.StaggeredJoints ? _t.JointSpacingMetres * 0.5 : _t.JointSpacingMetres)
-            : 0.0;
-        double circ = Math.PI * _w.DiameterMetres;
-        for (int i = 0; i < _axleOffset.Length; i++)
-        {
-            double at = _distance + _axleOffset[i];
-            if (at >= _nextJoint[i])
-            {
-                _nextJoint[i] += period;
-                // The impact speed: the dip angle times the train's speed.
-                Strike(_t.JointDipRadians * v * (0.8f + 0.4f * (float)_rng.NextDouble()));
-            }
-            if (at >= _nextFlat[i])
-            {
-                _nextFlat[i] += circ;
-                // A flat of length L arrives at about V L / D: far harder than a joint, which is why
-                // one bad wheel is audible over the whole train.
-                Strike(v * _w.FlatLengthMetres / MathF.Max(0.1f, _w.DiameterMetres));
-            }
-        }
+        int n = _schedule.Advance(v, _dt, _struck);
+        for (int i = 0; i < n; i++) Strike(_struck[i], 1f);
 
+        float y = Radiate(Blows(force));
+        return (y + Squeal(v, curveDemand, 1f)) * _refAmp * _chainGain;
+    }
+
+    /// <summary>
+    /// One sample of a chain carrying many bogies of this make at once (TrainSlotState). The wheel, the
+    /// rail and the sleepers are linear, so many bogies through one chain are the sum of each through its
+    /// own: the roughness of each is independent noise, so together they are one noise <paramref
+    /// name="rollWeight"/> (the root of the sum of their squared weights) times as strong, and each
+    /// one's blows come in through <see cref="Inject"/> at its own moment and weight. Its own schedule
+    /// is not used.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    public float StepShared(float speed, float curveDemand, float rollWeight)
+    {
+        float v = MathF.Max(0f, speed);
+        float y = Radiate(Blows(RollForce(v) * rollWeight));
+        return (y + Squeal(v, curveDemand, rollWeight)) * _refAmp * _chainGain;
+    }
+
+    /// <summary>A blow from a bogie this chain carries, at this impact speed and weight.</summary>
+    public void Inject(float impactMps, float weight) => Strike(impactMps, weight);
+
+    /// <summary><paramref name="force"/> with the force of the blows in progress added, advanced a sample.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private float Blows(float force)
+    {
         for (int i = 0; i < _impact.Length; i++)
         {
             ref var im = ref _impact[i];
@@ -305,8 +297,15 @@ internal sealed class BogieVoice
             force += MathF.Sin(MathF.PI * x) * im.Peak;
             im.T += _dt;
         }
-        float y = Radiate(force);
+        return force;
+    }
 
+    /// <summary>The squeal, before the bogie's gain: <paramref name="weight"/> is how many like it,
+    /// as for the roll.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private float Squeal(float v, float curveDemand, float weight)
+    {
+        float y = 0f;
         float creep = MathF.Abs(curveDemand);
         // Lateral creepage saturates at about five milliradians; below it the contact grips, which
         // is why a wheelset squeals on a hundred-metre curve and not on a five-hundred-metre one.
@@ -323,19 +322,19 @@ internal sealed class BogieVoice
             _squealState = _squealMode.Process(_squealDrive);
             // Flanging: the flange grinding on the gauge face, broadband.
             float fl = (float)(_rng.NextDouble() * 2 - 1) * 0.3f * MathF.Abs(_squealState);
-            y += (_squealState + fl) * 3.2f * MathF.Min(1f, excess / 0.008f);
+            y += (_squealState + fl) * 3.2f * MathF.Min(1f, excess / 0.008f) * weight;
         }
         else if (_squealState != 0f)
         {
             _squealState *= _squealRelease;
             if (MathF.Abs(_squealState) < 1e-6f) _squealState = 0f;
         }
-
-        return y * _refAmp * _chainGain;
+        return y;
     }
 
-    /// <summary>A blow: the unsprung mass meeting the contact spring at this closing speed.</summary>
-    private void Strike(float impactMps)
+    /// <summary>A blow: the unsprung mass meeting the contact spring at this closing speed, at this
+    /// weight (how loud this bogie is in the chain carrying it: one for its own).</summary>
+    private void Strike(float impactMps, float weight)
     {
         float peak = impactMps * _impactScale;
         // Past three or four times the static load the wheel and rail separate: uncapped, a flat at
@@ -350,10 +349,83 @@ internal sealed class BogieVoice
                 T = 0,
                 // Half the contact period: 200 Hz is a 2.5 ms blow.
                 Tau = 0.5f / MathF.Max(40f, _contactHz),
-                Peak = peak * 3.2e-5f,     // into the same units the roughness force uses
+                Peak = peak * 3.2e-5f * weight,     // into the same units the roughness force uses
                 Live = true,
             };
             return;
         }
+    }
+}
+
+/// <summary>
+/// When each axle of one bogie next meets a joint or brings a flat round: the rhythm of a bogie, apart
+/// from the chain that radiates it, so a bogie can be heard through a chain it shares with others
+/// (BogieVoice.StepShared).
+/// </summary>
+internal sealed class AxleSchedule
+{
+    /// <summary>The most impacts one bogie can make in one sample: a joint and a flat on each of three axles.</summary>
+    public const int MaxPerSample = 6;
+
+    private readonly WheelsetSpec _w;
+    private readonly TrackSpec _t;
+    private readonly Random _rng;
+    private readonly double[] _axleOffset, _nextJoint, _nextFlat;
+    private readonly double _period, _circ;
+    private double _distance;             // metres the bogie centre has travelled
+
+    public AxleSchedule(WheelsetSpec w, TrackSpec t, int axles, float wheelbase, Random rng)
+    {
+        _w = w; _t = t; _rng = rng;
+        int na = Math.Clamp(axles, 1, 3);
+        _axleOffset = new double[na];
+        _nextJoint = new double[na];
+        _nextFlat = new double[na];
+        for (int i = 0; i < na; i++)
+            _axleOffset[i] = na == 1 ? 0.0 : (i - (na - 1) * 0.5) * (wheelbase / (na - 1));
+        _period = t.JointSpacingMetres > 0.1f ? (t.StaggeredJoints ? t.JointSpacingMetres * 0.5 : t.JointSpacingMetres) : 0.0;
+        _circ = Math.PI * w.DiameterMetres;
+    }
+
+    /// <summary>Where the bogie centre is along the track, metres.</summary>
+    public double Distance => _distance;
+
+    /// <summary>Puts the bogie at a place on the track and works out when each axle next meets something.</summary>
+    public void Place(double position)
+    {
+        _distance = position;
+        for (int i = 0; i < _axleOffset.Length; i++)
+        {
+            double at = position + _axleOffset[i];
+            _nextJoint[i] = _period > 0.0 ? Math.Ceiling(at / _period) * _period : double.MaxValue;
+            _nextFlat[i] = _w.FlatLengthMetres > 1e-3f ? Math.Ceiling(at / _circ) * _circ : double.MaxValue;
+        }
+    }
+
+    /// <summary>Moves on one sample at <paramref name="v"/> m/s and writes the impact speed of each axle
+    /// that met something; returns how many did.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    public int Advance(float v, float dt, Span<float> impacts)
+    {
+        _distance += v * dt;
+        int n = 0;
+        for (int i = 0; i < _axleOffset.Length; i++)
+        {
+            double at = _distance + _axleOffset[i];
+            if (at >= _nextJoint[i])
+            {
+                _nextJoint[i] += _period;
+                // The impact speed: the dip angle times the train's speed.
+                impacts[n++] = _t.JointDipRadians * v * (0.8f + 0.4f * (float)_rng.NextDouble());
+            }
+            if (at >= _nextFlat[i])
+            {
+                _nextFlat[i] += _circ;
+                // A flat of length L arrives at about V L / D: far harder than a joint, which is why
+                // one bad wheel is audible over the whole train.
+                impacts[n++] = v * _w.FlatLengthMetres / MathF.Max(0.1f, _w.DiameterMetres);
+            }
+        }
+        return n;
     }
 }

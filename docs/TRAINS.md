@@ -207,6 +207,53 @@ that and out of nothing else:
 - the far end of a long freight is **duller** than the near end, because the air has had four
   hundred metres to take the top off it.
 
+## Voicing a train
+
+In the game a train is heard through at most six voices however long it is: four for its rolling
+stock and engines, one for the horn (or whistle) while it sounds, one for the bell while it rings
+(`TrainVoicing`, `TrainSlotState` in `RailVoice.cs`, the game-thread side in
+`ClientAudioSystem.Trains.cs`). The server still places one entity per source; none of them gets a
+voice of its own.
+
+Until 2026-10-07 each source was a voice, and all of a train's voices stepped one `TrainSynth` under
+one lock. Cody added a fifty-wagon freight on the city and the sound cut out all over the map: the
+freight held 130 voices at once (190-215 active against about 60 before it), emptied the binaural
+pool so 60-84 voices played without HRTF (mono, "the sound went mono"), took the mixer from 60 % to
+over 100 %, and its synth needed 2.5 cores on the one thread that held the lock, so every render
+worker that reached for one of its taps waited and every car on those workers starved (up to
+3,224 starved blocks a second). Its voices were started 913 times in nine minutes.
+
+**Which sources share a voice** is what the ear can tell apart: two sources closer together than
+about four degrees, as seen from where the listener stands, are one sound from one place. The
+sources are merged along the train, neighbour with neighbour, the pair that look closest together
+first, until four groups are left and no two still apart are within four degrees (a group is split
+back out only past seven, so the count does not flicker as the train moves). Beside the line the
+bogies passing you are a voice or two of their own and the far end of the freight is one; a
+kilometre off, the whole train is one. Groups are worked out twice a second and keep their voice as
+they drift along the train.
+
+**At what weight.** A source played through a voice that is not its own keeps its own level: its
+weight is the ratio of the two levels it would be declared at times the ratio of the two gains the
+mixer would play them at (`TrainVoicing.Weight`), the ear model's correction included. A source moving
+from one voice to another fades out of one and into the other over 0.4 s, in power, so its level holds
+through the hand-over (measured: +0.6 dB). The voice is placed at the middle of what it carries, by the
+power each source brings.
+
+**What a voice renders.** The engines, fans, drives, chimneys, horn and bell have state of their own
+and are rendered once each, by a lane on the render pool (each diesel its own lane: an EMD 645 is half
+a core), into a ring any voice may read. The rolling stock is rendered by the voice carrying it through
+one chain per kind of bogie and one per kind of body: the wheel, rail and sleepers are linear, so forty
+bogies through one chain are exactly forty through their own (measured +15.9 dB against the +16.0 of
+forty independent sources), each bogie's roughness being independent noise (one noise at the root of
+the sum of their squared weights) and each bogie's blows arriving at its own moment and weight from
+its own axle schedule. The freight's rolling stock costs 16 % of a core on one voice; through 154
+separate bogies it cost 104 %. A voice whose lane has not caught up renders nothing that pass; it never
+waits on a lock.
+
+Everything is timed by one clock, the train's own timeline (256-sample blocks of speed, notch, head
+position and signals), so a source handed between voices is the same source at the same moment in
+both, and the horn's rhythm starts at the same sample in every voice.
+
 ## The models are data
 
 Every one of these lives in `ModelLibrary` and can be written, shared and overridden without
@@ -296,6 +343,11 @@ Each of these was found by an instrument and would not have been found by listen
    loud as a two-wheel one.
 10. **The pass-by level meter averaged each source's contribution** instead of summing them, and
     read twenty decibels low.
+11. **Every bogie of a train shared one track's filters** (2026-10-07), so on a fifty-wagon freight
+    the rail's modes were stepped 154 times a sample and folded back as hiss: the freight's 4 kHz band
+    15 dB over what its bogies make. And a bogie radiated its rolling force and each blow in flight
+    separately, stepping its own modes two or three times a sample while a blow lasted. Each bogie has
+    its own track now and radiates once a sample (`--rail-cost`: 247 % of a core to 192 %).
 
 ## Not done, in the order it should go
 
@@ -303,7 +355,7 @@ Each of these was found by an instrument and would not have been found by listen
    passed by ear (2026-09-18: "sounds great", "perfect in fact, keepers"). The train pass-bys have
    had one listen and the crossing scene one; neither has been iterated on.
 2. **Into the game.** Done (session 19): `RailSystem` on the server, `TrainVoiceState` with one
-   tap per source on the client, level crossings from the map's `Crossings`, platform stops. Only
+   tap per source on the client (a handful of voices per train since 2026-10-07, "Voicing a train"), level crossings from the map's `Crossings`, platform stops. Only
    light rail is in a map file; `/spawn train PRESET` puts any preset on the nearest track.
 3. **The track is not in the acoustic map.** A train in a cutting, under a bridge, or in a tunnel
    should get that from the geometry the way everything else does; `TrackSpec.StructureDb` is a

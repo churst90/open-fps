@@ -48,7 +48,7 @@ public class DspCallbackTests
         "air horn" => new HornVoiceState("air:truck_dual", new[] { 2f }, Rate, 3),
         "crossing bell" => new BellVoiceState(ModelLibrary.Bell("crossing_gong"), Rate, 5),
         "rain" => Rain(),
-        "light rail" => new TrainTapState(new TrainVoiceState("light_rail/test", TrainProfile.ByName("light_rail"), Rate, 7), 0, Rate),
+        "light rail" => LightRail(),
         "fountain" => new WaterVoiceState(WaterFeatureSpec.ByName("park_fountain"), Rate, 3, Somewhere),
         "fountain tap" => new WaterTapState(new WaterFeatureVoice("park_fountain/test", WaterFeatureSpec.ByName("park_fountain"), Rate, 1), 0, Rate, Somewhere),
         "fire" => new FireVoiceState(FireSpec.ByName("fire_pit"), Rate, 13, Somewhere),
@@ -59,6 +59,16 @@ public class DspCallbackTests
         "shore" => new NaturePlaceState(new PlacedNatureVoice("shore:sea", ShoreSpec.SeaSand, ShoreSpec.SeaSand.DefaultGeometry, Rate, 23, Somewhere), 0, Rate, Somewhere),
         _ => throw new ArgumentException(kind),
     };
+
+    /// <summary>A light rail set heard through one voice carrying all of it (TrainSlotState), its lanes
+    /// rendered inline, from the start of the train's timeline so a twin made later is in step.</summary>
+    private static PhysicalVoiceState LightRail()
+    {
+        var t = new TrainVoiceState("light_rail/test", TrainProfile.ByName("light_rail"), Rate, 7) { Offline = true };
+        var field = t.Layout.Where(e => !e.IsSignal).Select(e => e.Index).ToArray();
+        t.SetPlan(0, new TrainSlotPlan(field, field.Select(_ => 0.5f).ToArray()));
+        return new TrainSlotState(t, 0, OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(t.Layout), Rate, startSample: 0);
+    }
 
     /// <summary>A steel roof in steady rain, on a clock of its own from zero (every rain voice in the game
     /// shares one; two made a moment apart here would otherwise start at two moments of the shared one).</summary>

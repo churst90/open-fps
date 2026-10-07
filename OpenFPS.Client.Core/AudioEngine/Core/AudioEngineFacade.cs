@@ -264,6 +264,15 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.SignalTrain(train, warning, bellSeconds, secondsAgo);
     }
 
+    /// <summary>Binaural voices free (IAudioProvider.SpatialVoicesFree); without a mixer, no limit.</summary>
+    public int SpatialVoicesFree => _isInitialized ? _provider.SpatialVoicesFree : int.MaxValue / 4;
+
+    /// <summary>See IAudioProvider.PlanTrainSlot.</summary>
+    public void PlanTrainSlot(string preset, string train, int slot, OpenFPS.Client.AudioEngine.Fmod.TrainSlotPlan plan)
+    {
+        if (_isInitialized) _provider.PlanTrainSlot(preset, train, slot, plan);
+    }
+
     public void SetListenerEnclosure(float lowDb, float midDb, float highDb)
     {
         if (_isInitialized) _provider.SetListenerEnclosure(lowDb, midDb, highDb);

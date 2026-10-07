@@ -631,16 +631,24 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         _engineSnapshot.Clear();
         _engineOrder.Clear();
+        _snapshotTrains.Clear();
         lock (_lock)
             foreach (var a in _activeSounds)
             {
                 if (a.EngineState != null) _engineOrder.Add((a.EffectiveDistance, a.EngineState));
-                else if (a.MachineState != null) _engineOrder.Add((a.EffectiveDistance, a.MachineState));
+                else if (a.MachineState != null)
+                {
+                    _engineOrder.Add((a.EffectiveDistance, a.MachineState));
+                    // A train's lanes render what its voices read: listed once, just ahead of its nearest voice.
+                    if (a.MachineState is TrainSlotState tv && _snapshotTrains.Add(tv.Shared))
+                        foreach (var lane in tv.Shared.Lanes) _engineOrder.Add((a.EffectiveDistance - 0.01f, lane));
+                }
             }
         _engineOrder.Sort(static (x, y) => x.Distance.CompareTo(y.Distance));
         foreach (var e in _engineOrder) _engineSnapshot.Add(e.Voice);
         return _engineSnapshot;
     }
+    private readonly HashSet<TrainVoiceState> _snapshotTrains = new();
 
     /// <summary>
     /// Makeup gain on the master, dB: how loud the game plays, decided in this one place (see the
@@ -1587,7 +1595,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // ...and so is a tree, a fire or a fountain heard from several places.
             string? sharedKey = a.MachineState switch
             {
-                TrainTapState tap => tap.Shared.Key,
+                TrainSlotState trainVoice => trainVoice.Shared.Key,
                 NaturePlaceState place => "place:" + place.Shared.GetHashCode(),
                 WaterTapState water => "water:" + water.Shared.Key,
                 _ => null,
@@ -1979,8 +1987,9 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    // Trains: one synth per consist, a tap per entity (RailVoice.cs). The server names every source of
-    // a train "rail:<preset>/<train>/<i>"; the synth for <preset>/<train> is made on the first tap.
+    // Trains: one model per consist, heard through a handful of voices (RailVoice.cs). The client asks for
+    // voice k of a train as "rail:<preset>/<train>/@k"; the model for <preset>/<train> is made on the
+    // first voice or the first plan.
     private readonly Dictionary<string, TrainVoiceState> _trains = new();
 
     /// <summary>The last signal each train was given, and when, for a synth made after it arrived.</summary>
@@ -1998,27 +2007,53 @@ public partial class FmodAudioProvider : IAudioProvider
                         string.Join(",", warning.Select(w => w.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))), bellSeconds);
     }
 
-    private PhysicalVoiceState? RailTap(string key, int rate)
+    /// <summary>The model of a train, made on first use. Caller holds the lock on _trains.</summary>
+    private TrainVoiceState TrainFor(string preset, string train, int rate)
     {
-        if (!TrainVoiceState.ParseKey(key, out string preset, out string train, out int index)) return null;
         string shared = preset + "/" + train;
+        if (_trains.TryGetValue(shared, out var t)) return t;
+        // The seed from the name's characters, not string.GetHashCode (randomised per process): every
+        // client and every run hears the same train.
+        int seed = 17;
+        foreach (char c in train) seed = unchecked(seed * 31 + c);
+        t = new TrainVoiceState(shared, OpenFPS.Common.TrainProfile.ByName(preset), rate, seed & 0x7fff);
+        _trains[shared] = t;
+        Log.Information("Train '{Train}' ({Profile}): one model, {Sources} source(s) over {Length:F0} m, heard through at most {Voices} voice(s); {Lanes} lane(s) render its engines and signals",
+                        shared, t.Profile.Name, t.Layout.Count, t.Profile.LengthMetres,
+                        OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots, t.Lanes.Length);
+        // Sounding already: the horn came in before any of the train had a voice.
+        if (_trainSignals.TryGetValue(shared, out var sig))
+        {
+            double ago = OpenFPS.Common.AudioClock.Now - sig.At;
+            if (ago < OpenFPS.Common.TrainSignal.Duration(sig.Warning, sig.Bell)) t.Signal(sig.Warning, sig.Bell, ago);
+        }
+        return t;
+    }
+
+    /// <summary>See IAudioProvider.PlanTrainSlot.</summary>
+    public void PlanTrainSlot(string preset, string train, int slot, TrainSlotPlan plan)
+    {
+        if (!_isInitialized) return;
+        _system.getSoftwareFormat(out int rate, out _, out _);
         lock (_trains)
         {
-            if (!_trains.TryGetValue(shared, out var t))
-            {
-                t = new TrainVoiceState(shared, OpenFPS.Common.TrainProfile.ByName(preset), rate, train.GetHashCode() & 0x7fff);
-                _trains[shared] = t;
-                Log.Information("Train '{Train}' ({Profile}): one synth, {Sources} source(s) over {Length:F0} m",
-                                shared, t.Profile.Name, t.Layout.Count, t.Profile.LengthMetres);
-                // Sounding already: the horn came in before any of the train had a voice.
-                if (_trainSignals.TryGetValue(shared, out var sig))
-                {
-                    double ago = OpenFPS.Common.AudioClock.Now - sig.At;
-                    if (ago < OpenFPS.Common.TrainSignal.Duration(sig.Warning, sig.Bell)) t.Signal(sig.Warning, sig.Bell, ago);
-                }
-            }
-            if (index < 0 || index >= t.Layout.Count) return null;
-            return new TrainTapState(t, index, rate);
+            try { TrainFor(preset, train, rate).SetPlan(slot, plan); }
+            catch (Exception ex) { Log.Warning("Train '{Preset}/{Train}': {Message}", preset, train, ex.Message); }
+        }
+    }
+
+    private PhysicalVoiceState? RailSlot(string key, int rate)
+    {
+        if (!TrainVoiceState.ParseSlotKey(key, out string preset, out string train, out int slot)) return null;
+        lock (_trains)
+        {
+            var t = TrainFor(preset, train, rate);
+            // Declared at the train's loudest field source; a signal's voice at the signal's own level.
+            float level = OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(t.Layout);
+            int signal = slot == OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.WarningSlot ? OpenFPS.Common.TrainSignal.WarningSource(t.Layout)
+                       : slot == OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.BellSlot ? OpenFPS.Common.TrainSignal.BellSource(t.Layout) : -1;
+            if (signal >= 0) level = t.Layout[signal].LevelDb;
+            return new TrainSlotState(t, slot, level, rate);
         }
     }
 
@@ -2471,7 +2506,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     "aircraft" => new AircraftVoiceState(OpenFPS.Common.AircraftProfile.ByName(preset),
                                                          mrate, emitter.EntityId * 17 + 3,
                                                          lever: emitter.PowerLever),
-                    "rail" => RailTap(emitter.PhysicalKey, mrate),
+                    "rail" => RailSlot(emitter.PhysicalKey, mrate),
                     // Its own voice: 35 dB over the car's exhaust, the two cannot share one full-scale
                     // reference (SirenVoiceState).
                     "siren" => new SirenVoiceState(OpenFPS.Common.SirenSpec.ByName(preset), mrate),
@@ -2872,12 +2907,12 @@ public partial class FmodAudioProvider : IAudioProvider
                     {
                         mach.TargetGroundSpeed = emitter.Velocity.Length();
                     }
-                    else if (active.MachineState is TrainTapState tap)
+                    else if (active.MachineState is TrainSlotState trainVoice)
                     {
-                        // Any tap may set it, all reading one train: the lever is the notch over
-                        // eight, the wake slot the speed.
-                        tap.Shared.TargetSpeed = emitter.RotorWake;
-                        tap.Shared.TargetNotch = emitter.PowerLever * 8f;
+                        // Any of its voices may set it, all reading one train: the lever is the notch
+                        // over eight, the wake slot the speed.
+                        trainVoice.Shared.TargetSpeed = emitter.RotorWake;
+                        trainVoice.Shared.TargetNotch = emitter.PowerLever * 8f;
                     }
                     else if (active.MachineState is NaturePlaceState { Place: 0 } middle)
                     {

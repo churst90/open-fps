@@ -13,7 +13,7 @@ namespace OpenFPS.Client.Core;
 /// Turns the world's entities into sounds: emitters, their acoustic paths, and the budgets that decide
 /// which of them get a voice.
 /// </summary>
-public class ClientAudioSystem
+public partial class ClientAudioSystem
 {
     private readonly AudioEngineFacade _audio;
     private readonly SoundMappingService _sounds;
@@ -247,20 +247,24 @@ public class ClientAudioSystem
     private const int NewEnginesPerUpdate = 2;
 
     /// <summary>
-    /// How many standing machines (air conditioners, mowers, plant) may run live at once. Its own budget:
-    /// a map carries tens of vehicles but hundreds of small machines (the city has 114 window units).
-    /// Ranked not by distance but by how loud each would be here, at the ear (Loudness.RenderedGain, then
-    /// Loudness.HeardGain): a rooftop condenser at 65 dB 80 m away beats a 59 dB window unit behind a hedge.
-    /// OPENFPS_MACHINE_VOICES overrides, and 0 is a valid answer: every machine and aircraft voice off.
+    /// How many voices the standing machines (air conditioners, mowers, plant), aircraft, fountains, bells
+    /// and trains may have at once. Its own budget: a map carries tens of vehicles but hundreds of small
+    /// machines (the city has 114 window units). Ranked not by distance but by how loud each would be here,
+    /// at the ear (Loudness.RenderedGain, then Loudness.HeardGain): a rooftop condenser at 65 dB 80 m away
+    /// beats a 59 dB window unit behind a hedge. Counted in voices, not things: a fountain is five and a
+    /// train up to six (TrainVoicing), and counted as things ten let one train shut out the fountain, the
+    /// crossing's bell and everything else. OPENFPS_MACHINE_VOICES overrides, and 0 is a valid answer:
+    /// every machine and aircraft voice off.
     /// </summary>
     public static readonly int MachineVoiceBudget =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MACHINE_VOICES"), out int mbudget) && mbudget >= 0
-            ? mbudget : 10;
+            ? mbudget : 24;
     private int _adaptiveMachines = MachineVoiceBudget;
 
-    /// <summary>However short the mixer runs, this many standing machines keep a voice. One, because
-    /// the one you are standing next to is the one you would notice going silent.</summary>
-    private const int MinMachineVoices = 1;
+    /// <summary>However short the mixer runs, this many machine voices are kept, and the loudest machine
+    /// keeps its voice whatever it costs: the one you are standing next to is the one you would notice
+    /// going silent.</summary>
+    private const int MinMachineVoices = 6;
 
     /// <summary>Nothing at all, when the budget is zero: the adaptive floor must not put one back.</summary>
     private int MachineFloor => MachineVoiceBudget == 0 ? 0 : MinMachineVoices;
@@ -445,6 +449,7 @@ public class ClientAudioSystem
     public void LeaveWorld(IEnumerable<int> entityIds)
     {
         foreach (int id in entityIds) ForgetEntity(id);
+        ForgetTrains();
         WorldAudio.Clear();
         if (_mapAmbienceId.Length > 0) _audio.StopAmbientBed(_mapAmbienceId);
         if (_regionAmbienceId.Length > 0) _audio.StopAmbientBed(_regionAmbienceId);
@@ -616,6 +621,9 @@ public class ClientAudioSystem
         // of its own. Without this, twelve city cars were never occluded or darkened by the air: the
         // white-noise wash from the map's edge (high band 10 dB under the low, against 42 for the rest).
         _pathIds.UnionWith(_distantVoiced);
+        // ...and the sources whose paths a train's voices borrow (last frame's: they are placed later on).
+        _pathIds.UnionWith(_trainPathIds);
+        _trainPathIds.Clear();
         foreach (var id in _pathIds)
         {
             // Ids below -5000 are copies and voices that work out their own paths (a wall's copy, your
@@ -808,6 +816,7 @@ public class ClientAudioSystem
         UpdateCabinVoices();
 
         long partAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        UpdateTrains(world, visualEyePos, engineDt);
         UpdateHorns(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
         UpdateSirens(world, visualEyePos);
         UpdateOwnVoice(visualEyePos, OpenFPS.Common.AudioClock.Now);
@@ -1363,13 +1372,19 @@ public class ClientAudioSystem
                 OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume * chorus, reference, range, d), timbre, physical: true);
 
             // A water feature's taps are one fountain the same way, and come and go together.
-            string group = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _)
-                ? "rail:" + preset + "/" + train
+            bool rail = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _);
+            string group = rail
+                ? preset + "/" + train
                 : OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(em.SoundId, out string waterPreset, out string feature, out _)
                 ? "water:" + waterPreset + "/" + feature : "#" + entityId;
-            if (!_machineGroups.TryGetValue(group, out var g)) _machineGroups[group] = g = new MachineGroup();
+            if (!_machineGroups.TryGetValue(group, out var g))
+            {
+                _machineGroups[group] = g = new MachineGroup();
+                if (rail) { g.Train = group; g.Live = _liveTrains.Contains(group); g.Held = _trainStarted.TryGetValue(group, out double t0) && now - t0 < EngineMinimumHoldSeconds; }
+            }
             g.Members.Add(entityId);
             g.Level = MathF.Max(g.Level, level);
+            if (rail) continue;
             if (_liveMachines.Contains(entityId)) g.Live = true;
             if (_machineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds) g.Held = true;
         }
@@ -1379,14 +1394,38 @@ public class ClientAudioSystem
             float key = g.Live ? -g.Level / (EngineKeepBias * EngineKeepBias) : -g.Level;
             if (g.Held) key = float.NegativeInfinity;
             g.Key = key;
+            // What it costs in voices: a train its handful (TrainVoicing), anything else one per member.
+            g.Cost = g.Train != null ? TrainVoiceCost(g) : g.Members.Count;
         }
         _groupOrder.Clear();
         _groupOrder.AddRange(_machineGroups.Values);
         _groupOrder.Sort((x, y) => x.Key.CompareTo(y.Key));
 
-        int keepGroups = Math.Min(_adaptiveMachines, _groupOrder.Count);
+        // In voices, the loudest first, the first whatever it costs. A group not yet playing is only
+        // started while the binaural pool can take it and still keep a reserve: past that, a voice would
+        // play without HRTF, flat and in the middle of the head, which is worse than not playing it.
+        int spent = 0, hrtfLeft = _audio.SpatialVoicesFree - HrtfReserve;
+        _keptGroups.Clear();
+        if (MachineVoiceBudget > 0)
+            for (int i = 0; i < _groupOrder.Count; i++)
+            {
+                var g = _groupOrder[i];
+                // One that does not fit leaves room for a smaller one further down.
+                if (i > 0 && spent + g.Cost > _adaptiveMachines) continue;
+                if (!g.Live && i > 0 && g.Cost > hrtfLeft) continue;
+                if (!g.Live) hrtfLeft -= g.Cost;
+                spent += g.Cost;
+                _keptGroups.Add(g);
+            }
+        int keepGroups = _keptGroups.Count;
         _wantedMachines.Clear();
-        for (int i = 0; i < keepGroups; i++) foreach (int id in _groupOrder[i].Members) _wantedMachines.Add(id);
+        _wantedTrains.Clear();
+        for (int i = 0; i < keepGroups; i++)
+        {
+            if (_keptGroups[i].Train is { } t) { _wantedTrains.Add(t); continue; }
+            foreach (int id in _keptGroups[i].Members) _wantedMachines.Add(id);
+        }
+        _machineVoicesSpent = spent;
 
         foreach (int id in _liveMachines)
         {
@@ -1403,15 +1442,29 @@ public class ClientAudioSystem
 
         int admittedGroups = 0;
         _liveMachines.Clear();
+        _liveTrains.Clear();
+        _trainMembers.Clear();
         for (int i = 0; i < keepGroups; i++)
         {
-            var g = _groupOrder[i];
+            var g = _keptGroups[i];
+            if (g.Train != null)
+            {
+                if (!g.Live)
+                {
+                    if (admittedGroups >= NewEnginesPerUpdate) continue;
+                    admittedGroups++;
+                    _trainStarted[g.Train] = now;
+                }
+                _liveTrains.Add(g.Train);
+                _trainMembers[g.Train] = g.Members.ToArray();
+                continue;
+            }
             bool isNew = false;
             foreach (int id in g.Members) if (!_machineStarted.ContainsKey(id)) { isNew = true; break; }
             if (isNew)
             {
                 // A map load presents every machine at once; building one is a set of waveguides and
-                // resonators. Counted per machine: a train's taps share one synth.
+                // resonators. Counted per machine: a fountain's taps share one synth.
                 if (admittedGroups >= NewEnginesPerUpdate) continue;
                 admittedGroups++;
             }
@@ -1429,9 +1482,21 @@ public class ClientAudioSystem
         public readonly List<int> Members = new();
         public float Level, Key;
         public bool Live, Held;
+        /// <summary>"preset/train" for a train's group, else null.</summary>
+        public string? Train;
+        /// <summary>Voices it takes.</summary>
+        public int Cost = 1;
     }
+
+    /// <summary>Binaural voices kept free when the machine budget starts something new: what the cars,
+    /// the footsteps and the speech need in the next second.</summary>
+    private const int HrtfReserve = 16;
+
+    /// <summary>Machine voices in use after the last ranking, for the log.</summary>
+    private int _machineVoicesSpent;
     private readonly Dictionary<string, MachineGroup> _machineGroups = new();
     private readonly List<MachineGroup> _groupOrder = new();
+    private readonly List<MachineGroup> _keptGroups = new();
     private readonly HashSet<int> _wantedMachines = new();
 
     /// <summary>

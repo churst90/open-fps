@@ -82,6 +82,9 @@ public interface IAudioProvider : IDisposable
     /// for this long, begun <paramref name="secondsAgo"/> before now (TrainSignal). Played by the train's
     /// own synth, on its own outlets.</summary>
     void SignalTrain(string train, float[] warning, float bellSeconds, double secondsAgo) { }
+    /// <summary>What one of a train's voices carries (TrainVoicing, TrainSlotPlan): "preset/train", the
+    /// voice, its sources and their weights. Kept until replaced; the voice reads it as it renders.</summary>
+    void PlanTrainSlot(string preset, string train, int slot, OpenFPS.Client.AudioEngine.Fmod.TrainSlotPlan plan) { }
     /// <summary>
     /// A car engine's told road speed, its own driveline's speed, its crank speed and gear. "The cars
     /// sound like they are slowing down" has four causes that sound alike (they are, the world reports
