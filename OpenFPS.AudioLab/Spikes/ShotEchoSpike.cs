@@ -7,7 +7,7 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// <summary>
 /// What a shot echoes off: every arrival EarlyReflections finds for an impulse on a real map, with the
 /// solid (material and size) each first-order copy came off.
-/// `--shot-echoes [map=city] at=x,z [shot=x,z] [height=1.5]` — `shot` defaults to half a metre from you.
+/// `--shot-echoes [map=city] at=x,z [shot=x,z]`: `shot` defaults to half a metre from you, 1.5 m up.
 /// </summary>
 public static class ShotEchoSpike
 {

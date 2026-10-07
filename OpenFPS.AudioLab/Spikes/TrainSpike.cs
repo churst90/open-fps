@@ -8,17 +8,12 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// <summary>
 /// A train going past somebody standing by the line.
 ///
-///   --train [preset ...] [speed=m/s] [offset=m] [sec=s] [notch=0..8] [cars=N] [horn=0|1] [stems]
+///   --train [preset ...] [speed=m/s] [offset=m] [sec=s] [notch=0..8] [cars=N] [horn=0|1] [stems] [binaural]
 ///
-/// Rendered the honest way, the same as the aircraft flyover: every source is integrated in the
-/// TRAIN's time and every sample is deposited at the moment it ARRIVES — emission time plus the path
-/// over the speed of sound — with the inverse-distance gain and the air's absorption for that path.
-/// Doppler is not applied; it happens. And because a train is sixty sources spread over a couple of
-/// hundred metres rather than one source at a place, three things come out that no point-source
-/// rendering can give you: the level RISES TO A PLATEAU instead of a peak, because a line source
-/// falls off three decibels a doubling and not six; the clatter SWEEPS along the train past you as
-/// each bogie's bangs arrive from a different place; and the far end of a long train is DULLER than
-/// the near end, because the air has had four hundred metres to take the top off it.
+/// As the aircraft flyover: each source integrated in the train's time and deposited when it arrives,
+/// with spreading and air absorption, so Doppler happens. A train is sixty sources over a couple of
+/// hundred metres, so the level rises to a plateau (a line source loses 3 dB a doubling, not 6), the
+/// clatter sweeps along the train, and the far end is duller than the near end.
 /// </summary>
 public static class TrainSpike
 {
@@ -44,8 +39,8 @@ public static class TrainSpike
         foreach (var key in presets)
         {
             var p = ModelLibrary.Train(key);
-            // Only rewrite a consist that HAS a long tail of like vehicles: "cars=18" means
-            // eighteen wagons behind the locomotives, not eighteen trams.
+            // Only a consist with a long tail of like vehicles: cars=18 is eighteen wagons behind the
+            // locomotives, not eighteen trams.
             if (cars > 0 && p.Consist[^1].Count > 4)
             {
                 var consist = p.Consist.ToArray();
@@ -64,8 +59,7 @@ public static class TrainSpike
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var r = binaural ? PassByBinaural(train, v, offset, sec, horn, dir, key) : PassBy(train, v, offset, sec, horn, stems);
             Console.WriteLine($"    at the ear: {r.ClosestDb:F0} dB as it passes, peak {r.PeakDb:F0} dB   ({sw.Elapsed.TotalSeconds:F0} s to render)");
-            // Averaged over windows spread across the whole pass, NOT the first four thousand
-            // samples — which on a pass-by are the train still being a mile away.
+            // Windows across the whole pass: the first samples are the train still a mile away.
             var offsets = Enumerable.Range(1, 40).Select(i => (int)(r.Mix.Length * i / 42f)).ToArray();
             Console.WriteLine("    bands: " + string.Join("  ", Spectrum.AverageBandsDb(r.Mix, Sr, offsets).Select((d, i) => $"{Spectrum.BandEdges[i]:F0}:{d:F0}")));
             foreach (var (name, pcm) in r.Stems)
@@ -102,9 +96,8 @@ public static class TrainSpike
         public float PeakDb, ClosestDb, Peak;
     }
 
-    /// <summary>Which layer a source belongs to, for the stems. A quiet layer buried under a loud
-    /// one is indistinguishable from a missing one, which is the whole reason for rendering them
-    /// apart.</summary>
+    /// <summary>Which layer a source belongs to, for the stems: a buried layer and a missing one sound
+    /// the same in the mix.</summary>
     private static int LayerOf(string label)
     {
         if (label.Contains("horn") || label.Contains("whistle") || label.Contains("bell")) return 2;
@@ -203,10 +196,8 @@ public static class TrainSpike
             }
         }
 
-        // The level at the ear as it passes: the RMS of what actually ARRIVED, over a second
-        // either side of the moment the middle of the train is abeam. Summing each source's own
-        // contribution and averaging them (which is what this did first) measures the mean of the
-        // sources rather than the sound of the train, and reads about twenty decibels low.
+        // The RMS of what arrived, a second either side of the middle of the train abeam; averaging
+        // each source's own contribution measures the mean source and reads about 20 dB low.
         int from = Math.Max(0, (int)((half + train.Profile.LengthMetres * 0.5f / speed - 1f) * Sr));
         int to = Math.Min(mix.Length, from + 2 * Sr);
         double closestP2 = 0; int closeCount = 0;

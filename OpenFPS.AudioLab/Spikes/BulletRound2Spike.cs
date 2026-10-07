@@ -416,8 +416,7 @@ public static class BulletRound2Spike
             float fullScale = BulletFlyby.WhizzFullScalePascals(w);
             var (_, jb, jc, _) = Joins(w);
             float join1 = Heard(w, jb), join2 = Heard(w, jc);
-            // Round one seeded this from HashCode, which differs every run; a fixed mix here, so the
-            // before files and their numbers come out the same each time.
+            // A fixed mix, not round one's HashCode seed (different every run), so the before files repeat.
             var rng = new Random((int)(BulletFlyby.Mix(BulletFlyby.Mix((uint)w.Speed, (uint)w.MissDm), (uint)(w.BeforeMetres * 1009 + (seed & 3))) & 0x7fffffff));
             const int partials = 96;
             float f0 = BulletFlyby.Strouhal * MathF.Max(1f, w.Speed) / w.Diameter;

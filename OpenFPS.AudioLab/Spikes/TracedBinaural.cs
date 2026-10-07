@@ -26,12 +26,9 @@ internal static class TracedBinaural
     /// the listener's trace to the ear of what it is asked.</summary>
     public static void Report(Vector3 ear, Vector3 source, Action<Vector3> ask, string indent = "      ")
     {
-        // Steam Audio keeps averaging a trace's energy while the listener and the source stand still
-        // and the scene's version number is unchanged, and two different scenes can carry the same
-        // number (every whole scene is version 1): moved by a millimetre, both traces start again on the
-        // scene they now have, as they do in the game, where the listener moves. Twice, waiting out a
-        // few traces each time: on the whole-scene build the first traces after a swap sometimes still
-        // gave the room as it was (seen 2026-10-06, a second later they did not).
+        // Steam Audio keeps averaging a trace while listener, source and scene version stand still, and
+        // every whole scene is version 1: a millimetre's move restarts both traces on the scene in use.
+        // Twice: the first traces after a whole-scene swap sometimes still gave the old room (2026-10-06).
         var until = DateTime.UtcNow.AddSeconds(30);
         while (TracedReverbSet.Reconfiguring && DateTime.UtcNow < until) Thread.Sleep(20);
         var listener = TracedReverbSet.Listener;

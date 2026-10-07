@@ -9,24 +9,15 @@ using OpenFPS.Client.AudioEngine.Fmod;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// Walk round the rooms map's wood room with the megaphone running, through the real provider, and
-/// write the mix to a WAV so "it pops when I walk" can be measured rather than argued about.
+/// The wood room walked with the megaphone on, through the real provider, the mix written to a WAV, so
+/// "it pops when I walk" is measured. A live capture had one discontinuity in five minutes while the
+/// room "popped and clicked", so the pop is something done on purpose per step or frame (a reverb
+/// restated, a filter stepped, a copy started); each mechanism can be switched off here in turn.
+/// Everything the game thread sends the provider each frame is sent, from the same models; only the
+/// world is a copy (the wood room's boxes from <c>maps/default.json</c>).
 ///
-/// This exists because a five-minute capture of a live session showed one waveform discontinuity in
-/// three hundred seconds and none at all inside the rooms, while the report from the chair was "lots
-/// of popping and clicking when I walk around this room". Both are true at once only if what pops is
-/// not a broken sample stream but something the engine does on purpose, per step or per frame — a
-/// reverb unit restated, a filter stepped, a copy started. Each of those is a mechanism that can be
-/// switched off here, one at a time, and the capture compared.
-///
-/// Everything the game thread sends the provider each frame is sent here too, from the same models:
-/// the listener, the megaphone's attributes and acoustic path, the enclosure survey that drives the
-/// reverb, and the near-field boundary probes. Nothing is a stub except the world, which is the wood
-/// room's own boxes copied from <c>maps/default.json</c>.
-///
-/// Run from the lab's bin dir:
-///   AudioLab --room-walk [seconds=30] [cone=off] [reverb=off] [boundary=off] [steps=off]
-///                        [megaphone=off] [still] [out=/tmp/openfps-roomwalk.wav]
+///   --room-walk [seconds=30] [speed=M/S] [cone=off] [reverb=off] [boundary=off] [steps=off]
+///               [megaphone=off] [still] [echo=on] [clock] [out=/tmp/openfps-roomwalk.wav]
 /// </summary>
 public static class RoomWalkSpike
 {
@@ -52,8 +43,7 @@ public static class RoomWalkSpike
         AcousticRegistry.Initialize();
         if (Array.Exists(args, a => a == "clock")) return ClockCheck(outPath);
 
-        // The lab's build carries the synthesised sound sets, not the recorded ones, and a run with
-        // no megaphone file is thirty seconds of a reverb reverberating silence. Say so up front.
+        // Without the megaphone file the run is thirty seconds of reverberated silence: say so up front.
         string soundRoot = OpenFPS.AudioLab.LabPaths.Output();
         if (!System.IO.File.Exists(System.IO.Path.Combine(soundRoot, "BEACONS", "megaphone.wav")))
         {
@@ -109,15 +99,8 @@ public static class RoomWalkSpike
                 new Vector3(3.5f, 1.7f, 11.5f), new Vector3(10.5f, 1.7f, 11.5f),
                 new Vector3(10.5f, 1.7f, 18.5f), new Vector3(3.5f, 1.7f, 18.5f),
             };
-            // THE SPEED THE GAME WALKS AT, not a speed that sounds like walking.
-            //
-            // This was 1.4 m/s — a real human walk — and the steps below were every 0.55 s, which is
-            // a real human cadence. Both are lovely and neither is what the game does: the game walks
-            // at 4.5 m/s, and with the half-metre stride it had at the time that was NINE footfalls a
-            // second. So this instrument, which exists to settle "it pops when I walk", was measuring
-            // a walk the game has never taken, and a pop that only happens at nine steps a second
-            // could not appear in it however long it ran. An instrument with its own private idea of
-            // the thing it measures is worse than no instrument.
+            // The speed the game walks at, not one that sounds like walking: at a human 1.4 m/s this
+            // instrument could never show a pop that happens only at the game's cadence.
             float speed = Num(args, "speed", PhysicsConstants.WalkSpeed);
             float perimeter = 0f;
             for (int i = 0; i < corners.Length; i++) perimeter += Vector3.Distance(corners[i], corners[(i + 1) % corners.Length]);
@@ -125,8 +108,7 @@ public static class RoomWalkSpike
             var probeDirs = BoundaryModel.ProbeDirections;
             var probes = new BoundaryProbe[probeDirs.Length];
             int footstepIndex = 0;
-            // ...and the footfalls come from the GAME'S OWN accumulator, fed the same speed, so the
-            // cadence here is the cadence there by construction and cannot drift from it again.
+            // The footfalls from the game's own accumulator, so the cadence cannot drift from the game's.
             var gait = new StrideAccumulator();
             int frames = 0, surveys = 0;
             float lastDecayMs = 0f, lastEnclosure = 0f;
@@ -191,10 +173,8 @@ public static class RoomWalkSpike
                     provider.UpdateBoundaries(probes);
                 }
 
-                // echo=on: three seconds in, a wall starts answering — one image-source voice of the
-                // megaphone, a hundred milliseconds late, the way ClientAudioSystem starts one. What is
-                // measured afterwards is that the copy joins mid-file without a step and lags by its
-                // delay rather than being the announcement again from the top.
+                // echo=on: three seconds in, one image-source voice of the megaphone 100 ms late, as
+                // ClientAudioSystem starts one; it must join mid-file without a step, not from the top.
                 if (megaphone && echo && !echoStarted && t >= 3.0)
                 {
                     echoStarted = true;
@@ -229,10 +209,8 @@ public static class RoomWalkSpike
                         SoundId = file,
                         Mode = PlaybackMode.Single,
                         Type = EmitterType.WorldLocked,
-                        // Pinned under the head, as OnOwnFootstep pins it. Left in the world, the
-                        // step recedes at walking pace for the length of its own sample — which
-                        // makes the reverb send climb with the distance and is not what your own
-                        // feet do.
+                        // Pinned under the head, as OnOwnFootstep pins it: left in the world, the step
+                        // recedes for the length of its sample and its reverb send climbs.
                         Position = eye with { Y = 0.1f },
                         ApparentPosition = eye with { Y = 0.1f },
                         FollowsListener = true,
@@ -265,14 +243,10 @@ public static class RoomWalkSpike
     }
 
     /// <summary>
-    /// Does a scheduled start (DelayMs) and the onset ramp actually land on FMOD's clock?
-    ///
-    /// Both are written against the clock the channel reports for ITSELF, before it has started. If
-    /// that clock were not the parent's, every delay and every fade point would be in the past and
-    /// silently ignored — a "delayed" reflection would start at once, and a one-shot's 6 ms ramp
-    /// would never happen. Plays the same footstep at 1.0 s with no delay, at 2.0 s with 300 ms of
-    /// delay, and at 3.0 s from the middle of the megaphone file with the ramp; the WAV says when
-    /// each actually began and whether the third starts from silence.
+    /// `clock`: do a scheduled start (DelayMs) and the onset ramp land on FMOD's clock? Both are written
+    /// against the clock a channel reports for itself before it starts; were it not the parent's, every
+    /// delay and fade point would be in the past and ignored. A footstep at 1.0 s, at 2.0 s with 300 ms of
+    /// delay, and the megaphone from mid-file at 3.0 s with the ramp: the WAV shows when each began.
     /// </summary>
     private static int ClockCheck(string outPath)
     {

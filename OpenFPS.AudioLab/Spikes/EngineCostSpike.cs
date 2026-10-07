@@ -7,38 +7,23 @@ using OpenFPS.Client.AudioEngine.Core.Engine;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// How much of a CPU one live vehicle costs.
-///
-/// A grid of cars is not an audio design question until it is a budget question: every car on the
-/// track is a whole engine integrated sample by sample inside the FMOD mixer callback, and the mixer
-/// callback has a hard deadline. This renders the GAME'S voice — <see cref="EngineVoiceState"/>,
-/// the same object the DSP wraps — for a fixed stretch of audio and reports the real-time factor,
-/// which is how many seconds of engine one second of CPU buys. Divide a sensible share of a core by
-/// that and you have the size of the grid.
-///
-/// Measured at the speed a car actually laps at, not at idle: the valve solver iterates more and the
-/// steepening does more work under load, so an idle measurement flatters the budget.
+/// The game's engine voice (<see cref="EngineVoiceState"/>) on the bench: what one live vehicle costs
+/// a core (--engine-cost), its level at a metre (--engine-levels, --voice-levels) and its crackle
+/// (--engine-jumps). Cost is measured at a lapping speed, not idle: the valve solver and the
+/// steepening work harder under load, so idle flatters the budget.
 /// </summary>
 public static class EngineCostSpike
 {
     /// <summary>
-    /// What every preset actually measures at full load, and the peak that goes with it.
-    ///
-    /// Both numbers are needed and they are different numbers. The LEVEL decides where the emitter
-    /// is placed in the world (Loudness.Place). The PEAK decides what one full-scale sample has to
-    /// mean inside the DSP, and getting that wrong does not make the engine quiet or loud — it makes
-    /// it CLIP, because EngineVoiceState runs everything past its reference through a tanh. A race
-    /// engine is twenty decibels over a road car and, against a road car's reference, arrives as a
-    /// square wave.
-    ///
-    /// Command line: --engine-levels
+    /// Every machine's offline tailpipe at full load: its level and its peak (--engine-levels). The level
+    /// places the emitter (Loudness.Place); the peak sets what full scale means in the DSP, and a wrong one
+    /// clips through EngineVoiceState's tanh (a race engine against a road car's reference is a square wave).
     /// </summary>
     public static int Levels()
     {
         Console.WriteLine("\n  Full load, one metre. level = loudest second; peak = the largest sample in it.\n");
         Console.WriteLine("    preset            level dB    peak dB   99.9% dB   crest dB   sust dB   declared");
-        // Every machine the game would play, not every preset the library holds: an authored machine
-        // that overrides a built-in has to be measured as the thing that will actually be heard.
+        // Every machine the game would play: an authored machine overrides a built-in preset.
         foreach (var key in MachineRegistry.Ids)
         {
             var v = MachineRegistry.VehicleFor(key);
@@ -49,9 +34,8 @@ public static class EngineCostSpike
                 new(DriverAction.Holding, 3.5f, v.Engine.RedlineRpm * 0.85f, 1f),
             };
             var r = VehicleSynth.Render(v, orders, seed: 5);
-            // The offline buffers are NORMALISED; PascalsPerUnit is what puts them back in pascals.
-            // Comparing a normalised peak against a level in dB SPL is how a crest factor of minus
-            // thirty decibels gets printed, which is not a thing.
+            // The offline buffers are normalised; PascalsPerUnit puts them back in pascals (without it
+            // the crest factor printed as -30 dB).
             float peak = 0f;
             int from = r.OrderStart[2];
             for (int i = from; i < r.Exhaust.Length; i++)
@@ -59,10 +43,8 @@ public static class EngineCostSpike
                 float pa = MathF.Abs(r.Exhaust[i] + r.Intake[i] * 0.35f) * r.PascalsPerUnit;
                 if (pa > peak) peak = pa;
             }
-            // The absolute peak can be one backfire in three seconds. The 99.9th percentile is what
-            // the waveform does over and over, and it is that — not the single largest sample — the
-            // headroom has to clear, because rounding one transient is limiting and rounding all of
-            // them is clipping.
+            // The headroom must clear the 99.9th percentile, not the single largest sample (one backfire
+            // in three seconds): rounding one transient is limiting, rounding all of them is clipping.
             var sorted = new System.Collections.Generic.List<float>();
             for (int i = from; i < r.Exhaust.Length; i++)
                 sorted.Add(MathF.Abs(r.Exhaust[i] + r.Intake[i] * 0.35f) * r.PascalsPerUnit);
@@ -78,15 +60,9 @@ public static class EngineCostSpike
     }
 
     /// <summary>
-    /// Sample-to-sample discontinuities in the GAME'S voice, rendered on its own.
-    ///
-    /// "It crackles" has to be narrowed down before it can be fixed, and the first cut is whether the
-    /// crackle is IN the synthesis or added by the things around it — the mixer, the reflections, the
-    /// limiter. This renders EngineVoiceState alone at a constant speed, with no spatialisation and
-    /// nothing else in the graph, and counts the jumps. Fully deterministic, so two runs can actually
-    /// be compared, which a live scene cannot.
-    ///
-    /// Command line: --engine-jumps [preset ...] [kmh=..] [sec=..] [blame]
+    /// Sample-to-sample jumps in the game's voice alone, at a constant speed and with nothing else in the
+    /// graph: whether a crackle is in the synthesis or added by the mixer, reflections or limiter.
+    /// Deterministic, so two runs compare. --engine-jumps [preset ...] [kmh=] [sec=] [blame]
     /// </summary>
     public static int Jumps(string[] args)
     {
@@ -129,13 +105,8 @@ public static class EngineCostSpike
     }
 
     /// <summary>
-    /// Which PART of the engine is stepping.
-    ///
-    /// The voice sums four things — the tailpipe, the intake, the block and the tyres — and a jump in
-    /// the total says nothing about which. This steps the synthesis one sample at a time and, on the
-    /// worst discontinuities, prints what each component did across them. A shock front arriving at
-    /// the tailpipe and a glitch in the crank solver look identical in the output and are fixed in
-    /// completely different places.
+    /// Which part of the voice (tailpipe, intake, block, tyres) makes the worst jumps: a shock front at the
+    /// tailpipe and a glitch in the crank solver look identical in the total.
     /// </summary>
     private static int Blame(string[] args)
     {
@@ -186,12 +157,11 @@ public static class EngineCostSpike
         return 0;
     }
 
-    /// <summary>Command line: --engine-cost [preset ...] [kmh=..] [sec=..]</summary>
+    /// <summary>--engine-cost [preset ...] [kmh=] [sec=] [body=off] [rate=]: the real-time factor of one
+    /// voice, steady and in its first half second. body=off measures what the body's resonances cost.</summary>
     public static int Run(string[] args)
     {
         float kmh = 180f, seconds = 4f;
-        // body=off strips the car's own resonances, so what they cost can be measured rather than
-        // assumed. A remembered figure from a different build is not a baseline.
         bool withBody = true;
         int rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;   // rate=44100 for the old mixer
         var presets = new System.Collections.Generic.List<string>();
@@ -224,21 +194,10 @@ public static class EngineCostSpike
             if (!withBody) profile = profile with { Body = VehicleBody.None };
             var voice = new EngineVoiceState(profile, sr, 7) { TargetSpeed = kmh / 3.6f };
 
-            // The FIRST half second, before anything has settled — the column this spike spent its
-            // whole life not having.
-            //
-            // It rendered a second of audio to let the engine reach speed and the pipes fill, and
-            // only then started the clock, so it measured the one condition that never matters: a
-            // voice that has been running for a while on an idle machine. What a map load is, is the
-            // opposite — thirty voices created at once while the JIT is busy compiling everything
-            // else, which keeps the synthesis at unoptimized tier-0 for as long as the load lasts.
-            // That cost twice steady state when it was finally measured, and it was invisible here.
-            //
-            // Only the FIRST preset in a run sees a genuinely cold JIT; after that the code is warm
-            // whatever this column does. To reproduce the load condition for every row, pin tiering:
-            //     DOTNET_TC_CallCountingDelayMs=100000 dotnet ... --engine-cost <preset>
-            // which should now read close to the steady-state column. If it reads half of it again,
-            // something on the per-sample path has lost its AggressiveOptimization.
+            // The first half second: a map load creates thirty voices while the JIT keeps them at tier-0,
+            // measured at twice steady cost (docs/AUDIO_LOAD_DROPOUTS.md section 2). Only the first preset
+            // of a run is cold; DOTNET_TC_CallCountingDelayMs=100000 makes every row cold, and should read
+            // close to steady state. Half of it means the per-sample path lost AggressiveOptimization.
             int coldBlocks = (int)(0.5 * sr / block);
             var coldClock = Stopwatch.StartNew();
             for (int i = 0; i < coldBlocks; i++) voice.Render(buf);
@@ -274,24 +233,11 @@ public static class EngineCostSpike
 
 
     /// <summary>
-    /// What the GAME'S voice measures at one metre — not what the offline render does.
-    ///
-    /// <c>--engine-levels</c> answers a different question than anyone reading it thinks. It renders
-    /// <see cref="VehicleSynth"/> offline and measures the TAILPIPE plus a third of the intake, and
-    /// that figure is what every preset's <see cref="VehicleProfile.SourceLevelDb"/> was set from.
-    /// The thing the game actually plays is <see cref="EngineVoiceState"/>, which is that plus the
-    /// body ringing, plus the tyres, plus whatever leaks out of the engine bay, plus the air system.
-    /// Those extra layers were each added and heard, but the declared level was never re-measured
-    /// against them — and the declared level is what <see cref="Loudness.Place"/> hangs the emitter
-    /// off, so anything the voice makes above its declaration is loudness the mix does not know it
-    /// has, and anything below is a machine placed louder than it can fill.
-    ///
-    /// So this renders the live voice at full load and reports the one-metre level it truly has, the
-    /// declaration beside it, and what each added layer is worth by muting it and differencing.
-    /// A layer worth less than about a decibel is not audible as itself, whatever it was intended to
-    /// do; that is the column to read after adding one.
-    ///
-    /// Command line: --voice-levels [preset ...]
+    /// The game's whole voice at one metre against its declaration (--voice-levels [preset ...] [sweep]
+    /// [parts]). <c>--engine-levels</c> measures the offline tailpipe plus a third of the intake, which is
+    /// what <see cref="VehicleProfile.SourceLevelDb"/> was set from; the live voice adds the body, tyres,
+    /// bay leak and air system, and <see cref="Loudness.Place(float)"/> knows only the declaration. Each
+    /// layer's worth is the total's fall with it muted: under about a decibel it is not heard as itself.
     /// </summary>
     public static int VoiceLevels(string[] args)
     {
@@ -311,9 +257,6 @@ public static class EngineCostSpike
             float noBay = Measure(v, sr, block, bay: false, tyres: true, fan: true, out _, out _);
             float noTyre = Measure(v, sr, block, bay: true, tyres: false, fan: true, out _, out _);
             float noFan = Measure(v, sr, block, bay: true, tyres: true, fan: false, out _, out _);
-            // What a layer is WORTH is how much the total falls without it, which is the honest
-            // figure: a layer twenty decibels under the exhaust moves the total by nothing at all,
-            // however loud it measures on its own.
             string bayCol = v.EngineBayLeakage > 0f ? $"{full - noBay,7:F1}" : "      —";
             string fanCol = v.CoolingFan != null ? $"{full - noFan,7:F1}" : "      —";
             Console.WriteLine($"    {key,-16}  {v.SourceLevelDb,8:F0}  {full,6:F1}  {full - v.SourceLevelDb,7:+0.0;-0.0;0.0}  "
@@ -327,18 +270,9 @@ public static class EngineCostSpike
 
 
     /// <summary>
-    /// What each PART of the live voice makes, in pascals at one metre — `--voice-levels &lt;p&gt; parts`.
-    ///
-    /// The diesel evaluation. "I can hardly hear the engines on those diesels" is a statement about
-    /// a balance inside one machine, and the only way to read a balance is to meter the parts
-    /// separately: a mechanical layer twenty decibels under the tailpipe is not a quiet layer, it is
-    /// an absent one, and it looks identical in the total to a layer that is working.
-    ///
-    /// The engine's three outlets are metered where they are made — exhaust, intake and block are
-    /// what EngineSynth hands out every sample. The rest are metered by DIFFERENCE, rendering the
-    /// same voice with one thing muted, because the body, the bay, the fan and the tyres are not
-    /// separable signals inside the voice; what they are worth is how much the total falls without
-    /// them, which is the number that decides whether they are audible at all.
+    /// Each part of the live voice at one metre (`--voice-levels &lt;p&gt; parts`), written for the diesels'
+    /// buried engines. Exhaust, intake and block are metered where EngineSynth makes them; the body, bay,
+    /// fan and tyres are not separable, so each is metered by the total's fall with it muted.
     /// </summary>
     private static int Parts(System.Collections.Generic.List<string> presets, int sr, int block)
     {
@@ -370,14 +304,9 @@ public static class EngineCostSpike
     }
 
     /// <summary>
-    /// The live voice's level against ENGINE SPEED, for one preset — `--voice-levels &lt;p&gt; sweep`.
-    ///
-    /// Written to settle a single disagreement: the bus measured six decibels under its declaration
-    /// on the live voice and exactly on it offline, and there are only two things that can be —
-    /// the voice is quieter than the offline render, or the two are being metered at different
-    /// operating points. One number cannot tell them apart; a curve can. If the live curve passes
-    /// through the declared figure at the rpm the bench holds, the declaration is right and the
-    /// single-number measurement was reading the wrong place on it.
+    /// The live voice's level against engine speed (`--voice-levels &lt;p&gt; sweep`). Written when the bus
+    /// read 6 dB under its declaration live and on it offline: a curve tells a quieter voice from a
+    /// different operating point, which one number cannot.
     /// </summary>
     private static int Sweep(System.Collections.Generic.List<string> presets, int sr, int block)
     {
@@ -398,14 +327,11 @@ public static class EngineCostSpike
             var buf = new float[block];
             for (int i = 0; i < sr / block; i++) voice.Render(buf);
 
-            // One bucket per twentieth of the redline, filled by whatever the run passes through.
             const int buckets = 20;
             var sum = new double[buckets]; var count = new long[buckets];
             var thr = new double[buckets]; var gearOf = new int[buckets];
-            // The tailpipe ON ITS OWN, in pascals, straight off the synthesis — before the body,
-            // the bay, the fan, the tyres and the full-scale reference. This is the same quantity
-            // the offline bench reports, so where the two disagree the disagreement is inside
-            // EngineSynth and not in anything the live voice adds around it.
+            // The tailpipe alone in pascals, the offline bench's quantity: where the two disagree, the
+            // difference is inside EngineSynth.
             var ex = new double[buckets]; var boost = new double[buckets];
             for (int b = 0; b < (int)(40f * sr / block); b++)
             {
@@ -460,8 +386,7 @@ public static class EngineCostSpike
             float rpm = voice.Engine.Rpm;
             if (rpm < redline * 0.78f || rpm > redline * 0.95f || voice.Engine.Throttle < 0.8f) continue;
             foreach (float x in buf) { tot += (double)x * x; n++; }
-            // The outlets are sampled once per block rather than per sample: they are already
-            // pascals, and a block is 23 ms of a signal whose statistics do not change that fast.
+            // Sampled once per block: a block is 23 ms, and the outlets' statistics change slower.
             ex += (double)voice.Engine.Exhaust * voice.Engine.Exhaust * buf.Length;
             inn += (double)voice.Engine.Intake * voice.Engine.Intake * buf.Length;
             bl += (double)voice.Engine.Block * voice.Engine.Block * buf.Length;
@@ -473,9 +398,8 @@ public static class EngineCostSpike
     }
 
     /// <summary>
-    /// One vehicle's live voice, accelerating at full throttle, metered over the stretch where the
-    /// engine is near its redline — the same condition <c>--engine-levels</c> holds, so the two
-    /// numbers are comparable. Steady cruise would measure a part-throttle engine and read low.
+    /// One vehicle's live voice at full throttle, metered near its redline as <c>--engine-levels</c> holds
+    /// it; a steady cruise would meter a part-throttle engine and read low.
     /// </summary>
     private static float Measure(VehicleProfile v, int sr, int block, bool bay, bool tyres, bool fan,
                                  out float atRpm, out int atGear)
@@ -485,8 +409,7 @@ public static class EngineCostSpike
         if (!tyres) voice.TyreMix = 0f;
         if (!fan) voice.FanMix = 0f;
         float redline = v.Engine.RedlineRpm;
-        // Start rolling at a road speed and floor it. A vehicle's gearing decides what speed that
-        // is, so it is found from the gearbox rather than guessed: half the redline in first.
+        // Rolling at half the redline in first, from the gearbox, then floored.
         float start = redline * 0.5f / 60f * 2f * MathF.PI * v.Gearbox.WheelRadiusMetres
                     / MathF.Max(0.1f, v.Gearbox.Ratios[0] * v.Gearbox.FinalDrive);
         voice.PlaceAtSpeed(start);
@@ -503,14 +426,8 @@ public static class EngineCostSpike
         {
             voice.Render(buf);
             float r = voice.Engine.Rpm;
-            // Meter only where the engine is doing what the offline bench holds it at. Everything
-            // else in the run is the getting-there.
-            //
-            // The THROTTLE condition is not belt and braces. A bus's gearbox takes nine tenths of a
-            // second to change gear and the engine is off the throttle for all of it, at an rpm that
-            // is still inside the window — so a run metered on rpm alone averages full load together
-            // with a shut throttle and reads several decibels under what the same engine measures on
-            // a bench that simply holds it there.
+            // Only where the bench holds the engine. The throttle test is needed: a bus's 0.9 s gear
+            // change is off the throttle inside the rpm window, and metering it read several dB low.
             if (r < redline * 0.78f || r > redline * 0.95f || voice.Engine.Throttle < 0.8f) continue;
             foreach (float x in buf) { sum += (double)x * x; n++; }
             atRpm = r; atGear = voice.Driveline.Gear;
@@ -518,8 +435,7 @@ public static class EngineCostSpike
         }
         if (n == 0) { atRpm = voice.Engine.Rpm; atGear = voice.Driveline.Gear; return float.NaN; }
         float rms = MathF.Sqrt((float)(sum / n));
-        // Full scale means PascalsAtFullScale pascals, which is where the profile's declared level
-        // plus the peak headroom put it. dB SPL against 20 micropascals, like every other level here.
+        // Full scale is PascalsAtFullScale (declared level plus peak headroom); dB SPL re 20 uPa.
         return 20f * MathF.Log10(MathF.Max(1e-9f, rms * voice.PascalsAtFullScale) / 20e-6f);
     }
 

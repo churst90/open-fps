@@ -11,7 +11,7 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [legcost] [root=DIR/]
+/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [swings=N] [traced] [legcost] [root=DIR/]
 ///
 /// What the game's occlusion worker hands the mixer for one source and one ear on a real map: occlusion
 /// and the three band gains in dB, with what each part of the answer says on its own — the one-shot
@@ -86,8 +86,7 @@ public static class PathProbeSpike
             if (r > 0f) foreach (var e in leaves) if (Vector3.Distance(e.Transform.Position, ear) <= r) chosen.Add(e.Id);
             foreach (var at in doorArgs)
                 if (leaves.Count > 0) chosen.Add(leaves.OrderBy(e => Vector3.Distance(e.Transform.Position, at)).First().Id);
-            // swings=N: open, shut, open... N times, each handed over as its own rebuild, so a scene set used
-            // in turn (TileSceneSet's two pairs) is measured on every pair and after every kind of change.
+            // Each swing its own rebuild, so TileSceneSet's two pairs are each measured after every kind of change.
             int swings = int.TryParse(args.FirstOrDefault(a => a.StartsWith("swings="))?[7..], out int n) ? Math.Max(1, n) : 1;
             var closed = chosen.ToDictionary(d => d, d => world.Entities[d].Transform);
             if (worker.TileScenesState is { } before) Console.WriteLine($"  tile scenes: {before}");

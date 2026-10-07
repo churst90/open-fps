@@ -12,8 +12,9 @@ namespace OpenFPS.AudioLab.Spikes;
 /// Command line:
 ///   --footsteps                          every surface, every shoe, walking
 ///   --footsteps concrete gravel          only those surfaces
-///   --footsteps shoe=dress run steps=8   one shoe, running, a longer walk
+///   --footsteps shoe=dress run steps=8   one shoe, running, a longer walk (kg= sets the walker's mass)
 ///   --footsteps table                    just the numbers, no rendering
+///   --footsteps compare=DIR              against a folder of recorded steps (see Compare)
 /// </summary>
 public static class FootstepSpike
 {
@@ -63,10 +64,8 @@ public static class FootstepSpike
     }
 
     /// <summary>
-    /// The numbers that decide the sound, before any of it is rendered.
-    ///
-    /// This is the table worth arguing with: if the contact time for a trainer on concrete is not
-    /// several times a leather heel's, the model is wrong and no amount of listening will fix it.
+    /// The numbers that decide the sound, before any of it is rendered: if a trainer's contact time on
+    /// concrete is not several times a leather heel's, the model is wrong and listening will not fix it.
     /// </summary>
     private static void Table(List<string> surfaces, List<Shoe> shoes, float mass, float speed)
     {
@@ -95,9 +94,8 @@ public static class FootstepSpike
                 float grainHz = Footsteps.ImpactCornerHz(
                     Footsteps.GrainContactSeconds(tau, shoe.HeelRadiusM, grainMm));
                 float scuff = coverage * (1f - conform);
-                // The two scales between the heel and the grit: the sole's own lumps, and the sole
-                // as a struck panel. Both live in 60-400 Hz, which is where a real footstep keeps
-                // its body and where the model measured a hole against a recording.
+                // The sole's own lumps, and the sole as a struck panel: both in 60-400 Hz, where a real
+                // step keeps its body and the model measured a hole against a recording.
                 float treadHz = Footsteps.ImpactCornerHz(
                     Footsteps.GrainContactSeconds(tau, shoe.HeelRadiusM, shoe.TreadBlockM * 1000f));
                 float shoeHz = PanelAcoustics.RingHz(sole, shoe.SoleRadiusM * 1.15f,
@@ -115,15 +113,8 @@ public static class FootstepSpike
     }
 
     /// <summary>
-    /// The synthesised step against a REAL one, band by band.
-    ///
-    /// The instrument this whole thing should have had before anybody was asked to listen. A model
-    /// can have every parameter defensible and still be unlistenable, and the difference shows up
-    /// here in about a second: a band that is fifteen decibels out is a missing mechanism, not a
-    /// matter of taste.
-    ///
-    /// Point it at a folder of single-footstep WAVs — `tools/split_footsteps.py` makes them out of a
-    /// recording of somebody walking.
+    /// The synthesised step against recorded ones, band by band: a band fifteen decibels out is a
+    /// missing mechanism, not taste. The folder holds single-step WAVs (`tools/split_footsteps.py`).
     ///
     ///   --footsteps compare=approved/footsteps/split/concrete_walk [surface=Concrete] [shoe=sneaker]
     /// </summary>
@@ -144,9 +135,7 @@ public static class FootstepSpike
         float mass = Arg(args, "kg", 78f);
         float speed = args.Contains("run") ? 4.2f : 1.4f;
 
-        // The real thing: every step in the folder, averaged. One step is one sample of a random
-        // process — which grit it happened to land on — and averaging is what turns that into a
-        // measurement of the surface rather than of one footfall.
+        // Every step in the folder averaged: one step is one draw of which grit it landed on.
         var realAcc = new double[Spectrum.BandCount];
         int used = 0;
         foreach (string f in files)
@@ -201,8 +190,7 @@ public static class FootstepSpike
     /// <summary>A few steps, alternating feet, with the cadence the speed implies.</summary>
     private static float[] Walk(string surface, Shoe shoe, float mass, float speed, int steps, bool running)
     {
-        // Cadence from the gait: a stride is about 0.8 of the walker's height, so step time is
-        // roughly stride over speed. A walk is about two steps a second, a run nearly three.
+        // A walk is about two steps a second, a run nearly three.
         float stride = running ? 1.5f : 0.75f;
         float period = Math.Clamp(stride / MathF.Max(0.3f, speed), 0.18f, 1.2f);
 
@@ -210,8 +198,7 @@ public static class FootstepSpike
         int longest = 0;
         for (int i = 0; i < steps; i++)
         {
-            // A little jitter, because nobody walks to a metronome and a perfectly even walk is the
-            // single most artificial thing a game does with footsteps.
+            // Jitter: a perfectly even walk is the most artificial thing a game does with footsteps.
             var rng = new Random(i * 31 + 7);
             float at = i * period * (0.94f + 0.12f * (float)rng.NextDouble());
             var buf = Footsteps.Render(new Footstep
@@ -228,9 +215,7 @@ public static class FootstepSpike
             for (int i = 0; i < buf.Length && start + i < mix.Length; i++)
                 mix[start + i] += buf[i];
 
-        // Peak-normalised for the file only. The LEVEL lives on the emitter, from
-        // Footsteps.MeasuredLevelDb — a WAV has no absolute scale and normalising here would be a
-        // lie if the game read it back.
+        // Peak-normalised for the file only: the level lives on the emitter (Footsteps.MeasuredLevelDb).
         float peak = 0f;
         foreach (float x in mix) peak = MathF.Max(peak, MathF.Abs(x));
         if (peak > 1e-6f)

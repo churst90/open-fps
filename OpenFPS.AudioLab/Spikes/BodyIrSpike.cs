@@ -3,13 +3,8 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// The car, on its own, with no engine in it.
-///
-/// Renders a vehicle body's impulse response, writes it to a WAV and measures it. Three jobs, and
-/// they are all the same job: an impulse response is a sound you can listen to, a file another tool
-/// can load, and a spectrum you can hold a recording of a real car against. Doing all three from one
-/// command is the point — every correction in this project so far came from lining a rendered thing
-/// up against a measured one.
+/// A vehicle body's impulse response, no engine: written as a WAV to listen to or load elsewhere, and
+/// measured as a spectrum to hold a recording of a real car against.
 ///
 ///   --body-ir [preset ...] [out=DIR] [sec=0.25]
 ///
@@ -84,16 +79,14 @@ public static class BodyIrSpike
     {
         var bands = VehicleBody.Bands(ir, SampleRate);
         if (bands.Low + bands.Mid + bands.High <= 0f) return "silent";
-        // One decimal, because rounding to whole percent hid the cabin entirely once the modes
-        // acquired their zeros at DC and the low band fell to a couple of per cent.
+        // One decimal: whole percent hid the cabin once the low band fell to a couple of per cent.
         return $"{100 * bands.Low:0.0}% below 200 Hz, {100 * bands.Mid:0.0}% to 1.5 kHz, "
              + $"{100 * bands.High:0.0}% above; rings {VehicleBody.DecayMs(ir, SampleRate):0} ms";
     }
 
     private static void WriteWav(string path, float[] samples, int sampleRate)
     {
-        // Normalised, because an impulse response has no absolute level — it is a ratio, and what it
-        // is a ratio OF is decided where it is applied, not here.
+        // Normalised: an impulse response is a ratio, its level decided where it is applied.
         float peak = 0f;
         foreach (float v in samples) peak = MathF.Max(peak, MathF.Abs(v));
         float scale = peak > 0f ? 0.99f / peak : 1f;

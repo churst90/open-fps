@@ -5,13 +5,15 @@ using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// Does the tail hold still while you do? The listener's trace of one place, standing still, for
-/// some seconds: every trace's tail as it was played before (each trace's own samples) and as it
-/// is played now (SmoothTail: energy averaged, fixed noise), side by side, through the game's own
-/// convolvers and tail renderer (DiffuseTail) to two ears.
+/// Does the tail hold still while you do? The listener's trace of one place, standing still: each
+/// trace's own samples (raw) against SmoothTail (energy averaged, fixed noise), through the game's
+/// convolvers and DiffuseTail to two ears.
 ///
-///   --tail-steady [room=stair|flat|corridor] [seconds=10] [jitter=CM] [skip=4]
-///   jitter moves the ear that far at random each trace; skip leaves out the first traces.
+///   --tail-steady [room=stair|flat|corridor] [seconds=10] [jitter=CM] [skip=4] [late=velvet] [earvelvet=1] [early=old]
+///   jitter moves the ear that far at random each trace (a standing player does not quite stay put);
+///   skip leaves out the first traces; late=velvet renders the late part through the velvet branches
+///   instead of the late field (DiffuseLate), earvelvet=1 adds the ear velvet to the field, early=old
+///   starts the smooth tail at 50 ms (SmoothTail.FromFiftyMs), as before 2026-10-03.
 ///
 /// Reports, per octave:
 ///   steady noise: its level's s.d. in 50 ms windows at the left ear, and the left-right difference's,
@@ -50,12 +52,8 @@ public static class TailSteadySpike
     {
         AcousticRegistry.Initialize();
         string room = Arg(args, "room") ?? "stair";
-        // late=velvet: the smooth tail's late part as it was, one channel through the velvet branches
-        // and the ear velvet; the default is the game's, the late field (DiffuseLate). earvelvet=1 puts
-        // the ear velvet on the field too.
         Velvet = Arg(args, "late") == "velvet";
         DiffuseTail.LateEarVelvet = Arg(args, "earvelvet") == "1";
-        // early=old: the smooth tail as it was before 2026-10-03, from 50 ms (SmoothTail.FromFiftyMs).
         SmoothTail.FromFiftyMs = Arg(args, "early") == "old";
         double seconds = double.TryParse(Arg(args, "seconds"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double s) ? s : 10;
         var (boxes, ear) = Scene(room);
@@ -74,8 +72,7 @@ public static class TailSteadySpike
             tr.SetScene(scene);
             tr.SetListener(ear, 1);
             LateTailIr? seen = null;
-            // jitter=CM: the ear moved this far at random each trace, as a standing player's does not
-            // quite stay put (a trace from exactly the same point is the same trace).
+            // A trace from exactly the same point is the same trace.
             float jitter = float.TryParse(Arg(args, "jitter"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float jc) ? jc / 100f : 0f;
             var jr = new Random(5);
             while (traces.Count < want && sw.Elapsed.TotalSeconds < seconds * 6 + 30)
@@ -192,9 +189,8 @@ public static class TailSteadySpike
         }
 
         // ── A steady hum through it: each harmonic's level, 50 ms at a time ──────────────────
-        // Noise in gives noise out whatever the response's fine structure; a tone does not. Its level
-        // is the response's gain at that frequency, and if the fine structure changes every trace,
-        // every harmonic of an engine or a voice jumps every 250 ms: the waviness.
+        // Noise hides a changing fine structure; a tone does not: each harmonic is the response's gain
+        // there, and jumps every 250 ms if the fine structure changes (the waviness).
         {
             var hum = new float[n];
             var hr = new Random(11);

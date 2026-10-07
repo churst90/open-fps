@@ -6,7 +6,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// The push-bar door against recordings of real ones, both measured the same way. The recordings are a
 /// yardstick only: nothing of them is played by the game.
 ///
-///   --pushbar-vs-ref [refs=DIR] [before=DIR] [out=DIR] [only=v1]
+///   --pushbar-vs-ref [before=DIR] [out=DIR] [only=v1]
 ///
 /// The recordings (inbox/door-sounds-2026-10-02/pushbar and inbox/door-types-2026-10-02/real):
 ///   kyles (an institutional door, the microphone near the latch, in a corridor): the bar pushed (0.07 s),
