@@ -135,6 +135,50 @@ The traps each of SharedMovementEngine's rules guards against:
   height): a push out of something big carries the body metres, PushedDeeperIntoAnything can see only
   what is gathered, and every past fix was heard with that reach.
 
+### Footfalls
+
+StrideAccumulator is the one place the rules for a footfall live, for the local player (predicted and
+corrected) and for remote bodies (interpolated). Each rule was learned from a fault, so they are not
+written twice to drift apart.
+
+- A stride is something a body did, not something done to it. `MaxStrideStep` (1 m in one update; a
+  sprinter at 6 m/s covers a fifth of that between frames) catches a teleport, one big jump. It misses
+  a reconciliation, a run of small ones: arriving on a map, predicted and authoritative positions
+  converged in steps of a few centimetres, each plausible, together nine metres of phantom walking.
+  `MinStrideSpeed` tells those apart: a correction moves you while the body's own velocity is zero.
+- A passenger is not silenced by that rule (it was once written that it was): the server gives an
+  occupant the velocity of what it rides in (OccupancySystem). Each caller keeps riders out instead,
+  the local player by RidingEntityId, others by their definition (OtherBodies). A vehicle's motion fed
+  to a stride generator is a footstep every stride of road: at sixty miles an hour, a machine gun.
+- A step is as long as the speed makes it (`StepLength`). A fixed half metre at the game's 4.5 m/s
+  walk is nine footfalls a second, fourteen at a sprint: insects running. A human tops out near four
+  a second because a leg is a pendulum, and above that buys speed with a longer step. Alexander's
+  dynamic similarity (one curve for mouse, human and elephant): stride / L = 2.3 (v^2 / gL)^0.3, with
+  L the leg length and a footfall half a stride. It gives 1.4 m/s: 0.69 m per step, 2.0 a second;
+  4.5 m/s (W): 1.38 m, 3.3 a second; 7.2 m/s (Shift): 1.82 m, 4.0 a second. A steady cadence and a
+  stride that does the work, which is what a run sounds like against a walk. There is deliberately
+  no cadence cap: a cap is a rule about the clock standing in for the body's, and it eats footfalls.
+- A walk's first footfall is at its start. Counted from a standstill the first falls half a stride in,
+  and a body cannot move without putting a foot down. A tap of a movement key moves one 30 Hz tick at
+  4.5 m/s, 15 cm: counting from standstill took three or four taps to bank a step. Now a tap is a
+  footfall and a longer press is that and then one every step length. Only a body on the ground can
+  have stopped (a run ending in a jump has its feet in the air), and a landing is the foot going down,
+  so it takes the place of the start footfall.
+- Distance is judged per update, not as a speed: a speed needs a delta time, and this is driven at
+  whatever rate its caller manages (in tests, as fast as a loop goes).
+- A landing needs a fall (`MinLandingSpeed`, 1.5 m/s, a drop of about 7 cm). A blip in the ground (a
+  map still streaming in, a probe straddling two surfaces, a correction across a lip) without it
+  sounded as a landing gated to two a second: five in two seconds at the city spawn before a step was
+  taken. Speed, not time in the air, because time needs a clock. Anything the movement engine really
+  puts in the air has dropped more than a StepHeight first and arrives at 3.5 m/s.
+- The foot's height is the lower of now and an update ago: the movement engine lifts a body the whole
+  StepHeight for one update when it steps up and the probe settles it the next, so a footfall in that
+  update put the next one, on the landing at the top, 22 cm below it, and the last step of a flight of
+  17.6 cm risers went down as a heel drop (2026-10-04, the walk up Selby House).
+- Stair footfalls: up, the ball of the foot is put down slower than a heel strike on the flat (about
+  0.4 m/s against 0.6); down, the heel drops with the body already falling (about 1.0 m/s). Estimates
+  of a controlled stair gait, not measurements: -3.5 dB and +4.4 dB against a level step.
+
 ## The racing line's arc length
 
 RaceLine's nodes are not evenly spaced once built: Resample lays them out

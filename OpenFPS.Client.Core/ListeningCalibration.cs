@@ -6,20 +6,14 @@ using OpenFPS.Common.Hearing;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Telling the game how loud your headphones are (docs/EAR_MODEL.md, "Playback calibration").
+/// Telling the game how loud your headphones are (docs/EAR_MODEL.md, "Playback calibration"). A person
+/// talks from one step in front at a normal voice at arm's length (62.35 dB, ANSI S3.5 normal effort at
+/// a metre) if your headphones play as assumed; you set your volume, or Up and Down, until it sounds so.
 ///
-/// The ear model keeps a sound's tone right when it plays quieter or louder than it really is, and for
-/// that it needs the level at your ears, which only you can hear. So: a person talks to you from one
-/// step in front, at the digital level that is a normal speaking voice at arm's length (62.35 dB, ANSI
-/// S3.5 normal effort at a metre) if your headphones play as the game assumes, and you set your volume,
-/// or move the voice with Up and Down, until that is what it sounds like.
-///
-/// Up says the voice is too quiet: your headphones play quieter than assumed, the listening level goes
-/// down a decibel and the voice comes up a decibel. Down the reverse. Shift with either: five. Space:
-/// the line again. R: back to the default. Enter saves; Escape puts back what was there.
-///
-/// It changes no level in the mix: the system volume is the player's. It changes only how much tone the
-/// compensation gives back, and the loudness figures the instruments report.
+/// Up (too quiet) lowers the listening level a decibel and raises the voice one; Down the reverse;
+/// Shift moves five. Space repeats, R resets, Enter saves, Escape restores. No level in the mix changes
+/// (the system volume is the player's): only how much tone the ear model gives back, and the loudness
+/// figures the instruments report.
 /// </summary>
 public sealed class ListeningCalibration
 {
@@ -158,10 +152,7 @@ public sealed class ListeningCalibration
         return $"Listening level {db.ToString("F0", CultureInfo.InvariantCulture)}: {tail}";
     }
 
-    /// <summary>
-    /// /listening with a value: /listening 65, /listening default. With none the calibration opens
-    /// (the caller's business, signalled by null).
-    /// </summary>
+    /// <summary>/listening 65 or /listening default. Null with no value: the caller opens the calibration.</summary>
     public static string? Command(string[] args, Action save)
     {
         if (args.Length == 0) return null;

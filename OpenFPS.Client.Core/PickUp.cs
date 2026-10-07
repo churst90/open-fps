@@ -4,15 +4,10 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Which of the things on the ground E picks up.
-///
-/// "If two items are on the ground next to each other, like 2 guns on the ground, what determines
-/// which one is picked up? ... whatever is tracked gets picked up?" (Cody, 2026-10-04). It used to be
-/// whichever was nearest your body, whatever way you faced, and nothing said there was another. Now,
-/// in order: the thing you picked out with comma or period, if it is in reach; else the nearest one
-/// in front of you (within <see cref="FrontDegrees"/> of the way you face); else, with two or more in
-/// reach and none in front, a list to choose from, since a guess between them is a coin toss; else the
-/// one there is. With nothing in reach, E is the door and vehicle key it always was.
+/// Which of the things on the ground E picks up (Cody, 2026-10-04: "whatever is tracked gets picked
+/// up?"). In order: the thing picked out with comma or period, if in reach; the nearest within
+/// <see cref="FrontDegrees"/> of the way you face; with two or more in reach and none in front, a list
+/// to choose from; else the only one. With nothing in reach, E is the door and vehicle key.
 /// </summary>
 public static class PickUp
 {

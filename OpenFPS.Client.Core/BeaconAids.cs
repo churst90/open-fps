@@ -8,17 +8,12 @@ using Serilog;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// The beacons a listener hears: a short blip from each of the nearest doors, things to pick up, cars
-/// to get into and other players, in whichever categories are on. See <see cref="Beacons"/> for who
-/// decides that. A player in your own team calls in a tone of their own.
-///
-/// A blip is a sound IN THE WORLD, at the thing, like any other — so which way it is and how far
-/// is heard, not described, and a door round a corner is quieter than one in front of you. Only the
-/// nearest few of each kind, and each on its own staggered beat, so a corridor of doors is a few
-/// doors near you rather than a wall of beeping.
-///
-/// Authored beacons (a prefab of Type Beacon, with its own sound) are not played here — they are
-/// ordinary emitters — but the same on/off decides whether they are heard (<see cref="IsOn"/>).
+/// The beacons a listener hears: a short blip from each of the nearest doors, things to pick up,
+/// vehicles, stairs and other players, in whichever categories are on (<see cref="Beacons"/> decides).
+/// A blip is a sound in the world at the thing, so direction and distance are heard, not described.
+/// Only the nearest few of each kind, each on its own staggered beat, so a corridor of doors is not a
+/// wall of beeping. Authored beacons (prefabs of Type Beacon) are ordinary emitters, but obey the same
+/// <see cref="IsOn"/>.
 /// </summary>
 public sealed class BeaconAids
 {
@@ -39,13 +34,10 @@ public sealed class BeaconAids
         [Beacons.Door] = ("SYNTH/beacon_door_chime", 523f, 12f, 3),
         [Beacons.Item] = ("SYNTH/beacon_item_ring", 1046f, 10f, 3),
         [Beacons.Vehicle] = ("SYNTH/beacon_vehicle_hum", 262f, 25f, 2),
-        // One a floor, and only your floor's: the foot of the flight up from it, a stair marker the map
-        // put on the landing, and on the roof the top of the flight down (StairCues.FloorBeacons).
-        // The bottom and the top of the stairwell alone left "the levels in between" to be found
-        // without seeing where the stairs are (Cody, 2026-10-04); every flight end on every floor
-        // was two blips a landing and a shaft full of them. Heard to 15 m: on the city's towers a
-        // floor's way up is as much as 11.7 m from the stairwell's door, at the far end of the shaft
-        // on every other floor, and from that door at 10 m it was silent.
+        // One a floor, and only your floor's (StairCues.FloorBeacons): the levels in between need one
+        // too (Cody, 2026-10-04), and every flight end on every floor filled the shaft with blips.
+        // 15 m: on the city's towers a floor's way up is up to 11.7 m from the stairwell door, and
+        // at 10 m it was silent from there.
         [Beacons.Stairs] = ("SYNTH/beacon_stairs_steps", 392f, 15f, 2),
         [Beacons.Player] = ("SYNTH/beacon_player_call", 392f, 30f, 4),
     };
@@ -75,16 +67,11 @@ public sealed class BeaconAids
     }
 
     /// <summary>
-    /// How blocked a beacon may be and still blip. A door in the room you are in, or round the corner
-    /// of it, is a door you can walk to; one on the far side of a wall is a door in somebody else's
-    /// flat, and blipping it through the brick made a corridor sound like one room full of doors —
-    /// "I hear other beacons through walls which sound like the same room".
-    ///
-    /// Asked only of a beacon you cannot SEE — see <see cref="InSight"/>. The occlusion figure alone
-    /// cannot tell a door round the corner from one in front of you at an angle: a door set into a
-    /// facade is partly hidden by its own jamb and reads 0.4 to 0.6 from a few metres off to one side,
-    /// and on that figure alone 162 of the city's 470 doors fell silent from four metres out and two
-    /// to the side — "I don't hear the beacons for doors now where I heard them before".
+    /// How blocked a beacon you cannot see (<see cref="InSight"/>) may be and still blip: round a near
+    /// corner, not through a wall. Through the brick a corridor sounded like one room full of doors
+    /// (Cody: "I hear other beacons through walls"). It is not asked of a beacon in sight: a door's own
+    /// jamb reads 0.4 to 0.6 from a few metres to one side, and on this figure alone 162 of the city's
+    /// 470 doors fell silent (Cody: "I don't hear the beacons for doors now").
     /// </summary>
     private const float MaxOcclusion = 0.5f;
 
@@ -98,8 +85,9 @@ public sealed class BeaconAids
     public bool IsOn(string? category)
         => string.IsNullOrEmpty(category) || Beacons.IsOn(PolicyFor(category), _prefs.Choice(category));
 
-    /// <param name="selfId">The listener's own body, which is a player like any other on the wire and
-    /// must never blip at its own ears; and whose team decides which players are teammates.</param>
+    /// <summary>Blips whatever is due. <paramref name="selfId"/> is the listener's own body: a player on
+    /// the wire like any other, which must never blip at its own ears, and whose team decides who is a
+    /// teammate.</summary>
     public void Update(WorldSnapshot world, Vector3 listener, double now, int selfId = -1)
     {
         EnsureSounds();
@@ -129,10 +117,8 @@ public sealed class BeaconAids
 
     /// <summary>
     /// One blip from a thing picked out with comma or period (<see cref="MapTracker"/>), so the ear
-    /// finds what the words described: the door's chime from the door, the item's ring from the item.
-    /// Played whether or not that category's beacons are on, since you asked for this one — but not
-    /// where the map forbids it. A place has no sound. Through the same path as every blip, so one
-    /// on the far side of a wall is not heard through it.
+    /// finds what the words described. Played even with that category off, since you asked, but not
+    /// where the map forbids it; a place has no sound; and like every blip it is not heard through a wall.
     /// </summary>
     public void Ping(WorldSnapshot world, int id, TrackCategory category, Vector3 listener, int selfId = -1)
     {
@@ -162,22 +148,18 @@ public sealed class BeaconAids
     private void Blip(WorldSnapshot world, int sourceId, string sound, Vector3 at, Vector3 listener)
     {
         var (gain, reference) = Loudness.Place(BlipDb + (float)_prefs.LevelDb);
-        // A door's beacon is a thing fixed to the door at face height, on your side of it, and it rings
-        // the room it faces, the one you are in, with that room's reflections. From the middle of the
-        // doorway it was in no room at all, and the room it rang was whichever zone the doorway fell to.
+        // A door's beacon is fixed to the door at face height on your side, and rings the room you are
+        // in. From the middle of the doorway it rang whichever zone the doorway fell to.
         int region = -1;
         if (TryDoorFace(world, sourceId, listener, out var face, out var inRoom))
         {
             at = face;
             if (_acoustics != null) region = _acoustics.GetRegionAt(world, inRoom);
         }
-        // A vehicle's beacon is on the side of its body toward you. From where the vehicle rests, the
-        // middle of its footprint at road level, it was inside its own floor and doors: every path out
-        // read 0.95 blocked, so no vehicle beacon was ever heard (Cody, 2026-10-05: "I'm not sure I
-        // hear vehicle beacons").
+        // A vehicle's beacon is on the side of its body toward you. From the middle of its footprint
+        // every path out read 0.95 blocked and none was heard (Cody, 2026-10-05).
         else if (TryVehicleSide(world, sourceId, listener, out var side)) at = side;
-        // Through the same acoustic path every one-off sound takes: blocked by what is in the way,
-        // bent round what it can bend round. The door's own leaf does not block its own blip.
+        // The acoustic path every one-off sound takes; the door's own leaf does not block its own blip.
         if (!Reaches(world, sourceId, listener, at, out var path)) return;
         _audio.Submit(new SpatialEmitter
         {
@@ -215,18 +197,14 @@ public sealed class BeaconAids
     }
 
     /// <summary>
-    /// Whether nothing stands between you and the FACE of the thing on your side of it.
-    ///
-    /// One ray, from a point just off the face toward you, ignoring the thing itself. A door's face
-    /// is its thinnest side; stepping off it clears the jamb and the wall it is set into, which is
-    /// what made the path model call a door in plain view half-blocked.
+    /// Whether nothing stands between you and the face of the thing on your side of it: one ray from
+    /// just off its thinnest face, which clears the jamb and the wall a door is set into.
     /// </summary>
     private bool InSight(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at)
     {
         if (_acoustics == null || !world.Entities.TryGetValue(sourceId, out var e)) return false;
-        // A vehicle's blip is already off its body, on your side of it (TryVehicleSide): the sight
-        // line starts there. Stepped off its narrowest face, as a door's is, it would leave from the
-        // car's flank and cut across its bonnet to reach somebody standing in front of it.
+        // A vehicle's blip is already off its body on your side (TryVehicleSide). Stepped off its
+        // narrowest face instead, the ray would cut across its own bonnet.
         if (IsVehicle(e))
         {
             var ray = listener - at;
@@ -272,12 +250,10 @@ public sealed class BeaconAids
     }
 
     /// <summary>
-    /// Where a vehicle's blip sounds from: the point on its body nearest you, a little out from it,
-    /// and between its sills and its roof at the height nearest your ears. The body is the box its
-    /// collider gives, resting where the vehicle stands, as VehicleShadow takes it. A line from the
-    /// nearest point of a box to you never passes back through the box, so the vehicle does not
-    /// block its own beacon wherever round it you stand. False for anything that is not a vehicle
-    /// beacon, one with no body, and one you are inside.
+    /// Where a vehicle's blip sounds from: the point of its collider box nearest you, a little out from
+    /// it, between sills and roof at the height nearest your ears. A line from a box's nearest point
+    /// never passes back through the box, so a vehicle never blocks its own beacon. False for anything
+    /// not a vehicle beacon, one with no body, and one you are inside.
     /// </summary>
     internal static bool TryVehicleSide(WorldSnapshot world, int sourceId, Vector3 listener, out Vector3 side)
     {
@@ -322,11 +298,8 @@ public sealed class BeaconAids
     internal static string TeamOf(WorldSnapshot world, int id)
         => id >= 0 && world.Entities.TryGetValue(id, out var e) ? e.Definition.Team ?? "" : "";
 
-    /// <summary>
-    /// Which call a player's beacon makes: the teammate's when they are in the team you are in, the
-    /// player's otherwise. Nobody is a teammate of a listener in no team, and two players in no team
-    /// are not on the same side.
-    /// </summary>
+    /// <summary>The teammate's call for a player in your team, the player's otherwise. Two players in no
+    /// team are not on the same side.</summary>
     internal static string SoundFor(WorldSnapshot world, int id, string myTeam)
         => myTeam.Length > 0 && string.Equals(TeamOf(world, id), myTeam, StringComparison.OrdinalIgnoreCase)
             ? TeammateSound : Kinds[Beacons.Player].Sound;
@@ -341,14 +314,11 @@ public sealed class BeaconAids
         {
             if (e.Id == skip) return;
             if (!string.Equals(e.Definition.Identity.BeaconCategory, category, StringComparison.OrdinalIgnoreCase)) return;
-            // At the middle of the thing, and at ear height at most: a door's blip comes from the
-            // door, not from the floor under it.
             var at = e.Transform.Position;
             float d = Vector3.Distance(listener, at);
             if (d > range) return;
-            // A stairwell is open from bottom to top, so the floors above and below are in sight and
-            // a few metres off: nearer, from a corridor door, than your own floor's stairs at the far
-            // end of the landing. They are not the way up from here.
+            // Other floors' stair beacons are in sight up an open stairwell and can be nearer than your
+            // own floor's, but they are not the way up from here.
             if (floorBeacons != null && (!floorBeacons.Contains(e.Id) || MathF.Abs(at.Y - listener.Y) > StairCues.OtherFloorMetres))
                 return;
             if (category == Beacons.Vehicle && Inside(e, listener)) return;
@@ -389,14 +359,10 @@ public sealed class BeaconAids
     }
 
     /// <summary>
-    /// What each kind of beacon sounds like: soft sine notes, told apart by their SHAPE as much as their
-    /// pitch, so a glance of an ear says which it is (Cody, 2026-09-29: "unique sine, easy on the ears
-    /// ... unobtrusive but easily picked out when nearby").
-    ///
-    /// Two rules from the ones before. Nothing high and chirpy: a clean high beep repeating by a
-    /// doorway IS a pedestrian crossing's chirp, and was heard as one, so everything here sits between
-    /// middle C and the C two octaves up. And nothing clicks: every note rises over a few milliseconds
-    /// and dies away rather than stopping, with a quiet octave above it for warmth.
+    /// What each kind of beacon sounds like: soft sine notes told apart by shape as much as pitch (Cody,
+    /// 2026-09-29: "unique sine, easy on the ears ... unobtrusive but easily picked out when nearby").
+    /// Nothing high and chirpy (a high beep by a doorway was heard as a crossing's chirp), so all sit
+    /// between C4 and C6; and nothing clicks: every note rises over a few milliseconds and dies away.
     ///
     ///   door      two notes rising a fourth, C5 then F5 — a soft ding-dong, upward
     ///   vehicle   two low warm pulses on one note, C4 — a hum, twice
@@ -421,12 +387,10 @@ public sealed class BeaconAids
     };
 
     /// <summary>
-    /// A player in your team: the player's call, the same two notes at the same pitch and in the same
-    /// time, played by another instrument (Cody, 2026-10-03: "use that same sound and change the wave
-    /// form ... they should just be able to be told apart if they were side by side"). The player's call
-    /// is nearly a pure sine; this one carries the octave the login chime has and the odd harmonics a
-    /// triangle wave has, which make it hollow and a little reedy without making it bright. Brought to
-    /// the player's call's loudness, so the harmonics do not make a teammate louder than a stranger.
+    /// A player in your team: the player's call on another instrument (Cody, 2026-10-03: "use that same
+    /// sound and change the wave form ... told apart if they were side by side"), hollow and a little
+    /// reedy from <see cref="TeammateTimbre"/>. Matched to the call's RMS, so a teammate is not louder
+    /// than a stranger.
     /// </summary>
     internal static float[] TeammateTone(int rate)
     {
@@ -453,12 +417,10 @@ public sealed class BeaconAids
     private static readonly (float Harmonic, float Amplitude)[] PlainTimbre = { (2f, 0.1f) };
 
     /// <summary>
-    /// The player's call: G4 falling to E4, the falling minor third a voice calls somebody's name on,
-    /// and the only figure in the set that falls — every other beacon is a thing, and a person is the
-    /// one that calls out. Both notes scaled by <paramref name="ratio"/>, and the timing the same at
-    /// any pitch, so the teammate's version is the same rhythm. Each note swells in over 12 ms rather
-    /// than the struck 6 ms of the others: a voice calling does not strike, and a low note that comes
-    /// in as fast as a chime's reaches most of its height inside two milliseconds, which is a click.
+    /// The player's call: G4 falling to E4, the minor third a voice calls a name on, and the only
+    /// falling figure in the set. Both notes scaled by <paramref name="ratio"/>, the timing the same.
+    /// A 12 ms rise, not the others' 6: a low note that fast reaches most of its height inside 2 ms,
+    /// which is a click.
     /// </summary>
     private static float[] Call(int rate, float ratio)
         => Notes(rate, 0.012f, PlainTimbre, (392.00f * ratio, 0.00f, 0.14f, 1.0f), (329.63f * ratio, 0.15f, 0.22f, 0.9f));
@@ -514,10 +476,8 @@ public sealed class BeaconAids
 
     // ── What the player says ────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// /beacons — every category and whether it is on, and why. /beacons door — switch doors the
-    /// other way. /beacons door on|off — say which.
-    /// </summary>
+    /// <summary>/beacons: every category, on or off and why. /beacons door [on|off], every N,
+    /// louder, quieter.</summary>
     public string Command(string[] args)
     {
         if (args.Length == 0)
@@ -583,9 +543,9 @@ public sealed class BeaconAids
 }
 
 /// <summary>
-/// Which beacon categories this player has switched on or off, kept between sessions in
-/// $XDG_CONFIG_HOME/openfps/beacons.json (or ~/.config/openfps). A category never touched has no
-/// entry, and falls back to the map's default.
+/// The player's beacon choices (categories on or off, interval, level), kept in beacons.json beside
+/// client.json: %APPDATA%\openfps on Windows, $XDG_CONFIG_HOME/openfps or ~/.config/openfps elsewhere.
+/// A category never touched has no entry and follows the map's default.
 /// </summary>
 public sealed class BeaconPreferences
 {
@@ -606,13 +566,12 @@ public sealed class BeaconPreferences
         LevelDb = levelDb;
     }
 
-    /// <summary>An in-memory store that is never written — for tests.</summary>
+    /// <summary>A store that is never written, for tests.</summary>
     public static BeaconPreferences InMemory() => new(null, new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase));
 
     public static BeaconPreferences Load()
     {
-        // Beside client.json (see ClientSettings.DefaultPath): %APPDATA%\openfps on Windows. Linux keeps
-        // the XDG folder it always used, which is the same place ClientSettings resolves to there.
+        // The same folder as ClientSettings.DefaultPath.
         string dir = OperatingSystem.IsWindows()
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openfps")
             : Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
@@ -623,8 +582,7 @@ public sealed class BeaconPreferences
         double every = BeaconAids.DefaultEvery, level = BeaconAids.DefaultLevelDb;
         try
         {
-            // One object: a true or false per category, and "every", the seconds between soundings.
-            // A file from before the interval existed is the same object without it.
+            // One object: true or false per category, "every" (seconds) and "level" (dB), each optional.
             if (File.Exists(path))
                 using (var doc = JsonDocument.Parse(File.ReadAllText(path)))
                     foreach (var p in doc.RootElement.EnumerateObject())

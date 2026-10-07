@@ -8,22 +8,13 @@ namespace OpenFPS.Client.Core;
 public enum TrackCategory { Doors, Entrances, Stairs, Items, People, Vehicles, Places }
 
 /// <summary>
-/// The things of one kind on the map, nearest first, stepped through a key at a time.
-///
-/// "We should have a way of tracking different things on a map, like just doors, or just items ...
-/// shift variants change categories of things you can view just like the chat implementation. then
-/// just , and . should cycle the selected items" (Cody, 2026-10-04). So it is the chat ring's shape:
-/// Shift+comma and Shift+period go round the categories, which are a fixed ring — an empty one is
-/// still there, said as "none nearby", so the ring does not change under your fingers as you walk —
-/// and comma and period step back and forth through the things in the one you are on.
-///
-/// Each thing is said as its name, which way it is from the way you face (the eight words the server
-/// uses, <see cref="DirectionWords"/>), how far across the ground, and how many floors up or down
-/// if it is on another one. The order is nearest first, worked out when you change category or press
-/// a key having moved <see cref="ResortMetres"/> since it was last worked out; between those it stays
-/// put, so stepping on goes on to the next one rather than jumping about as you turn.
-///
-/// Everything comes from the world the client already holds, within <see cref="RangeMetres"/>.
+/// The things of one kind on the map, nearest first, stepped through a key at a time (Cody, 2026-10-04:
+/// "just , and . should cycle the selected items", categories on the Shift variants like chat).
+/// The categories are a fixed ring, an empty one said as "none nearby", so the ring does not change
+/// under your fingers. Each thing is said with its direction (<see cref="DirectionWords"/>), distance
+/// across the ground and floors up or down. The order is worked out again only on a category change or
+/// after moving <see cref="ResortMetres"/>, so stepping does not jump about as you turn. Everything
+/// comes from the world the client already holds, within <see cref="RangeMetres"/>.
 /// </summary>
 public sealed class MapTracker
 {
@@ -52,10 +43,9 @@ public sealed class MapTracker
     public readonly record struct Tracked(int Id, string Name, Vector3 At, float FloorY, float Distance);
 
     /// <summary>
-    /// How far a thing is to get to: across the ground, and each metre up or down counted twice, since
-    /// a floor up is a flight of stairs away and not three metres. Straight-line distance put a roof
-    /// door eighteen metres overhead before the next building's front door sixteen metres along the
-    /// pavement; this puts what is on your own floor first.
+    /// How far a thing is to get to: across the ground, with each metre up or down counted twice, since a
+    /// floor up is a flight of stairs away. Straight-line distance put a roof door 18 m overhead before
+    /// the next building's front door 16 m along the pavement.
     /// </summary>
     public static float Reach(Vector3 feet, Vector3 at, float floorY)
         => Vector2.Distance(new Vector2(feet.X, feet.Z), new Vector2(at.X, at.Z)) + 2f * MathF.Abs(floorY - feet.Y);
@@ -166,8 +156,8 @@ public sealed class MapTracker
         return floors.Length > 0 ? $"{t.Name}, {where}, {floors}." : $"{t.Name}, {where}.";
     }
 
-    /// <summary>"one floor up", "2 floors down", or "" on your own floor (within half a storey,
-    /// so a kerb, a ramp or a car's roof is not a floor).</summary>
+    /// <summary>"one floor up", "2 floors down", or "" within half a metre short of a storey, so a kerb,
+    /// a ramp or a car's roof is not a floor.</summary>
     public static string Floors(float rise)
     {
         if (MathF.Abs(rise) < StoreyMetres - 0.5f) return "";
@@ -296,10 +286,8 @@ public sealed class MapTracker
     private static bool Is(string beacon, string category) => string.Equals(beacon, category, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// A way in or out of a building: a door between inside and outside — the open air on one side of
-    /// its doorway (no region, or a region that is not indoors) and a room on the other — or an exit
-    /// beacon, or anything its map calls an entrance. Worked out from the doorway, not from names,
-    /// except where a map has said so in words.
+    /// A way in or out of a building: an exit beacon, anything named an entrance, or a door with the
+    /// open air (no region, or one not indoors) on one side of its portal and a room on the other.
     /// </summary>
     internal static bool IsEntrance(WorldSnapshot world, in EntitySnapshot e)
     {

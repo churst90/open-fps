@@ -9,25 +9,14 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// The birds.
+/// The birds. Nobody places one: sparrows and doves live in foliage, pigeons and crows on roofs, and a
+/// stable hash of each hedge and roof decides whether a group is there, so the same hedge always has
+/// its sparrows and a new map has birds untold. Geese go over now and then.
 ///
-/// Nobody places a bird. Sparrows live in foliage and pigeons and crows on roofs, so where they are
-/// falls out of the map: every foliage volume and every roof is a place a species could be, and a
-/// stable hash of the thing decides whether one is — so the same hedge always has its sparrows and the
-/// same tower its pigeons, and a map built tomorrow has birds without being told. Geese go over now and
-/// then, wherever there is sky.
-///
-/// A group is never a recording of a group. Each bird has its own place in the hedge, its own voice
-/// (a fixed pitch a few percent off its neighbours'), a handful of the species' calls as its own
-/// repertoire, and its own rhythm — bouts of calls with quiet between them, a little contagious, so a
-/// hedge breaks out together and settles together. Each call is a one-off sound at that bird, heard
-/// through the same acoustic path as everything else: behind a wall it is behind the wall.
-///
-/// And they notice things. A loud enough sound where they are — a gunshot, a slammed door, a horn
-/// close by — shuts them up for a while, and they come back one at a time. Walk right up to a hedge
-/// and the ones in it go quiet until you move on.
-///
-/// Client-side, like footsteps: nothing about a sparrow is a fact the server needs to agree on.
+/// Each bird has its own place, pitch, small repertoire and rhythm of bouts, a little contagious, so a
+/// hedge breaks out and settles together; each call is a one-off sound heard through the acoustic path.
+/// A loud enough sound nearby quiets a group for a while, and walking right up to one quiets it until
+/// you move on. Client-side, like footsteps: the server need not agree on a sparrow.
 /// </summary>
 public sealed class BirdLife
 {
@@ -78,8 +67,8 @@ public sealed class BirdLife
     /// <summary>A skein of geese goes over, on average, this often.</summary>
     private const float SkeinEverySeconds = 420f;
 
-    /// <param name="seed">Seeds the timing of calls, bouts and skeins. Tests pass one so a run is
-    /// repeatable; the game leaves it null.</param>
+    /// <summary><paramref name="seed"/> seeds the timing of calls, bouts and skeins: tests pass one, the
+    /// game leaves it null.</summary>
     public BirdLife(AudioEngineFacade audio, SpatialAcoustics? acoustics, int? seed = null)
     {
         _audio = audio;
@@ -107,11 +96,9 @@ public sealed class BirdLife
     // ── Where they live ────────────────────────────────────────────────────────────────────────
 
     /// <summary>Looks for habitat once the map's static geometry has arrived, and again if it changes.
-    ///
-    /// Keyed on the scenery alone. It used to be keyed on how many entities there were, and on the city
-    /// that number changes every few seconds as people and cars come into and out of range: the whole
-    /// survey ran again, 16 rays over every roof on the game thread (150 ms, 850 ms the first time),
-    /// found the same birds, and threw away the ones already calling.</summary>
+    /// Keyed on the scenery alone: keyed on the entity count, it reran every few seconds on the city as
+    /// people and cars came and went (16 rays a roof on the game thread, 150 ms, 850 ms the first time)
+    /// and threw away the birds already calling.</summary>
     private void Survey(WorldSnapshot world)
     {
         long scenery = ScenerySignature(world);
@@ -170,10 +157,8 @@ public sealed class BirdLife
     }
 
     /// <summary>
-    /// Open sky over most of it: a grid of points across the slab, each asked whether anything is
-    /// above. A floor inside a tower has the next floor over every point; a roof has sky over nearly
-    /// all of it, with a condenser or a stair head here and there — which is why one ray up the middle
-    /// found one roof on the whole city.
+    /// Open sky over most of the slab, asked at a 4 x 4 grid of points: a roof has a condenser or a
+    /// stair head here and there, and one ray up the middle found one roof on the whole city.
     /// </summary>
     private bool NothingAbove(WorldSnapshot world, EntitySnapshot e, float top)
     {
@@ -259,8 +244,7 @@ public sealed class BirdLife
             if (!near) { g.Awake = false; continue; }
             if (!g.Awake)
             {
-                // Coming into earshot of a group mid-afternoon, not at its dawn: each bird is
-                // somewhere in its own cycle already.
+                // Come into earshot mid-cycle, not at dawn.
                 g.Awake = true;
                 foreach (var b in g.Birds)
                     b.Next = now + Uniform(0f, g.Species.BoutGapMax * 0.5f);
@@ -295,9 +279,8 @@ public sealed class BirdLife
             b.Next = now + (b.CallsLeft > 0 ? Uniform(sp.CallGapMin, sp.CallGapMax) : Uniform(sp.BoutGapMin, sp.BoutGapMax));
             if (b.CallsLeft <= 0) b.RestingSince = now;
 
-            // One breaking out sets others off — once per bout it starts, and only a bird that has
-            // rested properly. Pulled on every call instead, a hedge never rested at all: six sparrows
-            // chattered ten times a second, which is a machine and not a hedge.
+            // Once per bout, and only birds that have rested: pulled on every call, six sparrows
+            // chattered ten times a second and the hedge never rested.
             if (starting && sp.Contagion > 0f)
                 foreach (var other in g.Birds)
                     if (other != b && other.CallsLeft <= 0 && now - other.RestingSince >= sp.BoutGapMin
@@ -306,10 +289,8 @@ public sealed class BirdLife
         }
     }
 
-    /// <summary>
-    /// Something made a noise. Anything loud enough where a group is sends it quiet for a while;
-    /// the birds come back one at a time as they settle.
-    /// </summary>
+    /// <summary>A sound loud enough where a group is (over its StartleDb) quiets it for 8 to 30 s; the
+    /// birds come back one at a time.</summary>
     public void Heard(WorldAudioEvent message, double now)
     {
         if (message.Sounds == null) return;
@@ -370,9 +351,8 @@ public sealed class BirdLife
     // ── Geese ──────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Now and then a skein of geese goes over: a V, sixty to a hundred metres up, at fourteen metres a
-    /// second, honking. It passes somewhere near — not always overhead — and is gone in a minute and a
-    /// half, which is how geese are actually met.
+    /// Now and then a skein of geese goes over: a V 60 to 110 m up at 14 m/s, passing within 150 m of
+    /// you and gone in about a minute and a half.
     /// </summary>
     private void UpdateSkein(WorldSnapshot world, Vector3 listener, double now)
     {

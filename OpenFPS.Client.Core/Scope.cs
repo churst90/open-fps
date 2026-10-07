@@ -17,12 +17,9 @@ public readonly record struct Sighting(
     float Distance, float Right, float Up, bool OnCrosshair, float HalfWidth);
 
 /// <summary>
-/// What is in the scope's view, worked out from the world the client already has.
-///
-/// In view means three things: inside the scope's round field of view at its power, no further than
-/// things can be made out at that power, and not hidden behind anything solid. Glass is seen through.
-/// The occlusion is a line of sight from the eye to the aim point; something solid in the way within
-/// a body's depth of the target is the target's own outline (a car's panels) and does not hide it.
+/// What is in the scope's view: inside its round field at its power, within the range things can be
+/// made out at, and not hidden behind anything solid (glass is seen through). Something in the way
+/// within the target's own depth is its own outline (a car's panels) and does not hide it.
 /// </summary>
 public static class ScopeView
 {
@@ -82,8 +79,6 @@ public static class ScopeView
             float distance = Vector3.Distance(eye, aim);
             if (distance > maxRange) continue;
 
-            // Hidden? A line of sight to the aim point; anything solid nearer than the target's own
-            // depth hides it.
             float depth = body ? 0.4f : 0.5f * MathF.Max(size.X, MathF.Max(size.Y, size.Z)) + 1f;
             Vector3 to = aim - eye;
             int targetId = e.Id;
@@ -179,10 +174,9 @@ public readonly record struct Guidance(bool Sounding, bool OnTarget, float Close
     public static readonly Guidance Silent = new(false, false, 0f);
 
     /// <summary>
-    /// The tone for what is in view: silent with nothing, the held note when the crosshair is on a
-    /// body, and otherwise pulses whose closeness is how near the crosshair is to the nearest thing,
-    /// on a log scale from the edge of the view (0) to touching it (1). It knows nothing of drop, wind
-    /// or lead; those are the shooter's.
+    /// Silent with nothing in view, the held note with the crosshair on anything it picks out, else
+    /// pulses at how near the crosshair is to the nearest thing, on a log scale from the edge of the
+    /// view (0) to touching it (1). Drop, wind and lead are the shooter's.
     /// </summary>
     public static Guidance For(IReadOnlyList<Sighting> seen, float fovDegrees)
     {
