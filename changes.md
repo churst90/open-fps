@@ -4,6 +4,18 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- The water models are cheaper, and sound the same (docs/WAVES_AND_SHORES.md 8.2). The smoothing round
+  had made the surf, the shingle and the harbour wall dearer; most of it was single bubbles ringing.
+  A bubble is now worked out a vector of samples at a time, a splash's noise in a loop the JIT keeps in
+  registers, and a shore's crowd noise, events and hull a block at a time with its places side by side.
+  One core (a Zen 5c at 3.3 GHz), one stretch or source: surf 29.4 % to 5.8 %, shingle 37.9 % to 7.2 %,
+  harbour wall 4.1 % to 2.5 %, lake beach 3.1 % to 1.0 %, pond bank 2.0 % to 1.1 %, creek 9.9 % to
+  1.9 %, the gutters, drains, downpipes and sinks about half. Only the bubbles are not bit-identical:
+  every place of every preset differs from before by 90-118 dB under the signal (AudioLab
+  `--water-cost null`); through the game every scene of the approving rounds measures the same within
+  what two takes of one build differ by. The render fingerprints of rain on asphalt and in a puddle
+  were regenerated for it (-159 and -132 dB). Renders: inbox/water-perf-2026-10-07. AudioLab
+  `--water-cost` (cost per preset, a null test between builds, the cost of a bubble and a splash).
 - The CI hang (run 37576816453, shard 2: `PresenceTests.ALoginIsAnnouncedToEveryoneElseOnTheAllChannel`
   silent for 30 minutes). Not SQLite: every `ClientGameSession` a test built, sound or not, queued the
   whole door prewarm (164 renders) on the thread pool, and a pool thread that finished one took the next

@@ -309,7 +309,9 @@ Through the game (client, mixer, HRTF, ear model, loudness law): no clipping, no
 heard wide (IACC 0.1-0.3 at 500 Hz-4 kHz from its bank), the drain and downpipe near a point. Renders
 and the full table: `inbox/running-water-2026-10-06/README.txt`.
 
-Cost of one core: creek 7.6 %, gutter 1.6 %, drain 2.3 %, downpipe 1.5 %, overflow 1.2 %.
+Cost of one core: creek 7.6 %, gutter 1.6 %, drain 2.3 %, downpipe 1.5 %, overflow 1.2 %. Since 2026-10-07 (docs/WAVES_AND_SHORES.md 8.2, the bubbles
+rung eight samples at a time; `--water-cost` on a Zen 5c core): creek 1.9 %, gutter 1.1 %, drain 1.5 %, downpipe
+0.8 %, overflow 0.8 %.
 
 Not connected to the Elm Park fountain: an overflow at 2 L/s adds 4.6 dB from 4 m south of its kerb
 and dominates that side. A before/after pair is in the inbox for Cody to decide.
@@ -508,7 +510,8 @@ At a metre (AudioLab `--running-water cycle` and `levels`):
   the kitchen sink's running and 9.2 dB over the washbasin's. Renders and tables:
   `inbox/running-water-round2-2026-10-06/README.txt`.
 - Cost of one core: kitchen sink 2.0 %, washbasin 1.3 %, shower 2.4 %, gutter outlet 0.9 %, downpipe
-  1.4 %.
+  1.4 %. Since 2026-10-07 (the same Zen 5c core as above): kitchen sink 1.4 %, washbasin 1.1 %, shower
+  1.6 %, gutter outlet 0.7 %, downpipe 0.8 %.
 
 ### 10.9 Sources (round 2)
 
