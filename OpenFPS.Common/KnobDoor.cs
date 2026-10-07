@@ -5,50 +5,29 @@ using static OpenFPS.Common.DoorPhysics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A knob door, simulated as the object it is, and the sound is whatever the object does.
-///
-/// Cody, 2026-10-03: "are we modeling the doors or modeling the sound? ... we need to model the
-/// physical doors." The round before this one fitted a recipe to each event, and every open sounded
-/// the same whatever the door was doing. Here nothing is a recipe. There are parts, each with its
-/// mass, stiffness and loss, and contacts between them; a hand moves the leaf and turns the knob,
-/// and the pressure radiated by everything that vibrates is the sound.
-///
-/// The parts:
-///
-///   The LEAF: a rigid rotation about the hinge axis plus its bending modes, from its construction
-///   (a hollow-core leaf is two 3 mm fibreboard skins on a 28 mm core; a solid one is 40 mm of wood).
-///   The modes and how well each one radiates come from the plate's size, stiffness and mass, and the
-///   radiation from the Rayleigh integral over the face, so coincidence and the cancellation of the
-///   low modes are not assumed.
-///
-///   Three HINGES. Each knuckle turns on its pin with dry friction (LuGre), and the knuckle is held to
-///   the leaf by its screws, which makes it a small torsional resonator. Friction that falls with
-///   sliding speed (a dry or rusty pin) feeds that resonator, and it squeaks; an oiled pin's friction
-///   rises with speed and it is silent. Each hinge has its own wear and its own load (the top and
-///   bottom hinges carry the leaf's weight as a couple, the middle almost none), so each sings at its
-///   own pitch, and only when the leaf is moving slowly enough for its pin to stick.
-///
-///   The LATCH: a sprung bolt with a 45 degree bevel. Closing, the bevel meets the strike's lip, the
-///   lip drives the bolt in, and once past it the spring snaps the bolt out into the strike, against
-///   its own stop in the housing. The bolt sits in the strike with play, so a leaf that bounces off
-///   the stop hits the keeper with the bolt's flat face. Opening, the knob's spindle takes up its play,
-///   picks up the cam and draws the bolt in while the hand's pull presses its flat face on the keeper.
-///   Let go of the knob and the spring throws the bolt back out against its stop and the knob back
-///   against its rose.
-///
-///   The STOP: the leaf's face meets the frame's stop at five places (three down the latch edge, two
-///   along the head). A real leaf is not flat, so they land at different moments, which is why a shut
-///   door is a short flam rather than one tick.
-///
-///   The FRAME and WALL: what the stop and the strike are fixed to, a plasterboard panel beside the
-///   opening, takes every reaction and radiates as a plate.
-///
-///   HARDWARE: the strike plate, the latch faceplate and housing, and the knob's brass shell each ring
-///   at their own modes from their own dimensions. The knob is damped by the hand while it is held.
-///
-/// The simulation runs at four times the output rate, because metal on metal contacts last tens of
-/// microseconds, and is filtered down. Pressure is computed at a metre; <see cref="PascalsAtFullScale"/>
-/// converts to samples.
+/// A knob door, simulated as the object, and the sound is whatever the object does: parts with mass,
+/// stiffness and loss, contacts between them, a hand on the leaf and the knob, and the pressure everything
+/// radiates (Cody, 2026-10-03: "we need to model the physical doors", after per-event recipes sounded the
+/// same whatever the door did).
+/// <list type="bullet">
+/// <item>The leaf: a rigid rotation plus its bending modes (hollow core: two 3 mm fibreboard skins on a
+/// 28 mm core; solid: 40 mm of wood), radiating by the Rayleigh integral, so coincidence and the low
+/// modes' cancellation are not assumed.</item>
+/// <item>Three hinges: each knuckle on its pin with LuGre friction, held by its screws as a small torsional
+/// resonator. A dry pin's friction falls with speed and feeds it (a squeak); an oiled pin's rises and is
+/// silent. Each has its own wear and load, so each sings at its own pitch, only when slow enough to stick.</item>
+/// <item>The latch: a sprung bolt with a 45 degree bevel, driven in by the strike's lip and snapped out
+/// against its stop. It sits in the strike with play, so a leaf bouncing off the stop hits the keeper.
+/// Opening, the spindle takes up its play and the cam draws the bolt while the pull drags it on the
+/// keeper; let go, the bolt and knob are thrown back against their stops.</item>
+/// <item>The stop: five places (three down the latch edge, two along the head), landing at different
+/// moments on a leaf that is not flat: a short flam, not one tick.</item>
+/// <item>The frame and wall: a plasterboard panel beside the opening takes every reaction and radiates.</item>
+/// <item>Hardware: strike, faceplate, housing and the knob's brass shell ring at their own modes; the hand
+/// damps the knob while it holds it.</item>
+/// </list>
+/// Runs at four times the output rate, as metal contacts last tens of microseconds. Pressure is at a metre;
+/// <see cref="PascalsAtFullScale"/> converts to samples. What each round fixed: docs/DOOR_TYPES.md, Model history.
 /// </summary>
 public static class KnobDoor
 {
@@ -62,12 +41,9 @@ public static class KnobDoor
         SolidWood,
     }
 
-    /// <summary>How the door is shut: the latch edge's speed when the hand lets go, m/s.</summary>
-    /// <summary>
-    /// How the door is shut: its latch edge's speed as it reaches the strike. Nobody has published
-    /// building-door closing speeds; the recordings' latch-to-thump gaps (40-150 ms over about 10 mm of
-    /// bevel) put a hand close at 0.06-0.5 m/s, guided in to the latch except when it is thrown.
-    /// </summary>
+    /// <summary>How the door is shut (<see cref="StrikeSpeed"/>). No closing speeds are published; the
+    /// recordings' latch-to-thump gaps (40-150 ms over about 10 mm of bevel) put a hand close at 0.06-0.5
+    /// m/s, guided in except when thrown.</summary>
     public enum Shut { Gentle, Normal, Hard, Slam }
 
     /// <summary>The latch edge's speed at the strike for each way of shutting, m/s.</summary>
@@ -76,12 +52,9 @@ public static class KnobDoor
         Shut.Gentle => 0.08, Shut.Normal => 0.22, Shut.Hard => 0.4, _ => 1.2,
     };
 
-    /// <summary>
-    /// The latch edge's speed when a slamming hand lets go of the leaf 0.25 m out: what the hand of
-    /// <see cref="RenderClose"/> reaches by then from 85 degrees (0.47 m/s on a 1.4 m leaf). It meets the stop at
-    /// about 0.42 m/s, 11 dB over a normal close, the gap the one measurement of a slammed interior door against
-    /// a normal one gives (US 11,674,342: 84 and 95 dB at 2.1 m).
-    /// </summary>
+    /// <summary>The latch edge's speed when a slamming hand lets go 0.25 m out (<see cref="RenderClose"/>
+    /// reaches 0.47 m/s by then on a 1.4 m leaf). It meets the stop at about 0.42 m/s, 11 dB over a normal
+    /// close, as the one measurement of slammed against normal gives (US 11,674,342: 84 and 95 dB at 2.1 m).</summary>
     public const double SlamLetGoSpeed = 0.45;
 
     /// <summary>One particular door. The same door always sounds like itself.</summary>
@@ -95,16 +68,12 @@ public static class KnobDoor
         public int Seed = 1;
     }
 
-    /// <summary>A sample of 1.0 is this many pascals at a metre (120 dB SPL peak). Every render uses
-    /// it, so a slam and a gentle close keep their real difference.</summary>
+    /// <summary>A sample of 1.0 is this many pascals at a metre (120 dB SPL peak), for every render.</summary>
     public const double PascalsAtFullScale = 20.0;
 
-    /// <summary>
-    /// How much of the bolt's blow on the keeper bends the strike plate. The blow is along the plate, but
-    /// the keeper edge is the root of the plate's curved lip, so some of it bends the plate and rings it:
-    /// in a shut the door rebounds onto the bolt before it can snap out, so that blow is the latch's
-    /// click. The least known coupling in the door; the lab brackets it (--knob-door latch=X).
-    /// </summary>
+    /// <summary>How much of the bolt's blow on the keeper bends the strike plate (the keeper edge is the root
+    /// of its lip): in a shut that blow is the latch's click. The least known coupling in the door; the lab
+    /// brackets it (--knob-door latch=X).</summary>
     public static double KeeperBendsStrike = 0.3;
 
     /// <summary>The lab's instrument: when set, every render also writes each part's pressure alone,
@@ -151,16 +120,12 @@ public static class KnobDoor
 
     public const string KeyPrefix = "knobdoor:";
 
-    /// <summary>How many characters of door there are. A door's id picks one, so the same door always
-    /// sounds like itself and the next one along does not.</summary>
+    /// <summary>How many characters of door there are; a door's id picks one.</summary>
     public const int Variants = 4;
 
-    /// <summary>
-    /// Each character's hinge wear, top, middle, bottom. Most doors are not squeaky: an earlier round
-    /// put a creak on every door and the building sounded haunted. Three in four are oiled or barely
-    /// worn; one in four is dry (a merely worn pin, 0.55, never stuck at a game's opening speed, and
-    /// Cody heard no squeak at all).
-    /// </summary>
+    /// <summary>Each character's hinge wear, top, middle, bottom. Three in four are oiled or barely worn (a
+    /// creak on every door sounded haunted); one is dry, as a merely worn pin (0.55) never stuck at a game's
+    /// opening speed and Cody heard no squeak at all.</summary>
     public static float[] WearOf(int variant) => (variant % Variants) switch
     {
         0 => new[] { 0f, 0f, 0f },
@@ -170,37 +135,30 @@ public static class KnobDoor
     };
 
     /// <summary>
-    /// The level the server declares, dB at a metre. A world sound's level is its buffer's FULL SCALE at a
-    /// metre (<see cref="Speech.LevelDb"/>, <see cref="CarWindow.LevelDb"/>), and <see cref="RenderKey"/>
-    /// brings a render's peak to full scale, so what a door declares is its render's peak: the median, over
-    /// the four characters at the game's 1.1 and 1.4 m leaves, of the model's own (AudioLab --knob-renders,
-    /// 2026-10-04, round 4). The client puts each render's own peak in its place once it has rendered it
-    /// (WorldAudioPlayer), so the level heard is the model's to the decibel.
-    ///
-    /// These used to be the model's LAFmax less a 14 dB calibration. Played as full scale, a close whose
-    /// crack stands 21-29 dB over its own LAFmax came out that far under it as well: a normal close heard
-    /// at 51 dBA at 1.5 m (Cody on "real") where the model puts 86, under a pedestrian's greeting at 60.
-    /// Cody, 2026-10-03: "way way way too quiet ... if I'm 5 feet away from a door at these levels I'd
-    /// barely know someone opened a door", and no calibration taking level off the doors.
+    /// The level the server declares, dB at a metre. A world sound's level is its buffer's full scale at a
+    /// metre (<see cref="Speech.LevelDb"/>, <see cref="CarWindow.LevelDb"/>) and <see cref="RenderKey"/> brings
+    /// a render's peak to full scale, so a door declares its render's peak: the median over the four characters
+    /// at 1.1 and 1.4 m leaves (AudioLab --knob-renders, 2026-10-04, round 4). The client puts each render's own
+    /// peak in its place (WorldAudioPlayer).
     /// </summary>
+    /// <remarks>Never the LAFmax less a calibration: a close's crack stands 21-29 dB over its LAFmax, and a
+    /// normal close was heard at 51 dBA at 1.5 m where the model puts 86 (Cody, 2026-10-03: "way way way too
+    /// quiet").</remarks>
     public const float OpenLevelDb = 105.5f;
-    /// <summary>A close's declared level by how it was shut: the model's peak, as <see cref="OpenLevelDb"/>. A
-    /// gentle and a normal close peak within a few decibels: the peak of both is the bolt snapping out.
-    /// (The server sends no slam; the game's render of one comes in thrown, <see cref="SlamLetGoSpeed"/>.)</summary>
+    /// <summary>A close's declared level, as <see cref="OpenLevelDb"/>. Gentle and normal peak within a few
+    /// decibels: both peaks are the bolt snapping out. The server sends no slam (<see cref="SlamLetGoSpeed"/>).</summary>
     public static float CloseLevelDb(Shut how) => how switch
     {
         Shut.Gentle => 107f, Shut.Hard => 128.5f, Shut.Slam => 129f, _ => 109.5f,
     };
 
     /// <summary>
-    /// What the model puts at a metre, LAFmax (A-weighted, fast, after a 20 Hz high-pass: a leaf's swing
-    /// pushes the air at 1-2 Hz, which nobody hears and which leaks 4-8 dB into the A-weighting filter of the
-    /// lab's meter at 48 kHz), a metre from the latch. Medians over the same survey. The model's own, not
-    /// published figures. The one measurement of an interior door (US 11,674,342: 84 dB normal, 95 slammed,
-    /// at 2.1 m, weighting unstated) puts a normal latching close at no more than about 90 dB at 1 m; the
-    /// research note's working range (70-82 dBA normal, 60-70 gentle, 85-98 slam) is its own estimate. Kyles'
-    /// light wood door opens 14 dB under its closes (9-16); these open 17.5 under a normal close (13.5-21.5),
-    /// their turn's clicks being quieter than the recording's.
+    /// What the model puts a metre from the latch, LAFmax after a 20 Hz high-pass (the swing's 1-2 Hz push
+    /// leaks 4-8 dB into the lab meter's A-weighting at 48 kHz); medians over the same survey. The one
+    /// measurement of an interior door (US 11,674,342: 84 dB normal, 95 slammed, at 2.1 m, weighting
+    /// unstated) puts a normal close at no more than about 90 dB at 1 m; the research note's range (70-82
+    /// dBA normal, 60-70 gentle, 85-98 slam) is its own estimate. Kyles' light wood door opens 14 dB under
+    /// its closes (9-16); these 17.5 (13.5-21.5), their turn's clicks quieter than the recording's.
     /// </summary>
     public const float OpenLafDb = 70.5f;
     public static float CloseLafDb(Shut how) => how switch
@@ -212,8 +170,7 @@ public static class KnobDoor
     /// A door's sound for the game. Opening is grip, turn, pull, swing over <paramref name="swingSeconds"/>;
     /// closing is a hand close of the kind <paramref name="how"/> names, sent when the leaf arrives.
     /// </summary>
-    /// <remarks>An opening pushed from the stop's side ends ":push"; a pull (the approved one) has no eighth
-    /// field, so its keys are as they were.</remarks>
+    /// <remarks>An opening pushed from the stop's side ends ":push"; a pull has no eighth field.</remarks>
     public static string Key(bool closing, Construction leaf, int variant, float swingSeconds, Shut how,
                              float width, float height, bool push = false)
         => FormattableString.Invariant(
@@ -248,8 +205,7 @@ public static class KnobDoor
     /// <summary>The sound a key names, peak one, as the client's renderer wants it.</summary>
     public static float[] RenderKey(string key, int sampleRate) => RenderKey(key, sampleRate, out _);
 
-    /// <summary>The same, and the level its full scale stands for: the render's own peak, dB SPL at a
-    /// metre, which is the level to place it at.</summary>
+    /// <summary>The same, and the level its full scale stands for: the render's peak, dB SPL at a metre.</summary>
     public static float[] RenderKey(string key, int sampleRate, out float fullScaleDb)
     {
         fullScaleDb = 0f;
@@ -258,11 +214,8 @@ public static class KnobDoor
         return PeakToFullScale(pcm, PascalsAtFullScale, out fullScaleDb);
     }
 
-    /// <summary>
-    /// A model's render (pressure at a metre, in units of <paramref name="pascalsAtFullScale"/>) brought to a
-    /// peak of one, with the level that peak is, dB SPL at a metre: a world sound's level is its buffer's
-    /// full scale. Shared by the door models.
-    /// </summary>
+    /// <summary>A door model's render (pressure at a metre over <paramref name="pascalsAtFullScale"/>) brought
+    /// to a peak of one, with that peak's level, dB SPL at a metre.</summary>
     public static float[] PeakToFullScale(float[] pcm, double pascalsAtFullScale, out float fullScaleDb)
     {
         float peak = 1e-9f;
@@ -272,17 +225,13 @@ public static class KnobDoor
         return pcm;
     }
 
-    /// <summary>
-    /// Closing as the game sends it, when the leaf arrives: the last 12 degrees of a hand close, so the
-    /// bevel's scrape, the latch and the stop fall at their own gaps and the settle follows.
-    /// </summary>
+    /// <summary>Closing as the game sends it when the leaf arrives: the last 12 degrees of a hand close.</summary>
     public static float[] RenderGameClose(Door door, int sampleRate, Shut how, Report? report = null)
     {
         var sim = new Sim(door, sampleRate, report);
         sim.StartOpen(12 * Math.PI / 180);
-        // A slammed leaf has been thrown before the last 12 degrees (a hand lets go of a slam 0.25 m out, and 12
-        // degrees of a 0.9-1.1 m leaf is 0.19-0.23 m): it comes in already coasting at its speed. Started at rest
-        // and let go at once, it drifted shut at 39 dBA. (The game sends no slam today: see SlamLetGoSpeed.)
+        // A slam is let go 0.25 m out, before the last 12 degrees (0.19-0.23 m), so it comes in coasting;
+        // started at rest it drifted shut at 39 dBA.
         if (how == Shut.Slam) sim.ThrowShut(SlamLetGoSpeed);
         sim.ScriptHandClose(how);
         return sim.Output();
@@ -299,17 +248,16 @@ public static class KnobDoor
     private const double SolidE = 3.1e9, SolidRho = 650, SolidT = 0.04;
     /// <summary>Loss a hung leaf has beyond its material: rubbing at hinges and stop, the paint.</summary>
     private const double MountingLoss = 0.01;
-    /// <summary>Fibreboard skins (about 0.02) on a glued paper core. Above 0.05 a leaf stops sounding like
-    /// wood and starts sounding like plastic, which is what Cody heard in the first round.</summary>
+    /// <summary>Fibreboard skins (about 0.02) on a glued paper core. Above 0.05 a leaf sounds like plastic,
+    /// as Cody heard in the first round.</summary>
     private const double HollowLoss = 0.03;
-    /// <summary>Timber along and across the grain, about 0.015. (The registry's 0.03 for Wood is a
-    /// fitted figure for wood as built, joints and all.)</summary>
+    /// <summary>Timber, about 0.015 (the registry's 0.03 for Wood is fitted for wood as built, joints and
+    /// all).</summary>
     private const double SolidWoodLoss = 0.015;
     private const double LeafModeMaxHz = 14000;
-    /// <summary>The latch jamb's face: 110 mm of 30 mm pine, its bending across and along the grain averaged
-    /// (sqrt of 10 and 0.7 GPa). It bends faster than sound above about 900 Hz, so it gives a blow on its stop
-    /// back as 1-4 kHz, as the patio door's jamb walls do. Without it a shut's blow was the leaf and the stud,
-    /// 300 Hz-1 kHz, and its 1-4 kHz 6-8 dB under the recordings' (re its own 300 Hz-1 kHz).</summary>
+    /// <summary>The latch jamb's face: 110 mm of 30 mm pine (sqrt of 10 and 0.7 GPa across and along the
+    /// grain). Bending faster than sound above about 900 Hz, it gives a blow back as 1-4 kHz; without it a
+    /// shut's 1-4 kHz was 6-8 dB under the recordings' (re its own 300 Hz-1 kHz).</summary>
     private const double JambFace = 0.11, JambThickness = 0.03, JambE = 2.6e9;
     /// <summary>What holds a patch of the jamb's face to the stud behind it: as the leaf's skin over its stile.</summary>
     private const double JambBacking = 2e7;
@@ -322,9 +270,8 @@ public static class KnobDoor
     /// <summary>Lateral stiffness of a No. 9 wood screw in pine, about 1.2 kN/mm, three per leaf, at a
     /// mean 25 mm from the pin: the knuckle's torsional stiffness against the leaf.</summary>
     private const double ScrewLateralStiffness = 1.2e6, ScrewArm = 0.025;
-    /// <summary>The knuckle and its steel hinge leaf, 60 g at the screw arm, twisting on the screws
-    /// against the door's edge (which is the ground here: it is far heavier). That puts the squeak's
-    /// resonator near 1.2 kHz.</summary>
+    /// <summary>The knuckle and its steel hinge leaf, 60 g at the screw arm, twisting on the screws against
+    /// the far heavier door: the squeak's resonator near 1.2 kHz.</summary>
     private const double KnuckleMass = 0.06;
     /// <summary>Steel screwed into wood: the joint is lossy.</summary>
     private const double KnuckleLoss = 0.15;
@@ -336,15 +283,14 @@ public static class KnobDoor
     private const double BoltMass = 0.012, Throw = 0.012, SpringPreload = 3.5, SpringRate = 350;
     /// <summary>How far the bolt reaches across the gap before it is over the strike.</summary>
     private const double LatchGap = 0.003;
-    /// <summary>Play between the bolt's flat face and the keeper when the leaf is on its stop: an eighth of an
-    /// inch, as strikes are set so a shut door neither rattles nor binds. The bolt snaps out as its face passes
-    /// the keeper, so this, over the edge's speed, is the gap between the latch and the door (Cody: "the door
-    /// and the latch are too close together"). At 1.5 mm it was 10 ms; at 3 mm a normal close's is 20-40 ms,
-    /// the recordings' 6-38 (Kyles' light wood door, five closes).</summary>
+    /// <summary>Play between the bolt's face and the keeper with the leaf on its stop: an eighth of an inch,
+    /// so a shut door neither rattles nor binds. Over the edge's speed it is the gap between latch and door
+    /// (Cody: "too close together" at 1.5 mm, 10 ms); at 3 mm a normal close's is 20-40 ms, the recordings'
+    /// 6-38 (Kyles' light wood door, five closes).</summary>
     private const double KeeperPlay = 0.003;
     private const double LatchHeight = 0.95, KnobInset = 0.06;
-    /// <summary>The knob on its spindle and the rose on its screws rock in a little play, a tenth of a
-    /// millimetre or two; a shut throws them about in it, which is the jiggle after a door closes.</summary>
+    /// <summary>The knob and rose rock in a tenth of a millimetre or two of play; a shut throws them about in
+    /// it, the jiggle after a door closes.</summary>
     private const double KnobPlayMetres = 0.00015, KnobMass = 0.12, KnobVolume = 4e-5;
     /// <summary>The springs' hold on a free knob in its play, N/m (a few newtons over a tenth of a mm).</summary>
     private const double SpindleCentring = 3e4;
@@ -352,10 +298,8 @@ public static class KnobDoor
     private const double SkinOverStile = 2e7;
     /// <summary>The stile's wood under that patch moves with it: 25 mm of a 30 by 35 mm pine stile, 13 g.</summary>
     private const double StileUnderPatch = 0.013;
-    /// <summary>The bolt moves in the leaf's plane, but its housing sits in a stile whose faces are the
-    /// skins, glued on: a blow along the stile shears into the skins at the edge and bends them. A tenth of
-    /// it, against the mortise's eccentricity alone (a millimetre in 35, 0.03), which left the latch's
-    /// click inaudible under a shut.</summary>
+    /// <summary>A blow along the stile shears into the glued skins and bends them: a tenth of it. The
+    /// mortise's eccentricity alone (0.03) left the latch's click inaudible under a shut.</summary>
     private const double LatchBending = 0.1;
 
     // Knob: 55 mm brass knob (two on the spindle), spindle play 10 degrees, full turn 50 degrees.
@@ -370,40 +314,31 @@ public static class KnobDoor
     private const double KnobFriction = 0.015, KnobGrease = 2e-4;
     /// <summary>The bolt sliding in its housing, N.</summary>
     private const double BoltFriction = 0.3;
-    /// <summary>How hard a hand pulls on a knob while it turns it, N: the bolt's flat face drags on the
-    /// keeper under this until it clears, and then the door comes away. Round 1 pulled with a sixth of
-    /// it and the opening was a faint click.</summary>
+    /// <summary>How hard a hand pulls on a knob while turning it, N, dragging the bolt on the keeper until it
+    /// clears. A sixth of it made the opening a faint click.</summary>
     private const double HandPull = 12;
-    /// <summary>A hand pushing a door open from the stop's side leans on the knob as it turns it, harder than a
-    /// pull's tug, and comes up to it a little faster: about 20 N in 0.15 s.</summary>
+    /// <summary>A push from the stop's side leans harder and comes up faster: about 20 N in 0.15 s.</summary>
     private const double HandPush = 20, PushRamp = 0.15;
-    /// <summary>The arm holding a knob is not a force alone: it gives way to the knob's motion like a damper,
-    /// about 150 N s/m at the hand (ISO 10068's hand-arm impedance, as the patio door's handle). While a hand
-    /// pulls on a knob it is turning, the leaf comes off its stop onto the keeper against it, and the bolt's
-    /// face lands on the keeper without the knock that was the loudest part of an opening (a 55 N metal blow
-    /// that rang the leaf, 82 dBA, under 300 Hz, where the recordings' openings are their clicks).</summary>
+    /// <summary>The arm gives way to the knob like a damper, about 150 N s/m at the hand (ISO 10068). Without
+    /// it the bolt's face knocked on the keeper, the loudest part of an opening (a 55 N blow, 82 dBA under
+    /// 300 Hz, where the recordings' openings are their clicks).</summary>
     private const double PullDamping = 150;
-    /// <summary>A hand guiding a door shut does not let go as the bolt drops: it leans on the leaf, its arm
-    /// giving way to it as when it pulls, and lets go this long after the leaf meets its stop. (Let go as the
-    /// bolt dropped, the leaf bounced off the stop onto the keeper and back three times in 200 ms, each within
-    /// 2-9 dB of the shut; the recordings have one blow and nothing within 33 dB of it after. At the patio
-    /// door's 300 N s/m the arm all but stopped the leaf in its last 3 mm: it met the stop at 0.02 m/s, 80 ms
-    /// after the latch.)</summary>
+    /// <summary>A hand guiding a door shut leans on the leaf and lets go this long after it meets its stop.
+    /// Let go as the bolt dropped, the leaf bounced off stop and keeper three times in 200 ms, each within 2-9
+    /// dB of the shut, where the recordings have nothing within 33 dB after. At 300 N s/m the arm all but
+    /// stopped the leaf (0.02 m/s at the stop, 80 ms after the latch).</summary>
     private const double LeanDamping = 150, HoldHomeSeconds = 0.15;
     /// <summary>How hard that hand leans on the leaf, N.</summary>
     private const double PressHome = 5;
-    /// <summary>The bolt's flat face and the keeper's edge: dry brass on steel, worn to a ridged track by
-    /// years of the same drag. The ridges, 0.1 mm apart, are what makes the drag a grind.</summary>
+    /// <summary>Dry brass on steel, the keeper worn to ridges 0.1 mm apart: what makes the drag a grind.</summary>
     private const double KeeperRidges = 0.0001, KeeperRidgeDepth = 0.35;
-    /// <summary>The rose's stops are a die-cast zinc lug against a nylon bush: a dead contact, not a bell. A
-    /// knob let go strikes the rest stop and comes back off it at four tenths of its speed, at any speed (with
-    /// Hunt-Crossley's fixed damping a slow knob kept almost all of its speed and bounced twelve times over 190
-    /// ms, a rattle where the recordings have one click and a small one after).</summary>
+    /// <summary>The rose's stop, zinc on a nylon bush, returns four tenths of the knob's speed at any speed.
+    /// With Hunt-Crossley's fixed damping a slow knob bounced twelve times in 190 ms, where the recordings
+    /// have one click and a small one after.</summary>
     private const double RoseRestitution = 0.4;
-    /// <summary>The other stop on the rose, a few degrees past where the cam has the bolt fully in: a hand
-    /// turns a knob until it meets it. (The recordings' turn is two to five clicks over the first 60 ms of an
-    /// opening, within 0-6 dB of the release; this stop and the spindle's play taken up are ours, and they stay
-    /// 30 dB under the release above 2 kHz: the knob's mass behind a 10 mm lever makes a 1 ms contact.)</summary>
+    /// <summary>The turn stop, a few degrees past the bolt fully in. The recordings' turn is two to five
+    /// clicks over 60 ms within 0-6 dB of the release; ours stay 30 dB under it above 2 kHz, as the knob's
+    /// mass behind a 10 mm lever makes a 1 ms contact.</summary>
     private const double KnobTurnStop = KnobFull + 5 * Math.PI / 180;
     /// <summary>Where the hand means to turn the knob to: past the stop, so it meets it moving and then
     /// holds it there through its fingers.</summary>
@@ -413,24 +348,20 @@ public static class KnobDoor
     private const double GripStiffness = 3, GripDamping = 0.02;
     /// <summary>Brass bolt on the zinc housing's stop: about half its speed comes back.</summary>
     private const double BoltStopLambda = 0.3;
-    /// <summary>The latch body (housing and faceplate, 40 g) sits in its bore and mortise: wood
-    /// holding it (2e7 N/m) and wood taking its energy away as waves into the leaf's edge (the stile's
-    /// in-plane impedance, about 1500 N s/m). It thuds; it does not ring.</summary>
+    /// <summary>The latch body (40 g) in its bore, held by wood (2e7 N/m) that carries its energy into the
+    /// stile (about 1500 N s/m): it thuds, it does not ring.</summary>
     private const double LatchBodyMass = 0.04, LatchMountStiffness = 2e7, LatchMountDamping = 1500;
     /// <summary>The faceplate's area, flush in the leaf's edge, which radiates the body's motion.</summary>
     private const double FaceplateArea = 0.057 * 0.025;
-    /// <summary>The bolt meets the strike metal on metal, but each is held in wood: the bolt sideways
-    /// by its sliding fit and the housing's bore (1e7 N/m), the strike plate (25 g) by its two screws
-    /// into the jamb (2e7 N/m).</summary>
+    /// <summary>Bolt and strike meet metal on metal, each held in wood: the bolt by its bore (1e7 N/m), the
+    /// 25 g strike plate by two screws (2e7 N/m).</summary>
     private const double BoltSideStiffness = 1e7, StrikeMass = 0.025, StrikeScrewStiffness = 2e7;
     private const double StrikeArea = 0.07 * 0.028;
 
     // Contacts (Hunt-Crossley): stiffness N/m^1.5 and damping s/m.
-    /// <summary>The stop is a 10 by 32 mm pine moulding, tacked and painted onto the jamb's face: each
-    /// stretch of it a 50 g strip that the leaf strikes (painted wood on painted wood, a hard contact)
-    /// and that is held to the solid jamb along a painted 32 mm wide joint, so it is close to part of
-    /// the jamb: wood across the grain, about 0.5 GPa, over that joint is about 150 N per micrometre for
-    /// each 300 mm. Against that the leaf's own give decides how long a shut lasts.</summary>
+    /// <summary>The stop: a 10 by 32 mm pine moulding tacked to the jamb, each stretch a 50 g strip held along
+    /// its 32 mm joint (wood across the grain, about 0.5 GPa: 150 N per micrometre each 300 mm), so the leaf's
+    /// own give decides how long a shut lasts.</summary>
     private const double StopMass = 0.05, StopStiffness = 1.5e8, StopMountDamping = 0.3, StopArea = 0.3 * 0.032;
     /// <summary>Painted face on painted face: flat, so stiffer than a ball on a plate, and the paint
     /// crushes, so about half the speed comes back.</summary>
@@ -441,14 +372,12 @@ public static class KnobDoor
     // plates, bending across the wall. The stop's force bends it on its strong axis.
     private const double StudE = 10e9, StudDepth = 0.089, StudWidth = 0.038, StudRho = 500, StudLength = 2.4;
     private const double JambKgPerM = 0.03 * 0.11 * 500;
-    /// <summary>Plasterboard (12.5 mm, 8.75 kg/m2) screwed to the stud moves with it for about half a
-    /// bending wavelength each side at the frequencies the stop drives (0.23 m at 200 Hz): the board
-    /// strip the stud carries, and what radiates.</summary>
+    /// <summary>Plasterboard (12.5 mm, 8.75 kg/m2) moves with the stud for about half a bending wavelength
+    /// each side (0.23 m at 200 Hz): the strip the stud carries and radiates.</summary>
     private const double BoardKgPerM2 = 8.75, CarriedBoard = 0.25;
     private const double FrameLoss = 0.03, FrameModeMaxHz = 5000;
-    /// <summary>The plasterboard panel beside the opening, between the jamb's stud and the next one
-    /// 0.4 m away. The stud carries its edge, and the rest of it lags behind as a plate: the boom of a
-    /// slammed door is this wall, not the door.</summary>
+    /// <summary>The plasterboard panel beside the opening, 0.4 m to the next stud, lagging the stud as a
+    /// plate: the boom of a slammed door is this wall, not the door.</summary>
     private const double PanelWidth = 0.4, PanelHeight = 2.4, BoardE = 2.5e9, BoardT = 0.0125;
     private const double PanelLoss = 0.03, PanelModeMaxHz = 3000;
 
@@ -591,9 +520,8 @@ public static class KnobDoor
 
             frameLength = StudLength;
             frame = FrameModes(dt, rng);
-            // The panel: simply supported between the studs, its jamb edge carried by the stud. Its
-            // own modes are driven by the inertia of the shape the stud drags it into, (1 - x/a) times
-            // the stud's deflection: -rho h times the overlap of each mode with that shape.
+            // The panel, simply supported between the studs, is driven by the inertia of the shape the stud
+            // drags it into, (1 - x/a) times its deflection: -rho h times each mode's overlap with it.
             panelRhoH = BoardKgPerM2;
             double boardD = BoardE * BoardT * BoardT * BoardT / (12 * (1 - Poisson * Poisson));
             var panelPlate = new Plate(PanelWidth, PanelHeight, boardD, panelRhoH, PanelLoss, PanelModeMaxHz, false, rng, 0.04);
@@ -628,18 +556,17 @@ public static class KnobDoor
                 double warp = (rng.NextDouble() - 0.3) * 0.0012;
                 stops[i] = (stops[i].X, stops[i].Y, warp, leafPlate.Shape(stops[i].X, stops[i].Y));
             }
-            // The strike is fitted to the door as it hangs: its keeper stands its play beyond where the bolt sits
-            // when the leaf rests on the proudest point of its stop. (Measured from the stop's line instead, a
-            // wide leaf resting on a bowed head stood with its bolt half a millimetre into the keeper, and the
-            // first step of every opening threw it out with an 8.8 kN blow: 104 dBA, 25 dB over every other.)
+            // The strike is fitted to the door as it hangs, from the proudest point of its stop. From the stop's
+            // line, a bowed leaf stood with its bolt half a millimetre into the keeper and every opening began
+            // with an 8.8 kN blow, 104 dBA.
             double rest = 0;
             foreach (var st in stops) rest = Math.Max(rest, -st.Warp / st.X);
             keeperPlay += width * rest;
             latchShape = leafPlate.Shape(width, LatchHeight);
             knobShape = leafPlate.Shape(width - KnobInset, LatchHeight);
 
-            // Hinges: the weight's moment is a couple across the top and bottom hinges; the end faces
-            // share the weight. Expressed as load at the pin's radius.
+            // The weight's moment is a couple across the top and bottom hinges, and the end faces share the
+            // weight, as load at the pin's radius.
             knuckleInertia = KnuckleMass * ScrewArm * ScrewArm;
             knuckleStiffness = 3 * ScrewLateralStiffness * ScrewArm * ScrewArm;
             knuckleDamping = KnuckleLoss * Math.Sqrt(knuckleStiffness * knuckleInertia);
@@ -655,11 +582,9 @@ public static class KnobDoor
                     Wear = wear,
                     Load = (i == 1 ? 0.15 * couple : couple) + axial,
                 };
-                // Dry steel on steel breaks away at about 0.5 and slides at 0.2, the fall spread over the
-                // first few mm/s by rust and grit. Oil takes both to about 0.1 and makes friction rise
-                // with speed instead of falling. A pin squeaks when its friction falls faster with speed
-                // than the knuckle's own loss can hold: a dry pin sings whenever it turns slowly enough,
-                // an oiled one never.
+                // Dry steel on steel breaks away at about 0.5 and slides at 0.2 over the first few mm/s; oil
+                // takes both to about 0.1 and makes friction rise with speed. A pin squeaks when its friction
+                // falls faster than the knuckle's loss can hold.
                 h.Friction = new LuGre
                 {
                     MuStatic = 0.12 + 0.38 * wear,
@@ -683,8 +608,8 @@ public static class KnobDoor
             keeperFriction = new LuGre { MuStatic = 0.35, MuSliding = 0.2, StribeckSpeed = 0.01, Viscous = 0 };
             keeperSurface = SurfaceProfile(rng, Throw, KeeperRidges);
 
-            // Strike plate: 1.5 mm steel between screws 48 mm apart, clamped, and its curved lip a 20 mm
-            // tongue standing out into the opening, free to ring: the "tink" of a latch catching.
+            // Strike plate: 1.5 mm steel clamped between screws 48 mm apart, its lip a free 20 mm tongue: the
+            // "tink" of a latch catching.
             strike = new Modes(new[] { Beam(0.048, 0.0015, 7850, 200e9, 4.730), Beam(0.048, 0.0015, 7850, 200e9, 7.853),
                                        Beam(0.020, 0.0015, 7850, 200e9, 1.875) },
                                new[] { 0.1, 0.1, 0.1 }, new[] { 0.010, 0.010, 0.006 },
@@ -695,12 +620,9 @@ public static class KnobDoor
             housing = new Modes(new[] { Ring(0.011, 0.0008, 7850, 200e9, 2), Ring(0.011, 0.0008, 7850, 200e9, 3) },
                                 new[] { 0.15, 0.15 }, new[] { 0.010, 0.010 },
                                 new[] { SmallPlateGain(FaceplateArea, 0.05), SmallPlateGain(FaceplateArea, 0.05) }, dt);
-            // The knob: a closed brass ball crimped onto a base disc. A closed ball of 27 mm radius is far
-            // too stiff to ring below about 18 kHz (its membrane holds it), so what rings is the base
-            // disc, held at its rim by the crimp and at its centre by the shank: a 19 mm wide annulus of
-            // 1 mm brass clamped on both edges, which rings like a clamped beam that long, near 10 kHz,
-            // with its circumferential variants a little above. The first round modelled the knob as an
-            // open cylinder, which is a wine glass, and that is what it sounded like.
+            // The knob: a closed 27 mm brass ball, too stiff to ring below about 18 kHz, crimped onto a base
+            // disc that rings: a 19 mm annulus of 1 mm brass clamped both edges, near 10 kHz. As an open
+            // cylinder it was a wine glass, and sounded like one.
             var kh = new List<double>(); var kg = new List<double>(); var km = new List<double>(); var kl = new List<double>();
             double annulus = 0.019, discT = 0.001;
             double f0 = Beam(annulus, discT, 8500, 100e9, 4.730);
@@ -716,8 +638,7 @@ public static class KnobDoor
             knobShell = new Modes(kh, kl, km, kg, dt);
 
             {
-                // The latch jamb's face, struck through the stop moulding nailed to it. Built last, from a generator
-                // of its own, so it draws nothing from the door's random numbers.
+                // The jamb's face has its own generator, so it draws nothing from the door's random numbers.
                 var jrng = new Random(door.Seed * 7919 + 17);
                 jambField = new DenseField(JambFace, height, JambThickness, JambE, StudRho, Poisson, f => WoodLoss(f) + MountingLoss,
                                            300, 16000, jrng, dt);
@@ -826,12 +747,11 @@ public static class KnobDoor
             const double grip = 0.05, turn = 0.20;
             holdingKnob = true;
             knobPath = t => MinJerk(Math.Clamp((t - grip) / turn, 0, 1)) * KnobTurnAim;
-            // While turning, the hand pulls gently: the leaf comes off its stop onto the keeper.
             double cleared = -1, released = -1;
             double end = grip + turn + swingSeconds + 0.6;
             while (time < end)
             {
-                // The pull comes up as the knob turns, and the arm gives way to the leaf as it pulls.
+                // The pull comes up as the knob turns: the leaf comes off its stop onto the keeper.
                 if (time > grip && cleared < 0)
                     pullTorque = push ? Math.Min(1.0, (time - grip) / PushRamp) * HandPush * (width - KnobInset)
                                       : Math.Min(1.0, (time - grip) / turn) * HandPull * (width - KnobInset);
@@ -858,13 +778,9 @@ public static class KnobDoor
             }
         }
 
-        /// <summary>
-        /// A hand shutting the door: it swings it in at an easy pace, slows as the latch comes near and
-        /// brings the latch edge to the strike at <see cref="StrikeSpeed"/>. A gentle or normal close is
-        /// guided in until the bolt drops into the strike, and from there the hand leans on the leaf until it
-        /// has been home a moment; a hard one is let go 30 mm out; a slam is thrown from a quarter of a metre
-        /// and coasts.
-        /// </summary>
+        /// <summary>A hand shutting the door, bringing the latch edge to the strike at <see cref="StrikeSpeed"/>:
+        /// gentle and normal are guided in and leaned on until home a moment, a hard one let go 30 mm out, a
+        /// slam thrown from a quarter of a metre.</summary>
         public void ScriptHandClose(Shut how)
         {
             double vs = StrikeSpeed(how), vMid = Math.Max(vs, 0.9);
@@ -876,15 +792,12 @@ public static class KnobDoor
             {
                 if (released < 0)
                 {
-                    // The speed the hand wants for where the edge is: easy until 0.2 m out, then down to
-                    // the strike speed by 30 mm, and never faster than an arm gets going.
+                    // Easy until 0.2 m out, down to the strike speed by 30 mm, never faster than an arm gets going.
                     double want = vs + (vMid - vs) * Math.Clamp((e - 0.03) / 0.17, 0, 1);
                     v = Math.Min(want, v + 4.0 * dt);
-                    // The hand presses home: its target goes 2 mm past the stop, into the moulding.
+                    // The target goes 2 mm past the stop, into the moulding.
                     e = Math.Max(-0.002, e - v * dt);
-                    // A guided close: once the bolt drops into the strike the hand no longer leads the leaf to a
-                    // place but leans on it, the arm giving way to it, and it stays until the leaf has been on its
-                    // stop a moment.
+                    // Once the bolt drops, the hand leans on the leaf instead of leading it.
                     if (!pressing && letGoAt < 0 && (boltInStrike || contactLog.ContainsKey("stop")))
                     {
                         holdingLeaf = false; pressing = true;
@@ -971,7 +884,6 @@ public static class KnobDoor
             double handTorque = 0;
             double latchEdgeForce = 0;   // through-thickness force on the leaf at the latch, + opens
 
-            // --- the hand on the leaf
             if (holdingLeaf && leafPath != null)
             {
                 var (a, r) = leafPath(time);
@@ -996,12 +908,11 @@ public static class KnobDoor
                 for (int i = 0; i < stops.Length; i++)
                 {
                     var s = stops[i];
-                    // The moulding meets a patch of the leaf's skin, over the stile, which gives a little and
-                    // passes the blow to the leaf and to the skin around it.
+                    // The moulding meets a patch of skin over the stile, which passes the blow to leaf and skin.
                     var port = skinPorts![i];
                     double pos = s.X * theta + leaf.At(s.Shape) + s.Warp + port.X;
                     double vel = s.X * omega + leaf.RateAt(s.Shape) + port.V;
-                    // The moulding is pushed away from the leaf (its X towards the closed side).
+                    // The moulding's X is toward the closed side.
                     var m = mouldings[i];
                     double f = Contact(WoodContactK, WoodContactLambda, -(pos + m.X), -(vel + m.V));
                     double skinDrive = port.Step(f, dt, out double toLeaf);
@@ -1018,8 +929,7 @@ public static class KnobDoor
             for (int i = 0; i < mouldings.Length; i++)
             {
                 double r = mouldings[i].Reaction;
-                // The moulding is nailed to the jamb's face: its push lands on a patch of that face, which passes it
-                // to the frame behind and sends what it can into the face's own bending.
+                // The moulding pushes a patch of the jamb's face, into the frame and the face's own bending.
                 jambField.Modes.Push(jambAtStops[i], jambPorts[i].Step(-r, dt, out double host));
                 if (host != 0) frame.Push(frameAtStops[i], host);
             }
@@ -1027,7 +937,6 @@ public static class KnobDoor
             Note("stop-head", headSum);
             Speeds("stop", stopSum + headSum > 0);
 
-            // --- the latch
             double edge = width * theta + latchW, edgeRate = width * omega + latchWRate;
             double boltForce = SpringPreload + SpringRate * (Throw - bolt);   // the spring, outward
             double latchBodyForce = 0; // along the bolt, outward, on the housing and faceplate
@@ -1038,12 +947,10 @@ public static class KnobDoor
             {
                 if (!boltInStrike)
                 {
-                    // On the bevel: how far the bolt reaches past where the lip lets it be. The bolt's
-                    // place across the gap is the leaf's edge plus its give in its bore; the lip's is the
-                    // strike plate's give on its screws.
+                    // On the bevel: how far the bolt reaches past where the lip lets it be, each with its give.
                     double across = edge + boltSide.X - strikeBody.X, acrossRate = edgeRate + boltSide.V - strikeBody.V;
-                    // The strike plate gives under the bevel and springs back at its own modes, so the bolt
-                    // meets it again: the few re-strikes in a latch's click.
+                    // The plate springs back at its own modes and meets the bolt again: the few re-strikes in a
+                    // latch's click.
                     double strikeGive = 0;
                     for (int k = 0; k < strike.N; k++) strikeGive += strike.Q[k];
                     double over = (bolt - LatchGap) - (across - keeperPlay) - strikeGive / Math.Sqrt(2);
@@ -1072,7 +979,6 @@ public static class KnobDoor
                 }
                 if (boltInStrike)
                 {
-                    // The flat face against the keeper when the leaf comes back.
                     double fk = Contact(MetalContactK, MetalContactLambda, edge + boltSide.X - strikeBody.X - keeperPlay,
                                         edgeRate + boltSide.V - strikeBody.V);
                     boltSide.F -= fk;
@@ -1101,12 +1007,10 @@ public static class KnobDoor
                 Log($"{time * 1000:F1} ms  bolt in: clear of the keeper");
             }
 
-            // --- the knob and its cam
             double gripTorque = 0;
             if (holdingKnob && knobPath != null)
             {
-                // The fingers turn the knob through the give of their pads: a stiff spring to where the hand
-                // is turning, so the knob has its own inertia and meets its stops.
+                // The fingers turn the knob through their pads' give, so it keeps its inertia and meets its stops.
                 double k1 = knobPath(time), k1Rate = (k1 - lastGrip) / dt;
                 lastGrip = k1;
                 gripTorque = GripStiffness * (k1 - knob) + GripDamping * (k1Rate - knobRate);
@@ -1119,14 +1023,12 @@ public static class KnobDoor
             boltForce -= fCam;
             latchBodyForce += fCam * 0.5;
             Note("cam", fCam);
-            // The bolt's own stop in the housing, which sits in the wood on its mount.
             double fStop = Contact(MetalContactK, BoltStopLambda, bolt - Throw - latchBody, boltRate - latchBodyRate);
             boltForce -= fStop;
             latchBodyForce += fStop;
             Note("bolt-stop", fStop);
 
-            // The knobs and their spindle: return spring, cam, the hand when it holds them, and the rose's two
-            // stops, one at rest and one at the end of the turn. Both knobs turn with the spindle.
+            // Both knobs on the spindle: return spring, cam, hand, and the rose's rest and turn stops.
             double fRose, fTurnStop;
             {
                 double tq = knob > 0 ? -(KnobReturnPreload + KnobReturnRate * knob) : 0;
@@ -1143,13 +1045,11 @@ public static class KnobDoor
             Note("turn-stop", fTurnStop);
             fRose += fTurnStop;
 
-            // --- hinges
             double alphaAcc = (omega - prevOmega) / dt; // the leaf's angular acceleration, last step
             prevOmega = omega;
             for (int i = 0; i < hinges.Length; i++)
             {
                 var h = hinges[i];
-                // The leaf's knuckle turning on the pin, which the frame's knuckles hold.
                 double slip = PinRadius * (omega + h.TwistRate);
                 h.Travel += slip * dt;
                 double patch = Math.Max(0.3, 1 + SurfacePatchiness * h.Wear * h.SurfaceAt(h.Travel));
@@ -1164,8 +1064,8 @@ public static class KnobDoor
                 h.Twist += h.TwistRate * dt;
                 torque += moment;
                 leaf.Push(h.Slope, moment);
-                // The pin's grip goes straight into the frame's knuckles and the jamb, as a couple across
-                // the hinge leaf's screws: the unfiltered stick and slip, where its harmonics come from.
+                // The pin's grip goes straight into the frame as a couple across the screws: the unfiltered
+                // stick and slip, where the squeak's harmonics come from.
                 frame.Push(frameAtHinges![i], f * PinRadius / ScrewArm);
                 if (PinTrace != null && i == 2 && ((long)(time * rate)) % 4 == 0)
                     PinTrace.Add($"{time:F5} {slip * 1000:F3} {f:F2} {h.Friction.Z * 1e6:F4} {moment:F4}");
@@ -1173,8 +1073,6 @@ public static class KnobDoor
                 h.PeakMoment = Math.Max(h.PeakMoment, Math.Abs(moment));
             }
 
-            // --- forces into the bodies
-            // The bolt's give in its bore pushes the leaf; the strike's on its screws pushes the jamb.
             latchEdgeForce += boltSide.Reaction;
             frameForce += strikeBody.Reaction;
             if (latchEdgeForce != 0)
@@ -1183,27 +1081,23 @@ public static class KnobDoor
                 leaf.Push(latchShape, latchEdgeForce);
 
             }
-            // The latch body on its mount; what the mount passes on goes into the leaf's edge.
             double mount = LatchMountStiffness * latchBody + LatchMountDamping * latchBodyRate;
             double latchBodyAcc = (latchBodyForce - mount) / LatchBodyMass;
             leaf.Push(latchShape, mount * LatchBending);
 
 
-            // The knobs rock in their play as the leaf is thrown about: each is its own body, held to the
-            // leaf only by metal at either end of its play, so when the leaf is stopped dead the knob
-            // carries on, strikes, and comes back. Force and reaction are the same contact, so nothing can
-            // feed itself (a knob shaken by a filtered copy of the leaf's motion ran away).
+            // Each knob is its own body in its play, so a leaf stopped dead throws it to the end. Force and
+            // reaction are one contact, so nothing feeds itself (a knob shaken by a filtered copy of the
+            // leaf's motion ran away).
             double knobArm = width - KnobInset;
             double leafAtKnob = knobArm * theta + leaf.At(knobShape), leafRateAtKnob = knobArm * omega + leaf.RateAt(knobShape);
             if (!knobsSeated) { for (int i = 0; i < 2; i++) { knobY[i] = leafAtKnob; knobV[i] = leafRateAtKnob; } knobsSeated = true; }
             for (int i = 0; i < 2; i++)
             {
                 double gap = knobY[i] - leafAtKnob, gapRate = knobV[i] - leafRateAtKnob;
-                // A hand on the knob holds the spindle, and with it both knobs: they go with the leaf.
                 if (holdingKnob) { knobY[i] = leafAtKnob; knobV[i] = leafRateAtKnob; knobAccNow[i] = 0; continue; }
                 double hit = Contact(MetalContactK, 0.3, Math.Abs(gap) - knobPlay[i], Math.Sign(gap) * gapRate);
-                // The latch's and the roses' springs load the spindle, so a free knob is centred in its play
-                // and only a real jolt throws it to the end.
+                // The springs centre a free knob in its play; only a real jolt throws it to the end.
                 double centring = -SpindleCentring * gap - 2 * 0.3 * Math.Sqrt(SpindleCentring * KnobMass) * gapRate;
                 double onKnob = -Math.Sign(gap) * hit + centring;
                 double knobAcc = onKnob / KnobMass;
@@ -1224,10 +1118,8 @@ public static class KnobDoor
             if (strikeForce != 0) strike.Push(ones4, strikeForce);
             if (frameForce != 0) frame.Push(frameAtLatch, frameForce);
 
-            // Knob shell damping: the hand holds it.
             SetKnobLoss(holdingKnob);
 
-            // --- rigid motion
             double alpha = torque / inertia;
             omega += alpha * dt;
             theta += omega * dt;
@@ -1241,7 +1133,6 @@ public static class KnobDoor
             boltSide.Step(dt);
             strikeBody.Step(dt);
 
-            // --- radiate
             for (int k = 0; k < panel.N; k++)
             {
                 double drive = 0;
@@ -1253,8 +1144,8 @@ public static class KnobDoor
             double pLatch = housing.Step() + latchSound.Pressure(latchBodyAcc) + latchNoise.Pressure(latchBodyAcc)
                           + boltNoise.Pressure(boltAcc);
             pStrike += strikeSound.Pressure(strikeBody.Acc) + strikeNoise.Pressure(strikeBody.Acc);
-            // The skins ride on the leaf: driven, above where its own modes stop, by its motion where the
-            // blows land, through their impedance, so they take what the leaf has and no more.
+            // The skins are driven through their impedance by the leaf's motion above where its modes stop,
+            // so they take what the leaf has and no more.
             skinField.Modes.Push(skinAtLatch, skinField.Impedance * skinHigh[stops.Length].Next(width * omega + leaf.RateAt(latchShape)));
             skinField.Modes.Push(skinAtKnob, skinField.Impedance * skinHigh[stops.Length + 1].Next((width - KnobInset) * omega + leaf.RateAt(knobShape)));
             pLeaf += skinField.Modes.Step();
@@ -1262,8 +1153,8 @@ public static class KnobDoor
             double pStop = 0;
             for (int i = 0; i < mouldings.Length; i++) pStop += mouldingSound[i].Pressure(mouldings[i].Acc);
             double p = pLeaf + pFrame + pStrike + pLatch + pKnob + pStop;
-            // The rigid rotation: a piston, whose pressure follows its acceleration only below the
-            // frequency where the leaf is a wavelength across; above that it follows velocity.
+            // The rigid rotation is a piston: pressure follows acceleration below where the leaf is a
+            // wavelength across, velocity above.
             double corner = C0 / (2 * Math.PI * Math.Sqrt(width * height / Math.PI));
             double aLp = 1 - Math.Exp(-2 * Math.PI * corner * dt);
             rigidLow += aLp * (alpha - rigidLow);
@@ -1293,7 +1184,6 @@ public static class KnobDoor
         {
             if (held == knobHeldState) return;
             knobHeldState = held;
-            // Rebuild the shell's step with the new loss, keeping its state.
             var q = (double[])knobShell.Q.Clone(); var v = (double[])knobShell.V.Clone();
             var loss = new double[knobShell.N];
             for (int i = 0; i < loss.Length; i++) loss[i] = held ? knobHeldLoss : knobFreeLoss[i];

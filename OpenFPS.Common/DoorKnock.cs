@@ -1,16 +1,13 @@
 namespace OpenFPS.Common;
 
 /// <summary>
-/// Knuckles on a wooden door, made the way the approved car door is made: each knock a burst of noise
-/// in every octave band, at the band's own level and with the band's own dry decay. No resonators —
-/// the car door's first version was built from them and rejected as "an instrument, too tonal".
+/// Knuckles on a wooden door, made as the car door is: each knock a burst of noise in every octave band
+/// at the band's level and dry decay, no resonators (they were "an instrument, too tonal" on the car door).
 ///
-/// Fitted to Cody's "Heavy Door Knocks" recording (inbox/door sounds, measured 2026-09-29, 30 knocks,
-/// 0-120 ms after each): the energy is in the door, 63-500 Hz, with 1 kHz about 8 dB under it and the
-/// knuckle's crack at 2-8 kHz 19-31 dB under. The middle dies inside 50 ms; the panel's body at
-/// 125-250 Hz rings a little longer. The recording's slow tail is the room it was made in, which the
-/// game adds for itself, so none of it is baked in. Knocks come in a run, about a quarter of a second
-/// apart, the last a touch softer.
+/// Fitted to Cody's "Heavy Door Knocks" recording (measured 2026-09-29, 30 knocks, 0-120 ms after each):
+/// the energy is in the door, 63-500 Hz, 1 kHz about 8 dB under it and the knuckle's crack at 2-8 kHz
+/// 19-31 dB under; the middle dies inside 50 ms, 125-250 Hz rings a little longer. The recording's slow
+/// tail is its room, which the game adds itself. Knocks come about a quarter second apart, the last softer.
 /// </summary>
 public static class DoorKnock
 {
@@ -43,7 +40,6 @@ public static class DoorKnock
         float at = 0.005f;
         for (int k = 0; k < knocks; k++)
         {
-            // A hand is not a metronome, and no two knocks land the same.
             float db = (k == knocks - 1 && knocks > 1 ? -2f : 0f) + ((float)rng.NextDouble() - 0.5f) * 3f;
             for (int b = 0; b < Shape.Length; b++)
             {

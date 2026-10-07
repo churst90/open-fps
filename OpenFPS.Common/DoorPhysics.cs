@@ -5,8 +5,8 @@ namespace OpenFPS.Common;
 /// <summary>
 /// The parts every simulated door is built from (<see cref="KnobDoor"/>, <see cref="PushBarDoor"/>):
 /// modes stepped exactly, plates whose radiation comes from the Rayleigh integral, contacts, LuGre
-/// friction, small parts on mounts, and the hand's paths. Moved out of the knob door unchanged, so the
-/// approved knob door renders bit for bit as it did.
+/// friction, small parts on mounts, and the hand's paths. The approved door renders depend on these bit
+/// for bit.
 /// </summary>
 internal static class DoorPhysics
 {
@@ -20,10 +20,8 @@ internal static class DoorPhysics
 
     internal const int Oversample = 4;
 
-    /// <summary>
-    /// Modes stepped exactly: each is a damped oscillator, and with the force held over a step its
-    /// state moves by a fixed 2x2 matrix, so a mode at 14 kHz is as accurate as one at 40 Hz.
-    /// </summary>
+    /// <summary>Modes stepped exactly: with the force held over a step each damped oscillator moves by a
+    /// fixed 2x2 matrix, so a mode at 14 kHz is as accurate as one at 40 Hz.</summary>
     internal sealed class Modes
     {
         public readonly int N;
@@ -92,10 +90,8 @@ internal static class DoorPhysics
         }
     }
 
-    /// <summary>
-    /// A plate's modes from separable shapes, with what each radiates found by the Rayleigh integral
-    /// over the face (baffled, far field, averaged over the half space in front of it).
-    /// </summary>
+    /// <summary>A plate's modes from separable shapes, each one's radiation from the Rayleigh integral over
+    /// the face (baffled, far field, averaged over the half space in front).</summary>
     internal sealed class Plate
     {
         public readonly List<(int M, int N)> Index = new();
@@ -129,8 +125,7 @@ internal static class DoorPhysics
                     // radiation of those it stands for (gain times the root of keepEvery).
                     if (f < minHz) continue;
                     if (keepEvery > 1 && (counted++ % keepEvery) != 0) continue;
-                    // Wood is not uniform and a hung leaf's edges are not ideal; each door's modes land a
-                    // little apart from the formula's.
+                    // Wood is not uniform and a hung leaf's edges are not ideal.
                     f *= 1 + scatter * (rng.NextDouble() * 2 - 1);
                     Index.Add((m, n));
                     Hz.Add(f);
@@ -169,10 +164,8 @@ internal static class DoorPhysics
         /// straight at the listener, a struck leaf came out 20 dB loud.</summary>
         internal const double ListenerTheta = 35 * Math.PI / 180, ListenerPhi = 20 * Math.PI / 180;
 
-        /// <summary>
-        /// Radiation efficiency (power over the half space), and the complex pressure at a metre at the
-        /// listener per unit modal acceleration.
-        /// </summary>
+        /// <summary>Radiation efficiency (power over the half space), and the complex pressure at a metre at
+        /// the listener per unit modal acceleration.</summary>
         private double Radiation(int m, int n, double f, out double gain, out double gainQuad)
         {
             double k = 2 * Math.PI * f / C0;
@@ -198,9 +191,8 @@ internal static class DoorPhysics
             double lx = k * Math.Sin(ListenerTheta) * Math.Cos(ListenerPhi), ly = k * Math.Sin(ListenerTheta) * Math.Sin(ListenerPhi);
             var cx = Integral(x => X(m, x), a, lx, Kx(m));
             var cy = Integral(y => Y(n, y), b, ly, Ky(n));
-            // Its level is its power over the half space, which is what a room hears; its phase is the
-            // one it arrives with at the listener, so the modes still add as they would there and not
-            // all in step.
+            // Level from the power over the half space, which a room hears; phase from the listener, so the
+            // modes add as they would there and not all in step.
             double pr = cx.re * cy.re - cx.im * cy.im, pi = cx.re * cy.im + cx.im * cy.re;
             double mag = Math.Sqrt(pr * pr + pi * pi);
             if (mag < 1e-30) { pr = 1; pi = 0; mag = 1; }
@@ -253,11 +245,9 @@ internal static class DoorPhysics
         return f > 0 ? f : 0;
     }
 
-    /// <summary>
-    /// LuGre friction: a bristle state that holds while the surfaces stick and lets go when the force
-    /// passes the static limit. Its exact update relaxes the bristle towards its sliding deflection, so
-    /// stiff bristles do not need a tiny step.
-    /// </summary>
+    /// <summary>LuGre friction: a bristle that holds while the surfaces stick and lets go past the static
+    /// limit. The exact update relaxes it toward its sliding deflection, so stiff bristles need no tiny
+    /// step.</summary>
     internal struct LuGre
     {
         public double Z, MuStatic, MuSliding, StribeckSpeed, Viscous, Bristle;
@@ -364,14 +354,12 @@ internal static class DoorPhysics
     // ── Dense fields ─────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// A thin panel's bending modes at the density its geometry gives them, n(f) = sqrt(3) S / (h c_L)
-    /// per hertz (Irvine), which for a 1 mm steel skin is a mode every 1.7 Hz: far too many to step one by
-    /// one, and where they overlap (modal overlap f n eta above one) the response to a blow is statistically
-    /// noise. So the field is stood in for by effective modes spaced at random about CapSpacing apart, each
-    /// carrying the energy of the real modes it stands for (modal mass M/K for K real modes), its radiation
-    /// from the panel's radiation efficiency (Maidanik), its loss from the panel's loss law. A sparse set of
-    /// modes rang as sines and the doors were heard as "tonal and synthetic": this is the count put right.
-    /// One-way: the field takes the contact forces and radiates; it does not push back on the contact.
+    /// A thin panel's bending modes at their real density, n(f) = sqrt(3) S / (h c_L) per hertz (Irvine): a
+    /// mode every 1.7 Hz for a 1 mm steel skin, and where they overlap (f n eta above one) the response to a
+    /// blow is statistically noise. Stood in for by effective modes about CapSpacing apart at random, each
+    /// with the energy of the real modes it stands for (modal mass M/K), radiating by the panel's efficiency
+    /// (Maidanik) and losing by its loss law. A sparse set rang as sines, "tonal and synthetic". One-way: the
+    /// field takes the contact forces and radiates, and does not push back.
     /// </summary>
     internal sealed class DenseField
     {
@@ -433,11 +421,9 @@ internal static class DoorPhysics
     }
 
     /// <summary>
-    /// Where a contact meets a dense field: a patch of panel with its own mass, held to the structure behind
-    /// it by a spring and losing energy into the field through the panel's point impedance. What drives the
-    /// field is that impedance times the patch's velocity, so the field never takes more than the contact
-    /// gives. (Fed the full contact force one way, a thin case radiated more than the pad that struck it
-    /// ever had.)
+    /// Where a contact meets a dense field: a patch of panel with its own mass on a spring to the structure
+    /// behind, driving the field with the point impedance times its velocity, so the field never takes more
+    /// than the contact gives. Fed the full contact force, a thin case radiated more than the pad that struck it.
     /// </summary>
     internal sealed class Port
     {
@@ -457,10 +443,8 @@ internal static class DoorPhysics
         }
     }
 
-    /// <summary>
-    /// Radiation efficiency of a simply supported panel (Maidanik, with Leppington's correction near
-    /// coincidence): edge and corner radiation below coincidence, about one above.
-    /// </summary>
+    /// <summary>Radiation efficiency of a simply supported panel (Maidanik, with Leppington's correction near
+    /// coincidence): edge and corner radiation below coincidence, about one above.</summary>
     internal static double RadiationEfficiency(double f, double fc, double a, double b)
     {
         double lc = C0 / fc, area = a * b, perimeter = 2 * (a + b);
@@ -486,10 +470,9 @@ internal static class DoorPhysics
     internal static double WoodLoss(double f) => 2.14 / (2 * Math.PI * f) + 3.08e-6 * 2 * Math.PI * f;
 
     /// <summary>
-    /// Acceleration noise: a small hard part (a bolt, a plunger, a crank) has its own modes above hearing,
-    /// and what is heard from it is its whole body being jerked in a contact a tenth of a millisecond long.
-    /// A compact body accelerating radiates as a dipole, p = rho V' (da/dt) / (c r) with V' = 3V/(8 pi) for
-    /// a sphere of the same volume (Chadwick, James et al. 2012). Feed it the part's acceleration each step.
+    /// Acceleration noise: a small hard part (a bolt, a plunger, a crank) has its modes above hearing, and is
+    /// heard as its whole body jerked in a contact a tenth of a millisecond long, radiating as a dipole,
+    /// p = rho V' (da/dt) / (c r), V' = 3V/(8 pi) for a sphere of its volume (Chadwick, James et al. 2012).
     /// </summary>
     internal sealed class AccelerationNoise
     {

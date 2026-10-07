@@ -622,3 +622,62 @@ Not current: the plan for the rejected recipes. The physical models replaced it.
 3. Glass (types 3, 4, 6) adds the strong low panel modes, the frame tube series and the rattle.
 4. The moving doors (types 5, 7) add a speed curve, rolling noise and motor tones on top of the same
    impact engine.
+
+## Model history
+
+The longer story behind the door models' constants; each warning and number is also in the code, a
+sentence each.
+
+### Knob door
+
+- Round 1 (2026-10-03) fitted a recipe to each event, and every opening sounded the same whatever the door
+  was doing. Cody: "are we modeling the doors or modeling the sound? ... we need to model the physical
+  doors." Everything since is parts, contacts and a hand.
+- The first knob was an open cylinder: a wine glass, and it sounded like one. A closed 27 mm ball is too
+  stiff to ring below about 18 kHz; what rings is the 19 mm base annulus, near 10 kHz.
+- The first hollow leaf lost more than 0.05 and sounded like plastic; 0.03 now.
+- Round 1 pulled on the knob with a sixth of today's 12 N and the opening was a faint click.
+- A creak on every door made the building sound haunted. A merely worn pin (wear 0.55) never stuck at a
+  game's opening speed and Cody heard no squeak, so the one squeaky character is dry and rusty (0.95-1.0).
+- Declared levels used to be the model's LAFmax less a 14 dB calibration. A close's crack stands 21-29 dB
+  over its own LAFmax, so a normal close was heard at 51 dBA at 1.5 m on "real" where the model puts 86,
+  under a pedestrian's greeting at 60. Cody, 2026-10-03: "way way way too quiet ... if I'm 5 feet away from
+  a door at these levels I'd barely know someone opened a door", and no calibration taking level off the
+  doors. Every door model now declares its render's peak.
+
+### Push-bar door
+
+- Round 1 put every bar on soft urethane and Cody heard no push at all; bare metal on every one rang the
+  case's walls at 134 dBA. Characters now run nylon, acetal, worn, and an old one with its slider worn to
+  almost nothing.
+- Round 8 (2026-10-04) put the pad's landings on its steel lever tabs; plastic only knocks on the rails.
+  The steel door's latch case, as a damped lump on a spring, passed its bolt's 0.1 ms stop on as a thud
+  under 2 kHz until round 8 made its stops tabs of the case's steel; the glass door's lock body had the
+  same fault and the same fix.
+- Thin aluminium for the case and pad rang long and high: "a spoon in the sink". The case is 1.5 mm pressed
+  steel, the pad moulded plastic (Cody: "the push bar that gets pushed in is usually plastic, the casing
+  around the pusher is usually metal").
+
+### Sliding doors
+
+- The automatic door's prefab times (1.5 s open, 2.5 s shut) were a guess; a real one opens at 0.7 m/s and
+  shuts at the 0.3 m/s ANSI/BHMA A156.10 allows, and AutomaticSeconds now derives the time from the
+  controller.
+- The patio stop was once a single soft bulb: a 20 ms push with nothing above 1 kHz, the blow carried by a
+  76 Hz frame mode and the glass, Cody's "hollow". Now a cushion of pile and bulb, then frame on frame.
+- The round 2 rolling profiles were noise smoothed on a 3 mm grain and drawn straight between points every
+  0.4 mm: every point a kink, and the roll came out flat to 8 kHz. Now RollingProfile builds the spectrum
+  and Smooth interpolates with a cubic.
+- Round 3's "gritty": grains met at a point clicked to 20 kHz and, with the roll no longer a hiss to hide
+  them, a worn door's grit was all that was heard. Grains are now met across the Hertz patch.
+- Openings used to run the leaf into the head-track bumper: "the open sound sounds like a close sound".
+  The hand now brings the leaf to rest short of it.
+- Steel wheels on a patio door: each grain clicked and rang, Cody's "metallic". Every patio door rolls on
+  nylon; the old one is the same door dirty, pitted and flatted.
+- The header as one 0.45 by 2 m sheet from 60 Hz boomed: "a metallic tube".
+- The drive's housings at a loss of 0.01: "too much resonance", and the brushes' friction as white noise
+  was the hiss.
+
+### Car window
+
+The four characters and Cody's choice of the old one: docs/COMMON_NOTES.md, Car windows.
