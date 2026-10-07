@@ -1,93 +1,149 @@
 # To do
 
-Planned work in priority order. Finished work is in [changes.md](changes.md) and `git log`.
-Updated 2026-10-05 (evening). Today's plan, agreed with Cody: [docs/PLAN_2026-10-05.md](docs/PLAN_2026-10-05.md).
+Planned work. Finished work is in [changes.md](changes.md), `git log` and
+[docs/DONE_2026-10.md](docs/DONE_2026-10.md). "(Cody)" marks what waits on Cody's ear or decision.
+Updated 2026-10-07: every item checked against the code, the git history, changes.md and Cody's approvals.
+
+## Next, in order
+
+1. Finish this batch: the honest tests and the lab argument bugs; the probable bugs (below), on their
+   own branch, heard by Cody before they merge.
+2. One full test run on the final main (`tools/test-local.sh`).
+3. Push, then the VPS, then the Windows zip. Cody: only after the whole batch. The VPS runs
+   f1a0421123d3 (2026-10-05); the wire has changed since, so client and server go together.
+4. Geometry stage 3, terrain from real elevation (docs/GEOMETRY.md section 7), with world streaming
+   stage 2, one world in UTM tiles generated on demand (docs/WORLD_STREAMING.md).
+5. Sound library stage 3 alongside: `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`
+   (docs/SOUND_LIBRARY_BOUNDARY.md section 8).
+6. World editor phase 3: people, roads and routes, map versions, baking an overlay into a map file
+   (docs/WORLD_EDITOR.md section 9).
+
+Waiting on Cody's ear:
+- Driving cues and horns: H horn, U siren, J and L indicators, the brake cue, line rumble, the speed
+  limit, rails, gates, aircraft roll-out (inbox/driving-2026-10-06). The brake cue's notes, the rail
+  strike level and the gate motor and clunk are assumptions.
+- Trains' own horn, whistle and bell; air conditioners cycling with the weather
+  (inbox/fault-fixes-2026-10-06).
+- Downpipes, round 2: the flange should be gone (inbox/water-smoothing-2026-10-06/round2).
+- The world editor in the game (F12), and `/editorkeys on` with Orca, then NVDA.
+- The probable-bug fixes, before and after (inbox/probable-bugs-2026-10-07).
 
 ## Now
 
-In this order.
+### Probable bugs
+Found by the housekeeping on 2026-10-07; not fixed on main. Fixes go on their own branch.
+- `WorldAudioPlayer.Clear` is never called on `/join`: one-shots and thunder carry over to the next map.
+- Every emitter gets `ApplyGround`: `physicalKey != null` is always true (ClientAudioSystem.cs 2864;
+  probably meant `Length > 0`).
+- A landing plays a footstep take, never the LANDING bank (`SubmitLanding` passes force 0).
+- `SetSimulatedReverbDecay` takes the hf and lf decay ratios and does not use them, so a room's colour
+  never reaches the reverb (FmodAudioProvider.cs 1110).
+- The bell's clapper damping comes back at the end of the contact, 0.1-0.3 ms, not the 12 ms `Step`
+  allows (StruckBell.cs 132).
+- A hull's blow lands at the start of its block, up to 2.7 ms early (`ShoreSynth.HullPlate.Blow` does
+  not read `at`).
+- The fire's fizz is scaled by `CracklePart` (FireSynth.cs 870).
+- `Footsteps.Key` writes twice the speed, so 1.4 m/s reads back as a run (AudioLab only).
+- Not heard: `AggressiveOptimization` sits on `EngineProcessor.QueueStrikes`, meant for `Synthesize`;
+  `AcousticPathData.ReflectionId` and `Scattering` are written and never read.
+- The traced reverb stage averages its stereo input (TracedReverbDsp `v /= inCh`), so since the
+  binaural input fix of 2026-10-06 the tail is 3 dB drier than the -6 Cody set by ear. Fix the input or
+  move the trim (Cody).
+- A new engine donor is held for 2.5 s inside the budget, so one budget car is let go once and rebuilt
+  2.5 s later (docs/COVERAGE_2026-10-06.md).
 
-### 1. Listen in the game
-Built, rendered or measured, but not heard in the game. Each needs Cody's ear before it counts as done.
-Restart the server and update the client first.
-- Doors: push and pull sides, the tower front doors locked from the street (key, then pull), and
-  nothing shutting on a person.
-- The glass front door, the glass shop door and the lift door models (inbox/door-models-2026-10-05).
-- The teleporter: the charge, the thump where you leave, the pop where you arrive.
-- Hand-over sounds when something is given.
-- Bodies and carrying. Carrying a body slows you to 1 m/s; walking is 4.5 m/s. Is the pace right?
-- Elm Park's fountain, the fire pit at 58 Alder Street, and the trees in the wind
-  (inbox/nature-round1-2026-10-05).
-- The six Resonance-port fixes: tyres at the device's rate, the bus's air compressor at the back,
-  rail axles from the model file, machines built on a base, the road vehicles' air horn, the bell's
-  headroom. Also the diesel locomotives (crank, then the governor holds the notch).
-- After a map change, sounds keep their direction (the fountain moves as you turn; the speedway's
-  cars are placed). Fixed 2026-10-05; travel city -> speedway -> city and listen.
-- The fountain and the trees, rounds 2 and 3 (inbox/nature-round2-2026-10-05, nature-round3).
-  Cody on round 2: "almost there", the water still a little grainy, the hiss could be smoother.
-- Wind at the ears and the weather's wind in the trees (inbox/weather-wind-2026-10-05). Try
-  `/weather wind 8 north west gusty`, `/weather storm`, `/weather auto`. Is walking in still air
-  faint enough? Is a storm (about -19 LUFS, a busy street) too loud? `OPENFPS_EAR_WIND=0` for an A/B.
-- Car fronts: engine noise out of the bay, radiator fans (inbox/car-fronts-2026-10-05). Cody's first
-  listen: the renders were far too quiet (written at raw scale, -55 to -65 dBFS), and some fronts
-  louder than the tailpipes. Being redone.
-- Rain on surfaces, thunder and lightning (inbox/rain-2026-10-05, inbox/thunder-2026-10-05), when built.
-- The Magnolia and Albany maps, when built (`/join magnolia tx`, `/join albany or`).
+### Listen in the game (Cody)
+Built and measured, not heard in the game. Restart the server and update the client first.
+- Doors: push and pull sides, the tower front doors locked from the street (key, then pull), nothing
+  shutting on a person. The glass front door, glass shop door and lift door models
+  (inbox/door-models-2026-10-05).
+- Bodies and carrying: carrying slows you to 1 m/s against a 4.5 m/s walk. Is the pace right?
+- The trees in the wind, rounds 2 and 3 (inbox/nature-round2/3-2026-10-05). Round 2: "almost there".
+- The six Resonance-port fixes (tyres at the device rate, the bus compressor at the back, rail axles from
+  the model file, machines on a base, the air horn, the bell's headroom) and the diesel locomotives.
+- After a map change sounds keep their direction: travel city, speedway, city.
+- Car fronts: the engine bay and radiator fans, re-rendered at game level (inbox/car-fronts-2026-10-05).
+- Thunder round 2 and lightning (`/weather storm`; inbox/thunder-round2-2026-10-05).
+- Magnolia and Albany (`/join magnolia tx`, `/join albany or`), streamed as you move.
+- The cab heard from where each sound comes in (inbox/cabin-2026-10-06); wet roads
+  (inbox/wet-roads-2026-10-06); distant woods; Alex on the city; ramps, stairs and arches.
+- The ear model's effects (idles louder, birds quieter) and `/listening`; the 48 kHz mixer and limiter.
+- Older: arriving speech ("You're in <map>, at <zone>", no "Under Shelter" at doorways); street life
+  (honks, hard stops, parking); pedestrian and driver speech; driving aids in the head; the car starter
+  (inbox/starter-2026-10-02); the street through an open lobby door, and two rooms in; bus air brakes;
+  the airliner's whine; walls (lows through, top not).
 
-### 2. Cody to say
-- The admin gun's report: which of the five (`/admingun report 1-5`, inbox/admin-gun-2026-10-05).
-  Default is 1; he said the sounds are fine.
-- Do the reflections follow a moving talker, and follow himself? He will check again.
-- The loudness law places a sound by its peak. Anything over about 126 dB peak at 1 m (gunshots, a
-  window breaking, a thin steel plate) plays at full scale out to the 40 m clamp, so 5 m and 20 m
-  sound the same (`Loudness.Place`).
-- City temperature: city.json authors 42 as an OFFSET over the server's seasonal curve (+22 C), so
-  the city runs 17 C in January and over 50 C in summer, and every stopped car's fan runs. Intended?
-- Car fans: real pickups and vans mostly have a belt-driven viscous-clutch fan (none modelled yet);
-  the car fan's 205 Hz blade hum stands 23 dB over its noise (level derived from the truck fan); a
-  3.4 kHz block mode is 12 dB louder from the front now and may be heard as a whistle.
-- Lightning: a spoken or tone cue at the flash ("lightning, north east"), or only the thunder?
-- The scope hint ("Nobody in view. Nearest person 60 metres, below and to the left"): parked by Cody
-  2026-10-05. At 4 power the scope sees a 6 degree cone, so from a roof looking level the street
-  below is out of view.
+### Decisions (Cody)
+- Reflections following a moving talker, and himself: he will check again.
+- Loudness law: anything over about 126 dB peak at 1 m (gunshots, glass, a thin plate) plays at full
+  scale out to the 40 m clamp, so 5 m and 20 m sound the same (`Loudness.Place`). Explosions wait on it.
+- City temperature: city.json's 42 is an offset over the seasonal curve, so the city runs 17 C in
+  January and over 50 C in summer, and every stopped car's fan runs. Intended?
+- Car fans: real pickups and vans mostly have a belt-driven viscous-clutch fan (not modelled); the car
+  fan's 205 Hz hum is 23 dB over its noise; a 3.4 kHz block mode is 12 dB louder from the front.
+- Lightning: a spoken or tone cue at the flash, or only the thunder?
+- The scope hint ("Nobody in view..."): parked by Cody 2026-10-05.
+- The commuter cars at a cruise are mostly tyre noise on one shared tyre, 11-20 dB over their engines
+  ("too reverby, all the same", inbox/vehicles-2026-10-05).
+- The Elm Park fountain's basin overflow: +4.6 dB on its side; not connected.
+- A tap and its plug on one key, or two?
+- Steam Audio pathing never runs (`enablePathing: false`); routes come from OpeningRoutes. Turn it on, or
+  remove it.
+- Server: `/move NAME` is staff-only, so an owner cannot use it on their own map. Intended?
+- `/savemap` on a generated map (the city, the real places) rewrites the generated file. Refuse it?
+- Hardening limits in play: chat 6 then one every 2 s; commands 20 then 5/s; editor changes 20 then
+  4/s; `/join` 3 then one every 10 s; chat 512 characters, commands 1,024; no cap on model versions.
+  Recommended: keep.
+- MemoryPack's string-length overflow (one packet crashed the server) is not fixed upstream: report it
+  to Cysharp?
+- Sound library: `ColliderShape` stays in Common; CI compares renders by tolerance; 430 KB per stream
+  regeneration. Recommended: yes to all three.
+- World editor: carry a map entry's `Form` through Remake and duplicate (recommended).
+- Streaming: a menu control for `/detail`; tree counts and cost of distant woods (+0.5 core); the cab's
+  own reverb adds up to 20 dB at the bottom, so it is unchanged.
 
-### 3. Door models: gaps
+### Housekeeping finds
+Left by the 2026-10-07 housekeeping; none changes sound.
+- `ReachingFrom`'s two branches return the same point; `OccupancyService.Moving` stops getting in
+  above 2.0 m/s for a driven car and 1.0 m/s for a map's bus; on tiled maps, confirm how the broadcast
+  forgets dynamic things a client knew (Program.cs).
+- `SharedMovementEngine`'s `stepped = true` is never read; `WindModel` and `WindField` overlap;
+  `TransientSound` lacks its APPEND ONLY marker; `PhysicsUtils.GroundMaterial` returns its input.
+- `ElevatorDoor.faceAtFoot` and `PushBarDoor.railHit` are kept only for the random sequence: retire them
+  with a render regeneration.
+- Nullable warnings: CS8602 in Spawning and MovementSystem, CA2014 in SolidContact, CS8714 in
+  SpatialGrid.
+- Stale code comment: RainField.cs 33 lists gutters, downpipes and run-off as missing (built 2026-10-06).
+- `Machines.cs` 87: the declared extent is read by nothing; it should replace the car-sized
+  `MathF.Max(reference, 3f)` in ClientAudioSystem, with audibility ranking.
+
+### Doors
 - The lift's close is soft: no bump and no rebounds.
 - The glass front door's bar push is about 5 dB over the steel door's.
-- The knob door's push is about 9 dB over its pull. From round 4: turn clicks about 30 dB under the
-  release, soft knocks after a close, the hard close 17-20 dB over the normal one.
-- The client renders about 20 glass door sounds at start, 10-40 s of CPU each. Keep rendered door
-  sounds in a disk cache.
-- Not made yet: the lift reversing, the closer's sweep, a knock on the outside lever, the shop
-  door's roller catch.
+- The knob door's push is about 9 dB over its pull; turn clicks about 30 dB under the release; soft
+  knocks after a close; the hard close 17-20 dB over the normal one.
+- Not made: the lift reversing, the closer's sweep, a knock on the outside lever, the shop door's
+  roller catch.
 - A door leaf swings through furniture and walls.
-- Footsteps, car doors and the knock declare a level against their peak the way doors did before
-  2026-10-04 (14-29 dB low). Fix after the doors are heard. The knock (`DoorKnock`) may also be about
-  20 dB short at 1-2 kHz against the recordings.
-- Doors waiting on Cody: push-bar fire doors on the towers' stairwells (they would change every
-  tower's acoustics); the terminal's road-side steel door, automatic if it is the public way in.
+- Footsteps, car doors and the knock declare a level against their peak, as doors did before
+  2026-10-04 (14-29 dB low). The knock (`DoorKnock`) may also be about 20 dB short at 1-2 kHz.
+- Push-bar fire doors on the towers' stairwells (they change every tower's acoustics); the terminal's
+  road-side steel door, automatic if it is the public way in (Cody).
 
-### 4. Roles: follow-ups
-- `/undo` covers `/put` only: not `/place` or `/spawn`, and not after a reconnect.
+### Roles, bodies, admin gun, keys
+- `/undo` covers `/put` only: not `/place` or `/spawn`, and not after a reconnect (`/edit undo` covers
+  the editor).
 - Spawned walkers get no crosswalks.
 - Old single grants of "tp" were dropped. Moderators need a teleporter.
-- `CommandHandler.cs` is still 2,500 lines; split it by area.
-
-### 5. Bodies: follow-ups
-- Walkers have no names of their own ("body of a pedestrian").
-- Later: what a body is for (selling it, once there is money).
-
-### 6. Admin gun: follow-ups
+- Walkers have no names of their own ("body of a pedestrian"); only Alex is named.
 - Trains cannot be frozen.
+- Who holds which keys (Cody, later). Keyed doors work, and everyone can open them now.
 
-### 7. Keys
-Keyed doors work, and everyone can open them now. Who holds which keys is Cody's decision, later.
-
-### 8. Network: next steps (waiting on Cody)
-Resting states, packed positions and stats on change are done: 5.8 to 1.75 Mbit/s for three
-players. The rest, with measured savings, is in docs/PLAN_2026-10-05.md section 6:
-1. Rate by distance (5 Hz beyond 150 m): 50-70 %. Needs per-thing interpolation, and Doppler and
-   tyre demand from the server.
+### Network (Cody)
+1.75 Mbit/s for three players after the 2026-10-05 trim. The rest, with measured savings, is in
+docs/PLAN_2026-10-05.md section 6:
+1. Rate by distance (5 Hz beyond 150 m): 50-70 %. Needs per-thing interpolation, and Doppler and tyre
+   demand from the server.
 2. A byte budget per packet filled by priority: caps the worst case.
 3. Only the change, against what the client confirmed: about 30 %.
 4. Traffic run on the client from routes, with corrections from the server: most of what remains.
@@ -95,68 +151,74 @@ players. The rest, with measured savings, is in docs/PLAN_2026-10-05.md section 
 6. Voice: cull by distance, send nothing in silence, 32 kbit/s.
 7. LZ4 compression: 10-15 %.
 
-Also: Sean's voice stopped being heard after he changed his audio device (2026-10-04). Undiagnosed;
-needs his client log and the server's voice line.
+Sean's voice stopped being heard after he changed his audio device (2026-10-04). Needs his client log
+and the server's voice line.
 
-### 9. Walls, what is left (the panel model went in 2026-09-30, unheard)
-- Listen: through a wall the lows and the rumble should come through and the top should not.
+### Walls
 - A source just behind a building corner made of two boxes gets no diffraction route (the 5 cm joint
   padding in `RouteIsClear`). Fix without reopening the shut-door crack leak.
 - Each floor is two overlapping 25 cm slabs, and carpet counts as a barrier: upstairs is about 15 dB
   too quiet in the lows. Merge layers in contact.
 - No cavity resonances or air leaks: sealed glazing is about 10 dB optimistic in the mids; door gaps
   and seals are not modelled.
-- The glass front doors let more in when shut than steel doors: 17/28/43 dB against 13/48/58
-  (`--wall-tl`).
+- Shut glass front doors let more in than steel doors: 17/28/43 dB against 13/48/58 (`--wall-tl`).
 - Steam Audio counts walls in a row as (2n+1)/3 of one; the tracer counts them exactly.
 - Diffraction is evaluated at 200/1250/8000 Hz, not the band averages transmission uses.
 
-### 10. Acoustics still open
-- If the game goes silent again, read the log for `[NONFINITE]`: the first line names the unit.
-- Listen for the room answering at once (early-tail): clap in a main-street lobby and in flat 01F.
-  Is 20-100 ms too strong? Speech and steady sounds get no copies, so they lose that share of the
-  first 20 ms; a per-source early part would fix it.
-- Listen for pops on the Main Street pavement and in Selby House and Marlow Tower. Cars behind
-  buildings are now heard over the roofs: is the city too busy? `--pop-hunt` still finds:
-  - indoors, a car's straight line through one wall as it passes a gap: -80 to -62 dB for 200-400 ms;
-  - a pier on a wall: 3 dB down for about 1 m; under the covered hall west of Main Street, up to
-    19 dB between over the wall and over the roof.
-- Listen to the late tail (`SmoothTail`, `DiffuseLate`): does it pulse? Is it boomy below 500 Hz?
-  Narrow above 2 kHz? A second noise per ear above 1 kHz would cost 25 MB and twice the convolution.
+### Acoustics
+- The room answering at once (early tail): clap in a main-street lobby and in flat 01F. Is 20-100 ms
+  too strong? Speech and steady sounds get no copies; a per-source early part would fix it (Cody).
+- Pops on the Main Street pavement and in Selby House and Marlow Tower; is the city too busy with cars
+  heard over the roofs (Cody)? `--pop-hunt` still finds a car's straight line through one wall as it
+  passes a gap (-80 to -62 dB for 200-400 ms), and up to 19 dB between over the wall and over the roof
+  under the covered hall west of Main Street.
+- The late tail: boomy below 500 Hz, narrow above 2 kHz? A second noise per ear above 1 kHz would cost
+  25 MB and twice the convolution (Cody).
 - Below 120 Hz the tail of a room you are not in is identical in both ears.
-- A voice's ground reflection flanges, so voices have none. Next: a lab render with realistic head
-  and body movement on both ends.
+- A voice's ground reflection flanges, so voices have none. Next: the ground as it answers (Next,
+  below), and a lab render with head and body movement on both ends.
 - Blocked sources come from one edge at a time. If a siren behind buildings wanders again, blend the
   routes by energy.
 - The traced echoes convolve at 1,024 samples and arrive about 20 ms late.
-- Furnished flats: beds, sofas, curtains and shelves placed by the generator.
+- Furnished flats: curtains and shelves (a sofa and a bed per flat since 2026-09-29).
 - The traced decay of the tunnel and the garage against real figures.
-- Beacons: door range 12 m to 6 m, and lifting beacons when a louder sound is near (proposed, not
-  asked for).
+- Beacons: door range 12 m to 6 m, and lifting beacons when a louder sound is near (proposed, Cody).
 
-### 11. Gunfire
+### Water
+- A big river's bank in a calm is silent: an eddy's wave never breaks (`breaks = !eddy`).
+- Shingle reaches the master limiter at 3 m: the plunging breakers (90.9 dB), not the stones.
+- Boats too clicky; lake lows 15-25 dB under the recordings (which carry mic wind).
+- The fountain's rim jets are heard from the rocks' taps, 2.3 m from its middle, though they land near
+  the kerb.
+- Showers 11-22 dB darker than the recordings at 4-16 kHz; the dripping tap rings steel where real
+  drips plink into water; the violent-rain gutter outlet 4-6 dB heavy at 250-500 Hz.
+- Not built: toilet flush and cistern refill; the plug as its own control; NPCs using taps; pipe walls
+  radiating; trap seals; snowmelt.
+- AudioLab `--waves levels heard=` ignores `parts=`.
+
+### Gunfire
 Synthesis to spec; recordings are the yardstick only.
-- In the mix a Glock at 0.5 m carries 3.7 dB less energy than a clap over 300 ms, because one-shots
-  are 16-bit. A float path for registered sounds would let them reach the master limiter. Ear first.
 - The shotgun has no recording to fit to.
 - Casings that land and bounce where they fall.
-- Dry fire: five guns share one "hammer falls" contact. Give each action its own mechanism. Cody:
-  fine for now. The revolver's empty and partial reloads are listed twice in the render.
+- Dry fire: five guns share one "hammer falls" contact (Cody: fine for now). The revolver's empty and
+  partial reloads are listed twice in the render.
 - A proper fire message in the protocol (fire is a text command).
+- AudioLab: `GunSpecSpike` does not read its angle; every angle renders on axis.
 
-### 12. Bodies and wheels
+### Bodies and wheels
 Plan: [docs/NEXT_BODIES_WHEELS_ROADS.md](docs/NEXT_BODIES_WHEELS_ROADS.md). Roads as data and per-wheel
-physics are done (the second unheard).
-- Stage 2: moving bodies in the acoustic scene (vehicles from their panels, people as soft bodies),
-  so a bus or a crowd blocks sound like a wall of its size and material.
-- Stage 4: rolling noise per wheel, left and right as separate directions, the surface under each,
-  joints struck by each axle.
+physics are done.
+- Stage 2: moving bodies in the acoustic scene (vehicles from their panels, people as soft bodies), so
+  a bus or a crowd blocks sound like a wall of its size and material (geometry stage 6).
+- Stage 4: rolling noise per wheel outside the car (inside it is per wheel since 2026-10-06), left and
+  right as separate directions, the surface under each, joints struck by each axle.
 - Turning paths cut over the kerb on the 7 m estate roads (a junction connector needs a kerb-aware
   radius).
-- No physical value hard-coded in a model or map; presets move to JSON.
+- No physical value hard-coded in a model or map; presets move to data (engines and vehicles are
+  editable library kinds since 2026-10-07).
 - Stage 5: traffic lights and accessible pedestrian signals.
 
-### 13. Left from the 2026-10-01 mutation triage
+### Left from the 2026-10-01 mutation triage
 [docs/MUTATION_2026-10-01.md](docs/MUTATION_2026-10-01.md)
 - A car stopped for a crossing on a turn can have a front corner up to 0.36 m inside the walkers'
   strip. Work each stop out from the body's corners.
@@ -166,29 +228,19 @@ physics are done (the second unheard).
   collision, ungroup; parking door claims; your own car into a wall; pairs talking and reactions;
   crowd cooldown and radius; passenger view and velocity; the game clock at midnight.
 
-### 14. Mutation testing (on hold, Cody 2026-10-02)
-Results: [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md),
-[docs/MUTATION_2026-10-01.md](docs/MUTATION_2026-10-01.md). Harness: `~/.cache/openfps-stryker`
-(8 GB heap cap, a watchdog, sections; see its README).
-- When it resumes: Common in three sections, then Client.Core. Re-run server sections only for files
-  changed since (`--since`).
-- Client (`VoiceManager`, `VehicleShadow`, `BeaconAids`, `BirdLife`): 39.2 %, survivors not yet done.
+### Tests
+- Mutation testing is on hold (Cody 2026-10-02). When it resumes: Common in three sections, then
+  Client.Core; server sections only for files changed since (`--since`). Client (`VoiceManager`,
+  `VehicleShadow`, `BeaconAids`, `BirdLife`): 39.2 %, survivors not yet done. Harness
+  `~/.cache/openfps-stryker`; results docs/MUTATION_2026-09-24.md and docs/MUTATION_2026-10-01.md.
+- Untested in ClientAudioSystem: the starvation path, `PlayReferenceVoice`, `SubmitLanding`.
 
-### 15. Tests for the untested audio code
-Done 2026-10-06 ([docs/COVERAGE_2026-10-06.md](docs/COVERAGE_2026-10-06.md)). Left:
-- Cody to decide: the ear model's correction raises the rank of a sound the ear hears less of (a
-  25 Hz rumble ranks 20 dB up), in the machine ranking and VoiceManager.Audibility.
-- A shore voice is silent for its first 11 s or so.
-- In ClientAudioSystem: the starvation path, PlayReferenceVoice, TyreDemand, SubmitLanding, OnBreath,
-  NameOfGap.
-
-### 16. Zones (waiting on Cody)
+### Zones (Cody)
 - Today a zone is a named box in the map; the smallest box you stand in is the one said.
 - Proposal: a room or building names its own zone from its walls; a free-standing zone (park, plaza,
-  car park) stays a box; a zone inside a zone is said as the inner one, the outer on the where-am-I
-  key.
+  car park) stays a box; a zone inside a zone is said as the inner one, the outer on the where-am-I key.
 
-### 17. Bump sounds
+### Bump sounds
 Walking into something (`--bumps`) is always the same woofy, hollow thunk. Missing: radiation
 efficiency below a panel's critical frequency, and a hard contact of about a millisecond. Then anchor
 the level to the footstep takes.
@@ -196,84 +248,59 @@ the level to the footstep takes.
 ## Next
 
 ### Doors as live models (filed 2026-10-05, not started)
-The door models are physical (hinges with their own friction and wear, the leaf's modes, the latch,
-the stop), but each is rendered once per key, far slower than real time, and replayed from one point
-by the handle; the leaf does not swing in the world. Cody wants the squeak in the hinge and the
-leaf's sound from the swinging leaf. Needs: the leaf swinging on the server from how it was pushed;
-the model reworked to run faster than real time (find what is slow first: probably the leaf's modes
-and the contacts); taps at each hinge, the latch edge and the leaf, as trains and cars already do.
-Knob door first, the approved renders as the yardstick. Large.
+The door models are physical but rendered once per key, slower than real time, and replayed from the
+handle; the leaf does not swing in the world. Cody wants the squeak in the hinge and the leaf's sound
+from the swinging leaf. Needs: the leaf swinging on the server from how it was pushed; the model faster
+than real time (find what is slow first: probably the leaf's modes and the contacts); taps at each
+hinge, the latch edge and the leaf. Knob door first, the approved renders as the yardstick. Large.
 
 ### Real places from open data
-Maps from OpenStreetMap plus public records (tools/gen_osm.py; docs/MAPS_FROM_REAL_PLACES.md). Magnolia
-TX (31907 Bobcat Lane) and Albany OR (1042 Belmont Ave SW), 3 km each, in progress 2026-10-05.
-- Whole towns (a city's boundary, a ZIP area) need streaming: the map in tiles, full detail near the
-  player and a coarse layer (shells, roads) beyond, loaded as you move. The same work serves the 10 km
-  city and joined maps. A client detail setting (low, medium, high) then sets how far full detail
-  reaches. The importer already tags tiles and has detail levels.
+tools/gen_osm.py; docs/MAPS_FROM_REAL_PLACES.md. Magnolia and Albany are built and stream by tile.
+- Whole towns: world streaming stage 2 (Next, in order).
 - Real weather for real places (Open-Meteo or NOAA by latitude and longitude).
 - Traffic volumes from published counts (average daily traffic by road), with time-of-day curves.
-- Ground height from USGS 3DEP once there is terrain.
+- Ground height from USGS 3DEP: geometry stage 3 (Next, in order).
 
 ### Map editor
-In the game, typed commands and F-key menus with speech, building on `/map new`, `/put`, `/group`,
-`/saveas`, `/place` and the build cursor. Missing: copy, rename, delete and publish maps; choose things
-(nearest, by name, in an area) with each spoken back; move, turn and resize by numbers or small steps
-with snapping; duplicate and repeat; undo and redo for everything; a property menu (material, sound,
-model settings); a prefab browser that plays a prefab before placing it; ungroup; edit a prefab and
-update every copy; a road tool (from, to, class, lanes, speed limit, junctions made automatically);
-checks ("this room has no door"); "what is around me". Undo, choosing and moving first.
+Phases 1 and 2 are built (docs/WORLD_EDITOR.md). Phase 3 is in Next, in order. Also missing: copy,
+rename, delete and publish maps; checks ("this room has no door"); groups as one composite (only if
+building houses needs it); a preview of a wall being struck.
 
 ### Weather, the rest
-Wind is done (2026-10-05); rain and thunder are being built. Still to do:
-- Wet roads: tyre hiss and spray; wetness that lasts after the rain; puddles.
-- Gutters, downpipes and run-off.
-- Snow, sleet, hail and freezing rain; ice. Snow and ice underfoot: measure before synthesising
-  (synthetic footsteps failed three times); recordings may be the answer.
-- Wind tilting the rain; ear-wind shelter that depends on the wind's direction (a wall upwind).
-- Grip from the weather (snow 0.2, ice 0.1 exist in `RoadSurfaces` but only from map materials).
+- Snow and ice underfoot: measure before synthesising (synthetic footsteps failed three times);
+  recordings may be the answer.
+- Wind tilting the rain onto walls and windows (a vertical pane takes no drops today); ear-wind shelter
+  that depends on the wind's direction (a wall upwind).
+- Grip on snow and ice from the weather (0.2 and 0.1 exist in `RoadSurfaces`, from map materials only).
 - A more physical weather model: fronts, clouds, fog, a random walk instead of four fixed states.
 - Ear wind assumptions to check: the per-angle figures, a helmet's 12 dB, the open-window cabin airflow.
+- Wet roads, not modelled: wipers, ruts, porous asphalt, puddles away from kerbs, spray in the air
+  (docs/WET_ROADS.md section 6). In a car the wet tyres are about 12 dB up, against a recalled 2-5.
+- Rain: in a car at moderate rain the 10 ms kurtosis is 4.5, just over the recordings; sleet and hail
+  stay sharp ticks (no recording to compare).
 
 ### The ground reflection, done properly (discussed 2026-10-06)
 The ground is the strongest reflection outdoors, so it stays, but as the ground really answers:
-filtered by the surface's impedance (grass and soil absorb the top and shift the phase; Delany-Bazley
-or Miki), with the coherent share falling with frequency, distance, roughness and turbulence
-(Clifford and Lataitis; Nord2000 and Harmonoise do this), and the rest scattered. A perfect mirror
-copy is what flanged, which is why speech has none today; done this way speech can have it back.
-Moving bodies (cars, buses, aircraft, people) go into the acoustic scene so sound reflects off and
-is shadowed by them (Bodies and wheels, stage 2).
+filtered by the surface's impedance (Delany-Bazley or Miki), with the coherent share falling with
+frequency, distance, roughness and turbulence (Clifford and Lataitis; Nord2000, Harmonoise), and the
+rest scattered. A perfect mirror copy is what flanged, which is why speech has none today. Moving
+bodies go into the acoustic scene with Bodies and wheels stage 2.
 
-### Tests on GitHub (asked 2026-10-06)
-Every test and build runs on Cody's machine today. GitHub Actions is free for a public repo: a
-workflow sharded across parallel runners (4 cores each; the suite is 48 minutes on 24 cores here).
-The Linux FMOD and Steam Audio libraries are not in the repo: Steam Audio is Apache-2.0 and can be
-fetched in the workflow; FMOD's licence does not allow publishing its SDK, so tests that need FMOD
-either skip in CI or get the library from a private store.
-
-### Fire at any size
-Built 2026-10-06 (docs/FIRE.md, inbox/fire-2026-10-06, unheard): bodies of fire over the burning area,
-heard from nine places spread as the burning area is; the roar as dQ/dt's turbulent tail; crowds of crackles; torching, falls,
-windows, collapses, a car's bursts; a life from lighting to smoulder; seven presets from a campfire to a
-crown fire; /spawn fire. Open:
+### Fire, the rest
+Fire at any size is built and approved (docs/FIRE.md). Open:
 - the crown fire against a real crown-fire recording (none found);
 - the car against more than two recordings;
 - smoke explosions in a closed building;
 - spotting ahead of a crown fire;
 - fire spreading from one thing on a map to the next.
 
-### Water bodies
-Lakes and ponds lapping at a shore, creeks running, surf. The importer brings them in as zones; none
-has a sound model.
-
 ### Water you are in or on (asked 2026-10-06)
-Shore, wave, river and hull-slap sound models are being built (docs/WAVES_AND_SHORES.md). After the
-triangle geometry and real terrain (docs/GEOMETRY.md stages 1 and 3), which give water a real surface
-and depth:
-- Being under water: sound about 4.3 times faster, so direction is mostly lost; little from the air
-  above; muffled, partly bone-conducted hearing; the ambient (rain on the surface overhead, snapping
-  shrimp in warm water); your own breath bubbles. Needs swimming and diving.
-- Boats as floating vehicles that pitch and roll, the hull heard from inside, and wavelets slapping it.
+After the triangle geometry and real terrain (geometry stage 3), which give water a surface and depth:
+- Under water: sound about 4.3 times faster, so direction is mostly lost; little from the air above;
+  muffled, partly bone-conducted hearing; rain on the surface overhead, snapping shrimp; your own breath
+  bubbles. Needs swimming and diving.
+- Boats as floating vehicles that pitch and roll, the hull heard from inside, wavelets slapping it.
+- Sea surf and shingle are on no map yet.
 
 ### Explosions
 Charge as TNT equivalent; peak overpressure and positive-phase duration from Kingery-Bulmash scaled
@@ -283,19 +310,43 @@ that breaks above an overpressure. Needs the loudness law fixed for very loud so
 ### Vehicles: what is still simple
 - Bodies: a driven car is about ten boxes; traffic cars are one box; no vehicle is in the acoustic
   scene, so nothing reflects off a car.
-- No suspension: one ground sample under the middle, no pitch or roll, a kerb lifts the whole car.
+- Suspension: a driven car pitches and rolls on four wheel rays, but has no springs; traffic has one
+  ground sample under the middle.
 - Brakes: ideal sharing by load, no brake torque, no wheel inertia, no ABS.
 - The server shifts instantly; the clutch exists only in the sound.
 - No belt or alternator whine of its own.
-- Fuel: a tank per vehicle, use from power (brake-specific fuel consumption), sputter and stall when
-  dry, gas stations with pumps, the nozzle click and the fill.
+- Fuel: a tank per vehicle, use from power, sputter and stall when dry, gas stations with pumps, the
+  nozzle click and the fill.
 - Road classes: the city has no highway. Arterials at 40-45 mph and highways at 65 mph, with lane
-  changes, on and off ramps (the ramps need shapes other than boxes).
+  changes, on and off ramps.
+
+### Vehicles
+- Crossing gates are sounds only: no arm in the world, nothing stops a player's car.
+- From the driver's seat a horn's first 0.15-0.3 s is about 16 dB louder than the rest (street-life
+  honks too): find what lets a loud close source through late.
+- The city's runway is 588 m: only the light single can land and take off on it.
+- In a car seat, cranking carries sub-20 Hz pressure 13-16 dB over everything audible. Decide with the
+  cabin model.
+- Cabin: 250 Hz-1 kHz and idle are still more alike in the two ears than a real cabin; the tread tone
+  is one tone in phase on every tyre.
+- The airliner's squeal note (430 Hz): a squeal or a groan? (Cody)
+- From the 2026-09-30 set-aside (they sound good):
+  - `Steepening` is capped at 1.5 (ExhaustNetwork.cs 122): the sports bike's 1.6 and the V-twin's 2.0
+    do nothing.
+  - `WallLossMultiplier` and the pickups' pipe size and steepening have no anchor.
+  - A narrow tailpipe radiates less bass (`Waveguide.cs`); not checked.
+  - `single` and `vtwin_stock` never measured on `--voice-levels`.
+  - The 2.8 turbo diesel is jet-heavy.
+  - Motorbike exhausts too long ("farting into a bottle"); about 0.5 m.
+  - The diesel pickup that sounds backwards (turbo lag, fuelling, gear changes).
+  - A V10 and a V12 from sourced firing orders and headers.
+  - One table for every preset: declared level, live level, bay leakage, extent.
+  - Buses about 5 dB under real life; a big cam's idle lope; the sports bike's pull-away surge.
 
 ### Shapes other than boxes
-Plan in docs/NEXT_CITY_10KM.md. Order: a wedge ramp and stairs from steps (medium); a height grid for
-terrain; full meshes later (the largest engine job so far). Ground in layers you can dig into is a
-voxel ground, a separate structure. Then forests, ocean maps and boats.
+Wedges, stairs and arches are built (geometry stage 2). Next is terrain (geometry stage 3); then the
+shape library and import (stage 4); diggable ground with strata (stage 5). Then forests, ocean maps and
+boats.
 
 ### Experience and badges
 Rules, categories and tiers in docs/PLAN_2026-10-05.md section 3: scored by difficulty and variety,
@@ -304,12 +355,11 @@ start now. `/profile` then shows level and badges.
 
 ### The wider world
 In order, each needing the one before: money (a ledger), banks, shops and selling, mail, NPC lives
-(home, job, a day's schedule).
+(home, job, a day's schedule). Then: what a body is for (selling it, once there is money).
 
 ### The sword and melee
 An "Iron Sword" item exists; nothing swings it. Model it like the doors: the blade's modes, the draw
-along the scabbard, the swing's air, strikes per material. Melee itself (swing, reach, block, hit)
-with it.
+along the scabbard, the swing's air, strikes per material. Melee itself (swing, reach, block, hit).
 
 ### Flying a helicopter
 Helicopters can be given and spawned but only stand. Flying needs its own controls (collective,
@@ -318,22 +368,23 @@ cyclic, pedals on keys). Giving jets later; the only jet is the airliner.
 ### People, phones and characters
 - Still to generate: the characters (gang crew, delivery driver, police and the rest) and the
   vocalisations, from `~/npc-lines-2026-09-28`; conversations then get their laughs.
-- The footstep bank's labels need a check by ear (`inbox/footstep-file-review-2026-09-28`, 193 clips).
-  Then jog and run by speed, scuffs on turns, a shoe per person.
+- The footstep bank's labels need a check by ear (`inbox/footstep-file-review-2026-09-28`, 193 clips)
+  (Cody). Then jog and run by speed, scuffs on turns, a shoe per person.
 - A phone model: ringtones through a small speaker, vibration on a table and in a pocket, the far side
   heard from the earpiece up close, coverage from cell towers later.
 - Two people walking together, sharing a line from `pairs.py`.
 - Characters: an east-end crew that warns a stranger in stages and shoots at the last; a delivery
   driver who knocks and calls out.
+- Alex: no shops on the city for him yet; cars do not yield to him.
 - Machines to model: elevators, garage doors, leaf blowers, fridges, smartphones, a piano that plays
   MIDI. What to record: `~/Desktop/openfps-sounds-to-source.md`.
 
 ### Building services (Cody: after the core sounds)
 Corridor ventilation, fridges, extractor fans, pipes, lift machinery and electrical hum as physical
-sources placed by the generator. Also an inner lobby door in the towers.
-Also asked 2026-10-05: gas stove burners (the piezo click, the gas, the flame), cookware (sizzle,
-boiling, a lid rattling), HVAC with ducts and vents, running water and sinks, and electricity with a
-power grid (substations and lines as data; an outage silences fridges, fans and lights).
+sources placed by the generator; an inner lobby door in the towers. Asked 2026-10-05: gas stove burners
+(the piezo click, the gas, the flame), cookware (sizzle, boiling, a lid rattling), HVAC with ducts and
+vents, and electricity with a power grid (substations and lines as data; an outage silences fridges,
+fans and lights). Taps, sinks and showers are built.
 
 ### A map's own sounds
 A map or server carries a sound pack: named cues (login, chat, menus, beacons), each a short
@@ -342,16 +393,7 @@ the player. Anything missing uses the built-in sound.
 
 ### The new city
 Plan: [docs/NEXT_CITY_10KM.md](docs/NEXT_CITY_10KM.md): a 10 x 10 km city, shapes other than boxes,
-and building a map in the game. Needs the roads and bodies work first.
-
-### Listen and confirm (older)
-- Arriving: "You're in <map>, at <zone>."; no "Under Shelter" at doorways.
-- Street life: honks, hard stops, cars parking.
-- Pedestrian and driver speech since the fix for the room-like copy.
-- Driving aids, now in the head.
-- The car starter in the game (inbox/starter-2026-10-02/).
-- The street washing into a lobby through an open door, and two rooms in.
-- Bus air brakes; the airliner's whine.
+and building a map in the game. After streaming stage 2 and real terrain.
 
 ### Load and stuck-voice checks
 Some may already be fixed; confirm before fixing again.
@@ -367,47 +409,19 @@ Some may already be fixed; confirm before fixing again.
 - A command to change a password (your own, and an admin resetting someone's).
 - A ban list, by name and by address.
 - `/restart` and `/reloadmap` for admins.
-- The default admin is `admin` / `admin123` unless `OPENFPS_ADMIN_PASSWORD` is set: make the first
-  run ask.
-- A failed port bind still logs "started". Fail loudly.
+- The default admin is `admin` / `admin123` unless `OPENFPS_ADMIN_PASSWORD` is set: make the first run
+  ask.
+- A failed port bind still logs "started" (`NetworkService.Start` ignores the result). Fail loudly.
 - `/savemap` rewrites a map as plain JSON and loses its comments.
 - Name locks and rate-limit counts are in memory and reset on restart.
-- The MUD listens on all interfaces in plain text. Decide whether a public server should listen for
-  it at all, or only on localhost.
+- The MUD listens on all interfaces in plain text. Decide whether a public server should listen for it
+  at all, or only on localhost (Cody).
 - Saving world state across restarts (vaporized and spawned things come back or vanish).
-
-### Vehicles
-- Driving controls and aids built 2026-10-06, not yet heard (docs/DRIVING_AIDS.md, inbox/driving-2026-10-06):
-  horn (H) and siren (U, Shift+U), indicators (J, L), the brake cue, rumble on the lines, the speed
-  limit, rails and gates, aircraft that land and roll out. To judge by ear: the brake cue's notes and
-  bands, the rail strike level (an assumption), the gate motor and clunk (assumptions).
-- Crossing gates are sounds only: no arm in the world, nothing stops a player's car.
-- From the driver's seat a horn's first 0.15-0.3 s is about 16 dB louder than the rest (street-life
-  honks too): find what lets a loud close source through late.
-- The city's runway is 588 m: only the light single can land and take off on it.
-- In a car seat, cranking carries sub-20 Hz pressure 13-16 dB over everything audible. Decide with
-  the cabin model.
-- From the 2026-09-30 set-aside (they sound good):
-  - `Steepening` is capped at 1.5 (`ExhaustNetwork.cs` 145): the sports bike's 1.6 and the V-twin's
-    2.0 do nothing.
-  - `WallLossMultiplier` and the pickups' pipe size and steepening have no anchor.
-  - A narrow tailpipe radiates less bass (`Waveguide.cs`); not checked.
-  - `single` and `vtwin_stock` never measured on `--voice-levels`.
-  - The 2.8 turbo diesel is jet-heavy.
-  - Motorbike exhausts too long ("farting into a bottle"); about 0.5 m.
-  - The diesel pickup that sounds backwards (turbo lag, fuelling, gear changes).
-  - A V10 and a V12 from sourced firing orders and headers.
-  - One table for every preset: declared level, live level, bay leakage, extent.
-  - Buses about 5 dB under real life; a big cam's idle lope; the sports bike's pull-away surge.
 
 ### Client
 - The client sends interact only within 3 m; the server allows 5 m.
 
 ### Sound synthesis to come
-- Rain on surfaces is being built (2026-10-05); wetness that lasts is not.
-- Wet roads: tyres +4-7 dB above 2 kHz.
-- Streams and surf.
-- Explosions (see Explosions above).
 - Refraction past 150 m; wind and temperature against height; turbulence.
 
 ## Later
@@ -415,25 +429,27 @@ Some may already be fixed; confirm before fixing again.
 ### Acoustics
 - Synthetic footsteps (parked 2026-09-28 after three failures by ear). If tried again: fit only the
   dry first 30-60 ms, give the heel the body's weight, and give each loose surface its own mechanism.
-- Aggregation: many distant sources heard as one extended source.
+- Aggregation for traffic and crowds: many distant sources heard as one extended source (woods done).
 - Fused early reflections (inside 50 ms) by convolution or delay taps.
-- One acoustic path per machine: a wall between you and one end of a bus is not modelled.
+- One acoustic path per machine: a wall between you and one end of a bus is not modelled; machines
+  with several radiators are still one point.
 - A check that the HRTF voice count holds through a crowd reaction.
+- Masking (partial loudness), designed in docs/EAR_MODEL.md.
 
 ### Engines and vehicles
 - Idle hunting on the NASCAR, muscle car and V10.
 - F1 above 12,300 rpm, and its airbox as a Helmholtz volume.
 - Exhaust pipe delays that follow gas temperature.
-- Tyres on gravel and wet roads.
+- Tyres on gravel.
 - Fit the body `Coupling` and `ShellLevel` to recordings.
-- Collision damage.
+- Collision damage (`DrivingSystem` has no impulse or damage).
 - Walking about inside a moving bus.
 - Getting into traffic cars.
 
 ### World and gameplay
 - The siren switches off at every short stop; real crews keep it on through a junction.
-- Elevators: the lift doors are modelled, but there is no car, shaft or machine, and none on the
-  city. Signal sounds in `inbox/elevator sounds`.
+- Elevators: the lift doors are modelled, but there is no car, shaft or machine, and none on the city.
+  Signal sounds in `inbox/elevator sounds`.
 - Crowds; gunfire as occasional world events.
 - A crowd murmur from the recorded chatter (8 or more talkers), for the grandstand and busy places.
 - Crowd reaction lines to generate: cheers, gasps, laughter, groans.
@@ -447,8 +463,7 @@ Some may already be fixed; confirm before fixing again.
 
 ## Ideas
 
-- Shapes other than boxes: curved kerbs, round columns, trees, and acoustics that handle them.
-- Airport take-offs and landings.
+- Curved kerbs, round columns, trees as shapes, and acoustics that handle them.
 - A real mourning dove; wing flaps when a flock is startled.
 - Walking speed: 4.5 m/s is a jog.
 - Mac client; a web version.
