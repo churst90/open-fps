@@ -113170,7 +113170,7 @@
     "Z": 0.7143
    },
    "Name": "21718 Meadowsweet Drive north wall",
-   "Tile": "-6,5",
+   "Tile": "-6,4",
    "Layer": "structure"
   },
   {
@@ -113193,7 +113193,7 @@
     "Z": 0.7143
    },
    "Name": "21718 Meadowsweet Drive north wall",
-   "Tile": "-6,5",
+   "Tile": "-6,4",
    "Layer": "structure"
   },
   {
@@ -113262,7 +113262,7 @@
     "Z": 8.5458
    },
    "Name": "21718 Meadowsweet Drive west wall",
-   "Tile": "-6,5",
+   "Tile": "-6,4",
    "Layer": "structure"
   },
   {
@@ -114326,7 +114326,7 @@
     "Z": 75.489
    },
    "Name": "24709 Sylvan Place southeast wall",
-   "Tile": "-6,3",
+   "Tile": "-6,4",
    "Layer": "structure"
   },
   {
@@ -120248,7 +120248,7 @@
     "Z": 0.7143
    },
    "Name": "21600 Silver Elms Place south wall",
-   "Tile": "-6,3",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -120363,7 +120363,7 @@
     "Z": 54.1448
    },
    "Name": "21600 Silver Elms Place west wall",
-   "Tile": "-6,3",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -121893,7 +121893,7 @@
     "Z": 1.4614
    },
    "Name": "21603 Satin Clover Court floor",
-   "Tile": "-5,2",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -121939,7 +121939,7 @@
     "Z": 1.4614
    },
    "Name": "21603 Satin Clover Court roof",
-   "Tile": "-5,2",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -121985,7 +121985,7 @@
     "Z": 117.6138
    },
    "Name": "21603 Satin Clover Court ceiling",
-   "Tile": "-5,2",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -122031,7 +122031,7 @@
     "Z": 1.4114
    },
    "Name": "21603 Satin Clover Court, house",
-   "Tile": "-5,2",
+   "Tile": "-5,3",
    "Layer": "rooms"
   },
   {
@@ -122100,7 +122100,7 @@
     "Z": 1.25
    },
    "Name": "21603 Satin Clover Court east wall",
-   "Tile": "-5,2",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -122146,7 +122146,7 @@
     "Z": 1.25
    },
    "Name": "21603 Satin Clover Court west wall",
-   "Tile": "-5,2",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -122169,7 +122169,7 @@
     "Z": 1.25
    },
    "Name": "21603 Satin Clover Court west wall",
-   "Tile": "-5,2",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -122215,7 +122215,7 @@
     "Z": 73.0683
    },
    "Name": "21603 Satin Clover Court south wall",
-   "Tile": "-5,2",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -122309,7 +122309,7 @@
     "Z": 1
    },
    "Name": "21603 Satin Clover Court front door",
-   "Tile": "-5,2",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -130660,7 +130660,7 @@
     "Z": 1.25
    },
    "Name": "25119 Sea Turtle Lane east wall",
-   "Tile": "-5,-1",
+   "Tile": "-5,-2",
    "Layer": "structure"
   },
   {
@@ -130752,7 +130752,7 @@
     "Z": 22.6434
    },
    "Name": "25119 Sea Turtle Lane north wall",
-   "Tile": "-5,-1",
+   "Tile": "-5,-2",
    "Layer": "structure"
   },
   {
@@ -130775,7 +130775,7 @@
     "Z": 40.255
    },
    "Name": "25119 Sea Turtle Lane north wall",
-   "Tile": "-5,-1",
+   "Tile": "-5,-2",
    "Layer": "structure"
   },
   {
@@ -133946,7 +133946,7 @@
     "Z": 22.1273
    },
    "Name": "26503 Country Hollow east wall",
-   "Tile": "-4,3",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -133969,7 +133969,7 @@
     "Z": 2.7143
    },
    "Name": "26503 Country Hollow east wall",
-   "Tile": "-4,3",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -133992,7 +133992,7 @@
     "Z": 22.1273
    },
    "Name": "26503 Country Hollow east wall",
-   "Tile": "-4,3",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -134017,7 +134017,7 @@
     "Z": 1
    },
    "Name": "26503 Country Hollow front door",
-   "Tile": "-4,3",
+   "Tile": "-5,3",
    "Layer": "structure"
   },
   {
@@ -134247,7 +134247,7 @@
     "Z": 72.6002
    },
    "Name": "20106 Turtle Dove Lane northeast wall",
-   "Tile": "-4,-1",
+   "Tile": "-5,-1",
    "Layer": "structure"
   },
   {
@@ -134525,7 +134525,7 @@
     "Z": 20.5417
    },
    "Name": "18030 Butera Road east wall",
-   "Tile": "-4,4",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -134688,7 +134688,7 @@
     "Z": 0.7143
    },
    "Name": "17869 Butera Road east wall",
-   "Tile": "-4,4",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -134757,7 +134757,7 @@
     "Z": 23.5613
    },
    "Name": "17869 Butera Road north wall",
-   "Tile": "-4,4",
+   "Tile": "-5,4",
    "Layer": "structure"
   },
   {
@@ -134943,7 +134943,7 @@
     "Z": 0.7143
    },
    "Name": "26241 Country Hollow east wall",
-   "Tile": "-4,2",
+   "Tile": "-5,2",
    "Layer": "structure"
   },
   {
@@ -134966,7 +134966,7 @@
     "Z": 0.7143
    },
    "Name": "26241 Country Hollow east wall",
-   "Tile": "-4,2",
+   "Tile": "-5,2",
    "Layer": "structure"
   },
   {
@@ -134989,7 +134989,7 @@
     "Z": 0.7143
    },
    "Name": "26241 Country Hollow east wall",
-   "Tile": "-4,2",
+   "Tile": "-5,2",
    "Layer": "structure"
   },
   {
@@ -135083,7 +135083,7 @@
     "Z": 1
    },
    "Name": "26241 Country Hollow front door",
-   "Tile": "-4,2",
+   "Tile": "-5,2",
    "Layer": "structure"
   },
   {
@@ -135129,7 +135129,7 @@
     "Z": 1.0873
    },
    "Name": "18006 Butera Road floor",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -135175,7 +135175,7 @@
     "Z": 1.0873
    },
    "Name": "18006 Butera Road roof",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -135221,7 +135221,7 @@
     "Z": 86.442
    },
    "Name": "18006 Butera Road ceiling",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -135267,7 +135267,7 @@
     "Z": 1.0373
    },
    "Name": "18006 Butera Road, house",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "rooms"
   },
   {
@@ -135313,7 +135313,7 @@
     "Z": 0.7143
    },
    "Name": "18006 Butera Road south wall",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -135336,7 +135336,7 @@
     "Z": 0.7143
    },
    "Name": "18006 Butera Road south wall",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -135382,7 +135382,7 @@
     "Z": 0.7143
    },
    "Name": "18006 Butera Road north wall",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -135451,7 +135451,7 @@
     "Z": 31.0658
    },
    "Name": "18006 Butera Road west wall",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -135545,7 +135545,7 @@
     "Z": 1
    },
    "Name": "18006 Butera Road front door",
-   "Tile": "-5,4",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -135867,7 +135867,7 @@
     "Z": 70.3469
    },
    "Name": "18011 Sea Turtle Court west wall",
-   "Tile": "-5,5",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -140890,7 +140890,7 @@
     "Z": 1.25
    },
    "Name": "26510 Country Hollow south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -140936,7 +140936,7 @@
     "Z": 38.0331
    },
    "Name": "26510 Country Hollow west wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -140959,7 +140959,7 @@
     "Z": 4.75
    },
    "Name": "26510 Country Hollow west wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -141030,7 +141030,7 @@
     "Z": 1
    },
    "Name": "26510 Country Hollow front door",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -145980,7 +145980,7 @@
     "Z": 28.1256
    },
    "Name": "26314 Country Hollow north wall",
-   "Tile": "-4,3",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -147161,7 +147161,7 @@
     "Z": 0.7959
    },
    "Name": "20003 Turtle Dove Lane floor",
-   "Tile": "-4,-1",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -147207,7 +147207,7 @@
     "Z": 0.7959
    },
    "Name": "20003 Turtle Dove Lane roof",
-   "Tile": "-4,-1",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -147253,7 +147253,7 @@
     "Z": 62.157
    },
    "Name": "20003 Turtle Dove Lane ceiling",
-   "Tile": "-4,-1",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -147299,7 +147299,7 @@
     "Z": 0.7459
    },
    "Name": "20003 Turtle Dove Lane, house",
-   "Tile": "-4,-1",
+   "Tile": "-4,-2",
    "Layer": "rooms"
   },
   {
@@ -147437,7 +147437,7 @@
     "Z": 1.25
    },
    "Name": "20003 Turtle Dove Lane north wall",
-   "Tile": "-4,-1",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -147460,7 +147460,7 @@
     "Z": 39.7942
    },
    "Name": "20003 Turtle Dove Lane west wall",
-   "Tile": "-4,-1",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -148432,7 +148432,7 @@
     "Z": 79.4425
    },
    "Name": "17911 Country Meadow Lane south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -156273,7 +156273,7 @@
     "Z": 1.25
    },
    "Name": "17911 Country Grove, building north wall",
-   "Tile": "-4,3",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -156296,7 +156296,7 @@
     "Z": 1.25
    },
    "Name": "17911 Country Grove, building north wall",
-   "Tile": "-4,3",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -156319,7 +156319,7 @@
     "Z": 1.25
    },
    "Name": "17911 Country Grove, building north wall",
-   "Tile": "-4,3",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -156390,7 +156390,7 @@
     "Z": 1
    },
    "Name": "17911 Country Grove, building door",
-   "Tile": "-4,3",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -159534,7 +159534,7 @@
     "Z": 45.5707
    },
    "Name": "17903 Country Meadow Lane south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -160600,7 +160600,7 @@
     "Z": 0.7143
    },
    "Name": "17807 Country Grove east wall",
-   "Tile": "-4,3",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -160646,7 +160646,7 @@
     "Z": 15.6005
    },
    "Name": "17807 Country Grove north wall",
-   "Tile": "-4,3",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -160669,7 +160669,7 @@
     "Z": 2.7143
    },
    "Name": "17807 Country Grove north wall",
-   "Tile": "-4,3",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -160692,7 +160692,7 @@
     "Z": 15.6005
    },
    "Name": "17807 Country Grove north wall",
-   "Tile": "-4,3",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -160786,7 +160786,7 @@
     "Z": 1
    },
    "Name": "17807 Country Grove front door",
-   "Tile": "-4,3",
+   "Tile": "-4,2",
    "Layer": "structure"
   },
   {
@@ -161434,7 +161434,7 @@
     "Z": 1.25
    },
    "Name": "19907 Turtle Creek Lane south wall",
-   "Tile": "-4,-3",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -161549,7 +161549,7 @@
     "Z": 44.1693
    },
    "Name": "19907 Turtle Creek Lane east wall",
-   "Tile": "-4,-3",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -165161,7 +165161,7 @@
     "Z": 77.954
    },
    "Name": "17815 Country Meadow Lane south wall",
-   "Tile": "-4,3",
+   "Tile": "-4,4",
    "Layer": "structure"
   },
   {
@@ -166018,7 +166018,7 @@
     "Z": 45.8563
    },
    "Name": "17811 Country Grove south wall",
-   "Tile": "-4,2",
+   "Tile": "-4,3",
    "Layer": "structure"
   },
   {
@@ -166969,7 +166969,7 @@
     "Z": 0.7143
    },
    "Name": "17961 Sea Turtle Lane east wall",
-   "Tile": "-4,4",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -167061,7 +167061,7 @@
     "Z": 26.3471
    },
    "Name": "17961 Sea Turtle Lane south wall",
-   "Tile": "-4,4",
+   "Tile": "-4,5",
    "Layer": "structure"
   },
   {
@@ -168081,7 +168081,7 @@
     "Z": 1.6865
    },
    "Name": "17725 Country Crest Street floor",
-   "Tile": "-3,1",
+   "Tile": "-4,1",
    "Layer": "structure"
   },
   {
@@ -168127,7 +168127,7 @@
     "Z": 1.6865
    },
    "Name": "17725 Country Crest Street roof",
-   "Tile": "-3,1",
+   "Tile": "-4,1",
    "Layer": "structure"
   },
   {
@@ -168173,7 +168173,7 @@
     "Z": 136.3776
    },
    "Name": "17725 Country Crest Street ceiling",
-   "Tile": "-3,1",
+   "Tile": "-4,1",
    "Layer": "structure"
   },
   {
@@ -168219,7 +168219,7 @@
     "Z": 1.6365
    },
    "Name": "17725 Country Crest Street, house",
-   "Tile": "-3,1",
+   "Tile": "-4,1",
    "Layer": "rooms"
   },
   {
@@ -168265,7 +168265,7 @@
     "Z": 0.7143
    },
    "Name": "17725 Country Crest Street south wall",
-   "Tile": "-3,1",
+   "Tile": "-4,1",
    "Layer": "structure"
   },
   {
@@ -168288,7 +168288,7 @@
     "Z": 0.7143
    },
    "Name": "17725 Country Crest Street north wall",
-   "Tile": "-3,1",
+   "Tile": "-4,1",
    "Layer": "structure"
   },
   {
@@ -168380,7 +168380,7 @@
     "Z": 22.7362
    },
    "Name": "17725 Country Crest Street east wall",
-   "Tile": "-3,1",
+   "Tile": "-4,1",
    "Layer": "structure"
   },
   {
@@ -168403,7 +168403,7 @@
     "Z": 2.7143
    },
    "Name": "17725 Country Crest Street east wall",
-   "Tile": "-3,1",
+   "Tile": "-4,1",
    "Layer": "structure"
   },
   {
@@ -168426,7 +168426,7 @@
     "Z": 22.7362
    },
    "Name": "17725 Country Crest Street east wall",
-   "Tile": "-3,1",
+   "Tile": "-4,1",
    "Layer": "structure"
   },
   {
@@ -168451,7 +168451,7 @@
     "Z": 1
    },
    "Name": "17725 Country Crest Street front door",
-   "Tile": "-3,1",
+   "Tile": "-4,1",
    "Layer": "structure"
   },
   {
@@ -168635,7 +168635,7 @@
     "Z": 0.7143
    },
    "Name": "19903 Turtle Creek Lane north wall",
-   "Tile": "-3,-2",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -168681,7 +168681,7 @@
     "Z": 25.6782
    },
    "Name": "19903 Turtle Creek Lane east wall",
-   "Tile": "-3,-2",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -168867,7 +168867,7 @@
     "Z": 0.7143
    },
    "Name": "19920 Turtle Creek Lane south wall",
-   "Tile": "-3,-2",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -168890,7 +168890,7 @@
     "Z": 0.7143
    },
    "Name": "19920 Turtle Creek Lane north wall",
-   "Tile": "-3,-2",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -168936,7 +168936,7 @@
     "Z": 31.6169
    },
    "Name": "19920 Turtle Creek Lane east wall",
-   "Tile": "-3,-2",
+   "Tile": "-4,-2",
    "Layer": "structure"
   },
   {
@@ -168984,7 +168984,7 @@
     "Z": 1.0106
    },
    "Name": "26402 Country Woods Trail floor",
-   "Tile": "-4,2",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -169030,7 +169030,7 @@
     "Z": 1.0106
    },
    "Name": "26402 Country Woods Trail roof",
-   "Tile": "-4,2",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -169076,7 +169076,7 @@
     "Z": 80.0482
    },
    "Name": "26402 Country Woods Trail ceiling",
-   "Tile": "-4,2",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -169122,7 +169122,7 @@
     "Z": 0.9606
    },
    "Name": "26402 Country Woods Trail, house",
-   "Tile": "-4,2",
+   "Tile": "-3,2",
    "Layer": "rooms"
   },
   {
@@ -169168,7 +169168,7 @@
     "Z": 0.7143
    },
    "Name": "26402 Country Woods Trail south wall",
-   "Tile": "-4,2",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -169191,7 +169191,7 @@
     "Z": 0.7143
    },
    "Name": "26402 Country Woods Trail south wall",
-   "Tile": "-4,2",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -169214,7 +169214,7 @@
     "Z": 0.7143
    },
    "Name": "26402 Country Woods Trail south wall",
-   "Tile": "-4,2",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -169260,7 +169260,7 @@
     "Z": 0.7143
    },
    "Name": "26402 Country Woods Trail north wall",
-   "Tile": "-4,2",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -169306,7 +169306,7 @@
     "Z": 28.8737
    },
    "Name": "26402 Country Woods Trail west wall",
-   "Tile": "-4,2",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -169400,7 +169400,7 @@
     "Z": 1
    },
    "Name": "26402 Country Woods Trail front door",
-   "Tile": "-4,2",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -169423,7 +169423,7 @@
     "Z": 1.7134
    },
    "Name": "17811 Country Meadow Lane floor",
-   "Tile": "-4,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -169446,7 +169446,7 @@
     "Z": 1.7134
    },
    "Name": "17811 Country Meadow Lane roof",
-   "Tile": "-4,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -169469,7 +169469,7 @@
     "Z": 138.6147
    },
    "Name": "17811 Country Meadow Lane ceiling",
-   "Tile": "-4,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -169492,7 +169492,7 @@
     "Z": 1.6634
    },
    "Name": "17811 Country Meadow Lane, house",
-   "Tile": "-4,4",
+   "Tile": "-3,4",
    "Layer": "rooms"
   },
   {
@@ -169538,7 +169538,7 @@
     "Z": 1.25
    },
    "Name": "17811 Country Meadow Lane west wall",
-   "Tile": "-4,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -169561,7 +169561,7 @@
     "Z": 85.6688
    },
    "Name": "17811 Country Meadow Lane south wall",
-   "Tile": "-4,3",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -169607,7 +169607,7 @@
     "Z": 4.75
    },
    "Name": "17811 Country Meadow Lane north wall",
-   "Tile": "-4,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -169630,7 +169630,7 @@
     "Z": 40.4594
    },
    "Name": "17811 Country Meadow Lane north wall",
-   "Tile": "-4,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -169655,7 +169655,7 @@
     "Z": 1
    },
    "Name": "17811 Country Meadow Lane front door",
-   "Tile": "-4,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -169793,7 +169793,7 @@
     "Z": 1.25
    },
    "Name": "19914 Turtle Dove Lane south wall",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -169885,7 +169885,7 @@
     "Z": 20.0241
    },
    "Name": "19914 Turtle Dove Lane west wall",
-   "Tile": "-4,-1",
+   "Tile": "-3,-1",
    "Layer": "structure"
   },
   {
@@ -169979,7 +169979,7 @@
     "Z": 0.3501
    },
    "Name": "17803 Country Grove, building floor",
-   "Tile": "-4,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -170025,7 +170025,7 @@
     "Z": 0.3501
    },
    "Name": "17803 Country Grove, building roof",
-   "Tile": "-4,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -170071,7 +170071,7 @@
     "Z": 0.3001
    },
    "Name": "17803 Country Grove, building",
-   "Tile": "-4,3",
+   "Tile": "-3,3",
    "Layer": "rooms"
   },
   {
@@ -170094,7 +170094,7 @@
     "Z": 1.25
    },
    "Name": "17803 Country Grove, building west wall",
-   "Tile": "-4,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -170232,7 +170232,7 @@
     "Z": 17.5031
    },
    "Name": "17803 Country Grove, building south wall",
-   "Tile": "-4,3",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -172224,7 +172224,7 @@
     "Z": 15.7263
    },
    "Name": "19815 Turtle Creek Lane, building north wall",
-   "Tile": "-3,-2",
+   "Tile": "-3,-3",
    "Layer": "structure"
   },
   {
@@ -172247,7 +172247,7 @@
     "Z": 4.75
    },
    "Name": "19815 Turtle Creek Lane, building north wall",
-   "Tile": "-3,-2",
+   "Tile": "-3,-3",
    "Layer": "structure"
   },
   {
@@ -172270,7 +172270,7 @@
     "Z": 15.7263
    },
    "Name": "19815 Turtle Creek Lane, building north wall",
-   "Tile": "-3,-2",
+   "Tile": "-3,-3",
    "Layer": "structure"
   },
   {
@@ -172295,7 +172295,7 @@
     "Z": 1
    },
    "Name": "19815 Turtle Creek Lane, building door",
-   "Tile": "-3,-2",
+   "Tile": "-3,-3",
    "Layer": "structure"
   },
   {
@@ -173221,7 +173221,7 @@
     "Z": 46.5294
    },
    "Name": "17807 Country Meadow Lane south wall",
-   "Tile": "-3,3",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -175374,7 +175374,7 @@
     "Z": 15.5122
    },
    "Name": "26618 Sea Turtle Lane south wall",
-   "Tile": "-3,4",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -178129,7 +178129,7 @@
     "Z": 50.9466
    },
    "Name": "17803 Country Meadow Lane south wall",
-   "Tile": "-3,3",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -182623,7 +182623,7 @@
     "Z": 1.68
    },
    "Name": "17719 Country Meadow Lane floor",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -182646,7 +182646,7 @@
     "Z": 1.68
    },
    "Name": "17719 Country Meadow Lane roof",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -182669,7 +182669,7 @@
     "Z": 135.8329
    },
    "Name": "17719 Country Meadow Lane ceiling",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -182692,7 +182692,7 @@
     "Z": 1.63
    },
    "Name": "17719 Country Meadow Lane, house",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "rooms"
   },
   {
@@ -182738,7 +182738,7 @@
     "Z": 0.7143
    },
    "Name": "17719 Country Meadow Lane north wall",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -182761,7 +182761,7 @@
     "Z": 47.9999
    },
    "Name": "17719 Country Meadow Lane west wall",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -182807,7 +182807,7 @@
     "Z": 2.7143
    },
    "Name": "17719 Country Meadow Lane east wall",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -182830,7 +182830,7 @@
     "Z": 22.6428
    },
    "Name": "17719 Country Meadow Lane east wall",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -182855,7 +182855,7 @@
     "Z": 1
    },
    "Name": "17719 Country Meadow Lane front door",
-   "Tile": "-3,4",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -185654,7 +185654,7 @@
     "Z": 43.8927
    },
    "Name": "26203 Country Woods Trail south wall",
-   "Tile": "-3,1",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -186233,7 +186233,7 @@
     "Z": 13.1034
    },
    "Name": "19821 Turtle Dove Lane north wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -186256,7 +186256,7 @@
     "Z": 2.7143
    },
    "Name": "19821 Turtle Dove Lane north wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -186279,7 +186279,7 @@
     "Z": 13.1034
    },
    "Name": "19821 Turtle Dove Lane north wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -186350,7 +186350,7 @@
     "Z": 1
    },
    "Name": "19821 Turtle Dove Lane front door",
-   "Tile": "-3,-1",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -187345,7 +187345,7 @@
     "Z": 0.7931
    },
    "Name": "17710 Country Bend floor",
-   "Tile": "-3,3",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -187391,7 +187391,7 @@
     "Z": 0.7931
    },
    "Name": "17710 Country Bend roof",
-   "Tile": "-3,3",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -187437,7 +187437,7 @@
     "Z": 61.9274
    },
    "Name": "17710 Country Bend ceiling",
-   "Tile": "-3,3",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -187483,7 +187483,7 @@
     "Z": 0.7431
    },
    "Name": "17710 Country Bend, house",
-   "Tile": "-3,3",
+   "Tile": "-3,2",
    "Layer": "rooms"
   },
   {
@@ -187598,7 +187598,7 @@
     "Z": 0.7143
    },
    "Name": "17710 Country Bend south wall",
-   "Tile": "-3,3",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -187621,7 +187621,7 @@
     "Z": 0.7143
    },
    "Name": "17710 Country Bend north wall",
-   "Tile": "-3,3",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -187667,7 +187667,7 @@
     "Z": 22.6608
    },
    "Name": "17710 Country Bend west wall",
-   "Tile": "-3,3",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -187713,7 +187713,7 @@
     "Z": 22.6608
    },
    "Name": "17710 Country Bend east wall",
-   "Tile": "-3,3",
+   "Tile": "-3,2",
    "Layer": "structure"
   },
   {
@@ -195119,7 +195119,7 @@
     "Z": 18.5719
    },
    "Name": "19779 Turtle Dove Lane north wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -195142,7 +195142,7 @@
     "Z": 2.7143
    },
    "Name": "19779 Turtle Dove Lane north wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -195165,7 +195165,7 @@
     "Z": 18.5719
    },
    "Name": "19779 Turtle Dove Lane north wall",
-   "Tile": "-3,-1",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -195190,7 +195190,7 @@
     "Z": 1
    },
    "Name": "19779 Turtle Dove Lane front door",
-   "Tile": "-3,-1",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -197550,7 +197550,7 @@
     "Z": 1.25
    },
    "Name": "17597 Country Meadow Lane southeast wall",
-   "Tile": "-3,2",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -197596,7 +197596,7 @@
     "Z": 81.0889
    },
    "Name": "17597 Country Meadow Lane southwest wall",
-   "Tile": "-3,2",
+   "Tile": "-3,3",
    "Layer": "structure"
   },
   {
@@ -198359,7 +198359,7 @@
     "Z": 29.6153
    },
    "Name": "19711 Turtle Creek Lane south wall",
-   "Tile": "-3,-3",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -198984,7 +198984,7 @@
     "Z": 52.8894
    },
    "Name": "26602 Sunset Lane east wall",
-   "Tile": "-2,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -199887,7 +199887,7 @@
     "Z": 1.25
    },
    "Name": "19710 Turtle Creek Lane south wall",
-   "Tile": "-2,-2",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -199956,7 +199956,7 @@
     "Z": 53.1862
    },
    "Name": "19710 Turtle Creek Lane east wall",
-   "Tile": "-2,-2",
+   "Tile": "-3,-2",
    "Layer": "structure"
   },
   {
@@ -200234,7 +200234,7 @@
     "Z": 1.25
    },
    "Name": "26606 Sunset Lane north wall",
-   "Tile": "-2,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -200395,7 +200395,7 @@
     "Z": 24.3882
    },
    "Name": "26606 Sunset Lane east wall",
-   "Tile": "-2,4",
+   "Tile": "-3,4",
    "Layer": "structure"
   },
   {
@@ -200673,7 +200673,7 @@
     "Z": 44.5176
    },
    "Name": "26710 Sunset Lane east wall",
-   "Tile": "-2,5",
+   "Tile": "-3,5",
    "Layer": "structure"
   },
   {
@@ -200721,7 +200721,7 @@
     "Z": 1.5285
    },
    "Name": "17591 Country Meadow Lane floor",
-   "Tile": "-3,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -200744,7 +200744,7 @@
     "Z": 1.5285
    },
    "Name": "17591 Country Meadow Lane roof",
-   "Tile": "-3,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -200767,7 +200767,7 @@
     "Z": 123.2063
    },
    "Name": "17591 Country Meadow Lane ceiling",
-   "Tile": "-3,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -200790,7 +200790,7 @@
     "Z": 1.4785
    },
    "Name": "17591 Country Meadow Lane, house",
-   "Tile": "-3,2",
+   "Tile": "-2,2",
    "Layer": "rooms"
   },
   {
@@ -200836,7 +200836,7 @@
     "Z": 0.7143
    },
    "Name": "17591 Country Meadow Lane northwest wall",
-   "Tile": "-3,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -200859,7 +200859,7 @@
     "Z": 43.6707
    },
    "Name": "17591 Country Meadow Lane southwest wall",
-   "Tile": "-3,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -200976,7 +200976,7 @@
     "Z": 1.9134
    },
    "Name": "19710 Turtle Dove Lane floor",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -201022,7 +201022,7 @@
     "Z": 1.9134
    },
    "Name": "19710 Turtle Dove Lane roof",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -201068,7 +201068,7 @@
     "Z": 155.2792
    },
    "Name": "19710 Turtle Dove Lane ceiling",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -201114,7 +201114,7 @@
     "Z": 1.8634
    },
    "Name": "19710 Turtle Dove Lane, house",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "rooms"
   },
   {
@@ -201160,7 +201160,7 @@
     "Z": 0.7143
    },
    "Name": "19710 Turtle Dove Lane south wall",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -201183,7 +201183,7 @@
     "Z": 0.7143
    },
    "Name": "19710 Turtle Dove Lane south wall",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -201275,7 +201275,7 @@
     "Z": 0.7143
    },
    "Name": "19710 Turtle Dove Lane north wall",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -201298,7 +201298,7 @@
     "Z": 54.6672
    },
    "Name": "19710 Turtle Dove Lane west wall",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -201392,7 +201392,7 @@
     "Z": 1
    },
    "Name": "19710 Turtle Dove Lane front door",
-   "Tile": "-3,-1",
+   "Tile": "-2,-1",
    "Layer": "structure"
   },
   {
@@ -201438,7 +201438,7 @@
     "Z": 0.3087
    },
    "Name": "26610 Sunset Lane floor",
-   "Tile": "-3,4",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -201484,7 +201484,7 @@
     "Z": 0.3087
    },
    "Name": "26610 Sunset Lane roof",
-   "Tile": "-3,4",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -201530,7 +201530,7 @@
     "Z": 21.5558
    },
    "Name": "26610 Sunset Lane ceiling",
-   "Tile": "-3,4",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -201576,7 +201576,7 @@
     "Z": 0.2587
    },
    "Name": "26610 Sunset Lane, house",
-   "Tile": "-3,4",
+   "Tile": "-2,4",
    "Layer": "rooms"
   },
   {
@@ -201645,7 +201645,7 @@
     "Z": 0.7143
    },
    "Name": "26610 Sunset Lane north wall",
-   "Tile": "-3,4",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -201668,7 +201668,7 @@
     "Z": 10.4017
    },
    "Name": "26610 Sunset Lane west wall",
-   "Tile": "-3,4",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -201691,7 +201691,7 @@
     "Z": 2.7143
    },
    "Name": "26610 Sunset Lane west wall",
-   "Tile": "-3,4",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -201714,7 +201714,7 @@
     "Z": 10.4017
    },
    "Name": "26610 Sunset Lane west wall",
-   "Tile": "-3,4",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -201785,7 +201785,7 @@
     "Z": 1
    },
    "Name": "26610 Sunset Lane front door",
-   "Tile": "-3,4",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -208056,7 +208056,7 @@
     "Z": 0.7143
    },
    "Name": "17590 Country Meadow Lane southwest wall",
-   "Tile": "-2,2",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -208079,7 +208079,7 @@
     "Z": 0.7143
    },
    "Name": "17590 Country Meadow Lane southwest wall",
-   "Tile": "-2,2",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -208240,7 +208240,7 @@
     "Z": 65.1585
    },
    "Name": "17590 Country Meadow Lane southeast wall",
-   "Tile": "-2,2",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -208265,7 +208265,7 @@
     "Z": 1
    },
    "Name": "17590 Country Meadow Lane front door",
-   "Tile": "-2,2",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -211643,7 +211643,7 @@
     "Z": 32.4912
    },
    "Name": "26665 North Barnett Lane north wall",
-   "Tile": "-2,5",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -215090,7 +215090,7 @@
     "Z": 1.25
    },
    "Name": "19615 Turtle Creek Lane south wall",
-   "Tile": "-2,-3",
+   "Tile": "-2,-2",
    "Layer": "structure"
   },
   {
@@ -221455,7 +221455,7 @@
     "Z": 1.25
    },
    "Name": "17558 Country Meadow Lane north wall",
-   "Tile": "-2,2",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -229160,7 +229160,7 @@
     "Z": 1.25
    },
    "Name": "19607 Turtle Creek Lane south wall",
-   "Tile": "-2,-3",
+   "Tile": "-2,-2",
    "Layer": "structure"
   },
   {
@@ -234087,7 +234087,7 @@
     "Z": 37.4409
    },
    "Name": "26614 North Marek Lane north wall",
-   "Tile": "-2,5",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -235868,7 +235868,7 @@
     "Z": 32.2778
    },
    "Name": "24551 Spencer Boulevard northeast wall",
-   "Tile": "-2,-5",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -238506,7 +238506,7 @@
     "Z": 38.0256
    },
    "Name": "17523 Country Mile east wall",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -238529,7 +238529,7 @@
     "Z": 2.7143
    },
    "Name": "17523 Country Mile east wall",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -238552,7 +238552,7 @@
     "Z": 38.0256
    },
    "Name": "17523 Country Mile east wall",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -238577,7 +238577,7 @@
     "Z": 1
    },
    "Name": "17523 Country Mile front door",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -238784,7 +238784,7 @@
     "Z": 53.2865
    },
    "Name": "17511 Country Mile east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -238807,7 +238807,7 @@
     "Z": 4.75
    },
    "Name": "17511 Country Mile east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -238830,7 +238830,7 @@
     "Z": 53.2865
    },
    "Name": "17511 Country Mile east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -238855,7 +238855,7 @@
     "Z": 1
    },
    "Name": "17511 Country Mile front door",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -239085,7 +239085,7 @@
     "Z": 43.7057
    },
    "Name": "26522 South Marek Lane east wall",
-   "Tile": "-1,4",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -239432,7 +239432,7 @@
     "Z": 0.7143
    },
    "Name": "26514 South Marek Lane east wall",
-   "Tile": "-1,4",
+   "Tile": "-2,4",
    "Layer": "structure"
   },
   {
@@ -239733,7 +239733,7 @@
     "Z": 9.1451
    },
    "Name": "24811 Spencer Boulevard east wall",
-   "Tile": "-1,-4",
+   "Tile": "-2,-4",
    "Layer": "structure"
   },
   {
@@ -239756,7 +239756,7 @@
     "Z": 4.75
    },
    "Name": "24811 Spencer Boulevard east wall",
-   "Tile": "-1,-4",
+   "Tile": "-2,-4",
    "Layer": "structure"
   },
   {
@@ -239779,7 +239779,7 @@
     "Z": 9.1451
    },
    "Name": "24811 Spencer Boulevard east wall",
-   "Tile": "-1,-4",
+   "Tile": "-2,-4",
    "Layer": "structure"
   },
   {
@@ -239804,7 +239804,7 @@
     "Z": 1
    },
    "Name": "24811 Spencer Boulevard front door",
-   "Tile": "-1,-4",
+   "Tile": "-2,-4",
    "Layer": "structure"
   },
   {
@@ -240011,7 +240011,7 @@
     "Z": 36.704
    },
    "Name": "17551 Country Mile east wall",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -240034,7 +240034,7 @@
     "Z": 4.75
    },
    "Name": "17551 Country Mile east wall",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -240057,7 +240057,7 @@
     "Z": 36.704
    },
    "Name": "17551 Country Mile east wall",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -240082,7 +240082,7 @@
     "Z": 1
    },
    "Name": "17551 Country Mile front door",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -240289,7 +240289,7 @@
     "Z": 1.25
    },
    "Name": "19589 Turtle Dove Lane north wall",
-   "Tile": "-1,-2",
+   "Tile": "-2,-2",
    "Layer": "structure"
   },
   {
@@ -240335,7 +240335,7 @@
     "Z": 39.0906
    },
    "Name": "19589 Turtle Dove Lane east wall",
-   "Tile": "-1,-2",
+   "Tile": "-2,-2",
    "Layer": "structure"
   },
   {
@@ -240544,7 +240544,7 @@
     "Z": 0.7143
    },
    "Name": "26506 South Marek Lane east wall",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -240845,7 +240845,7 @@
     "Z": 21.2066
    },
    "Name": "17505 Country Mile east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -240868,7 +240868,7 @@
     "Z": 2.7143
    },
    "Name": "17505 Country Mile east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -240891,7 +240891,7 @@
     "Z": 21.2066
    },
    "Name": "17505 Country Mile east wall",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -240916,7 +240916,7 @@
     "Z": 1
    },
    "Name": "17505 Country Mile front door",
-   "Tile": "-1,1",
+   "Tile": "-2,1",
    "Layer": "structure"
   },
   {
@@ -240939,7 +240939,7 @@
     "Z": 1.965
    },
    "Name": "17557 Country Mile floor",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -240985,7 +240985,7 @@
     "Z": 1.965
    },
    "Name": "17557 Country Mile roof",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -241031,7 +241031,7 @@
     "Z": 159.586
    },
    "Name": "17557 Country Mile ceiling",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -241077,7 +241077,7 @@
     "Z": 1.915
    },
    "Name": "17557 Country Mile, house",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "rooms"
   },
   {
@@ -241169,7 +241169,7 @@
     "Z": 0.7143
    },
    "Name": "17557 Country Mile east wall",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -241192,7 +241192,7 @@
     "Z": 0.7143
    },
    "Name": "17557 Country Mile east wall",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -241215,7 +241215,7 @@
     "Z": 0.7143
    },
    "Name": "17557 Country Mile east wall",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -241238,7 +241238,7 @@
     "Z": 0.7143
    },
    "Name": "17557 Country Mile east wall",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -241307,7 +241307,7 @@
     "Z": 17.275
    },
    "Name": "17557 Country Mile north wall",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -241330,7 +241330,7 @@
     "Z": 56.1438
    },
    "Name": "17557 Country Mile south wall",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -241355,7 +241355,7 @@
     "Z": 1
    },
    "Name": "17557 Country Mile front door",
-   "Tile": "-1,3",
+   "Tile": "-2,3",
    "Layer": "structure"
   },
   {
@@ -241401,7 +241401,7 @@
     "Z": 1.151
    },
    "Name": "17517 Country Mile floor",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -241447,7 +241447,7 @@
     "Z": 1.151
    },
    "Name": "17517 Country Mile roof",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -241493,7 +241493,7 @@
     "Z": 91.7508
    },
    "Name": "17517 Country Mile ceiling",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -241539,7 +241539,7 @@
     "Z": 1.101
    },
    "Name": "17517 Country Mile, house",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "rooms"
   },
   {
@@ -241585,7 +241585,7 @@
     "Z": 0.7143
    },
    "Name": "17517 Country Mile south wall",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -241654,7 +241654,7 @@
     "Z": 12.8684
    },
    "Name": "17517 Country Mile east wall",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -241677,7 +241677,7 @@
     "Z": 15.0859
    },
    "Name": "17517 Country Mile east wall",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -241700,7 +241700,7 @@
     "Z": 2.7143
    },
    "Name": "17517 Country Mile east wall",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -241723,7 +241723,7 @@
     "Z": 15.0859
    },
    "Name": "17517 Country Mile east wall",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -241748,7 +241748,7 @@
     "Z": 1
    },
    "Name": "17517 Country Mile front door",
-   "Tile": "-1,2",
+   "Tile": "-2,2",
    "Layer": "structure"
   },
   {
@@ -241886,7 +241886,7 @@
     "Z": 0.7143
    },
    "Name": "19584 Turtle Creek Lane east wall",
-   "Tile": "-1,-2",
+   "Tile": "-2,-2",
    "Layer": "structure"
   },
   {
@@ -241978,7 +241978,7 @@
     "Z": 18.9494
    },
    "Name": "19584 Turtle Creek Lane south wall",
-   "Tile": "-1,-2",
+   "Tile": "-2,-2",
    "Layer": "structure"
   },
   {
@@ -242141,7 +242141,7 @@
     "Z": 0.7143
    },
    "Name": "24507 Spencer Boulevard east wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242164,7 +242164,7 @@
     "Z": 0.7143
    },
    "Name": "24507 Spencer Boulevard east wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242187,7 +242187,7 @@
     "Z": 0.7143
    },
    "Name": "24507 Spencer Boulevard east wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242258,7 +242258,7 @@
     "Z": 1
    },
    "Name": "24507 Spencer Boulevard front door",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242442,7 +242442,7 @@
     "Z": 12.8216
    },
    "Name": "24419 Spencer Boulevard east wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242465,7 +242465,7 @@
     "Z": 2.7143
    },
    "Name": "24419 Spencer Boulevard east wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242488,7 +242488,7 @@
     "Z": 12.8216
    },
    "Name": "24419 Spencer Boulevard east wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242513,7 +242513,7 @@
     "Z": 1
    },
    "Name": "24419 Spencer Boulevard front door",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242559,7 +242559,7 @@
     "Z": 0.4912
    },
    "Name": "10 Abel Road floor",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242605,7 +242605,7 @@
     "Z": 0.4912
    },
    "Name": "10 Abel Road roof",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242651,7 +242651,7 @@
     "Z": 36.7644
    },
    "Name": "10 Abel Road ceiling",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242697,7 +242697,7 @@
     "Z": 0.4412
    },
    "Name": "10 Abel Road, house",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "rooms"
   },
   {
@@ -242720,7 +242720,7 @@
     "Z": 1.25
    },
    "Name": "10 Abel Road south wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242812,7 +242812,7 @@
     "Z": 1.25
    },
    "Name": "10 Abel Road north wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242881,7 +242881,7 @@
     "Z": 24.5586
    },
    "Name": "10 Abel Road west wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242904,7 +242904,7 @@
     "Z": 39.2938
    },
    "Name": "10 Abel Road east wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242927,7 +242927,7 @@
     "Z": 24.5586
    },
    "Name": "10 Abel Road east wall",
-   "Tile": "-1,-6",
+   "Tile": "-2,-6",
    "Layer": "structure"
   },
   {
@@ -242975,7 +242975,7 @@
     "Z": 1.0733
    },
    "Name": "24993 Spencer Boulevard floor",
-   "Tile": "-1,-3",
+   "Tile": "-2,-3",
    "Layer": "structure"
   },
   {
@@ -242998,7 +242998,7 @@
     "Z": 1.0733
    },
    "Name": "24993 Spencer Boulevard roof",
-   "Tile": "-1,-3",
+   "Tile": "-2,-3",
    "Layer": "structure"
   },
   {
@@ -243021,7 +243021,7 @@
     "Z": 85.2783
    },
    "Name": "24993 Spencer Boulevard ceiling",
-   "Tile": "-1,-3",
+   "Tile": "-2,-3",
    "Layer": "structure"
   },
   {
@@ -243044,7 +243044,7 @@
     "Z": 1.0233
    },
    "Name": "24993 Spencer Boulevard, house",
-   "Tile": "-1,-3",
+   "Tile": "-2,-3",
    "Layer": "rooms"
   },
   {
@@ -243067,7 +243067,7 @@
     "Z": 1.25
    },
    "Name": "24993 Spencer Boulevard east wall",
-   "Tile": "-1,-3",
+   "Tile": "-2,-3",
    "Layer": "structure"
   },
   {
@@ -243090,7 +243090,7 @@
     "Z": 1.25
    },
    "Name": "24993 Spencer Boulevard east wall",
-   "Tile": "-1,-3",
+   "Tile": "-2,-3",
    "Layer": "structure"
   },
   {
@@ -243113,7 +243113,7 @@
     "Z": 1.25
    },
    "Name": "24993 Spencer Boulevard east wall",
-   "Tile": "-1,-3",
+   "Tile": "-2,-3",
    "Layer": "structure"
   },
   {
@@ -243182,7 +243182,7 @@
     "Z": 53.667
    },
    "Name": "24993 Spencer Boulevard north wall",
-   "Tile": "-1,-3",
+   "Tile": "-2,-3",
    "Layer": "structure"
   },
   {
@@ -243207,7 +243207,7 @@
     "Z": 1
    },
    "Name": "24993 Spencer Boulevard front door",
-   "Tile": "-1,-3",
+   "Tile": "-2,-3",
    "Layer": "structure"
   },
   {
@@ -243230,7 +243230,7 @@
     "Z": 1.755
    },
    "Name": "17533 Country Star floor",
-   "Tile": "-2,2",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -243253,7 +243253,7 @@
     "Z": 1.755
    },
    "Name": "17533 Country Star roof",
-   "Tile": "-2,2",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -243276,7 +243276,7 @@
     "Z": 142.0811
    },
    "Name": "17533 Country Star ceiling",
-   "Tile": "-2,2",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -243299,7 +243299,7 @@
     "Z": 1.705
    },
    "Name": "17533 Country Star, house",
-   "Tile": "-2,2",
+   "Tile": "-1,2",
    "Layer": "rooms"
   },
   {
@@ -243322,7 +243322,7 @@
     "Z": 1.25
    },
    "Name": "17533 Country Star south wall",
-   "Tile": "-2,2",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -243345,7 +243345,7 @@
     "Z": 1.25
    },
    "Name": "17533 Country Star north wall",
-   "Tile": "-2,2",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -243368,7 +243368,7 @@
     "Z": 1.25
    },
    "Name": "17533 Country Star north wall",
-   "Tile": "-2,2",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -243414,7 +243414,7 @@
     "Z": 87.7487
    },
    "Name": "17533 Country Star west wall",
-   "Tile": "-2,2",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -243462,7 +243462,7 @@
     "Z": 1
    },
    "Name": "17533 Country Star front door",
-   "Tile": "-2,2",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -243485,7 +243485,7 @@
     "Z": 1.034
    },
    "Name": "19515 Turtle Creek Lane floor",
-   "Tile": "-1,-2",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243508,7 +243508,7 @@
     "Z": 0.4924
    },
    "Name": "19515 Turtle Creek Lane floor",
-   "Tile": "-2,-3",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243531,7 +243531,7 @@
     "Z": 1.034
    },
    "Name": "19515 Turtle Creek Lane roof",
-   "Tile": "-1,-2",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243554,7 +243554,7 @@
     "Z": 0.4924
    },
    "Name": "19515 Turtle Creek Lane roof",
-   "Tile": "-2,-3",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243577,7 +243577,7 @@
     "Z": 82.0014
    },
    "Name": "19515 Turtle Creek Lane ceiling",
-   "Tile": "-1,-2",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243600,7 +243600,7 @@
     "Z": 36.8657
    },
    "Name": "19515 Turtle Creek Lane ceiling",
-   "Tile": "-2,-3",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243623,7 +243623,7 @@
     "Z": 0.984
    },
    "Name": "19515 Turtle Creek Lane, house",
-   "Tile": "-1,-2",
+   "Tile": "-1,-3",
    "Layer": "rooms"
   },
   {
@@ -243646,7 +243646,7 @@
     "Z": 0.4424
    },
    "Name": "19515 Turtle Creek Lane, house",
-   "Tile": "-2,-3",
+   "Tile": "-1,-3",
    "Layer": "rooms"
   },
   {
@@ -243669,7 +243669,7 @@
     "Z": 0.7143
    },
    "Name": "19515 Turtle Creek Lane east wall",
-   "Tile": "-1,-2",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243715,7 +243715,7 @@
     "Z": 0.7143
    },
    "Name": "19515 Turtle Creek Lane west wall",
-   "Tile": "-2,-3",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243738,7 +243738,7 @@
     "Z": 14.0683
    },
    "Name": "19515 Turtle Creek Lane south wall",
-   "Tile": "-2,-3",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243784,7 +243784,7 @@
     "Z": 13.4145
    },
    "Name": "19515 Turtle Creek Lane north wall",
-   "Tile": "-1,-2",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243807,7 +243807,7 @@
     "Z": 2.7143
    },
    "Name": "19515 Turtle Creek Lane north wall",
-   "Tile": "-1,-2",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243830,7 +243830,7 @@
     "Z": 13.4145
    },
    "Name": "19515 Turtle Creek Lane north wall",
-   "Tile": "-2,-2",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -243855,7 +243855,7 @@
     "Z": 1
    },
    "Name": "19515 Turtle Creek Lane front door",
-   "Tile": "-1,-2",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -244154,7 +244154,7 @@
     "Z": 0.7143
    },
    "Name": "24807 Spencer Boulevard west wall",
-   "Tile": "-2,-4",
+   "Tile": "-1,-4",
    "Layer": "structure"
   },
   {
@@ -244340,7 +244340,7 @@
     "Z": 0.7143
    },
    "Name": "24615 Spencer Boulevard, building west wall",
-   "Tile": "-2,-5",
+   "Tile": "-1,-5",
    "Layer": "structure"
   },
   {
@@ -244618,7 +244618,7 @@
     "Z": 1.25
    },
    "Name": "17417 Country Skies west wall",
-   "Tile": "-2,1",
+   "Tile": "-1,1",
    "Layer": "structure"
   },
   {
@@ -245080,7 +245080,7 @@
     "Z": 1.25
    },
    "Name": "24909 Spencer Boulevard west wall",
-   "Tile": "-2,-3",
+   "Tile": "-1,-3",
    "Layer": "structure"
   },
   {
@@ -253159,7 +253159,7 @@
     "Z": 28.4387
    },
    "Name": "26615 North Carrol Lane north wall",
-   "Tile": "-1,5",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -254728,7 +254728,7 @@
     "Z": 14.4381
    },
    "Name": "19563 Turtle Dove Lane north wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -254751,7 +254751,7 @@
     "Z": 4.75
    },
    "Name": "19563 Turtle Dove Lane north wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -254774,7 +254774,7 @@
     "Z": 14.4381
    },
    "Name": "19563 Turtle Dove Lane north wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -254822,7 +254822,7 @@
     "Z": 1
    },
    "Name": "19563 Turtle Dove Lane front door",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -275019,7 +275019,7 @@
     "Z": 0.2981
    },
    "Name": "19503 Turtle Dove Lane floor",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -275088,7 +275088,7 @@
     "Z": 0.2981
    },
    "Name": "19503 Turtle Dove Lane roof",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -275111,7 +275111,7 @@
     "Z": 0.1491
    },
    "Name": "19503 Turtle Dove Lane roof",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -275157,7 +275157,7 @@
     "Z": 20.6765
    },
    "Name": "19503 Turtle Dove Lane ceiling",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -275410,7 +275410,7 @@
     "Z": 0.2481
    },
    "Name": "19503 Turtle Dove Lane, den",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "rooms"
   },
   {
@@ -275433,7 +275433,7 @@
     "Z": 0.2481
    },
    "Name": "19503 Turtle Dove Lane den floor",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "interiors"
   },
   {
@@ -276215,7 +276215,7 @@
     "Z": 1.25
    },
    "Name": "19503 Turtle Dove Lane north wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -276238,7 +276238,7 @@
     "Z": 0.25
    },
    "Name": "19503 Turtle Dove Lane north wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "interiors"
   },
   {
@@ -276261,7 +276261,7 @@
     "Z": 14.9059
    },
    "Name": "19503 Turtle Dove Lane west wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -276284,7 +276284,7 @@
     "Z": 24.8432
    },
    "Name": "19503 Turtle Dove Lane west wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "interiors"
   },
   {
@@ -290097,7 +290097,7 @@
     "Z": 5.0
    },
    "Name": "19415 Turtle Dove Lane, barn north wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -290120,7 +290120,7 @@
     "Z": 5.0
    },
    "Name": "19415 Turtle Dove Lane, barn north wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -290143,7 +290143,7 @@
     "Z": 5.0
    },
    "Name": "19415 Turtle Dove Lane, barn north wall",
-   "Tile": "-1,-1",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -298349,7 +298349,7 @@
     "Z": 1.25
    },
    "Name": "24711 Doe Trail south wall",
-   "Tile": "-1,-5",
+   "Tile": "-1,-4",
    "Layer": "structure"
   },
   {
@@ -303942,7 +303942,7 @@
     "Z": 11.5607
    },
    "Name": "17479 Pine Lane north wall",
-   "Tile": "-1,3",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -303965,7 +303965,7 @@
     "Z": 2.7143
    },
    "Name": "17479 Pine Lane north wall",
-   "Tile": "-1,3",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -303988,7 +303988,7 @@
     "Z": 11.5607
    },
    "Name": "17479 Pine Lane north wall",
-   "Tile": "-1,3",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -304036,7 +304036,7 @@
     "Z": 1
    },
    "Name": "17479 Pine Lane front door",
-   "Tile": "-1,3",
+   "Tile": "-1,2",
    "Layer": "structure"
   },
   {
@@ -304590,7 +304590,7 @@
     "Z": 15.6242
    },
    "Name": "17474 Oak Lane north wall",
-   "Tile": "-1,2",
+   "Tile": "-1,1",
    "Layer": "structure"
   },
   {
@@ -317612,7 +317612,7 @@
     "Z": 51.4474
    },
    "Name": "19406 Turtle Creek Lane east wall",
-   "Tile": "0,-2",
+   "Tile": "-1,-2",
    "Layer": "structure"
   },
   {
@@ -317890,7 +317890,7 @@
     "Z": 30.8824
    },
    "Name": "17408 Butera Road east wall",
-   "Tile": "0,4",
+   "Tile": "-1,4",
    "Layer": "structure"
   },
   {
@@ -318099,7 +318099,7 @@
     "Z": 0.709
    },
    "Name": "19406 Turtle Dove Lane, garage",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "rooms"
   },
   {
@@ -318812,7 +318812,7 @@
     "Z": 1.25
    },
    "Name": "19406 Turtle Dove Lane south wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -318835,7 +318835,7 @@
     "Z": 1.25
    },
    "Name": "19406 Turtle Dove Lane south wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -318927,7 +318927,7 @@
     "Z": 0.25
    },
    "Name": "19406 Turtle Dove Lane south wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -318950,7 +318950,7 @@
     "Z": 0.25
    },
    "Name": "19406 Turtle Dove Lane south wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -319019,7 +319019,7 @@
     "Z": 1.25
    },
    "Name": "19406 Turtle Dove Lane north wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -319088,7 +319088,7 @@
     "Z": 0.25
    },
    "Name": "19406 Turtle Dove Lane north wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -319157,7 +319157,7 @@
     "Z": 44.9664
    },
    "Name": "19406 Turtle Dove Lane east wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -319180,7 +319180,7 @@
     "Z": 74.944
    },
    "Name": "19406 Turtle Dove Lane east wall",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "interiors"
   },
   {
@@ -319253,7 +319253,7 @@
     "Z": 1.2
    },
    "Name": "19406 Turtle Dove Lane garage door",
-   "Tile": "0,-1",
+   "Tile": "-1,-1",
    "Layer": "structure"
   },
   {
@@ -319482,7 +319482,7 @@
     "Z": 1.25
    },
    "Name": "17414 Walnut Lane south wall",
-   "Tile": "-1,2",
+   "Tile": "0,2",
    "Layer": "structure"
   },
   {
@@ -319574,7 +319574,7 @@
     "Z": 59.8213
    },
    "Name": "17414 Walnut Lane west wall",
-   "Tile": "-1,2",
+   "Tile": "0,2",
    "Layer": "structure"
   },
   {
@@ -319829,7 +319829,7 @@
     "Z": 1.25
    },
    "Name": "17422 Willow Way west wall",
-   "Tile": "-1,2",
+   "Tile": "0,2",
    "Layer": "structure"
   },
   {
@@ -320337,7 +320337,7 @@
     "Z": 0.7143
    },
    "Name": "16314 Antelope Lane south wall",
-   "Tile": "-1,1",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -320383,7 +320383,7 @@
     "Z": 25.7465
    },
    "Name": "16314 Antelope Lane west wall",
-   "Tile": "-1,1",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -320753,7 +320753,7 @@
     "Z": 1.25
    },
    "Name": "24951 Doe Trail north wall",
-   "Tile": "-1,-3",
+   "Tile": "0,-3",
    "Layer": "structure"
   },
   {
@@ -320799,7 +320799,7 @@
     "Z": 30.2807
    },
    "Name": "24951 Doe Trail west wall",
-   "Tile": "-1,-3",
+   "Tile": "0,-3",
    "Layer": "structure"
   },
   {
@@ -321332,7 +321332,7 @@
     "Z": 44.9629
    },
    "Name": "17415 Willow Way west wall",
-   "Tile": "-1,2",
+   "Tile": "0,2",
    "Layer": "structure"
   },
   {
@@ -321403,7 +321403,7 @@
     "Z": 0.9622
    },
    "Name": "26527 South Dogwood Lane floor",
-   "Tile": "0,4",
+   "Tile": "0,3",
    "Layer": "structure"
   },
   {
@@ -321449,7 +321449,7 @@
     "Z": 0.9622
    },
    "Name": "26527 South Dogwood Lane roof",
-   "Tile": "0,4",
+   "Tile": "0,3",
    "Layer": "structure"
   },
   {
@@ -321495,7 +321495,7 @@
     "Z": 76.0145
    },
    "Name": "26527 South Dogwood Lane ceiling",
-   "Tile": "0,4",
+   "Tile": "0,3",
    "Layer": "structure"
   },
   {
@@ -321541,7 +321541,7 @@
     "Z": 0.9122
    },
    "Name": "26527 South Dogwood Lane, house",
-   "Tile": "0,4",
+   "Tile": "0,3",
    "Layer": "rooms"
   },
   {
@@ -321679,7 +321679,7 @@
     "Z": 0.7143
    },
    "Name": "26527 South Dogwood Lane north wall",
-   "Tile": "0,4",
+   "Tile": "0,3",
    "Layer": "structure"
   },
   {
@@ -321702,7 +321702,7 @@
     "Z": 27.4907
    },
    "Name": "26527 South Dogwood Lane west wall",
-   "Tile": "0,4",
+   "Tile": "0,3",
    "Layer": "structure"
   },
   {
@@ -321748,7 +321748,7 @@
     "Z": 46.3001
    },
    "Name": "26527 South Dogwood Lane east wall",
-   "Tile": "0,4",
+   "Tile": "0,3",
    "Layer": "structure"
   },
   {
@@ -325313,7 +325313,7 @@
     "Z": 5.0714
    },
    "Name": "19403 Turtle Dove Lane north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "structure"
   },
   {
@@ -325336,7 +325336,7 @@
     "Z": 2.7143
    },
    "Name": "19403 Turtle Dove Lane north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "structure"
   },
   {
@@ -325359,7 +325359,7 @@
     "Z": 15.4092
    },
    "Name": "19403 Turtle Dove Lane north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "structure"
   },
   {
@@ -325382,7 +325382,7 @@
     "Z": 14.7917
    },
    "Name": "19403 Turtle Dove Lane north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "interiors"
   },
   {
@@ -325405,7 +325405,7 @@
     "Z": 7.9167
    },
    "Name": "19403 Turtle Dove Lane north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "interiors"
   },
   {
@@ -325428,7 +325428,7 @@
     "Z": 44.9435
    },
    "Name": "19403 Turtle Dove Lane north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "interiors"
   },
   {
@@ -325453,7 +325453,7 @@
     "Z": 1
    },
    "Name": "19403 Turtle Dove Lane front door",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "structure"
   },
   {
@@ -330372,7 +330372,7 @@
     "Z": 71.5555
    },
    "Name": "19403 Turtle Dove Lane, barn north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "structure"
   },
   {
@@ -330395,7 +330395,7 @@
     "Z": 60.0
    },
    "Name": "19403 Turtle Dove Lane, barn north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "structure"
   },
   {
@@ -330418,7 +330418,7 @@
     "Z": 71.5555
    },
    "Name": "19403 Turtle Dove Lane, barn north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "structure"
   },
   {
@@ -339543,7 +339543,7 @@
     "Z": 44.5575
    },
    "Name": "24510 Doe Trail south wall",
-   "Tile": "0,-6",
+   "Tile": "0,-5",
    "Layer": "structure"
   },
   {
@@ -339821,7 +339821,7 @@
     "Z": 54.7787
    },
    "Name": "26659 North Dogwood Lane south wall",
-   "Tile": "0,4",
+   "Tile": "0,5",
    "Layer": "structure"
   },
   {
@@ -352332,7 +352332,7 @@
     "Z": 15.9903
    },
    "Name": "17406 Oak Lane south wall",
-   "Tile": "0,1",
+   "Tile": "0,2",
    "Layer": "structure"
   },
   {
@@ -352355,7 +352355,7 @@
     "Z": 4.75
    },
    "Name": "17406 Oak Lane south wall",
-   "Tile": "0,1",
+   "Tile": "0,2",
    "Layer": "structure"
   },
   {
@@ -352378,7 +352378,7 @@
     "Z": 15.9903
    },
    "Name": "17406 Oak Lane south wall",
-   "Tile": "0,1",
+   "Tile": "0,2",
    "Layer": "structure"
   },
   {
@@ -352403,7 +352403,7 @@
     "Z": 1
    },
    "Name": "17406 Oak Lane front door",
-   "Tile": "0,1",
+   "Tile": "0,2",
    "Layer": "structure"
   },
   {
@@ -356655,7 +356655,7 @@
     "Z": 51.0049
    },
    "Name": "19315 Turtle Dove Lane, barn north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "structure"
   },
   {
@@ -356678,7 +356678,7 @@
     "Z": 60.0
    },
    "Name": "19315 Turtle Dove Lane, barn north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "structure"
   },
   {
@@ -356701,7 +356701,7 @@
     "Z": 51.0049
    },
    "Name": "19315 Turtle Dove Lane, barn north wall",
-   "Tile": "0,-1",
+   "Tile": "0,-2",
    "Layer": "structure"
   },
   {
@@ -363004,7 +363004,7 @@
     "Z": 32.4719
    },
    "Name": "26612 Weir Way south wall",
-   "Tile": "0,4",
+   "Tile": "0,5",
    "Layer": "structure"
   },
   {
@@ -363353,7 +363353,7 @@
     "Z": 0.7031
    },
    "Name": "17340 Oak Lane floor",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -363399,7 +363399,7 @@
     "Z": 0.7031
    },
    "Name": "17340 Oak Lane roof",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -363445,7 +363445,7 @@
     "Z": 54.4255
    },
    "Name": "17340 Oak Lane ceiling",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -363491,7 +363491,7 @@
     "Z": 0.6531
    },
    "Name": "17340 Oak Lane, house",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "rooms"
   },
   {
@@ -363606,7 +363606,7 @@
     "Z": 0.7143
    },
    "Name": "17340 Oak Lane north wall",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -363629,7 +363629,7 @@
     "Z": 0.7143
    },
    "Name": "17340 Oak Lane north wall",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -363675,7 +363675,7 @@
     "Z": 20.0887
    },
    "Name": "17340 Oak Lane west wall",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -363698,7 +363698,7 @@
     "Z": 20.0887
    },
    "Name": "17340 Oak Lane east wall",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -363721,7 +363721,7 @@
     "Z": 14.3491
    },
    "Name": "17340 Oak Lane east wall",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -373178,7 +373178,7 @@
     "Z": 0.7143
    },
    "Name": "26614 Weir Way north wall",
-   "Tile": "0,5",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -373201,7 +373201,7 @@
     "Z": 0.7143
    },
    "Name": "26614 Weir Way north wall",
-   "Tile": "0,5",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -373224,7 +373224,7 @@
     "Z": 0.7143
    },
    "Name": "26614 Weir Way north wall",
-   "Tile": "0,5",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -373295,7 +373295,7 @@
     "Z": 1
    },
    "Name": "26614 Weir Way front door",
-   "Tile": "0,5",
+   "Tile": "0,4",
    "Layer": "structure"
   },
   {
@@ -394608,7 +394608,7 @@
     "Z": 87.6736
    },
    "Name": "16217 Beaver Lane, workshop east wall",
-   "Tile": "1,-1",
+   "Tile": "0,-1",
    "Layer": "structure"
   },
   {
@@ -395442,7 +395442,7 @@
     "Z": 0.098
    },
    "Name": "16230 Longneck Drive, hall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "rooms"
   },
   {
@@ -395465,7 +395465,7 @@
     "Z": 0.098
    },
    "Name": "16230 Longneck Drive hall floor",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -395488,7 +395488,7 @@
     "Z": 0.4284
    },
    "Name": "16230 Longneck Drive, bedroom 2",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "rooms"
   },
   {
@@ -395511,7 +395511,7 @@
     "Z": 0.4284
    },
    "Name": "16230 Longneck Drive bedroom 2 floor",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -395534,7 +395534,7 @@
     "Z": 0.4284
    },
    "Name": "16230 Longneck Drive, bedroom 3",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "rooms"
   },
   {
@@ -395557,7 +395557,7 @@
     "Z": 0.4284
    },
    "Name": "16230 Longneck Drive bedroom 3 floor",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -395580,7 +395580,7 @@
     "Z": 0.4284
    },
    "Name": "16230 Longneck Drive, bathroom",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "rooms"
   },
   {
@@ -395603,7 +395603,7 @@
     "Z": 0.4284
    },
    "Name": "16230 Longneck Drive bathroom floor",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -395626,7 +395626,7 @@
     "Z": 0.4284
    },
    "Name": "16230 Longneck Drive, main bedroom",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "rooms"
   },
   {
@@ -395649,7 +395649,7 @@
     "Z": 0.4284
    },
    "Name": "16230 Longneck Drive main bedroom floor",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -395718,7 +395718,7 @@
     "Z": 2.2222
    },
    "Name": "16230 Longneck Drive bed",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -395741,7 +395741,7 @@
     "Z": 2.2222
    },
    "Name": "16230 Longneck Drive bed",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -395764,7 +395764,7 @@
     "Z": 2.2222
    },
    "Name": "16230 Longneck Drive bed",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396017,7 +396017,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive living room wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396040,7 +396040,7 @@
     "Z": 1.25
    },
    "Name": "16230 Longneck Drive living room wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396063,7 +396063,7 @@
     "Z": 6.37
    },
    "Name": "16230 Longneck Drive living room wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396086,7 +396086,7 @@
     "Z": 1.25
    },
    "Name": "16230 Longneck Drive living room wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396109,7 +396109,7 @@
     "Z": 38.2838
    },
    "Name": "16230 Longneck Drive living room wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396132,7 +396132,7 @@
     "Z": 38.2838
    },
    "Name": "16230 Longneck Drive kitchen wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396155,7 +396155,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396178,7 +396178,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396201,7 +396201,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396224,7 +396224,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396247,7 +396247,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396270,7 +396270,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396293,7 +396293,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396316,7 +396316,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396339,7 +396339,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396362,7 +396362,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396385,7 +396385,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396408,7 +396408,7 @@
     "Z": 1.0
    },
    "Name": "16230 Longneck Drive hall wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396431,7 +396431,7 @@
     "Z": 38.2838
    },
    "Name": "16230 Longneck Drive bedroom 2 wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396454,7 +396454,7 @@
     "Z": 38.2838
    },
    "Name": "16230 Longneck Drive bathroom wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396569,7 +396569,7 @@
     "Z": 0.7143
    },
    "Name": "16230 Longneck Drive south wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -396684,7 +396684,7 @@
     "Z": 0.25
    },
    "Name": "16230 Longneck Drive south wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396753,7 +396753,7 @@
     "Z": 0.7143
    },
    "Name": "16230 Longneck Drive north wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -396822,7 +396822,7 @@
     "Z": 0.25
    },
    "Name": "16230 Longneck Drive north wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -396891,7 +396891,7 @@
     "Z": 29.3946
    },
    "Name": "16230 Longneck Drive east wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "structure"
   },
   {
@@ -396914,7 +396914,7 @@
     "Z": 85.7343
    },
    "Name": "16230 Longneck Drive east wall",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -397065,7 +397065,7 @@
    "RegionAId": 17427,
    "RegionBId": 17431,
    "ApertureSize": 0.7644056413719909,
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -397090,7 +397090,7 @@
     "Z": 1
    },
    "Name": "16230 Longneck Drive bedroom 2 door",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -397115,7 +397115,7 @@
     "Z": 1
    },
    "Name": "16230 Longneck Drive bedroom 3 door",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -397140,7 +397140,7 @@
     "Z": 1
    },
    "Name": "16230 Longneck Drive bathroom door",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -397165,7 +397165,7 @@
     "Z": 1
    },
    "Name": "16230 Longneck Drive main bedroom door",
-   "Tile": "1,0",
+   "Tile": "0,0",
    "Layer": "interiors"
   },
   {
@@ -397303,7 +397303,7 @@
     "Z": 1.25
    },
    "Name": "17311 Jui Lane east wall",
-   "Tile": "1,1",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -397326,7 +397326,7 @@
     "Z": 9.2612
    },
    "Name": "17311 Jui Lane north wall",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -397349,7 +397349,7 @@
     "Z": 4.75
    },
    "Name": "17311 Jui Lane north wall",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -397372,7 +397372,7 @@
     "Z": 9.2612
    },
    "Name": "17311 Jui Lane north wall",
-   "Tile": "1,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -397420,7 +397420,7 @@
     "Z": 1
    },
    "Name": "17311 Jui Lane front door",
-   "Tile": "0,2",
+   "Tile": "0,1",
    "Layer": "structure"
   },
   {
@@ -397535,7 +397535,7 @@
     "Z": 1.25
    },
    "Name": "19206 Turtle Creek Way southeast wall",
-   "Tile": "0,-2",
+   "Tile": "1,-2",
    "Layer": "structure"
   },
   {
@@ -397604,7 +397604,7 @@
     "Z": 1.25
    },
    "Name": "19206 Turtle Creek Way northwest wall",
-   "Tile": "0,-2",
+   "Tile": "1,-2",
    "Layer": "structure"
   },
   {
@@ -397627,7 +397627,7 @@
     "Z": 44.406
    },
    "Name": "19206 Turtle Creek Way southwest wall",
-   "Tile": "0,-2",
+   "Tile": "1,-2",
    "Layer": "structure"
   },
   {
@@ -397721,7 +397721,7 @@
     "Z": 1.4923
    },
    "Name": "16206 Beaver Lane floor",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -397744,7 +397744,7 @@
     "Z": 1.4923
    },
    "Name": "16206 Beaver Lane roof",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -397767,7 +397767,7 @@
     "Z": 0.7461
    },
    "Name": "16206 Beaver Lane roof",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -397790,7 +397790,7 @@
     "Z": 120.1877
    },
    "Name": "16206 Beaver Lane ceiling",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -397882,7 +397882,7 @@
     "Z": 0.7897
    },
    "Name": "16206 Beaver Lane, living room",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "rooms"
   },
   {
@@ -397905,7 +397905,7 @@
     "Z": 0.7897
    },
    "Name": "16206 Beaver Lane living room floor",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -397928,7 +397928,7 @@
     "Z": 0.6405
    },
    "Name": "16206 Beaver Lane, kitchen",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "rooms"
   },
   {
@@ -397951,7 +397951,7 @@
     "Z": 0.6405
    },
    "Name": "16206 Beaver Lane kitchen floor",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -397974,7 +397974,7 @@
     "Z": 1.4423
    },
    "Name": "16206 Beaver Lane, bathroom",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "rooms"
   },
   {
@@ -397997,7 +397997,7 @@
     "Z": 1.4423
    },
    "Name": "16206 Beaver Lane bathroom floor",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398020,7 +398020,7 @@
     "Z": 1.4423
    },
    "Name": "16206 Beaver Lane, main bedroom",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "rooms"
   },
   {
@@ -398043,7 +398043,7 @@
     "Z": 1.4423
    },
    "Name": "16206 Beaver Lane main bedroom floor",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398066,7 +398066,7 @@
     "Z": 1.0
    },
    "Name": "16206 Beaver Lane sofa",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398089,7 +398089,7 @@
     "Z": 2.0
    },
    "Name": "16206 Beaver Lane kitchen counter",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398112,7 +398112,7 @@
     "Z": 2.2222
    },
    "Name": "16206 Beaver Lane bed",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398319,7 +398319,7 @@
     "Z": 1.0
    },
    "Name": "16206 Beaver Lane living room wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398342,7 +398342,7 @@
     "Z": 1.0
    },
    "Name": "16206 Beaver Lane living room wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398388,7 +398388,7 @@
     "Z": 30.8641
    },
    "Name": "16206 Beaver Lane living room wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398411,7 +398411,7 @@
     "Z": 6.6667
    },
    "Name": "16206 Beaver Lane living room wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398434,7 +398434,7 @@
     "Z": 30.8641
    },
    "Name": "16206 Beaver Lane living room wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398457,7 +398457,7 @@
     "Z": 24.6464
    },
    "Name": "16206 Beaver Lane kitchen wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398480,7 +398480,7 @@
     "Z": 6.6667
    },
    "Name": "16206 Beaver Lane kitchen wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398503,7 +398503,7 @@
     "Z": 24.6464
    },
    "Name": "16206 Beaver Lane kitchen wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398526,7 +398526,7 @@
     "Z": 58.8438
    },
    "Name": "16206 Beaver Lane bathroom wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398549,7 +398549,7 @@
     "Z": 6.6667
    },
    "Name": "16206 Beaver Lane bathroom wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398572,7 +398572,7 @@
     "Z": 58.8438
    },
    "Name": "16206 Beaver Lane bathroom wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398595,7 +398595,7 @@
     "Z": 1.25
    },
    "Name": "16206 Beaver Lane south wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -398618,7 +398618,7 @@
     "Z": 1.25
    },
    "Name": "16206 Beaver Lane south wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -398710,7 +398710,7 @@
     "Z": 0.25
    },
    "Name": "16206 Beaver Lane south wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398733,7 +398733,7 @@
     "Z": 0.25
    },
    "Name": "16206 Beaver Lane south wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398825,7 +398825,7 @@
     "Z": 1.25
    },
    "Name": "16206 Beaver Lane north wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -398848,7 +398848,7 @@
     "Z": 1.25
    },
    "Name": "16206 Beaver Lane north wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -398894,7 +398894,7 @@
     "Z": 0.25
    },
    "Name": "16206 Beaver Lane north wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398917,7 +398917,7 @@
     "Z": 0.25
    },
    "Name": "16206 Beaver Lane north wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -398963,7 +398963,7 @@
     "Z": 74.6126
    },
    "Name": "16206 Beaver Lane west wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -398986,7 +398986,7 @@
     "Z": 124.3544
    },
    "Name": "16206 Beaver Lane west wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399057,7 +399057,7 @@
     "Z": 1
    },
    "Name": "16206 Beaver Lane front door",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -399082,7 +399082,7 @@
     "Z": 1
    },
    "Name": "16206 Beaver Lane back door",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -399169,7 +399169,7 @@
    "RegionAId": 17537,
    "RegionBId": 17539,
    "ApertureSize": 1.6,
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399194,7 +399194,7 @@
     "Z": 1
    },
    "Name": "16206 Beaver Lane bathroom door",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399219,7 +399219,7 @@
     "Z": 1
    },
    "Name": "16206 Beaver Lane bathroom door",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399244,7 +399244,7 @@
     "Z": 1
    },
    "Name": "16206 Beaver Lane bathroom door",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399474,7 +399474,7 @@
     "Z": 0.9015
    },
    "Name": "16207 Longneck Drive, bathroom",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "rooms"
   },
   {
@@ -399497,7 +399497,7 @@
     "Z": 0.9015
    },
    "Name": "16207 Longneck Drive bathroom floor",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399520,7 +399520,7 @@
     "Z": 0.9015
    },
    "Name": "16207 Longneck Drive, main bedroom",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "rooms"
   },
   {
@@ -399543,7 +399543,7 @@
     "Z": 0.9015
    },
    "Name": "16207 Longneck Drive main bedroom floor",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399612,7 +399612,7 @@
     "Z": 2.2222
    },
    "Name": "16207 Longneck Drive bed",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399727,7 +399727,7 @@
     "Z": 1.0
    },
    "Name": "16207 Longneck Drive living room wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399796,7 +399796,7 @@
     "Z": 18.4722
    },
    "Name": "16207 Longneck Drive living room wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399819,7 +399819,7 @@
     "Z": 6.6667
    },
    "Name": "16207 Longneck Drive living room wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399842,7 +399842,7 @@
     "Z": 18.4722
    },
    "Name": "16207 Longneck Drive living room wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399865,7 +399865,7 @@
     "Z": 14.5076
    },
    "Name": "16207 Longneck Drive kitchen wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399888,7 +399888,7 @@
     "Z": 6.6667
    },
    "Name": "16207 Longneck Drive kitchen wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399911,7 +399911,7 @@
     "Z": 14.5076
    },
    "Name": "16207 Longneck Drive kitchen wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399934,7 +399934,7 @@
     "Z": 36.3131
    },
    "Name": "16207 Longneck Drive bathroom wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399957,7 +399957,7 @@
     "Z": 6.6667
    },
    "Name": "16207 Longneck Drive bathroom wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -399980,7 +399980,7 @@
     "Z": 36.3131
    },
    "Name": "16207 Longneck Drive bathroom wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -400003,7 +400003,7 @@
     "Z": 0.7143
    },
    "Name": "16207 Longneck Drive south wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -400072,7 +400072,7 @@
     "Z": 0.25
    },
    "Name": "16207 Longneck Drive south wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -400141,7 +400141,7 @@
     "Z": 0.7143
    },
    "Name": "16207 Longneck Drive north wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -400256,7 +400256,7 @@
     "Z": 0.25
    },
    "Name": "16207 Longneck Drive north wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -400371,7 +400371,7 @@
     "Z": 27.1861
    },
    "Name": "16207 Longneck Drive west wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "structure"
   },
   {
@@ -400394,7 +400394,7 @@
     "Z": 79.2929
    },
    "Name": "16207 Longneck Drive west wall",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -400577,7 +400577,7 @@
     "Z": 1
    },
    "Name": "16207 Longneck Drive bathroom door",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -400602,7 +400602,7 @@
     "Z": 1
    },
    "Name": "16207 Longneck Drive bathroom door",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -400627,7 +400627,7 @@
     "Z": 1
    },
    "Name": "16207 Longneck Drive bathroom door",
-   "Tile": "0,0",
+   "Tile": "1,0",
    "Layer": "interiors"
   },
   {
@@ -400742,7 +400742,7 @@
     "Z": 1.25
    },
    "Name": "19207 Turtle Creek Lane west wall",
-   "Tile": "0,-3",
+   "Tile": "1,-3",
    "Layer": "structure"
   },
   {
@@ -401112,7 +401112,7 @@
     "Z": 34.4908
    },
    "Name": "17310 McIntosh Circle west wall",
-   "Tile": "0,1",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -403127,7 +403127,7 @@
     "Z": 1.25
    },
    "Name": "17277 Pinion Creek Road south wall",
-   "Tile": "1,1",
+   "Tile": "1,2",
    "Layer": "structure"
   },
   {
@@ -410195,7 +410195,7 @@
     "Z": 0.7143
    },
    "Name": "17715 Pinion Creek Road north wall",
-   "Tile": "1,2",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -410218,7 +410218,7 @@
     "Z": 0.7143
    },
    "Name": "17715 Pinion Creek Road north wall",
-   "Tile": "1,2",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -410241,7 +410241,7 @@
     "Z": 0.7143
    },
    "Name": "17715 Pinion Creek Road north wall",
-   "Tile": "1,2",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -410312,7 +410312,7 @@
     "Z": 1
    },
    "Name": "17715 Pinion Creek Road front door",
-   "Tile": "1,2",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -415264,7 +415264,7 @@
     "Z": 16.9912
    },
    "Name": "16111 Antelope Lane south wall",
-   "Tile": "1,0",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -426000,7 +426000,7 @@
     "Z": 0.7143
    },
    "Name": "26314 Pinion Creek Road south wall",
-   "Tile": "1,2",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -426023,7 +426023,7 @@
     "Z": 0.7143
    },
    "Name": "26314 Pinion Creek Road south wall",
-   "Tile": "1,2",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -426046,7 +426046,7 @@
     "Z": 0.7143
    },
    "Name": "26314 Pinion Creek Road south wall",
-   "Tile": "1,2",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -426069,7 +426069,7 @@
     "Z": 0.7143
    },
    "Name": "26314 Pinion Creek Road south wall",
-   "Tile": "1,2",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -426138,7 +426138,7 @@
     "Z": 11.5147
    },
    "Name": "26314 Pinion Creek Road west wall",
-   "Tile": "1,2",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -426186,7 +426186,7 @@
     "Z": 1
    },
    "Name": "26314 Pinion Creek Road front door",
-   "Tile": "1,2",
+   "Tile": "1,3",
    "Layer": "structure"
   },
   {
@@ -427344,7 +427344,7 @@
     "Z": 0.6865
    },
    "Name": "16105 Antelope Lane floor",
-   "Tile": "1,0",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -427390,7 +427390,7 @@
     "Z": 0.6865
    },
    "Name": "16105 Antelope Lane roof",
-   "Tile": "1,0",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -427436,7 +427436,7 @@
     "Z": 53.0396
    },
    "Name": "16105 Antelope Lane ceiling",
-   "Tile": "1,0",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -427482,7 +427482,7 @@
     "Z": 0.6365
    },
    "Name": "16105 Antelope Lane, house",
-   "Tile": "1,0",
+   "Tile": "1,1",
    "Layer": "rooms"
   },
   {
@@ -427528,7 +427528,7 @@
     "Z": 0.7143
    },
    "Name": "16105 Antelope Lane east wall",
-   "Tile": "1,0",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -427597,7 +427597,7 @@
     "Z": 19.6136
    },
    "Name": "16105 Antelope Lane south wall",
-   "Tile": "1,0",
+   "Tile": "1,1",
    "Layer": "structure"
   },
   {
@@ -428778,7 +428778,7 @@
     "Z": 22.8692
    },
    "Name": "19709 Pinion Creek Road south wall",
-   "Tile": "1,1",
+   "Tile": "1,2",
    "Layer": "structure"
   },
   {
@@ -433176,7 +433176,7 @@
     "Z": 28.2844
    },
    "Name": "17110 Butera Road west wall",
-   "Tile": "1,3",
+   "Tile": "2,3",
    "Layer": "structure"
   },
   {
@@ -433408,7 +433408,7 @@
     "Z": 23.6152
    },
    "Name": "16018 Longneck Drive, building west wall",
-   "Tile": "1,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -434079,7 +434079,7 @@
     "Z": 37.4715
    },
    "Name": "26280 Pinion Creek Road west wall",
-   "Tile": "1,3",
+   "Tile": "2,3",
    "Layer": "structure"
   },
   {
@@ -434821,7 +434821,7 @@
     "Z": 0.7143
    },
    "Name": "16007 Antelope Lane north wall",
-   "Tile": "2,1",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -434844,7 +434844,7 @@
     "Z": 0.7143
    },
    "Name": "16007 Antelope Lane north wall",
-   "Tile": "2,1",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -434867,7 +434867,7 @@
     "Z": 0.7143
    },
    "Name": "16007 Antelope Lane north wall",
-   "Tile": "2,1",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -434938,7 +434938,7 @@
     "Z": 1
    },
    "Name": "16007 Antelope Lane front door",
-   "Tile": "2,1",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -436788,7 +436788,7 @@
     "Z": 27.3177
    },
    "Name": "26118 Pinion Creek Road south wall",
-   "Tile": "2,1",
+   "Tile": "2,2",
    "Layer": "structure"
   },
   {
@@ -450112,7 +450112,7 @@
     "Z": 65.3498
    },
    "Name": "19003 Turtle Creek Lane south wall",
-   "Tile": "2,-3",
+   "Tile": "2,-2",
    "Layer": "structure"
   },
   {
@@ -452865,7 +452865,7 @@
     "Z": 19.82
    },
    "Name": "18915 Turtle Creek Lane north wall",
-   "Tile": "2,-2",
+   "Tile": "2,-3",
    "Layer": "structure"
   },
   {
@@ -452888,7 +452888,7 @@
     "Z": 4.75
    },
    "Name": "18915 Turtle Creek Lane north wall",
-   "Tile": "2,-2",
+   "Tile": "2,-3",
    "Layer": "structure"
   },
   {
@@ -452911,7 +452911,7 @@
     "Z": 19.82
    },
    "Name": "18915 Turtle Creek Lane north wall",
-   "Tile": "2,-2",
+   "Tile": "2,-3",
    "Layer": "structure"
   },
   {
@@ -452936,7 +452936,7 @@
     "Z": 1
    },
    "Name": "18915 Turtle Creek Lane front door",
-   "Tile": "2,-2",
+   "Tile": "2,-3",
    "Layer": "structure"
   },
   {
@@ -456080,7 +456080,7 @@
     "Z": 54.4009
    },
    "Name": "26518 Stagecoach Crossing Drive south wall",
-   "Tile": "2,3",
+   "Tile": "2,4",
    "Layer": "structure"
   },
   {
@@ -459803,7 +459803,7 @@
     "Z": 1.2106
    },
    "Name": "59 Somerset Drive floor",
-   "Tile": "3,2",
+   "Tile": "2,2",
    "Layer": "structure"
   },
   {
@@ -459849,7 +459849,7 @@
     "Z": 1.2106
    },
    "Name": "59 Somerset Drive roof",
-   "Tile": "3,2",
+   "Tile": "2,2",
    "Layer": "structure"
   },
   {
@@ -459895,7 +459895,7 @@
     "Z": 96.7208
    },
    "Name": "59 Somerset Drive ceiling",
-   "Tile": "3,2",
+   "Tile": "2,2",
    "Layer": "structure"
   },
   {
@@ -459941,7 +459941,7 @@
     "Z": 1.1606
    },
    "Name": "59 Somerset Drive, house",
-   "Tile": "3,2",
+   "Tile": "2,2",
    "Layer": "rooms"
   },
   {
@@ -459964,7 +459964,7 @@
     "Z": 0.7143
    },
    "Name": "59 Somerset Drive south wall",
-   "Tile": "3,2",
+   "Tile": "2,2",
    "Layer": "structure"
   },
   {
@@ -459987,7 +459987,7 @@
     "Z": 0.7143
    },
    "Name": "59 Somerset Drive north wall",
-   "Tile": "3,2",
+   "Tile": "2,2",
    "Layer": "structure"
   },
   {
@@ -460079,7 +460079,7 @@
     "Z": 0.7143
    },
    "Name": "59 Somerset Drive north wall",
-   "Tile": "3,2",
+   "Tile": "2,2",
    "Layer": "structure"
   },
   {
@@ -460125,7 +460125,7 @@
     "Z": 34.59
    },
    "Name": "59 Somerset Drive west wall",
-   "Tile": "3,2",
+   "Tile": "2,2",
    "Layer": "structure"
   },
   {
@@ -460148,7 +460148,7 @@
     "Z": 20.1775
    },
    "Name": "59 Somerset Drive east wall",
-   "Tile": "3,2",
+   "Tile": "2,2",
    "Layer": "structure"
   },
   {
@@ -460171,7 +460171,7 @@
     "Z": 34.59
    },
    "Name": "59 Somerset Drive east wall",
-   "Tile": "3,2",
+   "Tile": "2,2",
    "Layer": "structure"
   },
   {
@@ -460426,7 +460426,7 @@
     "Z": 0.7143
    },
    "Name": "18911 Turtle Creek Lane south wall",
-   "Tile": "3,-3",
+   "Tile": "2,-3",
    "Layer": "structure"
   },
   {
@@ -460495,7 +460495,7 @@
     "Z": 0.7143
    },
    "Name": "18911 Turtle Creek Lane north wall",
-   "Tile": "3,-3",
+   "Tile": "2,-3",
    "Layer": "structure"
   },
   {
@@ -460564,7 +460564,7 @@
     "Z": 25.4991
    },
    "Name": "18911 Turtle Creek Lane east wall",
-   "Tile": "3,-3",
+   "Tile": "2,-3",
    "Layer": "structure"
   },
   {
@@ -460842,7 +460842,7 @@
     "Z": 0.7143
    },
    "Name": "15910 Beaver Lane south wall",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -460888,7 +460888,7 @@
     "Z": 0.7143
    },
    "Name": "15910 Beaver Lane north wall",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -460980,7 +460980,7 @@
     "Z": 12.9618
    },
    "Name": "15910 Beaver Lane east wall",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -461003,7 +461003,7 @@
     "Z": 44.6463
    },
    "Name": "15910 Beaver Lane east wall",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -461051,7 +461051,7 @@
     "Z": 2.3775
    },
    "Name": "15907 Longneck Drive floor",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -461097,7 +461097,7 @@
     "Z": 2.3775
    },
    "Name": "15907 Longneck Drive roof",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -461143,7 +461143,7 @@
     "Z": 193.9548
    },
    "Name": "15907 Longneck Drive ceiling",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -461189,7 +461189,7 @@
     "Z": 2.3275
    },
    "Name": "15907 Longneck Drive, house",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "rooms"
   },
   {
@@ -461281,7 +461281,7 @@
     "Z": 1.25
    },
    "Name": "15907 Longneck Drive east wall",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -461327,7 +461327,7 @@
     "Z": 4.75
    },
    "Name": "15907 Longneck Drive north wall",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -461350,7 +461350,7 @@
     "Z": 57.0614
    },
    "Name": "15907 Longneck Drive north wall",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -461373,7 +461373,7 @@
     "Z": 84.2016
    },
    "Name": "15907 Longneck Drive south wall",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -461421,7 +461421,7 @@
     "Z": 1
    },
    "Name": "15907 Longneck Drive front door",
-   "Tile": "3,0",
+   "Tile": "2,0",
    "Layer": "structure"
   },
   {
@@ -463689,7 +463689,7 @@
     "Z": 25.4191
    },
    "Name": "15907 North Cooter Court north wall",
-   "Tile": "3,1",
+   "Tile": "3,0",
    "Layer": "structure"
   },
   {
@@ -463712,7 +463712,7 @@
     "Z": 4.75
    },
    "Name": "15907 North Cooter Court north wall",
-   "Tile": "3,1",
+   "Tile": "3,0",
    "Layer": "structure"
   },
   {
@@ -463735,7 +463735,7 @@
     "Z": 25.4191
    },
    "Name": "15907 North Cooter Court north wall",
-   "Tile": "3,1",
+   "Tile": "3,0",
    "Layer": "structure"
   },
   {
@@ -463806,7 +463806,7 @@
     "Z": 1
    },
    "Name": "15907 North Cooter Court front door",
-   "Tile": "3,1",
+   "Tile": "3,0",
    "Layer": "structure"
   },
   {
@@ -466003,7 +466003,7 @@
     "Z": 28.6183
    },
    "Name": "18903 Turtle Creek Lane north wall",
-   "Tile": "3,-2",
+   "Tile": "3,-3",
    "Layer": "structure"
   },
   {
@@ -466026,7 +466026,7 @@
     "Z": 2.7143
    },
    "Name": "18903 Turtle Creek Lane north wall",
-   "Tile": "3,-2",
+   "Tile": "3,-3",
    "Layer": "structure"
   },
   {
@@ -466049,7 +466049,7 @@
     "Z": 28.6183
    },
    "Name": "18903 Turtle Creek Lane north wall",
-   "Tile": "3,-2",
+   "Tile": "3,-3",
    "Layer": "structure"
   },
   {
@@ -466074,7 +466074,7 @@
     "Z": 1
    },
    "Name": "18903 Turtle Creek Lane front door",
-   "Tile": "3,-2",
+   "Tile": "3,-3",
    "Layer": "structure"
   },
   {
@@ -467968,7 +467968,7 @@
     "Z": 68.3477
    },
    "Name": "32010 North Cooter Street south wall",
-   "Tile": "3,0",
+   "Tile": "3,1",
    "Layer": "structure"
   },
   {
@@ -472876,7 +472876,7 @@
     "Z": 1.25
    },
    "Name": "Building off Private road west wall",
-   "Tile": "3,-5",
+   "Tile": "3,-6",
    "Layer": "structure"
   },
   {
@@ -472922,7 +472922,7 @@
     "Z": 48.4545
    },
    "Name": "Building off Private road north wall",
-   "Tile": "3,-5",
+   "Tile": "3,-6",
    "Layer": "structure"
   },
   {
@@ -475215,7 +475215,7 @@
     "Z": 3.3335
    },
    "Name": "Building off Service road floor",
-   "Tile": "3,-2",
+   "Tile": "3,-1",
    "Layer": "structure"
   },
   {
@@ -475238,7 +475238,7 @@
     "Z": 3.3335
    },
    "Name": "Building off Service road roof",
-   "Tile": "3,-2",
+   "Tile": "3,-1",
    "Layer": "structure"
   },
   {
@@ -475261,7 +475261,7 @@
     "Z": 3.2835
    },
    "Name": "Building off Service road",
-   "Tile": "3,-2",
+   "Tile": "3,-1",
    "Layer": "rooms"
   },
   {
@@ -475284,7 +475284,7 @@
     "Z": 0.7143
    },
    "Name": "Building off Service road west wall",
-   "Tile": "3,-2",
+   "Tile": "3,-1",
    "Layer": "structure"
   },
   {
@@ -475307,7 +475307,7 @@
     "Z": 0.7143
    },
    "Name": "Building off Service road east wall",
-   "Tile": "3,-2",
+   "Tile": "3,-1",
    "Layer": "structure"
   },
   {
@@ -475399,7 +475399,7 @@
     "Z": 95.2425
    },
    "Name": "Building off Service road south wall",
-   "Tile": "3,-2",
+   "Tile": "3,-1",
    "Layer": "structure"
   },
   {
@@ -475677,7 +475677,7 @@
     "Z": 36.8685
    },
    "Name": "18810 Turtle Creek Lane east wall",
-   "Tile": "4,-2",
+   "Tile": "3,-2",
    "Layer": "structure"
   },
   {
@@ -475700,7 +475700,7 @@
     "Z": 4.75
    },
    "Name": "18810 Turtle Creek Lane east wall",
-   "Tile": "4,-2",
+   "Tile": "3,-2",
    "Layer": "structure"
   },
   {
@@ -475723,7 +475723,7 @@
     "Z": 36.8685
    },
    "Name": "18810 Turtle Creek Lane east wall",
-   "Tile": "4,-2",
+   "Tile": "3,-2",
    "Layer": "structure"
   },
   {
@@ -475748,7 +475748,7 @@
     "Z": 1
    },
    "Name": "18810 Turtle Creek Lane front door",
-   "Tile": "4,-2",
+   "Tile": "3,-2",
    "Layer": "structure"
   },
   {
@@ -476417,7 +476417,7 @@
     "Z": 24.0718
    },
    "Name": "31980 South Lite Street east wall",
-   "Tile": "4,0",
+   "Tile": "3,0",
    "Layer": "structure"
   },
   {
@@ -476695,7 +476695,7 @@
     "Z": 25.7237
    },
    "Name": "32018 North Lite Street east wall",
-   "Tile": "4,1",
+   "Tile": "3,1",
    "Layer": "structure"
   },
   {
@@ -476950,7 +476950,7 @@
     "Z": 25.7329
    },
    "Name": "32014 North Lite Street east wall",
-   "Tile": "4,1",
+   "Tile": "3,1",
    "Layer": "structure"
   },
   {
@@ -477159,7 +477159,7 @@
     "Z": 0.7143
    },
    "Name": "31902 South Lite Street east wall",
-   "Tile": "4,-1",
+   "Tile": "3,-1",
    "Layer": "structure"
   },
   {
@@ -477391,7 +477391,7 @@
     "Z": 1.25
    },
    "Name": "32014 North Lite Street, building east wall",
-   "Tile": "4,0",
+   "Tile": "3,0",
    "Layer": "structure"
   },
   {
@@ -477414,7 +477414,7 @@
     "Z": 31.4824
    },
    "Name": "32014 North Lite Street, building north wall",
-   "Tile": "3,1",
+   "Tile": "3,0",
    "Layer": "structure"
   },
   {
@@ -477508,7 +477508,7 @@
     "Z": 0.8557
    },
    "Name": "18807 Turtle Creek Lane floor",
-   "Tile": "3,-3",
+   "Tile": "4,-3",
    "Layer": "structure"
   },
   {
@@ -477554,7 +477554,7 @@
     "Z": 0.8557
    },
    "Name": "18807 Turtle Creek Lane roof",
-   "Tile": "3,-3",
+   "Tile": "4,-3",
    "Layer": "structure"
   },
   {
@@ -477600,7 +477600,7 @@
     "Z": 67.1392
    },
    "Name": "18807 Turtle Creek Lane ceiling",
-   "Tile": "3,-3",
+   "Tile": "4,-3",
    "Layer": "structure"
   },
   {
@@ -477646,7 +477646,7 @@
     "Z": 0.8057
    },
    "Name": "18807 Turtle Creek Lane, house",
-   "Tile": "3,-3",
+   "Tile": "4,-3",
    "Layer": "rooms"
   },
   {
@@ -477715,7 +477715,7 @@
     "Z": 1.25
    },
    "Name": "18807 Turtle Creek Lane north wall",
-   "Tile": "3,-3",
+   "Tile": "4,-3",
    "Layer": "structure"
   },
   {
@@ -477738,7 +477738,7 @@
     "Z": 1.25
    },
    "Name": "18807 Turtle Creek Lane north wall",
-   "Tile": "3,-3",
+   "Tile": "4,-3",
    "Layer": "structure"
   },
   {
@@ -477784,7 +477784,7 @@
     "Z": 138.4173
    },
    "Name": "18807 Turtle Creek Lane west wall",
-   "Tile": "3,-3",
+   "Tile": "4,-3",
    "Layer": "structure"
   },
   {
@@ -477855,7 +477855,7 @@
     "Z": 1
    },
    "Name": "18807 Turtle Creek Lane front door",
-   "Tile": "3,-3",
+   "Tile": "4,-3",
    "Layer": "structure"
   },
   {
@@ -478202,7 +478202,7 @@
     "Z": 0.7143
    },
    "Name": "18797 Turtle Creek Way south wall",
-   "Tile": "4,-2",
+   "Tile": "4,-1",
    "Layer": "structure"
   },
   {
@@ -478294,7 +478294,7 @@
     "Z": 30.1542
    },
    "Name": "18797 Turtle Creek Way west wall",
-   "Tile": "3,-1",
+   "Tile": "4,-1",
    "Layer": "structure"
   },
   {
@@ -483666,7 +483666,7 @@
     "Z": 50.3796
    },
    "Name": "16539 Mellow Brew Place south wall",
-   "Tile": "4,0",
+   "Tile": "4,1",
    "Layer": "structure"
   },
   {
@@ -486722,7 +486722,7 @@
     "Z": 0.5037
    },
    "Name": "32011 Mellow Brew Court floor",
-   "Tile": "4,1",
+   "Tile": "4,0",
    "Layer": "structure"
   },
   {
@@ -486768,7 +486768,7 @@
     "Z": 0.5037
    },
    "Name": "32011 Mellow Brew Court roof",
-   "Tile": "4,1",
+   "Tile": "4,0",
    "Layer": "structure"
   },
   {
@@ -486814,7 +486814,7 @@
     "Z": 37.8042
    },
    "Name": "32011 Mellow Brew Court ceiling",
-   "Tile": "4,1",
+   "Tile": "4,0",
    "Layer": "structure"
   },
   {
@@ -486860,7 +486860,7 @@
     "Z": 0.4537
    },
    "Name": "32011 Mellow Brew Court, house",
-   "Tile": "4,1",
+   "Tile": "4,0",
    "Layer": "rooms"
   },
   {
@@ -486975,7 +486975,7 @@
     "Z": 0.7143
    },
    "Name": "32011 Mellow Brew Court north wall",
-   "Tile": "4,1",
+   "Tile": "4,0",
    "Layer": "structure"
   },
   {
@@ -486998,7 +486998,7 @@
     "Z": 14.39
    },
    "Name": "32011 Mellow Brew Court west wall",
-   "Tile": "4,1",
+   "Tile": "4,0",
    "Layer": "structure"
   },
   {
@@ -492416,7 +492416,7 @@
     "Z": 0.3577
    },
    "Name": "16614 Walnut Springs Lane floor",
-   "Tile": "4,0",
+   "Tile": "4,-1",
    "Layer": "structure"
   },
   {
@@ -492462,7 +492462,7 @@
     "Z": 0.3577
    },
    "Name": "16614 Walnut Springs Lane roof",
-   "Tile": "4,0",
+   "Tile": "4,-1",
    "Layer": "structure"
   },
   {
@@ -492508,7 +492508,7 @@
     "Z": 25.6405
    },
    "Name": "16614 Walnut Springs Lane ceiling",
-   "Tile": "4,0",
+   "Tile": "4,-1",
    "Layer": "structure"
   },
   {
@@ -492554,7 +492554,7 @@
     "Z": 0.3077
    },
    "Name": "16614 Walnut Springs Lane, house",
-   "Tile": "4,0",
+   "Tile": "4,-1",
    "Layer": "rooms"
   },
   {
@@ -492577,7 +492577,7 @@
     "Z": 0.7143
    },
    "Name": "16614 Walnut Springs Lane east wall",
-   "Tile": "4,0",
+   "Tile": "4,-1",
    "Layer": "structure"
   },
   {
@@ -492715,7 +492715,7 @@
     "Z": 10.2196
    },
    "Name": "16614 Walnut Springs Lane south wall",
-   "Tile": "4,0",
+   "Tile": "4,-1",
    "Layer": "structure"
   },
   {
@@ -492738,7 +492738,7 @@
     "Z": 27.7389
    },
    "Name": "16614 Walnut Springs Lane north wall",
-   "Tile": "4,0",
+   "Tile": "4,-1",
    "Layer": "structure"
   },
   {
@@ -493317,7 +493317,7 @@
     "Z": 32.3379
    },
    "Name": "16510 Mellow Brew Place east wall",
-   "Tile": "5,1",
+   "Tile": "4,1",
    "Layer": "structure"
   },
   {
@@ -493457,7 +493457,7 @@
     "Z": 1.25
    },
    "Name": "32010 Mellow Brew Court east wall",
-   "Tile": "5,1",
+   "Tile": "4,1",
    "Layer": "structure"
   },
   {
@@ -493480,7 +493480,7 @@
     "Z": 1.25
    },
    "Name": "32010 Mellow Brew Court west wall",
-   "Tile": "4,0",
+   "Tile": "4,1",
    "Layer": "structure"
   },
   {
@@ -493549,7 +493549,7 @@
     "Z": 45.2497
    },
    "Name": "32010 Mellow Brew Court south wall",
-   "Tile": "4,0",
+   "Tile": "4,1",
    "Layer": "structure"
   },
   {
@@ -493735,7 +493735,7 @@
     "Z": 0.7143
    },
    "Name": "31607 Walnut Creek Road east wall",
-   "Tile": "5,-3",
+   "Tile": "4,-3",
    "Layer": "structure"
   },
   {
@@ -493758,7 +493758,7 @@
     "Z": 0.7143
    },
    "Name": "31607 Walnut Creek Road east wall",
-   "Tile": "5,-3",
+   "Tile": "4,-3",
    "Layer": "structure"
   },
   {
@@ -493852,7 +493852,7 @@
     "Z": 1
    },
    "Name": "31607 Walnut Creek Road front door",
-   "Tile": "5,-3",
+   "Tile": "4,-3",
    "Layer": "structure"
   },
   {
@@ -494082,7 +494082,7 @@
     "Z": 0.7143
    },
    "Name": "31960 Mellow Brew Street north wall",
-   "Tile": "5,0",
+   "Tile": "4,0",
    "Layer": "structure"
   },
   {
@@ -494197,7 +494197,7 @@
     "Z": 4.3429
    },
    "Name": "31960 Mellow Brew Street east wall",
-   "Tile": "5,0",
+   "Tile": "4,0",
    "Layer": "structure"
   },
   {
@@ -494220,7 +494220,7 @@
     "Z": 23.1622
    },
    "Name": "31960 Mellow Brew Street east wall",
-   "Tile": "5,0",
+   "Tile": "4,0",
    "Layer": "structure"
   },
   {
@@ -494452,7 +494452,7 @@
     "Z": 1.25
    },
    "Name": "31325 Walnut Creek Road south wall",
-   "Tile": "4,-5",
+   "Tile": "4,-4",
    "Layer": "structure"
   },
   {
@@ -494567,7 +494567,7 @@
     "Z": 36.7427
    },
    "Name": "31325 Walnut Creek Road east wall",
-   "Tile": "5,-4",
+   "Tile": "4,-4",
    "Layer": "structure"
   },
   {
@@ -494590,7 +494590,7 @@
     "Z": 4.75
    },
    "Name": "31325 Walnut Creek Road east wall",
-   "Tile": "5,-4",
+   "Tile": "4,-4",
    "Layer": "structure"
   },
   {
@@ -494613,7 +494613,7 @@
     "Z": 36.7427
    },
    "Name": "31325 Walnut Creek Road east wall",
-   "Tile": "5,-4",
+   "Tile": "4,-4",
    "Layer": "structure"
   },
   {
@@ -494638,7 +494638,7 @@
     "Z": 1
    },
    "Name": "31325 Walnut Creek Road front door",
-   "Tile": "5,-4",
+   "Tile": "4,-4",
    "Layer": "structure"
   },
   {
@@ -499839,7 +499839,7 @@
     "Z": 0.7143
    },
    "Name": "31216 Walnut Creek Road east wall",
-   "Tile": "5,-6",
+   "Tile": "5,-5",
    "Layer": "structure"
   },
   {
@@ -499954,7 +499954,7 @@
     "Z": 9.7996
    },
    "Name": "31216 Walnut Creek Road south wall",
-   "Tile": "5,-6",
+   "Tile": "5,-5",
    "Layer": "structure"
   },
   {
@@ -499977,7 +499977,7 @@
     "Z": 8.3997
    },
    "Name": "31216 Walnut Creek Road south wall",
-   "Tile": "5,-6",
+   "Tile": "5,-5",
    "Layer": "structure"
   },
   {
@@ -512212,7 +512212,7 @@
     "Z": 59.4724
    },
    "Name": "31510 Walnut Creek Road north wall",
-   "Tile": "5,-3",
+   "Tile": "5,-4",
    "Layer": "structure"
   },
   {
@@ -513972,7 +513972,7 @@
     "Z": 5.0
    },
    "Name": "The Primrose Inn southeast wall",
-   "Tile": "5,1",
+   "Tile": "5,2",
    "Layer": "structure"
   },
   {
@@ -516173,7 +516173,7 @@
     "Z": 0.7143
    },
    "Name": "31310 Keehan Street south wall",
-   "Tile": "5,-5",
+   "Tile": "5,-4",
    "Layer": "structure"
   },
   {
@@ -516219,7 +516219,7 @@
     "Z": 14.3703
    },
    "Name": "31310 Keehan Street west wall",
-   "Tile": "5,-5",
+   "Tile": "5,-4",
    "Layer": "structure"
   },
   {
@@ -517492,7 +517492,7 @@
     "Z": 0.7143
    },
    "Name": "16507 Walnut Springs Lane south wall",
-   "Tile": "5,-1",
+   "Tile": "5,0",
    "Layer": "structure"
   },
   {
@@ -521497,7 +521497,7 @@
     "Z": 0.6395
    },
    "Name": "16506 Burklin Lane floor",
-   "Tile": "6,0",
+   "Tile": "5,0",
    "Layer": "structure"
   },
   {
@@ -521543,7 +521543,7 @@
     "Z": 0.6395
    },
    "Name": "16506 Burklin Lane roof",
-   "Tile": "6,0",
+   "Tile": "5,0",
    "Layer": "structure"
   },
   {
@@ -521589,7 +521589,7 @@
     "Z": 49.1209
    },
    "Name": "16506 Burklin Lane ceiling",
-   "Tile": "6,0",
+   "Tile": "5,0",
    "Layer": "structure"
   },
   {
@@ -521635,7 +521635,7 @@
     "Z": 0.5895
    },
    "Name": "16506 Burklin Lane, house",
-   "Tile": "6,0",
+   "Tile": "5,0",
    "Layer": "rooms"
   },
   {
@@ -521704,7 +521704,7 @@
     "Z": 0.7143
    },
    "Name": "16506 Burklin Lane south wall",
-   "Tile": "6,0",
+   "Tile": "5,0",
    "Layer": "structure"
   },
   {
@@ -521750,7 +521750,7 @@
     "Z": 0.7143
    },
    "Name": "16506 Burklin Lane north wall",
-   "Tile": "6,0",
+   "Tile": "5,0",
    "Layer": "structure"
   },
   {
@@ -521819,7 +521819,7 @@
     "Z": 42.1616
    },
    "Name": "16506 Burklin Lane east wall",
-   "Tile": "6,0",
+   "Tile": "5,0",
    "Layer": "structure"
   },
   {
@@ -521959,7 +521959,7 @@
     "Z": 0.7143
    },
    "Name": "31307 Bermar Drive east wall",
-   "Tile": "6,-5",
+   "Tile": "5,-5",
    "Layer": "structure"
   },
   {
@@ -522028,7 +522028,7 @@
     "Z": 10.9812
    },
    "Name": "31307 Bermar Drive north wall",
-   "Tile": "6,-4",
+   "Tile": "5,-5",
    "Layer": "structure"
   },
   {
@@ -522051,7 +522051,7 @@
     "Z": 2.7143
    },
    "Name": "31307 Bermar Drive north wall",
-   "Tile": "5,-4",
+   "Tile": "5,-5",
    "Layer": "structure"
   },
   {
@@ -522074,7 +522074,7 @@
     "Z": 10.9812
    },
    "Name": "31307 Bermar Drive north wall",
-   "Tile": "5,-4",
+   "Tile": "5,-5",
    "Layer": "structure"
   },
   {
@@ -522099,7 +522099,7 @@
     "Z": 1
    },
    "Name": "31307 Bermar Drive front door",
-   "Tile": "5,-4",
+   "Tile": "5,-5",
    "Layer": "structure"
   },
   {

@@ -369,10 +369,21 @@ def tile_of(x, z):
     return f"{math.floor(x / TILE)},{math.floor(z / TILE)}"
 
 
+# A building is kept whole in the tile its middle is in: while one is being built, everything it is
+# made of (walls, roof, floor, rooms, doors, doorways, furniture) is tagged with that tile, wherever its
+# own centre falls. Cut by a tile edge, a streamer loading one tile got half a house: walls on one side
+# and not the other, a room whose doorway was in the next tile (104 of Magnolia's buildings).
+_TILE_PIN = [None]
+
+
+def entity_tile(x, z):
+    return _TILE_PIN[0] or tile_of(x, z)
+
+
 def _finish(e, name, layer):
     if name:
         e["Name"] = name
-    e["Tile"] = tile_of(e["Position"]["X"], e["Position"]["Z"])
+    e["Tile"] = entity_tile(e["Position"]["X"], e["Position"]["Z"])
     e["Layer"] = layer
     entities.append(e)
     COUNT[layer] += 1
@@ -417,7 +428,7 @@ def named_place(name, F, u0, u1, v0, v1, y0, y1):
 def portal(x, y, z, a, b, aperture, layer="interiors"):
     e = {"EntityId": new_id(), "PrefabId": "portal", "Position": v3(x, y, z),
          "RegionAId": a, "RegionBId": b, "ApertureSize": aperture}
-    e["Tile"] = tile_of(x, z)
+    e["Tile"] = entity_tile(x, z)
     e["Layer"] = layer
     entities.append(e)
     COUNT[layer] += 1
@@ -2367,8 +2378,14 @@ for g in ROAD_GEOM:
             named_place(name, F, -e0, L + e1, lo, hi, 0.0, ZONE_H)
 
 # ══ The buildings ═════════════════════════════════════════════════════════════════════════════════
+CUT_BY_EDGE = 0                       # buildings whose parts stand in more than one tile
 for bd in sorted(BLD, key=lambda b: (round(b.cx, 2), round(b.cz, 2))):
+    first = len(entities)
+    _TILE_PIN[0] = tile_of(bd.cx, bd.cz)
     build(bd)
+    _TILE_PIN[0] = None
+    if len({tile_of(e["Position"]["X"], e["Position"]["Z"]) for e in entities[first:]}) > 1:
+        CUT_BY_EDGE += 1
     CLEAR.add(("box", Frame(bd.cx, bd.cz, bd.angle), *extents(Frame(bd.cx, bd.cz, bd.angle), bd.ring)),
               bd.x0, bd.x1, bd.z0, bd.z1)
 
@@ -2682,5 +2699,6 @@ print("  buildings: " + ", ".join(f"{k} {STATS[k]}" for k in ("house", "mobile_h
 print(f"  {regions} zones and rooms, {by_prefab['named_place']} named places, {STATS['doors']} outside doors, "
       f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {n_shores} stretches of shore, {len(VEHICLES)} vehicles")
 print("  by layer: " + ", ".join(f"{k} {v}" for k, v in sorted(COUNT.items())))
+print(f"  {CUT_BY_EDGE} buildings stand across a {TILE:.0f} m tile edge; each is tagged whole with the tile its middle is in")
 print(f"  spawn {tuple(round(c, 2) for c in spawn)} facing {math.degrees(spawn_yaw) % 360:.0f} degrees from north, "
       f"at {SPAWN_ADDR.label if SPAWN_ADDR else 'the origin'}")

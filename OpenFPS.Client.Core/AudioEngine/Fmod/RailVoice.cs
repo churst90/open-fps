@@ -4,7 +4,6 @@ using System.Numerics;
 using System.Threading;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Rail;
-using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -46,10 +45,18 @@ public sealed class TrainVoiceState
 
     public int Taps;                                       // how many entities currently read it
 
+    /// <summary>What the train is sounding (TrainSignal): the horn's rhythm and the bell's length, from a
+    /// sample of the synth's own timeline. Swapped whole by the game thread; read by whichever worker
+    /// renders the train.</summary>
+    private sealed record Signalling(float[] Warning, float BellSeconds, long StartSample);
+    private Signalling? _signal;
+    private readonly float _rate;
+
     public TrainVoiceState(string key, TrainProfile p, float sampleRate, int seed)
     {
         Key = key;
         Profile = p;
+        _rate = sampleRate;
         Train = new TrainSynth(p, sampleRate, seed);
         Layout = TrainLayout.Sources(p);
         int n = Train.Sources.Count;
@@ -61,6 +68,19 @@ public sealed class TrainVoiceState
     /// <summary>Where a tap should start reading: the newest sample, so a voice that joins late
     /// does not begin three seconds behind the train.</summary>
     public long Newest => Volatile.Read(ref _rendered);
+
+    /// <summary>
+    /// The train sounds its horn (or whistle) in this rhythm and rings its bell for this long, begun
+    /// <paramref name="secondsAgo"/> before now. Played by the train's own outlets, where they are on
+    /// it (TrainSynth's horn, whistle and bell sources), from the newest sample the synth has made: a
+    /// voice renders a few hundred milliseconds ahead, and that is all the rhythm can be late by.
+    /// </summary>
+    public void Signal(float[] warning, float bellSeconds, double secondsAgo)
+        => Volatile.Write(ref _signal, new Signalling(warning, MathF.Max(0f, bellSeconds),
+                                                      Newest - (long)(Math.Max(0.0, secondsAgo) * _rate)));
+
+    /// <summary>Whether the horn, whistle or bell is being sounded at the newest rendered sample.</summary>
+    public bool IsSignalling => Volatile.Read(ref _signal) != null;
 
     /// <summary>The sample at position <paramref name="at"/> of source <paramref name="source"/>,
     /// rendering forward as needed. Called from the render pool's worker threads.</summary>
@@ -90,6 +110,17 @@ public sealed class TrainVoiceState
         _notch += (TargetNotch - _notch) * MathF.Min(1f, dt * 0.8f);
         Train.Speed = Running ? MathF.Max(0f, _speed) : 0f;
         Train.Notch = _notch;
+        // The hand on the horn valve and the bell, every 32 samples (two thirds of a millisecond).
+        if ((_rendered & 31) == 0 && Volatile.Read(ref _signal) is { } sig)
+        {
+            float t = (_rendered - sig.StartSample) / _rate;
+            bool warn = Honk.BlowingAt(sig.Warning, t);
+            Train.HornBlowing = warn;
+            Train.WhistleBlowing = warn;
+            Train.BellRinging = t >= 0f && t < sig.BellSeconds;
+            // Done: let it go, unless the game thread has already put a new one in its place.
+            if (t > TrainSignal.Duration(sig.Warning, sig.BellSeconds)) Interlocked.CompareExchange(ref _signal, null, sig);
+        }
         Train.Step();
         var src = Train.Sources;
         int idx = (int)(_rendered & _mask);
@@ -120,7 +151,7 @@ public sealed class TrainTapState : PhysicalVoiceState
     private readonly float _dt;
 
     public TrainTapState(TrainVoiceState shared, int source, float sampleRate)
-        : base(shared.Layout[source].LevelDb, sampleRate)
+        : base(shared.Layout[source].LevelDb, sampleRate, shared.Layout[source].HeadroomDb)
     {
         Shared = shared;
         Source = source;
@@ -130,7 +161,13 @@ public sealed class TrainTapState : PhysicalVoiceState
         Interlocked.Increment(ref shared.Taps);
     }
 
-    protected override void PushListener(Vector3 frame) => Shared.Train.SetListener(frame);
+    /// <summary>Only the horn's own tap aims the horn: its frame is the listener seen from the horn (x
+    /// right, y up, z along the track), which the train's frame has as (z, y, x). Every tap pushing its
+    /// own frame left the horn aimed from whichever bogie rendered last.</summary>
+    protected override void PushListener(Vector3 frame)
+    {
+        if (Entry.Kind == TrainLayout.Kind.Horn) Shared.Train.SetListener(new Vector3(frame.Z, frame.Y, frame.X));
+    }
     protected override void Control(float seconds, float dt) => Shared.Running = Running;
     protected override float StepSynth() => Shared.Sample(Source, _cursor++, _dt);
 }

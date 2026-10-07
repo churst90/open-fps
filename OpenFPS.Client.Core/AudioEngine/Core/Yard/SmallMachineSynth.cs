@@ -47,6 +47,14 @@ public sealed class SmallMachineSynth
     /// nobody could name.</summary>
     public bool CompressorOn { get; set; } = true;
 
+    /// <summary>How hard the compressor is pumping against its rating (1): the lift the weather sets
+    /// (CompressorSpec.LoadAt). Its motor's slip, and so the pumping note, goes with it.</summary>
+    public float CompressorLoad { get; set; } = 1f;
+
+    /// <summary>An electric fan's speed against its nameplate, a fraction: no two fan motors of one
+    /// model turn at quite the same speed.</summary>
+    public float FanSpeedFraction { get; set; } = 1f;
+
     // ── What it is doing, after Step() ──────────────────────────────────────────────────────────
 
     public float Engine { get; private set; }
@@ -62,6 +70,8 @@ public sealed class SmallMachineSynth
     public float Throttle { get; private set; }
     /// <summary>Blade or fan speed, rpm.</summary>
     public float BladeRpm { get; private set; }
+    /// <summary>The compressor's pumping fundamental while it last ran, Hz (0 for a machine that has none).</summary>
+    public float CompressorHz { get; private set; }
 
     private readonly EngineSynth? _engine;
     private readonly BladeRow[] _blades = Array.Empty<BladeRow>();
@@ -206,8 +216,8 @@ public sealed class SmallMachineSynth
         }
         else if (Spec.Blade is { } fanSpec)
         {
-            // An electric fan: it is either on at its one speed or spinning down.
-            float want = Running ? fanSpec.RpmMax : 0f;
+            // An electric fan: it is either on at its one speed (its own motor's) or spinning down.
+            float want = Running ? fanSpec.RpmMax * Math.Clamp(FanSpeedFraction, 0.5f, 1.2f) : 0f;
             _bladeRpm += (want - _bladeRpm) * MathF.Min(1f, _dt * SlowEvery / 2.5f);
             Rpm = 0f;
         }
@@ -306,7 +316,9 @@ public sealed class SmallMachineSynth
             // The pump is the SHAFT, which is a few per cent slower than synchronous under load and
             // slower still while it is coming up to speed. The two series beat, and that beat is the
             // whole difference between a compressor and a mains transformer.
-            _pulsePhase += comp.PulsationHz * (0.55f + 0.45f * up) / _rate;
+            float pumpHz = comp.PulsationHzAt(CompressorLoad) * (0.55f + 0.45f * up);
+            CompressorHz = pumpHz;
+            _pulsePhase += pumpHz / _rate;
             if (_pulsePhase > 1.0) _pulsePhase -= 1.0;
             double g = _pulsePhase * Math.Tau;
             float pump = (float)(Math.Sin(g) + 0.55 * Math.Sin(2 * g) + 0.30 * Math.Sin(3 * g)) * _pulseAmp * up * up;

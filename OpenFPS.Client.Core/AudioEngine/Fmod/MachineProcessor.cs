@@ -295,34 +295,52 @@ public sealed class MachineVoiceState : PhysicalVoiceState
     // driven here, from a seed taken from the ENTITY ID. Two clients hearing the same mower hear the
     // same walk through the same grass, and forty window units on one wall are forty machines rather
     // than one machine forty times, which is what a chorus of identical waveforms would be.
+    //
+    // An air conditioner's is the WEATHER: its thermostat runs it for the share of the time the
+    // outdoor air asks (Thermostat), and its compressor pumps harder, and so turns slower, the hotter
+    // the air its condenser rejects heat into (CompressorSpec.LoadAt). What is its own: where in its
+    // cycle it is, how well its house holds the cool, a refrigerant charge a few per cent either way
+    // (the pump's load wanders slowly with it), and a fan motor a per cent or two off its nameplate.
     private readonly float _loadBase, _loadSwing, _loadHz, _loadPhase;
-    private readonly float _dutyOn, _dutyOff, _dutyPhase;
-    private readonly bool _cycles;
+    private readonly Thermostat? _thermostat;
+    private readonly float _fanTrim, _wanderHz1, _wanderHz2, _wanderPhase1, _wanderPhase2;
+
+    /// <summary>
+    /// The air round the machine, °C: what its thermostat and its condenser answer to. NaN (the
+    /// default) takes the world's, AudioPhysics.CurrentAirCelsius, which the provider keeps from the
+    /// server's weather; an instrument or a test sets it outright.
+    /// </summary>
+    public float AmbientCelsius = float.NaN;
+
+    /// <summary>Whether the thermostat is calling for the compressor, after the last render.</summary>
+    public bool CompressorCalled => _thermostat?.Calling ?? false;
 
     public MachineVoiceState(SmallMachineSpec spec, float sampleRate, int entityId, int seed)
         : base(spec.SourceLevelDb, sampleRate)
     {
         Spec = spec;
-        Machine = new SmallMachineSynth(spec, sampleRate, seed);
+        // Its noise is its own too: two of one model given one seed are still two machines.
+        Machine = new SmallMachineSynth(spec, sampleRate, unchecked(seed * 31 + entityId));
 
         var rng = new Random(entityId * 2654435761u.GetHashCode());
-        _cycles = spec.Compressor != null;
-        if (_cycles)
+        if (spec.Compressor != null)
         {
-            // A thermostat. Real cycles are minutes long; these are 100-220 s on and 60-140 s off,
-            // which is short enough that a walk down a street crosses several and long enough that
-            // none of them reads as a stutter. The phase is spread, so a wall of them is a wall.
-            _dutyOn = 100f + (float)rng.NextDouble() * 120f;
-            _dutyOff = 60f + (float)rng.NextDouble() * 80f;
-            _dutyPhase = (float)rng.NextDouble() * (_dutyOn + _dutyOff);
+            _thermostat = new Thermostat(spec.Thermostat ?? new ThermostatSpec(), rng.Next());
+            // A few per cent of load either way, over a minute or two: charge, a dirty coil, the sun
+            // coming off the cabinet. Two incommensurate swings, so it never repeats.
+            _wanderHz1 = 0.008f + (float)rng.NextDouble() * 0.006f;
+            _wanderHz2 = 0.019f + (float)rng.NextDouble() * 0.011f;
+            _wanderPhase1 = (float)rng.NextDouble() * MathF.Tau;
+            _wanderPhase2 = (float)rng.NextDouble() * MathF.Tau;
         }
-        // How hard it is working, and how much that wanders. A condenser's load is the weather and
-        // barely moves; a mower's is the grass and moves a lot, which is what the governor's droop
-        // is FOR — the bog going into a thick patch and the recovery out of it.
-        bool mows = spec.Cutting != null;
-        _loadBase = mows ? 0.42f : 0.55f;
-        _loadSwing = mows ? 0.34f : 0.06f;
-        _loadHz = mows ? 0.19f + (float)rng.NextDouble() * 0.12f : 0.03f;
+        // A permanent-split-capacitor fan motor of one model turns within a per cent or two of its
+        // nameplate, and no two at the same speed.
+        _fanTrim = 1f + ((float)rng.NextDouble() * 2f - 1f) * 0.015f;
+        // How hard a mower is working, and how much that wanders: the grass, which moves a lot, and is
+        // what the governor's droop is FOR — the bog going into a thick patch and the recovery out of it.
+        _loadBase = 0.42f;
+        _loadSwing = 0.34f;
+        _loadHz = 0.19f + (float)rng.NextDouble() * 0.12f;
         _loadPhase = (float)rng.NextDouble() * MathF.Tau;
     }
 
@@ -351,13 +369,17 @@ public sealed class MachineVoiceState : PhysicalVoiceState
         // staircase of speeds would hunt on it. A second to get going is about what a push takes.
         _groundSpeed += Math.Clamp(TargetGroundSpeed - _groundSpeed, -1.5f * dt, 1.5f * dt);
         Machine.GroundSpeed = _groundSpeed;
-        Machine.Load = Math.Clamp(
-            _loadBase + _loadSwing * MathF.Sin(_loadPhase + MathF.Tau * _loadHz * seconds), 0f, 1f);
-        if (_cycles)
+        if (Spec.Cutting != null)
+            Machine.Load = Math.Clamp(
+                _loadBase + _loadSwing * MathF.Sin(_loadPhase + MathF.Tau * _loadHz * seconds), 0f, 1f);
+        Machine.FanSpeedFraction = _fanTrim;
+        if (_thermostat != null)
         {
-            float period = _dutyOn + _dutyOff;
-            float phase = (seconds + _dutyPhase) % period;
-            Machine.CompressorOn = phase < _dutyOn;
+            float air = float.IsNaN(AmbientCelsius) ? OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius : AmbientCelsius;
+            Machine.CompressorOn = _thermostat.Step(dt, air, AudioClock.Now);
+            float wander = 0.6f * MathF.Sin(_wanderPhase1 + MathF.Tau * _wanderHz1 * seconds)
+                         + 0.4f * MathF.Sin(_wanderPhase2 + MathF.Tau * _wanderHz2 * seconds);
+            Machine.CompressorLoad = CompressorSpec.LoadAt(air) * (1f + 0.04f * wander);
         }
     }
 

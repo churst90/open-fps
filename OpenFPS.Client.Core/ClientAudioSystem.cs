@@ -375,6 +375,7 @@ public class ClientAudioSystem
         // takes exactly the path a recorded one would.
         WorldAudio = new WorldAudioPlayer(_audio, _acoustics);
         WorldAudio.HornReceived = StartHorn;
+        WorldAudio.TrainSignalReceived = StartTrainSignal;
         WorldAudio.Ground = ApplyRecordedGround;
         _birds = new BirdLife(audio, _acoustics);
         _rain = new RainField(audio, _acoustics);
@@ -1189,6 +1190,12 @@ public class ClientAudioSystem
                 h = OpenFPS.Common.ShoreSpec.ByName(soundId).PeakHeadroomDb;
             else if (soundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase))
                 h = OpenFPS.Common.ModelLibrary.Bell(soundId[5..]).PeakHeadroomDb;
+            else if (OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(soundId, out string railPreset, out _, out int railIndex))
+            {
+                // A train's bell renders with the bell's own room, as a crossing's does (TrainLayout).
+                var layout = OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(railPreset));
+                if (railIndex >= 0 && railIndex < layout.Count) h = layout[railIndex].HeadroomDb;
+            }
         }
         catch (Exception) { }
         _physicalHeadroom[soundId] = h;
@@ -1511,6 +1518,8 @@ public class ClientAudioSystem
             if (!PhysicalLevel(em.SoundId, out float levelDb, out float extent)) continue;
             // A gutter, a drain or a downpipe with no rain running off into it is not there to be heard.
             if (Dry(em.SoundId, entityId, em.SynthRunning, now)) continue;
+            // A train's horn or bell that nobody is sounding.
+            if (SilentSignal(em.SoundId, now)) continue;
             // A tree past the hand-over is heard in its wood, and a wood with no trees in it now is not
             // heard; ranked by what each plays (a wood's trees in power, so its amplitude by their root).
             float chorus = ChorusShare(entityId, out float chorusTrees);
@@ -2362,6 +2371,46 @@ public class ClientAudioSystem
 
     /// <summary>Voice ids for a vehicle's horn, one per vehicle.</summary>
     internal const int HornVoiceBase = -1_200_000;
+
+    /// <summary>Trains sounding their horn or bell ("preset/train"), until when. A train's horn,
+    /// whistle and bell sources are given a voice only while it is: silent, they are nothing to hear,
+    /// and ranked at a horn's 139 dB they would hold a voice for the whole train from kilometres off.</summary>
+    private readonly Dictionary<string, double> _trainSignals = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A train sounds for a crossing. Its synth plays it on the train's own horn (or whistle) and bell
+    /// (TrainSignal); this keeps the signal sources ranked while it lasts. A synth that does not exist
+    /// yet takes the signal when it is made, the time already gone counted off.
+    /// </summary>
+    private void StartTrainSignal(string train, float[] warning, float bellSeconds)
+    {
+        _trainSignals[train] = _now() + OpenFPS.Common.TrainSignal.Duration(warning, bellSeconds) + 1.0;
+        _audio.SignalTrain(train, warning, bellSeconds, 0.0);
+    }
+
+    /// <summary>A train's horn, whistle or bell source, while the train is not sounding it.</summary>
+    private bool SilentSignal(string soundId, double now)
+    {
+        if (!soundId.StartsWith("rail:", StringComparison.OrdinalIgnoreCase)) return false;
+        if (!_signalTrains.TryGetValue(soundId, out string? train))
+        {
+            train = null;
+            if (OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(soundId, out string preset, out string name, out int index))
+            {
+                try
+                {
+                    var layout = OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset));
+                    if (index >= 0 && index < layout.Count && layout[index].IsSignal) train = preset + "/" + name;
+                }
+                catch (Exception) { }
+            }
+            _signalTrains[soundId] = train;
+        }
+        return train != null && (!_trainSignals.TryGetValue(train, out double until) || now > until);
+    }
+
+    /// <summary>Which train a signal source belongs to, by SoundId; null for every other source.</summary>
+    private readonly Dictionary<string, string?> _signalTrains = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Horns being sounded: the vehicle, the key its voice was built from, and when the
     /// voice may be let go.</summary>

@@ -204,11 +204,67 @@ public sealed record CompressorSpec
     public float StartSeconds { get; init; } = 0.55f;
 
     /// <summary>The shaft speed under load, rpm.</summary>
-    public float ShaftRpm => LineHz * 60f / MathF.Max(1, PolePairs) * (1f - Math.Clamp(Slip, 0f, 0.5f));
+    public float ShaftRpm => ShaftRpmAt(1f);
     /// <summary>The hum: twice the LINE frequency, not twice the shaft.</summary>
     public float HumHz => 2f * LineHz;
     /// <summary>The pumping series' fundamental.</summary>
-    public float PulsationHz => ShaftRpm / 60f * MathF.Max(1, EventsPerRevolution);
+    public float PulsationHz => PulsationHzAt(1f);
+
+    /// <summary>
+    /// The shaft speed at a load (1 = the rating), rpm. An induction motor's slip is in proportion to
+    /// the torque asked of it, so a compressor pumping against a hotter condenser turns slower, and
+    /// two compressors on two houses never turn at quite the same speed.
+    /// </summary>
+    public float ShaftRpmAt(float load)
+        => LineHz * 60f / MathF.Max(1, PolePairs) * (1f - Math.Clamp(Slip * MathF.Max(0f, load), 0f, 0.5f));
+
+    /// <summary>The pumping series' fundamental at a load.</summary>
+    public float PulsationHzAt(float load) => ShaftRpmAt(load) / 60f * MathF.Max(1, EventsPerRevolution);
+
+    /// <summary>
+    /// How hard the pump is working with the outdoor air at this temperature, against its rating
+    /// (1). What it works against is the lift, condensing less evaporating temperature: the coil
+    /// evaporates near 7 °C whatever the weather, and the condenser runs about 11 K over the air
+    /// round it, so at the 35 °C rating point (AHRI 210/240) the lift is 39 K and on a 25 °C evening
+    /// 29. The pump's torque goes with the lift.
+    /// </summary>
+    public static float LoadAt(float outdoorCelsius) => Math.Clamp((outdoorCelsius + 11f - 7f) / 39f, 0.2f, 1.4f);
+}
+
+/// <summary>
+/// The house an air conditioner cools, as its thermostat sees it.
+///
+/// A thermostat does not run a compressor "now and then": it runs it for as much of the time as the
+/// house needs cooling, and the house needs cooling in proportion to how far the outdoor air is over
+/// the temperature at which what the people, the lights and the appliances put in is all it needs to
+/// lose. So the share of the time it runs follows the weather: nothing on a cool day, all of it at the
+/// temperature the machine was sized for, and in between, in proportion. How OFTEN it cycles comes
+/// from the thermostat's dead band: a cycle a quarter of an hour at most, at half duty, and fewer
+/// either side of it (NEMA DC 3: N = Nmax 4 D (1 - D), Nmax = 3 an hour for cooling).
+/// </summary>
+public sealed record ThermostatSpec
+{
+    /// <summary>The outdoor temperature at which the house needs no cooling, °C: the setpoint (24) less
+    /// what the house's own heat is worth.</summary>
+    public float BalanceCelsius { get; init; } = 18f;
+    /// <summary>The outdoor temperature it was sized to keep up with running flat out, °C (a 1 % cooling
+    /// design day in the southern half of the US).</summary>
+    public float DesignCelsius { get; init; } = 35f;
+    /// <summary>Cycles an hour at half duty, the most there are.</summary>
+    public float MaxCyclesPerHour { get; init; } = 3f;
+    /// <summary>How far one house's balance point is from the next, ±°C: insulation, shade, how many
+    /// people are in.</summary>
+    public float BalanceSpreadCelsius { get; init; } = 2f;
+
+    /// <summary>The share of the time the compressor runs at an outdoor temperature.</summary>
+    public float Duty(float outdoorCelsius, float balanceOffset = 0f)
+    {
+        float balance = BalanceCelsius + balanceOffset;
+        return Math.Clamp((outdoorCelsius - balance) / MathF.Max(1f, DesignCelsius - balance), 0f, 1f);
+    }
+
+    /// <summary>On-off cycles an hour at a duty.</summary>
+    public float CyclesPerHour(float duty) => MaxCyclesPerHour * 4f * Math.Clamp(duty, 0f, 1f) * (1f - Math.Clamp(duty, 0f, 1f));
 }
 
 /// <summary>
@@ -278,6 +334,9 @@ public sealed record SmallMachineSpec
 
     /// <summary>The compressor, for a machine that is refrigeration rather than combustion.</summary>
     public CompressorSpec? Compressor { get; init; }
+
+    /// <summary>What calls for the compressor: the house it cools. Defaults when a compressor has none.</summary>
+    public ThermostatSpec? Thermostat { get; init; }
 
     public CasingSpec? Casing { get; init; }
 
@@ -392,6 +451,7 @@ public sealed record SmallMachineSpec
             HumDb = 63f, PulsationDb = 57f, FlowDb = 47f,
             ShellHz = 520f, ShellQ = 6f, StartSeconds = 0.6f,
         },
+        Thermostat = new ThermostatSpec(),
         Casing = new CasingSpec { WidthMetres = 0.8f, HeightMetres = 0.9f, ThicknessMm = 0.8f, Coupling = 0.3f },
         // MEASURED at 65 dB at one metre, which is a modern quiet unit: manufacturers quote these as
         // a sound POWER near 72 dB(A), and 72 less ten log of a hemisphere at a metre is 64.
@@ -420,6 +480,7 @@ public sealed record SmallMachineSpec
             HumDb = 58f, PulsationDb = 54f, FlowDb = 44f,
             ShellHz = 700f, ShellQ = 7f, StartSeconds = 0.4f,
         },
+        Thermostat = new ThermostatSpec(),
         Casing = new CasingSpec { WidthMetres = 0.56f, HeightMetres = 0.4f, ThicknessMm = 0.6f, Coupling = 0.4f },
         SourceLevelDb = 59f,
         ExtentMetres = 0.5f,

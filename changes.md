@@ -48,6 +48,29 @@ Recent work, newest first. `git log` has the rest.
     never written, so city.json stays byte for byte what gen_city.py writes; an entry finds its thing
     again by prefab and place if the generator renumbers.
   - New messages EditorMenu (40) and ModelUpdate (41): the server and clients must be rebuilt together.
+- Four faults the Resonance team listed (unheard; renders and a README in inbox/fault-fixes-2026-10-06):
+  - A light single's wheels spun up at touchdown in 313 ms, as an airliner's do. The load on the
+    wheels is now what the gear takes stopping a 0.9 m/s sink over its own stroke (LandingGearSpec:
+    StrokeMetres, StrokeEfficiency, TouchdownSinkMps): the light single's spring legs put 83 % of its
+    weight on its wheels, 57 ms; the airliner's oleos 15 %, 302 ms (was 297). The tyre is now told the
+    grip in use (slip over the 12 % slip at peak grip) instead of the slip ratio, which had left the
+    light single's touchdown silent: a touchdown is a skid that ends in the squeal. At a metre the
+    light single slides at 116 dB for 60 ms and the airliner at 127 dB for 290 ms (was an 80 ms squeal).
+  - Trains sound their own horn, whistle and bell. The signal sources are placed on the train now;
+    a crossing is sounded with a TrainSignal key (long, long, short, long held to the crossing, the
+    bell until it is reached) that the train's one synth plays on its own outlets, instead of the road
+    vehicle's horn on the lead bogie. Signal sources take a voice only while sounding; their levels are
+    their models' (the tram's two-chime 124 dB, the loco bell 110); the bell renders with its own
+    headroom.
+  - Small machines answer to the weather: an air conditioner's thermostat runs the compressor for the
+    share of the time the outdoor air asks (18 C balance, 35 C design, each house its own within 2 C,
+    at most three cycles an hour), and the pump's motor slows with the lift the weather sets. Each fan
+    and pump turns at its own speed, so two of one model are two machines. Found on the way: half of
+    all blade-row seeds stacked pulses on one blade, which ran a condenser's fan 11 dB over its level.
+  - tools/gen_osm.py tags everything a building is made of with the tile of its middle. 156 of
+    Magnolia's buildings and 138 of Albany's stood across a 250 m edge; both maps regenerated (only
+    Tile tags moved). The server's MapTiles works from geometry and is unchanged.
+  - AudioLab `--game-levels set=faults|faults-ac` renders the scenes.
 - Inside a vehicle, its sound comes from where it gets in (unheard). Cody: "the inside of the cab of
   the cars sounds mono". It was one voice from one point ahead of you and below; the ears matched 0.97
   to 1.00 from 125 Hz to 1 kHz at a cruise. The interior model is now split into its paths, each played
