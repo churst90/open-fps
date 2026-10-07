@@ -1,5 +1,7 @@
 using System;
+using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
 
@@ -26,7 +28,8 @@ public sealed class EventSum
 {
     private const int Bits = 15;                 // 32768 samples: 0.68 s at 48 kHz
     private const int Mask = (1 << Bits) - 1;
-    private readonly float[] _ring = new float[1 << Bits];
+    private const int RingLength = 1 << Bits;
+    private readonly float[] _ring = new float[RingLength];
     private readonly float _rate;
     private long _now;
     private uint _rng;
@@ -73,6 +76,18 @@ public sealed class EventSum
         _ring[i] = 0f;
         _now++;
         return v;
+    }
+
+    /// <summary>The next <paramref name="into"/>.Length output samples, as that many calls to <see cref="Next"/>.</summary>
+    public void Take(Span<float> into)
+    {
+        for (int i = 0; i < into.Length; i++)
+        {
+            int at = (int)(_now & Mask);
+            into[i] = _ring[at];
+            _ring[at] = 0f;
+            _now++;
+        }
     }
 
     /// <summary>A uniform number in [0, 1). One generator per sum, so a render is repeatable from its seed.</summary>
@@ -125,29 +140,77 @@ public sealed class EventSum
         int length = Math.Min(Horizon - offset, (int)(4.6f / decay * _rate));
         float perSample = MathF.Exp(-decay / _rate);
         float sigma = rise * decay;                                // relative climb per second
-        long at = _now + offset;
-        float re = 1f, im = 0f, env = pascals;
+        int start = (int)((_now + offset) & Mask);
         float onset = 1f / MathF.Max(1f, _rate / hz);              // one cycle to full
-        float w = MathF.Tau * hz / _rate;
-        float cw = MathF.Cos(w), sw = MathF.Sin(w);
-        for (int i = 0; i < length; i++)
+        ref float ring = ref MemoryMarshal.GetArrayDataReference(_ring);
+        // The hottest loop in the water models (a surf beach rings 50 million bubble samples a second), so
+        // a vector of samples at a time, each its own sine of the phase: a rotation carried from sample to
+        // sample is a chain the core waits on. The phase is kept in double; the note is retuned every
+        // sixteen samples. Within 1e-5 of the rotation it replaced (docs/WAVES_AND_SHORES.md 8.2).
+        int lanes = Vector<float>.Count;
+        var lane = LaneIndex;
+        Span<float> fall = stackalloc float[lanes];
+        float decayed = 1f;
+        for (int l = 0; l < lanes; l++) { fall[l] = decayed; decayed *= perSample; }
+        var env = new Vector<float>(fall) * pascals;
+        var step = new Vector<float>(decayed);
+        double phase = 0;
+        for (int i0 = 0; i0 < length; i0 += 16)
         {
-            if ((i & 15) == 0)
+            float f = hz * (1f + sigma * i0 / _rate);
+            if (f > 0.45f * _rate) break;
+            float w = MathF.Tau * f / _rate;
+            var from = new Vector<float>((float)phase);
+            for (int j = 0; j < 16 && i0 + j < length; j += lanes)
             {
-                float f = hz * (1f + sigma * i / _rate);
-                if (f > 0.45f * _rate) break;
-                w = MathF.Tau * f / _rate;
-                cw = MathF.Cos(w); sw = MathF.Sin(w);
-                float mag = 1f / MathF.Sqrt(re * re + im * im);
-                re *= mag; im *= mag;
+                int i = i0 + j;
+                var y = env * Sine(from + (lane + new Vector<float>(j)) * w);
+                if (i * onset < 1f) y *= Vector.Min((lane + new Vector<float>(i)) * onset, Vector<float>.One);
+                int at = (start + i) & Mask, left = length - i;
+                if (left < lanes) y = Vector.ConditionalSelect(Vector.LessThan(lane, new Vector<float>(left)), y, Vector<float>.Zero);
+                if (at + lanes <= RingLength)
+                {
+                    ref float cell = ref Unsafe.Add(ref ring, at);
+                    Vector.StoreUnsafe(Vector.LoadUnsafe(ref cell) + y, ref cell);
+                }
+                else
+                    for (int l = 0; l < lanes; l++) Unsafe.Add(ref ring, (at + l) & Mask) += y[l];
+                env *= step;
             }
-            float a = i * onset < 1f ? i * onset : 1f;
-            _ring[(int)((at + i) & Mask)] += env * a * im;
-            float nr = re * cw - im * sw;
-            im = re * sw + im * cw;
-            re = nr;
-            env *= perSample;
+            phase += 16 * (double)w;
+            phase -= Math.Tau * Math.Round(phase * (1 / Math.Tau));
         }
+    }
+
+    private static readonly Vector<float> LaneIndex = MakeLaneIndex();
+
+    /// <summary>sin x for |x| up to a few dozen radians, within about 2e-7: x less the nearest multiple of
+    /// π (in two parts, Cody and Waite, so the reduction keeps what the polynomial needs), then the series
+    /// to x^11, whose first term left out is under 6e-8 at π/2. Plain multiplies and adds, so it is the
+    /// same on every machine.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector<float> Sine(Vector<float> x)
+    {
+        // Adding 1.5 * 2^23 rounds to the nearest integer and leaves its parity in the lowest bit.
+        var t = x * InversePi + RoundingMagic;
+        var k = t - RoundingMagic;
+        var r = x - k * PiHigh - k * PiLow;
+        var r2 = r * r;
+        var p = r + r * r2 * (S3 + r2 * (S5 + r2 * (S7 + r2 * (S9 + r2 * S11))));
+        // An odd multiple of π turns the sine over.
+        return Vector.AsVectorSingle(Vector.AsVectorInt32(p) ^ Vector.ShiftLeft(Vector.AsVectorInt32(t), 31));
+    }
+
+    private static readonly Vector<float> InversePi = new(1f / MathF.PI), RoundingMagic = new(12582912f),
+                                          PiHigh = new(3.140625f), PiLow = new(9.676535897932795e-4f),
+                                          S3 = new(-1f / 6f), S5 = new(1f / 120f), S7 = new(-1f / 5040f),
+                                          S9 = new(1f / 362880f), S11 = new(-1f / 39916800f);
+
+    private static Vector<float> MakeLaneIndex()
+    {
+        Span<float> v = stackalloc float[Vector<float>.Count];
+        for (int l = 0; l < v.Length; l++) v[l] = l;
+        return new Vector<float>(v);
     }
 
     /// <summary>
@@ -238,20 +301,49 @@ public sealed class EventSum
         float band = MathF.Max(1e-4f, (MathF.Min(highHz, 0.45f * _rate) - lowHz) / (0.5f * _rate));
         float gain = pascals / MathF.Sqrt(band) * 1.7320508f;
         int length = Math.Min(Horizon - offset, (int)((rise + 6f * decay) * _rate));
-        long at = _now + offset;
-        float lp0 = 0f, lp = 0f, hp = 0f;
+        int start = (int)((_now + offset) & Mask);
         float riseSamples = MathF.Max(1f, rise * _rate);
         float down = MathF.Exp(-1f / MathF.Max(1f, decay * _rate));
-        float env = 0f;
+        _rng = BandNoise(_ring, start, length, _rng, a1, a2, gain, riseSamples, down);
+    }
+
+    // On its own for the same reason as ResonantNoise.
+    private static uint BandNoise(float[] ringArray, int start, int length, uint rng, float a1, float a2,
+                                  float gain, float riseSamples, float down)
+    {
+        float lp0 = 0f, lp = 0f, hp = 0f;
+        float env = 0f, c1 = 1f - a1, c2 = 1f - a2;
+        var shape = new Envelope(riseSamples);
+        ref float ring = ref MemoryMarshal.GetArrayDataReference(ringArray);
         for (int i = 0; i < length; i++)
         {
-            float x = Signed();
-            lp0 = (1f - a1) * x + a1 * lp0;
-            lp = (1f - a1) * lp0 + a1 * lp;
-            hp = (1f - a2) * lp + a2 * hp;
-            env = i < riseSamples ? i / riseSamples : (i == (int)riseSamples ? 1f : env * down);
-            _ring[(int)((at + i) & Mask)] += gain * env * (lp - hp);
+            float x = Signed(ref rng);
+            lp0 = c1 * x + a1 * lp0;
+            lp = c1 * lp0 + a1 * lp;
+            hp = c2 * lp + a2 * hp;
+            env = shape.At(i, env, down);
+            Unsafe.Add(ref ring, (start + i) & Mask) += gain * env * (lp - hp);
         }
+        return rng;
+    }
+
+    /// <summary>A burst's envelope: a ramp up over <c>rise</c> samples, then a fall by <c>down</c> a sample.</summary>
+    private readonly struct Envelope(float rise)
+    {
+        private readonly int _ramp = (int)MathF.Ceiling(rise), _top = (int)rise;
+
+        /// <summary>The envelope at sample <paramref name="i"/>, from the one before it.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public float At(int i, float before, float down)
+            => i < _ramp ? i / rise : i == _ramp && i == _top ? 1f : before * down;
+    }
+
+    /// <summary><see cref="Signed"/> on a copy of the generator, for a loop that keeps it in a register.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float Signed(ref uint rng)
+    {
+        rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+        return 2f * ((rng >> 8) * (1f / 16777216f)) - 1f;
     }
 
     private void ResonantBurst(int offset, float rise, float decay, float pascals, float lowHz, float highHz)
@@ -267,21 +359,32 @@ public sealed class EventSum
         float enbw = MathF.PI / 4f * (highHz - lowHz);
         float gain = pascals / MathF.Sqrt(enbw * 2f / _rate / 3f);
         int length = Math.Min(Horizon - offset, (int)((rise + 6f * decay) * _rate));
-        long at = _now + offset;
-        float x1 = 0f, x2 = 0f, y1 = 0f, y2 = 0f, u1 = 0f, u2 = 0f, z1 = 0f, z2 = 0f;
+        int start = (int)((_now + offset) & Mask);
         float riseSamples = MathF.Max(1f, rise * _rate);
         float down = MathF.Exp(-1f / MathF.Max(1f, decay * _rate));
+        _rng = ResonantNoise(_ring, start, length, _rng, b0, a1, a2, gain, riseSamples, down);
+    }
+
+    // On its own, with nothing else live, so the JIT keeps the eight filter states in registers: inside
+    // ResonantBurst it kept them on the stack, which doubled the time a sample takes.
+    private static uint ResonantNoise(float[] ringArray, int start, int length, uint rng, float b0, float a1, float a2,
+                                      float gain, float riseSamples, float down)
+    {
+        float x1 = 0f, x2 = 0f, y1 = 0f, y2 = 0f, u1 = 0f, u2 = 0f, z1 = 0f, z2 = 0f;
         float env = 0f;
+        var shape = new Envelope(riseSamples);
+        ref float ring = ref MemoryMarshal.GetArrayDataReference(ringArray);
         for (int i = 0; i < length; i++)
         {
-            float x = Signed();
+            float x = Signed(ref rng);
             float y = b0 * (x - x2) - a1 * y1 - a2 * y2;
             x2 = x1; x1 = x; y2 = y1; y1 = y;
             float z = b0 * (y - u2) - a1 * z1 - a2 * z2;
             u2 = u1; u1 = y; z2 = z1; z1 = z;
-            env = i < riseSamples ? i / riseSamples : (i == (int)riseSamples ? 1f : env * down);
-            _ring[(int)((at + i) & Mask)] += gain * env * z;
+            env = shape.At(i, env, down);
+            Unsafe.Add(ref ring, (start + i) & Mask) += gain * env * z;
         }
+        return rng;
     }
 
     /// <summary>

@@ -528,6 +528,13 @@ if (args.Contains("--waves"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.WavesSpike.Run(args));
 }
 
+if (args.Contains("--water-cost"))
+{
+    // --water-cost [shore|flow] [preset ...] [sec= reps= wind= out=DIR] | bubbles | null DIR_A DIR_B: what
+    // each shore and running water preset costs a core as the game renders it, and a null test between builds.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WaterCostSpike.Run(args));
+}
+
 if (args.Contains("--wet-roads"))
 {
     // --wet-roads [water|levels out=DIR|game out=DIR set=]: tyres on wet roads, the road's water,

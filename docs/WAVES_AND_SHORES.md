@@ -347,9 +347,17 @@ What does not fit:
 
 - A big river's bank in a calm is nearly silent: the current's eddies (U² / 2g, an estimate) make waves
   too gentle to break at the bank. With a wind it is 5 of 14: the recorded river banks are mostly ship
-  wakes and chop from further off, which the model does not have.
+  wakes and chop from further off, which the model does not have. Measured 2026-10-07: 16.8 dB at a metre,
+  32 dB under the 48.5 dB it is declared at (its level at 5 m/s), which the game plays it against. An eddy's wave never breaks (`Beach`, `breaks = !eddy`), and a wave that
+  does not break makes no front, spray or foam, so all that is left is the pockets in roots and riprap
+  (13 in 20 s). A surging wavelet lapping a steep bank, which `Face` would slap at a wall, makes nothing
+  on a beach.
 - Shingle's band envelopes move more than the recordings' (5-7 of 14), and it is loud: at 3 m its peaks
-  reach the master limiter's ceiling.
+  reach the master limiter's ceiling. Taken apart at its reference wind (`--waves levels shingle parts=`,
+  a metre, 2026-10-07): the breakers' plume 90.9 dB and the plunging jet's crash 90.4 dB, the stones only
+  70.5 dB; 94.1 dB in all, its 10 ms peaks 18 dB over that. Since 8.1 every wave of the 55 cm wind sea
+  (5 m/s over 50 km) plunges at the step on its own, about 2.7 breakers a second a stretch, so the shingle
+  is heard as plunging breakers more than as stones.
 - The boats are more click-like inside 10 ms than the recordings (6-7 against 3.0-4.7), and the
   planking's lowest modes stand 11-13 dB up at 125 Hz from inside.
 - The lakes' lowest two octaves are 15-25 dB under the recordings', which carry wind on the microphone.
@@ -360,11 +368,10 @@ harbour wall 66 (64.5), boats 60-61.
 The surf heard 15 m back from 150 m of beach measures 62 dB, against 62 dB at 40 m quoted from Bolin and
 Åbom (wave height not read): about right, perhaps a little low.
 
-Cost of one core, one stretch: lake beach 3.2 %, rocky edge 3.3 %, pond 0.9 %, reedy edge 0.8 %, river
-bank 0.9 %, surf 11.1 %, shingle 5.9 %, harbour wall 1.7 %, boats 2.2-2.9 %. A near stretch takes 5 HRTF
-voices (surf 10). Since section 8.1 the surf costs about half as much again, the shingle about four
-times and the harbour wall about twice (measured side by side with the old model on a busy machine:
-surf 21-27 % to 36 %, shingle 8 % to 32-37 %, harbour wall 4.4 % to 10 %); the rest are unchanged.
+Cost of one core, one stretch, rendered as the game renders it (AudioLab `--water-cost`, a Zen 5c core at
+3.3 GHz, 2026-10-07, section 8.2): lake beach 1.0 %, rocky edge 2.0 %, pond 1.1 %, reedy edge 0.5 %, river
+bank 0.9 %, surf 5.8 %, shingle 7.2 %, harbour wall 2.5 %, boats 1.4-1.5 %. A near stretch takes 5 HRTF
+voices (surf 10).
 
 ### 8.1 Smoothing, 2026-10-06
 
@@ -407,6 +414,51 @@ metre: shingle 92.3 dB, harbour wall 65.8.
 Still open: the harbour wall and the boats are slaps with little between them (the boats' 2-8 kHz level
 standard deviation 14 dB against 3.6-11.8 recorded); what fills the time between slaps at a real face is
 not modelled. The shingle is still lumpier than its recordings.
+
+### 8.2 Cost, 2026-10-07
+
+The smoothing of 8.1 made the surf, the shingle and the harbour wall dearer (side by side on a busy
+machine: surf 21-27 % of a core to 36 %, shingle 8 % to 32-37 %, harbour wall 4.4 % to 10 %). Profiled
+(`--water-cost`, timers round each part of a block): most of it was the bubbles rung one at a time. The
+three pieces each break of a column is cut into (8.1) make every population a third as dense, so more of
+them stay under the crowd limit and are rung event by event: the surf rings 30,000 bubbles a second,
+50 million bubble samples, the shingle 16,000 bubbles and 58 million samples, most of them the long rings
+of the 250 and 500 Hz bubbles. The harbour wall's cost was its splashes (1,100 a second of 110 ms each).
+
+What changed, none of it in what the model decides:
+
+- A bubble's samples are each the sine of its phase, a vector of eight at a time (`EventSum.Bubble`), where
+  each sample used to be a rotation of the one before, a chain the core waits on: 0.63 ns a sample against
+  4.0. Not bit-identical: the phase is exact where the rotation drifted by its rounding.
+- A splash's two resonators run in a loop of their own, so the JIT keeps their eight states in registers:
+  2.0 ns a sample against 3.7. Bit-identical.
+- A block's samples are rendered at once (`ShoreSynth.RenderBlock`): each place's crowd noise with the
+  places side by side in vector lanes, each place's events read from its ring a block at a time, a hull's
+  modes from plain arrays, and a band's unevenness worked out only where the band is used. Bit-identical.
+
+The cost of one core, before and after, three runs each from a fresh synth, the cheapest:
+
+| preset | Zen 5c, 3.3 GHz | Zen 5, 5.1 GHz |
+|---|---|---|
+| lake beach | 3.05 % to 0.97 % | 2.01 % to 0.64 % |
+| rocky edge | 4.00 to 1.97 | 2.65 to 1.21 |
+| pond bank | 1.97 to 1.12 | 1.30 to 0.76 |
+| reedy edge | 0.88 to 0.47 | 0.60 to 0.31 |
+| river bank | 1.55 to 0.93 | 1.03 to 0.62 |
+| surf | 29.4 to 5.8 | 19.3 to 3.8 |
+| shingle | 37.9 to 7.2 | 24.9 to 4.7 |
+| harbour wall | 4.12 to 2.53 | 2.76 to 1.52 |
+| boat, wood | 3.15 to 1.54 | 2.08 to 0.97 |
+| boat, aluminium | 2.77 to 1.43 | 1.84 to 0.91 |
+
+Measured on two cores: on one core alone the JIT's tiering thread barely runs, the hot loops stay in
+their first, unoptimised code and the figures mean little.
+
+The sound: every place of every preset, 20 s rendered before and after and subtracted (`--water-cost
+null`): the difference is 90-118 dB under the signal (the harbour wall's -90 dB is its pockets' long rings,
+where the old rotation's phase had drifted furthest). The renders through the game, every scene of 8.1,
+before and after, measure the same within what two takes of one build differ by:
+`inbox/water-perf-2026-10-07/README.txt`.
 
 ## 9. Not modelled yet, and what comes next
 
