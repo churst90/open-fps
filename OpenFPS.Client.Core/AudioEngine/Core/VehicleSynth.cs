@@ -347,8 +347,15 @@ public static class VehicleSynth
     /// no <paramref name="slip"/> of its own, so the sliding is not made twice.</param>
     /// <param name="sampleRate">The rate the caller runs at, which sets the tread tone, the rolling
     /// high-pass and the squeal's resonators in hertz.</param>
+    /// <param name="squealScale">The share of the <paramref name="slip"/>'s squeal and slide this call
+    /// makes, as pressure: one wheel of an axle whose slip is all that is known (CabinPaths' corners,
+    /// each 1/sqrt(wheels) so the axle's wheels together squeal as loud as the axle did).</param>
+    /// <param name="toneScale">How much of the tread tone this call makes, as amplitude. Zero leaves it
+    /// out: CabinPaths' wheels each roll and squeal for themselves, and the tread tone, one tone in phase
+    /// on every tyre of a size, is played once from under the floor (<see cref="TreadTone"/>).</param>
     public static float Tyre(TyreProfile t, float speed, float slip, Random rng, ref TyreVoice v, float rollingPa = 0f,
-                             float rollingRadius = 0.337f, float sliding = 0f, float sampleRate = SampleRate)
+                             float rollingRadius = 0.337f, float sliding = 0f, float sampleRate = SampleRate,
+                             float squealScale = 1f, float toneScale = 1f)
     {
         // The demand is smoothed, and asymmetrically: a tyre lets go quickly and settles slowly, so
         // a squeal starts on the instant and dies away over a couple of hundred milliseconds. Stepping
@@ -380,6 +387,8 @@ public static class VehicleSynth
             tone = (float)(Math.Sin(v.TreadPhase) * 0.34 + Math.Sin(v.TreadPhase * 2) * 0.16);
             tone *= 1f - t.SurfaceRoughness * 0.55f;
         }
+        // The roar's normalisation below is from the untouched tone's level; only the tone's share moves.
+        float toneOut = tone * toneScale;
         float mix;
         if (rollingPa > 0f)
         {
@@ -398,10 +407,10 @@ public static class VehicleSynth
             float norm = MathF.Sqrt(roarW * roarW + toneW * toneW);
             float toneRms = 0.2657f * (1f - t.SurfaceRoughness * 0.55f);
             float unit = (roarW / norm) * band / MathF.Max(1e-6f, bandRms)
-                       + (toneW > 0f ? (toneW / norm) * tone / toneRms : 0f);
+                       + (toneW > 0f ? (toneW / norm) * toneOut / toneRms : 0f);
             mix = unit * rollingPa * level / OutputGain;
         }
-        else mix = (roar * 1.4f + tone) * level * 0.3f;
+        else mix = (roar * 1.4f + toneOut) * level * 0.3f;
 
         // ── Sliding ──
         float squeal = TyreFriction.SquealAmount(demand);
@@ -417,7 +426,7 @@ public static class VehicleSynth
             if (squeal > 1e-3f)
             {
                 float hz = t.SquealHz * TyreFriction.SquealPitch(demand);
-                float amp = Level(t.SquealDb) * squeal * rub * SquealProminence;
+                float amp = Level(t.SquealDb) * squeal * rub * SquealProminence * squealScale;
                 // Two poles at the fundamental and one at the second harmonic. Real squeal is rich —
                 // the release is a snap, not a sine — and the octave is most of what makes it read as
                 // rubber rather than as a test tone.
@@ -431,7 +440,7 @@ public static class VehicleSynth
                 // A locked wheel is broadband and DARK: the tread is being torn rather than tapped,
                 // and the energy sits well below the squeal it replaced.
                 v.SlideLp += rates.SlideStep * (noise - v.SlideLp);
-                mix += v.SlideLp * Level(t.SquealDb) * skid * rub * 1.6f * SquealProminence;
+                mix += v.SlideLp * Level(t.SquealDb) * skid * rub * 1.6f * SquealProminence * squealScale;
             }
         }
 
@@ -451,6 +460,26 @@ public static class VehicleSynth
         // the tanh for what it is for, which is catching the rare extreme rather than shaping the
         // normal case.
         return MathF.Tanh(y * 0.05f) * 26f;
+    }
+
+    /// <summary>
+    /// The tread tone of an anchored <see cref="Tyre"/> call alone, as it leaves that call (its output
+    /// stage is linear at rolling levels): the same tone, phase and weight, for <paramref name="rollingPa"/>
+    /// at <paramref name="speed"/>. For a voice that plays an axle's tread tone apart from its roar.
+    /// </summary>
+    public static float TreadTone(TyreProfile t, float speed, float rollingPa, float rollingRadius, ref double phase,
+                                  float sampleRate = SampleRate)
+    {
+        if (t.TreadBlocks <= 0 || rollingPa <= 0f || speed < 0.3f) return 0f;
+        float level = MathF.Pow(MathF.Max(speed, 0.3f) / 20f, 1.5f);
+        float blockHz = speed / (2f * MathF.PI * MathF.Max(0.05f, rollingRadius)) * t.TreadBlocks;
+        phase += 2.0 * Math.PI * blockHz / sampleRate;
+        if (phase > 2.0 * Math.PI) phase -= 2.0 * Math.PI;
+        float tone = (float)(Math.Sin(phase) * 0.34 + Math.Sin(phase * 2) * 0.16) * (1f - t.SurfaceRoughness * 0.55f);
+        float roarW = 1.4f * (0.55f + 0.45f * t.SurfaceRoughness) * 0.19f;
+        float toneW = 0.2657f * (1f - t.SurfaceRoughness * 0.55f);
+        float norm = MathF.Sqrt(roarW * roarW + toneW * toneW);
+        return (toneW / norm) * tone / toneW * rollingPa * level;
     }
 
     /// <summary>The output stage's gain for small signals: tanh(0.05 y) x 26.</summary>

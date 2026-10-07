@@ -577,6 +577,9 @@ public partial class FmodAudioProvider : IAudioProvider
         public bool FollowsListener;
         public bool InsideListenersVehicle;
         public Vector3 ListenerOffset;
+        /// <summary>The direction (Steam Audio's frame) the cabin path's HRTF trim was last worked out for.</summary>
+        public Vector3 CabinTrimDir;
+
         public float ConeInside;
         public float ConeOutside;
         public float ConeOutsideVolume;
@@ -1310,6 +1313,8 @@ public partial class FmodAudioProvider : IAudioProvider
         // gives it back that way when a map is unloaded; a point source that borrowed it next played
         // the same signal in both ears. After a /join, half the voices on the new map were mono.
         v.State.SpatialBlend = 1f;
+        v.State.PreEq = null;
+        Array.Clear(v.State.PreEqState);
         v.State.LastRms = v.State.LastRmsL = v.State.LastRmsR = 0f;
         v.State.ProducedAudio = false;
         v.State.GuardName = null; v.State.NonFiniteReported = 0; v.State.NonFiniteInputReported = 0;
@@ -1718,6 +1723,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>The cabin's traced response against its physical level, dB: 0 is the traced level.
     /// `/cabin <dB>` sets it, for judging a ride by ear; the reflections trim does not touch it.</summary>
     public static volatile float CabinDb = 0f;
+
     /// <summary>Once chosen, a source keeps its trace at least this long: no flicker as it passes
     /// behind something.</summary>
     private const float EchoMinHoldSeconds = 3f;
@@ -1833,6 +1839,10 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             if (a.IsReflection || a.FadeTarget <= 0f || a.TargetRegionId != _listenerRegionId) continue;
             if (!a.SourceReverbConnection.hasHandle()) continue;
+            // The paths into the cabin you sit in send at the interior voice's own send, so they need no
+            // trace of their own; given slots, they pushed the rain on the roof out of them (+2 dB, the
+            // rain falling back on the stand-in law).
+            if (a.TapState is { CabinPath: > 0 }) continue;
             float dist = Vector3.Distance(_listenerPos, a.Position);
             _lateCandidates.Add((a, a.BaseVolume * Loudness.RenderedGain(1f, a.MinDistance, a.Range, dist)));
         }
@@ -2776,6 +2786,28 @@ public partial class FmodAudioProvider : IAudioProvider
             // switched: see EngineVoiceState.SplitVoices.
             src.SplitVoices = true;
         }
+        else if (emitter.IsSynth && emitter.CabinOfEntity != 0)
+        {
+            // A path into the cabin of the vehicle the listener sits in (CabinPaths): it reads that
+            // engine's ring for the path. No engine this frame, nothing to be a path of.
+            if (!_isInitialized) return;
+            EngineVoiceState? src;
+            lock (_lock) { src = FindActive(emitter.CabinOfEntity)?.EngineState; }
+            if (src?.CabinLayout == null || emitter.CabinPath < 1 || emitter.CabinPath >= src.CabinLayout.Count) return;
+            var tap = new EngineTapState(src, emitter.CabinPath);
+            if (TapProcessor.CreateDSP(_system, tap, out engineDsp, out engineHandle) != RESULT.OK) return;
+            engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
+            if (_system.playDSP(engineDsp, targetGroup, true, out channel) != RESULT.OK)
+            {
+                engineDsp.release();
+                engineHandle.Free();
+                return;
+            }
+            channel.setMode(MODE._3D | Rolloff.Mode);
+            tapState = tap;
+            // ...and the engine's own voice stops carrying the path, slewed as the tap fades in.
+            src.SetCabinTapLive(emitter.CabinPath, true);
+        }
         else if (emitter.IsSynth && emitter.EchoOfEntity != 0)
         {
             if (!_isInitialized) return;
@@ -2934,6 +2966,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 ServingStop = emitter.ServingStop,
                 WindowsOpen = emitter.WindowsOpen,
                 Interior = emitter.Interior,
+                CabinEarX = emitter.CabinEarX,
                 RoadWaterMm = emitter.RoadWaterMm,
                 // Live: the loudness law applies to what the engine is doing now, not just to its
                 // declared level. See EngineVoiceState.CompensateLevel.
@@ -3354,6 +3387,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 {
                     active.EngineState.TargetSpeed = emitter.EngineSpeed;
                     active.EngineState.Interior = emitter.Interior;
+                    active.EngineState.CabinEarX = emitter.CabinEarX;
                     active.EngineState.Running = emitter.EngineRunning;
                     active.EngineState.ServingStop = emitter.ServingStop;
                     active.EngineState.WindowsOpen = emitter.WindowsOpen;
@@ -3896,7 +3930,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // A machine whose second outlet has gone is a machine heard through one voice again, and
             // the front tap slews back into it. Without this the intake would simply disappear — the
             // car would lose a third of its sound for being far enough away to be heard as one thing.
-            if (active.TapState != null) active.TapState.Source.SplitVoices = false;
+            active.TapState?.HandBack();
             active.TapState = null;
         }
         // ...and only now is nothing left pointing at it.
@@ -4170,6 +4204,9 @@ public partial class FmodAudioProvider : IAudioProvider
                 active.SaState.DirX = local.X / len;
                 active.SaState.DirY = local.Y / len;
                 active.SaState.DirZ = -local.Z / len;
+                // A path into the cabin you sit in: its HRTF colouring taken back to the one voice's.
+                if (active.EngineState is { Interior: true, CabinLayout: not null } || active.TapState is { CabinPath: > 0 })
+                    CabinTrim(active, new Vector3(active.SaState.DirX, active.SaState.DirY, active.SaState.DirZ));
             }
             // The ground's image: the placed source mirrored in the surface it bounces off.
             if (active.GroundHeight is float gh)
@@ -4350,12 +4387,26 @@ public partial class FmodAudioProvider : IAudioProvider
             // while it lasted, wrong in size, and worse the faster the listener moved. What a
             // reflection must not inherit is a Doppler that is not its own; what it must not be given
             // is one it already has.
+            // The vehicle you sit in and the paths into its cabin ride with you: no Doppler at all, not
+            // the near-one a smoothed listener velocity against the vehicle's makes while it speeds up.
+            // A pitched channel is called an extra block now and then, and the cabin's taps, which play
+            // the samples the vehicle's own voice plays at the same moment, would lose it by a block.
+            if (active.EngineState is { Interior: true } || active.TapState is { CabinPath: > 0 }) doppler = 1f;
             if (active.EchoState != null && active.IsReflection) active.Channel.setPitch(1.0f);
             else active.Channel.setPitch(basePitch * doppler);
             // ...and what reads this voice in step with it is told the rate it is being taken at,
             // because its play position moves in whole blocks (EngineVoiceState.ConsumeRate).
             if (active.EngineState != null) active.EngineState.ConsumeRate = basePitch * doppler;
             if (active.TapState != null) active.TapState.ChannelRate = basePitch * doppler;
+            // Where this channel's own clock sits on its parent's, once it has started: what puts the
+            // vehicle you sit in and the taps of its cabin on one time line (EngineVoiceState.BlockAt).
+            if ((active.EngineState is { CabinLayout: not null, Interior: true } || active.TapState is { CabinPath: > 0 })
+                && active.Channel.getDSPClock(out ulong own, out ulong parent) == RESULT.OK && own > 0)
+            {
+                long offset = (long)parent - (long)own;
+                if (active.EngineState != null) active.EngineState.ChannelClockOffset = offset;
+                else active.TapState!.ChannelClockOffset = offset;
+            }
         }
 
         if (active.ThreeEqDsp.hasHandle())
@@ -4421,6 +4472,12 @@ public partial class FmodAudioProvider : IAudioProvider
         bool here = active.TargetRegionId == _listenerRegionId;
         float atDistance = here ? LateSend(active, d)
                                 : MathF.Min(d, 1f) * MathF.Pow(MathF.Max(d, 1f), Math.Clamp(_listenerEnclosure, 0f, 1f));
+        // The paths into the cabin you sit in feed your room as the one interior voice did: the voice's
+        // own send, every path alike. Each traced for itself, they came out a decibel apart, and the
+        // cabin's boom with them.
+        if (here && active.EngineState is { Interior: true, CabinLayout: not null } inside) inside.CabinRoomSend = atDistance;
+        else if (here && active.TapState is { CabinPath: > 0 } cabinTap && cabinTap.Source.CabinRoomSend is float shared && shared >= 0f)
+            atDistance = shared;
         float ownMix = active.IsReflection || !_traced.ContainsKey(active.TargetRegionId) ? 0f : (here ? atDistance : 1f);
         float crossMix = active.IsReflection || !_traced.ContainsKey(_listenerRegionId) ? 0f : 1f;
         if (active.SourceReverbConnection.hasHandle() && active.ReverbConnection.hasHandle()
@@ -4552,6 +4609,55 @@ public partial class FmodAudioProvider : IAudioProvider
     /// Direction — which for an engine is the entity's own heading — or, failing that, the way it is
     /// moving. A machine standing still with no heading has nothing to say, and says so.
     /// </summary>
+    // ── The cabin's paths, equalised for their directions (CabinPaths, HrtfBands) ──────────────────
+
+    /// <summary>The ears' mean power per band in each direction asked about, by direction to a degree
+    /// or so, and in the one interior voice's direction.</summary>
+    private readonly Dictionary<(int, int, int), float[]?> _hrtfBands = new();
+    private float[]? _hrtfOnePlace;
+
+    /// <summary>The ears' mean power per band from <paramref name="dir"/>, measured once a direction. A
+    /// measurement is a millisecond or two of the game thread, so at most one is made every
+    /// <see cref="HrtfMeasureSeconds"/>: getting into a car asks for nine at once. False when this one
+    /// has to wait its turn.</summary>
+    private bool HrtfBandsAt(Vector3 dir, out float[]? db)
+    {
+        var key = ((int)MathF.Round(dir.X * 50f), (int)MathF.Round(dir.Y * 50f), (int)MathF.Round(dir.Z * 50f));
+        if (_hrtfBands.TryGetValue(key, out db)) return true;
+        double now = OpenFPS.Common.AudioClock.Now;
+        if (now - _hrtfMeasuredAt < HrtfMeasureSeconds) return false;
+        _hrtfMeasuredAt = now;
+        db = HrtfBands.Measure(_saContext, _saHrtf, MixerQuality.MixerRate, _saFrameSize, dir);
+        if (_hrtfBands.Count > 512) _hrtfBands.Clear();
+        _hrtfBands[key] = db;
+        return true;
+    }
+
+    private double _hrtfMeasuredAt = double.NegativeInfinity;
+    private const double HrtfMeasureSeconds = 0.01;
+
+    /// <summary>
+    /// Works out, when the direction it is played from has moved by more than a couple of degrees, the
+    /// equaliser that takes a cabin path's HRTF colouring back to the one interior voice's (a little
+    /// ahead and below, CabinPaths.OnePlace), and puts it on the path's binaural stage.
+    /// </summary>
+    private void CabinTrim(ActiveSound active, Vector3 dir)
+    {
+        if (!_steamAudioEnabled || _saHrtf == IntPtr.Zero) return;
+        if (active.CabinTrimDir != Vector3.Zero && Vector3.Dot(dir, active.CabinTrimDir) > 0.9994f) return;   // 2 degrees
+        var one = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.OnePlace;
+        if (_hrtfOnePlace == null && !HrtfBandsAt(Vector3.Normalize(new Vector3(one.X, one.Y, -one.Z)), out _hrtfOnePlace)) return;
+        if (!HrtfBandsAt(dir, out var here)) return;   // its turn comes next update
+        active.CabinTrimDir = dir;
+        if (_hrtfOnePlace == null || here == null) return;
+        Span<float> trim = stackalloc float[here.Length];
+        for (int k = 0; k < trim.Length; k++) trim[k] = Math.Clamp(_hrtfOnePlace[k] - here[k], -12f, 12f);
+        // On the binaural stage, after the room's send: the HRTF colours only what reaches the ears
+        // directly, and the cabin's response is fed what the path really is. Put on the path itself, it
+        // took the low end's correction off the send too, and the cabin's boom fell 1-2 dB.
+        if (active.SaState != null) active.SaState.PreEq = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.Design(trim, MixerQuality.MixerRate);
+    }
+
     private bool ListenerInMachineFrame(Vector3 position, Vector3 direction, Vector3 velocity, out Vector3 local)
     {
         Vector3 fwd = direction;
@@ -5033,9 +5139,9 @@ public partial class FmodAudioProvider : IAudioProvider
             {
                 tap.TargetGain = 0f;
                 // Handed back at the moment the fade STARTS, so the two crossfade rather than
-                // leaving a hole: the voice that stays gains the front tap over the same sixty
-                // milliseconds this one loses it.
-                tap.Source.SplitVoices = false;
+                // leaving a hole: the voice that stays gains the front tap (or the cabin path) over
+                // the same sixty milliseconds this one loses it.
+                tap.HandBack();
                 return tap.FadedOut;
             }
             var mach = active?.MachineState;

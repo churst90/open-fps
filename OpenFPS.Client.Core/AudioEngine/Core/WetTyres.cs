@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Runtime.CompilerServices;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Common;
@@ -103,6 +104,42 @@ public sealed class WetTyres
     /// <summary>This sample's pressure at the front tap, the rear tap, and in the cabin, Pa at a metre.</summary>
     public float Front, Rear, Cabin;
 
+    // ── Each wheel into the cabin on its own (CabinPaths) ──────────────────────────────────────────
+    //
+    // Sitting in the vehicle, each wheel's spray comes in through its own arch, so the cabin's share is
+    // kept per wheel: each wheel's drops go into an event sum of its own, and each wheel's hiss through a
+    // low-pass of its own. The sum over the wheels is exactly the one Cabin signal (the low-pass is
+    // linear), and the front and rear taps are unchanged. Made the first time anyone sits in it.
+    private sealed class Corners
+    {
+        public readonly EventSum[] Events;
+        public readonly float[] Lp, Out;
+        public Corners(int n, float rate, int seed)
+        {
+            Events = new EventSum[n];
+            for (int i = 0; i < n; i++) Events[i] = new EventSum(rate, seed + 7 + i);
+            Lp = new float[n]; Out = new float[n];
+        }
+    }
+    private Corners? _corners;
+    /// <summary>The corners as this block uses them: latched in <see cref="Block"/>, so a block never
+    /// changes its mind half way.</summary>
+    private Corners? _cornersNow;
+    private readonly int _seed;
+
+    /// <summary>Keeps each wheel's share of the cabin apart from now on. Game thread; allocates.</summary>
+    public void EnableCorners()
+    {
+        if (Volatile.Read(ref _corners) == null) Volatile.Write(ref _corners, new Corners(_n, _rate, _seed));
+    }
+
+    /// <summary>This sample's spray in the cabin through wheel <paramref name="i"/>'s arch, Pa (zero
+    /// before <see cref="EnableCorners"/>, when it is all in <see cref="Cabin"/>).</summary>
+    public float CabinWheel(int i) => _cornersNow is { } c && i < c.Out.Length ? c.Out[i] : 0f;
+
+    /// <summary>What the cabin still hears of the drops thrown before the wheels were kept apart.</summary>
+    public float CabinTail;
+
     /// <summary>Whether anything is wet: when not, <see cref="Step"/> costs a branch.</summary>
     public bool Active => _active;
 
@@ -134,6 +171,7 @@ public sealed class WetTyres
         _frontEvents = new EventSum(sampleRate, seed);
         _rearEvents = new EventSum(sampleRate, seed + 1);
         _rng = (uint)seed * 2654435761u | 1u;
+        _seed = seed;
         _cabinGain = MathF.Pow(10f, CabinDb / 20f);
         _cabinA = 1f - MathF.Exp(-2f * MathF.PI * CabinCornerHz / sampleRate);
         _bowLpA = 1f - MathF.Exp(-2f * MathF.PI * BowHighHz / sampleRate);
@@ -152,6 +190,7 @@ public sealed class WetTyres
     public void Block(ReadOnlySpan<float> waterMm, ReadOnlySpan<float> gain, ReadOnlySpan<float> textureMm, float speed, int count)
     {
         _speed = MathF.Abs(speed);
+        _cornersNow = Volatile.Read(ref _corners);
         bool any = false;
         float u = _speed / ReferenceSpeed;
         float hiHz = MathF.Min(0.45f * _rate, EjectionHighHz * MathF.Pow(MathF.Max(0.2f, u), BrightnessExponent));
@@ -180,7 +219,7 @@ public sealed class WetTyres
 
             // The drops: a Poisson count this block, each a struck surface (EventSum.Impact). Their
             // number follows the water swept; each one's size the speed it was thrown at.
-            var sum = _front[i] ? _frontEvents : _rearEvents;
+            var sum = _cornersNow != null ? _cornersNow.Events[i] : _front[i] ? _frontEvents : _rearEvents;
             float rate = ImpactsPerSecond * _widthShare[i] * (w / ReferenceWaterMm) * u;
             int drops = sum.Poisson(rate * count / _rate);
             if (drops > 0)
@@ -236,9 +275,25 @@ public sealed class WetTyres
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public void Step()
     {
-        if (!_active) { Front = Rear = Cabin = 0f; return; }
+        var corners = _cornersNow;
+        if (!_active)
+        {
+            Front = Rear = Cabin = CabinTail = 0f;
+            if (corners != null) Array.Clear(corners.Out);
+            return;
+        }
         float front = _frontEvents.Next(), rear = _rearEvents.Next();
         float cabinIn = front + rear;
+        if (corners != null)
+        {
+            // Each wheel's drops from its own sum, into its own share of the cabin.
+            for (int i = 0; i < _n; i++)
+            {
+                float e = corners.Events[i].Next();
+                if (_front[i]) front += e; else rear += e;
+                corners.Out[i] = e;
+            }
+        }
         for (int i = 0; i < _n; i++)
         {
             if (_ampE[i] <= 0f && _ampB[i] <= 0f) continue;
@@ -266,12 +321,28 @@ public sealed class WetTyres
             }
             y *= _gain[i];
             if (_front[i]) front += y; else rear += y;
-            cabinIn += y * 0.5f * _cabinShare[i];
+            if (corners != null) corners.Out[i] += y * 0.5f * _cabinShare[i];
+            else cabinIn += y * 0.5f * _cabinShare[i];
         }
         _cabinLp += _cabinA * (cabinIn - _cabinLp);
         Front = front;
         Rear = rear;
-        Cabin = _cabinLp * _cabinGain;
+        if (corners == null)
+        {
+            Cabin = _cabinLp * _cabinGain;
+            return;
+        }
+        // Kept apart: each wheel through a low-pass of its own, and the two old sums' last drops on
+        // their own. Together, exactly the one Cabin signal.
+        float sum = 0f;
+        for (int i = 0; i < _n; i++)
+        {
+            corners.Lp[i] += _cabinA * (corners.Out[i] - corners.Lp[i]);
+            corners.Out[i] = corners.Lp[i] * _cabinGain;
+            sum += corners.Out[i];
+        }
+        CabinTail = _cabinLp * _cabinGain;
+        Cabin = sum + CabinTail;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

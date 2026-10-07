@@ -321,6 +321,13 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         // BOTH taps: a borrowed voice and an echo are a whole car heard from somewhere else, not the
         // back half of one. Only a listener close enough to tell the two ends apart gets them apart.
         float a = _ring[j0] + _front[j0], b = _ring[j1] + _front[j1];
+        // ...and, sitting in it, every path into the cabin.
+        if (Volatile.Read(ref _cabinRings) is { } rings)
+            foreach (var r in rings)
+            {
+                int m = r.Length - 1;
+                a += r[(int)(i0 & m)]; b += r[(int)((i0 + 1) & m)];
+            }
         return Soft(a + (b - a) * f);
     }
 
@@ -460,16 +467,19 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         // the intake over to its own voice is a crossfade and not a step.
         float shareTarget = SplitVoices ? 0f : 1f;
         float shareStep = 1f / (0.06f * SampleRate);
+        // The cabin's paths whose taps are not playing (yet, or at all) are carried here.
+        var cabin = Volatile.Read(ref _cabinRings);
         for (int i = 0; i < take; i++)
         {
             int j = (int)((at + i) & mask);
             _frontShare += Math.Clamp(shareTarget - _frontShare, -shareStep, shareStep);
+            float carried = cabin != null ? CarriedCabin(cabin, at + i, shareStep) : 0f;
             // The ground AFTER the ceiling. The ceiling guards the synthesis — a backfire past the
             // voice's headroom — and the voice's headroom was set for the direct sound. With the
             // road's up-to-six-decibel bass lift inside it, every exhaust pulse of a loud V8 ran
             // into the knee and the car came out crunched ("really bad over sampling ... the v8
             // muscle car"). The mixer is floating point; the lift has room there.
-            mono[i] = Ground.Process(Soft(_ring[j] + _front[j] * _frontShare));
+            mono[i] = Ground.Process(Soft(_ring[j] + _front[j] * _frontShare + carried));
         }
         if (take > 0)
         {
@@ -508,10 +518,16 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         int mask = _ring.Length - 1;
         float shareTarget = SplitVoices ? 0f : 1f;
         float shareStep = 1f / (0.06f * SampleRate);
+        var cabin = Volatile.Read(ref _cabinRings);
         for (int i = 0; i < mono.Length; i++)
         {
             int j = (int)((at + i) & mask);
             _frontShare += Math.Clamp(shareTarget - _frontShare, -shareStep, shareStep);
+            if (cabin != null)
+            {
+                mono[i] = Ground.Process(Soft(_ring[j] + _front[j] * _frontShare + CarriedCabin(cabin, at + i, shareStep)));
+                continue;
+            }
             // The ground AFTER the ceiling. The ceiling guards the synthesis — a backfire past the
             // voice's headroom — and the voice's headroom was set for the direct sound. With the
             // road's up-to-six-decibel bass lift inside it, every exhaust pulse of a loud V8 ran
@@ -647,6 +663,27 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         float perTyrePa = 20e-6f * MathF.Pow(10f, v.Tyres.ReferenceDb / 20f);
         _rollingFrontPa = perTyrePa * MathF.Sqrt(frontTyres) / (PerAxle * DefaultTyreMix);
         _rollingRearPa = perTyrePa * MathF.Sqrt(Math.Max(1, tyres - frontTyres)) / (PerAxle * DefaultTyreMix);
+
+        // The paths into the cabin, if it has one (CabinPaths). Each wheel rolls at its share of its
+        // axle group's power, so the wheels together are the two axles.
+        _cabinLayout = CabinPaths.For(v);
+        if (_cabinLayout is { } cl && cl.PathOfWheel.Length == nw)
+        {
+            _cabinTapLive = new int[cl.Count];
+            _cabinShare = new float[cl.Count];
+            Array.Fill(_cabinShare, 1f);
+            _pathLp = new float[cl.Count];
+            _pathNow = new float[cl.Count];
+            _cornerTyre = new VehicleSynth.TyreVoice[nw];
+            _cornerPa = new float[nw]; _cornerRadius = new float[nw]; _wheelSq = new float[nw];
+            for (int i = 0; i < nw; i++)
+            {
+                bool front = _wheelFront[i];
+                _cornerPa[i] = (front ? _rollingFrontPa : _rollingRearPa) * MathF.Sqrt(cl.RollingShare[i]);
+                _cornerRadius[i] = front ? _frontRadius : _rearRadius;
+            }
+        }
+        else _cabinLayout = null;
     }
 
     /// <summary>
@@ -752,9 +789,155 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     public bool Interior
     {
         get => Volatile.Read(ref _interior) != 0;
-        set => Volatile.Write(ref _interior, value ? 1 : 0);
+        set
+        {
+            // The cabin's rings before the flag: the producer reads the flag and then the rings, so by
+            // the time it renders anything inside, everything it writes into exists.
+            if (value && _cabinLayout != null && Volatile.Read(ref _cabinRings) == null) EnsureCabin();
+            Volatile.Write(ref _interior, value ? 1 : 0);
+        }
     }
     private int _interior;
+
+    // ── The cabin from where each path comes in (CabinPaths) ──────────────────────────────────
+    //
+    // Inside, the interior model is split into its paths: the bulkhead (this voice's own ring), the
+    // exhaust under the floor, each wheel at its corner, the wind at each A-pillar, a bus's door.
+    // Every path but the first is written to a ring of its own, and a tap voice reads it from where
+    // the path comes in (EngineTapState with a cabin path). Until a path's tap is playing, this voice
+    // carries it, so nothing is lost while the taps are being made or if one cannot be; the hand-over
+    // is the same sixty-millisecond crossfade the front outlet uses.
+
+    /// <summary>This vehicle's paths into its cabin, or null (no cabin, or OPENFPS_CABIN_PATHS=0).</summary>
+    public CabinPaths.Layout? CabinLayout => _cabinLayout;
+    private readonly CabinPaths.Layout? _cabinLayout;
+    /// <summary>One ring per path after the first. Made on the game thread the first time the
+    /// listener sits in this vehicle; the producer writes them, the mixer and the taps read.</summary>
+    private float[][]? _cabinRings;
+    private const int CabinRingBits = 16;                  // 1.4 s at 48 kHz: past the deepest lead
+    /// <summary>Per path, whether a tap is playing it (game thread writes, mixer reads).</summary>
+    private readonly int[] _cabinTapLive = Array.Empty<int>();
+    /// <summary>Per path, how much of it this voice is still carrying, 0..1. Mixer thread only.</summary>
+    private readonly float[] _cabinShare = Array.Empty<float>();
+    /// <summary>Per wheel, its own tyre: the rolling noise, squeal and slide of that wheel alone.</summary>
+    private readonly VehicleSynth.TyreVoice[] _cornerTyre = Array.Empty<VehicleSynth.TyreVoice>();
+    private readonly float[] _cornerPa = Array.Empty<float>(), _cornerRadius = Array.Empty<float>(), _wheelSq = Array.Empty<float>();
+    /// <summary>Per path, the panels' mass-law low-pass, and this sample's pressure on the path.</summary>
+    private readonly float[] _pathLp = Array.Empty<float>(), _pathNow = Array.Empty<float>();
+    /// <summary>The front and rear axles' tread tone phases, for the cabin's tread path.</summary>
+    private double _treadFront, _treadRear;
+    /// <summary>The right-hand wind's own noise through the same filters as the left's.</summary>
+    private float _windLpR, _windHpR, _windHpInR;
+    /// <summary>Samples of the rings still to be cleared after getting out, so a ring read later
+    /// never replays a ride.</summary>
+    private int _cabinDirty;
+
+    /// <summary>
+    /// Where the listener's ear is across the cabin, metres right of its middle (the vehicle's frame).
+    /// Game thread writes. Decides which side's open windows the outside comes in by for this ear.
+    /// </summary>
+    public volatile float CabinEarX;
+
+    /// <summary>The interior voice's send into the room you sit in (the provider's, game thread), which
+    /// its cabin taps send at too; negative until it has one.</summary>
+    public volatile float CabinRoomSend = -1f;
+
+    private void EnsureCabin()
+    {
+        var layout = _cabinLayout!;
+        var rings = new float[Math.Max(0, layout.Count - 1)][];
+        for (int i = 0; i < rings.Length; i++) rings[i] = new float[1 << CabinRingBits];
+        _wet.EnableCorners();
+        Volatile.Write(ref _cabinRings, rings);
+    }
+
+    /// <summary>Whether path <paramref name="path"/> has a voice of its own playing it. Game thread.</summary>
+    public void SetCabinTapLive(int path, bool live)
+    {
+        if (path > 0 && path < _cabinTapLive.Length) Volatile.Write(ref _cabinTapLive[path], live ? 1 : 0);
+    }
+
+    /// <summary>One sample of cabin path <paramref name="path"/> (1 and up), absolute, interpolated:
+    /// what a cabin tap reads, on the cursor rules of <see cref="EngineTapState"/>.</summary>
+    public float ReadCabinAt(int path, double position)
+    {
+        var rings = Volatile.Read(ref _cabinRings);
+        if (rings == null || path < 1 || path > rings.Length) return 0f;
+        var r = rings[path - 1];
+        long i0 = (long)Math.Floor(position);
+        float f = (float)(position - i0);
+        int mask = r.Length - 1;
+        float a = r[(int)(i0 & mask)], b = r[(int)((i0 + 1) & mask)];
+        return Soft(a + (b - a) * f);
+    }
+
+    // Which samples of this voice went out at which time on the parent's clock: a seqlock of two copies
+    // of the time round the position, written by the mixer, read by the cabin taps.
+    private long _blockAtA = long.MinValue, _blockFrom, _blockAtB = long.MinValue;
+
+    /// <summary>For the lab: replace the cabin with a click in this voice and its negative in the first
+    /// path, to measure how the taps line up with the voice.</summary>
+    internal static bool LabAlignProbe;
+
+    /// <summary>
+    /// Where this voice's channel's own clock sits on its parent's (parent minus own), once the channel
+    /// has started; long.MinValue until then. Set from the game thread (Channel.getDSPClock).
+    /// </summary>
+    public long ChannelClockOffset { get => Volatile.Read(ref _channelClockOffset); set => Volatile.Write(ref _channelClockOffset, value); }
+    private long _channelClockOffset = long.MinValue;
+    public bool ChannelClockKnown => ChannelClockOffset != long.MinValue;
+
+    /// <summary>The mixer took the block starting at <paramref name="from"/> in a block whose channel
+    /// clock was <paramref name="clock"/>. Mixer thread.</summary>
+    internal void NoteBlock(ulong clock, long from)
+    {
+        long offset = ChannelClockOffset;
+        if (offset == long.MinValue) return;
+        long at = (long)clock + offset;
+        Volatile.Write(ref _blockAtA, at);
+        Volatile.Write(ref _blockFrom, from);
+        Volatile.Write(ref _blockAtB, at);
+    }
+
+    /// <summary>
+    /// Where in this voice's stream the sample that leaves at <paramref name="parentTime"/> on the parent's
+    /// clock is: so a tap plays the samples this voice plays at the same moment, whichever of the two
+    /// FMOD calls first and however far into a block either channel was started. A cabin path read by a
+    /// tap is part of one pressure field with the paths this voice carries (the block, the intake and the
+    /// exhaust are one engine), so it must line up sample for sample. A tap on its own clock sat 239 to
+    /// 1 024 samples away (AudioLab --cabin probe=align), and at idle that turned the cancellation
+    /// between the intake's suction and the exhaust's pressure into a sum: +6.5 dB, measured. False
+    /// until both clocks are known, and the tap keeps its own.
+    /// </summary>
+    internal bool BlockAt(long parentTime, out long position)
+    {
+        long b = Volatile.Read(ref _blockAtB);
+        long from = Volatile.Read(ref _blockFrom);
+        long a = Volatile.Read(ref _blockAtA);
+        position = 0;
+        if (a != b || a == long.MinValue) return false;
+        long delta = parentTime - a;
+        if (delta < -2 * DspCallback.MaxBlock || delta > 2 * DspCallback.MaxBlock) return false;
+        position = from + delta;
+        return true;
+    }
+
+    /// <summary>The cabin paths this voice still carries at sample <paramref name="j"/> (absolute),
+    /// sliding each path's share toward whether its tap is playing. Mixer thread.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private float CarriedCabin(float[][] rings, long at, float step)
+    {
+        float sum = 0f;
+        for (int p = 1; p < _cabinShare.Length && p - 1 < rings.Length; p++)
+        {
+            float target = Volatile.Read(ref _cabinTapLive[p]) != 0 ? 0f : 1f;
+            _cabinShare[p] += Math.Clamp(target - _cabinShare[p], -step, step);
+            if (_cabinShare[p] <= 0f) continue;
+            var r = rings[p - 1];
+            sum += r[(int)(at & (r.Length - 1))] * _cabinShare[p];
+        }
+        return sum;
+    }
 
     private readonly BodyResonator _cabin;
     private readonly float _panelCorner, _sealLeak, _windPaAt110, _starterPath;
@@ -1146,6 +1329,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         int mask = _ring.Length - 1;
         long w = _written;
         bool inside = Interior;
+        var cabinRings = _cabinLayout != null ? Volatile.Read(ref _cabinRings) : null;
         // Inside, the listener is AT the machine, and the outside-listener geometry (which tailpipe
         // is nearer, which way the fan blows) has nothing to say about a sound that comes through
         // the floor.
@@ -1234,6 +1418,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // coming from two places a few metres apart, which combs against itself as the car goes
             // by and is heard as a car passing inside out.
             float tyreRear, tyreFront;
+            float frontSlip = 0f, rearSlip = 0f;
             if (perWheel)
             {
                 // Each wheel squeals for itself; the axle voices roll, and carry the squeal of the
@@ -1246,13 +1431,14 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                                                          _wheelSqueal.Length, _rng, ref _wheelSqueal[k], _wheelStickSlip[k], SampleRate)
                              * _wheelGain[k] * _wheelWetSqueal[k];
                     if (_wheelFront[k]) frontSliding += sq; else rearSliding += sq;
+                    if (k < _wheelSq.Length) _wheelSq[k] = sq;
                 }
                 tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _tyre, _rollingRearPa, _rearRadius, rearSliding, SampleRate);
                 tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _tyreFront, _rollingFrontPa, _frontRadius, frontSliding, SampleRate);
             }
             else
             {
-                AxleSlip(RoadSlip, wheels, out float frontSlip, out float rearSlip);
+                AxleSlip(RoadSlip, wheels, out frontSlip, out rearSlip);
                 tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, rearSlip + _tyreChirp, _rng, ref _tyre, _rollingRearPa, _rearRadius, sampleRate: SampleRate);
                 tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, frontSlip + _tyreChirp, _rng, ref _tyreFront, _rollingFrontPa, _frontRadius, sampleRate: SampleRate);
             }
@@ -1386,48 +1572,91 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
             // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.
             _interiorMix += Math.Clamp((inside ? 1f : 0f) - _interiorMix, -envStep, envStep);
-            if (_interiorMix > 0f)
+            // What the cabin carries that the lift leaves alone (the air and the beeper), in this voice.
+            float insideExtras = chimeOut + 0.5f * airOut;
+            float doorUnlifted = 0f;
+            bool split = false;
+            if (_interiorMix > 0f && cabinRings != null)
             {
-                // What arrives at the outside of the cabin: the engine bay just ahead of the
-                // firewall, the exhaust along the floor to a tailpipe a couple of metres back, and
-                // all four tyres under the floor.
-                // All four tyres, at the power the single signal had.
-                float atPanels = Engine.Block + Engine.Intake + 0.5f * Engine.Exhaust + (tyreRear + tyreFront) * 0.6f * 0.70710678f * TyreMix;
-                _panelLp += (atPanels - _panelLp) * panelA;
-                float inCabin = _panelLp + _sealLeak * atPanels;
-                // The starter through the mounts and the floor (VehicleBody.StarterPathLossDb).
-                // Through rubber and a damped floor the top is gone: two poles at the path's corner.
+                // The same model, path by path (CabinPaths): each through its own panels, from where it
+                // comes in. Linear throughout, so the paths sum to the one signal below, except that the
+                // tyres are a noise per wheel and the wind a noise per side, at the same powers.
+                split = true;
+                var lay = _cabinLayout!;
+                Array.Clear(_pathNow);
+                // The bulkhead: the block and the intake through the firewall and the dash.
+                float bulkSrc = Engine.Block + Engine.Intake;
+                _pathLp[0] += (bulkSrc - _pathLp[0]) * panelA;
+                _pathNow[0] = _pathLp[0] + _sealLeak * bulkSrc;
+                // The exhaust along the floor.
+                int ex = lay.Exhaust;
+                float exSrc = 0.5f * Engine.Exhaust;
+                _pathLp[ex] += (exSrc - _pathLp[ex]) * panelA;
+                _pathNow[ex] += _pathLp[ex] + _sealLeak * exSrc;
+                // Every wheel through its arch and the floor at its corner: its own tyre, squeal and spray.
+                const float TyreToPanels = 0.6f * 0.70710678f;
+                for (int q = 0; q < _cornerTyre.Length; q++)
+                {
+                    // Its roar and its squeal: the tread tone is played once, below (CabinPaths.Kind.Tread).
+                    float corner = perWheel
+                        ? VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _cornerTyre[q], _cornerPa[q], _cornerRadius[q], _wheelSq[q], SampleRate,
+                                            toneScale: 0f)
+                        : VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, (_wheelFront[q] ? frontSlip : rearSlip) + _tyreChirp, _rng,
+                                            ref _cornerTyre[q], _cornerPa[q], _cornerRadius[q], sampleRate: SampleRate,
+                                            squealScale: 1f / MathF.Sqrt(lay.GroupWheels[q]), toneScale: 0f);
+                    int pq = lay.PathOfWheel[q];
+                    float src = corner * TyreToPanels * TyreMix;
+                    _pathLp[pq] += (src - _pathLp[pq]) * panelA;
+                    _pathNow[pq] += _pathLp[pq] + _sealLeak * src + _wet.CabinWheel(q) * wetMix;
+                }
+                if (lay.PathOfWheel.Length > 0) _pathNow[lay.PathOfWheel[0]] += _wet.CabinTail * wetMix;
+                // The tread tone of both ends, as the axles make it, from under the floor.
+                {
+                    float tone = (VehicleSynth.TreadTone(Vehicle.Tyres, Driveline.Speed, _rollingFrontPa, _frontRadius, ref _treadFront, SampleRate)
+                                + VehicleSynth.TreadTone(Vehicle.Tyres, Driveline.Speed, _rollingRearPa, _rearRadius, ref _treadRear, SampleRate))
+                                * TyreToPanels * TyreMix;
+                    int tp = lay.Tread;
+                    _pathLp[tp] += (tone - _pathLp[tp]) * panelA;
+                    _pathNow[tp] += _pathLp[tp] + _sealLeak * tone;
+                }
+                // The starter through the mounts and the floor of the footwell.
                 _starterLp1 += (Engine.StarterOut * _starterPath - _starterLp1) * starterA;
                 _starterLp2 += (_starterLp1 - _starterLp2) * starterA;
-                inCabin += _starterLp2;
-                // The spray on the arches and the floor, through the wheelhouses and the trim.
-                inCabin += _wet.Cabin * wetMix;
-                inCabin += _cabin.Process(inCabin);
+                _pathNow[0] += _starterLp2;
+                // The cabin's own modes, driven by everything through the body, as before. Its boom is
+                // the length of the cabin, low enough that where it is played from hardly matters.
+                float through = 0f;
+                for (int q = 0; q < _pathNow.Length; q++) through += _pathNow[q];
+                _pathNow[0] += _cabin.Process(through);
 
-                // The wind: broadband turbulence, most of it between a couple of hundred hertz and a
-                // kilohertz by the time it is through the glass. Pressure goes as speed cubed.
+                // The wind at each A-pillar, a noise each, half the power each.
                 float vRatio = MathF.Abs(Driveline.Speed) / WindReferenceSpeed;
                 float windPa = _windPaAt110 * vRatio * vRatio * vRatio;
-                float n = (float)(_rng.NextDouble() * 2.0 - 1.0) * 1.7f;     // ~unit RMS
+                float n = (float)(_rng.NextDouble() * 2.0 - 1.0) * 1.7f;
+                float nR = (float)(_rng.NextDouble() * 2.0 - 1.0) * 1.7f;
                 _windLp += (n - _windLp) * windLpA;
                 _windHp = windHpA * (_windHp + _windLp - _windHpIn);
                 _windHpIn = _windLp;
-                inCabin += _windHp * windPa * 3.78f;         // the band-limited noise is 0.265 RMS; this is its inverse
+                _windLpR += (nR - _windLpR) * windLpA;
+                _windHpR = windHpA * (_windHpR + _windLpR - _windHpInR);
+                _windHpInR = _windLpR;
+                const float HalfPower = 0.70710678f;
+                _pathNow[lay.WindLeft] += _windHp * windPa * 3.78f * HalfPower;
+                _pathNow[lay.WindRight] += _windHpR * windPa * 3.78f * HalfPower;
 
-                // The windows. Followed over about a tenth of a second, so a glass moving is a glide.
                 _windowsNow += (Math.Clamp(WindowsOpen, 0f, 1f) - _windowsNow) * MathF.Min(1f, dt * 10f);
                 if (_windowsNow > 0.001f && _windowShareFull > 0f)
                 {
                     float share = _windowsNow * _windowShareFull;
-                    float hole = MathF.Sqrt(share);                // pressure through the opening
-                    // The outside, straight in: the engine bay, the exhaust, the tyres, as heard outside
-                    // at the windows.
-                    inCabin += (pa - rearExtras + bay) * hole * _windowFromSources;
-                    // The wind outside the glass, in through the hole: broader than through the glass,
-                    // because nothing has taken its bottom or its top away. (_windLp is low-passed
-                    // noise of about 0.6 RMS.)
-                    inCabin += _windLp * windPa * _windOutside * hole * 1.7f;
-                    // The cabin's throb, where the shear layer's shedding meets its note.
+                    float hole = MathF.Sqrt(share);
+                    // The outside through the window beside this ear: one signal, one place.
+                    int nearSide = CabinEarX > 0f ? lay.WindRight : lay.WindLeft;
+                    _pathNow[nearSide] += (pa - rearExtras + bay) * hole * _windowFromSources;
+                    // Each side's wind in through its own windows.
+                    _pathNow[lay.WindLeft] += _windLp * windPa * _windOutside * hole * 1.7f * HalfPower;
+                    _pathNow[lay.WindRight] += _windLpR * windPa * _windOutside * hole * 1.7f * HalfPower;
+                    // The cabin's throb is the whole cabin's air at once: the same at both ears whatever
+                    // it is played from.
                     float speed = MathF.Abs(Driveline.Speed);
                     if (speed > 3f && _cabinHelmholtzHz > 0f)
                     {
@@ -1436,29 +1665,98 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                         float locked = MathF.Exp(-off * off);
                         if (locked > 1e-3f)
                         {
-                            // A resonator at the cabin's note, damped more the more windows vent it: each
-                            // opening radiates the cabin's energy away.
                             float w0 = 2f * MathF.PI * _cabinHelmholtzHz * dt;
                             float r = MathF.Exp(-w0 / (2f * (6f / MathF.Max(1, _windowCount))));
                             float y = n * (1f - r) + 2f * r * MathF.Cos(w0) * _buffetY1 - r * r * _buffetY2;
                             _buffetY2 = _buffetY1; _buffetY1 = y;
                             float q = 0.5f * 1.2f * speed * speed;
-                            inCabin += y * locked * BuffetShare * q * _windowsNow;
+                            _pathNow[0] += y * locked * BuffetShare * q * _windowsNow;
                         }
                     }
                 }
 
-                // What is INSIDE with you, not through the body: the door beeper hangs over the
-                // doorway, and the door engines vent into the step well — half of what the air
-                // system says is in here, the brakes under the floor are the other half.
-                inCabin += chimeOut + 0.5f * airOut;
-                // And with the doors open there is a hole in the side of the bus: the outside comes
-                // in through a doorway about 2.4 m^2 of a hundred-odd m^2 of cabin wall, which lets
-                // in a couple of per cent of the power (-16 dB), unfiltered.
-                if (_doorsOpen) inCabin += (pa - rearExtras + bay) * DoorwayLeak;
+                // The door beeper, the door engines and an open doorway, at the door if there is one.
+                int doorPath = lay.Door >= 0 ? lay.Door : 0;
+                if (_doorsOpen) _pathNow[doorPath] += (pa - rearExtras + bay) * DoorwayLeak;
+                if (lay.Door >= 0) { doorUnlifted = chimeOut + 0.5f * airOut; insideExtras = 0f; }
+                else _pathNow[0] += chimeOut + 0.5f * airOut;
                 float k = _interiorMix;
-                pa = pa * (1f - k) + inCabin * k;
+                pa = pa * (1f - k) + _pathNow[0] * k;
                 front *= 1f - k;
+            }
+            else if (_interiorMix > 0f)
+            {
+                    // What arrives at the outside of the cabin: the engine bay just ahead of the
+                    // firewall, the exhaust along the floor to a tailpipe a couple of metres back, and
+                    // all four tyres under the floor.
+                    // All four tyres, at the power the single signal had.
+                    float atPanels = Engine.Block + Engine.Intake + 0.5f * Engine.Exhaust + (tyreRear + tyreFront) * 0.6f * 0.70710678f * TyreMix;
+                    _panelLp += (atPanels - _panelLp) * panelA;
+                    float inCabin = _panelLp + _sealLeak * atPanels;
+                    // The starter through the mounts and the floor (VehicleBody.StarterPathLossDb).
+                    // Through rubber and a damped floor the top is gone: two poles at the path's corner.
+                    _starterLp1 += (Engine.StarterOut * _starterPath - _starterLp1) * starterA;
+                    _starterLp2 += (_starterLp1 - _starterLp2) * starterA;
+                    inCabin += _starterLp2;
+                    // The spray on the arches and the floor, through the wheelhouses and the trim.
+                    inCabin += _wet.Cabin * wetMix;
+                    inCabin += _cabin.Process(inCabin);
+
+                    // The wind: broadband turbulence, most of it between a couple of hundred hertz and a
+                    // kilohertz by the time it is through the glass. Pressure goes as speed cubed.
+                    float vRatio = MathF.Abs(Driveline.Speed) / WindReferenceSpeed;
+                    float windPa = _windPaAt110 * vRatio * vRatio * vRatio;
+                    float n = (float)(_rng.NextDouble() * 2.0 - 1.0) * 1.7f;     // ~unit RMS
+                    _windLp += (n - _windLp) * windLpA;
+                    _windHp = windHpA * (_windHp + _windLp - _windHpIn);
+                    _windHpIn = _windLp;
+                    inCabin += _windHp * windPa * 3.78f;         // the band-limited noise is 0.265 RMS; this is its inverse
+
+                    // The windows. Followed over about a tenth of a second, so a glass moving is a glide.
+                    _windowsNow += (Math.Clamp(WindowsOpen, 0f, 1f) - _windowsNow) * MathF.Min(1f, dt * 10f);
+                    if (_windowsNow > 0.001f && _windowShareFull > 0f)
+                    {
+                        float share = _windowsNow * _windowShareFull;
+                        float hole = MathF.Sqrt(share);                // pressure through the opening
+                        // The outside, straight in: the engine bay, the exhaust, the tyres, as heard outside
+                        // at the windows.
+                        inCabin += (pa - rearExtras + bay) * hole * _windowFromSources;
+                        // The wind outside the glass, in through the hole: broader than through the glass,
+                        // because nothing has taken its bottom or its top away. (_windLp is low-passed
+                        // noise of about 0.6 RMS.)
+                        inCabin += _windLp * windPa * _windOutside * hole * 1.7f;
+                        // The cabin's throb, where the shear layer's shedding meets its note.
+                        float speed = MathF.Abs(Driveline.Speed);
+                        if (speed > 3f && _cabinHelmholtzHz > 0f)
+                        {
+                            float shedHz = ShearStrouhal * speed / MathF.Max(0.2f, _windowRunM);
+                            float off = MathF.Log(shedHz / _cabinHelmholtzHz) / 0.25f;
+                            float locked = MathF.Exp(-off * off);
+                            if (locked > 1e-3f)
+                            {
+                                // A resonator at the cabin's note, damped more the more windows vent it: each
+                                // opening radiates the cabin's energy away.
+                                float w0 = 2f * MathF.PI * _cabinHelmholtzHz * dt;
+                                float r = MathF.Exp(-w0 / (2f * (6f / MathF.Max(1, _windowCount))));
+                                float y = n * (1f - r) + 2f * r * MathF.Cos(w0) * _buffetY1 - r * r * _buffetY2;
+                                _buffetY2 = _buffetY1; _buffetY1 = y;
+                                float q = 0.5f * 1.2f * speed * speed;
+                                inCabin += y * locked * BuffetShare * q * _windowsNow;
+                            }
+                        }
+                    }
+
+                    // What is INSIDE with you, not through the body: the door beeper hangs over the
+                    // doorway, and the door engines vent into the step well — half of what the air
+                    // system says is in here, the brakes under the floor are the other half.
+                    inCabin += chimeOut + 0.5f * airOut;
+                    // And with the doors open there is a hole in the side of the bus: the outside comes
+                    // in through a doorway about 2.4 m^2 of a hundred-odd m^2 of cabin wall, which lets
+                    // in a couple of per cent of the power (-16 dB), unfiltered.
+                    if (_doorsOpen) inCabin += (pa - rearExtras + bay) * DoorwayLeak;
+                    float k = _interiorMix;
+                    pa = pa * (1f - k) + inCabin * k;
+                    front *= 1f - k;
             }
 
             _envelope += Math.Clamp(envTarget - _envelope, -envStep, envStep);
@@ -1471,12 +1769,31 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // Inside, all of the air and the beeper arrive through the cabin (inCabin, in the back
             // tap); outside, each end carries its own.
             float extras = (1f - _interiorMix) * rearExtras
-                         + _interiorMix * (chimeOut + 0.5f * airOut);
+                         + _interiorMix * insideExtras;
             pa = (pa - extras) * _levelGain + extras;
             float outSample = pa * gain * _envelope;
+            // The lab's alignment probe: a click every tenth of a second in this voice and the same
+            // click upside down in the first cabin path, nothing else. In line, they cancel.
+            if (LabAlignProbe && split) outSample = w % 4800 == 0 ? 0.25f : 0f;
             _ring[(int)(w & mask)] = outSample;
             outSum += (double)outSample * outSample;
             _front[(int)(w & mask)] = (front * _levelGain + (1f - _interiorMix) * frontExtras) * gain * _envelope;
+            // Every other path into the cabin, into its own ring, lifted as the engine is (not the door's
+            // air and beeper). Cleared for a ring's length after getting out.
+            if (cabinRings != null && (split || _cabinDirty > 0))
+            {
+                float k = _interiorMix, ge = gain * _envelope;
+                int door = _cabinLayout!.Door;
+                for (int p = 1; p < _pathNow.Length && p - 1 < cabinRings.Length; p++)
+                {
+                    float v = split ? (_pathNow[p] * k * _levelGain + (p == door ? doorUnlifted * k : 0f)) * ge : 0f;
+                    if (LabAlignProbe && split) v = p == 1 && w % 4800 == 0 ? -0.25f : 0f;
+                    var r = cabinRings[p - 1];
+                    r[(int)(w & (r.Length - 1))] = v;
+                    outSum += (double)v * v;
+                }
+                _cabinDirty = split ? 1 << CabinRingBits : _cabinDirty - 1;
+            }
             w++;
         }
         Volatile.Write(ref _written, w);
@@ -1818,16 +2135,68 @@ public sealed class EngineTapState : IGuardedUnit
 
     public EngineTapState(EngineVoiceState source) { Source = source; Ground = new(source.SampleRate); source._frontGround = Ground; }
 
+    /// <summary>A path into the cabin of the vehicle the listener is sitting in (CabinPaths), read from
+    /// its own ring: the same cursor, fade and hand-over as the front outlet. No ground: from inside
+    /// there is no road to hear.</summary>
+    public EngineTapState(EngineVoiceState source, int cabinPath)
+    {
+        Source = source;
+        Ground = new(source.SampleRate);
+        CabinPath = cabinPath;
+    }
+
+    /// <summary>Cabin path blocks read in line with the engine's own voice by the mixer clock, and
+    /// read on the tap's own clock because the two could not be lined up. For the instruments.</summary>
+    internal static long AlignedBlocks, UnalignedBlocks;
+
+    /// <summary>Where this tap's channel's own clock sits on its parent's (EngineVoiceState.ChannelClockOffset).</summary>
+    public long ChannelClockOffset { get => Volatile.Read(ref _channelClockOffset); set => Volatile.Write(ref _channelClockOffset, value); }
+    private long _channelClockOffset = long.MinValue;
+    public bool ChannelClockKnown => ChannelClockOffset != long.MinValue;
+
+    /// <summary>The cabin path this tap plays (1 and up), or -1 for the machine's front outlet.</summary>
+    public readonly int CabinPath = -1;
+
+    /// <summary>Hands what this tap plays back to the voice it came from (slewed there): the front
+    /// outlet, or its cabin path.</summary>
+    public void HandBack()
+    {
+        if (CabinPath > 0) Source.SetCabinTapLive(CabinPath, false);
+        else Source.SplitVoices = false;
+    }
+
     /// <summary>The ground between the front of the machine and the listener.</summary>
     public readonly OpenFPS.Client.AudioEngine.Acoustics.GroundReflection Ground;
 
-    public void Render(Span<float> mono)
+    public void Render(Span<float> mono) => Render(mono, long.MinValue);
+
+    /// <param name="parentTime">Where this block starts on the parent's clock (this channel's clock plus
+    /// <see cref="ChannelClockOffset"/>), or long.MinValue if not known.</param>
+    public void Render(Span<float> mono, long parentTime)
     {
         // Nothing until the engine has something to give. A tap that synthesized on demand would be
         // doing it on the mixer thread, which is the one thing the whole producer design exists to
         // prevent.
         if (!Source.Primed) { mono.Clear(); return; }
 
+        // A cabin path: the samples the engine's own voice plays at the same moment, exactly. Rider and
+        // vehicle move together, so neither channel is pitched and there is no rate to follow.
+        if (CabinPath > 0 && parentTime != long.MinValue && Source.BlockAt(parentTime, out long from))
+        {
+            Interlocked.Increment(ref AlignedBlocks);
+            float gStep = 1f / (0.06f * MathF.Max(1f, Source.SampleRate));
+            float gTo = TargetGain;
+            for (int i = 0; i < mono.Length; i++)
+            {
+                _gain += Math.Clamp(gTo - _gain, -gStep, gStep);
+                mono[i] = Source.ReadCabinAt(CabinPath, from + i) * _gain;
+            }
+            _clock.Position = from + mono.Length;
+            if (gTo <= 0f && _gain <= 1e-4f) FadedOut = true;
+            return;
+        }
+
+        if (CabinPath > 0) Interlocked.Increment(ref UnalignedBlocks);
         // In step with the voice we are the other half of, on a continuous clock: the source's own
         // rate over ours, leaning slowly on where the source has got to. It used to step up to ten
         // samples once a block toward Played, and Played moves in whole blocks when either channel is
@@ -1841,7 +2210,8 @@ public sealed class EngineTapState : IGuardedUnit
         for (int i = 0; i < mono.Length; i++)
         {
             _gain += Math.Clamp(gTarget - _gain, -step, step);
-            mono[i] = Ground.Process(Source.ReadFrontAt(_clock.Position)) * _gain;
+            float x = CabinPath > 0 ? Source.ReadCabinAt(CabinPath, _clock.Position) : Ground.Process(Source.ReadFrontAt(_clock.Position));
+            mono[i] = x * _gain;
             _clock.Position += rate;
         }
 
@@ -1963,7 +2333,11 @@ public static class TapProcessor
         int ch = outchannels, n = (int)length;
         if (n > state.MixScratch.Length) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
         var mono = state.MixScratch.AsSpan(0, n);
-        try { state.Render(mono); } catch { mono.Clear(); }
+        long parentTime = long.MinValue;
+        if (state.CabinPath > 0 && state.ChannelClockOffset is long offset && offset != long.MinValue
+            && DspCallback.Clock(ref dsp_state, out ulong clock))
+            parentTime = (long)clock + offset;
+        try { state.Render(mono, parentTime); } catch { mono.Clear(); }
         unsafe
         {
             float* outBuf = (float*)outbuffer;
@@ -2138,8 +2512,12 @@ public static class EngineProcessor
         int n = (int)length;
         if (n > state.MixScratch.Length) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
         var mono = state.MixScratch.AsSpan(0, n);
+        // Which samples went out when, for the cabin's taps (EngineVoiceState.BlockAt).
+        long from = state.Played;
         try { state.Consume(mono); }
         catch { mono.Clear(); }
+        if (state.CabinLayout != null && state.ChannelClockKnown && DspCallback.Clock(ref dsp_state, out ulong clock))
+            state.NoteBlock(clock, from);
 
         unsafe
         {

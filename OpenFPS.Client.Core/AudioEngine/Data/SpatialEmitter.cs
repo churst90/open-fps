@@ -211,6 +211,16 @@ public struct SpatialEmitter
     /// </summary>
     public int IntakeOfEntity;
     /// <summary>
+    /// When non-zero, this voice is one path into the cabin of that entity, the vehicle the listener
+    /// is sitting in (CabinPaths): path <see cref="CabinPath"/> (1 and up), read from its own ring of
+    /// the vehicle's live engine and played from where it comes in. See EngineTapState.
+    /// </summary>
+    public int CabinOfEntity;
+    public int CabinPath;
+    /// <summary>For the vehicle the listener sits in: where the ear is across its cabin, metres right
+    /// of its middle (which side's windows the outside comes in by).</summary>
+    public float CabinEarX;
+    /// <summary>
     /// When non-zero, this voice is place <see cref="Place"/> of that entity's tree or fire: one of the
     /// independent streams its synth renders across its extent (ExtendedSources, NaturePlaceState). Its
     /// PhysicalKey is the source's own.

@@ -75,6 +75,7 @@ string[] usage =
     "  --intake-ir [preset ...] [thr=] [sec=] [out=] the intake tract alone, thumped once",
     "  --wheel-squeal [out=] [axle] [binaural]       each wheel squealing for itself, and four drives",
     "  --wet-roads [water|levels out=|game out= set=] tyres on wet roads: the water, the grip, the sound",
+    "  --cabin [game out= paths=on|off set=|model out=] sitting in a vehicle: the cabin's paths, through the game",
     "  --speedway [map] [seconds=] [voices=] [probe] the shipped race heard from its spawn point",
     "  --earshot [map=city] [at=x,z] [top=]          everything audible from a spot, ranked, under both distance laws",
     "  --car-horn / --siren [preset] [sec=]          horns and the siren on the bench, measured and written",
@@ -524,6 +525,13 @@ if (args.Contains("--wet-roads"))
     // --wet-roads [water|levels out=DIR|game out=DIR set=]: tyres on wet roads, the road's water,
     // the grip it leaves, and the sound through the game.
     Environment.Exit(OpenFPS.AudioLab.Spikes.WetRoadSpike.Run(args));
+}
+
+if (args.Contains("--cabin"))
+{
+    // --cabin [game out=DIR paths=on|off set=all|car|bus|police | model out=DIR]: sitting in a vehicle,
+    // the interior heard from where each path comes in (CabinPaths), through the game.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.CabinSpike.Run(args));
 }
 
 if (args.Contains("--running-water"))
