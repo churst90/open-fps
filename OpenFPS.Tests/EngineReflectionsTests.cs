@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
@@ -8,7 +5,6 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -19,8 +15,8 @@ namespace OpenFPS.Tests;
 /// ones. No engine is synthesised; an echo voice only names the engine it reads.
 ///
 /// The scene: a concrete wall 40 m long and 6 m high whose face is 9.75 m north of a car and a
-/// listener 10 m apart on an east-west line. Coordinates are the engine's: x east, y up, z north
-/// (north is -z here, so the wall is at z = -10).
+/// listener 10 m apart on an east-west line. The engine's axes are x east, y up, z north, but this
+/// scene calls -z north (the wall's centre is at z = -10).
 /// </summary>
 public class EngineReflectionsTests
 {

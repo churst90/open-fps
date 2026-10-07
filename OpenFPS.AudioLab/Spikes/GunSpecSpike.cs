@@ -1,33 +1,27 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using OpenFPS.Client.AudioEngine.Core;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// A gunshot synthesized to the spec measured from real ones, against the real ones.
-///
-///   --gun-spec [out=DIR] [refs=DIR]
-///
-/// The spec (docs/GUNFIRE.md): at 20 m and beyond a rifle's report is a positive phase of 0.3-0.5 ms,
-/// down 20 dB within 2-4 ms and 30 dB within about 5; its spectrum is roughly flat from 125 Hz to
-/// 2 kHz and falls about 13 dB by 4 kHz, 20 by 8 and 28 by 16. The shot here is a Friedlander pulse
-/// and a short turbulent burst at one metre, carried to the listener by the inverse distance law,
-/// ISO 9613-1 air absorption and a ground reflection. Each render is measured with the same numbers
-/// as the recordings, and written next to the real shot with the range's echo cut away.
+/// --gun-spec [out=DIR] [refs=DIR]: a gunshot synthesised to the spec measured from the NIJ recordings
+/// (docs/GUNFIRE.md: at 20 m and beyond a 0.3-0.5 ms positive phase, down 20 dB in 2-4 ms and 30 in about
+/// 5; flat 125 Hz-2 kHz, then about -13 dB by 4 kHz, -20 by 8, -28 by 16), measured the same way and
+/// written beside each real shot with the range's echo cut away. A Friedlander pulse and a turbulent burst
+/// at a metre, carried by the inverse distance law, ISO 9613-1 air and a ground reflection.
 /// </summary>
 public static class GunSpecSpike
 {
     private const int Sr = 48000;
 
     /// <summary>What a gun's report is at one metre, from the spec.</summary>
+    /// <param name="Name">The NIJ take it is matched against.</param>
+    /// <param name="PositivePhaseMs">The Friedlander pulse's positive phase.</param>
     /// <param name="BurstLevel">Turbulent gas behind the shock, against the pulse's peak.</param>
     /// <param name="BurstDecayMs">Its time constant: the fast first drop, 10 dB in about a millisecond.</param>
     /// <param name="TrailLevel">What is left after it, against the burst.</param>
     /// <param name="TrailDecayMs">Its time constant: the slower fall from -20 to -30 dB.</param>
     /// <param name="CornerHz">One pole: the measured fall is about 6 dB an octave above 1-2 kHz.</param>
+    /// <param name="HighPassHz">Little is left below it.</param>
     public sealed record BlastSpec(string Name, float PositivePhaseMs, float BurstLevel, float BurstDecayMs,
                                    float TrailLevel, float TrailDecayMs, float CornerHz, float HighPassHz);
 
@@ -112,14 +106,14 @@ public static class GunSpecSpike
         return x;
     }
 
-    /// <summary>What a listener hears at this angle and distance in the open, before any room.</summary>
+    /// <summary>What a listener hears at this distance in the open, before any room.</summary>
+    // TODO: angleDeg is not read; every angle renders as on axis.
     public static float[] Render(BlastSpec s, float angleDeg, float metres, float seconds)
     {
         var src = Source(s, seconds);
         // Air: ISO 9613-1 at 20 C and 50% humidity, applied per frequency over the whole path.
         var direct = Air(src, metres);
-        // Ground: source and listener 1.5 m up over hard ground. The reflected path is a little
-        // longer, a little later and a little weaker (inverse distance and a coefficient of 0.8).
+        // Ground: source and listener 1.5 m up over hard ground, reflection coefficient 0.8.
         float hs = 1.5f, hr = 1.5f;
         float reflected = MathF.Sqrt(metres * metres + (hs + hr) * (hs + hr));
         int lag = (int)MathF.Round((reflected - metres) / 343f * Sr);
@@ -144,9 +138,8 @@ public static class GunSpecSpike
     }
 
     /// <summary>
-    /// Air absorption applied in the frequency domain. Padded 40 ms either side and trimmed back:
-    /// a filter applied by DFT is circular, and without the pad the spread it adds wrapped round to
-    /// the END of the buffer, a faint copy of the shot 80 ms after it — heard as an echo.
+    /// Air absorption in the frequency domain, padded 40 ms either side: a DFT filter is circular, and
+    /// unpadded its spread wrapped to the buffer's end as a faint copy 80 ms later, heard as an echo.
     /// </summary>
     private static float[] Air(float[] x0, float metres)
     {
@@ -217,9 +210,8 @@ public static class GunSpecSpike
     }
 
     /// <summary>
-    /// Energy in one octave band over the event: a flat-topped (Tukey) window from a millisecond
-    /// before the onset to 20 ms after. A Hann window starting AT the onset is nearly zero over the
-    /// first three milliseconds, where almost all of a gunshot is, and measured its tail instead.
+    /// Energy in one octave band over the event, a Tukey window from 1 ms before the onset to 20 ms after:
+    /// a Hann window from the onset is nearly zero over the first 3 ms, where almost all of a shot is.
     /// </summary>
     private static float Band(float[] x, int onset, float fc)
     {

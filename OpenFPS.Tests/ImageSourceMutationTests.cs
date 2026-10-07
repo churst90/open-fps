@@ -1,20 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The image-source solver held to its own physics, edge by edge.
-///
-/// Written against the mutants Stryker found surviving in ImageSource.cs (2026-09-24): the thresholds,
-/// the diffuse taps, the Fresnel aperture, the second-order chain, the occlusion callbacks, the box
-/// faces and the insert that keeps the strongest arrivals. Every expected number here comes from the
-/// geometry — path difference over the speed of sound, distance ratio times what the surface kept,
-/// the Lambert share of a rough patch, the first Fresnel zone — never from what the code printed.
+/// The image-source solver held to its own physics, edge by edge, against the mutants Stryker left
+/// alive in ImageSource.cs (2026-09-24). Every expected number comes from the geometry (path
+/// difference over c, distance ratio times what the surface kept, Lambert share, first Fresnel zone),
+/// never from what the code printed.
 /// </summary>
 public class ImageSourceMutationTests
 {
@@ -87,11 +80,7 @@ public class ImageSourceMutationTests
 
     // ── The specular test's thresholds ──────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A bounce that lands exactly on the edge of a face is ON the face. The source and listener are
-    /// placed so the bounce point is the origin, and the face is moved so its edge — in one case along
-    /// its U axis, in the other along V — passes through that point.
-    /// </summary>
+    /// <summary>A bounce exactly on a face's edge (in U, then in V) is on the face.</summary>
     [Fact]
     public void ABounceExactlyOnTheEdgeOfAFaceStillReflects()
     {
@@ -235,12 +224,9 @@ public class ImageSourceMutationTests
     // ── The scattered share ────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// A face scattering one per cent or less is a mirror: it sends no diffuse taps even when taps are
-    /// asked for — though at this range a 60 m face at 1 % would still be loud enough to hear (its
-    /// Lambert share times 0.01 is over MinGain), which is what makes the threshold matter. At 2 % the
-    /// tap is there, at its Lambert gain. (Source and listener 8 m apart, so the 60 m face is not
-    /// "much larger than the scene"; one that is scatters from round the bounce point instead — see
-    /// GroundScatterTests.)
+    /// A face scattering 1 % or less is a mirror and sends no diffuse taps, though here its Lambert share
+    /// would clear MinGain; at 2 % the tap is there at its Lambert gain. A face much larger than the
+    /// scene scatters from round the bounce point instead (GroundScatterTests).
     /// </summary>
     [Fact]
     public void ANearlySmoothFaceSendsNoDiffuseTaps()
@@ -405,10 +391,8 @@ public class ImageSourceMutationTests
 
     // ── Keeping the strongest ───────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The near wall's reflection is louder than the far wall's, and it comes out first whichever
-    /// order the walls were found in; with room for only one, the near one is kept either way.
-    /// </summary>
+    /// <summary>The louder (near) wall's reflection comes first and keeps the only slot, whichever wall
+    /// was found first.</summary>
     [Fact]
     public void TheStrongestReflectionIsFirstAndWinsTheLastSlot()
     {

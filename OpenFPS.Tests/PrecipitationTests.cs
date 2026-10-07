@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using MemoryPack;
 using OpenFPS.Client.AudioEngine.Core.Nature;
@@ -8,15 +5,13 @@ using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// What falls (rain of any drop size, freezing rain, sleet, snow, hail), as the radar reads it, and the
-/// near drops played one by one. The lab (--rain levels, --rain resolve) measured these; the tests hold
-/// what must not drift.
+/// What falls (rain of any drop size, freezing rain, sleet, snow, hail) as the radar reads it, and the
+/// near drops played one by one; measured in the lab (--rain levels), held here.
 /// </summary>
 public class PrecipitationTests
 {

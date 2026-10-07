@@ -1,30 +1,20 @@
-using System;
-using System.Linq;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A footstep falls out of what the foot and the ground are made of.
-///
-/// The claim these hold is not "it sounds good" — nothing headless can check that — but that the
-/// MECHANISM is wired the right way round. If a soft sole does not produce a longer contact than a
-/// hard one, or if grass is not quieter than concrete, then no amount of listening will fix it,
-/// because the thing being listened to is not the model.
+/// A footstep falls out of what the foot and the ground are made of. These hold that the mechanism is
+/// wired the right way round (a soft sole touches longer, grass is quieter than concrete), not that it
+/// sounds good.
 /// </summary>
 public class FootstepTests
 {
     private readonly ITestOutputHelper _o;
     public FootstepTests(ITestOutputHelper o) { _o = o; AcousticRegistry.Initialize(); }
 
-    /// <summary>
-    /// A soft sole is in contact longer than a hard one, and therefore cannot be as bright.
-    ///
-    /// The single chain the whole model hangs off: stiffness sets contact time, contact time bounds
-    /// the spectrum. It is why a trainer cannot click however hard you stamp in it.
-    /// </summary>
+    /// <summary>A soft sole is in contact longer than a hard one and so cannot be as bright: stiffness sets
+    /// contact time, and contact time bounds the spectrum.</summary>
     [Fact]
     public void ASofterSoleIsInContactLongerAndSoCannotBeAsBright()
     {
@@ -47,17 +37,12 @@ public class FootstepTests
         Assert.True(bare > sneaker, "a bare foot is softer than a trainer and must be in contact longer");
         Assert.True(sneaker > boot, "a trainer is softer than a work boot");
         Assert.True(boot > dress, "a work boot's rubber is softer than a leather board sole");
-        // ...and the spread is worth something: if every shoe were within a hair of every other,
-        // the model would be right in direction and useless in practice.
+        // And the spread between shoes is large enough to matter.
         Assert.True(sneaker / dress > 1.8f, $"a trainer's contact is only {sneaker / dress:F2}x a dress shoe's");
     }
 
-    /// <summary>
-    /// The SOFTER of the two things that meet decides the contact.
-    ///
-    /// Which is why a trainer sounds much the same on granite and on chipboard — the rubber is doing
-    /// all the deforming either way — and why the ground matters far more to a hard shoe.
-    /// </summary>
+    /// <summary>The softer of the two things that meet decides the contact: a trainer sounds much the same
+    /// on granite and chipboard, and the ground matters far more to a hard shoe.</summary>
     [Fact]
     public void TheSofterOfTheTwoSurfacesDecidesTheContact()
     {
@@ -78,13 +63,9 @@ public class FootstepTests
         Assert.True(hardOnHard > softOnHard * 8f);
     }
 
-    /// <summary>
-    /// A grain of grit is a contact two decades smaller than a heel, so it lands two decades higher.
-    ///
-    /// This is what a footstep on a hard floor actually sounds like. The bulk impact for a soft shoe
-    /// is at forty hertz, which nobody hears from a foot; if the model had only that, a trainer on a
-    /// pavement would be silent.
-    /// </summary>
+    /// <summary>A grain of grit is a contact two decades smaller than a heel, so it lands two decades
+    /// higher; a soft shoe's bulk impact is at 40 Hz, and without grit a trainer on a pavement would be
+    /// silent.</summary>
     [Fact]
     public void TheGrainIsHeardWhereTheBulkImpactCannotReach()
     {
@@ -106,10 +87,8 @@ public class FootstepTests
         Assert.True(grainHz > 1500f, "the grain should reach where a footstep is actually heard");
     }
 
-    /// <summary>
-    /// A hard sole puts more of the ground's texture into the sound than a soft one, because it does
-    /// not flow into it. That, not loudness, is what makes a dress shoe a click.
-    /// </summary>
+    /// <summary>A hard sole puts more of the ground's texture into the sound than a soft one, which does
+    /// not flow into it: that, not loudness, makes a dress shoe click.</summary>
     [Fact]
     public void AHardSoleRattlesOverTheGritAndASoftOneFlowsIntoIt()
     {
@@ -132,10 +111,8 @@ public class FootstepTests
         Assert.True(Scuff(Shoe.DressShoe, "Marble") < Scuff(Shoe.DressShoe, "Concrete") * 0.5f);
     }
 
-    /// <summary>
-    /// A wooden floor rings and a concrete one does not — which is what "hollow" means, and it comes
-    /// from the same <see cref="PanelAcoustics"/> that rings a door and a car's wing.
-    /// </summary>
+    /// <summary>A wooden floor rings ("hollow") and a concrete one does not, through the same
+    /// <see cref="PanelAcoustics"/> that rings a door.</summary>
     [Fact]
     public void AWoodenFloorRingsAndASlabDoesNot()
     {
@@ -151,10 +128,8 @@ public class FootstepTests
         Assert.InRange(hz, 80f, 900f);
     }
 
-    /// <summary>
-    /// Grass swallows a footstep and concrete returns it. Not a mixing decision — it is
-    /// <see cref="MaterialProperties.Absorption"/>, which was already there for every other reason.
-    /// </summary>
+    /// <summary>Grass swallows a footstep and concrete returns it, through
+    /// <see cref="MaterialProperties.Absorption"/>, not a mixing decision.</summary>
     [Fact(Skip = "BROKEN BY THE RADIATION WORK, and recorded rather than weakened. "
                + "Measured now: concrete 76 dB, grass 79, carpet 80 — soft ground comes out LOUDER, "
                + "which is the opposite of true. It passed before the two radiating paths and the "
@@ -175,12 +150,11 @@ public class FootstepTests
 
         Assert.True(concrete > grass, "grass takes three quarters of what reaches it");
         Assert.True(concrete > carpet);
-        // And everything is in the range a footstep actually measures at a metre.
+        // And everything is in the range a footstep measures at a metre.
         foreach (float db in new[] { concrete, grass, carpet }) Assert.InRange(db, 40f, 85f);
     }
 
-    /// <summary>Running is louder than walking, because the foot arrives faster — not because
-    /// anything is scaled by a "running" flag.</summary>
+    /// <summary>Running is louder because the foot arrives faster, not by a "running" flag.</summary>
     [Fact]
     public void RunningIsLouderThanWalkingBecauseTheFootArrivesFaster()
     {
@@ -193,12 +167,8 @@ public class FootstepTests
         Assert.True(run > walk + 3f, $"a run is only {run - walk:F1} dB over a walk");
     }
 
-    /// <summary>
-    /// Two steps of the same kind are not the same buffer, and the same step twice IS.
-    ///
-    /// Both halves matter: the first is why a corridor does not sound like a list being played, and
-    /// the second is why the engine can cache a handful of buffers instead of rendering per footfall.
-    /// </summary>
+    /// <summary>Two steps of the same kind differ, so a corridor is not a list being played; the same step
+    /// twice is the same buffer, so a handful can be cached.</summary>
     [Fact]
     public void StepsVaryButAreRepeatable()
     {
@@ -214,8 +184,7 @@ public class FootstepTests
                      "two different steps rendered identically");
     }
 
-    /// <summary>A step can name itself, and be read back — which is how the client renders one the
-    /// server never had to ship.</summary>
+    /// <summary>A step's key round-trips, so the client renders a step the server never ships.</summary>
     [Fact]
     public void AStepCanBeNamedAndReadBack()
     {
@@ -236,44 +205,24 @@ public class FootstepTests
     }
 
     /// <summary>
-    /// The band balance of a MEASURED concrete footstep, from a recording of somebody walking.
-    ///
-    /// Averaged over the 46 clean steps in `approved/footsteps/split/concrete_walk`, which
-    /// `tools/split_footsteps.py` cut out of a fifty-second recording. Normalised to its own total,
-    /// so this is the SHAPE of a footstep and says nothing about level — level is
-    /// <see cref="Footsteps.MeasuredLevelDb"/>'s job and a separate question.
-    ///
-    /// Baked in rather than read from the file so the test runs anywhere, the way every engine preset
-    /// carries its own measured `SourceLevelDb`. Re-measure with
-    /// `--footsteps compare=&lt;dir&gt;` if the reference recording is ever replaced.
+    /// The band balance of a measured concrete footstep: the 46 clean steps in
+    /// `approved/footsteps/split/concrete_walk` (tools/split_footsteps.py), normalised to their own total,
+    /// so shape only; level is <see cref="Footsteps.MeasuredLevelDb"/>'s. Baked in so the test runs
+    /// anywhere; re-measure with `--footsteps compare=&lt;dir&gt;` if the recording is replaced.
     /// </summary>
     private static readonly float[] RealConcreteWalk =
         { -33.4f, -20.6f, -11.9f, -11.1f, -10.2f, -4.7f, -7.7f, -8.1f, -10.5f };
 
     /// <summary>
-    /// How far from that the model is allowed to be, per band.
-    ///
-    /// A RATCHET, not a target. The model is currently out by up to ten decibels at 125-250 Hz —
-    /// the band where a footstep keeps its body — and that is why it has not been played to anybody
-    /// as finished. What this holds is that it cannot get WORSE, which is the thing a test can
-    /// usefully do about a work in progress. Tighten it as the gap closes; four decibels is where it
-    /// stops being worth arguing about.
-    ///
-    /// The history it is ratcheting against, all measured the same way: the first version was out by
-    /// 32 dB in this band, having no mechanism at all between the whole heel and the grit on the
-    /// ground.
+    /// How far from that the model may be, per band: a ratchet, not a target. The model is out by up to
+    /// 10 dB at 125-250 Hz, where a footstep keeps its body (the first version was out by 32 dB there);
+    /// this holds that it gets no worse. Tighten as the gap closes; 4 dB is the goal.
     /// </summary>
     private const float BandToleranceDb = 11f;
 
-    /// <summary>
-    /// The synthesised footstep against a real one, band by band.
-    ///
-    /// This is the test that should have existed before anybody was asked to listen. "It does not
-    /// sound right" cannot be automated; "it has fifteen decibels too little at two hundred hertz"
-    /// can, and it is usually the same fault said precisely. The first renders were played to the
-    /// owner and rejected — correctly — and the reason turned out to be a missing mechanism that a
-    /// measurement found in minutes.
-    /// </summary>
+    /// <summary>The synthesised footstep against a real one, band by band: "too little at 200 Hz" is the
+    /// automatable form of "it does not sound right" (the first renders were rejected by ear for a missing
+    /// mechanism this measurement found).</summary>
     [Fact]
     public void TheModelMatchesTheShapeOfARealFootstep()
     {
@@ -308,15 +257,9 @@ public class FootstepTests
           + $"past the {BandToleranceDb:F0} dB this is ratcheted at.");
     }
 
-    /// <summary>
-    /// A small source cannot radiate low frequencies, and that is most of why the first attempt was
-    /// unlistenable.
-    ///
-    /// The model computed the force at the contact correctly and then radiated it as though the
-    /// underside of a shoe were a perfect loudspeaker at every frequency. It is not: efficiency goes
-    /// as (ka)², so a nine-centimetre sole is twenty-odd decibels down at a hundred hertz and barely
-    /// touched at two kilohertz.
-    /// </summary>
+    /// <summary>A small source cannot radiate low frequencies: efficiency goes as (ka)², so a 9 cm sole is
+    /// twenty-odd dB down at 100 Hz and barely touched at 2 kHz. Radiating the contact force as a perfect
+    /// loudspeaker made the first attempt unlistenable.</summary>
     [Fact]
     public void ASmallRadiatorCannotPushLowFrequencies()
     {
@@ -330,12 +273,12 @@ public class FootstepTests
         Assert.True(low < mid && mid <= high, "efficiency must rise with frequency");
         Assert.True(10f * MathF.Log10(mid / low) > 15f, "two decades of frequency is 40 dB of (ka)²");
         Assert.Equal(1f, high, 3);   // past ka = 1 there is no penalty left to pay
-        // ...and a bigger radiator pays less, which is why a floor carries and a shoe does not.
+        // A bigger radiator pays less: a floor carries and a shoe does not.
         Assert.True(Footsteps.RadiationEfficiency(60f, 1.0f) > Footsteps.RadiationEfficiency(60f, sole));
     }
 
-    /// <summary>Every sole and every surface the model names is actually in the registry — a
-    /// material that does not exist silently becomes Generic, and the shoe stops being that shoe.</summary>
+    /// <summary>Every sole and surface the model names is in the registry: an unknown material silently
+    /// becomes Generic.</summary>
     [Fact]
     public void EverySoleAndSurfaceTheModelNamesExists()
     {

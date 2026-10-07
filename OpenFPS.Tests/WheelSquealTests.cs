@@ -1,11 +1,8 @@
-using System;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -108,7 +105,7 @@ public class WheelSquealTests
     /// A squeal is a note, not a band of noise. It was noise through a resonance, whose amplitude
     /// jumps at the resonance's bandwidth: measured in 5 ms blocks its level swung by 28 % of its
     /// mean, which Cody heard on an airliner's touchdown as gravel and on the cars as a hiss
-    /// (2026-10-07). The stick-slip note's holds (14 %, most of it the scrub under it); its pitch moves.
+    /// (2026-10-07). The stick-slip note holds (14 %, most of it the scrub under it); its pitch moves.
     /// </summary>
     [Fact]
     public void A_squeal_holds_its_level_like_a_note()
@@ -132,9 +129,8 @@ public class WheelSquealTests
     }
 
     /// <summary>
-    /// A tyre is in hertz whatever rate the device runs at. The mixer runs at the device's rate, often
-    /// 48 kHz, and the tread tone, the rolling high-pass and the squeal's resonators were worked out at
-    /// 44.1 kHz whatever it was, so at 48 kHz every one of them came out 9 % sharp.
+    /// A tyre is in hertz whatever rate the device runs at: worked out at 44.1 kHz, the tread tone, the
+    /// rolling high-pass and the squeal's resonators came out 9 % sharp on a 48 kHz device.
     /// </summary>
     [Fact]
     public void A_tyre_is_in_hertz_at_any_device_rate()

@@ -1,9 +1,6 @@
-using System;
-using System.Linq;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -93,7 +90,7 @@ public class BrakeSquealTests
     [Fact]
     public void AnEmergencyStopDoesNotSqueal()
     {
-        var (y, rest) = Stop(Squealer(false), from: 10f, decel: 6f);
+        var (y, _) = Stop(Squealer(false), from: 10f, decel: 6f);
         Assert.True(Db(y, 0, y.Length) < 20f);
     }
 
@@ -142,8 +139,8 @@ public class BrakeSquealTests
             if (t > 4.6f && t < 6f) { frontBand += Goertzel(nose, hz); rearBand += Goertzel(rear, hz); }
         }
         Assert.True(frontBand > rearBand * 10, $"squeal band front {frontBand:G3} vs rear {rearBand:G3}");
-        // The squeal is the front brake's, drum or disc as the preset's running gear says, not a rule
-        // about weight: the 1969 Charger has drums all round, the Blue Bird Vision hydraulic discs.
+        // Drum or disc as the preset's running gear says, not by weight: the 1969 Charger has drums all
+        // round, the Blue Bird Vision hydraulic discs.
         Assert.True(new EngineVoiceState(MachineRegistry.VehicleFor("charger440"), Rate, 1).Squeal.Hz < 2300f,
                     "drum brakes squeal at 0.9-2.2 kHz");
         Assert.True(new EngineVoiceState(MachineRegistry.VehicleFor("school_bus_na"), Rate, 1).Squeal.Hz >= 2300f,

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -11,22 +7,14 @@ using OpenFPS.Server.Core;
 using Microsoft.EntityFrameworkCore;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Getting inside something, and it taking you with it.
-///
-/// The last of the four things a composite is for — saved, placed again, owned, ENTERED — and the one
-/// that makes driving stop being a feature of its own. A house you can stand in and a car you can
-/// drive away are the same structure; the only differences are whether a seat has
-/// <see cref="Seat.Controls"/> set and whether anything is willing to move the root.
-///
-/// What these hold, in order: that a seat carries its occupant, that turning the vehicle turns the
-/// person in it, that a driver's inputs reach the wheels, that the car's own behaviour comes out of
-/// its profile rather than out of constants in the driving code, and that ownership gates the things
-/// it should while gating none of the things it should not.
+/// Entering a composite: a seat carries its occupant, turning the vehicle turns them, a driver's inputs
+/// reach the wheels, the car drives from its profile and not from constants in the driving code, and
+/// ownership gates only what it should. A house and a car are the same structure; a car has a seat with
+/// <see cref="Seat.Controls"/> and something willing to move the root.
 /// </summary>
 public class OccupancyTests : IDisposable
 {
@@ -49,8 +37,7 @@ public class OccupancyTests : IDisposable
         Assert.True(f.World.Has<OccupantComponent>(session.Entity));
         Assert.True(f.World.Get<PlayerComponent>(session.Entity).IsInVehicle);
 
-        // With no seat named, the first one they are allowed into wins — and a driver's seat is
-        // declared first, so getting into your own car puts you behind the wheel without asking.
+        // With no seat named the first allowed one wins, and the driver's seat is declared first.
         Assert.True(f.World.Get<OccupantComponent>(session.Entity).Controls);
 
         var seat = f.SeatOf(root, 0);
@@ -82,17 +69,14 @@ public class OccupancyTests : IDisposable
         Assert.False(f.Seats.Enter(second, root, "driver", out string b));
         Assert.Contains("taken", b);
 
-        // ...but the passenger seat is still free, and the second one falls into it unasked.
+        // The passenger seat is still free, and an unnamed request takes it.
         Assert.True(f.Seats.Enter(second, root, null, out string c), c);
         Assert.Equal(1, f.World.Get<OccupantComponent>(second.Entity).SeatIndex);
         Assert.False(f.World.Get<OccupantComponent>(second.Entity).Controls);
     }
 
-    /// <summary>
-    /// Getting out puts you back where you got in, which is ground you demonstrably fitted on a moment
-    /// ago. Standing in the engine bay of the car you just left is merely odd to look at and
-    /// completely disorienting to listen to.
-    /// </summary>
+    /// <summary>Getting out puts you back where you got in, ground you fitted on a moment ago, not in
+    /// the engine bay.</summary>
     [Fact]
     public void GettingOutPutsYouBackWhereYouGotIn()
     {
@@ -111,10 +95,7 @@ public class OccupancyTests : IDisposable
                     $"got out at {where}, not at the door they came in by");
     }
 
-    /// <summary>
-    /// ...unless it has driven off since. Then you step out beside where it NOW is, because the spot
-    /// you climbed in from is half a mile back up the road.
-    /// </summary>
+    /// <summary>If it has driven off since, you step out beside where it is now.</summary>
     [Fact]
     public void GettingOutOfSomethingThatHasMovedPutsYouDownBesideIt()
     {
@@ -126,8 +107,7 @@ public class OccupancyTests : IDisposable
 
         f.Hold(session, forward: 1f);
         f.Tick(45);
-        // Back against forward motion is the brake — and back again once stopped is REVERSE, so let
-        // go the moment it is down to walking pace rather than holding it through the change.
+        // Back while moving forward brakes, and once stopped it is reverse: let go at walking pace.
         f.Hold(session, forward: -1f);
         for (int i = 0; i < 200 && f.World.Get<DriveComponent>(f.Entity(root)).Speed > 0.2f; i++) f.Tick(1);
         f.Hold(session, forward: 0f);
@@ -178,13 +158,8 @@ public class OccupancyTests : IDisposable
         Assert.Equal(before + new Vector3(0, 0, 40), f.World.Get<Transform>(session.Entity).Position);
     }
 
-    /// <summary>
-    /// Turn the car and the driver turns with it.
-    ///
-    /// Not cosmetic, and not optional: the whole world is rendered relative to where the listener is
-    /// facing. A driver whose head stayed pointing north through a right-hander would hear the track,
-    /// the crowd and their own engine swing around them every corner.
-    /// </summary>
+    /// <summary>Turn the car and the driver turns with it: the world is heard relative to the
+    /// listener's facing, so a head left pointing north would hear everything swing round each corner.</summary>
     [Fact]
     public void TurningTheVehicleTurnsWhoIsInIt()
     {
@@ -205,10 +180,8 @@ public class OccupancyTests : IDisposable
         Assert.Equal(quarterTurn, MathHelper.WrapAngle(after - before), 2);
     }
 
-    /// <summary>
-    /// "When I get out I should be facing that direction": you step off facing the way the vehicle
-    /// was going, whichever way your head was turned in the seat.
-    /// </summary>
+    /// <summary>You step off facing the way the vehicle was going, whichever way your head was turned
+    /// in the seat (Cody: "when I get out I should be facing that direction").</summary>
     [Fact]
     public void GettingOutFacesTheWayItWasGoing()
     {
@@ -340,11 +313,8 @@ public class OccupancyTests : IDisposable
         Assert.NotEqual(heading, f.World.Get<DriveComponent>(f.Entity(root)).Heading, 3);
     }
 
-    /// <summary>
-    /// The point of the whole exercise: nothing about how a thing drives is written in the driving
-    /// code. Give the same shape of car a lorry's profile and it accelerates like a lorry — not
-    /// because anything tested for one, but because a lorry is fourteen tonnes pushing a barn door.
-    /// </summary>
+    /// <summary>How a thing drives comes from its profile, not the driving code: the same shape with a
+    /// lorry's profile (fourteen tonnes, a barn door of drag) accelerates like a lorry.</summary>
     [Fact]
     public void WhatItDrivesLikeComesOutOfWhatItIs()
     {
@@ -360,11 +330,8 @@ public class OccupancyTests : IDisposable
                   + $"{VehicleProfile.ByName(heavy).MassKg:F0} kg {heavy} reached {heavySpeed:F1} m/s");
     }
 
-    /// <summary>
-    /// A driver whose client has gone quiet coasts to a stop. Not instantly — ordinary packet loss
-    /// must not stutter the throttle — but a car that drives itself away forever because somebody's
-    /// connection dropped is a car nobody can catch.
-    /// </summary>
+    /// <summary>A driver whose client has gone quiet coasts to a stop: not instantly, so ordinary packet
+    /// loss does not stutter the throttle, but it does not drive on for ever.</summary>
     [Fact]
     public void ASilentDriverCoastsToAStop()
     {
@@ -394,7 +361,7 @@ public class OccupancyTests : IDisposable
         Assert.False(f.Seats.Enter(stranger, root, "driver", out string refused));
         Assert.Contains("cody", refused);
 
-        // ...but the passenger seat is not trespass. A world you cannot get a lift in is not a world.
+        // The passenger seat of somebody else's car is allowed.
         Assert.True(f.Seats.Enter(stranger, root, null, out string message), message);
         Assert.False(f.World.Get<OccupantComponent>(stranger.Entity).Controls);
     }
@@ -428,11 +395,8 @@ public class OccupancyTests : IDisposable
 
     // ── Saving it ───────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Seats and an engine are part of what a thing IS, so they go out with the template and come
-    /// back with every instance. Place a bus twice and both have the same seats, the same way both
-    /// have the same walls.
-    /// </summary>
+    /// <summary>Seats and an engine are saved with the template and come back with every
+    /// instance.</summary>
     [Fact]
     public void ACarSavedAsATemplateIsStillACarWhenItIsPlacedAgain()
     {
@@ -456,7 +420,7 @@ public class OccupancyTests : IDisposable
         Assert.True(f.World.Has<DriveComponent>(placed));
         Assert.True(f.World.Has<Velocity>(placed));     // it moves, so the grid must treat it as moving
 
-        // And it drives, as itself, with nobody having said so a second time.
+        // And the instance drives without being made drivable again.
         var session = f.Player("cody", new Vector3(-29, 0, -30));
         Assert.True(f.Seats.Enter(session, second, null, out string message), message);
         f.StartEngine(second);                       // placed again, it is parked: key first
@@ -475,10 +439,8 @@ public class OccupancyTests : IDisposable
         Assert.Contains("fixed in place", error);
     }
 
-    /// <summary>
-    /// An engine in something nobody can drive is a shed with an engine in it: nothing can ever ask
-    /// it to move, so all the engine buys it is a noise.
-    /// </summary>
+    /// <summary>An engine is refused on something nobody can drive: nothing could ever ask it to
+    /// move.</summary>
     [Fact]
     public void SomethingWithNoDrivingSeatIsNotDrivable()
     {
@@ -488,7 +450,7 @@ public class OccupancyTests : IDisposable
         Assert.False(f.Composites.MakeDrivable(f.MapId, root, "v8_sports", "cody", true, out string error));
         Assert.Contains("nothing in it drives", error);
 
-        // Passenger seats are not enough either — somebody has to be able to steer it.
+        // Passenger seats are not enough: somebody has to be able to steer.
         Assert.True(f.Composites.AddSeat(f.MapId, root, "bench", false, new Vector3(-20, 0, 40), 0f,
                                          "cody", true, out error), error);
         Assert.False(f.Composites.MakeDrivable(f.MapId, root, "v8_sports", "cody", true, out error));
@@ -498,10 +460,8 @@ public class OccupancyTests : IDisposable
         Assert.True(f.Composites.MakeDrivable(f.MapId, root, "v8_sports", "cody", true, out error), error);
     }
 
-    /// <summary>
-    /// Every refusal names what IS free. A no on its own is a no a player has to go and investigate,
-    /// and investigating a car you cannot see means walking round it trying doors.
-    /// </summary>
+    /// <summary>Every refusal names what is free, so a player need not walk round a car trying
+    /// doors.</summary>
     [Fact]
     public void BeingTurnedAwayFromASeatTellsYouWhichOnesAreFree()
     {
@@ -510,22 +470,20 @@ public class OccupancyTests : IDisposable
         var owner = f.Player("cody", new Vector3(21, 0, 20));
         var friend = f.Player("mate", new Vector3(21, 0, 21));
 
-        // Refused because it is not theirs to drive, with nobody in it at all.
+        // Not theirs to drive, and empty.
         Assert.False(f.Seats.Enter(friend, root, "driver", out string notYours));
         Assert.Contains("cannot drive it", notYours);
         Assert.Contains("passenger", notYours);
 
-        // ...and refused because somebody is already in it, which is the more useful of the two facts.
+        // Somebody already in it: that is the fact named.
         Assert.True(f.Seats.Enter(owner, root, null, out _));
         Assert.False(f.Seats.Enter(friend, root, "driver", out string taken));
         Assert.Contains("taken", taken);
         Assert.Contains("passenger", taken);
     }
 
-    /// <summary>
-    /// Owning a thing permits; it never compels. Wanting to ride in your own car is not a special
-    /// case that has to be allowed for — asking for the passenger seat asks for the passenger seat.
-    /// </summary>
+    /// <summary>Owning permits and never compels: an owner asking for the passenger seat gets the
+    /// passenger seat.</summary>
     [Fact]
     public void AnOwnerMayRideInTheirOwnVehicle()
     {
@@ -539,10 +497,8 @@ public class OccupancyTests : IDisposable
 
     // ── A car that was parked, not built ────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// "vehicle:i4_economy" is a hatchback built from its profile: a closed cabin that grows a room,
-    /// four seats with the driver's first, and an engine. Nobody wrote a file for it.
-    /// </summary>
+    /// <summary>"vehicle:i4_economy" is built from its profile with no file: a closed cabin that grows
+    /// a room, four seats with the driver's first, and an engine.</summary>
     [Fact]
     public void AParkedCarIsBuiltFromItsProfile()
     {
@@ -557,9 +513,8 @@ public class OccupancyTests : IDisposable
         Assert.True(seats[0].Controls);
         Assert.True(parts >= 9, $"only {parts} parts");
 
-        // The cabin is a room — which is the whole of what makes sitting in it sound like a car. And it
-        // is the CABIN: the bonnet and the boot sit inside the car's bounding box, and a room derived
-        // from that box was the whole 4.1 m car, three times the volume of the 2.4 m cabin.
+        // The room is the 2.4 m cabin, not the car's bounding box: a room from the box was the whole
+        // 4.1 m car, three times the cabin's volume.
         var roomEntity = CompositeService.MembersOf(f.World, root).Find(m => f.World.Has<RegionComponent>(m));
         Assert.NotEqual(Arch.Core.Entity.Null, roomEntity);
         var size = f.World.Get<RegionComponent>(roomEntity).RoomSize;
@@ -567,11 +522,8 @@ public class OccupancyTests : IDisposable
         Assert.InRange(size.Y, 1.0f, 1.3f);
     }
 
-    /// <summary>
-    /// Get in, hold W for three seconds: it goes, forwards, and stays on the road. The last half is
-    /// the one that matters — a car asking where the ground is used to find its own floor inside the
-    /// step height and climb onto it, every tick.
-    /// </summary>
+    /// <summary>Get in, hold W for three seconds: it goes forwards and stays on the road. A car's ground
+    /// probe once found its own floor within the step height and climbed onto it every tick.</summary>
     [Fact]
     public void AParkedCarDrivesAwayWithoutClimbingItsOwnFloor()
     {
@@ -592,10 +544,8 @@ public class OccupancyTests : IDisposable
         Assert.True(MathF.Abs(at.Y - startY) < 0.1f, $"it rose from {startY:F2} to {at.Y:F2} — standing on its own floor");
     }
 
-    /// <summary>
-    /// A tap on a steering key is a small correction, not a jolt of full lock; holding it tightens
-    /// the turn steadily; and letting go straightens up. Taps are how a lot of people steer.
-    /// </summary>
+    /// <summary>A tap on a steering key is a small correction, not full lock; holding tightens the turn
+    /// steadily; letting go straightens up.</summary>
     [Fact]
     public void SteeringIsAHandOnTheWheelNotASwitch()
     {
@@ -621,10 +571,8 @@ public class OccupancyTests : IDisposable
         Assert.True(MathF.Abs(released) < 0.05f, $"let go, the wheel stayed at {released:F2}");
     }
 
-    /// <summary>
-    /// At speed, full lock on the keys is not full lock at the wheels: it is as far as the tyres can
-    /// hold, and a little more. Otherwise holding a key at seventy is a spin.
-    /// </summary>
+    /// <summary>At speed, full lock on the keys is as far as the tyres can hold and a little more, not
+    /// full lock at the wheels.</summary>
     [Fact]
     public void FullLockAtSpeedIsWhatTheTyresCanHold()
     {
@@ -642,17 +590,14 @@ public class OccupancyTests : IDisposable
         float h0 = f.World.Get<DriveComponent>(e).Heading;
         f.Tick(30);
         var after = f.World.Get<DriveComponent>(e);
-        // Full lock at 25 m/s would ask the tyres for several times what they have — a demand of 2,
-        // the ceiling, every tick. Limited to what they can hold, it sits just over the edge: the
-        // tyres squeal a little and the car goes round.
+        // Full lock at 25 m/s would be a demand of 2 (the ceiling) every tick; limited, it sits just
+        // over the edge: the tyres squeal a little and the car goes round.
         Assert.InRange(after.TyreDemand, 0.9f, 1.4f);
         Assert.True(MathF.Abs(after.Heading - h0) > 0.2f, "it did not turn");
     }
 
-    /// <summary>
-    /// A parked car is parked: the engine is off and W does nothing until the key is turned, and then
-    /// nothing for the second the starter spends turning it over. And the voice is told.
-    /// </summary>
+    /// <summary>A parked car's engine is off: W does nothing until the key is turned and the starter has
+    /// had its second, and the voice is told.</summary>
     [Fact]
     public void AParkedCarNeedsTheKey()
     {
@@ -679,11 +624,9 @@ public class OccupancyTests : IDisposable
         Assert.True(f.RootTransform(root).Position.Z - 20f > 2f, "the engine started and nothing happened");
     }
 
-    /// <summary>
-    /// "I can't figure out how to get out of the garage." The cars are parked nose out between the
-    /// street-side piers; key, W, and it should be on Main Street in a few seconds without touching
-    /// anything. If this fails, it names what it hit.
-    /// </summary>
+    /// <summary>Key and W drive a garage car, parked nose out between the street-side piers, onto Main
+    /// Street without touching anything (Cody could not get out of the garage); a failure names what it
+    /// hit.</summary>
     [Fact]
     public void AParkedCarDrivesStraightOutOfTheGarage()
     {
@@ -722,12 +665,9 @@ public class OccupancyTests : IDisposable
 
     // ── Leaving ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Disconnecting sitting in a car with things in your hands and on your back leaves the things on
-    /// the map for somebody else, the way changing map always did. Before, the body was destroyed and
-    /// the things kept a HeldComponent pointing at it, so nobody could ever pick them up again, and a
-    /// ParentComponent pointing at an id Arch would hand to the next thing created.
-    /// </summary>
+    /// <summary>Disconnecting in a car leaves what you carry on the map for somebody else. The things
+    /// used to keep a HeldComponent on the destroyed body, so nobody could pick them up, and a
+    /// ParentComponent on an id Arch would reuse.</summary>
     [Fact]
     public void DisconnectingPutsDownWhatYouCarryAndGetsYouOut()
     {
@@ -765,11 +705,8 @@ public class OccupancyTests : IDisposable
         Assert.True(hands.Take(other, "torch", out m), m);
     }
 
-    /// <summary>
-    /// Logging out in the passenger seat of a car that is still moving: leaving the world is not a
-    /// request, so the car does not refuse it, and the place kept for coming back is standing beside
-    /// the car, which is where the next login puts you.
-    /// </summary>
+    /// <summary>Logging out in the passenger seat of a moving car is not refused, and the next login puts
+    /// you beside the car.</summary>
     [Fact]
     public void LeavingTheWorldFromAMovingCarKeepsAPlaceBesideIt()
     {
@@ -824,11 +761,8 @@ public class OccupancyTests : IDisposable
 
     // ── Fixture ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A map on disk, a world, and the four things that touch it. Deliberately the real
-    /// MapManager over real prefab and map files rather than a stub: a composite is only worth
-    /// anything if it is made of the same entities the map itself is made of.
-    /// </summary>
+    /// <summary>A map on disk, a world, and the four services that touch it: the real MapManager over
+    /// real prefab and map files, so a composite is made of the map's own entities.</summary>
     private sealed class Fixture
     {
         public readonly MapManager Maps;
@@ -945,11 +879,8 @@ public class OccupancyTests : IDisposable
         /// <summary>Every client stops sending. Not a disconnect — a silence.</summary>
         public void Silence() => _drivers.Clear();
 
-        /// <summary>
-        /// Ticks the server the way the server ticks itself, in the same order and through the same
-        /// systems. A driving test that drove the physics directly would prove the physics and
-        /// nothing about whether a player can reach it.
-        /// </summary>
+        /// <summary>Ticks the server's own systems in the server's order, so a test proves a player can
+        /// reach the physics, not only the physics.</summary>
         public void Tick(int ticks)
         {
             float dt = PhysicsConstants.FixedDeltaTime;

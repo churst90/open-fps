@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text.Json;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
@@ -15,15 +10,10 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --siren-route [map=city] [track=downtown] [preset=police_interceptor] [lane=1.8]
-///               [at=x,z] [from=metres] [sec=60] [every=10]
-///
-/// The path a car's sound takes to a fixed listener, frame by frame, as the car drives its real racing
-/// line on the real map — through the same AsyncAcousticWorker (Steam Audio direct + barrier search +
-/// pathing) the game runs. Written for "sirens where I'm standing are fluttering": the question is
-/// whether the path's level jumps between one worker answer and the next while the car is far and
-/// behind buildings. Asked at the game's own cadence (a source past 50 m is re-asked every tenth
-/// frame of a ~33 Hz loop), and printed as the per-band dB the provider would be handed.
+/// --siren-route [map=city] [track=downtown] [preset=police_interceptor] [lane=1.8] [at=x,z] [from=metres]
+/// [sec=60] [every=10]: a car's path to a fixed listener frame by frame, as it drives its racing line,
+/// through the game's AsyncAcousticWorker at the game's cadence (past 50 m, every tenth frame of a ~33 Hz
+/// loop), printed as the per-band dB the provider is handed. For sirens fluttering behind buildings.
 /// </summary>
 public static class SirenRouteSpike
 {

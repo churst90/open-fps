@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
@@ -21,8 +19,7 @@ public static class SpeechLinesSpike
         double worstLength = 0, rmsLo = 0, rmsHi = -200, worstPeak = -200;
         foreach (var t in Speech.Takes)
         {
-            // By full path: the lab does not carry the client's ASSETS folder, and GranularBank takes a
-            // path with ASSETS in it as it stands.
+            // A full path: the lab has no ASSETS folder, and GranularBank takes a path with ASSETS in it as it stands.
             string id = OpenFPS.AudioLab.LabPaths.Sounds("VOICES", t.Voice, t.Line + ".ogg");
             if (!bank.TryDecode(id, out var pcm, out int ch, out int rate) || pcm.Length == 0)
             {

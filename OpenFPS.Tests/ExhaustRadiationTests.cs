@@ -1,9 +1,7 @@
-using System;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core.Engine;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -93,7 +91,7 @@ public class ExhaustRadiationTests
         var (backLow, backHigh) = Bands(new Vector3(0f, 1.2f, -12f));
         var (frontLow, frontHigh) = Bands(new Vector3(0f, 1.2f, 12f));
         _o.WriteLine($"low: behind {backLow:F1} dB, in front {frontLow:F1} dB; high: behind {backHigh:F1} dB, in front {frontHigh:F1} dB");
-        // Not all of it: the body's panels ring, driven by the exhaust, and radiate from the whole car.
+        // Not all of it: the body's panels, driven by the exhaust, radiate from the whole car.
         Assert.True(backHigh - frontHigh > 6f, $"the top is only {backHigh - frontHigh:F1} dB brighter behind");
         Assert.True(MathF.Abs(backLow - frontLow) < 6f, $"the bass moved {backLow - frontLow:F1} dB");
         Assert.True(frontLow <= backLow + 0.5f, "the front view was lifted above the back");

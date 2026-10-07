@@ -1,22 +1,16 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Every side of a room that is not closed in is an opening, sized and placed from the gap in its walls
-/// (FaceOpenings, AcousticVolumeGenerator.AddFaceOpenings), and a door is an opening with a leaf in it.
-/// One opening per gap, not one per pair of rooms: until 2026-10-02 a building with a door to the street
-/// lost its open side onto the same street, and two doorways between two rooms were one.
+/// Every open side of a room is an opening sized and placed from the gap in its walls
+/// (AcousticVolumeGenerator.AddFaceOpenings); a door is an opening with a leaf. One per gap, not per pair
+/// of rooms: until 2026-10-02 a door to the street hid an open side onto it, and two doorways were one.
 /// </summary>
 public class OpeningsFromGapsTests
 {

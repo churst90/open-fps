@@ -1,18 +1,12 @@
-using System;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for the crack-and-thump, which is a gameplay instrument rather than a decoration.
-///
-/// A supersonic round makes two sounds: the shock as it passes the listener, and the muzzle report
-/// chasing it at the speed of sound. The round outruns its own report, so the crack lands FIRST, and the
-/// gap between them is d·(1/c − 1/v) — a direct readout of how far away the shooter is, available to a
-/// player who cannot see them. These tests hold that relationship to the physics rather than to a
-/// designer's taste, because the moment it stops being the physics it stops being trustworthy, and a
-/// player who has learned to read range by ear would be quietly misled.
+/// The crack and thump as a gameplay instrument: a supersonic round's shock lands first and its muzzle
+/// report after, d·(1/c − 1/v) later, which tells a player who cannot see the shooter how far away they are.
+/// Held to the physics, because a player who has learned to read range by ear would be misled otherwise.
 /// </summary>
 public class BallisticsTests
 {
@@ -39,8 +33,7 @@ public class BallisticsTests
     [InlineData(400f)]
     public void TheGapReadsBackTheRangeItEncodes(float distance)
     {
-        // The round trip: if a player could measure the gap exactly, they would recover the range
-        // exactly. Anything else means the cue is lying about something.
+        // The round trip: an exact gap recovers the range exactly.
         float gap = Ballistics.CrackToReportSeconds(distance, RifleV, C);
         float recovered = Ballistics.DistanceFromCrackToReport(gap, RifleV, C);
         Assert.Equal(distance, recovered, 1);
@@ -49,8 +42,7 @@ public class BallisticsTests
     [Fact]
     public void TheGapIsBigEnoughToHearAndGrowsWithRange()
     {
-        // Two sounds under about 30 ms apart fuse into one for most listeners. The cue is only useful
-        // if it clears that at the ranges the game will actually use.
+        // Two sounds under about 30 ms apart fuse for most listeners; the cue must clear that at the game's ranges.
         float at25 = Ballistics.CrackToReportSeconds(25f, RifleV, C);
         float at100 = Ballistics.CrackToReportSeconds(100f, RifleV, C);
         float at400 = Ballistics.CrackToReportSeconds(400f, RifleV, C);
@@ -64,8 +56,7 @@ public class BallisticsTests
     [Fact]
     public void ASubsonicRoundMakesNoCrackAtAll()
     {
-        // A 340 m/s pistol round never outruns its own sound, so there is nothing to hear passing —
-        // and a suppressed weapon's silence is a gameplay fact, not an omission.
+        // A 340 m/s pistol round never outruns its sound, so nothing is heard passing.
         Assert.False(Ballistics.MakesCrack(340f, 1.5f, C));
         Assert.True(Ballistics.MakesCrack(RifleV, 1.5f, C));
     }
@@ -90,8 +81,7 @@ public class BallisticsTests
     [Fact]
     public void ColdAirStretchesTheGap()
     {
-        // Sound slows in cold air while the bullet does not care, so the report takes longer to arrive
-        // and the gap widens. The same temperature that moves every Doppler shift moves this too.
+        // Sound slows in cold air and the bullet does not, so the gap widens.
         float cold = Ballistics.CrackToReportSeconds(100f, RifleV, AudioPhysics.SpeedOfSoundAt(-20f));
         float warm = Ballistics.CrackToReportSeconds(100f, RifleV, AudioPhysics.SpeedOfSoundAt(40f));
         Assert.True(cold > warm);
@@ -102,9 +92,8 @@ public class BallisticsTests
     [Fact]
     public void TheRenderedShotIsDryAndCentred()
     {
-        // Dry because the engine makes its own room: a layer that rings on would put a second room
-        // inside the one the player is standing in. Centred because a DC offset is wasted headroom and
-        // a step in the waveform every time a voice starts or stops.
+        // Dry, because the engine makes its own room; centred, because a DC offset is wasted headroom and a step
+        // every time a voice starts or stops.
         foreach (var pcm in new[]
         {
             WeaponSynth.MuzzleBlast(WeaponProfile.Rifle),
@@ -118,15 +107,10 @@ public class BallisticsTests
     }
 
     /// <summary>
-    /// A shot's energy is balanced the way a real one is: 20-45 per cent of it below 500 Hz.
-    ///
-    /// Measured on the NIJ recordings, the first 20 ms of clean shots at 20-40 m: 16-40 per cent below
-    /// 500 Hz across the M16, the AK, the Glock and the Colt, about a quarter typically (a handheld
-    /// recorder rolls off below 80 Hz, so a little more in truth). This test used to demand MORE than
-    /// half, from a listening test that called a white-noise-heavy synthesis "a burst of white noise";
-    /// the complaint was right and the number it produced was not, and the measurement replaces it.
-    /// Both ends matter: under 20 per cent is a hiss, over 45 a thud. The shotgun, never recorded, is
-    /// the lowest-weighted of the five and still under 60.
+    /// A shot's energy is balanced as a real one's: 20-45 % below 500 Hz (under 20 a hiss, over 45 a thud).
+    /// Measured on the NIJ recordings, first 20 ms of clean shots at 20-40 m: 16-40 % across the M16, AK, Glock
+    /// and Colt, about a quarter typically (a handheld recorder rolls off below 80 Hz). The unrecorded shotgun
+    /// is the lowest-weighted and still under 60.
     /// </summary>
     [Fact]
     public void AShotIsBalancedTheWayARealOneIs()
@@ -144,16 +128,15 @@ public class BallisticsTests
             float share = Share(w);
             Assert.True(share >= 0.20f && share <= 0.45f, $"{w.Id}: {share * 100f:F0}% of the energy below 500 Hz");
         }
-        // The shotgun has no recording: the biggest bore and charge, so the lowest-weighted of all,
-        // and still not a thud.
+        // The shotgun has no recording: the biggest bore and charge, so the lowest-weighted, and not a thud.
         float shotgun = Share(WeaponRegistry.Shotgun);
         Assert.True(shotgun < 0.60f, $"shotgun: {shotgun * 100f:F0}% below 500 Hz");
         foreach (var w in WeaponRegistry.All.Where(w => w != WeaponRegistry.Shotgun))
             Assert.True(shotgun > Share(w), $"{w.Id} is weighted lower than a 12 gauge");
     }
 
-    /// <summary>Energy in a band, by one-pole filtering. Crude and adequate: the question is whether
-    /// two thirds of the energy is in the bottom two octaves, not where a notch sits.</summary>
+    /// <summary>Energy in a band, by one-pole filtering: crude and adequate for a share of energy, not for
+    /// where a notch sits.</summary>
     private static float BandEnergy(float[] pcm, float lowHz, float highHz)
     {
         const float sampleRate = WeaponSynth.SampleRate;
@@ -181,8 +164,7 @@ public class BallisticsTests
     [Fact]
     public void TwoWeaponsDoNotSoundTheSame()
     {
-        // The profile has to actually reach the waveform: identifying a weapon by ear is the whole
-        // reason for having more than one.
+        // The profile reaches the waveform: telling weapons apart by ear is why there is more than one.
         var rifle = WeaponSynth.MuzzleBlast(WeaponProfile.Rifle);
         var pistol = WeaponSynth.MuzzleBlast(WeaponProfile.Pistol);
         Assert.NotEqual(rifle.Length, pistol.Length);

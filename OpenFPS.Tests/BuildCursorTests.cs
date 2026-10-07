@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -10,22 +6,13 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Putting something exactly where you meant, without being able to see where that is.
-///
-/// Every other building verb solves this by using the player's own body as the coordinate —
-/// `/group` sweeps a radius around you, `/addseat` puts a seat where you stand. That works until
-/// you need a roof, which you cannot walk to, or a straight wall, which you cannot pace out
-/// reliably. So the cursor: moved in metres from an origin the builder chose, announcing itself and
-/// what is already there on every move. A review cursor, applied to a building site.
-///
-/// What these hold: that the cursor's arithmetic is right in world terms, that a run of parts comes
-/// out straight and touching, that you are told what is already where you are about to build, that
-/// a mistake can be taken back, and that the thing which says "this is not a room yet" says WHY.
+/// The build cursor: moved in metres from an origin the builder chose, saying what is already there on
+/// every move, for the roof you cannot walk to and the wall you cannot pace out. Holds its arithmetic,
+/// straight touching runs, undo, and /room saying why something is not a room yet.
 /// </summary>
 public class BuildCursorTests : IDisposable
 {
@@ -35,11 +22,8 @@ public class BuildCursorTests : IDisposable
 
     // ── The cursor ──────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The axes are the BUILDER'S, fixed when the origin is set. Fixed rather than live, because a
-    /// coordinate system that rotates when you turn round is one where the wall you placed a moment
-    /// ago has moved.
-    /// </summary>
+    /// <summary>The axes are the builder's, fixed when the origin is set: axes that turned with you would
+    /// move the wall you just placed.</summary>
     [Fact]
     public void TheCursorsAxesAreTheBuildersAndTheyDoNotMove()
     {
@@ -51,18 +35,14 @@ public class BuildCursorTests : IDisposable
         build.Cursor = new Vector3(2, 1, 0);
         Assert.Equal(new Vector3(102, 1, 100), build.WorldCursor, Compare);
 
-        // Facing east, "forward" is +X — and it stays +X however the player turns afterwards.
+        // Facing east, forward is +X, however the player turns afterwards.
         var east = new BuildSession();
         east.SetOrigin(new Vector3(100, 0, 100), yaw: MathF.PI / 2f);
         east.Cursor = new Vector3(0, 0, 3);
         Assert.Equal(new Vector3(103, 0, 100), east.WorldCursor, Compare);
     }
 
-    /// <summary>
-    /// The cursor reads out in small named numbers, never a world coordinate. "Two right, three
-    /// forward" is somewhere a person can hold in their head and walk back to; "204.7, 12.3, -88.1"
-    /// is what every one of these commands would be reduced to if the origin were the map's.
-    /// </summary>
+    /// <summary>The cursor reads out as "2 right, 3 forward", never a world coordinate or a minus sign.</summary>
     [Fact]
     public void TheCursorReadsOutAsSomewhereAPersonCanRememberIt()
     {
@@ -98,11 +78,7 @@ public class BuildCursorTests : IDisposable
         Assert.Equal(f.Feet + new Vector3(0, 0, 4), f.World.Get<Transform>(placed).Position, Compare);
     }
 
-    /// <summary>
-    /// A wall is not one part, it is a line of them, and a line placed by hand from a cursor is only
-    /// as straight as the arithmetic somebody did in their head. A run steps by the part's OWN
-    /// footprint, so the panels touch and the wall is straight.
-    /// </summary>
+    /// <summary>A run steps by the part's own footprint, so the panels touch and the wall is straight.</summary>
     [Fact]
     public void ARunComesOutStraightAndTouching()
     {
@@ -124,10 +100,7 @@ public class BuildCursorTests : IDisposable
         }
     }
 
-    /// <summary>
-    /// A run can be aimed on the spot. Without this the only way to aim one is to move the cursor
-    /// zero metres in the direction you want first, which works and is a riddle.
-    /// </summary>
+    /// <summary>A run is aimed on the spot, not by first moving the cursor zero metres that way.</summary>
     [Fact]
     public void ARunCanBeAimedWhereItIsAskedFor()
     {
@@ -141,8 +114,7 @@ public class BuildCursorTests : IDisposable
         Assert.True(placed.Max(p => p.X) - placed.Min(p => p.X) > 3f);     // ...and that line runs right
     }
 
-    /// <summary>The cursor is left at the end of a run, where the next thing goes — otherwise every
-    /// run is followed by arithmetic the builder has to do themselves.</summary>
+    /// <summary>The cursor is left at the end of a run, where the next thing goes.</summary>
     [Fact]
     public void ARunLeavesTheCursorAtTheEndOfIt()
     {
@@ -166,11 +138,8 @@ public class BuildCursorTests : IDisposable
         Assert.Equal(MathF.PI / 2f, MathF.Abs(yaw), 2);
     }
 
-    /// <summary>
-    /// Moving the cursor says what is already there. Moving to a spot and being told nothing is the
-    /// same as not moving; being told "Concrete Wall" is how you find the wall you placed a minute
-    /// ago and build the next one against it.
-    /// </summary>
+    /// <summary>Moving the cursor says what is already there, which is how a builder finds the wall they
+    /// placed a minute ago.</summary>
     [Fact]
     public void TheCursorSaysWhatIsAlreadyThere()
     {
@@ -199,11 +168,8 @@ public class BuildCursorTests : IDisposable
         Assert.Single(f.PlacedEntities());
     }
 
-    /// <summary>
-    /// Undo is not a convenience. A part in the wrong place is invisible to somebody who cannot see
-    /// it, so the mistake is not merely unfixed, it is undetectable until they walk into it — and by
-    /// then they have built three more things around it.
-    /// </summary>
+    /// <summary>Undo takes the last part back: a misplaced part is undetectable without sight until it is
+    /// walked into.</summary>
     [Fact]
     public void AMistakeCanBeTakenBack()
     {
@@ -223,11 +189,7 @@ public class BuildCursorTests : IDisposable
 
     // ── Standing back ───────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The feedback loop the whole of building without sight hangs off. A sighted builder stands
-    /// back and sees the roof is missing; /room is the replacement for standing back, and it has to
-    /// name what is missing rather than merely saying no.
-    /// </summary>
+    /// <summary>/room stands in for standing back to look: it names what is missing, not just no.</summary>
     [Fact]
     public void RoomSaysWhatIsMissingAndNotJustNo()
     {
@@ -237,18 +199,14 @@ public class BuildCursorTests : IDisposable
         f.Run("room", "9");
         Assert.DoesNotContain("encloses a room", f.LastReply);
         Assert.Contains("4 are needed", f.LastReply);
-        Assert.Contains("wall", f.LastReply);          // and it names which faces are open
+        Assert.Contains("wall", f.LastReply);          // names which faces are open
 
         f.BuildShell(sides: 4);            // the missing side
         f.Run("room", "9");
         Assert.Contains("encloses a room", f.LastReply);
     }
 
-    /// <summary>
-    /// Even when it IS a room, it says what is still open. Four walls with nothing above or below is
-    /// a shaft — which genuinely does sound like a room, and is still not what most people mean when
-    /// they say they have built one.
-    /// </summary>
+    /// <summary>A room still names what is open: four walls with nothing above or below is a shaft.</summary>
     [Fact]
     public void ItNamesWhatIsStillOpenEvenWhenItPasses()
     {
@@ -266,7 +224,7 @@ public class BuildCursorTests : IDisposable
         Assert.DoesNotContain("ceiling", f.LastReply);
     }
 
-    /// <summary>...and it answers BEFORE anything is grouped, which is the point of asking.</summary>
+    /// <summary>/room answers before anything is grouped.</summary>
     [Fact]
     public void RoomAnswersBeforeAnythingIsCommittedTo()
     {
@@ -300,11 +258,8 @@ public class BuildCursorTests : IDisposable
         public int GetHashCode(Vector3 v) => 0;
     }
 
-    /// <summary>
-    /// A real map, a real player and the real command handler, driven the way a telnet session drives
-    /// it. Going through the commands rather than the services is the point: the arithmetic being
-    /// right is worth nothing if the words a player types do not reach it.
-    /// </summary>
+    /// <summary>A real map, player and command handler, driven through typed commands as telnet drives
+    /// them, so the words a player types are tested too.</summary>
     private sealed class Fixture
     {
         public readonly MapManager Maps;
@@ -348,11 +303,7 @@ public class BuildCursorTests : IDisposable
             _commands = new CommandHandler(sessions, Maps, _server, Composites, new OccupancyService(Maps));
         }
 
-        /// <summary>
-        /// One typed command, run the whole way a telnet line is run: dispatched, buffered, and
-        /// executed on the tick thread. Going through the real path is the point — arithmetic being
-        /// right is worth nothing if the words a player types do not reach it.
-        /// </summary>
+        /// <summary>One typed command, dispatched, buffered and executed as on the tick thread.</summary>
         public void Run(string command, params string[] args)
         {
             _replies.Clear();
@@ -376,11 +327,8 @@ public class BuildCursorTests : IDisposable
         public Vector3 PrefabSize(string prefabId)
             => Composites.Prefabs.Prefabs[prefabId].ColliderSize ?? Vector3.One;
 
-        /// <summary>
-        /// Walls round the origin, built the way a player would: put the cursor at a corner, say
-        /// which way you are running, and run. Called again with more sides it adds only the sides
-        /// it has not already built, so a test can watch a shell being closed one wall at a time.
-        /// </summary>
+        /// <summary>Walls round the origin, built as a player would (cursor to a corner, aim, run). Called
+        /// again with more sides it adds only the missing ones.</summary>
         public void BuildShell(int sides)
         {
             if (!Session.Build.Placed) Run("origin");

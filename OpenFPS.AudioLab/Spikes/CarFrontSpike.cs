@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -22,22 +18,19 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 ///   --car-fronts tailpipe [preset ...]     the tailpipe alone at idle and at the ISO 5130 stationary-test speed
 ///   --car-fronts fan [preset ...]          the cooling fan alone
 ///
-/// level=game (the default) renders what the game plays: the live voice's idle lift
-/// (CompensateLevel) at the loudness law in force (Loudness.DynamicRangeCompression, 0.45 unless
-/// OPENFPS_LEVEL_COMPRESSION says otherwise), each outlet placed as ClientAudioSystem places it
-/// (Loudness.Place at the vehicle's declared level, widened to the distance between its outlets) and
-/// rolled off by Loudness.RenderedGain, then the master's trim and makeup (+9 dB); samples are the
-/// game's own full scale at its output, the WAVs unscaled. No room, no reflections, no other sound.
-/// level=physical renders pascals with spherical spreading from each outlet, the WAVs at 1 Pa = 0.1
-/// full scale (94 dB SPL is -20 dBFS).
+/// level=game (the default) renders what the game plays: the idle lift (CompensateLevel) at the
+/// loudness law in force (Loudness.DynamicRangeCompression), each outlet placed as ClientAudioSystem
+/// places it (Loudness.Place at the declared level, widened to the distance between the outlets) and
+/// rolled off by Loudness.RenderedGain, then the master's trim and makeup (+9 dB), the WAVs unscaled.
+/// level=physical renders pascals spreading spherically from each outlet, the WAVs at 1 Pa = 0.1 full
+/// scale (94 dB SPL is -20 dBFS). Neither has a room, reflections or any other sound. bay=X forces
+/// every voice's engine-bay leak to X.
 ///
-/// Writes, per preset, the mono signals (float32, at the mixer's 48 kHz) to DIR/raw for measuring, and binaural
-/// WAVs to DIR for listening:
+/// Writes, per preset, the mono signals (float32, 48 kHz) to DIR/raw for measuring (the two taps at a
+/// metre, .front/.rear, and .heard), and binaural WAVs to DIR:
 ///   {preset}_{tag}_idle_front2m.wav  standing 2 m in front of the bumper, facing the car
 ///   {preset}_{tag}_idle_rear2m.wav   2 m behind the rear bumper, facing it
 ///   {preset}_{tag}_passby10.wav      at the kerb, 2 m from the path, the car passing at 10 km/h
-/// The raw files are the two taps at a metre (.front/.rear) and what reaches the listener (.heard).
-/// Physical levels throughout: no loudness law, no idle lift (CompensateLevel is off), no room.
 /// </summary>
 public static class CarFrontSpike
 {
@@ -51,9 +44,7 @@ public static class CarFrontSpike
 
     public static int Run(string[] args)
     {
-        // FAN-MODE-BEGIN
         if (args.Contains("fan")) return Fan(args.Where(x => !x.StartsWith("--") && x != "fan").ToArray());
-        // FAN-MODE-END
         if (args.Contains("tailpipe")) return Tailpipe(args.Where(x => !x.StartsWith("--") && x != "tailpipe").ToArray());
         Game = Arg(args, "level=") != "physical";
         float wavScale = Game ? 1f : WavScale;
@@ -91,11 +82,9 @@ public static class CarFrontSpike
         return 0;
     }
 
-    // FAN-METHOD-BEGIN
     /// <summary>
     /// The cooling fan alone (no bay, no tyres) at a metre from the front voice, idling: off on a
     /// mild day, on low for the air conditioning on a hot one, and on high with the coolant hot.
-    /// Unweighted and A-weighted (the A-weighting by octave, from the dumped file, is fronts.py's).
     /// </summary>
     static int Fan(string[] names)
     {
@@ -144,7 +133,6 @@ public static class CarFrontSpike
         return 0;
     }
 
-    // FAN-METHOD-END
 
     /// <summary>
     /// The tailpipe alone (VehicleSynth, the offline bench: the exhaust and the body it shakes, no
@@ -252,7 +240,6 @@ public static class CarFrontSpike
     static EngineVoiceState Voice(VehicleProfile v, float speed, float ambient)
     {
         var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = speed, SplitVoices = true, CompensateLevel = Game };
-        // By name, so this instrument also builds against a tree from before the field existed.
         if (!float.IsNaN(ambient)) typeof(EngineVoiceState).GetField("AmbientCelsius")?.SetValue(voice, ambient);
         if (!float.IsNaN(BayOverride)) voice.BayLeakage = BayOverride;
         voice.PlaceAtSpeed(speed);
@@ -380,8 +367,7 @@ public static class CarFrontSpike
             if (b < warm) continue;
             for (int i = 0; i < Block; i++) { front[(b - warm) * Block + i] = fb[i] * scale; rear[(b - warm) * Block + i] = rb[i] * scale; }
         }
-        // Received at the listener: for each output sample, find the emission time by iterating the
-        // flight time from the tap's position (two passes is plenty at 3 m/s).
+        // Each output sample's emission time, by iterating the flight time (two passes is plenty at 3 m/s).
         var outF = new float[n]; var outR = new float[n];
         var dirF = new Phonon.IPLVector3[n]; var dirR = new Phonon.IPLVector3[n];
         var lis = new Vector3(0f, 1.2f, -lateral);      // (E, H, N)

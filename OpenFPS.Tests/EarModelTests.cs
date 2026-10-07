@@ -1,9 +1,7 @@
-using System;
 using OpenFPS.Common;
 using OpenFPS.Common.Hearing;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -177,11 +175,8 @@ public class EarModelTests
         });
     }
 
-    /// <summary>
-    /// The law in loudness: a source exactly as loud as a speech line plays exactly as loud as that
-    /// line does, at any setting, whatever its spectrum and whichever way its level is declared. The
-    /// line at the pivot (70 dB declared at its reference) is the old law's pivot.
-    /// </summary>
+    /// <summary>A source as loud as a speech line plays as loud as that line at any setting, whatever its
+    /// spectrum or way of declaring its level; the line at the pivot is 70 dB at its reference.</summary>
     [Theory]
     [InlineData(0.3f, 70f)]
     [InlineData(0.45f, 70f)]
@@ -304,11 +299,9 @@ public class EarModelTests
     // ── Ranking by loudness ──────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The voice budget ranks by how loud a voice is to the ear, not by the gain the law plays it at
-    /// (Cody, 2026-10-07). A 65 dB rumble at 25 Hz and a 60 dB 1 kHz tone, both physical voices at the
-    /// same distance and path: the law plays the rumble about 21 dB up because the ear hears so little
-    /// of it, and the old rank (the played gain) put it above the tone. Heard, the tone is far louder,
-    /// and it ranks first.
+    /// The voice budget ranks by loudness at the ear, not played gain (Cody, 2026-10-07): a 60 dB 1 kHz
+    /// tone outranks a 65 dB 25 Hz rumble at the same distance, though the law plays the rumble about
+    /// 21 dB up.
     /// </summary>
     [Fact]
     public void ARumbleRanksBelowAQuieterToneAtTheSameDistance()
@@ -330,7 +323,7 @@ public class EarModelTests
                     float t = VoiceManager.Audibility(Voice("test:tone", 60f, new Vector3(0, 0, d)), d, false);
                     Assert.True(r > 0f && t > 0f);
                     Assert.True(t > r * 4f, $"at {d} m the 60 dB tone ({20 * MathF.Log10(t):F1}) should rank well above the 65 dB rumble ({20 * MathF.Log10(r):F1})");
-                    // The played gains were the other way round: what the old rank read.
+                    // The played gains are the other way round.
                     float playedR = Loudness.RenderedGain(Voice("test:rumble", 65f, default).Volume, 1f, 500f, d) * MathF.Pow(10f, correction / 20f);
                     float playedT = Loudness.RenderedGain(Voice("test:tone", 60f, default).Volume, 1f, 500f, d) * MathF.Pow(10f, Loudness.TimbreCorrectionDb(60f, tone) / 20f);
                     Assert.True(playedR > playedT, "the law should play the rumble at more gain than the tone");
@@ -341,11 +334,8 @@ public class EarModelTests
         });
     }
 
-    /// <summary>
-    /// A speech line ranks at exactly the gain it plays at, as it always did, and so does a recording
-    /// not measured yet; louder is always higher, through the threshold of hearing, so voices too far
-    /// off to hear still keep their order instead of tying at zero sone.
-    /// </summary>
+    /// <summary>A speech line, and an unmeasured recording, rank at the gain they play at; louder ranks
+    /// higher through the threshold, so inaudible voices keep their order rather than tie at zero sone.</summary>
     [Fact]
     public void HeardGainIsThePlayedGainForSpeechAndAlwaysRisesWithLevel()
     {

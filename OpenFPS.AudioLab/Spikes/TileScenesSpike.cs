@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 
@@ -13,7 +8,7 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
 /// The Steam Audio scene a client holds at the spawn of a streamed map, three ways: one mesh on the
-/// default tracer (as before), one mesh on Embree, and a sub-scene per tile on Embree (TileSceneSet).
+/// default tracer, one mesh on Embree, and a sub-scene per tile on Embree (TileSceneSet).
 /// What each costs to build, what assembling the tiled one costs, and whether they answer the same:
 /// occlusion and transmission from the direct stage, and reverberation times from the reflection stage,
 /// for sources round the listener, with each tracer's own run-to-run spread for comparison.

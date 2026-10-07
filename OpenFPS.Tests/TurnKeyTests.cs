@@ -1,21 +1,13 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Common.Networking;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Which way the turn keys actually turn you, derived rather than assumed.
-///
-/// The physics is `Yaw -= LookDelta.X * RotationSpeed * dt`, and forward is (sin yaw, 0, cos yaw) —
-/// so increasing yaw swings forward toward +X, which is RIGHT. A positive LookDelta.X therefore
-/// decreases yaw and turns LEFT. J emitted a negative X and so turned right, which is exactly how it
-/// was reported: "turning left seems to turn me right".
-///
-/// Every step of that chain is individually plausible, which is why it survived. The test pins the
-/// END of the chain — where the player is actually facing — rather than the sign of any one term.
+/// Which way the turn keys turn you, derived: `Yaw -= LookDelta.X * RotationSpeed * dt` with forward (sin yaw,
+/// 0, cos yaw), so a positive LookDelta.X turns left. J emitted a negative X and turned right ("turning left
+/// seems to turn me right"). Every step of the sign chain reads as correct, so the test pins where the player
+/// ends up facing.
 /// </summary>
 public class TurnKeyTests
 {
@@ -41,16 +33,9 @@ public class TurnKeyTests
     }
 
     /// <summary>
-    /// Which way a look key tilts you — the same derivation, one axis over.
-    ///
-    /// `Pitch += LookDelta.Y * RotationSpeed * dt`, and the rotation is built by
-    /// Quaternion.CreateFromYawPitchRoll, whose pitch term is a right-handed rotation about +X. That
-    /// takes forward (+Z) toward MINUS Y: increasing pitch looks DOWN, not up. The comment beside the
-    /// key table said the opposite, K was written to look down from that comment, and so K looked up.
-    /// Reported as "k and o seem to be swapped".
-    ///
-    /// Pinned at the end of the chain — where the nose actually points — for the same reason as the
-    /// yaw test: every individual step of the sign chain reads as correct.
+    /// Which way a look key tilts you: `Pitch += LookDelta.Y * RotationSpeed * dt`, and CreateFromYawPitchRoll's
+    /// pitch is right-handed about +X, so increasing pitch looks down. K was written from a comment that said
+    /// the opposite and looked up ("k and o seem to be swapped"). Pinned where the nose points.
     /// </summary>
     [Fact]
     public void APositiveLookYLooksDownAndANegativeOneLooksUp()
@@ -66,7 +51,7 @@ public class TurnKeyTests
     [Fact]
     public void KLooksDownAndOLooksUp()
     {
-        // Mirrors ClientGameSession.TurnKeys. If that table is edited without this, one of them fails.
+        // A copy of ClientGameSession.TurnKeys (private): an edit there is not caught here.
         const float KLookY = +1f;
         const float OLookY = -1f;
 
@@ -108,19 +93,13 @@ public class TurnKeyTests
 }
 
 /// <summary>
-/// A coarse turn key lands you ON a compass point, wherever you started.
-///
-/// This is the arithmetic behind "if I press j or l to go facing north and I walk straight, both
-/// the x and the y change when they shouldn't". A tap that ADDS forty-five degrees keeps an
-/// off-angle heading off-angle for ever: once a fine nudge or a held sweep has left you at 47
-/// degrees, every coarse tap after it lands on 92, 137, 182. Walking then moves both coordinates,
-/// and the one thing a coarse turn key exists for — face a cardinal direction and have exactly one
-/// coordinate change — is impossible.
+/// A coarse turn key lands you on a compass point wherever you started. A tap that added 45 degrees kept
+/// an off-angle heading off-angle (47, 92, 137...), so walking "north" changed both coordinates.
 /// </summary>
 public class TurnSnapTests
 {
-    /// <summary>The session's rule, reproduced: the distance to the next mark in the direction of
-    /// travel, or a whole step if you are already on one.</summary>
+    /// <summary>The session's rule: the distance to the next mark in the direction of travel, or a whole
+    /// step if already on one.</summary>
     private static float Snap(float currentDeg, float dir, float step = 45f)
     {
         float grid = dir > 0f ? MathF.Ceiling(currentDeg / step) * step
@@ -143,10 +122,8 @@ public class TurnSnapTests
     public void ACoarseTapGoesToTheNextMark(float from, float dir, float expected)
         => Assert.Equal(expected, Snap(from, dir), 2);
 
-    /// <summary>
-    /// And the point of it: after one coarse tap from anywhere, walking forward changes exactly one
-    /// coordinate. Four taps from an off-angle start, checked at every step.
-    /// </summary>
+    /// <summary>After one coarse tap from anywhere, walking forward changes exactly one coordinate (or is a
+    /// true diagonal); eight taps from an off-angle start, checked at every step.</summary>
     [Fact]
     public void AfterACoarseTapForwardIsOnAnAxisOrADiagonal()
     {

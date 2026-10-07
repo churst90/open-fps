@@ -1,8 +1,5 @@
-using System;
-using System.Linq;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Signals;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -76,12 +73,10 @@ public class ElectricHornTests
     }
 
     /// <summary>
-    /// Let go and it rings OUT, and then it is gone. The ring-out is deliberate: the relay lets go
-    /// through its suppression diode (RelayBreakSeconds) and the buzzer strikes softer and then not
-    /// at all before the diaphragm and tone disc ring down. The first version stopped dead in ten
-    /// milliseconds and was called "staccato", so this asserts both ends: still audibly fading
-    /// 10-20 ms after release (above -30 dB), well down by 50-60 ms (below -30 dB), and silent by
-    /// 100-110 ms (below -60 dB). A horn that hangs on is a fault as much as one that clicks off.
+    /// Let go and it rings out, then is gone: the relay breaks through its suppression diode
+    /// (RelayBreakSeconds), the strikes soften and stop, the diaphragm and tone disc ring down. Above
+    /// -30 dB 10-20 ms after release, below -30 dB by 50-60 ms, below -60 dB by 100-110 ms; stopping
+    /// dead in 10 ms was called "staccato".
     /// </summary>
     [Theory, MemberData(nameof(Keys))]
     public void ItRingsOutWhenTheButtonIsReleased(string key)
@@ -99,12 +94,9 @@ public class ElectricHornTests
         Assert.True(late < -60, $"{key} still sounding at {late:F0} dB 100 ms after release");
     }
 
-    /// <summary>
-    /// It swells in over a couple of dozen milliseconds: the relay seats (RelayMakeSeconds) and the
-    /// diaphragm swings short of the pole for its first cycles. Heard as instant, but not a click —
-    /// the 2 ms step it used to be was the other half of "staccato". So -6 dB of the steady level
-    /// is reached no sooner than 8 ms and no later than 30.
-    /// </summary>
+    /// <summary>It swells in: the relay seats (RelayMakeSeconds) and the diaphragm swings short of the
+    /// pole for its first cycles, reaching -6 dB of the steady level in 8 to 30 ms (a 2 ms step was the
+    /// other half of "staccato").</summary>
     [Theory, MemberData(nameof(Keys))]
     public void ItSwellsInQuickly(string key)
     {
@@ -135,7 +127,7 @@ public class ElectricHornTests
         _o.WriteLine($"{key}: {lo:F0} Hz {20 * Math.Log10(atLo / between):F0} dB, {hi:F0} Hz {20 * Math.Log10(atHi / between):F0} dB above the gap at {0.5f * (lo + hi):F0} Hz");
         Assert.True(atLo > 10 * between, $"low note {lo} Hz missing");
         Assert.True(atHi > 10 * between, $"high note {hi} Hz missing");
-        // ...and neither buries the other.
+        // And neither buries the other.
         Assert.InRange(20 * Math.Log10(atLo / atHi), -10, 10);
     }
 

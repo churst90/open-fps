@@ -1,30 +1,20 @@
-using System;
 using System.Numerics;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Running, and what it costs a body.
-///
-/// A run is not "walking, but sooner". It decides how often a body is heard, how far away, and — for
-/// a good while after it stops — whether it is heard at all. These hold the two claims that make it
-/// information rather than decoration: that a footfall is half a metre of GROUND and not a tick of
-/// the clock, and that being out of breath outlasts the running by long enough to find somebody.
+/// Running, and what it costs a body: footfalls come from ground covered, not the clock, and being out
+/// of breath outlasts the running long enough to find somebody by it.
 /// </summary>
 public class RunningAndBreathingTests
 {
     private static readonly Quaternion Facing = Quaternion.Identity;
 
     /// <summary>
-    /// One step of ground is one footstep, and the answer does not depend on how often the
-    /// accumulator is asked.
-    ///
-    /// The number of footsteps in ten metres is a property of the BODY and the speed, not of the
-    /// renderer: a fast machine polling every five centimetres and a slow one polling every forty
-    /// have to agree, or how somebody sounds depends on their frame rate.
+    /// One step of ground is one footstep however often the accumulator is asked: polled every 5 cm or
+    /// every 40, ten metres is the same count, or a body would sound like its frame rate.
     /// </summary>
     [Theory]
     [InlineData(0.05f)]   // many small updates, as a fast renderer produces
@@ -45,20 +35,15 @@ public class RunningAndBreathingTests
             if (stride.Update(at, velocity, isGrounded: true, Facing).Stepped) steps++;
         }
 
-        // Ten metres divided by the step this speed takes, plus the one that started the walk.
+        // Ten metres over this speed's step, plus the one that started the walk.
         int expected = (int)(10f / StrideAccumulator.StepLength(speed));
         Assert.InRange(steps, expected, expected + 2);
     }
 
     /// <summary>
-    /// A faster body takes LONGER steps, so the same ground is FEWER footsteps — and the cadence
-    /// barely moves.
-    ///
-    /// This is the opposite of what the model used to claim, and the old claim was audible: a
-    /// constant half-metre stride made this game's walk nine footfalls a second and its sprint
-    /// fourteen, reported from the chair as *"sounds like cockroaches running"*. A leg is a pendulum
-    /// and it cannot be swung round faster than about four times a second by anybody, so past a walk
-    /// the speed is bought with stride instead. See <see cref="StrideAccumulator.StepLength"/>.
+    /// A faster body takes longer steps, so the same ground is fewer footsteps and the cadence barely
+    /// moves. A fixed half-metre stride "sounds like cockroaches running" (docs/COMMON_NOTES.md, Walking;
+    /// <see cref="StrideAccumulator.StepLength"/>).
     /// </summary>
     [Fact]
     public void ARunIsLongerStepsAndBarelyAFasterCadence()
@@ -90,16 +75,13 @@ public class RunningAndBreathingTests
         // And nobody, at any speed this game can produce, steps faster than a human can.
         Assert.True(running / 4f < 4.5f, $"{running / 4f:F1} footfalls a second is not a body running");
 
-        // ...which means the same ground is FEWER steps at a run, because each one is longer.
+        // So the same ground is fewer steps at a run.
         Assert.True(StrideAccumulator.StepLength(PhysicsConstants.SprintSpeed)
                   > StrideAccumulator.StepLength(PhysicsConstants.WalkSpeed) * 1.2f);
     }
 
-    /// <summary>
-    /// The gait curve against the bodies it was measured on. Alexander's relation is not a fit to
-    /// this game, it is the curve every legged animal that has been filmed lies on, so it has to give
-    /// the textbook answers for a human at the speeds humans are studied at.
-    /// </summary>
+    /// <summary>Alexander's gait curve gives the textbook answers for a human at the speeds humans are
+    /// studied at.</summary>
     [Theory]
     [InlineData(1.4f, 0.60f, 0.80f, 1.7f, 2.4f)]    // a real walk: 70 cm steps, 2 a second
     [InlineData(4.5f, 1.20f, 1.55f, 2.8f, 3.8f)]    // a jog, which is what this game calls walking
@@ -165,8 +147,8 @@ public class RunningAndBreathingTests
     }
 
     /// <summary>
-    /// Getting your breath back takes longer than losing it, and that asymmetry is the point: a body
-    /// that has been running is still findable well after it has stopped and gone quiet.
+    /// Getting your breath back takes longer than losing it, so a body that has been running is still
+    /// findable well after it has stopped.
     /// </summary>
     [Fact]
     public void YouAreStillAudibleAfterYouStopRunning()
@@ -201,8 +183,7 @@ public class RunningAndBreathingTests
             $"walking reached {walking.Exertion:F2} and running {running.Exertion:F2}");
     }
 
-    /// <summary>A body has not been running just because something carried it fast. Exertion is
-    /// measured against what the body itself can do, and demand is clamped there.</summary>
+    /// <summary>Being carried fast is not running: demand is clamped at what the body itself can do.</summary>
     [Fact]
     public void BeingCarriedFasterThanYouCanRunIsNotRunning()
     {

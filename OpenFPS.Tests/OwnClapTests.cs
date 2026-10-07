@@ -4,7 +4,6 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -42,8 +41,7 @@ public class OwnClapTests
         client.Clear(new Vector3(100, 20, 100));
         var clock = Stopwatch.StartNew();
         player.Receive(new WorldAudioEvent { SourceEntityId = 7, Label = "clap", Sounds = new() { clap }, Seed = 1 }, clock.Elapsed.TotalSeconds);
-        // Rendered off the game thread: up to ten seconds for it, because a full test run on a busy
-        // machine took longer than one and the test reported a clap that was simply still rendering.
+        // Rendered off the game thread: ten seconds, since a busy full run took longer than one.
         double until = clock.Elapsed.TotalSeconds + 10.0;
         while (clock.Elapsed.TotalSeconds < until && provider.Emitters.Count == 0)
         {

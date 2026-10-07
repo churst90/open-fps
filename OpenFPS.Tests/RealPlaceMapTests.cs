@@ -1,19 +1,13 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Systems;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -44,7 +38,7 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
             Directory.CreateDirectory(Path.Combine(maps, "places"));
             File.Copy(Path.Combine(AppContext.BaseDirectory, "places", id + ".json"), Path.Combine(maps, "places", id + ".json"));
             AcousticRegistry.Initialize();
-            var p = new Place { Id = id };
+            var p = new Place();
             var sw = Stopwatch.StartNew();
             p.Manager = new MapManager(new MapRepository(maps), new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")));
             p.Manager.Initialize();
@@ -82,7 +76,6 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
 
     public sealed class Place
     {
-        public string Id = "";
         public MapManager Manager = null!;
         public World Ecs = null!;
         public MapData Data = null!;

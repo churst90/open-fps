@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -9,17 +5,13 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Trains running and crossings closing, ticked the way the server ticks them.
-///
-/// Everything else about rail is checked as sound: the bogies, the horn, the bell. These run
-/// RailSystem and CrossingSystem themselves on a small loop laid onto the default map, so what is
-/// held is where a train goes, where it stops, where its sources are, and when the road may cross.
+/// RailSystem and CrossingSystem ticked as the server ticks them, on a loop laid onto the default map:
+/// where a train goes, where it stops, where its sources are, and when the road may cross.
 /// </summary>
 public class RailRunTests : IDisposable
 {
@@ -34,10 +26,8 @@ public class RailRunTests : IDisposable
     // ── Crossings ───────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The road reopens when the BACK of the train is clear, not the front. It used to measure the
-    /// head against the clearance, so a 55 m tram with 30 m of clearance still had its rear on the
-    /// road when the bells stopped; only the six seconds a crossing stays shut hid it, and only for a
-    /// train doing more than about 3.3 m/s.
+    /// The road reopens when the back of the train is clear, not the front: measured from the head, a
+    /// 55 m tram with 30 m of clearance had its rear on the road when the bells stopped.
     /// </summary>
     [Fact]
     public void A_crossing_stays_closed_until_the_tail_is_clear()
@@ -56,9 +46,8 @@ public class RailRunTests : IDisposable
             bool closed = f.Crossings.IsClosedAt(f.MapId, f.CrossingPosition);
             if (closed) closedOnce = true;
             else if (closedOnce) { reopened = true; tailPastWhenReopened = tailPast; }
-            // From the moment the front reaches the crossing until the back is the clearance past it,
-            // the road is held. Two metres of slack for where the crossing system finds itself round
-            // the line, which it samples every two metres.
+            // Held from the front reaching the crossing until the back is the clearance past it; 2 m of
+            // slack, as the crossing system samples the line every 2 m.
             if (head > f.CrossingAt && tailPast < 30f - 2f)
                 Assert.True(closed, $"open with the tail {tailPast:F1} m past the crossing (head {head:F0} m)");
         }
@@ -68,10 +57,9 @@ public class RailRunTests : IDisposable
     }
 
     /// <summary>
-    /// A train blows for a crossing on its OWN horn and rings its own bell: the signal sources are
-    /// placed on the train with the rest, and what is sent names the train and comes from its horn.
-    /// Resonance found it (2026-10-06): the horn, whistle and bell sources were never spawned and the
-    /// crossing was sounded with Honk, the road vehicle's horn, on the leading bogie.
+    /// A train blows for a crossing on its own horn and rings its own bell, sources placed on the train.
+    /// Resonance found (2026-10-06) they were never spawned, and the crossing sounded a road horn on the
+    /// leading bogie.
     /// </summary>
     [Fact]
     public void A_train_sounds_its_own_horn_and_bell_for_a_crossing()
@@ -110,9 +98,8 @@ public class RailRunTests : IDisposable
     // ── Sources ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Every source rides at its own height above the rail, wherever the rail goes. The old
-    /// placement worked out to "keep the old absolute height", so on a slope a bogie stayed at the
-    /// height it was spawned at until it was six metres out, then snapped to half a metre.
+    /// Every source rides at its own height above the rail. On a slope a bogie used to keep its spawn
+    /// height until it was 6 m out, then snap to half a metre.
     /// </summary>
     [Fact]
     public void Every_source_keeps_its_height_above_a_sloping_rail()
@@ -137,9 +124,8 @@ public class RailRunTests : IDisposable
     // ── Stops ───────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// A line with one platform: the train stops, stands, and goes on round. With one stop the next
-    /// stop after it is itself, and the train was still standing at it at zero speed, so it began
-    /// dwelling again and never left.
+    /// With one platform the train stops, stands and goes on round. The next stop after it is itself, and
+    /// the train, still standing there, used to dwell again for ever.
     /// </summary>
     [Fact]
     public void A_train_leaves_the_only_platform_on_its_line()
@@ -154,10 +140,7 @@ public class RailRunTests : IDisposable
         Assert.True(f.Distance > 300f, $"went {f.Distance:F0} m in four minutes");
     }
 
-    /// <summary>
-    /// A train placed past the first platform stops at the next one ahead of it, rather than running
-    /// a lap to the first one in the list and passing everything on the way.
-    /// </summary>
+    /// <summary>A train placed past the first platform stops at the next one ahead, not at the first in the list.</summary>
     [Fact]
     public void A_train_stops_first_at_the_platform_ahead_of_it()
     {
@@ -176,9 +159,8 @@ public class RailRunTests : IDisposable
     // ── Fixture ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The default map with a loop of track laid onto it: a circle 150 m across the middle, 942 m
-    /// round, one light rail set on it, and a crossing if asked for. Built through the map data the
-    /// way a map file would declare it, then spawned and ticked in the server's order.
+    /// The default map with a 942 m loop of track (150 m across), one light rail set and a crossing if
+    /// asked, declared through the map data as a map file would, spawned and ticked in the server's order.
     /// </summary>
     private sealed class Fixture
     {

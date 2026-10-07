@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using MemoryPack;
 using OpenFPS.Client.Core;
@@ -9,7 +6,6 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server;
 using OpenFPS.Server.Core;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -252,7 +248,7 @@ public class NetworkTrimTests
     }
 
     /// <summary>What the client's interpolation makes of a stream, sampled every frame at 60 Hz.
-    /// Each tick arrives 40 ms after the server made it; <paramref name="lost"/> says which never do.</summary>
+    /// Each tick arrives 40 ms after the server made it; a null in <paramref name="packets"/> never does.</summary>
     private static List<Dictionary<int, (Vector3 Pos, Quaternion Rot, Vector3 Vel, WheelState[]? Wheels)>> Play(
         List<ServerStateUpdate?> packets, int[] ids, int frames)
     {

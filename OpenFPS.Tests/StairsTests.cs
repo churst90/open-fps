@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -15,20 +11,15 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
 /// The city's blocks of flats, walked up and down by the real movement engine over the real map:
-/// every flight from the ground floor to the roof and back, the roof's parapet, and what the map
-/// tells the client about each flight — its two ends as stair markers, said and blipped.
-///
-/// "We need to also implement stairs ... I need to get up there" (Cody, 2026-10-03). The flights the
-/// generator had built could not be climbed: a body's head was in the ceiling slab by the second
-/// step, because the slabs were laid whole across the stairwell and every storey's flight stood
-/// directly over the one below. There was no flight from the top storey to the roof at all.
+/// every flight from the ground floor to the roof and back, the roof's parapet, and each flight's two
+/// ends as stair markers, said and blipped. Guards Cody's "I need to get up there" (2026-10-03): the
+/// generator's flights put a climber's head in the slab above by the second step, and none reached the roof.
 /// </summary>
 public class StairsTests : IClassFixture<StairsTests.City>
 {
@@ -172,8 +163,8 @@ public class StairsTests : IClassFixture<StairsTests.City>
         var seen = new HashSet<Entity>();
         var cols = new List<SharedMovementEngine.Collider>();
         int leg = 0, airborne = 0, landings = 0, up = 0, down = 0, level = 0, still = 0;
-        // ...and half a second standing at the end: the ground under the last tick's position is
-        // probed on the tick after it, as the server does.
+        // Half a second standing at the end: the server probes the ground under a tick's position on
+        // the tick after it.
         for (int i = 0; i < seconds / dt && still < 15; i++)
         {
             var toward = Vector3.Zero;
@@ -261,9 +252,8 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// The roof is the open air and its stair housing a room. The housing is measured from its walls
-    /// (regions-measure-themselves); the roof is said to be outdoors by the map, because a strip of it
-    /// between the parapet and the housing measured as a room.
+    /// The roof is the open air and its stair housing a room. The housing is measured from its walls;
+    /// the map declares the roof outdoors, because the strip between parapet and housing measured as a room.
     /// </summary>
     [Fact]
     public void TheRoofIsOutdoorsAndItsHousingIsARoom()
@@ -535,10 +525,8 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// Stepping off a flight says nothing about that flight, at either end, whichever way you face:
-    /// up it and turning round at the top, or down it walking backwards — facing up it, as Cody often
-    /// walks — and arriving at the foot. The feet are on the flight between the two ends and the two
-    /// floors, and only there. Somebody arriving at the top who did not come up it is told.
+    /// Stepping off a flight says nothing about it, at either end, whichever way you face (Cody often
+    /// walks down backwards, facing up). Somebody arriving at the top who did not come up it is told.
     /// </summary>
     [Fact]
     public void ArrivingOffAFlightSaysNothingAboutIt()
@@ -574,12 +562,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// The cue speaks for the stairs it has just told you about, and their zones are said only when it
-    /// did not. Up to a flight facing it: the cue is said and stepping onto the flight is a flight it
-    /// announced, so the flight's name is not said after it; nor is a landing entered a moment before
-    /// the cue or while it was being said. Off the top and later back down it backwards, with no cue,
-    /// the flight's name is news. A room is not a named part of one, and is always said (the zone
-    /// announcer asks this only of a flight or a landing).
+    /// A flight's zone name is not said after its cue, nor a landing entered just before or during the
+    /// cue; back down the flight with no cue, its name is news. The zone announcer asks this only of a
+    /// flight or a landing: a room is always said.
     /// </summary>
     [Fact]
     public void TheCueSpeaksForAFlightAndItsLandingAndTheZoneForTheRest()
@@ -611,10 +596,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// Where two flights meet, each is said once however you shuffle between them: up the first, turn,
-    /// and the flight you came up is not news but the next one is, once, however many times you step
-    /// across the well and back. Up the second and back down it — you have been on another floor — and
-    /// the first one's top is news again, once.
+    /// Where two flights meet, each is said once however you shuffle across the well: the flight you
+    /// came up is not news, the next one is. Up the second and back down, and the first one's top is news
+    /// again, once.
     /// </summary>
     [Fact]
     public void ALandingWhereTwoFlightsMeetSaysEachOnceHoweverYouShuffle()
@@ -646,7 +630,7 @@ public class StairsTests : IClassFixture<StairsTests.City>
         Shuffle(3f, 6);
         Assert.Equal(new[] { "Stairs up, 17 steps, to floor 1", "Stairs up, 17 steps, to the roof" }, said);
 
-        // Up the second flight, which climbs along -z from far, and back down it walking backwards.
+        // Up the second flight (along -z from far), and back down it walking backwards.
         said.Clear();
         for (float z = far - MarkerBack - 0.05f; z > MarkerBack; z -= 0.14f)
             Step(new Vector3(-2.4f, 3f + TreadHeight(far - z), z), minusZ);
@@ -658,11 +642,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// Cody's walk on Marlow Tower's floor 2 landing (2026-10-04, 04:53:27 to 04:54:02), replayed on
-    /// the stairwell as it was then: two markers 1.8 m apart facing the same way, and him walking up
-    /// to the flight, seven metres back across the landing and back, five metres along it and back,
-    /// and across between the two lanes. The old cues said "Stairs up, 10 steps, to floor 3" four
-    /// times and "Stairs down" once in those thirty-five seconds; each is said once.
+    /// Cody's walk on Marlow Tower's floor 2 landing (2026-10-04, 04:53:27 to 04:54:02), replayed on the
+    /// stairwell as it was then. The old cues said "Stairs up, 10 steps, to floor 3" four times in those
+    /// 35 s; each flight is said once.
     /// </summary>
     [Fact]
     public void CodysWalkOnTheLandingSaysEachFlightOnce()
@@ -672,7 +654,7 @@ public class StairsTests : IClassFixture<StairsTests.City>
             MarkerSnap(2, "Stairs down, 10 steps, to floor 2", new Vector3(-12.45f, 10.28f, -110.45f), Vector3.UnitZ),
             MarkerSnap(3, "Stairs down, 10 steps, to floor 1", new Vector3(-10.65f, 7.28f, -106.45f), -Vector3.UnitZ),
             MarkerSnap(4, "Stairs up, 10 steps, to floor 2", new Vector3(-10.65f, 4.28f, -110.45f), Vector3.UnitZ));
-        // Where his feet went down, from the client log's footsteps, in order.
+        // His footfalls from the client log, in order.
         var path = new (float X, float Z)[]
         {
             (-10.15f, -102.32f), (-11.5f, -102.32f), (-11.65f, -102.47f), (-11.95f, -103.97f), (-11.65f, -105.17f),
@@ -727,11 +709,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// The stairs beacon blips once a floor, from where you step onto the stairs to go up from it, and
-    /// on the roof from the top of the flight down: "how will you find the levels in between" with a
-    /// beacon only at the bottom and the top (Cody, 2026-10-04). On the landing where two flights meet
-    /// only the one going up blips, and only your own floor's: the floors above and below are open to
-    /// the stairwell and a few metres off. /beacons stairs off and a map that forbids it both silence it.
+    /// The stairs beacon blips once a floor, from the foot of its way up, and on the roof from the top of
+    /// the flight down ("how will you find the levels in between", Cody, 2026-10-04). Where two flights
+    /// meet only your own floor's way up blips. /beacons stairs off and a map that forbids it silence it.
     /// </summary>
     [Fact]
     public void TheStairsBeaconBlipsFromYourFloorsWayUp()
@@ -789,9 +769,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// Standing in the doorway from the corridor into the stairwell, on every floor of every tower,
-    /// the stairs beacon is heard, and from that floor's way up only: on every other floor that is at
-    /// the far end of the shaft, nearly twelve metres off, and the floors above and below are nearer.
+    /// From the stairwell door on every floor of every tower, the stairs beacon is heard from that floor's
+    /// way up only, although it is nearly 12 m off at the far end of the shaft and the floors above and
+    /// below are nearer.
     /// </summary>
     [Fact]
     public void FromEveryStairwellDoorYouHearThatFloorsWayUp()
@@ -832,11 +812,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// Each flight is a named place of its own, from its first riser to its last, and the floor at each
-    /// end of it a landing: "the stairs themselves need a zone, then the landings need a zone" (Cody,
-    /// 2026-10-04). Up every flight of every tower at eye height, over the treads as they are built,
-    /// the name is the landing, then the flight, then the next landing — and the room you hear is the
-    /// stairwell all the way, as it was: a flight and a landing are names, not rooms.
+    /// Each flight is a named place from its first riser to its last, and the floor at each end a landing
+    /// ("the stairs themselves need a zone, then the landings need a zone", Cody, 2026-10-04). The room
+    /// for sound stays the stairwell all the way: a flight and a landing are names, not rooms.
     /// </summary>
     [Fact]
     public void EveryFlightAndEveryLandingIsAZone()
@@ -874,11 +852,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// "Are you sure when it says 19 steps that it's actually 19 actual steps, how is this
-    /// measured?" (Cody, 2026-10-04.) Counted from the map: the boxes each flight is built of, one box
-    /// a step. Every box's top is one riser over the one before it, the first one riser over the floor
-    /// you start from and the last level with the floor you arrive on — so the count is the number of
-    /// times you step up, the last of them onto the landing, and it is what both ends of the flight say.
+    /// "Are you sure when it says 19 steps that it's actually 19 actual steps?" (Cody, 2026-10-04.) The
+    /// count both ends say is the number of boxes the flight is built of, one riser each, the last level
+    /// with the landing: the number of times you step up.
     /// </summary>
     [Fact]
     public void EveryFlightSaysHowManyStepsItIsBuiltOf()
@@ -905,7 +881,7 @@ public class StairsTests : IClassFixture<StairsTests.City>
                     last = y;
                 }
                 Assert.Equal(top.Floor.Y, last, 2);                                      // the last onto the landing
-                // ...in a line from the foot to the top, a tread apart.
+                // In a line from the foot to the top, a tread apart.
                 var along = boxes.Select(b => Vector3.Dot((b.Min + b.Max) / 2 - foot.At, foot.Along)).ToList();
                 for (int k = 1; k < along.Count; k++) Assert.Equal(Going, along[k] - along[k - 1], 2);
             }
@@ -915,10 +891,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     private static int Steps(Marker m) => int.Parse(m.Name.Split(' ')[2].TrimEnd(','));
 
     /// <summary>
-    /// Every flight in every tower is built to the figures a real stair is (International Building
-    /// Code 2021, 1011): risers no more than 178 mm, treads at least 279 mm, at least 1.12 m clear
-    /// between its guards, and an open well between it and the flight beside it — "the stairs also
-    /// seem kind of short ... way too narrow and close to each other" (Cody, 2026-10-04).
+    /// Every flight is built to International Building Code 2021, 1011: risers at most 178 mm, treads at
+    /// least 279 mm, 1.12 m clear between its guards, and an open well to the next flight ("way too
+    /// narrow and close to each other", Cody, 2026-10-04).
     /// </summary>
     [Fact]
     public void EveryFlightIsBuiltToCode()
@@ -953,8 +928,7 @@ public class StairsTests : IClassFixture<StairsTests.City>
                 }
                 Assert.Equal(top.Floor.Y, lastTop, 2);
 
-                // Clear width, half way up, at waist height over the tread: to the first solid thing
-                // either side of the centre line.
+                // Clear width half way up, at waist height: to the first solid thing either side.
                 var mid = treads[n / 2];
                 var at = foot.At + foot.Along * mid.Along;
                 at.Y = mid.Box.Max.Y + 0.5f;
@@ -1036,11 +1010,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// The movement engine takes a step up by lifting the body its whole StepHeight, 40 cm, and the
-    /// ground probe settles it onto the tread an update later. A footfall on the lifted update must
-    /// not count from there: the landing at the top of a flight of 17.6 cm risers is 22 cm under it,
-    /// and the last step up was heard as a heel drop. Every phase of footfall against the lifts: up a
-    /// flight is never a step down, and the level beyond it is never a step down either.
+    /// The movement engine lifts the body its whole StepHeight (40 cm) onto a tread and the ground probe
+    /// settles it an update later. A footfall on the lifted update must not count from there: the top
+    /// landing is 22 cm under it, and the last step up was heard as a heel drop. Tried at every phase.
     /// </summary>
     [Fact]
     public void TheEnginesLiftOntoATreadIsNotAStepDown()
@@ -1091,9 +1063,8 @@ public class StairsTests : IClassFixture<StairsTests.City>
             h.Mixer.Live.Clear();
             return step.Volume;
         }
-        // Each take wanders a decibel either way, so the levels are compared on the average of twenty;
-        // the difference is the source's, through the mix's own loudness law (Loudness.Place), which
-        // narrows every difference in level between quiet sounds the same way.
+        // Each take wanders a decibel either way, so levels are averaged over twenty; the expected
+        // difference goes through the mix's loudness law (Loudness.Place), which narrows it.
         double upDb = 0, levelDb = 0, downDb = 0;
         const int n = 20;
         for (int i = 0; i < n; i++)

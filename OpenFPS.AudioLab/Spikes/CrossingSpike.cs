@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
@@ -13,18 +9,11 @@ using OpenFPS.Client.AudioEngine.Core.Signals;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// Air, and a grade crossing to hear it at.
-///
-///   --airbrake [tractor_trailer|transit_bus|locomotive]
-///   --crossing [train preset] [speed=m/s] [sec=s]
-///
-/// The crossing is the scene this whole session was for, because it is where all of it has to work
-/// at once and at the right relative levels: a bronze gong two seconds into its ring, a lorry and a
-/// bus standing on their brakes with their air going, a five-chime horn a quarter of a mile out, and
-/// then a hundred and seventy metres of train going through the middle of it. Nothing in it is a
-/// recording and nothing in it is sequenced against anything else — the gong rings because the
-/// circuit is down, the horn sounds because the rule says a quarter mile, and the clatter is where
-/// the axles are.
+/// --airbrake [tractor_trailer|transit_bus|locomotive]: air brakes on their own.
+/// --crossing [train preset] [speed=m/s] [sec=s] [track=11] [mast=2.6]: a grade crossing, everything at its
+/// relative level: the gong, a lorry and a bus on their brakes, a five-chime horn a quarter mile out, and
+/// 170 m of train. Nothing is recorded or sequenced: the gong rings because the circuit is down, the horn
+/// sounds by the quarter-mile rule, the clatter is where the axles are.
 /// </summary>
 public static class CrossingSpike
 {
@@ -106,7 +95,6 @@ public static class CrossingSpike
         public required Func<float, Vector3> Where { get; init; }   // of time
         public required Func<float> Render { get; init; }
         public float Extent { get; init; } = 1.5f;
-        public float Lp1, Lp2, Gp1, Gp2;
     }
 
     public static int RunCrossing(string[] args)
@@ -117,18 +105,14 @@ public static class CrossingSpike
         float speed = TrainSpike.Arg(args, "speed", profile.TypicalSpeedMps);
         float seconds = TrainSpike.Arg(args, "sec", 46f);
 
-        // The geometry. You are STANDING AT THE GATES, which is the only place most people have
-        // ever heard a crossing bell: a couple of metres from the mast it is bolted to, ten metres
-        // back from the rails, with the road beside you. Put the listener on the far footway instead
-        // and the gong is seventeen metres off and twenty decibels down, which is correct and is not
-        // what anybody means by "a train passing with a crossing bell".
+        // The listener stands at the gates, a couple of metres from the mast and ten back from the rails,
+        // where people hear a crossing bell; on the far footway the gong is 17 m off and 20 dB down.
         float trackZ = TrainSpike.Arg(args, "track", 11f);   // rails, metres from the listener
         float mastDist = TrainSpike.Arg(args, "mast", 2.6f); // the signal mast, metres away
         var ear = new Vector3(0f, 1.6f, 0f);
         const float roadX = 7f;         // the road crosses the track this far along +x
         float stopLineZ = trackZ - 6f;  // where road vehicles wait, on the listener's side
-        // The mast stands beside the road on the near side of the track, and the listener is on the
-        // footway just short of it.
+        // The mast beside the road on the near side, the listener on the footway just short of it.
         var mastAt = new Vector3(MathF.Sqrt(MathF.Max(0.01f, mastDist * mastDist - 4f)) * 0.8f, 3.6f, 1.2f);
 
         var train = new TrainSynth(profile, Sr, 41) { Speed = speed, Notch = 7f };
@@ -337,13 +321,9 @@ public static class CrossingSpike
     }
 
     /// <summary>
-    /// One source, one sample, two ears.
-    ///
-    /// The interaural TIME difference is not applied here, it HAPPENS: each ear is a different
-    /// distance from the source, so each sample is deposited into each channel at its own arrival
-    /// moment, and a source sweeping past produces exactly the continuous time difference it should,
-    /// Doppler and all. The interaural LEVEL difference is the inverse distance plus the head in the
-    /// way, and the head is a filter rather than a fader because diffraction is frequency-dependent.
+    /// One source, one sample, two ears. The time difference is not applied: each sample lands in each
+    /// channel at its own arrival time, so a passing source gets the continuous difference and Doppler.
+    /// The level difference is inverse distance plus the head as a filter (diffraction depends on frequency).
     /// </summary>
     public static void DepositBinaural(float[] left, float[] right, float t, float s, Vector3 at,
                                        Vector3 head, Vector3 earL, Vector3 earR, float extent,
@@ -353,14 +333,12 @@ public static class CrossingSpike
         float hr = toSource.Length();
         if (hr > 1e-4f && (st.Tick++ & 63) == 0)
         {
-            // The angle from each ear's outward axis to the source. The ear axis is the head's own
-            // left and right, which here is the x axis.
+            // The angle from each ear's outward axis (here the x axis) to the source.
             var dir = toSource / hr;
             float cosR = Math.Clamp(dir.X, -1f, 1f);
             st.ShadowR.SetAngle(MathF.Acos(cosR), rate);
             st.ShadowL.SetAngle(MathF.Acos(-cosR), rate);
-            // The bounce comes up off the ground from the mirrored source, so it is shadowed by its
-            // own angle and not by the direct path's.
+            // The ground bounce comes from the mirrored source and is shadowed by its own angle.
             var gdir = Vector3.Normalize(new Vector3(toSource.X, -at.Y - head.Y, toSource.Z));
             float gcosR = Math.Clamp(gdir.X, -1f, 1f);
             st.GroundR.SetAngle(MathF.Acos(gcosR), rate);

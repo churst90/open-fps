@@ -1,13 +1,10 @@
-using System;
 using OpenFPS.Client.AudioEngine.Fmod;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// What the mixer makes of a path: each band's gain as a level, once, less the air. It used to read
-/// the gains as interpolation weights between 0 and a -20/-30/-40 dB floor (a gain of 0.2, -14 dB,
-/// came out at -32 in the high band), then take the occlusion off the volume and off the top again.
+/// What the mixer makes of a path: each band's gain as a level, once, less the air. Read as weights
+/// toward a -20/-30/-40 dB floor, a 0.2 gain (-14 dB) once came out at -32 in the high band.
 /// </summary>
 public class PathEqTests
 {

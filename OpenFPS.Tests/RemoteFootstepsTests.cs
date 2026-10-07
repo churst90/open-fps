@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using MemoryPack;
@@ -13,17 +9,13 @@ using OpenFPS.Server;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Another player's footsteps, end to end (Cody and Sean on the VPS, 2026-10-05: "I cannot hear his
-/// footsteps while he's walking, only his beacon, same with him. also, when I'm a passenger in a car and
-/// he's driving, I hear footsteps like his footsteps while he's driving").
-///
-/// The real server pieces: one player walks by input through MovementSystem, or drives a parked car of
+/// Another player's footsteps, end to end (Cody and Sean on the VPS, 2026-10-05: neither heard the
+/// other walking, only his beacon, and a passenger heard the driver's footsteps). The real server pieces: one player walks by input through MovementSystem, or drives a parked car of
 /// the city through DrivingSystem with OccupancySystem carrying him; the broadcast picks, trims, packs
 /// and splits his state exactly as it goes to the other player's socket; that client reads it back,
 /// interpolates it at 60 Hz with each tick arriving 40 ms late, and OtherBodies listens for his feet.

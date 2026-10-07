@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -9,23 +6,12 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Common.Systems;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Naming a place must not put a roof over it.
-///
-/// The speedway got its zones — Front straight, Turns one and two, Infield, Grandstand — and from
-/// that moment the whole map sounded like the inside of a building, because every open-air behaviour
-/// in the engine was keyed on "the listener is in the GLOBAL region id" and a named region is not
-/// that. The estimate underneath was wrong in the same direction: six faces of material "None" are
-/// six OPENINGS, and Sabine reads absorption zero as a perfect mirror, so an unbounded 277,000 m³
-/// infield came out as a sealed box — and then, because nothing had absorbed, fell through to a
-/// 500 ms default room at full wet.
-///
-/// These tests ask the boundary, which is the only thing that can answer it for a map nobody has
-/// seen yet.
+/// Naming a place must not put a roof over it: whether a place is open air is asked of its boundary,
+/// not its region id (docs/COMMON_NOTES.md, "A region is not a room").
 /// </summary>
 public class OpenAirReverbTests
 {
@@ -61,16 +47,13 @@ public class OpenAirReverbTests
         Assert.Equal(0, RoomAcoustics.OpenFaceCount(sealedRoom));
         Assert.Equal(1, RoomAcoustics.OpenFaceCount(courtyard));
 
-        // The ceiling of a 10 x 5 x 10 box is a quarter of its boundary, and the enclosure is measured
-        // by area for exactly that reason: an open sky over an infield is not one face out of six.
+        // The ceiling of a 10 x 5 x 10 box is a quarter of its boundary: enclosure is measured by area,
+        // as an open sky over an infield is not one face in six.
         Assert.Equal(1.0f, RoomAcoustics.Enclosure(sealedRoom), 3);
         Assert.Equal(0.75f, RoomAcoustics.Enclosure(courtyard), 3);
     }
 
-    /// <summary>
-    /// No closed boundary, no estimate. Not a small number, not a default: the model does not apply,
-    /// and the ray tracer is what governs the place instead.
-    /// </summary>
+    /// <summary>No closed boundary, no estimate, not even a default: the ray tracer governs the place.</summary>
     [Fact]
     public void AnUnclosedRegionGetsNoSabineEstimate()
     {
@@ -80,10 +63,7 @@ public class OpenAirReverbTests
                                               "Concrete", "Concrete", "Concrete")) > 1000f);
     }
 
-    /// <summary>
-    /// A closed boundary that absorbs nothing rings until the clamp stops it. It used to be handed
-    /// the 500 ms default room, which is the number that made an open infield sound like a hall.
-    /// </summary>
+    /// <summary>A closed boundary that absorbs nothing rings until the clamp, never the old 500 ms default room.</summary>
     [Fact]
     public void ABoundaryThatAbsorbsNothingIsAHallOfMirrorsAndNotA500msRoom()
     {
@@ -94,8 +74,7 @@ public class OpenAirReverbTests
             Materials = new[] { 99, 99, 99, 99, 99, 99 },
             ReverbTimeScale = 1.0f,
         };
-        // Index 99 is not in the registry, so it falls back to Generic rather than to an opening;
-        // what matters is that a closed boundary never lands on the old default.
+        // Index 99 falls back to Generic, not to an opening.
         Assert.NotEqual(AcousticConstants.DefaultReverbDecayMs, RoomAcoustics.DecayMs(mirrors));
     }
 
@@ -112,12 +91,11 @@ public class OpenAirReverbTests
             Assert.Equal(0f, RoomAcoustics.DecayMs(def.Region));
         }
 
-        // Including the one you land in on login, which is the one the player complained about.
+        // Including the one you land in on login.
         var infield = defs.Single(d => d.Region.FriendlyName == "Infield");
         Assert.Equal(0f, RoomAcoustics.DecayMs(infield.Region));
 
-        // And the outdoors itself, which used to be given six real materials and kept dry only by a
-        // test for its id.
+        // And the outdoors itself, once given six real materials and kept dry only by a test for its id.
         Assert.False(RoomAcoustics.IsEnclosure(map.Regions[map.GlobalEnvironmentId]));
     }
 
@@ -138,22 +116,16 @@ public class OpenAirReverbTests
                 $"'{room.Region.FriendlyName}' went dry: {decay:F0} ms.");
         }
 
-        // The carpeted room is still much deader than the concrete one — the material, not the id, is
-        // what makes the difference, and it still does.
+        // The carpeted room is still much deader than the concrete one: the material decides.
         float[] decays = rooms.Select(r => RoomAcoustics.DecayMs(r.Region)).OrderBy(d => d).ToArray();
         Assert.True(decays[^1] > decays[0] * 4f);
     }
 }
 
 /// <summary>
-/// What you are standing on does not decide whether you are in a room.
-///
-/// The client overrides a region's FLOOR material with whatever the server says is underfoot, so that
-/// a carpeted room deadens when you walk onto the carpet. Out of doors that same override was the
-/// thing that made the reverb change as you walked: a speedway sector declares no surfaces, so while
-/// you were on the grass it had no absorption at all and fell through to the 500 ms default room, and
-/// the moment you stepped onto the asphalt it had exactly one absorbing surface in a nine-thousand
-/// cubic metre box — which Sabine reads as ten seconds, the clamp.
+/// What you stand on does not decide whether you are in a room. The client writes the underfoot
+/// material into a region's floor, so carpet deadens a room; outdoors it made a speedway sector ring for
+/// ten seconds (one absorbing face in 9,000 m³) the moment you stepped onto asphalt.
 /// </summary>
 public class UnderfootMaterialTests
 {
@@ -179,7 +151,7 @@ public class UnderfootMaterialTests
         Assert.Equal(0f, RoomAcoustics.DecayMs(sector));
         Assert.Equal(5, RoomAcoustics.OpenFaceCount(sector));
 
-        // And a real room still responds to what is underfoot, which is why the override exists.
+        // A real room still responds to what is underfoot, which is why the override exists.
         var room = Box(10, 5, 10, "Concrete", "Concrete", "Concrete", "Concrete", "Concrete", "Concrete");
         float bare = RoomAcoustics.DecayMs(room);
         Assert.True(AcousticRegistry.TryGetResonanceIndex("Carpet", out int carpet));

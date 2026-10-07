@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
@@ -12,19 +8,12 @@ using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// Each wheel squealing for itself (VehicleSynth.WheelSqueal through EngineVoiceState), measured and
-/// rendered.
-///
-/// First the squeal of one tyre on its own, at three demands, measured: the band balance, the
-/// spectral flatness (1 is white noise, 0 a pure tone) and how far the strongest component stands
-/// above the band around it. Then four drives on the per-wheel model (WheelDynamics), its wheels sent
-/// to a live engine voice exactly as the server sends them: an ordinary stop, a hard stop, a turn
-/// tightened past the limit, and a pull-away with wheelspin. Each is rendered as two voices of the
-/// same car, the listener walking alongside two and a half metres off its left side for the left
-/// channel and off its right for the right, so which side is singing can be heard. Printed per
-/// wheel: when it first reached the squeal onset and the most it was asked for.
-///
-///   --wheel-squeal [out=DIR]
+/// --wheel-squeal [out=DIR] [axle] [binaural]: each wheel squealing for itself (VehicleSynth.WheelSqueal
+/// through EngineVoiceState). One tyre at three demands (band balance, spectral flatness, the strongest
+/// line's height), then four drives on WheelDynamics with the wheels sent as the server sends them: an
+/// ordinary stop, a hard stop, a turn past the limit, a wheelspin pull-away. Each is two voices of the car,
+/// the listener 2.5 m off its left side for the left channel and its right for the right; per wheel, when
+/// it first reached the squeal onset and its peak demand.
 /// </summary>
 public static class WheelSquealSpike
 {
@@ -37,10 +26,9 @@ public static class WheelSquealSpike
     public static bool AxleOnly;
 
     /// <summary>
-    /// Heard from the pavement: the listener stands 7.5 m from the car's path, beside where its tyres
-    /// work hardest, facing the road, and each end of the car (the rear voice, the front tap) goes
-    /// through Steam Audio's binaural effect from where it is, with spherical spreading. No ground,
-    /// walls or air: those the game adds. Files end in -binaural.wav.
+    /// Heard from the pavement 7.5 m from the path where the tyres work hardest, each end of the car
+    /// through Steam Audio's binaural effect with spherical spreading; no ground, walls or air.
+    /// Files end in -binaural.wav.
     /// </summary>
     public static bool Binaural;
 
@@ -62,35 +50,34 @@ public static class WheelSquealSpike
         }
 
         var report = new List<string>();
-        Scenario("1-ordinary-stop", "i4_midsize", 0.85f, modulated: true, outDir, report, (body, t) =>
+        Scenario("1-ordinary-stop", "i4_midsize", 0.85f, modulated: true, report, (body, t) =>
         {
             if (t < 2f) return (50f / 3.6f, 0f);
             return (MathF.Max(0f, body.Vx - 2.92f / 30f), 0f);
         }, startSpeed: 50f / 3.6f, seconds: 9f);
 
-        Scenario("2-hard-stop", "i4_midsize", 0.85f, modulated: false, outDir, report, (body, t) =>
+        Scenario("2-hard-stop", "i4_midsize", 0.85f, modulated: false, report, (body, t) =>
         {
             if (t < 2f) return (70f / 3.6f, 0f);
             // Standing on the pedal: asking for more than the tyres have.
             return (MathF.Max(0f, body.Vx - 11f / 30f), 0f);
         }, startSpeed: 70f / 3.6f, seconds: 7f);
 
-        Scenario("3-fast-turn", "i4_midsize", 0.85f, modulated: false, outDir, report, (body, t) =>
+        Scenario("3-fast-turn", "i4_midsize", 0.85f, modulated: false, report, (body, t) =>
         {
             // A 40 m left-hand bend at a speed that rises from 0.3 g to past the limit.
             float speed = MathF.Sqrt(MathF.Min(1.05f, 0.3f + 0.09f * t) * 9.81f * 40f);
             return (speed, -1f / 40f);
         }, startSpeed: MathF.Sqrt(0.3f * 9.81f * 40f), seconds: 10f);
 
-        Scenario("4-wheelspin-pull-away", "v8_muscle", 0.9f, modulated: false, outDir, report, (body, t) =>
+        Scenario("4-wheelspin-pull-away", "v8_muscle", 0.9f, modulated: false, report, (body, t) =>
         {
             if (t < 1f) return (0f, 0f);
             // Floored from rest: asking the rear tyres for 8 m/s^2.
             return (body.Vx + 8f / 30f, 0f);
         }, startSpeed: 0f, seconds: 6f);
 
-        // One gain for the whole set, a little under full scale at its loudest moment: a hard stop is
-        // louder than an ordinary one in the files as it is on the street.
+        // One gain for the whole set, so a hard stop is louder than an ordinary one as on the street.
         float peak = 1e-6f;
         foreach (var (_, l, r) in Rendered) foreach (var o in new[] { l, r }) foreach (float x in o) peak = MathF.Max(peak, MathF.Abs(x));
         float g = 0.7f / peak;
@@ -118,7 +105,7 @@ public static class WheelSquealSpike
     /// that holds that curvature at its speed (the kinematic angle plus the understeer the model has
     /// at that lateral acceleration), and its wheels go to two voices of the same car.
     /// </summary>
-    private static void Scenario(string name, string preset, float grip, bool modulated, string outDir, List<string> report,
+    private static void Scenario(string name, string preset, float grip, bool modulated, List<string> report,
                                  Func<WheelDynamics, float, (float Speed, float Curvature)> plan, float startSpeed, float seconds)
     {
         if (Binaural) { RoadsideBinaural(name, preset, grip, modulated, plan, startSpeed, seconds); return; }
@@ -132,8 +119,7 @@ public static class WheelSquealSpike
         var first = Enumerable.Repeat(float.NaN, body.Wheels.Length).ToArray();
         var most = new float[body.Wheels.Length];
         var block = new float[Tick];
-        // Each wheel's squeal on its own, made from the same drive the voice gets, to say which wheel
-        // is singing and how loud: the energy per tick, per wheel.
+        // Each wheel's squeal on its own from the same drive, energy per tick: which wheel is singing.
         var shadow = new VehicleSynth.WheelSquealVoice[body.Wheels.Length];
         var shadowRng = new Random(11);
         var energy = new List<float[]>();
@@ -177,7 +163,7 @@ public static class WheelSquealSpike
                 var v = voices[e];
                 v.TargetSpeed = body.Vx;
                 v.RoadSlip = MathF.Min(2f, body.MaxDemand);
-                // AxleOnly: the voice as it was before the wheels squealed for themselves, for comparison.
+                // AxleOnly: the axle voices squeal from the overall demand, for comparison.
                 v.Wheels = AxleOnly ? null : (WheelState[])wire.Clone();
                 v.SetListener(ears[e] - placedAt);
                 v.Render(block);

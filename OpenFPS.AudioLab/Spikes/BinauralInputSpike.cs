@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -6,13 +5,10 @@ using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --binaural-input: a mono voice through the game's binaural stage (SteamAudioDsp) in a real FMOD
-/// mixer, against Steam Audio's HRTF applied to the same signal directly. Each ear must come out at the
-/// level the HRTF alone gives it, which is the stage taking the voice at its own level. Prints the
-/// difference per ear and direction, and exits 1 if any is more than 0.1 dB.
-///
-/// Native, so here and not in OpenFPS.Tests: the fault it guards was FMOD's, which upmixed a mono voice
-/// to a stage that asked for a stereo input by panning it to the middle, 3.01 dB down on each side.
+/// --binaural-input: a mono voice through the game's binaural stage (SteamAudioDsp) in a real FMOD mixer,
+/// against Steam Audio's HRTF on the same signal; exits 1 if any ear differs by more than 0.1 dB. Native,
+/// so not in OpenFPS.Tests: it guards FMOD panning a mono voice to the middle (3.01 dB down each side)
+/// for a stage that asked for stereo input.
 /// </summary>
 public static class BinauralInputSpike
 {
@@ -34,7 +30,7 @@ public static class BinauralInputSpike
         return RESULT.OK;
     }
 
-    public static int Run(string[] args)
+    public static int Run()
     {
         var rng = new Random(7);
         var signal = new float[Rate * 2];
@@ -93,7 +89,7 @@ public static class BinauralInputSpike
         Phonon.iplAudioBufferAllocate(ctx, 2, Block, ref outBuf);
         var mono = new float[Block]; var stereo = new float[Block * 2];
         double l = 0, r = 0;
-        // The signal and then as much silence again, for the filter's tail.
+        // As much silence again, for the filter's tail.
         for (int b = 0; b < 2 * signal.Length / Block; b++)
         {
             for (int i = 0; i < Block; i++) { int at = b * Block + i; mono[i] = at < signal.Length ? signal[at] : 0f; }

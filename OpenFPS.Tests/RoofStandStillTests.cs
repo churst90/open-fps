@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -10,24 +6,17 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 using Xunit.Abstractions;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Somebody standing still stays where they stand. Sean, on Kestrel House's roof beside Cody
-/// (2026-10-05), with no input at all, was moved half a metre a tick along the north parapet and then,
-/// in the north-east corner, half a metre INTO the parapet and back out on alternate ticks for a minute
-/// and a half, until he came out of its far side and fell eighteen metres onto the dirt. What moved him
-/// was the player beside him: movement took a player's whole orientation for their box, look pitch
-/// included, so Cody looking down tipped a 1.8 m box over and swept it through Sean; and the collision
-/// passes, given a push into a wall, left the body inside the wall on every other tick.
-///
-/// These stand a player still on the real city through the real server movement, with somebody beside
-/// them looking up, down and round, against every parapet and in every corner of all five tower roofs,
-/// and beside every roof door as it is opened and shut.
+/// Somebody standing still stays where they stand, on the real city through the real server movement,
+/// with somebody beside them looking about: every parapet and corner of the five tower roofs, and beside
+/// every roof door as it swings. Sean (2026-10-05, Kestrel House) was moved 0.47 m a tick into the
+/// parapet and out until he fell eighteen metres: Cody looking down tipped his own 1.8 m box (it took
+/// the look pitch) through Sean, and the collision passes left a body in the wall every other tick.
 /// </summary>
 public class RoofStandStillTests : IClassFixture<RoofStandStillTests.City>
 {
@@ -297,12 +286,9 @@ public class RoofStandStillTests : IClassFixture<RoofStandStillTests.City>
         Assert.True(failures.Count == 0, string.Join("\n", failures));
     }
 
-    /// <summary>
-    /// The engine on its own: a body touching a 35 cm wall, with something overlapping it from the other
-    /// side by 0.47 m (what Cody's tipped box did to Sean). Pushed out of that into the wall, then out
-    /// of the wall back into it, the third pass left it inside the wall, and the next tick the other
-    /// way: half a metre a tick, for ever. It now stays where it stood, never in the wall.
-    /// </summary>
+    /// <summary>The engine alone: a body touching a 35 cm wall, overlapped from the other side by 0.47 m
+    /// (Cody's tipped box), stays where it stood and is never left in the wall (it used to alternate
+    /// half a metre a tick).</summary>
     [Fact]
     public void APushIntoAWallLeavesTheBodyWhereItStood()
     {

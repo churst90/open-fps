@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Arch.Core;
 using MemoryPack;
 using OpenFPS.Common;
@@ -7,7 +5,6 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

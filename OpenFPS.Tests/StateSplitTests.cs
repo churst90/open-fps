@@ -1,22 +1,16 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using MemoryPack;
-using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A state update too big for one packet is sent as several, and each piece must still say everything
-/// the whole did about the player it is for. It did not: the halves were rebuilt from three fields
-/// and RidingEntityId fell back to -1, so on the city — which splits every tick — a driver was told
-/// every tick that they were on foot. Checked by reflection, so the next field appended to the
-/// message is covered without anyone remembering this test exists.
+/// Each piece of a split state update says everything the whole did about its player: halves rebuilt
+/// from three fields told a driver on the city, which splits every tick, that they were on foot. Checked
+/// by reflection, so a field appended later is covered too.
 /// </summary>
 public class StateSplitTests
 {

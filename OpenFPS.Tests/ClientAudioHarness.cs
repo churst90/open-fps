@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
@@ -13,15 +11,9 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A whole ClientAudioSystem with no sound card: a real facade over a mixer that only writes down
-/// what it was asked to do, a real client world with cars in it, and a clock the test turns.
-///
-/// ClientAudioSystem is where it is decided which voices play, where, at what level and with which
-/// acoustic path, and until this existed none of that could be asked about outside a running game.
-/// Everything below it is real — the voice budget, the acoustic worker thread, the facade's queues —
-/// so a test here sees what the mixer would have been told.
-///
-/// Coordinates are the engine's: x east, y UP, z north.
+/// A whole ClientAudioSystem with no sound card: the real facade, voice budget and acoustic worker over
+/// a mixer that only records, a client world with cars in it, and a clock the test turns. Coordinates
+/// are the engine's: x east, y up, z north.
 /// </summary>
 internal sealed class ClientAudioHarness
 {
@@ -31,7 +23,7 @@ internal sealed class ClientAudioHarness
     public readonly LocalPlayerState Player = new();
     public readonly ClientAudioSystem Audio;
 
-    /// <summary>The system's clock, seconds. Advanced one audio frame per <see cref="Tick"/>.</summary>
+    /// <summary>The system's clock, seconds. Advanced one audio frame per <see cref="Tick()"/>.</summary>
     public double Now { get; private set; } = 1.0;
 
     /// <param name="soundsPath">A sound bank to resolve recorded sounds from, such as footsteps. None by
@@ -43,19 +35,16 @@ internal sealed class ClientAudioHarness
         Facade.InitializeForTest(soundsPath);
         var sounds = new SoundMappingService(Player);
         if (soundsPath != null) sounds.Initialize(soundsPath);
-        // No door renders in the background: none of these tests plays a model door, and with the render
-        // cache empty (TestConfigIsolation) every harness rendered all of the city's, which starved the
-        // tests' own threads.
+        // No door prewarm: with the render cache empty (TestConfigIsolation) every harness rendered the
+        // whole city's doors and starved the tests' own threads.
         Audio = new ClientAudioSystem(Facade, sounds, Player, () => Now, prewarm: false);
     }
 
     /// <summary>Stands the listener here, feet on the ground (the ear is EyeHeight above).</summary>
     public void StandAt(Vector3 feet) => Player.Position = feet;
 
-    /// <summary>
-    /// Puts a car on the map the way the server does (VehicleSystem / CompositeService): an engine
-    /// emitter on a moving entity, and a position that arrives as state.
-    /// </summary>
+    /// <summary>A car as the server puts one (VehicleSystem, CompositeService): an engine emitter on a
+    /// moving entity, its position arriving as state.</summary>
     public void AddCar(int id, string preset, Vector3 position, Vector3 velocity = default)
     {
         var profile = MachineRegistry.VehicleFor(preset);
@@ -104,8 +93,7 @@ internal sealed class ClientAudioHarness
     {
         Now += 1.0 / ClientAudioSystem.UpdateHz;
         Audio.Update(World.GetSnapshot());
-        // Twice: the budget plays a submitted voice by queueing a direct play, which the next pump
-        // hands to the mixer.
+        // Twice: a submitted voice is queued as a direct play, which the next pump hands to the mixer.
         Facade.PumpForTest();
         Facade.PumpForTest();
     }
@@ -118,16 +106,14 @@ internal sealed class ClientAudioHarness
         for (int i = 0; i < frames; i++) Tick();
     }
 
-    /// <summary>
-    /// Ticks until the condition holds, giving the acoustic worker (a real thread) a moment each
-    /// frame. True if it held within the limit.
-    /// </summary>
+    /// <summary>Ticks until the condition holds, giving the acoustic worker thread a moment each frame.
+    /// True if it held within the limit.</summary>
     public bool TickUntil(Func<bool> condition, int maxFrames = 600)
         => TickUntil(condition, maxFrames, TimeSpan.Zero);
 
-    /// <summary>As <see cref="TickUntil(Func{bool}, int)"/>, but keeps ticking past maxFrames until at least
-    /// <paramref name="atLeast"/> of wall time has gone: for a condition that waits on a background worker (the
-    /// rain survey), which a loaded two-core CI runner can take far longer to finish than a desk machine.</summary>
+    /// <summary>As <see cref="TickUntil(Func{bool}, int)"/>, but ticks past maxFrames until
+    /// <paramref name="atLeast"/> of wall time has gone: a background worker (the rain survey) is far
+    /// slower on a loaded two-core CI runner.</summary>
     public bool TickUntil(Func<bool> condition, int maxFrames, TimeSpan atLeast)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -146,11 +132,8 @@ internal sealed class ClientAudioHarness
     public static int HornVoice(int carId) => ClientAudioSystem.HornVoiceBase - Math.Abs(carId);
 }
 
-/// <summary>
-/// A mixer that records everything asked of it, keyed by voice id. It plays nothing.
-///
-/// Called only from the thread that pumps the facade, which in these tests is the test's own.
-/// </summary>
+/// <summary>A mixer that records everything asked of it, keyed by voice id, and plays nothing. Called
+/// only from the thread that pumps the facade: here, the test's own.</summary>
 internal sealed class RecordingMixer : IAudioProvider
 {
     /// <summary>Every voice started, in order.</summary>
@@ -183,11 +166,9 @@ internal sealed class RecordingMixer : IAudioProvider
     public void UpdateShelter(float f) { }
     public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes) { }
     public bool PlayAmbientBed(string id, AmbisonicLayout l, float v, bool loop = true) => true;
-    public void SetAmbientBedVolume(string id, float v) { }
     public void StopAmbientBed(string id) { }
     public void SetAcousticMap(AcousticMap map) { }
     public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) { }
-    public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres, float surfaceAreaSquareMetres = 0f) { }
     public void SetAirTemperature(float c) { }
     /// <summary>The mixer's load as the budget reads it, 0..1. A test sets it to drive the control loop.</summary>
     public float Load;
@@ -198,7 +179,6 @@ internal sealed class RecordingMixer : IAudioProvider
     public bool FadeOutVoice(int id) => true;
     public void CancelVoiceFade(int id) { }
     public Vector3 GetSoundPosition(int id) => Latest.TryGetValue(id, out var e) ? e.Position : Vector3.Zero;
-    public float GetPlaybackProgress(int id) => 0f;
     public void Preload(string id) { }
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;
     public void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume) { }

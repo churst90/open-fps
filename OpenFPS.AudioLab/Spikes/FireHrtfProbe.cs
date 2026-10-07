@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Linq;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;

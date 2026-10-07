@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Common;
@@ -11,7 +7,9 @@ using OpenFPS.Server.Systems;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --weather-wind [out=DIR] [sec=12]: the weather's wind, measured before anybody listens.
+/// --weather-wind [out=DIR] [sec=12] [ears|trees] [short] [live]: the weather's wind, measured before
+/// anybody listens. ears leaves out the trees, trees the ears; short is a 30 s tree run; live is
+/// <see cref="Live"/>.
 ///
 ///   1. The wind at the ears, at 2, 5, 10 and 15 m/s past the head, facing into it, side-on each way
 ///      and with the back to it: each ear's level as the game places it (dBFS) and as the model says
@@ -22,6 +20,7 @@ namespace OpenFPS.AudioLab.Spikes;
 ///      weather system (WorldEnvironmentSystem) set by the /weather path, broadcast once a second,
 ///      each broadcast followed by a client WindWeather ramp, and the tree reading the field. Calm,
 ///      breezy, stormy, and a storm arriving.
+///   4. The ears in the game's weather, standing and walking (EarsInWeather).
 ///
 /// The ear WAVs are stereo at the level the game would place them (default compression, before the
 /// master trim and limiter). The tree WAVs are mono at a metre, −20 dBFS rms = 94 dB SPL, the same

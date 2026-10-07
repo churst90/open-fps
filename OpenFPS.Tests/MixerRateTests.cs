@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using OpenFPS.Client.AudioEngine.Core;
@@ -8,7 +5,6 @@ using OpenFPS.Client.AudioEngine.Core.Signals;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -36,10 +32,9 @@ public class MixerRateTests
     }
 
     /// <summary>
-    /// No constructor or method in the game's audio code defaults a rate to 44,100, and no rate constant
-    /// is 44,100. Two filters are laid out in samples counted at 44.1 kHz and scaled to the rate they
-    /// are given (DiffuseBranch, EarDecorrelator); the rate they count in is not an assumption about
-    /// the mixer, and they say so by name.
+    /// No constructor, method or rate constant in the game's audio code defaults to 44,100. DiffuseBranch and
+    /// EarDecorrelator lay their filters out in samples counted at 44.1 kHz and scale to the rate given, and say
+    /// so by name.
     /// </summary>
     [Fact]
     public void NothingDefaultsToFortyFourOne()
@@ -91,10 +86,9 @@ public class MixerRateTests
         foreach (var (name, r) in voices) Assert.True(r == rate, $"{name} runs at {r} Hz, given {rate}");
     }
 
-    /// <summary>The engine's note is where its speed puts it at either rate: the strongest line of an
-    /// idle, against the engine's own revolutions, is the same order at 44.1 and at 48 kHz, and the idle
-    /// speed itself is within a few per cent (the crank is integrated per sample, so the idle's own
-    /// small hunt is not sample-for-sample the same).</summary>
+    /// <summary>The engine's note is where its speed puts it at either rate: an idle's strongest order is the
+    /// same at 44.1 and 48 kHz, and the idle speed within a few per cent (the crank is integrated per sample, so
+    /// the idle's small hunt differs).</summary>
     [Fact]
     public void AnEngineIdlesOnTheSameNoteAtEitherRate()
     {

@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -10,19 +8,10 @@ using OpenFPS.Client.AudioEngine.Fmod;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// That every voice which can be started can also be stopped.
-///
-/// This is the bug that made a whole map unusable, and it was invisible everywhere except in a
-/// running game. Voices come into existence by two routes: submitted to the VoiceManager, which
-/// scores them and decides what deserves a channel, or played DIRECTLY — which is what reflections
-/// and echoes do, because a reflection should follow its source rather than compete with it for a
-/// slot. Stopping went down one route only. A directly-played voice was asked to stop, the manager
-/// did not recognise the id, and the request was dropped.
-///
-/// Nothing failed. The voice simply never stopped, and on a racetrack — where each car has a
-/// reflection voice against each wall, and cars come and go from the mix constantly — the count ran
-/// from 24 to 123 in under a minute with the mixer at 100%, which is heard as the entire soundscape
-/// crackling and stuttering.
+/// Every voice that can be started can be stopped, by either route: submitted to the VoiceManager, or
+/// played directly (reflections and echoes, which follow their source rather than compete for a slot).
+/// Stopping once went down the manager's route only and a direct voice's stop was dropped: on a racetrack
+/// the count ran from 24 to 123 in under a minute with the mixer at 100 %, heard as everything crackling.
 /// </summary>
 public class VoiceLifecycleTests
 {
@@ -40,14 +29,12 @@ public class VoiceLifecycleTests
         public void UpdateShelter(float f) { }
         public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes) { }
         public bool PlayAmbientBed(string id, AmbisonicLayout l, float v, bool loop = true) => true;
-        public void SetAmbientBedVolume(string id, float v) { }
         public void StopAmbientBed(string id) { }
         public void SetAcousticMap(AcousticMap map) { }
         public void PlaySpatialSound(SpatialEmitter e) { Played.Add(e.EntityId); PlayedSounds.Add(e.SoundId); Live.Add(e.EntityId); }
         public void UpdateSpatialAttributes(SpatialEmitter e) { }
         public void SetAcousticPath(int id, AcousticPathData p) { }
         public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) { }
-        public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres, float surfaceAreaSquareMetres = 0f) { }
         public void SetAirTemperature(float c) { }
         public float MixerLoad => 0f;
         public void ReviveEngine(int id) { }
@@ -58,12 +45,10 @@ public class VoiceLifecycleTests
         public void StopSound(int id) { Stopped.Add(id); Live.Remove(id); }
         public bool IsPlaying(int id) => Live.Contains(id);
         public Vector3 GetSoundPosition(int id) => Vector3.Zero;
-        public float GetPlaybackProgress(int id) => 0f;
         public IEnumerable<int> GetActiveSpatialSoundIds() => new List<int>(Live);
         public void Preload(string id) { }
 
-        /// <summary>Records nothing: this fake has no FMOD behind it to hand a buffer to, and
-        /// every test here is about voice LIFECYCLE rather than about what a voice sounds like.</summary>
+        /// <summary>Records nothing: the tests here are about a voice's lifecycle, not its sound.</summary>
         public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;
         public readonly List<string> UiSounds = new();
         public void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume) { render(); UiSounds.Add(id); }

@@ -1,25 +1,14 @@
-using System;
-using System.Linq;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Fmod;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A borrowed voice must carry its OWN Doppler and nobody else's.
-///
-/// A car too far away to be worth its own engine is voiced by reading a near car's ring buffer. It is
-/// placed at its own position, moves at its own velocity, and is pitched by its own Doppler — and it
-/// was ALSO inheriting the Doppler of the car it borrowed from, because it read back from that car's
-/// PLAY POSITION and the play position advances at whatever rate the mixer is consuming that voice,
-/// which is its channel pitch, which is its Doppler. Two cars' Dopplers on one voice, belonging to two
-/// cars going different ways.
-///
-/// The test drives the mechanism directly: a source consumed faster than real time, exactly as a
-/// channel pitched up for an approaching car makes the mixer ask for more input per block, and a
-/// borrowed voice reading from it. What comes out must be at the pitch the source was SYNTHESIZED at.
+/// A borrowed voice carries its own Doppler and nobody else's. A far car voiced from a near car's ring also
+/// inherited that car's Doppler, because it read back from the near car's play position, which advances at
+/// the channel's pitch. Driven directly: a source consumed faster than real time, as a channel pitched up
+/// for an approaching car consumes it, and what comes out must be at the synthesized pitch.
 /// </summary>
 [Collection(nameof(ValveFlowSwitch))]
 public class BorrowedVoiceDopplerTests
@@ -30,10 +19,8 @@ public class BorrowedVoiceDopplerTests
     private const float Rate = 48000f;
     private const int Block = 1024;
 
-    /// <summary>
-    /// Runs a source being consumed at <paramref name="consumeRate"/> times real time with an echo
-    /// reading from it, and returns the echo's output.
-    /// </summary>
+    /// <summary>A source consumed at <paramref name="consumeRate"/> times real time with an echo reading
+    /// from it; returns the echo's output.</summary>
     private static float[] Run(bool ownCursor, double consumeRate, int blocks)
     {
         var profile = VehicleProfile.StockCar;
@@ -88,8 +75,7 @@ public class BorrowedVoiceDopplerTests
         // 25 % faster consumption is what a channel pitched up for a car approaching at 70 m/s does.
         const double approaching = 1.25;
 
-        // The period is found by autocorrelation, which the valves' broadband flow noise pulls about;
-        // the mechanism under test is the cursor, not the noise.
+        // The valves' broadband flow noise pulls the autocorrelation about; the cursor is under test, not the noise.
         var (truth, control, inherited, own) = ValveFlowSwitch.Without(() => (
             Run(ownCursor: true, consumeRate: 1.0, blocks: 24),
             Run(ownCursor: false, consumeRate: 1.0, blocks: 24),
@@ -108,9 +94,8 @@ public class BorrowedVoiceDopplerTests
         _o.WriteLine($"consumed 25% fast, following it   : period {pInherited:F0} samples ({Rate / pInherited:F1} Hz)");
         _o.WriteLine($"consumed 25% fast, own cursor     : period {pOwn:F0} samples ({Rate / pOwn:F1} Hz)");
 
-        // The control: while the source is consumed at real time, following its play position is fine.
-        // Nothing about the OLD path is wrong until the source's own pitch moves — which is exactly
-        // why this was so hard to see, and why it showed up as "sounds like cruising" on a pass.
+        // The control: at real-time consumption following the play position is fine, which is why this hid and
+        // was heard only as "sounds like cruising" on a pass.
         Assert.InRange(pControl, pTruth * 0.93f, pTruth * 1.07f);
 
         // Following the source's play position pulls the borrowed voice along with it...

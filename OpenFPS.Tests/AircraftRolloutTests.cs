@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -9,15 +5,14 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// "Aircraft roll out after landing instead of reversing at the end of the runway." An approach used
-/// to brake to a stop in the air over the runway point and spin round where it stood. Now it lands,
-/// rolls out on its type's figures, turns round on the runway and takes off back up the line.
+/// "Aircraft roll out after landing instead of reversing at the end of the runway." It lands, rolls out on its
+/// type's figures, turns round on the runway and takes off back up the line; an approach used to stop in the
+/// air over the runway point and spin round.
 /// </summary>
 public class AircraftRolloutTests
 {

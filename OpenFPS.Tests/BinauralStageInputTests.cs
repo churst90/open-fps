@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -6,12 +5,10 @@ using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// How the binaural stage (SteamAudioDsp) asks FMOD for its channels, without the native libraries.
-///
-/// The stage takes one channel in and puts two out. Done with a read callback it had to have its input
-/// made stereo, and FMOD did that by panning the mono voice to the middle, 3.01 dB down on each side:
-/// every voice reached the HRTF 3.01 dB under its placed level. The level itself is measured through
-/// FMOD and Steam Audio by the AudioLab (--binaural-input); these hold the contract that gives it.
+/// How the binaural stage (SteamAudioDsp) asks FMOD for its channels, without the native libraries: one
+/// channel in, two out. Through a read callback FMOD made the input stereo by panning the mono voice to the
+/// middle, so every voice reached the HRTF 3.01 dB under its placed level. The level itself is measured by
+/// AudioLab --binaural-input.
 /// </summary>
 public class BinauralStageInputTests
 {

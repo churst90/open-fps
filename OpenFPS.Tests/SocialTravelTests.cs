@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common.Components;
@@ -10,14 +6,12 @@ using OpenFPS.Server;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Services;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
 /// The social and travel menu's server half: real friends that persist, /where and /profile in
-/// words, the player list's bare usernames, and /join — a session changing map at run time, which
-/// until now no session could ever do.
+/// words, the player list's bare usernames, and /join: a session changing map at run time.
 /// </summary>
 public class SocialTravelTests : IDisposable
 {

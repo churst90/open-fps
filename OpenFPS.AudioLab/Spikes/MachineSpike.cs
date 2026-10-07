@@ -1,8 +1,4 @@
-using System;
-using System.IO;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
@@ -11,15 +7,9 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// What machines there are, and what they are made of.
-///
-/// A machine is a parts list — an engine, an exhaust somewhere behind an intake, a body, a set of
-/// tyres — and until now that list lived only in C#, where an author could read it and not write it.
-/// This prints the list for every machine the game knows, and writes any of them out as the JSON a
-/// map author would edit.
-///
-/// Command line:
-///   --machines                 what there is, one line each
+/// Machines as parts lists (an engine, an exhaust behind an intake, a body, tyres), as the JSON a map
+/// author edits.
+///   --machines                 every machine, one line each
 ///   --machines v8_muscle       one machine, part by part
 ///   --machines export=DIR      the whole library written out as parts lists
 /// </summary>
@@ -73,20 +63,10 @@ public static class MachineSpike
     }
 
     /// <summary>
-    /// A machine driving past you, first as one voice and then as two.
-    ///
-    /// The thing being auditioned is GEOMETRY, not timbre: with one voice a car is a point somewhere
-    /// between its two ends; with two, the intake goes past you before the exhaust does, which is
-    /// most of how a listener knows which way something is pointing and how long it is. The level is
-    /// identical either way by construction (the taps sum to the single voice), so anything you can
-    /// hear between the two passes is the rig.
-    ///
-    /// Command line: --machine-pass [id] [kmh=..] [side=..] [one] [two] [hard]
-    ///
-    /// `hard` accelerates the machine through the pass instead of holding a speed, which is worth
-    /// knowing about before judging how loud anything is: a declared source level is measured at FULL
-    /// LOAD, and an engine cruising at a steady 50 km/h in a tall gear is doing a fraction of that
-    /// work. A car that idles past you quietly and shouts when it is opened up is not a bug.
+    /// --machine-pass [id] [kmh=..] [side=..] [one] [two] [hard]: a machine driving past as one voice and
+    /// then as two. The geometry is on trial, not the timbre: with two, the intake passes before the
+    /// exhaust, and the taps sum to the one voice, so any difference heard is the rig. hard accelerates
+    /// through the pass: a declared level is at full load, and a steady cruise is a fraction of that.
     /// </summary>
     public static int Pass(string[] args)
     {
@@ -128,9 +108,7 @@ public static class MachineSpike
                               Vector3 ear, float kmh, float side, bool split, bool hard = false)
     {
         float speed = kmh / 3.6f;
-        // Opened up: the driver chases a speed well past the one it starts at, so the engine is under
-        // load and changing gear as it goes by — which is the state a declared source level describes
-        // and the state anybody notices a vehicle in.
+        // Opened up: chasing a speed well past the start keeps the engine under load and changing gear.
         float top = hard ? speed * 3f : speed;
         float from = -130f, to = 130f;
         var level = v.SourceLevelDb;
@@ -142,8 +120,7 @@ public static class MachineSpike
             : "  ── ONE voice: the whole machine at a point between its ends.")
             + (hard ? $"  Accelerating to {top * 3.6f:F0} km/h." : "  Steady speed."));
 
-        // Where each outlet is. Heard as one thing, the voice sits between them and nearer the
-        // exhaust — VehicleProfile.ExhaustEmitterBias — which is the compromise the split removes.
+        // As one voice it sits between the outlets, nearer the exhaust (VehicleProfile.ExhaustEmitterBias).
         Vector3 Rear(Vector3 p) => p + (split ? v.ExhaustSlot : v.ExhaustOffset);
         Vector3 Front(Vector3 p) => p + new Vector3(0f, v.IntakeHeight, v.IntakeOffsetZ);
 
@@ -187,8 +164,7 @@ public static class MachineSpike
             {
                 lastReport = (float)now;
                 float d = Vector3.Distance(pos, ear);
-                // The TRUE separation, not this pass's voice placement: the question being asked
-                // is what the machine's ends subtend, which does not depend on how it is voiced.
+                // What the machine's ends subtend, whatever this pass's voicing.
                 float sep = Vector3.Distance(
                     v.ExhaustSlot,
                     new Vector3(0f, v.IntakeHeight, v.IntakeOffsetZ));
@@ -205,15 +181,9 @@ public static class MachineSpike
     }
 
     /// <summary>
-    /// How loud a machine actually is at a speed — and what that becomes at a distance.
-    ///
-    /// The declared `SourceLevelDb` every preset carries is measured at FULL LOAD, which is the right
-    /// anchor for the mix and the wrong number to have in your head when a car cruises past. This
-    /// renders the game's own live voice at a steady speed, measures the pressure it makes, and then
-    /// walks it out through the mixer's own distance law (Loudness.RenderedGain) so the two questions
-    /// — "how loud is this thing" and "what will I hear" — are answered with one set of numbers.
-    ///
-    /// Command line: --machine-levels [id ...] [kmh=..]
+    /// --machine-levels [id ...] [kmh=..]: the live voice's pressure at a steady speed, then through the
+    /// mixer's distance law (Loudness.RenderedGain). SourceLevelDb is at full load: the mix's anchor, not
+    /// what a cruising car makes.
     /// </summary>
     public static int Levels(string[] args)
     {
@@ -230,15 +200,13 @@ public static class MachineSpike
             var v = MachineRegistry.VehicleFor(id);
             float idleDb = CruiseLevelDb(v, 0f);
             float cruiseDb = CruiseLevelDb(v, kmh / 3.6f);
-            // Placed the way the game places it: a machine is as big as the distance between the
-            // ends it radiates from, and the gain is paid down as the reference widens.
+            // As the game places it: the extent is the distance between its ends, and the gain is paid down for it.
             float extent = Vector3.Distance(
                 v.ExhaustSlot,
                 new Vector3(0f, v.IntakeHeight, v.IntakeOffsetZ));
             var (gain, reference) = Loudness.Place(v.SourceLevelDb, extent);
             float range = Loudness.AudibleRange(v.SourceLevelDb);
-            // The voice renders the pressure it actually makes, so the cruise/full difference is
-            // already IN the signal; the placement below is the same for both.
+            // The cruise against full load is already in the signal; the placement is the same for both.
             float under = cruiseDb - v.SourceLevelDb;
             string At(float d)
             {
@@ -283,12 +251,8 @@ public static class MachineSpike
     }
 
     /// <summary>
-    /// Writes the built-in library out as parts lists.
-    ///
-    /// On demand rather than checked in, deliberately. An exported file is a COPY of what C# says,
-    /// and an authored machine overrides the built-in of the same name — so a library exported into
-    /// the game's own machines/ folder would quietly freeze every car at the numbers it had on the
-    /// day it was written. Export it somewhere to read, copy the one you want to change.
+    /// The built-in library as parts lists. Never into machines/: an authored machine overrides the
+    /// built-in of its name, so an exported library there would freeze every car at today's numbers.
     /// </summary>
     private static int Export(string dir)
     {

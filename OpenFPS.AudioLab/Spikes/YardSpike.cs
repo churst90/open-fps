@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
@@ -14,21 +10,11 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 ///
 ///   --yard [preset ...] [sec=s] [levels] [pass] [dist=m]
 ///
-/// Three things, in the order they should be asked:
-///
-///   LEVELS is the first and it is not optional. What a machine MEASURES at one metre, and what
-///   shape it is across nine bands, decided before anybody listens to it — a mower that reads 96 dB
-///   with two thirds of its energy under 125 Hz is wrong however it sounds through one pair of
-///   speakers, and finding that out by ear costs a session (the memory is `synthesis-failures`).
-///
-///   The RUN is a script of the thing doing its job: a mower started, walked into grass, stopped to
-///   turn, put into something thick enough to bog it, and switched off; a condenser unit running its
-///   fan, calling for the compressor, and satisfying the thermostat. Each one is written as the
-///   LOAD and the GROUND SPEED over time, because those are the only two inputs a governed machine
-///   has, and everything you hear happening to it has to come out of them.
-///
-///   The PASS is the mower walked past a listener at three metres, which is the one that says
-///   whether the thing is a place in the world rather than a texture.
+/// levels: the level at one metre and the shape across nine bands, read before anybody listens (a
+/// mower at 96 dB with two thirds of its energy under 125 Hz is wrong however it sounds).
+/// The run: the machine doing its job, scripted as load and ground speed over time, the only two
+/// inputs a governed machine has. pass: a mower walked past at three metres, which says whether it is
+/// a place in the world rather than a texture.
 /// </summary>
 public static class YardSpike
 {
@@ -59,8 +45,7 @@ public static class YardSpike
             string path = Path.Combine(dir, $"yard_{key}.wav");
             File.WriteAllBytes(path, VehicleSynth.ToWav16(Normalise(pcm)));
             Console.WriteLine($"    run: peak {peak:F0} dB at 1 m over {seconds:F0} s; wrote {path}");
-            // What the machine DID, a second at a time, so the script can be checked without
-            // listening to it: a governed engine's rpm is its load readout and nothing else.
+            // A governed engine's rpm is its load readout: the script checked without listening.
             if (trace.Count > 0) Console.WriteLine($"    rpm by the second: {string.Join(" ", trace.Select(v => v.ToString("F0")))}");
 
             if (pass && spec.Cutting != null)
@@ -76,12 +61,9 @@ public static class YardSpike
     }
 
     /// <summary>
-    /// What the machine measures at one metre, running its job, and what shape it is.
-    ///
-    /// The level is an RMS over the steady part — not a peak, because a mower's peak is one exhaust
-    /// pulse and says nothing about how far away you can hear it. The bands are relative, so they
-    /// answer "is this the right KIND of sound" separately from "is this the right volume", which
-    /// are two questions that have been confused here before.
+    /// The machine's level at one metre, running its job, and its shape. An RMS over the steady part,
+    /// not a peak (a mower's peak is one exhaust pulse); the bands are relative, so the kind of sound is
+    /// read apart from its volume.
     /// </summary>
     private static void Levels(SmallMachineSpec spec)
     {
@@ -128,13 +110,10 @@ public static class YardSpike
         => 20f * MathF.Log10(MathF.Max(1e-9f, (float)Math.Sqrt(sumSquares / n)) / 20e-6f);
 
     /// <summary>
-    /// The machine doing its job, written as the two inputs it has.
-    ///
-    /// For a mower: started on the spot, walked into grass, stopped for a turn, into something thick,
-    /// out the other side, and switched off — so the governor is heard sagging and recovering four
-    /// times, and the cutting hiss appears and disappears with the walking rather than with the
-    /// throttle. For an air conditioner: the fan alone, the compressor called for, a minute of it,
-    /// and the thermostat satisfied.
+    /// The machine doing its job, as its two inputs. A mower is walked into grass, stopped for a turn,
+    /// put into something thick and switched off, so the governor sags and recovers and the cutting hiss
+    /// follows the walking, not the throttle. An air conditioner runs its fan, then the compressor until
+    /// the thermostat is satisfied.
     /// </summary>
     private static (float[] Pcm, float PeakDb, List<float> RpmTrace) Script(SmallMachineSpec spec, float seconds)
     {
@@ -177,9 +156,8 @@ public static class YardSpike
     }
 
     /// <summary>
-    /// The mower walked past a listener standing still, at a distance, with the arrival-time deposit
-    /// the aircraft flyover uses: the machine is integrated in its own time and each sample lands
-    /// when it ARRIVES. Doppler is not applied, it happens.
+    /// The mower walked past a listener standing still, each sample deposited when it arrives, as the
+    /// aircraft flyover does: Doppler happens rather than being applied.
     /// </summary>
     private static float[] PassBy(SmallMachineSpec spec, float offset)
     {
@@ -203,8 +181,7 @@ public static class YardSpike
 
             int land = i + (int)(d / c * Sr);
             if (land >= outBuf.Length) continue;
-            // Spreading, and the air taking the top off over the path. One pole is enough at these
-            // distances; it is the same shape the flyover uses.
+            // Spreading, and one pole of air absorption (enough at these distances), as the flyover.
             float g = 1f / d;
             _lp += OnePoleAlpha(MathF.Max(1500f, 12000f - 160f * d)) * (synth.Total - _lp);
             outBuf[land] += _lp * g;

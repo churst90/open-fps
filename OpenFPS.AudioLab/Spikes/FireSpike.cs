@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.Core;
@@ -18,21 +13,19 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --fire: fires from a campfire to a forest's crown fire (FireSynth, docs/FIRE.md), rendered from their
-/// models and measured.
-///
-///   --fire levels [preset ...] [sec=30] [wind=] [age=] [heard=D] [parts=roar,crackle,steam,settle,torch,fall,glass,burst]
-///        each preset fully developed (or at age= seconds since lit): its level at a metre, every place
-///        summed (Leq, LAeq, octaves, the headroom its peaks need), its texture statistics against the
-///        recordings of its kind, its 10 ms 4-16 kHz kurtosis, and what it costs a core. With heard=D, as
-///        a microphone D m from its middle hears it: each place by its own distance, 1/r and ISO 9613-1
-///        air. SourceLevelDb and PeakHeadroomDb are read from the plain one.
-///   --fire render out=DIR [preset ...] [sec=30] [heard=D]   mono float WAVs of the same (−20 dBFS is 94 dB SPL)
-///   --fire game out=DIR [set=all|near|far|walk] [sec=30]
-///        the game's own path: a ClientAudioSystem over the FMOD provider with the HRTF, the ear model and
-///        the loudness law, each fire a map entity as the server would send it (its box the burning area),
-///        the listener on foot facing it; captured from the master in float (DIR/capture.post.wav) with
-///        DIR/segments.csv. Flat grass, no walls; the wind at the ears off.
+/// --fire: fires from a campfire to a crown fire (FireSynth, docs/FIRE.md), rendered from their models.
+///   levels [preset ...] [sec=30] [wind=] [age=] [seed=7] [heard=D] [parts=roar,crackle,steam,settle,torch,fall,glass,burst]
+///        each preset developed (or age= s after lighting): level at a metre with every place summed (Leq,
+///        LAeq, octaves, peak headroom), texture statistics against its recordings, 10 ms 4-16 kHz kurtosis,
+///        and its cost. heard=D: a microphone D m off, each place by its distance, 1/r and ISO 9613-1 air.
+///        SourceLevelDb and PeakHeadroomDb are read from the plain run.
+///   render out=DIR [preset ...] [sec=30] [heard=D] [places=1]   mono float WAVs (-20 dBFS is 94 dB SPL);
+///        places=1 also writes every place as its own channel.
+///   game out=DIR [set=all|near|far|walk] [sec=30]   through ClientAudioSystem with the HRTF, ear model and
+///        loudness law, each fire a map entity, the listener facing it; captured to DIR/capture.post.wav with
+///        DIR/segments.csv. Flat grass, no walls, no wind at the ears.
+///   hrtf [out=DIR]   FireHrtfProbe.
+/// Fitting knobs: swing= alpha= flicker= beta= trees= crown= structure= vehicle= vfizz=.
 /// </summary>
 public static class FireSpike
 {
@@ -70,7 +63,7 @@ public static class FireSpike
             var spec = FireSpec.ByName(key);
             var sw = Stopwatch.StartNew();
             var (pa, census) = Render(spec, sec, seed, wind, age, heard, parts);
-            double cost = sw.Elapsed.TotalSeconds / (sec + Settle(spec));
+            double cost = sw.Elapsed.TotalSeconds / (sec + Settle());
             var (nx, nz, d) = FireSynth.CellGrid(spec);
             Console.WriteLine();
             Console.WriteLine($"== fire:{key} ({spec.Name}): {spec.HeatReleaseKw / 1000f:F2} MW over {spec.AreaWidth:F1} x {spec.AreaDepth:F1} m; " +
@@ -125,12 +118,12 @@ public static class FireSpike
         return 0;
     }
 
-    private static float Settle(FireSpec spec) => 8f;
+    private static float Settle() => 8f;
 
-    /// <summary>A fire at a metre (every place summed), or heard from <paramref name="heard"/> m: pascals.</summary>
     /// <summary>The last render's places, each its own stream, for the lab to write out.</summary>
     public static float[][]? LastPlaces;
 
+    /// <summary>A fire at a metre (every place summed), or heard from <paramref name="heard"/> m: pascals.</summary>
     public static (float[] Pa, string Census) Render(FireSpec spec, float sec, int seed, float wind, float age, float heard, string[]? parts = null)
     {
         var layout = FireSynth.Layout(spec);
@@ -141,9 +134,9 @@ public static class FireSpike
             s.RoarPart = On("roar"); s.CracklePart = On("crackle"); s.SteamPart = On("steam"); s.SettlePart = On("settle");
             s.TorchPart = On("torch"); s.FallPart = On("fall"); s.GlassPart = On("glass"); s.BurstPart = On("burst");
         }
-        // The glass is rendered off the audio threads; wait for it here so a short render can have it.
+        // The glass renders off the audio threads; a short render waits for it.
         for (int i = 0; i < 400 && !s.GlassReady; i++) Thread.Sleep(50);
-        int n = (int)(sec * Rate), lead = (int)(Settle(spec) * Rate);
+        int n = (int)(sec * Rate), lead = (int)(Settle() * Rate);
         var places = new float[layout.Length][];
         for (int p = 0; p < places.Length; p++) places[p] = new float[n];
         var out1 = new float[layout.Length];
@@ -153,7 +146,7 @@ public static class FireSpike
             {
                 double t = i / (double)Rate;
                 if (float.IsNaN(wind)) s.ReadWind(0f, 0f, t); else s.Wind = wind;
-                if (!float.IsNaN(age)) s.Age = age - Settle(spec) + t;
+                if (!float.IsNaN(age)) s.Age = age - Settle() + t;
                 s.Control(256f / Rate);
             }
             s.NextPlaces(out1);
@@ -167,8 +160,7 @@ public static class FireSpike
         }
         else
         {
-            // A microphone heard metres from the middle on the near side, at head height, the fire at its
-            // flames' middle: each place by its own distance.
+            // A microphone at head height on the near side; each place by its own distance.
             var mic = new Vector3(0f, 1.6f, -heard);
             float h = Height(spec);
             for (int p = 0; p < places.Length; p++)
@@ -361,9 +353,8 @@ public static class FireSpike
             }
             if (set is "check")
             {
-                // Are the places independent, and do the ears hear the geometry? The house at 30 m as it is, with
-                // its places all at its middle (independent streams from one point), and as one voice; then
-                // standing among a crown fire's front, its places to either side.
+                // Do the ears hear the geometry? The house at 30 m as it is, its places at its middle, and as one
+                // voice; then standing among a crown fire's front.
                 Fire("house_fire", 30f);
                 ExtendedSources.LayoutScale = 0f;
                 Fire("house_fire", 30f);
@@ -397,8 +388,7 @@ public static class FireSpike
             }
             if (set is "all" or "walk")
             {
-                // Walking up to a burning wood from 150 m to 10 m from its middle (2.5 m from its edge) at an
-                // ordinary pace.
+                // Walking up to a burning wood from 150 m to 10 m from its middle (2.5 m from its edge).
                 var spec = FireSpec.ByName("burning_trees");
                 var middle = new Vector3(0f, Height(spec), 0f);
                 int id = Add("burning_trees", middle);

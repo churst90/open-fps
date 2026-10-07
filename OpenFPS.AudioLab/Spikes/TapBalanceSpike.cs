@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System;
-using System.Linq;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Engine;
@@ -12,7 +9,8 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// the front voice (intake, engine bay, fan, front tyres, door), idling and cruising, for every preset.
 /// Reported as dB at one metre from each outlet, and the rear minus the front.
 ///
-///   --tap-balance [preset ...]
+///   --tap-balance [preset ...] [parts|front|cost|knock|pipe|turbo|frontparts|nan|audit|placed|port|shifts|squeal|whoosh|seed=N]
+/// OPENFPS_WHOOSH_DUMP names the folder the dumping modes write to.
 /// </summary>
 public static class TapBalanceSpike
 {
@@ -57,8 +55,6 @@ public static class TapBalanceSpike
         return 0;
     }
 
-    /// <summary>At a city cruise (12 m/s): each end's level, and what the tyres, the fan and the
-    /// engine bay are each worth to it (the level lost when they are muted).</summary>
     /// <summary>
     /// The front of each vehicle against its back, at idle and at a cruise, and what the intake and
     /// the engine bay are each worth to the front: "I can really hear the air intake ... the intake
@@ -82,6 +78,8 @@ public static class TapBalanceSpike
         return 0;
     }
 
+    /// <summary>At a city cruise (12 m/s): each end's level, and what the tyres, the fan and the
+    /// engine bay are each worth to it (the level lost when they are muted).</summary>
     static int Parts(string[] names)
     {
         Console.WriteLine($"{"preset",-20} {"rear",6} {"front",6}   worth to rear: {"tyres",5}   to front: {"tyres",5} {"fan",5} {"bay",5}");
@@ -313,11 +311,6 @@ public static class TapBalanceSpike
         return 0;
     }
 
-    /// <summary>
-    /// The combustion knock alone, at a city cruise and at idle: the engine with tyres and fan muted,
-    /// rendered with and without knock (same seed), dumped for octave analysis as
-    /// {name}.{speed}.engine.f32 and {name}.{speed}.noknock.f32 into OPENFPS_WHOOSH_DUMP.
-    /// </summary>
     /// <summary>What each engine costs to synthesize: seconds of one core per second of sound, at a
     /// city cruise. Forty cars at 0.02 each is most of a core.</summary>
     static int Cost(string[] names)
@@ -347,6 +340,11 @@ public static class TapBalanceSpike
         return 0;
     }
 
+    /// <summary>
+    /// The combustion knock alone, at a city cruise and at idle: the engine with tyres and fan muted,
+    /// rendered with and without knock (same seed), dumped for octave analysis as
+    /// {name}.{speed}.engine.f32 and {name}.{speed}.noknock.f32 into OPENFPS_WHOOSH_DUMP.
+    /// </summary>
     static int Knock(string[] names)
     {
         Action<EngineVoiceState> engineOnly = s => { s.TyreMix = 0f; s.FanMix = 0f; };
@@ -535,7 +533,6 @@ public static class TapBalanceSpike
                       + (x.Muffler.Kind == MufflerKind.None ? 0f : x.Muffler.ChamberLengthsMetres.Sum() + x.Muffler.AbsorptiveLengthMetres);
             int groups = e.CollectorGroups.Length;
             var exit = new OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation(v, Rate).Exit;
-            string body = v.Body?.GetType().Name ?? "";
             Console.WriteLine($"{n,-20} {e.Name,-44} {litres,4:F1} {e.Cylinders,3} {e.Induction.ToString()[..5],5} {v.EngineBayLeakage,4:F2} {(v.EngineAtRear ? "yes" : ""),4} {v.IntakeOffsetZ,5:F1} {v.ExhaustOffsetZ,5:F1} {v.ExhaustHeight,4:F1} {v.LengthMetres,4:F1} {exit.Z,6:F2} {x.TailpipeCount(groups),5} {x.TailpipeDiameterMm,6:F0} {x.Muffler.Kind,-11} {sys,5:F2} {v.TyreCount,3} {(v.CoolingFan != null ? "yes" : ""),3} {v.TyreCount,3} {v.SourceLevelDb,5:F1}");
         }
         return 0;

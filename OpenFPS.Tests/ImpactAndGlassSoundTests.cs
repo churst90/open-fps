@@ -1,20 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Two things meeting, and a window going out — both speaking the same four characters as everything
-/// else, and neither of them knowing what a car or a rifle is.
-///
-/// The point being held here is the GENERALITY. `ImpactAcoustics.Between` is handed two materials,
-/// two masses, a size and a closing speed; a car hitting a wall, a ball hitting a floor and a crate
-/// coming off a lorry are that one function called three times. If it ever grows a case for cars,
-/// this is where that should start failing.
+/// Two things meeting, and a window going out, neither knowing what a car or a rifle is. Guards the
+/// generality: `ImpactAcoustics.Between` takes two materials, two masses, a size and a closing speed, and
+/// a car into a wall or a crate off a lorry is that one function; a case for cars should fail here.
 /// </summary>
 public class ImpactAndGlassSoundTests
 {
@@ -24,7 +16,7 @@ public class ImpactAndGlassSoundTests
 
     // ── Impacts ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>A car creeping into a kerb at walking pace should not announce itself like a crash.</summary>
+    /// <summary>A car creeping into a kerb at walking pace does not sound like a crash.</summary>
     [Fact]
     public void ACrawlIsNotACrash()
     {
@@ -32,8 +24,7 @@ public class ImpactAndGlassSoundTests
         Assert.NotEmpty(Hit(speed: 6f));
     }
 
-    /// <summary>Twice the closing speed is six decibels, the same law as everything else that
-    /// arrives with energy.</summary>
+    /// <summary>Twice the closing speed is 6 dB.</summary>
     [Fact]
     public void TwiceTheClosingSpeedIsSixDecibels()
     {
@@ -43,9 +34,8 @@ public class ImpactAndGlassSoundTests
     }
 
     /// <summary>
-    /// A lorry hitting a drink can and a drink can hitting a lorry are the SAME collision, and both
-    /// are governed by the lighter of the two. Using the heavier would make a truck brushing a
-    /// bollard sound like the end of the world.
+    /// A lorry hitting a can and a can hitting a lorry are the same collision, governed by the lighter of
+    /// the two; the heavier would make a truck brushing a bollard sound like the end of the world.
     /// </summary>
     [Fact]
     public void TheLighterOfTheTwoGovernsIt()
@@ -54,12 +44,11 @@ public class ImpactAndGlassSoundTests
         float canIntoLorry = PanelAcoustics.ImpactJoules(0.02f, 14000f, 10f);
         Assert.Equal(lorryIntoCan, canIntoLorry, 4);
 
-        // ...and it is nearer the can's energy than the lorry's, by a very long way.
+        // Nearer the can's energy than the lorry's, by a long way.
         Assert.True(lorryIntoCan < 0.5f * 0.021f * 100f, $"the can's collision released {lorryIntoCan:F1} J");
     }
 
-    /// <summary>The blow takes the character of the SOFTER of the pair: hitting a carpeted wall is a
-    /// dull thump whatever you hit it with.</summary>
+    /// <summary>The blow takes the character of the softer of the pair: a carpeted wall thumps whatever hits it.</summary>
     [Fact]
     public void TheSofterOfTheTwoDecidesTheBlow()
     {
@@ -68,8 +57,7 @@ public class ImpactAndGlassSoundTests
         Assert.True(soft < hard, $"the carpet came out at {soft:F0} Hz and the concrete at {hard:F0}");
     }
 
-    /// <summary>...and the ring afterwards belongs to whichever of them actually rings, which is why
-    /// a hammer on a bell is a bell.</summary>
+    /// <summary>The ring belongs to whichever of the pair rings: a hammer on a bell is a bell.</summary>
     [Fact]
     public void WhicheverOfThemRingsIsTheOneYouHear()
     {
@@ -77,8 +65,7 @@ public class ImpactAndGlassSoundTests
         Assert.DoesNotContain(Hit(speed: 5f, struck: "Carpet"), s => s.Character == SoundCharacter.Ring);
     }
 
-    /// <summary>Something bolted to the world gives all the energy back; something that can move
-    /// takes some away with it. Same blow, different aftermath.</summary>
+    /// <summary>Something bolted to the world gives all the energy back; something that can move takes some away.</summary>
     [Fact]
     public void AThingThatCanMoveRingsLessThanOneBoltedDown()
     {
@@ -129,11 +116,9 @@ public class ImpactAndGlassSoundTests
     }
 
     /// <summary>
-    /// The whole reason GlassBreak was worth writing: a window shot out five floors up makes two
-    /// sounds most of two seconds apart, from two different places. The break is at the window; the
-    /// glass arrives at the FOOT of the wall. The gap is sqrt(2h/g) — which floor the shot was on.
-    /// Now each is the glass model's own render (GlassFracture), and the landing's starts at the bottom
-    /// edge's fall time, so the first piece to arrive still carries the height.
+    /// A window shot out five floors up makes two sounds most of two seconds apart: the break at the
+    /// window, the glass at the foot of the wall. The gap, sqrt(2h/g), says which floor; each is a
+    /// GlassFracture render, the landing's starting at the bottom edge's fall time.
     /// </summary>
     [Fact]
     public void AWindowUpstairsIsHeardTwiceAndTheGapSaysHowHigh()
@@ -156,8 +141,8 @@ public class ImpactAndGlassSoundTests
         Assert.True(landing.Position.Y < pane.Centre.Y - 5f, "the glass landed at the window it fell out of");
         Assert.Equal(pane.Centre, brk.Position);
 
-        // ...and inside the landing's own render the first piece arrives within a few per cent of the fall
-        // time of its start (drag and the moment it left the frame), so the gap still reads as the floor.
+        // In the landing's render the first piece arrives within a few per cent of its start's fall
+        // time (drag, and when it left the frame), so the gap still reads as the floor.
         var pcm = GlassFracture.Render(l, 48000);
         double peak = pcm.Max(Math.Abs);
         int first = Array.FindIndex(pcm, v => Math.Abs(v) > peak * 0.01);
@@ -203,9 +188,8 @@ public class ImpactAndGlassSoundTests
     }
 
     /// <summary>
-    /// What the glass lands on decides what is heard: on grass a piece meets something with an elastic
-    /// modulus of a few megapascals, a contact of milliseconds instead of microseconds, so the click is dull
-    /// and the piece hardly rings; on concrete both are bright.
+    /// What the glass lands on decides what is heard: grass (a modulus of a few MPa) makes a contact of
+    /// milliseconds instead of microseconds, a dull click and hardly a ring; on concrete both are bright.
     /// </summary>
     [Fact]
     public void GlassOnGrassIsDullerThanOnConcrete()
@@ -216,10 +200,7 @@ public class ImpactAndGlassSoundTests
                     $"above 4 kHz: concrete {EnergyAboveDb(concrete, 4000):F1}, grass {EnergyAboveDb(grass, 4000):F1}");
     }
 
-    /// <summary>
-    /// How much glass there was decides how much is heard: a shop front coming down is not a car's side
-    /// window coming down, by the energy in the whole landing.
-    /// </summary>
+    /// <summary>A shop front coming down carries more energy in its landing than a car's side window.</summary>
     [Fact]
     public void MoreGlassLandsLouder()
     {
@@ -229,10 +210,9 @@ public class ImpactAndGlassSoundTests
     }
 
     /// <summary>
-    /// A piece of glass rings at its own modes, a free plate's: f = lambda^2 / (2 pi a^2) sqrt(D / m''), so
-    /// for one shape the note goes with the thickness. A 3 mm piece rings an octave under a 6 mm one of the
-    /// same size, and it keeps ringing: glass loses almost nothing (the recordings' pieces on cement ring with
-    /// a loss factor near 0.0006), so a single drop is still there a tenth of a second later.
+    /// A piece rings at a free plate's modes, f = lambda^2 / (2 pi a^2) sqrt(D / m''): a 3 mm piece an
+    /// octave under a 6 mm one of the same size. It keeps ringing: the recordings' pieces on cement have
+    /// a loss factor near 0.0006, so a drop is still there a tenth of a second later.
     /// </summary>
     [Fact]
     public void ADroppedPieceRingsAtItsPlateModes()
@@ -262,9 +242,8 @@ public class ImpactAndGlassSoundTests
     }
 
     /// <summary>
-    /// Laminated glass keeps the pane: a hole and no fall at all, a very distinctive absence that tells a
-    /// listener something about the building. Its interlayer damps the pane, so the hole dies away far
-    /// quicker than one through plain glass.
+    /// Laminated glass keeps the pane: a hole and no fall at all. Its interlayer damps the pane, so the
+    /// hole dies away far quicker than one through plain glass.
     /// </summary>
     [Fact]
     public void LaminatedGlassTakesAHoleAndKeepsThePane()
@@ -281,9 +260,9 @@ public class ImpactAndGlassSoundTests
     }
 
     /// <summary>
-    /// The round's crack is the point-driven plate's own pulse, rho0 F / (2 pi m'' r) (Cremer and Heckl), and
-    /// not a spike over it: the pane's modes start from nothing and add their swing, they are not all at their
-    /// peak together at t = 0 (they were, and an intact pane shot through came out 10 dB over its own force).
+    /// The round's crack is the point-driven plate's pulse, rho0 F / (2 pi m'' r) (Cremer and Heckl), not a
+    /// spike over it: the modes start from nothing. All at their peak at t = 0, a pane shot through came
+    /// out 10 dB over its own force.
     /// </summary>
     [Fact]
     public void TheStrikeIsThePlatesOwnPulse()
@@ -297,10 +276,9 @@ public class ImpactAndGlassSoundTests
     }
 
     /// <summary>
-    /// How much of the falling glass's energy leaves as sound, two ways that share nothing but the contacts: the
-    /// simulation (pieces ringing at their modes, glass's measured loss) and every contact as a point force on
-    /// a plate radiating rho0 F / (2 pi m'' r). They agree within a few decibels, at a few per cent of the energy
-    /// for a house window coming down on concrete, and grass takes most of it away.
+    /// The share of the falling glass's energy that leaves as sound, two ways that share only the contacts:
+    /// the simulation, and each contact as a point force radiating rho0 F / (2 pi m'' r). They agree within
+    /// a few dB, at a few per cent for a house window on concrete; grass takes most of it away.
     /// </summary>
     [Fact]
     public void TheLandingsSoundIsAFewPerCentOfItsEnergyBothWays()
@@ -332,9 +310,8 @@ public class ImpactAndGlassSoundTests
     // ── The named-model escape hatch ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// A gunshot names its own model rather than being flattened into a knock. Four characters
-    /// describe nearly everything; a blast wave with a body resonance, a brightness sweep and an
-    /// action working is one of the few things they cannot, and a model for it already exists.
+    /// A gunshot names its own model rather than being flattened into a knock: a blast wave with a body
+    /// resonance, a brightness sweep and an action working is beyond the four characters.
     /// </summary>
     [Fact]
     public void AGunshotNamesTheModelThatKnowsHowToMakeIt()
@@ -349,7 +326,7 @@ public class ImpactAndGlassSoundTests
         };
 
         Assert.StartsWith("weapon:", shot.SynthKey);
-        // Loud enough to be a gunshot rather than a door, which is the thing the level has to carry.
+        // Loud enough to be a gunshot rather than a door.
         Assert.True(shot.LevelDb > 140f, $"the AKM came out at {shot.LevelDb:F0} dB");
     }
 }

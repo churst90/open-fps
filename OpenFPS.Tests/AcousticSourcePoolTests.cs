@@ -3,10 +3,9 @@ using OpenFPS.Client.AudioEngine.Acoustics;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The Steam Audio source pool (64) filled on the city with every id asked about in the last five
-/// seconds, and the pool was first come, first served: the newest sound was refused and fell back to
-/// the hand-rolled tracer. A full pool now lends out the source that has gone longest unasked — and
-/// never one that is being asked about this tick.
+/// The Steam Audio source pool (64) fills on the city with every id asked about in the last five
+/// seconds. A full pool lends out the source that has gone longest unasked, never one asked about this
+/// tick; first come, first served, the newest sound was refused and fell back to the hand-rolled tracer.
 /// </summary>
 public class AcousticSourcePoolTests
 {
@@ -29,12 +28,11 @@ public class AcousticSourcePoolTests
     }
 
     /// <summary>
-    /// Eighty sources asked about every tick and a pool of 64 (--pop-hunt extra=40, 2026-10-03). Every
-    /// source wanted this tick kept its own, so the sixteen at the back of the line were refused every
-    /// tick, for good, and heard through the hand-rolled tracer — cars behind a building popping between
-    /// -63 and -15 dB as that other model's answer came and went. The line now starts with whoever was
-    /// turned away last tick, the first 64 in it are served, and a source held by someone further back
-    /// is lent forward. Run as the worker runs it: the same helpers, the same order.
+    /// Eighty sources asked about every tick and a pool of 64 (--pop-hunt extra=40, 2026-10-03): the line
+    /// starts with whoever was turned away last tick, the first 64 are served, and a source held by
+    /// someone further back is lent forward. Otherwise the same sixteen are refused every tick and cars
+    /// behind a building pop between -63 and -15 dB through the hand-rolled tracer. Run as the worker runs
+    /// it: the same helpers, the same order.
     /// </summary>
     [Fact]
     public void Nobody_is_turned_away_two_ticks_running()

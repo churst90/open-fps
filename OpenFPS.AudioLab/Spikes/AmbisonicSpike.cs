@@ -1,6 +1,4 @@
-using System;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
 
@@ -11,17 +9,12 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// known direction, decode it binaurally with a given listener orientation, and check which ear it
 /// comes out of.
 ///
-/// This is the test that matters for a P/Invoke layer, because every way of getting it wrong is silent.
-/// A struct field in the wrong order, a coordinate handedness left unconverted, a rotation applied
-/// backwards — none of them return an error. They return audio that is confidently pointing the wrong
-/// way, and by ear that is very nearly indistinguishable from working.
-///
-/// So the assertions are about DIRECTION, not about whether sound came out:
-///   1. A source to the listener's left decodes louder in the LEFT ear.
-///   2. A source to the right decodes louder in the RIGHT ear.
-///   3. Turning the listener 180° swaps which ear a fixed source arrives in. This is the whole reason
-///      the beds are ambisonic instead of binaural recordings, so it is the assertion that earns its
-///      keep: a head-locked recording would fail it while sounding perfectly fine.
+/// Every P/Invoke mistake here is silent (a struct field out of order, handedness unconverted, a rotation
+/// backwards): it returns audio pointing the wrong way. So the checks are about direction:
+///   1. A source to the listener's left decodes louder in the left ear.
+///   2. A source to the right decodes louder in the right ear.
+///   3. Turning the listener 180° swaps which ear a fixed source arrives in (a head-locked recording
+///      would fail this while sounding fine).
 ///   4. Facing the source head-on leaves the ears balanced.
 /// </summary>
 public static class AmbisonicSpike
@@ -147,8 +140,7 @@ public static class AmbisonicSpike
         {
             for (int b = 0; b < blocks; b++)
             {
-                // Broadband-ish: a 440 Hz tone plus a little noise, so the HRTF has something to work
-                // with across the spectrum rather than one frequency it might notch.
+                // A tone plus a little noise, so one notched frequency cannot decide it.
                 var rnd = new Random(1000 + b);
                 for (int i = 0; i < FrameSize; i++)
                 {

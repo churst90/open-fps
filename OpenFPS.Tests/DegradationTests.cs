@@ -12,23 +12,17 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for step 3 of the engineering audit — "make every degradation loud".
-///
-/// The defects these pin down all shared one shape: a component that could not do its job answered with
-/// something that looked like success. Steam Audio failing a tick reported *zero occlusion for every
-/// source* — every wall in the level vanishing, silently. A CPU without AVX2 was handed an AVX2 context.
-/// A missing phonon library left the game running with the spatial audio it exists for quietly switched
-/// off. None of those threw; none of them logged.
+/// "Make every degradation loud" (step 3 of the engineering audit): a component that cannot do its job
+/// must not answer with something that looks like success, as a failed Steam Audio tick reporting zero
+/// occlusion everywhere, an AVX2 context on a CPU without it, or a missing phonon library once did.
 /// </summary>
 public class DegradationTests
 {
     // ── The Steam Audio fallback ────────────────────────────────────────────────────────────────
-    // These run with no phonon library next to the test assembly, so the worker takes exactly the path a
-    // client takes when Steam Audio is unavailable: the hand-rolled ray-tracer. The contract under test is
-    // that this path produces a REAL acoustic answer, not a clear one.
+    // No phonon library here, so the worker takes the hand-rolled tracer, which must give a real answer,
+    // not a clear one.
 
-    // Two rooms in maps/default.json, joined by an authored portal — the wall between them is what an
-    // occlusion result has to notice. (Same landmarks PortalPipelineTests uses.)
+    // Two rooms in maps/default.json joined by a portal (PortalPipelineTests' landmarks).
     private static readonly Vector3 RoomACentre = new(-7, 2, 15);
     private static readonly Vector3 RoomBCentre = new(7, 2, 15);
 
@@ -81,8 +75,7 @@ public class DegradationTests
     [Fact]
     public void OccludedSource_GetsATracedPath_NotAClearOne()
     {
-        // A source in the next room, behind a wall. Reporting Occlusion 0 here is the precise bug: it tells
-        // the player, by ear, that nothing is between them and the sound.
+        // A source in the next room, behind a wall: Occlusion 0 here was the bug.
         var paths = ResolvePaths(RoomACentre, RoomBCentre, entityId: 4242);
 
         Assert.NotEmpty(paths);
@@ -95,8 +88,7 @@ public class DegradationTests
     [Fact]
     public void UnoccludedSource_IsNotReportedAsBlocked()
     {
-        // The complement: the fallback must not be a blanket "everything is occluded" either. A source a
-        // couple of metres away in open space, with clear line of sight.
+        // Nor a blanket "everything is occluded": a source 1.5 m away in clear sight.
         var paths = ResolvePaths(RoomACentre, RoomACentre + new Vector3(1.5f, 0, 0), entityId: 4243);
 
         var direct = paths.First(p => !p.IsReflection);
@@ -107,8 +99,8 @@ public class DegradationTests
     [Fact]
     public void EveryRequestedSource_GetsAResult()
     {
-        // Before the fix, a source the simulator had no answer for (exhausted source pool, failed tick)
-        // was handed DirectResult.Clear. Now every requested source is answered by *something real*.
+        // A source the simulator has no answer for (exhausted pool, failed tick) is answered by
+        // something real, never DirectResult.Clear.
         var snapshot = LoadedWorld.Value.GetSnapshot();
         using var worker = new AsyncAcousticWorker(new SpatialAcoustics());
         worker.UpdateWorld(snapshot);
@@ -127,9 +119,7 @@ public class DegradationTests
 
             if (Enumerable.Range(0, sources).All(i => worker.TryGetResult(5000 + i, out _)))
             {
-                // "Degraded" means Steam Audio is running but not covering every source. With no phonon
-                // library present it never started, so there is nothing to report as degraded — a health
-                // flag that cried wolf on every machine without the library would be useless.
+                // "Degraded" means Steam Audio running but not covering every source; it never started here.
                 Assert.False(worker.IsDegraded);
                 Assert.False(worker.SteamAudioActive);
                 return;
@@ -219,9 +209,8 @@ public class DegradationTests
     [Fact]
     public void FailedConnect_IsReportedAsSpeakableText()
     {
-        // Port 1 on the loopback has nothing listening, so LiteNetLib exhausts its connect attempts and
-        // reports ConnectionFailed. Before this step that arrived as an empty handler body: the client
-        // simply sat on the menu forever with nothing said.
+        // Nothing listens on loopback port 1, so LiteNetLib reports ConnectionFailed, which once went
+        // to an empty handler and left the client silent on the menu.
         var net = new ClientNetworkService();
         string? reported = null;
         net.OnConnectionFailed += r => reported ??= r;
@@ -244,8 +233,7 @@ public class DegradationTests
     [Fact]
     public void SendWithoutAConnection_DoesNotThrow()
     {
-        // It logs the drop rather than pretending the message went out — and, crucially, never takes the
-        // client down mid-session.
+        // It logs the drop and never takes the client down mid-session.
         var net = new ClientNetworkService();
         net.Start();
         net.Send(new TextCommand { Command = "ready" });

@@ -1,19 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Common;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// Is the flat's traced tail boomy, or is it the rendering? The listener's trace of flat 01F, read
-/// back as the game reads it, per octave: its decay (T20, Schroeder) and its late energy, against
-/// Sabine and Eyring from the flat's real surfaces and the material table's band absorption.
-///
-///   --tail-bands
+/// --tail-bands [bare] [corridor]: is the flat's traced tail boomy, or is it the rendering? Flat 01F's
+/// listener trace read back as the game reads it, per octave (T20, late energy), against Sabine and
+/// Eyring from its surfaces and the material table. bare leaves the sofa out; corridor is a 60 m one.
 /// </summary>
 public static class TailBandsSpike
 {
@@ -37,8 +31,7 @@ public static class TailBandsSpike
             new(new Vector3(0, 1.4f, -9.0f), new Vector3(W, 2.73f, 0.2f), Q, "Plaster"),
             new(new Vector3(0, 1.4f, 9.0f), new Vector3(W, 2.73f, 0.2f), Q, "Plaster"),
         };
-        // The sofa, as in the research's flat: soft furnishing scatters the sideways-running sound into
-        // the absorbent floor. args "bare" leaves it out.
+        // The research flat's sofa: soft furnishing scatters the sideways-running sound into the absorbent floor.
         if (!args.Contains("bare")) boxes.Add(new(new Vector3(3.2f, 0.32f, -3.4f), new Vector3(1.8f, 0.6f, 1.8f), Q, "Audience"));
         var ear = new Vector3(0.175f, 1.7f, 0.16f);
         if (args.Contains("corridor"))

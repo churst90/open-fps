@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core;
@@ -13,7 +10,6 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -341,8 +337,8 @@ public class MapTrackerTests
 
     // ── E and the things on the ground (PickUp) ─────────────────────────────────────────────────
     //
-    // In this class, not their own, because the tracker's category is a process-wide setting
-    // (NavigationAids.Track) and tests in one class run one at a time.
+    // Here, not in a class of their own: the tracker's category is process-wide (NavigationAids.Track) and
+    // one class's tests run one at a time.
 
     private static PickUp.Loose L(int id, string name, float d, string dir, bool front) => new(id, name, d, dir, front);
 

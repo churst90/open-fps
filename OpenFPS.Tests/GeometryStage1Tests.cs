@@ -1,19 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
 using OpenFPS.Common.Geometry;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Geometry stage 1 (docs/GEOMETRY.md): the triangle world answers what the box tests answered, on the
-/// server and every client alike, and builds again only what changed. The parity harness (AudioLab
-/// --geometry-parity) runs the same comparisons on the shipped maps; these hold the rules on small
-/// scenes made to hit them.
+/// Geometry stage 1 (docs/GEOMETRY.md): the triangle world answers as the box tests did and rebuilds only
+/// what changed, on small scenes made to hit each rule (AudioLab --geometry-parity runs the shipped maps).
 /// </summary>
 public class GeometryStage1Tests
 {

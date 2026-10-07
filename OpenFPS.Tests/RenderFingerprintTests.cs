@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -17,23 +13,16 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The render fingerprint (docs/SOUND_LIBRARY_BOUNDARY.md, stage 0): a fixed set of offline sounds,
-/// rendered through the library exactly as the game's models make them, hashed, and compared with the
-/// hashes stored in OpenFPS.Tests/LibraryBoundary/render-fingerprints.tsv.
+/// The render fingerprint (docs/SOUND_LIBRARY_BOUNDARY.md, stage 0): a fixed set of deterministic offline
+/// renders, made as the game's models make them, hashed and compared with
+/// OpenFPS.Tests/LibraryBoundary/render-fingerprints.tsv, so the library's moves change no bit of a sound.
 ///
-/// It is there for the library's moves: a file moved to another project, a type moved out of a file, a
-/// static turned into an instance must not change one bit of what the models render. Every render here
-/// is deterministic (fixed seeds, no clock, no thread-count dependence); the ones that are not are left
-/// out and listed in the document.
+/// Bits depend on the platform's libm too, so the file stores a fingerprint of the maths
+/// (<see cref="MathsProbe"/>): where it matches, every render must match to the bit; elsewhere renders are
+/// compared by level every 4096 samples, and the test says so.
 ///
-/// Bits depend on the maths library as well as the code: MathF.Sin and the rest come from the platform's
-/// libm, and two glibc versions can round differently. So the file also stores a fingerprint of the maths
-/// (<see cref="MathsProbe"/>). Where the maths match the machine the hashes were made on, every render
-/// must match to the bit. Where they do not (another distribution, Windows), the renders are compared by
-/// level instead, every 4096 samples, and the test says so.
-///
-/// An intended change to a sound changes its hash. Regenerate in the same commit as the change, and say
-/// why in the commit message: OPENFPS_FINGERPRINT_WRITE=1 dotnet test --filter RenderFingerprintTests.
+/// An intended change to a sound regenerates in the same commit, saying why:
+/// OPENFPS_FINGERPRINT_WRITE=1 dotnet test --filter RenderFingerprintTests.
 /// </summary>
 public class RenderFingerprintTests
 {
@@ -257,11 +246,8 @@ public class RenderFingerprintTests
         return new LevelDiff(within, worst, blocks);
     }
 
-    /// <summary>
-    /// A fingerprint of this machine's floating-point maths: the bits of every libm function the models
-    /// call, over a spread of arguments, and the width of the runtime's vectors. Two machines with the same
-    /// probe render the same bits from the same code.
-    /// </summary>
+    /// <summary>A fingerprint of this machine's floating-point maths: the bits of every libm function the
+    /// models call over a spread of arguments, and the runtime's vector width.</summary>
     internal static string MathsProbe()
     {
         var sb = new StringBuilder();
@@ -341,8 +327,8 @@ public class RenderFingerprintTests
     [Fact]
     public void EveryRenderIsTheSameTwice()
     {
-        // What makes a fingerprint possible at all: the same render twice in one process, bit for bit.
-        // The cheap ones; the doors and the engine are the same code paths seeded the same way.
+        // The same render twice in one process, bit for bit, on the cheap renders (the doors and engine share
+        // these code paths and seeding).
         foreach (var name in new[] { "rain.steel", "siren.patrol.wail", "clap.dry", "door.car.close" })
             Assert.Equal(Hash(RenderPinned(Renders[name])), Hash(RenderPinned(Renders[name])));
     }

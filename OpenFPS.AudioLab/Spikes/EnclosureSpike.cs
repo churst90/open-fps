@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using OpenFPS.Common;
@@ -14,16 +10,11 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 ///
 ///   --enclosure [map=city] [at=x,y,z] [walk=x0,z0:x1,z1] [step=2] [head=1.6] [dist=1.6]
 ///
-/// This exists because "the reverb clicks in when I step into an area and pops when I step out" is a
-/// statement about a NUMBER, and until now there was no way to read that number anywhere but from a
-/// running game. It loads the shipped map, builds its solid boxes exactly as the acoustic worker
-/// does, and prints the survey at a point — or along a walk, a step at a time, which is the form that
-/// shows a number JUMPING.
-///
-/// The last column is the one that matters: the reverb send a source at <c>dist</c> metres would be
-/// given (Enclosure.ReverberantToDirectPower), which is what your own footsteps get. Over 100 % means
-/// the room answers louder than the sound itself, and a figure that swings as you walk is heard as a
-/// pop whatever its average is.
+/// For "the reverb clicks in when I step into an area and pops when I step out": the shipped map's
+/// solid boxes built as the acoustic worker builds them, and the survey at a point or a step at a time
+/// along a walk, which shows a number jumping. The last column is the reverb send a source at
+/// <c>dist</c> metres gets (Enclosure.ReverberantToDirectPower), as your own footsteps do: over 100 %
+/// the room answers louder than the sound, and a figure that swings as you walk is heard as a pop.
 /// </summary>
 public static class EnclosureSpike
 {
@@ -37,10 +28,8 @@ public static class EnclosureSpike
 
         string? mapPath = OpenFPS.AudioLab.LabPaths.Existing(OpenFPS.AudioLab.LabPaths.Server("maps", mapId + ".json"))
                        ?? OpenFPS.AudioLab.LabPaths.Existing(Path.Combine(AppContext.BaseDirectory, "maps", mapId + ".json"));
-        // BESIDE THE MAP, always. There is an empty `prefabs/` at the repo root, and searching for the
-        // name alone found that one and built a world out of nothing — 0 solid boxes, every place on
-        // the map reading as open field. The prefabs a map is made of are the ones the server loads
-        // next to it.
+        // The prefabs beside the map, always: an empty `prefabs/` at the repo root once built a world of
+        // no solid boxes, every place reading as open field.
         string? prefabDir = mapPath == null ? null
             : Path.Combine(Directory.GetParent(mapPath)!.Parent!.FullName, "prefabs");
         if (prefabDir != null && !Directory.Exists(prefabDir)) prefabDir = null;
@@ -85,9 +74,8 @@ public static class EnclosureSpike
             else points.Add(("spawn", spawn + new Vector3(0, head, 0)));
         }
 
-        // The decay's COLOUR as well as its length: a tail that loses its top four times faster than
-        // its middle is heard as muffled however long it is, and that is a fact about the materials
-        // the rays struck rather than about the size of the place.
+        // The decay's colour as well as its length: a tail losing its top four times faster than its
+        // middle is muffled however long it is.
         Console.WriteLine("       where          enclosure   open    mfp   surface   decay lo/mid/hi ms   absorption lo/mid/hi   send at " + dist.ToString("F1") + " m");
         float lastSend = -1f;
         foreach (var (label, at) in points)

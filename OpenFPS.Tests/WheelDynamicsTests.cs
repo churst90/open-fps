@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -135,13 +131,6 @@ public class WheelDynamicsTests
     }
 
     // ── Corners ───────────────────────────────────────────────────────────────────────────────
-
-    private static List<Vector3> Circle(float r, int n = 72)
-        => Enumerable.Range(0, n).Select(k =>
-        {
-            double a = 2 * Math.PI * k / n;
-            return new Vector3((float)(r * Math.Sin(a)), 0f, (float)(r * Math.Cos(a)));
-        }).ToList();
 
     /// <summary>
     /// A steady corner taken faster and faster (a 50 m radius, the steady state at each speed): the

@@ -206,3 +206,15 @@ Done: the block, and rooms that measure themselves. Next, in the order of the ci
 And the two machines that now exist and are not yet placeable (`docs/YARD_MACHINES.md`): a condenser
 unit belongs on the garage roof and a mower in the strip behind the west block, and both need the
 client voice path a stationary machine does not have yet.
+
+## Footfalls answered by the walls
+
+Reported from the chair, walking the city's car park: *"a parking garage is big, this sounds like a
+box... rather than reflections being emitted from the walls, it's like the whole room is reverby... it
+surrounds me rather than being directional. I should hear reflections from a wall, from the wall's
+direction, not an all around reflection from everywhere at once."* That is what a direct sound plus a
+diffuse tail with nothing in between sounds like: the near-field probes covered the last three metres
+and the diffuse bus the tail, and everything from three metres to the size of the room was missing,
+which in a 21 by 28 m garage is the whole room. StepReflectionTests hold what the early arrivals must
+be for a room to have a shape: a low ceiling answers soon and from above, a far wall later and from
+its own direction, and neither is louder than the step it copies.

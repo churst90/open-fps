@@ -1,37 +1,23 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// "The steel doors on the apartments make no sound — it just says the steel door swings open."
-///
-/// The door model was never the problem: a steel leaf's opening and closing were worked out on the
-/// server and sent like any other door's. What happened to them was on the client. A sound heard for
-/// the first time was rendered on a worker and the event that asked for it was DROPPED, and every
-/// sound comes in four seed variants — so anything rare was a first hearing, and silent, for its first
-/// handful of uses. Four hundred wooden doors wore their sounds in within minutes; the city's seven
-/// steel ones, each its own size, never did.
-///
-/// So this drives a real steel door on the real city from a client that has heard nothing yet, and
-/// asks that the FIRST opening and the FIRST closing both reach the mixer.
+/// "The steel doors on the apartments make no sound — it just says the steel door swings open." A
+/// sound heard for the first time was rendered on a worker and its event dropped, so the city's seven
+/// steel doors (rare, each its own size, four seed variants) were silent for their first uses. A real
+/// steel door on the city, from a client that has heard nothing: the first opening and the first
+/// closing both reach the mixer.
 /// </summary>
 public class SteelDoorSoundTests
 {
@@ -98,14 +84,12 @@ public class SteelDoorSoundTests
         public void UpdateShelter(float f) { }
         public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes) { }
         public bool PlayAmbientBed(string id, AmbisonicLayout l, float v, bool loop = true) => true;
-        public void SetAmbientBedVolume(string id, float v) { }
         public void StopAmbientBed(string id) { }
         public void SetAcousticMap(AcousticMap map) { }
         public void PlaySpatialSound(SpatialEmitter e) { Emitters.Add(e); _live.Add(e.EntityId); }
         public void UpdateSpatialAttributes(SpatialEmitter e) { }
         public void SetAcousticPath(int id, AcousticPathData p) { }
         public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) { }
-        public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres, float surfaceAreaSquareMetres = 0f) { }
         public void SetAirTemperature(float c) { }
         public float MixerLoad => 0f;
         public void ReviveEngine(int id) { }
@@ -116,7 +100,6 @@ public class SteelDoorSoundTests
         public void StopSound(int id) => _live.Remove(id);
         public bool IsPlaying(int id) => _live.Contains(id);
         public Vector3 GetSoundPosition(int id) => Vector3.Zero;
-        public float GetPlaybackProgress(int id) => 0f;
         public IEnumerable<int> GetActiveSpatialSoundIds() => new List<int>(_live);
         public void Preload(string id) { }
         public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;

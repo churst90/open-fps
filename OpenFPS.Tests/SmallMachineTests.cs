@@ -1,26 +1,12 @@
-using System;
-using System.Linq;
-using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Yard;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The machinery that stands in a garden and runs: mowers and air conditioners.
-///
-/// These hold the four claims the models are built on, each of which is arithmetic that a listener
-/// would take a long time to catch by ear and that a refactor could break in silence:
-///
-///   the governor trades SPEED for throttle and cannot hold its setting under load — that sag is the
-///   bog, and without it a mower in thick grass sounds like a mower on a path;
-///   a mower blade is bolted to the crankshaft, so its blade-passing tone is locked to the engine's
-///   firing and the machine is one sound rather than two beating;
-///   a compressor hums at twice the MAINS, not at anything the machine is doing, which is why every
-///   air conditioner on a street hums the same note and why a European one hums a tone lower;
-///   and the cutting hiss is worth what half m v squared says it is worth, which is far less than
-///   anyone expects.
+/// Mowers and air conditioners, held to the arithmetic a refactor could break in silence: the governor
+/// trades speed for throttle (the bog), the blade is locked to the engine's firing, a compressor hums at
+/// twice the mains, and the cutting hiss is worth what half m v squared says.
 /// </summary>
 public class SmallMachineTests
 {
@@ -36,7 +22,7 @@ public class SmallMachineTests
             var s = SmallMachineSpec.ByName(key);
             Assert.False(string.IsNullOrWhiteSpace(s.Name));
             Assert.True(s.SourceLevelDb > 30f, $"{key} declares {s.SourceLevelDb} dB");
-            // Petrol machinery is governed. Anything else here is a fan and a compressor.
+            // Petrol machinery is governed; the rest are fans and compressors.
             if (s.EngineKey != null)
             {
                 Assert.NotNull(s.Governor);
@@ -47,11 +33,8 @@ public class SmallMachineTests
     }
 
     /// <summary>
-    /// The governor gives up speed to open the throttle, and that is the whole of the bog.
-    ///
-    /// A proportional controller with no integral term CANNOT return to its setting under load: it
-    /// can only trade. So the throttle is shut at the setting, wide open a full droop below it, and
-    /// the machine's rpm under load is the readout of how hard it is working.
+    /// The governor gives up speed to open the throttle: that is the bog. A proportional controller with
+    /// no integral term cannot return to its setting under load, so rpm under load reads how hard it works.
     /// </summary>
     [Fact]
     public void AGovernorTradesSpeedForThrottleAndCannotHoldItsSetting()
@@ -62,7 +45,7 @@ public class SmallMachineTests
         Assert.Equal(1f, g.Throttle(2900f * (1f - 0.09f)), 3);       // a full droop down: wide open
         Assert.InRange(g.Throttle(2900f - 0.5f * 0.09f * 2900f), 0.45f, 0.55f);   // half way: half open
 
-        // ...and monotone, because a governor that was not would hunt for ever.
+        // Monotone: a governor that was not would hunt for ever.
         float last = 0f;
         for (float rpm = 2900f; rpm > 2500f; rpm -= 25f)
         {
@@ -73,8 +56,8 @@ public class SmallMachineTests
     }
 
     /// <summary>
-    /// Thick grass pulls a mower's speed down and the governor brings it back, and both take about
-    /// as long as they should. Run against the model rather than the controller: this is the sound.
+    /// Thick grass pulls a mower's speed down and the governor brings it back, each in about the right
+    /// time; run on the model, not the controller, since this is the sound.
     /// </summary>
     [Fact]
     public void ThickGrassBogsTheMowerAndItRecovers()
@@ -101,10 +84,8 @@ public class SmallMachineTests
     }
 
     /// <summary>
-    /// The MEAN speed over a second, which is the only honest way to ask a single-cylinder engine
-    /// how fast it is going. A thumper's crank speed ripples enormously between firings — a hundred
-    /// rpm either way at 2,800 — so one instant is a coin toss, and a test written on one instant
-    /// fails at random. (It did.)
+    /// The mean speed over a stretch: a single's crank ripples a hundred rpm either way at 2,800 between
+    /// firings, and a test written on one instant failed at random.
     /// </summary>
     private static float MeanRpm(SmallMachineSynth synth, float seconds)
     {
@@ -121,9 +102,8 @@ public class SmallMachineTests
     }
 
     /// <summary>
-    /// The blade is bolted to the crankshaft, so the machine has ONE rotating speed. A gear ratio
-    /// that quietly stopped being 1 would give a mower a second, beating note and nobody would know
-    /// where it came from.
+    /// The blade is bolted to the crankshaft, so the machine has one rotating speed; a ratio that stopped
+    /// being 1 would give a mower a second, beating note.
     /// </summary>
     [Fact]
     public void AMowerBladeTurnsAtEngineSpeed()
@@ -135,17 +115,15 @@ public class SmallMachineTests
         for (int i = 0; i < (int)(Sr * 8); i++) synth.Step();
         Assert.Equal(synth.Rpm, synth.BladeRpm, 0);
 
-        // Two tips, so the blade passes twice a revolution: the SECOND order of an engine that fires
-        // once every two. The two are locked and that is why a mower is one sound.
+        // Two tips pass twice a revolution: the second order of an engine that fires once every two,
+        // locked to it, so a mower is one sound.
         float bladePass = spec.Blade!.BladePassHz(synth.BladeRpm);
         float firing = synth.Rpm / 60f / 2f;      // a four-stroke single fires once per two turns
         Assert.Equal(4f, bladePass / firing, 1);
     }
 
-    /// <summary>
-    /// A compressor hums at twice the LINE frequency. Not twice the shaft, not the shaft — the
-    /// mains. Everything else about the machine can change and this note cannot.
-    /// </summary>
+    /// <summary>A compressor hums at twice the mains frequency, not at the shaft: every air conditioner
+    /// on a street hums the same note, and a European one a tone lower.</summary>
     [Fact]
     public void TheHumIsTheMainsAndNotTheMachine()
     {
@@ -155,8 +133,8 @@ public class SmallMachineTests
         var european = american with { LineHz = 50f };
         Assert.Equal(100f, european.HumHz, 1);
 
-        // The pump is the shaft and is NOT the hum: a couple of per cent of slip puts it well clear,
-        // and the beat between the two is what stops a compressor sounding like a transformer.
+        // The pump is the shaft, not the hum: a few per cent of slip puts it clear, and the beat between
+        // them stops a compressor sounding like a transformer.
         Assert.True(MathF.Abs(american.PulsationHz - american.HumHz) > 30f,
             $"pumping {american.PulsationHz:F0} Hz against a {american.HumHz:F0} Hz hum");
         Assert.InRange(american.ShaftRpm, 3300f, 3550f);
@@ -165,10 +143,7 @@ public class SmallMachineTests
         Assert.True(european.ShaftRpm < american.ShaftRpm * 0.88f);
     }
 
-    /// <summary>
-    /// The fan runs on when the compressor stops, which is the sound everybody knows and nobody can
-    /// name. It has to be audible in the model, not just representable.
-    /// </summary>
+    /// <summary>The fan runs on, audibly, when the compressor stops.</summary>
     [Fact]
     public void TheFanRunsOnWhenTheCompressorIsSatisfied()
     {
@@ -186,13 +161,8 @@ public class SmallMachineTests
     }
 
     /// <summary>
-    /// The cutting hiss is worth what half m v squared says, which is far less than the guess.
-    ///
-    /// Five milligrams at eighty metres a second is sixteen millijoules. Through the same impact
-    /// constant as every other struck thing in the engine that is a tick in the fifties, and against
-    /// a machine in the nineties it is a detail and not the event. Held here BECAUSE it is
-    /// counter-intuitive: the next person to hear a mower and think the grass should be louder can
-    /// read this and see that the difference they are hearing is the engine bogging.
+    /// The cutting hiss is worth what half m v squared says: 5 mg at 80 m/s is 16 mJ, a tick in the
+    /// fifties of dB against a machine in the nineties. Grass that seems too quiet is the engine bogging.
     /// </summary>
     [Fact]
     public void CuttingIsAsQuietAsTheEnergyArithmeticSaysItIs()
@@ -201,13 +171,13 @@ public class SmallMachineTests
         float tip = SmallMachineSpec.PushMower.Blade!.TipSpeed(SmallMachineSpec.PushMower.Blade!.RpmMax);
         Assert.InRange(c.ImpactDb(tip), 50f, 64f);
 
-        // Twice the speed is four times the energy is six decibels. Same ratio as a slam.
+        // Twice the speed is four times the energy: 6 dB.
         Assert.Equal(6f, c.ImpactDb(2f * tip) - c.ImpactDb(tip), 1);
     }
 
     /// <summary>
-    /// A mower standing still with the blade spinning cuts nothing. The rate is grass ARRIVING, so
-    /// it falls out that stopping to turn round stops the hiss without stopping the machine.
+    /// A mower standing still cuts nothing: the rate is grass arriving, so stopping to turn round stops
+    /// the hiss but not the machine.
     /// </summary>
     [Fact]
     public void AMowerStandingStillCutsNothing()
@@ -227,9 +197,8 @@ public class SmallMachineTests
     }
 
     /// <summary>
-    /// Every machine makes what it says it makes, within three decibels, measured the way
-    /// <c>--yard levels</c> measures it. A declared level that has drifted from the model is how a
-    /// machine ends up in the wrong place against everything else on a map.
+    /// Every machine renders its declared level within 3 dB, measured as <c>--yard levels</c> does; a
+    /// drifted level puts a machine in the wrong place against the rest of a map.
     /// </summary>
     [Theory]
     [InlineData("mower_push")]
@@ -256,9 +225,8 @@ public class SmallMachineTests
     }
 
     /// <summary>
-    /// The sheet-metal parts are STEEL, which the registry spells "Metal". Asking it for "Steel"
-    /// gets Generic — 1,200 kg/m^3 and 5 GPa, a plastic — and says nothing about it, and a deck with
-    /// the modes of a bucket is not a thing anybody would catch by ear.
+    /// The sheet-metal parts are steel, which the registry spells "Metal": "Steel" silently gets Generic
+    /// (1,200 kg/m^3 and 5 GPa, a plastic), a deck with the modes of a bucket.
     /// </summary>
     [Fact]
     public void TheMetalPartsAreActuallyMetal()
@@ -279,10 +247,7 @@ public class SmallMachineTests
         }
     }
 
-    /// <summary>
-    /// A machine can leave C#: written out as JSON and read back, it is the same machine. Same claim
-    /// as the trains and horns, and the reason a city map can carry its own air conditioner.
-    /// </summary>
+    /// <summary>A machine written out as JSON and read back is the same machine, so a map can carry its own.</summary>
     [Fact]
     public void AMachineSurvivesTheRoundTrip()
     {

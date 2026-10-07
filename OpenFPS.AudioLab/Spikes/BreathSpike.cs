@@ -1,32 +1,14 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// Breathing, rendered on its own so it can be judged on its own.
-///
-///   --breath [effort=0..1] [seconds=40] [out=path]
-///
-/// Written because of a report that took six sessions to get to: *"it is 2 different bangs so it
-/// makes me think it's breathing in and out... I don't hear the breathing either... can you play the
-/// breathing sound for me so I can hear it and I'll tell you?"*
-///
-/// Everything about that fits. Two alternating sounds, an inhale brighter and shorter than the
-/// exhale; they start after effort and go on for the best part of a minute after it stops, which is
-/// what <see cref="Breathing.RecoverySeconds"/> is for; and they were in the log all along as
-/// `recv 'breath out' ... Hiss 507 Hz 36 dB`. If a breath renders as a thump rather than as air, a
-/// listener hears exactly what was described: banging, and no breathing.
-///
-/// So this runs the real <see cref="Breathing"/> model at a given effort, renders every breath it
-/// takes through the real <see cref="TransientSynth"/>, and lays them out at their own times and
-/// their own levels. Nothing is a stub. It also prints what each one WAS, so "that is not a breath"
-/// can be answered with the numbers that made it.
+/// --breath [effort=0..1] [seconds=40] [out=path]: the real <see cref="Breathing"/> model at an effort,
+/// every breath rendered through the real <see cref="TransientSynth"/> and laid out at its own time and
+/// level, each one's parameters printed. Breaths go on long after effort stops
+/// (<see cref="Breathing.RecoverySeconds"/>). docs/CLIENT_NOTES.md, "A breath is turbulence".
 /// </summary>
 public static class BreathSpike
 {
@@ -42,8 +24,7 @@ public static class BreathSpike
         var lungs = new Breathing();
         var taken = new List<(float At, Breath B)>();
 
-        // Run hard for a third of the time, then stand still. The tail is the point: breathing
-        // outlasts the running, which is what puts breaths seconds after you have stopped moving.
+        // Hard for a third of the time, then still: breathing outlasts the running.
         const float dt = 1f / 60f;
         float runUntil = seconds / 3f;
         for (float t = 0; t < seconds; t += dt)
@@ -59,7 +40,6 @@ public static class BreathSpike
             Console.WriteLine($"    {at,7:F2} s   {(b.IsInhale ? "in " : "out")}    {b.LevelDb,5:F1} dB   "
                             + $"{b.Hz,5:F0} Hz   {b.DecaySeconds * 1000f,4:F0} ms");
 
-        // ...and lay them out as they happened, each at its own level against the others.
         var mix = new float[(int)((seconds + 2f) * Sr)];
         foreach (var (at, b) in taken)
         {
@@ -69,8 +49,8 @@ public static class BreathSpike
                 LevelDb = b.LevelDb, Hz = b.Hz, DecaySeconds = b.DecaySeconds, Noisiness = 1f,
             }, seed: (int)(at * 1000f));
 
-            // TransientSynth normalises what it renders, so the LEVEL has to be applied here — the
-            // same way the mixer applies it, as a gain against the loudest breath there can be.
+            // TransientSynth normalises its render, so the level is applied here as the mixer does,
+            // against the loudest breath there can be.
             float gain = MathF.Pow(10f, (b.LevelDb - Breathing.MaxLevelDb) / 20f);
             int start = (int)(at * Sr);
             for (int i = 0; i < one.Length && start + i < mix.Length; i++) mix[start + i] += one[i] * gain;
@@ -80,13 +60,8 @@ public static class BreathSpike
         foreach (var v in mix) peak = MathF.Max(peak, MathF.Abs(v));
         if (peak > 0f) { float g = 0.89f / peak; for (int i = 0; i < mix.Length; i++) mix[i] *= g; }
 
-        // ── What shape is it, before anybody plays it ───────────────────────────────────────────
-        //
-        // The rule this project learned from the footsteps (`synthesis-failures`): measure the band
-        // balance BEFORE listening, because "that does not sound like X" is a question about the
-        // spectrum and the ear is slow at answering it. A breath is TURBULENCE — air tearing past a
-        // narrow opening — and turbulence is broadband. If most of the energy is in one band, what is
-        // being rendered is not a breath, it is a thump with a breath's name on it.
+        // ── Band balance, measured before anybody listens ───────────────────────────────────────
+        // A breath is turbulence and broadband; most of its energy in one band is a thump, not a breath.
         var exhale = TransientSynth.Render(new TransientSound
         {
             Character = SoundCharacter.Hiss, LevelDb = 50f, Hz = 500f, DecaySeconds = 0.3f, Noisiness = 1f,

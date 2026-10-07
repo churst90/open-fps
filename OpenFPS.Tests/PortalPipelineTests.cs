@@ -10,14 +10,9 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// End-to-end cover for the portal pipeline: map JSON -> PrefabRepository/MapManager -> ECS components
-/// -> streamed EntityDefinition -> client-side AcousticMap.
-///
-/// This existed because every stage of that chain silently dropped authored portals: the `portal` prefab
-/// carried no portal fields, so PrefabRepository never attached a PortalComponent, so MapManager's linking
-/// pass (which only wrote into an existing component) had nothing to write into, so every EntityDefinition
-/// reported ApertureSize 0, so AcousticVolumeGenerator registered no portals at all. Nothing threw and
-/// nothing logged; the only symptom was that room reverb arrived from the wrong wall.
+/// The portal pipeline end to end: map JSON -> PrefabRepository/MapManager -> ECS components -> streamed
+/// EntityDefinition -> client-side AcousticMap. Every stage once dropped authored portals silently (the
+/// prefab had no portal fields), and the only symptom was room reverb arriving from the wrong wall.
 /// </summary>
 public class PortalPipelineTests
 {
@@ -33,8 +28,7 @@ public class PortalPipelineTests
 
     private static LoadedMap LoadDefaultMap()
     {
-        // maps/ and prefabs/ are copied next to the test assembly from the real server data, so this
-        // exercises the shipped content rather than a fixture that can drift away from it.
+        // The shipped maps/ and prefabs/, copied beside the test assembly.
         var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
         var maps = new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps"));
         var manager = new MapManager(maps, prefabs);
@@ -143,8 +137,7 @@ public class PortalPipelineTests
     [Fact]
     public void PortalPrefab_AloneYieldsAPortalComponent()
     {
-        // The prefab must be self-describing: spawning it outside of map loading (an editor, a console
-        // command) has to produce something that is actually a portal.
+        // Self-describing: spawned outside map loading (an editor, a command) it is still a portal.
         var repo = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
         var world = World.Create();
         try
@@ -191,8 +184,8 @@ public class PortalPipelineTests
         var on = AcousticVolumeGenerator.GenerateRegions(m.Definitions, m.Size, m.MinBound, 0.5f, 0.15f, autoDiscoverPortals: true);
 
         Assert.Equal(4, off.Portals.Count);
-        // The carpet half of the lab has no authored opening to the outside, so enabling the guess adds
-        // one there — on a wall, which is exactly why this is off by default.
+        // The carpet half of the lab has no authored opening outside, so the guess adds one on a wall:
+        // why it is off by default.
         Assert.True(on.Portals.Count > off.Portals.Count);
         Assert.Contains(on.Portals.Keys, id => id <= -1000);
     }

@@ -1,18 +1,14 @@
-using System;
 using OpenFPS.Client.AudioEngine.Core.Yard;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// What drives a small machine that nothing on the wire tells it (MachineVoiceState): an air
-/// conditioner's thermostat and its compressor's load answer to the weather, and two of one model are
-/// two machines, each turning at its own speed. Resonance found its port without any of it
-/// (2026-10-06); here the thermostat was a clock of 100-220 s on and 60-140 s off whatever the
-/// weather, and two window units' fans and pumps turned at exactly the same speed.
+/// What drives a small machine that nothing on the wire tells it (MachineVoiceState): an air conditioner's
+/// thermostat and compressor load answer to the weather, and two of one model turn at their own speeds. The
+/// thermostat was a fixed clock whatever the weather, and two window units ran at exactly the same speed.
 /// </summary>
 public class MachineWeatherTests
 {
@@ -36,12 +32,8 @@ public class MachineWeatherTests
         Assert.True(MathF.Abs(a.Machine.CompressorHz - b.Machine.CompressorHz) > 0.005f, "two pumps turn at one speed");
     }
 
-    /// <summary>
-    /// A blade row is the same machine whatever its seed. A blade tracking a little ahead of its slot
-    /// was found again on every sample of the sliver it led by, so a condenser whose blade 0 drew a
-    /// negative scatter (half of all seeds, and the seed is the entity id) ran its fan 11 dB over the
-    /// level it declares.
-    /// </summary>
+    /// <summary>A blade row is the same machine whatever its seed: a blade tracking ahead of its slot was found
+    /// again on every sample it led by, so half of all condensers (the seed is the entity id) ran 11 dB loud.</summary>
     [Fact]
     public void A_fan_is_as_loud_whatever_its_seed()
     {

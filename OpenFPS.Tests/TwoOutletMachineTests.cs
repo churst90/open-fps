@@ -1,32 +1,19 @@
-using System;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A machine heard through two voices is the same machine.
-///
-/// A car is a rig: the exhaust is a couple of metres behind the intake, and at close range that
-/// separation is most of how a listener knows which way it is pointing. Heard through one voice the
-/// geometry is lost. So a machine close enough for its two ends to be told apart gets a voice for
-/// each — and the one thing that must not change when it does is HOW LOUD IT IS. A level that moved
-/// when the mixer changed its mind about how many voices to spend would be heard as the car jumping,
-/// which is the kind of fault a listener notices and cannot name.
+/// A machine close enough for its two ends (intake and exhaust) to be told apart gets a voice for each,
+/// and its level must not change when it does: a level that moved with the voice count would be heard as
+/// the car jumping.
 /// </summary>
 public class TwoOutletMachineTests
 {
     private const int Rate = 44100, Block = 1024;
 
-    /// <summary>
-    /// The two outlets sum to exactly the one voice.
-    ///
-    /// Rendered twice from the same engine and the same seed: once as a single voice, once split into
-    /// an exhaust voice and an intake voice. Sample for sample, the split pair adds up to the single
-    /// one — which is what makes crossing the threshold a change in WHERE the sound comes from and
-    /// not in how much of it there is.
-    /// </summary>
+    /// <summary>Same engine and seed, rendered as one voice and as exhaust plus intake: the pair sums to
+    /// the single voice sample for sample, so the split changes where the sound comes from, not how much.</summary>
     [Fact]
     public void TheTwoOutletsSumToTheOneVoice()
     {
@@ -49,15 +36,13 @@ public class TwoOutletMachineTests
         {
             whole.Produce();
             split.Produce();
-            // The intake voice reads the block the exhaust voice is about to take. In the mixer the
-            // order of the two callbacks is FMOD's business; here it is ours, so the alignment is
-            // exact and what is being measured is the split itself.
+            // The intake voice reads the block the exhaust voice is about to take; here, unlike in FMOD,
+            // the callback order is ours, so the alignment is exact.
             front.Render(intake);
             whole.Consume(a);
             split.Consume(rear);
 
-            // The first tenth of a second is the crossfade: the exhaust voice is still handing the
-            // front of the machine over. Both are correct; they simply overlap.
+            // The first tenth of a second is the crossfade, the exhaust voice still handing the front over.
             if (b < Rate / 10 / Block) continue;
             for (int i = 0; i < Block; i++)
             {
@@ -71,10 +56,7 @@ public class TwoOutletMachineTests
         Assert.True(worst < 1e-4, $"the two outlets do not add back up to the one voice: worst sample difference {worst:G4}");
     }
 
-    /// <summary>
-    /// ...and the exhaust voice alone is NOT the whole machine, which is the other half of the
-    /// claim. If it were, the intake voice would be free and it would also be inaudible.
-    /// </summary>
+    /// <summary>The exhaust voice alone is not the whole machine, or the intake voice would be inaudible.</summary>
     [Fact]
     public void TheIntakeVoiceCarriesSomethingWorthHearing()
     {
@@ -102,16 +84,14 @@ public class TwoOutletMachineTests
         }
 
         double db = 10.0 * Math.Log10(Math.Max(1e-12, intakeEnergy) / Math.Max(1e-12, rearEnergy));
-        // The front of a car is well down on the back of it and is not nothing: an intake buried
-        // forty decibels under the exhaust would be a voice spent on silence.
+        // The front is well down on the back but not nothing: 40 dB under would be a voice spent on silence.
         Assert.InRange(db, -30.0, -1.0);
     }
 
     /// <summary>
-    /// An engine bay is where the engine is. A school bus idling at a stop is its block — 97.7 dB of
-    /// clatter from under the bonnet against an 83 dB silenced pipe — and that clatter used to leave
-    /// by the tailpipe's voice, eleven metres from the engine: "the front of the bus and the exhaust
-    /// are in the same place". Idling, the nose must be the louder end.
+    /// A school bus idling is its block, 97.7 dB under the bonnet against an 83 dB silenced pipe; that
+    /// clatter left by the tailpipe voice eleven metres away ("the front of the bus and the exhaust are in
+    /// the same place"). Idling, the nose is the louder end.
     /// </summary>
     [Fact]
     public void AnIdlingBusIsLouderAtItsEngineThanAtItsTailpipe()
@@ -140,10 +120,8 @@ public class TwoOutletMachineTests
         Assert.True(db > 3.0, $"the idling bus is {db:F1} dB louder at its nose than at its tail");
     }
 
-    /// <summary>
-    /// Two sources are two sources while the angle between them is wide enough, and one source after
-    /// that — and it is the ANGLE, not the distance, because that is the thing an ear measures.
-    /// </summary>
+    /// <summary>Two ends are two sources while the angle between them is wide enough: the angle, which the
+    /// ear measures, not the distance.</summary>
     [Fact]
     public void OutletsMergeAtTheDistanceTheAngleSays()
     {
@@ -152,21 +130,19 @@ public class TwoOutletMachineTests
         Assert.True(Localisation.Resolvable(car, 5f));
         Assert.False(Localisation.Resolvable(car, 60f));
 
-        // A motorcycle's ends are a metre apart, so it becomes one thing much sooner. Nothing was
-        // authored for either: it is the same arithmetic on a different machine.
+        // A motorcycle's ends are a metre apart, so it merges much sooner, by the same arithmetic.
         float bike = 1.0f;
         Assert.True(Localisation.MergingDistance(bike) < Localisation.MergingDistance(car));
         Assert.True(Localisation.Resolvable(bike, 3f));
         Assert.False(Localisation.Resolvable(bike, 20f));
 
-        // And the merging distance is where the test flips, in both directions.
+        // The merging distance is where the test flips, both ways.
         float d = Localisation.MergingDistance(car);
         Assert.True(Localisation.Resolvable(car, d * 0.95f));
         Assert.False(Localisation.Resolvable(car, d * 1.05f));
     }
 
-    /// <summary>Every machine in the library says where both its ends are — a rig with one end is
-    /// a machine that cannot be heard pointing anywhere.</summary>
+    /// <summary>Every machine in the library says where both its ends are.</summary>
     [Fact]
     public void EveryMachineHasTwoEndsThatAreNotTheSamePlace()
     {

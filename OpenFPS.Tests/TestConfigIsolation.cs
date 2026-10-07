@@ -1,16 +1,11 @@
-using System;
-using System.IO;
 using System.Runtime.CompilerServices;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// No test may write the player's own settings. BeaconPreferences and ClientSettings live under
-/// $XDG_CONFIG_HOME (or ~/.config), and a test that switches a beacon category off would otherwise
-/// switch it off for the player too, the moment anything (a mutant, a refactor) made preferences save
-/// to disk. Every test process starts with a scratch config folder of its own, before any test runs,
-/// and removes it when the process exits.
+/// No test writes the player's own settings or data: each test process gets scratch $XDG_CONFIG_HOME and
+/// $XDG_DATA_HOME folders before any test runs, removed at exit. A test that switched a beacon category off
+/// would otherwise switch it off for the player once anything made preferences save to disk.
 /// </summary>
 internal static class TestConfigIsolation
 {
@@ -20,9 +15,7 @@ internal static class TestConfigIsolation
         string scratch = Path.Combine(Path.GetTempPath(), "openfps-test-config-" + Environment.ProcessId);
         Directory.CreateDirectory(scratch);
         Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", scratch);
-        // And the player's data: every ClientAudioSystem a test builds renders the city's doors in the
-        // background and keeps them in the render cache (DoorRenderCache, under LocalApplicationData),
-        // pruning the folders of other builds. Without this that was the player's own cache.
+        // And the player's data: DoorRenderCache lives under LocalApplicationData and prunes other builds' folders.
         Directory.CreateDirectory(Path.Combine(scratch, "data"));
         Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(scratch, "data"));
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>

@@ -1,17 +1,15 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --nan-walk [map=city] [from=x,y,z] [to=x,y,z] [steps=12] [open=0|1]: the listener's trace over the real
+/// --nan-walk [map=city] [from=x,y,z] [to=x,y,z] [steps=12] [inside]: the listener's trace over the real
 /// map, walked from one point to another, and every response the tracer publishes (the late part, the
 /// directional part, the late field) and the energies behind them checked for anything not finite.
+/// inside puts the listener in, on and just off the faces of the boxes nearest the walk's middle (a
+/// door leaf swung through the head, a jamb brushed) instead.
 /// Written for "a pop inside one of the buildings and the audio just cut out" (Cody, 2026-10-03):
 /// the Marlow Tower corridor, floor 0, into flat 00B through its door.
 /// </summary>
@@ -37,8 +35,6 @@ public static class NanWalkSpike
         using var tr = new TracedReverb(ctx) { ExtractLate = true };
         tr.SetScene(scene);
         int bad = 0;
-        // inside: the listener in, on and just off the faces of the boxes nearest the walk's middle
-        // (a door leaf swung through the head, a jamb brushed), not along the walk.
         var points = new List<Vector3>();
         if (args.Contains("inside"))
         {

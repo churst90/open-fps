@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
@@ -14,7 +10,7 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --nan-mix [map=city] [from=x,y,z] [to=x,y,z] [seconds=10] [door=x,y,z]: Cody's walk of 2026-10-03
+/// --nan-mix [map=city] [from=x,y,z] [to=x,y,z] [seconds=10] [door=x,y,z] [atear]: Cody's walk of 2026-10-03
 /// through the whole mixer. The listener goes from the Marlow Tower corridor, floor 0, into flat
 /// 00B; the door is opened on the way (the scene rebuilt without its leaf, as the worker does);
 /// claps and footsteps at the listener, steady sources out in the street, every 0.3 s a one-off

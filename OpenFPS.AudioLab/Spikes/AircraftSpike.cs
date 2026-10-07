@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
@@ -10,27 +6,23 @@ using OpenFPS.Client.AudioEngine.Core.Aircraft;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// Aircraft, heard from the ground.
+/// Aircraft heard from the ground: flyovers, landings and the spool.
 ///
 ///   --aircraft [preset ...] [alt=m] [speed=m/s] [offset=m] [sec=s] [lever=0..1] [descend=0..1]
+///   --aircraft steady [preset ...]
 ///
-/// Renders each aircraft flying a straight line past a listener standing on grass, and writes one
-/// WAV per preset. The flyover is done the honest way: the machine is integrated in ITS time, and
-/// each sample is deposited at the moment it ARRIVES — emission time plus the path over the speed of
-/// sound — with the inverse-distance gain and the air's absorption for that path. Doppler is not
-/// applied; it happens, because the path is shortening. A second arrival off the ground, a little
-/// later and a little weaker, is what gives a flyover its slow comb.
+/// A flyover past a listener on grass, one WAV per preset. Each sample is integrated in the machine's
+/// time and deposited when it arrives (emission plus path over c) with spreading and air absorption,
+/// so Doppler happens rather than being applied; the ground's later, weaker arrival gives the slow comb.
 /// </summary>
 public static class AircraftSpike
 {
     private const int Sr = VehicleSynth.SampleRate;
 
     /// <summary>
-    /// --aircraft steady [preset ...]: the synth alone, the listener fixed beside it, ten seconds.
-    /// Any comb that moves has to come from the machine, since nothing in the geometry does. Reports
-    /// how much the spectrum's fine structure wanders from frame to frame between 300 Hz and 4 kHz
-    /// (the flange index: the mean over 1/12-octave bands of each band's standard deviation over
-    /// time, dB), for the preset as it is and with one engine.
+    /// --aircraft steady: the synth alone with the listener fixed beside it, so any moving comb is the
+    /// machine's. Reports the flange index (the mean over 1/12-octave bands, 300 Hz-4 kHz, of each band's
+    /// standard deviation over time, dB) as the preset is and with one engine.
     /// </summary>
     static int Steady(string[] args)
     {
@@ -173,25 +165,11 @@ public static class AircraftSpike
     }
 
     /// <summary>
-    /// What each mechanism is worth as the engines spool up, at a fixed bearing.
-    ///
-    /// "The whine is there but it gets quieter when it spools up" is a statement about a BALANCE, and
-    /// a balance cannot be read off a constant. The whine's own level rises with the spool (it goes
-    /// as the cube of it) — but so does everything else, and the jets go as the EIGHTH power of exit
-    /// velocity, which is the fastest-rising thing on the aeroplane. If the jets gain more decibels
-    /// per notch of lever than the tone does, the tone is being buried while getting louder, and
-    /// that is heard exactly as "it stops when it spools up".
-    ///
-    /// So this sweeps the lever and reports, at each setting, every mechanism's own level AND what
-    /// the whine is worth against the rest of the machine — by rendering the same aeroplane twice,
-    /// once with the tone and once with it silenced, and differencing. The last column is the number
-    /// that decides whether it is audible.
-    ///
-    /// Two bearings, because they are two different aeroplanes to a listener: AHEAD is an aircraft
-    /// coming towards you, where the fan and the compressor radiate out of the inlet; ASTERN is one
-    /// that has gone past, which is jets and nothing else.
-    ///
-    ///   --spool [preset ...] [alt=m]
+    /// --spool [preset ...] [alt=m]: each mechanism's level as the lever sweeps, and what the whine is
+    /// worth against the rest (the same aeroplane rendered with the tone muted, differenced). The whine
+    /// rises as the cube of the spool but the jets as the eighth power of exit velocity, so a tone can be
+    /// buried while it gets louder: heard as "it stops when it spools up". Ahead is the inlet's fan and
+    /// compressor; astern is jets alone.
     /// </summary>
     public static int Spool(string[] args)
     {
@@ -203,11 +181,9 @@ public static class AircraftSpike
         {
             var p = AircraftProfile.ByName(key);
             Console.WriteLine($"\n  {key} — {p.Name}.");
-            // What the machine declares, against what it makes. The same check `--voice-levels`
-            // does for a vehicle, and for the same reason: SourceLevelDb sets BOTH where the
-            // emitter is placed AND what one full-scale sample means inside the voice, and the two
-            // pull opposite ways, so a mis-declaration never cancels. An aeroplane that declares
-            // itself louder than it is comes out QUIETER, by more than half the error.
+            // Declared against made, as --voice-levels does for a vehicle: SourceLevelDb sets both the
+            // placement and full scale, which pull opposite ways, so an aeroplane declared louder than it
+            // is comes out quieter, by more than half the error.
             float loudest = float.NegativeInfinity;
             foreach (string bear in new[] { "ahead", "astern" })
             {
@@ -223,15 +199,12 @@ public static class AircraftSpike
 
             foreach (string bearing in new[] { "ahead", "astern" })
             {
-                // The listener a kilometre out and `alt` below, ahead of or behind the nose. What
-                // matters to every directivity in here is the DIRECTION, not the distance.
+                // A kilometre out and `alt` below: the directivities care about the direction only.
                 var at = new Vector3(0f, -alt, bearing == "ahead" ? 1000f : -1000f);
                 foreach (float lever in new[] { 0f, 0.25f, 0.5f, 0.75f, 1f })
                 {
                     var (bl, jt, co, tot, spool, bpf, bpfDb) = Hold(p, at, lever);
-                    // The same aeroplane with the tone taken out. Everything else — the spool, the
-                    // random streams, the order of operations — is identical, so the difference in
-                    // the total is the tone and nothing else.
+                    // Identical but for the tone (spool, random streams, order), so the difference is the tone.
                     var mute = p with { Turbine = p.Turbine with { WhineDb = -200f } };
                     var (_, _, _, totNoWhine, _, _, _) = Hold(mute, at, lever);
                     float worth = tot - totNoWhine;
@@ -251,28 +224,16 @@ public static class AircraftSpike
         var s = new AircraftSynth(p, Sr, 5) { Lever = lever };
         s.SetListener(listener);
         s.PlaceAtLever(lever);
-        // FOUR seconds, not half of one. A blade row's speed follows its target on a half-second
-        // time constant — a rotor's inertia is enormous against anything driving it — so a short
-        // settle meters a fan that is still accelerating, and a tone whose frequency is sliding has
-        // no line in a spectrum at all. The first version of this measurement reported the blade
-        // rate forty-eight decibels under the row's own energy for that reason and nothing else.
+        // Four seconds: a blade row follows its target on a half-second time constant, and a sliding
+        // tone has no line in a spectrum (a half-second settle read the blade rate 48 dB low).
         for (int i = 0; i < Sr * 4; i++) s.Step();
-        // How much of the blade row is in its BLADE-PASSING TONE, as against everything else it
-        // makes. This is the column that answers "the whine stops when it spools up": a fan whose
-        // tips have gone supersonic moves its energy out of the blade rate and down into the shaft
-        // harmonics — the buzz-saw — and a listener hears the clean tone go away even though the
-        // row got louder. Measured with a Goertzel at the blade rate, not assumed.
+        // How much of the blade row is in its blade-passing tone: supersonic tips move energy into the
+        // shaft harmonics (the buzz-saw), and the clean tone goes though the row got louder.
         var row = p.Turbine?.Fan ?? p.Propeller;
         float rpm = p.Turbine?.Fan != null ? p.Turbine.Fan.RpmMax * s.Spool : s.Rpm;
         float bpf = row != null && rpm > 1f ? row.Blades * rpm / 60f : 0f;
-        // A BANK of bins across a few per cent either side of the blade rate, not one bin at it.
-        //
-        // A twin's two fans are trimmed half a per cent apart, which at two kilohertz is ten hertz
-        // — ten whole bins of a one-second window — so a single Goertzel at the nominal rate sits
-        // BETWEEN the two lines and sees neither. It read the tone twenty-five decibels under the
-        // row when the row was radiating it at nine, and that is an artefact of the instrument and
-        // not of the aeroplane. Both lines, and the modulation sidebands they beat into, land
-        // inside this band.
+        // A bank of bins a few per cent either side, not one: a twin's fans are trimmed 0.5 % apart (10 Hz
+        // at 2 kHz), and one Goertzel between the lines read the tone 25 dB under the row instead of 9.
         const int Bins = 41;
         var cw = new double[Bins];
         var g1 = new double[Bins];
@@ -296,9 +257,7 @@ public static class AircraftSpike
             }
         }
         static float D(double sum) => 20f * MathF.Log10(MathF.Max(1e-12f, MathF.Sqrt((float)(sum / Sr))) / 20e-6f);
-        // The loudest line in the band, as an RMS: a sinusoid of amplitude A has RMS A/sqrt(2).
-        // The loudest rather than the sum, because the bins overlap and summing them would count
-        // one line several times over.
+        // The loudest line as an RMS (A/sqrt(2)); not the sum, as overlapping bins would count a line twice.
         double best = 0;
         for (int k = 0; k < Bins; k++)
         {
@@ -311,25 +270,10 @@ public static class AircraftSpike
     }
 
     /// <summary>
-    /// The aircraft flies along +x at a height, offset to one side, passing abeam the listener
-    /// half way through. Returns the received signal normalised for playback, plus the level at the
-    /// ear when it was closest and the peak.
-    /// </summary>
-
-    /// <summary>
-    /// An arrival, heard from beside the runway: the approach, the flare, the wheels, the rollout.
-    ///
-    /// The flight path is the only input. The aeroplane comes down a three-degree slope at its
-    /// approach speed, the descent stops at the runway, and at the instant it does the wheels —
-    /// which have been stationary for the whole flight — meet concrete going past at seventy metres
-    /// a second. Nothing here says "play a screech": the touchdown is the path reaching the ground,
-    /// and the sound is a tyre model at a hundred per cent slip for as long as the wheel's inertia
-    /// takes to be paid off, which is <see cref="LandingGearSpec.SpinUpSeconds"/> and nothing else.
-    ///
-    /// The POWER comes off the path too, the same way the game reads it: coming down is idle, and
-    /// on the ground it is idle with the reversers doing the stopping.
-    ///
-    ///   --landing [preset ...] [offset=m] [speed=m/s] [sec=s]
+    /// --landing [preset ...] [offset=m] [speed=m/s] [sec=s]: an arrival heard from beside the runway.
+    /// The flight path is the only input: a three-degree approach at idle, and at touchdown the still
+    /// wheels meet the runway, a tyre at full slip for <see cref="LandingGearSpec.SpinUpSeconds"/>; on the
+    /// ground, the reversers. Nothing says "play a screech".
     /// </summary>
     public static int Landing(string[] args)
     {
@@ -388,8 +332,7 @@ public static class AircraftSpike
         for (int k = 0; k < n; k++)
         {
             float t = k / (float)Sr;
-            // Down the slope to the threshold, then along the runway, slowing on the brakes and the
-            // reversers at a quarter of a g — which is what a wet-day landing rollout is.
+            // Down the slope, then along the runway at a quarter of a g: a wet-day rollout.
             float before = t - tTouch;
             float x, alt, v;
             if (before < 0f) { v = vApp; x = before * vApp; alt = 1.2f + (-before) * vApp * slope; }
@@ -443,6 +386,10 @@ public static class AircraftSpike
         return (wav, peakDb, touchDb);
     }
 
+    /// <summary>
+    /// Flies along +x at a height, offset to one side, abeam the listener half way: the signal normalised
+    /// for playback, its peak, and the level at the ear when closest.
+    /// </summary>
     private static (float[] Wav, float PeakDb, float ClosestDb) Flyover(AircraftSynth synth, float alt, float offset, float speed, float seconds)
     {
         const float c = 343f;
@@ -452,8 +399,7 @@ public static class AircraftSpike
         var outBuf = new float[n + Sr * 4];
         float half = seconds * 0.5f;
 
-        // Warm the machine up out of earshot first: a piston engine has to crank and settle, a
-        // turbine has to spool.
+        // Warmed up out of earshot first: a piston engine cranks and settles, a turbine spools.
         int warm = (int)(3f * Sr);
         synth.SetListener(new Vector3(0f, -alt, -speed * half));
         for (int i = 0; i < warm; i++) synth.Step();
@@ -474,7 +420,6 @@ public static class AircraftSpike
             synth.Step();
             float s = synth.Total;
 
-            // Direct path.
             float r = Vector3.Distance(pos, ear);
             rMin = MathF.Min(rMin, r);
             float fc = AirCorner(r);
