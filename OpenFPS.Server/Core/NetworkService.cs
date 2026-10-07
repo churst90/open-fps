@@ -31,6 +31,13 @@ public class NetworkService : INetEventListener
     public const int MaxPeers = 200;
 
     private readonly ConcurrentDictionary<int, DateTime> _connectedAt = new();
+    private readonly FragmentGuard _fragments = new();
+
+    /// <summary>Messages one connection may send: a burst, then a steady rate, far above any client's.</summary>
+    public const int MessageBurst = 600;
+    public const double MessagesPerSecond = 400;
+    // Per peer, on the loop thread only (PollEvents): no string per packet.
+    private readonly Dictionary<int, (double Tokens, long AtMs)> _budget = new();
     // New connections per address: a burst of 10, then one every 2 seconds.
     private readonly RateLimiter _connectLimiter = new(capacity: 10, refillPerSecond: 0.5);
     // One warning per address a minute, so a flood of refusals cannot flood the log as well.
@@ -49,12 +56,16 @@ public class NetworkService : INetEventListener
 
     public void Start(int port)
     {
-        _netManager = new NetManager(this) { AutoRecycle = true };
+        // The guard sees every datagram before LiteNetLib holds any fragment of it (FragmentGuard).
+        _netManager = new NetManager(this, _fragments) { AutoRecycle = true };
         _netManager.Start(port);
         Log.Information("NetworkService started on port {Port}", port);
     }
 
     public void PollEvents() => _netManager?.PollEvents();
+
+    /// <summary>The port it listens on (Start(0) picks one).</summary>
+    public int LocalPort => _netManager?.LocalPort ?? 0;
 
     /// <summary>Closes the socket. Safe before Start and safe to call twice.</summary>
     public void Stop()
@@ -209,6 +220,8 @@ public class NetworkService : INetEventListener
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo info)
     {
         _connectedAt.TryRemove(peer.Id, out _);
+        _budget.Remove(peer.Id);
+        _fragments.Forget(peer.Address is { } a ? new IPEndPoint(a, peer.Port) : null);
         OnDisconnected?.Invoke(peer, info);
     }
 
@@ -221,6 +234,12 @@ public class NetworkService : INetEventListener
                     reader.AvailableBytes, peer.Id, peer.Address, MaxMessageBytes);
             return;
         }
+        if (!Spend(peer.Id, Environment.TickCount64))
+        {
+            if (_logLimiter.TryConsume("flood:" + RateLimiter.AddressKey(peer.Address)))
+                Log.Warning("Peer {Id} ({EndPoint}) is sending more than {Rate} messages a second; dropping the excess.", peer.Id, peer.Address, MessagesPerSecond);
+            return;
+        }
         if (!TryDecode(reader.GetRemainingBytes(), out var msg, out string? problem))
         {
             if (problem != null && _logLimiter.TryConsume("bad:" + RateLimiter.AddressKey(peer.Address)))
@@ -231,7 +250,27 @@ public class NetworkService : INetEventListener
     }
 
     /// <summary>Whether a message's first byte (its union tag) is one of the messages a client sends.</summary>
-    public static bool IsClientMessage(byte tag) => true;
+    public static bool IsClientMessage(byte tag) => ClientTags[tag];
+
+    private static readonly bool[] ClientTags = BuildClientTags();
+
+    private static bool[] BuildClientTags()
+    {
+        var tags = new bool[256];
+        foreach (MemoryPackUnionAttribute a in typeof(IMessage).GetCustomAttributes(typeof(MemoryPackUnionAttribute), false))
+            if (a.Tag < 250 && MessageDispatcher.SentByClients.Contains(a.Type)) tags[a.Tag] = true;
+        return tags;
+    }
+
+    /// <summary>Takes one message from a peer's budget; false if it has none left.</summary>
+    internal bool Spend(int peerId, long nowMs)
+    {
+        var (tokens, at) = _budget.TryGetValue(peerId, out var b) ? b : (MessageBurst, nowMs);
+        tokens = Math.Min(MessageBurst, tokens + Math.Max(0, nowMs - at) * MessagesPerSecond / 1000.0);
+        bool ok = tokens >= 1;
+        _budget[peerId] = (ok ? tokens - 1 : tokens, nowMs);
+        return ok;
+    }
 
     /// <summary>
     /// One message as a client sent it, read; or why not. Never throws: whatever arrives, the network
@@ -240,6 +279,9 @@ public class NetworkService : INetEventListener
     public static bool TryDecode(byte[] bytes, out IMessage? message, out string? problem)
     {
         message = null; problem = null;
+        // The server's own messages sent back at it are not read at all: reading one runs its code.
+        if (bytes.Length == 0 || !IsClientMessage(bytes[0])) { problem = "not a message a client sends"; return false; }
+        if (!WireCheck.IsSafe(bytes)) { problem = "a length that does not fit the message"; return false; }
         try
         {
             message = MemoryPackSerializer.Deserialize<IMessage>(bytes);
