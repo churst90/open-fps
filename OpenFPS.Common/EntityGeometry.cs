@@ -19,6 +19,9 @@ public enum GeometryRole
     Mover,
     /// <summary>Static and solid, but not a box (or not a fixed object): tested as it always was.</summary>
     Unindexed,
+    /// <summary>A fixed box that is not solid but is said by name: a look finds it (the Announced layer),
+    /// nothing else does.</summary>
+    SightOnly,
 }
 
 /// <summary>What the game's entities are as geometry: the one place a box becomes a solid with a surface,
@@ -32,9 +35,18 @@ public static class EntityGeometry
     /// moves are not geometry here.
     /// </summary>
     public static GeometryRole Classify(Components.EntityType type, bool moves, in Components.ColliderComponent collider,
-                                        int portalRegionA, int portalRegionB)
+                                        int portalRegionA, int portalRegionB, bool announced = false)
     {
-        if (!collider.IsSolid || moves) return GeometryRole.None;
+        if (moves) return GeometryRole.None;
+        if (!collider.IsSolid)
+        {
+            // Not solid, but a look should find it (SightGrid's index, geometry stage 2): a fixed box said by
+            // name. Not an opening.
+            var n = collider.Size;
+            return announced && type == Components.EntityType.StaticObject && collider.Shape == Components.ColliderShape.Box
+                   && n.X > 0f && n.Y > 0f && n.Z > 0f && portalRegionA == 0 && portalRegionB == 0
+                ? GeometryRole.SightOnly : GeometryRole.None;
+        }
         if (type != Components.EntityType.StaticObject) return GeometryRole.Unindexed;
         var s = collider.Size;
         if (collider.Shape != Components.ColliderShape.Box || !(s.X > 0f && s.Y > 0f && s.Z > 0f)) return GeometryRole.Unindexed;
@@ -43,7 +55,8 @@ public static class EntityGeometry
 
     /// <summary>Where a definition goes (<see cref="Classify"/>), as a client holds it.</summary>
     public static GeometryRole RoleOf(Networking.EntityDefinition? def)
-        => def == null ? GeometryRole.None : Classify(def.Type, def.Moves, def.Collider, def.Portal.RegionAId, def.Portal.RegionBId);
+        => def == null ? GeometryRole.None : Classify(def.Type, def.Moves, def.Collider, def.Portal.RegionAId, def.Portal.RegionBId,
+                                                      def.Identity.Announce);
 
     /// <summary>A definition's solid at <paramref name="transform"/>, made exactly as the server makes the
     /// entity's (ServerGeometry.SpecOf), so the two build the same triangles.</summary>
@@ -54,9 +67,13 @@ public static class EntityGeometry
         var surface = SurfaceOf(def.Material.Material, def.Collider.Size, a.LeafMetres, a.StudSpacingMetres, a.IsHollow,
                                 a.ShellThickness, a.Absorption, emitter, moves: false, doorLeaf: role == GeometryRole.Mover,
                                 def.Identity.Name);
+        if (role == GeometryRole.SightOnly) surface = SightOnly(surface);
         return SolidSpec.Of(def.EntityId, transform.Position, transform.Rotation, def.Collider.Size, surface,
                             Shapes.Make(def.Collider.Form, def.Collider.Size));
     }
+
+    /// <summary>A surface only a look meets (<see cref="GeometryLayers.Announced"/>).</summary>
+    public static Surface SightOnly(in Surface surface) => surface with { Layers = GeometryLayers.Announced, Flags = SurfaceFlags.None };
 
     /// <summary>
     /// The surface of a solid box entity. Every physical layer, and the acoustic one unless it is a sound

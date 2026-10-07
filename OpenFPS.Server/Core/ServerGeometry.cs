@@ -113,10 +113,12 @@ public sealed class ServerGeometry
             bool moves = world.Has<Velocity>(e) || world.Has<PlayerComponent>(e);
             var type = world.Has<EntityType>(e) ? world.Get<EntityType>(e) : EntityType.StaticObject;
             var portal = world.Has<PortalComponent>(e) ? world.Get<PortalComponent>(e) : default;
-            var role = EntityGeometry.Classify(type, moves, c, portal.RegionAId, portal.RegionBId);
+            bool announced = world.Has<IdentityComponent>(e) && world.Get<IdentityComponent>(e).Announce;
+            var role = EntityGeometry.Classify(type, moves, c, portal.RegionAId, portal.RegionBId, announced);
             if (role == GeometryRole.None) return;
             if (role == GeometryRole.Unindexed) { unindexed.Add(e); return; }
             var spec = SpecOf(world, e, t, c, role == GeometryRole.Mover);
+            if (role == GeometryRole.SightOnly) spec = spec with { Surface = EntityGeometry.SightOnly(spec.Surface) };
             if (role == GeometryRole.Mover) { movers.Add(spec); moverEntities?.Add(e); }
             else statics.Add(spec);
         });

@@ -538,6 +538,31 @@ public static class GeometryParitySpike
                               + (travel.Count > 0 ? $"distance walked, capsule over cylinder: median {travel[travel.Count / 2]:F3}, lowest {travel[0]:F3}, highest {travel[^1]:F3}" : ""));
         }
 
+        // ── The sight's index (SightGrid): its own grid of boxes, and the triangle world's ────────────
+        if (only.Contains("sightgrid"))
+        {
+            var t = new Tally("SightGrid.Cast (a look of the turn narration, 20 m)");
+            tallies.Add(t);
+            var oldIndex = new OpenFPS.Client.Core.SightIndex();
+            var newIndex = new OpenFPS.Client.Core.SightIndex();
+            oldIndex.Refresh(oldSnap, 0); newIndex.Refresh(newSnap, 0);
+            Func<EntitySnapshot, bool> stops = e => OpenFPS.Client.Core.Sightline.Stops(e, -1);
+            for (int i = 0; i < n; i++)
+            {
+                var eye = NearSomething(3f);
+                var d = Direction();
+                if (i % 2 == 0) { d.Y *= 0.15f; d = Vector3.Normalize(d); }
+                oldIndex.Prepare(oldSnap, eye); newIndex.Prepare(newSnap, eye);
+                var c = Stopwatch.StartNew();
+                bool h0 = oldIndex.Grid.Cast(oldSnap, eye, d, OpenFPS.Client.Core.Sightline.NarrationRange, stops, out var e0, out float d0);
+                t.OldMs += c.Elapsed.TotalMilliseconds; c.Restart();
+                bool h1 = newIndex.Grid.Cast(newSnap, eye, d, OpenFPS.Client.Core.Sightline.NarrationRange, stops, out var e1, out float d1);
+                t.NewMs += c.Elapsed.TotalMilliseconds;
+                CompareHit(t, h0, e0.Id, d0, h1, e1.Id, d1, eye, d, newSnap, show);
+            }
+            Console.WriteLine($"  sight grid: the old index holds {oldIndex.Grid.Size.Things} things, the new {newIndex.Grid.Size.Things} (what the triangles do not)");
+        }
+
         // ── Ricochet: the face a round meets, from the box's largest axis and from the triangle ──────
         if (only.Contains("ricochet"))
         {
