@@ -321,6 +321,59 @@ public class RolesScopeTests : IDisposable
         Assert.Contains("Nobody can fly one yet", rig.Run("spawn", "helicopter"));
     }
 
+    /// <summary>A parked aircraft on your own map is still there after /savemap and a restart, as a
+    /// parked car is.</summary>
+    [Fact]
+    public void AnAeroplaneParkedOnYourOwnMapIsKeptBySavemap()
+    {
+        var rig = new Rig(_dir, UserRole.Player);
+        Assert.Contains("Nobody can fly one yet", rig.Run("spawn", "helicopter"));
+        Assert.StartsWith("Map 'mine' saved.", rig.Run("savemap"));
+
+        var maps = new MapManager(new MapRepository(rig.MapDir), rig.Prefabs);
+        maps.Initialize();
+        new CompositeService(maps, rig.Prefabs, new CompositeRepository(Path.Combine(_dir, "composites-again"))).PlaceRecorded(maps);
+        Assert.True(maps.TryGetMap("mine", out var world, out _, out _, out _));
+        var parked = new List<string>();
+        world.Query(new Arch.Core.QueryDescription().WithAll<VehicleComponent, CompositeComponent>(),
+            (ref VehicleComponent v, ref CompositeComponent c) => parked.Add($"{v.VehicleType} {c.Owner}"));
+        Assert.Equal(new[] { "helicopter tester" }, parked);
+    }
+
+    /// <summary>
+    /// The server's own maps are generated (tools/gen_city.py and the rest) and their files must stay
+    /// as the generator wrote them. A walker, a train or a parked car spawned on one lasts until a
+    /// restart, and /savemap does not write it into the file.
+    /// </summary>
+    [Fact]
+    public void ThingsSpawnedOnAShippedMapAreNotWrittenIntoIt()
+    {
+        var rig = new Rig(_dir, UserRole.Admin);
+        var railway = MapTemplates.Flat("railway", "");
+        railway.IsPublic = true;
+        railway.Tracks = new List<TrackData>
+        {
+            new() { Id = "loop", Waypoints = Enumerable.Range(0, 32).Select(i => new Vector3(40f * MathF.Cos(i * MathF.Tau / 32), 0.05f, 40f * MathF.Sin(i * MathF.Tau / 32))).ToList() },
+        };
+        railway.Trains = new List<TrainData> { new() { Preset = "light_rail", Track = "loop" } };
+        Assert.True(rig.Maps.CreateMap(railway, out string error), error);
+        rig.On("railway");
+
+        string walker = rig.Run("spawn", "walker", "Pat");
+        Assert.Contains("walks back and forth here now", walker);
+        Assert.DoesNotContain("/savemap keeps", walker);
+        Assert.Contains("on the loop track", rig.Run("spawn", "train", "metro"));
+        Assert.Contains("parked beside you", rig.Run("spawn", "vehicle", "i4_economy"));
+        Assert.Contains("Nobody can fly one yet", rig.Run("spawn", "helicopter"));
+        rig.Run("savemap");
+
+        string file = File.ReadAllText(Path.Combine(rig.MapDir, "railway.json"));
+        Assert.DoesNotContain("Pat", file);
+        Assert.DoesNotContain("metro", file);
+        Assert.DoesNotContain("vehicle:i4_economy", file);
+        Assert.DoesNotContain("helicopter", file);
+    }
+
     // ── The rig ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>

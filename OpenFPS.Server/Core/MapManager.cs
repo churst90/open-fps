@@ -1044,6 +1044,15 @@ public class MapManager
         catch (Exception ex) { error = ex.Message; return false; }
     }
 
+    /// <summary>
+    /// Whether a loaded map is one of the server's own, not one a player made. Their files are written
+    /// by generators (tools/gen_city.py, gen_speedway.py, gen_osm.py), so what is spawned on them is not
+    /// recorded for /savemap; the world editor's overlay keeps lasting edits to them.
+    /// </summary>
+    public bool IsShipped(string mapId)
+        => TryGetMapData(mapId, out var data)
+        && !Path.GetDirectoryName(_mapRepo.PathFor(data))!.Equals(_mapRepo.PlayerDirectory, StringComparison.Ordinal);
+
     // ── Maps players make ───────────────────────────────────────────────────────────────────────
 
     /// <summary>How many maps one person may own.</summary>

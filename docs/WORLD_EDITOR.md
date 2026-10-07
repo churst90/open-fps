@@ -304,6 +304,8 @@ Selecting is not an operation: it changes nothing and is per player.
   already there is skipped), so a map that has been /savemap'd with its edits in it loads the same.
 - /savemap still writes the map file as it was in memory. On a generated map that is the existing
   hazard of writing a generated file, unchanged by the editor; the editor itself never calls it.
+  Walkers, trains, vehicles and aircraft spawned on a shipped map are not recorded in its data
+  (2026-10-07), so /savemap does not write them there; they last until a restart.
 
 ## 8. Accessibility
 

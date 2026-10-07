@@ -1026,10 +1026,13 @@ Moving:
 
 Spawning:
 - `/spawn walker [NAME]` (or `person`, `pedestrian`): a person who walks back and forth in front of
-  you. `/savemap` keeps them.
+  you.
 - `/spawn vehicle PRESET` (or `car`), `/spawn helicopter`, `/spawn aircraft PRESET`: parked beside
   you. On your own map it is yours. Aircraft cannot be flown yet. No airliner.
 - `/spawn train PRESET`: onto the nearest track that already has a train.
+- On a map a player made, `/savemap` keeps walkers, vehicles, aircraft and trains spawned there. On
+  the server's own maps (the city, the speedway, the real places) they last until the server
+  restarts: those files are made by generators and are not written with them.
 - `/spawn Box|Cylinder MATERIAL sx sy sz`: an object 3 m in front of you.
 
 Building:
