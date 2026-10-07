@@ -23,6 +23,12 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 ///   --geometry-parity [map=city] [n=4000] [seed=1] [only=rays,ground,overlap,steps,enclosure,occlusion,bullets,collision,determinism]
 ///                     [show=12] [times=1]
 ///
+/// Stage 2 (docs/GEOMETRY.md 10) adds: capsule (the stage 2 body and the grade against the cylinder, steps
+/// and walks), echoes (EarlyReflections over the box list and the acoustic triangle world, in woods too),
+/// engineechoes (EngineReflections' legs against every box and the tree), sightgrid (the sight's own index
+/// and the triangle world), ricochet (a round's face from the box's axis and from the triangle), and
+/// routes, tracks as before. Debugging: capsuledebug, walkdebug, stepdebug=x,y,z,ix,iz[,vx,vy,vz,sprint].
+///
 /// Both paths are the game's own code: the server's grid with and without its triangle world, and the
 /// client's SpatialService over a snapshot with and without one. Old and new are asked the same thing
 /// from the same state, one probe at a time, so a difference is a difference in the answer and never in
