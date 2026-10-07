@@ -373,7 +373,8 @@ public sealed partial class WorldEditor
         Push(s, new RetireOp(s.CurrentMapId, kind.Kind, id, retire));
         var (here, elsewhere) = UsedBy(kind.Kind, id, s.CurrentMapId);
         Say(reply, retire
-            ? $"Retired the {kind.Spoken} {id}: it is no longer offered for new things. {Plural(here + elsewhere, "thing")} using it keep it."
+            ? $"Retired the {kind.Spoken} {id}: it is no longer offered for new things."
+              + ((here + elsewhere) switch { 0 => " Nothing on a loaded map uses it.", 1 => " The one thing using it keeps it.", int n => $" The {n} things using it keep it." })
             : $"The {kind.Spoken} {id} is offered again.");
         Notify(s, $"{s.Username} {(retire ? "retired" : "brought back")} the {kind.Spoken} {id}.");
         Refresh(s, reply);

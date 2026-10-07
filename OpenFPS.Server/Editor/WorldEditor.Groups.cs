@@ -149,7 +149,7 @@ public sealed partial class WorldEditor
                 Settings = settings == null ? null : new Dictionary<string, string>(settings),
             };
         }).ToArray();
-        var spec = new GroupSpec { Name = Capital(string.Join(" ", args)), Parts = parts };
+        var spec = new GroupSpec { Name = Capital(id.Replace('_', ' ').Replace('-', ' ')), Parts = parts };
         ModelUpdate update;
         try { update = Models.Commit(GroupKind.KindId, id, JsonSerializer.Serialize(spec, GroupKind.Json), s.Username, $"made from {Plural(parts.Length, "thing")} on {_maps.DisplayName(s.CurrentMapId)}"); }
         catch (Exception ex) { Say(reply, $"Not made: {Reason(ex)}"); return; }

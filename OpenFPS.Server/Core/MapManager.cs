@@ -491,7 +491,7 @@ public class MapManager
         // own, and a concrete slab added flush under it was met wherever ties went its way.
         if (!GroundCovers(world, m.WalkMin, m.WalkMax))
         {
-            Log.Information("MapManager: '{Id}' has no ground of its own under all of its play area. Laying natural ground (Dirt) under its bounds.", m.Id);
+            Log.Information("MapManager: '{Id}' has no ground of its own under all of its play area. Laying natural ground ({Ground}) under its bounds.", m.Id, m.GroundPrefab ?? NaturalGroundPrefab);
             Vector3 mapSize = m.MaxBound - m.MinBound;
             // Under the whole of the bounds, top surface at Y=0. Centred on the bounds, not on the
             // origin: the speedway's bounds are not centred on 0, nor the city's, and a foundation

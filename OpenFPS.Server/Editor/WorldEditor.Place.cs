@@ -36,7 +36,7 @@ public sealed partial class WorldEditor
         {
             var hand = HandOf(s);
             hand.Mode = args[1].ToLowerInvariant() switch { "cursor" => PlaceMode.Cursor, "preview" => PlaceMode.Preview, _ => PlaceMode.Feet };
-            Say(reply, $"Choosing a prefab will {PlaceModeWords(hand.Mode)}.");
+            Say(reply, $"Choosing a prefab {PlaceModeWords(hand.Mode)}.");
             if (!s.IsTextClient) SendMenu(s, "place", reply, refresh: false);
             return;
         }

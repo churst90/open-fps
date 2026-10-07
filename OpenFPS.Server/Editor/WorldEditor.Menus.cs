@@ -368,7 +368,7 @@ public sealed partial class WorldEditor
         var groups = Placeable(s).GroupBy(CategoryOf).ToDictionary(g => g.Key, g => g.Count());
         var items = new List<EditorMenuItem>
         {
-            Opens($"Choosing a prefab will: {PlaceModeWords(hand.Mode)}. Change", "place.mode"),
+            Opens($"Choosing a prefab {PlaceModeWords(hand.Mode)}. Change", "place.mode"),
             Typed("Search, typed", "/edit find "),
         };
         if (hand.LastPlaced is { } last && _maps.Prefabs.TryGetValue(last.ToLowerInvariant(), out var lt))
@@ -376,22 +376,22 @@ public sealed partial class WorldEditor
         items.AddRange(Categories.Where(groups.ContainsKey).Select(c => Opens($"{c}, {groups[c]}", $"place.cat:{c}")));
         int groupCount = GroupIds().Count();
         if (groupCount > 0) items.Add(Opens($"{GroupsCategory}, {groupCount}", $"place.cat:{GroupsCategory}"));
-        return Menu($"Place, {PlaceModeWords(hand.Mode)}", items);
+        return Menu("Place", items);
     }
 
-    private EditorMenu PlaceModeMenu(UserSession s) => Menu("Choosing a prefab will", new[]
+    private EditorMenu PlaceModeMenu(UserSession s) => Menu("Choosing a prefab", new[]
     {
-        Act("Place it at your feet, or just in front of you if it is solid", "edit place mode feet", stay: false),
-        Act("Place it at the build cursor (/build)", "edit place mode cursor", stay: false),
-        Act("Play a preview of it to you alone, placing nothing", "edit place mode preview", stay: false),
+        Act("Places it at your feet, or just in front of you if it is solid", "edit place mode feet", stay: false),
+        Act("Places it at the build cursor, which /origin and /at set", "edit place mode cursor", stay: false),
+        Act("Plays a preview of it to you alone, placing nothing", "edit place mode preview", stay: false),
     });
 
     /// <summary>What choosing a prefab from Place does, said.</summary>
     private static string PlaceModeWords(PlaceMode mode) => mode switch
     {
-        PlaceMode.Cursor => "place at the build cursor",
-        PlaceMode.Preview => "preview by ear",
-        _ => "place at your feet",
+        PlaceMode.Cursor => "places it at the build cursor",
+        PlaceMode.Preview => "plays a preview of it to you",
+        _ => "places it at your feet",
     };
 
     /// <summary>The command choosing a prefab sends, by the mode the editor's place is in.</summary>

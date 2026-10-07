@@ -146,7 +146,7 @@ public sealed partial class WorldEditor
         if (!_maps.TryGetMapData(s.CurrentMapId, out var map)) { Say(reply, $"Map '{s.CurrentMapId}' is not loaded."); return; }
         if (args.Length == 0 || args[0].Equals("settings", StringComparison.OrdinalIgnoreCase))
         {
-            Say(reply, "Map settings: " + string.Join("; ", SettingPaths().Select(p => $"{MapSettings.Field(p, GroundChoices()).Label}, {MapSettings.Say(p, MapSettings.Get(map, p))}"))
+            Say(reply, "Map settings: " + string.Join("; ", SettingPaths().Select(p => $"{MapSettings.Field(p, GroundChoices()).Label}, {SaySetting(p, MapSettings.Get(map, p))}"))
                      + ". /edit map set weather|time|ground|beacon CATEGORY VALUE changes one.");
             return;
         }
@@ -173,7 +173,7 @@ public sealed partial class WorldEditor
         }
         if (!TryMapValue(path, typed, out string? stored, out string error)) { Say(reply, error); return; }
         string before = MapSettings.Get(map, path);
-        if (before == (stored ?? DefaultOf(path))) { Say(reply, $"The {MapSettings.Field(path, GroundChoices()).Label} is already {MapSettings.Say(path, before)}."); return; }
+        if (before == (stored ?? DefaultOf(path))) { Say(reply, $"The {MapSettings.Field(path, GroundChoices()).Label} is already {SaySetting(path, before)}."); return; }
         var o = Overlays.Get(s.CurrentMapId);
         o.Settings ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         string? keptBefore = o.Settings.TryGetValue(path, out var kb) ? kb : null;
@@ -182,10 +182,14 @@ public sealed partial class WorldEditor
         Push(s, new MapSetOp(s.CurrentMapId, path, label, keptBefore, stored));
         string note = path == MapSettings.Ground && !HasNaturalGround(s.CurrentMapId)
             ? " This map lays its own ground everywhere people walk, so nothing is laid; it applies if that ground is taken away and the map loads again." : "";
-        Say(reply, $"This map's {label}: {MapSettings.Say(path, MapSettings.Get(map, path))}.{note}");
+        Say(reply, $"This map's {label}: {SaySetting(path, MapSettings.Get(map, path))}.{note}");
         Notify(s, $"{s.Username} set the map's {label}.");
         Refresh(s, reply);
     }
+
+    /// <summary>A map setting as said, a ground by its prefab's name ("Grass").</summary>
+    private string SaySetting(string path, string stored)
+        => path == MapSettings.Ground && _maps.Prefabs.TryGetValue(stored.ToLowerInvariant(), out var p) ? p.Name : MapSettings.Say(path, stored);
 
     private static string DefaultOf(string path)
         => path == MapSettings.Ground ? MapManager.NaturalGroundPrefab : path.StartsWith(MapSettings.BeaconPrefix) ? "default_on" : "server";
@@ -287,7 +291,7 @@ public sealed partial class WorldEditor
         var items = new List<EditorMenuItem>();
         if (_maps.TryGetMapData(s.CurrentMapId, out var map))
             foreach (var path in new[] { MapSettings.Weather, MapSettings.Hour, MapSettings.Ground })
-                items.Add(Opens($"{Capital(MapSettings.Field(path, GroundChoices()).Label)}, {MapSettings.Say(path, MapSettings.Get(map, path))}", $"mapsetting:{path}"));
+                items.Add(Opens($"{Capital(MapSettings.Field(path, GroundChoices()).Label)}, {SaySetting(path, MapSettings.Get(map, path))}", $"mapsetting:{path}"));
         items.Add(Info("A held weather or hour is what this map's players hear; the server's sky goes on everywhere else."));
         return Menu("Map settings", items);
     }
@@ -309,7 +313,7 @@ public sealed partial class WorldEditor
         if (!_maps.TryGetMapData(s.CurrentMapId, out var map) || !SettingPaths().Contains(path, StringComparer.OrdinalIgnoreCase)) return null;
         var field = MapSettings.Field(path, GroundChoices());
         string now = MapSettings.Get(map, path);
-        var items = new List<EditorMenuItem> { Info($"{Capital(field.Label)}, {MapSettings.Say(path, now)}") };
+        var items = new List<EditorMenuItem> { Info($"{Capital(field.Label)}, {SaySetting(path, now)}") };
         if (path == MapSettings.Hour)
         {
             items.Add(Act("The server's clock", "edit map set time server"));
