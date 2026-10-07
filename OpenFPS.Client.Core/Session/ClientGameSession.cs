@@ -803,6 +803,8 @@ public sealed partial class ClientGameSession : IDisposable
                 {
                     _menus.Close();
                     foreach (int id in _world.GetSnapshot().Entities.Keys.ToList()) _audioSystem.ForgetEntity(id);
+                    // The one-offs still queued, rendering or followed (thunder, a line) belong to the old map.
+                    _audioSystem.WorldAudio.Clear();
                     _ownEntityId = -1;
                     _physics.OwnEntityId = -1;
                     _physics.Spatial.OwnEntityId = -1;

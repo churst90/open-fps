@@ -1424,9 +1424,21 @@ public sealed class WorldAudioPlayer
         return y;
     }
 
-    /// <summary>Forgets everything queued, and thunder still rendering: for a map change, where the
-    /// positions mean nothing any more.</summary>
-    public void Clear() { _pending.Clear(); _awaitingRender.Clear(); _following.Clear(); _mapGeneration++; }
+    /// <summary>Forgets everything queued, and thunder still rendering, and stops the voices it was
+    /// following: for a map change, where the positions mean nothing any more.</summary>
+    public void Clear()
+    {
+        // A followed voice left playing stays where it last was: thunder for tens of seconds, a line
+        // finishing in the next map from wherever its speaker stood in the last.
+        foreach (var f in _following) _audio.StopSound(f.Emitter.EntityId);
+        _pending.Clear(); _awaitingRender.Clear(); _following.Clear(); _mapGeneration++;
+    }
+
+    /// <summary>Sounds still to play: queued, waiting for a render, or followed.</summary>
+    internal int Outstanding => _pending.Count + _awaitingRender.Count + _following.Count;
+
+    /// <summary>Raised by each <see cref="Clear"/>.</summary>
+    internal int MapGeneration => _mapGeneration;
 
     /// <summary>
     /// A sound's parameters are its id, so a corridor of identical doors is one buffer. Quantised: a

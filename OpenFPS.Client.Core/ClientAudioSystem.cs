@@ -386,6 +386,7 @@ public class ClientAudioSystem
     public void LeaveWorld(IEnumerable<int> entityIds)
     {
         foreach (int id in entityIds) ForgetEntity(id);
+        WorldAudio.Clear();
         if (_mapAmbienceId.Length > 0) _audio.StopAmbientBed(_mapAmbienceId);
         if (_regionAmbienceId.Length > 0) _audio.StopAmbientBed(_regionAmbienceId);
         _mapAmbienceId = "";

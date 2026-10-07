@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- The probable bugs the Client.Core housekeeping pass reported, one commit each (tests in
+  ProbableBugsTests; renders in inbox/probable-bugs-2026-10-07).
+  - A map change forgets the old map's one-off sounds. `WorldAudioPlayer.Clear` had no caller, so on
+    /join a sound queued for its moment, a first hearing still rendering, a line or a part of the
+    thunder being followed, and thunder still being worked out all carried into the new map, placed by
+    the old one's positions. It now runs on travel and on leaving the world, and stops the voices it
+    was following.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream
