@@ -50,6 +50,7 @@ OpenFPS.Client.Core/AudioEngine/Core/Rail/ElectricDrive.cs	lib	Sound
 OpenFPS.Client.Core/AudioEngine/Core/Rail/RailNoise.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Rail/SteamFrontEnd.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Rail/TrainSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Rail/TrainVoicing.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/ReportMeasure.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/ChimeHorn.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Signals/ElectricHorn.cs	lib	Sound	
@@ -85,6 +86,7 @@ OpenFPS.Client.Core/AudioEngine/Fmod/MachineProcessor.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/Fmod/MasterDither.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/MasterLimiter.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/MasterTap.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/MixerProfile.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/MixerQuality.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/NatureVoices.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/Fmod/NonFinite.cs	lib	Audio	
@@ -113,6 +115,7 @@ OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedReverb.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedReverbDsp.cs	lib	Audio	
 OpenFPS.Client.Core/BeaconAids.cs	host		
 OpenFPS.Client.Core/BirdLife.cs	host		
+OpenFPS.Client.Core/ClientAudioSystem.Trains.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.cs	host		
 OpenFPS.Client.Core/ClientGeometry.cs	host		
 OpenFPS.Client.Core/ClientNetworkService.cs	host		
