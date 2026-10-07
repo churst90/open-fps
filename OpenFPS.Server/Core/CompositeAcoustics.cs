@@ -6,34 +6,15 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// Working out whether a composite is a ROOM, and what kind.
-///
-/// Nobody should have to author the inside of a building they just built. If you put four walls, a
-/// floor and a roof around yourself, you are indoors — that is a fact about the geometry, not a
-/// property somebody remembered to tick. So the question "is this a room" is asked of the parts
-/// themselves, and answered the same way for a shed, a cathedral and the cab of a lorry.
-///
-/// Three things have to be true, and each of them rules out a thing that is not a room:
-///
-///   IT HAS TO BE BIG ENOUGH TO BE INSIDE. A fence is a wall with more wall next to it; whatever its
-///   footprint, one of its dimensions is a wall's thickness, and you cannot be inside that.
-///
-///   IT HAS TO BE MOSTLY EMPTY. A stack of crates the size of a garage is not a garage. If the parts
-///   fill their own bounding box there is nowhere in it to stand.
-///
-///   MOST OF IT HAS TO BE COVERED. A room is a room because of what is between you and the sky. Four
-///   faces out of six is a roofless courtyard, which is generous and deliberately so — the acoustics
-///   of standing in a walled yard genuinely are closer to a room than to a field.
-///
-/// What the room is MADE of comes from the parts too: each of the six faces takes the material of
-/// whichever part covers most of it, and a side or roof nothing covers is open. A glass-sided office
-/// is bright, a carpeted one is not, and a car with metal panels rings — because of what they are
-/// built from, not because anyone said so.
+/// Whether a set of parts encloses a room, and what its six faces are made of, measured from the parts.
+/// A room is big enough to be inside (<see cref="MinimumRoomDimension"/>), mostly empty
+/// (<see cref="MaxSolidFraction"/>) and mostly covered (<see cref="MinimumCoveredFaces"/>; four is a
+/// roofless yard, which sounds closer to a room than a field). Each face takes the material of the part
+/// that covers most of it; a face nothing covers is open.
 /// </summary>
 public static class CompositeAcoustics
 {
-    /// <summary>The smallest a room can be in any direction, metres. Under this you are not inside
-    /// it, you are next to it.</summary>
+    /// <summary>The smallest a room can be in any direction, metres: a fence is never a room.</summary>
     public const float MinimumRoomDimension = 1.0f;
 
     /// <summary>How much of its own bounding box a composite may be made of and still have an inside.</summary>
@@ -49,13 +30,8 @@ public static class CompositeAcoustics
     public static readonly string[] FaceNames = { "floor", "ceiling", "north wall", "south wall", "east wall", "west wall" };
 
     /// <summary>
-    /// What was found when the parts were asked whether they enclose anything — and, when they do
-    /// not, WHICH of the three rules said no and by how much.
-    ///
-    /// The diagnosis is not a debugging aid, it is the feature. A sighted builder can stand back and
-    /// see that the roof is missing; a player who cannot has no way to tell a shed from four walls
-    /// and a hole except by being told. "It is not a room" is a dead end. "Its ceiling is open" is
-    /// an instruction.
+    /// What the parts were found to enclose, and when not a room, which rule said no and by how much:
+    /// "its ceiling is open" is what a builder who cannot see the missing roof needs to be told.
     /// </summary>
     public readonly struct RoomSurvey
     {
@@ -114,11 +90,8 @@ public static class CompositeAcoustics
     };
 
     /// <summary>
-    /// The room a set of parts makes, if they make one.
-    ///
-    /// <paramref name="centre"/> comes back in the composite's own frame, because a composite's origin
-    /// is where it meets the GROUND and a room's centre is half its height above that. Putting the
-    /// room volume at the origin would place its ceiling at your knees.
+    /// The room a set of parts makes, if they make one. <paramref name="centre"/> is in the composite's
+    /// own frame: its origin is at the ground, and a room placed there has its ceiling at your knees.
     /// </summary>
     public static bool Derive(World world, List<Entity> parts, string name,
                               out RegionComponent room, out Vector3 centre)
@@ -141,46 +114,19 @@ public static class CompositeAcoustics
         return true;
     }
 
-    /// <summary>
-    /// Measures a set of parts against all three rules and reports everything it found, whether or
-    /// not they make a room.
-    ///
-    /// Always measures all three rather than stopping at the first failure, because a builder who is
-    /// told only the first thing wrong fixes it and is told the next thing, and building a shed
-    /// becomes twenty round trips. One survey, everything that is wrong with it.
-    /// </summary>
+    /// <summary>Measures a set of parts against all three rules, never stopping at the first failure, so a
+    /// builder hears everything wrong at once.</summary>
     public static RoomSurvey Survey(World world, List<Entity> parts, out Vector3 centre)
         => Survey(Pieces(world, parts, loose: false), out centre);
 
-    /// <summary>
-    /// The same survey, asked of entities that are not in a composite yet.
-    ///
-    /// `/room` is a DRY RUN — it answers "would this be a room if I grouped it" before anyone commits
-    /// to grouping it, which is the difference between finding out your roof is missing now and
-    /// finding out after you have saved it as a template. Loose entities have no parent to be
-    /// relative to, so they are measured in the world's frame, which is exactly the frame a fresh
-    /// grouping would put them in anyway.
-    /// </summary>
+    /// <summary>The same survey of entities not yet grouped, in the world's frame: /room's dry run.</summary>
     public static RoomSurvey SurveyLoose(World world, List<Entity> entities)
         => Survey(Pieces(world, entities, loose: true), out _);
 
     /// <summary>
-    /// The same three questions asked of a box that is ALREADY KNOWN, rather than one derived from
-    /// the parts.
-    ///
-    /// This is what a static map needs and a composite does not. A composite is a thing somebody
-    /// built, so its bounding box IS the room and deriving it is the whole trick. A map's room is a
-    /// place an author named — the region entity — and the walls around it are shared: the wall
-    /// between two flats belongs to both, and the corridor wall runs the length of the building. Ask
-    /// those parts to derive a box and they give you the building.
-    ///
-    /// So the box is given, and the only question asked of the parts is the one an author should not
-    /// have to answer: WHAT IS EACH OF THE SIX FACES MADE OF. A brick flat and a tiled platform stop
-    /// being a list of materials somebody typed and start being a consequence of the walls that are
-    /// actually there — which is the point, because the walls are the thing that gets moved.
-    ///
-    /// A part larger than the face it covers is not a problem: coverage is clamped, and the material
-    /// is whichever part presents the most area, which for a long wall is that wall.
+    /// The same survey of a box that is already known, as a map's region is: its walls are shared with
+    /// its neighbours, so a box derived from them would be the whole building. Coverage is clamped, so a
+    /// wall longer than the face is fine.
     /// </summary>
     public static RoomSurvey SurveyBox(World world, List<Entity> parts, Vector3 centre, Vector3 size)
         => SurveyBox(Pieces(world, parts, loose: true), centre, size);
@@ -206,13 +152,8 @@ public static class CompositeAcoustics
     }
 
     /// <summary>
-    /// A composite's room when the room is KNOWN rather than found: a box in the composite's own
-    /// frame, and only its materials measured from the parts.
-    ///
-    /// A car is the case. Its bonnet and its boot are parts — they are what you walk into — and they
-    /// sit inside the bounding box a derived room is taken from, so deriving it gave the whole car
-    /// back as the room: 4.1 metres of hatchback where the cabin is 2.4, three times the volume, and
-    /// a tail to match. The shell knows exactly where its cabin is, so it says so.
+    /// A composite's room when the box is known (a vehicle's cabin) and only the materials are measured.
+    /// Derived from the parts, a hatchback's room was the whole 4.1 m car, not its 2.4 m cabin.
     /// </summary>
     public static bool DeriveInBox(World world, List<Entity> parts, string name, Vector3 centre, Vector3 size,
                                    out RegionComponent room)
@@ -235,16 +176,8 @@ public static class CompositeAcoustics
 
     /// <summary>
     /// What each face of a surveyed room is made of: the material of the parts that cover it, or open
-    /// (<see cref="RoomAcoustics.OpenFaceMaterial"/>) where they do not. Never the floor: a building
-    /// with no floor of its own stands on the ground, and the ground is a surface.
-    ///
-    /// An uncovered face is NOT a wall. It used to be given the material of whatever covered the most of
-    /// it however little that was, or Generic when nothing did, so a shed with one side open was a
-    /// sealed box to everything that asked its boundary a question: no opening on that side, the
-    /// street outside unheard through it, and a reverberant field that the missing side would have let
-    /// out. A map's rooms have always been measured this way (MapManager.SurveyRegions); a composite
-    /// is the same thing built by a player. Its open faces are openings to whatever is beyond them,
-    /// found from the geometry like every other gap (AcousticVolumeGenerator.AddFaceOpenings).
+    /// (<see cref="RoomAcoustics.OpenFaceMaterial"/>) where they do not. Never open for the floor: the
+    /// ground is a surface. An uncovered face given a material made a shed with one open side a sealed box.
     /// </summary>
     public static int[] FaceMaterials(in RoomSurvey survey)
     {
@@ -290,7 +223,6 @@ public static class CompositeAcoustics
         };
     }
 
-    /// <summary>One part, reduced to the four things this file cares about.</summary>
     private readonly record struct Piece(Vector3 Position, Quaternion Rotation, Vector3 Size, string Material);
 
     private static List<Piece> Pieces(World world, List<Entity> parts, bool loose)
@@ -345,19 +277,9 @@ public static class CompositeAcoustics
     }
 
     /// <summary>
-    /// How much of one face is covered, and by what.
-    ///
-    /// Two questions, and it used only to ask the first. A part belongs to a face if its OUTER edge is
-    /// near that face — near meaning within a quarter of the box's depth, or half a metre, whichever
-    /// is more forgiving, which is the tolerance that lets a wall a little inboard of the corner still
-    /// count as that wall. AND it has to be ACROSS the face: the area credited is the part's overlap
-    /// with the face's own rectangle, not the part's whole cross-section.
-    ///
-    /// For a composite, which is measured inside its own bounding box, those are the same thing and
-    /// nothing changes. For a MAP they are not, and the difference put a roof over the street: the
-    /// first-floor slab of a building is at the right height to be a pavement's ceiling and six metres
-    /// to one side of it, so every stretch of pavement came back enclosed, indoors, with a concrete
-    /// ceiling. A part that is not over you is not your ceiling.
+    /// How much of one face is covered, and by what. A part counts if it is near the face's plane
+    /// (within a quarter of the box's depth or 0.5 m) and is credited only its overlap with the face's
+    /// rectangle: a slab six metres to one side is not your ceiling (docs/THE_CITY_BLOCK.md).
     /// </summary>
     private static float Face(List<Piece> pieces, Vector3 size, Vector3 centre,
                               int axis, float side, out string material)
@@ -380,15 +302,8 @@ public static class CompositeAcoustics
         {
             var half = AxisAlignedHalfExtents(piece.Size * 0.5f, piece.Rotation);
 
-            // How far the part is from the face's plane, measured to its NEAREST edge and zero if the
-            // plane runs through it.
-            //
-            // It used to measure to the part's OUTER edge, which is the same answer for a composite —
-            // there the box is derived FROM the parts, so a wall's outer edge is the face — and quite
-            // wrong for a box that was drawn first. A tunnel wall three and a half metres thick has
-            // its outer edge three and a half metres away from the room it encloses, so the tunnel
-            // came back with no side walls at all and read as open sky. What faces you is the side of
-            // the wall that faces you.
+            // Measured to the part's nearest edge, zero if the plane runs through it: to its outer edge,
+            // the tunnel's 3.5 m walls were not walls and it read as open sky.
             float lo = Component(piece.Position, a) - Component(half, a);
             float hi = Component(piece.Position, a) + Component(half, a);
             float gap = plane < lo ? lo - plane : plane > hi ? plane - hi : 0f;
@@ -400,20 +315,9 @@ public static class CompositeAcoustics
 
             covered += area;
 
-            // ── Which of several parts on one face is the face ──────────────────────────────────
-            //
-            // Biggest area first, and that settles nearly everything. Two more rules settle the rest,
-            // and both were paid for by the city's floors:
-            //
-            // NEARER WINS a tie on area. A flat's ceiling is the concrete slab over it, and the
-            // CARPET OF THE FLAT ABOVE lies on the far side of that slab, covering exactly the same
-            // rectangle and landing inside the same tolerance. Tied on area, whichever was written
-            // last took the face, and every flat came back with a carpeted ceiling.
-            //
-            // INNERMOST WINS a tie on both. A carpet laid on a slab touches the same plane as the
-            // slab, so neither is nearer — and the one you are standing on is the one that reaches
-            // further INTO the room. That is the whole of what "laid on top of" means to a listener,
-            // and without it a carpeted floor measured as the concrete underneath it.
+            // Which part is the face: the biggest area; on a tie the nearer (else the flat above's carpet
+            // made every ceiling carpet); on a tie of both the one reaching further into the room (else a
+            // carpeted floor measured as the slab under it).
             float reach = -side * (Component(piece.Position, a) - side * Component(half, a));
             bool wins = area > best * 1.05f
                      || (area > best * 0.95f && (gap < bestGap - 0.05f
@@ -427,13 +331,8 @@ public static class CompositeAcoustics
     private static float Overlap(float centre, float half, float lo, float hi)
         => MathF.Max(0f, MathF.Min(centre + half, hi) - MathF.Max(centre - half, lo));
 
-    /// <summary>
-    /// The bounding box of a set of parts in their composite's own frame, and its centre.
-    ///
-    /// Rotated parts are measured by the box that CONTAINS them, not by their own dimensions: a wall
-    /// turned ninety degrees is two metres of wall across, not half a metre, and measuring it the
-    /// naive way makes every building that has corners come out the wrong shape.
-    /// </summary>
+    /// <summary>The bounding box of a set of parts in their composite's own frame, and its centre; a turned
+    /// part counts by the box that contains it.</summary>
     public static Vector3 Bounds(World world, List<Entity> parts, out Vector3 centre)
         => Bounds(Pieces(world, parts, loose: false), out centre);
 

@@ -59,7 +59,7 @@ public sealed class TileInterest
 /// client is told about.
 ///
 /// On joining, <see cref="Begin"/> chooses the tiles round where the player will arrive and the join
-/// sends them all at once, as the whole map used to be sent. After that <see cref="Update"/> runs every
+/// sends them all at once. After that <see cref="Update"/> runs every
 /// tick for every player on the map: when the player has moved <see cref="MoveMetres"/> or changed their
 /// detail setting it works the levels out again; tiles that went down have their entities removed at
 /// once, tiles that went up are queued nearest first, and the queue is sent at most

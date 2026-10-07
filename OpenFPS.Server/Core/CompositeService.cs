@@ -8,24 +8,9 @@ using Serilog;
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// Turning a pile of entities into a thing, and back.
-///
-/// Four operations, and between them they answer four questions that looked separate: how does
-/// somebody build a house, how do they customise it, can they later classify it as an object, and is
-/// it permanent where they built it.
-///
-///   GROUP   takes what is already standing there and makes it one thing with an origin.
-///   UNGROUP undoes that, leaving the same entities exactly where they were.
-///   SAVE    writes that thing to disk as a template, so it can be placed again by anyone.
-///   PLACE   instantiates a template into the world.
-///
-/// Customising is then not a feature at all — it is grouping, adding or moving parts, and saving
-/// again. And "permanent" is a property of the PLACEMENT (the map records it), not of the walls.
-///
-/// None of this needed a new transform system. Members wear a <see cref="ParentComponent"/> pointing
-/// at the root, and ParentSystem — which has run every tick since long before any of this — already
-/// carries them with it. A house that never moves and a vehicle you can drive away are the same
-/// structure; only whether anything moves the root differs.
+/// Composites: group what stands near you into one thing, ungroup it, save it as a template, place a
+/// template. Members carry a <see cref="ParentComponent"/> to the root and ParentSystem moves them, so
+/// a house and a car you built are the same structure. See docs/SERVER_NOTES.md, "Composites".
 /// </summary>
 public class CompositeService
 {
@@ -43,14 +28,7 @@ public class CompositeService
     public CompositeRepository Templates => _composites;
     public PrefabRepository Prefabs => _prefabs;
 
-    /// <summary>
-    /// What a grouping sweep will and will not take.
-    ///
-    /// Players, vehicles and anything already in a composite are left alone — a house cannot swallow
-    /// the person building it, or the car parked outside, or the shed next door. Everything else
-    /// within reach is fair game, because "everything I can see around me" is the selection a person
-    /// can actually make when they cannot point at anything.
-    /// </summary>
+    /// <summary>Whether a grouping sweep may take a thing: not players, vehicles, or anything already in a composite.</summary>
     public static bool CanBeGrouped(World world, Entity e)
         => world.IsAlive(e)
         && world.Has<Transform>(e)
@@ -60,11 +38,8 @@ public class CompositeService
         && !world.Has<ParentComponent>(e);
 
     /// <summary>
-    /// Makes one thing out of everything solid standing near a point.
-    ///
-    /// The origin is the CENTRE of what was taken, in the ground plane, and at the lowest point
-    /// vertically — which is to say, where the thing meets the ground. That matters for placing it
-    /// again later: a house placed at your feet should have its floor at your feet, not its middle.
+    /// Makes one thing out of everything standing near a point. Its origin is the middle of what was
+    /// taken at its lowest point, so a house placed again at your feet has its floor at your feet.
     /// </summary>
     public int Group(string mapId, Vector3 near, float radius, string name, bool anchored,
                      string owner, out int partCount)
@@ -110,16 +85,9 @@ public class CompositeService
     }
 
     /// <summary>
-    /// Makes a composite and everything in it move-able, as far as the spatial grid is concerned.
-    ///
-    /// The grid keeps two halves: a static one, built once and rebuilt only when geometry is created
-    /// or destroyed, and a dynamic one rebuilt from scratch every tick. Which half a thing goes in is
-    /// decided by whether it carries a <see cref="Velocity"/>. A free composite's walls MOVE, so
-    /// leaving them in the static half would leave the car's body permanently parked where it was
-    /// built: players colliding with a ghost of it, and the audio hearing it there.
-    ///
-    /// The rebuild at the end is what evicts those stale static entries; it is the only way the
-    /// static half can forget anything.
+    /// Moves a composite and its members into the grid's dynamic half by giving them a
+    /// <see cref="Velocity"/>. Left static, a moving body leaves a ghost where it was built. The
+    /// rebuild at the end is the only way the static half forgets an entry.
     /// </summary>
     private void MakeDynamic(string mapId, World world, Entity root, List<Entity> members)
     {
@@ -140,12 +108,8 @@ public class CompositeService
     }
 
     /// <summary>
-    /// Whether somebody may take this composite apart, save it out, change what it is, or drive it.
-    ///
-    /// Owning something is not the same as having a fence round it. A composite with no owner is
-    /// public property, an elevated role can do anything, and NOTHING here gates walking into a
-    /// building or sitting in a passenger seat — a world where you cannot enter other people's
-    /// houses is not a world, it is a street of locked doors.
+    /// Whether somebody may take this composite apart, save it, change it or make it drive: its owner,
+    /// anybody when it has none, or an elevated role. Going into it or sitting in it is never gated.
     /// </summary>
     public static bool MayModify(World world, Entity root, string requester, bool elevated)
     {
@@ -157,17 +121,8 @@ public class CompositeService
     }
 
     /// <summary>
-    /// Whether a thing is too big to have been what somebody meant.
-    ///
-    /// A sweep is somebody standing in a place and saying "this, and everything round me". The floor
-    /// they are standing on is within twelve metres of them and so is the field it sits in, and
-    /// neither is what they meant — you cannot be SELECTING something whose far side is nowhere near
-    /// you. So anything wider than the sweep itself is not in it.
-    ///
-    /// Geometric, not a list of things called floors. The same rule keeps a house out of a sweep
-    /// meant for the table inside it and lets a twelve-metre sweep take a twelve-metre wall, which is
-    /// exactly the line a person would draw. Widen the radius and the bigger thing comes into scope,
-    /// which is also right: at thirty metres you plainly do mean the building.
+    /// Whether a thing is wider than the sweep itself, and so not what somebody standing there meant:
+    /// the floor under them, the field round them. Widen the radius and it comes into scope.
     /// </summary>
     public static bool IsBiggerThanTheSweep(World world, Entity e, float radius)
     {
@@ -193,17 +148,9 @@ public class CompositeService
     }
 
     /// <summary>
-    /// Shuts every door in a set and makes it forget where "shut" was.
-    ///
-    /// A door records its shut pose in whatever frame it lives in — world for one standing on its
-    /// own, parent-local for one that is part of a building. Grouping and ungrouping CHANGE that
-    /// frame, so a door that remembers a world position and is then asked to swing as a part
-    /// computes its local pose from a world one and flings the leaf out of the world. Found exactly
-    /// that way: a shed's door opened perfectly until the shed was grouped, and then vanished.
-    ///
-    /// Shutting it first rather than trying to carry the swing across is the honest answer. A door
-    /// shuts when the building it belongs to is picked up or taken apart, which is both easy to say
-    /// and what anybody would expect.
+    /// Shuts every door in a set and makes it forget where "shut" was. A door keeps its shut pose in
+    /// the frame it lives in, and grouping changes that frame: a door that kept a world pose and then
+    /// swung as a part flung its leaf out of the world.
     /// </summary>
     private static void ShutAndForget(World world, IEnumerable<Entity> entities)
     {
@@ -225,14 +172,7 @@ public class CompositeService
         }
     }
 
-    /// <summary>
-    /// Undoes a grouping without moving anything.
-    ///
-    /// The parts keep the world transforms they had a moment ago, because those transforms were never
-    /// derived from the root while it stood still — the root was put where they already were. That is
-    /// what makes group and ungroup safe to use while experimenting, which is what anyone building
-    /// something will actually be doing.
-    /// </summary>
+    /// <summary>Undoes a grouping without moving anything: the parts keep the world transforms they have.</summary>
     public bool Ungroup(string mapId, int rootId, string requester, bool elevated,
                         out string name, out int partCount, out string error)
     {
@@ -249,28 +189,25 @@ public class CompositeService
         var members = new List<Entity>();
         foreach (var member in MembersOf(world, rootId))
         {
-            // The room went with the building, so it goes with the building being taken apart. Left
-            // behind it would be an invisible volume in a field that still sounds like a room.
+            // Left behind, the derived room would be a field that still sounds like a room.
             if (world.Has<DerivedRoomComponent>(member)) { _maps.DestroyEntity(mapId, member); continue; }
             world.Remove<ParentComponent>(member);
             members.Add(member);
             partCount++;
-            // Its frame just changed from the building's to the world's; see ShutAndForget.
             if (world.Has<DoorComponent>(member)) ShutAndForget(world, new[] { member });
         }
-        // Whoever was inside it is standing in the open now; the thing they were sitting in is gone.
         foreach (var occupant in OccupantsOf(world, rootId)) Disembark(world, occupant);
 
         if (!composite.Anchored) MakeStatic(mapId, world, members);
         lookup.Remove(rootId);
         world.Destroy(root);
-        // The root itself may have been in the static half of the grid; only a rebuild forgets it.
+        // The root may be in the grid's static half; only a rebuild forgets it.
         if (composite.Anchored) _maps.RefreshGrid(mapId);
         Log.Information("Composite '{Name}' ungrouped into {Count} loose entit(ies).", name, partCount);
         return true;
     }
 
-    /// <summary>Every entity currently parented to this root — the parts it is MADE of.</summary>
+    /// <summary>Every entity parented to this root, the derived room included.</summary>
     public static List<Entity> MembersOf(World world, int rootId)
     {
         var found = new List<Entity>();
@@ -279,13 +216,8 @@ public class CompositeService
         return found;
     }
 
-    /// <summary>
-    /// The parts a composite is BUILT from — its members, less the room it derived for itself.
-    ///
-    /// The derived room is a member in every mechanical sense (it is parented, it is carried, it is
-    /// destroyed with the thing) and is not a part in any meaningful one: nobody built it, it cannot
-    /// be saved, and measuring the building's own size by including it would be measuring the answer.
-    /// </summary>
+    /// <summary>The parts a composite is built from: its members less the room it derived, which nobody
+    /// built, cannot be saved, and would be measuring the answer.</summary>
     public static List<Entity> PartsOf(World world, int rootId)
     {
         var parts = MembersOf(world, rootId);
@@ -293,7 +225,7 @@ public class CompositeService
         return parts;
     }
 
-    /// <summary>Everyone currently inside this root — the people it is CARRYING.</summary>
+    /// <summary>Everyone sitting in this root.</summary>
     public static List<Entity> OccupantsOf(World world, int rootId)
     {
         var found = new List<Entity>();
@@ -302,12 +234,7 @@ public class CompositeService
         return found;
     }
 
-    /// <summary>
-    /// Takes somebody out of whatever they were in, wherever they now are.
-    ///
-    /// Deliberately does NOT move them: the caller knows whether this is getting out (put them down
-    /// beside it) or the thing they were in ceasing to exist (leave them exactly where it left them).
-    /// </summary>
+    /// <summary>Takes somebody out of whatever they were in, without moving them: where they go is the caller's to say.</summary>
     public static void Disembark(World world, Entity occupant)
     {
         if (!world.IsAlive(occupant) || !world.Has<OccupantComponent>(occupant)) return;
@@ -319,8 +246,7 @@ public class CompositeService
         }
     }
 
-    /// <summary>The composite root nearest a point, or -1. How a player refers to "this house" when
-    /// they are standing in it and cannot click on anything.</summary>
+    /// <summary>The composite root nearest a point, or -1: how a player says "this house".</summary>
     public int NearestRoot(string mapId, Vector3 near, float radius)
     {
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return -1;
@@ -334,13 +260,8 @@ public class CompositeService
         return best;
     }
 
-    /// <summary>
-    /// Writes a live composite to disk as something anyone can place again.
-    ///
-    /// The parts are recorded in the composite's OWN frame, which is why the root's origin mattered
-    /// when it was grouped: everything here is relative to it, so placing the template anywhere
-    /// reproduces the same arrangement rather than the same coordinates.
-    /// </summary>
+    /// <summary>Writes a live composite to disk as a template anyone can place, its parts, seats and
+    /// vehicle in its own frame.</summary>
     public bool SaveAsTemplate(string mapId, int rootId, string templateId, string requester, bool elevated,
                                out int partCount, out string error)
     {
@@ -364,9 +285,6 @@ public class CompositeService
             Anchored = composite.Anchored,
         };
 
-        // Seats and the vehicle profile are part of what the thing IS, so they go out with it. Place
-        // the template again and the second one has the same seats and the same engine, the same way
-        // it has the same walls.
         if (world.Has<OccupancyComponent>(root))
             foreach (var seat in world.Get<OccupancyComponent>(root).Seats)
                 template.Seats.Add(new SeatDefinition
@@ -386,8 +304,7 @@ public class CompositeService
             string prefabId = world.Has<IdentityComponent>(member) ? world.Get<IdentityComponent>(member).PrefabId : "";
             if (string.IsNullOrWhiteSpace(prefabId))
             {
-                // A part with no prefab behind it cannot be rebuilt from a template, and silently
-                // dropping it would produce a house missing a wall with nothing to say why.
+                // Refused rather than dropped: a house missing a wall with nothing to say why.
                 error = $"a part has no prefab id and cannot be saved; ungroup and rebuild it from prefabs";
                 return false;
             }
@@ -403,8 +320,6 @@ public class CompositeService
         if (partCount == 0) { error = "it has no parts"; return false; }
 
         _composites.Save(template);
-        // The composite now knows what it is an instance of — which is precisely the "build it out of
-        // parts, then classify it as an object" step.
         ref var live = ref world.Get<CompositeComponent>(root);
         live.TemplateId = templateId;
         return true;
@@ -430,12 +345,8 @@ public class CompositeService
     }
 
     /// <summary>
-    /// A vehicle shell for the map's own traffic to drive: a bus you can get on.
-    ///
-    /// The same shell a parked car is, with two differences. It has no engine of its own to drive —
-    /// VehicleSystem moves it along its route, exactly as it moves every other bus — so no
-    /// DriveComponent, which would have DrivingSystem trying to drive it too. And it has no seat that
-    /// drives: somebody is already driving it. Not recorded on the map: the route spawns it.
+    /// A vehicle shell for the map's own traffic to drive (a bus you can get on): passenger seats only and
+    /// no DriveComponent, or DrivingSystem would drive it too. Not recorded on the map: the route spawns it.
     /// </summary>
     public Entity InstantiateForTraffic(string mapId, string preset, Vector3 position, Quaternion rotation)
     {
@@ -451,11 +362,8 @@ public class CompositeService
     }
 
     /// <summary>
-    /// Puts a saved composite into the world, and records that it is there.
-    ///
-    /// The recording is the important half. An instance that exists only in memory is a house until
-    /// the server restarts; appending the placement to the map's own data is what makes it a house
-    /// afterwards too. <see cref="MapManager.SaveMap"/> is what commits that to disk.
+    /// Puts a saved composite into the world and records the placement in the map's data, which
+    /// <see cref="MapManager.SaveMap"/> commits to disk.
     /// </summary>
     /// <param name="record">False for something that lasts until a restart: a vehicle spawned on a
     /// shipped map (<see cref="MapManager.IsShipped"/>).</param>
@@ -481,11 +389,8 @@ public class CompositeService
     }
 
     /// <summary>
-    /// Rebuilds every composite each loaded map says is standing on it.
-    ///
-    /// Called once at startup, after the maps are loaded and before anything measures them — a placed
-    /// building is geometry, and the acoustic scene, the spatial grid and the broadcast radius all
-    /// have to be sized with it in place rather than around a hole where it will appear later.
+    /// Rebuilds every composite each loaded map records. Once at startup, after the maps load and before
+    /// anything measures them: the acoustics, grid and broadcast radius must include the buildings.
     /// </summary>
     public void PlaceRecorded(MapManager maps)
     {
@@ -523,9 +428,8 @@ public class CompositeService
     public const string AircraftPrefix = "aircraft:";
 
     /// <summary>
-    /// An aircraft parked on the ground. Nobody can fly one yet (they fly their circuits from the map),
-    /// so it is a body standing there with a name. Recorded on the map as a placement when
-    /// <paramref name="record"/>, so /savemap keeps it as it keeps a parked car.
+    /// An aircraft parked on the ground: a body with a name, since nobody can fly one yet. Recorded on the
+    /// map when <paramref name="record"/>, so /savemap keeps it as it keeps a parked car.
     /// </summary>
     public Entity ParkAircraft(string mapId, string preset, Vector3 position, Quaternion rotation, string owner, bool record)
     {
@@ -563,8 +467,7 @@ public class CompositeService
         _ => preset.Replace('_', ' '),
     };
 
-    /// <summary>Builds an instance without recording a placement — used by map load, which is
-    /// replaying placements that are already recorded.</summary>
+    /// <summary>Builds an instance without recording a placement (map load replays recorded ones).</summary>
     public int Instantiate(string mapId, CompositeTemplate template, Vector3 position, Quaternion rotation,
                            string owner, out int partCount)
     {
@@ -578,8 +481,6 @@ public class CompositeService
             new IdentityComponent
             {
                 Name = template.Name, Description = template.Description, Announce = true,
-                // Something you can get into and drive is a vehicle beacon: that is how you find
-                // the parked car.
                 BeaconCategory = string.IsNullOrWhiteSpace(template.VehiclePreset) ? "" : OpenFPS.Common.Beacons.Vehicle,
             },
             EntityType.StaticObject));
@@ -633,15 +534,9 @@ public class CompositeService
     // ── The inside of it ────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Gives a composite the room it encloses, or takes away the one it no longer does.
-    ///
-    /// Called every time the shape changes — grouped, placed, rebuilt. Cheap, and idempotent: the
-    /// derived room is destroyed and made again from what is actually there now, so a wall added or a
-    /// roof taken off is reflected without anyone having to say which change invalidates what.
-    ///
-    /// The room is a PART, not a flag on the root, so ParentSystem carries it with the building for
-    /// free and a house you drive away takes its acoustics with it. It is exactly what somebody
-    /// authoring a building by hand is already told to do.
+    /// Gives a composite the room it encloses, or takes away the one it no longer does. Call it whenever
+    /// the shape changes; the room is made again from what is there. It is a part, so it travels with
+    /// the building.
     /// </summary>
     public bool RefreshRoom(string mapId, int rootId)
     {
@@ -678,19 +573,14 @@ public class CompositeService
             },
             new ParentComponent { ParentEntityId = root.Id, LocalPosition = centre, LocalRotation = Quaternion.Identity },
             room,
-            // Not solid — it is a volume, not an obstacle. It needs a collider all the same: the
-            // broadcast walks the spatial grid, and the grid only carries things that have one, so a
-            // room without a body is a room no client is ever told about.
+            // Not solid, but it needs a collider: the broadcast walks the grid, which only carries things with one.
             new ColliderComponent { Shape = ColliderShape.Box, Size = room.RoomSize, IsSolid = false },
             new DerivedRoomComponent(),
             new NameComponent { Name = room.FriendlyName },
             EntityType.Trigger));
         if (e == Entity.Null) return false;
 
-        // Every door in the building now leads somewhere: from this room to the outside. Which room a
-        // doorway joins is a property of WHERE IT IS, and until the room existed there was nothing
-        // for it to be a doorway into — so this is the moment the link can be made, and it is remade
-        // whenever the shape changes for the same reason.
+        // Every door in the building now joins this room to the outside.
         int doors = 0;
         foreach (var part in parts)
         {
@@ -708,14 +598,8 @@ public class CompositeService
 
     // ── Seats, and driving ──────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Puts a seat where somebody is standing.
-    ///
-    /// Authored by standing in the right place rather than by typing coordinates, for the same reason
-    /// grouping is by radius: a player here cannot point at anything, but they can always walk to a
-    /// spot and say "here". The seat is recorded in the composite's OWN frame, so it survives the
-    /// thing being saved, placed again, and turned to face another way.
-    /// </summary>
+    /// <summary>Puts a seat where somebody is standing, facing their way, in the composite's own frame so it
+    /// survives saving, placing again and turning.</summary>
     public bool AddSeat(string mapId, int rootId, string seatName, bool controls, Vector3 worldPosition,
                         float worldYaw, string requester, bool elevated, out string error)
     {
@@ -763,9 +647,8 @@ public class CompositeService
         int index = occupancy.Seats.FindIndex(x => string.Equals(x.Name, seatName, StringComparison.OrdinalIgnoreCase));
         if (index < 0) { error = $"no seat called '{seatName}'"; return false; }
 
-        // Everyone at or beyond the removed seat is put out: the indices behind it all shift, and a
-        // passenger silently moved into the driver's seat by a list edit is not a thing that should
-        // be able to happen.
+        // Everyone at or beyond the removed seat is put out: the indices shift, and a list edit must not
+        // move a passenger into the driver's seat.
         foreach (var occupant in OccupantsOf(world, rootId))
             if (world.Get<OccupantComponent>(occupant).SeatIndex >= index) Disembark(world, occupant);
 
@@ -774,17 +657,8 @@ public class CompositeService
     }
 
     /// <summary>
-    /// Makes a composite drive.
-    ///
-    /// Everything this adds is something the map's own traffic already has: a profile naming the
-    /// engine and the tyres, a velocity so the world treats it as a thing that moves, a body the
-    /// grid can see, and a synthesised engine the client runs itself from the speed it is told. That
-    /// is the point — a car somebody built out of walls and a car the map spawned are the same kind
-    /// of object, so every bit of machinery that already makes traffic audible works on this one
-    /// without knowing it exists.
-    ///
-    /// It must be a FREE composite. A house that drives away is a caravan, and saying so is the one
-    /// line of policy in here.
+    /// Makes a free composite with a driving seat drive: the profile, velocity, body and engine voice the
+    /// map's own traffic has, so a car built from walls is the same kind of object as one the map spawned.
     /// </summary>
     public bool MakeDrivable(string mapId, int rootId, string preset, string requester, bool elevated, out string error)
     {
@@ -802,14 +676,8 @@ public class CompositeService
         return MakeDrivable(mapId, world, root, preset, out error);
     }
 
-    /// <summary>
-    /// Whether anybody could actually drive this.
-    ///
-    /// A vehicle with no driving seat is not a vehicle, it is a shed with an engine in it: nothing
-    /// can ever ask it to move, so all an engine buys it is a noise. Refusing at the moment somebody
-    /// says "make it drivable" is the only place the refusal helps — by the time it is a saved
-    /// template being placed on a map at startup, the person who could have added a seat is long gone.
-    /// </summary>
+    /// <summary>Whether anybody could drive this: it has a seat that controls it. Checked when somebody asks
+    /// for it to drive, the one moment the refusal can still be acted on.</summary>
     public static bool HasDrivingSeat(World world, Entity root)
         => world.Has<OccupancyComponent>(root)
         && world.Get<OccupancyComponent>(root).Seats is { Count: > 0 } seats
@@ -835,22 +703,17 @@ public class CompositeService
         });
         SetOrAdd(world, root, new SoundEmitterComponent
         {
-            // The client recognises the "engine:" prefix and runs the engine itself, following the
-            // speed this entity reports. The server decides where the car is and how fast; it knows
-            // nothing about exhausts.
+            // "engine:" makes the client run the engine itself from the speed this entity reports.
             IsSynth = true,
             SoundId = "engine:" + preset,
             Mode = PlaybackMode.LoopOne,
             Volume = 1f,
             Range = Loudness.AudibleRange(profile.SourceLevelDb),
             MinDistance = 3f,
-            // Parked with the engine off. The key starts it (DrivingSystem.SetIgnition), and the
-            // client cranks it on the starter when this flips, because that is what Running does to
-            // an engine voice that was stopped.
+            // Parked with the engine off; the key (DrivingSystem.SetIgnition) flips this and the client cranks it.
             SynthRunning = false,
         });
-        // A body, so the grid carries it into earshot and a person can walk into it. Not solid: the
-        // parts it is built from are the solid things, and they are already here.
+        // A body so the grid carries it into earshot; not solid, since its parts are.
         SetOrAdd(world, root, new ColliderComponent
         {
             Shape = ColliderShape.Box,

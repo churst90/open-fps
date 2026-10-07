@@ -9,9 +9,7 @@ using Serilog;
 
 namespace OpenFPS.Server.Core;
 
-/// <summary>
-/// Responsible for low-level UDP networking, message queuing, and reliable delivery.
-/// </summary>
+/// <summary>The UDP side: LiteNetLib peers, admission limits, received messages queued for the tick, and sends.</summary>
 public class NetworkService : INetEventListener
 {
     private NetManager _netManager = null!;
@@ -44,9 +42,7 @@ public class NetworkService : INetEventListener
     
     /// <summary>
     /// Offered each message as it is received, during <see cref="PollEvents"/> on the loop thread; true
-    /// means it has been handled and is not queued for the next tick. For voice, which would otherwise wait
-    /// up to a whole tick (33 ms) on the server before being relayed, and arrive at every listener that
-    /// much later and that much more unevenly.
+    /// means handled and not queued for the tick. For voice, which would otherwise wait up to 33 ms.
     /// </summary>
     public Func<NetPeer, IMessage, bool>? HandleNow;
 
@@ -78,8 +74,7 @@ public class NetworkService : INetEventListener
 
     /// <summary>
     /// Sends what is queued now rather than at the library's next update, up to 15 ms away. For voice:
-    /// held to the update, frames leave in bunches, and every listener's jitter buffer has to be that much
-    /// longer to smooth them out again.
+    /// frames held to the update leave in bunches, and every jitter buffer must grow to match.
     /// </summary>
     public void Flush() => _netManager.TriggerUpdate();
 
@@ -100,24 +95,10 @@ public class NetworkService : INetEventListener
     }
 
     /// <summary>
-    /// Sends a world-state update, SPLIT into as many packets as it takes to fit.
-    ///
-    /// LiteNetLib does not fragment unreliable packets: past the peer's single-packet size it throws
-    /// `TooBigPacketException` and the send does not happen. The broadcast loop catches, logs and
-    /// moves on, so the entire tick's world state is simply LOST — every entity, for every client.
-    ///
-    /// Eight cars fitted in 1023 bytes and thirty do not, which is how raising the field turned this
-    /// from dormant into constant: 47 dropped ticks in three minutes. A dropped tick freezes every
-    /// entity until one gets through, and because the packet is only sometimes over the line — it
-    /// depends how many cars are in range of that player — it is intermittent, and it lands on
-    /// whichever cars happened to be moving. Heard exactly as reported: some of the cars, not all of
-    /// them, stopping for about a second in front of you and then carrying on.
-    ///
-    /// The states go packed (<see cref="StatePacking"/>), and a tick that does not fit one packet is cut
-    /// at state boundaries into packets filled as far as the peer allows. It used to be halved until each
-    /// half fitted, which left packets anywhere between half full and full: more packets than the bytes
-    /// needed, each with its own header. Every piece keeps the same Tick, so the client reassembles them
-    /// into one snapshot.
+    /// Sends a world-state update split into as many packets as it takes to fit, each with the same Tick
+    /// for the client to reassemble. LiteNetLib does not fragment unreliable packets: one too big throws
+    /// and the whole tick is lost for that client (docs/AUDIO_LOAD_DROPOUTS.md, section 2). The states go
+    /// packed (<see cref="StatePacking"/>), cut at state boundaries into packets filled as far as allowed.
     /// </summary>
     public void SendStateUpdate(NetPeer peer, ServerStateUpdate update, DeliveryMethod deliveryMethod)
     {
@@ -140,10 +121,7 @@ public class NetworkService : INetEventListener
 
     private static readonly List<EntityState> NoStates = new();
 
-    /// <summary>
-    /// A tick's update as the packets it goes in, each no bigger than <paramref name="maxBytes"/>
-    /// serialised. Public for the tests.
-    /// </summary>
+    /// <summary>A tick's update as the packets it goes in, each no bigger than <paramref name="maxBytes"/> serialised.</summary>
     public static List<ServerStateUpdate> Pieces(ServerStateUpdate update, int maxBytes)
     {
         var offsets = new List<int>();
@@ -159,8 +137,7 @@ public class NetworkService : INetEventListener
             while (last < count && offsets[last + 1] - offsets[first] <= budget) last++;
             if (offsets[last] - offsets[first] > budget)
             {
-                // Only ever one state on its own: one entity that will not fit is not a splitting
-                // problem. Say so rather than loop for ever.
+                // One entity that will not fit on its own is not a splitting problem: said, not looped on.
                 Log.Warning("A single entity state is larger than the packet limit ({Max} bytes); dropped.", maxBytes);
                 first = last;
                 continue;
@@ -174,14 +151,9 @@ public class NetworkService : INetEventListener
     }
 
     /// <summary>
-    /// One packet of a tick: everything the client is told about ITSELF, and some of the states,
-    /// packed.
-    ///
-    /// Each piece is a whole update, not just the states. The pieces used to be rebuilt from three
-    /// fields, so RidingEntityId arrived as its default of -1 in every split update: on a map big enough
-    /// to split every tick, which the city is, a player in a driving seat was told every tick that they
-    /// were standing in the road. They heard their own footsteps, their own car from outside, no cabin
-    /// and no lane lines, and the client walked their ears away from the seat.
+    /// One packet of a tick: everything the client is told about itself, and some of the states. Every
+    /// piece carries all of the update's own fields; a piece without RidingEntityId told a driver every
+    /// tick that they were on foot.
     /// </summary>
     public static ServerStateUpdate Piece(ServerStateUpdate whole, byte[] packed) => new()
     {

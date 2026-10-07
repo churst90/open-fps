@@ -21,8 +21,7 @@ namespace OpenFPS.Server.Core;
 /// The cost is that a server that dies without shutting down loses what was being carried at that
 /// moment, the way it loses everything else in the world; a clean shutdown stores everybody first.
 ///
-/// If the store cannot keep them (a store with no table for it, or a write that failed), the things
-/// are put down where the body stood, which is what happened to everything before this existed.
+/// If the store cannot keep them (no table for it, or a failed write), they are put down where the body stood.
 /// </summary>
 public sealed class PlayerStore
 {

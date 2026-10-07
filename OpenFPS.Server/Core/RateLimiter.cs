@@ -4,13 +4,9 @@ using System.Net;
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// A token bucket per key, used to put a ceiling on how often one source may attempt an expensive or
-/// security-sensitive operation.
-///
-/// Login and registration are both: each verifies a bcrypt hash (deliberately slow) and each is a
-/// credential guess. Unthrottled, one host can both mine the account list and occupy the server doing
-/// it. The bucket is keyed by remote address rather than by connection id — a connection id is free to
-/// churn, an address is not. See <see cref="AddressKey"/> for what "an address" means for IPv6.
+/// A token bucket per key: a ceiling on how often one source may try something expensive or
+/// security-sensitive, such as a login (a slow bcrypt check and a credential guess). Keyed by address,
+/// not connection id, which is free to churn; see <see cref="AddressKey(IPAddress?)"/> for IPv6.
 /// </summary>
 public sealed class RateLimiter
 {
@@ -21,10 +17,8 @@ public sealed class RateLimiter
     }
 
     /// <summary>
-    /// The most keys held at once. Past this a prune runs at once rather than once a minute, and if
-    /// every bucket is still in use a NEW key is refused until some refill. Refusing is the safe way
-    /// round: a spray from a million addresses must not be able to grow the table without bound, and
-    /// the keys already in it are the ones that were here first.
+    /// The most keys held at once. Past this a prune runs at once, and if every bucket is still in use a
+    /// new key is refused until some refill: a spray from a million addresses must not grow the table.
     /// </summary>
     public const int MaxKeys = 10_000;
 

@@ -37,3 +37,38 @@ map they own, and staff's anywhere (Permissions.OnOwnMap). Getting into things, 
 and teams are every player's: building the thing you get into is the part that needs a role. Every
 carrying verb takes an optional name, because a player who cannot point has to be able to say which one
 they meant, and every refusal says what is in the way rather than merely no.
+
+## Composites
+
+Four operations answer four questions that looked separate: how somebody builds a house, how they
+customise it, whether they can later classify it as an object, and whether it is permanent where they
+built it.
+
+- Group takes what is already standing there and makes it one thing with an origin. The selection is a
+  radius, not a pick: "everything within twelve metres of me" is a selection somebody who cannot point
+  can make, and widen or narrow. Anything wider than the sweep (the floor, the field) is left out; at
+  thirty metres you plainly do mean the building.
+- Ungroup undoes it, leaving the same entities exactly where they were, which makes group and ungroup
+  safe to use while experimenting.
+- Save writes the thing to disk as a template, in its own frame, so it can be placed again anywhere.
+- Place instantiates a template and records the placement in the map's data; /savemap commits it.
+
+Customising is then not a feature: it is grouping, adding or moving parts, and saving again.
+"Permanent" is a property of the placement (the map records it), not of the walls.
+
+No new transform system was needed. Members carry a ParentComponent pointing at the root and
+ParentSystem, which runs every tick, carries them. A house that never moves and a vehicle you can drive
+away are the same structure; only whether anything moves the root differs. The derived room is a part
+too, so a house you drive away takes its acoustics with it.
+
+Ownership is not a fence. A composite with no owner is public, an elevated role can do anything, and
+nothing gates walking into a building or sitting in a passenger seat: a world where you cannot enter
+other people's houses is a street of locked doors.
+
+A composite made drivable gets exactly what the map's own traffic has (a profile, a velocity, a body the
+grid can see, an engine voice the client runs from the speed), so all the machinery that makes traffic
+audible works on it unchanged. It must be free: a house that drives away is a caravan.
+
+Doors are shut and forget their shut pose when grouped or ungrouped. A door records that pose in the
+frame it lives in, and grouping changes the frame: a shed's door opened perfectly until the shed was
+grouped, and then its leaf was flung out of the world.

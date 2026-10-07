@@ -33,25 +33,16 @@ public struct BelongingsBag
 }
 
 /// <summary>
-/// What is left when somebody is killed: a body, lying where they fell, that can be picked up.
-///
-/// Cody (2026-10-05): "When you shoot an npc it should fall to the ground where it was shot and play
-/// the item beacon sound and when you walk over to it, you can grab it." So a body is an ITEM, made
-/// the way any item is (an <see cref="ItemComponent"/>, the item beacon category, no collider), and
-/// everything an item already does it does: E picks it up, the inventory lists it, /drop puts it
-/// down. What is its own is only its weight, which is a person's, and so takes both arms and slows
-/// whoever carries it (<see cref="HandsService.SpeedLimit"/>).
-///
-/// It is a new entity, not the person: a walker who was an NPC is taken off the street (and somebody
-/// comes walking along later, out of sight), and a player gets up again at the spawn, while the body
-/// stays.
+/// What is left when somebody is killed: a body where they fell, which is an item like any other
+/// (Cody, 2026-10-05: it plays the item beacon and you can grab it). Only its weight is its own: both
+/// arms, and slower (<see cref="HandsService.SpeedLimit"/>). It is a new entity, not the person: a
+/// walker is replaced later out of sight, and a player gets up at the spawn.
 /// </summary>
 public static class Bodies
 {
     /// <summary>
-    /// What a body weighs, kilograms: the reference adult of radiological protection (ICRP Publication
-    /// 23's "Reference Man", 70 kg). Nobody in the game has a weight of their own yet; when somebody
-    /// does, theirs is used instead.
+    /// What a body weighs, kilograms: ICRP Publication 23's "Reference Man".
+    /// TODO: a person's own weight, once anybody has one.
     /// </summary>
     public const float MassKg = PhysicsConstants.PersonMassKg;
 
@@ -126,14 +117,11 @@ public static class Bodies
     }
 
     /// <summary>
-    /// Leaves a bag beside a body with everything the person carried in it: what was in their hands and on
-    /// their back, and their spare rounds. Cody (2026-10-05): "When a player dies, their inventory should
-    /// drop alongside their body, so 2 items are together, body/corpse of [entity/npc] and their
-    /// bag/inventory pack/belongings." The things go out of the world into the bag's list (the store's
-    /// own form, <see cref="HandsService.Pack"/>), so they come back as themselves, loaded as they were,
-    /// to whoever takes them out. Anything that could not be written down (not made from a prefab) is put
-    /// down on the ground where they fell instead. Returns the bag, or <see cref="Entity.Null"/> when they
-    /// carried nothing; <paramref name="gone"/> is the ids taken out of the world, for the clients.
+    /// Leaves a bag beside a body with everything the person carried (Cody, 2026-10-05: two items
+    /// together, the body and the belongings). The things go into the bag's list in the store's form
+    /// (<see cref="HandsService.Pack"/>) and come back as they were; one not made from a prefab is put
+    /// on the ground instead. Returns the bag, or <see cref="Entity.Null"/> when they carried nothing;
+    /// <paramref name="gone"/> is the ids taken out of the world, for the clients.
     /// </summary>
     public static Entity LeaveBelongings(MapManager maps, HandsService hands, string mapId, World world, SpatialGrid<Entity> grid,
                                          Dictionary<int, Entity> lookup, Entity person, double now, out List<int> gone)

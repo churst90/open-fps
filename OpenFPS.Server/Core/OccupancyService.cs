@@ -8,18 +8,9 @@ using Serilog;
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// Getting in and getting out.
-///
-/// The last of the four things a composite is for — a set of entities with a local origin, which can
-/// be saved, placed again, owned, and ENTERED — and the one that makes driving stop being a separate
-/// feature. Sitting in a kitchen chair and sitting in a driver's seat are the same act; the only
-/// difference is whether the seat has <see cref="Seat.Controls"/> set, and whether anything is
-/// willing to move the root underneath you.
-///
-/// While somebody is in a seat their body is not theirs to move: the seat owns where they are, and
-/// <see cref="OccupancySystem"/> puts them there after everything that could have moved the root has
-/// run. What stays theirs is where they are LOOKING, because for a player who navigates by ear that
-/// is most of what being a passenger consists of.
+/// Getting into a composite's seats and out again. A chair and a driver's seat differ only in
+/// <see cref="Seat.Controls"/>. While seated the seat owns where you are (<see cref="OccupancySystem"/>
+/// puts you there after the root has moved); where you look stays yours.
 /// </summary>
 public class OccupancyService
 {
@@ -30,8 +21,7 @@ public class OccupancyService
 
     private readonly Action<string, int, string, IReadOnlyList<TransientSound>>? _heard;
 
-    /// <param name="heard">Where the sounds of getting in and out go — the server's world-audio
-    /// channel. Null in tests that only care where people end up.</param>
+    /// <param name="heard">Where the sounds of getting in and out go (world audio); null in tests.</param>
     public OccupancyService(MapManager maps, Action<string, int, string, IReadOnlyList<TransientSound>>? heard = null)
     {
         _maps = maps;
@@ -42,12 +32,8 @@ public class OccupancyService
     private const float CarDoorKg = 22f;
 
     /// <summary>
-    /// The door beside a seat, opened and shut: getting in or out of a car.
-    ///
-    /// The same door model a building's door uses (<see cref="DoorAcoustics"/>) — a steel skin, a
-    /// seal and a latch — so a car door is a thunk and a click and a shed door is a clatter without
-    /// either being told. It opens, and a second and a bit later, once you are in or out, it shuts.
-    /// Only for things that drive: a bus has its own doors, and they are air.
+    /// The door beside a seat, opened and shut 1.3 s later: getting in or out of a car. Only for things
+    /// that drive; a bus's doors are air.
     /// </summary>
     private void CarDoor(string mapId, World world, Entity root, Seat seat)
     {
@@ -57,16 +43,14 @@ public class OccupancyService
         var right = Vector3.Transform(Vector3.UnitX, rootT.Rotation);
         var forward = Vector3.Transform(Vector3.UnitZ, rootT.Rotation);
         var seatPos = SeatPosition(rootT, seat);
-        // The door is in the side of the car beside the seat, at about the height of your hip.
         var centre = seatPos + right * side * 0.75f + new Vector3(0f, 0.55f, 0f);
         _heard(mapId, root.Id, "car door", CarDoorSounds(centre, forward, 1.3f));
     }
 
     /// <summary>
-    /// A car door opening and, <paramref name="closeAfter"/> seconds later, shutting: a steel skin on
-    /// a frame with a rubber seal and a latch. <paramref name="centre"/> is the middle of the door at
-    /// hip height; <paramref name="forward"/> is the way the car points, which is where the hinge is.
-    /// Shared by anybody getting in or out of anything that drives — a player, or a driver parking.
+    /// A car door opening and, <paramref name="closeAfter"/> seconds later, shutting. <paramref name="centre"/>
+    /// is the middle of the door at hip height; <paramref name="forward"/> is the way the car points,
+    /// where the hinge is. Used by players and by parking drivers.
     /// </summary>
     internal static List<TransientSound> CarDoorSounds(Vector3 centre, Vector3 forward, float closeAfter)
     {
@@ -75,9 +59,8 @@ public class OccupancyService
         var steel = AcousticRegistry.GetProperties("Metal");
         const float width = 1.0f, height = 1.1f, skin = 0.0008f;
 
-        // The waveform is the car door model's (CarDoor, fitted to a recording); the LEVEL is still the
-        // physics of this door: the loudest part of what DoorAcoustics works out for a 22 kg leaf
-        // opened, and shut at the edge speed of a firm push.
+        // The waveform is the CarDoor model's; the level is DoorAcoustics' loudest part for a 22 kg leaf
+        // opened, and shut at a firm push's edge speed.
         float openDb = DoorAcoustics.Opening(steel, latch, hinge, width, height, skin, CarDoorKg, 0.8f, 0f, hasSeal: true)
                                     .Max(s => s.LevelDb);
         float closeSpeed = DoorAcoustics.EdgeSpeed(width, 1.1f, 0.5f);
@@ -114,12 +97,6 @@ public class OccupancyService
     }
 
     /// <summary>
-    /// The composite with seats nearest a point, or -1.
-    ///
-    /// Nearest-with-seats rather than nearest outright: standing beside a car parked against a wall,
-    /// "get in" means the car. A house you are also within thirty metres of is not what you meant.
-    /// </summary>
-    /// <summary>
     /// Whether a thing is going too fast to get on or off. A car somebody drives says so in its
     /// DriveComponent; a bus the map drives says so in its VehicleComponent.
     /// </summary>
@@ -132,6 +109,8 @@ public class OccupancyService
         return false;
     }
 
+    /// <summary>The composite with a seat nearest a point, or -1: by its seats, so "get in" beside a car
+    /// against a wall means the car, not the house.</summary>
     public int NearestEnterable(string mapId, Vector3 near, float radius)
     {
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return -1;
@@ -165,12 +144,8 @@ public class OccupancyService
     }
 
     /// <summary>
-    /// Puts a player in a seat.
-    ///
-    /// A named seat is taken literally, including refusing when it is occupied — telling somebody
-    /// they are in the passenger seat when they asked to drive is worse than telling them no. With no
-    /// name, the first seat they are ALLOWED into wins, and since a driver's seat is nearly always
-    /// declared first, getting into your own car puts you behind the wheel without saying so.
+    /// Puts a player in a seat. A named seat is taken literally, refused when occupied. With no name,
+    /// the first free seat they may use within reach, else the nearest: in your own car, the driver's.
     /// </summary>
     public bool Enter(UserSession session, int rootId, string? seatName, out string message)
     {
@@ -207,9 +182,7 @@ public class OccupancyService
         }
         else
         {
-            // The first free seat in the order they were declared — the driver's, in your own car —
-            // among the ones you can actually reach. A bus is eleven metres long, and "the first free
-            // seat" on it is at the front whichever door you are standing at.
+            // Only seats within reach count as "first": a bus's first seat is at the front whichever door you are at.
             int nearest = -1; float nearestD = float.MaxValue;
             for (int i = 0; i < seats.Count; i++)
             {
@@ -223,8 +196,6 @@ public class OccupancyService
             if (chosen < 0) { message = $"There is nowhere free in {composite.Name}."; return false; }
         }
 
-        // Nobody steps on or off something that is going along the road. A bus you are waiting for
-        // opens its doors when it has stopped, and that is when you get on.
         if (Moving(world, root))
         { message = $"{composite.Name} is moving. Wait for it to stop."; return false; }
 
@@ -253,15 +224,13 @@ public class OccupancyService
         t.IsDirty = true;
         if (world.Has<Velocity>(session.Entity)) world.Get<Velocity>(session.Entity).Linear = Vector3.Zero;
 
-        // Whatever they had queued was them walking up to it. Spending it now would have them try to
-        // walk out of the seat they just sat down in.
+        // Queued input was the walk up to it; spent now, it would walk them out of the seat.
         while (session.InputQueue.TryDequeue(out _)) { }
         session.GroundProbe.Invalidate();
 
         CarDoor(session.CurrentMapId, world, root, seat);
 
-        // Whether it is running, said out loud: the engine idling is quiet, and a driver who cannot
-        // see the dashboard should not have to guess before reaching for the key.
+        // Said aloud: an idling engine is quiet, and there is no dashboard to look at.
         string engine = world.Has<DriveComponent>(root)
             ? world.Get<DriveComponent>(root).EngineOn ? " The engine is running." : " The engine is off; T starts it."
             : "";
@@ -273,13 +242,7 @@ public class OccupancyService
         return true;
     }
 
-    /// <summary>
-    /// What else they could have asked for, named.
-    ///
-    /// A refusal that only says no is a refusal a player has to go and investigate, and investigating
-    /// a car you cannot see means walking round it trying doors. Every no here carries the yeses with
-    /// it, which costs one sentence and saves a lap of the vehicle.
-    /// </summary>
+    /// <summary>The seats still free to them, named, so a refusal saves a lap of the car trying doors.</summary>
     private static string Alternatives(World world, int rootId, List<Seat> seats, bool mayDrive)
     {
         var free = new List<string>();
@@ -294,17 +257,9 @@ public class OccupancyService
     }
 
     /// <summary>
-    /// Puts a player back on the ground beside whatever they were in.
-    ///
-    /// Beside it, not inside it: stepping out of a car and finding yourself standing in its engine
-    /// bay is the kind of thing that is merely odd to look at and completely disorienting to listen
-    /// to. The spot is searched for around the composite rather than assumed, so getting out against
-    /// a wall puts you on the other side rather than in the wall.
-    ///
-    /// <paramref name="leavingWorld"/> is a body leaving the world from its seat (a logout, a lost
-    /// connection, a change of map): that is not a request, so neither a moving vehicle nor shut doors
-    /// refuse it, and the body is put beside the vehicle where it is now — which is the place kept for
-    /// the player's return.
+    /// Puts a player on clear ground beside whatever they were in. <paramref name="leavingWorld"/> is a
+    /// body leaving from its seat (logout, lost connection, map change): neither motion nor shut doors
+    /// refuse it, and where it is put is kept for the player's return.
     /// </summary>
     public bool Exit(UserSession session, out string message, bool leavingWorld = false)
     {
@@ -328,10 +283,8 @@ public class OccupancyService
                 message = $"{name} is still moving. Stop first.";
                 return false;
             }
-            // A vehicle with a passenger door that beeps (VehicleProfile.DoorChime) opens it at its
-            // stops and nowhere else: stopped at a light or a junction, a passenger stays on. It used
-            // to let you off wherever it stood still, without the doors or the beeper. The driver's
-            // own door is not that door.
+            // A vehicle whose passenger doors beep (VehicleProfile.DoorChime) lets passengers off only at
+            // its stops, not at a light; the driver's own door is not that door.
             if (!leavingWorld && !occupant.Controls && world.Has<SoundEmitterComponent>(root)
                 && world.Get<SoundEmitterComponent>(root) is { SoundId: { } sid } em
                 && sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
@@ -342,8 +295,7 @@ public class OccupancyService
                 return false;
             }
             spot = FindStandingRoom(world, grid, root, session.Entity, from, occupant.BoardedFrom);
-            // Off the way it was going: you step down facing the direction you were carried in,
-            // not whichever way your head happened to be turned in the seat.
+            // You step down facing the way you were carried, not the way your head was turned.
             if (world.Has<Transform>(root))
             {
                 MathHelper.ToYawPitch(world.Get<Transform>(root).Rotation, out float heading, out _);
@@ -372,17 +324,9 @@ public class OccupancyService
     }
 
     /// <summary>
-    /// A clear patch of ground to step out onto, searched outward from the SEAT rather than from the
-    /// middle of the thing.
-    ///
-    /// From the seat, because that is where the person is. Searching from the composite's origin
-    /// works for a car, whose origin is a metre from every seat in it, and is absurd for a bus or a
-    /// house: stepping off a bus would put you level with its front bumper, and leaving an upstairs
-    /// room would put you outside the building.
-    ///
-    /// Where they got IN is tried first and usually wins, because it is somewhere they demonstrably
-    /// fitted a moment ago — but only if the thing has not driven off since, or a passenger stepping
-    /// out at the far end of the road would be returned to the car park.
+    /// A clear patch of ground to step out onto, searched from the seat, not the composite's origin
+    /// (from a bus's origin you would land by its front bumper). Where they got in is tried first, if
+    /// the thing has not moved away from it since.
     /// </summary>
     private static Vector3 FindStandingRoom(World world, SpatialGrid<Entity> grid, Entity root, Entity self,
                                             Vector3 seatPosition, Vector3 boardedFrom)
@@ -397,8 +341,7 @@ public class OccupancyService
             if (!CollidesIgnoring(world, grid, back, root, self, members)) return back;
         }
 
-        // Otherwise: outward from the seat, sideways first — that is where the door is on nearly
-        // everything — widening until something fits.
+        // Outward from the seat, sideways first (where the door nearly always is), widening until something fits.
         MathHelper.ToYawPitch(world.Get<Transform>(root).Rotation, out float rootYaw, out _);
         float[] offsets = { MathF.PI / 2f, -MathF.PI / 2f, MathF.PI, 0f,
                             3f * MathF.PI / 4f, -3f * MathF.PI / 4f, MathF.PI / 4f, -MathF.PI / 4f };
@@ -414,19 +357,12 @@ public class OccupancyService
                     return candidate;
             }
 
-        // Nothing fits — parked in a garage barely its own size. The seat is at least somewhere the
-        // player already was, rather than inside a wall.
+        // Nothing fits (a garage barely its own size): the seat, rather than inside a wall.
         return seatPosition;
     }
 
-    /// <summary>
-    /// The standing-room test, blind to the composite itself.
-    ///
-    /// <see cref="MovementSystem.CheckCollision"/> can ignore one entity, and here there are always at
-    /// least two to ignore — the player and the thing they are climbing out of, which is made of as
-    /// many solid parts as somebody cared to build it from. Every one of those would otherwise report
-    /// that there is no room to stand anywhere near the car you are sitting in.
-    /// </summary>
+    /// <summary>The standing-room test, blind to the player and every part of the composite;
+    /// <see cref="MovementSystem.CheckCollision"/> can ignore only one entity.</summary>
     private static bool CollidesIgnoring(World world, SpatialGrid<Entity> grid, Vector3 pos,
                                          Entity root, Entity self, List<Entity> members)
     {

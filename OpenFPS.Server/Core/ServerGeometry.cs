@@ -42,10 +42,8 @@ public sealed class ServerGeometry
 
     // ── What the grid and the triangles hold, entity by entity (an incremental RefreshGrid) ─────────
     //
-    // A refresh read every fixed thing on the map and filed every one of them in the grid again, and
-    // built the triangles' input from all of them: 50 to 120 ms on a town for an item picked up. Each
-    // fixed thing is now remembered as it was filed (where, how big, and a hash of everything its solid
-    // is made of), and a refresh files again and rebuilds the tiles of only what changed.
+    // Each fixed thing is remembered as filed (place, size, a hash of its solid), and a refresh redoes only
+    // what changed: refiling everything cost 50 to 120 ms on a town for an item picked up.
 
     /// <summary>One fixed thing as it was last filed.</summary>
     private readonly record struct Filed(Entity Entity, Vector3 Position, Quaternion Rotation, Vector3 Size, long Hash,
@@ -65,11 +63,9 @@ public sealed class ServerGeometry
     public double LastRefreshMs { get; private set; }
 
     /// <summary>
-    /// The grid's static half and the triangles brought up to the world's fixed things, by what changed
-    /// since they were last filed: each changed thing taken out of the grid and filed again, each tile that
-    /// held or holds one built again, nothing else touched. The same grid and the same triangles as a full
-    /// refresh (except the order of the things filed in one cell). Falls back to a full refresh before the
-    /// first one.
+    /// The grid's static half and the triangles brought up to the world's fixed things by what changed
+    /// since last filed: changed things refiled, the tiles that held or hold them rebuilt. The same result
+    /// as a full refresh but for the order within a cell. A full refresh before the first.
     /// </summary>
     public void Refresh(World world, SpatialGrid<Entity> grid, Func<SpatialGrid<Entity>, int> fullGrid)
     {

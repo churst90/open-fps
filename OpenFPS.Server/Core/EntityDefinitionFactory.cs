@@ -5,10 +5,8 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// Builds the wire-format <see cref="EntityDefinition"/> the server streams to clients on map load.
-/// Extracted from <c>GameServer</c> so the live broadcast path and the map/acoustics tests build
-/// definitions from exactly the same code — the client generates its acoustic map from these, so a
-/// divergence here would not show up until it was audible.
+/// The <see cref="EntityDefinition"/> a client is sent for an entity. The broadcast and the map and
+/// acoustics tests share it: the client builds its acoustic map from these, so a divergence is heard.
 /// </summary>
 public static class EntityDefinitionFactory
 {
@@ -26,15 +24,10 @@ public static class EntityDefinitionFactory
         def.Portal = world.Has<PortalComponent>(e) ? world.Get<PortalComponent>(e) : new PortalComponent();
         def.Transform = world.Has<Transform>(e) ? world.Get<Transform>(e) : new Transform();
         def.Moves = world.Has<Velocity>(e);
-        // A player is a player beacon by being a player, as a door is a door beacon by being a door, and
-        // their team travels with them so a listener can hear a teammate in their own tone. Set here and
-        // not as an IdentityComponent on the body, so nothing on the server that looks things up by
-        // their identity (scan, take, the name of what you bumped into) starts finding people.
-        // A thing somebody is carrying is not a beacon: it is in their hands or on their back. Left as one,
-        // the things you carry were the nearest items there were and took every item beacon's slot, so a
-        // gun you had just put down never sounded (Cody, 2026-10-04). Taking and putting down re-send it.
-        // Nor is it announced as something near you: since the broadcast carries items, a client knows
-        // the gun in your own hand, and in the hands of everyone who walks past.
+        // A player is a player beacon, with their team for its tone. Set here, not as an IdentityComponent
+        // on the body, so server lookups by identity (scan, take, bumping) do not start finding people.
+        // A carried thing is neither a beacon nor announced: as beacons, the things you carry took every
+        // item beacon's slot (Cody, 2026-10-04). Taking and putting down re-send it.
         if (world.Has<HeldComponent>(e))
         {
             def.Identity.BeaconCategory = "";
@@ -44,25 +37,20 @@ public static class EntityDefinitionFactory
         {
             var player = world.Get<PlayerComponent>(e);
             def.Identity.BeaconCategory = OpenFPS.Common.Beacons.Player;
-            // And called by their name, in the definition only, for the same reason: walking into
-            // somebody said "something" (Cody, 2026-10-05), because a player's definition carried no
-            // name at all, and the sight line and a scope had nothing to say either.
+            // Their name, in the definition only for the same reason: without it, walking into somebody
+            // said "something" (Cody, 2026-10-05).
             if (string.IsNullOrWhiteSpace(def.Identity.Name)) def.Identity.Name = player.Username ?? "";
             def.Team = player.Team ?? "";
-            // Dead, a player is not a player beacon: their body lies there as an item, which is what
-            // there is to find. The definition goes out again when they die and when they get up.
+            // Dead, they are not a player beacon: their body is the item to find. Re-sent on death and on getting up.
             if (world.Has<DeadComponent>(e)) def.Identity.BeaconCategory = "";
         }
-        // In a seat, they are carried and not walking; see EntityDefinition.RidingEntityId. Anybody in a
-        // seat: a player, or Alex on the bus, whose footsteps at forty kilometres an hour are as wrong.
+        // Anybody in a seat is carried, not walking (EntityDefinition.RidingEntityId): Alex on the bus too.
         if (world.Has<OccupantComponent>(e)) def.RidingEntityId = world.Get<OccupantComponent>(e).RootEntityId;
         return def;
     }
 
-    /// <summary>
-    /// Every static entity in a world — the set the server streams in response to a MapDataRequest.
-    /// "Static" means no <see cref="PlayerComponent"/> and no <see cref="Velocity"/>.
-    /// </summary>
+    /// <summary>Every static entity in a world (no <see cref="PlayerComponent"/>, no <see cref="Velocity"/>):
+    /// what a MapDataRequest is answered with.</summary>
     public static List<Entity> StaticEntities(World world)
     {
         var result = new List<Entity>();
@@ -73,7 +61,7 @@ public static class EntityDefinitionFactory
         return result;
     }
 
-    /// <summary>Convenience: the definitions for every static entity, as the client would receive them.</summary>
+    /// <summary>The definitions for every static entity, as the client would receive them.</summary>
     public static List<EntityDefinition> StaticDefinitions(World world)
     {
         var entities = StaticEntities(world);
