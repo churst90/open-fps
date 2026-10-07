@@ -209,6 +209,23 @@ public class MovementSystemTests : IDisposable
         Assert.Equal(3, rig.Session.LastProcessedSequenceId);
     }
 
+    /// <summary>A huge but finite look turn leaves the yaw a heading, standing or seated.</summary>
+    [Fact]
+    public void AHugeLookTurnLeavesTheYawWithinOneTurn()
+    {
+        var rig = Build();
+        rig.Tick(30);
+        rig.Queue(Vector3.Zero, look: new Vector2(1e30f, 0f), count: 3);
+        rig.Tick(3);
+        Assert.NotEqual(0f, rig.Body.Yaw);
+        Assert.InRange(rig.Body.Yaw, -MathF.PI, MathF.PI);
+
+        rig.World.Add(rig.Player, new OccupantComponent { RootEntityId = -1 });
+        rig.Queue(Vector3.Zero, look: new Vector2(-3e38f, 0f), count: 3);
+        rig.Tick(3);
+        Assert.InRange(rig.Body.Yaw, -MathF.PI, MathF.PI);
+    }
+
     // ── What stops you ────────────────────────────────────────────────────────────────────────
 
     [Fact]

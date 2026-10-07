@@ -52,6 +52,11 @@ public static class MovementSystem
                     user, flat, from, to, input.MoveDirection, input.Jump, groundY, colliders);
     }
 
+    /// <summary>A yaw turned by a look input, kept within one turn.</summary>
+    // In double: a huge finite look times the turn rate overflows a float to infinity, and the yaw to NaN.
+    private static float Turned(float yaw, float look, float dt)
+        => (float)Math.IEEERemainder(yaw - (double)look * RotationSpeed * dt, 2.0 * Math.PI);
+
     public static void Update(World world, Vector3 mapMin, Vector3 mapMax, SpatialGrid<Entity> grid,
                               Dictionary<int, Entity> lookup, SessionManager sessions, MapManager maps, float dt)
     {
@@ -122,7 +127,7 @@ public static class MovementSystem
                 {
                     if (input.LookDelta != Vector2.Zero)
                     {
-                        player.Yaw -= input.LookDelta.X * RotationSpeed * stepDt;
+                        player.Yaw = Turned(player.Yaw, input.LookDelta.X, stepDt);
                         player.Pitch = Math.Clamp(player.Pitch + (input.LookDelta.Y * RotationSpeed * stepDt), -1.5f, 1.5f);
                     }
 
@@ -158,7 +163,7 @@ public static class MovementSystem
                 // 2. ROTATION
                 if (input.LookDelta != Vector2.Zero)
                 {
-                    player.Yaw -= input.LookDelta.X * RotationSpeed * stepDt;
+                    player.Yaw = Turned(player.Yaw, input.LookDelta.X, stepDt);
                     player.Pitch = Math.Clamp(player.Pitch + (input.LookDelta.Y * RotationSpeed * stepDt), -1.5f, 1.5f);
                     transform.Rotation = Quaternion.CreateFromYawPitchRoll(player.Yaw, player.Pitch, 0);
                     transform.IsDirty = true;

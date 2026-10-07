@@ -462,15 +462,25 @@ public static class HomelessLines
         @"\b(this morning|cold tonight|morning|afternoon|evening|tonight|night|noon|lunch|breakfast|dinner|day|today|days|tomorrow|yesterday|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|spring|summer|autumn|winter|weather|rain|raining|snow|snowing|cold|freezing|hot|heat|sun|sunny|storm|wind|windy|fog|foggy)\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private static readonly Regex Today = new(@"\b(this morning|cold tonight|tonight|today)\b",
+                                              RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Whether a story is true now. Only what it says about today is checked ("this morning",
+    /// "tonight"); the rest of a story is in the past, so "two in the morning" or "Sunday dinner" is
+    /// told at any hour.</summary>
+    public static bool StoryTrueNow(string text, SpeechConditions c) => TrueNow(text, c, Today);
+
     /// <summary>
     /// Whether a line is true now: every word in it about the hour or the weather is. "Somewhere to sleep
     /// tonight" from the afternoon on; "It's so fucking cold" when it is; "Not today", "one morning",
     /// "every night" and "a hot dog" at any time, because they are not about now.
     /// </summary>
-    public static bool TrueNow(string text, SpeechConditions c)
+    public static bool TrueNow(string text, SpeechConditions c) => TrueNow(text, c, Words);
+
+    private static bool TrueNow(string text, SpeechConditions c, Regex words)
     {
         string rest = Always.Replace(text, " ");
-        foreach (Match m in Words.Matches(rest))
+        foreach (Match m in words.Matches(rest))
         {
             float h = c.Hour;
             bool ok = m.Value.ToLowerInvariant() switch

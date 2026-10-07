@@ -170,6 +170,8 @@ public class HandsService
         { message = $"The admin gun is the admin's alone; {to.Username} cannot have it."; return false; }
         if (!TryGetHolder(to, out var world, out _, out var lookup) || to.Entity == Entity.Null || !world.IsAlive(to.Entity))
         { message = $"{to.Username} is not in the world just now."; return false; }
+        // What the dead carried is in the bag by their body; a thing given now would get up with them.
+        if (world.Has<DeadComponent>(to.Entity)) { message = $"{to.Username} is dead just now."; return false; }
 
         count = Math.Clamp(count, 1, MaxGive);
         var at = world.Get<Transform>(to.Entity).Position;

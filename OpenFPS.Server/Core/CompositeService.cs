@@ -458,8 +458,10 @@ public class CompositeService
     /// the server restarts; appending the placement to the map's own data is what makes it a house
     /// afterwards too. <see cref="MapManager.SaveMap"/> is what commits that to disk.
     /// </summary>
+    /// <param name="record">False for something that lasts until a restart: a vehicle spawned on a
+    /// shipped map (<see cref="MapManager.IsShipped"/>).</param>
     public int Place(string mapId, string templateId, Vector3 position, Quaternion rotation,
-                     string owner, out int partCount, out string error)
+                     string owner, out int partCount, out string error, bool record = true)
     {
         partCount = 0; error = "";
         if (!TryGetTemplate(templateId, out var template)) { error = $"no composite called '{templateId}'"; return -1; }
@@ -468,7 +470,7 @@ public class CompositeService
         int rootId = Instantiate(mapId, template, position, rotation, owner, out partCount);
         if (rootId < 0) { error = "nothing could be placed"; return -1; }
 
-        if (_maps.TryGetMapData(mapId, out var data))
+        if (record && _maps.TryGetMapData(mapId, out var data))
         {
             data.Composites ??= new List<CompositePlacement>();
             data.Composites.Add(new CompositePlacement
@@ -494,6 +496,12 @@ public class CompositeService
             int placed = 0, failed = 0;
             foreach (var p in data.Composites)
             {
+                if (p.TemplateId.StartsWith(AircraftPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (ParkAircraft(mapId, p.TemplateId[AircraftPrefix.Length..], p.Position, p.Rotation, p.Owner, record: false) == Entity.Null) failed++;
+                    else placed++;
+                    continue;
+                }
                 if (!TryGetTemplate(p.TemplateId, out var template))
                 {
                     Log.Error("Map '{Map}' places composite '{Id}', which does not exist. That building "
@@ -511,6 +519,50 @@ public class CompositeService
                 Log.Information("Map '{Map}': {Placed} composite(s) placed, {Failed} failed.", mapId, placed, failed);
         }
     }
+
+    /// <summary>What a parked aircraft is recorded under on a map: "aircraft:" and its preset.</summary>
+    public const string AircraftPrefix = "aircraft:";
+
+    /// <summary>
+    /// An aircraft parked on the ground. Nobody can fly one yet (they fly their circuits from the map),
+    /// so it is a body standing there with a name. Recorded on the map as a placement when
+    /// <paramref name="record"/>, so /savemap keeps it as it keeps a parked car.
+    /// </summary>
+    public Entity ParkAircraft(string mapId, string preset, Vector3 position, Quaternion rotation, string owner, bool record)
+    {
+        if (!AircraftProfile.Presets.ContainsKey(preset)) return Entity.Null;
+        var air = AircraftProfile.ByName(preset);
+        string word = AircraftWord(preset);
+        string name = char.ToUpperInvariant(word[0]) + word[1..];
+        var e = _maps.SpawnEntity(mapId, w => w.Create(
+            new Transform { Position = position, Rotation = rotation, IsDirty = true },
+            // The fuselage is the solid part; a wing you could walk under is not a wall.
+            new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(MathF.Min(2.5f, air.WingspanMetres), 2.8f, air.LengthMetres), IsSolid = true },
+            new CompositeComponent { Name = name, Anchored = true, TemplateId = "", Owner = owner },
+            new NameComponent { Name = name },
+            new IdentityComponent
+            {
+                Name = name, Description = $"A {air.Name}, parked. Nobody can fly one yet.", Announce = true,
+                BeaconCategory = OpenFPS.Common.Beacons.Vehicle,
+            },
+            new VehicleComponent { VehicleType = preset, MaxSeats = 0 },
+            EntityType.StaticObject));
+        if (e != Entity.Null && record && _maps.TryGetMapData(mapId, out var data))
+            (data.Composites ??= new List<CompositePlacement>()).Add(new CompositePlacement
+            {
+                TemplateId = AircraftPrefix + preset, Position = position, Rotation = rotation, Owner = owner,
+            });
+        return e;
+    }
+
+    /// <summary>What an aircraft preset is called aloud: "light aeroplane", "helicopter".</summary>
+    public static string AircraftWord(string preset) => preset switch
+    {
+        "helicopter" => "helicopter",
+        "piston_single" => "light aeroplane",
+        "turboprop" => "turboprop aeroplane",
+        _ => preset.Replace('_', ' '),
+    };
 
     /// <summary>Builds an instance without recording a placement — used by map load, which is
     /// replaying placements that are already recorded.</summary>

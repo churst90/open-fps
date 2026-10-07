@@ -695,6 +695,10 @@ public partial class ServerStateUpdate : IMessage
     /// </summary>
     public byte[]? Packed;
 
+    /// <summary>Whether the server is holding this client's body where it is: frozen by the admin gun,
+    /// or dead. The client neither walks nor turns while it is set.</summary>
+    public bool Held;
+
     [MemoryPackOnDeserialized]
     private void UnpackStates()
     {

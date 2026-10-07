@@ -192,6 +192,7 @@ public class NetworkService : INetEventListener
         RidingEntityId = whole.RidingEntityId,
         RidingControls = whole.RidingControls,
         Packed = packed,
+        Held = whole.Held,
     };
 
     public NetPeer? GetPeer(int id) => _netManager?.GetPeerById(id);

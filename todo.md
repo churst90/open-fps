@@ -69,22 +69,15 @@ Restart the server and update the client first.
 
 ### 4. Roles: follow-ups
 - `/undo` covers `/put` only: not `/place` or `/spawn`, and not after a reconnect.
-- A parked aircraft from `/spawn` is not saved with the map.
 - Spawned walkers get no crosswalks.
-- Walkers and trains spawned on a shipped map are written into it by `/savemap`. That breaks the
-  generated city.json.
 - Old single grants of "tp" were dropped. Moderators need a teleporter.
-- A map owner cannot make others editors; invite only lets them in.
 - `CommandHandler.cs` is still 2,500 lines; split it by area.
 
 ### 5. Bodies: follow-ups
-- Logging out while dead skips the 60 s wait.
 - Walkers have no names of their own ("body of a pedestrian").
-- Things given to a player while dead stay with them.
 - Later: what a body is for (selling it, once there is money).
 
 ### 6. Admin gun: follow-ups
-- A frozen player's client still predicts movement.
 - Trains cannot be frozen.
 
 ### 7. Keys
@@ -169,8 +162,6 @@ physics are done (the second unheard).
   strip. Work each stop out from the body's corners.
 - A car the deadlock breaker lets go creeps at about 0.3 m/s for 6-9 s before it enters.
 - When the smoothed lap runs ahead, a car in a junction can count as on the next lane.
-- Phone stories ("this morning") have no time filter. Muttered remarks bypass `AnyTime`.
-- A huge finite look turn drives yaw without bound; wrap it.
 - Test gaps: `/scan` output; door swing time and sound sets; composites walled solid, ghost
   collision, ungroup; parking door claims; your own car into a wall; pairs talking and reactions;
   crowd cooldown and radius; passenger view and velocity; the game clock at midnight.

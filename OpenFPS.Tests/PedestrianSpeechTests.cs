@@ -312,6 +312,39 @@ public class PedestrianSpeechTests
         Assert.All(said.Where(x => x.Sound.SynthKey.Contains("/story_")), x => Assert.True(x.Sound.DecaySeconds > 15f));
     }
 
+    /// <summary>A story that happened "this morning" is not told on the phone at night.</summary>
+    [Fact]
+    public void A_phone_story_from_this_morning_is_not_told_at_night()
+    {
+        var world = World.Create();
+        world.Create(new Transform { Position = Vector3.Zero, Rotation = Quaternion.Identity },
+                     new Velocity(), new Pedestrian { Voice = "joel" });
+        Player(world, new Vector3(0f, 0f, -20f));
+        var said = Run(new PedestrianSpeech(new Random(7)), world, 0, 4 * 3600, Night)
+            .Where(x => x.Sound.SynthKey.Contains("/story_"))
+            .Select(x => Speech.Find("joel", x.Sound.SynthKey[(x.Sound.SynthKey.IndexOf('/') + 1)..])!.Text)
+            .ToList();
+        Assert.NotEmpty(said);
+        Assert.DoesNotContain(said, text => text.Contains("this morning", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Somebody muttering to themselves in the morning does not think about dinner.</summary>
+    [Fact]
+    public void A_muttered_remark_fits_the_hour()
+    {
+        var morning = new SpeechConditions(9f, 20f, 0f, WeatherType.Clear);
+        var world = World.Create();
+        world.Create(new Transform { Position = Vector3.Zero, Rotation = Quaternion.Identity },
+                     new Velocity(), new Pedestrian { Voice = "joel" });
+        Player(world, new Vector3(0f, 0f, -10f));     // within earshot of a mutter, behind them
+        var said = Run(new PedestrianSpeech(new Random(3)), world, 0, 6 * 3600, morning)
+            .Select(x => x.Sound.SynthKey[(x.Sound.SynthKey.IndexOf('/') + 1)..])
+            .Where(line => line.StartsWith("mutter_") || line.StartsWith("think_aloud_") || line.StartsWith("read_text_"))
+            .ToList();
+        Assert.True(said.Count >= 20, $"only {said.Count} remarks in six hours");
+        Assert.DoesNotContain(said, line => !HomelessLines.TrueNow(Speech.Find("joel", line)!.Text, morning));
+    }
+
     /// <summary>
     /// Every call ends with a goodbye, and the next one waits. The ring-off used to come only if a
     /// line happened to fall due in the last six seconds of the call; the gap to the next line is up

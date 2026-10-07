@@ -57,13 +57,17 @@ public sealed class PredictionReconciler
     /// </summary>
     public bool Riding { get; set; }
 
+    /// <summary>Whether the server is holding the body still (frozen, or dead). Nothing is predicted:
+    /// the server moves a held body not at all, not even by gravity.</summary>
+    public bool Held { get; set; }
+
     /// <summary>
     /// Applies one freshly gathered input: rotate, predict, and remember it for replay.
     /// </summary>
     public void Step(ClientInputUpdate input, WorldSnapshot snapshot, float dt)
     {
         _physics.ApplyLook(input, dt);
-        LastContact = Riding ? null : _physics.Predict(input, snapshot, dt);
+        LastContact = Riding || Held ? null : _physics.Predict(input, snapshot, dt);
 
         // Still recorded while riding: the server acknowledges these sequence numbers, and the yaw
         // reconciliation below needs to know which look deltas it has not seen yet.
@@ -105,7 +109,7 @@ public sealed class PredictionReconciler
         // local heading is already ahead of the server by exactly those inputs (see ReconcileYaw),
         // and re-applying the deltas here would double-count every turn. A passenger replays
         // nothing at all — none of those inputs moved them.
-        if (!Riding)
+        if (!Riding && !Held)
             foreach (var input in _history)
                 _physics.Predict(input, snapshot, input.DeltaTime);
 

@@ -23,9 +23,13 @@ public sealed class PlayerState
     public Dictionary<string, SavedPlace> Places { get; set; } = new();
 
     /// <summary>Health when they left, and its most. Null for whole (or for somebody who left dead,
-    /// who comes back up whole at the spawn, as a respawn would have stood them up).</summary>
+    /// who comes back at the spawn and up whole once the wait is over).</summary>
     public int? Health { get; set; }
     public int? MaxHealth { get; set; }
+
+    /// <summary>For somebody who left dead, when they may get up again; null otherwise. Coming back
+    /// before then, they are still dead until it.</summary>
+    public DateTime? DeadUntilUtc { get; set; }
 
     /// <summary>
     /// Numbers that belong to the player and not the body: experience, level, kills, deaths, headshots,

@@ -14,9 +14,12 @@ namespace OpenFPS.Server.Core;
 /// (the spawn permission's scope). Giving a vehicle is premium (give-premium).
 ///
 /// Every one of these goes through the path the map's own take: a walker is a VehicleSystem walker, a
-/// car is the vehicle shell a parked car is (CompositeService.Place, so /savemap keeps it), a train is a
-/// RailSystem consist. Only the aircraft is new: nobody can fly one yet (they fly their circuits from the
-/// map), so a given or spawned one is a body standing on the ground with a name.
+/// car is the vehicle shell a parked car is (CompositeService.Place), a train is a RailSystem consist.
+/// Only the aircraft is new: nobody can fly one yet (they fly their circuits from the map), so a given or
+/// spawned one is a body standing on the ground with a name (CompositeService.ParkAircraft).
+///
+/// On a player's map each is recorded, so /savemap keeps it. On a shipped map (MapManager.IsShipped) it
+/// lasts until a restart: those files are generated and must stay as the generator wrote them.
 /// </summary>
 public partial class CommandHandler
 {
@@ -118,7 +121,7 @@ public partial class CommandHandler
 
     /// <summary>
     /// /spawn walker [NAME]: somebody walking back and forth on a clear line from in front of you, at a
-    /// walking pace, like the map's own pedestrians. Recorded on the map, so /savemap keeps them.
+    /// walking pace, like the map's own pedestrians.
     /// </summary>
     private void SpawnWalker(UserSession session, string name, Action<IMessage> reply)
     {
@@ -148,8 +151,9 @@ public partial class CommandHandler
         var vd = new VehicleData { Name = who, Preset = "walker", RoadStart = a, RoadEnd = b, SpeedsKmh = new[] { 5f }, WaitSeconds = 3f };
         var e = _server.Vehicles.SpawnOne(_maps, _composites, session.CurrentMapId, vd);
         if (e == Entity.Null) { Say(reply, "Nobody could be made to walk here."); return; }
-        if (_maps.TryGetMapData(session.CurrentMapId, out var data)) (data.Vehicles ??= new List<VehicleData>()).Add(vd);
-        Say(reply, $"{who} walks back and forth here now, over {length:F0} metres. /savemap keeps them.");
+        bool record = !_maps.IsShipped(session.CurrentMapId);
+        if (record && _maps.TryGetMapData(session.CurrentMapId, out var data)) (data.Vehicles ??= new List<VehicleData>()).Add(vd);
+        Say(reply, $"{who} walks back and forth here now, over {length:F0} metres. {Lasting(record, "them")}");
     }
 
     /// <summary>/spawn train PRESET: a train on the nearest track a train already runs, at the point of
@@ -189,9 +193,15 @@ public partial class CommandHandler
             StartOffsetMetres = bestAlong,
         };
         if (!_server.Rail.SpawnOne(_maps, session.CurrentMapId, td)) { Say(reply, "The train could not be put on the track."); return; }
-        data.Trains.Add(td);
-        Say(reply, $"A {profile.Name} is on the {best.Id} track, {bestDistance:F0} metres from you. /savemap keeps it.");
+        bool record = !_maps.IsShipped(session.CurrentMapId);
+        if (record) data.Trains.Add(td);
+        Say(reply, $"A {profile.Name} is on the {best.Id} track, {bestDistance:F0} metres from you. {Lasting(record, "it")}");
     }
+
+    /// <summary>How long something spawned lasts: kept by /savemap on a player's map, until a restart
+    /// on a shipped one.</summary>
+    private static string Lasting(bool recorded, string pronoun)
+        => recorded ? $"/savemap keeps {pronoun}." : "This is one of the server's own maps, so it lasts until the server restarts.";
 
     /// <summary>
     /// /give [NAME] vehicle PRESET: a vehicle parked beside them, theirs. Premium. True when the words
@@ -245,28 +255,18 @@ public partial class CommandHandler
         string mapId = beside.CurrentMapId;
         string yours = owner.Length == 0 ? "" : owner.Equals(beside.Username, StringComparison.OrdinalIgnoreCase) ? ", yours" : $", {owner}'s";
 
+        if (_composites == null) { said = "Vehicles are not available on this server."; return false; }
+        bool record = !_maps.IsShipped(mapId);
+
         if (aircraft)
         {
             var air = AircraftProfile.ByName(preset);
-            string word = AircraftWord(preset);
-            kind = $"a {word}";
+            kind = $"a {CompositeService.AircraftWord(preset)}";
             var footprint = new Vector3(air.WingspanMetres, 3f, air.LengthMetres);
             if (ClearGroundBeside(world, grid, feet, yaw, footprint, openSky: true) is not { } at)
             { said = $"There is no open ground beside {beside.Username} big enough for {kind}."; return false; }
-            var e = _maps.SpawnEntity(mapId, w => w.Create(
-                new Transform { Position = at, Rotation = rotation, IsDirty = true },
-                // The fuselage is the solid part; a wing you could walk under is not a wall.
-                new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(MathF.Min(2.5f, air.WingspanMetres), 2.8f, air.LengthMetres), IsSolid = true },
-                new CompositeComponent { Name = Capital(word), Anchored = true, TemplateId = "", Owner = owner },
-                new NameComponent { Name = Capital(word) },
-                new IdentityComponent
-                {
-                    Name = Capital(word), Description = $"A {air.Name}, parked. Nobody can fly one yet.", Announce = true,
-                    BeaconCategory = Beacons.Vehicle,
-                },
-                new VehicleComponent { VehicleType = preset, MaxSeats = 0 },
-                EntityType.StaticObject));
-            if (e == Entity.Null) { said = "It could not be made: the map is not loaded."; return false; }
+            if (_composites.ParkAircraft(mapId, preset, at, rotation, owner, record) == Entity.Null)
+            { said = "It could not be made: the map is not loaded."; return false; }
             said = $"{Capital(kind)} is parked beside you on open ground{yours}. Nobody can fly one yet: aircraft only fly their circuits for now.";
             return true;
         }
@@ -276,21 +276,12 @@ public partial class CommandHandler
         var size = new Vector3(profile.WidthMetres, MathF.Max(1.2f, profile.HeightMetres), profile.LengthMetres);
         if (ClearGroundBeside(world, grid, feet, yaw, size, openSky: false) is not { } spot)
         { said = $"There is no clear ground beside {beside.Username} big enough for {kind}."; return false; }
-        if (_composites == null) { said = "Vehicles are not available on this server."; return false; }
-        int root = _composites.Place(mapId, VehicleShell.Prefix + preset, spot, rotation, owner, out _, out string error);
+        int root = _composites.Place(mapId, VehicleShell.Prefix + preset, spot, rotation, owner, out _, out string error, record);
         if (root < 0) { said = $"It could not be parked: {error}."; return false; }
         _server.SyncAudioComponent(root);
         said = $"{Capital(kind)} is parked beside you{yours}. Get in with /enter.";
         return true;
     }
-
-    private static string AircraftWord(string preset) => preset switch
-    {
-        "helicopter" => "helicopter",
-        "piston_single" => "light aeroplane",
-        "turboprop" => "turboprop aeroplane",
-        _ => preset.Replace('_', ' '),
-    };
 
     /// <summary>
     /// Ground clear for a body of <paramref name="size"/> (width, height, length) beside somebody: to
