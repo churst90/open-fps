@@ -528,7 +528,7 @@ public sealed class HornVoiceState : PhysicalVoiceState
     }
 
     /// <summary>Seconds from the first audible sample to the last sound of the horn dying away.</summary>
-    public float Seconds => Honk.Duration(Pattern) + 0.3f;
+    public float Seconds => Honk.Held(Pattern) ? float.PositiveInfinity : Honk.Duration(Pattern) + 0.3f;
 
     protected override void PushListener(Vector3 frame)
     {

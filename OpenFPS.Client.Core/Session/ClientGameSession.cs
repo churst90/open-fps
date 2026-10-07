@@ -257,7 +257,10 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.C,
             () => Say(OpenFPS.Common.PlayerCoordinates.Format(_state.Position)));
         _bindings.Bind(InputContext.Gameplay, GameKey.F, () => Say(_state.GetCompassDirection()));
-        _bindings.Bind(InputContext.Gameplay, GameKey.H, () => Say($"{_state.Health} percent"));
+        // H is the horn in the driver's seat (held: GatherInput reads it), and your health everywhere
+        // else. Shift+H is your health in the driver's seat too.
+        _bindings.Bind(InputContext.Gameplay, GameKey.H, () => { if (!_state.RidingControls) Say($"{_state.Health} percent"); });
+        _bindings.Bind(InputContext.Gameplay, GameKey.H, KeyModifiers.Shift, () => Say($"{_state.Health} percent"));
         // Driving, Z is the road: which one, which way, which lane, how fast. On foot it is the area.
         _bindings.Bind(InputContext.Gameplay, GameKey.Z, () =>
             Say(_state.RidingControls && _audioSystem.Driving.Readout is { } road ? road : _state.CurrentRegion));
@@ -305,6 +308,16 @@ public sealed partial class ClientGameSession : IDisposable
         });
         _bindings.Bind(InputContext.Gameplay, GameKey.T, KeyModifiers.Shift,
             () => _network.Send(new TextCommand { Command = "ignition", Args = new[] { "off" } }));
+        // U: the siren on or off, on a vehicle that has one; Shift+U its next tone (wail, yelp,
+        // phaser). The server holds the switch and says what it did.
+        _bindings.Bind(InputContext.Gameplay, GameKey.U, () =>
+        {
+            if (_state.RidingControls) _network.Send(new TextCommand { Command = "siren" });
+        });
+        _bindings.Bind(InputContext.Gameplay, GameKey.U, KeyModifiers.Shift, () =>
+        {
+            if (_state.RidingControls) _network.Send(new TextCommand { Command = "siren", Args = new[] { "next" } });
+        });
         _bindings.Bind(InputContext.Gameplay, GameKey.Q, () => _network.Send(new TextCommand { Command = "drop" }));
         // R does what the moment calls for: in a seat it winds the window, with a gun in your hands it
         // reloads it, and otherwise it slings what you hold onto your back. One key for the three,
@@ -881,6 +894,9 @@ public sealed partial class ClientGameSession : IDisposable
                 : Vector3.Normalize(move);
 
         if (held.Contains(GameKey.Space)) input.Jump = true;
+        // The horn, for as long as H is down, in the driver's seat. Every packet says so; the server
+        // lets go of it a few ticks after they stop saying it.
+        input.Horn = _state.RidingControls && !fine && Pressed(GameKey.H);
 
         // Running is a claim about a key, not about a speed: the speed is the server's to apply, and
         // prediction reads the same flag so a stride does not mispredict.

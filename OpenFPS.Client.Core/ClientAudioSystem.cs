@@ -418,6 +418,7 @@ public class ClientAudioSystem
         if (_spreading.Remove(entityId, out var spreading) && spreading.Voiced) StopOuter(entityId, spreading, now: true);
         if (_sirenVoiced.Remove(entityId)) _audio.StopSound(SirenVoiceBase - Math.Abs(entityId));
         _sirenControl.Remove(entityId);
+        if (_heldHorns.Remove(entityId)) _audio.StopSound(HeldHornVoiceBase - Math.Abs(entityId));
         _frontRetiring.Remove(entityId);
         _placed.Remove(entityId);
         // Its image-source reflections: one voice per slot (see ReflectionVoiceId).
@@ -2365,6 +2366,7 @@ public class ClientAudioSystem
     /// </summary>
     private void UpdateHorns(WorldSnapshot world, Vector3 eyePos, double now)
     {
+        UpdateHeldHorns(world, eyePos, now);
         if (_horns.Count == 0) return;
         _hornsDone.Clear();
         foreach (var (id, horn) in _horns)
@@ -2379,7 +2381,7 @@ public class ClientAudioSystem
             // Behind a car's grille, a little above the bumper; on a locomotive's cab roof.
             bool rail = snap.Definition.SoundEmitter.SoundId?.StartsWith("rail:", StringComparison.OrdinalIgnoreCase) == true;
             Vector3 pos = snap.Transform.Position
-                        + Vector3.Transform(rail ? new Vector3(0f, 4.2f, 0f) : new Vector3(0f, 0.6f, 1.9f),
+                        + Vector3.Transform(rail ? new Vector3(0f, 4.2f, 0f) : new Vector3(0f, 0.6f, Grille(snap)),
                                             snap.Transform.Rotation);
             float levelDb = OpenFPS.Common.Honk.LevelDb(horn.Key[OpenFPS.Common.Honk.Prefix.Length..horn.Key.LastIndexOf(':')]);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
@@ -2426,6 +2428,89 @@ public class ClientAudioSystem
         }
     }
 
+    /// <summary>Voice ids for a horn a driver is holding down, one per vehicle.</summary>
+    internal const int HeldHornVoiceBase = -2_100_000;
+
+    /// <summary>Held horns with a voice: the vehicle, and when its key came up (NaN while held).</summary>
+    private readonly Dictionary<int, double> _heldHorns = new();
+    private readonly List<int> _heldDone = new();
+
+    /// <summary>How long a released horn's voice is kept for its own valve or relay to close, seconds.</summary>
+    private const double HornReleaseSeconds = 0.8;
+
+    /// <summary>
+    /// The horn of every vehicle whose driver is holding H (EntityState.Signals): the vehicle's own horn
+    /// model (VehicleProfile.HornFor) blowing for as long as the wire says, at the grille. Let go, the
+    /// voice is told to stop and the model's own valve or relay ends the note; the voice goes a moment
+    /// later.
+    /// </summary>
+    private void UpdateHeldHorns(WorldSnapshot world, Vector3 eyePos, double now)
+    {
+        foreach (var snap in world.DynamicEntities)
+        {
+            if (!OpenFPS.Common.VehicleSignalBits.IsManual(snap.Signals)) continue;
+            bool held = OpenFPS.Common.VehicleSignalBits.HornHeld(snap.Signals);
+            if (!held && !_heldHorns.ContainsKey(snap.Id)) continue;
+            string? sid = snap.Definition.SoundEmitter.SoundId;
+            if (sid == null || !sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+                || !OpenFPS.Common.MachineRegistry.Knows(sid[7..])) continue;
+            string horn = OpenFPS.Common.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor(sid[7..]));
+            if (held) _heldHorns[snap.Id] = double.NaN;
+            else if (double.IsNaN(_heldHorns[snap.Id])) _heldHorns[snap.Id] = now;
+            HeldHornVoice(world, snap, horn, held, eyePos);
+        }
+        _heldDone.Clear();
+        foreach (var (id, releasedAt) in _heldHorns)
+            if (!world.Entities.ContainsKey(id) || (!double.IsNaN(releasedAt) && now - releasedAt > HornReleaseSeconds))
+                _heldDone.Add(id);
+        foreach (int id in _heldDone)
+        {
+            _heldHorns.Remove(id);
+            _audio.StopSound(HeldHornVoiceBase - Math.Abs(id));
+        }
+    }
+
+    private void HeldHornVoice(WorldSnapshot world, EntitySnapshot snap, string horn, bool blowing, Vector3 eyePos)
+    {
+        int voiceId = HeldHornVoiceBase - Math.Abs(snap.Id);
+        var path = VehiclePath(world, snap, eyePos);
+        Vector3 pos = snap.Transform.Position + Vector3.Transform(new Vector3(0f, 0.6f, Grille(snap)), snap.Transform.Rotation);
+        float levelDb = OpenFPS.Common.Honk.LevelDb(horn);
+        var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
+        var e = new SpatialEmitter
+        {
+            EntityId = voiceId,
+            SoundId = "horn",
+            IsSynth = true,
+            PhysicalKey = OpenFPS.Common.Honk.HoldKey(horn),
+            EngineKey = "",
+            Mode = PlaybackMode.LoopOne,
+            Type = EmitterType.EntityAttached,
+            Position = pos,
+            ApparentPosition = SirenApparent(path, pos, eyePos),
+            Velocity = snap.Velocity,
+            PositionSampledAt = world.PositionsSampledAt,
+            Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
+            Volume = gain,
+            EarLevelDb = levelDb,
+            MinDistance = reference,
+            Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
+            Pitch = 1f,
+            // The hand on the horn: the voice blows while this is set.
+            EngineRunning = blowing,
+            Occlusion = path.Occlusion,
+            EqLow = path.EqLow, EqMid = path.EqMid, EqHigh = path.EqHigh,
+            AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
+            ApertureFactor = path.ApertureFactor,
+            TransmissionBleed = path.TransmissionBleed,
+            EffectiveDistance = path.EffectiveDistance,
+            TargetRegionId = path.RegionId,
+        };
+        ApplyGround(ref e, _groundWorld);
+        if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
+        else if (blowing) _audio.PlayPhysicalSoundDirect(e);
+    }
+
     /// <summary>
     /// The siren on a vehicle that carries one — its own voice at its own level, at the grille.
     ///
@@ -2448,7 +2533,10 @@ public class ClientAudioSystem
         catch { return; }
 
         float speed = snap.Velocity.Length();
-        var mode = SirenModeFor(snap.Id, speed, sampledAt);
+        // A vehicle somebody can drive sounds its siren as the driver switched it; traffic, as it drives.
+        var mode = OpenFPS.Common.VehicleSignalBits.IsManual(snap.Signals)
+            ? OpenFPS.Common.VehicleSignalBits.Siren(snap.Signals)
+            : SirenModeFor(snap.Id, speed, sampledAt);
         int voiceId = SirenVoiceBase - Math.Abs(snap.Id);
         if (mode == OpenFPS.Common.SirenMode.Off)
         {
@@ -2501,7 +2589,21 @@ public class ClientAudioSystem
 
     /// <summary>A siren head: at the grille, which is where the horn is.</summary>
     internal static Vector3 SirenMouth(in EntitySnapshot snap)
-        => snap.Transform.Position + Vector3.Transform(new Vector3(0f, 0.4f, 1.9f), snap.Transform.Rotation);
+        => snap.Transform.Position + Vector3.Transform(new Vector3(0f, 0.4f, Grille(snap)), snap.Transform.Rotation);
+
+    /// <summary>
+    /// How far ahead of a vehicle's middle its grille is, metres: a quarter of a metre in from the nose
+    /// of the body its profile declares. Where the horns and a siren head are mounted. A vehicle the
+    /// client cannot name is taken as a car, whose grille is 1.9 m ahead of its middle.
+    /// </summary>
+    internal static float Grille(in EntitySnapshot snap)
+    {
+        string? sid = snap.Definition.SoundEmitter.SoundId;
+        if (sid != null && sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+            && OpenFPS.Common.MachineRegistry.Knows(sid[7..]))
+            return MathF.Max(0.5f, OpenFPS.Common.MachineRegistry.VehicleFor(sid[7..]).LengthMetres * 0.5f - 0.25f);
+        return 1.9f;
+    }
 
     /// <summary>
     /// Where a siren is heard from: its own head, unless the car's path says the sound arrives round

@@ -423,6 +423,13 @@ public partial struct EntityState
     /// </summary>
     public WheelState[]? Wheels;
 
+    /// <summary>
+    /// A vehicle's horn and siren, as the driver has them switched (<see cref="OpenFPS.Common.VehicleSignalBits"/>):
+    /// the horn held, the siren on, which tone. Zero for anything that is not a player's vehicle. Sent
+    /// because nothing the client can observe says a hand is on the horn. Packed only when not zero.
+    /// </summary>
+    public byte Signals;
+
     public EntityState()
     {
         EntityId = 0;
@@ -618,6 +625,10 @@ public partial class ClientInputUpdate : IMessage
     /// claim that the key was held, and prediction and the authority must read it the same way or
     /// every stride mispredicts.</summary>
     public bool Sprint;
+
+    /// <summary>The horn key is down. Only a driver's counts; the server sounds the horn of the vehicle
+    /// they are driving for as long as it stays down.</summary>
+    public bool Horn;
 }
 
 /// <summary>
