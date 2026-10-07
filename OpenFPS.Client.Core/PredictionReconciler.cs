@@ -6,11 +6,8 @@ using static OpenFPS.Common.PhysicsConstants;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Owns client-side prediction bookkeeping: the unacknowledged-input history, the replay that
-/// follows a server correction, and the yaw reconciliation that keeps the local heading honest.
-///
-/// Both heads (Windows Forms and GTK) drive this, so there is exactly one implementation of the
-/// reconciliation rules rather than two that can drift apart.
+/// Client-side prediction: the unacknowledged inputs, their replay after a server correction, and the
+/// yaw reconciliation. One implementation for both heads.
 /// </summary>
 public sealed class PredictionReconciler
 {
@@ -23,7 +20,7 @@ public sealed class PredictionReconciler
     /// <summary>Yaw error (radians) tolerated before the local heading is snapped to the server's.</summary>
     private const float YawReconcileThreshold = 0.05f;
 
-    /// <summary>Position error (metres) above which we snap outright instead of smoothing.</summary>
+    /// <summary>Position error, metres, above which the position snaps instead of smoothing.</summary>
     private const float SnapDistance = 5.0f;
 
     public PredictionReconciler(LocalPlayerState state, ClientPhysicsSystem physics)
@@ -35,23 +32,18 @@ public sealed class PredictionReconciler
     public int PendingInputs => _history.Count;
 
     /// <summary>
-    /// What the body pressed into on the last FRESH step, or null. Replays after a correction do not
-    /// touch it: they re-walk inputs whose contacts were already reported once, and a wall bump heard
-    /// again on every server correction would be a bump per packet.
+    /// What the body pressed into on the last fresh step, or null. Replays do not set it: a wall bump
+    /// heard again on every server correction would be a bump per packet.
     /// </summary>
     public BodyContact? LastContact { get; private set; }
 
-    /// <summary>Drops the whole history — call on spawn or any teleport, where replay is meaningless.</summary>
+    /// <summary>Drops the history: on a spawn or a teleport, where replay means nothing.</summary>
     public void Reset() { _history.Clear(); LastContact = null; }
 
     /// <summary>
-    /// Whether the player's position is currently a seat's business rather than their own.
-    ///
-    /// Prediction exists to hide the round trip on movement the client CAUSED. A passenger causes
-    /// none: where they are is decided by something the client has no simulation of — a vehicle with
-    /// an engine, tyres and a driver who may be somebody else. Predicting it would mean inventing a
-    /// position and being corrected off it every tick, which is worse than the honest lag of simply
-    /// following the server. Look is untouched; turning your head is still yours.
+    /// The position is a seat's, not the player's. A passenger causes no movement the client could
+    /// predict (the vehicle is simulated on the server), so it follows the server; looking round is
+    /// still predicted.
     /// </summary>
     public bool Riding { get; set; }
 
@@ -59,9 +51,7 @@ public sealed class PredictionReconciler
     /// the server moves a held body not at all, not even by gravity.</summary>
     public bool Held { get; set; }
 
-    /// <summary>
-    /// Applies one freshly gathered input: rotate, predict, and remember it for replay.
-    /// </summary>
+    /// <summary>Applies a fresh input (look, then movement) and keeps it for replay.</summary>
     public void Step(ClientInputUpdate input, WorldSnapshot snapshot, float dt)
     {
         _physics.ApplyLook(input, dt);
@@ -71,22 +61,19 @@ public sealed class PredictionReconciler
         // reconciliation below needs to know which look deltas it has not seen yet.
         _history.Add(input);
 
-        // Bound the history. Without this, a client whose acks stop arriving (server hitch, packet
-        // loss, a dropped session) grows the list forever and re-simulates all of it every frame.
+        // Bounded: a client whose acks stop arriving would otherwise re-simulate an ever longer list
+        // every frame.
         if (_history.Count > MaxInputHistory)
             _history.RemoveRange(0, _history.Count - MaxInputHistory);
     }
 
     /// <summary>
-    /// Re-simulates the player's path from a verified server state, then measures the visual error
-    /// so the caller can bleed it away instead of snapping.
+    /// Re-simulates from a server state and leaves the visual error for the caller to bleed away.
     /// </summary>
     /// <returns>
-    /// True when the correction was a TELEPORT rather than a drift — further than any smoothing should
-    /// cover, so the position was snapped outright. The caller uses it to throw away anything that was
-    /// measuring continuous motion; the stride accumulator especially, which would otherwise read the
-    /// jump as ground covered on foot. <c>/tp</c> and an admin move arrive this way and no other: there
-    /// is no message that says "you were moved", only a position that could not have been walked to.
+    /// True when the correction was a teleport, too far to smooth, and the position snapped. The caller
+    /// then drops whatever measures continuous motion (the stride accumulator would count the jump as
+    /// walked). <c>/tp</c> and an admin move arrive only this way: no message says "you were moved".
     /// </returns>
     public bool ApplyServerCorrection(EntityState serverState, long lastProcessedId, WorldSnapshot snapshot)
     {
@@ -96,17 +83,14 @@ public sealed class PredictionReconciler
         _state.Position = transform.Position;
         _state.Velocity = serverState.LinearVelocity;
 
-        // Purge inputs the server has already folded into that state.
         _history.RemoveAll(i => i.SequenceId <= lastProcessedId);
 
         // A passenger faces the way the vehicle faces; the session sets that every frame, and the
         // server's copy of it is a network trip behind (see ClientGameSession.FollowRide).
         if (!Riding) ReconcileYaw(transform.Rotation);
 
-        // Replay only the movement of the still-unacknowledged inputs. Look is NOT replayed: the
-        // local heading is already ahead of the server by exactly those inputs (see ReconcileYaw),
-        // and re-applying the deltas here would double-count every turn. A passenger replays
-        // nothing at all — none of those inputs moved them.
+        // Movement only: the local heading is already ahead by these inputs' look (ReconcileYaw), and
+        // replaying it would count every turn twice. A passenger replays nothing.
         if (!Riding && !Held)
             foreach (var input in _history)
                 _physics.Predict(input, snapshot, input.DeltaTime);
@@ -118,10 +102,8 @@ public sealed class PredictionReconciler
     }
 
     /// <summary>
-    /// Reconciles the look angles against the server's quantized rotation. The server's yaw is
-    /// behind ours by the unacknowledged look deltas, so we compare against that projection rather
-    /// than the raw server value — and only correct when the disagreement is real, so quantization
-    /// noise never twitches the player's heading.
+    /// Compares the look angles with the server's quantized rotation plus the unacknowledged look
+    /// deltas, and corrects only past a threshold so quantization noise never twitches the heading.
     /// </summary>
     private void ReconcileYaw(Quaternion serverRotation)
     {

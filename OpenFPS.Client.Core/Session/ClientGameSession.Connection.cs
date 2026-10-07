@@ -6,10 +6,8 @@ using OpenFPS.Client.Core.Platform;
 namespace OpenFPS.Client.Core.Session;
 
 /// <summary>
-/// Connecting, logging in, losing the connection, and leaving: the part of a session that used to
-/// be written twice, once in each head, and had drifted (only Windows could create an account, and
-/// only Windows told the server it was leaving). Each head now calls <see cref="Connect"/> from its
-/// connect form and shows what <see cref="IClientShell"/> asks for; everything else is here.
+/// Connecting, logging in, losing the connection and leaving, for both heads: a head calls
+/// <see cref="Connect"/> from its connect form and shows what <see cref="IClientShell"/> asks for.
 /// </summary>
 public sealed partial class ClientGameSession
 {
@@ -130,8 +128,8 @@ public sealed partial class ClientGameSession
         string reason = $"Could not create the account. {reg.Message}";
         _speech.Speak(reason, interrupt: true);
         _link = LinkState.Idle;
-        // Nothing is logged in, so nothing stays connected. (It did, and quitting afterwards announced
-        // "Disconnected from the server" for a connection the player never had.)
+        // Nothing is logged in, so nothing stays connected: quitting would announce "Disconnected from
+        // the server" for a connection the player never had.
         DropConnection();
         ConnectFailed?.Invoke(reason);
     }
@@ -368,9 +366,8 @@ public sealed partial class ClientGameSession
     }
 
     /// <summary>
-    /// The gain part way through a fade. Even steps of loudness, not of amplitude: linear in
-    /// decibels over the 60 dB the fade spans, so the world neither lurches in at the start of a
-    /// fade-in nor hangs on at the end of a fade-out.
+    /// The gain part way through a fade, linear in decibels over its 60 dB, so the world neither
+    /// lurches in at the start of a fade-in nor hangs on at the end of a fade-out.
     /// </summary>
     public static float FadeGain(float from, float to, float t)
     {

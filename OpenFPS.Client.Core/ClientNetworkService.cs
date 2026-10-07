@@ -25,31 +25,24 @@ public class ClientNetworkService : INetEventListener
     public event Action? OnConnected;
 
     /// <summary>
-    /// Raised when the connection could not be established, or was lost after it was. The argument is a
-    /// finished, speakable sentence — heads pass it straight to the screen reader.
-    ///
-    /// A blind player has no window title, no greyed-out button and no spinner to look at: if a connection
-    /// dies silently the game simply stops responding with no explanation. Every one of these paths must
-    /// end in something said out loud.
+    /// A connection could not be made. The argument is a finished sentence the head speaks as it is. A
+    /// player who cannot see the screen has no other sign of a dead connection, so every failure path
+    /// must end in something said.
     /// </summary>
     public event Action<string>? OnConnectionFailed;
 
-    /// <summary>Raised when a packet arrives that cannot be decoded as a message — a protocol mismatch
-    /// between client and server, or a corrupt packet. Argument is a speakable sentence.</summary>
+    /// <summary>A packet that does not decode: a version mismatch or a damaged packet. The argument is a
+    /// speakable sentence.</summary>
     public event Action<string>? OnProtocolError;
 
-    /// <summary>Raised for a connection event that is not a failure but that the player must still hear —
-    /// a second Connect while one is already in flight, for instance. Argument is a speakable sentence.
-    /// Kept separate from <see cref="OnConnectionFailed"/> so nothing is announced as an error that
-    /// isn't one.</summary>
+    /// <summary>Something the player must hear that is not a failure, such as a second Connect while one
+    /// is in flight. Separate from <see cref="OnConnectionFailed"/> so it is not announced as an error.</summary>
     public event Action<string>? OnConnectionNotice;
 
-    /// <summary>Raised when a connection that WAS up has gone — the server stopped, the network
-    /// dropped, or we disconnected. The argument is a speakable reason. A connect that never
-    /// succeeded raises <see cref="OnConnectionFailed"/> instead.</summary>
+    /// <summary>A connection that was up has gone. The argument is a speakable reason. A connect that
+    /// never succeeded raises <see cref="OnConnectionFailed"/> instead.</summary>
     public event Action<string>? OnConnectionLost;
 
-    /// <summary>True while a server peer is connected.</summary>
     public bool IsConnected => _serverPeer != null;
 
     /// <summary>True while a connect has been started and has neither succeeded nor failed.</summary>
@@ -82,14 +75,10 @@ public class ClientNetworkService : INetEventListener
     }
 
     /// <summary>
-    /// Connects, or — when a peer to that server is already up — re-runs the connected handshake.
-    ///
-    /// LiteNetLib's <c>NetManager.Connect</c> RETURNS the existing peer when one is already connected to
-    /// the same endpoint, and fires no <c>OnPeerConnected</c> for it. That is the whole of the "I typed
-    /// the wrong password, tried again, and was dropped back at the menu with nothing said" bug: the
-    /// rejected login leaves the peer connected, so the retry produced no event, so the head never sent
-    /// its second <c>LoginRequest</c>, so the server never answered and there was nothing to speak. The
-    /// retry is legitimate — the server rate-limits it — so raise <see cref="OnConnected"/> ourselves.
+    /// Connects, or re-runs the connected handshake when a peer to that server is already up.
+    /// LiteNetLib's <c>NetManager.Connect</c> returns the existing peer then and fires no
+    /// <c>OnPeerConnected</c>: a retry after a wrong password sent no second login and the player was
+    /// dropped at the menu with nothing said. So <see cref="OnConnected"/> is raised here.
     /// </summary>
     public void Connect(string ip, int port)
     {
@@ -104,9 +93,8 @@ public class ClientNetworkService : INetEventListener
                 OnConnected?.Invoke();
                 return;
             }
-            // A DIFFERENT server. The shortcut above once sent every login meant for the dev server down
-            // the connection a rejected login had left open to the VPS: "your build is X, the server's
-            // is Y" from a server that was never asked (Cody, 2026-10-02).
+            // A different server: leave the old peer first, or the login goes to the server a rejected
+            // login left open ("your build is X" from a server never asked; Cody, 2026-10-02).
             Log.Information("Leaving {Old} for {New}.", _peerTarget, _lastTarget);
             _leaving = existing;
             _serverPeer = null;
@@ -136,10 +124,9 @@ public class ClientNetworkService : INetEventListener
     }
 
     /// <summary>
-    /// A server named by host name, as its IPv4 address when it has one. LiteNetLib resolves a name to
-    /// its IPv6 address whenever the machine has IPv6, and a connection to codyhurst.com that way was
-    /// never answered, from a machine whose IPv6 pinged the server fine; by its IPv4 address the same
-    /// login was accepted (2026-10-03). An address typed as an address is used as it is.
+    /// A host name as its IPv4 address when it has one. LiteNetLib prefers IPv6, and codyhurst.com over
+    /// IPv6 never answered from a machine whose IPv6 pinged it fine; over IPv4 the login was accepted
+    /// (2026-10-03). An address is used as it is.
     /// </summary>
     internal static string Resolve(string host)
     {
@@ -173,8 +160,7 @@ public class ClientNetworkService : INetEventListener
         var peer = _serverPeer;
         if (peer == null)
         {
-            // Dropping a message because there is no connection is exactly the kind of silent failure this
-            // step exists to remove: the player pressed a key and nothing happened, with no trace anywhere.
+            // Never drop silently: a key that did nothing must at least leave a line in the log.
             Log.Warning("Dropped outgoing {Type}: not connected to a server.", message.GetType().Name);
             return;
         }
@@ -220,8 +206,7 @@ public class ClientNetworkService : INetEventListener
         }
     }
 
-    // Protocol errors can arrive at packet rate, so speak/log the FIRST one immediately and then at most
-    // one per interval — loud enough to notice, quiet enough to stay usable.
+    // Protocol errors can arrive at packet rate: the first is reported at once, then one per interval.
     private long _lastProtocolReportTicks;
     private int _protocolErrorCount;
     private const long ProtocolReportIntervalMs = 5000;

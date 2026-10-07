@@ -12,9 +12,8 @@ public interface ISpeechOutput : IDisposable
     /// <summary>Speaks <paramref name="text"/>. When <paramref name="interrupt"/> is true, cancels current speech first.</summary>
     void Speak(string text, bool interrupt = true);
 
-    /// <summary>Immediately stops any in-progress speech.</summary>
     void Interrupt();
 
-    /// <summary>Detected backend / screen-reader name, for diagnostics.</summary>
+    /// <summary>The backend or screen reader found, for the log.</summary>
     string BackendName { get; }
 }

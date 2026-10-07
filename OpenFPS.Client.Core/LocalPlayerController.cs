@@ -4,13 +4,9 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Responsibility: the local player's physical events — footsteps and landings — from the position
-/// prediction already owns.
-///
-/// What a stride IS lives in <see cref="StrideAccumulator"/>, which this shares with every other body
-/// on the map (see <see cref="OtherBodies"/>). All that is local about the local player is where the
-/// three facts come from: the ground state and the material underfoot are the ones the client's own
-/// physics worked out this frame, rather than anything that had to travel.
+/// The local player's footsteps, landings and breaths, from the predicted position. The stride is
+/// <see cref="StrideAccumulator"/>, shared with every other body (<see cref="OtherBodies"/>); what is
+/// local is that the ground state and the material come from this frame's own physics.
 /// </summary>
 public class LocalPlayerController
 {
@@ -32,8 +28,8 @@ public class LocalPlayerController
     public event Action<Vector3, string, string, StepSlope>? OnStepTriggered; // Position, Material, Variant, up/down
     public event Action<Vector3, string, string>? OnLandTriggered;
 
-    /// <summary>The player took a breath. Getting in and out of a seat does NOT reset this the way it
-    /// resets the stride: a driver who sprinted to the car is still out of breath in it.</summary>
+    /// <summary>A breath. A seat does not reset the lungs as it resets the stride: a driver who sprinted
+    /// to the car is still out of breath in it.</summary>
     public event Action<Vector3, Breath>? OnBreath;
 
     /// <summary>How hard the player is working, 0 to 1. For a spoken readout, and for tests.</summary>
@@ -76,10 +72,8 @@ public class LocalPlayerController
         }
     }
 
-    /// <summary>
-    /// Lungs run on elapsed time, not on frames — this is called at whatever rate the renderer
-    /// manages, and how out of breath somebody is cannot depend on that.
-    /// </summary>
+    /// <summary>Lungs run on elapsed time, not frames: how out of breath somebody is cannot depend on the
+    /// frame rate.</summary>
     private void Breathe(Vector3 position, Vector3 velocity)
     {
         double now = OpenFPS.Common.AudioClock.Now;
@@ -87,8 +81,7 @@ public class LocalPlayerController
 
         float dt = (float)(now - _lastUpdateAt);
         _lastUpdateAt = now;
-        // A gap that long is a stall, a load or a breakpoint, and integrating it would have the
-        // player recover a minute of breath in one frame.
+        // A gap that long is a stall or a load; integrating it would recover a minute of breath at once.
         if (dt <= 0f || dt > 1f) return;
 
         float speed = new Vector2(velocity.X, velocity.Z).Length();

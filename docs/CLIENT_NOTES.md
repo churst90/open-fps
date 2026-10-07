@@ -40,3 +40,122 @@ flight two up a storey up. The lowest marker can only be a foot, and pairs with 
 above facing back down its line (that flight's top); in order of height, every marker not already a
 top is the foot of the flight above it, or the top of the whole stair if nothing above faces back.
 The same stacking is why `OnTreads` looks for the other end on the side of the marker the feet are.
+
+## Breathing is not played
+
+Breathing is the only sound a body still makes once it has stopped moving, and so the only way to find
+somebody who has stopped to listen for you. It was judged by ear and rejected: "I don't like the
+breathing, remove it." Not a bug: the model and the synthesis were both repaired first (BreathTests and
+the AudioLab's --breath), and what was left was a breath that sounded like a breath and was still not
+wanted. A sound nobody wants to hear is not information, however correct it is.
+
+The model stays and keeps running: Breathing (LocalPlayerController) drives the exertion readout on B
+("Breathing hard", "Winded"), which is the useful half. Only the voice is gone. Bringing it back means
+subscribing the controller's and the other bodies' OnBreath to a handler that submits the breath as a
+world sound; ClientAudioSystem.OnBreath, which did that, was removed as dead code on 2026-10-07 (it is
+in git history before commit d3944776).
+
+## Facing while riding
+
+Reported: "when the bus turns, the bus turns around my head, which is wrong. My head should stay facing
+the direction of the bus, and when I press F it should tell me the correct direction." A first attempt
+carried the player's own heading round with the vehicle's turns and let the server's copy correct it;
+but the server's copy arrives a network trip late, so half way through every corner the two disagreed by
+more than the correction threshold and the head was snapped back to where the bus had been, the bus
+swinging round the listener. Now, while riding, the heading is the vehicle's, set every frame from the
+vehicle (ClientGameSession.FollowRide) and never corrected (PredictionReconciler skips the look while
+Riding). The ears, the compass on F and the way you face when you step off all read the same number.
+
+In the driver's seat the look keys do nothing: every driving cue (the guide ahead, the centre line on
+your left) is placed relative to the car, and a head turned away with J or L would move them all.
+
+## Turn key signs
+
+Which way each key turns, as a sign on what the physics applies:
+
+- Yaw -= LookDelta.X * RotationSpeed * dt. Forward is (sin yaw, 0, cos yaw), so increasing yaw swings
+  forward toward +X, which is right: a positive LookDelta.X decreases yaw and turns left.
+- Pitch += LookDelta.Y * RotationSpeed * dt. Rotation is built by
+  Quaternion.CreateFromYawPitchRoll(yaw, pitch, 0), whose pitch is a right-handed rotation about +X,
+  taking forward (+Z) toward -Y: increasing pitch looks down.
+
+J and L were the wrong way round: J emitted a negative X, which increases yaw and turns right ("turning
+left seems to turn me right"). Only findable by following the sign to the forward vector, because every
+step is individually plausible. K and O were wrong for the same reason, and the comment there was part of
+it: it said a positive pitch looks up, the intuitive reading of the word and the opposite of what
+CreateFromYawPitchRoll does ("k and o seem to be swapped"). The F readout had the pitch backwards too
+("when I press O and I'm looking up, pressing f says looking down"). TurnKeyTests holds the signs.
+
+A key that turned for as long as it was down could not be aimed: at the old rate a press held a tenth of
+a second swung you twenty-six degrees ("it seems jumpy when I turn and then press f, it's like sometimes
+I overshoot"). A tap is now one step whatever the frame rate, and holding sweeps after 0.35 s.
+
+A coarse tap snaps to the grid rather than adding forty-five degrees to wherever you are: once a fine
+nudge or a sweep left you at 47 degrees every tap landed on 92, 137, 182, and walking "straight" then
+changed both coordinates ("if I press j or l to go facing north and I walk straight, both the x and the y
+change when they shouldn't"). Facing north, east, south or west with exactly one coordinate moving is
+what the key is for. Shift stays one degree, off the grid on purpose.
+
+## Shift, Control and taps in GatherInput
+
+Shift once stopped movement dead, so a Shift chord could never walk the player. That made Shift+W
+unusable, and Shift+W is where a run belongs. The meanings do not collide: Shift with a turn key is a
+one-degree nudge, Shift with a movement key is a run, and holding both does both. Alt still suppresses
+everything, as do the console keys.
+
+Held state is sampled once per fixed tick, 33 ms apart, and a quick tap is shorter: pressed and released
+inside one interval, the key was never in `held`, so the press did nothing (no movement, no footstep, no
+packet). A press is a player asking to move, and the least this simulation can move is one tick, so that
+is what a press already over is worth; the just-pressed set is consumed by the same drain, so it is paid
+once however the two rates line up.
+
+## Footsteps and the smoothed position
+
+VisualOffset slides the listener to a corrected position over about two tenths of a second so the world
+does not jump. Fed to the stride generator, that slide became walking: a correction of a few metres
+decays at up to twenty-five metres a second in plausible steps, and if the player was moving when it
+landed every step banked distance ("when I /tp myself or land in the map, I hear a few footsteps before
+it settles"). A stride is something a body did; the smoothing is done to the camera, so the stride reads
+the body's position only.
+
+## Speech has no ground reflection
+
+A one-off sound gets a ground reflection of its own only when it is an impulse (a shot, a door, a knock),
+whose bounce lands inside the attack and is heard as part of it; on anything that lasts it is a comb that
+stands still. Not an echo copy, which is already a path off a surface; not a source with a size, whose
+parts are at every height and distance at once, so their bounces arrive spread out and add up to no comb.
+
+Not speech. A voice three metres off on asphalt has a bounce 4 ms late at two thirds of its pressure, and
+that is what the physics says (Acta Acustica 2024, doi 10.1051/aacus/2024002: below 800 Hz it is stronger
+still). Rendered, it flanges, summed into the voice's direction and again from its own direction below. A
+real talker on a pavement does not sound like that, so something the ear uses is missing: the torso's
+shadow on sound from below, the talker's own vertical radiation, or the small movements that keep a comb
+from standing still. Until one is measured, a voice has none (WorldAudioPlayer.HearsTheGround).
+
+## One-off sounds: why the echoes are as they are
+
+- Render once, play by name. Before WorldAudioPlayer the server's whole vocabulary for sound was "this
+  entity carries a looping emitter", so glass breakage, gunfire and collisions were written, tested and
+  silent. Bridging at the sound-id layer, rather than playing buffers directly, is what lets a rendered
+  latch heard through a wall be muffled by the same code that muffles a recorded one.
+- A reflection of a one-shot is the one-shot, delayed, quieter and from somewhere else, so it is queued
+  as another pending sound at its mirror image. A cheer off the back of a grandstand is most of what makes
+  a stand sound occupied rather than a loudspeaker hung in the air; the same machinery gives a gunshot its
+  slapback off the building opposite.
+- The delay is not added when an echo is queued: the facade delays every submission by its own distance
+  over the speed of sound, and the echo is submitted at its image, the whole path away. An earlier version
+  added the delay as well, from when FMOD read the wrong clock and no delay was honoured; once that was
+  fixed both applied, and every echo came twice as late as its wall (a facade's slapback at 180 ms instead
+  of 90; a knock a second after a footstep instead of a tenth, the difference between a room and a canyon).
+- The level is the direct sound's, times what the surface kept, times the extra spreading undone: the
+  engine applies the spreading from the image itself, and leaving it in applied it twice, a wall that
+  answered a near source and went silent for a far one.
+- Echo copies were once the sound itself at the mirror point everywhere, a clean second gunshot off a
+  brick wall. Then all were smeared through the diffuser, and a shot off steel or concrete (the shortest
+  all-pass delays) came back a ringing, processed copy. Now the mirror share, (1 - scattering) of what the
+  face returns, is the clean crack, and only the scattered taps across the face are washed.
+- Transient voice ids were once a hash of the sound's parameters modulo a million, -1,000 to -1,001,000,
+  straight across the engine echo band (-600,000) and the borrowed-voice band (-700,000): a door or a
+  footstep that landed there took over a car's reflection or a distant car's voice, heard as a car going
+  quiet or a bike's reflection standing still and repeating. The id was also shared by a sound and its own
+  reflection, and under one id the last written won: a grandstand was heard only as its echo.

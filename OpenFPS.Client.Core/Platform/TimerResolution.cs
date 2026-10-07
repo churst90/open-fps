@@ -5,19 +5,12 @@ using Serilog;
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
-/// Asks Windows for a one-millisecond timer for the life of the process.
-///
-/// Windows wakes a sleeping thread on its timer tick, and the tick is 15.6 ms unless a process asks
-/// for finer. So every Thread.Sleep(1) to Sleep(5) in the client is really a sleep of 15.6 ms there:
-/// the audio thread, which sleeps up to 4 ms between passes to run at 250 Hz, ran at 59 Hz, and every
-/// pass-by stepped its pitch by 2.7 % instead of 0.65 %; the game loop, which places every moving
-/// sound once an iteration and sleeps 5 ms, ran at 63 Hz, so voices were placed at positions 110 ms
-/// old (Sean's log, 2026-10-05, build f1a0421123d3). Linux sleeps to the microsecond and needs none
-/// of this; there it does nothing.
-///
-/// Windows 11 also stops honouring a process's timer request when it decides the process is not
-/// being watched or heard, so the process opts out of that throttling as well — a game for people
-/// who do not look at its window must not be judged by whether its window is in view.
+/// Asks Windows for a one-millisecond timer for the life of the process; does nothing elsewhere.
+/// Windows' tick is 15.6 ms unless asked, so every short sleep took 15.6 ms: the audio thread ran at
+/// 59 Hz instead of 250 (a pass-by stepped its pitch 2.7 % instead of 0.65 %) and the game loop at
+/// 63 Hz, placing voices 110 ms late (Sean's log, 2026-10-05, build f1a0421123d3). Windows 11 also
+/// drops the request for a process it thinks unwatched, so that throttling is opted out of too: a
+/// game for people who do not look at its window must not be judged by whether it is in view.
 /// </summary>
 public sealed class TimerResolution : IDisposable
 {
@@ -29,9 +22,8 @@ public sealed class TimerResolution : IDisposable
     private TimerResolution(uint periodMs) => PeriodMs = periodMs;
 
     /// <summary>
-    /// Raises the timer to <paramref name="wantedMs"/> (or the finest the machine offers, if that is
-    /// coarser) and logs what it was, what it is now, and how long a one-millisecond sleep now takes.
-    /// Dispose at exit to give it back; Windows also gives it back when the process ends.
+    /// Raises the timer to <paramref name="wantedMs"/>, or the finest the machine offers, and logs the
+    /// before and after and what a 1 ms sleep now takes. Windows gives it back at exit if not disposed.
     /// </summary>
     public static TimerResolution Raise(uint wantedMs = 1)
     {

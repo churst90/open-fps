@@ -1,16 +1,9 @@
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
-/// Everything the shared game session needs from a window system, and nothing more.
-///
-/// This is the seam that lets one session class drive both heads: the session decides *when* a
-/// loading screen should appear, when the player has entered the world, and when the command console
-/// was asked for; the head decides what any of that looks like. On Windows those are WinForms
-/// windows marshaled through <c>ClientNavigationService</c>; on Linux they are GTK windows that
-/// expose themselves to Orca over AT-SPI.
-///
-/// Every method may be called from the game-loop thread. Implementations are responsible for
-/// marshaling to their own UI thread — the session never does, because it cannot know how.
+/// What the shared session needs from a window system: the session decides when, the head decides
+/// what it looks like (WinForms on Windows, GTK over AT-SPI on Linux). Every member may be called from
+/// the game-loop thread; the head marshals to its own UI thread, since the session cannot know how.
 /// </summary>
 public interface IClientShell
 {
@@ -20,11 +13,11 @@ public interface IClientShell
     /// <summary>Updates the loading screen's status line and progress (0-100).</summary>
     void UpdateLoadingStatus(string text, int percent);
 
-    /// <summary>The local player has spawned: hand the player the in-game window and keyboard focus.</summary>
+    /// <summary>The player has spawned: the in-game window takes keyboard focus.</summary>
     void EnterGame();
 
-    /// <summary>The player asked for the command console (slash). Opens a text entry that reports what
-    /// was typed through <see cref="CommandEntered"/>.</summary>
+    /// <summary>Opens the command console (slash); what is typed comes back through
+    /// <see cref="CommandEntered"/>.</summary>
     void OpenCommandConsole();
 
     /// <summary>Opens the command console with text already typed — "/pm sean01 " from a player's
@@ -32,35 +25,30 @@ public interface IClientShell
     void OpenCommandConsole(string initialText) => OpenCommandConsole();
 
     /// <summary>
-    /// The player pressed Escape in game. Shows the game menu — Keep playing, Main menu, Quit, with
-    /// Keep playing focused so a stray Enter does nothing — and reports the choice. Escape or closing
-    /// the menu is <see cref="GameMenuChoice.KeepPlaying"/>. The session does the logging out; the
-    /// shell only asks.
+    /// Escape in game: the game menu (Keep playing, Main menu, Quit), with Keep playing focused so a
+    /// stray Enter does nothing. Escape or closing it is <see cref="GameMenuChoice.KeepPlaying"/>. The
+    /// session does the logging out; the shell only asks.
     /// </summary>
     void ShowGameMenu(Action<GameMenuChoice> chosen);
 
-    /// <summary>Leaves the game: closes the game window and anything open over it, and puts the
-    /// player back on the main menu with focus on it.</summary>
+    /// <summary>Closes the game window and anything over it and focuses the main menu.</summary>
     void ReturnToMenu();
 
     /// <summary>Closes the program. The session has already logged out.</summary>
     void Quit();
 
     /// <summary>
-    /// True when gameplay keys should be acted on: the game window has focus and no modal text entry
-    /// is open. When false the session zeroes movement rather than letting the player drift while
-    /// typing into the console.
+    /// The game window has focus and no text entry is open. When false the session zeroes movement, so
+    /// the player does not drift while typing.
     /// </summary>
     bool IsGameInputActive { get; }
     /// <summary>
-    /// Whether Num Lock is on, as the head last saw it, or null when the head cannot tell. The scope's
-    /// keys are the keypad's digits, which only reach the game with Num Lock on: with it off NVDA and
-    /// Orca take the keypad for their own review commands.
+    /// Num Lock as the head last saw it, or null when it cannot tell. The scope's keys reach the game
+    /// only with Num Lock on: off, NVDA and Orca take the keypad for review.
     /// </summary>
     bool? NumLockOn => null;
 
-    /// <summary>Raised when the player commits a line in the command console. The session parses it
-    /// into a command or a chat message.</summary>
+    /// <summary>A line committed in the command console, for the session to parse.</summary>
     event Action<string>? CommandEntered;
 }
 
