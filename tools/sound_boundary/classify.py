@@ -42,13 +42,12 @@ CO = 'OpenFPS.Common/'
 
 # ── File rules: (path prefix or exact path, group, project, note) ──────────────────────────────────
 FILE_RULES = [
-    # Native bindings
-    (CC + 'FmodNative/', 'a', 'Native', 'FMOD bindings'),
-    (CC + 'AudioEngine/SteamAudio/Phonon.cs', 'a', 'Native', 'Steam Audio bindings'),
-    (CC + 'AudioEngine/SteamAudio/PhononSim.cs', 'a', 'Native', 'Steam Audio bindings'),
-    (CC + 'AudioEngine/SteamAudio/PhononAmbisonics.cs', 'a', 'Native', 'Steam Audio bindings'),
-    (CC + 'Platform/NativeAudioLibraries.cs', 'a', 'Native', 'finds libfmod/libphonon'),
-    (CC + 'Platform/BackgroundPriority.cs', 'a', 'Native', 'thread priority (libc)'),
+    # The library's own projects, once a stage has made them: everything in one is that project's.
+    ('OpenFPS.Geometry/', 'a', 'Geometry', ''),
+    ('OpenFPS.Acoustics/', 'a', 'Acoustics', ''),
+    ('OpenFPS.Sound/', 'a', 'Sound', ''),
+    ('OpenFPS.Native/', 'a', 'Native', ''),
+    ('OpenFPS.Audio/', 'a', 'Audio', ''),
     # The real-time runtime: FMOD DSPs, voices, Steam Audio, the acoustic worker
     (CC + 'AudioEngine/Data/', 'c', 'Audio', 'the source description the host fills'),
     (CC + 'AudioEngine/Fmod/', 'a', 'Audio', ''),
@@ -76,12 +75,6 @@ FILE_RULES = [
     (CC + 'Input/', 'b', '', ''),
     (CC + 'Services/', 'b', '', ''),
     (CC, 'b', '', 'client game'),
-    # Common: geometry
-    (CO + 'Geometry/', 'a', 'Geometry', ''),
-    (CO + 'GeometryUtils.cs', 'a', 'Geometry', ''),
-    (CO + 'SpatialGrid.cs', 'a', 'Geometry', ''),
-    (CO + 'BoxColumns.cs', 'a', 'Geometry', ''),
-    (CO + 'PerfProbe.cs', 'a', 'Geometry', 'diagnostics timer; lowest project so every layer can use it'),
     # Common: acoustics
     (CO + 'AcousticConstants.cs', 'a', 'Acoustics', ''),
     (CO + 'AcousticMap.cs', 'a', 'Acoustics', ''),
@@ -118,6 +111,10 @@ FILE_RULES = [
     (CO + 'PhysicsUtils.cs', 'b', '', 'player movement'),
     (CO + 'PhysicsConstants.cs', 'b', '', 'player movement'),
     (CO + 'GroundProbeMemo.cs', 'b', '', 'server movement'),
+    (CO + 'EntityGeometry.cs', 'b', '', "open-fps's entities to solids: the adapter the geometry library is fed through"),
+    (CO + 'MoverPoses.cs', 'b', '', "the server's count of door leaves moved"),
+    (CO + 'DrivingCuePlanner.cs', 'b', '', 'driving aid over the road network'),
+    (CO + 'RoadMapData.cs', 'b', '', 'map data (the MapRoads message)'),
     (CO + 'UpdateThrottle.cs', 'b', '', 'client loop'),
     (CO + 'TrackClearance.cs', 'b', '', 'server map validation'),
     (CO + 'Messages.cs', 'b', '', 'network'),
@@ -156,7 +153,6 @@ TYPE_RULES = {
     'OpenFPS.Common.AmmoType': ('b', '', 'game rule'),
     'OpenFPS.Common.Ammunition': ('b', '', 'game rule'),
     'OpenFPS.Common.MathHelper': ('a', 'Geometry', ''),
-    'OpenFPS.Common.Geometry.EntityGeometry': ('b', '', "open-fps's entities to SolidSpec: the adapter half of TriangleWorldBuilder.cs"),
     'OpenFPS.Client.Core.RainSurvey': ('a', 'Audio', 'reads entities to find roofs and gutters: becomes a reader of the world input'),
     'OpenFPS.Client.Core.DropBank': ('a', 'Audio', ''),
     'OpenFPS.Client.Core.Platform.FmodMicrophoneCapture': ('b', '', 'microphone for voice chat (uses Native)'),
@@ -177,6 +173,11 @@ ALLOWED = {
 }
 
 
+# Projects whose files are sorted by the rules above; every other project is host.
+SCANNED = ('OpenFPS.Common', 'OpenFPS.Client.Core', 'OpenFPS.Geometry', 'OpenFPS.Acoustics', 'OpenFPS.Sound',
+           'OpenFPS.Native', 'OpenFPS.Audio')
+
+
 def classify(t):
     if t in TYPE_RULES:
         return TYPE_RULES[t]
@@ -184,7 +185,7 @@ def classify(t):
     if not r:
         return ('?', '', '')
     f = r['file']
-    if r['project'] not in ('OpenFPS.Common', 'OpenFPS.Client.Core'):
+    if r['project'] not in SCANNED:
         return ('b', '', r['project'])
     for prefix, g, p, note in FILE_RULES:
         if f == prefix or (prefix.endswith('/') and f.startswith(prefix)):
@@ -209,10 +210,11 @@ def proj(t):
 SOUND_FILES = re.compile(r'^(OpenFPS\.Client\.Core/(AudioEngine|FmodNative)/|OpenFPS\.Client\.Core/('
                          r'ClientAudioSystem|WorldAudioPlayer|RainField|BirdLife|SpatialService|NearDrops|ClientGeometry'
                          r')\.cs|OpenFPS\.Client\.Core/Platform/(NativeAudioLibraries|BackgroundPriority)\.cs)')
-seed = {t for t, r in TYPES.items() if SOUND_FILES.match(r['file']) or (r['project'] == 'OpenFPS.Common' and GROUP[t][0] in ('a', 'c'))}
+seed = {t for t, r in TYPES.items() if SOUND_FILES.match(r['file'])
+        or (r['project'] in SCANNED and r['project'] != 'OpenFPS.Client.Core' and GROUP[t][0] in ('a', 'c'))}
 universe = set(seed)
 for e in EDGES:
-    if e['from_type'] in seed and e['to_type'] in TYPES and TYPES[e['to_type']]['project'] in ('OpenFPS.Common', 'OpenFPS.Client.Core'):
+    if e['from_type'] in seed and e['to_type'] in TYPES and TYPES[e['to_type']]['project'] in SCANNED:
         universe.add(e['to_type'])
 
 # ── Crossings ────────────────────────────────────────────────────────────────────────────────────
@@ -235,6 +237,33 @@ with open(os.path.join(out, 'crossings.tsv'), 'w', encoding='utf-8') as f:
     f.write('from_type\tfrom_group\tfile\tline\tto_type\tmember\n')
     for e in sorted(crossings, key=lambda e: (e['file'], int(e['line']))):
         f.write(f"{e['from_type']}\t{GROUP[e['from_type']][0]}:{proj(e['from_type'])}\t{e['file']}\t{e['line']}\t{e['to_type']}\t{e['member']}\n")
+
+# The ratchet's allowance (OpenFPS.Tests/LibraryBoundary/allowed.tsv): the crossings per file and host
+# type. LibraryBoundaryTests counts the same way and writes the same list (OPENFPS_BOUNDARY_WRITE=all).
+allowance = collections.Counter((e['file'], e['to_type']) for e in crossings)
+with open(os.path.join(out, 'allowed.tsv'), 'w', encoding='utf-8') as f:
+    f.write('file\tname\tcount\n')
+    for (path, to), n in sorted(allowance.items()):
+        f.write(f'{path}\t{to}\t{n}\n')
+
+# ── Every file of the sorted projects, for the ratchet test (OpenFPS.Tests/LibraryBoundaryTests.cs) ──
+# lib: every type in it is library (a or c); host: none is; mixed: both, and the library types are named
+# so the test scans only their declarations. A new file in one of these projects has no line here and
+# fails the test until it is sorted (a rule above) and this is run again.
+by_file = collections.defaultdict(list)
+for t, r in TYPES.items():
+    if r['project'] in SCANNED:
+        for f in r['files'].split(';'):
+            by_file[f].append(t)
+with open(os.path.join(out, 'files.tsv'), 'w', encoding='utf-8') as f:
+    f.write('file\tgroup\tprojects\tlibrary_types\n')
+    for path in sorted(by_file):
+        ts = by_file[path]
+        libs = sorted(t for t in ts if lib(t))
+        group = 'lib' if len(libs) == len(ts) else 'host' if not libs else 'mixed'
+        projects = ','.join(sorted({proj(t) for t in libs}))
+        names = ','.join(t.split('.')[-1] for t in libs) if group == 'mixed' else ''
+        f.write(f'{path}\t{group}\t{projects}\t{names}\n')
 
 # ── Tables ───────────────────────────────────────────────────────────────────────────────────────
 md = []

@@ -20,6 +20,11 @@ internal static class TestConfigIsolation
         string scratch = Path.Combine(Path.GetTempPath(), "openfps-test-config-" + Environment.ProcessId);
         Directory.CreateDirectory(scratch);
         Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", scratch);
+        // And the player's data: every ClientAudioSystem a test builds renders the city's doors in the
+        // background and keeps them in the render cache (DoorRenderCache, under LocalApplicationData),
+        // pruning the folders of other builds. Without this that was the player's own cache.
+        Directory.CreateDirectory(Path.Combine(scratch, "data"));
+        Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(scratch, "data"));
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
             try { Directory.Delete(scratch, recursive: true); }
@@ -38,5 +43,14 @@ public class TestConfigIsolationTests
         string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         Assert.StartsWith(Path.GetTempPath(), appData);
         Assert.NotEqual(Path.Combine(home, ".config"), appData);
+        string localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        Assert.StartsWith(Path.GetTempPath(), localData);
+    }
+
+    [Fact]
+    public void TestsNeverWriteThePlayersRenderCache()
+    {
+        string? folder = OpenFPS.Client.AudioEngine.Core.DoorRenderCache.Folder;
+        if (folder != null) Assert.StartsWith(Path.GetTempPath(), folder);
     }
 }

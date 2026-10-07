@@ -4,6 +4,8 @@
   <Project Path="OpenFPS.Client.Core/OpenFPS.Client.Core.csproj" />
   <Project Path="OpenFPS.Client.Gtk/OpenFPS.Client.Gtk.csproj" />
   <Project Path="OpenFPS.Common/OpenFPS.Common.csproj" />
+  <Project Path="OpenFPS.Geometry/OpenFPS.Geometry.csproj" />
+  <Project Path="OpenFPS.Native/OpenFPS.Native.csproj" />
   <Project Path="OpenFPS.Server/OpenFPS.Server.csproj" />
   <Project Path="OpenFPS.Tests/OpenFPS.Tests.csproj" />
 </Solution>

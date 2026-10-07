@@ -124,9 +124,17 @@ public class AsyncAcousticWorker : IDisposable
         _acoustics = acoustics;
     }
 
+    /// <summary>
+    /// For the emitter-stream replay (OpenFPS.Tests, EmitterStreamReplayTests): no thread. Each request
+    /// is answered when the test calls <see cref="StepForTest"/>, between one audio update and the next,
+    /// so an answer arrives on the same frame on every run. Steam Audio is never started: the answers
+    /// are the hand-rolled tracer's, the path a client without the phonon library takes.
+    /// </summary>
+    internal bool Manual { get; init; }
+
     public void Start()
     {
-        if (_workerThread != null) return;
+        if (_workerThread != null || Manual) return;
         _workerThread = new Thread(WorkerLoop)
         {
             IsBackground = true,
@@ -259,7 +267,20 @@ public class AsyncAcousticWorker : IDisposable
     private void WorkerLoop()
     {
         EnsureSteamAudio();
+        Run(once: false);
+    }
 
+    /// <summary>One pass of the worker, on the caller's thread: everything asked since the last. Only
+    /// for a worker made <see cref="Manual"/>.</summary>
+    internal void StepForTest()
+    {
+        if (!Manual) throw new InvalidOperationException("StepForTest drives a Manual worker only.");
+        _saTried = true;
+        Run(once: true);
+    }
+
+    private void Run(bool once)
+    {
         while (!_cts.Token.IsCancellationRequested)
         {
             // Drain ALL queued requests for this tick; the latest request per entity wins. Batching lets
@@ -269,7 +290,7 @@ public class AsyncAcousticWorker : IDisposable
             bool any = false;
             AcousticRequest newest = default;
             while (_requestQueue.TryDequeue(out var req)) { _pending[req.EntityId] = req; newest = req; any = true; }
-            if (!any && _pending.Count == 0) { Thread.Sleep(1); continue; }
+            if (!any && _pending.Count == 0) { if (once) return; Thread.Sleep(1); continue; }
             // A request carried over was made for where the listener was a tick ago; it is answered for
             // where they are now, as every other source this tick is.
             if (any && _carried.Count > 0)
@@ -279,7 +300,7 @@ public class AsyncAcousticWorker : IDisposable
 
             WorldSnapshot? world;
             lock (_worldLock) { world = _latestWorld; }
-            if (world == null) { _pending.Clear(); continue; }
+            if (world == null) { _pending.Clear(); if (once) return; continue; }
 
             if (_saEnabled && _saSim != null)
             {
@@ -350,6 +371,7 @@ public class AsyncAcousticWorker : IDisposable
                 ReportRayBudget(_pending.Count);
                 _pending.Clear();
                 foreach (var c in _carried) _pending[c.EntityId] = c;
+                if (once) return;
                 continue;
             }
             else
@@ -361,6 +383,7 @@ public class AsyncAcousticWorker : IDisposable
             }
 
             _pending.Clear();
+            if (once) return;
         }
     }
 

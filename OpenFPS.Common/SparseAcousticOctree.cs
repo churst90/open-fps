@@ -138,5 +138,3 @@ public partial class SparseAcousticOctree
                pos.Z >= _min.Z && pos.Z < _min.Z + _size;
     }
 }
-
-public enum BoxContainment { Outside, Partial, FullyInside }

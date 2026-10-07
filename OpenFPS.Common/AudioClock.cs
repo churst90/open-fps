@@ -24,7 +24,24 @@ namespace OpenFPS.Common;
 public static class AudioClock
 {
     private static readonly Stopwatch _clock = Stopwatch.StartNew();
+    private static Func<double>? _test;
 
     /// <summary>Seconds since the process's audio subsystem started. Monotonic; never reset.</summary>
-    public static double Now => _clock.Elapsed.TotalSeconds;
+    public static double Now => _test?.Invoke() ?? _clock.Elapsed.TotalSeconds;
+
+    /// <summary>
+    /// For the emitter-stream replay (OpenFPS.Tests): every reader of <see cref="Now"/> reads the test's
+    /// clock until the returned handle is disposed. The test assembly runs one test at a time. Goes when
+    /// the clock is an instance the host passes in (docs/SOUND_LIBRARY_BOUNDARY.md, stage 5).
+    /// </summary>
+    internal static IDisposable UseForTest(Func<double> now)
+    {
+        _test = now;
+        return new Restore();
+    }
+
+    private sealed class Restore : IDisposable
+    {
+        public void Dispose() => _test = null;
+    }
 }

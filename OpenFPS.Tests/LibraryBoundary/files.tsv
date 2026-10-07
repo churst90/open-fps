@@ -1,0 +1,314 @@
+file	group	projects	library_types
+OpenFPS.Client.Core/AudioDiagnostics.cs	host		
+OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Acoustics/CabinWalls.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Acoustics/EngineReflections.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Acoustics/GroundReflection.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Acoustics/OpeningGraph.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Acoustics/RouteAnswers.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Acoustics/SpatialAcoustics.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Acoustics/VehicleShadow.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Core/AdminGunSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Aircraft/AircraftSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/AmbisonicFormat.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Core/At44k.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/AudioBank.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Core/AudioEngineFacade.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Core/AudioPhysics.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/BoundaryModel.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/BrakeSqueal.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/DoorRenderCache.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Core/EarTimbres.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/BandEq.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/BayRadiation.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/CabinPaths.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/CoolingSystem.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/Driveline.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/EngineSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/ExhaustNetwork.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/ExhaustRadiation.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/IntakeNetwork.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Engine/Waveguide.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/EarWindSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/EventSum.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/ExtendedSources.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/FallingWaterSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/FireReferences.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/FireSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/FoliageSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/PowerLawNoise.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/RainPatch.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/RainSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/Resonator.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/RunningWaterSynth.Basin.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/RunningWaterSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/ShoreReferences.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/ShoreSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/TextureStatistics.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Pneumatics/AirSystem.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Rail/ElectricDrive.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Rail/RailNoise.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Rail/SteamFrontEnd.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Rail/TrainSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/ReportMeasure.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Signals/ChimeHorn.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Signals/ElectricHorn.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Signals/ElectronicSiren.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Signals/HeadShadow.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Signals/Modes.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Signals/SteamWhistle.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Signals/StruckBell.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Thunder.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/TransientSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/VehicleSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/VoiceManager.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Core/WeaponSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/WetTyres.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/WheelStrikes.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Yard/SmallMachineSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Yard/Thermostat.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Data/AcousticPathData.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Data/SpatialEmitter.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/BoundaryProximityProcessor.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/DspFault.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/EarStage.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/EarWindVoice.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/EngineProcessor.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/EngineRenderPool.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/FmodAudioProvider.Ear.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/FmodAudioProvider.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/FmodDebugLog.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/GranularBank.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/GranularProcessor.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/IAudioProvider.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/MachineProcessor.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/MasterDither.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/MasterLimiter.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/MasterTap.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/MixerQuality.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/NatureVoices.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/NonFinite.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/OwnVoice.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/RailVoice.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/RainVoices.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/SynthProcessor.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/TakeLevels.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/Fmod/TalkerVoice.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/AcousticGeometry.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/AmbiAxes.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/AmbisonicBedDsp.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/DiffuseLate.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/EarDecorrelator.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/EarlyCopies.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/HrtfBands.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/LateField.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/LateTail.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/SmoothTail.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioDsp.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioScene.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioSimulator.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/TileSceneSet.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedEchoes.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedReverb.cs	lib	Audio	
+OpenFPS.Client.Core/AudioEngine/SteamAudio/TracedReverbDsp.cs	lib	Audio	
+OpenFPS.Client.Core/BeaconAids.cs	host		
+OpenFPS.Client.Core/BirdLife.cs	host		
+OpenFPS.Client.Core/ClientAudioSystem.cs	host		
+OpenFPS.Client.Core/ClientGeometry.cs	host		
+OpenFPS.Client.Core/ClientNetworkService.cs	host		
+OpenFPS.Client.Core/ClientPhysicsSystem.cs	host		
+OpenFPS.Client.Core/ClientSettings.cs	host		
+OpenFPS.Client.Core/ClientWorldState.cs	host		
+OpenFPS.Client.Core/DiagnosticSwitches.cs	host		
+OpenFPS.Client.Core/DrivingAids.cs	host		
+OpenFPS.Client.Core/DrivingCueSounds.cs	host		
+OpenFPS.Client.Core/EditorKeys.cs	host		
+OpenFPS.Client.Core/Input/InputCommandMapper.cs	host		
+OpenFPS.Client.Core/Input/InputStateBuffer.cs	host		
+OpenFPS.Client.Core/ListMenu.cs	host		
+OpenFPS.Client.Core/ListeningCalibration.cs	host		
+OpenFPS.Client.Core/LocalPlayerController.cs	host		
+OpenFPS.Client.Core/LocalPlayerState.cs	host		
+OpenFPS.Client.Core/MapTracker.cs	host		
+OpenFPS.Client.Core/NamedPlaces.cs	host		
+OpenFPS.Client.Core/NearDrops.cs	lib	Audio	
+OpenFPS.Client.Core/OtherBodies.cs	host		
+OpenFPS.Client.Core/PickUp.cs	host		
+OpenFPS.Client.Core/Platform/FmodMicrophoneCapture.cs	host		
+OpenFPS.Client.Core/Platform/GameKey.cs	host		
+OpenFPS.Client.Core/Platform/IClientShell.cs	host		
+OpenFPS.Client.Core/Platform/IMicrophoneCapture.cs	host		
+OpenFPS.Client.Core/Platform/ISpeechOutput.cs	host		
+OpenFPS.Client.Core/Platform/SpeechDispatcherOutput.cs	host		
+OpenFPS.Client.Core/Platform/SpeechLog.cs	host		
+OpenFPS.Client.Core/Platform/TimerResolution.cs	host		
+OpenFPS.Client.Core/Platform/TolkSpeechOutput.cs	host		
+OpenFPS.Client.Core/Platform/VoiceCodec.cs	host		
+OpenFPS.Client.Core/PredictionReconciler.cs	host		
+OpenFPS.Client.Core/ProcessLifeLog.cs	host		
+OpenFPS.Client.Core/RainField.cs	lib	Audio	
+OpenFPS.Client.Core/Scope.cs	host		
+OpenFPS.Client.Core/ScopeSounds.cs	host		
+OpenFPS.Client.Core/Services/ChatManager.cs	host		
+OpenFPS.Client.Core/Services/SoundMappingService.cs	host		
+OpenFPS.Client.Core/Session/ClientGameSession.Connection.cs	host		
+OpenFPS.Client.Core/Session/ClientGameSession.Editor.cs	host		
+OpenFPS.Client.Core/Session/ClientGameSession.PickUp.cs	host		
+OpenFPS.Client.Core/Session/ClientGameSession.Scope.cs	host		
+OpenFPS.Client.Core/Session/ClientGameSession.Tracker.cs	host		
+OpenFPS.Client.Core/Session/ClientGameSession.cs	host		
+OpenFPS.Client.Core/SightGrid.cs	host		
+OpenFPS.Client.Core/SightWatch.cs	host		
+OpenFPS.Client.Core/Sightline.cs	host		
+OpenFPS.Client.Core/SpatialService.cs	host		
+OpenFPS.Client.Core/StairCues.cs	host		
+OpenFPS.Client.Core/StrideAccumulator.cs	host		
+OpenFPS.Client.Core/TurnNarration.cs	host		
+OpenFPS.Client.Core/UiSounds.cs	host		
+OpenFPS.Client.Core/WallBumps.cs	host		
+OpenFPS.Client.Core/WorldAudioPlayer.cs	host		
+OpenFPS.Client.Core/ZoneSettle.cs	host		
+OpenFPS.Common/AcousticConstants.cs	lib	Acoustics	
+OpenFPS.Common/AcousticMap.cs	lib	Acoustics	
+OpenFPS.Common/AcousticRegistry.cs	lib	Acoustics	
+OpenFPS.Common/AdminGun.cs	lib	Sound	
+OpenFPS.Common/Aircraft.cs	lib	Sound	
+OpenFPS.Common/AircraftGroundRun.cs	lib	Sound	
+OpenFPS.Common/Applause.cs	lib	Sound	
+OpenFPS.Common/AudioClock.cs	lib	Sound	
+OpenFPS.Common/AudioEmission.cs	lib	Acoustics	
+OpenFPS.Common/AudioEvents.cs	mixed	Sound	SoundCharacter,TransientSound
+OpenFPS.Common/Ballistics.cs	lib	Sound	
+OpenFPS.Common/Beacons.cs	host		
+OpenFPS.Common/Birds.cs	lib	Sound	
+OpenFPS.Common/Breathing.cs	lib	Sound	
+OpenFPS.Common/BulletFlyby.cs	lib	Sound	
+OpenFPS.Common/BulletImpact.cs	lib	Sound	
+OpenFPS.Common/CarDoor.cs	lib	Sound	
+OpenFPS.Common/CarWindow.cs	lib	Sound	
+OpenFPS.Common/Chassis.cs	lib	Sound	
+OpenFPS.Common/Components.cs	mixed	Geometry,Sound	ColliderShape,PlaybackMode,WeatherType
+OpenFPS.Common/CrossingGates.cs	lib	Sound	
+OpenFPS.Common/DesignedSoundKit.cs	lib	Sound	
+OpenFPS.Common/Diffraction.cs	lib	Acoustics	
+OpenFPS.Common/DirectionWords.cs	host		
+OpenFPS.Common/DoorKnock.cs	lib	Sound	
+OpenFPS.Common/DoorPhysics.cs	lib	Sound	
+OpenFPS.Common/Doors.cs	lib	Sound	
+OpenFPS.Common/DrivingCuePlanner.cs	host		
+OpenFPS.Common/EarWind.cs	lib	Sound	
+OpenFPS.Common/EarlyReflections.cs	lib	Acoustics	
+OpenFPS.Common/Editing/FieldDescriptor.cs	lib	Sound	
+OpenFPS.Common/Editing/ModelKinds.cs	lib	Sound	
+OpenFPS.Common/ElevatorDoor.cs	lib	Sound	
+OpenFPS.Common/Enclosure.cs	lib	Acoustics	
+OpenFPS.Common/Engines.cs	lib	Sound	
+OpenFPS.Common/EntityGeometry.cs	host		
+OpenFPS.Common/ExternalBallistics.cs	lib	Sound	
+OpenFPS.Common/Fire.cs	lib	Sound	
+OpenFPS.Common/Footsteps.cs	lib	Sound	
+OpenFPS.Common/Glass.cs	lib	Sound	
+OpenFPS.Common/GlassDoor.cs	lib	Sound	
+OpenFPS.Common/GlassFracture.cs	lib	Sound	
+OpenFPS.Common/GroundProbeMemo.cs	host		
+OpenFPS.Common/HandOverSounds.cs	lib	Sound	
+OpenFPS.Common/Hearing/BandAnalyser.cs	lib	Sound	
+OpenFPS.Common/Hearing/EarModel.cs	lib	Sound	
+OpenFPS.Common/Hearing/EqualLoudness.cs	lib	Sound	
+OpenFPS.Common/Hearing/LoudnessCompensation.cs	lib	Sound	
+OpenFPS.Common/Hearing/Timbre.cs	lib	Sound	
+OpenFPS.Common/Hearing/ZwickerLoudness.cs	lib	Sound	
+OpenFPS.Common/Honk.cs	lib	Sound	
+OpenFPS.Common/ImageSource.cs	lib	Acoustics	
+OpenFPS.Common/ImpactAcoustics.cs	lib	Sound	
+OpenFPS.Common/JsonConverters.cs	host		
+OpenFPS.Common/KnobDoor.cs	lib	Sound	
+OpenFPS.Common/LaneGuide.cs	host		
+OpenFPS.Common/LaneRoutes.cs	host		
+OpenFPS.Common/Lightning.cs	lib	Sound	
+OpenFPS.Common/LineFollower.cs	host		
+OpenFPS.Common/Localisation.cs	lib	Acoustics	
+OpenFPS.Common/LockCylinder.cs	lib	Sound	
+OpenFPS.Common/Loudness.cs	lib	Sound	
+OpenFPS.Common/Machines.cs	lib	Sound	
+OpenFPS.Common/Messages.cs	mixed	Sound	WheelState
+OpenFPS.Common/ModelLibrary.cs	lib	Sound	
+OpenFPS.Common/MoverPoses.cs	host		
+OpenFPS.Common/NatureModels.cs	lib	Sound	
+OpenFPS.Common/OpeningRoutes.cs	lib	Acoustics	
+OpenFPS.Common/PanelAcoustics.cs	lib	Acoustics	
+OpenFPS.Common/PhysicsConstants.cs	host		
+OpenFPS.Common/PhysicsUtils.cs	host		
+OpenFPS.Common/PlayerCoordinates.cs	host		
+OpenFPS.Common/Pneumatics.cs	lib	Sound	
+OpenFPS.Common/Precipitation.cs	lib	Sound	
+OpenFPS.Common/PushBarDoor.cs	lib	Sound	
+OpenFPS.Common/RaceLine.cs	host		
+OpenFPS.Common/Rain.cs	lib	Sound	
+OpenFPS.Common/RainSurfaces.cs	lib	Sound	
+OpenFPS.Common/Ricochet.cs	lib	Sound	
+OpenFPS.Common/RoadMapData.cs	host		
+OpenFPS.Common/RoadWater.cs	lib	Sound	
+OpenFPS.Common/Roads.cs	host		
+OpenFPS.Common/RoomAcoustics.cs	lib	Acoustics	
+OpenFPS.Common/RunningGear.cs	lib	Sound	
+OpenFPS.Common/RunningWater.cs	lib	Sound	
+OpenFPS.Common/Runoff.cs	lib	Sound	
+OpenFPS.Common/Scopes.cs	host		
+OpenFPS.Common/ShapedNoise.cs	lib	Sound	
+OpenFPS.Common/SharedMovementEngine.cs	host		
+OpenFPS.Common/Signals.cs	lib	Sound	
+OpenFPS.Common/SlidingDoor.cs	lib	Sound	
+OpenFPS.Common/SmallMachines.cs	lib	Sound	
+OpenFPS.Common/SparseAcousticOctree.cs	lib	Acoustics	
+OpenFPS.Common/Spectrum.cs	lib	Sound	
+OpenFPS.Common/Speech/Speech.cs	host		
+OpenFPS.Common/StatePacking.cs	host		
+OpenFPS.Common/Systems/AcousticVolumeGenerator.cs	lib	Acoustics	
+OpenFPS.Common/Systems/FaceOpenings.cs	lib	Acoustics	
+OpenFPS.Common/TeleporterSounds.cs	lib	Sound	
+OpenFPS.Common/Tiles.cs	host		
+OpenFPS.Common/TrackClearance.cs	host		
+OpenFPS.Common/TrainSignals.cs	lib	Sound	
+OpenFPS.Common/Trains.cs	lib	Sound	
+OpenFPS.Common/TyreFriction.cs	lib	Sound	
+OpenFPS.Common/UpdateThrottle.cs	host		
+OpenFPS.Common/VehicleBody.cs	lib	Sound	
+OpenFPS.Common/VehicleCabin.cs	lib	Sound	
+OpenFPS.Common/VehicleSignalBits.cs	lib	Sound	
+OpenFPS.Common/VehicleSpec.cs	lib	Sound	
+OpenFPS.Common/Vehicles.cs	lib	Sound	
+OpenFPS.Common/WallTransmission.cs	lib	Acoustics	
+OpenFPS.Common/Waves.cs	lib	Sound	
+OpenFPS.Common/WeaponHandling.cs	lib	Sound	
+OpenFPS.Common/Weapons.cs	mixed	Sound	FireMode,WeaponAction,WeaponDefinition,WeaponFeed,WeaponRegistry
+OpenFPS.Common/WheelDynamics.cs	lib	Sound	
+OpenFPS.Common/Wind.cs	lib	Sound	
+OpenFPS.Common/WindModel.cs	lib	Sound	
+OpenFPS.Common/WoodChorus.cs	lib	Sound	
+OpenFPS.Common/WorldSnapshot.cs	host		
+OpenFPS.Geometry/BoxColumns.cs	lib	Geometry	
+OpenFPS.Geometry/BoxContainment.cs	lib	Geometry	
+OpenFPS.Geometry/GeometryUtils.cs	lib	Geometry	
+OpenFPS.Geometry/PerfProbe.cs	lib	Geometry	
+OpenFPS.Geometry/SpatialGrid.cs	lib	Geometry	
+OpenFPS.Geometry/TileKey.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/Bvh.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/GeometryPiece.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/Shapes.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/SolidContact.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/Surfaces.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/TriangleGeometry.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/TriangleWorld.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/WheelRays.cs	lib	Geometry	
+OpenFPS.Geometry/WallBuild.cs	lib	Geometry	
+OpenFPS.Native/FmodNative/fmod.cs	lib	Native	
+OpenFPS.Native/FmodNative/fmod_dsp.cs	lib	Native	
+OpenFPS.Native/FmodNative/fmod_errors.cs	lib	Native	
+OpenFPS.Native/FmodNative/fmod_studio.cs	lib	Native	
+OpenFPS.Native/Platform/BackgroundPriority.cs	lib	Native	
+OpenFPS.Native/Platform/NativeAudioLibraries.cs	lib	Native	
+OpenFPS.Native/SteamAudio/Phonon.cs	lib	Native	
+OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	lib	Native	
+OpenFPS.Native/SteamAudio/PhononSim.cs	lib	Native	

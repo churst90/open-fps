@@ -359,8 +359,16 @@ public class ClientAudioSystem
         : this(audio, sounds, state, StopwatchClock()) { }
 
     /// <summary>For tests: the same system on a clock the caller controls.</summary>
+    /// <param name="manualAcoustics">The acoustic worker runs no thread: the test steps it between
+    /// updates (<see cref="AsyncAcousticWorker.StepForTest"/>), the rain survey runs in place, and no
+    /// door or thunder renders are started in the background. For the emitter-stream replay, which must
+    /// come out the same on every run.</param>
+    /// <param name="seed">Seeds what the game leaves to chance (birds, near rain drops, a footstep's
+    /// jitter). Null: unseeded, as in the game.</param>
+    /// <param name="prewarm">Render the city's doors in the background at start, as the game does
+    /// (<see cref="WorldAudioPlayer"/>). A test that plays no door has no use for minutes of a core.</param>
     internal ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state,
-                               Func<double> clock)
+                               Func<double> clock, bool manualAcoustics = false, int? seed = null, bool prewarm = true)
     {
         _now = clock;
         _audio = audio;
@@ -373,18 +381,25 @@ public class ClientAudioSystem
         _beacons = new BeaconAids(audio, acoustics: _acoustics);
         // The short sounds the world reports. Shares this system's acoustics so a rendered latch
         // takes exactly the path a recorded one would.
-        WorldAudio = new WorldAudioPlayer(_audio, _acoustics);
+        WorldAudio = new WorldAudioPlayer(_audio, _acoustics, prewarm: prewarm && !manualAcoustics);
         WorldAudio.HornReceived = StartHorn;
         WorldAudio.TrainSignalReceived = StartTrainSignal;
         WorldAudio.Ground = ApplyRecordedGround;
-        _birds = new BirdLife(audio, _acoustics);
-        _rain = new RainField(audio, _acoustics);
+        _birds = new BirdLife(audio, _acoustics, seed);
+        _rain = new RainField(audio, _acoustics, seed) { SurveyInPlace = manualAcoustics };
+        _stepRandom = seed is int s ? new Random(s) : Random.Shared;
         WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
         _audio.RoutesSource = () => _acoustics.Routes;
-        _acousticWorker = new AsyncAcousticWorker(_acoustics);
+        _acousticWorker = new AsyncAcousticWorker(_acoustics) { Manual = manualAcoustics };
         WorldAudio.Worker = _acousticWorker;
         _acousticWorker.Start();
     }
+
+    /// <summary>The acoustic worker, for a test that steps it (<see cref="AsyncAcousticWorker.Manual"/>).</summary>
+    internal AsyncAcousticWorker AcousticWorker => _acousticWorker;
+
+    /// <summary>A footstep's level and pitch jitter: the shared generator in the game, seeded in a replay.</summary>
+    private readonly Random _stepRandom;
 
     private static Func<double> StopwatchClock()
     {
@@ -3785,8 +3800,8 @@ public class ClientAudioSystem
             Type = EmitterType.WorldLocked,
             // No two steps alike: a take is heard a hair higher or lower and a touch louder or softer
             // each time, as the same foot never lands quite the same way twice.
-            Volume = stepGain * MathF.Pow(10f, (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * FootstepLevelJitterDb / 20f),
-            Pitch = slopePitch * (1f + (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * FootstepPitchJitter),
+            Volume = stepGain * MathF.Pow(10f, (float)(_stepRandom.NextDouble() * 2.0 - 1.0) * FootstepLevelJitterDb / 20f),
+            Pitch = slopePitch * (1f + (float)(_stepRandom.NextDouble() * 2.0 - 1.0) * FootstepPitchJitter),
             Range = FootstepRange,
             // Your own feet, pinned above the physics: they are how you know you are moving, and on
             // a loud map the arithmetic would rightly bury them under everything else. Only yours:

@@ -43,7 +43,10 @@ internal sealed class ClientAudioHarness
         Facade.InitializeForTest(soundsPath);
         var sounds = new SoundMappingService(Player);
         if (soundsPath != null) sounds.Initialize(soundsPath);
-        Audio = new ClientAudioSystem(Facade, sounds, Player, () => Now);
+        // No door renders in the background: none of these tests plays a model door, and with the render
+        // cache empty (TestConfigIsolation) every harness rendered all of the city's, which starved the
+        // tests' own threads.
+        Audio = new ClientAudioSystem(Facade, sounds, Player, () => Now, prewarm: false);
     }
 
     /// <summary>Stands the listener here, feet on the ground (the ear is EyeHeight above).</summary>

@@ -4,7 +4,8 @@
 #   tools/sound_boundary/run.sh [out-dir]
 #
 # Builds the Roslyn reader on tmpfs (the repo is on ntfs3: never build in place), reads every project's
-# sources, then sorts the types and writes tables.md and crossings.tsv into out-dir
+# sources, then sorts the types and writes tables.md, crossings.tsv and the ratchet's two lists
+# (files.tsv, allowed.tsv: OpenFPS.Tests/LibraryBoundaryTests) into out-dir
 # (default /tmp/openfps-wt-survey/out). Nothing in the repository is built or changed.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -17,3 +18,4 @@ DOTNET_CLI_USE_MSBUILD_SERVER=0 ~/.dotnet/dotnet build "$here/SoundBoundary.cspr
 ~/.dotnet/dotnet "$art/bin/SoundBoundary/debug/SoundBoundary.dll" "$repo" "$out"
 python3 "$here/classify.py" "$out" "$out"
 echo "tables: $out/tables.md  crossings: $out/crossings.tsv"
+echo "the ratchet's lists (copy into OpenFPS.Tests/LibraryBoundary): $out/files.tsv $out/allowed.tsv"

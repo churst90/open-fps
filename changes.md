@@ -4,6 +4,28 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- Sound library, stage 0: three guards for the moves to come (docs/SOUND_LIBRARY_BOUNDARY.md, section
+  13). `LibraryBoundaryTests` sorts every file of Common and Client.Core into library or host and fails
+  when a library file gains a reference to a host type (607 today, the survey's count exactly).
+  `RenderFingerprintTests` hashes seventeen offline renders (an engine at three speeds, every door model,
+  rain on three surfaces, a siren, a train, thunder, a clap). `EmitterStreamReplayTests` drives the
+  whole client audio system through a walk, a drive and traffic in the rain and compares every call it
+  makes on the mixer with a stored stream. The stored data changes only in a commit that changes a sound
+  on purpose, which says why (13.4). On other maths (CI's glibc) the renders and streams are compared by
+  level and to a part in a thousand instead of to the bit.
+- Sound library, stage 1: FMOD's C# wrapper, the Steam Audio bindings, the native library list and
+  the thread-priority helper are a project of their own, `OpenFPS.Native`, which Client.Core references
+  (docs/SOUND_LIBRARY_BOUNDARY.md, section 14). Moved, not changed: the same renders and stream.
+- Sound library, stage 2: the triangle world, shapes, wheel rays, tiles, the box helpers, the spatial
+  grid and the diagnostics timer are `OpenFPS.Geometry`, which Common references (docs/SOUND_LIBRARY_
+  BOUNDARY.md, section 15). The wire hash now covers the geometry too: a client and a server whose
+  geometry differs would disagree about where a body is. The door render fingerprint is unchanged.
+  `ColliderShape` stays in Common for now, for Cody to confirm (15.2).
+- Near rain drops are the same in every client: their renders were seeded from `string.GetHashCode`,
+  which .NET randomises per process. No change to how they sound.
+- Tests no longer write the player's door render cache (`~/.local/share/OpenFPS/rendercache`) or prune
+  its other builds' folders, and the test harness's client audio system no longer renders every door of
+  the city in the background: every test that built one did both.
 - Voices are ranked by how loud they are to the ear (Cody's decision on finding 1 of
   docs/COVERAGE_2026-10-06.md). The voice budget and the machine budget used to rank on the gain the
   law plays a voice at, which includes the extra gain the law gives a sound the ear hears less of: a

@@ -23,6 +23,9 @@ library that open-fps and Resonance both reference. Step 1 of
 10. Risks
 11. Decisions for Cody
 12. Appendices: every type by file, every crossing line, every static, every file read
+13. Stage 0 as built: the guards, and how to regenerate them
+14. Stage 1 as built: OpenFPS.Native
+15. Stage 2 as built: OpenFPS.Geometry
 
 ---
 
@@ -717,6 +720,7 @@ A session here is one working session of an agent, as in docs/GEOMETRY.md.
   makes stage 7 checkable without listening.
 - Risk: a stored stream is brittle against intended changes elsewhere; regenerate it in the same
   commit as an intended change, with the reason.
+- As built: section 13. The rule for regenerating is 13.4.
 
 ### Stage 1: `OpenFPS.Native` (0.5 to 1 session)
 
@@ -727,6 +731,7 @@ A session here is one working session of an agent, as in docs/GEOMETRY.md.
 - The native libraries are copied from `lib/` by the executables' projects (`OpenFPS.Client`,
   `OpenFPS.Client.Gtk`, `OpenFPS.AudioLab`), not by Client.Core, so the move does not touch them.
   Resonance ships its own copies.
+- As built: section 14.
 
 ### Stage 2: `OpenFPS.Geometry` (1 session)
 
@@ -737,6 +742,7 @@ A session here is one working session of an agent, as in docs/GEOMETRY.md.
 - Move `Geometry/*`, `GeometryUtils.cs`, `SpatialGrid.cs`, `BoxColumns.cs`, `PerfProbe.cs`.
   Common references Geometry.
 - After this stage the geometry stage 2 work lands in the Geometry project (section 9.2).
+- As built: section 15. `ColliderShape` was not moved (15.2).
 
 ### Stage 3: `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics` (2 to 3 sessions)
 
@@ -860,6 +866,9 @@ Two tests, one for before the projects exist and one for after:
   `WorldAudioPlayer`, `VoiceCodec`, `Speech.`, `PhysicsConstants.`, `RoadData`) and fails if any
   count is above its allowance or any file is new and not listed. The allowance only goes down;
   the survey tool regenerates it.
+  As built (13.1), it binds the sources instead of scanning for names: a name list misses a `var`
+  that reads a snapshot, which is how most of these files read one. It counts what `crossings.tsv`
+  counts, every host type, with no list to keep.
 - **After (each project exists)**: `LibraryBoundaryTests.LibraryReferencesOnlyLibrary`. For each
   library assembly, `Assembly.GetReferencedAssemblies()` must contain only the runtime, the allowed
   packages (Serilog, MemoryPack, if decided) and lower library projects. The compiler already
@@ -1581,6 +1590,262 @@ EarlyReflections._chain, EarlyReflections._flFaces, EarlyReflections._flHits, Ea
 | Common/PerfProbe.cs | OPENFPS_PROFILE |
 
 37 variables in 16 files.
+
+## 13. Stage 0 as built (2026-10-07)
+
+Three guards, each a test class in OpenFPS.Tests with its stored data in `OpenFPS.Tests/LibraryBoundary/`.
+They run with the rest of the suite on GitHub Actions; none needs FMOD or Steam Audio.
+
+### 13.1 The ratchet: `LibraryBoundaryTests`
+
+- `EveryFileIsSorted`: every `.cs` file of Common, Client.Core and the library's projects is in
+  `files.tsv` as library, host or mixed (a mixed file names its library types). A new file fails until
+  it is sorted, and a listed file that is gone fails until the list follows it.
+- `NoNewCrossings`: binds those projects' sources with Roslyn (one compilation, no source generators)
+  and counts, in every library file (only the library types' declarations of a mixed file), each name
+  that binds to a host type or a member of one, `var` included, exactly as the survey's reader does.
+  Each (file, host type) count must equal its line in `allowed.tsv`: over is a new crossing, under is a
+  fix whose allowance was not lowered in the same commit.
+- `LibraryReferencesOnlyLibrary` (added with stage 1, 14.2): each library assembly references only the
+  runtime, its allowed packages and lower library projects.
+- Both lists come from the survey: `tools/sound_boundary/run.sh` now writes `files.tsv` and
+  `allowed.tsv` beside `crossings.tsv`. At e814ed20 the test's counts equal `crossings.tsv` line for
+  line: 607 references in 26 files (the survey counted 600 at 26d531a2; the rest is code added since).
+- `classify.py` sorted four new Common files into the library by its default rule; they are host:
+  `EntityGeometry.cs` (the entity adapter geometry stage 2 split out), `MoverPoses.cs` (the server's
+  door-leaf count), `DrivingCuePlanner.cs` (a driving aid over the road network), `RoadMapData.cs`
+  (the MapRoads message). Without that the allowance would have held 202 references the library does
+  not have.
+- Merged with main at eff5b06c: 608. The one more is the world editor's: `ModelLibrary` (library)
+  reads its models with `Networking.Vector3Converter` (`JsonConverters.cs`, host). It is in the
+  allowance as main has it; a converter for a vector belongs with the library's JSON, a stage 3 fix.
+- Cost: about 17 s, nearly all of it binding the two projects.
+
+### 13.2 The render fingerprint: `RenderFingerprintTests`
+
+Seventeen renders, hashed (SHA-256 of the float buffers, in order, with their lengths) and stored in
+`render-fingerprints.tsv` with each buffer's level every 4096 samples:
+
+| Render | What |
+|---|---|
+| `engine.v8_muscle` | `VehicleSynth.Render`: cranking, idle, then the dyno held at 1,500, 3,000 and 4,500 rpm; exhaust, intake, tyres and block |
+| `door.knob.close`, `door.knob.open` | `KnobDoor.RenderGameClose`, `RenderOpen` |
+| `door.pushbar.open`, `door.sliding.close`, `door.glass.close`, `door.elevator.open`, `door.lock.unlock` | each model's `Render*` |
+| `door.car.close`, `window.car.down` | `CarDoor.Render`, `CarWindow.Render` |
+| `rain.asphalt`, `rain.steel`, `rain.puddle` | `RainSynth` over one square metre a metre away, 8 mm/h |
+| `siren.patrol.wail` | `ElectronicSiren` |
+| `train.light_rail.pass` | `TrainSynth`, every source summed |
+| `thunder.ground_1500` | `Thunder.Render` on two threads at 24 kHz |
+| `clap.dry` | `Applause.RenderClap` |
+
+- Deterministic: fixed seeds, no clock, no thread-count dependence. The lab levers a render reads
+  (`EngineSynth.ValveJetNoise` and the debug switches, `KnobDoor.KeeperBendsStrike`, every door's
+  `StemFolder`) are held at their game values while it renders. The same bits in Debug and Release,
+  and from one process to the next.
+- Left out: the clap in the traced room (Steam Audio's native library, which CI does not have);
+  `GlassFracture` (its worker count is the machine's core count, so its sum is too); anything rendered
+  by a voice state in the mixer (`EngineVoiceState` reads `AudioClock`, `MixerQuality.MixerRate` and the
+  ear settings).
+- Bits depend on the maths library as well as the code. `MathF.Sin` and the rest are the platform's
+  libm, and glibc 2.41 replaced many float functions with correctly rounded ones, so this machine
+  (glibc 2.43) and CI's Ubuntu (2.39) round some of them differently. The file stores a probe of the
+  maths (every libm function the models call, over 4,096 arguments, and the vector width). Where the
+  probe matches, every render must match to the bit; where it does not, every 4096-sample block within
+  40 dB of the buffer's loudest must be within 1 dB of the stored level, and the test says which it did.
+  Expect CI to take the second path. Not yet seen on CI.
+- Cost: about 60 s in Debug, the door models nearly all of it.
+
+### 13.3 The emitter-stream replay: `EmitterStreamReplayTests`
+
+A whole `ClientAudioSystem` driven through three scripted worlds, every call it makes on the mixer
+written down (`StreamMixer`) and compared with `streams/<scenario>.txt.gz`:
+
+| Scenario | Frames | What |
+|---|---:|---|
+| `walk` | 480 | on foot up a street between a brick building and a concrete wall, a car idling at the kerb, another driving past at 14 m/s |
+| `drive` | 360 | riding east at 12 m/s along a wall, an oncoming car sounding its horn as it nears |
+| `traffic_rain` | 360 | standing by a wall under a porch roof in 8 mm/h of rain, five cars on two lanes and a crossing street |
+
+- Recorded: every voice started (the whole emitter, every field), re-placed (the fields that changed),
+  stopped and faded; every acoustic path (the fields that changed); the listener, shelter, boundaries,
+  ear wind, enclosure, reverb, air, ambience beds, registered sounds (a hash of the PCM). 37,000 lines
+  for the rain, 430 KB compressed for all three.
+- Pinned so a run is the same every time: the acoustic worker has no thread (`AsyncAcousticWorker.Manual`;
+  the test steps it after each update, so an answer lands on the same frame every run) and never starts
+  Steam Audio; the triangle world, the tile acoustics and the rain survey are built in place; the audio
+  clock is the test's (`AudioClock.UseForTest`); birds, near drops and footsteps are seeded; the settings
+  the system reads from statics (the level compression, the ear model, the speed of sound, the mixer
+  rate, wide sources, cabin paths, runoff) are held at the game's defaults and the wind is still. Each
+  scenario runs twice per test and must agree with itself before it is compared. Checked across three
+  processes and among 170 other audio tests in one process.
+- It earned its keep at once: merging main (eff5b06c) changed `traffic_rain` from line 5,064, where
+  the voices began to be re-placed in a different order. That is main's ranking of voices by how loud
+  the ear hears them (615b8ae3), an intended change; the stream was regenerated in the merge's
+  follow-up commit, which says so. `walk` and `drive` did not change.
+- Library changes this needed, none heard: `AsyncAcousticWorker.Manual` and `StepForTest` (the loop is
+  unchanged for the game); a `manualAcoustics` and `seed` on `ClientAudioSystem`'s test constructor;
+  `RainField`'s seed and `SurveyInPlace`; `WorldAudioPlayer`'s `prewarm` (the replay starts no door or
+  thunder renders in the background: six systems a run would each have rendered the city's doors);
+  `AudioClock.UseForTest` (internal; Common gives OpenFPS.Tests
+  its internals). One is a fix: `DropBank` seeded each near drop's render from `string.GetHashCode`, which
+  .NET randomises per process, so every client and every test run rendered different drops; it is a
+  fixed hash of the key now (the same drops, chosen the same way, in every process).
+- Not in the stream: the door renders every client starts in the background (`PrewarmDoors`; the
+  fingerprint holds the models); one-off world events, which render on the thread pool; Steam Audio's
+  answers; the provider's own DSP; footsteps (no sound bank) and birds (no habitat in these worlds).
+- Under other maths the calls must be the same calls and every number within 1e-3 (relative) or 1e-4,
+  compared with each voice's fields written whole. `OPENFPS_REPLAY_DUMP=<dir>` writes each run's stream
+  as text, to diff two commits line by line.
+- Cost: about 3 s.
+
+Found on the way: every test that builds a `ClientAudioSystem` started rendering all of the city's
+doors in the background (minutes of a core each time) and kept them in the player's own render cache
+(`~/.local/share/OpenFPS/rendercache`), pruning the folders of other builds. The tests now run with a
+scratch `XDG_DATA_HOME` as well as the scratch config folder (`TestConfigIsolation`), and
+`ClientAudioHarness` builds its system without the prewarm (`prewarm: false` on the test constructor;
+the lab's spikes keep it). With an empty cache and the prewarm still on, the renders starved
+`ClientAudioSelectionTests`' rain test until it failed.
+
+### 13.4 Regenerating the stored data
+
+The rule: the stored hashes, streams and allowance change only in the commit that changes the sound or
+the boundary on purpose, and that commit says why (in its message and in changes.md). A move, a type
+split out of a file, a static made an instance: none of them may change any of the three.
+
+| Guard | When it changes | How |
+|---|---|---|
+| `allowed.tsv` | a crossing fixed: lower it | `OPENFPS_BOUNDARY_WRITE=1 dotnet test OpenFPS.Tests --filter LibraryBoundaryTests` (only lowers) |
+| `allowed.tsv` | a library file moved to another path | `OPENFPS_BOUNDARY_WRITE=all ...`; the diff must show only the path changing |
+| `files.tsv` | a file added, moved or deleted in a sorted project | `tools/sound_boundary/run.sh`, copy its `files.tsv`; a new file's group from `classify.py` |
+| `render-fingerprints.tsv` | a model's sound changed on purpose | `OPENFPS_FINGERPRINT_WRITE=1 dotnet test OpenFPS.Tests --filter RenderFingerprintTests` |
+| `streams/*.txt.gz` | what the audio system tells the mixer changed on purpose | `OPENFPS_REPLAY_WRITE=1 dotnet test OpenFPS.Tests --filter EmitterStreamReplayTests` |
+
+The maths probe is stored with the fingerprints and the streams. Regenerate them where they were made
+(glibc 2.43 here) or with the same maths: written anywhere else, they hold that machine's probe, and
+here every later run falls back to the tolerant comparison.
+
+## 14. Stage 1 as built (2026-10-07): `OpenFPS.Native`
+
+### 14.1 What moved
+
+By `git mv`, namespaces unchanged:
+
+| From | To |
+|---|---|
+| `OpenFPS.Client.Core/FmodNative/fmod.cs`, `fmod_dsp.cs`, `fmod_errors.cs`, `fmod_studio.cs` | `OpenFPS.Native/FmodNative/` |
+| `OpenFPS.Client.Core/AudioEngine/SteamAudio/Phonon.cs`, `PhononSim.cs`, `PhononAmbisonics.cs` | `OpenFPS.Native/SteamAudio/` |
+| `OpenFPS.Client.Core/Platform/NativeAudioLibraries.cs`, `BackgroundPriority.cs` | `OpenFPS.Native/Platform/` |
+
+- `OpenFPS.Native` references no project and one package, Serilog (`BackgroundPriority` logs a thread
+  it could not lower). `AllowUnsafeBlocks` as Client.Core had.
+- `OpenFPS.Client.Core` references it. Nothing else does directly: the Windows and GTK clients, the lab
+  and the tests get it through Client.Core. The server does not.
+- `InternalsVisibleTo` on Native: `OpenFPS.Client.Core`, `OpenFPS.Tests`, `OpenFPS.AudioLab` (`Phonon`
+  is internal). `OpenFPS.Audio` is added when that project exists (stage 6), not before: a grant to an
+  assembly that does not exist is one anybody can claim by the name. Client.Core keeps its own two
+  grants for its own internals.
+- The native libraries are copied from `lib/` by the executables, as before; the `DllImport`s resolve
+  next to the executable whichever assembly declares them, so nothing about loading changed. Checked:
+  `OpenFPS.Native.dll` lands beside `fmod.dll` and the rest in the Windows client's output, and in the
+  GTK client's and the lab's.
+
+### 14.2 Checks
+
+- Every project builds: the tests, the GTK client, the lab, the Windows client (compiled on Linux as
+  always, `EnableWindowsTargeting`), the server.
+- The render fingerprint and the emitter stream are the same bits as before the move; the ratchet's
+  allowance is unchanged (no crossings in these files; `files.tsv` changed only by the paths).
+- `LibraryBoundaryTests.LibraryReferencesOnlyLibrary`: OpenFPS.Native references only the runtime and
+  Serilog.
+- `tools/sound_boundary` reads the new project (Program.cs: its own compilation, its
+  `InternalsVisibleTo`; classify.py: a rule per library project folder).
+- CI: `.github/workflows/tests.yml` builds `OpenFPS.Tests`, which brings the new project in through
+  Client.Core; `tools/ci/shard_tests.py` deals out test classes, which did not change. Nothing to edit.
+
+### 14.3 Wire hash and door fingerprint
+
+Not touched: none of these files is in OpenFPS.Common, so `WireContract.Hash` and
+`DoorModelFingerprint` are computed over exactly the files they were.
+
+## 15. Stage 2 as built (2026-10-07): `OpenFPS.Geometry`
+
+### 15.1 What moved
+
+First three types out of the files that stay behind, each into a file of its own in Common (one
+commit, text unchanged): `BoxContainment` out of `SparseAcousticOctree.cs`, `WallBuild` out of
+`WallTransmission.cs` (its doc's cref to `WallTransmission` became plain text: the geometry does not
+see the acoustics), `TileKey` out of `Tiles.cs`. Then, by `git mv`, namespaces unchanged:
+
+| From (OpenFPS.Common/) | To (OpenFPS.Geometry/) |
+|---|---|
+| `Geometry/*` (Bvh, GeometryPiece, Shapes, SolidContact, Surfaces, TriangleGeometry, TriangleWorld, TriangleWorldBuilder, WheelRays) | `Triangles/` |
+| `GeometryUtils.cs` (with `MathHelper`), `SpatialGrid.cs`, `BoxColumns.cs`, `PerfProbe.cs` | the project's root |
+| `BoxContainment.cs`, `WallBuild.cs`, `TileKey.cs` | the project's root |
+
+- `OpenFPS.Geometry` references no project and one package, MemoryPack: a collider's `ShapeSpec` is
+  `[MemoryPackable]` and travels in `ColliderComponent` (decision 4, applied here first). Common
+  references Geometry; everything else gets it through Common. Nothing in it reads an entity: geometry
+  stage 2 had already put `EntityGeometry` and `MoverPoses` on the host's side.
+- No `InternalsVisibleTo`: nothing outside the project used an internal of these files.
+- The layering table (3.5) lost its three Geometry rows: `GeometryUtils` and `TriangleWorldBuilder`
+  /`Construction` now find `BoxContainment` and `WallBuild` beside them.
+
+### 15.2 Not moved: `ColliderShape`
+
+Section 8 listed `ColliderShape` for this stage. It stays in `Components.cs`, for Cody to confirm:
+
+- nothing in the geometry uses it (the triangle world has its own `ShapeKind`; the entity adapter,
+  `EntityGeometry`, reads `ColliderShape` and turns a box into a solid, on the host's side);
+- it is the entity model's collider enum, on the wire in `ColliderComponent`, with members
+  (`Sphere`, `Cylinder`, `Cone`, `Polygon`) the triangle world does not build;
+- the three library files that read it (`SteamAudioScene`, `RainField`, `AcousticVolumeGenerator`) read
+  it off `ColliderComponent`, which stage 6 replaces with the world input; after that the library needs
+  no `ColliderShape` at all.
+
+Moving it would put a type of the game's entity model into the geometry library to serve readers that
+are going away. If a library type is wanted later, it is the geometry's own shape, not this enum.
+
+### 15.3 The wire hash and the door fingerprint
+
+- `WireContract.Hash` now covers Common's sources and the Geometry project's, hashed by their paths
+  from the repository's root (`OpenFPS.Common.csproj`, `WireLibrarySource`). Geometry's files belong in
+  it: `ShapeSpec` and `TileKey`'s numbers are on the wire, and the client predicts movement with the
+  same geometry the server moves bodies with, so two builds whose geometry differs disagree about where
+  a body is. The hash changed with the move (`5e96a5472e62` to `551d1fe5906e` here) and changes again
+  with any edit to a Geometry file (checked: a comment added to `TileKey.cs` changed it, and taking it
+  out changed it back). A client and a server from either side of this commit refuse each other at
+  login, as they would for any edit to Common. Native is not in it: the server never loads it.
+- `DoorModelFingerprint` is unchanged (`b9dfebdd55c8`): the door renders read none of the moved
+  files. Followed through the survey's edges, every source a cached door render is made from (the
+  models, `DoorPhysics`, `Doors`, `Glass`, `AcousticRegistry`, `VehicleCabin`, `VehicleBody`) is still in
+  Common and still listed. Stage 3 moves them, and their list with them (section 8, stage 3 risks).
+- `publish-windows.sh` reads both hashes from `obj/OpenFPS.Common/`, where they are still written.
+
+### 15.4 Checks
+
+- Every project builds: Geometry, Common, the server, Client.Core, the GTK client, the Windows client,
+  the lab, the tests.
+- The render fingerprint and the emitter stream: the same bits as before the move. The ratchet: the same
+  607 references; `files.tsv` changed by the paths only; `LibraryReferencesOnlyLibrary`: Geometry
+  references only the runtime and MemoryPack.Core.
+- The test classes that touch the moved code: GeometryStage1Tests, GeometryStage2Tests,
+  GeometryUtilsTests, BoxOverlapTests, SteamAudioSceneTests, SteamAudioMappingTests, TileSceneSetTests,
+  WallTransmissionTests, WorldStreamingTests, DoorPrewarmTests.
+- CI and the scripts: nothing to edit. The workflow builds `OpenFPS.Tests`, which brings the project in;
+  `run-server.sh`, `run-gtk-client.sh`, `publish-server.sh` and `publish-windows.sh` build their
+  executables' projects, which reference it through Common.
+
+### 15.5 Left for stage 3
+
+- The ten small fixes of section 8, then `OpenFPS.Sound` and the first half of `OpenFPS.Acoustics`.
+  `DoorModelSource` moves with the door models; the wire hash's `WireLibrarySource` gains the Sound
+  project's files (`TransientSound`, `WheelState`, `Precipitation`, `WindAir`, `LightningStrike` travel).
+- `PerfProbe` is in Geometry as the survey placed it (the lowest project, so every layer can time
+  itself); it is a process-wide static (section 4.2's diagnostics exception).
+- `MoverPoses` stays host: the server's count of door leaves moved, read by `ServerGeometry` and the
+  client's geometry adapter. The triangle world takes the poses as a function (`WithMoverPoses`).
+
+---
 
 ## Decisions (Cody, 2026-10-06)
 

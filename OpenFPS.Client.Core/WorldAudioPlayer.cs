@@ -212,10 +212,14 @@ public sealed class WorldAudioPlayer
         return false;
     }
 
-    public WorldAudioPlayer(AudioEngineFacade audio, SpatialAcoustics acoustics)
+    /// <param name="prewarm">Render the city's doors and a strike of thunder in the background now
+    /// (the game). The emitter-stream replay builds six systems a run and wants neither the load nor
+    /// renders landing whenever their threads finish.</param>
+    public WorldAudioPlayer(AudioEngineFacade audio, SpatialAcoustics acoustics, bool prewarm = true)
     {
         _audio = audio;
         _acoustics = acoustics;
+        if (!prewarm) return;
         PrewarmDoors();
         PrewarmThunder();
     }
