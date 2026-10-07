@@ -782,11 +782,17 @@ public sealed class RainField
     /// <summary>The last survey, for the log and the lab.</summary>
     public RainSurvey.Result? LastSurvey => _last;
 
-    public RainField(AudioEngineFacade audio, SpatialAcoustics? acoustics)
+    /// <param name="seed">Seeds the near drops (NearDrops). Null: from the clock, as in the game.</param>
+    public RainField(AudioEngineFacade audio, SpatialAcoustics? acoustics, int? seed = null)
     {
         _audio = audio;
         _acoustics = acoustics;
+        _nearDrops = new NearDrops(seed ?? Environment.TickCount);
     }
+
+    /// <summary>The survey runs on the caller's thread, so its answer is taken up on the next update every
+    /// time (the emitter-stream replay). The game runs it in the background and takes it up when it lands.</summary>
+    internal bool SurveyInPlace { get; init; }
 
     private float _humidity = 0.5f, _temperature = 20f, _pressure = 1013.25f, _airMultiplier = 1f;
 
@@ -835,7 +841,9 @@ public sealed class RainField
                 || now - _surveyedWhen > SurveySeconds))
         {
             var (w, at, own, riding) = (world, ear, ownEntityId, ridingEntityId);
-            _pending = _running = System.Threading.Tasks.Task.Run(() => _survey.Run(w, at, own, riding));
+            _pending = _running = SurveyInPlace
+                ? System.Threading.Tasks.Task.FromResult(_survey.Run(w, at, own, riding))
+                : System.Threading.Tasks.Task.Run(() => _survey.Run(w, at, own, riding));
             _surveyedAt = ear;
             _surveyedWhen = now;
         }
@@ -1056,7 +1064,7 @@ public sealed class RainField
 
     // ── Near drops, one by one ──────────────────────────────────────────────────────────────────
 
-    private readonly NearDrops _nearDrops = new(Environment.TickCount);
+    private readonly NearDrops _nearDrops;
     private readonly DropBank _bank = new();
     private readonly List<NearDrops.Impact> _impacts = new();
     private readonly HashSet<string> _registered = new(StringComparer.Ordinal);

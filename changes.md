@@ -2,6 +2,23 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-07
+
+- Sound library, stage 0: three guards for the moves to come (docs/SOUND_LIBRARY_BOUNDARY.md, section
+  13). `LibraryBoundaryTests` sorts every file of Common and Client.Core into library or host and fails
+  when a library file gains a reference to a host type (607 today, the survey's count exactly).
+  `RenderFingerprintTests` hashes seventeen offline renders (an engine at three speeds, every door model,
+  rain on three surfaces, a siren, a train, thunder, a clap). `EmitterStreamReplayTests` drives the
+  whole client audio system through a walk, a drive and traffic in the rain and compares every call it
+  makes on the mixer with a stored stream. The stored data changes only in a commit that changes a sound
+  on purpose, which says why (13.4). On other maths (CI's glibc) the renders and streams are compared by
+  level and to a part in a thousand instead of to the bit.
+- Near rain drops are the same in every client: their renders were seeded from `string.GetHashCode`,
+  which .NET randomises per process. No change to how they sound.
+- Tests no longer write the player's door render cache (`~/.local/share/OpenFPS/rendercache`) or prune
+  its other builds' folders, and the test harness's client audio system no longer renders every door of
+  the city in the background: every test that built one did both.
+
 ## 2026-10-06
 
 - Tile scenes fixed and on again (`OPENFPS_TILE_SCENES=0` turns them off). After the first door swung

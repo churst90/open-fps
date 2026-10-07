@@ -23,6 +23,7 @@ library that open-fps and Resonance both reference. Step 1 of
 10. Risks
 11. Decisions for Cody
 12. Appendices: every type by file, every crossing line, every static, every file read
+13. Stage 0 as built: the guards, and how to regenerate them
 
 ---
 
@@ -717,6 +718,7 @@ A session here is one working session of an agent, as in docs/GEOMETRY.md.
   makes stage 7 checkable without listening.
 - Risk: a stored stream is brittle against intended changes elsewhere; regenerate it in the same
   commit as an intended change, with the reason.
+- As built: section 13. The rule for regenerating is 13.4.
 
 ### Stage 1: `OpenFPS.Native` (0.5 to 1 session)
 
@@ -860,6 +862,9 @@ Two tests, one for before the projects exist and one for after:
   `WorldAudioPlayer`, `VoiceCodec`, `Speech.`, `PhysicsConstants.`, `RoadData`) and fails if any
   count is above its allowance or any file is new and not listed. The allowance only goes down;
   the survey tool regenerates it.
+  As built (13.1), it binds the sources instead of scanning for names: a name list misses a `var`
+  that reads a snapshot, which is how most of these files read one. It counts what `crossings.tsv`
+  counts, every host type, with no list to keep.
 - **After (each project exists)**: `LibraryBoundaryTests.LibraryReferencesOnlyLibrary`. For each
   library assembly, `Assembly.GetReferencedAssemblies()` must contain only the runtime, the allowed
   packages (Serilog, MemoryPack, if decided) and lower library projects. The compiler already
@@ -1581,6 +1586,134 @@ EarlyReflections._chain, EarlyReflections._flFaces, EarlyReflections._flHits, Ea
 | Common/PerfProbe.cs | OPENFPS_PROFILE |
 
 37 variables in 16 files.
+
+## 13. Stage 0 as built (2026-10-07)
+
+Three guards, each a test class in OpenFPS.Tests with its stored data in `OpenFPS.Tests/LibraryBoundary/`.
+They run with the rest of the suite on GitHub Actions; none needs FMOD or Steam Audio.
+
+### 13.1 The ratchet: `LibraryBoundaryTests`
+
+- `EveryFileIsSorted`: every `.cs` file of Common, Client.Core and the library's projects is in
+  `files.tsv` as library, host or mixed (a mixed file names its library types). A new file fails until
+  it is sorted, and a listed file that is gone fails until the list follows it.
+- `NoNewCrossings`: binds those projects' sources with Roslyn (one compilation, no source generators)
+  and counts, in every library file (only the library types' declarations of a mixed file), each name
+  that binds to a host type or a member of one, `var` included, exactly as the survey's reader does.
+  Each (file, host type) count must equal its line in `allowed.tsv`: over is a new crossing, under is a
+  fix whose allowance was not lowered in the same commit.
+- `LibraryReferencesOnlyLibrary` (added with stage 1, 14.3): each library assembly references only the
+  runtime, its allowed packages and lower library projects.
+- Both lists come from the survey: `tools/sound_boundary/run.sh` now writes `files.tsv` and
+  `allowed.tsv` beside `crossings.tsv`. At e814ed20 the test's counts equal `crossings.tsv` line for
+  line: 607 references in 26 files (the survey counted 600 at 26d531a2; the rest is code added since).
+- `classify.py` sorted four new Common files into the library by its default rule; they are host:
+  `EntityGeometry.cs` (the entity adapter geometry stage 2 split out), `MoverPoses.cs` (the server's
+  door-leaf count), `DrivingCuePlanner.cs` (a driving aid over the road network), `RoadMapData.cs`
+  (the MapRoads message). Without that the allowance would have held 202 references the library does
+  not have.
+- Cost: about 17 s, nearly all of it binding the two projects.
+
+### 13.2 The render fingerprint: `RenderFingerprintTests`
+
+Seventeen renders, hashed (SHA-256 of the float buffers, in order, with their lengths) and stored in
+`render-fingerprints.tsv` with each buffer's level every 4096 samples:
+
+| Render | What |
+|---|---|
+| `engine.v8_muscle` | `VehicleSynth.Render`: cranking, idle, then the dyno held at 1,500, 3,000 and 4,500 rpm; exhaust, intake, tyres and block |
+| `door.knob.close`, `door.knob.open` | `KnobDoor.RenderGameClose`, `RenderOpen` |
+| `door.pushbar.open`, `door.sliding.close`, `door.glass.close`, `door.elevator.open`, `door.lock.unlock` | each model's `Render*` |
+| `door.car.close`, `window.car.down` | `CarDoor.Render`, `CarWindow.Render` |
+| `rain.asphalt`, `rain.steel`, `rain.puddle` | `RainSynth` over one square metre a metre away, 8 mm/h |
+| `siren.patrol.wail` | `ElectronicSiren` |
+| `train.light_rail.pass` | `TrainSynth`, every source summed |
+| `thunder.ground_1500` | `Thunder.Render` on two threads at 24 kHz |
+| `clap.dry` | `Applause.RenderClap` |
+
+- Deterministic: fixed seeds, no clock, no thread-count dependence. The lab levers a render reads
+  (`EngineSynth.ValveJetNoise` and the debug switches, `KnobDoor.KeeperBendsStrike`, every door's
+  `StemFolder`) are held at their game values while it renders. The same bits in Debug and Release,
+  and from one process to the next.
+- Left out: the clap in the traced room (Steam Audio's native library, which CI does not have);
+  `GlassFracture` (its worker count is the machine's core count, so its sum is too); anything rendered
+  by a voice state in the mixer (`EngineVoiceState` reads `AudioClock`, `MixerQuality.MixerRate` and the
+  ear settings).
+- Bits depend on the maths library as well as the code. `MathF.Sin` and the rest are the platform's
+  libm, and glibc 2.41 replaced many float functions with correctly rounded ones, so this machine
+  (glibc 2.43) and CI's Ubuntu (2.39) round some of them differently. The file stores a probe of the
+  maths (every libm function the models call, over 4,096 arguments, and the vector width). Where the
+  probe matches, every render must match to the bit; where it does not, every 4096-sample block within
+  40 dB of the buffer's loudest must be within 1 dB of the stored level, and the test says which it did.
+  Expect CI to take the second path. Not yet seen on CI.
+- Cost: about 60 s in Debug, the door models nearly all of it.
+
+### 13.3 The emitter-stream replay: `EmitterStreamReplayTests`
+
+A whole `ClientAudioSystem` driven through three scripted worlds, every call it makes on the mixer
+written down (`StreamMixer`) and compared with `streams/<scenario>.txt.gz`:
+
+| Scenario | Frames | What |
+|---|---:|---|
+| `walk` | 480 | on foot up a street between a brick building and a concrete wall, a car idling at the kerb, another driving past at 14 m/s |
+| `drive` | 360 | riding east at 12 m/s along a wall, an oncoming car sounding its horn as it nears |
+| `traffic_rain` | 360 | standing by a wall under a porch roof in 8 mm/h of rain, five cars on two lanes and a crossing street |
+
+- Recorded: every voice started (the whole emitter, every field), re-placed (the fields that changed),
+  stopped and faded; every acoustic path (the fields that changed); the listener, shelter, boundaries,
+  ear wind, enclosure, reverb, air, ambience beds, registered sounds (a hash of the PCM). 37,000 lines
+  for the rain, 430 KB compressed for all three.
+- Pinned so a run is the same every time: the acoustic worker has no thread (`AsyncAcousticWorker.Manual`;
+  the test steps it after each update, so an answer lands on the same frame every run) and never starts
+  Steam Audio; the triangle world, the tile acoustics and the rain survey are built in place; the audio
+  clock is the test's (`AudioClock.UseForTest`); birds, near drops and footsteps are seeded; the settings
+  the system reads from statics (the level compression, the ear model, the speed of sound, the mixer
+  rate, wide sources, cabin paths, runoff) are held at the game's defaults and the wind is still. Each
+  scenario runs twice per test and must agree with itself before it is compared. Checked across three
+  processes and among 170 other audio tests in one process.
+- Library changes this needed, none heard: `AsyncAcousticWorker.Manual` and `StepForTest` (the loop is
+  unchanged for the game); a `manualAcoustics` and `seed` on `ClientAudioSystem`'s test constructor;
+  `RainField`'s seed and `SurveyInPlace`; `WorldAudioPlayer`'s `prewarm` (the replay starts no door or
+  thunder renders in the background: six systems a run would each have rendered the city's doors);
+  `AudioClock.UseForTest` (internal; Common gives OpenFPS.Tests
+  its internals). One is a fix: `DropBank` seeded each near drop's render from `string.GetHashCode`, which
+  .NET randomises per process, so every client and every test run rendered different drops; it is a
+  fixed hash of the key now (the same drops, chosen the same way, in every process).
+- Not in the stream: the door renders every client starts in the background (`PrewarmDoors`; the
+  fingerprint holds the models); one-off world events, which render on the thread pool; Steam Audio's
+  answers; the provider's own DSP; footsteps (no sound bank) and birds (no habitat in these worlds).
+- Under other maths the calls must be the same calls and every number within 1e-3 (relative) or 1e-4,
+  compared with each voice's fields written whole. `OPENFPS_REPLAY_DUMP=<dir>` writes each run's stream
+  as text, to diff two commits line by line.
+- Cost: about 3 s.
+
+Found on the way: every test that builds a `ClientAudioSystem` started rendering all of the city's
+doors in the background (minutes of a core each time) and kept them in the player's own render cache
+(`~/.local/share/OpenFPS/rendercache`), pruning the folders of other builds. The tests now run with a
+scratch `XDG_DATA_HOME` as well as the scratch config folder (`TestConfigIsolation`), and
+`ClientAudioHarness` builds its system without the prewarm (`prewarm: false` on the test constructor;
+the lab's spikes keep it). With an empty cache and the prewarm still on, the renders starved
+`ClientAudioSelectionTests`' rain test until it failed.
+
+### 13.4 Regenerating the stored data
+
+The rule: the stored hashes, streams and allowance change only in the commit that changes the sound or
+the boundary on purpose, and that commit says why (in its message and in changes.md). A move, a type
+split out of a file, a static made an instance: none of them may change any of the three.
+
+| Guard | When it changes | How |
+|---|---|---|
+| `allowed.tsv` | a crossing fixed: lower it | `OPENFPS_BOUNDARY_WRITE=1 dotnet test OpenFPS.Tests --filter LibraryBoundaryTests` (only lowers) |
+| `allowed.tsv` | a library file moved to another path | `OPENFPS_BOUNDARY_WRITE=all ...`; the diff must show only the path changing |
+| `files.tsv` | a file added, moved or deleted in a sorted project | `tools/sound_boundary/run.sh`, copy its `files.tsv`; a new file's group from `classify.py` |
+| `render-fingerprints.tsv` | a model's sound changed on purpose | `OPENFPS_FINGERPRINT_WRITE=1 dotnet test OpenFPS.Tests --filter RenderFingerprintTests` |
+| `streams/*.txt.gz` | what the audio system tells the mixer changed on purpose | `OPENFPS_REPLAY_WRITE=1 dotnet test OpenFPS.Tests --filter EmitterStreamReplayTests` |
+
+The maths probe is stored with the fingerprints and the streams. Regenerate them where they were made
+(glibc 2.43 here) or with the same maths: written anywhere else, they hold that machine's probe, and
+here every later run falls back to the tolerant comparison.
+
+---
 
 ## Decisions (Cody, 2026-10-06)
 

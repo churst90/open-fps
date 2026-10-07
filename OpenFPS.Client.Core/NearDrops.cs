@@ -274,6 +274,18 @@ public sealed class DropBank
 
     private static int Step(float d) => (int)MathF.Round(MathF.Log2(MathF.Max(0.05f, d)) * StepsPerOctave);
 
+    /// <summary>The key's seed, the same in every process (FNV-1a). string.GetHashCode is randomised per
+    /// process, which made every client, and every run of a test, render different drops.</summary>
+    private static int StableHash(string s)
+    {
+        unchecked
+        {
+            uint h = 2166136261;
+            foreach (char c in s) h = (h ^ c) * 16777619;
+            return (int)h;
+        }
+    }
+
     /// <summary>The sound for an impact, made if it is not yet, unless <paramref name="mayMake"/> is false.</summary>
     public Sound? Get(in NearDrops.Impact impact, int variant, bool mayMake = true)
     {
@@ -285,7 +297,7 @@ public sealed class DropBank
         var surface = impact.Surface;
         bool rings = surface.Kind == RainSurfaceKind.Plate || (surface.Kind == RainSurfaceKind.Pool && impact.Kind is PrecipitationKind.Rain or PrecipitationKind.FreezingRain or PrecipitationKind.Hail);
         int samples = (int)((rings ? 0.35f : 0.06f) * Rate);
-        var synth = new RainSynth(Rate, unchecked(key.GetHashCode() * 31 + _seed++));
+        var synth = new RainSynth(Rate, unchecked(StableHash(key) * 31 + _seed++));
         var pcm = synth.RenderOne(surface, impact.Kind, d, v, samples);
         float peak = 0f;
         foreach (float x in pcm) peak = MathF.Max(peak, MathF.Abs(x));
