@@ -179,6 +179,7 @@ OpenFPS.Common/Ballistics.cs	lib	Sound
 OpenFPS.Common/Beacons.cs	host		
 OpenFPS.Common/Birds.cs	lib	Sound	
 OpenFPS.Common/BoxColumns.cs	lib	Geometry	
+OpenFPS.Common/BoxContainment.cs	lib	Sound	
 OpenFPS.Common/Breathing.cs	lib	Sound	
 OpenFPS.Common/BulletFlyby.cs	lib	Sound	
 OpenFPS.Common/BulletImpact.cs	lib	Sound	
@@ -276,7 +277,8 @@ OpenFPS.Common/StatePacking.cs	host
 OpenFPS.Common/Systems/AcousticVolumeGenerator.cs	lib	Acoustics	
 OpenFPS.Common/Systems/FaceOpenings.cs	lib	Acoustics	
 OpenFPS.Common/TeleporterSounds.cs	lib	Sound	
-OpenFPS.Common/Tiles.cs	mixed	Geometry	TileKey
+OpenFPS.Common/TileKey.cs	lib	Geometry	
+OpenFPS.Common/Tiles.cs	host		
 OpenFPS.Common/TrackClearance.cs	host		
 OpenFPS.Common/TrainSignals.cs	lib	Sound	
 OpenFPS.Common/Trains.cs	lib	Sound	
@@ -286,6 +288,7 @@ OpenFPS.Common/VehicleBody.cs	lib	Sound
 OpenFPS.Common/VehicleCabin.cs	lib	Sound	
 OpenFPS.Common/VehicleSignalBits.cs	lib	Sound	
 OpenFPS.Common/Vehicles.cs	lib	Sound	
+OpenFPS.Common/WallBuild.cs	lib	Sound	
 OpenFPS.Common/WallTransmission.cs	lib	Acoustics	
 OpenFPS.Common/Waves.cs	lib	Sound	
 OpenFPS.Common/WeaponHandling.cs	lib	Sound	
