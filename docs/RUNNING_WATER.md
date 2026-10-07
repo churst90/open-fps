@@ -243,9 +243,9 @@ creek's water is a surface of the map and its rain is the survey's.
 ### 5.5 Cavities
 
 A gully pot or a downpipe is a tube: a delay line of the round trip with the ends' reflections (an
-open end -1, a water surface +1), the open end's loss above ka ≈ 1 in the loop, and a high-pass for
-what the opening radiates. Normalised on white noise, so it colours and does not add level. What lands
-inside is heard through it.
+open end -1, a water surface +1), each open end keeping e^(−(ka)²/2) of what reaches it (section 11.1),
+and a high-pass for what the opening radiates. Normalised on white noise, so it colours and does not
+add level. What lands inside is heard through it.
 
 ### 5.6 Drips
 
@@ -560,3 +560,32 @@ gone. The creek, the kerb gutter and the drain had no comb (their water is at th
 gutter's 0.41 at 0.67 ms and the drain's 0.21 at 0.46 ms are each one broad spectral peak, the bubbles
 of shallow water, and are unchanged. Filling the comb's notch makes the downpipes 1-3 dB louder, the
 house scene 0.7-1.2 dB and the shower 1.9 dB; the others are within a decibel.
+
+### 11.1 The pipe's round trip, 2026-10-07
+
+Cody, hearing the after files: "the down pipe drains still flange." Measured per ear (the cepstrum of
+8192-sample frames, 0.3-40 ms, a frame counting when its peak stands 6 standard deviations over the
+median), the downpipe scenes had two kinds of peak left:
+
+- 0.29-0.65 ms, in a third to all of the frames, wandering between a few lags. The same lags are in
+  white noise played from the downpipe's own places through the same voices (AudioLab `--running-water
+  game set=downpipes noise=1`: 80-100 % of frames), and in none of them with the HRTF off
+  (`OPENFPS_HRTF=0`: 0 %), and the water's dry render has none. They are the HRTF's own notches (the
+  pinna's), one set for each of the source's three places, and every binaural render has them (the
+  approved waves: 25-55 % of frames at 0.31-0.42 ms). Not the water.
+- 32.3 ms: the round trip of the downpipe's 5.5 m of air, in up to a third of the frames of the
+  gutter outlet through the game and 55 % dry. The loop let each open end keep a single pole's worth
+  at ka = 1, so a fifth to a third of a splash came back every 32 ms up to 6 kHz: a flutter of the
+  splashes, the "very fast repeating" left once the ground's comb had gone.
+
+An unflanged pipe's open end keeps e^(−(ka)²/2) of what reaches it [recalled; Levine and Schwinger
+1948 to within about a tenth below ka 1.5]: a third at ka 1.5 (2.4 kHz in a 68 mm pipe), almost nothing
+by ka 3. Round a downpipe that is e^(−(ka)²), as four one-pole low-passes in the loop (their (1 +
+(f/f1)²)^-2 is e^(−2 (f/f1)²) where it matters), the line shortened by their delay so the modes stay
+where the length puts them. The low modes are unchanged (the loop's 0.8 below a few hundred hertz), and
+so is the level: the cavity is still normalised on white noise. The gully pot, the sump and the sinks'
+wastes have the same law with their one open end.
+
+Dry (`--running-water render`, heavy rain): frames with the 32.3 ms peak, gutter outlet 55 % to 1 %,
+downpipe 14 % to 2 %; level within 0.3 dB (the drain 0.8 dB up). Through the game, per ear: see
+`inbox/water-smoothing-2026-10-06/round2/README.txt`.

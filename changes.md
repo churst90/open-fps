@@ -2,6 +2,15 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-07
+
+- Downpipes no longer flutter (unheard; renders in `inbox/water-smoothing-2026-10-06/round2`). A gutter
+  outlet's gulps and the film striking a downpipe's shoe are heard through the pipe's 5.5 m of air,
+  and its open ends handed a fifth to a third of every splash back every 32 ms up to 6 kHz: the flange
+  left in the downpipe files. Each open end now keeps e^(−(ka)²/2) of what reaches it, as a real pipe's
+  does; the low modes and the level are as they were. The other peaks in the downpipe files (0.3-0.65
+  ms) are the HRTF's own and are in white noise played from the same places. docs/RUNNING_WATER.md 11.1.
+
 ## 2026-10-06
 
 - Tile scenes fixed and on again (`OPENFPS_TILE_SCENES=0` turns them off). After the first door swung
