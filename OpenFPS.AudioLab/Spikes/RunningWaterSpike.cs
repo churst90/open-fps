@@ -1,13 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text;
-using System.Threading;
-using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.Core;
@@ -22,7 +16,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// --running-water: creeks, gutters, drains, downpipes and overflows (RunningWaterSynth), rendered from
 /// their models and measured (docs/RUNNING_WATER.md).
 ///
-///   --running-water levels [preset ...] [sec=30] [rain=5] [flow=L/s] [parts=sites,spray,falls,drips]
+///   --running-water levels [preset ...] [sec=30] [rain=5] [flow=L/s] [dry=1] [parts=sites,spray,falls,drips,rain]
 ///        each model's hydraulics (depth, speed, Froude), its level at a metre (Leq, LAeq, octaves,
 ///        the headroom its peaks need), its texture statistics, its 10 ms 4-16 kHz kurtosis and crest,
 ///        and what it costs a core. SourceLevelDb and PeakHeadroomDb are read from this.
@@ -30,7 +24,10 @@ namespace OpenFPS.AudioLab.Spikes;
 ///                                             it runs on after the rain stops
 ///   --running-water render out=DIR [sec=30] [rain=] [flow=]
 ///        one mono float WAV per preset at a metre, dry (−20 dBFS is 94 dB SPL)
-///   --running-water game out=DIR [set=all|creek|rain|after|fountain] [sec=30]
+///   --running-water cycle PRESET [on=10] [off=20] [flow=] [out=DIR] [parts=sites,falls,drips,gurgle,plate]
+///        a tap turned on and shut (see TapCycle)
+///   --running-water game out=DIR [set=all|creek|rain|after|downpipes|fountain|taps|roof|round2|overflow]
+///        [sec=30] [noise=1]
 ///        the game's own path: a ClientAudioSystem over the FMOD provider with the HRTF, the ear model
 ///        and the loudness law, each source a map entity as the server would send it, the listener on
 ///        foot; captured from the master in float (DIR/capture.post.wav) with DIR/segments.csv. No map:
