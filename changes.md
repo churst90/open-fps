@@ -4,6 +4,25 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Common. No behaviour, sound or wire change: no
+  MemoryPack member moved, the render fingerprints, the emitter stream replay and the library boundary
+  pass unregenerated, and every comment edit was checked to leave the code's tokens as they were.
+  - Comments: 15,800 lines to 10,701. Narration and history cut, every warning, measured figure and
+    source kept in a sentence, doc comments that sat on the wrong member put back on their own (about
+    twenty), and some thirty comments corrected to what the code does (a push bar's travel and closer,
+    a siren's square wave, the racing line's smoothing, a wheel's ten bytes on the wire). The build's
+    doc warnings for misplaced comments, missing parameters and ambiguous overloads are gone. Reasoning
+    that was in no doc moved: the new docs/COMMON_NOTES.md (reverberation, where a room ends, a region
+    is not a room, car windows, walking, the racing line's arc length, machines as parts, the loudness
+    ceiling, the park tree), docs/DOOR_TYPES.md (Model history), docs/ENGINE_SYNTHESIS.md (the body and
+    the muffler case) and docs/FOOTSTEP_SYNTHESIS_RESEARCH.md (Session 10).
+  - Dead code, 247 code lines: members with no caller anywhere (sixteen AcousticConstants, six Loudness
+    levels, AdminGun.IsKey, ModelKinds.SoundPrefix, ModelLibrary.IsBuiltIn, Rainfall.TryParseRate,
+    LightningSchedule.RateNow, WindWaves.PhaseSpeed, ShoreSpec.ReferenceSea, RainPlate.EnergyIn and
+    ForcedPeak, EarlyReflections.LegIsClear and a dozen more); unread fields and constants in the door
+    models, each checked not to draw from a random generator; parameters no body read
+    (PushBarDoor.RenderClose's latch swing among them, its AudioLab and test callers updated); 116
+    unused usings.
 - Housekeeping (docs/HOUSEKEEPING.md) of the server, Geometry, Native and both client heads. No
   behaviour, sound or wire change: the render fingerprints, the emitter stream replay and the library
   boundary pass unregenerated.
