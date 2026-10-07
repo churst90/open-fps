@@ -313,6 +313,53 @@ public class RolesScopeTests : IDisposable
         Assert.Equal(before + 1, rig.Server.Rail.CountOn("railway"));
     }
 
+    /// <summary>/spawn train out takes off a train put on with /spawn train, nearest or named, and every
+    /// entity of it goes; the map's own train stays (Cody's freight, 2026-10-07, had no way off).</summary>
+    [Fact]
+    public void ASpawnedTrainComesOffAndTheMapsOwnStays()
+    {
+        var rig = new Rig(_dir, UserRole.Admin);
+        var railway = MapTemplates.Flat("railway", "");
+        railway.IsPublic = true;
+        railway.Tracks = new List<TrackData>
+        {
+            new() { Id = "loop", Waypoints = Enumerable.Range(0, 32).Select(i => new Vector3(80f * MathF.Cos(i * MathF.Tau / 32), 0.05f, 80f * MathF.Sin(i * MathF.Tau / 32))).ToList() },
+        };
+        railway.Trains = new List<TrainData> { new() { Preset = "light_rail", Track = "loop" } };
+        Assert.True(rig.Maps.CreateMap(railway, out string error), error);
+        rig.On("railway");
+        int own = rig.Server.Rail.CountOn("railway");
+        Assert.True(rig.Maps.TryGetMap("railway", out var world, out _, out _, out _));
+        int Sources()
+        {
+            int n = 0;
+            world.Query(new Arch.Core.QueryDescription().WithAll<SoundEmitterComponent>(), (ref SoundEmitterComponent em) =>
+            {
+                if (em.SoundId != null && em.SoundId.StartsWith("rail:", StringComparison.OrdinalIgnoreCase)) n++;
+            });
+            return n;
+        }
+        int ownSources = Sources();
+
+        Assert.Equal("There is no train put on with /spawn train on this map.", rig.Run("spawn", "train", "out"));
+        Assert.Contains("on the loop track", rig.Run("spawn", "train", "metro"));
+        Assert.Contains("on the loop track", rig.Run("spawn", "train", "amtrak"));
+        Assert.Equal(own + 2, rig.Server.Rail.CountOn("railway"));
+
+        string named = rig.Run("spawn", "train", "out", "amtrak");
+        Assert.Contains("Amtrak", named);
+        Assert.EndsWith("is off the track.", named);
+        Assert.EndsWith("is off the track.", rig.Run("spawn", "train", "out"));
+        Assert.Equal(own, rig.Server.Rail.CountOn("railway"));
+        Assert.Equal(ownSources, Sources());
+        Assert.Equal("There is no train put on with /spawn train on this map.", rig.Run("spawn", "train", "out"));
+
+        // Gated as /spawn is: a player on somebody else's map may not.
+        var player = new Rig(_dir, UserRole.Player);
+        player.On("theirs");
+        Assert.Equal(Denied, player.Run("spawn", "train", "out"));
+    }
+
     [Fact]
     public void AnAeroplaneIsParkedButTheAirlinerIsRefused()
     {

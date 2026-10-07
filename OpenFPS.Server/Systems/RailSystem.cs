@@ -47,6 +47,8 @@ public sealed class RailSystem
         /// <summary>Crossings this train has already sounded for on its way in, by where they are
         /// round the line; forgotten once it is past them.</summary>
         public readonly HashSet<float> Sounded = new();
+        /// <summary>Put on with /spawn train, not one of the map's own: what /spawn train out takes off.</summary>
+        public bool Spawned;
     }
 
     /// <summary>How a sound leaves this system. Set by the server; null in tests.</summary>
@@ -75,7 +77,40 @@ public sealed class RailSystem
     {
         int before = _trains.Count;
         Spawn(maps, mapId, new[] { td });
+        for (int i = before; i < _trains.Count; i++) _trains[i].Spawned = true;
         return _trains.Count > before;
+    }
+
+    /// <summary>
+    /// Takes a train put on with /spawn train off its map: the one named (any part of its name, any case),
+    /// or else the nearest to <paramref name="near"/>. Every entity of it is destroyed, so every client
+    /// lets its voices go. The map's own trains stay. Returns its name, or null when there is none.
+    /// </summary>
+    public string? RemoveSpawned(MapManager maps, string mapId, Vector3 near, string? name)
+    {
+        if (!maps.TryGetMap(mapId, out var world, out _, out _, out _)) return null;
+        Consist? pick = null;
+        float best = float.MaxValue;
+        foreach (var tr in _trains)
+        {
+            if (!tr.Spawned || !tr.MapId.Equals(mapId, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                if (tr.Name.Contains(name.Trim(), StringComparison.OrdinalIgnoreCase)) { pick = tr; break; }
+                continue;
+            }
+            foreach (var e in tr.Entities)
+            {
+                if (e == Entity.Null || !world.IsAlive(e)) continue;
+                float d = Vector3.Distance(near, world.Get<Transform>(e).Position);
+                if (d < best) { best = d; pick = tr; }
+            }
+        }
+        if (pick == null) return null;
+        foreach (var e in pick.Entities) if (e != Entity.Null) maps.DestroyEntity(mapId, e);
+        _trains.Remove(pick);
+        Log.Information("Map {Map}: train '{Name}' taken off the track ({Sources} source(s)).", mapId, pick.Name, pick.Entities.Length);
+        return pick.Name;
     }
 
     /// <summary>Every map's trains, or only <paramref name="only"/> on <paramref name="onlyMap"/>.</summary>

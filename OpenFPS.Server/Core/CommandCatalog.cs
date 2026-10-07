@@ -69,7 +69,7 @@ public static class CommandCatalog
           "your team: on its own, who is in it"),
         E("Talking", "t", "/t MESSAGE", "talk to your team"),
         E("People", "perms", "/perms [NAME|all]", "what you can use; all lists every permission", "permissions"),
-        E("Building", "spawn", "/spawn walker [NAME], /spawn vehicle PRESET, /spawn train PRESET, /spawn fire PRESET|out, or /spawn Box|Cylinder MATERIAL X Y Z", "make somebody walking, a parked vehicle, a train on a track already there, a fire to test, or an object"),
+        E("Building", "spawn", "/spawn walker [NAME], /spawn vehicle PRESET, /spawn train PRESET|out [NAME], /spawn fire PRESET|out, or /spawn Box|Cylinder MATERIAL X Y Z", "make somebody walking, a parked vehicle, a train on a track already there (or take one off), a fire to test, or an object"),
         E("Building", "move", "/move x y z, /move NAME, /move NAME x y z, or /move NAME to OTHER", "move yourself by coordinates; moving somebody else needs move-player"),
         E("Building", "prefabs", "/prefabs", "the things that can be placed"),
         E("Building", "composites", "/composites", "the saved designs"),
