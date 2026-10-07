@@ -1,6 +1,8 @@
 using System;
 using OpenFPS.Common;
 using OpenFPS.Common.Hearing;
+using System.Numerics;
+using OpenFPS.Client.AudioEngine.Core;
 using Xunit;
 
 namespace OpenFPS.Tests;
@@ -297,6 +299,101 @@ public class EarModelTests
             Assert.Equal(0f, Loudness.TimbreCorrectionDb(70f, BassHeavy()));
         }
         finally { EarModel.Enabled = was; }
+    }
+
+    // ── Ranking by loudness ──────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The voice budget ranks by how loud a voice is to the ear, not by the gain the law plays it at
+    /// (Cody, 2026-10-07). A 65 dB rumble at 25 Hz and a 60 dB 1 kHz tone, both physical voices at the
+    /// same distance and path: the law plays the rumble about 21 dB up because the ear hears so little
+    /// of it, and the old rank (the played gain) put it above the tone. Heard, the tone is far louder,
+    /// and it ranks first.
+    /// </summary>
+    [Fact]
+    public void ARumbleRanksBelowAQuieterToneAtTheSameDistance()
+    {
+        With(0.45f, () =>
+        {
+            var rumble = Tone(25f);
+            var tone = Tone(1000f);
+            try
+            {
+                OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("test:rumble", rumble);
+                OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("test:tone", tone);
+                float correction = Loudness.TimbreCorrectionDb(65f, rumble);
+                Assert.True(correction > Loudness.TimbreCorrectionDb(60f, tone) + 5f,
+                    $"the law lifts the rumble more than the tone: {correction:F1} dB");
+                foreach (float d in new[] { 2f, 10f, 40f })
+                {
+                    float r = VoiceManager.Audibility(Voice("test:rumble", 65f, new Vector3(d, 0, 0)), d, false);
+                    float t = VoiceManager.Audibility(Voice("test:tone", 60f, new Vector3(0, 0, d)), d, false);
+                    Assert.True(r > 0f && t > 0f);
+                    Assert.True(t > r * 4f, $"at {d} m the 60 dB tone ({20 * MathF.Log10(t):F1}) should rank well above the 65 dB rumble ({20 * MathF.Log10(r):F1})");
+                    // The played gains were the other way round: what the old rank read.
+                    float playedR = Loudness.RenderedGain(Voice("test:rumble", 65f, default).Volume, 1f, 500f, d) * MathF.Pow(10f, correction / 20f);
+                    float playedT = Loudness.RenderedGain(Voice("test:tone", 60f, default).Volume, 1f, 500f, d) * MathF.Pow(10f, Loudness.TimbreCorrectionDb(60f, tone) / 20f);
+                    Assert.True(playedR > playedT, "the law should play the rumble at more gain than the tone");
+                }
+            }
+            finally { OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear(); }
+            return 0;
+        });
+    }
+
+    /// <summary>
+    /// A speech line ranks at exactly the gain it plays at, as it always did, and so does a recording
+    /// not measured yet; louder is always higher, through the threshold of hearing, so voices too far
+    /// off to hear still keep their order instead of tying at zero sone.
+    /// </summary>
+    [Fact]
+    public void HeardGainIsThePlayedGainForSpeechAndAlwaysRisesWithLevel()
+    {
+        With(0.45f, () =>
+        {
+            foreach (float g in new[] { 1e-5f, 0.001f, 0.1f, 1f })
+            {
+                Assert.Equal(g, Loudness.HeardGain(g, Timbre.Speech, physical: false));
+                Assert.Equal(g, Loudness.HeardGain(g, null, physical: false));
+            }
+            // A physical voice's RMS sits 12 dB nearer full scale than a speech line's: as loud as a
+            // speech line played 12 dB higher.
+            Assert.InRange(20f * MathF.Log10(Loudness.HeardGain(0.01f, null, physical: true) / 0.01f), 11.5f, 12.5f);
+            foreach (var t in new[] { Tone(25f), Tone(1000f), BassHeavy(), Timbre.Speech })
+            {
+                float prev = 0f;
+                for (float db = -140f; db <= 10f; db += 0.5f)
+                {
+                    float h = Loudness.HeardGain(MathF.Pow(10f, db / 20f), t, physical: true);
+                    Assert.True(h > prev, $"{t} at {db} dB: {h} not above {prev}");
+                    prev = h;
+                }
+            }
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void WithTheEarModelOffTheRankIsThePlayedGain()
+    {
+        bool was = EarModel.Enabled;
+        try
+        {
+            EarModel.Enabled = false;
+            Assert.Equal(0.01f, Loudness.HeardGain(0.01f, Tone(25f), physical: true));
+        }
+        finally { EarModel.Enabled = was; }
+    }
+
+    private static OpenFPS.Client.AudioEngine.Data.SpatialEmitter Voice(string key, float levelDb, Vector3 at)
+    {
+        var (gain, reference) = Loudness.Place(levelDb);
+        return new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
+        {
+            EntityId = 1, SoundId = key, PhysicalKey = key, IsSynth = true, Position = at,
+            Mode = OpenFPS.Common.Components.PlaybackMode.LoopOne, Range = 500f, MinDistance = reference,
+            Volume = gain, EarLevelDb = levelDb,
+        };
     }
 
     // ── Compensation ─────────────────────────────────────────────────────────────────────────

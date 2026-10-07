@@ -168,6 +168,48 @@ public class WavesTests
         Assert.True(Db(MeanSquare(Render(ShoreSpec.Shingle, 0f, 10f))) > 50.0);
     }
 
+    /// <summary>
+    /// A shore is never silent, so a shore voice starts mid-sea: waves already arriving and the last
+    /// ones' swash still running, from its first moment. It used to start from a still sea and wait for
+    /// its first wave, two up-crossings of the surface: a sandy beach under a 9 s swell was exact silence
+    /// for about 11 s after it won a voice (docs/COVERAGE_2026-10-06.md, finding 2). Through the game's
+    /// own path (PlacedNatureVoice, its control from the held weather), for several seeds: the first
+    /// sample sounds, and no second of the first fifteen is far under the sea's own level later on.
+    /// </summary>
+    [Fact]
+    public void A_shore_voice_is_heard_from_its_first_moment()
+    {
+        using var wind = WindField.Hold(WindWeather.Steady(4.5f, 270f, 0f));
+        var spec = ShoreSpec.SeaSand;
+        const int Seconds = 40;
+        foreach (int seed in new[] { 23, 2 })
+        {
+            var voice = new OpenFPS.Client.AudioEngine.Fmod.PlacedNatureVoice("shore:sea", spec, spec.DefaultGeometry, Rate, seed, Vector3.Zero);
+            // The first block is where the sea is got under way: what that costs the render thread once.
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            voice.Sample(0, 0);
+            double firstMs = clock.Elapsed.TotalMilliseconds;
+            var perSecond = new double[Seconds];
+            long firstSound = -1;
+            for (long at = 0; at < (long)Seconds * Rate; at++)
+            {
+                double y = 0;
+                for (int p = 0; p < voice.Places; p++) y += voice.Sample(p, at);
+                if (firstSound < 0 && y != 0) firstSound = at;
+                perSecond[at / Rate] += y * y / Rate;
+            }
+            var later = perSecond.Skip(20).Select(Db).OrderBy(v => v).ToArray();
+            double median = later[later.Length / 2], quietLater = later[0];
+            var first = perSecond.Take(15).Select(Db).ToArray();
+            _o.WriteLine($"seed {seed}: first sound at {firstSound / (double)Rate * 1000:F1} ms; seconds 0-14 " +
+                         string.Join(" ", first.Select(v => v.ToString("F0"))) +
+                         $"; seconds 20-39 median {median:F1}, quietest {quietLater:F1} dB; first 512 samples rendered in {firstMs:F1} ms");
+            Assert.InRange(firstSound, 0, Rate / 100);
+            Assert.All(first, v => Assert.True(v > quietLater - 6.0,
+                $"seed {seed}: a second of the start at {v:F1} dB, under the quietest second later ({quietLater:F1}) by more than 6 dB"));
+        }
+    }
+
     [Fact]
     public void More_wind_makes_more_noise()
     {

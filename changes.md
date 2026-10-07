@@ -4,6 +4,29 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- Voices are ranked by how loud they are to the ear (Cody's decision on finding 1 of
+  docs/COVERAGE_2026-10-06.md). The voice budget and the machine budget used to rank on the gain the
+  law plays a voice at, which includes the extra gain the law gives a sound the ear hears less of: a
+  65 dB rumble at 25 Hz ranked about 20 dB up. They now rank on the voice's loudness at the ear (ISO
+  532-1 with its measured spectrum), as the gain a speech line would need to be as loud
+  (`Loudness.HeardGain`; docs/EAR_MODEL.md, Ranking). A speech line or an unmeasured recording ranks
+  as before. Physical voices and recordings are now compared on one scale (on gain a recording
+  outranked an equally loud physical voice by about 12.6 dB), and tonal sounds the law lifts, such as
+  beacons, rank about 8 dB lower than before. On the city every standing source is broadband, so the
+  machine budget changes by one source at its edge in four of six listening spots (instrument:
+  `RankingByLoudnessProbe`, run with `OPENFPS_PROBE_OUT`; list in inbox/ranking-2026-10-07). Unheard.
+- A shore voice starts mid-sea. It used to start from a still sea: exact silence until its second
+  wave crest (11 s for one seed of the sandy surf in a 4.5 m/s wind), then about ten seconds of
+  building up, because a surf bore's swash arrives 15 s after its break. The synth now runs its sea on
+  for four of its longest periods before its first sample, without rendering it; the sound after that
+  is made as before. In the game at 10 m: before, 2.2 s of silence and the first 15 s 8 dB under the
+  sea's own level; after, the sea's level from the voice's first block (renders and measurements in
+  inbox/ranking-2026-10-07). docs/WAVES_AND_SHORES.md 5.1. Unheard.
+- A repeating one-shot (an announcement, a foghorn) whose last play ended in the frame its next firing
+  came round was silent for a whole interval: the budget saw the old play finish and dropped the new
+  submission with it. A one-shot submitted again after its last play ended now starts afresh.
+- `EarTimbres.Find` also looks a model's own key up as a folder, so a shore stretch's measured spectrum
+  (played under a key with its geometry) is found when the budget ranks the stretch by its prefab key.
 - Downpipes no longer flutter (unheard; renders in `inbox/water-smoothing-2026-10-06/round2`). A gutter
   outlet's gulps and the film striking a downpipe's shoe are heard through the pipe's 5.5 m of air,
   and its open ends handed a fifth to a third of every splash back every 32 ms up to 6 kHz: the flange
