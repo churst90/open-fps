@@ -32,8 +32,23 @@ public sealed class TrainSynth
         public float ExtentMetres { get; init; } = 1.5f;
         /// <summary>Pascals at one metre, valid after Step().</summary>
         public float Out { get; internal set; }
-        internal Func<float> Render = () => 0f;
+        /// <summary>What it is, as TrainLayout names it.</summary>
+        public TrainLayout.Kind Kind { get; init; }
+        /// <summary>One sample at this train speed (m/s), pascals at a metre. Each source keeps its own
+        /// state, so sources can be rendered apart, on different threads (TrainVoiceState).</summary>
+        internal Func<float, float> Render = _ => 0f;
+        /// <summary>What it does with the notch, every 64 samples: a governor's set speed, a drive's effort.</summary>
+        internal Action<float>? Slow;
+        /// <summary>A bogie's or a body's recipe: enough to build another like it (TrainSlotState renders
+        /// the rolling stock it carries from these, not from this synth).</summary>
+        internal BogieRecipe? Bogie;
+        internal DrumRecipe? Drum;
     }
+
+    /// <summary>What a bogie is made of, for building another like it.</summary>
+    internal sealed record BogieRecipe(WheelsetSpec Wheels, TrackSpec Track, float ReferenceDb, int Axles, float Wheelbase, float Creep);
+    /// <summary>What a body drum is made of.</summary>
+    internal sealed record DrumRecipe(float Hz, float Db);
 
     public readonly TrainProfile Profile;
     private readonly float _rate, _dt;
@@ -94,7 +109,11 @@ public sealed class TrainSynth
             float creep = Profile.Track.CurveRadiusMetres > 1f
                 ? 0.5f * v.BogieWheelbaseMetres / Profile.Track.CurveRadiusMetres
                 : 0f;
-            var voice = new BogieVoice(v.Wheels, Profile.Track, _track, Profile.RollingReferenceDb,
+            // Its own stretch of track. The rail's response to a wheel dies away within a few metres, so
+            // two bogies eighteen metres apart do not share one; and a filter with state shared by every
+            // bogie was stepped once per bogie per sample: on a fifty-wagon freight the rail's modes ran
+            // at a hundred times the rate and folded back as a hiss.
+            var voice = new BogieVoice(v.Wheels, Profile.Track, new TrackResponse(Profile.Track, _rate), Profile.RollingReferenceDb,
                                        v.AxlesPerBogie, v.BogieWheelbaseMetres, _rate, seed++);
             _bogies.Add((voice, at));
             var captured = voice;
@@ -102,9 +121,10 @@ public sealed class TrainSynth
             var src = new Source
             {
                 Label = $"{v.Name} #{unit + 1} bogie {b + 1}",
-                AlongMetres = at, HeightMetres = 0.45f, ExtentMetres = 2.2f,
+                AlongMetres = at, HeightMetres = 0.45f, ExtentMetres = 2.2f, Kind = TrainLayout.Kind.Bogie,
+                Bogie = new BogieRecipe(v.Wheels, Profile.Track, Profile.RollingReferenceDb, v.AxlesPerBogie, v.BogieWheelbaseMetres, creep),
             };
-            src.Render = () => captured.Step(Speed, cr);
+            src.Render = speed => captured.Step(speed, cr);
             _sources.Add(src);
         }
 
@@ -115,8 +135,9 @@ public sealed class TrainSynth
             _sources.Add(new Source
             {
                 Label = $"{v.Name} #{unit + 1} body",
-                AlongMetres = mid, HeightMetres = 2.0f, ExtentMetres = v.LengthMetres * 0.5f,
-                Render = () => drum.Step(Speed),
+                AlongMetres = mid, HeightMetres = 2.0f, ExtentMetres = v.LengthMetres * 0.5f, Kind = TrainLayout.Kind.Body,
+                Drum = new DrumRecipe(v.BodyDrumHz, v.BodyDrumDb),
+                Render = speed => drum.Step(speed),
             });
         }
 
@@ -127,21 +148,29 @@ public sealed class TrainSynth
             case RailTraction.DieselElectric when tr.EngineKey != null:
             {
                 var eng = new EngineSynth(EngineProfile.ByName(tr.EngineKey), _rate, seed++) { Ignition = true };
+                // Already running at its notch: a train is first heard on the move, and from rest the engine
+                // cranks and catches each time a train comes into earshot.
+                if (tr.NotchRpm.Length > 0)
+                    eng.SpinTo(tr.NotchRpm[Math.Clamp((int)MathF.Round(Notch), 0, tr.NotchRpm.Length - 1)]);
                 _diesel ??= eng;
                 _diesels.Add(eng);
                 _notches = tr.NotchRpm;
+                var notches = tr.NotchRpm;
                 var fan = new FanNoise(tr.FanBlades, tr.FanRpm, tr.FanDb, _rate, seed++);
+                float duty = Math.Clamp(Notch / 8f, 0.25f, 1f);
                 _sources.Add(new Source
                 {
                     Label = $"{v.Name} #{unit + 1} exhaust stack",
-                    AlongMetres = mid - v.LengthMetres * 0.22f, HeightMetres = 4.4f, ExtentMetres = 1.0f,
-                    Render = () => { eng.Step(); return eng.Exhaust + 0.45f * eng.Intake + 0.6f * eng.Block; },
+                    AlongMetres = mid - v.LengthMetres * 0.22f, HeightMetres = 4.4f, ExtentMetres = 1.0f, Kind = TrainLayout.Kind.ExhaustStack,
+                    Render = _ => { eng.Step(); return eng.Exhaust + 0.45f * eng.Intake + 0.6f * eng.Block; },
+                    Slow = notch => Govern(eng, notches, notch),
                 });
                 _sources.Add(new Source
                 {
                     Label = $"{v.Name} #{unit + 1} radiator fans",
-                    AlongMetres = mid + v.LengthMetres * 0.34f, HeightMetres = 4.2f, ExtentMetres = 1.6f,
-                    Render = () => fan.Step(Math.Clamp(Notch / 8f, 0.25f, 1f)),
+                    AlongMetres = mid + v.LengthMetres * 0.34f, HeightMetres = 4.2f, ExtentMetres = 1.6f, Kind = TrainLayout.Kind.RadiatorFans,
+                    Render = _ => fan.Step(duty),
+                    Slow = notch => duty = Math.Clamp(notch / 8f, 0.25f, 1f),
                 });
                 break;
             }
@@ -157,8 +186,9 @@ public sealed class TrainSynth
                     _sources.Add(new Source
                     {
                         Label = $"{v.Name} #{unit + 1} traction {b + 1}",
-                        AlongMetres = at, HeightMetres = 0.7f, ExtentMetres = 2.0f,
-                        Render = () => d.Step(Speed),
+                        AlongMetres = at, HeightMetres = 0.7f, ExtentMetres = 2.0f, Kind = TrainLayout.Kind.Traction,
+                        Render = speed => d.Step(speed),
+                        Slow = notch => d.Effort = Math.Clamp(notch / 8f, 0f, 1f),
                     });
                 }
                 break;
@@ -170,8 +200,9 @@ public sealed class TrainSynth
                 _sources.Add(new Source
                 {
                     Label = $"{v.Name} #{unit + 1} chimney",
-                    AlongMetres = along + v.LengthMetres * 0.18f, HeightMetres = 4.6f, ExtentMetres = 0.8f,
-                    Render = () => st.Step(Speed),
+                    AlongMetres = along + v.LengthMetres * 0.18f, HeightMetres = 4.6f, ExtentMetres = 0.8f, Kind = TrainLayout.Kind.Chimney,
+                    Render = speed => st.Step(speed),
+                    Slow = notch => st.Effort = Math.Clamp(notch / 8f, 0f, 1f),
                 });
                 break;
             }
@@ -185,8 +216,8 @@ public sealed class TrainSynth
             _sources.Add(new Source
             {
                 Label = $"{v.Name} #{unit + 1} horn",
-                AlongMetres = along + 2.5f, HeightMetres = 4.8f, ExtentMetres = 0.6f,
-                Render = () => { h.Step(); return h.Out; },
+                AlongMetres = along + 2.5f, HeightMetres = 4.8f, ExtentMetres = 0.6f, Kind = TrainLayout.Kind.Horn,
+                Render = _ => { h.Step(); return h.Out; },
             });
         }
         if (tr.Steam?.WhistleKey is { } wk && _whistle == null)
@@ -196,8 +227,8 @@ public sealed class TrainSynth
             _sources.Add(new Source
             {
                 Label = $"{v.Name} #{unit + 1} whistle",
-                AlongMetres = along + v.LengthMetres * 0.55f, HeightMetres = 4.4f, ExtentMetres = 0.5f,
-                Render = () => { w.Step(); return w.Out; },
+                AlongMetres = along + v.LengthMetres * 0.55f, HeightMetres = 4.4f, ExtentMetres = 0.5f, Kind = TrainLayout.Kind.Whistle,
+                Render = _ => { w.Step(); return w.Out; },
             });
         }
         string? bellKey = tr.BellKey ?? tr.Steam?.BellKey;
@@ -208,8 +239,8 @@ public sealed class TrainSynth
             _sources.Add(new Source
             {
                 Label = $"{v.Name} #{unit + 1} bell",
-                AlongMetres = along + 1.8f, HeightMetres = 3.2f, ExtentMetres = 0.4f,
-                Render = () => { bl.Step(); return bl.Out; },
+                AlongMetres = along + 1.8f, HeightMetres = 3.2f, ExtentMetres = 0.4f, Kind = TrainLayout.Kind.Bell,
+                Render = _ => { bl.Step(); return bl.Out; },
             });
         }
     }
@@ -239,35 +270,35 @@ public sealed class TrainSynth
         _slowTick = _slowTick + 1 == 64 ? 0 : _slowTick + 1;
 
         HeadMetres += Speed * _dt;
-        for (int i = 0; i < _sources.Count; i++) _sources[i].Out = _sources[i].Render();
+        float speed = Speed;
+        for (int i = 0; i < _sources.Count; i++) _sources[i].Out = _sources[i].Render(speed);
     }
 
     private void UpdateSlow()
     {
-        if (_diesel != null && _notches.Length > 0)
-        {
-            // A diesel-electric has notches, not a throttle: the engine's own governor holds the
-            // notch's speed with the pedal up, so the sound steps, and takes a couple of seconds.
-            int n = Math.Clamp((int)MathF.Round(Notch), 0, _notches.Length - 1);
-            float want = _notches[n], idle = _notches[0];
-            float frac = n / MathF.Max(1f, _notches.Length - 1f);
-            foreach (var eng in _diesels)
-            {
-                float rpm = eng.Rpm;
-                eng.Starter = rpm < 100f;
-                eng.Throttle = 0f;
-                eng.GovernedRpm = want;
-                // The alternator is the load: not excited while cranking, all of it from idle up, and
-                // its torque goes with speed, which lets a bogged engine pull back up instead of
-                // stalling.
-                float excited = Math.Clamp((rpm - eng.Profile.CrankingRpm) / MathF.Max(1f, idle - eng.Profile.CrankingRpm), 0f, 1f);
-                float atNotch = eng.Profile.PeakTorqueNm * (0.06f + 0.84f * MathF.Pow(frac, 1.3f));
-                eng.LoadTorque = excited * atNotch * rpm / want;
-            }
-        }
-        float effort = Math.Clamp(Notch / 8f, 0f, 1f);
-        foreach (var d in _drives) d.Effort = effort;
-        if (_steam != null) _steam.Effort = effort;
+        float notch = Notch;
+        for (int i = 0; i < _sources.Count; i++) _sources[i].Slow?.Invoke(notch);
+    }
+
+    /// <summary>
+    /// A diesel-electric has notches, not a throttle: the engine's own governor holds the notch's speed
+    /// with the pedal up, so the sound steps, and takes a couple of seconds.
+    /// </summary>
+    internal static void Govern(EngineSynth eng, float[] notches, float notch)
+    {
+        if (notches.Length == 0) return;
+        int n = Math.Clamp((int)MathF.Round(notch), 0, notches.Length - 1);
+        float want = notches[n], idle = notches[0];
+        float frac = n / MathF.Max(1f, notches.Length - 1f);
+        float rpm = eng.Rpm;
+        eng.Starter = rpm < 100f;
+        eng.Throttle = 0f;
+        eng.GovernedRpm = want;
+        // The alternator is the load: not excited while cranking, all of it from idle up, and its torque
+        // goes with speed, which lets a bogged engine pull back up instead of stalling.
+        float excited = Math.Clamp((rpm - eng.Profile.CrankingRpm) / MathF.Max(1f, idle - eng.Profile.CrankingRpm), 0f, 1f);
+        float atNotch = eng.Profile.PeakTorqueNm * (0.06f + 0.84f * MathF.Pow(frac, 1.3f));
+        eng.LoadTorque = excited * atNotch * rpm / want;
     }
 
     public IEnumerable<string> Describe(float atSpeed = 0f)
@@ -330,9 +361,14 @@ internal sealed class BodyDrum
         _amp = 20e-6f * MathF.Pow(10f, db / 20f);
     }
 
-    public float Step(float speed)
+    public float Step(float speed) => StepShared(speed, 1f);
+
+    /// <summary>One sample of a body standing for several like it (TrainSlotState): the modes are
+    /// linear and each body's drive is its own noise, so together they are one drive <paramref
+    /// name="weight"/> times as strong (the root of the sum of their squared weights).</summary>
+    public float StepShared(float speed, float weight)
     {
-        float drive = (float)(_rng.NextDouble() * 2 - 1) * MathF.Min(1f, speed / 12f);
+        float drive = (float)(_rng.NextDouble() * 2 - 1) * MathF.Min(1f, speed / 12f) * weight;
         float y = (_m1.Process(drive) + 0.6f * _m2.Process(drive) + 0.35f * _m3.Process(drive)) * 22f * _amp;
         _hp += OnePole.AlphaFor(25f, _rate) * (y - _hp);
         return y - _hp;

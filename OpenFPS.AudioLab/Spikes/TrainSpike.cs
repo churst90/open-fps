@@ -28,6 +28,9 @@ public static class TrainSpike
         bool horn = Arg(args, "horn", 1f) > 0.5f;
         bool stems = args.Contains("stems");
         bool binaural = args.Contains("binaural");
+        // fullscale=PA writes the pass-by with that many pascals at full scale instead of to its own
+        // peak, so two renders can be compared by level.
+        _fullScalePa = Arg(args, "fullscale", 0f);
 
         var presets = args.Where(a => ModelLibrary.Knows(ModelLibrary.Kinds.Train, a)).ToList();
         if (presets.Count == 0) presets = ModelLibrary.Ids(ModelLibrary.Kinds.Train).ToList();
@@ -78,12 +81,14 @@ public static class TrainSpike
         return 0;
     }
 
+    private static float _fullScalePa;
+
     private static void Write(string dir, string name, float[] pcm, float peakOverride = 0f)
     {
         float peak = peakOverride;
         if (peak <= 0f) foreach (var x in pcm) peak = MathF.Max(peak, MathF.Abs(x));
         var wav = new float[pcm.Length];
-        float g = peak > 1e-12f ? 0.89f / peak : 0f;
+        float g = _fullScalePa > 0f ? 1f / _fullScalePa : peak > 1e-12f ? 0.89f / peak : 0f;
         for (int i = 0; i < wav.Length; i++) wav[i] = pcm[i] * g;
         File.WriteAllBytes(Path.Combine(dir, name + ".wav"), VehicleSynth.ToWav16(wav));
         Console.WriteLine($"    wrote {Path.Combine(dir, name + ".wav")}");

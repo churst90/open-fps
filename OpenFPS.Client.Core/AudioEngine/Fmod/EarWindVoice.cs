@@ -88,17 +88,22 @@ internal static class EarWindProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            Render(ref dsp_state, outbuffer, length, ref outchannels);
-            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "ear wind", ref _nonFiniteOther);
+            try
+            {
+                Render(ref dsp_state, outbuffer, length, ref outchannels);
+                NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "ear wind", ref _nonFiniteOther);
+            }
+            catch (Exception ex)
+            {
+                DspCallback.Silence(outbuffer, length, outchannels > 0 ? outchannels : 2);
+                DspFault.Record("EarWind", ex);
+            }
+            return RESULT.OK;
         }
-        catch (Exception ex)
-        {
-            DspCallback.Silence(outbuffer, length, outchannels > 0 ? outchannels : 2);
-            DspFault.Record("EarWind", ex);
-        }
-        return RESULT.OK;
+        finally { MixerProfile.Stop(MixerProfile.Kind.EarWind, profiled); }
     }
 
     private static unsafe void Render(ref DSP_STATE dsp_state, IntPtr outbuffer, uint length, ref int outchannels)

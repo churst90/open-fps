@@ -230,6 +230,20 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>Voices that played without an HRTF stage because the pool was empty: panned by FMOD,
     /// not placed by Steam Audio.</summary>
     private int _saPoolMisses, _lastSaPoolMisses;
+    /// <summary>Voices not started because no binaural voice was left (PlaySpatialSound).</summary>
+    private int _refusedForHrtf, _lastRefusedForHrtf;
+
+    /// <summary>For the lab: the voices playing, how many of them direct sounds without HRTF, how many
+    /// voices were refused for want of a binaural voice since the start, and how many binaural voices are free.</summary>
+    internal (int Active, int NoHrtf, int Refused, int BinauralFree) VoiceCensus()
+    {
+        lock (_lock)
+        {
+            int noHrtf = 0;
+            foreach (var a in _activeSounds) if (a.SaState == null && !a.IsReflection && a.Channel.hasHandle()) noHrtf++;
+            return (_activeSounds.Count, noHrtf, _refusedForHrtf, SpatialVoicesFree);
+        }
+    }
     // Pooled DSPs that could not be detached and were thrown away. Should stay zero; see Detach.
     private int _failedDetaches, _lastFailedDetaches;
     // Pooled DSPs cut loose from the DSP side because their channel was already recycled: the ordinary
@@ -631,16 +645,24 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         _engineSnapshot.Clear();
         _engineOrder.Clear();
+        _snapshotTrains.Clear();
         lock (_lock)
             foreach (var a in _activeSounds)
             {
                 if (a.EngineState != null) _engineOrder.Add((a.EffectiveDistance, a.EngineState));
-                else if (a.MachineState != null) _engineOrder.Add((a.EffectiveDistance, a.MachineState));
+                else if (a.MachineState != null)
+                {
+                    _engineOrder.Add((a.EffectiveDistance, a.MachineState));
+                    // A train's lanes render what its voices read: listed once, just ahead of its nearest voice.
+                    if (a.MachineState is TrainSlotState tv && _snapshotTrains.Add(tv.Shared))
+                        foreach (var lane in tv.Shared.Lanes) _engineOrder.Add((a.EffectiveDistance - 0.01f, lane));
+                }
             }
         _engineOrder.Sort(static (x, y) => x.Distance.CompareTo(y.Distance));
         foreach (var e in _engineOrder) _engineSnapshot.Add(e.Voice);
         return _engineSnapshot;
     }
+    private readonly HashSet<TrainVoiceState> _snapshotTrains = new();
 
     /// <summary>
     /// Makeup gain on the master, dB: how loud the game plays, decided in this one place (see the
@@ -1587,7 +1609,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // ...and so is a tree, a fire or a fountain heard from several places.
             string? sharedKey = a.MachineState switch
             {
-                TrainTapState tap => tap.Shared.Key,
+                TrainSlotState trainVoice => trainVoice.Shared.Key,
                 NaturePlaceState place => "place:" + place.Shared.GetHashCode(),
                 WaterTapState water => "water:" + water.Shared.Key,
                 _ => null,
@@ -1979,8 +2001,9 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    // Trains: one synth per consist, a tap per entity (RailVoice.cs). The server names every source of
-    // a train "rail:<preset>/<train>/<i>"; the synth for <preset>/<train> is made on the first tap.
+    // Trains: one model per consist, heard through a handful of voices (RailVoice.cs). The client asks for
+    // voice k of a train as "rail:<preset>/<train>/@k"; the model for <preset>/<train> is made on the
+    // first voice or the first plan.
     private readonly Dictionary<string, TrainVoiceState> _trains = new();
 
     /// <summary>The last signal each train was given, and when, for a synth made after it arrived.</summary>
@@ -1998,27 +2021,53 @@ public partial class FmodAudioProvider : IAudioProvider
                         string.Join(",", warning.Select(w => w.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))), bellSeconds);
     }
 
-    private PhysicalVoiceState? RailTap(string key, int rate)
+    /// <summary>The model of a train, made on first use. Caller holds the lock on _trains.</summary>
+    private TrainVoiceState TrainFor(string preset, string train, int rate)
     {
-        if (!TrainVoiceState.ParseKey(key, out string preset, out string train, out int index)) return null;
         string shared = preset + "/" + train;
+        if (_trains.TryGetValue(shared, out var t)) return t;
+        // The seed from the name's characters, not string.GetHashCode (randomised per process): every
+        // client and every run hears the same train.
+        int seed = 17;
+        foreach (char c in train) seed = unchecked(seed * 31 + c);
+        t = new TrainVoiceState(shared, OpenFPS.Common.TrainProfile.ByName(preset), rate, seed & 0x7fff);
+        _trains[shared] = t;
+        Log.Information("Train '{Train}' ({Profile}): one model, {Sources} source(s) over {Length:F0} m, heard through at most {Voices} voice(s); {Lanes} lane(s) render its engines and signals",
+                        shared, t.Profile.Name, t.Layout.Count, t.Profile.LengthMetres,
+                        OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.Slots, t.Lanes.Length);
+        // Sounding already: the horn came in before any of the train had a voice.
+        if (_trainSignals.TryGetValue(shared, out var sig))
+        {
+            double ago = OpenFPS.Common.AudioClock.Now - sig.At;
+            if (ago < OpenFPS.Common.TrainSignal.Duration(sig.Warning, sig.Bell)) t.Signal(sig.Warning, sig.Bell, ago);
+        }
+        return t;
+    }
+
+    /// <summary>See IAudioProvider.PlanTrainSlot.</summary>
+    public void PlanTrainSlot(string preset, string train, int slot, TrainSlotPlan plan)
+    {
+        if (!_isInitialized) return;
+        _system.getSoftwareFormat(out int rate, out _, out _);
         lock (_trains)
         {
-            if (!_trains.TryGetValue(shared, out var t))
-            {
-                t = new TrainVoiceState(shared, OpenFPS.Common.TrainProfile.ByName(preset), rate, train.GetHashCode() & 0x7fff);
-                _trains[shared] = t;
-                Log.Information("Train '{Train}' ({Profile}): one synth, {Sources} source(s) over {Length:F0} m",
-                                shared, t.Profile.Name, t.Layout.Count, t.Profile.LengthMetres);
-                // Sounding already: the horn came in before any of the train had a voice.
-                if (_trainSignals.TryGetValue(shared, out var sig))
-                {
-                    double ago = OpenFPS.Common.AudioClock.Now - sig.At;
-                    if (ago < OpenFPS.Common.TrainSignal.Duration(sig.Warning, sig.Bell)) t.Signal(sig.Warning, sig.Bell, ago);
-                }
-            }
-            if (index < 0 || index >= t.Layout.Count) return null;
-            return new TrainTapState(t, index, rate);
+            try { TrainFor(preset, train, rate).SetPlan(slot, plan); }
+            catch (Exception ex) { Log.Warning("Train '{Preset}/{Train}': {Message}", preset, train, ex.Message); }
+        }
+    }
+
+    private PhysicalVoiceState? RailSlot(string key, int rate)
+    {
+        if (!TrainVoiceState.ParseSlotKey(key, out string preset, out string train, out int slot)) return null;
+        lock (_trains)
+        {
+            var t = TrainFor(preset, train, rate);
+            // Declared at the train's loudest field source; a signal's voice at the signal's own level.
+            float level = OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.SlotLevelDb(t.Layout);
+            int signal = slot == OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.WarningSlot ? OpenFPS.Common.TrainSignal.WarningSource(t.Layout)
+                       : slot == OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.BellSlot ? OpenFPS.Common.TrainSignal.BellSource(t.Layout) : -1;
+            if (signal >= 0) level = t.Layout[signal].LevelDb;
+            return new TrainSlotState(t, slot, level, rate);
         }
     }
 
@@ -2303,6 +2352,17 @@ public partial class FmodAudioProvider : IAudioProvider
                 StopSound(emitter.EntityId);
             }
         }
+
+        // No binaural voice left: not started, rather than played without HRTF, flat and in the middle of
+        // the head. The budgets see it not playing and give voices up when the pool runs low
+        // (ClientAudioSystem.HrtfLowWater). Your own steps and speech (Essential) still play; a reflection
+        // is refused by the pool's reserve already.
+        if (_steamAudioEnabled && emitter.Type is EmitterType.EntityAttached or EmitterType.WorldLocked
+            && !emitter.IsReflection && !emitter.Essential && SpatialVoicesFree == 0)
+        {
+            _refusedForHrtf++;
+            return;
+        }
         
         FMOD.ChannelGroup targetGroup = emitter.IsReflection ? _reflectionGroup : default;
         FMOD.Channel channel;
@@ -2471,7 +2531,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     "aircraft" => new AircraftVoiceState(OpenFPS.Common.AircraftProfile.ByName(preset),
                                                          mrate, emitter.EntityId * 17 + 3,
                                                          lever: emitter.PowerLever),
-                    "rail" => RailTap(emitter.PhysicalKey, mrate),
+                    "rail" => RailSlot(emitter.PhysicalKey, mrate),
                     // Its own voice: 35 dB over the car's exhaust, the two cannot share one full-scale
                     // reference (SirenVoiceState).
                     "siren" => new SirenVoiceState(OpenFPS.Common.SirenSpec.ByName(preset), mrate),
@@ -2872,12 +2932,12 @@ public partial class FmodAudioProvider : IAudioProvider
                     {
                         mach.TargetGroundSpeed = emitter.Velocity.Length();
                     }
-                    else if (active.MachineState is TrainTapState tap)
+                    else if (active.MachineState is TrainSlotState trainVoice)
                     {
-                        // Any tap may set it, all reading one train: the lever is the notch over
-                        // eight, the wake slot the speed.
-                        tap.Shared.TargetSpeed = emitter.RotorWake;
-                        tap.Shared.TargetNotch = emitter.PowerLever * 8f;
+                        // Any of its voices may set it, all reading one train: the lever is the notch
+                        // over eight, the wake slot the speed.
+                        trainVoice.Shared.TargetSpeed = emitter.RotorWake;
+                        trainVoice.Shared.TargetNotch = emitter.PowerLever * 8f;
                     }
                     else if (active.MachineState is NaturePlaceState { Place: 0 } middle)
                     {
@@ -3126,21 +3186,26 @@ public partial class FmodAudioProvider : IAudioProvider
         int noHrtf = 0;
         foreach (var a in _activeSounds) if (a.SaState == null && !a.IsReflection && a.Channel.hasHandle()) noHrtf++;
 
-        int starves = EngineVoiceState.GlobalStarves;
+        int starves = EngineVoiceState.GlobalStarves + PhysicalVoiceState.GlobalStarves;
         int gen2 = GC.CollectionCount(2);
         double pauseMs = GC.GetTotalPauseDuration().TotalMilliseconds;
         _system.getChannelsPlaying(out int playing, out int real);
         Log.Information("Mixer load: dsp {Dsp:F1}%, update {Update:F1}%, stream {Stream:F1}% — "
                       + "{Engines} engine/echo voice(s) of {Total} active, {Real}/{Playing} real channel(s), "
-                      + "{NoHrtf} direct voice(s) without HRTF ({Misses} new since last, {SaFree} binaural free), {Starve} starve(s), "
+                      + "{NoHrtf} direct voice(s) without HRTF ({Misses} new since last, {SaFree} binaural free, {Refused} refused for want of one), {Starve} starve(s), "
                       + "gc {Gen2} gen2 / {Pause:F0} ms paused, {Late} DSP(s) cut loose after their channel went, {Detach} stuck, "
-                      + "{WrongBus} send drop(s) on the wrong bus",
+                      + "{WrongBus} send drop(s) on the wrong bus; render pool {Pool:P0} busy",
                         cpu.dsp, cpu.update, cpu.stream, voices, _activeSounds.Count, real, playing,
-                        noHrtf, _saPoolMisses - _lastSaPoolMisses, SpatialVoicesFree,
+                        noHrtf, _saPoolMisses - _lastSaPoolMisses, SpatialVoicesFree, _refusedForHrtf - _lastRefusedForHrtf,
                         starves - _lastStarves, gen2 - _lastGen2, pauseMs - _lastPauseMs,
                         _lateDetaches - _lastLateDetaches, _failedDetaches - _lastFailedDetaches,
-                        _sendDropsOnWrongBus);
+                        _sendDropsOnWrongBus, _enginePool?.TakeBusy() ?? 0f);
+        // Where the mixer's time went: our own units by kind; the rest of the dsp figure is FMOD's.
+        string profile = MixerProfile.Take(out float ours);
+        Log.Information("Mixer time: ours {Ours:F1} % ({Profile}); FMOD's own units and mixing about {Theirs:F1} %",
+                        ours * 100f, profile, Math.Max(0f, cpu.dsp - ours * 100f));
         _lastSaPoolMisses = _saPoolMisses; _lastFailedDetaches = _failedDetaches;
+        _lastRefusedForHrtf = _refusedForHrtf;
         _lastLateDetaches = _lateDetaches;
         _lastStarves = starves; _lastGen2 = gen2; _lastPauseMs = pauseMs;
 

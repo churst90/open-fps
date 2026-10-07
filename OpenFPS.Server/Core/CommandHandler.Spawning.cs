@@ -22,7 +22,7 @@ namespace OpenFPS.Server.Core;
 public partial class CommandHandler
 {
     private const string SpawnUsage =
-        "Usage: /spawn walker [NAME], /spawn vehicle PRESET, /spawn train PRESET, /spawn fire PRESET, /spawn fire out, or /spawn Box|Cylinder MATERIAL X Y Z.";
+        "Usage: /spawn walker [NAME], /spawn vehicle PRESET, /spawn train PRESET, /spawn train out [NAME], /spawn fire PRESET, /spawn fire out, or /spawn Box|Cylinder MATERIAL X Y Z.";
 
     /// <summary>The only jet. No jets are given or spawned.</summary>
     private const string Jet = "airliner";
@@ -59,7 +59,12 @@ public partial class CommandHandler
                 SpawnFire(session, args.Length > 1 ? args[1].ToLowerInvariant() : "", reply);
                 return;
             case "train":
-                if (args.Length < 2) { Say(reply, $"Usage: /spawn train PRESET. Presets: {string.Join(", ", TrainProfile.Presets.Keys)}."); return; }
+                if (args.Length < 2) { Say(reply, $"Usage: /spawn train PRESET, or /spawn train out [NAME]. Presets: {string.Join(", ", TrainProfile.Presets.Keys)}."); return; }
+                if (args[1].ToLowerInvariant() is "out" or "off" or "remove")
+                {
+                    TrainOut(session, args.Length > 2 ? string.Join(" ", args.Skip(2)) : null, reply);
+                    return;
+                }
                 SpawnTrain(session, args[1].ToLowerInvariant(), reply);
                 return;
             default:
@@ -194,6 +199,26 @@ public partial class CommandHandler
         bool record = !_maps.IsShipped(session.CurrentMapId);
         if (record) data.Trains.Add(td);
         Say(reply, $"A {profile.Name} is on the {best.Id} track, {bestDistance:F0} metres from you. {Lasting(record, "it")}");
+    }
+
+    /// <summary>
+    /// /spawn train out [NAME]: takes off a train put on with /spawn train, the one named or else the
+    /// nearest. The map's own trains stay. On a player's map it is also struck from what /savemap keeps.
+    /// </summary>
+    private void TrainOut(UserSession session, string? name, Action<IMessage> reply)
+    {
+        if (!TryGetBody(session, reply, out _, out _, out var feet)) return;
+        string? gone = _server.Rail.RemoveSpawned(_maps, session.CurrentMapId, feet, name);
+        if (gone == null)
+        {
+            Say(reply, string.IsNullOrWhiteSpace(name)
+                ? "There is no train put on with /spawn train on this map."
+                : $"There is no train put on with /spawn train called {name.Trim()} on this map.");
+            return;
+        }
+        if (!_maps.IsShipped(session.CurrentMapId) && _maps.TryGetMapData(session.CurrentMapId, out var data))
+            data.Trains?.RemoveAll(t => string.Equals(t.Name, gone, StringComparison.OrdinalIgnoreCase));
+        Say(reply, $"{gone} is off the track.");
     }
 
     /// <summary>How long something spawned lasts: kept by /savemap on a player's map, until a restart

@@ -431,6 +431,35 @@ public class RailAndSignalTests
         Assert.InRange(law, 18f, 42f);
     }
 
+    /// <summary>
+    /// Every bogie of a train is as loud in the train as on its own, and as loud as the game declares it
+    /// (TrainLayout.BogieLevelDb, what the mixer places it by). Until 2026-10-07 the bogies of a train
+    /// shared one track's filters, stepped once per bogie per sample: in the fifty-wagon freight each
+    /// bogie came out far under its declared level and its rail rang up as hiss, and the rolling anchor
+    /// had been raised twelve decibels to make up for it.
+    /// </summary>
+    [Fact]
+    public void ABogieInATrainIsAsLoudAsItIsDeclared()
+    {
+        var p = TrainProfile.ByName("freight");
+        var layout = TrainLayout.Sources(p);
+        var train = new TrainSynth(p, Sr, 41) { Speed = p.TypicalSpeedMps };
+        int n = Sr / 2;
+        var sum = new double[train.Sources.Count];
+        for (int i = 0; i < n + Sr / 4; i++)
+        {
+            train.Step();
+            if (i < Sr / 4) continue;
+            for (int k = 0; k < sum.Length; k++) sum[k] += train.Sources[k].Out * (double)train.Sources[k].Out;
+        }
+        var bogies = Enumerable.Range(0, sum.Length).Where(k => train.Sources[k].Kind == TrainLayout.Kind.Bogie).ToList();
+        var db = bogies.Select(k => 10 * Math.Log10(sum[k] / n / 4e-10)).ToList();
+        var declared = bogies.Select(k => (double)layout[k].LevelDb).ToList();
+        var off = db.Zip(declared, (a, b) => a - b).ToList();
+        _o.WriteLine($"{bogies.Count} bogies: rendered minus declared from {off.Min():+0.0;-0.0} to {off.Max():+0.0;-0.0} dB, mean {off.Average():+0.0;-0.0}");
+        Assert.All(off, d => Assert.InRange(d, -3.0, 3.0));
+    }
+
     [Fact]
     public void TreadBrakesAreWorthAboutNineDecibels()
     {

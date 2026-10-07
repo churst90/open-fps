@@ -133,7 +133,12 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     {
         TargetEnvelope = 1f;
         FadedOut = false;
+        Volatile.Write(ref _silentFrom, -1);
     }
+
+    /// <summary>Where in the ring the fade-out reached silence, or -1: the voice is released once the
+    /// mixer has played that far, not when it was rendered up to 0.7 s earlier, which cut it at full level.</summary>
+    private long _silentFrom = -1;
 
     private float _envelope;
     /// <summary>
@@ -319,7 +324,12 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // A starved block moved the play position past what was written (a voice keeps wall
             // clock); resume from there. Still the producer moving _written: one writer.
             long played = Volatile.Read(ref _played);
-            if (played > Volatile.Read(ref _written)) Volatile.Write(ref _written, played);
+            if (played > Volatile.Read(ref _written))
+            {
+                Volatile.Write(ref _written, played);
+                // Starved while fading: nothing of it is left to play.
+                if (TargetEnvelope <= 0f) FadedOut = true;
+            }
 
             int room = _ring.Length - 8;
             int want = Math.Min((int)(_leadSeconds * SampleRate), room);
@@ -374,6 +384,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         }
         // Wall clock, always: the whole block is gone whether or not it had audio in it.
         Volatile.Write(ref _played, at + mono.Length);
+        long silent = Volatile.Read(ref _silentFrom);
+        if (silent >= 0 && at + mono.Length >= silent) FadedOut = true;
         if (take == mono.Length) return;
 
         // Short: ramp out of the last sample; a step is a click.
@@ -415,6 +427,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             mono[i] = Ground.Process(Soft(_ring[j] + _front[j] * _frontShare));
         }
         Volatile.Write(ref _played, at + mono.Length);
+        long silent = Volatile.Read(ref _silentFrom);
+        if (silent >= 0 && at + mono.Length >= silent) FadedOut = true;
     }
 
     public EngineVoiceState(VehicleProfile v, float sampleRate, int seed)
@@ -1599,7 +1613,12 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         // sounding engine as near silence for its first half second, and the lift chased that.
         if (_levelMs <= 0 && blockMs > 0 && OpenFPS.Common.Hearing.EarModel.Enabled) _levelMs = blockMs;
         else _levelMs += (blockMs - _levelMs) * a;
-        if (envTarget <= 0f && _envelope <= 1e-4f) FadedOut = true;
+        if (envTarget <= 0f && _envelope <= 1e-4f)
+        {
+            // Released once the mixer has played this far (Consume), not now.
+            if (Volatile.Read(ref _silentFrom) < 0) Volatile.Write(ref _silentFrom, _written);
+        }
+        else if (Volatile.Read(ref _silentFrom) >= 0) Volatile.Write(ref _silentFrom, -1);
     }
 }
 
@@ -2007,24 +2026,29 @@ public static class TapProcessor
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
-            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "engine tap", ref _nonFiniteOther);
-            return r;
-        }
-        catch (Exception ex)
-        {
-            // Logged once: a faulting DSP faults every block, 43 a second.
-            DspFault.Record("TapProcessor", ex);
-            unsafe
+            try
             {
-                if (outchannels == 0) outchannels = 1;
-                float* outBuf = (float*)outbuffer;
-                for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+                var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+                NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "engine tap", ref _nonFiniteOther);
+                return r;
             }
-            return RESULT.OK;
+            catch (Exception ex)
+            {
+                // Logged once: a faulting DSP faults every block, 43 a second.
+                DspFault.Record("TapProcessor", ex);
+                unsafe
+                {
+                    if (outchannels == 0) outchannels = 1;
+                    float* outBuf = (float*)outbuffer;
+                    for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+                }
+                return RESULT.OK;
+            }
         }
+        finally { MixerProfile.Stop(MixerProfile.Kind.EngineTap, profiled); }
     }
 
 
@@ -2088,24 +2112,29 @@ public static class EchoProcessor
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
-            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "engine echo", ref _nonFiniteOther);
-            return r;
-        }
-        catch (Exception ex)
-        {
-            // Logged once: a faulting DSP faults every block, 43 a second.
-            DspFault.Record("EchoProcessor", ex);
-            unsafe
+            try
             {
-                if (outchannels == 0) outchannels = 1;
-                float* outBuf = (float*)outbuffer;
-                for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+                var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+                NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "engine echo", ref _nonFiniteOther);
+                return r;
             }
-            return RESULT.OK;
+            catch (Exception ex)
+            {
+                // Logged once: a faulting DSP faults every block, 43 a second.
+                DspFault.Record("EchoProcessor", ex);
+                unsafe
+                {
+                    if (outchannels == 0) outchannels = 1;
+                    float* outBuf = (float*)outbuffer;
+                    for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+                }
+                return RESULT.OK;
+            }
         }
+        finally { MixerProfile.Stop(MixerProfile.Kind.EngineEcho, profiled); }
     }
 
 
@@ -2168,24 +2197,29 @@ public static class EngineProcessor
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
-            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "engine voice", ref _nonFiniteOther);
-            return r;
-        }
-        catch (Exception ex)
-        {
-            // Logged once: a faulting DSP faults every block, 43 a second.
-            DspFault.Record("EngineProcessor", ex);
-            unsafe
+            try
             {
-                if (outchannels == 0) outchannels = 1;
-                float* outBuf = (float*)outbuffer;
-                for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+                var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+                NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "engine voice", ref _nonFiniteOther);
+                return r;
             }
-            return RESULT.OK;
+            catch (Exception ex)
+            {
+                // Logged once: a faulting DSP faults every block, 43 a second.
+                DspFault.Record("EngineProcessor", ex);
+                unsafe
+                {
+                    if (outchannels == 0) outchannels = 1;
+                    float* outBuf = (float*)outbuffer;
+                    for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+                }
+                return RESULT.OK;
+            }
         }
+        finally { MixerProfile.Stop(MixerProfile.Kind.Engine, profiled); }
     }
 
 

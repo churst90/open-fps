@@ -1048,7 +1048,9 @@ Spawning:
   you.
 - `/spawn vehicle PRESET` (or `car`), `/spawn helicopter`, `/spawn aircraft PRESET`: parked beside
   you. On your own map it is yours. Aircraft cannot be flown yet. No airliner.
-- `/spawn train PRESET`: onto the nearest track that already has a train.
+- `/spawn train PRESET`: onto the nearest track that already has a train. `/spawn train out` takes
+  the nearest train put on that way off again (`/spawn train out NAME` the one named); the map's own
+  trains stay.
 - On a map a player made, `/savemap` keeps walkers, vehicles, aircraft and trains spawned there. On
   the server's own maps (the city, the speedway, the real places) they last until the server
   restarts: those files are made by generators and are not written with them.

@@ -5,8 +5,8 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A train's horn, whistle and bell are its own sources, sounded by the train's one synth when the
-/// server says so (TrainSignal). See RailRunTests for the server half.
+/// A train's horn, whistle and bell are its own sources, sounded by the train's own outlets when the
+/// server says so (TrainSignal), on the train's own timeline. See RailRunTests for the server half.
 /// </summary>
 public class TrainSignalTests
 {
@@ -18,7 +18,7 @@ public class TrainSignalTests
     private static double Rms(TrainVoiceState v, int source, long from, int count)
     {
         double sum = 0;
-        for (int i = 0; i < count; i++) { double y = v.Sample(source, from + i, 1f / Rate); sum += y * y; }
+        for (int i = 0; i < count; i++) { double y = v.PointSample(source, from + i); sum += y * y; }
         return Math.Sqrt(sum / count);
     }
 
@@ -28,7 +28,7 @@ public class TrainSignalTests
     [InlineData("steam")]
     public void A_train_sounds_its_warning_and_bell_on_its_own_outlets_and_only_when_told(string preset)
     {
-        var v = new TrainVoiceState(preset + "/t", TrainProfile.ByName(preset), Rate, 3);
+        var v = new TrainVoiceState(preset + "/t", TrainProfile.ByName(preset), Rate, 3) { Offline = true };
         int warn = TrainSignal.WarningSource(v.Layout), bell = TrainSignal.BellSource(v.Layout);
         Assert.True(warn >= 0, "every preset has a horn or a whistle");
         Assert.True(bell >= 0, "every preset here has a bell");
@@ -36,9 +36,10 @@ public class TrainSignalTests
         int half = (int)(0.5f * Rate);
         double quietWarn = Rms(v, warn, 0, half), quietBell = Rms(v, bell, 0, half);
 
-        // One second on, a second off, a second on; the bell for three.
-        v.Signal(new[] { 1.0f, 1.0f, 1.0f }, 3.0f, 0.0);
-        long start = v.Newest;
+        // One second on, a second off, a second on; the bell for three. From a sample nothing has rendered
+        // yet, as the server's signal arrives ahead of what the voices have made.
+        long start = 2 * half;
+        v.SignalAt(new[] { 1.0f, 1.0f, 1.0f }, 3.0f, start);
         double blast = Rms(v, warn, start + half / 2, half);
         double gapLate = Rms(v, warn, start + (long)(1.8f * Rate), (int)(0.15f * Rate));
         double ringing = Rms(v, bell, start, (int)(2f * Rate));

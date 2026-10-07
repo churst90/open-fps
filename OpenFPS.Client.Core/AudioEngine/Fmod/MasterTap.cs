@@ -73,18 +73,23 @@ public sealed class MasterTap : IDisposable
     private static RESULT ReadCallback(ref DSP_STATE state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
-        try { return ReadCallbackCore(ref state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
-        catch (Exception ex)
+        long profiled = MixerProfile.Start();
+        try
         {
-            unsafe
+            try { return ReadCallbackCore(ref state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+            catch (Exception ex)
             {
-                int ch = outchannels > 0 ? outchannels : (inchannels > 0 ? inchannels : 2);
-                if (outbuffer != IntPtr.Zero)
-                    new Span<float>((void*)outbuffer, (int)length * ch).Clear();
+                unsafe
+                {
+                    int ch = outchannels > 0 ? outchannels : (inchannels > 0 ? inchannels : 2);
+                    if (outbuffer != IntPtr.Zero)
+                        new Span<float>((void*)outbuffer, (int)length * ch).Clear();
+                }
+                DspFault.Record("MasterTap", ex);
+                return RESULT.OK;
             }
-            DspFault.Record("MasterTap", ex);
-            return RESULT.OK;
         }
+        finally { MixerProfile.Stop(MixerProfile.Kind.Master, profiled); }
     }
 
 

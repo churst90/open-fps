@@ -597,22 +597,27 @@ internal static class TracedReverbDsp
 
     private static RESULT Read(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        // A callback on FMOD's mixer thread must never throw: the process aborts.
+        long profiled = MixerProfile.Start();
         try
         {
-            var r = ReadCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
-            Guard(ref dsp_state, inbuffer, outbuffer, (int)length, inchannels, outchannels > 0 ? outchannels : 2);
-            return r;
-        }
-        catch
-        {
-            unsafe
+            // A callback on FMOD's mixer thread must never throw: the process aborts.
+            try
             {
-                int ch = outchannels > 0 ? outchannels : 2;
-                if (outbuffer != IntPtr.Zero) new Span<float>((void*)outbuffer, (int)length * ch).Clear();
+                var r = ReadCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+                Guard(ref dsp_state, inbuffer, outbuffer, (int)length, inchannels, outchannels > 0 ? outchannels : 2);
+                return r;
             }
-            return RESULT.OK;
+            catch
+            {
+                unsafe
+                {
+                    int ch = outchannels > 0 ? outchannels : 2;
+                    if (outbuffer != IntPtr.Zero) new Span<float>((void*)outbuffer, (int)length * ch).Clear();
+                }
+                return RESULT.OK;
+            }
         }
+        finally { MixerProfile.Stop(MixerProfile.Kind.TracedReverb, profiled); }
     }
 
     /// <summary>

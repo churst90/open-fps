@@ -10,10 +10,21 @@ namespace OpenFPS.Client.AudioEngine.Core;
 public readonly record struct WheelStrike(int Wheel, double At, float Pascals, float ContactSeconds);
 
 /// <summary>
-/// A tyre struck by a step, wheel by wheel, inside a vehicle's voice. The force lasts as long as the
-/// patch takes to roll on (15 ms at 36 km/h) and rings the tread band's first radial mode (about
-/// 90 Hz on a car, heavily damped), the air cavity's (c / pi D, about 200 Hz, lightly damped: the
-/// "thunk" with a note in it) and a couple of milliseconds of tread slap.
+/// A tyre struck by a step, wheel by wheel, inside a vehicle's voice. Three things happen, on three
+/// time scales:
+/// <list type="bullet">
+/// <item>The clack: the tread's leading edge meets the rail head's edge. Rubber blocks against steel
+/// make a contact of a millisecond or two, whatever the speed, a broadband slap centred near 1.4 kHz
+/// that the tread and sidewall radiate well. Outside the car this is most of what is heard.</item>
+/// <item>The rail and its panel answer: steel held in rubber, ringing a few milliseconds near a
+/// kilohertz and its second mode.</item>
+/// <item>The thump: the patch rolling on (15 ms at 36 km/h) drives the tread band's first radial mode
+/// (about 90 Hz on a car, heavily damped), and a little of the air cavity's (c / pi D, about 200 Hz).
+/// A force that slow has almost nothing at 200 Hz, and what the cavity does is carried into the car by
+/// the wheel, not out of the tyre.</item>
+/// </list>
+/// The slap must not be put under the patch's onset: there it is 30 dB down, and the two modes alone
+/// are a hollow note, not a clack (--wheel-strike measures it).
 ///
 /// Strikes are queued ahead with their time; the render thread places each at the sample that will be
 /// played then, so the rhythm over two rails comes out as it happened however far ahead the voice is
@@ -31,16 +42,27 @@ public sealed class WheelStrikes
 
     private readonly float _dt;
     private readonly float[] _t, _amp, _onset, _f1, _f2;
-    /// <summary>The tonal part's peak per wheel, for contact times from 2 ms up by half-octaves
-    /// (<see cref="ShapePeak"/>), so a strike's peak is the pascals it was asked for.</summary>
+    /// <summary>Each wheel's slap band-pass (a biquad, direct form II transposed).</summary>
+    private readonly float[] _z1, _z2;
+    private readonly float _b0, _b2, _a1, _a2;
+    /// <summary>The strike's peak per wheel, for contact times from 2 ms up by half-octaves
+    /// (<see cref="StrikePeak"/>), so a strike's peak is about the pascals it was asked for.</summary>
     private readonly float[][] _peaks;
     private const int PeakSteps = 16;
     private uint _noise = 0x9E3779B9u;
     private int _active;
 
-    /// <summary>Damping of the tread band's mode and the cavity's, seconds (Q about 4 and 20).</summary>
-    private const float TreadTau = 0.014f, CavityTau = 0.032f, SlapTau = 0.002f;
+    /// <summary>Damping of the tread band's mode and the cavity's, seconds (Q about 4 and 9).</summary>
+    private const float TreadTau = 0.014f, CavityTau = 0.015f;
     private const float StrikeSeconds = 0.25f;
+    /// <summary>The slap's middle and the rail's two modes, Hz.</summary>
+    private const float SlapHz = 1400f, RailHz = 950f, RailHz2 = 2400f;
+    /// <summary>
+    /// How much of the strike's peak each part brings: the slap most, the thump a fifth. A tyre radiates
+    /// its 90 Hz mode poorly (a third of a metre is a sixth of that wavelength: (ka)² is about a third of
+    /// what it radiates at a kilohertz), so outside the car the thump is under the clack.
+    /// </summary>
+    private const float SlapShare = 0.8f, ThumpShare = 0.2f, RailShare = 0.35f, CavityShare = 0.06f;
 
     /// <param name="radius">Each wheel's rolling radius, metres, in the order the wire sends the wheels.</param>
     /// <param name="sampleRate">The voice's rate, Hz.</param>
@@ -49,6 +71,10 @@ public sealed class WheelStrikes
         int n = radius.Count;
         _dt = 1f / sampleRate;
         _t = new float[n]; _amp = new float[n]; _onset = new float[n]; _f1 = new float[n]; _f2 = new float[n];
+        _z1 = new float[n]; _z2 = new float[n]; _thump = new float[n];
+        // A band-pass a little under an octave and a half wide (Q 0.8) round the slap's middle.
+        float w0 = MathF.Tau * SlapHz / sampleRate, alpha = MathF.Sin(w0) / (2f * 0.8f), a0 = 1f + alpha;
+        _b0 = alpha / a0; _b2 = -alpha / a0; _a1 = -2f * MathF.Cos(w0) / a0; _a2 = (1f - alpha) / a0;
         for (int i = 0; i < n; i++)
         {
             _t[i] = -1f;
@@ -60,35 +86,82 @@ public sealed class WheelStrikes
             _f2[i] = 343f / (MathF.PI * 2f * r * 0.85f);
         }
         _peaks = new float[n][];
+        _thumpPeaks = new float[n][];
         for (int i = 0; i < n; i++)
         {
             _peaks[i] = new float[PeakSteps];
+            _thumpPeaks[i] = new float[PeakSteps];
             for (int k = 0; k < PeakSteps; k++)
-                _peaks[i][k] = ShapePeak(_f1[i], _f2[i], 0.002f * MathF.Pow(2f, k * 0.5f) / 3f, sampleRate);
+            {
+                float onset = 0.002f * MathF.Pow(2f, k * 0.5f) / 3f;
+                _thumpPeaks[i][k] = ThumpPeak(_f1[i], onset, sampleRate);
+                _peaks[i][k] = StrikePeak(i, onset, _thumpPeaks[i][k], sampleRate);
+            }
         }
     }
 
-    /// <summary>The largest value the strike's tonal part reaches (noise aside), found by stepping it.</summary>
-    private static float ShapePeak(float f1, float f2, float onset, float rate)
+    private readonly float[][] _thumpPeaks;
+    /// <summary>Each wheel's thump peak for the strike ringing now.</summary>
+    private readonly float[] _thump;
+
+    /// <summary>The largest value the thump reaches, found by stepping it, so its share is a share of the peak.</summary>
+    private static float ThumpPeak(float f1, float onset, float rate)
     {
         float peak = 0f;
         for (float t = 0f; t < 0.06f; t += 1f / rate)
+            peak = MathF.Max(peak, MathF.Abs((1f - MathF.Exp(-t / onset)) * MathF.Sin(MathF.Tau * f1 * t) * MathF.Exp(-t / TreadTau)));
+        return MathF.Max(0.05f, peak);
+    }
+
+    /// <summary>The whole strike's peak for this onset, stepped through with the noise from its seed: what
+    /// the asked-for pascals are divided by. A strike's own noise differs, so its peak is this within a few
+    /// tens of per cent.</summary>
+    private float StrikePeak(int wheel, float onset, float thumpPeak, float rate)
+    {
+        uint noise = 0x9E3779B9u;
+        float z1 = 0f, z2 = 0f, peak = 0f;
+        for (float t = 0f; t < 0.06f; t += 1f / rate)
         {
-            float s = (1f - MathF.Exp(-t / onset))
-                    * (0.6f * MathF.Sin(MathF.Tau * f1 * t) * MathF.Exp(-t / TreadTau)
-                     + 0.35f * MathF.Sin(MathF.Tau * f2 * t) * MathF.Exp(-t / CavityTau));
+            noise = noise * 1664525u + 1013904223u;
+            float s = Shape(wheel, t, (noise >> 8) / 8388608f - 1f, onset, thumpPeak, ref z1, ref z2);
             peak = MathF.Max(peak, MathF.Abs(s));
         }
         return MathF.Max(0.05f, peak);
     }
 
-    private float PeakFor(int wheel, float contactSeconds)
+    /// <summary>One sample of a strike's shape, unscaled: the slap, the rail, the thump and the cavity.</summary>
+    private float Shape(int wheel, float t, float noise, float onset, float thumpPeak, ref float z1, ref float z2)
+    {
+        // The slap: band-passed noise, on in a third of a millisecond. The tread blocks meet the edge one
+        // after another as the patch rolls over it, so it lasts a quarter of the patch's time, three to six
+        // milliseconds.
+        float bp = _b0 * noise + z1;
+        z1 = -_a1 * bp + z2;
+        z2 = _b2 * noise - _a2 * bp;
+        float slapTau = Math.Clamp(onset * 3f / 4f, 0.003f, 0.006f);
+        float slap = bp * 2.2f * (1f - MathF.Exp(-t / 0.0003f)) * MathF.Exp(-t / slapTau);
+        // The rail head and its panel.
+        float rail = (MathF.Sin(MathF.Tau * RailHz * t) * MathF.Exp(-t / 0.006f)
+                    + 0.6f * MathF.Sin(MathF.Tau * RailHz2 * t) * MathF.Exp(-t / 0.003f)) * (1f - MathF.Exp(-t / 0.0002f));
+        // The thump, on as the patch rolls on, and the little of the cavity it reaches.
+        float rise = 1f - MathF.Exp(-t / onset);
+        float thump = rise * MathF.Sin(MathF.Tau * _f1[wheel] * t) * MathF.Exp(-t / TreadTau) / thumpPeak;
+        float cavity = rise * MathF.Sin(MathF.Tau * _f2[wheel] * t) * MathF.Exp(-t / CavityTau);
+        return SlapShare * slap + RailShare * rail + ThumpShare * thump + CavityShare * cavity;
+    }
+
+    private float PeakFor(int wheel, float contactSeconds) => Lerp(_peaks[wheel], contactSeconds);
+
+    private float ThumpPeakFor(int wheel, float contactSeconds) => Lerp(_thumpPeaks[wheel], contactSeconds);
+
+    private static float Lerp(float[] table, float contactSeconds)
     {
         float k = 2f * MathF.Log2(MathF.Max(0.002f, contactSeconds) / 0.002f);
         int lo = Math.Clamp((int)k, 0, PeakSteps - 1), hi = Math.Min(lo + 1, PeakSteps - 1);
         float f = Math.Clamp(k - lo, 0f, 1f);
-        return _peaks[wheel][lo] + (_peaks[wheel][hi] - _peaks[wheel][lo]) * f;
+        return table[lo] + (table[hi] - table[lo]) * f;
     }
+
 
     /// <summary>Strikes to come (game thread).</summary>
     public void Queue(IReadOnlyList<WheelStrike> batch)
@@ -129,6 +202,8 @@ public sealed class WheelStrikes
             _t[w] = 0f;
             _amp[w] = _pendingAmp[k] / PeakFor(w, _pendingTc[k]);
             _onset[w] = _pendingTc[k] / 3f;
+            _thump[w] = ThumpPeakFor(w, _pendingTc[k]);
+            _z1[w] = _z2[w] = 0f;
             _pending--;
             _pendingAt[k] = _pendingAt[_pending];
             _pendingWheel[k] = _pendingWheel[_pending];
@@ -152,11 +227,7 @@ public sealed class WheelStrikes
         }
         _noise = _noise * 1664525u + 1013904223u;
         float noise = (_noise >> 8) / 8388608f - 1f;
-        float onset = 1f - MathF.Exp(-t / _onset[wheel]);
-        float s = 0.6f * MathF.Sin(MathF.Tau * _f1[wheel] * t) * MathF.Exp(-t / TreadTau)
-                + 0.35f * MathF.Sin(MathF.Tau * _f2[wheel] * t) * MathF.Exp(-t / CavityTau)
-                + 0.25f * noise * MathF.Exp(-t / SlapTau);
-        return _amp[wheel] * onset * s;
+        return _amp[wheel] * Shape(wheel, t, noise, _onset[wheel], _thump[wheel], ref _z1[wheel], ref _z2[wheel]);
     }
 
     // ── How hard ────────────────────────────────────────────────────────────────────────────────

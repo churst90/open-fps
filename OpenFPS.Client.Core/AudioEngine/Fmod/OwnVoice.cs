@@ -231,19 +231,24 @@ public static class OwnVoiceProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            var r = Core(ref dsp_state, outbuffer, length, ref outchannels);
-            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "own voice", ref _nonFiniteOther);
-            return r;
+            try
+            {
+                var r = Core(ref dsp_state, outbuffer, length, ref outchannels);
+                NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "own voice", ref _nonFiniteOther);
+                return r;
+            }
+            catch (Exception ex)
+            {
+                DspFault.Record("OwnVoiceProcessor", ex);
+                if (outchannels == 0) outchannels = 1;
+                DspCallback.Silence(outbuffer, length, outchannels);
+                return RESULT.OK;
+            }
         }
-        catch (Exception ex)
-        {
-            DspFault.Record("OwnVoiceProcessor", ex);
-            if (outchannels == 0) outchannels = 1;
-            DspCallback.Silence(outbuffer, length, outchannels);
-            return RESULT.OK;
-        }
+        finally { MixerProfile.Stop(MixerProfile.Kind.OwnVoice, profiled); }
     }
 
     private static RESULT Core(ref DSP_STATE dsp_state, IntPtr outbuffer, uint length, ref int outchannels)

@@ -94,74 +94,79 @@ public static class BoundaryProximityProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
-        // The handle resolution is inside a guard too: GCHandle.FromIntPtr throws once the handle is
-        // freed, and on the mixer thread that is a process abort (the same one-line gap the engine's four
-        // callbacks had).
-        IntPtr userData;
-        BoundaryVoiceState s;
+        long profiled = MixerProfile.Start();
         try
         {
-            userData = DspCallback.UserData(ref dsp_state);
-            if (userData == IntPtr.Zero) { DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels); return RESULT.OK; }
-            if (GCHandle.FromIntPtr(userData).Target is not BoundaryVoiceState bs) { DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels); return RESULT.OK; }
-            s = bs;
-        }
-        catch
-        {
-            // Pass the mix through: this unit is on the master bus, and silencing it silences the game.
-            unsafe
+            // The handle resolution is inside a guard too: GCHandle.FromIntPtr throws once the handle is
+            // freed, and on the mixer thread that is a process abort (the same one-line gap the engine's four
+            // callbacks had).
+            IntPtr userData;
+            BoundaryVoiceState s;
+            try
             {
-                if (inbuffer != IntPtr.Zero && outbuffer != IntPtr.Zero && inchannels == outchannels)
-                    new ReadOnlySpan<float>((void*)inbuffer, (int)length * inchannels)
-                        .CopyTo(new Span<float>((void*)outbuffer, (int)length * outchannels));
+                userData = DspCallback.UserData(ref dsp_state);
+                if (userData == IntPtr.Zero) { DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels); return RESULT.OK; }
+                if (GCHandle.FromIntPtr(userData).Target is not BoundaryVoiceState bs) { DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels); return RESULT.OK; }
+                s = bs;
+            }
+            catch
+            {
+                // Pass the mix through: this unit is on the master bus, and silencing it silences the game.
+                unsafe
+                {
+                    if (inbuffer != IntPtr.Zero && outbuffer != IntPtr.Zero && inchannels == outchannels)
+                        new ReadOnlySpan<float>((void*)inbuffer, (int)length * inchannels)
+                            .CopyTo(new Span<float>((void*)outbuffer, (int)length * outchannels));
+                }
+                return RESULT.OK;
+            }
+    
+            if (outchannels == 0) outchannels = inchannels > 0 ? inchannels : 2;
+            int outCh = outchannels;
+            int inCh = inchannels > 0 ? inchannels : outCh;
+            int n = (int)length;
+    
+            // A managed DSP callback must not throw: an IndexOutOfRangeException here, unguarded, unwound
+            // into FMOD's mixer thread and killed the client. The fallback passes the mix through rather
+            // than silencing it, since everything in the game goes through this unit.
+            try
+            {
+                unsafe
+                {
+                    if (inbuffer == IntPtr.Zero || outbuffer == IntPtr.Zero) return RESULT.OK;
+                    var input = new ReadOnlySpan<float>((void*)inbuffer, n * inCh);
+                    var output = new Span<float>((void*)outbuffer, n * outCh);
+                    // A NaN this far would put the limiter's state out for good and silence the game: the
+                    // block is silence instead, and the line says something upstream is unguarded.
+                    if (!NonFinite.AllFinite(input))
+                    {
+                        output.Clear();
+                        NonFinite.Report(ref s.NonFiniteInputReported, "the mix arriving at the master bus");
+                        s.ResetAfterFault();
+                        return RESULT.OK;
+                    }
+                    Process(s, input, output, inCh, outCh);
+                    if (NonFinite.Scrub(output, ref s.NonFiniteReported, "the master bus's boundary stage")) s.ResetAfterFault();
+                }
+            }
+            catch (Exception ex)
+            {
+                unsafe
+                {
+                    if (outbuffer != IntPtr.Zero)
+                    {
+                        var output = new Span<float>((void*)outbuffer, n * outCh);
+                        if (inbuffer != IntPtr.Zero && inCh == outCh)
+                            new ReadOnlySpan<float>((void*)inbuffer, n * inCh).CopyTo(output);
+                        else output.Clear();
+                    }
+                }
+                // Recorded, not logged: a log line from the mixer freezes the client (see DspFault).
+                DspFault.Record("BoundaryProximity", ex);
             }
             return RESULT.OK;
         }
-
-        if (outchannels == 0) outchannels = inchannels > 0 ? inchannels : 2;
-        int outCh = outchannels;
-        int inCh = inchannels > 0 ? inchannels : outCh;
-        int n = (int)length;
-
-        // A managed DSP callback must not throw: an IndexOutOfRangeException here, unguarded, unwound
-        // into FMOD's mixer thread and killed the client. The fallback passes the mix through rather
-        // than silencing it, since everything in the game goes through this unit.
-        try
-        {
-            unsafe
-            {
-                if (inbuffer == IntPtr.Zero || outbuffer == IntPtr.Zero) return RESULT.OK;
-                var input = new ReadOnlySpan<float>((void*)inbuffer, n * inCh);
-                var output = new Span<float>((void*)outbuffer, n * outCh);
-                // A NaN this far would put the limiter's state out for good and silence the game: the
-                // block is silence instead, and the line says something upstream is unguarded.
-                if (!NonFinite.AllFinite(input))
-                {
-                    output.Clear();
-                    NonFinite.Report(ref s.NonFiniteInputReported, "the mix arriving at the master bus");
-                    s.ResetAfterFault();
-                    return RESULT.OK;
-                }
-                Process(s, input, output, inCh, outCh);
-                if (NonFinite.Scrub(output, ref s.NonFiniteReported, "the master bus's boundary stage")) s.ResetAfterFault();
-            }
-        }
-        catch (Exception ex)
-        {
-            unsafe
-            {
-                if (outbuffer != IntPtr.Zero)
-                {
-                    var output = new Span<float>((void*)outbuffer, n * outCh);
-                    if (inbuffer != IntPtr.Zero && inCh == outCh)
-                        new ReadOnlySpan<float>((void*)inbuffer, n * inCh).CopyTo(output);
-                    else output.Clear();
-                }
-            }
-            // Recorded, not logged: a log line from the mixer freezes the client (see DspFault).
-            DspFault.Record("BoundaryProximity", ex);
-        }
-        return RESULT.OK;
+        finally { MixerProfile.Stop(MixerProfile.Kind.Boundary, profiled); }
     }
 
 

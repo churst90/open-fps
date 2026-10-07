@@ -146,30 +146,35 @@ public static class EarProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            IntPtr userData = DspCallback.UserData(ref dsp_state);
-            if (userData == IntPtr.Zero || GCHandle.FromIntPtr(userData).Target is not EarVoiceState s
-                || inbuffer == IntPtr.Zero || outbuffer == IntPtr.Zero || inchannels <= 0 || inchannels != outchannels)
+            try
             {
-                DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels);
+                IntPtr userData = DspCallback.UserData(ref dsp_state);
+                if (userData == IntPtr.Zero || GCHandle.FromIntPtr(userData).Target is not EarVoiceState s
+                    || inbuffer == IntPtr.Zero || outbuffer == IntPtr.Zero || inchannels <= 0 || inchannels != outchannels)
+                {
+                    DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels);
+                    return RESULT.OK;
+                }
+                unsafe
+                {
+                    int n = (int)length;
+                    var input = new ReadOnlySpan<float>((void*)inbuffer, n * inchannels);
+                    var output = new Span<float>((void*)outbuffer, n * outchannels);
+                    s.Process(input, output, n, inchannels);
+                }
+                NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "ear stage", ref _nonFiniteOther);
                 return RESULT.OK;
             }
-            unsafe
+            catch (Exception ex)
             {
-                int n = (int)length;
-                var input = new ReadOnlySpan<float>((void*)inbuffer, n * inchannels);
-                var output = new Span<float>((void*)outbuffer, n * outchannels);
-                s.Process(input, output, n, inchannels);
+                DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels);
+                DspFault.Record("EarProcessor", ex);
+                return RESULT.OK;
             }
-            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "ear stage", ref _nonFiniteOther);
-            return RESULT.OK;
         }
-        catch (Exception ex)
-        {
-            DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels);
-            DspFault.Record("EarProcessor", ex);
-            return RESULT.OK;
-        }
+        finally { MixerProfile.Stop(MixerProfile.Kind.Ear, profiled); }
     }
 }

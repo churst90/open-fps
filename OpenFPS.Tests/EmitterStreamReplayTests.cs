@@ -277,7 +277,11 @@ internal sealed class Replay
         ["traffic_rain"] = TrafficInRain,
     };
 
-    public static List<string> Run(string scenario)
+    public static List<string> Run(string scenario) => RunScript(Scenarios[scenario]).Mixer.Lines;
+
+    /// <summary>A script of a test's own, run with everything pinned as the stored scenarios are; the
+    /// replay is handed back so the test can read what the mixer was told.</summary>
+    internal static Replay RunScript(Action<Replay> script)
     {
         AcousticRegistry.Initialize();
         // The statics the audio system reads, at the game's defaults whatever ran before, and put back after
@@ -306,8 +310,8 @@ internal sealed class Replay
             // A still day: the weather's wind is read on the wall clock (WindField.Now).
             using (WindField.Hold(WindWeather.Steady(0f, 0f, 0f)))
             using (AudioClock.UseForTest(() => r.Now))
-                Scenarios[scenario](r);
-            return r.Mixer.Lines;
+                script(r);
+            return r;
         }
         finally
         {
@@ -323,7 +327,7 @@ internal sealed class Replay
 
     /// <summary>One audio frame: the update, the acoustic worker's answers, then the facade's audio thread
     /// pumped by hand twice (a voice the budget plays is queued, then handed over).</summary>
-    private void Tick()
+    internal void Tick()
     {
         Frame++;
         Now += Dt;
@@ -367,7 +371,7 @@ internal sealed class Replay
         Move(id, at, velocity);
     }
 
-    private void Move(int id, Vector3 at, Vector3 velocity)
+    internal void Move(int id, Vector3 at, Vector3 velocity)
         => World.SyncState(new[] { new EntityState
         {
             EntityId = id,
@@ -375,12 +379,33 @@ internal sealed class Replay
             LinearVelocity = velocity,
         } });
 
+    /// <summary>One source of a train as the server places it (RailSystem): an NPC entity whose SoundId
+    /// names the train and the source.</summary>
+    internal void RailSource(int id, string soundId, float levelDb, Vector3 at, Vector3 velocity)
+    {
+        var def = new EntityDefinition
+        {
+            EntityId = id,
+            Type = EntityType.NPC,
+            Moves = true,
+            Transform = new Transform { Position = at, Rotation = Facing(velocity) },
+        };
+        def.SoundEmitter.IsSynth = true;
+        def.SoundEmitter.SoundId = soundId;
+        def.SoundEmitter.Mode = PlaybackMode.LoopOne;
+        def.SoundEmitter.Volume = 1f;
+        def.SoundEmitter.Range = Loudness.AudibleRange(levelDb);
+        def.SoundEmitter.MinDistance = 3f;
+        World.RegisterDefinition(def);
+        Move(id, at, velocity);
+    }
+
     /// <summary>Turned to face along its velocity (forward is -Z), or north when it stands.</summary>
     private static Quaternion Facing(Vector3 velocity)
         => velocity.LengthSquared() < 1e-6f ? Quaternion.Identity
          : Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.Atan2(-velocity.X, -velocity.Z));
 
-    private void Listener(Vector3 feet, Vector3 velocity, float yawDegrees)
+    internal void Listener(Vector3 feet, Vector3 velocity, float yawDegrees)
     {
         Player.Position = feet;
         Player.Velocity = velocity;
@@ -587,13 +612,17 @@ internal sealed class StreamMixer : IAudioProvider
     public void SetAcousticPath(int id, AcousticPathData p) => LogDelta("Path", id, p, _pathFields, whole: false);
     public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) => Log("Reverb", ms, enclosure, hf, lf);
     public void SetAirTemperature(float c) => Log("Air", c);
-    public float MixerLoad => 0f;
-    public int SpatialVoicesFree => 256;
+    /// <summary>What the mixer says its load is; a test of the budgets sets it.</summary>
+    public float Load;
+    public float MixerLoad => Load;
+    public int Free = 256;
+    public int SpatialVoicesFree => Free;
     public void ReviveEngine(int id) => Log("ReviveEngine", id);
     public bool FadeOutEngine(int id) { Log("FadeEngine", id); return true; }
     public bool FadeOutVoice(int id) { Log("FadeVoice", id); return true; }
     public void CancelVoiceFade(int id) => Log("CancelFade", id);
     public void SignalTrain(string train, float[] warning, float bellSeconds, double secondsAgo) => Log("SignalTrain", train, warning, bellSeconds, secondsAgo);
+    public void PlanTrainSlot(string preset, string train, int slot, TrainSlotPlan plan) => Log("PlanTrain", preset + "/" + train, slot, plan.Sources, plan.Weights);
     public void StopSound(int id) { Log("Stop", id); _live.Remove(id); _emitterFields.Remove(id); _pathFields.Remove(id); }
     public bool IsPlaying(int id) => _live.Contains(id);
     public Vector3 GetSoundPosition(int id) => _latest.TryGetValue(id, out var e) ? e.Position : Vector3.Zero;

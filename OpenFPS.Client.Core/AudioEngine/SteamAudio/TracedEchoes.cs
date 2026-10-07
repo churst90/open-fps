@@ -350,16 +350,26 @@ internal static class TracedEchoDsp
 
     private static RESULT CaptureRead(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        var r = CaptureReadCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
-        NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "traced echo's capture (the voice it rides on)", ref _nonFiniteCapture);
-        return r;
+        long profiled = MixerProfile.Start();
+        try
+        {
+            var r = CaptureReadCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "traced echo's capture (the voice it rides on)", ref _nonFiniteCapture);
+            return r;
+        }
+        finally { MixerProfile.Stop(MixerProfile.Kind.TracedEchoes, profiled); }
     }
 
     private static RESULT MixRead(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        var r = MixReadCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
-        NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "traced echo", ref _nonFiniteMix);
-        return r;
+        long profiled = MixerProfile.Start();
+        try
+        {
+            var r = MixReadCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "traced echo", ref _nonFiniteMix);
+            return r;
+        }
+        finally { MixerProfile.Stop(MixerProfile.Kind.TracedEchoes, profiled); }
     }
 
     private static unsafe RESULT CaptureReadCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)

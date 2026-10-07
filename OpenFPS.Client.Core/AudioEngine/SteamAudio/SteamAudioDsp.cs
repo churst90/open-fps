@@ -129,22 +129,27 @@ internal static class SteamAudioDsp
     internal static RESULT ProcessCallback(ref DSP_STATE dsp_state, uint length, ref DSP_BUFFER_ARRAY inbufferarray,
                                            ref DSP_BUFFER_ARRAY outbufferarray, bool inputsidle, DSP_PROCESS_OPERATION op)
     {
-        if (op == DSP_PROCESS_OPERATION.PROCESS_QUERY)
+        long profiled = MixerProfile.Start();
+        try
         {
-            DeclareOutput(ref outbufferarray);
-            return RESULT.OK;
+            if (op == DSP_PROCESS_OPERATION.PROCESS_QUERY)
+            {
+                DeclareOutput(ref outbufferarray);
+                return RESULT.OK;
+            }
+            int inchannels = inbufferarray.numchannels, outchannels = OutputChannels;
+            IntPtr inbuffer = inbufferarray.buffer, outbuffer = outbufferarray.buffer;
+            if (outbuffer == IntPtr.Zero) return RESULT.OK;
+            if (inbuffer == IntPtr.Zero || inchannels <= 0)
+            {
+                DspCallback.Silence(outbuffer, length, outchannels);
+                return RESULT.OK;
+            }
+            // Idle input is silence; the HRTF and the ground still run, so what they hold plays out.
+            if (inputsidle) unsafe { new Span<float>((void*)inbuffer, (int)length * inchannels).Clear(); }
+            return Render(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
         }
-        int inchannels = inbufferarray.numchannels, outchannels = OutputChannels;
-        IntPtr inbuffer = inbufferarray.buffer, outbuffer = outbufferarray.buffer;
-        if (outbuffer == IntPtr.Zero) return RESULT.OK;
-        if (inbuffer == IntPtr.Zero || inchannels <= 0)
-        {
-            DspCallback.Silence(outbuffer, length, outchannels);
-            return RESULT.OK;
-        }
-        // Idle input is silence; the HRTF and the ground still run, so what they hold plays out.
-        if (inputsidle) unsafe { new Span<float>((void*)inbuffer, (int)length * inchannels).Clear(); }
-        return Render(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+        finally { MixerProfile.Stop(MixerProfile.Kind.Binaural, profiled); }
     }
 
     /// <summary>The query's answer: a stereo pair out, whatever comes in.</summary>

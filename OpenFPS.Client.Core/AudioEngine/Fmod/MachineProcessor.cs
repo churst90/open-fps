@@ -46,8 +46,13 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>Where the voice's own envelope is heading, 0 or 1. Game thread writes.</summary>
     public volatile float TargetEnvelope = 1f;
 
-    /// <summary>True once a fade-out has finished and the voice can be released.</summary>
+    /// <summary>True once a fade-out has been HEARD to its end and the voice can be released.</summary>
     public volatile bool FadedOut;
+
+    /// <summary>Where in the ring the fade-out reached silence, or -1: the voice is released once the mixer
+    /// has played that far. The fade is rendered up to 0.7 s before it is played, and released when it was
+    /// rendered, a voice was cut at full level.</summary>
+    private long _silentFrom = -1;
 
     /// <summary>Brings a fading voice back to full. Without it a source that loses and regains a slot
     /// stays silent for ever (see the engine's Revive).</summary>
@@ -55,6 +60,7 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
     {
         TargetEnvelope = 1f;
         FadedOut = false;
+        Volatile.Write(ref _silentFrom, -1);
     }
 
     /// <summary>The pressure that maps to full scale, pascals: the declared level plus the one shared
@@ -99,6 +105,21 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
 
     protected const float WarmupSeconds = 0.08f;
     private bool _warmed;
+    private int _warmLeft = -1;
+
+    /// <summary>How many of <paramref name="want"/> samples the model can make now without waiting on
+    /// anything. All of them, unless it renders from something rendered elsewhere (TrainSlotState).</summary>
+    protected virtual int Ready(int want) => want;
+
+    /// <summary>Samples rendered and not yet played: how long the voice can go on without rendering.</summary>
+    protected long Buffered => Volatile.Read(ref _written) - Volatile.Read(ref _played);
+
+    /// <summary>How far ahead the voice is rendering now, samples.</summary>
+    protected int LeadSamples => (int)(_leadSeconds * SampleRate);
+
+    /// <summary>The ring skipped <paramref name="samples"/> it never rendered (the voice starved and the
+    /// mixer ran on): a model keeping its own timeline moves it on as far.</summary>
+    protected virtual void Skipped(long samples) { }
 
     private float _listenerX, _listenerY, _listenerZ;
     private volatile bool _listenerKnown;
@@ -142,19 +163,38 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
         {
             if (!_warmed)
             {
+                // A model that renders from something else (a train's voice reading its lanes) may not
+                // have all of it yet: the warm-up finishes on a later pass.
+                if (_warmLeft < 0) _warmLeft = (int)(WarmupSeconds * SampleRate);
+                while (_warmLeft > 0)
+                {
+                    int n = Ready(Math.Min(512, _warmLeft));
+                    if (n <= 0) return;
+                    Synthesize(n);
+                    _warmLeft -= n;
+                }
                 _warmed = true;
-                int warm = (int)(WarmupSeconds * SampleRate);
-                while (warm > 0) { int n = Math.Min(512, warm); Synthesize(n); warm -= n; }
                 Volatile.Write(ref _played, Volatile.Read(ref _written));
             }
 
             long played = Volatile.Read(ref _played);
-            if (played > Volatile.Read(ref _written)) Volatile.Write(ref _written, played);
+            long written = Volatile.Read(ref _written);
+            if (played > written)
+            {
+                Skipped(played - written);
+                Volatile.Write(ref _written, played);
+                // Starved while fading: nothing of it is left to play.
+                if (TargetEnvelope <= 0f) FadedOut = true;
+            }
 
             int room = _ring.Length - 8;
             int want = Math.Min((int)(_leadSeconds * SampleRate), room);
             while (Volatile.Read(ref _written) - Volatile.Read(ref _played) < want)
-                Synthesize(Math.Min(512, want));
+            {
+                int n = Ready(Math.Min(512, want));
+                if (n <= 0) break;
+                Synthesize(n);
+            }
 
             if (!_primed && Volatile.Read(ref _written) - Volatile.Read(ref _played) >= want / 2) _primed = true;
 
@@ -184,6 +224,8 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
         }
         // Wall clock, always: the whole block is gone whether or not it had audio in it.
         Volatile.Write(ref _played, at + mono.Length);
+        long silent = Volatile.Read(ref _silentFrom);
+        if (silent >= 0 && at + mono.Length >= silent) FadedOut = true;
         if (take == mono.Length) return;
 
         int ramp = Math.Min(mono.Length - take, 64);
@@ -206,10 +248,13 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
     {
         long at = Volatile.Read(ref _played);
         long avail = Volatile.Read(ref _written) - at;
-        if (avail < mono.Length) Synthesize((int)(mono.Length - avail));
+        // Asked first, so a model that renders from something else gets it rendered (TrainSlotState, Offline).
+        if (avail < mono.Length) Synthesize(Math.Max(0, Ready((int)(mono.Length - avail))));
         int mask = _ring.Length - 1;
         for (int i = 0; i < mono.Length; i++) mono[i] = _ring[(int)((at + i) & mask)];
         Volatile.Write(ref _played, at + mono.Length);
+        long silent = Volatile.Read(ref _silentFrom);
+        if (silent >= 0 && at + mono.Length >= silent) FadedOut = true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -238,7 +283,12 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
             w++;
         }
         Volatile.Write(ref _written, w);
-        if (envTarget <= 0f && _envelope <= 1e-4f) FadedOut = true;
+        if (envTarget <= 0f && _envelope <= 1e-4f)
+        {
+            // Released once the mixer has played this far (Consume), not now.
+            if (Volatile.Read(ref _silentFrom) < 0) Volatile.Write(ref _silentFrom, w);
+        }
+        else if (Volatile.Read(ref _silentFrom) >= 0) Volatile.Write(ref _silentFrom, -1);
     }
 }
 
@@ -645,23 +695,28 @@ public static class MachineProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
-            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "machine voice", ref _nonFiniteOther);
-            return r;
-        }
-        catch (Exception ex)
-        {
-            DspFault.Record("MachineProcessor", ex);
-            unsafe
+            try
             {
-                if (outchannels == 0) outchannels = 1;
-                float* outBuf = (float*)outbuffer;
-                for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+                var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+                NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "machine voice", ref _nonFiniteOther);
+                return r;
             }
-            return RESULT.OK;
+            catch (Exception ex)
+            {
+                DspFault.Record("MachineProcessor", ex);
+                unsafe
+                {
+                    if (outchannels == 0) outchannels = 1;
+                    float* outBuf = (float*)outbuffer;
+                    for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+                }
+                return RESULT.OK;
+            }
         }
+        finally { MixerProfile.Stop(MixerProfile.Kind.Physical, profiled); }
     }
 
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
