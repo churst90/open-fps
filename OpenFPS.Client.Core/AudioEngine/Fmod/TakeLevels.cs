@@ -3,20 +3,12 @@ using System.Collections.Concurrent;
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// Every take in a bank at the same level: the one its bank's median take has.
-///
-/// A recorded bank is many takes of one thing — forty-eight footsteps on carpet — played one at
-/// random each time. The takes were not recorded at one level: measured, the carpet steps' peaks
-/// spread over 22 dB, a third of them 14-22 dB under the loudest, and the concrete, tile and wood
-/// banks the same. On a soft surface in a flat with an air conditioner in the window and traffic
-/// outside, the quiet third were simply not there: "my foot steps seem to be dropping out ... I only
-/// hear foot steps on few key presses". How loud one carpet step is against another is the
-/// microphone and the session, not the floor; how loud carpet is against wood is the floor, and that
-/// is kept, because each bank is brought to ITS OWN median.
-///
-/// The level of a take is its loudest 20 ms — a step is an impact, and its tail and the room tone
-/// either side of it are not what the ear judges it by. Only folders of three or more takes are
-/// banks; a lone file is played as it is.
+/// Every take in a bank (a folder of three or more) brought to its bank's median level; a lone file
+/// plays as it is. Measured, the carpet steps' peaks spread over 22 dB, a third 14-22 dB under the
+/// loudest (concrete, tile and wood the same), and the quiet third vanished under an air conditioner
+/// (Cody: "my foot steps seem to be dropping out"). Take against take is the microphone; bank against
+/// bank is the floor, kept because each bank goes to its own median. A take's level is its loudest
+/// 20 ms: a step is judged by its impact, not its tail.
 /// </summary>
 internal static class TakeLevels
 {

@@ -3,25 +3,10 @@ using Serilog;
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// Renders every live engine AHEAD of the mixer, across as many cores as the machine has.
-///
-/// This is the change that removes the ceiling on how many vehicles a map may carry. A physical
-/// engine is a serial integration — each sample depends on the one before it — so a single engine
-/// cannot be split across threads. But thirty engines are thirty INDEPENDENT integrations, and
-/// running them one after another inside the FMOD callback, which is what happened before, meant a
-/// twenty-four core machine did all of it on one core with the mixer's deadline running down. Every
-/// symptom that followed — the rationing, the shedding, the borrowed voices, cars dropping out of
-/// the world — traces back to that one thread.
-///
-/// The work is the same; only where it happens changes. Each engine fills its own ring buffer from
-/// a worker, and the mixer callback copies out of it. The ring already existed, because echoes read
-/// back through it; this makes the engine's own voice read through it too.
-///
-/// Why not the GPU: the sample axis is a recurrence and so cannot be parallelised at all, the valve
-/// solver's iteration count is data-dependent (which a lockstep warp pays for at its worst lane),
-/// and the GPU is not real-time scheduled — a graphics hitch would become an audio dropout. Thirty
-/// independent lanes is a poor fit for a device that wants thousands and an excellent fit for a CPU
-/// that has twenty-four.
+/// Renders every live engine ahead of the mixer, across cores. One engine is a serial integration
+/// and cannot be split, but thirty engines are thirty independent ones; each fills its own ring from
+/// a worker and the mixer callback only copies out of it. Rendered inside the FMOD callback, all of
+/// them ran on one core against the mixer's deadline. See docs/CLIENT_NOTES.md, "Engine render pool".
 /// </summary>
 public sealed class EngineRenderPool : IDisposable
 {
@@ -31,15 +16,10 @@ public sealed class EngineRenderPool : IDisposable
     private volatile bool _running = true;
 
     /// <summary>
-    /// The voices to render, republished as a whole array rather than mutated in place.
-    ///
-    /// Workers only ever read the reference, so there is no lock on the hot path and no list for a
-    /// worker to walk while it is being changed underneath. Each worker takes every Nth entry; if the
-    /// array is swapped between one worker reading it and another, the worst case is that two workers
-    /// reach for the same voice, and the second finds the producer already claimed and moves on.
-    ///
-    /// The list arrives sorted NEAREST FIRST, and the stride preserves that: when the machine cannot
-    /// fill every ring in time, the cars that get filled are the ones you can hear.
+    /// The voices to render, republished as a whole array, never mutated: workers read the reference
+    /// without a lock. If it is swapped between two workers' reads, two may reach for one voice and the
+    /// second finds its producer already claimed. Sorted nearest first, so when the machine cannot fill
+    /// every ring in time the cars it fills are the ones you can hear.
     /// </summary>
     private volatile IRenderedVoice[] _voices = Array.Empty<IRenderedVoice>();
 
@@ -47,20 +27,11 @@ public sealed class EngineRenderPool : IDisposable
     {
         _snapshot = snapshot;
 
-        // DEDICATED threads, not the shared thread pool, and this is the whole point of the class.
-        //
-        // The first version used Parallel.For, which runs on the .NET thread pool — the same pool
-        // that, at the exact moment a map loads, is saturated by the acoustic bake, the Steam Audio
-        // scene build and several dozen sample decodes. The pool grows by a thread or two a second
-        // when it is starved, so the engine producers got no time precisely when thirty of them had
-        // just been created, fell behind, and dumped the whole load back onto the mixer callback.
-        // Heard as the audio cutting out and going choppy for the first seconds in the map.
-        //
-        // A real-time producer cannot share a scheduler with background work. These threads exist for
-        // the life of the engine, are owned here, and nothing else can take them.
-        // Half the machine, up to twelve. A quarter capped at six was the size when an engine cost
-        // a twentieth of a core; with forty on the city at 0.1-0.23 each (--tap-balance cost) six
-        // threads were short and the nearest cars starved.
+        // Dedicated threads, never the .NET thread pool: at a map load the pool is saturated by the
+        // acoustic bake, the scene build and the sample decodes, and on Parallel.For the producers
+        // starved exactly then (audio choppy for the first seconds in a map).
+        // Half the machine, up to twelve: with forty engines on the city at 0.1-0.23 of a core each
+        // (--tap-balance cost), six threads were short and the nearest cars starved.
         int count = Math.Clamp(Environment.ProcessorCount / 2, 2, 12);
         _workers = new Thread[count];
         for (int i = 0; i < count; i++)
@@ -69,13 +40,9 @@ public sealed class EngineRenderPool : IDisposable
             _workers[i] = new Thread(() => Work(id, count))
             {
                 IsBackground = true,
-                // Windows only, and worth almost nothing even there. CoreCLR on Unix ACCEPTS this
-                // and silently does not apply it: raising a thread's priority needs CAP_SYS_NICE,
-                // which a game does not have, so on Linux the render workers, the acoustic bake, the
-                // sample decodes, the JIT and FMOD's own mixer thread all run at the same priority.
-                // What DOES work unprivileged is lowering the loader's threads, which is done where
-                // that work is started — not here. Nothing about this pool's behaviour should ever
-                // be explained by this line.
+                // Windows only. On Linux raising a priority needs CAP_SYS_NICE and CoreCLR ignores it
+                // silently; what works there is lowering the loader's threads, done where they start.
+                // Nothing about this pool's behaviour is explained by this line (docs/AUDIO_LOAD_DROPOUTS.md).
                 Priority = ThreadPriority.Highest,
                 Name = $"EngineRender{id}",
             };

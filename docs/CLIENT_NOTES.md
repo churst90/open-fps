@@ -222,3 +222,49 @@ where it came from. A 0.9 m wall gives a few centimetres of detour, loses about 
 the car keeps its own direction. A grandstand gives a detour the barrier ceiling flattens to 24 dB down,
 and any real opening beats it. Nothing in it knows what a wall or a doorway is.
 (AsyncAcousticWorker.RunSteamAudio.)
+
+## Engine render pool
+
+EngineRenderPool removed the ceiling on how many vehicles a map may carry. A physical engine is a
+serial integration (each sample depends on the one before), so one engine cannot be split across
+threads; but thirty engines are thirty independent integrations. Run one after another inside the FMOD
+callback, as they first were, a twenty-four core machine did all of it on one core with the mixer's
+deadline running down, and every symptom that followed (the rationing, the shedding, the borrowed
+voices, cars dropping out of the world) traced back to that one thread. The work is the same; only
+where it happens changed: each engine fills its own ring from a worker and the mixer copies out of it.
+The ring already existed because echoes read back through it.
+
+Why not the GPU: the sample axis is a recurrence and cannot be parallelised, the valve solver's
+iteration count is data-dependent (a lockstep warp pays for its worst lane), and the GPU is not
+real-time scheduled, so a graphics hitch would become an audio dropout. Thirty independent lanes are a
+poor fit for a device that wants thousands and a good fit for a CPU with twenty-four cores.
+
+The first version used Parallel.For on the .NET thread pool. At a map load that pool is saturated by
+the acoustic bake, the Steam Audio scene build and several dozen sample decodes, and it grows by a
+thread or two a second when starved; the producers got no time exactly when thirty had just been
+created, fell behind, and the load fell back onto the mixer callback. Heard as the audio cutting out
+and going choppy for the first seconds in a map. A real-time producer cannot share a scheduler with
+background work, so the pool owns dedicated threads for its life. A quarter of the machine capped at
+six was the size when an engine cost a twentieth of a core.
+
+## Why an echo is smeared
+
+A reflection read straight out of the source's ring is the source's own waveform, sample for sample,
+a few milliseconds late, and a signal added to a delayed copy of itself is a comb filter: evenly spaced
+notches that sweep as either end moves. That phasing makes a source sound inside out or like a narrow
+beam, and it is not what a wall does. A real wall hands the sound back from a patch a few metres across
+(the Fresnel zone), every part of it a slightly different distance away, and what faces the wall is not
+what faces you (the tailpipe points one way, the intake another). So the copy that comes back is the
+same sound but not the same waveform, and its notches, if any, fall at no regular spacing.
+
+EngineEchoState models this with EchoDiffuser, a short cascade of Schroeder all-passes: flat in level,
+so the echo is exactly as loud as the image-source method says, with a phase that wanders with
+frequency, spread over a time that grows with the roughness (about a millisecond for polished steel or
+glass, up to twenty or so for a brick facade or a crowd). The delays differ for every voice so no two
+walls smear alike. The arrival time, and so the direction and the slapback, are untouched. A borrowed
+voice (a distant car voiced from a near car's ring) is a different car, not an echo, and is not smeared.
+
+The borrowed voice keeps its own read cursor for a related reason: it is placed at its own position and
+pitched by its own Doppler, so reading relative to the source's play position (which moves at the
+source's Doppler) gave it two Dopplers belonging to two cars going different ways: a car at the redline
+that sounded like it was cruising, worse the more of the field was borrowing.
