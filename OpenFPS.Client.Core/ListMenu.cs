@@ -4,8 +4,10 @@ using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Core;
 
-/// <summary>One thing on a list: what it says, and what choosing it does — act, or open another list.</summary>
-public sealed record MenuItem(string Label, Action? Choose = null, Func<ListMenu>? Opens = null);
+/// <summary>One thing on a list: what it says, and what choosing it does — act, or open another list.
+/// An action that <paramref name="Stays"/> leaves the lists open (a nudge, a step, a request whose
+/// answer will open on top).</summary>
+public sealed record MenuItem(string Label, Action? Choose = null, Func<ListMenu>? Opens = null, bool Stays = false);
 
 /// <summary>A titled list of things you can choose.</summary>
 public sealed class ListMenu
@@ -13,6 +15,8 @@ public sealed class ListMenu
     public string Title { get; }
     public IReadOnlyList<MenuItem> Items { get; }
     public int At { get; set; }
+    /// <summary>What a list is, for one sent again to replace itself (the world editor's menu path).</summary>
+    public string Tag { get; init; } = "";
 
     public ListMenu(string title, IReadOnlyList<MenuItem> items)
     {
@@ -50,6 +54,28 @@ public sealed class MenuStack
     {
         _open.Clear();
         Push(menu);
+    }
+
+    /// <summary>Opens a list on top of the open ones, so Escape comes back to them; or as the only one
+    /// if none is open. For a list that arrives in answer to a choice (the world editor's menus).</summary>
+    public void Open(ListMenu menu)
+    {
+        if (_open.Count == 0) Show(menu);
+        else Push(menu);
+    }
+
+    /// <summary>
+    /// A new copy of the list on top, put in its place without a word: a value in a label is current
+    /// after it changed, and the cursor stays where it was. Only when the list on top has the same
+    /// <see cref="ListMenu.Tag"/>; false (and nothing changed) otherwise.
+    /// </summary>
+    public bool Replace(ListMenu menu)
+    {
+        if (_open.Count == 0 || menu.Tag.Length == 0 || _open.Peek().Tag != menu.Tag) return false;
+        int at = _open.Pop().At;
+        menu.At = menu.Items.Count == 0 ? 0 : Math.Clamp(at, 0, menu.Items.Count - 1);
+        _open.Push(menu);
+        return true;
     }
 
     private void Push(ListMenu menu)
@@ -132,6 +158,12 @@ public sealed class MenuStack
         if (menu.Items.Count == 0) return;
         var item = menu.Items[menu.At];
         if (item.Opens != null) { Push(item.Opens()); return; }
+        if (item.Stays)
+        {
+            _ui?.Play(UiCue.MenuSelect);
+            item.Choose?.Invoke();
+            return;
+        }
         _open.Clear();
         _ui?.Play(UiCue.MenuSelect);
         item.Choose?.Invoke();

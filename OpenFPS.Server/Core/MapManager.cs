@@ -176,12 +176,32 @@ public class MapManager
     /// test rig that does not keep them; the access then lives in memory only.</summary>
     public MapAccessRepository? Access { get; set; }
 
+    /// <summary>The world editor's edits, one overlay file per map, laid over each map's own data as it
+    /// loads (docs/WORLD_EDITOR.md section 7). Null in a test rig that keeps none.</summary>
+    public Editor.MapOverlayStore? Overlays { get; set; }
+
+    /// <summary>
+    /// Each map's authored entity ids (the EntityId in the map file, or the one its overlay gave) to the
+    /// runtime entity made from it. The world editor names things by the authored id, which is the same
+    /// every load; the runtime id is not.
+    /// </summary>
+    private readonly Dictionary<string, Dictionary<int, Entity>> _authored = new();
+
+    /// <summary>The authored ids of a map's things, and the entities made from them (the editor's index).</summary>
+    public Dictionary<int, Entity> AuthoredEntities(string mapId)
+    {
+        if (!_authored.TryGetValue(mapId, out var map)) _authored[mapId] = map = new Dictionary<int, Entity>();
+        return map;
+    }
+
     public void Initialize()
     {
         foreach (var m in _mapRepo.LoadAll())
         {
             Access?.ApplyTo(m);
+            Overlays?.ApplyBefore(m);
             CreateMapInstance(m);
+            Overlays?.ApplyAfter(this, m.Id);
         }
 
         // After the maps are in, not before: asking for one that does not exist has to be a named
@@ -420,6 +440,7 @@ public class MapManager
         Log.Information("MapManager: Loaded map '{Id}' with {Count} entities. Void Plane (MinimumY): {MinY}", m.Id, m.Entities.Count, m.MinimumY);
         
         _maps[m.Id] = (world, m.Size, grid, lookup, m);
+        _authored[m.Id] = new Dictionary<int, Entity>(authored);
         if (layers != null)
         {
             var tiles = MapTiles.Build(world, m.TileMetres, m.MinBound, m.MaxBound, layers);
@@ -692,6 +713,20 @@ public class MapManager
     public Entity SpawnPrefab(string mapId, string prefabId, Vector3 position)
         => SpawnEntity(mapId, w => _prefabRepo.Spawn(w, prefabId, position));
 
+    /// <summary>A prefab made into a live entity on a map, turned, scaled and named as a map file would
+    /// have it (the world editor's way in).</summary>
+    public Entity SpawnPrefab(string mapId, string prefabId, Vector3 position, Quaternion rotation, Vector3 scale, string? name)
+        => SpawnEntity(mapId, w =>
+        {
+            var e = _prefabRepo.Spawn(w, prefabId, position, rotation, scale, name);
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                if (w.Has<NameComponent>(e)) w.Get<NameComponent>(e).Name = name;
+                if (w.Has<IdentityComponent>(e)) w.Get<IdentityComponent>(e).Name = name;
+            }
+            return e;
+        });
+
     public Entity SpawnEntity(string mapId, Func<World, Entity> create)
     {
         if (!_maps.TryGetValue(mapId, out var data))
@@ -878,6 +913,11 @@ public class MapManager
     public bool IsOwner(string mapId, string username)
         => TryGetMapData(mapId, out var data) && !string.IsNullOrWhiteSpace(data.OwnerId)
         && data.OwnerId.Equals(username, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether the owner of a loaded map has made a username one of its editors (/map editor add).</summary>
+    public bool IsEditor(string mapId, string username)
+        => TryGetMapData(mapId, out var data)
+        && data.Editors.Any(n => n.Equals(username, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The loaded maps a username owns.</summary>
     public List<string> OwnedBy(string username)

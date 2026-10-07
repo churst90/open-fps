@@ -19,7 +19,12 @@ public partial class CommandHandler
     /// <summary>Whether this session may use a permission where it is: held (any map), or one everybody
     /// has on their own map and this is theirs.</summary>
     private bool MayHere(UserSession session, string permission)
-        => session.Can(permission) || (Permissions.OnOwnMap(permission) && OwnsHere(session));
+        => session.Can(permission) || (Permissions.OnOwnMap(permission) && OwnsHere(session))
+           || (Permissions.ForMapEditors(permission) && _maps.IsEditor(session.CurrentMapId, session.Username));
+
+    /// <summary>The world editor, made on first use (docs/WORLD_EDITOR.md).</summary>
+    public OpenFPS.Server.Editor.WorldEditor Editor => _editor ??= new OpenFPS.Server.Editor.WorldEditor(_maps, _server, _sessions);
+    private OpenFPS.Server.Editor.WorldEditor? _editor;
 
     /// <summary>
     /// Why somebody without grant-any may not grant or revoke this, or null if they may. A developer

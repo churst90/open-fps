@@ -169,6 +169,10 @@ public class MapData
     /// owner and the public flag, in map_access.json (MapAccessRepository) rather than in the map file,
     /// so changing who may come in never rewrites the map.</summary>
     [JsonIgnore] public List<string> Invited { get; set; } = new();
+
+    /// <summary>Who the owner has asked to edit the map with the world editor (/map editor add), by
+    /// username. Kept in map_access.json beside the invitations, never in the map file.</summary>
+    [JsonIgnore] public List<string> Editors { get; set; } = new();
 }
 
 /// <summary>
@@ -682,6 +686,12 @@ public class MapRepository
 
     private static readonly HashSet<string> EntityFields = new(
         typeof(EntityData).GetProperties().Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The folder the shipped maps are in, as resolved.</summary>
+    public string DirectoryPath => _directory;
+
+    /// <summary>Where the world editor keeps each map's edits (docs/WORLD_EDITOR.md section 7). Not read as maps.</summary>
+    public string OverlayDirectory => Path.Combine(_directory, "overlays");
 
     /// <summary>Where the maps players make are kept: a folder of their own beside the shipped maps.</summary>
     public string PlayerDirectory => Path.Combine(_directory, "players");

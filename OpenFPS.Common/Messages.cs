@@ -44,7 +44,72 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(37, typeof(InventoryList))]
 [MemoryPackUnion(38, typeof(TileStreamUpdate))]
 [MemoryPackUnion(39, typeof(EntityDefinitionPack))]
+// The world editor (docs/WORLD_EDITOR.md section 6).
+[MemoryPackUnion(40, typeof(EditorMenu))]
+[MemoryPackUnion(41, typeof(ModelUpdate))]
 public partial interface IMessage { }
+
+/// <summary>What choosing an item of the world editor's menu does.</summary>
+public enum EditorItemKind : byte
+{
+    /// <summary>Nothing: choosing it says it again.</summary>
+    Info = 0,
+    /// <summary>Opens another menu: <see cref="EditorMenuItem.Command"/> is its path, asked for with `edit menu PATH`.</summary>
+    Menu = 1,
+    /// <summary>Sends <see cref="EditorMenuItem.Command"/>, the text of an /edit command, as if typed.</summary>
+    Action = 2,
+    /// <summary>Puts <see cref="EditorMenuItem.Command"/> on the command line for the player to finish (a number).</summary>
+    Input = 3,
+}
+
+/// <summary>One item of a world editor menu.</summary>
+[MemoryPackable]
+public partial struct EditorMenuItem
+{
+    public string Label;
+    public EditorItemKind Kind;
+    public string Command;
+    /// <summary>The menu stays open after the action, for something done again and again (a nudge).</summary>
+    public bool Stay;
+
+    public EditorMenuItem()
+    {
+        Label = "";
+        Command = "";
+    }
+}
+
+/// <summary>
+/// A world editor menu, built by the server: the client only shows it (MenuStack), so it knows nothing
+/// about kinds of model or their fields, and a text player is sent the same menu as numbered lines.
+/// </summary>
+[MemoryPackable]
+public partial class EditorMenu : IMessage
+{
+    /// <summary>Which menu this is ("root", "selected", "model:small_machine:ac_condenser").</summary>
+    public string Path = "";
+    public string Title = "";
+    public EditorMenuItem[] Items = Array.Empty<EditorMenuItem>();
+    /// <summary>A new copy of a menu already open: it replaces that one where it stands, without being
+    /// said, so a value in a label is current after it was changed. Ignored if that menu is not open.</summary>
+    public bool Refresh;
+    public EditorMenu() { }
+}
+
+/// <summary>
+/// A model's version in use now, sent when it is changed in the world editor and to each player as
+/// they arrive on a map. The client puts it into its ModelLibrary and restarts that model's voices.
+/// </summary>
+[MemoryPackable]
+public partial class ModelUpdate : IMessage
+{
+    public string Kind = "";
+    public string Id = "";
+    public int Version;
+    /// <summary>The model as ModelLibrary.SpecJson writes it.</summary>
+    public string SpecJson = "";
+    public ModelUpdate() { }
+}
 
 public enum PlayerListScope
 {

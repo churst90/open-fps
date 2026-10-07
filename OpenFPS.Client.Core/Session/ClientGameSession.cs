@@ -345,6 +345,8 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(GameKey.F6, () => _network.Send(new MapListRequest { Scope = MapListScope.Server }));
         _bindings.Bind(GameKey.F6, KeyModifiers.Shift, () => _network.Send(new MapListRequest { Scope = MapListScope.Mine }));
         _bindings.Bind(GameKey.F8, () => _network.Send(new FriendListRequest()));
+        // The world editor (docs/WORLD_EDITOR.md): the server says whether you may, and builds the menu.
+        _bindings.Bind(GameKey.F12, OpenWorldEditor);
 
         // Chat scrollback: brackets step through messages, shift-brackets through buffers.
         _bindings.Bind(GameKey.BracketLeft, () => CycleChat(-1));
@@ -441,7 +443,7 @@ public sealed partial class ClientGameSession : IDisposable
         "R: with a gun, reload; in a vehicle, the window; otherwise put what you hold on your back.",
         "Scope, on the keypad with Num Lock on: star raises it, 8 2 4 6 aim, 5 what is on the crosshair, 7 and 9 the targets in view,",
         "plus and minus zoom, 1 and 3 the turret, period the rangefinder, 0 held to hold your breath, slash or Enter to fire.",
-        "V voice, F5 players, F6 maps, F8 friends, brackets to read chat, slash for the command console.",
+        "V voice, F5 players, F6 maps, F8 friends, F12 the world editor, brackets to read chat, slash for the command console.",
         "Escape for the game menu: keep playing, main menu, or quit.");
 
     /// <summary>Rebinds a key. Exposed so a head (or a future settings screen) can re-map without
@@ -542,7 +544,7 @@ public sealed partial class ClientGameSession : IDisposable
         foreach (var key in justPressed)
         {
             if (calibrating) { _listening.HandleKey(key, _shiftHeldThisStep, _simTime); continue; }
-            if (menuOpen && key is not (GameKey.F5 or GameKey.F6 or GameKey.F8)) { _menus.HandleKey(key); continue; }
+            if (menuOpen && key is not (GameKey.F5 or GameKey.F6 or GameKey.F8 or GameKey.F12)) { _menus.HandleKey(key); continue; }
             _bindings.Execute(context, key, modifiers);
         }
         _listening.Tick(_simTime);
@@ -1133,6 +1135,14 @@ public sealed partial class ClientGameSession : IDisposable
 
             case MapListResponse mList:
                 _menus.Show(MapsMenu(mList));
+                break;
+
+            case EditorMenu editorMenu:
+                ShowEditorMenu(editorMenu);
+                break;
+
+            case ModelUpdate model:
+                ApplyModelUpdate(model);
                 break;
 
             case TextEvent tEvent:
