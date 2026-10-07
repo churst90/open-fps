@@ -137,6 +137,9 @@ public class WallTransmissionTests
         var (l, m, h) = WallTransmission.BandGains("Plaster", StoreyWall, stud);
         Assert.True(Db(h) - Db(l) > 20f, $"stud wall: low {Db(l):F1} high {Db(h):F1}");
         Assert.InRange(Db(l), 10f, 30f);
+        // The mid band (400-3150 Hz) between the published 500 and 2000 Hz figures, with the 4 dB under
+        // that the brick check allows; 41.4 dB measured.
+        Assert.InRange(Db(m), 32f, 45f);
         // And it is a far lighter barrier at the bottom than the solid 280 kg/m² slab the same box was.
         var (sl, _, _) = WallTransmission.BandGains("Plaster", StoreyWall, WallBuild.Solid);
         Assert.True(Db(sl) - Db(l) > 8f, $"solid {Db(sl):F1} against studs {Db(l):F1}");
