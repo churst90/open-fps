@@ -136,7 +136,7 @@ public static class KnobDoor
 
     /// <summary>
     /// The level the server declares, dB at a metre. A world sound's level is its buffer's full scale at a
-    /// metre (<see cref="Speech.LevelDb"/>, <see cref="CarWindow.LevelDb"/>) and <see cref="RenderKey"/> brings
+    /// metre (<see cref="Speech.LevelDb"/>, <see cref="CarWindow.LevelDb"/>) and <see cref="RenderKey(string, int, out float)"/> brings
     /// a render's peak to full scale, so a door declares its render's peak: the median over the four characters
     /// at 1.1 and 1.4 m leaves (AudioLab --knob-renders, 2026-10-04, round 4). The client puts each render's own
     /// peak in its place (WorldAudioPlayer).
