@@ -190,4 +190,129 @@ public partial class CommandHandler
         if (!MovementSystem.CheckCollision(world, grid, feet, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight)) return feet;
         return FreeSpotNear(world, grid, feet, Quaternion.Identity, 1.5f);
     }
+
+    private void HandleMove(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        // /move NAME: go to a player. Staff's on any map; on your own map /move is for coordinates.
+        if (args.Length == 1)
+        {
+            if (!session.Can("move")) { DenyCommand(reply); return; }
+            if (OnlineSession(args[0]) is not { } other) { Say(reply, $"{args[0]} is not online."); return; }
+            if (other == session) { Say(reply, "You are already where you are."); return; }
+            PlaceBeside(session, other, session, reply);
+            return;
+        }
+        // /move NAME x y z, /move NAME to OTHER: move somebody else (administrators).
+        if (args.Length >= 2 && !float.TryParse(args[0], out _))
+        {
+            if (!session.Can(Permissions.MovePlayer)) { DenyCommand(reply); return; }
+            if (OnlineSession(args[0]) is not { } moved) { Say(reply, $"{args[0]} is not online."); return; }
+            if (args.Length >= 3 && args[1].Equals("to", StringComparison.OrdinalIgnoreCase))
+            {
+                if (OnlineSession(args[2]) is not { } beside) { Say(reply, $"{args[2]} is not online."); return; }
+                PlaceBeside(moved, beside, session, reply);
+                return;
+            }
+            if (args.Length < 4 || !float.TryParse(args[1], out float mx) || !float.TryParse(args[2], out float my) || !float.TryParse(args[3], out float mz))
+            { Say(reply, "Usage: /move NAME x y z, or /move NAME to OTHER."); return; }
+            if (!_maps.TryGetMap(moved.CurrentMapId, out var mworld, out _, out var mgrid, out _)
+                || moved.Entity == Entity.Null || !mworld.IsAlive(moved.Entity))
+            { Say(reply, $"{moved.Username} is not in the world just now."); return; }
+            Vector3 to = PlayerCoordinates.ToWorld(mx, my, mz);
+            if (OpenFPS.Server.Systems.MovementSystem.CheckCollision(mworld, mgrid, to, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight))
+            { Say(reply, "Cannot move them there: Area is solid."); return; }
+            Teleport(moved, mworld, to);
+            if (moved != session) _server.SendToSession(moved, new TextEvent { Text = $"{session.Username} moved you to {PlayerCoordinates.Format(to)}." });
+            Say(reply, $"Moved {moved.Username} to {PlayerCoordinates.Format(to)}.");
+            return;
+        }
+        if (args.Length < 3)
+        {
+            Say(reply, "Usage: /move x y z (x east, y north, z height), or /move NAME to go to a player.");
+            return;
+        }
+
+        if (!float.TryParse(args[0], out float x) || !float.TryParse(args[1], out float y) || !float.TryParse(args[2], out float z))
+        {
+            Say(reply, "Usage: /move x y z — x east, y north, z height");
+            return;
+        }
+
+        if (!TryGetBody(session, reply, out var world, out var grid, out _)) return;
+
+        // In the player's order — x east, y north, z height — which is the order C reads out.
+        Vector3 targetPos = PlayerCoordinates.ToWorld(x, y, z);
+
+        // COLLISION AWARE TELEPORT (Cylinder-based)
+        if (OpenFPS.Server.Systems.MovementSystem.CheckCollision(world, grid, targetPos, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight))
+        {
+            Say(reply, "Cannot move there: Area is solid.");
+            return;
+        }
+
+        // Out of whatever you were sitting in first. The seat owns a passenger's position and puts
+        // them back in it every tick, so a teleport from a seat moved you for one tick and no further.
+        if (world.Has<OccupantComponent>(session.Entity)) CompositeService.Disembark(world, session.Entity);
+
+        ref var t = ref world.Get<Transform>(session.Entity);
+        t.Position = targetPos;
+        t.IsDirty = true;
+
+        // Force client reset
+        reply(new PlayerSpawned { EntityId = session.Entity.Id, SpawnTransform = t });
+        Say(reply, $"Moved to {PlayerCoordinates.Format(targetPos)}");
+    }
+
+    /// <summary>
+    /// Puts <paramref name="who"/> beside <paramref name="target"/>: a clear spot about a metre from them,
+    /// on their map (moving maps first if need be). <paramref name="by"/> is who asked; somebody moved by
+    /// someone else is told so.
+    /// </summary>
+    private void PlaceBeside(UserSession who, UserSession target, UserSession by, Action<IMessage> reply)
+    {
+        if (!who.CurrentMapId.Equals(target.CurrentMapId, StringComparison.OrdinalIgnoreCase))
+        {
+            // Going to somebody yourself is going to their map, which has to be one you may enter.
+            // Being brought or moved by staff is theirs to decide.
+            if (who == by && !DiscoveryCanEnter(who, target.CurrentMapId))
+            { Say(reply, $"{target.Username} is on a map you cannot enter."); return; }
+            _server.MoveToMap(who, target.CurrentMapId);
+            // MoveToMap is queued; the placement follows it in the same queue.
+            _server.EnqueueCommand(() => PlaceBeside(who, target, by, reply));
+            return;
+        }
+        if (!_maps.TryGetMap(target.CurrentMapId, out var world, out _, out var grid, out _)
+            || target.Entity == Entity.Null || !world.IsAlive(target.Entity)
+            || who.Entity == Entity.Null || !world.IsAlive(who.Entity))
+        { Say(reply, "They are not in the world just now."); return; }
+        var t = world.Get<Transform>(target.Entity);
+        Vector3 forward = Vector3.Transform(Vector3.UnitZ, t.Rotation);
+        forward.Y = 0f;
+        forward = forward.LengthSquared() > 1e-6f ? Vector3.Normalize(forward) : Vector3.UnitZ;
+        Vector3? spot = null;
+        for (int k = 0; k < 8 && spot == null; k++)
+        {
+            var dir = Vector3.Transform(forward, Quaternion.CreateFromAxisAngle(Vector3.UnitY, k * MathF.PI / 4f));
+            var p = t.Position + dir * 1.2f;
+            if (!OpenFPS.Server.Systems.MovementSystem.CheckCollision(world, grid, p, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight))
+                spot = p;
+        }
+        if (spot == null) { Say(reply, $"There is no room beside {target.Username}."); return; }
+        Teleport(who, world, spot.Value);
+        if (who != by) _server.SendToSession(who, new TextEvent { Text = $"{by.Username} moved you beside {target.Username}." });
+        Say(reply, who == by ? $"You are beside {target.Username}." : $"{who.Username} is now beside {target.Username}.");
+    }
+
+    private bool DiscoveryCanEnter(UserSession who, string mapId) => OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, mapId, who);
+
+    /// <summary>Moves a session's body to a point on its map: out of any seat first, and the client told
+    /// to start from there.</summary>
+    private void Teleport(UserSession who, World world, Vector3 at)
+    {
+        if (world.Has<OccupantComponent>(who.Entity)) CompositeService.Disembark(world, who.Entity);
+        ref var tr = ref world.Get<Transform>(who.Entity);
+        tr.Position = at;
+        tr.IsDirty = true;
+        _server.SendToSession(who, new PlayerSpawned { EntityId = who.Entity.Id, SpawnTransform = tr });
+    }
 }

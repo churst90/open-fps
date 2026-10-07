@@ -1,3 +1,4 @@
+using Arch.Core;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Services;
 
@@ -194,5 +195,35 @@ public partial class CommandHandler
             return false;
         }
         return true;
+    }
+
+    /// <summary>/join MAP — go to another loaded map, if it is public, yours, or you are staff.</summary>
+    private void HandleJoin(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var enterable = _maps.LoadedMapIds.Where(id => OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, id, session))
+                                          .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).Select(_maps.DisplayName).ToList();
+        if (args.Length < 1) { Say(reply, $"Usage: /join [map]. Maps: {string.Join(", ", enterable)}."); return; }
+
+        // A map is joined by its id or by the name it is listed under, which may be several words
+        // ("/join magnolia tx").
+        string said = string.Join(" ", args);
+        string? mapId = _maps.ResolveMapId(said) ?? _maps.ResolveMapId(args[0]);
+        if (mapId == null)
+        {
+            Say(reply, $"There is no map called {said}. Maps: {string.Join(", ", enterable)}.");
+            return;
+        }
+        string named = _maps.DisplayName(mapId);
+        if (!OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, mapId, session))
+        {
+            Say(reply, $"{named} is private.");
+            return;
+        }
+        if (mapId.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase) && session.Entity != Entity.Null)
+        {
+            Say(reply, $"You are already on {named}.");
+            return;
+        }
+        _server.MoveToMap(session, mapId, reply);
     }
 }

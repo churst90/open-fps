@@ -322,4 +322,41 @@ public partial class CommandHandler
             }
         return true;
     }
+
+    private void HandleSpawnShape(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (args.Length < 5)
+        {
+            Say(reply, SpawnUsage);
+            return;
+        }
+
+        if (!TryGetBody(session, reply, out var world, out _, out var playerPos)) return;
+
+        if (!Enum.TryParse<ColliderShape>(args[0], true, out var shape)) shape = ColliderShape.Box;
+        string material = args[1];
+        if (!float.TryParse(args[2], out float sx) || !float.TryParse(args[3], out float sy) || !float.TryParse(args[4], out float sz))
+        {
+            Say(reply, "Invalid sizes.");
+            return;
+        }
+
+        var rot = world.Get<Transform>(session.Entity).Rotation;
+        Vector3 forward = Vector3.Transform(new Vector3(0, 0, 1), rot);
+        Vector3 spawnPos = playerPos + (forward * 3.0f);
+
+        // Through the one spawn path: a bare world.Create leaves the object out of the map lookup and
+        // out of the spatial grid, so nothing could see it, hear it or walk into it.
+        var e = _maps.SpawnEntity(session.CurrentMapId, w => w.Create(
+            new Transform { Position = spawnPos, Rotation = Quaternion.Identity },
+            new ColliderComponent { Shape = shape, Size = new Vector3(sx, sy, sz), IsSolid = true },
+            new MaterialComponent { Material = material, Variant = "0" },
+            new IdentityComponent { Name = $"Custom {shape}" },
+            EntityType.StaticObject
+        ));
+
+        if (e == Entity.Null) { Say(reply, "Spawn failed: the map is not loaded."); return; }
+
+        Say(reply, $"Spawned {material} {shape} (entity {e.Id}) at {PlayerCoordinates.Format(spawnPos)}");
+    }
 }
