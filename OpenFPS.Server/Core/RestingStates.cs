@@ -25,27 +25,21 @@ public sealed class SentState
 }
 
 /// <summary>
-/// Leaves out of a client's tick the things that have not moved.
-///
-/// Everything that can move was sent to everyone every tick, moving or not. On the city that is about
-/// 480 states a tick per player, and two thirds of them are the same as the tick before: parked cars,
-/// people waiting at a crossing, a bus at its stop, the panels of every parked car. Sending a state that
-/// has not changed tells the client nothing it does not already hold, so it is now sent:
+/// Leaves out of a client's tick the things that have not moved. On the city about 480 states a tick go
+/// to each player, and two thirds are the same as the tick before (parked cars, people waiting at a
+/// crossing, a bus at its stop). A state is sent:
 /// <list type="bullet">
 /// <item>every tick it differs from the last one this client was sent, in anything the wire carries;</item>
-/// <item>on the <see cref="RepeatTicks"/> ticks after it stops changing, so that losing one packet (the
-/// stream is unreliable) cannot leave a car parked a few centimetres from where it stopped, or a person
-/// still walking. The client ends up holding the exact resting state three times over;</item>
+/// <item>on the <see cref="RepeatTicks"/> ticks after it stops changing, so that one lost packet (the
+/// stream is unreliable) cannot leave a car a few centimetres from where it stopped, or a person still
+/// walking;</item>
 /// <item>once every <see cref="KeepAliveTicks"/> (a second) while it rests, which heals anything worse;</item>
 /// <item>always when the client has just been told what the thing is, and always for the client's own
 /// body, which the client reconciles its prediction against every tick.</item>
 /// </list>
-/// The moment a resting thing moves it differs, so it goes that tick: nothing waits for a keep-alive to
-/// start moving. The client holds the last state it had for anything it is not sent
-/// (ClientWorldState.UpdateInterpolation).
-///
-/// The wheels follow the same rule on their own: a car moving at a steady speed has the same wheels
-/// tick after tick, and a state without wheels means "as before" to the client.
+/// A resting thing that moves goes that tick; the client holds the last state it had for anything it is
+/// not sent (ClientWorldState.UpdateInterpolation). The wheels follow the same rule on their own: a
+/// state without wheels means "as before" to the client.
 /// </summary>
 public static class RestingStates
 {

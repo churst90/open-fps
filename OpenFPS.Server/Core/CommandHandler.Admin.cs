@@ -6,14 +6,12 @@ using Serilog;
 
 namespace OpenFPS.Server.Core;
 
+/// <summary>
+/// Administration: connections, accounts, roles and permissions. These show remote addresses, which are
+/// personal data, and change other people's accounts.
+/// </summary>
 public partial class CommandHandler
 {
-    // ── Administration ──────────────────────────────────────────────────────────────────────────
-    //
-    // What the server knows about connections and accounts, for whoever runs it. Every one of these is
-    // Admin only. They show remote addresses, which are personal data, and change other people's
-    // accounts. A developer builds the world; an administrator runs the server.
-
     private static string When(DateTime? utc) => utc is { } t ? t.ToString("yyyy-MM-dd HH:mm") + " UTC" : "never";
 
     /// <summary>"3 h 5 min", "12 min", "40 s".</summary>
@@ -26,7 +24,7 @@ public partial class CommandHandler
         return $"{(int)span.TotalSeconds} s";
     }
 
-    /// <summary>/sessions — everybody connected, and the connections that have not logged in.</summary>
+    /// <summary>/sessions: everybody connected, and the connections that have not logged in.</summary>
     private void HandleSessions(Action<IMessage> reply)
     {
         var now = DateTime.UtcNow;
@@ -53,7 +51,7 @@ public partial class CommandHandler
 
     private static string Address(string address) => string.IsNullOrEmpty(address) ? "an unknown address" : address;
 
-    /// <summary>/user NAME — an account's record: role, dates, addresses, failures, lock.</summary>
+    /// <summary>/user NAME: an account's record: role, dates, addresses, failures, lock.</summary>
     private void HandleUser(string[] args, Action<IMessage> reply)
     {
         if (args.Length < 1) { Say(reply, "Usage: /user [name]"); return; }
@@ -84,7 +82,7 @@ public partial class CommandHandler
         Say(reply, $"{record.Username}, {RoleWord(record.Role)}. {created} {login}{failed}{lockText}{now}{realName}");
     }
 
-    /// <summary>/throttled — addresses over a limit now, and names locked now.</summary>
+    /// <summary>/throttled: addresses over a limit now, and names locked now.</summary>
     private void HandleThrottled(Action<IMessage> reply)
     {
         var auth = _server.Auth;
@@ -105,7 +103,7 @@ public partial class CommandHandler
             Say(reply, $"  {name}: locked for {Span(until - now)} more after {failures} failed logins.");
     }
 
-    /// <summary>/unlock NAME or /unlock ADDRESS — lifts a name's lock, or gives an address its limits back.</summary>
+    /// <summary>/unlock NAME or ADDRESS: lifts a name's lock, or gives an address its limits back.</summary>
     private void HandleUnlock(string[] args, Action<IMessage> reply)
     {
         if (args.Length < 1) { Say(reply, "Usage: /unlock [name or address]"); return; }
@@ -125,11 +123,9 @@ public partial class CommandHandler
                        : $"{AuthService.Fold(args[0])} was not locked.");
     }
 
-    /// <summary>/setrole NAME player|dev|admin — changes an account's role, and the session's if they are on.</summary>
     /// <summary>
-    /// /grant NAME COMMAND, /revoke NAME COMMAND: one permission on top of the account's role, kept with
-    /// the account. A command's main name (tp, not move), or fire-any, join-private, edit-any,
-    /// move-player. /perms lists them.
+    /// /grant and /revoke NAME PERMISSION: one permission on top of the account's role, kept with the
+    /// account: a command's main name (tp, not move) or a named one such as fire-any. /perms lists them.
     /// </summary>
     private void HandleGrant(UserSession session, string[] args, Action<IMessage> reply, bool give)
     {
@@ -139,7 +135,7 @@ public partial class CommandHandler
         if (!Permissions.IsGated(perm)) { Say(reply, $"'{args[1]}' is not a permission. /perms lists them."); return; }
         if (!Permissions.Grantable(perm)) { Say(reply, "Roles and permissions stay with administrators: make them an administrator instead."); return; }
         if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
-        // Without grant-any, a developer's: only to a player, and only what the developer can do.
+        // Without grant-any: only to a player, and only what the granter can do.
         if (!session.Can(Permissions.GrantAny) && GrantCeiling(session, record, perm) is { } refused) { Say(reply, refused); return; }
         var grants = Permissions.Parse(record.Permissions);
         bool changed = give ? grants.Add(perm) : grants.Remove(perm);
@@ -189,6 +185,7 @@ public partial class CommandHandler
         Say(reply, $"{who} {article} {word}: {roleText}. {granted}");
     }
 
+    /// <summary>/setrole NAME ROLE: a built-in or custom role, and the session's too if they are on.</summary>
     private void HandleSetRole(UserSession session, string[] args, Action<IMessage> reply)
     {
         var roles = _server.Roles;
@@ -206,14 +203,12 @@ public partial class CommandHandler
         if (role == null && custom.Length == 0)
         { Say(reply, $"'{args[1]}' is not a role. Roles: player, moderator, dev, admin{customList}."); return; }
         if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
-        // Your own role is somebody else's to change: an admin who demoted themselves by a slip would
-        // have nobody left to put it back.
+        // Not your own: an admin who demoted themselves by a slip would have nobody to put it back.
         if (record.Username.Equals(session.Username, StringComparison.OrdinalIgnoreCase))
         { Say(reply, "You cannot change your own role."); return; }
         // A custom role sits on top of Player.
         var newRole = role ?? UserRole.Player;
-        // The custom-role field is touched only when there is one to set or one to clear, so a store that
-        // keeps no custom roles still changes built-in ones.
+        // Touch the custom role only to set or clear one, so a store without custom roles still works.
         bool customChanges = custom.Length > 0 || !string.IsNullOrEmpty(record.CustomRole);
         if (!_users.SetRole(record.Username, newRole)
             || (customChanges && !_users.SetCustomRole(record.Username, custom.Length > 0 ? custom : null)))
@@ -248,9 +243,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// /role: roles an administrator makes. /role list; /role create NAME [PERMISSION ...];
-    /// /role add NAME PERMISSION; /role remove NAME PERMISSION; /role show NAME; /role delete NAME.
-    /// A custom role is Player plus its permissions; /setrole NAME ROLE gives it to somebody.
+    /// /role list, create NAME [PERMISSION ...], add or remove NAME PERMISSION, show NAME, delete NAME.
+    /// A custom role is Player plus its permissions; /setrole gives it to somebody.
     /// </summary>
     private void HandleRole(UserSession session, string[] args, Action<IMessage> reply)
     {

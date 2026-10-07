@@ -5,9 +5,8 @@ using OpenFPS.Server.Services;
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// Maps of your own: /map new, public, private, invite, uninvite, and /maps. Not gated: making a map
-/// and deciding who comes into it is every player's. On a map you own you build, spawn, move yourself
-/// and save as staff do anywhere (<see cref="Permissions.OnOwnMap"/>).
+/// Maps of your own: /map new, public, private, invite, uninvite, /maps and /join. Every player's. On a
+/// map you own you build, spawn, move yourself and save as staff do anywhere (<see cref="Permissions.OnOwnMap"/>).
 /// </summary>
 public partial class CommandHandler
 {
@@ -197,15 +196,14 @@ public partial class CommandHandler
         return true;
     }
 
-    /// <summary>/join MAP — go to another loaded map, if it is public, yours, or you are staff.</summary>
+    /// <summary>/join MAP: another loaded map, if it is public, yours, or you are staff.</summary>
     private void HandleJoin(UserSession session, string[] args, Action<IMessage> reply)
     {
         var enterable = _maps.LoadedMapIds.Where(id => OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, id, session))
                                           .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).Select(_maps.DisplayName).ToList();
         if (args.Length < 1) { Say(reply, $"Usage: /join [map]. Maps: {string.Join(", ", enterable)}."); return; }
 
-        // A map is joined by its id or by the name it is listed under, which may be several words
-        // ("/join magnolia tx").
+        // By id or by the listed name, which may be several words ("/join magnolia tx").
         string said = string.Join(" ", args);
         string? mapId = _maps.ResolveMapId(said) ?? _maps.ResolveMapId(args[0]);
         if (mapId == null)

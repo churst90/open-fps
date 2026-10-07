@@ -10,29 +10,12 @@ namespace OpenFPS.Server.Core;
 /// <summary>Doors: opening, shutting, knocking and listing them.</summary>
 public partial class CommandHandler
 {
-    // ── Doors ───────────────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// How far away a door can be and still be one you can reach.
-    ///
-    /// The same range as every other interaction rather than a number of its own: a door is a thing
-    /// you reach for, and there is no reason reaching for one should work at a different distance
-    /// from reaching for anything else.
-    /// </summary>
+    /// <summary>How far away a door can be and still be reached: the same range as any other interaction.</summary>
     private const float DoorReach = PhysicsConstants.InteractionRange;
 
     /// <summary>
-    /// /open [name] — opens the door you meant, which is nearly always the nearest one.
-    ///
-    /// From a seat it is YOUR door: the one nearest the seat you are sitting in, which is the
-    /// question "which door serves this seat" answered by proximity rather than by a table somebody
-    /// has to author and keep in step. That is automatically right for a two-door, a four-door, a bus
-    /// with a middle door, and whatever anybody invents next.
-    /// </summary>
-    /// <summary>
-    /// Knocking on the nearest door: three knuckles on the wood, heard by whoever is on either side of
-    /// it (the door's own transmission carries it through). Nothing is said when it works — the knock
-    /// is the answer.
+    /// /knock [name]: three knuckles on the nearest door, heard on either side of it through the door's
+    /// own transmission. Nothing is said when it works: the knock is the answer.
     /// </summary>
     private void HandleKnock(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -65,6 +48,10 @@ public partial class CommandHandler
         });
     }
 
+    /// <summary>
+    /// /open and /close [name]: the door you meant, nearly always the nearest. From a seat it is the door
+    /// nearest your seat, so a two-door, a four-door and a bus's middle door need no table.
+    /// </summary>
     private void HandleDoor(UserSession session, string[] args, Action<IMessage> reply, bool open)
     {
         if (!TryGetBody(session, reply, out var world, out _, out var position)) return;
@@ -75,9 +62,7 @@ public partial class CommandHandler
         var door = NearestDoor(world, from, wanted, out float distance, out string name);
         if (door == null)
         {
-            // Say how far the nearest one actually is. "No door within five metres" while /doors is
-            // cheerfully reporting one at five and a half is the tool contradicting itself, and the
-            // player has no way to tell which of the two is lying.
+            // Say how far the nearest one is, or this contradicts /doors reporting one at five and a half.
             var anywhere = NearestDoor(world, from, wanted, out float away, out string itsName, reach: 40f);
             Say(reply, anywhere != null
                 ? $"The nearest {itsName} is {away:F1} metres away. Get closer."
@@ -113,13 +98,7 @@ public partial class CommandHandler
             : $"The {name} {DoorSystem.Verb(moved)} shut, {distance:F1} metres away.");
     }
 
-    /// <summary>
-    /// /doors — what doors are near, how far, and whether they are open.
-    ///
-    /// The replacement for glancing round a room. It has to say the STATE as well as the name: an
-    /// open door and a shut one in the same place are different facts, and the only other way to
-    /// find out which you have is to walk into it.
-    /// </summary>
+    /// <summary>/doors: the doors within twenty metres, how far, which way, and whether they are open.</summary>
     private void HandleListDoors(UserSession session, Action<IMessage> reply)
     {
         if (!TryGetBody(session, reply, out var world, out _, out var position)) return;
@@ -143,10 +122,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// Where a player is reaching from — their seat if they are in one, otherwise their feet.
-    ///
-    /// Sitting in a car, the door you mean is the one beside YOU, not the one nearest the middle of
-    /// the vehicle. On a bus those are different doors.
+    /// Where a player reaches from: their seat if they are in one, otherwise their feet. In a bus the door
+    /// beside you and the door nearest the middle are different doors.
     /// </summary>
     private static Vector3 ReachingFrom(World world, Entity player, Vector3 position)
         => world.Has<OccupantComponent>(player) && world.Has<Transform>(player)

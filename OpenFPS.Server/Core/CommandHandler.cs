@@ -9,14 +9,10 @@ using Serilog;
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// Executes the text command set (/scan, /move, /spawn, …).
-///
-/// Two things about the shape of this class matter. First, it never touches a <see cref="LiteNetLib.NetPeer"/>:
-/// it answers through a reply callback, so a telnet session and a UDP session are the same thing to it.
-/// Second, every command body runs on the tick thread via the server's command buffer. The MUD gateway
-/// dispatches from its own TCP task thread, and a command that mutated the Arch world from there would
-/// race the simulation — the old peer-null guard prevented that race only by dropping every MUD command
-/// on the floor, silently.
+/// Executes the text commands (/scan, /move, /spawn, ...). It answers through a reply callback, never a
+/// <see cref="LiteNetLib.NetPeer"/>, so a MUD session and a UDP session are the same to it. Every
+/// command body runs on the tick thread via the server's command buffer: the MUD gateway dispatches
+/// from its own TCP thread, and touching the Arch world from there races the simulation.
 /// </summary>
 public partial class CommandHandler
 {
@@ -71,18 +67,15 @@ public partial class CommandHandler
                 Log.Error(ex, "Error executing command '{Command}' for {User}", commandName, session.Username);
                 Say(reply, $"Command '{commandName}' failed. The error has been logged.");
             }
-            // After the command, so /afk is announced as soon as it is typed, and anything else
-            // typed by somebody who was away says they are back.
+            // After the command, so /afk is announced at once and anything else says they are back.
             _server.UpdatePresence(session, DateTime.UtcNow);
         });
     }
 
     private void Execute(string commandName, string[] args, UserSession session, Action<IMessage> reply)
     {
-        // Who may run what is Permissions: a role is a set of commands and an account can be granted
-        // single ones. docs/SERVER_SECURITY.md has the table; keep it in step. One check, here, for
-        // every gated command, so a new case cannot forget its own. Building, spawning, moving
-        // yourself, saving and the sound tools are everybody's on a map they own (the scope half).
+        // The one permission check for every gated command, so a new case cannot forget its own.
+        // docs/SERVER_SECURITY.md has the table; keep it in step with Permissions.
         if (!MayHere(session, Permissions.Canonical(commandName)))
         {
             // F12 is answered in words of its own: who the editor is for.
@@ -110,8 +103,7 @@ public partial class CommandHandler
                 if (args.Length == 0) { Say(reply, "Usage: /announce [message]"); break; }
                 _server.Announce(string.Join(" ", args), fromStaff: true);
                 break;
-            // Moving yourself by coordinates is a building tool (yours on your own maps, staff's on
-            // any); /tp is the teleporter's, an item you carry.
+            // /move by coordinates is a building tool; /tp is the teleporter's, an item you carry.
             case "move":
                 HandleMove(session, args, reply);
                 break;
@@ -143,11 +135,6 @@ public partial class CommandHandler
                 HandleStartState(session, args, reply);
                 break;
             // ── Building ────────────────────────────────────────────────────────────────────
-            //
-            // The whole verb set for making something, and it is deliberately small: gather what is
-            // around you into one thing, take it apart again, save it so it can be made again, put a
-            // saved one down, and write the world to disk. A house, a market stall, a barricade and a
-            // vehicle body are all the same five verbs.
             case "group":
                 HandleGroup(session, args, reply);
                 break;
@@ -179,26 +166,24 @@ public partial class CommandHandler
             case "room":
                 HandleRoom(session, args, reply);
                 break;
-            // The world editor: F12 and /edit (docs/WORLD_EDITOR.md). Gated above: the edit permission,
-            // the map's owner, or an editor the owner named.
+            // The world editor, F12 and /edit (docs/WORLD_EDITOR.md).
             case "edit":
                 Editor.Handle(session, args, reply);
                 break;
-            // The whole server's weather, for testing: developers and administrators (Permissions).
+            // The whole server's weather, for testing.
             case "weather":
                 HandleWeather(args, reply);
                 break;
             case "prefabs":
                 HandleListPrefabs(reply);
                 break;
-            // Firing is no longer elevated when you are HOLDING the thing: a gun in your hands is
-            // the permission. Naming a weapon out of the air still is — that is the dev trigger.
             case "clap":
                 HandleClap(session, reply);
                 break;
             case "knock":
                 HandleKnock(session, args, reply);
                 break;
+            // A gun in your hands is the permission to fire it; naming a weapon out of the air needs fire-any.
             case "fire":
             case "shoot":
                 _combat.Fire(session, args, reply, session.Can(Permissions.FireAny));
@@ -208,12 +193,10 @@ public partial class CommandHandler
                 string assist = AimAssistCommand(session, args);
                 if (!args.Any(a => a.Equals("quiet", StringComparison.OrdinalIgnoreCase))) Say(reply, assist);
                 break;
-            // How far round you a streamed map is sent: the client's world detail setting, which it
-            // restates ("quiet") when it joins a map. Not elevated: it is your own bandwidth.
+            // The client's world detail setting, restated ("quiet") when it joins a map.
             case "detail":
                 HandleDetail(session, args, reply);
                 break;
-            // Not elevated: loading the gun in your hands is part of having it.
             case "reload":
                 _combat.Reload(session, reply);
                 break;
@@ -221,11 +204,11 @@ public partial class CommandHandler
             case "selector":
                 _combat.Selector(session, args, reply);
                 break;
-            // The trigger let go: automatic fire stops. Sent by the client when Enter comes up.
+            // The trigger let go (Enter up): automatic fire stops.
             case "cease":
                 _combat.Cease(session);
                 break;
-            // The admin gun's calibre (Y and Shift+Y) and its settings; gated by admin-gun (Permissions).
+            // The admin gun's calibre, Y and Shift+Y.
             case "calibre":
             case "caliber":
                 _combat.Calibre(session, args, reply);
@@ -236,9 +219,7 @@ public partial class CommandHandler
             case "ammo":
                 Say(reply, _combat.AmmoReadout(session));
                 break;
-            // The scope is the game client's: what it sees is worked out from the world the client
-            // already holds, and these four are answered there before they are ever sent. One that
-            // arrives here came from a text client, which has no scope to raise.
+            // The game client answers these itself; one that arrives here came from a text client.
             case "scope":
             case "zoom":
             case "range":
@@ -246,8 +227,6 @@ public partial class CommandHandler
                 Say(reply, "The scope works in the game client: hold a scoped rifle and press numpad star, or type /scope.");
                 break;
             // ── Doors ───────────────────────────────────────────────────────────────────────
-            //
-            // Not elevated. Building a door needs a role; going through one does not.
             case "open":
                 HandleDoor(session, args, reply, open: true);
                 break;
@@ -268,9 +247,6 @@ public partial class CommandHandler
                 HandleDrivable(session, args, reply);
                 break;
             // ── Occupancy ───────────────────────────────────────────────────────────────────
-            //
-            // Not elevated, any of it. Getting into things is what the world is FOR; building the
-            // thing you get into is the part that needs a role.
             case "ignition":
             case "key":
                 HandleIgnition(session, args, reply);
@@ -298,11 +274,6 @@ public partial class CommandHandler
                 HandleSeats(session, reply);
                 break;
             // ── Carrying things ─────────────────────────────────────────────────────────────
-            //
-            // Not elevated either, and for the same reason: picking a thing up is what the world is
-            // for. Every one of these takes an optional NAME, because a player who cannot point has
-            // to be able to say which one they meant, and every refusal says what is in the way
-            // rather than merely no.
             case "take":
             case "get":
             case "grab":
@@ -344,7 +315,6 @@ public partial class CommandHandler
                 if (_friends == null) { Say(reply, "Friends are not available on this server."); break; }
                 reply(OpenFPS.Server.Services.SocialService.BuildFriendList(session.Username, _friends, _sessions));
                 break;
-            // Every player's: a team is people choosing each other, not a power the server hands out.
             case "team":
                 HandleTeam(session, args, reply);
                 break;
@@ -357,8 +327,7 @@ public partial class CommandHandler
                 break;
             case "where":
             case "locate":
-                // Where somebody is standing is staff's to know, not every player's: a profile says
-                // which map, and that is all.
+                // Staff's: a profile says which map, and that is all.
                 HandleWhere(session, args, reply);
                 break;
             case "afk":
@@ -424,7 +393,7 @@ public partial class CommandHandler
                     string prefab = _hands.ResolveItem(rest[0]) ?? rest[0].ToLowerInvariant();
                     if (_maps.Prefabs.TryGetValue(prefab, out var premium) && premium.Premium && !session.Can(Permissions.GivePremium))
                     { Say(reply, $"{premium.Name} is a premium item; giving one needs {Permissions.GivePremium}."); break; }
-                    // Give makes at most MaxGive; the message said the number asked for (/give akm 100 made 50).
+                    // Give makes at most MaxGive; say the number made, not the number asked for.
                     count = Math.Min(count, HandsService.MaxGive);
                     if (!_hands.Give(receiver, rest[0].ToLowerInvariant(), count, out string item, out string placed, out string why)) { Say(reply, why); break; }
                     string what = $"{count} {(count == 1 ? item : Plural(item))}";
@@ -531,8 +500,8 @@ public partial class CommandHandler
         Say(reply, "You do not have permission to execute this command.");
 
     /// <summary>
-    /// Resolves the session's map and its body in it. A session that has authenticated but not yet sent
-    /// 'ready' has no entity, so a world command must not dereference it.
+    /// The session's map and its body in it. A session that has logged in but not yet sent 'ready' has
+    /// no entity, so a world command must not dereference it.
     /// </summary>
     private bool TryGetBody(UserSession session, Action<IMessage> reply,
                             out World world, out SpatialGrid<Entity> grid, out Vector3 position)
@@ -564,9 +533,8 @@ public partial class CommandHandler
     private static string Capital(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
     /// <summary>
-    /// Where something is from the way you face, in words: in front, right in front, right, right behind,
-    /// behind, left behind, left, left in front. Cody, 2026-10-04: a clock face made him work out that
-    /// 5 o'clock was behind him; the words say it.
+    /// Where something is from the way you face, in words ("left in front"), not a clock face. Cody,
+    /// 2026-10-04: a clock face made him work out that 5 o'clock was behind him.
     /// </summary>
     internal static string GetRelativeDirection(Quaternion rotation, Vector3 targetDir)
         => OpenFPS.Common.DirectionWords.Relative(rotation, targetDir);

@@ -35,13 +35,9 @@ public partial class CommandHandler
         reply(new ChatMessage { Sender = session.Username, Text = message, Channel = ChatChannel.Private, To = targetSession.Username });
     }
 
-    // ── People and places ───────────────────────────────────────────────────────────────────────
-
-    /// <summary>The online session of a user, if they are on.</summary>
     /// <summary>
-    /// An online player by name: the exact name, or failing that the one player whose name starts with
-    /// what was typed (so "/bring se" finds sean when nobody else's name starts "se"). Never a guess
-    /// between two.
+    /// An online player by name: the exact name, or else the one player whose name starts with what was
+    /// typed ("/bring se" finds sean). Never a guess between two.
     /// </summary>
     private UserSession? OnlineSession(string username)
     {
@@ -53,8 +49,7 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// A user's name as the server stores it, and their role, if they are registered. Falls back on
-    /// who is online when there is no user store to ask (a test rig).
+    /// A registered user's stored name and role; from who is online when there is no user store (a test rig).
     /// </summary>
     private bool TryFindUser(string name, out string username, out UserRole role)
     {
@@ -99,8 +94,7 @@ public partial class CommandHandler
 
         if (remove)
         {
-            // Removal does not need the account to exist: a deleted account is exactly the friend
-            // somebody wants off their list.
+            // No account needed: a deleted account is exactly the friend somebody wants off their list.
             string shown = TryFindUser(name, out var stored, out _) ? stored : name;
             Say(reply, _friends.Remove(session.Username, shown)
                 ? $"{shown} removed from your friends."
@@ -120,9 +114,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// /profile NAME — who somebody is, in a sentence or two: their rank, the name they chose to show,
-    /// whether they are on, and which map. Never where on it: that is /where, and /where is staff's.
-    /// A private map the asker could not walk into is not named.
+    /// /profile NAME: rank, real name, whether they are on, and which map, never where on it (/where is
+    /// staff's). A private map the asker could not enter is not named.
     /// </summary>
     private void HandleProfile(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -148,10 +141,7 @@ public partial class CommandHandler
         Say(reply, $"{head} {status}, {map}.{friend}");
     }
 
-    /// <summary>
-    /// /realname [name] — the name you want your profile to show. On its own it says what is set;
-    /// /realname clear takes it off.
-    /// </summary>
+    /// <summary>/realname [name|clear]: the name your profile shows; on its own, what is set.</summary>
     private void HandleRealName(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (_users == null) { Say(reply, "Profiles are not kept on this server."); return; }
@@ -179,12 +169,12 @@ public partial class CommandHandler
         Say(reply, clear ? "Your profile no longer shows a real name." : $"Your profile now shows the real name {name}.");
     }
 
-    /// <summary>/where NAME — which way and how far, if they are on your map; which map otherwise.</summary>
+    /// <summary>/where NAME: which way and how far if they are on your map, otherwise which map.</summary>
     private void HandleWhere(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (args.Length < 1) { Say(reply, "Usage: /where [name]"); return; }
         var target = OnlineSession(args[0]);
-        // Somebody with a name who is not a player: Alex.
+        // A character, not a player: Alex.
         if (target == null && _server.Characters.Find(args[0]) is { } character)
         {
             WhereCharacter(session, character.MapId, character.Body, reply);
@@ -249,9 +239,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// "25 metres away, left in front, 4 metres above you, at Main Street sidewalk" — the other
-    /// player's bearing from the asker's facing, from the same clock face /scan uses. Empty if
-    /// either of them has no body yet.
+    /// "25 metres away, left in front, 4 metres above you, at Main Street sidewalk": the other player
+    /// from the asker's facing, in the words /scan uses. Empty if either has no body yet.
     /// </summary>
     private string RelativeTo(UserSession asker, UserSession target)
     {
@@ -275,9 +264,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// The name of the place a point is in: the named part of a room holding it if there is one (a
-    /// flight of stairs, a landing), or else the smallest named region volume that contains it — the
-    /// same boxes, in the same order, as the client names places from. Null where nowhere is named.
+    /// The name of the place a point is in: the named part of a room holding it (a flight of stairs, a
+    /// landing), else the smallest named region holding it, as the client names places. Null if none.
     /// </summary>
     public static string? PlaceAt(World world, Vector3 point)
     {
@@ -315,8 +303,8 @@ public partial class CommandHandler
         return best;
     }
 
-    /// <summary>The prefab of a named part of a room — a flight of stairs, a landing — which is a name
-    /// and not a room (prefabs/named_place.json; the client's NamedPlaces).</summary>
+    /// <summary>The prefab of a named part of a room, a name and not a room (prefabs/named_place.json;
+    /// the client's NamedPlaces).</summary>
     public const string NamedPlacePrefab = "named_place";
 
     /// <summary>Whether an entity is a named part of a room: a place you are in, not a thing near you.</summary>

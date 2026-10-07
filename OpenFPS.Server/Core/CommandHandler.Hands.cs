@@ -5,16 +5,12 @@ using Arch.Core;
 
 namespace OpenFPS.Server.Core;
 
+/// <summary>
+/// Carrying things: take, drop, stow, draw, hands and inv are the whole inventory. A carried thing is
+/// the same entity it was on the floor, and the readout is a sentence, what a screen reader takes in.
+/// </summary>
 public partial class CommandHandler
 {
-    // ── Carrying things ─────────────────────────────────────────────────────────────────────────
-    //
-    // Four verbs and two readouts, and between them they are the whole inventory: take, drop, stow,
-    // draw, hands, inv. There is no inventory SCREEN because there is nothing to put on one — a
-    // thing you are carrying is the same entity it was on the floor, at a position on your body, and
-    // the readout is a sentence rather than a grid because a sentence is what a screen reader takes
-    // in at a go.
-
     private HandsService? Hands(Action<IMessage> reply)
     {
         if (_hands == null) Say(reply, "Picking things up is not available on this server.");
@@ -24,10 +20,7 @@ public partial class CommandHandler
     /// <summary>How near somebody must be to be handed something, metres: arm's length and a step.</summary>
     public const float HandMetres = 2.5f;
 
-    /// <summary>
-    /// /hand [THING] — gives what you hold to the person beside you who will take it: Alex, who asks
-    /// everybody for something. It is his then, and gone from your hands; he thanks you for it.
-    /// </summary>
+    /// <summary>/hand [THING]: gives what you hold to the character beside you who asks for things (Alex).</summary>
     private void HandleHand(UserSession session, string[] args, Action<IMessage> reply)
     {
         var svc = Hands(reply); if (svc == null) return;
@@ -46,7 +39,7 @@ public partial class CommandHandler
         Say(reply, $"You hand {name} the {what}. He takes it.");
     }
 
-    /// <summary>/take [name] — picks up the nearest thing you can reach, or the nearest one called that.</summary>
+    /// <summary>/take [name]: picks up the nearest thing you can reach, or the nearest one called that.</summary>
     private void HandleTake(UserSession session, string[] args, Action<IMessage> reply)
     {
         var svc = Hands(reply); if (svc == null) return;
@@ -54,13 +47,7 @@ public partial class CommandHandler
         Say(reply, message);
     }
 
-    /// <summary>
-    /// /drop [name|left|right|all] — puts something down, and it lands.
-    ///
-    /// The landing goes out to everyone in earshot rather than back to the person who dropped it: a
-    /// dropped thing is a sound in a room, and the useful half of it is that the people who did NOT
-    /// drop it can hear where it went.
-    /// </summary>
+    /// <summary>/drop [name|left|right|all]: puts something down; everyone in earshot hears it land.</summary>
     private void HandleDrop(UserSession session, string[] args, Action<IMessage> reply)
     {
         var svc = Hands(reply); if (svc == null) return;
@@ -69,7 +56,7 @@ public partial class CommandHandler
         Say(reply, message);
     }
 
-    /// <summary>/stow [name|left|right|all] — slings what you are holding onto your back.</summary>
+    /// <summary>/stow [name|left|right|all]: slings what you are holding onto your back.</summary>
     private void HandleStow(UserSession session, string[] args, Action<IMessage> reply)
     {
         var svc = Hands(reply); if (svc == null) return;
@@ -77,7 +64,7 @@ public partial class CommandHandler
         Say(reply, message);
     }
 
-    /// <summary>/draw [name] — takes something off your back and puts it in your hands.</summary>
+    /// <summary>/draw [name]: takes something off your back and puts it in your hands.</summary>
     private void HandleDraw(UserSession session, string[] args, Action<IMessage> reply)
     {
         var svc = Hands(reply); if (svc == null) return;
@@ -85,7 +72,7 @@ public partial class CommandHandler
         Say(reply, message);
     }
 
-    /// <summary>/hands — what is in your hands, which is the question with the hard limit behind it.</summary>
+    /// <summary>/hands: what is in your hands.</summary>
     private void HandleHands(UserSession session, Action<IMessage> reply)
     {
         var svc = Hands(reply); if (svc == null) return;
@@ -97,9 +84,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// /give [NAME] [ammo] KIND [COUNT] — spare rounds, when the words name ammunition: "/give 9mm
-    /// 60", "/give sean ammo 7.62 90". False when they do not, and /give carries on with items. The
-    /// count defaults to a box.
+    /// /give [NAME] [ammo] KIND [COUNT]: spare rounds when the words name ammunition ("/give sean ammo
+    /// 7.62 90"), a box when no count is given. False when they do not, and /give goes on to items.
     /// </summary>
     private bool TryGiveAmmo(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -116,7 +102,7 @@ public partial class CommandHandler
         return true;
     }
 
-    /// <summary>/inv — everything you have on you, hands first, with what it weighs.</summary>
+    /// <summary>/inv: everything you have on you, hands first, with what it weighs.</summary>
     private void HandleInventory(UserSession session, Action<IMessage> reply)
     {
         var svc = Hands(reply); if (svc == null) return;

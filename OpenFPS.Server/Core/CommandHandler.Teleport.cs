@@ -191,9 +191,10 @@ public partial class CommandHandler
         return FreeSpotNear(world, grid, feet, Quaternion.Identity, 1.5f);
     }
 
+    /// <summary>/move x y z, /move NAME, /move NAME x y z, /move NAME to OTHER.</summary>
     private void HandleMove(UserSession session, string[] args, Action<IMessage> reply)
     {
-        // /move NAME: go to a player. Staff's on any map; on your own map /move is for coordinates.
+        // Going to a player needs the move permission itself, not just a map of your own.
         if (args.Length == 1)
         {
             if (!session.Can("move")) { DenyCommand(reply); return; }
@@ -202,7 +203,7 @@ public partial class CommandHandler
             PlaceBeside(session, other, session, reply);
             return;
         }
-        // /move NAME x y z, /move NAME to OTHER: move somebody else (administrators).
+        // Moving somebody else needs move-player.
         if (args.Length >= 2 && !float.TryParse(args[0], out _))
         {
             if (!session.Can(Permissions.MovePlayer)) { DenyCommand(reply); return; }
@@ -240,25 +241,22 @@ public partial class CommandHandler
 
         if (!TryGetBody(session, reply, out var world, out var grid, out _)) return;
 
-        // In the player's order — x east, y north, z height — which is the order C reads out.
+        // x east, y north, z height: the order C reads out.
         Vector3 targetPos = PlayerCoordinates.ToWorld(x, y, z);
 
-        // COLLISION AWARE TELEPORT (Cylinder-based)
         if (OpenFPS.Server.Systems.MovementSystem.CheckCollision(world, grid, targetPos, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight))
         {
             Say(reply, "Cannot move there: Area is solid.");
             return;
         }
 
-        // Out of whatever you were sitting in first. The seat owns a passenger's position and puts
-        // them back in it every tick, so a teleport from a seat moved you for one tick and no further.
+        // Out of any seat first: the seat puts a passenger back in it every tick.
         if (world.Has<OccupantComponent>(session.Entity)) CompositeService.Disembark(world, session.Entity);
 
         ref var t = ref world.Get<Transform>(session.Entity);
         t.Position = targetPos;
         t.IsDirty = true;
 
-        // Force client reset
         reply(new PlayerSpawned { EntityId = session.Entity.Id, SpawnTransform = t });
         Say(reply, $"Moved to {PlayerCoordinates.Format(targetPos)}");
     }
@@ -272,8 +270,7 @@ public partial class CommandHandler
     {
         if (!who.CurrentMapId.Equals(target.CurrentMapId, StringComparison.OrdinalIgnoreCase))
         {
-            // Going to somebody yourself is going to their map, which has to be one you may enter.
-            // Being brought or moved by staff is theirs to decide.
+            // Going yourself needs a map you may enter; being brought or moved by staff does not.
             if (who == by && !DiscoveryCanEnter(who, target.CurrentMapId))
             { Say(reply, $"{target.Username} is on a map you cannot enter."); return; }
             _server.MoveToMap(who, target.CurrentMapId);

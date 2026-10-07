@@ -3,18 +3,13 @@ using OpenFPS.Server.Repositories;
 
 namespace OpenFPS.Server.Core;
 
+/// <summary>Teams: every player may make one, and a team is the people in it.</summary>
 public partial class CommandHandler
 {
-    // ── Teams ───────────────────────────────────────────────────────────────────────────────────
-
     /// <summary>
-    /// /team — yours. /team create NAME, /team invite NAME, /team join NAME, /team leave, /team list,
-    /// /team kick NAME (the leader's), /team open and /team close (the leader's: whether anybody may
-    /// join uninvited), /team chat MESSAGE (or /t MESSAGE).
-    ///
-    /// Not gated: every player may make a team, and a team is the people in it. Whenever somebody comes
-    /// or goes, their body is given its new team and re-sent (<see cref="GameServer.RefreshTeam"/>), so
-    /// everybody near them hears their beacon change tone without anybody leaving and coming back.
+    /// /team: yours. create, invite, join, leave, list NAME; kick, open and close are the leader's;
+    /// chat MESSAGE (or /t). Whoever comes or goes is re-sent with their new team
+    /// (<see cref="GameServer.RefreshTeam"/>), so everybody near hears their beacon change tone.
     /// </summary>
     private void HandleTeam(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -25,7 +20,7 @@ public partial class CommandHandler
         string? arg = args.Length > 1 ? args[1] : null;
         var mine = teams.TeamOf(session.Username);
 
-        // Everybody in a team who is on, except whoever is named: news of the team, to the team.
+        // News of the team, to everybody in it who is on, except whoever is named.
         void Tell(TeamRepository.Team team, string text, string? except = null)
         {
             foreach (var s in _sessions.GetAllSessions())

@@ -81,7 +81,7 @@ public partial class CommandHandler
         return nearest;
     }
 
-    /// <summary>Every client on the map opens a sound id as a file, so only a relative name under its sounds folder.</summary>
+    /// <summary>Every client opens a sound id as a file, so only a relative name under its sounds folder.</summary>
     private static string NotASoundId(string id)
         => $"'{AuthService.ForLog(id)}' is not a sound id: a name under the sounds folder, like AMBIENCE/woods_mid_day.";
 
@@ -104,8 +104,7 @@ public partial class CommandHandler
             return;
         }
 
-        // SetOrAdd, not Add: Add throws on an entity that already carries the component, which is what
-        // every sibling handler here already knew.
+        // SetOrAdd: Add throws on an entity that already carries the component.
         SetOrAdd(world, nearest.Value, new SoundEmitterComponent { SoundId = args[0], Volume = vol, Range = 50.0f });
         SetOrAdd(world, nearest.Value, EntityType.Beacon);
         _server.SyncAudioComponent(nearest.Value.Id);
@@ -113,8 +112,7 @@ public partial class CommandHandler
         Say(reply, $"Attached sound {args[0]} to nearest object.");
     }
 
-    /// <summary>Clapping your hands: one clap, in front of your chest, heard by everyone near and
-    /// answered by the walls like any other short sound. Nothing is said back.</summary>
+    /// <summary>/clap: one clap in front of your chest, answered by the walls like any short sound.</summary>
     private void HandleClap(UserSession session, Action<IMessage> reply)
     {
         if (!TryGetBody(session, reply, out var world, out _, out var position)) return;

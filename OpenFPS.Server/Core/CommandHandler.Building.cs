@@ -7,11 +7,12 @@ using Arch.Core;
 
 namespace OpenFPS.Server.Core;
 
-/// <summary>Building: composites, the build cursor, prefabs and saving the map.</summary>
+/// <summary>
+/// Building: composites, the build cursor, prefabs and saving the map. Every verb works without
+/// pointing; see docs/SERVER_NOTES.md, "Building without pointing".
+/// </summary>
 public partial class CommandHandler
 {
-    // ── Building ────────────────────────────────────────────────────────────────────────────────
-
     /// <summary>How far a grouping sweep reaches by default, metres. About a room.</summary>
     private const float DefaultGroupRadius = 12f;
     /// <summary>How far away a composite may be and still count as "this one".</summary>
@@ -24,11 +25,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// /group name [radius] [free] — makes one thing out of everything standing near you.
-    ///
-    /// A radius rather than a selection, because a selection needs pointing at things and pointing is
-    /// the one thing a player here cannot do. "Everything within twelve metres of me" is a selection
-    /// anybody can make, and can widen or narrow until it is the right one.
+    /// /group name [radius] [free]: one thing out of everything near you. A radius, because a selection
+    /// needs pointing.
     /// </summary>
     private void HandleGroup(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -38,7 +36,7 @@ public partial class CommandHandler
 
         string name = args[0];
         float radius = args.Length > 1 && float.TryParse(args[1], out float r) ? r : DefaultGroupRadius;
-        // "free" is the word for a composite that is not fixed down: a caravan rather than a house.
+        // "free": not fixed down, a caravan rather than a house.
         bool anchored = !args.Contains("free", StringComparer.OrdinalIgnoreCase);
 
         int root = svc.Group(session.CurrentMapId, position, radius, name, anchored, session.Username, out int parts);
@@ -47,7 +45,7 @@ public partial class CommandHandler
                  + $"{(anchored ? "fixed in place" : "free to be moved")}, yours. Save it with /saveas.");
     }
 
-    /// <summary>/ungroup — takes the nearest composite apart, leaving its parts exactly where they are.</summary>
+    /// <summary>/ungroup: takes the nearest composite apart, its parts left where they are.</summary>
     private void HandleUngroup(UserSession session, Action<IMessage> reply)
     {
         var svc = Composites(reply); if (svc == null) return;
@@ -61,7 +59,7 @@ public partial class CommandHandler
         Say(reply, $"'{name}' is now {parts} loose part(s), all where they were.");
     }
 
-    /// <summary>/saveas id — writes the nearest composite to disk so anyone can place it again.</summary>
+    /// <summary>/saveas id: writes the nearest composite to disk so anyone can place it again.</summary>
     private void HandleSaveAs(UserSession session, string[] args, Action<IMessage> reply)
     {
         var svc = Composites(reply); if (svc == null) return;
@@ -81,7 +79,7 @@ public partial class CommandHandler
         Say(reply, $"Saved '{args[0]}' with {parts} part(s). Place another with /place {args[0]}.");
     }
 
-    /// <summary>/place id [yaw] — puts a saved composite down at your feet, facing where you like.</summary>
+    /// <summary>/place id [yaw]: puts a saved composite down at your feet.</summary>
     private void HandlePlace(UserSession session, string[] args, Action<IMessage> reply)
     {
         var svc = Composites(reply); if (svc == null) return;
@@ -102,14 +100,9 @@ public partial class CommandHandler
     /// on a map of their own.</summary>
     private bool Elevated(UserSession session) => session.Can(Permissions.EditAny) || OwnsHere(session);
 
-    // ── Building where you cannot point ─────────────────────────────────────────────────────────
-    //
-    // Walking to the spot works for a wall and not for a roof, and walking to twenty wall positions
-    // in a row does not reliably produce a straight wall. So there is a CURSOR: moved in metres from
-    // an origin the player chose, announcing itself and what is already there every time it moves.
-    // That is a review cursor, which a screen-reader user has navigated documents with for years.
+    // ── The build cursor: a review cursor moved in metres from an origin the player chose ───────
 
-    /// <summary>/origin — puts the build origin at your feet, facing the way you face.</summary>
+    /// <summary>/origin: the build origin at your feet, facing the way you face.</summary>
     private void HandleOrigin(UserSession session, Action<IMessage> reply)
     {
         if (!TryGetBody(session, reply, out var world, out _, out var position)) return;
@@ -119,11 +112,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// /at [right up forward] — moves the cursor there and says what is there, or just reads it out.
-    ///
-    /// Also takes a named direction and a distance (`/at forward 3`), which is the form you want when
-    /// you are running a wall: it moves RELATIVE to where the cursor already is, and remembers the
-    /// direction so a `/put ... run` can follow it.
+    /// /at [right up forward]: moves the cursor and says what is there; on its own, reads it out.
+    /// `/at forward 3` moves relative to the cursor and remembers the direction for `/put ... run`.
     /// </summary>
     private void HandleAt(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -154,13 +144,7 @@ public partial class CommandHandler
         Say(reply, $"Cursor {build.Describe()}. {WhatIsAt(world, grid, build.WorldCursor)}");
     }
 
-    /// <summary>
-    /// What is already where the cursor is.
-    ///
-    /// The half of the cursor that makes it usable. Moving to a spot and being told nothing is the
-    /// same as not moving; being told "concrete wall" is how you find the wall you placed a minute
-    /// ago and build the next one against it.
-    /// </summary>
+    /// <summary>What is already where the cursor is: how a builder finds the wall placed a minute ago.</summary>
     private static string WhatIsAt(World world, SpatialGrid<Entity> grid, Vector3 at)
     {
         Entity? closest = null;
@@ -179,12 +163,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// /put prefab [turn degrees] [run n] — places a prefab at the cursor.
-    ///
-    /// The run is the important half. A wall is not one part, it is a line of them, and a line placed
-    /// by hand from a cursor is only as straight as the arithmetic somebody did in their head. Asking
-    /// for a run steps by the part's OWN footprint along the direction the cursor last travelled, so
-    /// the panels touch, the wall is straight, and it is one command instead of eight.
+    /// /put prefab [turn degrees] [run n [direction]]: places a prefab at the cursor. A run steps by the
+    /// part's own footprint along the cursor's last direction, so the panels of a wall touch.
     /// </summary>
     private void HandlePut(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -210,9 +190,7 @@ public partial class CommandHandler
             else if (args[i].Equals("run", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
                 int.TryParse(args[i + 1], out run);
-                // A direction on the run itself — "run 4 right" — which is what anybody would say.
-                // Without it the only way to aim a run is to move the cursor zero metres in the
-                // direction you want first, which works and is a riddle.
+                // "run 4 right": a direction on the run itself.
                 if (i + 2 < args.Length && BuildSession.TryDirection(args[i + 2], out var aimed))
                 {
                     step = aimed;
@@ -241,7 +219,6 @@ public partial class CommandHandler
         }
 
         if (placed == 0) { Say(reply, "There is already something there. Nothing placed."); return; }
-        // Leave the cursor at the end of the run, where the next thing goes.
         if (placed > 1) build.Cursor += step * (spacing * placed);
 
         string what = svc.Prefabs.Prefabs[prefabId.ToLowerInvariant()].Name;
@@ -255,13 +232,11 @@ public partial class CommandHandler
     private static float FootprintAlong(PrefabRepository prefabs, string prefabId, Quaternion rotation,
                                         float buildYaw, Vector3 stepInBuildAxes)
     {
-        // A prefab need not have a body at all (a region volume, a bare emitter). One metre is a
-        // sane pitch for a run of those, and the alternative — a run that never advances — would
-        // stack the whole lot in one place with nothing to say why.
+        // A prefab with no body (a region volume, a bare emitter) runs at one metre, or the whole run
+        // would stack in one place.
         var size = prefabs.Prefabs[prefabId.ToLowerInvariant()].ColliderSize ?? Vector3.One;
         if (size == Vector3.Zero) return 1f;
-        // The part is rotated into the world; the step is in the builder's axes. Measure the part's
-        // extent along the step by taking both into the same frame.
+        // The part is turned in the world and the step is in the builder's axes: one frame for both.
         var half = CompositeAcoustics.AxisAlignedHalfExtents(size * 0.5f,
             Quaternion.Concatenate(rotation, Quaternion.Inverse(Quaternion.CreateFromYawPitchRoll(buildYaw, 0f, 0f))));
         float along = MathF.Abs(stepInBuildAxes.X) * half.X
@@ -281,13 +256,7 @@ public partial class CommandHandler
         return false;
     }
 
-    /// <summary>
-    /// /undo — takes back the last thing you placed.
-    ///
-    /// Not a convenience. A part in the wrong place is invisible to somebody who cannot see it, so
-    /// the mistake is not merely unfixed, it is undetectable until they walk into it — and by then
-    /// they have built three more things around it.
-    /// </summary>
+    /// <summary>/undo: takes back the last thing you placed.</summary>
     private void HandleUndo(UserSession session, Action<IMessage> reply)
     {
         var build = session.Build;
@@ -310,18 +279,15 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// /room [radius] — says whether what is around you encloses a room, and if not, what is missing.
-    ///
-    /// A dry run of the rule `/group` will apply, so it can be asked BEFORE committing. This is the
-    /// feedback loop the whole of building without sight hangs off: a sighted builder stands back and
-    /// sees that the roof is missing, and this is the replacement for standing back.
+    /// /room [radius]: whether what is around you encloses a room, and if not what is missing. A dry run
+    /// of the rule /group applies.
     /// </summary>
     private void HandleRoom(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (!TryGetBody(session, reply, out var world, out _, out var position)) return;
         float radius = args.Length > 0 && float.TryParse(args[0], out float r) ? r : DefaultGroupRadius;
 
-        // Exactly what a sweep of this radius would take, measured about where it would put the origin.
+        // Exactly what a sweep of this radius would take.
         var parts = new List<Entity>();
         var q = new QueryDescription().WithAll<Transform>();
         float r2 = radius * radius;
@@ -339,7 +305,7 @@ public partial class CommandHandler
         Say(reply, $"{parts.Count} part(s) within {radius:F0} m. {survey.Explain()}");
     }
 
-    /// <summary>/prefabs — what there is to put down.</summary>
+    /// <summary>/prefabs: what there is to put down.</summary>
     private void HandleListPrefabs(Action<IMessage> reply)
     {
         var svc = Composites(reply); if (svc == null) return;
@@ -367,7 +333,7 @@ public partial class CommandHandler
         };
     }
 
-    /// <summary>/composites — what there is to place.</summary>
+    /// <summary>/composites: what there is to place.</summary>
     private void HandleListComposites(Action<IMessage> reply)
     {
         var svc = Composites(reply); if (svc == null) return;
@@ -380,11 +346,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// /savemap — writes this map to disk exactly as it now stands.
-    ///
-    /// Explicit rather than automatic on purpose. A world that rewrites its own map file every time
-    /// somebody experiments cannot be experimented with, and the first thing anyone does with a
-    /// building tool is put something in the wrong place.
+    /// /savemap: writes this map to disk as it now stands. Never automatic, so a map can be
+    /// experimented on.
     /// </summary>
     private void HandleSaveMap(UserSession session, Action<IMessage> reply)
     {

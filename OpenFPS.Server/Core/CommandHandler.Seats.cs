@@ -15,12 +15,7 @@ public partial class CommandHandler
         return _seats;
     }
 
-    /// <summary>
-    /// /addseat name [drive] — puts a seat where you are standing, facing the way you are facing.
-    ///
-    /// Authored by standing in the right place, for the same reason grouping is by radius: a player
-    /// here cannot point at anything, but they can always walk to a spot and say "here".
-    /// </summary>
+    /// <summary>/addseat name [drive]: a seat where you stand, facing the way you face.</summary>
     private void HandleAddSeat(UserSession session, string[] args, Action<IMessage> reply)
     {
         var svc = Composites(reply); if (svc == null) return;
@@ -43,7 +38,7 @@ public partial class CommandHandler
             : $"Seat '{args[0]}' added here.");
     }
 
-    /// <summary>/removeseat name — forgets a seat, putting whoever is in it out first.</summary>
+    /// <summary>/removeseat name: forgets a seat, putting whoever is in it out first.</summary>
     private void HandleRemoveSeat(UserSession session, string[] args, Action<IMessage> reply)
     {
         var svc = Composites(reply); if (svc == null) return;
@@ -58,12 +53,8 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// /drivable preset — gives the nearest free composite an engine, tyres and a mass.
-    ///
-    /// The last step of turning a pile of walls into a car, and the shortest, because everything it
-    /// needs already exists: the same vehicle profiles the map's own traffic runs on. From here the
-    /// thing is a vehicle to every system that cares — the grid, the broadcast radius, the client's
-    /// engine synthesis — none of which needs telling that a player built this one.
+    /// /drivable preset: gives the nearest free composite an engine, tyres and a mass, from the same
+    /// vehicle profiles the map's traffic runs on.
     /// </summary>
     private void HandleDrivable(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -86,7 +77,7 @@ public partial class CommandHandler
                  + "Add a seat that drives with /addseat driver drive, then get in with /enter.");
     }
 
-    /// <summary>/enter [seat] — gets into the nearest thing with seats.</summary>
+    /// <summary>/enter [seat]: gets into the nearest thing with seats.</summary>
     private void HandleEnter(UserSession session, string[] args, Action<IMessage> reply)
     {
         var svc = Seats(reply); if (svc == null) return;
@@ -99,7 +90,7 @@ public partial class CommandHandler
         Say(reply, message);
     }
 
-    /// <summary>/exit — gets out, onto a clear patch of ground beside it.</summary>
+    /// <summary>/exit: gets out, onto a clear patch of ground beside it.</summary>
     private void HandleExit(UserSession session, Action<IMessage> reply)
     {
         var svc = Seats(reply); if (svc == null) return;
@@ -107,12 +98,7 @@ public partial class CommandHandler
         Say(reply, message);
     }
 
-    /// <summary>
-    /// /seats — reads out what is inside the nearest thing you could get into.
-    ///
-    /// The replacement for looking through a window, and it has to say which seats are TAKEN as well
-    /// as which exist: walking round a car trying doors is how a sighted player finds that out.
-    /// </summary>
+    /// <summary>/seats: the seats in the nearest thing you could get into, and which are taken.</summary>
     private void HandleSeats(UserSession session, Action<IMessage> reply)
     {
         var svc = Seats(reply); if (svc == null) return;
@@ -131,10 +117,7 @@ public partial class CommandHandler
                      + $"{(seat.Taken ? "taken" : "free")}, {seat.Distance:F1} metres.");
     }
 
-    /// <summary>
-    /// /ignition [on|off] — the key, from the driver's seat. No argument turns it the other way from
-    /// wherever it is, which is what a key does.
-    /// </summary>
+    /// <summary>/ignition [on|off]: the key, from the driver's seat; on its own it turns it the other way.</summary>
     private void HandleIgnition(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (!_maps.TryGetMap(session.CurrentMapId, out var world, out _, out _, out var lookup)
@@ -167,14 +150,14 @@ public partial class CommandHandler
         return true;
     }
 
-    /// <summary>/siren [on|off|wail|yelp|phaser|hilo|next] — U and Shift+U in the driver's seat.</summary>
+    /// <summary>/siren [on|off|wail|yelp|phaser|hilo|next]: U and Shift+U in the driver's seat.</summary>
     private void HandleSiren(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (!DrivenVehicle(session, reply, out var world, out var root)) return;
         Say(reply, VehicleSignals.SirenCommand(world, root, args));
     }
 
-    /// <summary>/horn — a short blast, for a session that cannot hold H down.</summary>
+    /// <summary>/horn: a short blast, for a session that cannot hold H down.</summary>
     private void HandleHorn(UserSession session, Action<IMessage> reply)
     {
         if (!DrivenVehicle(session, reply, out var world, out var root)) return;
@@ -182,10 +165,7 @@ public partial class CommandHandler
         VehicleSignals.Tap(root.Id);
     }
 
-    /// <summary>
-    /// /window [down|up|half] — the side windows, from any seat. No argument rolls them the other way
-    /// from wherever they are going, which is what R does in a vehicle.
-    /// </summary>
+    /// <summary>/window [down|up|half]: the side windows, from any seat; on its own, the other way, as R does.</summary>
     private void HandleWindow(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (!_maps.TryGetMap(session.CurrentMapId, out var world, out _, out _, out var lookup)

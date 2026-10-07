@@ -11,18 +11,14 @@ namespace OpenFPS.Server.Core;
 /// <summary>
 /// Firing, reloading, wounds and death.
 ///
-/// A gun holds what its magazine holds and fires one round per press of the trigger, no faster than
-/// its action can be worked; empty, it clicks. A reload is the routine of a pair of hands
-/// (<see cref="WeaponHandling"/>), and the gun is not ready until that routine is over: the same
-/// routine is the sound everybody near hears, so the click of the bolt going home and the moment you
-/// can fire again are one moment.
+/// A gun fires one round per press, no faster than its action can be worked; empty, it clicks. A reload
+/// is the routine of a pair of hands (<see cref="WeaponHandling"/>) and the gun is ready when the routine
+/// everybody near hears is over: the bolt going home and the moment you can fire are one moment.
 ///
-/// A shot that lands on a person takes health, and the shooter alone is told, by a
-/// <see cref="HitConfirm"/> that their client plays as a chime. A person at no health dies: they fall,
-/// which everyone near hears, and their body stays where they fell, as something that can be picked up
-/// (<see cref="Bodies"/>). A player gets up again at the spawn after <see cref="PlayerRespawnSeconds"/>;
-/// a person in the street is taken off it, and after <see cref="WalkerRespawnSeconds"/> somebody else
-/// comes walking along the same way, out of sight of where the body lies.
+/// A hit on a person takes health and only the shooter is told (<see cref="HitConfirm"/>, a chime). At
+/// no health they fall, heard by everyone near, and the body stays as something that can be picked up
+/// (<see cref="Bodies"/>). A player gets up at the spawn after <see cref="PlayerRespawnSeconds"/>; after
+/// <see cref="WalkerRespawnSeconds"/> somebody else walks a killed pedestrian's way, out of sight of the body.
 /// </summary>
 public sealed partial class CombatService
 {
@@ -49,14 +45,11 @@ public sealed partial class CombatService
 
     /// <summary>
     /// Seconds a killed player waits before getting up again at the spawn. Cody (2026-10-05): "they
-    /// shouldn't repopulate right away, they should wait like a minute or so before respawning again".
+    /// should wait like a minute or so before respawning again".
     /// </summary>
     public const double PlayerRespawnSeconds = 60;
 
-    /// <summary>
-    /// Seconds before somebody new walks where a killed pedestrian walked. Cody (2026-10-05): "they
-    /// shouldn't repopulate right away, they should wait like a minute or so before respawning again".
-    /// </summary>
+    /// <summary>Seconds before somebody new walks where a killed pedestrian walked; the same minute.</summary>
     public const double WalkerRespawnSeconds = 60;
 
     /// <summary>A dead player is told once more how long is left, at this many seconds.</summary>
@@ -116,26 +109,16 @@ public sealed partial class CombatService
     // ── Firing ──────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// /fire [weapon] — fires what is in your hands, at whatever is in front of you.
-    ///
-    /// Hands join a gun to a player, without an `EquippedWeaponComponent`: the weapon is the
-    /// `ItemComponent.WeaponId` of the thing you are holding, so equipping a gun and picking one up
-    /// are the same act, and putting it down disarms you with no bookkeeping anywhere.
-    ///
-    /// Naming a weapon out of the air is for those with the fire-any permission only — useful for
-    /// hearing a model without first building a world to find a gun in — and spends no rounds, because
-    /// there is no gun to spend them from.
-    ///
-    /// It also happens to be the only thing in the game that can currently break a window, which is
-    /// why the glass path hangs off it too.
+    /// /fire [weapon]: fires what is in your hands. The weapon is the held item's WeaponId, so picking a
+    /// gun up arms you and putting it down disarms you. Naming a weapon needs fire-any (for hearing a
+    /// model without finding a gun) and spends no rounds.
     /// </summary>
     public void Fire(UserSession session, string[] args, Action<IMessage> reply, bool canNameAny)
     {
         if (!TryGetBody(session, reply, out var world, out var grid, out var lookup, out var position)) return;
         if (world.Has<DeadComponent>(session.Entity)) { Say(reply, "You are dead."); return; }
 
-        // The admin gun is not a registry weapon: it fires whatever calibre it is set to, and what its
-        // round does is its mode's (CombatService.AdminGun.cs). Naming a weapon still fires that one.
+        // The admin gun fires the calibre it is set to and its round does its mode's (CombatService.AdminGun.cs).
         if (!(canNameAny && args.Length > 0) && HoldsAdminGun(world, session.Entity, lookup, out var adminGun))
         {
             FireAdminGun(session, world, grid, adminGun, position, reply);
@@ -145,13 +128,9 @@ public sealed partial class CombatService
         bool armed = HandsService.TryGetHeldWeapon(world, session.Entity, lookup, out var weapon, out var item);
         bool fromTheAir = false;
 
-        // Naming one overrides what you are holding, and only a dev may do that. Everyone else fires
-        // the thing in their hands or nothing.
-        //
-        // NAMING ONE IS THE WHOLE OF THE EXEMPTION. An admin who fires with EMPTY HANDS must not be
-        // handed a weapon out of the air: a dev convenience that arms you silently is the same shape
-        // of fault as a trigger on a screen reader's key — the sound happens and the player cannot
-        // tell why. `/fire akm` is what the convenience is for.
+        // Naming one is the whole of the fire-any exemption: empty hands must never be armed out of the
+        // air, or a shot sounds and the player cannot tell why (the same fault as a trigger on a screen
+        // reader's key).
         if (canNameAny && args.Length > 0)
         {
             string id = args[0];
@@ -175,8 +154,7 @@ public sealed partial class CombatService
         if (!fromTheAir && !SpendRound(session, world, weapon, item, position, forward, reply)) return;
 
         Shoot(session, world, grid, weapon, position, forward, muzzle, cycle: !fromTheAir);
-        // On automatic the gun goes on firing at its cyclic rate until the trigger is let go
-        // ("cease"), the magazine runs dry, or the hand on it changes (UpdateAutomatic).
+        // On automatic it fires on until "cease", an empty magazine, or a change of hands (UpdateAutomatic).
         if (!fromTheAir && !session.IsTextClient && SelectorOf(world, item, weapon) == FireMode.Auto)
             StartAutomatic(session, item, weapon);
         if (session.IsTextClient) Say(reply, $"You fire the {weapon.DisplayName}.");
@@ -190,22 +168,11 @@ public sealed partial class CombatService
                        Vector3 position, Vector3 forward, Vector3 muzzle, bool cycle,
                        string? reportKey = null, AdminGunMode? admin = null, bool assist = true, float? dispersion = null)
     {
-        // 1. The shot itself. Named rather than described, because a gunshot is a blast wave, a body
-        //    resonance, a brightness sweep and the action working — and a model for that already
-        //    exists and is better than four numbers.
         EmitReport(session, weapon, position, forward, muzzle, cycle, reportKey);
 
-        // 2. The round, flown like every other: along the aim, from the body's own axis at the height
-        //    the gun is held, so a wall between you and your muzzle is the first thing it meets. What it
-        //    hits is said when it gets there (FlyBullets). This was a hit-scan: the nearest entity by its
-        //    CENTRE inside a flat 14-degree cone, a body taking the hit and a solid stopping it. A long
-        //    wall's centre is metres away along it, so from the second floor of Brandt Court the floor's
-        //    own east wall (88 m long, its centre 40 m off) was never in the cone and the pedestrian
-        //    below in the street was (Cody, 2026-10-04).
-        //
-        //    Aim assistance first, if the player has it on (/aimassist, on by default): somebody near the
-        //    aim and in plain view turns the gun onto them. Then the hip's own scatter, and the round is
-        //    flown as ever, so what it does on the way is still the world's to decide.
+        // The round is flown from the body's axis at the gun's height, so a wall between you and the
+        // muzzle is the first thing it meets; never a hit-scan (docs/GUNFIRE.md, "Rounds are flown").
+        // The assist turns the aim, then the hip's scatter, then the world decides.
         Vector3 from = position + new Vector3(0f, HipHeight, 0f);
         Vector3 aim = forward;
         if (assist && session.AimAssist && Assist(session, world, grid, weapon, from, forward, out var onto, out var whom))
@@ -220,8 +187,7 @@ public sealed partial class CombatService
 
     // ── Aim assistance ──────────────────────────────────────────────────────────────────────────
 
-    /// <summary>The widest the assist reaches, either side of the aim, measured flat: the old hit-scan
-    /// cone's 14 degrees (a dot of 0.97), so close in it forgives what that forgave.</summary>
+    /// <summary>The widest the assist reaches either side of the aim, measured flat: 14 degrees (a dot of 0.97).</summary>
     public static readonly float AssistHalfAngle = MathF.Acos(0.97f);
 
     /// <summary>
@@ -241,14 +207,10 @@ public sealed partial class CombatService
     public const float HeadHeight = 1.67f;
 
     /// <summary>
-    /// Console-style aim assistance for a shot from the hip. Of the living people (players and people in
-    /// the street) inside the assist cone of the aim, measured flat as the old cone was, and in plain
-    /// view of the muzzle (the round's own collider test from the muzzle to their chest: a wall, a car or
-    /// another person in the way means no; glass does not, it is see-through), the one nearest the aim
-    /// line, and of those equally near the nearest in distance. The gun is turned onto their chest, or
-    /// their head if the aim already passed above their shoulders, led for their walk and held up for
-    /// the drop over the time the round takes to get there (still air: the wind is the shooter's
-    /// problem). Nothing about the round is changed: it is flown from there like any other.
+    /// Console-style aim assistance from the hip. Of the living people inside the assist cone and in plain
+    /// view of the muzzle (glass does not block), the one nearest the aim line, then nearest in distance.
+    /// The gun is turned onto their chest, or their head if the aim passed above their shoulders, led for
+    /// their walk and held up for the drop in still air (the wind is the shooter's). The round is unchanged.
     /// </summary>
     private bool Assist(UserSession session, World world, SpatialGrid<Entity> grid, WeaponDefinition weapon,
                         Vector3 from, Vector3 forward, out Vector3 aim, out Entity target)
@@ -343,8 +305,7 @@ public sealed partial class CombatService
         return Vector3.Normalize(aimAt - from);
     }
 
-    /// <summary>How high above the feet a gun fired from the hip is held: where the report has always
-    /// come from.</summary>
+    /// <summary>How high above the feet a gun fired from the hip is held, and where its report comes from.</summary>
     public const float HipHeight = 1.5f;
 
     /// <summary>
@@ -389,16 +350,14 @@ public sealed partial class CombatService
             if (now < pending.DoneAt) { Say(reply, $"Still reloading the {weapon.DisplayName}."); return false; }
             FinishReload(session, pending, reply);
         }
-        // A trigger pressed faster than the action can be worked does nothing: there is no round
-        // in the chamber yet. Said nothing about, because the missing shot is the answer.
+        // Faster than the action: no round is chambered yet, and the missing shot is the answer.
         if (_lastShot.TryGetValue(session, out double last) && now - last < weapon.SecondsBetweenShots - 1e-6) return false;
         _lastShot[session] = now;
 
         ref var ammo = ref Arms.Ammo(world, item, weapon);
         if (ammo.Rounds <= 0)
         {
-            // The hammer falls on nothing. Heard by everyone near, as it would be: an empty click
-            // is the most important sound in a firefight to the person who is NOT holding the gun.
+            // The empty click is heard by everyone near: it matters most to the one not holding the gun.
             _server.EmitWorldAudio(session.CurrentMapId, session.Entity.Id, "dry fire", new[]
             {
                 HandSound(position, forward, WeaponHandling.DryFireKey(weapon),
@@ -424,9 +383,8 @@ public sealed partial class CombatService
             {
                 Character = SoundCharacter.Knock,
                 Position = muzzle,
-                // At the muzzle on the shooter's body as it is when heard, as a clap is: placed where the
-                // server had the body, a shot fired while walking came from a step behind you (Cody,
-                // 2026-10-04: "my gun shots are lagging behind me when I move").
+                // On the shooter's body as it is when heard: placed where the server had it, a shot fired
+                // walking came from a step behind (Cody, 2026-10-04).
                 OnBody = true,
                 BodyOffset = new Vector3(0f, 1.5f, 0.5f),
                 LevelDb = Loudness.MuzzleBlastDb(weapon),
@@ -503,16 +461,14 @@ public sealed partial class CombatService
     /// <summary>Bullets in the air now. For tests.</summary>
     public int BulletsInFlight => _flights.Count;
 
-    /// <summary>
-    /// A shot through a scope: the round is FLOWN, not hit-scanned. It leaves the barrel raised over
-    /// the line of sight by the rifle's zero and the turret, slows by its ballistic coefficient, falls
-    /// at 9.81 m/s² and is carried by the wind, and whatever it meets first is hit when the bullet gets
-    /// there — 0.8 s later at 600 m, by which time a walking target has moved a metre. Leading the
-    /// target and dialling the drop are the shooter's to do; nothing here helps with either.
-    /// </summary>
     /// <summary>One line a minute per player about an aim the server did not take, not one per shot.</summary>
     private static readonly RateLimiter AimLog = new(capacity: 1, refillPerSecond: 1.0 / 60);
 
+    /// <summary>
+    /// A shot through a scope, flown: raised over the line of sight by the zero and the turret, slowed by
+    /// its ballistic coefficient, dropping and carried by the wind; what it meets is hit when it gets
+    /// there (0.8 s at 600 m, a walker's metre). Leading and dialling the drop are the shooter's.
+    /// </summary>
     public void FireScoped(UserSession session, ScopedShot shot, Action<IMessage> reply)
     {
         if (!TryGetBody(session, reply, out var world, out _, out var lookup, out var position)) return;
@@ -593,13 +549,11 @@ public sealed partial class CombatService
     // ── What the others hear go by ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The crack or the whizz of a round going by, for every other player near its path, each sent
-    /// only to the one it is for and all of them NOW, with the trigger: the round is flown ahead here
-    /// against the world as it stands (<see cref="FlyAhead"/>), and each sound carries its own delay
-    /// from the shot (<see cref="BulletFlyby"/>). Sent with the report, the gap between the two is
-    /// exactly the physics; sent when the bullet got there, it would be a tick late and the report
-    /// would not be. A round that the real flight stops sooner than this one did (somebody stepped into
-    /// it) has already been heard further on: rare, and a crack that did not happen is the lesser fault.
+    /// The crack or whizz of a round going by, for every other player near its path, sent with the trigger:
+    /// the round is flown ahead against the world as it stands (<see cref="FlyAhead"/>) and each sound
+    /// carries its delay from the shot (<see cref="BulletFlyby"/>), so the gap after the report is exact
+    /// rather than a tick late. If the real flight stops sooner (somebody stepped in), a crack further on
+    /// was heard anyway: rare, and the lesser fault.
     /// </summary>
     private void PassingSounds(Flight f, World world, SpatialGrid<Entity> grid)
     {
@@ -643,15 +597,14 @@ public sealed partial class CombatService
         return (new Air(weather.TemperatureC, weather.PressureMb), WindModel.Felt(weather.Wind, weather.Gustiness, Clock()));
     }
 
-    /// <summary>
-    /// A round's whole flight, flown ahead of time against the world as it stands now (people carried on
-    /// at the pace they are walking), to where it stops or its time runs out: through glass, as the real
-    /// one goes, and with nothing broken or hurt.
-    /// </summary>
     /// <summary>One stretch of a round's flight between ricochets: its samples (times from the shot),
     /// and for a stretch after a ricochet the slug it is, where it left the face, how and when.</summary>
     private sealed record Leg(List<FlightSample> Path, Slug Slug, Vector3 From, Vector3 Velocity, float Seconds);
 
+    /// <summary>
+    /// A round's whole flight, flown ahead against the world as it stands (people carried on at their
+    /// walking pace) to where it stops: through glass as the real one goes, with nothing broken or hurt.
+    /// </summary>
     private List<Leg> FlyAhead(Flight f, World world, SpatialGrid<Entity> grid, Air air, Vector3 wind)
     {
         var state = f.State;
@@ -749,9 +702,8 @@ public sealed partial class CombatService
         var t = world.Get<Transform>(e);
         var c = world.Get<ColliderComponent>(e);
         Vector3 rel = at - t.Position;
-        // The face the round met, from the triangle it met (docs/GEOMETRY.md 3.6): its own normal, right at
-        // an edge and on any shape. The box's largest local axis guessed it, and near an edge of a long wall
-        // the guess was the end of the wall rather than its face.
+        // The face from the triangle it met (docs/GEOMETRY.md 3.6), right at an edge and on any shape: a
+        // box's largest axis guessed the end of a long wall near its edge rather than its face.
         if (c.Shape == ColliderShape.Box && geometry != null && TriangleNormal(geometry, e.Id, at, velocity, out var met))
         {
             var local = Vector3.Transform(met, Quaternion.Inverse(t.Rotation));
@@ -866,9 +818,7 @@ public sealed partial class CombatService
                               || (f.Slug.Tumbling && f.State.Velocity.LengthSquared() < MinSlugSpeed * MinSlugSpeed)))
                     done = true;
             }
-            // A round that flew its whole time, or out of the bottom of the map, without meeting
-            // anything says nothing: the silence after the shot is the answer, and every round that
-            // ends in something has already said what.
+            // A round that met nothing says nothing: the silence after the shot is the answer.
             if (done) _flights.RemoveAt(i);
         }
     }
@@ -922,8 +872,7 @@ public sealed partial class CombatService
             }
             string whom = NameOf(world, hitEntity);
             var shooter = f.Shooter;
-            // The chime and the words when the bullet gets there, not when the trigger breaks: a person
-            // 400 m off is hit more than half a second after the shot.
+            // The chime when the bullet gets there: at 400 m that is over half a second after the shot.
             bool killed = Wound(shooter, world, grid, hitEntity, damage, f.Weapon,
                                 m => _server.SendToSession(shooter, m), head);
             _server.SendToSession(shooter, new TextEvent { Text = HitWords(world, hitEntity, killed, head, metres) });
@@ -972,10 +921,8 @@ public sealed partial class CombatService
         }
         float graze = MathF.Asin(Math.Clamp(-Vector3.Dot(Vector3.Normalize(velocity), normal), 0f, 1f));
         EmitStrike(f, world, grid, hitEntity, material, at, normal, face, speed, graze, 0f, f.Slug);
-        // What it ended in, for the shooter alone: the ground, a roof, a wall, a car, by the name the
-        // map gives it ("Hit Kestrel House north wall at 22 metres"). This used to be the material,
-        // which is how a sofa came to be "audience": that is its acoustic material, soft and absorbent,
-        // the one a grandstand full of people is built of (Cody, 2026-10-04).
+        // What it ended in, for the shooter alone, by the name the map gives it, never the material
+        // (a sofa's is "Audience"; Cody, 2026-10-04).
         f.Called = true;
         _server.SendToSession(f.Shooter, new TextEvent { Text = StruckWords(world, hitEntity, metres) });
         Log.Information("{User}'s {Weapon} round hit {What} ({Id}) at {Metres:F0} m after {Seconds:F2} s.",
@@ -1166,12 +1113,8 @@ public sealed partial class CombatService
         => world.Has<PlayerComponent>(e) || world.Has<Pedestrian>(e);
 
     /// <summary>
-    /// A window going out, which is two sounds most of two seconds apart and from two different places.
-    ///
-    /// The whole reason `GlassBreak` was worth writing: the break is up at the window, then nothing,
-    /// then the glass arrives at the FOOT of the wall — and the gap between them is sqrt(2h/g), a
-    /// direct readout of which floor the shot was on. One crash sample throws that away, and a sighted
-    /// game would never notice it was gone.
+    /// A window going out: the break up at the window, then the glass landing at the foot of the wall,
+    /// sqrt(2h/g) later, which tells a listener which floor the shot was on.
     /// </summary>
     private void BreakGlass(UserSession session, World world, SpatialGrid<Entity> grid, Dictionary<int, Entity> lookup,
                             Entity pane, Transform t, ColliderComponent collider, WeaponDefinition weapon, float speed)
@@ -1287,8 +1230,7 @@ public sealed partial class CombatService
             {
                 Text = $"You are dead. You come back in {PlayerRespawnSeconds:0} seconds.",
             });
-            // Their own beacon goes quiet while they are dead (EntityDefinitionFactory): the body is
-            // what lies there now.
+            // Their beacon goes quiet while they are dead (EntityDefinitionFactory): the body lies there now.
             _server.SyncAudioComponent(target.Id);
         }
         Log.Information("{Target} ({Id}) died.", NameOf(world, target), target.Id);
@@ -1297,10 +1239,8 @@ public sealed partial class CombatService
     }
 
     /// <summary>
-    /// A person going down: the knees and hips first, from about half a metre, and then the trunk
-    /// from about a metre, nearly half a second later, onto whatever the floor is. The impact model
-    /// that every dropped thing uses, with a body's softness and mass, so a fall on a wooden floor and
-    /// one on wet grass are as different as they should be.
+    /// A person going down: knees and hips from about half a metre, then the trunk from about a metre
+    /// nearly half a second later, through the impact model every dropped thing uses.
     /// </summary>
     /// <param name="lowered">Set down from somebody's shoulder rather than collapsing: the same two
     /// contacts, legs then trunk, from a fifth of the height.</param>
@@ -1308,8 +1248,7 @@ public sealed partial class CombatService
     {
         float legs = lowered ? 0.1f : 0.5f, trunk = lowered ? 0.2f : 1.0f;
         float ground = PhysicsUtils.GetGroundHeight(world, grid, at + new Vector3(0, 0.5f, 0), out string floor);
-        // No floor found under them (the probe says so with a height far below the world): they
-        // fall where they stand.
+        // No floor found (a height far below the world): they fall where they stand.
         if (!float.IsFinite(ground) || ground < at.Y - 3f) { ground = at.Y; floor = "Generic"; }
         var where = new Vector3(at.X, ground, at.Z);
         var body = AcousticRegistry.GetProperties("Skin");
@@ -1330,12 +1269,9 @@ public sealed partial class CombatService
     // ── Reloading ───────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// /reload — fills the gun in your hands from what you carry spare.
-    ///
-    /// Takes as long as the hands' routine takes (<see cref="WeaponHandling"/>), during which the gun
-    /// cannot be fired; a magazine swap that leaves a round in the chamber is quicker than one from
-    /// empty, which needs the bolt sent home as well. The rounds move when the routine ends, so a
-    /// reload abandoned by putting the gun away moves none.
+    /// /reload: fills the gun in your hands from what you carry spare, as long as the hands' routine takes
+    /// (<see cref="WeaponHandling"/>; quicker with a round still chambered). The rounds move when it
+    /// ends, so a reload abandoned by putting the gun away moves none.
     /// </summary>
     public void Reload(UserSession session, Action<IMessage> reply)
     {
@@ -1375,8 +1311,7 @@ public sealed partial class CombatService
         {
             HandSound(position, forward, key, new HandlingSpec(weapon.Id, IsReload: true, load, fromEmpty)),
         });
-        // The routine is the answer: its last click is the gun being ready. A text player hears none
-        // of it, so is told it has begun.
+        // The routine's last click is the gun being ready; a text player hears none, so is told.
         if (session.IsTextClient) Say(reply, $"You start reloading the {weapon.DisplayName}.");
     }
 
@@ -1420,7 +1355,7 @@ public sealed partial class CombatService
         Tell($"{Arms.RoundsWords(r.Weapon, rounds)}, {spare} spare.");
     }
 
-    /// <summary>/ammo — what is in the gun in your hands, and what you carry spare.</summary>
+    /// <summary>/ammo: what is in the gun in your hands, and what you carry spare.</summary>
     public string AmmoReadout(UserSession session)
     {
         if (!_maps.TryGetMap(session.CurrentMapId, out var world, out _, out _, out var lookup)
@@ -1455,10 +1390,7 @@ public sealed partial class CombatService
         return true;
     }
 
-    /// <summary>
-    /// Gives a player spare rounds. Says "You gave sean 60 rounds of 9mm." to the giver and
-    /// "cody gave you 60 rounds of 9mm." to the receiver, the same words as an item given.
-    /// </summary>
+    /// <summary>Gives a player spare rounds, said in the same words as an item given.</summary>
     public bool GiveAmmo(UserSession giver, UserSession receiver, AmmoType ammo, int count, out string message)
     {
         message = "";
@@ -1494,7 +1426,7 @@ public sealed partial class CombatService
         List<Entity>? due = null, remind = null;
         world.Query(new QueryDescription().WithAll<DeadComponent>(), (Entity e, ref DeadComponent dead) =>
         {
-            // Anybody but a player is taken off at once: their body is already lying there as a body.
+            // Anybody but a player is taken off at once: their body already lies there.
             if (!world.Has<PlayerComponent>(e)) { (due ??= new List<Entity>()).Add(e); return; }
             double left = dead.DiedAt + PlayerRespawnSeconds - now;
             if (left <= 0) (due ??= new List<Entity>()).Add(e);
@@ -1592,9 +1524,8 @@ public sealed partial class CombatService
         => $"Hit {ThingName(world, e)} at {MathF.Round(metres):F0} metres.";
 
     /// <summary>
-    /// A thing by its name: the map's name for the part ("Kestrel House north wall"), or its prefab's
-    /// ("Brick Wall"), and "the ground" for the ground. Never its material, which is a property of the
-    /// thing and not what it is: a sofa's material is "Audience", and a bullet in one was "Hit audience".
+    /// A thing by the map's name for the part ("Kestrel House north wall"), or its prefab's ("Brick
+    /// Wall"), and "the ground" for the ground. Never its material: a sofa's is "Audience".
     /// </summary>
     internal static string ThingName(World world, Entity e)
     {

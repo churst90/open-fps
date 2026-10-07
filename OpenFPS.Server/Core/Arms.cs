@@ -27,9 +27,9 @@ public static class Arms
     }
 
     /// <summary>
-    /// The rounds in a weapon, made the first time anything asks: a gun that has never been touched
-    /// comes full, with <see cref="SpareMagazines"/> beside it. Lazily rather than at spawn, so a gun
-    /// placed by a map, a prefab, /give or a test is loaded the same way without each remembering to.
+    /// The rounds in a weapon, made the first time anything asks: an untouched gun comes full, with
+    /// <see cref="SpareMagazines"/> beside it. Lazily, so a gun from a map, a prefab, /give or a test is
+    /// loaded the same way without each remembering to.
     /// </summary>
     public static ref AmmoComponent Ammo(World world, Entity item, WeaponDefinition weapon)
     {

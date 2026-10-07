@@ -10,10 +10,8 @@ namespace OpenFPS.Server.Core;
 public partial class CommandHandler
 {
     /// <summary>
-    /// What is round you, nearest first: named things within 20 m that you could actually see or hear
-    /// directly, not through a wall, and measured to the nearest part of each, so a long wall beside
-    /// you is not placed at its middle. Said as one line, closest first; what is behind a wall is not
-    /// reported.
+    /// Named things within 20 m in direct line, not through a wall, said in one line nearest first.
+    /// Each is measured to its nearest part, so a long wall beside you is not placed at its middle.
     /// </summary>
     private void HandleScan(UserSession session, Action<IMessage> reply)
     {
@@ -27,27 +25,25 @@ public partial class CommandHandler
         world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) =>
         {
             if (e.Id == session.Entity.Id) return;
-            // Somebody's carried things ride on them: yours are not near you, and another player's are
-            // said by saying the player (Cody, 2026-10-04: Shift+P read out every gun Sean had).
+            // Carried things are said by saying who carries them (Cody, 2026-10-04: Shift+P read out
+            // every gun Sean had).
             if (world.Has<HeldComponent>(e)) return;
-            // Somebody dead is said by their body, which lies where they fell: "body of sean".
+            // Somebody dead is said by their body: "body of sean".
             if (world.Has<DeadComponent>(e)) return;
             Vector3 size = world.Has<ColliderComponent>(e) ? world.Get<ColliderComponent>(e).Size : Vector3.Zero;
             bool solid = world.Has<ColliderComponent>(e) && world.Get<ColliderComponent>(e).IsSolid && size.X > 0f;
             if (solid && Vector3.Distance(eye, t.Position) < scanRadius + size.Length()) solids.Add((e, t.Position, size, t.Rotation));
 
-            // A place is not a thing near you. The zone you are in was said when you walked into it, and
-            // a region or the portal between two is a volume nobody can walk into (Cody, 2026-10-04:
-            // a scan in a stairwell named the stairwell, and the one below it, at 0 metres). A door
-            // carries a portal too, and a door is very much a thing.
+            // A region, a named place or a bare portal is not a thing near you (Cody, 2026-10-04: a scan
+            // in a stairwell named it, and the one below, at 0 metres). A door carries a portal and is a thing.
             if (world.Has<RegionComponent>(e) || IsNamedPlace(world, e)) return;
             if (world.Has<PortalComponent>(e) && !world.Has<DoorComponent>(e)) return;
 
             string? name = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e).Name
                          : world.Has<PlayerComponent>(e) ? world.Get<PlayerComponent>(e).Username : null;
             if (string.IsNullOrWhiteSpace(name)) return;
-            // Ground is not announced: "that's what z is for" (Cody, 2026-10-04). Nor is a ceiling or a
-            // roof you are under. Decided by shape, not by name.
+            // Not the ground ("that's what z is for", Cody, 2026-10-04), nor a ceiling or roof over you;
+            // decided by shape, not by name.
             if (IsGroundOrOverhead(t.Position, size, t.Rotation, playerPos, eye.Y)) return;
             Vector3 nearest = NearestPointOf(t.Position, size, t.Rotation, eye);
             // The floor you are standing on is not something near you.
@@ -57,8 +53,8 @@ public partial class CommandHandler
             if (dist <= scanRadius) results.Add((name!, dist, dist > 0.001f ? Vector3.Normalize(nearest - eye) : Vector3.UnitZ, e));
         });
 
-        // Each name once, at its nearest: a wall is built in pieces round its doorways, and a flight of
-        // stairs is a box a step, so five nearest parts were often one wall said five times.
+        // Each name once, at its nearest: a wall is in pieces round its doorways and stairs are a box a
+        // step, so five nearest parts were often one wall said five times.
         var seen = results.Where(r => !Blocked(eye, r.Direction, r.Distance, r.E, solids))
                           .OrderBy(r => r.Distance)
                           .DistinctBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
@@ -75,17 +71,14 @@ public partial class CommandHandler
     }
 
     /// <summary>
-    /// Whether a box is a surface you stand on or stand under rather than a thing you could walk into:
-    /// a thin horizontal slab — no more than a metre thick and at least four times as wide as it is
-    /// thick, and a metre wide — with its top at or below the eye (a floor, a road, a pavement, a roof
-    /// you are on, a platform you could climb onto), or its underside over your head (a ceiling, a
-    /// canopy). A slab at head height is neither, and is said: that is a beam you would walk into.
-    /// Anything narrow, however low — a gun on the floor, a step — is a thing.
+    /// Whether a box is a surface you stand on or under rather than a thing: a level slab at most a metre
+    /// thick, at least a metre and four thicknesses wide, with its top at or below the eye or its
+    /// underside over your head. A slab at head height is a beam and is said; anything narrow is a thing.
     /// </summary>
     internal static bool IsGroundOrOverhead(Vector3 centre, Vector3 size, Quaternion rot, Vector3 feet, float eyeY)
     {
         if (size == Vector3.Zero) return false;
-        // Only a box that is level: turned about the vertical, or not at all.
+        // Level only: turned about the vertical or not at all.
         Vector3 up = Vector3.Transform(Vector3.UnitY, rot);
         if (MathF.Abs(up.Y) < 0.95f) return false;
         float thick = size.Y, narrow = MathF.Min(size.X, size.Z);

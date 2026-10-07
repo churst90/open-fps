@@ -9,14 +9,12 @@ using OpenFPS.Server.Systems;
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// /spawn of things that live: a walker, a parked vehicle, a train on a track already laid, an aircraft
-/// parked on open ground; and /give of a vehicle. Everybody on a map they own, staff anywhere
-/// (the spawn permission's scope). Giving a vehicle is premium (give-premium).
+/// /spawn of things that live (a walker, a parked vehicle, a train on a track already laid, an aircraft
+/// parked on open ground, a fire, a plain shape) and /give of a vehicle, which is give-premium.
 ///
-/// Every one of these goes through the path the map's own take: a walker is a VehicleSystem walker, a
-/// car is the vehicle shell a parked car is (CompositeService.Place), a train is a RailSystem consist.
-/// Only the aircraft is new: nobody can fly one yet (they fly their circuits from the map), so a given or
-/// spawned one is a body standing on the ground with a name (CompositeService.ParkAircraft).
+/// Each goes through the path the map's own take: a VehicleSystem walker, the vehicle shell a parked car
+/// is (CompositeService.Place), a RailSystem consist. Nobody can fly an aircraft yet, so a spawned one is
+/// a named body on the ground (CompositeService.ParkAircraft).
 ///
 /// On a player's map each is recorded, so /savemap keeps it. On a shipped map (MapManager.IsShipped) it
 /// lasts until a restart: those files are generated and must stay as the generator wrote them.
@@ -323,6 +321,7 @@ public partial class CommandHandler
         return true;
     }
 
+    /// <summary>/spawn Box|Cylinder MATERIAL X Y Z: a plain solid three metres in front of you.</summary>
     private void HandleSpawnShape(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (args.Length < 5)
@@ -345,8 +344,8 @@ public partial class CommandHandler
         Vector3 forward = Vector3.Transform(new Vector3(0, 0, 1), rot);
         Vector3 spawnPos = playerPos + (forward * 3.0f);
 
-        // Through the one spawn path: a bare world.Create leaves the object out of the map lookup and
-        // out of the spatial grid, so nothing could see it, hear it or walk into it.
+        // Through SpawnEntity: a bare world.Create leaves the object out of the map lookup and the
+        // spatial grid, so nothing could see it, hear it or walk into it.
         var e = _maps.SpawnEntity(session.CurrentMapId, w => w.Create(
             new Transform { Position = spawnPos, Rotation = Quaternion.Identity },
             new ColliderComponent { Shape = shape, Size = new Vector3(sx, sy, sz), IsSolid = true },

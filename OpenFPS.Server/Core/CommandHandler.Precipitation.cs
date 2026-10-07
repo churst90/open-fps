@@ -18,8 +18,8 @@ namespace OpenFPS.Server.Core;
 ///     /weather snow light|moderate|heavy|rate        (water equivalent, mm/h)
 ///     /weather hail pea|marble|quarter|golf|baseball|N mm   with the heavy rain it falls in
 ///
-/// Plain /weather rain, snow and storm are the fronts, as before. The answer is one short sentence,
-/// with the colour it would be on the radar.
+/// Plain /weather rain, snow and storm are the fronts. The answer is one short sentence, with the
+/// colour it would be on the radar.
 /// </summary>
 public partial class CommandHandler
 {
@@ -137,8 +137,8 @@ public partial class CommandHandler
         }
         if (dbz is float z)
         {
-            // What the radar says: the rate by the WSR-88D's relation, and the drops the size that,
-            // at that rate, reflect that much (unless a size was given too, which then stands).
+            // The rate by the WSR-88D's relation, and drops the size that reflect that much at that
+            // rate, unless a size was given too.
             rate = Math.Min(Rainfall.FullIntensityRate, Hydrometeors.RateFromDbz(z));
             if (median <= 0f) median = Hydrometeors.MedianForDbz(kind, rate, z);
         }

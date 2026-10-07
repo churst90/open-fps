@@ -13,15 +13,8 @@ namespace OpenFPS.Server.Core;
 /// and the sound tools are allowed to EVERYBODY on a map they own (<see cref="OnOwnMap"/>); holding the
 /// permission is what allows them on any map. Owning a map is a scope, not a role.
 ///
-/// The roles, and why (docs/PLAN_2026-10-05.md section 1 is the agreed table, docs/SERVER_SECURITY.md
-/// the reference):
-/// - Player: the game, and building on maps of their own.
-/// - Moderator: looks after people, never the world. Announcements, where somebody is, bringing them,
-///   kicking and muting, joining private maps to answer a report.
-/// - Dev: builds the world and tests it, on any map. Firing any weapon, giving ordinary items, joining
-///   private maps, and granting a player what the developer can do themselves. No power over people.
-/// - Admin: everything, and alone changes roles, makes custom roles, grants anything to anybody, gives
-///   premium items, moves other players, and sees and changes accounts and addresses.
+/// The roles and the table are in docs/SERVER_SECURITY.md: a Moderator looks after people and never the
+/// world, a Dev builds and tests the world and has no power over people, an Admin has everything.
 /// </summary>
 public static class Permissions
 {
