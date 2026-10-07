@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Security.Cryptography;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Common;
@@ -20,7 +21,15 @@ namespace OpenFPS.AudioLab.Spikes;
 ///        then sec= seconds timed, reps= times from a fresh synth; the cheapest and the median rep as a
 ///        share of one core, the bytes allocated while timed, and a hash of the places' samples. out=DIR
 ///        writes the first rep's places, interleaved float32, as DIR/shore_KEY.f32 (or flow_KEY.f32),
-///        for tools/null_test.py.
+///        for a null test.
+///   --water-cost rain out=DIR
+///        the render fingerprint's three rain renders (RenderFingerprintTests: 2 s at 8 mm/h on asphalt,
+///        steel and a puddle, seed 9) as DIR/rain_SURFACE.f32, for a null test of a change that moves them.
+///   --water-cost bubbles
+///        what one sample of a ringing bubble (EventSum.Bubble) costs, at five sizes.
+///   --water-cost null DIR_A DIR_B
+///        every .f32 in both: whether they are the same to the bit, and if not, how far apart: the
+///        difference's rms against the signal's, and its largest sample against the signal's peak.
 /// </summary>
 public static class WaterCostSpike
 {
@@ -29,6 +38,9 @@ public static class WaterCostSpike
 
     public static int Run(string[] args)
     {
+        if (args.Contains("null")) return Null(args);
+        if (args.Contains("bubbles")) return Bubbles();
+        if (args.Contains("rain")) return Rain(args);
         AcousticRegistry.Initialize();
         float sec = Arg(args, "sec=", 20f);
         int reps = (int)Arg(args, "reps=", 3f);
@@ -109,6 +121,100 @@ public static class WaterCostSpike
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"{name,-22} {what,-14} places {places,2}  cost min {costs[0] * 100,6:F2} %  median {costs[costs.Count / 2] * 100,6:F2} %  " +
             $"alloc {allocated,8} B  rms {rms:E3} Pa  peak {peak:E3} Pa  hash {hash}"));
+    }
+
+    private static int Rain(string[] args)
+    {
+        AcousticRegistry.Initialize();
+        string dir = args.First(a => a.StartsWith("out=", StringComparison.Ordinal))[4..];
+        Directory.CreateDirectory(dir);
+        var surfaces = new (string Name, RainLayer Layer)[]
+        {
+            ("asphalt", new RainLayer { Kind = RainSurfaceKind.Hard, Material = "Asphalt", ModulusGPa = 3f }),
+            ("steel", new RainLayer { Kind = RainSurfaceKind.Plate, Material = "Metal", ModulusGPa = 200f, Plate = new RainPlate("Metal", 0.0007f, 1.2f, 0.6f) }),
+            ("puddle", new RainLayer { Kind = RainSurfaceKind.Pool, Material = "Water", ModulusGPa = 2.2f }),
+        };
+        foreach (var (name, layer) in surfaces)
+        {
+            var synth = new RainSynth(Rate, 9) { Patch = new RainPatch { Layers = new[] { layer.Single() }, ReferenceDistance = 1f }, RainRate = 8f };
+            var x = new float[2 * Rate];
+            for (int i = 0; i < x.Length; i++) x[i] = synth.Next();
+            var bytes = new byte[x.Length * 4];
+            Buffer.BlockCopy(x, 0, bytes, 0, bytes.Length);
+            File.WriteAllBytes(Path.Combine(dir, "rain_" + name + ".f32"), bytes);
+        }
+        return 0;
+    }
+
+    /// <summary>What one sample of a ringing bubble costs, by its size.</summary>
+    private static int Bubbles()
+    {
+        Console.WriteLine($"Vector<float>: {Vector<float>.Count} lanes, accelerated {Vector.IsHardwareAccelerated}");
+        var sum = new EventSum(Rate, 3);
+        foreach (float mm in new[] { 13f, 6.5f, 3.3f, 1.6f, 0.8f })
+        {
+            float hz = FallingWaterSynth.MinnaertHzMetres / (mm * 1e-3f);
+            float damping = FallingWaterSynth.BubbleDamping(mm);
+            int length = (int)(4.6f / (MathF.PI * damping * hz) * Rate);
+            double best = double.MaxValue;
+            for (int rep = 0; rep < 5; rep++)
+            {
+                var sw = Stopwatch.StartNew();
+                for (int k = 0; k < 2000; k++)
+                {
+                    sum.Bubble(k % 64, hz, damping, 0.01f, FallingWaterSynth.BubbleRise);
+                    if ((k & 63) == 63) for (int i = 0; i < 64; i++) sum.Next();
+                }
+                best = Math.Min(best, sw.Elapsed.TotalSeconds);
+            }
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"bubble {mm,5:F1} mm {hz,6:F0} Hz: {length,6} samples, {best / 2000 * 1e9 / length:F2} ns a sample, {best / 2000 * 1e6:F1} us a bubble"));
+        }
+        foreach (float decay in new[] { 0.005f, 0.025f })
+        {
+            int length = (int)((0.0002f + 6f * decay) * Rate);
+            double best = double.MaxValue;
+            for (int rep = 0; rep < 5; rep++)
+            {
+                var sw = Stopwatch.StartNew();
+                for (int k = 0; k < 500; k++)
+                {
+                    sum.Burst(k % 64, 0.0002f, decay, 0.01f, 2000f, 4500f, steep: true);
+                    if ((k & 63) == 63) for (int i = 0; i < 64; i++) sum.Next();
+                }
+                best = Math.Min(best, sw.Elapsed.TotalSeconds);
+            }
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"splash burst {decay * 1e3,4:F0} ms: {length,6} samples, {best / 500 * 1e9 / length:F2} ns a sample, {best / 500 * 1e6:F1} us a burst"));
+        }
+        return 0;
+    }
+
+    private static int Null(string[] args)
+    {
+        var dirs = args.Where(a => !a.StartsWith("--") && a != "null").ToList();
+        if (dirs.Count != 2) { Console.WriteLine("--water-cost null DIR_A DIR_B"); return 2; }
+        foreach (var pathA in Directory.GetFiles(dirs[0], "*.f32").OrderBy(p => p, StringComparer.Ordinal))
+        {
+            string pathB = Path.Combine(dirs[1], Path.GetFileName(pathA));
+            if (!File.Exists(pathB)) { Console.WriteLine($"{Path.GetFileName(pathA),-26} missing in {dirs[1]}"); continue; }
+            byte[] a = File.ReadAllBytes(pathA), b = File.ReadAllBytes(pathB);
+            int n = Math.Min(a.Length, b.Length) / 4, same = 0;
+            double sa = 0, sd = 0, peak = 0, worst = 0;
+            for (int i = 0; i < n; i++)
+            {
+                float x = BitConverter.ToSingle(a, 4 * i), y = BitConverter.ToSingle(b, 4 * i);
+                if (BitConverter.SingleToInt32Bits(x) == BitConverter.SingleToInt32Bits(y)) same++;
+                double d = (double)y - x;
+                sa += (double)x * x; sd += d * d;
+                peak = Math.Max(peak, Math.Abs(x)); worst = Math.Max(worst, Math.Abs(d));
+            }
+            string verdict = same == n && a.Length == b.Length ? "identical to the bit"
+                : string.Create(CultureInfo.InvariantCulture,
+                    $"{100.0 * same / n:F2} % of samples identical; difference rms {10 * Math.Log10(Math.Max(1e-30, sd) / Math.Max(1e-30, sa)):F1} dB re the signal's, largest {20 * Math.Log10(Math.Max(1e-30, worst) / Math.Max(1e-30, peak)):F1} dB re its peak");
+            Console.WriteLine($"{Path.GetFileName(pathA),-26} {verdict}");
+        }
+        return 0;
     }
 
     private static float Arg(string[] args, string prefix, float fallback)

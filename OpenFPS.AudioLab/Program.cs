@@ -530,8 +530,8 @@ if (args.Contains("--waves"))
 
 if (args.Contains("--water-cost"))
 {
-    // --water-cost [shore|flow] [preset ...] [sec= reps= wind= out=DIR]: what each shore and running water
-    // preset costs a core as the game renders it, and a hash of its samples for a null test.
+    // --water-cost [shore|flow] [preset ...] [sec= reps= wind= out=DIR] | bubbles | null DIR_A DIR_B: what
+    // each shore and running water preset costs a core as the game renders it, and a null test between builds.
     Environment.Exit(OpenFPS.AudioLab.Spikes.WaterCostSpike.Run(args));
 }
 
