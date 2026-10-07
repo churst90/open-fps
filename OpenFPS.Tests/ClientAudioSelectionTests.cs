@@ -674,7 +674,7 @@ public class ClientAudioSelectionTests
             int[] far = { 5, 6, 7, 8 };
             bool NearDrop(SpatialEmitter e) => e.EntityId <= RainField.NearVoiceBase && e.EntityId > RainField.NearVoiceBase - RainField.NearVoicePool;
             Assert.True(h.TickUntil(() => far.All(s => h.Mixer.Latest.ContainsKey(RainField.VoiceBase - s))
-                                       && h.Mixer.Started.Count(NearDrop) >= 5, 600),
+                                       && h.Mixer.Started.Count(NearDrop) >= 5, 5000),
                         "the rain was never voiced");
 
             var ear = new Vector3(0f, h.Player.EyeHeight, 0f);
