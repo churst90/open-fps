@@ -173,13 +173,13 @@ public class WorldEditorTests : IDisposable
         Assert.Equal("Undid: copied Concrete Wall.", rig.Run("edit", "undo"));
         Assert.False(rig.Exists(copy));
 
-        // The map's own floor: deleted, and put back where it was.
-        Assert.StartsWith("Selected Concrete Floor", rig.Run("edit", "select", "#1"));
+        // The map's own ground (dirt since geometry stage 2): deleted, and put back where it was.
+        Assert.StartsWith("Selected Ground", rig.Run("edit", "select", "#1"));
         var floor = rig.PoseOf(1);
-        Assert.Equal("Deleted Concrete Floor. Undo puts it back.", rig.Run("edit", "delete"));
+        Assert.Equal("Deleted Ground. Undo puts it back.", rig.Run("edit", "delete"));
         Assert.False(rig.Exists(1));
         Assert.Single(rig.Overlay("mine").Removed);
-        Assert.Equal("Undid: deleted Concrete Floor.", rig.Run("edit", "undo"));
+        Assert.Equal("Undid: deleted Ground.", rig.Run("edit", "undo"));
         Assert.True(rig.Exists(1));
         Assert.Equal(floor, rig.PoseOf(1));
         Assert.Empty(rig.Overlay("mine").Removed);
@@ -299,11 +299,11 @@ public class WorldEditorTests : IDisposable
         Assert.StartsWith("Selected Fire, 2.7 metres right", rig.Run("edit", "select", "nearest"));
         Assert.Equal(fire, rig.Selected);
         Assert.StartsWith("Selected Fire", rig.Run("edit", "select", "fire"));
-        Assert.StartsWith("Selected Concrete Floor, under you", rig.Run("edit", "select", "#1"));
+        Assert.StartsWith("Selected Ground, under you", rig.Run("edit", "select", "#1"));
         Assert.Equal("Nothing here is called piano.", rig.Run("edit", "select", "piano"));
         var within = Assert.IsType<EditorMenu>(rig.Menu("select", "within", "10"));
         Assert.Equal("select.within:10", within.Path);
-        Assert.Contains(within.Items, i => i.Label.StartsWith("Concrete Floor, under you") && i.Command == "edit select #1");
+        Assert.Contains(within.Items, i => i.Label.StartsWith("Ground, under you") && i.Command == "edit select #1");
     }
 
     // ── Keeping it: the overlay ─────────────────────────────────────────────────────────────────
