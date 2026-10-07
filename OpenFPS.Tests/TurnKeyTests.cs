@@ -1,4 +1,6 @@
 using System.Numerics;
+using OpenFPS.Client.Core.Platform;
+using OpenFPS.Client.Core.Session;
 using OpenFPS.Common;
 
 namespace OpenFPS.Tests;
@@ -47,16 +49,19 @@ public class TurnKeyTests
         Assert.True(up.Y > 0.4f, $"a negative LookDelta.Y should tilt the nose up (+Y); it faced {up}");
     }
 
-    /// <summary>And the keys, as the session maps them: K down, O up.</summary>
+    /// <summary>And the keys, as the session maps them: J left, L right, K down, O up.</summary>
     [Fact]
     public void KLooksDownAndOLooksUp()
     {
-        // A copy of ClientGameSession.TurnKeys (private): an edit there is not caught here.
-        const float KLookY = +1f;
-        const float OLookY = -1f;
+        float LookY(GameKey key) => ClientGameSession.TurnKeys.Single(t => t.Key == key).Y;
+        float LookX(GameKey key) => ClientGameSession.TurnKeys.Single(t => t.Key == key).X;
 
-        Assert.True(ForwardAfterPitch(KLookY * LookXForDegrees(30f)).Y < 0f, "K must look DOWN");
-        Assert.True(ForwardAfterPitch(OLookY * LookXForDegrees(30f)).Y > 0f, "O must look UP");
+        Assert.True(ForwardAfterPitch(LookY(GameKey.K) * LookXForDegrees(30f)).Y < -0.4f, "K must look DOWN");
+        Assert.True(ForwardAfterPitch(LookY(GameKey.O) * LookXForDegrees(30f)).Y > 0.4f, "O must look UP");
+        Assert.True(ForwardAfter(LookX(GameKey.J) * LookXForDegrees(45f)).X < -0.5f, "J must turn LEFT");
+        Assert.True(ForwardAfter(LookX(GameKey.L) * LookXForDegrees(45f)).X > 0.5f, "L must turn RIGHT");
+        Assert.Equal(0f, LookX(GameKey.K));
+        Assert.Equal(0f, LookY(GameKey.J));
     }
 
     private static Vector3 ForwardAfterPitch(float lookY, float dt = PhysicsConstants.FixedDeltaTime)

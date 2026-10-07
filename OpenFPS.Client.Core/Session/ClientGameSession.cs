@@ -638,7 +638,7 @@ public sealed partial class ClientGameSession : IDisposable
     // X turns left) and Pitch += LookDelta.Y (CreateFromYawPitchRoll's pitch takes +Z toward -Y, so
     // increasing pitch looks down). J/L and K/O were each the wrong way round once, every step of the
     // reasoning plausible; TurnKeyTests holds them. See docs/CLIENT_NOTES.md, "Turn key signs".
-    private static readonly (GameKey Key, float X, float Y)[] TurnKeys =
+    internal static readonly (GameKey Key, float X, float Y)[] TurnKeys =
     {
         (GameKey.J, +1f,  0f),   // left
         (GameKey.L, -1f,  0f),   // right
