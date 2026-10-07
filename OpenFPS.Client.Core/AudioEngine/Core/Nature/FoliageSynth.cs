@@ -34,7 +34,6 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// </summary>
 public sealed class FoliageSynth
 {
-
     /// <summary>One leaf strike's peak, Pa at a metre from the crown, for a 40 cm² leaf in a 5 m/s wind.</summary>
     public const float LeafStrikePascals = 0.00075f;
 

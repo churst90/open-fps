@@ -180,7 +180,6 @@ public static class BoundaryProximityProcessor
         if (lineLen < 4 || n <= 0) { if (!output.IsEmpty) output.Clear(); return; }
         if ((uint)s.Write >= (uint)lineLen) s.Write = 0;
         float glide = s.Glide;
-        float loudest = 0f;
 
         for (int i = 0; i < n; i++)
         {
@@ -217,9 +216,6 @@ public static class BoundaryProximityProcessor
 
                 addL += gL * s.FilterL[t];
                 addR += gR * s.FilterR[t];
-
-                float mag = MathF.Max(MathF.Abs(gL), MathF.Abs(gR));
-                if (mag > loudest) loudest = mag;
             }
 
             s.Write = w + 1 >= lineLen ? 0 : w + 1;

@@ -357,8 +357,6 @@ public class ClientAudioSystem
         _audio.StopSound(entityId);
         _liveEngines.Remove(entityId);
         _engineStarted.Remove(entityId);
-        _motionHistory.Remove(entityId);
-        _tyreDemand.Remove(entityId);
         _engineRetiring.Remove(entityId);
         _engineEchoes.Forget(entityId, _audio);
         int distant = DistantVoiceBase - Math.Abs(entityId);
@@ -2576,10 +2574,6 @@ public class ClientAudioSystem
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
         else _audio.PlayPhysicalSoundDirect(e);
     }
-
-    // TODO: nothing reads these two since TyreDemand went; only ForgetEntity touches them.
-    private readonly Dictionary<int, (Vector3 Velocity, double At)> _motionHistory = new();
-    private readonly Dictionary<int, float> _tyreDemand = new();
 
     private void ProcessAudioEmitter(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos, float engineDt = 0f)
     {

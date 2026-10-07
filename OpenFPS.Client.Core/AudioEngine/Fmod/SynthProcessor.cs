@@ -121,7 +121,6 @@ public static class SynthProcessor
 
             for (uint frame = 0; frame < length; frame++)
             {
-                float prevLfo = state.LfoPhase;
                 state.LfoPhase += state.LfoRate / sampleRate;
                 if (state.LfoPhase >= 1.0f)
                 {

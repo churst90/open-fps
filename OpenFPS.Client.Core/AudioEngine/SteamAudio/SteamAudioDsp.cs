@@ -301,7 +301,7 @@ internal static class SteamAudioDsp
         float blend = Math.Clamp(state.SpatialBlend, 0f, 1f);
         float fromBlend = state.LastBlend < 0f ? blend : state.LastBlend;
         state.LastBlend = blend;
-        double sumSq = 0, sumSqL = 0, sumSqR = 0;
+        double sumSqL = 0, sumSqR = 0;
         unsafe
         {
             float* o = (float*)outbuffer;
@@ -338,7 +338,6 @@ internal static class SteamAudioDsp
                     o[i * 2] = l; o[i * 2 + 1] = r;
                     sumSqL += l * (double)l; sumSqR += r * (double)r;
                 }
-                sumSq = sumSqL + sumSqR;
             }
             else
             {
@@ -348,7 +347,6 @@ internal static class SteamAudioDsp
                     sumSqL += l * (double)l; sumSqR += r * (double)r;
                     for (int c = 0; c < outCh; c++) o[i * outCh + c] = c == 0 ? l : (c == 1 ? r : 0f);
                 }
-                sumSq = sumSqL + sumSqR;
             }
         }
 

@@ -177,7 +177,6 @@ public sealed class ClientGeometry
         Runner(() =>
         {
             TriangleWorld? built = null;
-            var clock = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 var statics = new List<SolidSpec>();

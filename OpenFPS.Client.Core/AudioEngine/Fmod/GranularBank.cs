@@ -75,8 +75,6 @@ public class GranularBank : IDisposable
             sound.getLength(out uint lengthBytes, TIMEUNIT.PCMBYTES);
 
             byte[] rawBytes = new byte[lengthBytes];
-            IntPtr ptr = Marshal.AllocHGlobal((int)lengthBytes);
-            
             res = sound.@lock(0, lengthBytes, out IntPtr ptr1, out IntPtr ptr2, out uint len1, out uint len2);
             if (res == RESULT.OK)
             {
@@ -89,10 +87,8 @@ public class GranularBank : IDisposable
             }
             else
             {
-                Marshal.FreeHGlobal(ptr);
                 return false;
             }
-            Marshal.FreeHGlobal(ptr);
 
             data =ConvertToFloatArray(rawBytes, format);
             return channels > 0;
