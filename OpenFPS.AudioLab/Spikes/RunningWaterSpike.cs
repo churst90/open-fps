@@ -219,6 +219,10 @@ public static class RunningWaterSpike
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         Console.WriteLine($"Extended sources {(ExtendedSources.Enabled ? "spread" : "one point")}; ear model {(OpenFPS.Common.Hearing.EarModel.Enabled ? "on" : "off")}");
+        // noise=1: every place of every running water source plays its own white noise instead of its
+        // water, through the same voices, places, ground and HRTF: what the game's path does on its own.
+        RunningWaterSynth.LabNoise = args.Contains("noise=1");
+        if (RunningWaterSynth.LabNoise) Console.WriteLine("Running water replaced by noise (noise=1)");
         var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
@@ -392,6 +396,28 @@ public static class RunningWaterSpike
                     StreetScene($"downpipe {name} 1.5m, no rain heard", r, r, false, pipe + new Vector3(0f, -0.15f, 1.5f), pipe, false, false, true);
                     StreetScene($"downpipe {name} 1.5m, in the rain", r, r, true, pipe + new Vector3(0f, -0.15f, 1.5f), pipe, false, false, true);
                 }
+            }
+            if (set is "downpipes")
+            {
+                // The downpipe scenes alone, for measuring what the game's path does to them: the street's
+                // downpipe from 1.5 m in moderate and heavy rain (the rain not heard), then the house's
+                // downpipe and its outlet together and the outlet alone, in heavy rain.
+                foreach (var (name, r) in new[] { ("moderate", Rainfall.ModerateRate), ("heavy", Rainfall.HeavyRate) })
+                    StreetScene($"downpipe {name} 1.5m, no rain heard", r, r, false, pipe + new Vector3(0f, -0.15f, 1.5f), pipe, false, false, true);
+                Vector3 shoe = o + new Vector3(30f, 0.15f, 60f);
+                Vector3 outlet = shoe + new Vector3(0f, 2.65f, -0.1f);
+                Weather(0f);
+                Runoff(Rainfall.HeavyRate);
+                int a = Add("flow:downpipe", shoe, 50f, 0.6f), b = Add("flow:gutter_outlet", outlet, 50f, 0.6f);
+                Stand(new(shoe.X - 1f, 0f, shoe.Z + 2f), shoe);
+                Pump(5.0);
+                Record("downpipe and gutter outlet heavy", sec);
+                Remove(a, b);
+                int c = Add("flow:gutter_outlet", outlet, 50f, 0.6f);
+                Stand(new Vector3(outlet.X - 1f, 0f, outlet.Z + 1.5f), outlet);
+                Pump(5.0);
+                Record("gutter outlet alone heavy", sec);
+                Remove(c);
             }
             if (set is "all" or "after")
             {
