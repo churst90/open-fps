@@ -175,7 +175,7 @@ cut-out and a 12 mm hole blowing 2.2 litres down in 140 ms.
 
 | anchor | value | from |
 |---|---|---|
-| `TrainProfile.RollingReferenceDb` | 104 dB per axle at 1 m at 100 km/h | set so the rendered PASS-BY reads 82 dB at 7.5 m for a disc-braked train at 80 km/h |
+| `TrainProfile.RollingReferenceDb` | 92 dB per axle at 1 m at 100 km/h (104 until 2026-10-07) | set so the rendered PASS-BY reads 82 dB at 7.5 m for a disc-braked train at 80 km/h |
 | `ChimeHornSpec.ReferenceDb` | 139 dB at 1 m on axis (K5LA) | the legal 96–110 dBA at 100 ft |
 | `StruckBellSpec.ReferenceDb` | 86 (gong) / 110 (loco) / 95 (tram gong) dB at 1 m, **RMS while ringing** | meter readings of bells in use |
 | `StruckBellSpec.PeakHeadroomDb` | 29 (gong) / 31 (others and default) dB | each bell's loudest blow over its RMS, measured over 20 s of ringing |
@@ -188,9 +188,14 @@ the difference back where it places the voice. Under the shared 16 every blow wa
 10 to 12 dB. A train's own bell, rung inside the train voice, keeps the shared headroom.
 
 The rolling anchor is the one worth reading twice. Setting it by extrapolating a single axle back to
-one metre and forward again to the lineside put it **twelve decibels light**, because a line of
-sources does not behave like one of them. Anchoring against the measurement that actually exists —
-a pass-by at 7.5 m — is the only honest way to do it.
+one metre and forward again to the lineside put it **twelve decibels light** against the pass-by, and
+that was put down to a line of sources not behaving like one of them. It was a bug (2026-10-07): every
+bogie of a train shared one track's filters, stepped once per bogie per sample, so the rail's modes ran
+at many times their rate and most of what the rail radiates was lost, more the more bogies (a light rail
+set 7 dB under what its bogies make, the six-coach train 9 to 13, the freight 11). With a track to each
+bogie the six-coach train passed at 92 dB with the old 104, so the anchor is 92 again, where one axle
+puts it, and the pass-by reads 82. Anchoring against the measurement that actually exists, a pass-by
+at 7.5 m, is still the check.
 
 ## A train is not a thing at a place
 
