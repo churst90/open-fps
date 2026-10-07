@@ -513,6 +513,9 @@ public sealed partial class CombatService
     /// there — 0.8 s later at 600 m, by which time a walking target has moved a metre. Leading the
     /// target and dialling the drop are the shooter's to do; nothing here helps with either.
     /// </summary>
+    /// <summary>One line a minute per player about an aim the server did not take, not one per shot.</summary>
+    private static readonly RateLimiter AimLog = new(capacity: 1, refillPerSecond: 1.0 / 60);
+
     public void FireScoped(UserSession session, ScopedShot shot, Action<IMessage> reply)
     {
         if (!TryGetBody(session, reply, out var world, out _, out var lookup, out var position)) return;
@@ -535,8 +538,9 @@ public sealed partial class CombatService
             if (!finite || MathF.Abs(MathHelper.WrapAngle(yaw - p.Yaw)) > MaxAimDisagreement
                         || MathF.Abs(pitch - p.Pitch) > MaxAimDisagreement)
             {
-                Log.Warning("{User}'s scoped aim {Yaw:F4},{Pitch:F4} is too far from the server's {SYaw:F4},{SPitch:F4}; using the server's.",
-                            session.Username, yaw, pitch, p.Yaw, p.Pitch);
+                if (AimLog.TryConsume(session.Username))
+                    Log.Warning("{User}'s scoped aim {Yaw:F4},{Pitch:F4} is too far from the server's {SYaw:F4},{SPitch:F4}; using the server's.",
+                                session.Username, yaw, pitch, p.Yaw, p.Pitch);
                 yaw = p.Yaw; pitch = p.Pitch;
             }
         }

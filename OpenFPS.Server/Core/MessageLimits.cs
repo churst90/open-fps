@@ -3,13 +3,9 @@ using Serilog;
 
 namespace OpenFPS.Server.Core;
 
-/// <summary>
-/// How often one account may do each thing a client can ask for (docs/SERVER_SECURITY.md, "Limits").
-/// Counted per account once logged in, so reconnecting does not refill them, and per connection before.
-/// Each limit is a burst and then a steady rate, set well above what anybody playing does; what is over it
-/// is refused (said, for what a person typed) or dropped (for what a client sends by itself), and logged
-/// once a minute per account, never once per message.
-/// </summary>
+/// <summary>How often one account may do each thing a client can ask for (docs/SERVER_SECURITY.md, "Limits").</summary>
+// Per account once logged in, so reconnecting does not refill them. Over a limit, typed things are refused
+// in words, things a client sends by itself are dropped; either is logged once a minute per account.
 public sealed class MessageLimits
 {
     /// <summary>Lines of chat, /all, /pm and /t: six at once, then one every two seconds.</summary>
@@ -46,10 +42,7 @@ public sealed class MessageLimits
     public const string CommandTooLong = "That command is too long.";
 }
 
-/// <summary>
-/// Abuse said in the log once per interval per source and kind, with how many times it happened since it
-/// was last said: a flood of ten thousand packets is one line a minute, not ten thousand lines.
-/// </summary>
+/// <summary>Abuse in the log once a minute per source and kind, with how many times since the last line.</summary>
 public sealed class AbuseLog
 {
     private readonly RateLimiter _lines;
