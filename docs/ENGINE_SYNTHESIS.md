@@ -458,6 +458,69 @@ The muffler case, settled by ear over several rounds:
 BodyResonator was first normalised by the sum of the mode weights: sixteen modes summing to one leave
 the loudest around a tenth, and a tenth of a coupling of 0.25 is thirty decibels down, inaudible.
 
+## The turbocharger's three sources
+
+A whistle set as a hand-set fraction of the block and sent out through the bay vanishes exactly when
+it should scream: floored, a straight-piped compound Cummins is 112 dB at its tailpipe. So the turbo
+(EngineSynth.Turbo) is three sources, each at its measured level, each out of the place it leaves by:
+
+- The compressor's blade-pass tone: main blades x shaft speed, 81 dB at 60,000 rpm on a heavy-duty
+  diesel's compressor (7+7 blades, open inlet), rising as the fourth power of the shaft speed
+  (Sustainability 15, 11300, 2023). Its outlet is 30-35 dB louder than its inlet in the duct
+  (Tiikoja, KTH), so it leaves by the boost pipes: through the bay.
+- The whoosh: a diesel's is broadband at 1.5-3.5 kHz (Evans & Ward, SAE 2005-01-2485), 85-90 dB(A)
+  at 10 cm from the boost duct near full speed (SAE 2009-01-2048): 68 at a metre. Also the bay.
+- The turbine's blade-pass tone, out of the tailpipe: ten to twelve blades, so 4 kHz at an idling
+  shaft and past hearing at full boost. No measured level exists; owners of straight-piped diesels
+  report it "increased massively". It is put in the duct 10 dB under the compressor outlet's and
+  radiated from the pipe's mouth, which at these frequencies is large against the wavelength: at a
+  metre, the duct pressure times radius / sqrt 2. It does not go through the waveguide: the pipes'
+  losses above 5 kHz took a 150 dB tone to nothing, and changing them would change every engine. A
+  muffler takes 15 dB off it (industrial and truck mufflers at 4-8 kHz: Lilly; Donaldson US 6,082,487).
+
+TurboWhistleLevel stays as the declared multiplier: one is a single turbo breathing through an open
+inlet, as the measurement was made.
+
+Pitch. Two measured facts set it, and together they put it an octave under the plain blade-passing
+tone of a 22,000 rpm idle:
+
+- What a compressor sings at part speed is not its blade-passing tone but tip-clearance noise, a
+  narrow hump at about half of it: over "a large range of rotor speeds with subsonic flow, radial
+  compressor noise is dominated by tip clearance noise" (Raitor and Neise, JSV 314, 2008); an
+  automotive wheel at design speed shows it at 0.53 x BPF under a BPF that has only then become the
+  strongest (Broatch et al. 2018). The blade-passing tone is kept, under the hump at part speed and
+  over it as the tips go supersonic near full boost; how much under and over is not published, so
+  the +-6 dB crossing is a setting. The hump is noise through a narrow band, not a sine: the
+  rotating instability that makes it is noise, and a sine, even with a wandering pitch, sounds thin.
+- The shaft idles at 12-15,000 rpm on a truck turbo (logged speed sensors: HE351VE, Power Stroke),
+  cruises at 40-50,000 and makes 120-130,000 at full boost. 22,000 (an earlier figure, from
+  engine-sensor readings) is where a light throttle starts to walk it up, not the idle.
+
+A cruise comes out at 2.3-2.9 kHz.
+
+## The starter motor
+
+The engine turning over on the starter falls out of the cylinders: the compression pulses coming
+round with nothing lighting them are the chug of cranking. The starter is the rest: a solenoid
+slamming the pinion into the ring gear, then a small DC motor pushing through a planetary reduction
+and the pinion.
+
+It is modelled as a machine, not a tone. Six recordings of real starts (Freesound: a V8 van, a Volvo
+245, an Aston V8, a Beetle, a Mazda 6 from the cabin, a diesel) are broadband from 500 Hz to 4 kHz,
+flat within a few decibels per octave, with weak, nearly steady gear lines under the noise and a
+swell and a clack on every compression. The noise is the brushes and the gears sliding
+(US10895239); the clack is the one-way clutch: the motor's own inertia, reflected through the whole
+reduction, cannot follow the crank as it springs off each compression, so the clutch lets go and
+picks it up again a moment later (US5086657). When the engine catches it runs away from the motor
+for good: the clutch overruns, the gears unload and go quiet, and the motor winds down once the
+pinion is thrown out. Nothing in a starter climbs in pitch.
+
+Gearing: a 130-tooth ring against a 10-tooth pinion, and a 4.5:1 planetary set inside a
+permanent-magnet gear-reduction starter (Bosch quotes 13-16:1 at the ring, 4.4:1 inside). The
+recordings put the gear lines 8-14 dB over the noise around them in a 5 Hz bin: the ring mesh
+(380-830 Hz) and, on a geared starter, the armature's slots passing the magnets near 2-2.5 kHz (a
+Volvo 245, an Aston V8, a diesel).
+
 ## Dead ends and cautions
 
 - The linear waveguide plus a choked valve has no solution for a large sustained inflow; the Mach

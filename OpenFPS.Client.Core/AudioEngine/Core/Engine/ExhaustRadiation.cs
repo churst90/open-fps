@@ -4,28 +4,21 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.AudioEngine.Core.Engine;
 
 /// <summary>
-/// Which way a tailpipe throws its sound, and what the vehicle's own body does to it.
+/// Which way a tailpipe throws its sound, and what the vehicle's own body does to it, so a car is not
+/// as bright from its nose as from its tail (Cody: "the tail pipe facing you should be loud — you
+/// should hear the crackling"). Two mechanisms, both per band:
 ///
-/// Reported: "a car facing you with the tail pipes away should give you reflections off whatever the
-/// sound is bouncing off, while the tail pipe facing you should be loud — you should hear the
-/// crackling." The pipe radiated as a bare point, the same in every direction, and nothing of the car
-/// stood between it and a listener in front, so a car was as bright from its nose as from its tail.
+/// The pipe. An open pipe radiates evenly while small against the wavelength and beams along its axis
+/// as it grows (Levine and Schwinger's unflanged pipe): the directional share is
+/// w = (ka)² / (1 + (ka)²), and a listener at θ off the axis gets 1 - w (1 - cos θ) / 2. A 63 mm
+/// tailpipe heard toward the car's nose keeps almost all its bass, loses about 3 dB at 1.25 kHz and
+/// 26 at 8 kHz, in line with measured unflanged-pipe patterns.
 ///
-/// Two mechanisms, both per band:
+/// The body. When the vehicle stands between exit and listener, the sound goes over, under or round
+/// it (see <see cref="BodyShadow"/>).
 ///
-/// THE PIPE. An open pipe radiates evenly while it is small against the wavelength and beams along its
-/// axis as it grows (Levine and Schwinger's unflanged pipe). The share that goes directional is
-/// w = (ka)² / (1 + (ka)²) for a pipe of radius a at wavenumber k, and a listener at angle θ off the
-/// axis gets 1 - w (1 - cos θ) / 2 of it. From the pipe's real radius: a 63 mm tailpipe straight
-/// behind — toward the car's nose — keeps almost all of its bass, loses about 3 dB at 1.25 kHz and
-/// about 26 at 8 kHz, in line with measured unflanged-pipe patterns.
-///
-/// THE BODY. When the vehicle stands between the pipe's exit and the listener, the sound goes over it,
-/// under it or round it: every route round the vehicle's own box, each with the same diffraction the
-/// walls use (Diffraction.BandGains), their energies added (see BodyShadow).
-///
-/// The result is three band gains at the model's band centres, applied to the pipe's signal by a split
-/// at the mixer's own crossovers (400 Hz and 4 kHz) that sums back to the input when all three are one.
+/// Three band gains, applied by a split at the mixer's crossovers (400 Hz, 4 kHz) that sums back to the
+/// input when all three are one.
 /// </summary>
 public sealed class ExhaustRadiation
 {
@@ -52,11 +45,9 @@ public sealed class ExhaustRadiation
         _axis = v.ExhaustAxis.LengthSquared() > 1e-6f ? Vector3.Normalize(v.ExhaustAxis) : -Vector3.UnitZ;
         _radius = MathF.Max(0.005f, v.Engine.Exhaust.TailpipeDiameterMm * 0.0005f);
         _body = new Vector3(v.WidthMetres, v.HeightMetres, v.LengthMetres);
-        // A motorcycle or an open-wheeler has no body round its pipe: the pipe ends where it ends,
-        // beside the wheel, in open air. Treating its length and height as a solid box pushed a
-        // cruiser's exit 0.8 m behind its own pipe, behind the rear tyre, and shaded it from anyone
-        // in front of the bike as if a car stood in the way — "I still think the exhaust is too
-        // long on the motor cycles".
+        // A motorcycle or an open-wheeler has no body round its pipe. As a solid box it pushed a
+        // cruiser's exit 0.8 m behind its pipe and shaded it from the front like a car ("I still think
+        // the exhaust is too long on the motor cycles").
         _openFrame = (v.Body?.CabinLengthM ?? 0f) <= 0f;
         var slot = v.ExhaustSlot;
         _exit = _openFrame ? slot + _axis * 0.05f : ExitPoint(slot, _axis, _body);
@@ -107,13 +98,11 @@ public sealed class ExhaustRadiation
     /// <summary>
     /// What the vehicle's own body lets past, per band, between the pipe's exit and the listener.
     ///
-    /// A car is not a wall. It is a box a couple of metres across, and at 200 Hz (1.7 m of wavelength)
-    /// sound bends round it from every side at once — over the roof, under the floor, round both
-    /// flanks — so treating it as an infinite screen with one route over the top took 14 dB off the bass
-    /// in front of a car, which is not what standing in front of a car sounds like. Each route round is
-    /// taken separately, the edge's loss for each from the same formula the walls use, and their
-    /// energies added: the finite-barrier treatment (ISO 9613-2's lateral paths). A route counts only
-    /// if its legs stay outside the body.
+    /// A car is a box a couple of metres across, and at 200 Hz sound bends round every side at once;
+    /// as an infinite screen with one route over the top it took 14 dB off the bass in front of a car.
+    /// So every route round (roof, floor, both flanks) is taken with the walls' edge loss
+    /// (Diffraction.BandGains) and their energies added: ISO 9613-2's lateral paths. A route counts
+    /// only if its legs stay outside the body.
     /// </summary>
     internal static (float Low, float Mid, float High) BodyShadow(Vector3 from, Vector3 to, Vector3 body, float speedOfSound)
     {

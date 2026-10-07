@@ -5,31 +5,27 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 
 /// <summary>
 /// Where the engine bay's noise comes out, and what the vehicle's own body does to it on the way to a
-/// listener: the same treatment <see cref="ExhaustRadiation"/> gives the tailpipe.
+/// listener: the treatment <see cref="ExhaustRadiation"/> gives the tailpipe.
 ///
-/// A bay lets its noise out of two holes (<see cref="EngineBaySpec"/>), and they are added as
-/// energies in the proportion of their areas:
+/// A bay lets its noise out of two holes (<see cref="EngineBaySpec"/>), added as energies in the
+/// proportion of their areas:
 ///
-///   THE GRILLE, at the face of the vehicle. Heard straight from in front, round the corner from the
-///   side, and over, under and round the whole body from behind: the body shadow per band, by the same
-///   finite-barrier routes the pipe uses (<see cref="ExhaustRadiation.BodyShadow"/>).
+///   The grille, at the face of the vehicle: the body shadow per band, by the finite-barrier routes
+///   the pipe uses (<see cref="ExhaustRadiation.BodyShadow"/>).
 ///
-///   THE OPEN FLOOR, onto the road. That sound is in the gap between the floor and the road, and it
-///   gets out from under the car at the edge nearest the listener: under the front bumper for a
-///   listener in front, under the sill beside the bay for one at the side, and under the back bumper,
-///   after the length of the car, for one behind it. On the way it loses
-///   <see cref="EngineBaySpec.UnderbodyLossDbPerMetre"/> for every metre of underbody it crosses.
+///   The open floor: the sound in the gap under the car gets out at the edge nearest the listener
+///   (front bumper, sill, or back bumper after the car's length), losing
+///   <see cref="EngineBaySpec.UnderbodyLossDbPerMetre"/> per metre of underbody crossed.
 ///
-/// With nobody outside listening it passes the bay's sound unchanged: how much gets out at all is
-/// <see cref="VehicleProfile.EngineBayLeakage"/>. Straight in front, or beside the bay, it is
-/// within a fraction of a decibel of unchanged.
+/// With nobody outside listening it passes the bay's sound unchanged; how much gets out at all is
+/// <see cref="VehicleProfile.EngineBayLeakage"/>.
 ///
 /// This is what makes the front of an idling car louder than its back by the margin NHTSA measured
 /// (6 to 10 dB; FMVSS 141 final rule, 81 FR 90416, 2016). A bay radiating evenly from its middle can
-/// only ever be louder in front by the extra distance to the back of the car, about 6 dB.
+/// only be louder in front by the extra distance to the back of the car, about 6 dB.
 ///
-/// Inactive (unity) for a vehicle with no bay model, an open frame, or an engine in the back; those
-/// leak evenly, as they always did.
+/// Inactive (unity) for a vehicle with no bay model, an open frame, or an engine in the back: those
+/// leak evenly.
 /// </summary>
 public sealed class BayRadiation
 {

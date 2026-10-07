@@ -8,9 +8,9 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// gain asked for. Immutable once designed: a voice swaps one in whole. Each user keeps its own
 /// <see cref="State"/>.
 ///
-/// A third of an octave, not an octave: what it takes back is an HRTF (HrtfBands), whose level moves by
-/// several decibels inside an octave at the top, and fitted an octave at a time it left a decibel in
-/// the 4 and 8 kHz octaves of a spectrum that falls across them (a bus, AudioLab --cabin).
+/// Thirds, not octaves: it takes back an HRTF (HrtfBands), which moves several decibels inside an
+/// octave at the top; fitted by octaves it left a decibel in the 4 and 8 kHz octaves of a bus
+/// (AudioLab --cabin).
 /// </summary>
 public sealed class BandEq
 {
