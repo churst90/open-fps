@@ -152,7 +152,13 @@ public sealed class OtherBodies
             if (string.IsNullOrEmpty(material) || material == "None") material = "Generic";
 
             if (fall.Landed) OnLandTriggered?.Invoke(body.Transform.Position, material, "0");
-            if (fall.Stepped) OnStepTriggered?.Invoke(fall.StepPosition, material, "0", fall.Slope, body.Id);
+            if (fall.Stepped)
+            {
+                // The foot on the floor under it (a tread on a flight), and what that floor is.
+                var at = PhysicsUtils.FootOnFloor(snapshot, fall.StepPosition, body.Transform.Position, body.Velocity, body.Id, out var footMaterial);
+                if (!string.IsNullOrEmpty(footMaterial) && footMaterial != "None") material = footMaterial;
+                OnStepTriggered?.Invoke(at, material, "0", fall.Slope, body.Id);
+            }
         }
 
         // Somebody who has gone — disconnected, died, or simply walked out of the area of interest —

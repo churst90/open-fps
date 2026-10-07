@@ -766,6 +766,11 @@ if (args.Contains("--stream-walk"))
     // --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [heading=east]: tiles streamed as you move.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.StreamWalkSpike.Run(args));
 }
+if (args.Contains("--stair-walk"))
+{
+    // --stair-walk [scene=shapes|city] [sprint] [trace]: up and down real treads, every footfall checked (docs/GEOMETRY.md stage 2).
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.StairWalkSpike.Run(args));
+}
 if (args.Contains("--geometry-parity"))
 {
     // --geometry-parity [map=city] [n=4000] [only=...]: the box path and the triangle world side by side (docs/GEOMETRY.md stage 1).

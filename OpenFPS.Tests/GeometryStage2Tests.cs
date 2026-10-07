@@ -254,6 +254,47 @@ public class GeometryStage2Tests : IDisposable
         Assert.True(down.End.Z < -0.5f, $"stopped at {down.End}");
     }
 
+    /// <summary>
+    /// Every footfall up a concrete flight and down a wooden one lands on a tread: the floor under the
+    /// foot is at the foot's height and is the flight's material, two treads a footfall at the game's walk
+    /// (the client's stride, PhysicsUtils.FootOnFloor; AudioLab --stair-walk walks the same with a report).
+    /// </summary>
+    [Fact]
+    public void EachFootfallOnAFlightLandsOnATread()
+    {
+        var concrete = new Vector3(1.2f, 2.8f, 4.48f);
+        var wood = new Vector3(1.0f, 2.6f, 3.9f);
+        var woodSurface = EntityGeometry.SurfaceOf("Wood", wood, 0, 0, false, 0, 0, false, false, false, null);
+        var world = WorldOf(
+            Shaped(7, new Vector3(0, 1.4f, 2f + concrete.Z / 2f), concrete, new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }),
+            Shaped(8, new Vector3(0, 2.75f, 2f + concrete.Z + 1f), new Vector3(1.2f, 0.1f, 2f), null),
+            SolidSpec.Of(9, new Vector3(0, 0.2f + wood.Y / 2f, 2f + concrete.Z + 2f + wood.Z / 2f), Quaternion.CreateFromYawPitchRoll(MathF.PI, 0, 0),
+                         wood, woodSurface, Shapes.Make(new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 15 }, wood)),
+            Shaped(10, new Vector3(0, 0.1f, 2f + concrete.Z + 2f + wood.Z / 2f), new Vector3(1.0f, 0.2f, wood.Z), null));
+        var walk = Walk(world, new Vector3(0, 0, 0), Vector3.UnitZ, 150);
+        var stride = new OpenFPS.Client.Core.StrideAccumulator();
+        var all = new AcceptAll();
+        Vector3 last = walk.Path[0];
+        int onConcrete = 0, onWood = 0;
+        foreach (var at in walk.Path)
+        {
+            var vel = (at - last) / PhysicsConstants.FixedDeltaTime;
+            last = at;
+            var fall = stride.Update(at, vel, true, Quaternion.Identity);
+            if (!fall.Stepped) continue;
+            var foot = PhysicsUtils.FootOnFloor(world, ref all, fall.StepPosition, at, vel, out var material);
+            float floor = world.FloorAt(foot.X, foot.Z, foot.Y + 0.4f, GeometryLayers.Ground, ref all, out var hit);
+            Assert.True(MathF.Abs(foot.Y - floor) < 2e-3f, $"foot at {foot} over a floor at {floor}");
+            string under = world.SurfaceOf(hit).Material;
+            Assert.Equal(under, material);
+            if (foot.Z > 2.3f && foot.Z < 6.3f) { Assert.Equal("Concrete", under); onConcrete++; }
+            if (foot.Z > 8.8f && foot.Z < 12.2f) { Assert.Equal("Wood", under); onWood++; }
+        }
+        // Two treads a footfall: about eight up sixteen treads and down fifteen.
+        Assert.InRange(onConcrete, 6, 10);
+        Assert.InRange(onWood, 5, 10);
+    }
+
     /// <summary>A bank too steep to walk is a wall: walked at, it is not climbed.</summary>
     [Fact]
     public void ABankTooSteepToWalkIsNotClimbed()
