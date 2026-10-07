@@ -1234,6 +1234,20 @@ public class AsyncAcousticWorker : IDisposable
 
     /// <summary>Tile rebuilds swapped in, and how long the last took, milliseconds. Diagnostic.</summary>
     public int TileSceneBuilds { get; private set; }
+    /// <summary>Background rebuilds (doors and tiles) swapped in so far. Diagnostic.</summary>
+    public int SceneSwaps { get; private set; }
+    /// <summary>The tile scenes' state (which pair is in use, what each holds), or null without them. Diagnostic:
+    /// read while no build is running (<see cref="SceneBuildPending"/>), or it may say only that one is.</summary>
+    public string? TileScenesState
+    {
+        get
+        {
+            try { return _tileScenes?.Describe(); }
+            catch (InvalidOperationException) { return "a build is changing them"; }
+        }
+    }
+    /// <summary>True while a background rebuild (a door, tiles) is being made and not yet handed over. Diagnostic.</summary>
+    public bool SceneBuildPending => _doorBuild != null;
     public double LastTileSceneBuildMs { get; private set; }
     /// <summary>Every background scene build so far (tiles and doors), milliseconds of wall time in all.</summary>
     public double SceneBuildMsTotal { get; private set; }
@@ -1273,6 +1287,7 @@ public class AsyncAcousticWorker : IDisposable
         _acoustics.PublishReflectionWorld(geometry, map);
         _lastSceneBoxes = boxes.Count;
         PublishRoutes(routes);
+        SceneSwaps++;
         SceneBuildMsTotal += (DateTime.UtcNow.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
         if (_buildIsForTiles)
         {
@@ -1373,11 +1388,13 @@ public class AsyncAcousticWorker : IDisposable
         {
             // A new map's own set of tiles; the last map's goes once no build is using it.
             if (_tileScenes != null) _retiredTileSets.Add((_tileScenes, DateTime.UtcNow.Ticks));
-            // Off unless OPENFPS_TILE_SCENES=1 (2026-10-06): the first door that moved swapped in the second
-            // pair of top scenes, which traced as empty, so every wall stopped occluding and the traced reverb
-            // and echoes lost their walls (Cody: traffic heard inside Selby House, reflections mono). The
-            // whole-scene build answers the same before and after a swing (AudioLab --path-probe door=).
-            _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") != "1" ? null : new TileSceneSet(_saContext, world.TileMetres);
+            // On unless OPENFPS_TILE_SCENES=0. Off for a day (2026-10-06): the first door that moved handed
+            // over the second pair of top scenes, which traced as empty, so every wall stopped occluding and
+            // the traced reverb and echoes lost their walls (Cody: traffic heard inside Selby House,
+            // reflections mono). Two things Steam Audio's Embree scenes do were missed, and TileSceneSet's
+            // remarks say both; tile scenes now answer as the whole-scene build does before and after any
+            // number of swings and tile changes (AudioLab --path-probe door= swings=, --stream-walk stops=).
+            _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres);
             _acousticStore = _tileScenes == null ? new AcousticGeometry(world.TileMetres) : null;
             var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, world, boxes, mapLeaves);
             _saScene.Dispose();

@@ -4,6 +4,18 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Tile scenes fixed and on again (`OPENFPS_TILE_SCENES=0` turns them off). After the first door swung
+  near you, every wall stopped occluding and the traced reverb and echoes lost their walls (traffic
+  heard inside Selby House, reflections mono). Steam Audio puts each instance of a tile in its top
+  scene, enabled, the moment it is made, and Embree then refuses to build that scene until the instance
+  is committed; and a released instance leaves its geometry behind, so the next tile given its id was
+  missing. Instances are now disabled when made and kept as long as their scene, and a pair of scenes
+  that holds too many replaced tiles is made again from scratch while it is idle (docs/WORLD_STREAMING.md,
+  "Steam Audio scene"). Measured the same as the whole-scene build across door swings on the city and
+  600 m of streaming on Magnolia; the traced reverb at the ear in Selby House went from silent after a
+  swing to the same level and IACC as the whole scene. New lab options: `--path-probe ... swings=N
+  traced`, `--stream-walk ... stops=M`. Regression test `TileSceneSetTests` (runs only with
+  `OPENFPS_STEAMAUDIO_TESTS=1`, since it needs the Steam Audio library). Unheard.
 - Geometry stage 2 (docs/GEOMETRY.md, "Stage 2 as built"; unheard, unplayed):
   - Stage 1's decisions: the loader no longer lays a concrete foundation under a map that has its own
     ground; where a map needs one it is dirt (the speedway). `/map new` starts on dirt. Every turn in a

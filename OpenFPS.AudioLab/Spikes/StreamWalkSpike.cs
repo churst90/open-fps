@@ -26,12 +26,18 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// without a fresh answer, before and while tiles change: the worker's own "placement stalled".
 ///
 ///   --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [heading=east|north|west|south]
-///                 [churn=N] [keep=old]
+///                 [churn=N] [keep=old] [stops=M]
 ///
 /// churn=N asks about N one-off sources a frame (a fraction: one every so many frames) besides the twenty that stay, each once and never again,
 /// as footsteps and birds come and go; the managed heap after a full collection is said every ten
 /// seconds. keep=old keeps route answers as they were kept before 2026-10-06 (RouteAnswers), for the
 /// before-and-after of a stopped voice holding the graph it was asked of.
+///
+/// stops=M stops every M metres walked until the tiles, the client's acoustic map and the worker's scene
+/// have all settled, then asks about the twenty sources afresh and prints the occlusion and band gains
+/// of each, with how many scenes the worker has swapped in so far. The stops fall at the same places on
+/// every run, so two runs (OPENFPS_TILE_SCENES=0 and on) can be compared stop by stop: tile scenes must
+/// answer as the whole-scene build does however many tile changes they have been through.
 /// </summary>
 public static class StreamWalkSpike
 {
@@ -51,6 +57,7 @@ public static class StreamWalkSpike
         var radii = StreamRadii.Named(Arg("detail", "medium")) ?? StreamRadii.Default;
         float churn = float.Parse(Arg("churn", "0"), System.Globalization.CultureInfo.InvariantCulture);
         float churnDue = 0f;
+        float stopEvery = float.Parse(Arg("stops", "0"), System.Globalization.CultureInfo.InvariantCulture);
         RouteAnswers.RetainSuperseded = Arg("keep", "") == "old";
         var heading = Arg("heading", "east") switch
         {
@@ -155,10 +162,22 @@ public static class StreamWalkSpike
         double nextHeap = 0;
         var heap = new List<(double T, double Mb)>();
         double HeapMb() { GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); return GC.GetTotalMemory(true) / 1048576.0; }
-        while (loop.Elapsed.TotalSeconds < seconds + 3)
+        // Walked by distance, so a stop holds the body still and the walk takes up where it left off.
+        float walked = 0f, walkTo = speed * (float)seconds, nextStop = stopEvery > 0 ? stopEvery : float.MaxValue;
+        double lastNow = 0, stopSince = -1, walkEnded = -1, lastTileMessage = 0;
+        int stopsMade = 0;
+        while (walkEnded < 0 || loop.Elapsed.TotalSeconds < walkEnded + 3)
         {
             double now = loop.Elapsed.TotalSeconds;
-            if (now < seconds) at = spawn + heading * (float)(speed * now);
+            if (stopSince < 0 && walked < walkTo)
+            {
+                walked = MathF.Min(walkTo, walked + speed * (float)(now - lastNow));
+                if (walked >= nextStop) { walked = nextStop; stopSince = now; }
+                else if (walked >= walkTo && stopEvery > 0) stopSince = now;   // and a last stop where the walk ends
+            }
+            if (walked >= walkTo && stopSince < 0 && walkEnded < 0) walkEnded = now;
+            lastNow = now;
+            at = spawn + heading * walked;
             world.Get<Transform>(body).Position = at;
             server.BroadcastForTest(tick++);
 
@@ -166,7 +185,7 @@ public static class StreamWalkSpike
             bool tiles = false;
             while (inbox.TryDequeue(out var m)) { tiles |= m is EntityDefinitionPack or EntityRemoved or TileStreamUpdate; Take(m); }
             var snap = client.GetSnapshot();
-            if (tiles) gameMs.Add(g.Elapsed.TotalMilliseconds);
+            if (tiles) { gameMs.Add(g.Elapsed.TotalMilliseconds); lastTileMessage = now; }
             worker.UpdateWorld(snap);
             for (int i = 0; i < offsets.Length; i++)
                 worker.EnqueueRequest(new AcousticRequest { EntityId = 900000 + i, ListenerPos = at + new Vector3(0, 1.7f, 0), SourcePos = at + offsets[i], SourceRadius = 0.3f });
@@ -200,6 +219,16 @@ public static class StreamWalkSpike
                     lastResult[i] = paths; lastFresh[i] = now;
                 }
             }
+            // A stop is measured once everything has settled: no tile message for a second, the client's
+            // acoustic map refreshed, the worker's last scene handed over to every tracer.
+            if (stopSince >= 0 && now - stopSince > 2.0 && now - lastTileMessage > 1.0 && !client.AcousticRefreshPending
+                && !worker.SceneBuildPending && !TracedReverbSet.Reconfiguring)
+            {
+                MeasureStop(worker, ++stopsMade, at, walked, offsets);
+                stopSince = -1;
+                nextStop += stopEvery;
+                if (walked >= walkTo) walkEnded = loop.Elapsed.TotalSeconds;
+            }
             double spent = loop.Elapsed.TotalSeconds - now;
             if (spent < frame) Thread.Sleep(TimeSpan.FromSeconds(frame - spent));
         }
@@ -219,5 +248,38 @@ public static class StreamWalkSpike
                           $"Steam Audio scenes {(worker.SceneOnlyMsTotal - onlyAtStart) / wall:F0} ms a second, routes {(worker.RoutesMsTotal - routesAtStart) / wall:F0}; " +
                           $"process CPU {cpu / wall * 100:F0} % of one core over {wall:F0} s");
         return 0;
+    }
+
+    /// <summary>The twenty sources asked about afresh where the body stands, and what the worker says of each.</summary>
+    private static void MeasureStop(AsyncAcousticWorker worker, int stop, Vector3 at, float walked, Vector3[] offsets)
+    {
+        var ear = at + new Vector3(0, 1.7f, 0);
+        var occ = new float[offsets.Length];
+        float low = 0, mid = 0, high = 0;
+        int answered = 0;
+        static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
+        for (int i = 0; i < offsets.Length; i++)
+        {
+            int id = 700000 + stop * 100 + i;
+            var src = at + offsets[i];
+            occ[i] = float.NaN;
+            var until = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < until)
+            {
+                worker.EnqueueRequest(new AcousticRequest { EntityId = id, ListenerPos = ear, SourcePos = src, SourceRadius = 0.3f });
+                Thread.Sleep(20);
+                if (worker.TryGetResult(id, out var paths) && paths.Count > 0 && paths[0].SourcePosition == src)
+                {
+                    var p = paths[0];
+                    occ[i] = p.Occlusion; low += Db(p.EqLow); mid += Db(p.EqMid); high += Db(p.EqHigh); answered++;
+                    break;
+                }
+            }
+        }
+        int n = Math.Max(1, answered);
+        Console.WriteLine($"  STOP {stop} at ({at.X:F0}, {at.Z:F0}), {walked:F0} m walked, {worker.SceneSwaps} scene swap(s): "
+                        + $"mean {low / n:F1}/{mid / n:F1}/{high / n:F1} dB, {occ.Count(o => o > 0.05f)} of {offsets.Length} occluded"
+                        + (worker.TileScenesState is { } state ? $"; tile scenes: {state}" : ""));
+        Console.WriteLine($"  STOP {stop} occlusion: " + string.Join(" ", occ.Select(o => float.IsNaN(o) ? "--" : o.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))));
     }
 }
