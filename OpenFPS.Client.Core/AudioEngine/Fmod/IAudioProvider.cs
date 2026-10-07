@@ -9,29 +9,25 @@ public interface IAudioProvider : IDisposable
     bool Initialize();
     void Update();
 
-    /// <summary>Mean and worst time one attribute pass took since this was last read, how many passes
-    /// there were, and how many voices each walked. Reading it resets the window. See
-    /// AudioEngineFacade's loop: the period is what makes a pass-by glide instead of step, so
-    /// somebody has to be able to check that it is actually being met.</summary>
+    /// <summary>Mean and worst time of one attribute pass since the last read, the passes and the voices
+    /// each walked; reading resets the window. The period is what makes a pass-by glide instead of step
+    /// (AudioEngineFacade's loop), so this checks it is met.</summary>
     (double MeanMs, double MaxMs, int Calls, int Voices) TakeUpdateCost() => (0, 0, 0, 0);
     void UpdateListener(Vector3 position, Quaternion rotation, Vector3 velocity, int regionId);
     void UpdateShelter(float shelterFactor);
-    /// <summary>What the body of the vehicle the listener is sitting in takes off everything outside
-    /// it, dB per band (negative). Zero when on foot.</summary>
+    /// <summary>What the body of the vehicle the listener sits in takes off everything outside it, dB per
+    /// band (negative); zero on foot.</summary>
     void SetListenerEnclosure(float lowDb, float midDb, float highDb) { }
-    /// <summary>Where the listener is, for the wind at their ears (EarWind); null when nobody is in a
-    /// world.</summary>
+    /// <summary>For the wind at the ears (EarWind); null when nobody is in a world.</summary>
     void SetEarWind(OpenFPS.Common.EarWindListener? listener) { }
-    /// <summary>Describes the surfaces immediately around the listener's head — one probe per
-    /// direction, in HEAD space — so the mixer can render each as its own early reflection.</summary>
+    /// <summary>The surfaces right round the listener's head, one probe per direction in head space, each
+    /// rendered as its own early reflection.</summary>
     void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes);
 
     /// <summary>
-    /// Starts an ambisonic ambience bed, or re-aims a playing one at a new level. The soundfield is
-    /// fixed in the WORLD: it is rotated by the listener's orientation and decoded binaurally every
-    /// block, so turning your head moves you through it rather than carrying it with you. Returns false
-    /// (having said why in the log) when the file is not a full-sphere ambisonic recording, or when
-    /// Steam Audio is unavailable to decode one.
+    /// Starts an ambisonic ambience bed, or re-aims a playing one at a new level. The soundfield is fixed
+    /// in the world, rotated by the listener and decoded binaurally every block. False (said in the log)
+    /// when the file is not a full-sphere ambisonic recording or Steam Audio cannot decode it.
     /// </summary>
     bool PlayAmbientBed(string soundId, AmbisonicLayout layout, float volume, bool loop = true);
 
@@ -43,32 +39,26 @@ public interface IAudioProvider : IDisposable
     void SetAcousticPath(int entityId, AcousticPathData path);
 
     /// <summary>
-    /// Overrides the listener-region reverb decay (FMOD SFXREVERB ms) with a geometry-derived value from
-    /// the Steam Audio reflection simulation. 0 = no override (keep the Sabine estimate).
-    ///
-    /// <paramref name="enclosure"/> is the OTHER half of the same answer, 0 (open field) to 1 (sealed
-    /// box): the decay says how long a tail would last here, and the enclosure says whether there is
-    /// one. They have to arrive together, because a long decay measured where nothing comes back is
-    /// precisely the reading that put a cathedral over an open racetrack. See OpenFPS.Common.Enclosure.
+    /// The listener's surveyed reverb decay, ms (0: keep the Sabine estimate), with
+    /// <paramref name="enclosure"/>, 0 (open field) to 1 (sealed box). They arrive together: the decay
+    /// says how long a tail would last and the enclosure whether there is one, and a long decay where
+    /// nothing comes back put a cathedral over an open racetrack (OpenFPS.Common.Enclosure). The
+    /// FMOD provider does not read <paramref name="hfDecayRatio"/> or <paramref name="lfDecayRatio"/>.
     /// </summary>
     void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio);
 
-    /// <summary>Sets the air temperature (°C) the Doppler math uses for the speed of sound. This is how
-    /// the simulated weather reaches the mix: c = 331.3 + 0.606·T.</summary>
+    /// <summary>°C, for the speed of sound in the Doppler (c = 331.3 + 0.606·T).</summary>
     void SetAirTemperature(float celsius);
-    /// <summary>The mixer's DSP load, 0..1+. 1 means the callback is using its whole deadline.</summary>
+    /// <summary>0..1+; 1 is the callback using its whole deadline.</summary>
     float MixerLoad { get; }
 
     /// <summary>
-    /// How many binaural voices are still free — the resource a voice budget is actually spending.
-    ///
-    /// Every spatialised voice needs an HRTF slot. A voice that cannot get one still plays, and that
-    /// is the trouble: it plays FLAT, with no position at all, which on a map navigated by ear is
-    /// worse than silence because it lies about where something is.
+    /// Binaural (HRTF) voices still free: what a voice budget really spends. A voice without one still
+    /// plays, flat, with no position, which on a map navigated by ear is worse than silence.
     /// </summary>
     int SpatialVoicesFree { get; }
 
-    /// <summary>Brings a live engine voice back to full after a fade-out was started. Idempotent.</summary>
+    /// <summary>Brings a live engine voice back after a fade-out was started. Idempotent.</summary>
     void ReviveEngine(int entityId);
 
     /// <summary>Asks a live engine voice to fade out; true once it is silent and safe to stop.
@@ -76,34 +66,27 @@ public interface IAudioProvider : IDisposable
     bool FadeOutEngine(int entityId);
 
     /// <summary>
-    /// Takes ANY voice down to silence over about eighty milliseconds; true once it is there.
-    ///
-    /// The budget's way of letting go of a continuous source. Distinct from FadeOutEngine, which
-    /// slews the SYNTHESIS's own envelope inside the DSP: this is the channel's gain, so it works for
-    /// a sample, a loop, a granular voice and a synthesized engine alike. True also when there is no
-    /// such voice, so "gone" and "never existed" look the same.
+    /// Takes any voice to silence over about eighty milliseconds by the channel's gain (FadeOutEngine
+    /// slews the synthesis instead); true once silent, or when there is no such voice. The budget's way
+    /// of letting go of a continuous source.
     /// </summary>
     bool FadeOutVoice(int entityId);
 
     /// <summary>Brings one back after a fade was started. Idempotent.</summary>
     void CancelVoiceFade(int entityId);
 
-    /// <summary>
-    /// What one car's engine is actually doing: the road speed it has been TOLD, the speed its own
-    /// driveline has reached, the crank speed, and the gear. Diagnostic.
-    ///
-    /// "The cars sound like they are slowing down" has at least four different causes that sound
-    /// identical from a chair — the cars really are slowing (an oval makes them lift twice a lap),
-    /// the world is reporting a speed that is too low, the virtual driver is not holding the speed it
-    /// was given, or the driver is shifting up. Reading the four numbers separates them in one line.
-    /// </summary>
-    /// <summary>Whether a vehicle voice has its doors standing open (a bus at a stop). The voice decides
-    /// that from its own speed history, so it is the one to ask.</summary>
+    /// <summary>Whether a vehicle voice has its doors open (a bus at a stop): the voice decides from its
+    /// own speed history.</summary>
     bool EngineDoorsOpen(int entityId) => false;
     /// <summary>A train ("preset/train") sounds its horn or whistle in this rhythm and rings its bell
     /// for this long, begun <paramref name="secondsAgo"/> before now (TrainSignal). Played by the train's
     /// own synth, on its own outlets.</summary>
     void SignalTrain(string train, float[] warning, float bellSeconds, double secondsAgo) { }
+    /// <summary>
+    /// A car engine's told road speed, its own driveline's speed, its crank speed and gear. "The cars
+    /// sound like they are slowing down" has four causes that sound alike (they are, the world reports
+    /// too low, the driver is not holding speed, the driver shifts up); these four numbers tell them apart.
+    /// </summary>
     bool TryGetEngineTelemetry(int entityId, out float toldSpeed, out float ownSpeed, out float rpm, out int gear)
     {
         toldSpeed = ownSpeed = rpm = 0f; gear = 0; return false;
@@ -119,37 +102,28 @@ public interface IAudioProvider : IDisposable
     IEnumerable<int> GetActiveSpatialSoundIds();
     void Preload(string soundId);
 
-    /// <summary>
-    /// Decodes a sound from the bank to interleaved float PCM, without keeping it. False when there is
-    /// no such sound or nothing to decode it with.
-    /// </summary>
+    /// <summary>Decodes a bank sound to interleaved float PCM without keeping it.</summary>
     bool TryDecode(string soundId, out float[] pcm, out int channels, out int sampleRate)
     {
         pcm = Array.Empty<float>(); channels = 0; sampleRate = 0; return false;
     }
 
     /// <summary>
-    /// Makes a buffer the game synthesised available under a sound id.
-    ///
-    /// The bridge between physical modelling and everything else: once registered, a rendered door
-    /// latch is an ordinary sound id, so it is placed, attenuated, occluded and reverberated by the
-    /// same path that handles a recording, and none of that path needs to know nobody recorded it.
+    /// Makes a synthesised buffer an ordinary sound id, placed, occluded and reverberated by the same
+    /// path as a recording.
     /// </summary>
     bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate);
 
     /// <summary>
-    /// Lets go of a buffer registered by <see cref="RegisterSynthesisedSound"/>, once nothing is
-    /// playing it: releasing a sound stops every channel still playing it. For one-off renders that
-    /// will never be asked for again (a strike's thunder, worked out for one listener), which would
-    /// otherwise stay in memory for the rest of the session. False if there was nothing to release.
+    /// Lets go of a buffer from <see cref="RegisterSynthesisedSound"/> once nothing plays it (releasing
+    /// stops every channel still playing it): for one-off renders such as a strike's thunder.
     /// </summary>
     bool ReleaseSynthesisedSound(string soundId) => false;
 
     /// <summary>
-    /// The same as <see cref="RegisterSynthesisedSound"/>, kept in 32-bit float. For a long render with
-    /// a wide range in it (a strike's thunder: a crack and then a minute of rumble 40-60 dB under it),
-    /// whose quiet end sixteen bits would leave as a few steps of the last bit: heard as crackle and
-    /// as stretches of exact silence. Falls back to sixteen bits where a provider has no float path.
+    /// <see cref="RegisterSynthesisedSound"/> in 32-bit float, for a render with a wide range (thunder's
+    /// crack, then a minute of rumble 40-60 dB under it), whose quiet end sixteen bits turn to crackle
+    /// and stretches of exact silence. Sixteen bits where a provider has no float path.
     /// </summary>
     bool RegisterSynthesisedSoundFloat(string soundId, float[] pcm, int sampleRate)
     {
@@ -163,49 +137,44 @@ public interface IAudioProvider : IDisposable
         return RegisterSynthesisedSound(soundId, bytes, sampleRate);
     }
 
-    /// <summary>Plays a short interface sound in both ears, not in the world: no position, no room.
-    /// The buffer is made once per id and kept; <paramref name="volume"/> is 0..1.</summary>
+    /// <summary>An interface sound in both ears: no position, no room. The buffer is made once per id
+    /// and kept; <paramref name="volume"/> is 0..1.</summary>
     void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume);
     /// <summary>
-    /// Keeps an interface LOOP playing in a named slot (the scope's guidance tone): the loop
-    /// <paramref name="id"/> at <paramref name="volume"/> and playback rate <paramref name="pitch"/>.
-    /// The same id again only changes the volume and rate; a different id fades the old loop out and
-    /// the new one in, so changing between them never clicks.
+    /// Keeps an interface loop playing in a named slot (the scope's guidance tone). The same
+    /// <paramref name="id"/> again only changes <paramref name="volume"/> and <paramref name="pitch"/>; a
+    /// different one cross-fades, so changing never clicks.
     /// </summary>
     void SetUiLoop(string slot, string id, Func<float[]> render, int sampleRate, float volume, float pitch) { }
     /// <summary>Fades the loop in a slot out and stops it.</summary>
     void StopUiLoop(string slot) { }
-    /// <summary>Fades the world (everything but the interface sounds), 0..1. 1 is as authored.</summary>
+    /// <summary>Everything but the interface sounds, 0..1; 1 is as authored.</summary>
     void SetWorldFade(float gain) { }
 
     /// <summary>True when a microphone is connected.</summary>
     bool HasRecordingDevice => false;
-    /// <summary>Starts recording from the named input device (empty: the default). Gives the rate it
-    /// records at. False when there is no device or it would not open.</summary>
+    /// <summary>From the named input device (empty: the default). False when there is none or it would
+    /// not open.</summary>
     bool StartRecording(string deviceName, out int sampleRate) { sampleRate = 0; return false; }
-    /// <summary>Appends what has been recorded since the last call, mixed to mono, -1..1. Returns how many.</summary>
+    /// <summary>Appends what was recorded since the last call, mixed to mono; returns how many.</summary>
     int ReadRecording(List<float> mono) => 0;
-    /// <summary>Stops recording and lets the device go.</summary>
     void StopRecording() { }
-    /// <summary>The voices reaching the listener loudest, most first. Diagnostic.</summary>
+    /// <summary>The voices reaching the listener loudest, loudest first. Diagnostic.</summary>
     IReadOnlyList<VoiceLevel> LoudestVoices(int count);
-    /// <summary>The output devices the system offers, by name, in driver order.</summary>
+    /// <summary>In driver order.</summary>
     IReadOnlyList<string> OutputDevices();
-    /// <summary>The recording devices the system offers, by name.</summary>
     IReadOnlyList<string> InputDevices();
-    /// <summary>Switches output to the named device ("" for the system default). False if there is no
-    /// such device, in which case nothing changes.</summary>
+    /// <summary>"" for the system default. False, and nothing changes, if there is no such device.</summary>
     bool SetOutputDevice(string name);
 
-    // --- Diagnostics (Step 1a): an isolated mono source for verifying HRTF / 3D panning. ---
+    // An isolated mono source for checking HRTF and 3D panning by ear (AudioDiagnostics).
     void StartDiagnosticSound();
     void SetDiagnosticPosition(Vector3 position);
     void StopDiagnosticSound();
 }
 
-/// <summary>One voice as it reaches the listener: its level in dB full scale in its loudest band, how much
-/// is blocked, the level in each of the low/mid/high bands (distance, occlusion, air, shelter and cone
-/// all applied), and whether it is a reflection or arriving from somewhere other than its source (round
-/// an edge).</summary>
+/// <summary>One voice as it reaches the listener: dBFS in its loudest band, how much is blocked, each band's
+/// level (distance, occlusion, air, shelter and cone applied), and whether it is a reflection or arrives
+/// from somewhere other than its source (round an edge).</summary>
 public readonly record struct VoiceLevel(int EntityId, string SoundId, float Distance, float Db, float Occlusion,
                                          float Low, float Mid, float High, bool Reflection, bool Redirected);

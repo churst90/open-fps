@@ -5,22 +5,16 @@ using OpenFPS.Client.AudioEngine.Core.Nature;
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// The voices for things nobody made: falling water, a fire, the wind in a tree. Each is a
-/// <see cref="PhysicalVoiceState"/> like a machine, ranked and budgeted with the machines by what it
-/// renders at the listener, and each reads the one <see cref="WindField"/> at its own place, so a
-/// gust that bends the trees upwind of you reaches the fire and the fountain spray a moment later.
-///
-/// They need their POSITION, which a machine does not: a machine's state comes from its entity id,
-/// but the wind at a tree is the wind where the tree is, and two trees fifty metres apart along the
-/// wind hear the same gust ten seconds apart. The position is fixed when the voice is made — none of
-/// these move.
+/// The voices for things nobody made: falling water, a fire, the wind in a tree. Ranked and budgeted
+/// with the machines, and each reads the one <see cref="WindField"/> at its own fixed place, so a gust
+/// that bends the trees upwind reaches the fire and the fountain a moment later.
 /// </summary>
 public abstract class NatureVoiceState : PhysicalVoiceState
 {
-    /// <summary>Where the source is, map metres (x east, y up, z north).</summary>
+    /// <summary>Map metres (x east, y up, z north).</summary>
     public readonly Vector3 Position;
 
-    /// <summary>How high above its base the wind it feels is, m: the crown of a tree, the flames.</summary>
+    /// <summary>Metres above its base where it feels the wind: a tree's crown, the flames.</summary>
     protected readonly float WindHeight;
 
     protected NatureVoiceState(float sourceLevelDb, float headroomDb, float sampleRate, Vector3 position, float windHeight)
@@ -30,8 +24,8 @@ public abstract class NatureVoiceState : PhysicalVoiceState
         WindHeight = windHeight;
     }
 
-    /// <summary>The wind where this source is, m/s, now. The field is read once a block, eleven
-    /// milliseconds apart against gusts that last seconds; each synth glides between the readings.</summary>
+    /// <summary>m/s, read once a block against gusts that last seconds; each synth glides between the
+    /// readings.</summary>
     protected float WindHere() => WindField.SpeedAt(Position.X, WindHeight, Position.Z, WindField.Now());
 
     protected override void PushListener(Vector3 frame) { }
@@ -59,24 +53,17 @@ public sealed class WaterVoiceState : NatureVoiceState
 }
 
 /// <summary>
-/// A water feature heard from several places at once: ONE <see cref="FallingWaterSynth"/>, each of its
-/// taps (<see cref="WaterFeatureSpec.Taps"/>) a voice of its own where that water lands on the map.
+/// A water feature heard from several places at once: one <see cref="FallingWaterSynth"/>, each of its
+/// taps (<see cref="WaterFeatureSpec.Taps"/>) a voice where that water lands, keyed
+/// "water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;".
 ///
-/// The map places one emitter per tap, keyed "water:&lt;preset&gt;/&lt;feature&gt;/&lt;tap&gt;"; every tap of
-/// one feature reads this one synth, as a train's bogies read one TrainVoiceState (RailVoice.cs), so the
-/// pump, the wind in the spray and the jets' wandering are the fountain's, not each tap's. Each tap
-/// gets the events that land there, so the voices are as decorrelated as the water is, and a fountain
-/// eleven metres across is heard as eleven metres across rather than from one point (two ears 0.92
-/// alike at 2 m, docs/AUDIO_QUALITY_2026-10-06.md item 8).
-///
-/// Each tap voice renders against the WHOLE feature's level and headroom, and the mixer places each tap
-/// by that level (ClientAudioSystem.LookUpPhysicalLevel): the taps' pressures are their own shares, so
-/// at any distance past the feature they sum to the feature as one voice would play it, whatever the
-/// loudness law's compression.
-///
-/// Each tap may itself be heard from several places across its landing (ExtendedSources): the tap's
-/// map emitter is its middle, the client places the others, and every place reads its own stream of
-/// the one synth (FallingWaterSynth.NextPlaces). The middle carries the tap's spread (<see cref="SetSpread"/>).
+/// One synth, so the pump, the wind in the spray and the jets' wandering are the fountain's, not each
+/// tap's; each tap gets the events that land there, so a fountain eleven metres across is heard that
+/// wide rather than from a point (two ears 0.92 alike at 2 m, docs/AUDIO_QUALITY_2026-10-06.md item 8).
+/// Each tap renders against the whole feature's level and is placed by it
+/// (ClientAudioSystem.LookUpPhysicalLevel), so past the feature the taps sum to it whatever the loudness
+/// law's compression. A tap may itself be heard from several places across its landing
+/// (ExtendedSources, FallingWaterSynth.NextPlaces); its middle carries its spread (<see cref="SetSpread"/>).
 /// </summary>
 public sealed class WaterFeatureVoice
 {
@@ -96,8 +83,8 @@ public sealed class WaterFeatureVoice
     private int _untilControl;
     private const int ControlBlock = 256;
 
-    /// <summary>The wind at the spray, as the most recent tap read it. Any tap's place will do: they are
-    /// metres apart and gusts are tens of metres long.</summary>
+    /// <summary>The wind at the spray, as the latest tap read it: taps are metres apart, gusts tens of
+    /// metres long.</summary>
     public volatile float Wind = float.NaN;
     public volatile bool Running = true;
 
@@ -118,8 +105,8 @@ public sealed class WaterFeatureVoice
 
     public long Newest => Volatile.Read(ref _rendered);
 
-    /// <summary>The rings' length, samples: a place further behind the newest render than this reads
-    /// what has been written over.</summary>
+    /// <summary>Samples: a place further behind the newest render than this reads what has been
+    /// written over.</summary>
     public const int RingLength = 1 << RingBits;
 
     /// <summary>How much of tap <paramref name="tap"/> its outer places carry, from its middle's emitter.</summary>
@@ -128,7 +115,7 @@ public sealed class WaterFeatureVoice
         if (tap >= 0 && tap < _spread.Length) Volatile.Write(ref _spread[tap], spread);
     }
 
-    /// <summary>Place <paramref name="place"/> of tap <paramref name="tap"/> at <paramref name="at"/>.</summary>
+    /// <summary>Renders ahead under a lock on whichever render worker asks first.</summary>
     public float Sample(int tap, int place, long at)
     {
         if (at >= Volatile.Read(ref _rendered))
@@ -180,7 +167,7 @@ public sealed class WaterTapState : NatureVoiceState
 {
     public readonly WaterFeatureVoice Shared;
     public readonly int Tap;
-    /// <summary>Which place of the tap: 0 its middle (the map's emitter), the rest round it.</summary>
+    /// <summary>0 the tap's middle (the map's emitter), the rest round it.</summary>
     public readonly int Place;
     private long _cursor;
 
@@ -256,18 +243,12 @@ public sealed class FoliageVoiceState : NatureVoiceState
 }
 
 /// <summary>
-/// A tree, a fire or running water heard from several places at once (ExtendedSources): ONE synth rendering each place's
-/// own stream, each place a voice of its own (<see cref="NaturePlaceState"/>). Place 0 is the source's
-/// middle, the map's own emitter; the others are made by the client when the source is wide enough at
-/// the listener to be heard as wide, and let go when it is not.
-///
-/// The streams are independent (the synth writes each event to one place and gives each place its own
-/// noise), so the voices do not need to read in step: each keeps its own cursor into the rings, as a
-/// fountain's taps do. The synth renders ahead of the furthest cursor under a lock, on whichever render
-/// worker asks first, and reads the wind where the source is.
-///
-/// <see cref="TargetSpread"/> is the client's, already slewed (ExtendedSources.Slew); it is handed to the
-/// synth once a control block, and the synth glides its noise gains to it, so nothing steps.
+/// A tree, a fire, running water or a shore heard from several places at once (ExtendedSources): one
+/// synth rendering each place's own stream, each place a voice (<see cref="NaturePlaceState"/>). Place 0
+/// is the map's emitter; the client adds the others while the source is wide enough at the listener.
+/// The streams are independent, so each voice keeps its own cursor into the rings; the synth renders
+/// ahead under a lock on whichever render worker asks first. <see cref="TargetSpread"/> comes already
+/// slewed (ExtendedSources.Slew) and the synth glides to it, so nothing steps.
 /// </summary>
 public sealed class PlacedNatureVoice
 {
@@ -297,7 +278,7 @@ public sealed class PlacedNatureVoice
     public Vector3[]? WindPlaces;
     public volatile float TargetTrees = 1f;
     private float _trees = -1f;
-    /// <summary>How many place voices read this synth, for the log.</summary>
+    /// <summary>Place voices reading this synth, for the log.</summary>
     public int Voices;
 
     public PlacedNatureVoice(string key, FoliageSpec spec, int places, float sampleRate, int seed, Vector3 position)
@@ -318,8 +299,8 @@ public sealed class PlacedNatureVoice
         : this(Math.Max(1, spec.Places), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f)
         => Flow = new RunningWaterSynth(spec, sampleRate, seed);
 
-    /// <summary>Waves at an edge (ShoreSynth): the source's own fetch, the way its water lies and its
-    /// length come from the map's key (ShoreSpec.KeyFor).</summary>
+    /// <summary>Waves at an edge (ShoreSynth); fetch, lie and length come from the map's key
+    /// (ShoreSpec.KeyFor).</summary>
     public PlacedNatureVoice(string key, ShoreSpec spec, ShoreGeometry geometry, float sampleRate, int seed, Vector3 position)
         : this(spec.TotalPlaces, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 10f)
         => Shore = new ShoreSynth(spec, sampleRate, seed, geometry);
@@ -339,8 +320,7 @@ public sealed class PlacedNatureVoice
 
     public long Newest => Volatile.Read(ref _rendered);
 
-    /// <summary>Place <paramref name="place"/>'s sample at <paramref name="at"/>, rendering ahead as
-    /// needed. Called from the render pool's worker threads.</summary>
+    /// <summary>Called from the render pool's worker threads; renders ahead as needed.</summary>
     public float Sample(int place, long at)
     {
         if (at >= Volatile.Read(ref _rendered))
@@ -423,15 +403,15 @@ public sealed class PlacedNatureVoice
     }
 }
 
-/// <summary>One place of a tree or a fire, as a voice. See <see cref="PlacedNatureVoice"/>.</summary>
+/// <summary>One place of a <see cref="PlacedNatureVoice"/>, as a voice.</summary>
 public sealed class NaturePlaceState : NatureVoiceState
 {
     public readonly PlacedNatureVoice Shared;
     public readonly int Place;
     private long _cursor;
 
-    /// <summary>Every place renders against the WHOLE source's level and headroom, so the places' powers
-    /// at their shares add up to the source's, and the mixer places each by the source's level.</summary>
+    /// <summary>Every place renders against the whole source's level and headroom, so the places'
+    /// powers add up to the source's and the mixer places each by it.</summary>
     public NaturePlaceState(PlacedNatureVoice shared, int place, float sampleRate, Vector3 position)
         : base(shared.SourceLevelDb, shared.HeadroomDb, sampleRate, position, shared.WindHeight)
     {
@@ -451,8 +431,8 @@ public sealed class NaturePlaceState : NatureVoiceState
 
     protected override float StepSynth()
     {
-        // A voice that fell further behind the newest render than the rings hold (it stopped being
-        // produced while others went on) catches up rather than reading what has been written over.
+        // A voice that fell further behind than the rings hold catches up rather than reading what has
+        // been written over.
         long newest = Shared.Newest;
         if (newest - _cursor > PlacedNatureVoice.RingLength - 4096) _cursor = newest;
         return Shared.Sample(Place, _cursor++);

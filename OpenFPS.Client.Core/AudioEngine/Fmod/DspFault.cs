@@ -1,21 +1,7 @@
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
-/// <summary>
-/// What a DSP read callback does instead of logging.
-///
-/// A MIXER CALLBACK MUST NOT DO I/O. It runs on FMOD's mixer thread with the deadline of the whole
-/// mix running down, and the thread that tears a voice down calls `removeDSP`, which BLOCKS until
-/// any in-flight callback has finished — while holding the provider's lock. So a callback that
-/// stops to write a log line stops the mixer, which stops the teardown, which stops everything that
-/// wants that lock: the game loop, the audio update, the acoustic worker. The whole client freezes,
-/// the log ends mid-stream, and from the chair that is indistinguishable from a crash.
-///
-/// Serilog's console sink writes to stdout. If whatever is reading stdout is slow or has stopped —
-/// a terminal you alt-tabbed away from — that write blocks, and the freeze is permanent.
-///
-/// So a faulting callback records the fault in two interlocked writes and returns. The AUDIO UPDATE,
-/// on the game thread, notices and logs it once. Nothing in here allocates, takes a lock, or waits.
-/// </summary>
+/// <summary>Helpers every DSP read callback uses. Mixer thread: no locks, no waits, and no allocation after
+/// a thread's first look at FMOD's function table.</summary>
 internal static class DspCallback
 {
     /// <summary>
@@ -48,35 +34,8 @@ internal static class DspCallback
         else Silence(outbuffer, length, outchannels);
     }
 
-    /// <summary>
-    /// A DSP callback's userdata, fetched THROUGH THE CALLBACK'S OWN FUNCTION TABLE.
-    ///
-    /// THIS IS THE RULE FMOD STATES AND EVERY CALLBACK IN THIS ENGINE BROKE. The general API — the
-    /// one you use from the game thread — must NOT be called from inside a DSP callback; the
-    /// callback is handed a table of accessors in DSP_STATE precisely so it does not have to.
-    /// Every processor here did the forbidden thing:
-    ///
-    ///     var dsp = new FMOD.DSP(dsp_state.instance);
-    ///     dsp.getUserData(out userData);          // the general API, on the mixer thread
-    ///
-    /// which re-enters FMOD and takes its system locks from inside its own mix, once per DSP per
-    /// block. It does not fail every time; it fails as a function of how many DSPs are running,
-    /// which is exactly the shape the crash had:
-    ///
-    ///   * 100 s to crash, then 16 s once the broadcast radius went from 1,200 m to 3,000 and far
-    ///     more voices were live;
-    ///   * turning OFF any single subsystem — machines, reflections, HRTF, the Steam Audio
-    ///     simulator — still crashed, because none of them is the cause, each is just some of the
-    ///     DSPs;
-    ///   * turning off ALL of them at once survived 131 s, because that is the configuration with
-    ///     the fewest callbacks per block.
-    ///
-    /// The table's getuserdata is the supported accessor and touches none of FMOD's locks.
-    ///
-    /// The delegate is cached per functions-table pointer, per thread: marshalling the struct on
-    /// every block for every voice would be its own problem, and FMOD hands out the same table for
-    /// the life of a system. ThreadStatic because there is more than one mixer thread.
-    /// </summary>
+    // Cached per function table, per thread: there is more than one mixer thread, and FMOD hands out
+    // one table for the life of a system.
     [ThreadStatic] private static IntPtr _cachedTable;
     [ThreadStatic] private static FMOD.DSP_GETUSERDATA_FUNC? _cachedGet;
 
@@ -85,9 +44,8 @@ internal static class DspCallback
 
     /// <summary>
     /// The clock of the block this callback is rendering, through the callback's own function table (as
-    /// <see cref="UserData"/>, and for the same reason). It is the CHANNEL's clock, counted from when that
-    /// channel started, not the mixer's: two channels started a frame apart disagree by however far apart
-    /// they started, and FMOD starts a channel part way into a block, so the gap is any number of samples
+    /// <see cref="UserData"/>). It is the channel's clock, counted from when that channel started, and
+    /// FMOD starts a channel part way into a block, so two channels disagree by any number of samples
     /// (AudioLab --cabin probe=align: 239 one run, 785 another). Add the channel's offset to its parent's
     /// clock (Channel.getDSPClock, game thread) to put two channels on one time line.
     /// </summary>
@@ -108,6 +66,12 @@ internal static class DspCallback
         return get(ref state, out clock, out _, out _) == FMOD.RESULT.OK;
     }
 
+    /// <summary>
+    /// A callback's userdata, through the callback's own function table. Never the general API
+    /// (`new FMOD.DSP(dsp_state.instance).getUserData`) on the mixer thread: it takes FMOD's system locks
+    /// inside its own mix, and crashed the client in proportion to how many DSPs ran. See
+    /// docs/THE_MIXER_THREAD_CRASH.md, "A callback's userdata through its own function table".
+    /// </summary>
     public static IntPtr UserData(ref FMOD.DSP_STATE state)
     {
         IntPtr table = state.functionsPtr;
@@ -125,18 +89,24 @@ internal static class DspCallback
     }
 }
 
+/// <summary>
+/// What a DSP read callback does instead of logging. A mixer callback must not do I/O: `removeDSP`
+/// blocks on an in-flight callback while holding the provider's lock, so a log line written from the
+/// mixer (to a stdout nobody reads) froze the whole client. A fault is two interlocked writes here, and
+/// the audio update logs it once from the game thread. See docs/THE_MIXER_THREAD_CRASH.md, "A mixer
+/// callback does no I/O".
+/// </summary>
 internal static class DspFault
 {
     private static int _count;
     private static string? _first;
 
-    /// <summary>Called from a DSP callback. Must stay allocation-free and lock-free.</summary>
+    /// <summary>Called from a DSP callback's catch. Lock-free; the message string is its one allocation,
+    /// made only for the first fault.</summary>
     public static void Record(string processor, Exception ex)
     {
         Interlocked.Increment(ref _count);
-        // First writer wins; every later one is just counted. ToString() would allocate, so the
-        // message is taken as-is — it is already an interned literal plus the exception's own text,
-        // which the runtime has built by the time this is called.
+        // First writer wins; every later one is only counted.
         Interlocked.CompareExchange(ref _first, processor + ": " + ex.Message, null);
     }
 

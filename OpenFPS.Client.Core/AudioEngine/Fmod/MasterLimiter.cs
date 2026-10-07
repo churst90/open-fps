@@ -4,40 +4,33 @@ using FMOD;
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// The master limiter: a look-ahead, true-peak, linked-stereo limiter with a program-dependent release.
-///
-/// WHY NOT FMOD'S. FMOD's LIMITER has no look-ahead. A shot or a thunder crack reaches full height in a
-/// sample or two, and a limiter that only reacts to what it has already passed cannot get its gain down
-/// in time, so the leading edge is cut flat at the ceiling: measured on Cody's 16-minute capture, 975
-/// flat-topped runs at exactly -2.0 dBFS around gunfire and the storm, and up to 7.9 dB of reduction on
-/// a thunder crack 3 km away (docs/AUDIO_QUALITY_2026-10-06.md, finding 6). Flat tops are clipping, and
-/// clipping on a crack is crunch. Its channels were also limited independently, so a shot on the left
-/// moved the image to the right while it was being held down.
-///
-/// WHAT THIS DOES, per sample:
-/// 1. Makeup (the maximizer's gain, <see cref="FmodAudioProvider.MasterMakeupDb"/>, unchanged).
-/// 2. TRUE PEAK, ITU-R BS.1770-4 Annex 2: the signal four times oversampled with the
-///    recommendation's own 48-tap interpolator, so the peak between two samples, which is what a
-///    sound card's reconstruction filter actually puts out, counts as well as the samples. Both
-///    channels feed one detector (LINKED): one gain for the pair keeps the image where it is.
-/// 3. LOOK-AHEAD. The audio is delayed by <see cref="LatencySamples"/> (2 ms), and the gain needed
-///    for a peak is held for the whole window ahead of it, then smoothed by two running means, so
-///    the gain is already down when the peak arrives and has come down along an S-curve over the
-///    look-ahead: no sample is cut, and the attack is not a step.
-/// 4. RELEASE, which depends on the programme. The gain reduction is held for <see cref="HoldSeconds"/>
-///    (longer than half a period of 20 Hz, so it does not ride the waveform of a rumble and distort it),
-///    then returns FAST (<see cref="FastSeconds"/>) down to the reduction the material has been
-///    needing on average, and SLOWLY (<see cref="SlowSeconds"/>) from there. A single shot leaves
-///    almost nothing in the average and recovers in about a tenth of a second; a long thunder roll
-///    builds the average up and is let go of slowly, which is what keeps a held-down roll from pumping.
-///
-/// The gain the hold and the means produce can never be above the gain any peak in the window needs,
-/// so the output's true peak stays at the ceiling to within the interpolator's accuracy (a few
-/// hundredths of a dB).
-///
-/// Mixer thread: everything is allocated in the constructor; <see cref="Process"/> does not
-/// allocate, lock or throw for any input, and a non-finite sample is taken as silence.
+/// The master limiter: look-ahead, true-peak, linked stereo, with a release that depends on the
+/// programme.
 /// </summary>
+/// <remarks>
+/// Not FMOD's LIMITER: it has no look-ahead, so a shot's or a thunder crack's leading edge was cut flat
+/// at the ceiling (975 flat-topped runs at -2.0 dBFS in Cody's 16-minute capture, up to 7.9 dB on a crack
+/// 3 km away; docs/AUDIO_QUALITY_2026-10-06.md, finding 6), and it limited each channel on its own, so a
+/// shot on the left moved the image right.
+///
+/// Per sample:
+/// 1. Makeup (<see cref="FmodAudioProvider.MasterMakeupDb"/>).
+/// 2. True peak, ITU-R BS.1770-4 Annex 2: four times oversampled with the recommendation's 48-tap
+///    interpolator, both channels into one detector so one gain keeps the image still.
+/// 3. Look-ahead: the audio is delayed by <see cref="LatencySamples"/> (about 2 ms); the gain a peak
+///    needs is held over the window ahead of it and smoothed by two running means, so it is already
+///    down when the peak arrives and got there along an S-curve.
+/// 4. Release: held for <see cref="HoldSeconds"/> (over half a period of 20 Hz, so it does not ride a
+///    rumble's waveform), then fast (<see cref="FastSeconds"/>) down to the reduction the material has
+///    needed on average, and slowly (<see cref="SlowSeconds"/>) from there. A shot recovers in about a
+///    tenth of a second; a long thunder roll is let go of slowly and does not pump.
+///
+/// The gain is never above what any peak in the window needs, so the output's true peak stays at the
+/// ceiling to within the interpolator's accuracy (hundredths of a dB).
+///
+/// Mixer thread: everything is allocated in the constructor; <see cref="Process(float*, float*, int, int)"/>
+/// does not allocate, lock or throw for any input, and a non-finite sample is taken as silence.
+/// </remarks>
 public sealed class TruePeakLimiter
 {
     public const int MaxChannels = 8;
@@ -46,7 +39,7 @@ public sealed class TruePeakLimiter
     /// card's own resampler needs, and the level BS.1770 / EBU R128 practice sets.</summary>
     public const float DefaultCeilingDb = -1f;
 
-    /// <summary>How far ahead the gain looks, seconds (the attack takes all of it).</summary>
+    /// <summary>Seconds; the attack takes all of it.</summary>
     public const float LookAheadSeconds = 0.002f;
     /// <summary>Gain reduction held after its peak before it starts to come back, seconds.</summary>
     public const float HoldSeconds = 0.025f;
@@ -160,8 +153,8 @@ public sealed class TruePeakLimiter
         ReductionDb = 0f;
     }
 
-    /// <summary>As the pointer form, for managed buffers (the lab and the tests): <paramref name="input"/>
-    /// and <paramref name="output"/> interleaved, the same length.</summary>
+    /// <summary>The pointer form for managed buffers (the lab and the tests), interleaved, the same
+    /// length.</summary>
     public unsafe void Process(ReadOnlySpan<float> input, Span<float> output, int channels)
     {
         if (channels <= 0 || output.Length < input.Length) return;
@@ -208,7 +201,6 @@ public sealed class TruePeakLimiter
                         p = MathF.Max(p, MathF.Abs(y));
                     }
                     peak = MathF.Max(peak, p);
-                    // The audio into the delay line, made up.
                     delay[_delayPos * MaxChannels + c] = x;
                 }
                 _histPos = hp + 1 == Taps ? 0 : hp + 1;

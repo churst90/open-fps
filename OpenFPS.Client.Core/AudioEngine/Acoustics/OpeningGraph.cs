@@ -14,8 +14,8 @@ namespace OpenFPS.Client.AudioEngine.Acoustics;
 public static class OpeningGraph
 {
     /// <summary>A door leaf: a solid box that is also a portal. The server gives every door a portal
-    /// (PrefabRepository), with both sides the outside when the map names no rooms, so a door is told by
-    /// HAVING one, not by its two sides differing. Movers are not in the scene at all.</summary>
+    /// (PrefabRepository), both sides the outside when the map names no rooms, so a door is told by having
+    /// one, not by its sides differing. Movers are not in the scene at all.</summary>
     public static bool IsDoorLeaf(EntityDefinition? def)
         => def != null && def.Collider.IsSolid && !def.Moves
            && (def.Portal.RegionAId != 0 || def.Portal.RegionBId != 0);
@@ -59,8 +59,8 @@ public static class OpeningGraph
         {
             if (!world.Entities.TryGetValue(id, out var snap)) continue;
             var def = snap.Definition;
-            // The doorway, not the leaf: the pose the server recorded for it shut. A definition from
-            // before that existed carries the pose it was defined in, which is shut at load.
+            // The doorway, not the leaf: the pose the server recorded for it shut; an older definition
+            // carries the pose it was defined in, which is shut at load.
             Vector3 centre; Quaternion rotation;
             if (def.Portal.OpeningRotation != default) { centre = def.Portal.OpeningCentre; rotation = def.Portal.OpeningRotation; }
             else if (def.Transform.Rotation != default) { centre = def.Transform.Position; rotation = def.Transform.Rotation; }

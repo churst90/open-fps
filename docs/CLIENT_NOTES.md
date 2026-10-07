@@ -202,3 +202,23 @@ matched). Even the smoothed onset is not a point: the air under the drop is sque
 of it trapped (Thoroddsen et al. 2005, J. Fluid Mech. 545, 203-212; Mandre, Mani and Brenner 2009, Phys.
 Rev. Lett. 102, 134502), and the contact spreads over the drop's tip in some microseconds, so the onset is
 smoothed over the fountain's own first-contact time, ImpactRise.
+
+## The bearing follows the level
+
+Losing the line of sight is not on its own a reason to move a source. Sound past an obstacle takes the
+better of two routes, and they arrive from different directions: over the top of a barrier, essentially
+still the source's own bearing, or through an opening somewhere else, which is not. BuildSimPath lets the
+two compete for the level (that is what stopped a knee-high pit wall silencing a car). The direction was
+once decided separately, on visibility alone, so the two halves disagreed: the level said "it came over
+the wall" and the bearing "it came from a probe seven metres to your left".
+
+On the speedway that was heard, and reported, as a near car stopping. The pathing probes lie on a uniform
+floor grid sized to the map, 7.3 m apart over a 900 x 480 m track, so a redirected bearing is quantised to
+that grid: four degrees at a hundred metres, nearly thirty at fifteen, held still while the car crosses
+the cell and then jumping.
+
+So the routes compete for the bearing as they do for the level: whichever delivers more energy decides
+where it came from. A 0.9 m wall gives a few centimetres of detour, loses about five decibels, and wins:
+the car keeps its own direction. A grandstand gives a detour the barrier ceiling flattens to 24 dB down,
+and any real opening beats it. Nothing in it knows what a wall or a doorway is.
+(AsyncAcousticWorker.RunSteamAudio.)

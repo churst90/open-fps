@@ -5,26 +5,19 @@ using Serilog;
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// Settings of the mixer itself that decide how clean every voice is, whatever the voice is.
-///
-/// THE RESAMPLER. FMOD resamples a channel whenever its rate is not the mixer's: a buffer rendered
-/// at 48 kHz (every TransientSynth sound, the door renders), thunder at 24 kHz, a recording at
-/// 48 kHz — and EVERY voice with a pitch that is not exactly one, which here is every voice that
-/// moves or that a moving listener hears, because Doppler is applied as a channel pitch. FMOD's
-/// default is linear interpolation. Linear interpolation is a two-tap filter whose response depends
-/// on where between two samples the read falls: halfway between, it is down 6 dB at 15 kHz and
-/// 11 dB at 18 kHz; on a sample it is flat. With a pitch a fraction of a percent off one, that
-/// position sweeps round hundreds of times a second, so the top octave of every noisy sound — water,
-/// leaves, rain, tyres, wind — is amplitude-modulated at that rate, and everything a 48 kHz source
-/// holds above 22 kHz folds back down into the top of the band. Measured with the lab's
-/// --quality resampler (docs/AUDIO_QUALITY_2026-10-06.md).
-///
-/// OPENFPS_RESAMPLER=linear|cubic|spline|none overrides it, for an A/B by ear.
+/// Settings of the mixer itself that decide how clean every voice is.
 /// </summary>
+/// <remarks>
+/// The resampler: FMOD resamples every channel whose rate is not the mixer's, and every voice with a
+/// pitch other than one, which is every voice with Doppler. Its default, linear interpolation, is down
+/// 6 dB at 15 kHz halfway between two samples and flat on one, so a pitch slightly off one modulates the
+/// top octave of every noisy sound hundreds of times a second (measured with the lab's --quality
+/// resampler; docs/AUDIO_QUALITY_2026-10-06.md). OPENFPS_RESAMPLER=linear|cubic|spline|none overrides,
+/// for an A/B by ear.
+/// </remarks>
 public static class MixerQuality
 {
-    /// <summary>The method the mixer is given. See the class summary. Read when a mixer is made, so
-    /// the lab can make one of each in a single run.</summary>
+    /// <summary>Read when a mixer is made, so the lab can make one of each in a single run.</summary>
     public static DSP_RESAMPLER Resampler => Parse(Environment.GetEnvironmentVariable("OPENFPS_RESAMPLER"));
 
     /// <summary>Captures (OPENFPS_AUDIO_CAPTURE, _PRE) in 32-bit float, unless OPENFPS_AUDIO_CAPTURE_FLOAT=0
@@ -33,7 +26,6 @@ public static class MixerQuality
     /// truncation distortion and sixteen-bit steps the game itself never makes.</summary>
     public static bool CaptureFloat => Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT") != "0";
 
-    /// <summary>The default when nothing is asked for.</summary>
     public const DSP_RESAMPLER Default = DSP_RESAMPLER.SPLINE;
 
     internal static DSP_RESAMPLER Parse(string? name) => name?.Trim().ToLowerInvariant() switch
@@ -46,11 +38,9 @@ public static class MixerQuality
     };
 
     /// <summary>
-    /// The rate the mixer is asked for: 48 kHz. Sound servers (PipeWire, PulseAudio's default) and
-    /// almost every device run at 48 kHz, and the synthesised one-shots, the door renders, speech and
-    /// voice chat are made at 48 kHz; a 44.1 kHz mixer put all of those through a resampler on the way
-    /// in and the whole mix through the sound server's on the way out. OPENFPS_MIXER_RATE=44100 (or any
-    /// rate 22050-192000) asks for another, for an A/B.
+    /// 48 kHz: the sound servers, almost every device, the one-shots, door renders, speech and voice chat
+    /// all run at it, so nothing is resampled on the way in or out. OPENFPS_MIXER_RATE (22050-192000)
+    /// asks for another, for an A/B.
     /// </summary>
     public const int DefaultRate = 48000;
 
@@ -58,20 +48,16 @@ public static class MixerQuality
     public static int RequestedRate
         => int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MIXER_RATE"), out int r) && r >= 22050 && r <= 192000 ? r : DefaultRate;
 
-    /// <summary>The mixer's sample rate, once a mixer has been made (FmodAudioProvider.Initialize), and
-    /// <see cref="DefaultRate"/> until then. Everything that renders for the mixer, or sets up a stage
-    /// that runs in it, reads this: nothing may assume a rate.</summary>
+    /// <summary>The mixer's rate once one is made, <see cref="DefaultRate"/> until then. Everything that
+    /// renders for the mixer or runs in it reads this: nothing may assume a rate.</summary>
     public static int MixerRate { get => _mixerRate; set => _mixerRate = value > 0 ? value : DefaultRate; }
     private static volatile int _mixerRate = DefaultRate;
 
     /// <summary>
-    /// A buffer at another rate brought to <paramref name="to"/> properly: band-limited, by a
-    /// Kaiser-windowed sinc (64 taps a side, about 90 dB down in the stop band, flat to 95 % of the
-    /// lower Nyquist). For anything rendered at another rate than the mixer's (thunder at 24 kHz, a
-    /// one-shot at 48 kHz under OPENFPS_MIXER_RATE=44100): FMOD's resampler, even its spline, is a
-    /// short polynomial, and from 48 kHz to 44.1 it folds everything above 22 kHz back into the band and images the top octave 3.9 kHz down
-    /// (a 15 kHz component came back at 11.1 kHz only 24-28 dB under itself, measured with the lab's
-    /// --quality resampler). Done once per buffer, on the thread that rendered it.
+    /// Brings a buffer to <paramref name="to"/> with a Kaiser-windowed sinc (64 taps a side, about 90 dB
+    /// down in the stop band, flat to 95 % of the lower Nyquist), once, on the thread that rendered it.
+    /// FMOD's resampler, even its spline, images the top octave: 48 to 44.1 kHz brought a 15 kHz
+    /// component back at 11.1 kHz only 24-28 dB under itself (the lab's --quality resampler).
     /// </summary>
     public static float[] Resample(float[] x, int from, int to)
     {
@@ -142,7 +128,7 @@ public static class MixerQuality
 
     /// <summary>
     /// OPENFPS_FMOD_OUTPUT=pulse|alsa|wasapi: which output FMOD drives, for measuring what reaches the
-    /// sound server (the lab's --quality output). Unset, FMOD chooses, as it always has.
+    /// sound server (the lab's --quality output). Unset, FMOD chooses.
     /// </summary>
     public static void ApplyOutput(FMOD.System system)
     {
@@ -159,7 +145,7 @@ public static class MixerQuality
         else Log.Warning("FMOD output {Type} refused: {Result}.", type, r);
     }
 
-    /// <summary>Sets the resampler. BEFORE System.init: FMOD reads it when the mixer is made.</summary>
+    /// <summary>Before System.init: FMOD reads it when the mixer is made.</summary>
     public static void ApplyResampler(FMOD.System system)
     {
         DSP_RESAMPLER method = Resampler;

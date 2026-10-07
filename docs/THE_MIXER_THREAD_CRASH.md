@@ -460,6 +460,41 @@ the same thing and can be deleted.
 - **Vehicle audio feedback** from earlier in the session (skidding, level spread, gearing, aircraft
   range) was addressed but never heard back on, because every run so far has ended in a crash.
 
+## A mixer callback does no I/O
+
+A DSP read callback runs on FMOD's mixer thread with the deadline of the whole mix running down, and
+the thread that tears a voice down calls `removeDSP`, which blocks until any in-flight callback has
+finished, while holding the provider's lock. So a callback that stops to write a log line stops the
+mixer, which stops the teardown, which stops everything that wants that lock: the game loop, the audio
+update, the acoustic worker. The client freezes, the log ends mid-stream, and from the chair that is
+indistinguishable from a crash. Serilog's console sink writes to stdout; if whatever reads stdout is
+slow or has stopped (a terminal alt-tabbed away from), that write blocks and the freeze is permanent.
+So a faulting callback records the fault in two interlocked writes (DspFault.Record) and returns; the
+audio update, on the game thread, logs it once.
+
+## A callback's userdata through its own function table
+
+FMOD's general API must not be called from inside a DSP callback; the callback is handed a table of
+accessors in DSP_STATE so it does not have to. Every processor in the engine once did
+
+    var dsp = new FMOD.DSP(dsp_state.instance);
+    dsp.getUserData(out userData);          // the general API, on the mixer thread
+
+which re-enters FMOD and takes its system locks from inside its own mix, once per DSP per block. It did
+not fail every time; it failed as a function of how many DSPs were running, which is the shape the crash
+had:
+
+- 100 s to crash, then 16 s once the broadcast radius went from 1,200 m to 3,000 and far more voices
+  were live;
+- turning off any single subsystem (machines, reflections, HRTF, the Steam Audio simulator) still
+  crashed, because none of them was the cause, each was just some of the DSPs;
+- turning off all of them at once survived 131 s, the configuration with the fewest callbacks per block.
+
+The table's getuserdata is the supported accessor and touches none of FMOD's locks. The delegate is
+cached per table pointer, per thread (there is more than one mixer thread): marshalling the struct on
+every block for every voice would be its own problem, and FMOD hands out the same table for the life of
+a system. DspCallback.UserData and DspCallback.Clock.
+
 ## Sources
 
 - [FMOD Threads and Thread Safety](https://www.fmod.com/docs/2.01/api/white-papers-threads.html)

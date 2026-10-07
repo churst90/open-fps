@@ -5,17 +5,16 @@ using OpenFPS.Client.AudioEngine.Core;
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// Live state for the near-field boundary effect: the delay line, and the reflections currently being
-/// rendered from it. The game thread writes the targets; the mixer thread reads them and glides toward
-/// them. Everything is allocated once, at construction — nothing here allocates in the callback.
+/// The near-field boundary effect's delay line and reflections. The game thread writes the targets and
+/// the mixer glides toward them; everything is allocated at construction, nothing in the callback.
 /// </summary>
 public sealed class BoundaryVoiceState
 {
     /// <summary>Six probes: right, left, up, down, forward, back.</summary>
     public const int MaxTaps = 6;
 
-    /// <summary>Longest round trip the line must hold: 2 × <see cref="BoundaryModel.MaxDistance"/> at a
-    /// cold-air speed of sound, plus the interaural offset, plus headroom.</summary>
+    /// <summary>2 × <see cref="BoundaryModel.MaxDistance"/> at a cold-air speed of sound, plus the
+    /// interaural offset, plus headroom.</summary>
     private const float MaxDelaySeconds = 0.064f;
 
     public readonly int SampleRate;
@@ -30,7 +29,7 @@ public sealed class BoundaryVoiceState
     public readonly float[] TargetGainR = new float[MaxTaps];
     public readonly float[] LowpassAlpha = new float[MaxTaps];
 
-    // What the mixer is actually rendering right now.
+    // What the mixer is rendering now.
     public readonly float[] CurrentDelayL = new float[MaxTaps];
     public readonly float[] CurrentDelayR = new float[MaxTaps];
     public readonly float[] CurrentGainL = new float[MaxTaps];
@@ -38,16 +37,14 @@ public sealed class BoundaryVoiceState
     public readonly float[] FilterL = new float[MaxTaps];
     public readonly float[] FilterR = new float[MaxTaps];
 
-    /// <summary>Per-sample glide toward the targets. Fast enough to track a walking player, slow enough
-    /// that a 60 Hz update never lands as a step — a step in a gain is a click, and a step in a DELAY is
-    /// worse, because it tears the waveform apart mid-cycle.</summary>
+    /// <summary>Per-sample glide toward the targets: a 60 Hz update must never land as a step. A step in
+    /// a gain is a click; a step in a delay tears the waveform mid-cycle.</summary>
     public float Glide;
-
 
     /// <summary>The non-finite guard's flags: the mix arriving at the master, and this stage's output.</summary>
     public int NonFiniteInputReported, NonFiniteReported;
 
-    /// <summary>Forgets the delay line and the tap filters. Mixer thread; allocation-free.</summary>
+    /// <summary>Forgets the delay line and the tap filters. Mixer thread; no allocation.</summary>
     public void ResetAfterFault()
     {
         Array.Clear(Line); Array.Clear(FilterL); Array.Clear(FilterR);
@@ -64,17 +61,11 @@ public sealed class BoundaryVoiceState
 }
 
 /// <summary>
-/// The FMOD custom DSP that renders the near-field boundary reflections onto the master bus.
-///
-/// It is a multi-tap FEEDFORWARD comb: the dry signal plus one delayed, damped, panned copy per nearby
-/// surface. Feedforward matters — a feedback delay is a resonator that rings at a fixed pitch, which is
-/// what the old FMOD-echo version did and why it read as a metallic artefact rather than as a wall. One
-/// tap per surface matters too: a ceiling at a metre and a wall at thirty centimetres produce two
-/// different comb spacings at once, and hearing both is how a corridor sounds different from a stairwell.
-///
-/// Every tap glides — gains and delays alike — so that a 60 Hz update from the game thread can never put
-/// a step into the sample stream. The delays are read with linear interpolation, so a gliding delay
-/// sweeps continuously rather than jumping between whole samples.
+/// The near-field boundary reflections on the master bus: a multi-tap feedforward comb, the dry signal
+/// plus one delayed, damped, panned copy per nearby surface. Feedforward, because a feedback delay rings
+/// at a fixed pitch (the old FMOD-echo version sounded metallic, not like a wall); one tap per surface,
+/// because a ceiling at a metre and a wall at thirty centimetres make two comb spacings at once, which
+/// is how a corridor differs from a stairwell. Gains and delays glide, and delays are read interpolated.
 /// </summary>
 public static class BoundaryProximityProcessor
 {
@@ -103,13 +94,9 @@ public static class BoundaryProximityProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
-        // THE HANDLE RESOLUTION IS INSIDE THE GUARD TOO, and it was not.
-        //
-        // The note below says a managed DSP callback must not throw, and the try it describes began
-        // AFTER these lines — leaving out the one statement most likely to raise. GCHandle.FromIntPtr
-        // throws InvalidOperationException the instant the handle it names is no longer allocated,
-        // and this callback runs on the mixer thread, so that exception is a process abort rather
-        // than a bad block. Same one-line gap as the engine's four callbacks had.
+        // The handle resolution is inside a guard too: GCHandle.FromIntPtr throws once the handle is
+        // freed, and on the mixer thread that is a process abort (the same one-line gap the engine's four
+        // callbacks had).
         IntPtr userData;
         BoundaryVoiceState s;
         try
@@ -121,8 +108,7 @@ public static class BoundaryProximityProcessor
         }
         catch
         {
-            // Pass the mix through untouched. This unit is on the master bus; silencing it silences
-            // the game.
+            // Pass the mix through: this unit is on the master bus, and silencing it silences the game.
             unsafe
             {
                 if (inbuffer != IntPtr.Zero && outbuffer != IntPtr.Zero && inchannels == outchannels)
@@ -137,16 +123,9 @@ public static class BoundaryProximityProcessor
         int inCh = inchannels > 0 ? inchannels : outCh;
         int n = (int)length;
 
-        // A MANAGED DSP CALLBACK MUST NOT THROW.
-        //
-        // This one had no guard and it killed the client outright: an IndexOutOfRangeException in
-        // here does not fault a voice, it unwinds into FMOD's native mixer thread, and an exception
-        // that crosses that boundary takes the process with it. Every other custom DSP in this
-        // engine already catches; this one was the exception, and it is the one that crashed.
-        //
-        // The fallback is a PASS-THROUGH rather than silence: this unit sits at the tail of the
-        // master bus, so everything in the game goes through it. Clearing the buffer would mute the
-        // whole mix; copying the input across loses the walls and keeps the game audible.
+        // A managed DSP callback must not throw: an IndexOutOfRangeException here, unguarded, unwound
+        // into FMOD's mixer thread and killed the client. The fallback passes the mix through rather
+        // than silencing it, since everything in the game goes through this unit.
         try
         {
             unsafe
@@ -154,9 +133,8 @@ public static class BoundaryProximityProcessor
                 if (inbuffer == IntPtr.Zero || outbuffer == IntPtr.Zero) return RESULT.OK;
                 var input = new ReadOnlySpan<float>((void*)inbuffer, n * inCh);
                 var output = new Span<float>((void*)outbuffer, n * outCh);
-                // The whole mix comes through here on its way to the limiter. A NaN that got this far
-                // would put the limiter's state out for good and the game would go silent: the block
-                // is silence instead, and the line says something upstream is unguarded.
+                // A NaN this far would put the limiter's state out for good and silence the game: the
+                // block is silence instead, and the line says something upstream is unguarded.
                 if (!NonFinite.AllFinite(input))
                 {
                     output.Clear();
@@ -180,15 +158,7 @@ public static class BoundaryProximityProcessor
                     else output.Clear();
                 }
             }
-            // RECORDED, NOT LOGGED, and the difference matters more here than anywhere.
-            //
-            // This unit is on the master bus, so its callback runs for every block of the whole mix.
-            // Writing a log line from it stops the mixer; the thread tearing a voice down is inside
-            // removeDSP waiting for exactly this callback to return, holding the provider's lock, and
-            // everything that wants that lock stops behind it. That is a total freeze, and if the
-            // console sink's write is what blocked — a terminal nobody is reading — it never ends.
-            //
-            // The audio update reports it from the game thread. See DspFault.
+            // Recorded, not logged: a log line from the mixer freezes the client (see DspFault).
             DspFault.Record("BoundaryProximity", ex);
         }
         return RESULT.OK;
@@ -196,17 +166,15 @@ public static class BoundaryProximityProcessor
 
 
     /// <summary>
-    /// The whole of the effect, over spans rather than mixer pointers — so it can be rendered offline
-    /// and its spectrum checked against the geometry it claims to represent. The read callback is a
-    /// three-line wrapper around this.
+    /// The whole effect over spans rather than mixer pointers, so it can be rendered offline and its
+    /// spectrum checked against the geometry.
     /// </summary>
     public static void Process(BoundaryVoiceState s, ReadOnlySpan<float> input, Span<float> output,
                                int inChannels, int outChannels)
     {
         int n = outChannels > 0 ? output.Length / outChannels : 0;
-        // ...and never more samples than the INPUT holds. The two spans are sized from the same
-        // block length and channel counts FMOD reported, so they should agree; "should" is not a
-        // bounds check, and this runs on the thread where being wrong is a crash rather than a bug.
+        // Never more samples than the input holds: the spans should agree, and on the mixer thread being
+        // wrong is a crash.
         if (inChannels > 0) n = Math.Min(n, input.Length / inChannels);
         int lineLen = s.Line.Length;
         if (lineLen < 4 || n <= 0) { if (!output.IsEmpty) output.Clear(); return; }
@@ -264,14 +232,12 @@ public static class BoundaryProximityProcessor
 
     }
 
-    /// <summary>Reads the line `delaySamples` behind the write head, interpolating between the two
-    /// neighbouring samples so a delay that is gliding sweeps smoothly instead of stepping.</summary>
+    /// <summary>Reads the line <paramref name="delaySamples"/> behind the write head, interpolated so a
+    /// gliding delay sweeps instead of stepping.</summary>
     private static float ReadInterpolated(float[] line, int lineLen, int write, float delaySamples)
     {
-        // Written as "is it in range?" rather than "is it out of range?", because NaN answers NO to
-        // every comparison: `if (d < 1f) d = 1f;` leaves a NaN untouched, and a NaN delay then walks
-        // straight through both clamps and into the index. One NaN in a tap's target delay is
-        // permanent, too — the glide carries it forward for ever.
+        // "Is it in range?" rather than "is it out?": NaN fails every comparison, so `if (d < 1f)` would
+        // let a NaN delay through to the index, and the glide would carry it for ever.
         float maxDelay = lineLen - 2f;
         if (!(delaySamples >= 1f)) delaySamples = 1f;
         if (!(delaySamples <= maxDelay)) delaySamples = maxDelay;

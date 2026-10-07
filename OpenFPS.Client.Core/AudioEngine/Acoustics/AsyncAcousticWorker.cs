@@ -11,14 +11,19 @@ public struct AcousticRequest
 {
     public int EntityId;
     public Vector3 ListenerPos;
-    /// <summary>Where the sound comes OUT — see <see cref="AudioEmission.PointFor"/> — not the
-    /// entity's origin. Everything downstream is an answer about this point.</summary>
+    /// <summary>Where the sound comes out (<see cref="AudioEmission.PointFor"/>), not the entity's origin.</summary>
     public Vector3 SourcePos;
-    /// <summary>How big a sphere to probe around it. Per source because it depends on how much room
-    /// the emitter has above what it is resting on. See <see cref="AudioEmission.OcclusionRadiusFor"/>.</summary>
+    /// <summary>The sphere probed round it: per source, by the room the emitter has above what it rests on
+    /// (<see cref="AudioEmission.OcclusionRadiusFor"/>).</summary>
     public float SourceRadius;
 }
 
+/// <summary>
+/// The acoustic paths of every voice, worked out off the game thread: Steam Audio's direct stage with the
+/// barrier search, the routes through openings and image-source early reflections where the phonon library
+/// is present, the hand-rolled tracer (SpatialAcoustics) where it is not or has no answer. Every Phonon
+/// object lives on this worker's thread only, never on the mixer's.
+/// </summary>
 public class AsyncAcousticWorker : IDisposable
 {
     private readonly SpatialAcoustics _acoustics;
@@ -27,32 +32,24 @@ public class AsyncAcousticWorker : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private Thread? _workerThread;
 
-    // We hold a reference to the latest world snapshot to avoid queueing it per-request
     private WorldSnapshot? _latestWorld;
     private readonly object _worldLock = new();
 
-    // --- Steam Audio simulation (Phase 4b) ---------------------------------------------------------
-    // Per-source occlusion + transmission computed from real geometry via SteamAudioSimulator, replacing
-    // the hand-rolled occlusion/EQ on the DIRECT path. Everything Phonon here lives on THIS worker thread
-    // only (created lazily in WorkerLoop, freed in Dispose after the thread joins) — no cross-thread calls,
-    // and never on the FMOD mixer thread. The hand-rolled SpatialAcoustics still produces reflections,
-    // portal apparent-position, air absorption and room gain; we only override occlusion/EQ/bleed.
-    // Set OPENFPS_STEAMAUDIO_SIM=0 to force the legacy hand-rolled occlusion.
+    // ── Steam Audio ─────────────────────────────────────────────────────────────────────────────
+    // Every Phonon object lives on this worker's thread only: made in WorkerLoop, freed in Dispose after
+    // the thread joins, never touched from another thread or the mixer. OPENFPS_STEAMAUDIO_SIM=0 forces the
+    // hand-rolled tracer.
     private static readonly bool _saDisabled = Environment.GetEnvironmentVariable("OPENFPS_STEAMAUDIO_SIM") == "0";
     private static readonly bool _saDebug = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
     private int _lastSceneBoxes;
 
-    // OPENFPS_AUDIO_DEBUG=1 tracing. The per-source line used to print for EVERY pending source on EVERY
-    // worker tick: on the speedway that is twenty-odd sources at the audio update's 60 Hz cap, well over a
-    // thousand synchronized Console.WriteLine calls a second, which floods the log the ear test is supposed
-    // to be read from and slows the thread it is measuring. Per source it is now one line a second, and the
-    // line that is actually useful during a live listen — how many sources the simulator answered for, how
-    // many it says are blocked, how many it re-aimed at an opening — is a single summary at the same rate.
+    // OPENFPS_AUDIO_DEBUG=1: one line a second per source, and one summary. A line per source per tick
+    // was over a thousand a second on the speedway, flooding the log and slowing the thread it measured.
     private const long SaDebugIntervalMs = 1000;
     private readonly Dictionary<int, long> _saDebugLastPrint = new();
     private long _saSummaryLastPrint;
     private const int SaMaxSources = 64;
-    private const long SaSourceTtlMs = 5000; // release a source whose voice hasn't been requested in 5s
+    private const long SaSourceTtlMs = 5000; // a source not asked about for 5 s is released
 
     private bool _saTried;
     private bool _saEnabled;
@@ -61,25 +58,24 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>The same scene without its open ground, for the trace from the listener's head.</summary>
     private SteamAudioScene? _saListenerScene;
     private SteamAudioSimulator? _saSim;
-    private AcousticMap? _saSceneMap; // the map the current scene was built for (rebuild when it changes)
+    private AcousticMap? _saSceneMap; // the map the current scene was built for
 
     private volatile float _listenerReverbMs;  // 0 = no simulated reverb available yet
     private volatile float _listenerEnclosure; // 0..1, how closed-in the listener is; see Enclosure
-    private volatile float _listenerHfDecayRatio = 1f;  // RT60(high)/RT60(mid) — how the tail is coloured
+    private volatile float _listenerHfDecayRatio = 1f;  // RT60(high)/RT60(mid)
     private volatile float _listenerLfDecayRatio = 1f;  // RT60(low)/RT60(mid)
     private int _reverbTick;
     private const int ReverbEveryNTicks = 6;
 
-    /// <summary>True once Steam Audio simulation is running (occlusion/pathing). The client uses this to
-    /// stop spawning the hand-rolled discrete reflection emitters, since geometry-driven reverb covers them.</summary>
+    /// <summary>Steam Audio's simulation is running; the client then makes none of the hand-rolled
+    /// reflection emitters.</summary>
     public bool SteamAudioActive => _saEnabled;
 
-    /// <summary>The probe graph has been baked and pathing takes part in every tick. The lab waits on
-    /// this: a probe asked before the bake lands measures a different engine from the game's.</summary>
+    /// <summary>The probe graph is baked and pathing takes part in every tick. The lab waits on this: a
+    /// probe asked before the bake measures a different engine from the game's.</summary>
     public bool PathingReady => _saSim?.PathingReady == true;
 
-    /// <summary>The simulated reverb decay (FMOD SFXREVERB ms) for the listener's room, or false if SA
-    /// simulation isn't producing one. Read from the game thread to drive the listener-region reverb.</summary>
+    /// <summary>The surveyed decay for the listener's room, ms, or false without one. Game thread.</summary>
     public bool TryGetListenerReverbDecayMs(out float ms)
     {
         ms = _listenerReverbMs;
@@ -87,21 +83,19 @@ public class AsyncAcousticWorker : IDisposable
     }
 
     /// <summary>
-    /// How enclosed the listener is, 0 (open field) to 1 (sealed box) — the fraction of what leaves
-    /// that comes back off geometry near enough to be a room rather than an echo.
-    ///
-    /// Separate from the decay time on purpose. The decay says how long a tail lasts; this says
-    /// whether there is one. See <see cref="Enclosure"/> for why that had to be split apart.
+    /// 0 (open field) to 1 (sealed box): the fraction of what leaves that comes back off geometry near
+    /// enough to be a room. The decay says how long a tail lasts; this says whether there is one
+    /// (<see cref="Enclosure"/>).
     /// </summary>
     public float ListenerEnclosure => _listenerEnclosure;
 
-    /// <summary>How the listener's room colours its own tail: the ratio of the high band's decay to the
-    /// middle's, and the low band's to the middle's. 1 means an even decay across the spectrum.</summary>
+    /// <summary>The high band's decay over the middle's, and the low band's: how the listener's room colours
+    /// its tail (1, even).</summary>
     public float ListenerHfDecayRatio => _listenerHfDecayRatio;
     public float ListenerLfDecayRatio => _listenerLfDecayRatio;
-    private readonly Dictionary<int, IntPtr> _saSources = new();   // entityId -> acquired IPLSource
-    private readonly Dictionary<int, long> _saLastSeen = new();     // entityId -> TickCount64 of last request
-    private readonly Dictionary<int, AcousticRequest> _pending = new(); // drained-per-tick latest request
+    private readonly Dictionary<int, IntPtr> _saSources = new();   // entity id -> IPLSource
+    private readonly Dictionary<int, long> _saLastSeen = new();     // entity id -> TickCount64 of its last request
+    private readonly Dictionary<int, AcousticRequest> _pending = new(); // the latest request per entity
     private List<int>? _evictScratch;
 
     public AsyncAcousticWorker(SpatialAcoustics acoustics)
@@ -110,10 +104,9 @@ public class AsyncAcousticWorker : IDisposable
     }
 
     /// <summary>
-    /// For the emitter-stream replay (OpenFPS.Tests, EmitterStreamReplayTests): no thread. Each request
-    /// is answered when the test calls <see cref="StepForTest"/>, between one audio update and the next,
-    /// so an answer arrives on the same frame on every run. Steam Audio is never started: the answers
-    /// are the hand-rolled tracer's, the path a client without the phonon library takes.
+    /// For the emitter-stream replay (EmitterStreamReplayTests): no thread; requests are answered when the
+    /// test calls <see cref="StepForTest"/>, so an answer lands on the same frame every run. Steam Audio is
+    /// never started: the answers are the hand-rolled tracer's.
     /// </summary>
     internal bool Manual { get; init; }
 
@@ -124,15 +117,9 @@ public class AsyncAcousticWorker : IDisposable
         {
             IsBackground = true,
             Name = "AcousticWorkerThread",
-            // BELOW the game, and a long way below the engine producers and the mixer.
-            //
-            // What this thread computes — occlusion, reflection paths, the geometry-driven reverb —
-            // is allowed to arrive late. What the mixer computes is not: a block that misses its
-            // deadline is not stale, it is a hole. At AboveNormal this competed for cores with the
-            // audio at the one moment there are none to spare, which is a map load: the scene is
-            // being built from a hundred-odd colliders and thirty engines are starting at the same
-            // time. The cost of losing that race is a fraction of a second of slightly stale
-            // occlusion. The cost of the mixer losing it is the audio cutting out.
+            // Below the game and well below the engine producers and the mixer: this thread's answers may
+            // arrive late, a mixer block may not. At AboveNormal it fought the audio for cores at a map
+            // load, and the audio cut out.
             Priority = ThreadPriority.BelowNormal
         };
         _workerThread.Start();
@@ -151,24 +138,22 @@ public class AsyncAcousticWorker : IDisposable
         _requestQueue.Enqueue(req);
     }
 
-    /// <summary>Lab only (--pop-hunt): records what produced each source's last direct answer in
-    /// <see cref="Provenance"/>. Off in the game.</summary>
+    /// <summary>Lab only (--pop-hunt): fills <see cref="Provenance"/>. Off in the game.</summary>
     public static bool TraceProvenance;
     /// <summary>What produced each source's last direct answer, when <see cref="TraceProvenance"/> is on.</summary>
     public readonly ConcurrentDictionary<int, string> Provenance = new();
 
     /// <summary>Each source's last Steam Audio answer and when, for a tick the pool had no room for it.</summary>
     private readonly Dictionary<int, (List<AcousticPathData> Paths, long At)> _lastSimPath = new();
-    /// <summary>How old a held answer may be: well past a tick, well short of anything moving far.</summary>
+    /// <summary>Well past a tick, well short of anything moving far.</summary>
     private const long HeldSimPathMs = 1000;
     /// <summary>Requests the pool had no room for this tick, asked first on the next.</summary>
     private readonly List<AcousticRequest> _carried = new();
     /// <summary>The sources given a place in the pool this tick: the first SaMaxSources in line.</summary>
     private readonly HashSet<int> _served = new();
 
-    /// <summary>Files a result under the entity it answers, stamped with where the source was when it
-    /// was asked about, so the consumer can tell a result for THIS sound from one left behind by a
-    /// previous occupant of a pooled id.</summary>
+    /// <summary>Stamps a result with where the source was when asked, so the consumer can tell a result for
+    /// this sound from one left by a previous user of a pooled id.</summary>
     private void Store(AcousticRequest req, List<AcousticPathData> paths)
     {
         for (int i = 0; i < paths.Count; i++)
@@ -184,13 +169,10 @@ public class AsyncAcousticWorker : IDisposable
 
     // ── What was heard near here a moment ago ─────────────────────────────────────────────────
     //
-    // A one-shot gets a voice id of its own, so the simulator has never been asked about it when it
-    // starts. It used to start on the hand-rolled tracer's guess and slide to the simulator's answer a
-    // frame or two later — after the attack, the loudest part, had already played. For a walker on the
-    // pavement outside a flat that guess was a route out of the flat's door (-4 dB) where the brick
-    // wall's answer was -24: every step's attack came through the wall ("I still hear people walking
-    // outside to my right"). The walker's previous step, 0.7 m back, has the real answer; so does the
-    // shot before this one. Nothing here knows what a footstep is: it is an answer for a nearby point.
+    // A one-shot's voice id is new, so the simulator has never been asked about it when it starts. On the
+    // hand-rolled tracer's guess, a walker outside a flat came through the brick wall at -4 dB where the
+    // simulator said -24, for every step's attack ("I still hear people walking outside to my right"). The
+    // previous step, 0.7 m back, has the real answer: an answer for a nearby point, whatever made it.
     private const int RecentCapacity = 256;
     private const long RecentMaxAgeMs = 1500;
     private readonly (Vector3 Listener, Vector3 Source, long At, AcousticPathData Path)[] _recent = new (Vector3, Vector3, long, AcousticPathData)[RecentCapacity];
@@ -238,10 +220,7 @@ public class AsyncAcousticWorker : IDisposable
         return _results.TryGetValue(entityId, out paths!);
     }
 
-    /// <summary>
-    /// Drops a removed entity's cached acoustic result. Its Steam Audio source (if any) is released by
-    /// the idle TTL sweep; this stops the stale paths being handed back for an entity that no longer exists.
-    /// </summary>
+    /// <summary>Drops a removed entity's result; its Steam Audio source goes with the idle sweep.</summary>
     public void Forget(int entityId) => _results.TryRemove(entityId, out _);
 
     public WorldSnapshot? GetLastWorld()
@@ -268,16 +247,13 @@ public class AsyncAcousticWorker : IDisposable
     {
         while (!_cts.Token.IsCancellationRequested)
         {
-            // Drain ALL queued requests for this tick; the latest request per entity wins. Batching lets
-            // the Steam Audio direct stage run ONCE for every active source instead of once per request.
-            // What the pool had no room for last tick goes first: it was put back in _pending, ahead of
-            // anything asked since, and a newer request for the same source takes its place in the line.
+            // Every queued request, the latest per entity, so the direct stage runs once a tick for all of
+            // them. What the pool had no room for last tick is still first in _pending.
             bool any = false;
             AcousticRequest newest = default;
             while (_requestQueue.TryDequeue(out var req)) { _pending[req.EntityId] = req; newest = req; any = true; }
             if (!any && _pending.Count == 0) { if (once) return; Thread.Sleep(1); continue; }
-            // A request carried over was made for where the listener was a tick ago; it is answered for
-            // where they are now, as every other source this tick is.
+            // A carried request is answered for where the listener is now.
             if (any && _carried.Count > 0)
                 foreach (var c in _carried)
                     if (_pending.TryGetValue(c.EntityId, out var held) && held.ListenerPos != newest.ListenerPos)
@@ -289,13 +265,9 @@ public class AsyncAcousticWorker : IDisposable
 
             if (_saEnabled && _saSim != null)
             {
-                // Steam Audio is the ACTIVE spatializer: build the acoustic result from the simulator
-                // (occlusion/transmission + pathing arrival direction). Any source the simulator did NOT
-                // produce a result for — a failed tick, an unbuilt scene, an exhausted source pool — falls
-                // back to the hand-rolled ray-tracer for that source. It must NEVER fall back to
-                // DirectResult.Clear: "no result" would then be rendered as "nothing is in the way", which
-                // is the single worst possible answer in a game played by ear — every wall in the level
-                // silently disappears and the player is told a lie about where sounds are.
+                // A source the simulator gave no answer (a failed tick, no scene yet, a full pool) falls back
+                // to the hand-rolled tracer, never to DirectResult.Clear: "no result" heard as "nothing in
+                // the way" makes every wall disappear, the worst answer in a game played by ear.
                 Dictionary<int, SaResult>? sim = RunSteamAudio(world);
                 int degraded = 0;
                 _carried.Clear();
@@ -310,20 +282,16 @@ public class AsyncAcousticWorker : IDisposable
                     }
                     else if (sim != null && _lastSimPath.ContainsKey(req.EntityId))
                     {
-                        // ── No room in the pool this tick: asked again first thing next tick ─────
-                        //
-                        // Not handed to the hand-rolled tracer. That is a different model, and from
-                        // the Main Street pavement it put a car behind a building at -15 dB where
-                        // Steam Audio and the barrier search say -63, until the source's turn in the
-                        // pool came round again (2026-10-03, --pop-hunt extra=40): a pop every time
-                        // the pool ran over. A source that has had an answer from the simulator
-                        // keeps it — moved with the source, below — and waits one tick for the next.
+                        // No room in the pool this tick: it keeps its last answer and is asked first next
+                        // tick. Not the hand-rolled tracer, a different model: it put a car behind a
+                        // building at -15 dB where the simulator said -63, a pop every time the pool ran
+                        // over (2026-10-03, --pop-hunt extra=40).
                         _carried.Add(req);
                         if (_lastSimPath.TryGetValue(req.EntityId, out var held)
                             && Environment.TickCount64 - held.At < HeldSimPathMs)
                         {
-                            // Moved with the source: the answer's positions are where it WAS, and a bus
-                            // at 15 m/s held for a second would be heard 15 m behind itself.
+                            // Moved with the source: a bus at 15 m/s held for a second would be heard 15 m
+                            // behind itself.
                             var moved = new List<AcousticPathData>(held.Paths.Count);
                             foreach (var hp in held.Paths)
                             {
@@ -337,8 +305,8 @@ public class AsyncAcousticWorker : IDisposable
                     }
                     else
                     {
-                        // Never answered by the simulator: the tracer's answer stands in until it is,
-                        // first thing next tick if the pool was what refused it.
+                        // Never answered by the simulator: the tracer stands in, and a source the pool
+                        // refused is asked first next tick.
                         Store(req, HandRolledPath(world, req));
                         if (TraceProvenance) Provenance[req.EntityId] = "hand-rolled";
                         if (sim != null) _carried.Add(req);
@@ -361,8 +329,7 @@ public class AsyncAcousticWorker : IDisposable
             }
             else
             {
-                // Legacy hand-rolled spatializer — the standing configuration when Steam Audio sim is
-                // unavailable or disabled (OPENFPS_STEAMAUDIO_SIM=0 / no phonon library).
+                // No simulator (no phonon library, or OPENFPS_STEAMAUDIO_SIM=0): the hand-rolled tracer.
                 foreach (var kv in _pending)
                     Store(kv.Value, HandRolledPath(world, kv.Value));
             }
@@ -373,13 +340,9 @@ public class AsyncAcousticWorker : IDisposable
     }
 
     /// <summary>
-    /// The hand-rolled ray-traced acoustic path for one source — the real fallback whenever the Steam Audio
-    /// simulator did not answer for it. It is a worse model than the simulator, but it is a MODEL: it still
-    /// occludes through walls, still finds portals, still attenuates. Returning it is always better than
-    /// returning "clear".
-    ///
-    /// If even the hand-rolled tracer throws, the source keeps whatever result it last had rather than being
-    /// reset to unoccluded; only a source that has never had one gets a clear path, and that is logged.
+    /// The hand-rolled tracer's paths for one source: a worse model than the simulator's, but always better
+    /// than "clear". If it throws, the source keeps its last result; only one that never had any gets a clear
+    /// path, and that is logged.
     /// </summary>
     private List<AcousticPathData> HandRolledPath(WorldSnapshot world, AcousticRequest req)
     {
@@ -404,17 +367,15 @@ public class AsyncAcousticWorker : IDisposable
         }
     }
 
-    // --- Degradation reporting ------------------------------------------------------------------------
-    // A degradation that nobody is told about is a bug that never gets fixed. These log on the TRANSITION
-    // (healthy -> degraded and back) rather than every tick, so the log stays readable while never hiding
-    // the fact that the geometry-driven acoustics stopped answering.
+    // ── Degradation reporting ────────────────────────────────────────────────────────────────────
+    // Logged on the change (healthy to degraded and back), not every tick: readable, and never hiding that
+    // the simulator stopped answering.
     private bool _simDegradedLogged;
     private long _lastDegradeLogTicks;
     private const long DegradeLogIntervalMs = 10_000;
     private readonly HashSet<int> _tracerFailuresReported = new();
 
-    /// <summary>True when Steam Audio simulation is enabled but is not currently covering every source, so
-    /// some or all of the acoustics are coming from the hand-rolled tracer.</summary>
+    /// <summary>The simulator is on but some sources this tick came from the hand-rolled tracer.</summary>
     public bool IsDegraded { get; private set; }
 
     private void ReportSimCoverage(int degraded, int total, bool wholeTickFailed)
@@ -443,21 +404,18 @@ public class AsyncAcousticWorker : IDisposable
         Console.WriteLine($"[AcousticWorker] DEGRADED: {degraded}/{total} sources fell back to the hand-rolled ray-tracer — {cause}.");
     }
 
-    // --- Ray budget -----------------------------------------------------------------------------------
-    // "Measure the Steam Audio ray budget" (audit step 6). The simulation cost is a configuration — rays
-    // times bounces times sources — and until it is measured on real hardware every number in it is a
-    // guess. The simulator times its own runs; this reports them, and says so loudly when a run costs more
-    // than the audio frame it is feeding, because a worker that cannot keep up does not fail, it just
-    // silently delivers older and older acoustics.
+    // ── Ray budget ───────────────────────────────────────────────────────────────────────────────
+    // The simulator times its own runs (rays times bounces times sources); this reports them, loudly when a
+    // run costs more than an audio frame: a worker that cannot keep up does not fail, it delivers older and
+    // older acoustics.
     private long _lastRayBudgetReportTicks;
     private long _lastRayBudgetWarnTicks;
     private const long RayBudgetReportIntervalMs = 30_000;
 
-    /// <summary>One audio frame at <see cref="ClientAudioSystem"/>'s 60 Hz cap — the wall a run should
-    /// stay under to keep the acoustics current with what is being heard.</summary>
+    /// <summary>One audio frame at ClientAudioSystem's 60 Hz cap: what a run should stay under.</summary>
     private const double RayBudgetFrameMs = 1000.0 / 60.0;
 
-    /// <summary>The last measured simulation cost, for anything that wants to display it.</summary>
+    /// <summary>The last measured simulation cost, for display.</summary>
     public string RayBudgetSummary { get; private set; } = "no simulation runs yet";
 
     private void ReportRayBudget(int sources)
@@ -485,8 +443,7 @@ public class AsyncAcousticWorker : IDisposable
     private string? _lastSimTickFailure;
     private long _lastSimTickFailureTicks;
 
-    /// <summary>Records why a whole simulation tick produced nothing. Logged on change of cause, and at
-    /// most once per interval thereafter — a persistent failure stays visible without flooding.</summary>
+    /// <summary>Why a whole tick produced nothing: logged on a change of cause, then once per interval.</summary>
     private void ReportSimTickFailure(string reason)
     {
         long now = Environment.TickCount64;
@@ -502,29 +459,28 @@ public class AsyncAcousticWorker : IDisposable
         Console.WriteLine($"[AcousticWorker] Hand-rolled acoustic tracer failed for entity {entityId} (reported once): {ex.Message}");
     }
 
-    /// <summary>Per-entity Steam Audio result for one tick: the direct occlusion/transmission, and (when the
-    /// source is occluded and pathing found a route) the world-space apparent position to localize the HRTF
-    /// to the opening the sound arrives through.</summary>
-    /// <summary>What the simulator says about one source this tick. <c>BarrierDelta</c> is how far out of
-    /// its way sound had to bend to get past the worst thing in the line (negative = nothing in the way),
-    /// measured once here because BOTH the arrival direction and the per-band level are decided by it.</summary>
-    /// <param name="BarrierVerified">The route round the barrier box is clear of everything else. When it
-    /// is not, the route does not exist and its level must not be used (BuildSimPath).</param>
+    /// <summary>What the simulator says about one source this tick.</summary>
+    /// <param name="Direct">The direct stage's occlusion and transmission.</param>
+    /// <param name="ApparentPosition">Where the sound is heard from when it arrives round an edge or through
+    /// an opening (world space).</param>
+    /// <param name="HasApparent">Whether <paramref name="ApparentPosition"/> is set.</param>
+    /// <param name="BarrierDelta">How far out of its way sound bent past the worst thing in the line, metres
+    /// (negative: nothing in the way); measured once, since it decides both the bearing and the level.</param>
+    /// <param name="BarrierVerified">The route round the barrier box is clear of everything else; when not,
+    /// the route does not exist and its level must not be used (BuildSimPath).</param>
     /// <param name="Path">Steam Audio's own route through the scene, when it found one.</param>
-    /// <param name="Route">What came by the openings (OpeningRoutes), when the source and the listener are
-    /// in different places and a route joins them.</param>
+    /// <param name="Route">What came by the openings (OpeningRoutes), when source and listener are in
+    /// different places and a route joins them.</param>
     private readonly record struct SaResult(SteamAudioSimulator.DirectResult Direct, Vector3 ApparentPosition,
                                             bool HasApparent, float BarrierDelta,
                                             bool BarrierVerified = true,
                                             SteamAudioSimulator.PathResult Path = default,
                                             OpeningRoutes.Answer? Route = null);
 
-    // Below this direct visibility a source is "occluded enough" that pathing should drive its apparent
-    // position to the opening the sound arrives through (rather than the straight-through-wall direction).
+    // Below this visibility a source is heard from where it arrives (an edge, an opening), not through the wall.
     private const float PathRedirectVisibility = 0.5f;
 
-    /// <summary>Runs the Steam Audio direct + pathing stages for all pending sources against the current
-    /// listener and returns per-entity results, or null when SA simulation is unavailable/disabled.</summary>
+    /// <summary>The direct and pathing stages for every pending source, or null with no simulator.</summary>
     private Dictionary<int, SaResult>? RunSteamAudio(WorldSnapshot world)
     {
         if (!_saEnabled || _saSim == null) return null;
@@ -537,18 +493,9 @@ public class AsyncAcousticWorker : IDisposable
                 return null;
             }
 
-            // ── A finished bake joins the simulation HERE, before anything is staged ───────────
-            //
-            // Before, not after, and that ordering is the whole of it. Attaching the probe batch flips
-            // PathingReady true, and PathingReady is what decides BOTH whether a source's inputs carry
-            // a probe batch and whether the run executes the pathing stage. Committing it after the
-            // sources were staged left the two disagreeing for exactly one tick: thirty sources staged
-            // without probes, and then a pathing run over them. Steam Audio dereferenced a probe batch
-            // no source had been given and took the process with it — no exception, no log line, the
-            // client simply ended a second after the cars started.
-            //
-            // Between runs, and on the thread that owns the simulator: it is single-threaded by
-            // contract, and the bake thread never touches it.
+            // A finished bake joins here, before anything is staged, between runs, on the thread that owns
+            // the simulator (single-threaded by contract). Committed after staging, it crashed the client
+            // natively a second after the cars started (docs/AUDIO_GHOSTS_AND_STUTTERS.md, the probe batch).
             if (_saSim.CommitPendingProbes())
                 Console.WriteLine("[AcousticWorker] Pathing probes are live; occluded sources can now be localized to the opening they arrive through.");
 
@@ -556,19 +503,14 @@ public class AsyncAcousticWorker : IDisposable
             Vector3 listener = default;
             bool haveListener = false;
             int blocked = 0, viaEdge = 0, viaProbe = 0, reflections = 0;
-            // ── Who is served this tick when more are asked about than the pool holds ─────────────
-            //
-            // The first SaMaxSources in line, and the line starts with whoever was turned away last
-            // tick (WorkerLoop). A source held by someone further back is lent to someone served. Before,
-            // every source asked about this tick kept its own, so when eighty were asked about every
-            // tick the same sixteen were turned away every tick, for good, and heard through the
-            // hand-rolled tracer: cars behind a building popping between -63 and -15 dB.
+            // More asked about than the pool holds: the first SaMaxSources in line are served, the line
+            // starting with last tick's turned-away, and a source held by someone further back is lent.
+            // With every source keeping its own, the same sixteen of eighty were turned away for good and
+            // popped between -63 and -15 dB through the hand-rolled tracer.
             Serve(_pending.Keys, SaMaxSources, _served);
             foreach (var kv in _pending)
             {
-                // The listener is the same for every request this tick, so take it from the first one —
-                // NOT only from requests that won a source. Otherwise an exhausted source pool would drop
-                // the whole tick instead of just the sources it could not fit.
+                // The listener from the first request, served or not: else a full pool drops the whole tick.
                 if (!haveListener) { listener = kv.Value.ListenerPos; haveListener = true; _lastListenerPos = listener; _haveLastListener = true; }
 
                 if (!_served.Contains(kv.Key)) continue;   // asked first next tick (WorkerLoop)
@@ -579,8 +521,8 @@ public class AsyncAcousticWorker : IDisposable
                 _saLastSeen[kv.Key] = now;
             }
             if (!haveListener) return null;   // nothing pending; not a degradation
-            // The traced reverb follows the ear; it runs its own trace on its own thread. The region
-            // tells it when you have gone into another room, so its averaged tail starts again.
+            // The traced reverb runs its own trace on its own thread; the region tells it when you have gone
+            // into another room, so its averaged tail starts again.
             int hereRegion = _acoustics.GetRegionAt(world, listener);
             OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.SetListener(listener, hereRegion);
 
@@ -607,29 +549,10 @@ public class AsyncAcousticWorker : IDisposable
                     }
                 }
 
-                // ── Which way did it come: over the thing, or round it? ──────────────────────────
-                //
-                // Losing the line of sight is not on its own a reason to move a source. Sound past an
-                // obstacle takes the better of two routes, and they arrive from DIFFERENT DIRECTIONS:
-                // over the top of a barrier, which is essentially still the source's own bearing, or
-                // through an opening somewhere else, which is not. BuildSimPath already lets the two
-                // compete for the LEVEL — that is what stopped a knee-high pit wall silencing a car.
-                // The direction was being decided separately, on visibility alone, so the two halves
-                // disagreed: the level said "it came over the wall" and the bearing said "it came from
-                // a probe seven metres to your left".
-                //
-                // On the speedway that is heard, and was reported, as a near car STOPPING. The pathing
-                // probes are laid on a uniform floor grid sized to the map — 7.3 m apart over a
-                // 900 x 480 m track — so a redirected bearing is quantised to that grid. At a hundred
-                // metres that is four degrees and invisible; at fifteen it is nearly thirty, and it
-                // holds still while the car crosses the cell and then jumps. The car's sound stops
-                // tracking the car.
-                //
-                // So the routes compete for the bearing on the same terms they compete for the level:
-                // whichever delivers more energy decides where it came from. A 0.9 m wall gives a few
-                // centimetres of detour, loses about five decibels, and wins — the car keeps its own
-                // direction. A grandstand gives a detour the barrier ceiling flattens to 24 dB down,
-                // and any real opening beats it. Nothing here knows what a wall or a doorway is.
+                // Over the thing or round it: the routes compete for the bearing on the same terms as for
+                // the level (BuildSimPath), whichever delivers more energy. Decided on visibility alone, a
+                // near car on the speedway was heard to stop: the bearing snapped to the 7.3 m probe grid.
+                // See docs/CLIENT_NOTES.md, "The bearing follows the level".
                 Vector3 edge = kv.Value.ListenerPos;
                 bool edgeVerified = false;
                 float barrierDelta = routes != null
@@ -645,10 +568,8 @@ public class AsyncAcousticWorker : IDisposable
                     float dist = Vector3.Distance(kv.Value.ListenerPos, kv.Value.SourcePos);
                     if (edgeVerified)
                     {
-                        // The edge is the secondary source. Placed along its bearing at the real
-                        // source's distance, for the same reason the pathing branch does: the level
-                        // has already been decided by the route, and moving the source nearer would
-                        // charge it for the detour twice.
+                        // The edge is the secondary source, placed on its bearing at the real source's
+                        // distance: the level has paid for the detour already.
                         Vector3 toEdge = edge - kv.Value.ListenerPos;
                         if (toEdge.LengthSquared() > 1e-6f)
                         {
@@ -656,19 +577,13 @@ public class AsyncAcousticWorker : IDisposable
                             hasApparent = true; viaEdge++;
                         }
                     }
-                    // No verified route: the level is what comes THROUGH the wall (BuildSimPath), so the
-                    // bearing is the source's own. The probe graph's direction used to be taken here with
-                    // the level from elsewhere, and from a flat on the ground floor the graph's route ran
-                    // down to its floor grid: a siren behind the wall was heard from straight below,
-                    // where turning the head changes nothing.
+                    // No verified route: the level is what comes through the wall, so the bearing is the
+                    // source's own. The probe graph's direction here put a siren behind a ground-floor
+                    // flat's wall straight below, where turning the head changes nothing.
                 }
-                // ── And by the openings ──────────────────────────────────────────────────────
-                //
-                // Through the walls and round one edge is all the above can find. From the street to a
-                // corridor by the front door, the stairwell and its doorway is a route with corners
-                // in it, and without it an open front door changed nothing ("only when a loud source
-                // passes does it come inside"). Asked whenever the source and the listener are in
-                // different places; BuildSimPath lets it compete band by band.
+                // And by the openings, a route with corners in it (the street to a corridor by way of the
+                // front door): without it an open front door changed nothing ("only when a loud source
+                // passes does it come inside"). BuildSimPath lets it compete band by band.
                 OpeningRoutes.Answer? viaOpenings = routes != null
                     ? AskRoutes(routes, world, kv.Key, kv.Value.SourcePos, kv.Value.ListenerPos, listenerRegion)
                     : null;
@@ -696,11 +611,9 @@ public class AsyncAcousticWorker : IDisposable
         }
     }
 
-    /// <summary>Builds the complete acoustic result for one source purely from the Steam Audio simulator —
-    /// occlusion/transmission EQ (SA <c>occlusion</c> is a VISIBILITY gain; the engine wants "fraction
-    /// blocked" + per-band clarity), and the apparent position redirected to the opening when pathing found a
-    /// route around an occluder. Region is looked up from the map (for reverb routing) when one is loaded.
-    /// No hand-rolled ray-tracing or reflection entries — those are retired on the SA path.</summary>
+    /// <summary>One source's paths from the simulator's answer: Steam Audio's visibility turned into the
+    /// engine's "fraction blocked" and band gains, the better of the routes over an edge and by the openings,
+    /// air, and the early reflections (<see cref="AddEarlyReflections"/>).</summary>
     private List<AcousticPathData> BuildSimPath(WorldSnapshot world, AcousticRequest req, SaResult sr)
     {
         var ap = SteamAudioSimulator.ToAcousticParams(sr.Direct);
@@ -711,58 +624,34 @@ public class AsyncAcousticWorker : IDisposable
         Vector3 apparent = sr.HasApparent ? sr.ApparentPosition : req.SourcePos;
         float dist = Vector3.Distance(req.ListenerPos, req.SourcePos);
 
-        // ── What actually gets past the thing in the way ────────────────────────────────────
-        //
-        // The simulator's direct stage knows line-of-sight and transmission THROUGH a material. It has
-        // no edge diffraction, so a source it cannot see is a source that can only reach the ear by
-        // going through the wall — and for a solid wall that is almost nothing. Taken literally, a
-        // knee-high pit wall silenced a car twenty metres behind it: twenty-six decibels down with the
-        // top three octaves gone. The wall is 0.9 m tall. You can see over it.
-        //
-        // So the simulator's visibility is an INPUT here, not the answer. What arrives is the better of
-        // the two routes sound can take past an obstacle — through it, or round it — and the second is
-        // a function of how far out of its way it had to go, which is geometry the simulator does not
-        // report and we can measure ourselves. A high wall gives a big detour and stays a wall; a low
-        // one gives a few centimetres and costs a handful of decibels, mostly at the top end. Neither
-        // outcome is written down anywhere: both fall out of the same measurement.
+        // What gets past the thing in the way. The direct stage has no edge diffraction: taken as the
+        // answer, a 0.9 m pit wall silenced a car twenty metres behind it (26 dB, the top three octaves
+        // gone). So what arrives is the better of through it and round it, the second by the detour.
         if (occ > 0f)
         {
-            // Measured once per source per tick, in RunSteamAudio, because the SAME number decides
-            // the bearing there and the per-band level here. Two measurements could disagree, and a
-            // source whose level says "over the wall" while its bearing says "through a door" is
-            // exactly the fault this carrying was introduced to remove.
+            // Measured once, in RunSteamAudio, where the same number decides the bearing: two measurements
+            // could have the level "over the wall" and the bearing "through a door".
             float delta = sr.BarrierDelta;
-            // Only a route that EXISTS. The barrier search goes round one box at a time; round the edge
-            // of a shut door is eight centimetres out of the way and straight into the wall the door is
-            // hung in, and if that route set the level a shut door between two rooms would pass
-            // -7/-11/-19 dB (--path-probe shows it). When the route round is blocked, what arrives is
-            // what the wall lets through.
-            //
-            // NOT Steam Audio's pathing eq. That is the colour of the bend, not the loss: about 1.0 for a
-            // route a hundred and fifty metres long, so every siren and walker behind a wall would play
-            // at full level, and from below, where the probe grid's route points.
+            // Only a route that exists: round a shut door's edge is eight centimetres and straight into the
+            // wall it hangs in, and would pass -7/-11/-19 dB (--path-probe). Not Steam Audio's pathing eq
+            // either: that is the bend's colour, about 1.0 for a route 150 m long, not its loss.
             if (delta >= 0f && !sr.BarrierVerified) delta = -1f;
             if (delta >= 0f)
             {
                 var (dLow, dMid, dHigh) = Diffraction.BandGains(delta, AudioPhysics.CurrentSpeedOfSound);
-                // And the route round is LONGER, which the barrier's insertion loss does not pay for
-                // once it reaches its 24 dB ceiling. A walker on the pavement outside Marlow flat 01F
-                // is 8 m from the ear through a brick wall and 164 m round the building: capped, that
-                // route would come out at -24 dB in every band and beat the wall's own -24/-30/-36, so
-                // every step would be heard through the brick. Spreading over the longer
-                // route costs 26 dB there, and under half a decibel for a half-metre kerb.
+                // The longer route's spreading, which the barrier loss stops paying at its 24 dB ceiling: a
+                // walker 8 m through a brick wall and 164 m round the building (Marlow flat 01F) would beat
+                // the wall's -24/-30/-36 and be heard through it. 26 dB there; under half a dB for a kerb.
                 float spread = MathF.Max(0.5f, dist) / (MathF.Max(0.5f, dist) + delta);
                 dLow *= spread; dMid *= spread; dHigh *= spread;
-                // Per band, the better route wins. Transmission is what the material lets through;
-                // diffraction is what came round the edge regardless of what the material is.
+                // Per band, the better of what the material lets through and what came round the edge.
                 ap = new SteamAudioSimulator.AcousticParams(
                     ap.Occlusion,
                     MathF.Max(ap.EqLow, dLow),
                     MathF.Max(ap.EqMid, dMid),
                     MathF.Max(ap.EqHigh, dHigh),
                     ap.Bleed);
-                // And the dry level cannot fall below what the loudest band still delivers: a source
-                // whose energy is arriving round an edge is quieter, not absent.
+                // A source arriving round an edge is quieter, not absent.
                 float throughput = MathF.Max(dLow, MathF.Max(dMid, dHigh));
                 occ = Math.Clamp(MathF.Min(occ, 1f - throughput), 0f, AcousticConstants.OcclusionCap);
                 if (trace != null) trace += $"; over an edge {delta:F1} m {Db(dLow):F0}/{Db(dMid):F0}/{Db(dHigh):F0}";
@@ -770,12 +659,8 @@ public class AsyncAcousticWorker : IDisposable
             else if (trace != null && sr.BarrierDelta >= 0f) trace += $"; edge {sr.BarrierDelta:F1} m not verified";
         }
 
-        // ── By the openings, where that delivers more ───────────────────────────────────────
-        //
-        // The same rule as the one-shots' path (SpatialAcoustics.CalculateMainPath) and the same graph:
-        // per band the better of the straight way and the way by the openings, and the openings decide
-        // where it is heard from when they deliver more over all — from the last one, at the source's
-        // own distance, the level having already paid for the longer way.
+        // By the openings, the same rule and graph as SpatialAcoustics.CalculateMainPath: per band the
+        // better way, and heard from the last opening, at the source's own distance, when it delivers more.
         if (sr.Route is { } viaOpenings)
         {
             var g = OpeningRoutes.Better(new Vector3(ap.EqLow, ap.EqMid, ap.EqHigh), viaOpenings, out bool routeWins);
@@ -804,18 +689,14 @@ public class AsyncAcousticWorker : IDisposable
             TransmissionBleed = ap.Bleed,
             ApparentPosition = apparent,
             EffectiveDistance = dist,
-            // The per-band gains above already carry the barrier's frequency dependence, so the
-            // provider's aperture low-pass — which models a sound squeezing through a small OPENING,
-            // a different phenomenon — stays out of the way and is not a second filter over the top.
+            // The band gains carry the barrier already; the aperture low-pass is for a small opening.
             ApertureFactor = 1f,
             RoomGain = 1f,
             RegionId = region,
             IsReflection = false,
         };
-        // What the air took on the way, per band (ISO 9613-1). Once a hard zero here, described as "a
-        // later phenomena pass": turning the simulator on turned air absorption off, and a shot two
-        // streets away arrived with its top end intact — quiet but bright, which reads as small and
-        // near rather than big and far.
+        // The air, per band (ISO 9613-1). Once zero here, and a shot two streets away arrived quiet but
+        // bright, which reads as small and near.
         (path.AirLowDb, path.AirMidDb, path.AirHighDb) = AudioPhysics.AirLossDb(
             dist, world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
 
@@ -826,19 +707,10 @@ public class AsyncAcousticWorker : IDisposable
     }
 
     /// <summary>
-    /// The copies of this source that the surfaces around it send back.
-    ///
-    /// The simulator does not produce these and cannot: its reflection stage is parametric, which
-    /// yields a decay TIME for the listener's surroundings and no directions at all. A tail with no
-    /// direction in it is a blanket — a room answers from everywhere at once, and a doorway cannot be
-    /// heard from outside, which is exactly what was reported. So the early part of a room's response
-    /// is built here from the same boxes everything else in this file reads, as first-order image
-    /// sources: mirror the source through each surface and you have where the copy stands, how far it
-    /// travelled, and what the material took out of it.
-    ///
-    /// These are the LOUD, EARLY, DIRECTIONAL part. What is left after them — the copies of copies,
-    /// too many and too close together to have a direction any more — is the reverb bus's job, and its
-    /// level comes from how enclosed the place is (see Enclosure).
+    /// The copies of this source the surfaces send back, as first-order image sources from the scene's
+    /// boxes: the loud, early, directional part. The simulator's parametric reflections give a decay time
+    /// and no directions, a blanket in which a doorway cannot be heard from outside. The copies of copies
+    /// are the reverb's, its level from how enclosed the place is (Enclosure).
     /// </summary>
     private void AddEarlyReflections(List<AcousticPathData> into, WorldSnapshot world,
                                      AcousticRequest req, int region)
@@ -848,13 +720,9 @@ public class AsyncAcousticWorker : IDisposable
         if (solids != null && solids.Count == 0) return;
 
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
-        // FIRST ORDER, in EarlyReflections' own order, for a sound that goes on. With third order and
-        // separate events first, an aeroplane's jet and a bus's air hiss mirrored off the hangar and
-        // the facades become extra copies of themselves standing still in the distance, cutting in
-        // and out as each path comes and goes, and a far siren's image puts it in front of you. The
-        // echo of a SUSTAINED sound is not heard as an event; it is part of the field, which the
-        // reverb is. Copies of copies belong to one-off sounds (WorldAudioPlayer), where an echo
-        // happens once and is gone.
+        // First order only, for a sound that goes on: at third order a jet's and a bus's hiss became
+        // copies of themselves standing in the distance, cutting in and out, and a far siren's image
+        // stood in front of you. Copies of copies belong to one-off sounds (WorldAudioPlayer).
         if (solids != null) EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
         else EarlyReflections.Find(req.SourcePos, req.ListenerPos, geometry!, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
 
@@ -863,39 +731,29 @@ public class AsyncAcousticWorker : IDisposable
         {
             var a = _reflectionScratch[i];
 
-            // ── Only an arrival the ear hears apart gets a voice of its own ─────────────────────
-            //
-            // A voice is an independent playback. Two voices of one sound are two reads of it at
-            // unrelated positions, so for anything sustained — a siren, a machine, a megaphone
-            // repeating an announcement — a second voice is a second copy of the announcement, not a
-            // reflection of it. Inside the fusion window the ear would not have heard a separate event
-            // anyway; it would have heard one wider, slightly coloured event. Rendering it as a voice
-            // buys nothing and costs the repeat that was reported.
-            //
-            // The energy is not lost. Those surfaces are the same ones the room survey measured, and
-            // what they return is the room's tail — which is where a fused reflection belongs.
+            // Only an arrival the ear hears apart gets a voice: a second voice of a sustained sound is a
+            // second copy (a megaphone's announcement heard twice), and inside the fusion window the ear
+            // hears one wider event. Its energy is the room's tail, which the survey measured.
             if (!EarlyReflections.IsSeparateEvent(a)) continue;
 
             var reflected = new AcousticPathData
             {
                 IsReflection = true,
-                // The surface's own identity, so a wall keeps one voice while the listener moves
-                // instead of being torn down and started again — which is a click per frame.
+                // The surface's identity. TODO: nothing reads ReflectionId; meant to keep a wall on one voice
+                // as the listener moves (a voice torn down and restarted is a click per frame).
                 ReflectionId = a.SurfaceId,
                 ReflectionIndex = i,
                 ApparentPosition = a.ImagePosition,
                 EffectiveDistance = a.PathLength,
                 ReflectionDelayMs = a.ExtraDelaySeconds * 1000f,
-                // A reflection is not occluded — it got here, which is what being found means. What it
-                // LOST is carried per band, by the surface and by the extra distance it travelled.
+                // Found means it got here: what it lost is per band, by the surface and the extra distance.
                 Occlusion = 0f,
                 EqLow = a.GainLow,
                 EqMid = a.GainMid,
                 EqHigh = a.GainHigh,
                 MaterialAbsorption = 1f - a.GainMid,
                 Scattering = a.Scattering,
-                // A rough surface returns a wider, less pointlike copy. The provider reads this as the
-                // arrival's angular width.
+                // A rough surface returns a wider copy: the arrival's angular width.
                 Spread = a.Scattering * 90f,
                 ApertureFactor = 1f,
                 RoomGain = 1f,
@@ -911,11 +769,11 @@ public class AsyncAcousticWorker : IDisposable
 
     private List<EarlyReflections.Arrival>? _reflectionScratch;
 
-    /// <summary>How many arrivals the last source's reflection search produced, for the summary line.</summary>
+    /// <summary>The last source's arrivals, for the summary line.</summary>
     private int _lastReflectionCount;
 
-    /// <summary>The scene's boxes in the shape the reflection model wants. Rebuilt only when the scene
-    /// is, because the geometry is static and this runs per source per tick.</summary>
+    /// <summary>The scene's boxes for the reflection model, rebuilt only with the scene: this runs per
+    /// source per tick.</summary>
     private IReadOnlyList<EarlyReflections.Solid> ReflectionSolids()
     {
         var boxes = _barrierBoxes;
@@ -931,36 +789,34 @@ public class AsyncAcousticWorker : IDisposable
     private object? _reflectionSolidsFor;
     private IReadOnlyList<EarlyReflections.Solid> _reflectionSolids = Array.Empty<EarlyReflections.Solid>();
 
-    /// <summary>The boxes the current scene was built from, for the barrier search. Replaced whole on
-    /// a scene rebuild and only ever read afterwards, so the worker needs no lock to walk it.</summary>
+    /// <summary>The current scene's boxes, for the barrier search. Replaced whole on a rebuild and only
+    /// read afterwards, so no lock.</summary>
     private List<OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box> _barrierBoxes = new();
 
     // ── Routes by the openings, and what they cost ────────────────────────────────────────────
     //
-    // The graph (OpeningRoutes) is built with each scene, so it has the door leaves where the scene has
-    // them, and handed to SpatialAcoustics so every other voice asks the same one. A route query is a
-    // few Dijkstra steps and a handful of segment tests, but there are dozens of sources a tick: an
-    // answer is kept while neither end has moved enough to change it.
+    // The graph is built with each scene, door leaves where the scene has them, and handed to
+    // SpatialAcoustics so every voice asks the same one. Dozens of sources a tick: an answer is kept
+    // while neither end has moved enough to change it.
     private volatile OpeningRoutes? _routes;
     private readonly RouteAnswers _routeCache = new();
-    /// <summary>How far either end may move before a source's route is asked again, metres: well under a
-    /// doorway's width, so the crossing it reports cannot be a different opening.</summary>
+    /// <summary>Metres either end may move before the route is asked again: well under a doorway's width,
+    /// so the crossing cannot be a different opening.</summary>
     private const float RouteReuseMetres = 0.25f;
     private const long RouteReuseMs = 500;
     /// <summary>
-    /// How much of a tick route queries may take, milliseconds. A source whose ends are new costs a leg
-    /// search through the city (a millisecond or more when the way to a door is blocked); past this, a
-    /// source that has an answer keeps it for this tick, however far it has moved, and only a source
-    /// that has none is asked. A bound on cost, not on what is heard: the answer comes a tick later.
+    /// Milliseconds of a tick route queries may take (a new query can cost a millisecond or more in the
+    /// city). Past it, a source with an answer keeps it this tick and only one with none is asked: the
+    /// answer comes a tick later.
     /// </summary>
     private const double RouteBudgetMs = 4.0;
-    /// <summary>The oldest answer the budget may stand on, milliseconds.</summary>
+    /// <summary>The oldest answer the budget may stand on, ms.</summary>
     private const long RouteHeldMaxMs = 2000;
     private long _routeTicksThisTick;
     private long _routeQueries, _routeTicks, _routeReused;
     private long _lastRouteReport;
 
-    /// <summary>The cost of the route queries so far: how many, and the mean per query.</summary>
+    /// <summary>How many route queries, and the mean per query.</summary>
     public string RouteCostSummary =>
         _routeQueries == 0 ? "no route queries yet"
         : $"{_routeQueries} route queries, {_routeTicks * 1e6 / System.Diagnostics.Stopwatch.Frequency / _routeQueries:F0} µs each, {_routeReused} reused";
@@ -1005,11 +861,10 @@ public class AsyncAcousticWorker : IDisposable
     }
 
     /// <summary>
-    /// The routes through openings for a scene. With the scene's acoustic triangle store
-    /// (<paramref name="geometry"/>, geometry stage 1) they are built tile by tile: the boxes asked of the
-    /// store's trees, each tile's boxes and each opening kept while nothing round it changed
-    /// (<paramref name="cache"/>, this map's). Each opening's sides are checked against the places only
-    /// when the result is reported: the check only ever wrote the report.
+    /// The routes through openings for a scene: with the acoustic triangle store (<paramref name="geometry"/>)
+    /// built tile by tile, each tile and opening kept in <paramref name="cache"/> while nothing round it
+    /// changed. The openings' sides are checked against the places only when <paramref name="report"/>: the
+    /// check only ever wrote the report.
     /// </summary>
     private OpeningRoutes BuildRoutes(WorldSnapshot world, List<SteamAudioScene.Box> boxes,
                                       OpenFPS.Common.Geometry.TriangleWorld? geometry, OpeningRoutes.TileCache? cache, bool report)
@@ -1030,7 +885,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         _routes = model;
         _acoustics.Routes = model;
-        // Answers about the graph before are no use now, and each one holds that graph and its scene.
+        // Answers about the old graph are no use, and each holds that graph and its scene.
         _routeCache.Published(model);
     }
 
@@ -1041,9 +896,8 @@ public class AsyncAcousticWorker : IDisposable
         if (_saDisabled) { Console.WriteLine("[AcousticWorker] Steam Audio sim disabled by OPENFPS_STEAMAUDIO_SIM=0; using the hand-rolled ray-tracer for occlusion, portals and reverb."); return; }
         try
         {
-            // Idempotent: ensure acoustic materials exist before the scene build queries them. Without this
-            // an uninitialized registry makes every scene-material lookup throw, and the sim silently falls
-            // back to no-occlusion. The clients already call this, but the SA path shouldn't depend on it.
+            // Idempotent. Uninitialised, every material lookup in the scene build throws and the simulator
+            // falls back to no occlusion.
             AcousticRegistry.Initialize();
 
             var cs = Phonon.DefaultContextSettings();
@@ -1051,19 +905,18 @@ public class AsyncAcousticWorker : IDisposable
             if (Phonon.iplContextCreate(ref cs, out _saContext) != Phonon.IPL_STATUS_SUCCESS)
             { _saContext = IntPtr.Zero; Console.WriteLine($"[AcousticWorker] DEGRADED: Steam Audio context create failed (SIMD {simd}); using the hand-rolled ray-tracer."); return; }
 
-            // Pathing off: its probe grid is too coarse on a city (tens of metres) to say where a sound
-            // comes from, nothing reads its answer, and the bake cost a core for minutes at every map
-            // load. Routes round obstacles come from the barrier search (BarrierPathDifference).
-            // Embree, where it starts: the scene is then made of a sub-scene per tile and per door leaf
-            // (TileSceneSet), and a tile arriving or a door swinging rebuilds none of the rest. The
-            // simulators are made for the context's scene type, so this comes first.
-            // OPENFPS_EMBREE=0 keeps the default tracer and whole-scene rebuilds (for comparison, or a
-            // machine where Embree misbehaves); OPENFPS_TILE_SCENES=0 keeps Embree with whole scenes.
+            // Embree, where it starts: a sub-scene per tile and per door leaf (TileSceneSet), so a tile
+            // arriving or a door swinging rebuilds none of the rest. First, since the simulators are made
+            // for the context's scene type. OPENFPS_EMBREE=0 keeps the default tracer and whole rebuilds;
+            // OPENFPS_TILE_SCENES=0 keeps Embree with whole scenes.
             _embree = Environment.GetEnvironmentVariable("OPENFPS_EMBREE") != "0"
                       && OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.UseEmbree(_saContext);
             Console.WriteLine(_embree
                 ? "[AcousticWorker] Steam Audio scenes use Embree: a sub-scene per tile and per door leaf."
                 : "[AcousticWorker] Embree did not start here; Steam Audio scenes use the default tracer and are rebuilt whole.");
+            // Pathing off: its probe grid is too coarse on a city (tens of metres) to say where a sound comes
+            // from, nothing reads its answer, and the bake cost a core for minutes at every map load. Routes
+            // round obstacles come from the barrier search (BarrierPathDifference).
             _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: false);
             if (!_saSim.IsValid)
             {
@@ -1086,20 +939,15 @@ public class AsyncAcousticWorker : IDisposable
         catch (Exception ex) { Console.WriteLine($"[AcousticWorker] DEGRADED: Steam Audio sim init failed; using the hand-rolled ray-tracer: {ex.Message}"); }
     }
 
-    /// <summary>Rebuilds the simulator scene from the world's solid box colliders when the acoustic map
-    /// changes (or on first use). Geometry is mostly static, so this is a per-map-load cost.</summary>
     // ── Doors are part of the geometry, where they are now ────────────────────────────────────────
     //
-    // Built once per map with every door leaf where it stood at load, an open door would still be a
-    // wall to occlusion, diffraction and the traces. The server swings the leaf's real transform, so
-    // the world knows where it is. When any leaf has moved, the scene is rebuilt with it there — every
-    // simulator takes the new one as it does on a map change, and Steam Audio's reference counting
-    // keeps the old alive until each has let go — at most every DoorRebuildSeconds while a door
-    // swings, and once more when it settles. The pathing probes are not rebaked for a door.
+    // When a leaf near the listener has moved, the scene is rebuilt with it there, at most every
+    // DoorRebuildSeconds while it swings and once more when it settles; Steam Audio's reference counting
+    // keeps the old scene alive until every simulator has let go. Built once per map, an open door stayed
+    // a wall to occlusion, diffraction and the traces.
     private long _lastDoorRebuildTicks;
     private const double DoorRebuildSeconds = 0.3;
-    /// <summary>Only doors this near the listener count: on the city walkers open doors all day, and a
-    /// scene rebuild for one three hundred metres off is work nobody can hear.</summary>
+    /// <summary>Only doors this near the listener count: on the city walkers open doors all day.</summary>
     private const float DoorNearMetres = 50f;
     private Vector3 _lastListenerPos;
     private bool _haveLastListener;
@@ -1107,10 +955,8 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>Where each door leaf stood when the scene in use was built, by entity.</summary>
     private readonly Dictionary<int, long> _builtDoorPoses = new();
 
-    /// <summary>A door leaf: a solid box that is also a portal. The server gives every door a portal
-    /// (PrefabRepository), with both sides the outside when the map names no rooms, so a door is told by
-    /// HAVING one, not by its two sides differing — that test missed every door on the city. Movers
-    /// are not in the scene at all.</summary>
+    /// <summary>See <see cref="OpeningGraph.IsDoorLeaf"/>; telling a door by its sides differing missed
+    /// every door on the city.</summary>
     private static bool IsDoorLeaf(OpenFPS.Common.Networking.EntityDefinition? def) => OpeningGraph.IsDoorLeaf(def);
 
     /// <summary>A leaf's pose to the centimetre and the degree, folded into one number.</summary>
@@ -1123,10 +969,9 @@ public class AsyncAcousticWorker : IDisposable
         return h;
     }
 
-    /// <summary>True when a leaf near the listener stands somewhere other than where the scene in use has
-    /// it. Only a leaf that MOVED counts: a hash of the doors within 50 m would change every time one
-    /// crossed that radius as you walked, and rebuild the scene for nothing. A far leaf that moved is
-    /// left as it is until you come near it.</summary>
+    /// <summary>A leaf near the listener stands somewhere other than the scene in use has it. Only a leaf
+    /// that moved: a hash of the doors within 50 m changed whenever one crossed the radius as you walked.
+    /// A far leaf that moved waits until you come near.</summary>
     private bool NearDoorMoved(WorldSnapshot world)
     {
         foreach (var snap in world.Entities.Values)
@@ -1146,33 +991,30 @@ public class AsyncAcousticWorker : IDisposable
             if (IsDoorLeaf(snap.Definition)) _builtDoorPoses[snap.Id] = DoorPose(snap);
     }
 
-    // A door's rebuild is built OFF this thread and swapped in here when it is ready: on the city the
-    // two scenes take about 120 ms (--scene-cost), and every source's occlusion would stand still for
-    // that, several times a swing. Replaced scenes are released a few seconds later, once every
-    // simulator has taken the new one.
+    // A door's rebuild is made off this thread and swapped in when ready: the city's two scenes take
+    // about 120 ms (--scene-cost), and occlusion would stand still that long, several times a swing.
+    // Replaced scenes are released a few seconds later, once every simulator has the new one.
     private System.Threading.Tasks.Task<(SteamAudioScene Full, SteamAudioScene Listener, List<SteamAudioScene.Box> Boxes, AcousticMap? Map, OpeningRoutes Routes, OpenFPS.Common.Geometry.TriangleWorld? Geometry)>? _doorBuild;
     private readonly List<(SteamAudioScene Scene, long At)> _retiredScenes = new();
 
     // ── Tiles arriving and leaving ─────────────────────────────────────────────────────────────
     //
-    // On a map streamed in tiles the acoustic map object stays the same while its contents follow the
-    // player (ClientWorldState.RefreshAcousticsNow), and each refresh bumps the snapshot's
-    // GeometryVersion. A change of version rebuilds the scene exactly as a door does: off this thread, on
-    // a niced one of its own because a radius of tiles is a bigger scene than a door's, and swapped in
-    // when it is ready. Sources keep their last answers meanwhile; nothing waits for it.
+    // On a streamed map the acoustic map object stays while its contents follow the player, and each
+    // refresh bumps GeometryVersion (ClientWorldState.RefreshAcousticsNow). A new version rebuilds the
+    // scene as a door does, on a niced thread of its own; sources keep their last answers meanwhile.
     private long _builtGeometryVersion;
     private bool _buildIsForTiles;
     /// <summary>Embree started on this context: scenes are assembled from tiles (TileSceneSet).</summary>
     private bool _embree;
     /// <summary>This map's sub-scenes. Replaced on a new map; the old set is let go once no build uses it.</summary>
     private TileSceneSet? _tileScenes;
-    /// <summary>Without a tile set, this map's acoustic triangle store (a new one each map: a build for the
-    /// last map may still be using the old one).</summary>
+    /// <summary>Without a tile set, this map's acoustic triangle store: a new one each map, since a build
+    /// for the last may still use the old.</summary>
     private AcousticGeometry? _acousticStore;
     /// <summary>The acoustic scene as triangles, swapped in with <see cref="_barrierBoxes"/>: what the
     /// enclosure survey casts against.</summary>
     private OpenFPS.Common.Geometry.TriangleWorld? _enclosureWorld;
-    /// <summary>This map's routes kept tile by tile (OpeningRoutes.TileCache): one build at a time uses it.</summary>
+    /// <summary>This map's routes kept tile by tile: one build at a time uses it.</summary>
     private OpeningRoutes.TileCache? _routeTiles;
     private double _lastScenesMs, _lastRoutesMs;
     private object? _routesPortals;
@@ -1181,8 +1023,8 @@ public class AsyncAcousticWorker : IDisposable
     private const double RoutesEverySeconds = 3.0;
     private readonly List<(TileSceneSet Set, long At)> _retiredTileSets = new();
 
-    /// <summary>The tile sets of earlier maps, let go as replaced scenes are: once no build uses one, no
-    /// tracer is still being handed over, and five seconds have passed.</summary>
+    /// <summary>Earlier maps' tile sets go once no build uses one, no tracer is being handed over, and five
+    /// seconds have passed.</summary>
     private void ReleaseRetiredTileSets()
     {
         if (_doorBuild != null || _retiredTileSets.Count == 0) return;
@@ -1210,9 +1052,8 @@ public class AsyncAcousticWorker : IDisposable
     }
 
     /// <summary>
-    /// The acoustic scene as triangles (docs/GEOMETRY.md stage 1), the one the scenes were just made from:
-    /// the tile set's store, or (without Embree) a store of the map's own brought up to the same boxes.
-    /// What the enclosure survey casts its rays against.
+    /// The acoustic scene as triangles (docs/GEOMETRY.md stage 1), what the enclosure survey casts against:
+    /// the tile set's store, or without Embree a store of the map's own brought up to the same boxes.
     /// </summary>
     private static OpenFPS.Common.Geometry.TriangleWorld? GeometryFor(TileSceneSet? set, AcousticGeometry? store,
                                                                       List<SteamAudioScene.Box> boxes, ISet<int>? leaves = null)
@@ -1223,12 +1064,12 @@ public class AsyncAcousticWorker : IDisposable
     }
     private long _buildStartedTicks;
 
-    /// <summary>Tile rebuilds swapped in, and how long the last took, milliseconds. Diagnostic.</summary>
+    /// <summary>Tile rebuilds swapped in. Diagnostic.</summary>
     public int TileSceneBuilds { get; private set; }
     /// <summary>Background rebuilds (doors and tiles) swapped in so far. Diagnostic.</summary>
     public int SceneSwaps { get; private set; }
-    /// <summary>The tile scenes' state (which pair is in use, what each holds), or null without them. Diagnostic:
-    /// read while no build is running (<see cref="SceneBuildPending"/>), or it may say only that one is.</summary>
+    /// <summary>The tile scenes' state, or null without them. Diagnostic: read while no build runs
+    /// (<see cref="SceneBuildPending"/>).</summary>
     public string? TileScenesState
     {
         get
@@ -1237,10 +1078,11 @@ public class AsyncAcousticWorker : IDisposable
             catch (InvalidOperationException) { return "a build is changing them"; }
         }
     }
-    /// <summary>True while a background rebuild (a door, tiles) is being made and not yet handed over. Diagnostic.</summary>
+    /// <summary>A background rebuild (a door, tiles) is being made. Diagnostic.</summary>
     public bool SceneBuildPending => _doorBuild != null;
+    /// <summary>How long the last tile rebuild took, ms.</summary>
     public double LastTileSceneBuildMs { get; private set; }
-    /// <summary>Every background scene build so far (tiles and doors), milliseconds of wall time in all.</summary>
+    /// <summary>Every background build so far (tiles and doors), ms of wall time in all.</summary>
     public double SceneBuildMsTotal { get; private set; }
     /// <summary>Of those: making the Steam Audio scenes, and making the routes through openings, ms in all.</summary>
     public double SceneOnlyMsTotal, RoutesMsTotal;
@@ -1264,7 +1106,7 @@ public class AsyncAcousticWorker : IDisposable
         var (full, listener, boxes, map, routes, geometry) = t.Result;
         if (!ReferenceEquals(map, _saSceneMap) || !full.IsBuilt)
         {
-            full.Dispose(); listener.Dispose();        // the map changed meanwhile: it is not this map's
+            full.Dispose(); listener.Dispose();        // the map changed meanwhile
             return;
         }
         long now = DateTime.UtcNow.Ticks;
@@ -1301,6 +1143,7 @@ public class AsyncAcousticWorker : IDisposable
             if (_retiredScenes[i].At < cutoff) { _retiredScenes[i].Scene.Dispose(); _retiredScenes.RemoveAt(i); }
     }
 
+    /// <summary>A new scene for a new map at once; for a door or tiles, a background build.</summary>
     private void RebuildSceneIfNeeded(WorldSnapshot world)
     {
         if (_saScene == null || _saSim == null) return;
@@ -1327,9 +1170,9 @@ public class AsyncAcousticWorker : IDisposable
             RecordDoorPoses(world);
             var doorBoxes = SteamAudioScene.BoxesFromWorld(world);
             var ctx = _saContext; var forMap = _saSceneMap; var set = _tileScenes;
-            // The routes through openings are made again when the openings changed (a door moved, rooms
-            // came or went) and otherwise at most every few seconds: the coarse ring moving as you drive
-            // changes their far barriers, not their doorways, and making them is most of a tile's cost.
+            // The routes are made again when the openings changed, otherwise at most every few seconds: the
+            // coarse ring moving as you drive changes their far barriers, not their doorways, and making
+            // them is most of a tile's cost.
             var portals = world.AcousticMap?.Portals;
             bool routesDue = !tiles || _routes == null || !ReferenceEquals(portals, _routesPortals)
                              || DateTime.UtcNow.Ticks - _routesBuiltTicks > RoutesEverySeconds * TimeSpan.TicksPerSecond;
@@ -1362,9 +1205,8 @@ public class AsyncAcousticWorker : IDisposable
         var boxes = SteamAudioScene.BoxesFromWorld(world);
         var mapLeaves = OpeningGraph.LeavesOf(world);
         _lastSceneBoxes = boxes.Count;
-        // A new map gets new scene objects; the old ones are retired, not rebuilt in place. The
-        // tracers' threads and the pathing bake may still be running on them, and freeing a native
-        // scene under a running trace is a crash.
+        // A new map gets new scene objects; the old are retired, not rebuilt in place: the tracers and
+        // the bake may still run on them, and freeing a native scene under a running trace is a crash.
         if (_saScene.IsBuilt)
         {
             long now = DateTime.UtcNow.Ticks;
@@ -1377,14 +1219,12 @@ public class AsyncAcousticWorker : IDisposable
                 Console.WriteLine($"[SABOX] center=({b.Center.X:F1},{b.Center.Y:F1},{b.Center.Z:F1}) size=({b.Size.X:F1},{b.Size.Y:F1},{b.Size.Z:F1}) mat={b.Material}");
         if (_embree)
         {
-            // A new map's own set of tiles; the last map's goes once no build is using it.
             if (_tileScenes != null) _retiredTileSets.Add((_tileScenes, DateTime.UtcNow.Ticks));
-            // On unless OPENFPS_TILE_SCENES=0. Off for a day (2026-10-06): the first door that moved handed
-            // over the second pair of top scenes, which traced as empty, so every wall stopped occluding and
-            // the traced reverb and echoes lost their walls (Cody: traffic heard inside Selby House,
-            // reflections mono). Two things Steam Audio's Embree scenes do were missed, and TileSceneSet's
-            // remarks say both; tile scenes now answer as the whole-scene build does before and after any
-            // number of swings and tile changes (AudioLab --path-probe door= swings=, --stream-walk stops=).
+            // On unless OPENFPS_TILE_SCENES=0. Off for a day (2026-10-06): the second pair of scenes, handed
+            // over at the first door swing, traced as empty and every wall stopped occluding (Cody: traffic
+            // heard inside Selby House). TileSceneSet's remarks say why; they now answer as the whole-scene
+            // build does through any number of swings and tile changes (AudioLab --path-probe door=
+            // swings=, --stream-walk stops=).
             _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres);
             _acousticStore = _tileScenes == null ? new AcousticGeometry(world.TileMetres) : null;
             var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, boxes, mapLeaves);
@@ -1407,12 +1247,8 @@ public class AsyncAcousticWorker : IDisposable
         if (_saScene.IsBuilt)
         {
             _saSim.SetScene(_saScene);
-            // The places themselves, traced: an impulse response from where the listener stands, and
-            // one from the middle of each other room that can be heard (SteamAudio.TracedReverbSet).
-            //
-            // The listener's own trace gets the scene without its open ground: see
-            // SteamAudioScene.WithoutOpenGround for why a trace from the listener's head must not hear
-            // the floor under their feet.
+            // The places traced (TracedReverbSet): from where the listener stands, and from the middle of
+            // each other room heard. The listener's trace has no open ground (SteamAudioScene.WithoutOpenGround).
             if (!_embree)
             {
                 _saListenerScene ??= new SteamAudioScene(_saContext);
@@ -1425,37 +1261,22 @@ public class AsyncAcousticWorker : IDisposable
             }
             OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Configure(_saContext, _saScene,
                 _saListenerScene is { IsBuilt: true } ? _saListenerScene : null);
-            // Off the worker thread and out of the way. This is the work that used to sit inside
-            // SetScene and take a hundred seconds of a single core before ANY source got an occlusion
-            // value — a hundred seconds in which the whole world was rendered as if nothing were in
-            // the way, ending in every source receiving its first real occlusion in the same frame.
+            // Off the worker thread: inside SetScene the bake took a hundred seconds of a core before any
+            // source had an occlusion value, the world unoccluded until then.
             if (mapChanged) _saSim.BeginProbeBake(_saScene);
         }
-        // The boxes the barrier model bends sound around and the routes run through. The same list the
-        // scene was built from, so the diffraction path and the occlusion test can never disagree about
-        // what is in the world.
+        // The scene's own boxes, so diffraction and occlusion cannot disagree about what is there.
         _barrierBoxes = boxes;
         PublishRoutes(BuildRoutes(world, boxes, _enclosureWorld, _routeTiles, report: mapChanged));
         Console.WriteLine($"[AcousticWorker] Built Steam Audio scene from {boxes.Count} solid box colliders ({built.ElapsedMilliseconds} ms).");
     }
 
-    /// <summary>Throttled: runs the reflections sim for a single probe at the listener to get the room's
-    /// geometry-driven RT60, mapped to an FMOD reverb decay (ms) the provider applies to the listener's
-    /// reverb. Reflections are the heaviest stage, so this runs only every Nth tick for one source.</summary>
     /// <summary>
-    /// What the room around the listener does to sound, measured from its surfaces.
-    ///
-    /// This used to be Steam Audio's reflection stage — a second simulator, the heaviest of the three,
-    /// run on a throttle to fit a single number out of it. That number could not tell a room from a
-    /// yard (a roofless box fitted a LONGER tail than the same box with a roof on), had no bands in it,
-    /// and knew nothing about what the walls were made of. The stage is retired here; the simulator
-    /// still supports it for the spikes.
-    ///
-    /// What replaces it is a sphere of rays from the listener, which was already being cast to measure
-    /// enclosure. The same cast yields the mean free path and the mean absorption per band, and those
-    /// are the two things a decay time is made of. So the room's character now comes from its
-    /// materials: a carpeted half of a hall answers dull and short, the concrete half beside it bright
-    /// and long, and neither is written down anywhere.
+    /// What the room round the listener does to sound, every few ticks, from the enclosure survey's sphere
+    /// of rays: its mean free path and absorption per band make the decay, so a carpeted half of a hall
+    /// answers dull and short and the concrete half bright and long. Steam Audio's reflection stage, which
+    /// this replaced, fitted a roofless box a longer tail than a roofed one (docs/COMMON_NOTES.md,
+    /// "Reverberation").
     /// </summary>
     private void RunListenerReverb(Vector3 listener)
     {
@@ -1470,15 +1291,13 @@ public class AsyncAcousticWorker : IDisposable
         _listenerEnclosure = survey.Enclosure;
         _listenerReverbMs = Math.Clamp(mid * 1000f, AcousticConstants.MinReverbDecayMs,
                                                     AcousticConstants.MaxReverbDecayMs);
-        // How much faster the top decays than the middle. This is the audible half of what a material
-        // is: carpet takes the high band four times harder than the low, so its tail dies bright-first
-        // and sounds like cloth; concrete's barely tilts at all and rings.
+        // The tilt is the audible half of a material: carpet takes the high band four times harder than
+        // the low and sounds like cloth; concrete barely tilts and rings.
         _listenerHfDecayRatio = Math.Clamp(high / MathF.Max(0.01f, mid), 0.1f, 2.0f);
         _listenerLfDecayRatio = Math.Clamp(low / MathF.Max(0.01f, mid), 0.1f, 4.0f);
     }
 
-    /// <summary>The scene's boxes as the enclosure measure wants them. Rebuilt only when the scene is,
-    /// because the geometry is static and this runs on the audio worker.</summary>
+    /// <summary>The scene's boxes for the enclosure measure, rebuilt only with the scene.</summary>
     private IReadOnlyList<Enclosure.Solid> EnclosureSolids()
     {
         var boxes = _barrierBoxes;
@@ -1500,18 +1319,9 @@ public class AsyncAcousticWorker : IDisposable
         IntPtr src = _saSim!.AcquireSource();
         if (src == IntPtr.Zero)
         {
-            // ── A full pool lends out the source nobody is asking about ──────────────────────
-            //
-            // A source is held for SaSourceTtlMs after its last request, so the pool fills with
-            // every id asked about in the last five seconds — on the city that is fifty-odd playing
-            // voices plus every live car and machine, and it crossed 64. The pool was first come,
-            // first served: whichever sound started LAST (a door, a footstep, the room you just
-            // walked into) was the one refused, and it was rendered by the hand-rolled tracer —
-            // different occlusion from its neighbours, until you walked out and something expired.
-            //
-            // Nothing a source carries between runs is needed: its inputs are staged fresh before
-            // every run it is read in. So only the sources asked about THIS tick need one, and a
-            // held source that is not among them can be handed over without anything losing an answer.
+            // A full pool lends out a source nobody asks about this tick: inputs are staged fresh every run,
+            // so nothing is lost. First come, first served, the last sound to start (a door, a footstep) was
+            // refused and heard through the hand-rolled tracer, the city's pool past 64 within five seconds.
             int victim = PickSourceToReclaim(_saSources, _saLastSeen, _served);
             if (victim != int.MinValue && _saSources.Remove(victim, out src))
                 _saLastSeen.Remove(victim);   // its last result stays in _results until it asks again
@@ -1522,9 +1332,8 @@ public class AsyncAcousticWorker : IDisposable
         return src;
     }
 
-    /// <summary>Who gets a place in the pool this tick: the first <paramref name="capacity"/> in line.
-    /// The line is the order sources were asked about in, with whoever was turned away last tick put at
-    /// its head (WorkerLoop), so nobody is turned away two ticks running.</summary>
+    /// <summary>The first <paramref name="capacity"/> in line, the line headed by last tick's turned-away,
+    /// so nobody is turned away two ticks running.</summary>
     internal static void Serve(IEnumerable<int> line, int capacity, HashSet<int> served)
     {
         served.Clear();
@@ -1585,7 +1394,7 @@ public class AsyncAcousticWorker : IDisposable
     public void Dispose()
     {
         _cts.Cancel();
-        _workerThread?.Join(); // after this, no other thread touches the Phonon sim objects
+        _workerThread?.Join(); // after this, nothing else touches the Phonon objects
 
         OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Dispose();
         if (_saSim != null) { _saSim.Dispose(); _saSim = null; }

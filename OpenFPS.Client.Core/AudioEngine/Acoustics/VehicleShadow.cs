@@ -5,18 +5,10 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.AudioEngine.Acoustics;
 
 /// <summary>
-/// A vehicle standing between you and a sound.
-///
-/// The acoustic scene is built once, from what does not move, so a bus parked across the line from
-/// you to a car was never in it: the car behind was heard as though the bus were glass. This puts the
-/// moving bodies back as what they are acoustically — a BARRIER, a box the sound has to bend over or
-/// round — using the textbook result for one (Maekawa 1968): the extra distance the sound must travel
-/// to get round the easiest edge, in wavelengths, sets how much is lost. So it is frequency-dependent
-/// by construction. A bus takes most of the top off a car behind it and very little of the bottom, a
-/// low rumble walks straight round a hatchback, and nothing here knows what either of them is.
-///
-/// Worked out every frame, for every voiced source, against every body big enough to matter, because
-/// both ends and the barrier all move. It is a handful of box tests per source.
+/// A vehicle standing between you and a sound, as a barrier (Maekawa 1968): the extra distance round the
+/// easiest edge, in wavelengths, sets the loss, so a bus takes most of the top off a car behind it and
+/// little of the bottom. The acoustic scene holds only what does not move, so without this the car was
+/// heard as though the bus were glass. Every frame, for every voiced source: a handful of box tests.
 /// </summary>
 public static class VehicleShadow
 {
@@ -24,22 +16,21 @@ public static class VehicleShadow
     private const float LowHz = 150f, MidHz = 1000f, HighHz = 4000f;
 
     /// <summary>
-    /// The most a vehicle takes off, dB. A thin screen of infinite extent reaches 20-25; a body a few
-    /// metres long with a gap under it and sound reaching round both ends does not, and field
-    /// measurements of a lorry between a road and a microphone come out around ten to fifteen.
+    /// dB. An infinite thin screen reaches 20-25; field measurements of a lorry between a road and a
+    /// microphone come out around ten to fifteen (a gap under it, and sound round both ends).
     /// </summary>
     private const float MaxLossDb = 15f;
 
-    /// <summary>Anything smaller than this is not worth asking about — a person, a mower.</summary>
+    /// <summary>Smaller is not worth asking about: a person, a mower.</summary>
     private const float MinVolumeCubicMetres = 2.5f;
 
-    /// <summary>Ground clearance: the body starts this far above where it rests.</summary>
+    /// <summary>Ground clearance.</summary>
     private const float UnderbodyMetres = 0.2f;
 
     /// <summary>
-    /// Takes whatever the vehicles between <paramref name="listener"/> and <paramref name="source"/>
-    /// cost off the path's three bands. <paramref name="sourceId"/> and <paramref name="ridingId"/>
-    /// are never their own barrier. Returns the worst loss applied, dB, for diagnostics.
+    /// Takes what the vehicles between <paramref name="listener"/> and <paramref name="source"/> cost off
+    /// the path's three bands; <paramref name="sourceId"/> and <paramref name="ridingId"/> are never a
+    /// barrier. Returns the high band's loss, dB, for diagnostics.
     /// </summary>
     public static float Apply(ref AcousticPathData path, WorldSnapshot world, int sourceId,
                               Vector3 source, Vector3 listener, int ridingId)
@@ -54,8 +45,8 @@ public static class VehicleShadow
             if (size.X * size.Y * size.Z < MinVolumeCubicMetres) continue;
             float detour = Detour(body.Transform.Position, body.Transform.Rotation, size, listener, source);
             if (detour <= 0f) continue;
-            // Barriers do not add like that in the field, but the second one in a line of traffic
-            // does take something more; the worst one plus a little of the rest is honest enough.
+            // Barriers do not add in the field, but a second one in a line of traffic takes something
+            // more: the worst plus a little of the rest.
             low = Combine(low, Loss(detour, LowHz));
             mid = Combine(mid, Loss(detour, MidHz));
             high = Combine(high, Loss(detour, HighHz));
@@ -106,13 +97,9 @@ public static class VehicleShadow
     }
 
     /// <summary>
-    /// The shortest way round the box seen from above: via its corners, each leg staying outside it.
-    ///
-    /// It used to push the points where the line enters and leaves out to a face along one axis. A
-    /// line crossing the box broadside already enters and leaves through exactly those faces, so the
-    /// "route round the side" was the straight line through the bus: a detour of nothing, a bus that
-    /// cast no shadow at all on a level line. Round a convex box the answer is a chain of at most
-    /// three of its corners, so every such chain is tried.
+    /// The shortest way round the box seen from above: every chain of up to three of its corners, each leg
+    /// outside it. Pushing the entry and exit points out to a face, as this once did, gave a broadside line
+    /// a detour of nothing, and a bus cast no shadow on a level line.
     /// </summary>
     private static float RoundInPlan(Vector3 a, Vector3 b, Vector3 half)
     {
