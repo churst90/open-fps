@@ -41,10 +41,9 @@ public class ClientAudioSystemTests
     }
 
     /// <summary>
-    /// Every voice started for a vehicle is given an acoustic path: its live engine, its borrowed
-    /// voice when it is voiced from afar, and its horn. A voice with no path is never occluded and
-    /// never darkened by distance — before d538b01 that was every car voiced from afar, heard as a
-    /// white-noise wash from the edge of the city.
+    /// Every voice started for a vehicle (live engine, borrowed voice, horn) gets an acoustic path. A
+    /// voice with no path is never occluded or darkened: before d538b01 every car voiced from afar was,
+    /// heard as a white-noise wash from the edge of the city.
     /// </summary>
     [Fact]
     public void EveryVoiceOfEveryCarIsGivenAnAcousticPath()
@@ -73,12 +72,8 @@ public class ClientAudioSystemTests
         Assert.Equal(h.Mixer.LastPath(DistantNear).AirHighDb, h.Mixer.LastPath(ClientAudioHarness.DistantVoice(DistantNear)).AirHighDb);
     }
 
-    /// <summary>
-    /// A car voiced from afar is darkened by the air in proportion to how far away it is: the one at
-    /// 110 m carries more air absorption than the one at 45 m, and both more than a live engine 20 m
-    /// away. The failure this guards is a borrowed voice arriving with its high band intact however
-    /// far off it is.
-    /// </summary>
+    /// <summary>A car voiced from afar is darkened by the air with distance (110 m more than 45 m, both more
+    /// than a live engine at 20 m), not arriving with its high band intact.</summary>
     [Fact]
     public void ADistantVoiceIsDarkenedByTheAirInProportionToItsDistance()
     {
@@ -96,12 +91,8 @@ public class ClientAudioSystemTests
         Assert.True(at110 > at45 + 3f, $"110 m ({at110}) should be clearly darker than 45 m ({at45})");
     }
 
-    /// <summary>
-    /// A car's voice is placed by its own declared level and its own size: Volume and MinDistance are
-    /// exactly Loudness.Place(SourceLevelDb, outlet separation), for a live engine and for a borrowed
-    /// one. Presets twenty-odd decibels apart must not come out the same, and neither may fall back
-    /// to the one-number-for-every-car level.
-    /// </summary>
+    /// <summary>A car's voice is placed by its own declared level and size, Loudness.Place(SourceLevelDb,
+    /// outlet separation), live or borrowed; presets 20 dB apart must not come out the same.</summary>
     [Theory]
     [InlineData("v6")]
     [InlineData("school_bus")]
@@ -130,8 +121,7 @@ public class ClientAudioSystemTests
         Assert.Equal(preset, live.EngineKey);
         if (live.ExtentMetres == 0f)
         {
-            // Close enough for a voice at each end (a bus is, at 30 m): each end is the point it is,
-            // and the car's length is modelled by where they are rather than widened as well.
+            // A voice at each end (a bus at 30 m): the length is where the ends are, not widened as well.
             var (pointGain, pointReference) = Loudness.Place(profile.SourceLevelDb);
             Assert.Equal(pointGain, live.Volume, 5);
             Assert.Equal(pointReference, live.MinDistance, 4);
@@ -158,12 +148,8 @@ public class ClientAudioSystemTests
         }
     }
 
-    /// <summary>
-    /// With more cars than the live budget, the nearest get live engines and the next ones are voiced
-    /// from afar; walk to the other end of the line and the two sets swap — the cars now nearest are
-    /// synthesized and give their borrowed voices back, the ones left behind lose their engines and
-    /// borrow. A budget that ranked by anything but nearness, or never re-ranked, fails here.
-    /// </summary>
+    /// <summary>With more cars than the live budget the nearest get live engines and the next borrow; walk
+    /// to the other end of the line and the two sets swap.</summary>
     [Fact]
     public void TheNearestCarsAreSynthesizedAndTheRestBorrowAndMovingSwapsThem()
     {
@@ -204,12 +190,9 @@ public class ClientAudioSystemTests
     }
 
     /// <summary>
-    /// A car that wins a live voice starts behind whatever it is behind. The occlusion worker had not
-    /// been asked about it — nothing asks about a car with no voice, and its last answer is dropped five
-    /// seconds after — so its first frames used to go out on "no answer", built as nothing in the way:
-    /// a car behind a building started at full level and was pulled down only when the worker's answer
-    /// came, a fifth of a second later, and eased in after that. The [POP] detector never saw it (it
-    /// ignores a voice's first half second); the city's 359 engine starts in one session were each one.
+    /// A car that wins a live voice starts behind whatever it is behind. With no worker answer yet its
+    /// first frames went out as nothing in the way, at full level for a fifth of a second: each of the
+    /// city's 359 engine starts in one session, unseen by [POP], which ignores a voice's first half second.
     /// </summary>
     [Fact]
     public void AnEngineStartsBehindTheWallItIsBehind()
@@ -226,7 +209,7 @@ public class ClientAudioSystemTests
         Assert.True(Db(first.EqMid) < -15f, $"started at {Db(first.EqMid):F1} dB in the mid band behind a 10 m brick wall");
         Assert.True(first.Occlusion > 0.5f, $"started with occlusion {first.Occlusion:F2}");
 
-        // And where the worker then puts it, so the start is not a different answer of its own.
+        // Where the worker then puts it, so the start is not an answer of its own.
         Assert.True(h.TickUntil(() => h.Mixer.HasPath(NearCar), 300), "the worker never answered");
         var worker = h.Mixer.LastPath(NearCar);
         _o.WriteLine($"worker: occlusion {worker.Occlusion:F2}, bands {Db(worker.EqLow):F1}/{Db(worker.EqMid):F1}/{Db(worker.EqHigh):F1} dB");
@@ -237,10 +220,9 @@ public class ClientAudioSystemTests
     private static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
 
     /// <summary>
-    /// When the server says a car is gone, every voice it had stops: its live engine and its borrowed
-    /// voice at once, from ForgetEntity itself, and a horn that was still blowing on the next update —
-    /// and none of them is started again. A voice keyed by an id the world no longer has plays for
-    /// the rest of the session.
+    /// When the server says a car is gone every voice it had stops (engine and borrowed voice from
+    /// ForgetEntity, a blowing horn on the next update) and none restarts: a voice keyed by a gone id
+    /// plays for the rest of the session.
     /// </summary>
     [Fact]
     public void AForgottenCarLosesEveryVoiceItHad()

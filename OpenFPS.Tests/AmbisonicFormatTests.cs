@@ -3,17 +3,10 @@ using OpenFPS.Client.AudioEngine.Core;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for the ambisonic format layer — the one part of the soundfield path that cannot be checked
-/// by ear, because getting it wrong does not sound broken. It sounds *vague*.
-///
-/// Steam Audio decodes N3D (ACN order, orthonormal harmonics). Recordings in the wild are AmbiX
-/// (ACN/SN3D) or, if older, FuMa (WXYZ order, W attenuated). Feed AmbiX to an N3D decoder and the
-/// directional channels are 1.73x too quiet — the field renders over-wide and badly localized, with
-/// nothing to say why. Feed FuMa to an ACN decoder and the axes are permuted outright: front becomes up.
-/// Neither mistake produces an error, so it gets asserted here instead.
-///
-/// The rotation and decode themselves need the native library and are verified by
-/// `OpenFPS.AudioLab --ambisonic`.
+/// The ambisonic format layer, which sounds vague rather than broken when wrong. Steam Audio decodes N3D
+/// (ACN order); recordings are AmbiX (ACN/SN3D, directional channels 1.73x too quiet for N3D) or FuMa
+/// (WXYZ, W attenuated: fed as ACN, front becomes up). Rotation and decode need the native library and
+/// are checked by `OpenFPS.AudioLab --ambisonic`.
 /// </summary>
 public class AmbisonicFormatTests
 {
@@ -94,7 +87,6 @@ public class AmbisonicFormatTests
     [Fact]
     public void FuMaAndAmbiXDoNotProduceTheSameThing()
     {
-        // The point of having both: if these agreed, the layout field would be decoration.
         var asAmbix = new float[] { 1f, 2f, 3f, 4f };
         var asFuma = new float[] { 1f, 2f, 3f, 4f };
         AmbisonicFormat.ConvertToN3d(asAmbix, 4, AmbisonicLayout.AmbiX);
@@ -117,7 +109,7 @@ public class AmbisonicFormatTests
     [Fact]
     public void AConversionNeverWalksOffTheEndOfARaggedBuffer()
     {
-        // A truncated final frame must not throw — a half-written file should be quiet, not fatal.
+        // A truncated final frame must not throw: a half-written file is quiet, not fatal.
         var samples = new float[] { 1, 1, 1, 1, 1, 1 }; // 1.5 frames of 4 channels
         var exception = Record.Exception(() => AmbisonicFormat.ConvertToN3d(samples, 4, AmbisonicLayout.AmbiX));
         Assert.Null(exception);

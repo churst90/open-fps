@@ -7,16 +7,8 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The channel for every short sound the world makes.
-///
-/// Before it there was no way for the server to say "that just happened" — an entity could carry a
-/// looping emitter and that was the entire vocabulary, which is why glass breakage, gunfire and
-/// collisions are all written, tested and completely silent.
-///
-/// The thing being tested is that it is GENERIC. It carries knocks, rings, hisses and scrapes, not
-/// doors — so a ball that bounces, a bucket somebody kicks over and a round striking concrete need no
-/// new code anywhere in the audio engine. A sample library would need a recording of each, at each
-/// size, of each material, struck at each force.
+/// The channel for every short sound the world makes. It is generic: it carries knocks, rings, hisses
+/// and scrapes, not doors, so a bouncing ball or a round striking concrete needs no new audio code.
 /// </summary>
 public class WorldAudioEventTests
 {
@@ -24,11 +16,8 @@ public class WorldAudioEventTests
 
     // ── The wire ────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// It survives the trip, parameters and all. Worth a test of its own because the whole design
-    /// rests on sending PHYSICS rather than a file name: if the numbers do not arrive intact, the
-    /// client renders a different sound from the one that happened.
-    /// </summary>
+    /// <summary>It survives the wire, parameters and all: the client renders from the physics sent, so
+    /// numbers that arrive changed are a different sound.</summary>
     [Fact]
     public void AnEventSurvivesTheWire()
     {
@@ -84,8 +73,7 @@ public class WorldAudioEventTests
             Assert.Equal(sound.DecaySeconds, transient.DecaySeconds);
         }
 
-        // ...and the door's parts map onto the right physical characters, which is what lets the
-        // synthesiser render them without knowing what a door is.
+        // The door's parts map onto physical characters, so the synthesiser need not know what a door is.
         Assert.Equal(SoundCharacter.Knock, sounds.First(s => s.Kind == DoorSoundKind.Latch).Character);
         Assert.Equal(SoundCharacter.Ring, sounds.First(s => s.Kind == DoorSoundKind.Panel).Character);
         Assert.Equal(SoundCharacter.Hiss, sounds.First(s => s.Kind == DoorSoundKind.Seal).Character);
@@ -114,10 +102,8 @@ public class WorldAudioEventTests
         Assert.All(pcm, v => Assert.InRange(v, -1.001f, 1.001f));
     }
 
-    /// <summary>
-    /// A ring holds on and a knock does not. That difference is the whole of why a steel door and a
-    /// wooden one are told apart by ear, so it had better survive into the samples.
-    /// </summary>
+    /// <summary>A ring holds on and a knock does not, in the samples: it is how steel and wooden doors are
+    /// told apart.</summary>
     [Fact]
     public void ARingOutlastsAKnock()
     {
@@ -140,12 +126,8 @@ public class WorldAudioEventTests
         return all <= 0f ? 0f : tail / all;
     }
 
-    /// <summary>
-    /// The seed makes it vary. Twenty rounds from one rifle that are the same twenty samples read as
-    /// a recording being replayed, which is the one thing this engine exists not to sound like — and
-    /// the same seed has to give the same result, or two players standing together hear two different
-    /// doors.
-    /// </summary>
+    /// <summary>The seed varies the render (twenty identical rounds read as a replayed recording), and the
+    /// same seed gives the same render, so two players together hear the same door.</summary>
     [Fact]
     public void TheSeedVariesItAndRepeatsIt()
     {
@@ -162,10 +144,7 @@ public class WorldAudioEventTests
         Assert.NotEqual(a, b);
     }
 
-    /// <summary>
-    /// A ring's note is its note. Rendering is allowed to vary it slightly — nothing real is struck
-    /// in exactly the same place twice — but a panel asked for 200 Hz must not come out an octave off.
-    /// </summary>
+    /// <summary>A ring keeps its note within a small variation: a panel asked for 200 Hz is not an octave off.</summary>
     [Fact]
     public void ARingComesOutAtAboutTheNoteItWasAskedFor()
     {
@@ -212,8 +191,7 @@ public class WorldAudioEventTests
         Assert.Equal(0, At(0));
         Assert.InRange(At(1), 16000, 16500);
         Assert.InRange(At(2), -16500, -16000);
-        // The ones past full scale clamp rather than wrapping — a wrap is a loud click, and a loud
-        // click on every impact would be the most noticeable bug in the game.
+        // Past full scale clamps rather than wraps: a wrap is a loud click.
         Assert.Equal(short.MaxValue, At(5));
         Assert.Equal(short.MinValue, At(6));
     }

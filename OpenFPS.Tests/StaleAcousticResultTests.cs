@@ -8,11 +8,9 @@ using OpenFPS.Client.Core;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The acoustic worker answers for a PLACE, and files the answer under a voice id. A one-shot's id
-/// comes from a small pool and is reused every few seconds, so without this rule a fresh footstep was
-/// handed the previous occupant's result — the occlusion, EQ and apparent position of a step taken
-/// seconds ago somewhere else in the room — for its first frames, and then snapped to its own. Heard
-/// as a quiet click from the wrong place, then the step: "pop pop pop click" as you walk.
+/// The acoustic worker answers for a place but files the answer under a voice id, and one-shot ids are
+/// pooled: a fresh footstep took the last occupant's result for its first frames, heard as "pop pop pop
+/// click" as you walk. A one-shot takes no answer for somewhere else; an entity keeps its last.
 /// </summary>
 public class StaleAcousticResultTests
 {

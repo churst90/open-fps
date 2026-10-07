@@ -8,21 +8,10 @@ using OpenFPS.Common;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// No gameplay action may be bound to a key a screen reader owns.
-///
-/// This is not a preference. CONTROL is how a screen reader user silences speech — every reader
-/// there is stops talking when it is pressed — and ALT belongs to the window manager. A blind player
-/// presses both dozens of times a minute as punctuation, without ever thinking of them as input to
-/// the game. A game action on one of those keys is not a key that is awkward to use; it is a key
-/// that fires by itself.
-///
-/// Control was the trigger. The cost is on record: five sessions chasing a report of *"random
-/// banging... bang, wait a few seconds, bang, like someone closing a cabinet, I have no clue what the
-/// noise is"*, through the reverb model, the room equation, the movement engine and the reflection
-/// machinery — and the answer was twenty-six rifle shots at 159 dB that the player had fired himself
-/// by shutting his screen reader up. It was found in an audio trace, not by reading the bindings.
-///
-/// So the bindings are asserted instead.
+/// No gameplay action may be bound to a key a screen reader owns: Control silences speech and Alt is the
+/// window manager's, pressed dozens of times a minute, so an action there fires by itself. Control was
+/// once the trigger: five sessions chased "random banging" that was the player's own rifle shots
+/// (docs/CLIENT_NOTES.md, "Screen reader keys are not game keys").
 /// </summary>
 public class ScreenReaderKeyTests
 {
@@ -71,10 +60,7 @@ public class ScreenReaderKeyTests
         }
     }
 
-    /// <summary>
-    /// ...and the trigger in particular is on a key a blind player can find by touch. Named because
-    /// it is the one that went wrong, and because "there is a trigger at all" is worth asserting.
-    /// </summary>
+    /// <summary>The trigger exists and is on a key a blind player can find by touch.</summary>
     [Fact]
     public void TheTriggerIsReachableAndIsNotAModifier()
     {
@@ -87,7 +73,7 @@ public class ScreenReaderKeyTests
     /// <summary>
     /// The keypad with Num Lock off is NVDA's review keys. Windows reports keypad 8 as Up and keypad
     /// period as Delete; only the extended flag tells them from the arrows and Delete, which are the
-    /// game's. GTK names them apart, and the Windows head now drops them the same way.
+    /// game's. GTK names them apart, and the Windows head drops them the same way.
     /// </summary>
     [Theory]
     [InlineData(0x26, false, true)]    // keypad 8: Up, not extended

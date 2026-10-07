@@ -4,15 +4,10 @@ using OpenFPS.Common;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The reverberant field has a direction, and the survey reports it.
-///
-/// "If I'm standing on carpet, even with the megaphone, it should be insulated. Then if I turn to
-/// face the wood/concrete half, I should hear a wash of reverb coming ONLY from that half of the
-/// room, as if the reflections are in front of me." The survey's return centroid is the
-/// energy-weighted mean direction the rays came back from; its anisotropy says how one-sided that
-/// is. The listener's reverb bus is steered by both. Nothing here is a special case for that map:
-/// the same measure turns a uniform room into a field from everywhere and one hard wall in a field
-/// into a field from that wall.
+/// The reverberant field has a direction: the survey's return centroid (energy-weighted mean direction
+/// the rays came back from) and anisotropy (how one-sided), which steer the listener's reverb bus. Asked
+/// for as "a wash of reverb coming ONLY from that half of the room" when standing on carpet facing the
+/// hard half; no special case for that map.
 /// </summary>
 public class ReverbFieldDirectionTests
 {
@@ -45,8 +40,7 @@ public class ReverbFieldDirectionTests
     [Fact]
     public void ACarpetedHalfHearsItsFieldFromTheHardHalf()
     {
-        // Standing in the middle of the carpeted (west) half of a hall whose east half is concrete,
-        // against the same hall made of concrete throughout.
+        // The middle of the carpeted west half, against the same hall all concrete.
         var carpeted = Enclosure.Look(new Vector3(-5, 1.7f, 0), Room(west: "Carpet", east: "Concrete"));
         var uniform = Enclosure.Look(new Vector3(-5, 1.7f, 0), Room(west: "Concrete", east: "Concrete"));
 
@@ -57,9 +51,7 @@ public class ReverbFieldDirectionTests
         Assert.True(carpeted.ReturnDirection.X > uniform.ReturnDirection.X + 0.3f,
             $"the carpet should push the field east: centroid {carpeted.ReturnDirection} against {uniform.ReturnDirection} all-concrete");
         // Measured 2026-09-18: carpeted (0.53, -0.84, 0.05) at 25 %, all-concrete 27 % leaning down and
-        // west. The steer is real and it is mild, because the registry's Carpet (0.5 mid absorption)
-        // still returns half of what concrete does. A thicker carpet is a MATERIAL, and it would move
-        // this number; nothing here should.
+        // west. Mild, because the registry's Carpet (0.5 mid absorption) returns half what concrete does.
         Assert.True(carpeted.Anisotropy > 0.15f, $"anisotropy read {carpeted.Anisotropy:P0}");
     }
 
@@ -74,9 +66,8 @@ public class ReverbFieldDirectionTests
     [Fact]
     public void ARooflessHallHearsItsFieldFromBelow()
     {
-        // The sky returns nothing. What comes back to a listener in a roofless hall comes off the
-        // floor and the walls, so the field has a downward lean — a fact about missing roofs, not
-        // about this hall. (Measured: centroid (0.05, -1.00, -0.01), anisotropy 24 %.)
+        // The sky returns nothing, so a roofless hall's field leans down (measured: centroid
+        // (0.05, -1.00, -0.01), anisotropy 24 %).
         var s = Enclosure.Look(new Vector3(0, 1.7f, 0), Room(west: "Concrete", east: "Concrete"));
         Assert.True(s.ReturnDirection.Y < -0.8f, $"expected a downward centroid, got {s.ReturnDirection}");
         Assert.InRange(s.Anisotropy, 0.1f, 0.5f);

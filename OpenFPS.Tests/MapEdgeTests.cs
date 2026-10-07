@@ -6,13 +6,9 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A player cannot walk off the edge of the ground.
-///
-/// Walking is held inside a map's walkable bounds, so those bounds must not reach past the ground.
-/// The city's acoustic bounds reach a kilometre out for its aircraft, walking used them, and the
-/// ground stops about 500 m from the centre: you could walk off it, fall 25 m, and be put back at the
-/// spawn point by the void check. On every shipped map, each corner of the walkable area, a metre in,
-/// has ground under it.
+/// A player cannot walk off the ground: on every shipped map each corner of the walkable area, a metre
+/// in, has ground under it. Walking once used the city's acoustic bounds, a kilometre out for its
+/// aircraft, past ground that stops at about 500 m.
 /// </summary>
 public class MapEdgeTests
 {

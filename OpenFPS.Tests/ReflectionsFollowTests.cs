@@ -10,22 +10,10 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The surfaces answering you, and somebody talking beside you, wherever you both are in a building.
-///
-/// Cody, 2026-10-04, climbing the stairwell of Marlow Tower: "as I'm walking around the apartment
-/// building I'm not hearing my own reflections follow me, it's like they're left on the first floor",
-/// and with another player walking round him: "I can hear him but it's dry, his reflections don't
-/// follow him and neither do mine".
-///
-/// Two faults. Your own steps' copies, each placed at its image behind the surface it came off and
-/// carrying that path, were handed to the occlusion worker as if they were sources standing at their
-/// images: the worker traced each image to your ear THROUGH the wall that made it (-40 to -100 dB in
-/// the stairwell's brick and concrete) or round by the openings — out of the ground-floor door and up
-/// the stair openings, heard from the floor below — and that path replaced the copy's own. And another
-/// player's voice had no copies at all: the room it was in answered it only with the late tail.
-///
-/// Built here as two identical storeys, one over the other, so "follows" has a plain meaning: on the
-/// floor above, every copy is where the same copy was on the floor below, one storey up.
+/// Reflections of your steps, your voice and another talker follow you both up a building: on the
+/// upper of two identical storeys every copy is where it was below, one storey up. Copies once went to
+/// the occlusion worker as sources at their images, and a talker had none
+/// (docs/TEST_NOTES.md, "Reflections that did not follow").
 /// </summary>
 public class ReflectionsFollowTests
 {
@@ -82,8 +70,7 @@ public class ReflectionsFollowTests
         Assert.NotEmpty(echoes);
         int step = h.Mixer.Started.Skip(from).First(e => e.FollowsListener).EntityId;
 
-        // The step itself is asked about and answered (the worker is running), and for long enough
-        // after that the copies would have been answered too.
+        // The step itself is answered, and long enough after for the copies to have been too.
         Assert.True(h.TickUntil(() => h.Mixer.HasPath(step), 300), "the worker never answered for the step itself");
         for (int i = 0; i < 30; i++) { h.Tick(); System.Threading.Thread.Sleep(2); }
 
@@ -208,8 +195,8 @@ public class ReflectionsFollowTests
             // His voice reverberates in the room his mouth is in...
             Assert.True(h.TickUntil(() => h.Mixer.Latest[voice].TargetRegionId == Floor0Room, 120),
                 $"Sean's voice went to region {h.Mixer.Latest[voice].TargetRegionId}, not the room he is standing in");
-            // ...and its surfaces answer it: copies of THIS talker's voice, placed at their images, each
-            // its own path and never a reverb send of its own.
+            // ...and its surfaces answer: copies of this talker's voice at their images, each its own path
+            // and never a reverb send of its own.
             var below = SeansCopies(h);
             Assert.All(below, c =>
             {

@@ -8,12 +8,8 @@ using OpenFPS.Server.Systems;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Building a thing out of parts, and it still being there tomorrow.
-///
-/// A map, a house, a vehicle and an object somebody invented are the same idea at four scales: a set
-/// of entities with a local origin, which can be saved, placed again, owned and entered. These tests
-/// hold the four verbs that make that true — group, ungroup, save, place — and the one property that
-/// makes it worth anything, which is that a building survives a restart.
+/// Composites: a set of entities with a local origin (a house, a vehicle, an invented object). Holds
+/// group, ungroup, save and place, and that a building survives a restart.
 /// </summary>
 public class CompositeTests : IDisposable
 {
@@ -35,7 +31,7 @@ public class CompositeTests : IDisposable
         Assert.True(lookup.ContainsKey(root));
         Assert.Equal("shed", world.Get<CompositeComponent>(lookup[root]).Name);
 
-        // Every wall is now a member, and none of them moved to become one.
+        // Every wall is a member, and none moved.
         foreach (var (entity, wasAt) in walls)
         {
             Assert.True(world.Has<ParentComponent>(entity));
@@ -44,10 +40,8 @@ public class CompositeTests : IDisposable
         }
     }
 
-    /// <summary>
-    /// The origin is where the thing meets the ground, not its middle. A house placed at your feet
-    /// should have its floor at your feet — otherwise every placement buries or floats the building.
-    /// </summary>
+    /// <summary>The origin is where the thing meets the ground, not its middle, so a house placed at your
+    /// feet has its floor there.</summary>
     [Fact]
     public void TheOriginSitsOnTheGroundUnderTheMiddleOfIt()
     {
@@ -83,10 +77,7 @@ public class CompositeTests : IDisposable
         }
     }
 
-    /// <summary>
-    /// Build something, save it, place it somewhere else: the arrangement comes with it, not the
-    /// coordinates. That is the whole of "classify it as an object later".
-    /// </summary>
+    /// <summary>Saved and placed elsewhere, a composite brings its arrangement, not its coordinates.</summary>
     [Fact]
     public void SavingThenPlacingReproducesTheArrangementSomewhereElse()
     {
@@ -97,7 +88,6 @@ public class CompositeTests : IDisposable
         Assert.True(svc.SaveAsTemplate(mapId, root, "cabin", "builder", false, out int saved, out string error), error);
         Assert.Equal(built, saved);
 
-        // It is now on disk and placeable by id.
         Assert.True(svc.Templates.TryGet("cabin", out var template));
         Assert.Equal(built, template.Parts.Count);
 
@@ -106,7 +96,7 @@ public class CompositeTests : IDisposable
         Assert.True(placed >= 0, error);
         Assert.Equal(built, parts);
 
-        // The parts arrived in the same shape, around the new origin.
+        // The same shape, round the new origin.
         Assert.True(maps.TryGetMap(mapId, out var world, out _, out _, out _));
         var members = CompositeService.MembersOf(world, placed);
         Assert.Equal(built, members.Count);
@@ -117,11 +107,8 @@ public class CompositeTests : IDisposable
         }
     }
 
-    /// <summary>
-    /// A composite that is not anchored is carried by its root, and ParentSystem — which has run
-    /// every tick since long before any of this — is what carries it. A house and a vehicle body are
-    /// the same structure; only whether anything moves the root differs.
-    /// </summary>
+    /// <summary>An unanchored composite is carried by its root through ParentSystem: a house and a vehicle
+    /// body differ only in whether anything moves the root.</summary>
     [Fact]
     public void MovingAFreeCompositeCarriesItsParts()
     {
@@ -166,12 +153,8 @@ public class CompositeTests : IDisposable
         Assert.False(world.Has<ParentComponent>(car));
     }
 
-    /// <summary>
-    /// The property that makes a building a building: it is still there after a restart.
-    ///
-    /// Placing records the placement on the map's own data; saving the map commits it; loading it
-    /// again rebuilds it. This walks the whole of that, through the real files.
-    /// </summary>
+    /// <summary>A placed building is still there after a restart: placed into the map's data, saved,
+    /// and rebuilt by a second server over the same files.</summary>
     [Fact]
     public void APlacedBuildingSurvivesARestart()
     {
@@ -183,15 +166,13 @@ public class CompositeTests : IDisposable
         var where = new Vector3(-320, 0, 40);
         Assert.True(svc.Place(mapId, "hut", where, Quaternion.Identity, "tester", out _, out error) >= 0, error);
 
-        // The map now knows it is there...
         Assert.True(maps.TryGetMapData(mapId, out var data));
         Assert.NotNull(data.Composites);
         Assert.Contains(data.Composites!, p => p.TemplateId == "hut" && p.Owner == "tester");
 
-        // ...and saying so on disk is what makes it permanent.
         Assert.True(maps.SaveMap(mapId, out error), error);
 
-        // A second server over the same files: the restart.
+        // The restart: a second server over the same files.
         var (svc2, maps2, _) = Build();
         Assert.True(maps2.TryGetMapData(mapId, out var reloaded));
         Assert.Contains(reloaded.Composites ?? new List<CompositePlacement>(), p => p.TemplateId == "hut");
@@ -211,8 +192,7 @@ public class CompositeTests : IDisposable
 
     private (CompositeService svc, MapManager maps, string mapId) Build()
     {
-        // The shipped maps are copied beside the test assembly; work on a COPY so a test that saves a
-        // map cannot rewrite the one that ships.
+        // A copy of the shipped maps, so a test that saves cannot rewrite the one that ships.
         if (string.IsNullOrEmpty(_mapDir))
         {
             _mapDir = Path.Combine(_dir, "maps");

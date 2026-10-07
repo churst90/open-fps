@@ -248,7 +248,7 @@ public class NetworkTrimTests
     }
 
     /// <summary>What the client's interpolation makes of a stream, sampled every frame at 60 Hz.
-    /// Each tick arrives 40 ms after the server made it; <paramref name="lost"/> says which never do.</summary>
+    /// Each tick arrives 40 ms after the server made it; a null in <paramref name="packets"/> never does.</summary>
     private static List<Dictionary<int, (Vector3 Pos, Quaternion Rot, Vector3 Vel, WheelState[]? Wheels)>> Play(
         List<ServerStateUpdate?> packets, int[] ids, int frames)
     {

@@ -4,17 +4,9 @@ using OpenFPS.Common;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A room answering with its own surfaces, rather than with a blanket.
-///
-/// Asked for directly, 2026-09-18, after a session in a map made of walls that produced no reflections
-/// at all: "shouldn't it just be the natural reflections off the surfaces of the roof walls and such
-/// rather than a blanket reverb? the reflections themselves should cause the reverb naturally right?"
-/// — and, from outside the same room, "I don't hear the room reflections when I'm outside the room
-/// facing the room coming through the doorway".
-///
-/// These hold the image-source model to the things that make it a model and not a sound effect: the
-/// copy is where the geometry says, it arrives when the distance says, it is missing what the material
-/// took, and it is not there at all when there is nothing to come off.
+/// A room answering with its own surfaces: the copy is where the geometry says, arrives when the
+/// distance says, is missing what the material took, and is absent when there is nothing to come off.
+/// docs/TEST_NOTES.md, "Early reflections from the surfaces".
 /// </summary>
 public class EarlyReflectionTests
 {
@@ -24,14 +16,11 @@ public class EarlyReflectionTests
     private static EarlyReflections.Solid Wall(Vector3 centre, Vector3 size, string material = "Concrete")
         => new(centre, size, Q, material);
 
-    /// <summary>
-    /// The mirror. A source 3 m in front of a wall, a listener beside it: the copy stands 3 m BEHIND
-    /// the wall, and its path is longer than the direct one by exactly the detour.
-    /// </summary>
+    /// <summary>The copy stands as far behind the wall as the source is in front, late by the detour.</summary>
     [Fact]
     public void AReflectionIsTheSourceMirroredThroughTheWall()
     {
-        // A wall in the x = 0 plane, facing +x. Everything lives at positive x.
+        // A wall in the x = 0 plane, facing +x.
         var wall = Wall(new Vector3(-0.25f, 2f, 0f), new Vector3(0.5f, 6f, 40f));
         var source = new Vector3(3f, 1.5f, -2f);
         var listener = new Vector3(3f, 1.5f, 2f);
@@ -39,26 +28,21 @@ public class EarlyReflectionTests
         EarlyReflections.Find(source, listener, new[] { wall }, _found);
 
         var a = Assert.Single(_found);
-        // Mirrored through the face at x = 0: same y and z, x negated.
         Assert.Equal(-source.X, a.ImagePosition.X, 2);
         Assert.Equal(source.Y, a.ImagePosition.Y, 2);
         Assert.Equal(source.Z, a.ImagePosition.Z, 2);
 
-        // The bounce point is on the wall, and the two legs add up to the reported path.
         Assert.Equal(0f, a.HitPoint.X, 2);
         Assert.Equal(Vector3.Distance(source, a.HitPoint) + Vector3.Distance(a.HitPoint, listener),
                      a.PathLength, 3);
 
-        // And it arrives later by the extra distance over the speed of sound.
         float direct = Vector3.Distance(source, listener);
         Assert.Equal((a.PathLength - direct) / 343f, a.ExtraDelaySeconds, 4);
         Assert.True(a.ExtraDelaySeconds > 0f);
     }
 
-    /// <summary>
-    /// What the wall is made of is what is missing from the copy. Nothing about this is per-material
-    /// code: carpet and concrete differ because the registry says they do.
-    /// </summary>
+    /// <summary>The copy is missing what the surface absorbed, by the registry's figures, with no
+    /// per-material code.</summary>
     [Fact]
     public void TheCopyIsMissingWhatTheSurfaceAbsorbed()
     {
@@ -74,18 +58,16 @@ public class EarlyReflectionTests
         EarlyReflections.Find(source, listener, new[] { Wall(at, size, "Carpet") }, soft);
         var dull = Assert.Single(soft);
 
-        // Carpet takes half the mid band's ENERGY and concrete two percent of it, which is 2.9 dB
-        // between them (10·log10(0.5 / 0.98)) — the registry's numbers, not a threshold picked to make
-        // this pass. It read 5.9 while absorption was applied as an amplitude (EarlyReflections.Keep).
+        // Carpet takes half the mid band's energy and concrete 2 %: 2.9 dB (10·log10(0.5 / 0.98)). It
+        // read 5.9 while absorption was applied as an amplitude (EarlyReflections.Keep).
         float downDb = 20f * MathF.Log10(dull.GainMid / hard.GainMid);
         Assert.True(downDb < -2.5f,
             $"carpet returned {dull.GainMid:F3} against concrete's {hard.GainMid:F3} ({downDb:F1} dB)");
-        // And it is duller, not merely quieter: carpet takes the top off hardest.
+        // Duller, not merely quieter: carpet takes the top off hardest.
         Assert.True(dull.GainHigh / dull.GainLow < hard.GainHigh / hard.GainLow);
     }
 
-    /// <summary>An open field has nothing to be heard off. This is the case a blanket reverb could not
-    /// express and the reason a field used to sound like a room.</summary>
+    /// <summary>An open field has nothing to answer: a blanket reverb made a field sound like a room.</summary>
     [Fact]
     public void NothingToReflectOffIsNoReflections()
     {
@@ -94,12 +76,8 @@ public class EarlyReflectionTests
         Assert.Empty(_found);
     }
 
-    /// <summary>
-    /// A wall the sound would have to pass through something to reach does not answer.
-    ///
-    /// Both legs are checked, not just the one arriving at the ear: a facade behind a building is not
-    /// reflecting anything at you, and neither is one whose view of the SOURCE is blocked.
-    /// </summary>
+    /// <summary>A wall the sound must pass through something to reach does not answer; both legs are
+    /// checked, the source's as well as the ear's.</summary>
     [Fact]
     public void AWallBehindSomethingElseDoesNotAnswer()
     {
@@ -115,28 +93,22 @@ public class EarlyReflectionTests
         Assert.DoesNotContain(_found, a => MathF.Abs(a.ImagePosition.X + source.X) < 0.1f);
     }
 
-    /// <summary>
-    /// A surface is only a mirror on the side you are standing on. A listener inside a box hears its
-    /// inner faces; one outside hears the outer ones, and neither hears through it.
-    /// </summary>
+    /// <summary>A surface is a mirror only on the listener's side; nothing comes through it.</summary>
     [Fact]
     public void AMirrorHasNoBack()
     {
-        // A slab with the source on one side and the listener on the other.
         var slab = Wall(new Vector3(0f, 2f, 0f), new Vector3(0.5f, 6f, 40f));
         EarlyReflections.Find(new Vector3(-3f, 1.5f, 0f), new Vector3(3f, 1.5f, 0f), new[] { slab }, _found);
 
         foreach (var a in _found)
             Assert.True(Vector3.Distance(a.HitPoint, new Vector3(3f, 1.5f, 0f)) < 60f);
-        // Nothing may come off the face the listener cannot see.
         Assert.DoesNotContain(_found, a => a.HitPoint.X < 0f);
     }
 
     /// <summary>
-    /// A copy placed at its image arrives, after the engine's own distance law, at exactly the share of
-    /// the direct sound the surfaces kept — inside the source's reference distance as well as past it.
-    /// L/d was right only past it, and a loud source's reference reaches 40 m: a gunshot's copies came
-    /// out 8-11 dB hot.
+    /// A copy at its image arrives, after the engine's distance law, at exactly the share the surfaces
+    /// kept, inside the source's reference distance as well as past it. L/d was right only past it, and
+    /// with a loud source's reference at 40 m a gunshot's copies came out 8-11 dB hot.
     /// </summary>
     [Theory]
     [InlineData(40f, 2f, 5f)]     // a gunshot, both inside the reference
@@ -153,11 +125,8 @@ public class EarlyReflectionTests
         Assert.Equal(relative, atEarCopy / atEarDirect, 3);
     }
 
-    /// <summary>
-    /// A listener just behind a thin wall, with the source well in front of it, hears nothing off its
-    /// front face. The case above is also guarded by the path test; this one only by the listener-side
-    /// plane test.
-    /// </summary>
+    /// <summary>A listener just behind a thin wall hears nothing off its front face; only the
+    /// listener-side plane test guards this case.</summary>
     [Fact]
     public void AListenerBehindAWallHearsNoReflectionOffItsFront()
     {
@@ -166,10 +135,7 @@ public class EarlyReflectionTests
         Assert.Empty(_found);
     }
 
-    /// <summary>
-    /// A room answers from several directions at once, and a corridor from its two sides — the property
-    /// that makes a space legible by ear rather than merely reverberant.
-    /// </summary>
+    /// <summary>A room answers from several surfaces at once, each surface once.</summary>
     [Fact]
     public void ARoomAnswersFromMoreThanOneDirection()
     {
@@ -188,21 +154,17 @@ public class EarlyReflectionTests
         Assert.True(_found.Count >= 3, $"a hard six-sided room produced {_found.Count} arrival(s)");
         Assert.True(_found.Count <= EarlyReflections.MaxArrivals);
 
-        // Every arrival is a distinct surface — the same wall must not answer twice.
         var seen = new HashSet<int>();
         foreach (var a in _found) Assert.True(seen.Add(a.SurfaceId), "one surface produced two arrivals");
 
-        // What survives is ordered by SURFACE, not by loudness, so a slot means the same wall from
-        // one tick to the next. Two arrivals of nearly equal strength would otherwise swap places on
-        // the smallest movement, and a swap hands each voice the other one's reflection.
+        // Ordered by surface, not loudness, so a slot is the same wall tick to tick: two near-equal
+        // arrivals would otherwise swap on the smallest movement and each voice get the other's.
         for (int i = 1; i < _found.Count; i++)
             Assert.True(_found[i - 1].SurfaceId < _found[i].SurfaceId);
     }
 
-    /// <summary>
-    /// A surface keeps its identity as the listener moves, so its reflection keeps one voice instead of
-    /// being torn down and started again every frame — which is a click per frame.
-    /// </summary>
+    /// <summary>A surface keeps its identity as the listener moves, so its reflection keeps one voice
+    /// rather than restarting (a click) every frame.</summary>
     [Fact]
     public void ASurfaceKeepsItsIdentityAsYouMove()
     {
@@ -217,10 +179,8 @@ public class EarlyReflectionTests
         Assert.Equal(first, Assert.Single(later).SurfaceId);
     }
 
-    /// <summary>
-    /// The same geometry measures the same every time. The generator this replaced jittered each
-    /// surface normal with a fresh random seed per call, so a wall's reflection moved every frame.
-    /// </summary>
+    /// <summary>The same geometry measures the same every time; the generator this replaced jittered the
+    /// normals per call, and a wall's reflection moved every frame.</summary>
     [Fact]
     public void TheSameGeometryAnswersTheSameTwice()
     {
@@ -245,15 +205,11 @@ public class EarlyReflectionTests
         }
     }
 
-    /// <summary>
-    /// The budget keeps the LOUDEST arrivals, even though the survivors come back in surface order —
-    /// the two orderings are separate steps and a reader should not have to take that on trust.
-    /// </summary>
+    /// <summary>The budget keeps the loudest arrivals, though the survivors come back in surface order.</summary>
     [Fact]
     public void TheBudgetDropsTheQuietestNotTheNearest()
     {
-        // The six hard faces of a room, plus one soft wall a long way off. There are more candidates
-        // than slots, so something has to go, and the distant carpet is what nobody would have heard.
+        // Six hard faces and a distant carpet wall: more candidates than slots, and the carpet goes.
         var room = new List<EarlyReflections.Solid>
         {
             Wall(new Vector3(0, -0.25f, 0), new Vector3(10, 0.5f, 10)),
@@ -275,14 +231,9 @@ public class EarlyReflectionTests
     }
 
     /// <summary>
-    /// A reflection inside a small room is NOT an event of its own, and must never become a voice.
-    ///
-    /// This is the fault that made a megaphone repeat itself: "the megaphone is like repeating echoing,
-    /// not an environmental reverb... if I stand by the megaphone, I hear it repeat softer but in the
-    /// same place". Every arrival in a ten-metre room is inside thirty milliseconds, which is well
-    /// under the window in which the ear fuses a copy with the sound it is a copy of — so a listener
-    /// should hear one wider, slightly coloured event, and instead heard a second playback of the
-    /// announcement. The geometry is right and it is the RENDERING decision that was missing.
+    /// A reflection in a small room is inside the fusion window (every arrival in a ten-metre room is
+    /// under 30 ms) and must never become a voice of its own: one that did made the megaphone repeat
+    /// itself (docs/REPEATS_AND_POPS.md).
     /// </summary>
     [Fact]
     public void ReflectionsInARoomAreNotSeparateEvents()
@@ -298,7 +249,7 @@ public class EarlyReflectionTests
         };
         EarlyReflections.Find(new Vector3(-2f, 1.5f, -2f), new Vector3(2f, 1.7f, 2f), room, _found);
 
-        Assert.NotEmpty(_found);                       // the room still answers — they are real
+        Assert.NotEmpty(_found);                       // the room still answers
         foreach (var a in _found)
         {
             Assert.True(a.ExtraDelaySeconds < EarlyReflections.FusionSeconds,
@@ -307,15 +258,12 @@ public class EarlyReflectionTests
         }
     }
 
-    /// <summary>
-    /// And a wall a long way off IS an event of its own — the slapback a stand across a racetrack or a
-    /// facade down a street gives back, which is the case discrete voices exist for.
-    /// </summary>
+    /// <summary>A distant wall is an event of its own: the slapback of a stand across a racetrack or a
+    /// facade down a street, which discrete voices exist for.</summary>
     [Fact]
     public void ADistantWallIsASeparateEvent()
     {
-        // A stand 20 m behind the listener: the copy travels some 40 m further than the direct sound,
-        // which is over a tenth of a second and unmistakably its own arrival.
+        // A stand 20 m behind the listener: some 40 m further, over a tenth of a second late.
         var stand = Wall(new Vector3(0f, 6f, 20f), new Vector3(200f, 12f, 4f));
         EarlyReflections.Find(new Vector3(0f, 0.5f, -5f), new Vector3(0f, 1.7f, 0f), new[] { stand }, _found);
 
@@ -324,8 +272,7 @@ public class EarlyReflectionTests
             $"a stand thirty metres away answered {a.ExtraDelaySeconds * 1000:F0} ms later and was called fused");
     }
 
-    /// <summary>A copy that travelled further arrives quieter, in the proportion the extra distance
-    /// costs — the same inverse law the direct sound obeys, applied to a longer path.</summary>
+    /// <summary>A copy that travelled further arrives quieter, by the inverse law over its longer path.</summary>
     [Fact]
     public void AFurtherBounceIsAQuieterOne()
     {

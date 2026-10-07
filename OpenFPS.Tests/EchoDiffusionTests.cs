@@ -4,14 +4,10 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// An echo of a sustained sound must not phase against it.
-///
-/// "Sirens inside out" and "a laser beam into my ears" were an engine's reflection being the engine's
-/// own waveform, a few milliseconds late. The direct sound plus that copy is a comb filter: notches at
-/// EXACTLY regular spacing, which the ear hears as a pitch of its own and, as either end moves, as a
-/// flanger. A real wall hands the sound back from a patch, not a point, so the copy is the same
-/// sound but not the same waveform. This measures the difference: the ripple the echo puts on the
-/// combined spectrum, and how periodic that ripple is.
+/// An echo of a sustained sound must not phase against it: an engine's reflection as its own waveform a
+/// few ms late is a comb, heard as a pitch and a flanger ("sirens inside out", "a laser beam into my
+/// ears"). A wall answers from a patch, so this measures the ripple the echo puts on the spectrum and
+/// how periodic it is.
 /// </summary>
 public class EchoDiffusionTests
 {
