@@ -102,8 +102,9 @@ public class PlaceNameTests
         var spatial = new SpatialService();
 
         // The cross streets, found from the map's own carriageway regions ("Dock Street, block 1").
-        var carriageways = defs.Where(d => Regex.IsMatch(d.Region.FriendlyName ?? "", @"^\w+ Street, block \d+$")
-                                           && !d.Region.FriendlyName.StartsWith("Main"))
+        var carriageways = defs.Where(d => d.Region.FriendlyName is { } name
+                                           && Regex.IsMatch(name, @"^\w+ Street, block \d+$")
+                                           && !name.StartsWith("Main"))
                                .ToList();
         Assert.True(carriageways.Select(d => d.Region.FriendlyName.Split(',')[0]).Distinct().Count() >= 4,
             "expected Dock, Central, Foundry and North Street");
