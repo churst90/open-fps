@@ -128,8 +128,7 @@ public sealed class StruckBell
         _strikeAmp = MathF.Max(0.02f, force);
         _sinceStrike = 0;
         // While the clapper is on the bell it is extra loss, and the ring is held back until it
-        // comes off.
-        // TODO: the end of the contact (Step's Multiply(1f)) already restores the damping, so the hold lasts the contact, not the 12 ms Step allows.
+        // comes off (Step, 12 ms), not when the blow's contact ends a fifth of a millisecond in.
         for (int i = 0; i < _modes.Length; i++) _modes[i].Multiply(1f + 40f * _spec.ClapperDamping);
     }
 
@@ -146,7 +145,7 @@ public sealed class StruckBell
         if (_strikeT >= 0)
         {
             float x = (float)(_strikeT / _contactSeconds);
-            if (x >= 1f) { _strikeT = -1; for (int i = 0; i < _modes.Length; i++) _modes[i].Multiply(1f); }
+            if (x >= 1f) _strikeT = -1;
             else { f = MathF.Sin(MathF.PI * x) * _strikeAmp; _strikeT += dt; }
         }
         // The clapper is clear again a few milliseconds after it landed.

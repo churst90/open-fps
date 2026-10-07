@@ -34,6 +34,15 @@ Recent work, newest first. `git log` has the rest.
     had one: the speedway's four PA speakers played their speech over the asphalt's bounce, the comb that
     flanged when speech had one (docs/CLIENT_NOTES.md, "Speech has no ground reflection"). One-off sounds
     are unchanged (impulses keep theirs). Unheard; renders in inbox/probable-bugs-2026-10-07/2-ground.
+  - A struck bell's clapper rests on it for its 12 ms (StruckBell): the end of the blow's contact, a fifth
+    of a millisecond in, used to lift the clapper's damping again, so the hold did nothing. Held, the fast
+    top modes lose more of the first milliseconds (the tram gong's first 11 ms fall 2.4 dB less steeply
+    against the next 10), the ring is calibrated to the same RMS, and the blows stand higher over it:
+    31.8 to 36.4 dB, where they measured 28.7 to 30.1. The bells' render headroom follows (crossing gong
+    29 to 32, locomotive bell 31 to 35, tram gong 31 to 37); under the old figures the tram gong's blows
+    were squared off by up to 5 dB. In the game at 5 m the tram gong's sharper blows push the master
+    limiter (10 dB of gain reduction, 5 before), so its average comes out 4.5 dB lower. Unheard; renders
+    in inbox/probable-bugs-2026-10-07/5-bell.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream

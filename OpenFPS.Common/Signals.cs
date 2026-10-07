@@ -502,8 +502,9 @@ public sealed record StruckBellSpec
 
     /// <summary>
     /// How far its blows stand over <see cref="ReferenceDb"/>, dB: the headroom its voice renders with,
-    /// the loudest blow over the RMS across twenty seconds, rounded up. The presets measure 28.7 to 30.1;
-    /// under the fleet's shared 16 every blow was squared off.
+    /// the loudest blow over the RMS across twenty seconds, rounded up. The presets measure 31.8 to 36.4
+    /// since the clapper's hold lasts its 12 ms (StruckBell.Strike; 28.7 to 30.1 before); under the fleet's
+    /// shared 16 every blow was squared off.
     /// </summary>
     public float PeakHeadroomDb { get; init; } = 31f;
 
@@ -522,7 +523,7 @@ public sealed record StruckBellSpec
         YoungsPa = 105e9f, DensityKgM3 = 8800f, LossFactor = 5e-5f,
         StrikeRadiusFraction = 0.94f, ClapperKg = 0.22f, ClapperMps = 2.6f,
         ClapperDamping = 0.05f, StrikesPerSecond = 2.3f, ReferenceDb = 86f,
-        PeakHeadroomDb = 29f,
+        PeakHeadroomDb = 32f,
     };
 
     /// <summary>A locomotive's bell: 400 mm of thick bronze rung about 1.6 times a second, an octave and
@@ -534,6 +535,7 @@ public sealed record StruckBellSpec
         YoungsPa = 105e9f, DensityKgM3 = 8800f, LossFactor = 3e-5f,
         StrikeRadiusFraction = 0.90f, ClapperKg = 1.1f, ClapperMps = 2.0f,
         ClapperDamping = 0.10f, StrikesPerSecond = 1.6f, ReferenceDb = 110f,
+        PeakHeadroomDb = 35f,
     };
 
     /// <summary>A tram's foot gong: a small steel dome under the floor, struck by a pedal. Steel, so
@@ -545,6 +547,7 @@ public sealed record StruckBellSpec
         YoungsPa = 210e9f, DensityKgM3 = 7850f, LossFactor = 2.2e-4f,
         StrikeRadiusFraction = 0.85f, ClapperKg = 0.12f, ClapperMps = 2.4f,
         ClapperDamping = 0.18f, StrikesPerSecond = 2.0f, ReferenceDb = 95f,
+        PeakHeadroomDb = 37f,
     };
 
     public static IReadOnlyDictionary<string, Func<StruckBellSpec>> Presets { get; } =
