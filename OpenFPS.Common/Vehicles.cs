@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
@@ -9,17 +10,22 @@ public sealed record Gearbox
 {
     /// <summary>Ratio per gear, first at index 0.</summary>
     public required float[] Ratios { get; init; }
+    [Tunable("", 1.5, 15, "Ratio of the final drive: turns of the gearbox output for one turn of the wheel. It includes any chain or primary reduction.", Label = "final drive ratio", Step = 0.01)]
     public required float FinalDrive { get; init; }
     /// <summary>Rolling radius of the driven wheel, metres.</summary>
+    [Tunable("m", 0.15, 0.8, "Rolling radius of the driven wheel.", Label = "wheel radius", Step = 0.005)]
     public required float WheelRadiusMetres { get; init; }
 
     /// <summary>How long the clutch is DOWN during a shift. This is the silence in the middle of the
     /// shift, and getting it right is most of what makes a change sound like a person rather than an
     /// event: a quick change is about a quarter of a second.</summary>
+    [Tunable("s", 0.02, 2, "How long the clutch is down during a shift: the gap in the sound. A quick change is about a quarter of a second.", Label = "shift time", Step = 0.01)]
     public float ShiftSeconds { get; init; } = 0.28f;
     /// <summary>RPM the driver shifts up at when accelerating hard.</summary>
+    [Tunable("rpm", 500, 20000, "Engine speed the driver changes up at when accelerating hard.", Label = "upshift speed", Step = 50)]
     public float UpshiftRpm { get; init; } = 6100f;
     /// <summary>...and drops to when coasting down.</summary>
+    [Tunable("rpm", 300, 15000, "Engine speed the driver changes down at when coasting.", Label = "downshift speed", Step = 50)]
     public float DownshiftRpm { get; init; } = 1500f;
     /// <summary>RPM the driver changes up at on a light throttle. Unset, it is 85 % of the torque
     /// peak — right for a car, but a litre bike peaks at 11,000 and its first gear runs to 150 km/h,
@@ -231,9 +237,11 @@ public sealed record TyreProfile
     /// <summary>Tread blocks around the circumference. Their passing rate is a real tonal component of
     /// tyre noise — speed divided by block spacing — and it is why tyre roar rises in PITCH with speed
     /// rather than only in level.</summary>
+    [Tunable("", 0, 150, "Tread blocks around the circumference. Their passing rate is the tone of the tyre roar. Zero for a slick or a grooved bike tyre.")]
     public int TreadBlocks { get; init; } = 68;
     /// <summary>How rough the surface is, 0 = polished concrete, 1 = coarse chip seal. Drives how much
     /// broadband roar there is against the tonal component.</summary>
+    [Tunable("", 0, 1, "How rough the road surface is: 0 is polished concrete, 1 coarse chip seal. Rougher makes more broadband roar.", Label = "road roughness", Step = 0.05)]
     public float SurfaceRoughness { get; init; } = 0.55f;
     /// <summary>
     /// One tyre's rolling noise at 20 m/s (72 km/h), dB SPL at 1 m. Tyres are the dominant sound of a
@@ -245,6 +253,7 @@ public sealed record TyreProfile
     /// within two decibels of that. The live voice renders the rolling noise to this level; ten to
     /// fifteen decibels short of it, the cars have no roar at all.
     /// </summary>
+    [Tunable("dB", 60, 100, "One tyre's rolling noise at 72 km/h, at 1 metre.", Label = "rolling noise at 72 km/h", Step = 0.5, Source = "pass-by measurements, 73 dB(A) at 7.5 m for a car at 70 km/h; CNOSSOS-EU light vehicle rolling noise")]
     public float ReferenceDb { get; init; } = 84f;
 
     // ── Sliding ─────────────────────────────────────────────────────────────────────────────────
@@ -263,6 +272,7 @@ public sealed record TyreProfile
     /// performance tyre 1.1; a stock-car slick on a banked oval nearer 2.9 once the banking is
     /// carrying part of the load; a loaded truck tyre 0.75.
     /// </summary>
+    [Tunable("g", 0.3, 5, "Peak friction the tyre can deliver before it slides. A road tyre on dry asphalt is about 0.95, a loaded truck tyre 0.75.", Label = "peak grip", Step = 0.05)]
     public float PeakGripG { get; init; } = 0.95f;
 
     /// <summary>
@@ -271,14 +281,17 @@ public sealed record TyreProfile
     /// Set by how stiff the rubber is and how big the block is, so it goes DOWN as tyres get bigger:
     /// a kart tyre shrieks, a truck tyre groans. This is the fundamental; the harmonics come with it.
     /// </summary>
+    [Tunable("Hz", 200, 3000, "Stick-slip resonance of a tread element: the note the tyre squeals at. Bigger tyres squeal lower.", Label = "squeal pitch", Step = 10)]
     public float SquealHz { get; init; } = 950f;
 
     /// <summary>How sharp that resonance is. High is a clean, almost musical squeal; low is a rough,
     /// noisy scrub. Soft compounds and worn surfaces blur it.</summary>
+    [Tunable("", 1, 40, "How sharp the squeal resonance is. High is a clean squeal, low a rough scrub.", Label = "squeal sharpness", Step = 0.5)]
     public float SquealQ { get; init; } = 14f;
 
     /// <summary>Level of a full squeal at 1 m, dB SPL. Loud: a car at the limit is heard from a long
     /// way, and on a track it carries further than the engines because it is higher up the spectrum.</summary>
+    [Tunable("dB", 70, 120, "Level of a full squeal at 1 metre.", Label = "squeal level", Step = 1)]
     public float SquealDb { get; init; } = 92f;
 
     // ── Force ───────────────────────────────────────────────────────────────────────────────────
@@ -294,26 +307,35 @@ public sealed record TyreProfile
     // scales the passenger tyre to a truck's or a motorcycle's: no other tyre has published data.
 
     /// <summary>Lateral shape factor C (PCY1).</summary>
+    [Tunable("", 0.8, 2, "Magic Formula lateral shape factor C (PCY1).", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
     public float LateralShape { get; init; } = 1.193f;
     /// <summary>Lateral curvature factor E (PEY1).</summary>
+    [Tunable("", -3, 1, "Magic Formula lateral curvature factor E (PEY1).", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
     public float LateralCurvature { get; init; } = -1.003f;
     /// <summary>Cornering stiffness at the nominal load, over that load, before the saturation
     /// (PKY1): K = PKY1 Fz0 sin(2 atan(Fz / (PKY2 Fz0))), per radian.</summary>
+    [Tunable("per radian", 3, 40, "Cornering stiffness at the nominal load, over that load (PKY1).", Step = 0.05, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
     public float CorneringStiffness { get; init; } = 14.95f;
     /// <summary>The load, in nominal loads, at which the cornering stiffness stops rising (PKY2).</summary>
+    [Tunable("", 0.5, 6, "The load, in nominal loads, at which the cornering stiffness stops rising (PKY2).", Step = 0.01, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
     public float CorneringStiffnessLoad { get; init; } = 2.130f;
     /// <summary>Longitudinal shape factor C (PCX1).</summary>
+    [Tunable("", 0.8, 2.5, "Magic Formula longitudinal shape factor C (PCX1).", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
     public float LongitudinalShape { get; init; } = 1.685f;
     /// <summary>Longitudinal curvature factor E (PEX1).</summary>
+    [Tunable("", -3, 1, "Magic Formula longitudinal curvature factor E (PEX1).", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
     public float LongitudinalCurvature { get; init; } = 0.344f;
     /// <summary>Longitudinal slip stiffness over load, per unit slip (PKX1), and its change with load (PKX2).</summary>
+    [Tunable("", 3, 60, "Longitudinal slip stiffness over load, per unit slip (PKX1).", Step = 0.05, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
     public float SlipStiffness { get; init; } = 21.51f;
+    [Tunable("", -1, 1, "Change of the slip stiffness with load (PKX2).", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
     public float SlipStiffnessLoad { get; init; } = -0.163f;
     /// <summary>
     /// How the friction coefficient changes with load, per nominal load over the nominal: PDY2 over
     /// PDY1, 0.145 / 0.990, falling. A tyre loaded half as hard again grips about 7 % less per newton,
     /// which is why moving load from one tyre to the other in a corner costs the axle grip.
     /// </summary>
+    [Tunable("", -0.5, 0, "Change of the friction coefficient with load, per nominal load (PDY2 over PDY1). Negative: a harder loaded tyre grips less per newton.", Step = 0.001, Source = "Pacejka, Tire and Vehicle Dynamics, 2nd ed. 2006, appendix 3: the 205/60R15 91V tyre at 2.2 bar")]
     public float LoadSensitivity { get; init; } = -0.146f;
 
     // ── Water ───────────────────────────────────────────────────────────────────────────────────
@@ -324,9 +346,11 @@ public sealed record TyreProfile
     // so a worn tyre or a slick lets a film lift it sooner.
 
     /// <summary>Inflation pressure, kPa. The force data above are for the tyre at 2.2 bar.</summary>
+    [Tunable("kPa", 80, 1000, "Inflation pressure. It sets the speed the tyre aquaplanes at.", Label = "inflation pressure", Step = 5)]
     public float InflationKPa { get; init; } = 220f;
 
     /// <summary>Tread depth, mm: a car tyre is 8 mm new and 1.6 at the legal limit; a part-worn one, 5.</summary>
+    [Tunable("mm", 0, 30, "Tread depth. A car tyre is 8 mm new and 1.6 at the legal limit. Deeper grooves clear water better.", Label = "tread depth", Step = 0.5)]
     public float TreadDepthMm { get; init; } = 5f;
 
     /// <summary>A decent road tyre on dry asphalt.</summary>

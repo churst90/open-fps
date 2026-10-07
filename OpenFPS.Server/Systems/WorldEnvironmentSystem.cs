@@ -379,8 +379,30 @@ public class WorldEnvironmentSystem
         state.Humidity = Math.Clamp(_env.Humidity + (map.Humidity - BaselineHumidity), 0f, 1f);
         state.AirPressure = map.AirPressure;
         state.AirAbsorptionMultiplier = map.AirAbsorptionMultiplier;
+        // A map that holds its own sky (world editor map settings): its hour, and its weather at the
+        // front's own settled values, whatever the server's sky is doing.
+        if (map.HeldHour is float hour) state.GameTime = Math.Clamp(hour, 0f, 24f) % 24f;
+        if (map.HeldWeather is WeatherType held)
+        {
+            var (humidity, precipitation, wind, gustiness, offset, ceiling) = HeldFront(held);
+            state.Humidity = humidity;
+            state.PrecipitationIntensity = precipitation;
+            state.WindVelocity = wind;
+            state.WindGustiness = gustiness;
+            state.Temperature = MathF.Min(state.Temperature + offset, ceiling);
+        }
         return state;
     }
+
+    /// <summary>A front's settled values, as <see cref="SetScenario"/> sets its targets (a clear sky's
+    /// wind is the middle of its random range).</summary>
+    internal static (float Humidity, float Precipitation, Vector3 Wind, float Gustiness, float TempOffset, float TempCeiling) HeldFront(WeatherType w) => w switch
+    {
+        WeatherType.Rain => (0.9f, 0.6f, new Vector3(5f, 0, 5f), 0.3f, -2f, float.MaxValue),
+        WeatherType.Storm => (1.0f, 1.0f, new Vector3(15f, 0, -10f), 0.8f, -4f, float.MaxValue),
+        WeatherType.Snow => (0.6f, 0.5f, new Vector3(8f, 0, 2f), 0.4f, -5f, -1f),
+        _ => (0.4f, 0f, new Vector3(2.5f, 0, 2.5f), 0.1f, 0f, float.MaxValue),
+    };
 }
 
 /// <summary>
@@ -392,8 +414,15 @@ public readonly record struct MapAtmosphere(
     float Temperature,
     float Humidity,
     float AirPressure,
-    float AirAbsorptionMultiplier)
+    float AirAbsorptionMultiplier,
+    float? HeldHour = null,
+    WeatherType? HeldWeather = null)
 {
+    /// <summary>What a map authors, and what the world editor's map settings hold (a weather, an hour).</summary>
+    public static MapAtmosphere Of(OpenFPS.Server.Repositories.MapData m) => new(
+        m.Temperature, m.Humidity, m.AirPressure, m.AirAbsorptionMultiplier, m.HeldHour,
+        OpenFPS.Server.Editor.MapSettings.WeatherOf(m.HeldWeather));
+
     /// <summary>A map that authors nothing: the global weather, unmodified, at sea level.</summary>
     public static MapAtmosphere Default => new(
         WorldEnvironmentSystem.BaselineTemperature,

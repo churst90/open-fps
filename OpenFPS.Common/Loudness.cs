@@ -280,6 +280,40 @@ public static class Loudness
         => timbre == null || timbre.IsReference || !Hearing.EarModel.Enabled ? 0f
          : PlacedDb(sourceLevelDb, timbre) - PlacedDb(sourceLevelDb);
 
+    /// <summary>The ranking as it was before 2026-10-07, on the played gain: for an instrument's before and
+    /// after (RankingByLoudnessProbe). Nothing in the game sets it.</summary>
+    public static bool RankOnPlayedGain { get; set; }
+
+    /// <summary>
+    /// How loud a voice is to the ear, for ranking (docs/EAR_MODEL.md, Ranking): a voice that plays at
+    /// <paramref name="playedGain"/> (the rendered amplitude, the law's correction and the path
+    /// included), of this spectrum, turned into the gain at which a speech line would play exactly as
+    /// loud. A voice that is heard as louder ranks higher, whatever the law had to do to its gain.
+    ///
+    /// Its level at the ear is taken at the designed playback, in its own convention (a recording's RMS
+    /// sits at its gated RMS under full scale, a physical voice's at <see cref="PhysicalRmsDbfs"/>); its
+    /// loudness level from ISO 532-1 with its own measured spectrum (<see cref="Hearing.Timbre.HeardPhons"/>);
+    /// and back through the reference sound. So a speech line, or a recording not measured yet (taken
+    /// as one), ranks at exactly its played gain, as it always did. A physical voice not measured yet
+    /// is taken as speech-shaped at its own RMS.
+    ///
+    /// Not the compensated gain: the law plays a sound the ear hears less of LOUDER so that it is heard
+    /// at its real loudness (a 65 dB rumble at 25 Hz gets about 21 dB more than speech), and ranking on
+    /// that gain put the rumble 21 dB up the list. With the ear model off this is the played gain.
+    /// </summary>
+    public static float HeardGain(float playedGain, Hearing.Timbre? timbre, bool physical)
+    {
+        if (!(playedGain > 0f)) return 0f;
+        if (!Hearing.EarModel.Enabled || RankOnPlayedGain) return playedGain;
+        // The reference itself: exactly its own gain.
+        if (timbre?.IsReference ?? !physical) return playedGain;
+        var t = timbre ?? Hearing.Timbre.Speech;
+        float digital = timbre?.DigitalRmsDb ?? (physical ? PhysicalRmsDbfs : ReferenceRmsDbfs);
+        float atEar = DesignFullScaleDb + 20f * MathF.Log10(playedGain) + digital;
+        float speechAtEar = Hearing.Timbre.Speech.LevelForHeardPhons(t.HeardPhons(atEar));
+        return MathF.Pow(10f, (speechAtEar - DesignFullScaleDb - ReferenceRmsDbfs) / 20f);
+    }
+
     private static (float Gain, float ReferenceDistance) PlaceHeard(float sourceLevelDb, Hearing.Timbre timbre, float compression)
     {
         var speech = Hearing.Timbre.Speech;

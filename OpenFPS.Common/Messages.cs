@@ -47,7 +47,9 @@ namespace OpenFPS.Common.Networking;
 // The world editor (docs/WORLD_EDITOR.md section 6).
 [MemoryPackUnion(40, typeof(EditorMenu))]
 [MemoryPackUnion(41, typeof(ModelUpdate))]
-// 42-43 are free; 44 is the driving aids'.
+// The world editor, phase 2 (section 11.7): a map's settings changed live.
+[MemoryPackUnion(42, typeof(MapSettingsUpdate))]
+// 43 is free; 44 is the driving aids'.
 [MemoryPackUnion(44, typeof(MapRoads))]
 public partial interface IMessage { }
 
@@ -111,6 +113,20 @@ public partial class ModelUpdate : IMessage
     /// <summary>The model as ModelLibrary.SpecJson writes it.</summary>
     public string SpecJson = "";
     public ModelUpdate() { }
+}
+
+/// <summary>
+/// A map's settings changed in the world editor while players are on it (docs/WORLD_EDITOR.md section
+/// 11.7): its beacon rules, as MapManifest.BeaconPolicy carries them on arrival. The weather and the hour
+/// a map holds travel in the sky's state as they always do. Union tag 42; append fields only.
+/// </summary>
+[MemoryPackable]
+public partial class MapSettingsUpdate : IMessage
+{
+    public string MapId = "";
+    /// <summary>"category=policy" pairs, as MapManifest.BeaconPolicy.</summary>
+    public string[] BeaconPolicy = Array.Empty<string>();
+    public MapSettingsUpdate() { }
 }
 
 public enum PlayerListScope

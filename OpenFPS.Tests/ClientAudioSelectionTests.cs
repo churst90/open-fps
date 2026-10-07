@@ -412,19 +412,15 @@ public class ClientAudioSelectionTests
     }
 
     /// <summary>
-    /// The machine budget ranks a machine on the gain the mixer's law will play it at, the ear model's
-    /// correction for what it is made of included (EarTimbres, as VoiceManager.Audibility does), so the
-    /// two never disagree about a source: one that wins a voice on one set of numbers and is played at
-    /// another is picked out of a crowd and then cannot be heard. A condenser 30 m off loses the last
-    /// slot to the window units; give it a measured timbre the law plays 20 dB up (all of it in the
-    /// lowest third-octave) and the same machine at the same place takes the slot.
-    ///
-    /// Whether a timbre the ear barely hears SHOULD rank higher is a question for the ear model (see
-    /// docs/COVERAGE_2026-10-06.md): the law plays such a sound louder so that it is heard at its real
-    /// loudness, and the ranking follows the law's gain, not the loudness.
+    /// The machine budget ranks a machine by how loud it is to the ear (Cody, 2026-10-07; as
+    /// VoiceManager.Audibility ranks every other voice), not by the gain the law plays it at. A
+    /// condenser (65 dB) 12 m off beats the furthest of ten window units (59 dB) while it is not
+    /// measured. Measured as a rumble with everything in the 25 Hz third-octave, the law plays it more
+    /// than 10 dB up so that it is heard at its real loudness, which is very little: it now loses the
+    /// slot. Under the old rule (rank on the corrected gain) the rumble ranked those decibels HIGHER.
     /// </summary>
     [Fact]
-    public void TheMachineBudgetRanksOnTheGainTheLawPlaysItAt()
+    public void TheMachineBudgetRanksOnHowLoudTheEarHearsAMachine()
     {
         int budget = ClientAudioSystem.MachineVoiceBudget;
         bool wasOn = OpenFPS.Common.Hearing.EarModel.Enabled;
@@ -438,7 +434,7 @@ public class ClientAudioSelectionTests
                 float a = i * MathF.Tau / budget;
                 AddSource(h, 100 + i, "machine:ac_window", new Vector3(MathF.Cos(a) * (8f + i * 0.2f), 1f, MathF.Sin(a) * (8f + i * 0.2f)));
             }
-            AddSource(h, Condenser, "machine:ac_condenser", new Vector3(0f, 1f, 30f));
+            AddSource(h, Condenser, "machine:ac_condenser", new Vector3(0f, 1f, 12f));
             h.Tick(budget);
             Assert.Equal(budget, Enumerable.Range(100, budget).Count(h.Mixer.Live.Contains) + (h.Mixer.Live.Contains(Condenser) ? 1 : 0));
             return h.Mixer.Live.Contains(Condenser);
@@ -447,22 +443,71 @@ public class ClientAudioSelectionTests
         {
             OpenFPS.Common.Hearing.EarModel.Enabled = true;
             OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
-            Assert.False(CondenserWins(), "unmeasured, a 65 dB condenser at 30 m should not beat a 59 dB window unit at 10 m");
+            Assert.True(CondenserWins(), "unmeasured, a 65 dB condenser at 12 m should beat a 59 dB window unit at 10 m");
 
-            var levels = Enumerable.Repeat(-60f, OpenFPS.Common.Hearing.Timbre.Bands).ToArray();
-            levels[0] = 0f;
-            OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("machine:ac_condenser",
-                OpenFPS.Common.Hearing.Timbre.FromBandLevels(levels, "rumble"));
+            OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("machine:ac_condenser", Band(0, "rumble"));
             float correction = OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb("machine:ac_condenser", 65f);
             _o.WriteLine($"the law's correction for a 65 dB rumble at 25 Hz: {correction:+0.0;-0.0} dB");
             Assert.True(correction > 10f, $"the law plays a 25 Hz rumble well up: {correction:F1} dB");
-            Assert.True(CondenserWins(), "the ranking did not read the law's correction");
+            Assert.False(CondenserWins(), "a rumble the ear barely hears took a voice from a window unit it hears");
         }
         finally
         {
             OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
             OpenFPS.Common.Hearing.EarModel.Enabled = wasOn;
         }
+    }
+
+    /// <summary>
+    /// The rule in its plainest form, through the machine budget: one slot left, a 65 dB condenser that
+    /// is a 25 Hz rumble and a 59 dB window unit that is a 1 kHz tone, at the same distance. The tone is
+    /// heard as far louder and takes the slot; the rumble, which the law plays at more gain, does not.
+    /// Unmeasured, the louder condenser takes it.
+    /// </summary>
+    [Fact]
+    public void ARumbleLosesTheLastMachineSlotToAQuieterToneAtTheSameDistance()
+    {
+        int budget = ClientAudioSystem.MachineVoiceBudget;
+        bool wasOn = OpenFPS.Common.Hearing.EarModel.Enabled;
+        const int Condenser = 200, Window = 201;
+        (bool Condenser, bool Window) Wins()
+        {
+            var h = new ClientAudioHarness();
+            h.StandAt(Vector3.Zero);
+            // Every slot but one taken by mowers close by.
+            for (int i = 0; i < budget - 1; i++)
+            {
+                float a = i * MathF.Tau / (budget - 1);
+                AddSource(h, 100 + i, "machine:mower_push", new Vector3(MathF.Cos(a) * 4f, 0f, MathF.Sin(a) * 4f));
+            }
+            AddSource(h, Condenser, "machine:ac_condenser", new Vector3(20f, 1f, 0f));
+            AddSource(h, Window, "machine:ac_window", new Vector3(-20f, 1f, 0f));
+            h.Tick(budget);
+            Assert.Equal(budget - 1, Enumerable.Range(100, budget - 1).Count(h.Mixer.Live.Contains));
+            return (h.Mixer.Live.Contains(Condenser), h.Mixer.Live.Contains(Window));
+        }
+        try
+        {
+            OpenFPS.Common.Hearing.EarModel.Enabled = true;
+            OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
+            Assert.Equal((true, false), Wins());
+            OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("machine:ac_condenser", Band(0, "rumble"));
+            OpenFPS.Client.AudioEngine.Core.EarTimbres.Set("machine:ac_window", Band(16, "1 kHz tone"));
+            Assert.Equal((false, true), Wins());
+        }
+        finally
+        {
+            OpenFPS.Client.AudioEngine.Core.EarTimbres.Clear();
+            OpenFPS.Common.Hearing.EarModel.Enabled = wasOn;
+        }
+    }
+
+    /// <summary>A spectrum with everything in one third-octave band (0 is 25 Hz, 16 is 1 kHz).</summary>
+    private static OpenFPS.Common.Hearing.Timbre Band(int band, string name)
+    {
+        var levels = Enumerable.Repeat(-60f, OpenFPS.Common.Hearing.Timbre.Bands).ToArray();
+        levels[band] = 0f;
+        return OpenFPS.Common.Hearing.Timbre.FromBandLevels(levels, name);
     }
 
     /// <summary>
@@ -674,7 +719,7 @@ public class ClientAudioSelectionTests
             int[] far = { 5, 6, 7, 8 };
             bool NearDrop(SpatialEmitter e) => e.EntityId <= RainField.NearVoiceBase && e.EntityId > RainField.NearVoiceBase - RainField.NearVoicePool;
             Assert.True(h.TickUntil(() => far.All(s => h.Mixer.Latest.ContainsKey(RainField.VoiceBase - s))
-                                       && h.Mixer.Started.Count(NearDrop) >= 5, 5000),
+                                       && h.Mixer.Started.Count(NearDrop) >= 5, 5000, TimeSpan.FromSeconds(90)),
                         "the rain was never voiced");
 
             var ear = new Vector3(0f, h.Player.EyeHeight, 0f);
@@ -759,6 +804,47 @@ public class ClientAudioSelectionTests
         h.Wait(10.0); h.Tick();
         h.Tick(5);
         Assert.Equal(2, Starts());
+    }
+
+    /// <summary>
+    /// A repeating one-shot whose last play ends in the very frame its next firing comes round speaks
+    /// that frame. The new submission is a new play: the budget used to see the old play finish in the
+    /// same pass, mark it finished and throw the new submission away with it, so the emitter was silent
+    /// for a whole interval (docs/COVERAGE_2026-10-06.md, finding 3).
+    /// </summary>
+    [Fact]
+    public void ARepeatingEmitterWhoseLastPlayEndsAsItsIntervalComesRoundSpeaksAgain()
+    {
+        var h = new ClientAudioHarness();
+        h.StandAt(Vector3.Zero);
+        const int Pa = 23;                 // 23 % 7 = 2: the first firing 1.8 s after first sight
+        var def = new EntityDefinition
+        {
+            EntityId = Pa,
+            Type = EntityType.StaticObject,
+            Transform = new Transform { Position = new Vector3(0f, 4f, 10f), Rotation = Quaternion.Identity, Scale = Vector3.One },
+        };
+        def.SoundEmitter.SoundId = "announcements/test_line";
+        def.SoundEmitter.Mode = PlaybackMode.Single;
+        def.SoundEmitter.Volume = 1f;
+        def.SoundEmitter.MinDistance = 2f;
+        def.SoundEmitter.Range = 80f;
+        def.SoundEmitter.RepeatIntervalSeconds = 10f;
+        h.World.RegisterDefinition(def);
+
+        int Starts() => h.Mixer.Started.Count(e => e.EntityId == Pa);
+        h.Tick();
+        h.Wait(2.0); h.Tick();
+        Assert.Equal(1, Starts());
+        Assert.Contains(Pa, h.Mixer.Live);
+
+        // The line ends between two updates, and the next update is the one the interval comes round in.
+        h.Wait(10.0);
+        h.Mixer.Live.Remove(Pa);
+        h.Tick();
+        h.Tick(3);
+        Assert.Equal(2, Starts());
+        Assert.Contains(Pa, h.Mixer.Live);
     }
 
     /// <summary>

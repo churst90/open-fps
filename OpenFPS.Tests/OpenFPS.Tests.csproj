@@ -39,6 +39,10 @@
     </None>
     <!-- The rooms map (doors, portals, the material lab): a fixture only, never served to players. -->
     <None Update="maps\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- At most four test classes at once (2026-10-07). Many start audio, acoustics and Steam Audio threads of
+         their own: at the default, one per core, a run on the 24-core desk machine reached a load of 350 and locked
+         the desktop and the screen reader. GitHub's runners have four cores, so CI is unchanged. -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

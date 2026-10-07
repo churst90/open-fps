@@ -26,9 +26,104 @@ Recent work, newest first. `git log` has the rest.
 - Tests no longer write the player's door render cache (`~/.local/share/OpenFPS/rendercache`) or prune
   its other builds' folders, and the test harness's client audio system no longer renders every door of
   the city in the background: every test that built one did both.
+- Voices are ranked by how loud they are to the ear (Cody's decision on finding 1 of
+  docs/COVERAGE_2026-10-06.md). The voice budget and the machine budget used to rank on the gain the
+  law plays a voice at, which includes the extra gain the law gives a sound the ear hears less of: a
+  65 dB rumble at 25 Hz ranked about 20 dB up. They now rank on the voice's loudness at the ear (ISO
+  532-1 with its measured spectrum), as the gain a speech line would need to be as loud
+  (`Loudness.HeardGain`; docs/EAR_MODEL.md, Ranking). A speech line or an unmeasured recording ranks
+  as before. Physical voices and recordings are now compared on one scale (on gain a recording
+  outranked an equally loud physical voice by about 12.6 dB), and tonal sounds the law lifts, such as
+  beacons, rank about 8 dB lower than before. On the city every standing source is broadband, so the
+  machine budget changes by one source at its edge in four of six listening spots (instrument:
+  `RankingByLoudnessProbe`, run with `OPENFPS_PROBE_OUT`; list in inbox/ranking-2026-10-07). Unheard.
+- A shore voice starts mid-sea. It used to start from a still sea: exact silence until its second
+  wave crest (11 s for one seed of the sandy surf in a 4.5 m/s wind), then about ten seconds of
+  building up, because a surf bore's swash arrives 15 s after its break. The synth now runs its sea on
+  for four of its longest periods before its first sample, without rendering it; the sound after that
+  is made as before. In the game at 10 m: before, 2.2 s of silence and the first 15 s 8 dB under the
+  sea's own level; after, the sea's level from the voice's first block (renders and measurements in
+  inbox/ranking-2026-10-07). docs/WAVES_AND_SHORES.md 5.1. Unheard.
+- A repeating one-shot (an announcement, a foghorn) whose last play ended in the frame its next firing
+  came round was silent for a whole interval: the budget saw the old play finish and dropped the new
+  submission with it. A one-shot submitted again after its last play ended now starts afresh.
+- `EarTimbres.Find` also looks a model's own key up as a folder, so a shore stretch's measured spectrum
+  (played under a key with its geometry) is found when the budget ranks the stretch by its prefab key.
+- World editor, phase 2 (unheard; tests and a MUD walk only). The plan and what was built:
+  docs/WORLD_EDITOR.md sections 11 and 12.
+  - Every kind describes its physical parameters: water, fire, foliage, running water, shores, horns,
+    whistles, bells, air systems, trains, rail vehicles, track, engines, and a vehicle's tyres, body
+    and gearbox, about 460 fields with units, ranges that hold every built-in value, help, and the source
+    where the code names one. Render trims, headroom and seeds stay read only.
+  - Engines and vehicles are library kinds. An edited engine is in every vehicle, machine and train
+    that has it; an edited vehicle is what MachineRegistry gives, on the server and every client.
+  - Prefabs are a kind, described from prefab-schema.json. A new version makes every thing made from the
+    prefab again where it stands.
+  - Versions: use one on every map, or pin one on a map (a map setting: an owner may). Each map's players
+    are sent the versions it uses. Where a model is used, map by map.
+  - Library: new from a template, copy, replace one model with another on this map or every map (one
+    undo), retire and restore, take an item out of a list.
+  - Place: search, preview by ear (to you alone, six seconds), rows, again, at the build cursor.
+  - Groups: hold things, group them as a model, place the group as its things.
+  - Settings of a placed thing: its model, a door's locked and push sides, a room's six materials and
+    whether it is indoors, a place's name. A thing moved into another tile of a streamed map is in that
+    tile.
+  - Map settings: hold the weather or the hour, the natural ground, the beacon rules (sent to the map's
+    players at once).
+  - Direct keys on Shift while an editor list is open, off by default (`/editorkeys on`); to be tried
+    with Orca and NVDA first.
+  - Wire: MapSettingsUpdate, union tag 42. Rebuild client and server together.
+- Downpipes no longer flutter (unheard; renders in `inbox/water-smoothing-2026-10-06/round2`). A gutter
+  outlet's gulps and the film striking a downpipe's shoe are heard through the pipe's 5.5 m of air,
+  and its open ends handed a fifth to a third of every splash back every 32 ms up to 6 kHz: the flange
+  left in the downpipe files. Each open end now keeps e^(−(ka)²/2) of what reaches it, as a real pipe's
+  does; the low modes and the level are as they were. The other peaks in the downpipe files (0.3-0.65
+  ms) are the HRTF's own and are in white noise played from the same places. docs/RUNNING_WATER.md 11.1.
 
 ## 2026-10-06
 
+- Fire at any size (unheard). Cody: "does the sound of the fire scale with the size? a bonfire in the
+  back yard vs a group of trees on fire, a raging blaze". Research and design: docs/FIRE.md.
+  - Seven fires: campfire, the garden fire pit (unchanged except its roar), bonfire, a burning car, a
+    house fully alight, a stand of burning trees, a crown fire's front 300 m long.
+  - A fire wider than one body of flame is many bodies side by side, each puffing in its own time
+    (1.5 / sqrt(D) Hz). It is heard from nine places across it, independent streams, so a
+    300 m front is heard 300 m wide.
+  - The roar is the flames' unsteady burning, p = (γ − 1) / (4π r c²) dQ/dt. Its spectrum falls as
+    f^-2.5 from 20 Hz up, and its level comes from the heat release swinging 35 % with the puffs (fitted;
+    the research expects 20-40 %). A house roars about 30 dB more than the fire pit, a crown fire's
+    front about 60 dB more.
+  - A big fire's crackles are a crowd: up to 240 a second a place are drawn one by one, the rest are
+    noise of the same power. A bigger body pops less often per kilowatt but louder (fitted).
+  - Events:
+    - Logs: steam jets and settling.
+    - Trees: torching, and branches falling through the crown onto the ground (the game's impact law).
+    - A house: windows cracking in the heat and later falling out (the glass model's own landing), rooms
+      flaring, four collapses.
+    - A car: struts and tyres bursting, the side windows dicing, the fuel tank flaring.
+  - The weather's wind is read at each place. A crown fire's heat release follows the wind, as its spread
+    does.
+  - A fire lit at a known moment grows, burns, dies down and smoulders. Its key carries when it was lit,
+    so every client hears the same point of its life.
+  - `/spawn fire PRESET` lights one in front of you for testing; `/spawn fire out` puts it out. Nothing
+    new is placed on the maps.
+  - Fitted to 31 recordings (campfires, bonfires, burning trees, prescribed burns and one forest fire,
+    houses, cars). Through the game: campfire, fire pit, bonfire and trees 13-14 of 14 statistics; house
+    9-11; crown fire 6-8; car 5.
+  - The fire pit's declared level is now 67 dB (was 59.5): the new roar is 9 dB more unweighted, nearly
+    all under 125 Hz, and 3 dB more A-weighted.
+  - Renders and measurements: inbox/fire-2026-10-06 with a README. AudioLab `--fire levels|render|game`.
+  - Round 2 (how wide it sounds): round 1's renders measured close to mono. The places were independent
+    already (any two correlate under 0.03 in every band), and 1.00 at 125-500 Hz is what a head gives a
+    fire in front of it. But the places sat at three-quarters of the fire's half-widths and spread less
+    than the fire. There are now nine, on a ring whose spread is the burning area's (w²/12 across,
+    d²/12 along), and a single hearth is heard from all of them alike. The renders now agree with each
+    scene's geometry on the game's own head within 0.05 in most bands. The car is side-on, the house is
+    also heard at 12 m, and the walk goes to 10 m. inbox/fire-2026-10-06/round2; docs/FIRE.md 7.2;
+    AudioLab `--fire hrtf`.
+- Each extended source now has twelve voice ids for its places. With eight, a surf beach's ninth and
+  tenth places took the next stretch's first two. A layout with more than twelve is heard from its
+  middle.
 - Tile scenes fixed and on again (`OPENFPS_TILE_SCENES=0` turns them off). After the first door swung
   near you, every wall stopped occluding and the traced reverb and echoes lost their walls (traffic
   heard inside Selby House, reflections mono). Steam Audio puts each instance of a tile in its top

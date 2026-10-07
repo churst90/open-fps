@@ -511,6 +511,10 @@ OpenFPS.Server/friends.json.bad
 OpenFPS.Server/map_access.json
 OpenFPS.Server/map_access.json.bad
 OpenFPS.Server/maps/players/
+# The world editor's data on a running server (docs/WORLD_EDITOR.md section 10): a deploy must not
+# overwrite edits made on the live server.
+**/maps/overlays/
+**/model_versions/
 
 # Built packages: publish-windows.sh and publish-server.sh
 dist/

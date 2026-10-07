@@ -29,7 +29,7 @@ namespace OpenFPS.AudioLab.Spikes;
 ///   --waves sea                                 every preset's sea at a range of winds
 ///   --waves render out=DIR [sec=30] [wind=]     one mono float WAV per preset at a metre, dry
 ///                                               (−20 dBFS is 94 dB SPL)
-///   --waves game out=DIR [set=all|lake|sea|river|wall|hull|walk] [sec=30]
+///   --waves game out=DIR [set=all|lake|sea|river|wall|hull|walk|start] [sec=30]
 ///        the game's own path: a ClientAudioSystem over the FMOD provider with the HRTF, the ear model
 ///        and the loudness law, each shore a map entity as the server would send it (its box the
 ///        stretch of edge and its fetch, its +Z to the water), the listener on foot on the land side;
@@ -381,6 +381,19 @@ public static class WavesSpike
             {
                 Shore("sea_sand", "sea sand", 5f, 5f, 40f);
                 Shore("shingle", "shingle", 5f, 3f, 15f);
+            }
+            if (set is "start")
+            {
+                // A shore voice from the moment it starts (2026-10-07): the sandy surf beach placed while
+                // you stand 10 m back from its edge in a 4.5 m/s onshore wind, recorded from the update it
+                // is placed in. It used to be exact silence for about 11 s.
+                Wind(4.5f);
+                Vector3 edge = new(0f, 0.05f, 0f);
+                Stand(new Vector3(0f, 0f, -10f), edge);
+                Pump(1.0);
+                int id = Add("sea_sand", edge);
+                Record("sea sand from its start 10m wind 4.5", sec);
+                Remove(id);
             }
             if (set is "all" or "wall")
                 Shore("harbour_wall", "harbour wall", 6f, 2f);

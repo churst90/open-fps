@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
@@ -61,8 +62,48 @@ public partial class ClientGameSession
             Serilog.Log.Warning("ModelUpdate: {Kind} {Id} version {Version} did not read as a model; kept the one we had.", model.Kind, model.Id, model.Version);
             return;
         }
-        var restarted = _audioSystem.ModelChanged(model.Kind, model.Id, _world.GetSnapshot());
+        var snapshot = _world.GetSnapshot();
+        var restarted = _audioSystem.ModelChanged(model.Kind, model.Id, snapshot);
+        // An engine is heard through what it is in: every vehicle and machine built on it starts again.
+        if (model.Kind == ModelLibrary.Kinds.Engine)
+            foreach (var (kind, id) in UsersOfEngine(model.Id, snapshot).ToList())
+                restarted.AddRange(_audioSystem.ModelChanged(kind, id, snapshot));
         Serilog.Log.Information("ModelUpdate: {Kind} {Id} is version {Version}; {Count} voice(s) started again.",
             model.Kind, model.Id, model.Version, restarted.Count);
+    }
+
+    /// <summary>The vehicles and small machines heard here that are built on an engine.</summary>
+    private static IEnumerable<(string Kind, string Id)> UsersOfEngine(string engine, WorldSnapshot snapshot)
+    {
+        var seen = new HashSet<(string, string)>();
+        foreach (var (_, entity) in snapshot.Entities)
+        {
+            if (!OpenFPS.Common.Editing.ModelKinds.TryModelOfSound(entity.Definition?.SoundEmitter.SoundId, out var kind, out var id)) continue;
+            if (!seen.Add((kind, id))) continue;
+            string built = kind == ModelLibrary.Kinds.Vehicle ? MachineRegistry.EngineKeyFor(id)
+                         : kind == ModelLibrary.Kinds.SmallMachine ? ModelLibrary.SmallMachine(id).EngineKey ?? ""
+                         : "";
+            if (built.Equals(engine, StringComparison.OrdinalIgnoreCase)) yield return (kind, id);
+        }
+    }
+
+    /// <summary>/editorkeys [on|off]: the world editor's direct keys, saved. Off by default.</summary>
+    internal static string EditorKeysCommand(string[] args, Action? save = null)
+    {
+        string word = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+        if (word is not ("on" or "off"))
+            return $"The editor's direct keys are {(EditorKeys.Enabled ? "on" : "off")}. /editorkeys on or off. With an editor list open: {EditorKeys.Said}";
+        EditorKeys.Enabled = word == "on";
+        (save ?? SaveSettings)();
+        return EditorKeys.Enabled
+            ? "Editor direct keys on, while an editor list is open: " + EditorKeys.Said + " They are new: say if a screen reader takes any of them."
+            : "Editor direct keys off.";
+    }
+
+    /// <summary>A map's settings changed while we are on it: its beacon rules, at once.</summary>
+    internal void ApplyMapSettings(MapSettingsUpdate update)
+    {
+        _audioSystem.Beacons.SetMapPolicy(update.BeaconPolicy);
+        Serilog.Log.Information("MapSettingsUpdate: {Map} beacon rules {Rules}.", update.MapId, string.Join(", ", update.BeaconPolicy));
     }
 }

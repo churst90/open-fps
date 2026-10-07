@@ -119,6 +119,17 @@ public class MapData
     /// </summary>
     public Dictionary<string, string>? BeaconPolicy { get; set; }
 
+    /// <summary>A weather this map always has ("clear", "rain", "snow", "storm"), or null to follow the
+    /// server's sky. Set in the world editor (map settings) or by the map's author.</summary>
+    public string? HeldWeather { get; set; }
+
+    /// <summary>An hour of the day this map always has, 0 to 24, or null to follow the server's clock.</summary>
+    public float? HeldHour { get; set; }
+
+    /// <summary>The prefab laid as natural ground where the map has none of its own; null is dirt
+    /// (MapManager.NaturalGroundPrefab).</summary>
+    public string? GroundPrefab { get; set; }
+
     public List<EntityData> Entities { get; set; } = new();
 
     /// <summary>Vehicles that drive the map's roads. See VehicleSystem.</summary>

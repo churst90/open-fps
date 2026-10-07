@@ -52,7 +52,8 @@ itself, undo and redo, and edits that are kept.
 - Items that need a number open the command line with the start of the command typed for you
   (`/edit move `, `/edit set Volume `). Type the number and press Enter. The menu is still open after.
 - No editor action is on Control, Alt or Insert, or on the numeric keypad (screen readers use it for
-  review with Num Lock off). Phase 1 has no direct keys outside the menu.
+  review with Num Lock off). Phase 2 adds direct keys on Shift while an editor list is open, off unless
+  a player turns them on (section 11.8).
 
 Every result is spoken, briefly: "Moved Fountain 0.5 metres north.", "Volume 0.8.", "Undid: moved
 Fountain."
@@ -97,8 +98,9 @@ existing library already is this:
 | water, fire, foliage, flow, shore | WaterFeatureSpec, FireSpec, FoliageSpec, RunningWaterSpec, ShoreSpec | ModelLibrary, NatureModels.cs, RunningWater.cs, Waves.cs |
 | horn, whistle, bell, air | ChimeHornSpec, WhistleSpec, StruckBellSpec, AirSystemSpec | ModelLibrary |
 | train, rail_vehicle, track | TrainProfile, RailVehicleSpec, TrackSpec | ModelLibrary |
-| vehicle, engine (2) | MachineRegistry's Describe/Assemble shapes | Machines.cs, Engines.cs |
-| prefab (2 for versions) | PrefabTemplate | prefabs/*.json, prefab-schema.json |
+| vehicle, engine | VehicleSpec (over MachineRegistry), EngineProfile | ModelLibrary, VehicleSpec.cs, Engines.cs |
+| prefab | PrefabTemplate, described from prefab-schema.json | prefabs/*.json (PrefabKind, the server's) |
+| group | GroupSpec | made in the editor (GroupKind, the server's) |
 
 `ModelKinds` (OpenFPS.Common/Editing) takes its list of kinds from `ModelLibrary.AllKinds`, so a kind
 added to the library is in the editor with no further code.
@@ -332,7 +334,7 @@ Selecting is not an operation: it changes nothing and is per player.
 - Tests: permissions, every op and its undo, overlay reload, generated maps byte-identical, ranges,
   wire round trips, menu navigation and speech, a model change re-voicing a machine.
 
-### Phase 2
+### Phase 2 (built 2026-10-07: sections 11 and 12)
 
 - Pins and per-map model versions sent to the players on that map; versions menu; where used per map.
 - Describe the remaining kinds (water, fire, foliage, flow, shore, horns, bells, trains), vehicles and
@@ -355,11 +357,271 @@ Selecting is not an operation: it changes nothing and is per player.
 
 1. Overlay for every map, including player maps and the speedway, rather than writing player maps
    directly. One rule, and a map file is never rewritten by the editor. Baking is phase 3.
-2. maps/overlays/ and model_versions/ are not in .gitignore: edits made on your own server can be
-   committed like any other map change. Say if they should be ignored instead.
+2. maps/overlays/ and model_versions/ are in .gitignore (decided 2026-10-07): they are the running
+   server's data, and a deploy from the repository must not overwrite edits made on the live server.
 3. Invited editors may use the editor on that map and nothing else (not /spawn or /savemap). Changing
    models needs edit-models (developers and admins), because a model is shared by every map.
 4. Undo history is lost on a restart; the edits themselves are kept.
 5. A solid thing placed "at your feet" is put just in front of you, so you are not inside it.
 6. Owners and named editors may place at most 5,000 things on a map with the editor; staff are not
    limited. Things to carry need the give permission to place, and premium items cannot be placed.
+
+Decided (Cody, 2026-10-07): "go with your recommendations on the editor". All of the above stand, with 2 as
+amended: the editor's data is ignored by git.
+
+## 11. Phase 2: the plan
+
+Written before the work (2026-10-07), in the order it is done. What was built is section 12.
+
+### 11.1 Every kind describes itself, and vehicles, engines and prefabs are kinds
+
+- `[Tunable]` on the physical parameters of water, fire, foliage, flow, shore, horn, whistle, bell, air,
+  train, rail vehicle and track, with units, physical ranges that hold every built-in value, one line of
+  help and the source where the code already names one. Render trims, headroom, mixing shares and seeds
+  are left without it: shown, read only. The realism rule decides, not convenience.
+- **Engines** become a library kind, `engine`, whose models are EngineProfile.Presets. An edited engine
+  is used by every vehicle that has it: MachineRegistry takes the engine through the library
+  (`MachineRegistry.EngineFor`), and forgets what it assembled when the library changes.
+- **Vehicles** become a library kind, `vehicle`, edited as a `VehicleSpec`: the engine (by name), the
+  chassis (mass, drag area, rolling resistance, axles, size, level at one metre, tyre count), where the
+  exhaust and intake are, and the tyres, body and gearbox records as they are. Everything else (siren, air
+  system, fan, starter) comes from the base vehicle, as MachineRegistry's own parts lists do. Editing one
+  changes what MachineRegistry.VehicleFor gives on the server (physics) and on every client (sound).
+- **Prefabs** become a kind, `prefab`, described from prefab-schema.json: its types, enums, minimum and
+  maximum, and its descriptions as help. Units come from the field's name and description. The prefab's
+  JSON is checked by PrefabValidator before it is a version. A prefab is the server's alone: its versions
+  are not sent to clients; instead every thing made from it on a loaded map is made again from the new
+  version, where it stands, with its own settings.
+- Choices can name the library: `Choices = "models:horn"` lists the horns, so a train's horn is chosen,
+  not typed.
+- Where a kind's models are heard: `engine:<vehicle>` sounds name a vehicle, and an engine is used by
+  the vehicles built on it.
+
+### 11.2 Pins and per-map versions
+
+- A map's overlay pins a model to a version: `"Pins": { "small_machine:ac_condenser": 1 }`. Pinning
+  is a map setting, so it needs `edit` on that map (an owner may pin on their own map), not edit-models.
+- What a player is sent depends on the map they are on: on arrival (the manifest), every changed
+  model at the version that map uses; when a model changes, only players on maps that do not pin it;
+  when a pin is set or lifted, the players on that map get the version they now use. The client's
+  library is one, and it always holds the versions of the map it is on.
+- The server's own library holds the current versions. Where the server simulates with a model (a
+  vehicle's mass and gearbox in DrivingSystem, a train), it uses the current version even on a map that
+  pins an older one: pins are for what is heard. Said in the versions menu.
+- Versions menu: each version with its note, author and date, and for each: "use on every map"
+  (edit-models; undoable), "pin on this map", and "lift the pin". Where used: by map, with counts.
+
+### 11.3 Library
+
+- New from template (`/edit model new KIND TEMPLATE NEWID`, the new id last so the menu can type the
+  rest of the command for you): a built-in model as built (version 0) under a new id. Copy (`/edit model copy KIND ID NEWID`): any model at the version in use. Both need
+  edit-models, make version 1 of the new model, and undo by retiring it.
+- Replace everywhere (`/edit model replace KIND ID WITH OTHER [here|everywhere]`): every thing playing
+  one model plays another; on this map needs `edit` here, everywhere needs edit-models. One undo puts all
+  of them back. The model a thing plays is a setting of its own (Model), kept in the overlay.
+- Retire (`/edit model retire KIND ID`, `/edit model restore KIND ID`): a retired model is not offered
+  for new things or as a template, and says so in the library; things already using it keep it.
+
+### 11.4 Place
+
+- Search (`/edit find WORDS`): prefabs whose name or id has every word, as a menu to place from.
+- Preview by ear (`/edit preview PREFAB`): the prefab's sound made at your feet for six seconds, sent to
+  you alone as a definition with an id of its own and taken away after; nothing on the map changes. No
+  new message.
+- Rows (`/edit row COUNT [SPACING]`): copies of the selected thing in a line the way you face, spacing
+  its own width unless given; one undo takes the row away. Repeat (`/edit again`): the last place,
+  again, where you stand now.
+- At the build cursor (`/edit place PREFAB at cursor`): where /build's cursor is, facing the build
+  heading, for things that cannot be walked to (a roof).
+
+### 11.5 Groups
+
+- A selection of more than one thing: `/edit select add` (the nearest, or NAME, or #ID) and
+  `/edit select clear`; the selected-thing menu says how many are held.
+- Group (`/edit group NAME`): the held things become a group, kept with the models as kind `group`
+  with versions, and the things stay where they are. A group is placed from Place, Groups, as its
+  things. (Built this way rather than as CompositeService composites: see section 12.)
+- Edit a group's parts: its parts listed with prefab and offset; change a part's place or turn, take a
+  part out. A new version of the group.
+
+### 11.6 Doors, rooms, named places and regions
+
+- Settings of a placed thing, when it has the part: door keyed side and push side; a room's six
+  materials (floor, ceiling, north, south, east, west) chosen from AcousticRegistry; a region's name
+  (named place). A changed room or door goes out to clients as its definition, as a move does.
+- Streaming: a map-file thing moved into another tile has its tile membership worked out again
+  (MapTiles), so a client holding the new tile is sent it.
+
+### 11.7 Map settings
+
+- Weather and time: a map may hold the sky (a fixed weather, a fixed hour) or follow the server's; kept
+  in the overlay, applied in WorldEnvironmentSystem.GetStateForMap.
+- Beacon rules: each beacon category's policy (default on, default off, forced on, forbidden); sent to
+  the map's players at once.
+- Ground: the natural ground laid where the map has none (dirt, grass, concrete, asphalt, gravel).
+
+### 11.8 Direct keys
+
+Designed, and OFF by default (a client setting): while the editor menu is open, keys that act on the
+selected thing without going through the list. They must be tried with Orca and NVDA before they are
+turned on for anybody. Never Control, Alt, Insert or the numeric keypad.
+
+## 12. Phase 2 as built
+
+Built 2026-10-07 on branch worktree-agent-a325b79569e36d170, in the order of section 11. Everything in
+11.1 to 11.8 is in; where it was built differently from the plan it says so here. Unheard: nothing
+here has been tried in the game client yet, only by tests and through the MUD gateway.
+
+### Kinds
+
+- Described, attributes only on the model records: water (WaterFeatureSpec, WaterFallSpec,
+  WaterTapSpec), fire (FireSpec, now in Fire.cs), foliage, flow (RunningWaterSpec and its inlet, falls,
+  basin, taps, cavity, obstacles), shore (ShoreSpec, HullSpec), horn, whistle, bell (with their bells),
+  air (AirSystemSpec, its ports), train (TrainProfile, its consist), rail vehicle (with wheelsets,
+  traction, electric drive, steam), track, engine (EngineProfile with cams, valves, exhaust, mufflers,
+  intake, mechanical), and the vehicle parts (TyreProfile, VehicleBody, Gearbox). About 460 fields.
+- Left read only on purpose, as not physical: every PeakHeadroomDb (render headroom), the number of
+  places a source is heard from, AirSystemSpec.JetTrimDb, a port's Name (code finds ports by it), an
+  engine's IdleRoughness, Steepening, FlowLoss and its level scales (JetNoiseLevel, PortNoiseLevel,
+  intake Level and FlowNoiseLevel, the mechanical level scales), MufflerSpec.ShellLevel,
+  VehicleBody.Coupling and MaxModes, a gearbox's derived shift speeds, an engine's
+  RevolutionsBeforeFiring (NaN, worked out from the fuel), ElectricDriveSpec.SyncFromHz (1,000,000 is
+  its "no inverter").
+- Judgement calls left editable, each with help that says what it is: a chime bell's LevelTrimDb (the
+  bell's level against the others), PitchBend, Breathiness, a track's StructureDb, a rail vehicle's
+  BodyDrumDb, ExhaustSpec.WallLossMultiplier, OverrunPopRate, IdleGovernorGain, VehicleBody.CabinLeak,
+  and the conditions a level was measured at (ReferenceRainMmPerHour, ShoreSpec.ReferenceWind).
+- A test walks every built-in model of every kind and fails if a value lies outside its declared range
+  (WorldEditorTests). It passes for all of them.
+- `Choices = "models:horn"` lists a kind's models: a rail vehicle's horn, bell, whistle and engine are
+  chosen, not typed.
+- Engines are kind `engine`; EngineProfile.ByName takes an edited engine, so a vehicle, a small
+  machine, a train and an aircraft engine all have the change. Vehicles are kind `vehicle`
+  (VehicleSpec, OpenFPS.Common/VehicleSpec.cs); MachineRegistry.VehicleFor builds an edited one on its
+  base and forgets what it assembled whenever the library changes. A client restarts the voices of the
+  vehicles and machines on an engine that changed.
+- Prefabs are kind `prefab` (ModelCatalog.cs, PrefabKind): fields from prefab-schema.json (vectors are
+  groups of X, Y and Z; lists such as RoomMaterials are not shown), checked by PrefabValidator. Id,
+  Type, IsItem, Premium, WeaponId and Hands are shown, not changed. A version is the server's alone and
+  makes every thing made from the prefab again where it stands (Remake), keeping its name, settings, a
+  doorway's rooms, a door's sides and a room's materials, and joining doorways to a room made again.
+- The editor knows kinds through ModelCatalog (EditorKind: fields, ids, JSON, check, apply). ModelStore
+  keeps every kind's versions, puts them in use through the kind, and keeps made and retired models.
+
+### Pins and versions
+
+- `/edit model pin|unpin|use|versions|where`. A map's pins are in its overlay. A player arriving is sent
+  every changed model at the version the map uses (Program.SendManifest, ModelStore.UpdatesFor); a new
+  version goes only to maps that do not pin the model; a pin set or lifted is sent to that map's players.
+- The server's own library holds the current versions, so what it simulates (a vehicle's mass) is the
+  current version everywhere. The versions menu says so. Prefabs and groups cannot be pinned (the
+  server's alone).
+
+### Library
+
+- `/edit model new KIND TEMPLATE NEWID`, `copy KIND ID NEWID`, `retire`, `restore`, `replace KIND ID
+  with OTHER [here|everywhere]`, and `remove KIND ID LIST[N]` (an item out of a list: a fountain's fall,
+  a group's part). A made model is named from its id. Undoing a making retires the model: versions are
+  never deleted.
+- A thing's model is a setting of its own (Model), kept in the overlay. Changing it makes the thing
+  again, so every client hears the new model at once (a definition sent again does not restart a
+  voice). Replace is that setting on every thing, one undo for all; for prefabs it is a delete and a
+  place for each thing.
+
+### Place
+
+- Search (`/edit find`), preview (`/edit preview`: the prefab made in a world of its own, its definition
+  sent to you alone under an id from 1,950,000,000, removed after six seconds; no new message), rows
+  (`/edit row COUNT [SPACING]`, one undo), again (`/edit again`), and the build cursor
+  (`/edit place PREFAB at cursor`, after /origin and /at).
+- The Place menu has a mode: what choosing a prefab does (place at your feet, at the build cursor, or
+  preview). Each item still sends a plain command, so the MUD gets the same.
+
+### Groups (built differently from the plan)
+
+- Holding: `/edit select add nearest|NAME|#ID`, `/edit select clear`, the Held menu.
+- `/edit group NAME` keeps the held things as a group, kind `group`: each part's prefab, name, place
+  (right, forward and up of the group's origin, in the frame the builder faced), turn, scale and settings.
+  `/edit place group NAME` puts the parts down in front of you, turned the way you face, as editor
+  additions, one undo for all.
+- Not CompositeService composites: those are one root carrying its members (ParentComponent), kept in
+  the map file's Composites, with no authored ids for the editor to select or the overlay to keep. A
+  group placed as separate things uses everything the editor already has (overlay additions, undo,
+  every setting). The cost: a placed group is not one thing to move, and a new version of a group
+  changes what is placed next, not what was placed. See decision 2 below.
+
+### Doors, rooms, places, tiles
+
+- Settings: KeyedSide (neither, front, back), PushSide (front, back), Indoor, and Floor, Ceiling, North,
+  South, East and West for a room, from AcousticRegistry's names; a region's Name is the place's name.
+  The menus "Places and rooms" and "Doors near you" select them.
+- A thing from the map file on a map streamed in tiles is placed in its tiles again when it moves or is
+  made again (MapTiles.Place), and sent to every player on the map who holds a tile it is now in. Things
+  the editor adds are not tiled (as in phase 1): they are sent by where they stand.
+
+### Map settings
+
+- `/edit map settings`, `/edit map set weather|time|ground|beacon ...`, the Settings and Beacon rules
+  menus. Kept in the overlay's Settings and laid on the map's data at load (MapData.HeldWeather,
+  HeldHour, GroundPrefab, BeaconPolicy).
+- A held weather or hour is applied in WorldEnvironmentSystem.GetStateForMap (MapAtmosphere.Of), so the
+  map's players and the server's own systems on that map read it at once; the server's sky goes on
+  everywhere else. A held weather is the front's settled values (SetScenario's targets).
+- Natural ground: the loader lays MapData.GroundPrefab where a map has no ground of its own; changing it
+  lays the new ground at once. A map that lays its own ground says so.
+- Beacon rules go to the map's players at once in MapSettingsUpdate (union tag 42, new).
+
+### Direct keys
+
+- `/editorkeys on|off` (client, saved in the client's settings, off by default). While an editor list
+  is open: Shift+arrows nudge forward, back, left, right; Shift+] and Shift+[ nudge up and down;
+  Shift+period and Shift+comma turn 15 degrees; Shift+slash says where the selected thing is; Shift+D
+  duplicates; Shift+Delete asks to delete; Shift+Z undoes; Shift+Y redoes. Shift only; never Control,
+  Alt, Insert or the keypad.
+- **They must be tried with Orca and NVDA before anybody is told to turn them on.** NVDA uses
+  Shift+arrows for selection in browse mode and Orca has Shift+keypad commands; neither should reach
+  the game window in focus mode, but that is to be heard, not assumed.
+
+### Wire changes
+
+- New message MapSettingsUpdate { MapId, BeaconPolicy[] }, union tag 42. Nothing else on the wire
+  changed: ModelUpdate now also carries kinds "engine" and "vehicle", and previews are ordinary
+  EntityDefinition and EntityRemoved messages. Client and server must be rebuilt together.
+
+### Tests
+
+- WorldEditorPhase2Tests (22): kinds described, vehicles and engines through MachineRegistry, prefab
+  versions remaking things, pins and the versions sent, use, new, copy, retire, replace, a thing's
+  model, removing a list item, search, preview, rows, again, the build cursor, groups, door sides and
+  room materials, tiles, map settings and their reload, the ground, the new message.
+- WorldEditorClientTests: direct keys off by default and Shift only; vehicle and shore sounds name
+  their models. ModelLibraryTests: engines and vehicles survive the round trip.
+
+### What is left
+
+- Groups as one thing (CompositeService composites with a root), if Cody wants a placed house to move
+  as one; a new group version changing placed copies.
+- Prefab lists (RoomMaterials, MissingFaces) are not editable in a prefab model; a room's six materials
+  are settings of the placed room instead.
+- Remaking a thing (a prefab's new version, a new model) starts it again: a door that was open is shut,
+  a fire lit at a known moment is lit again.
+- Vehicles written as parts lists in machines/ (not built in) are not listed as library vehicles.
+- A held weather holds the front's intensity, wind and humidity; lightning follows the server's front.
+- Previews are for things with a sound of their own; there is no preview of a wall being struck.
+- Phase 3 as in section 9.
+
+### Decisions for Cody
+
+1. **Pins are for what is heard.** The server simulates with the current version on every map (a
+   pinned school bus sounds as pinned but weighs what the current version says). Recommendation: keep;
+   a per-map server library is a lot of machinery for a difference nobody hears.
+2. **Groups place as separate things, not as one composite.** Recommendation: keep for now; build
+   composite groups (one root, moved as one) only if building houses shows the need.
+3. **Direct keys stay off until tried.** Recommendation: try `/editorkeys on` with Orca first, then
+   NVDA on the Windows client; if either takes a key, move that key, and only then mention them in
+   the manual as ready.
+
+Phase 2 decided (Cody, 2026-10-07): "go with your recommendations on the editor phase". Pins change what players
+hear; the server's simulation uses the current version on every map. Groups place as separate things until
+building houses shows one-piece composites are needed. Direct keys stay off until Cody has tried them with Orca
+and then NVDA, and any key a screen reader takes is moved first.

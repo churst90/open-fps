@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
@@ -35,40 +36,55 @@ public sealed record AirPortSpec
     public required string Name { get; init; }
     /// <summary>The hole, metres. It decides the pitch (Strouhal 0.2 on it) and, with the volume
     /// behind it, how long the sound lasts.</summary>
+    [Tunable("m", 0.001, 0.05, "Diameter of the hole the air leaves by. A bigger hole is lower in pitch and empties the volume faster.", Label = "orifice diameter", Step = 0.0005)]
     public required float OrificeMetres { get; init; }
     /// <summary>What is behind the hole, litres. A quick-release valve on a tractor is emptying two
     /// brake chambers; a parking brake is emptying the spring brake side of the whole unit.</summary>
+    [Tunable("L", 0.1, 2000, "Volume of air behind the hole. More volume makes the release last longer.", Label = "volume behind it", Step = 0.5)]
     public required float VolumeLitres { get; init; }
     /// <summary>Discharge coefficient of the port. A sharp-edged hole is 0.6, a nozzle 0.9.</summary>
+    [Tunable("", 0.5, 1, "How much of the hole's area the flow actually uses. A sharp-edged hole is 0.6, a nozzle 0.9.", Step = 0.01)]
     public float DischargeCoefficient { get; init; } = 0.72f;
     /// <summary>The muffler screwed into the exhaust port: how much of the top it takes off, 0..1,
     /// and the corner it rolls off from. Without it every one of these is a shriek.</summary>
+    [Tunable("", 0, 1, "How much of the top end the muffler in the exhaust port takes off. Zero is no muffler and a shriek.", Label = "muffler absorption", Step = 0.05)]
     public float MufflerAbsorption { get; init; } = 0.55f;
+    [Tunable("Hz", 500, 10000, "Where the muffler starts to roll the top off.", Label = "muffler corner", Step = 100)]
     public float MufflerCornerHz { get; init; } = 2600f;
     /// <summary>Where it is on the vehicle: metres back from the front, out to the right, and up.
     /// A trailer's brake valves are at the back and at the axles; a bus's door valve is at the
     /// front step, which is why it goes off next to your head.</summary>
+    [Tunable("m", 0, 40, "How far back from the front of the vehicle the port is.", Label = "distance back from the front", Step = 0.1)]
     public float AlongMetres { get; init; }
+    [Tunable("m", -2, 2, "How far right of the centre line the port is. Negative is to the left.", Label = "distance to the right", Step = 0.05)]
     public float LateralMetres { get; init; }
+    [Tunable("m", 0, 5, "How high above the ground the port is.", Label = "height", Step = 0.05)]
     public float HeightMetres { get; init; } = 0.6f;
     /// <summary>The valve itself opening: a mechanical crack before the air says anything.</summary>
+    [Tunable("dB", 60, 120, "Level at one metre of the valve's mechanical crack as it opens, before the air.", Label = "valve clack level", Step = 1)]
     public float ValveClackDb { get; init; } = 88f;
 }
 
 /// <summary>The air system of a road vehicle: a compressor, a reservoir, a governor, and ports.</summary>
 public sealed record AirSystemSpec
 {
+    [Tunable("", 0, 0, "The air system's name as it is said.")]
     public required string Name { get; init; }
+    [Tunable("L", 10, 2000, "Volume of the main reservoir.", Label = "reservoir volume", Step = 5)]
     public float ReservoirLitres { get; init; } = 60f;
     /// <summary>The governor: the compressor loads at the low figure and unloads at the high one.
     /// 100 and 120 psi is the American standard, and the unloading is the "pop" you hear from a
     /// parked truck every couple of minutes.</summary>
+    [Tunable("kPa", 300, 1100, "Pressure, gauge, at which the governor sets the compressor pumping again.", Label = "governor cut-in pressure", Step = 10, Source = "American standard governor settings, 100 and 120 psi")]
     public float CutInKPa { get; init; } = 690f;
+    [Tunable("kPa", 300, 1200, "Pressure, gauge, at which the governor unloads the compressor: the pop from a parked truck.", Label = "governor cut-out pressure", Step = 10, Source = "American standard governor settings, 100 and 120 psi")]
     public float CutOutKPa { get; init; } = 827f;
     public required AirPortSpec[] Ports { get; init; }
     /// <summary>The compressor itself: a little two-cylinder pump geared off the engine. It is a
     /// knocking, not a hiss, and it is at twice the crank order it is geared to.</summary>
+    [Tunable("dB", 50, 110, "Level at one metre of the compressor's knocking while it pumps.", Label = "compressor level", Step = 1)]
     public float CompressorDb { get; init; } = 76f;
+    [Tunable("", 0.5, 8, "Compressor knocks per engine revolution. A two-cylinder pump geared at engine speed is 2.", Label = "compressor order", Step = 0.5)]
     public float CompressorOrder { get; init; } = 2f;
     /// <summary>Where a jet of this kind sits against Lighthill's law with K = 1e-4, dB. The same
     /// anchor, and the same sign, as the aircraft's jets: the law's one-metre figure is a near-field

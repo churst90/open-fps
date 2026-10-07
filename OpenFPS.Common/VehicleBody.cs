@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
@@ -40,10 +41,12 @@ public sealed record VehicleBody
 {
     /// <summary>What the panels are made of. Steel for almost everything; aluminium for a supercar,
     /// which is why one sounds tighter and higher than the same engine in a saloon.</summary>
+    [Tunable("", 0, 0, "What the panels are made of. Steel is Metal.", Label = "panel material", Choices = "materials")]
     public string PanelMaterial { get; init; } = "Metal";
 
     /// <summary>Panel thickness, metres. Car body skin is 0.7 to 1.0 mm; a van's is thicker, a race
     /// car's composite shell is thinner and made of something else entirely.</summary>
+    [Tunable("m", 0.0003, 0.006, "Panel thickness. Car body skin is 0.0007 to 0.001 m. Thicker panels ring higher.", Label = "panel thickness", Step = 0.0001)]
     public float PanelThicknessM { get; init; } = 0.0008f;
 
     /// <summary>
@@ -76,6 +79,7 @@ public sealed record VehicleBody
     /// second one is a CHOICE a manufacturer makes and it is audible: a van and a luxury saloon
     /// differ here by a factor of five, and that is a large part of why one sounds cheap.
     /// </summary>
+    [Tunable("", 0.001, 0.5, "Loss factor of the panels as fitted, with mounting and deadening pads. Higher stops them ringing sooner.", Label = "panel loss factor", Step = 0.005)]
     public float PanelLoss { get; init; } = 0.12f;
 
     /// <summary>How much of the engine's pressure gets into the structure at all, 0 to 1. A tailpipe
@@ -85,8 +89,11 @@ public sealed record VehicleBody
 
     /// <summary>Inside dimensions of the cabin, metres. All three zero for something with no cabin —
     /// a motorcycle, a formula car — which then has only its panels.</summary>
+    [Tunable("m", 0, 15, "Inside length of the cabin. Zero for no cabin.", Label = "cabin length", Step = 0.05)]
     public float CabinLengthM { get; init; } = 2.4f;
+    [Tunable("m", 0, 4, "Inside width of the cabin. Zero for no cabin.", Label = "cabin width", Step = 0.05)]
     public float CabinWidthM { get; init; } = 1.45f;
+    [Tunable("m", 0, 4, "Inside height of the cabin. Zero for no cabin.", Label = "cabin height", Step = 0.05)]
     public float CabinHeightM { get; init; } = 1.15f;
 
     /// <summary>
@@ -107,10 +114,12 @@ public sealed record VehicleBody
     /// Default false, because it is the conservative reading and because a car's outer skin is a
     /// large plate with the underbody and cavities connected round behind much of it.
     /// </summary>
+    [Tunable("", 0, 1, "Whether the panels are the walls of a sealed volume, so their low modes radiate instead of cancelling round the edges.")]
     public bool SealedBox { get; init; }
 
     /// <summary>Average absorption of the cabin's surfaces. Seats, carpet and headlining are soft;
     /// a stripped race car is not, which is why it booms.</summary>
+    [Tunable("", 0.02, 0.95, "Average absorption of the cabin's surfaces. Seats and carpet are soft; a stripped race car is not.", Step = 0.01)]
     public float CabinAbsorption { get; init; } = 0.35f;
 
     /// <summary>
@@ -126,6 +135,7 @@ public sealed record VehicleBody
     /// exactly what an interior mix needs, and a listener can already sit in one of these cars. When
     /// interior audio arrives this is the number it turns up, not a model it has to invent.
     /// </summary>
+    [Tunable("", 0, 1, "Share of the cabin's resonance that reaches a listener outside the car.", Label = "cabin leak to outside", Step = 0.01)]
     public float CabinLeak { get; init; } = 0.15f;
 
     /// <summary>
@@ -138,6 +148,7 @@ public sealed record VehicleBody
     /// has no mass. 0.03 is thirty decibels, which is a well-sealed saloon; a bus with folding doors
     /// and a rattling old truck leak more, a stripped race car with no seals more still.
     /// </summary>
+    [Tunable("", 0, 1, "Share of the outside pressure that gets in round the doors, vents and glass. 0.03 is a well-sealed saloon.", Label = "seal leak", Step = 0.01)]
     public float SealLeak { get; init; } = 0.03f;
 
     /// <summary>
@@ -149,6 +160,7 @@ public sealed record VehicleBody
     /// it inside. A normal starter drive is 60-70 dB, and from the seat it is the loudest thing in a
     /// car for the second before the engine catches: an 82 dB starter about eighteen decibels down.
     /// </summary>
+    [Tunable("dB", 0, 50, "How far down the starter is in the cabin against its level at a metre in the open.", Label = "starter path loss", Step = 1)]
     public float StarterPathLossDb { get; init; } = 18f;
 
     /// <summary>
@@ -159,6 +171,7 @@ public sealed record VehicleBody
     /// the sound at motorway speed. 64 dB is a quiet modern saloon at 110; a boxy van or a bus with
     /// its windows open is louder, and the number is where that difference lives.
     /// </summary>
+    [Tunable("dB", 40, 95, "Wind noise inside at 110 km/h. A quiet modern saloon is 64; a boxy van or a bus is louder.", Label = "wind noise at 110 km/h", Step = 1)]
     public float WindNoiseDbAt110 { get; init; } = 64f;
 
     /// <summary>

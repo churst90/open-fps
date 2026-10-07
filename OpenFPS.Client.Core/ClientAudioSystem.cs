@@ -1576,9 +1576,15 @@ public class ClientAudioSystem
             float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
             float range = MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb));
-            // Ranked in loudness: the law's correction for what this machine is made of, once heard.
-            gain *= MathF.Pow(10f, OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb(em.SoundId, levelDb) / 20f);
-            float level = OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume * chorus, reference, range, d);
+            // Ranked by how loud it is to the ear (docs/EAR_MODEL.md, Ranking), as VoiceManager.Audibility
+            // ranks every other voice: the gain the mixer will play it at, the law's correction for what
+            // it is made of included, turned into loudness by its measured spectrum. Not the corrected
+            // gain itself: the law plays a sound the ear hears less of louder, so a rumble would rank
+            // above a louder hum.
+            var timbre = OpenFPS.Client.AudioEngine.Core.EarTimbres.Find(em.SoundId);
+            gain *= MathF.Pow(10f, OpenFPS.Common.Loudness.TimbreCorrectionDb(levelDb, timbre) / 20f);
+            float level = OpenFPS.Common.Loudness.HeardGain(
+                OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume * chorus, reference, range, d), timbre, physical: true);
 
             // A water feature's taps are one fountain the same way, and come and go together.
             string group = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _)
@@ -2196,9 +2202,12 @@ public class ClientAudioSystem
 
     // ── Extended sources: a tree's crown, a fire's bed (ExtendedSources) ───────────────────────────
 
-    /// <summary>Voice ids for the outer places of a tree or a fire: eight a source, place 1 to 7.</summary>
+    /// <summary>Voice ids for the outer places of an extended source: <see cref="ExtendedSources.MaxPlaces"/> a
+    /// source, place 1 up. Eight a source until 2026-10-06, when a surf beach had ten places and its ninth and
+    /// tenth took the next source's first two ids.</summary>
     internal const int PlaceVoiceBase = -5_000_000;
-    internal static int PlaceVoiceId(int sourceId, int place) => PlaceVoiceBase - Math.Abs(sourceId) * 8 - place;
+    internal const int PlaceIdsPerSource = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MaxPlaces;
+    internal static int PlaceVoiceId(int sourceId, int place) => PlaceVoiceBase - Math.Abs(sourceId) * PlaceIdsPerSource - place;
 
     /// <summary>After a source merges to its middle, its outer voices are kept this long, s: what was
     /// already written to them (a twig's clatter, a crackle's rattle, up to the render lead ahead) rings

@@ -544,9 +544,19 @@ public sealed partial class RunningWaterSynth
         }
     }
 
+    /// <summary>For the lab only (AudioLab --running-water game noise=1): each place plays its own white
+    /// noise, 0.1 Pa rms at a metre, instead of its water, so what the game's path does to a source at
+    /// these places can be told from what the water does.</summary>
+    public static bool LabNoise;
+
     /// <summary>The next sample at each place, pascals at a metre from it. Their sum is the source.</summary>
     public void NextPlaces(Span<float> places)
     {
+        if (LabNoise)
+        {
+            for (int k = 0; k < _open.Length && k < places.Length; k++) places[k] = 0.1732f * _open[k].Signed();
+            return;
+        }
         Step();
         for (int k = 0; k < _open.Length; k++)
         {
@@ -800,31 +810,43 @@ public sealed partial class RunningWaterSynth
     /// and closed by the water (a quarter-wave tube, its modes at the odd multiples of c / 4L'), a
     /// downpipe open at both ends (a half-wave tube, every multiple of c / 2L'). L' is the length with
     /// the open end's correction, 0.6 of its radius (Levine and Schwinger 1948). The open end lets the
-    /// low notes back in more than the high ones (its reflection falls as (ka)² grows), which is the
-    /// loss the loop has; the walls take a little more. Normalised so white noise in comes out at the
-    /// same power, so a cavity colours the sound and does not make it louder.
+    /// low notes back in and the high ones out: an unflanged pipe's reflection falls as e^(−(ka)²/2)
+    /// [recalled; close to Levine and Schwinger's below ka of about 1.5], to a third at ka 1.5 and to
+    /// almost nothing by ka 3, so a round trip through an open end keeps e^(−(ka)²/2) and one through
+    /// both e^(−(ka)²). That is the loss the loop has, as a cascade of four one-pole low-passes (their
+    /// (1 + (f/f1)²)^-2 is e^(−2 (f/f1)²) where it matters); the walls and the water take a little more.
+    /// Until 2026-10-07 it was one one-pole at ka = 1, which let a 5.5 m downpipe hand its splashes back
+    /// every 32 ms at a fifth to a third of their pressure up to 6 kHz: a flutter Cody heard as the
+    /// downpipe flanging. Normalised so white noise in comes out at the same power, so a cavity colours
+    /// the sound and does not make it louder.
     /// </summary>
     private sealed class Tube
     {
         private readonly float[] _line;
         private int _at;
         private readonly float _sign, _loopGain, _lp, _hp;
-        private float _state, _hpIn, _hpOut;
+        private float _s1, _s2, _s3, _s4, _hpIn, _hpOut;
         private readonly float _norm = 1f;
 
         public Tube(FlowCavity cavity, float sampleRate)
         {
             float a = 0.5f * MathF.Max(0.02f, cavity.DiameterMetres);
             float length = MathF.Max(0.05f, cavity.LengthMetres) + 0.6f * a * (cavity.FarEndOpen ? 2f : 1f);
-            int delay = Math.Max(2, (int)MathF.Round(2f * length / 343f * sampleRate));
-            _line = new float[delay];
             // Open end: −1; a water surface or a closed end: +1. Two open ends: +1 round the loop.
             _sign = cavity.FarEndOpen ? 1f : -1f;
-            // The open end's reflection falls off above ka ≈ 1: a one-pole low-pass there in the loop,
-            // and what leaves through it is high-passed below the same (radiation goes as (ka)²).
-            float fc = Math.Min(343f / (MathF.Tau * a), 0.4f * sampleRate);
-            _lp = MathF.Exp(-MathF.Tau * fc / sampleRate);
-            _hp = MathF.Exp(-MathF.Tau * 0.5f * fc / sampleRate);
+            // ka = 1 here. A round trip keeps e^(−n (f/fk)²/2), n the open ends it meets; four one-poles at
+            // f1 = fk √(4 / n) give e^(−2 (f/f1)²), the same.
+            float fk = 343f / (MathF.Tau * a);
+            float openEnds = cavity.FarEndOpen ? 2f : 1f;
+            float f1 = Math.Min(fk * MathF.Sqrt(4f / openEnds), 0.4f * sampleRate);
+            _lp = MathF.Exp(-MathF.Tau * f1 / sampleRate);
+            // What leaves through the opening is high-passed below ka of a half (radiation goes as (ka)²).
+            _hp = MathF.Exp(-MathF.Tau * 0.5f * fk / sampleRate);
+            // The four poles hold the low notes back by 4 / (2π f1); the line is that much shorter, so
+            // the modes stay where the length puts them.
+            float poles = 4f / (MathF.Tau * f1) * sampleRate;
+            int delay = Math.Max(2, (int)MathF.Round(2f * length / 343f * sampleRate - poles));
+            _line = new float[delay];
             // What a round trip keeps at low notes: the open end lets out (ka)²/2 of it (Levine and
             // Schwinger), a gully pot's wide grate a sixth at its 200 Hz mode, and the walls and the
             // water's ruffled surface take more. At 0.9 a glug that fell on a pot's mode stood 8 dB
@@ -841,15 +863,19 @@ public sealed partial class RunningWaterSynth
             }
             _norm = outPower > 0 ? (float)Math.Sqrt(inPower / outPower) : 1f;
             Array.Clear(_line);
-            _state = _hpIn = _hpOut = 0f;
+            _s1 = _s2 = _s3 = _s4 = _hpIn = _hpOut = 0f;
             _at = 0;
         }
 
         public float Process(float x)
         {
             float back = _line[_at];
-            _state = (1f - _lp) * back + _lp * _state;
-            float y = x + _sign * _loopGain * _state;
+            float g = 1f - _lp;
+            _s1 += g * (back - _s1);
+            _s2 += g * (_s1 - _s2);
+            _s3 += g * (_s2 - _s3);
+            _s4 += g * (_s3 - _s4);
+            float y = x + _sign * _loopGain * _s4;
             _line[_at] = y;
             if (++_at >= _line.Length) _at = 0;
             // One-pole high-pass: what the opening radiates.

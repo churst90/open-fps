@@ -72,8 +72,11 @@ public sealed class MapOverlay
     public List<OverlayAddition> Added { get; set; } = new();
     /// <summary>Models this map holds at a version other than the current one (phase 2).</summary>
     public Dictionary<string, int> Pins { get; set; } = new();
+    /// <summary>The map's own settings (MapSettings): "Weather", "Hour", "Ground", "Beacon.door". Null when none.</summary>
+    public Dictionary<string, string>? Settings { get; set; }
 
-    [JsonIgnore] public bool IsEmpty => Spawn == null && Changed.Count == 0 && Removed.Count == 0 && Added.Count == 0 && Pins.Count == 0;
+    [JsonIgnore] public bool IsEmpty => Spawn == null && Changed.Count == 0 && Removed.Count == 0 && Added.Count == 0 && Pins.Count == 0
+                                        && (Settings == null || Settings.Count == 0);
 
     public OverlayChange? ChangeFor(int id) => Changed.FirstOrDefault(c => c.Id == id);
     public OverlayAddition? AdditionFor(int id) => Added.FirstOrDefault(a => a.Entity.EntityId == id);
@@ -183,6 +186,8 @@ public sealed class MapOverlayStore
 
         if (o.Spawn != null)
             map.SpawnPoint = new Transform { Position = o.Spawn.Position, Rotation = o.Spawn.Rotation };
+        if (o.Settings != null)
+            foreach (var (path, value) in o.Settings) MapSettings.Apply(map, path, value);
 
         var byId = new Dictionary<int, EntityData>();
         foreach (var e in map.Entities) byId.TryAdd(e.EntityId, e);

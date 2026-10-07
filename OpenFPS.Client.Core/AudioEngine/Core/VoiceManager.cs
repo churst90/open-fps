@@ -101,6 +101,8 @@ public class VoiceManager
     private readonly HashSet<int> _topEntityIds = new();
     private readonly List<int> _keysToRemove = new();
     private readonly List<int> _voiceStatesToRemove = new();
+    /// <summary>Voices submitted again since the last pass while a play of them was under way.</summary>
+    private readonly HashSet<int> _askedAgain = new();
 
     public VoiceManager(IVoiceSink audio, AudioBank bank, int maxVoices = 64)
     {
@@ -119,6 +121,9 @@ public class VoiceManager
         if (_voiceStates.TryGetValue(emitter.EntityId, out var status))
         {
             status.StopRequested = false; // Reset if re-submitted
+            // Asked for again while a play of it was under way: if that play turns out to have ended,
+            // this is a new one (Process).
+            if (status.IsPhysicallyPlaying) _askedAgain.Add(emitter.EntityId);
         }
         _activeSubmissions[emitter.EntityId] = emitter;
     }
@@ -209,6 +214,16 @@ public class VoiceManager
 
             if (status.State == InternalState.Finished)
             {
+                // A ONE-SHOT ASKED FOR AGAIN AS ITS LAST PLAY ENDED IS A NEW PLAY. Its end came between
+                // two passes, and the new submission with it: finishing the old play used to throw the
+                // new submission away too, so a repeating announcement whose last line ended in the
+                // frame its interval came round was silent for a whole interval. It starts afresh.
+                if (_askedAgain.Contains(id) && emitter.Mode == PlaybackMode.Single && !status.StopRequested)
+                {
+                    _voiceStates[id] = status = new VoiceStatus { Emitter = emitter };
+                    UpdateStateLogic(status);
+                    continue;
+                }
                 _keysToRemove.Add(id);
                 _voiceStatesToRemove.Add(id);
                 continue;
@@ -314,6 +329,7 @@ public class VoiceManager
         }
         foreach (var id in _keysToRemove) _activeSubmissions.Remove(id);
         foreach (var id in _voiceStatesToRemove) _voiceStates.Remove(id);
+        _askedAgain.Clear();
     }
 
     private void UpdateStateLogic(VoiceStatus status)
@@ -410,20 +426,31 @@ public class VoiceManager
     internal static float Audibility(in SpatialEmitter e, float distance, bool playing)
     {
         float level = OpenFPS.Common.Loudness.RenderedGain(e.Volume, e.MinDistance, e.Range, distance);
-        // In loudness, not level: the law's correction for what the voice is made of, when that has
-        // been measured (docs/EAR_MODEL.md). A pure tone and a broadband sound of one level are not
-        // equally loud, and the one that is heard more ranks higher.
+        level *= 1f - Math.Clamp(e.Occlusion, 0f, 1f);
+        // In loudness, not level (docs/EAR_MODEL.md, Ranking). The gain the voice plays at, the law's
+        // correction for what it is made of included, is turned into how loud that is to the ear, from
+        // its measured spectrum: a pure tone and a broadband sound of one level are not equally loud,
+        // and the one that is heard more ranks higher. Not the correction itself: the law plays a sound
+        // the ear hears LESS of louder (a 25 Hz rumble about 21 dB up), and ranking on that gain put
+        // the rumble at the top.
         if (e.EarLevelDb > 0f)
         {
-            float db = EarTimbres.CorrectionDb(string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId : e.PhysicalKey, e.EarLevelDb);
+            string key = string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId : e.PhysicalKey;
+            float db = EarTimbres.CorrectionDb(key, e.EarLevelDb);
             if (db != 0f) level *= MathF.Pow(10f, db / 20f);
+            level = OpenFPS.Common.Loudness.HeardGain(level, EarTimbres.Find(key), IsPhysical(e));
         }
-        level *= 1f - Math.Clamp(e.Occlusion, 0f, 1f);
         if (playing) level *= PlayingHysteresis;
         // Pinned, not weighted: an essential voice ranks above every voice that is merely loud, and
         // among themselves they still rank on what can be heard.
         return e.Essential ? level + EssentialPin : level;
     }
+
+    /// <summary>Whether a voice is a physical one (its declared level is its RMS) rather than a recording
+    /// (its declared level is its buffer's full scale): what the provider's ear stage decides by its
+    /// DSP, read here from what will build that DSP. Only consulted until its spectrum is measured.</summary>
+    private static bool IsPhysical(in SpatialEmitter e)
+        => e.IsSynth || e.IsGranular || !string.IsNullOrEmpty(e.PhysicalKey) || !string.IsNullOrEmpty(e.EngineKey);
 
     /// <summary>About two decibels. See <see cref="Audibility"/>.</summary>
     private const float PlayingHysteresis = 1.26f;

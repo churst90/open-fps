@@ -123,8 +123,15 @@ internal sealed class ClientAudioHarness
     /// frame. True if it held within the limit.
     /// </summary>
     public bool TickUntil(Func<bool> condition, int maxFrames = 600)
+        => TickUntil(condition, maxFrames, TimeSpan.Zero);
+
+    /// <summary>As <see cref="TickUntil(Func{bool}, int)"/>, but keeps ticking past maxFrames until at least
+    /// <paramref name="atLeast"/> of wall time has gone: for a condition that waits on a background worker (the
+    /// rain survey), which a loaded two-core CI runner can take far longer to finish than a desk machine.</summary>
+    public bool TickUntil(Func<bool> condition, int maxFrames, TimeSpan atLeast)
     {
-        for (int i = 0; i < maxFrames; i++)
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        for (int i = 0; i < maxFrames || clock.Elapsed < atLeast; i++)
         {
             Tick();
             if (condition()) return true;

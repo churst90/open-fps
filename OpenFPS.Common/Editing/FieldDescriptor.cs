@@ -100,7 +100,8 @@ public sealed record FieldDescriptor
         if (Type == FieldType.Bool) return value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "on" : "off";
         if (Type is FieldType.Number or FieldType.Integer
             && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double d))
-            return Format(d) + (Unit.Length > 0 ? " " + Unit : "");
+            // NaN is how a model says "worked out from the rest" (an engine's revolutions before firing).
+            return double.IsNaN(d) ? "worked out from the rest" : Format(d) + (Unit.Length > 0 ? " " + Unit : "");
         return value.Length == 0 ? "nothing" : value;
     }
 

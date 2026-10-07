@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
@@ -28,18 +29,23 @@ public sealed record ChimeBellSpec
     /// <summary>Throat to mouth along the axis, metres. THIS is the note: a horn flaring from a
     /// small throat behaves like a full cone, so it sounds c/2L and all of its harmonics — unlike a
     /// cylinder with a reed on it, which sounds c/4L and only the odd ones.</summary>
+    [Tunable("m", 0.1, 1.5, "Throat to mouth along the bell's axis. This sets the note: a longer bell is lower.", Label = "length", Step = 0.005)]
     public required float LengthMetres { get; init; }
     /// <summary>The mouth, metres. Sets the end correction, the horn's low cutoff and how hard it
     /// beams: a horn is a directional thing, which is why one coming at you is bright and the same
     /// horn going away is dull.</summary>
+    [Tunable("m", 0.03, 0.3, "Diameter of the bell's mouth. It sets the low cutoff and how hard the bell beams forward.", Label = "mouth diameter", Step = 0.002)]
     public float MouthDiameterMetres { get; init; } = 0.11f;
     /// <summary>The throat, metres, where the reed sits.</summary>
+    [Tunable("m", 0.005, 0.05, "Diameter of the throat, where the reed sits.", Label = "throat diameter", Step = 0.001)]
     public float ThroatDiameterMetres { get; init; } = 0.022f;
     /// <summary>When air reaches this bell relative to the first, seconds. The manifold does not
     /// feed them all at once and they do not start together — the little upward smear at the
     /// beginning of a horn blast, and its mirror at the end.</summary>
+    [Tunable("s", 0, 0.2, "How long after the first bell the air reaches this one. Spread bells swell into the chord.", Label = "start delay", Step = 0.002)]
     public float StartDelaySeconds { get; init; }
     /// <summary>Per-bell level adjustment, dB. Big bells breathe more air and are louder.</summary>
+    [Tunable("dB", -12, 6, "This bell's level against the others. Big bells take more air and are louder.", Label = "level against the others", Step = 0.5)]
     public float LevelTrimDb { get; init; }
 
     /// <summary>Effective length: the tube plus the flanged-mouth end correction 0.6a.</summary>
@@ -53,11 +59,13 @@ public sealed record ChimeBellSpec
 /// <summary>An air horn: one or more bells on a common air supply.</summary>
 public sealed record ChimeHornSpec
 {
+    [Tunable("", 0, 0, "The horn's name as it is said.")]
     public required string Name { get; init; }
     public required ChimeBellSpec[] Bells { get; init; }
     /// <summary>Supply pressure, kPa gauge. A locomotive blows its horn on 140 psi of main
     /// reservoir air; a truck on 120. Pressure decides how hard the reed is driven, which decides
     /// the harmonics — and it is why a horn on a leaking line goes flat and breathy.</summary>
+    [Tunable("kPa", 200, 1200, "Air pressure at the horn valve, gauge. A locomotive blows on about 965, a truck on about 830. More pressure drives the reed harder and brightens the note.", Label = "supply pressure", Step = 10)]
     public float SupplyKPa { get; init; } = 965f;
     /// <summary>
     /// The reed's own resonance as a multiple of the bell's note, and it is BELOW it.
@@ -70,6 +78,7 @@ public sealed record ChimeHornSpec
     /// column instead and the whole thing damps and you get a hiss; that is exactly what the first
     /// version of this model did, and the measured note in Describe() is what caught it.
     /// </summary>
+    [Tunable("", 0.3, 0.95, "The diaphragm's own resonance as a fraction of the bell's note. It must sit below the note; a floppier diaphragm is lower.", Label = "reed tuning", Step = 0.01)]
     public float ReedRatio { get; init; } = 0.62f;
     /// <summary>
     /// How much of each cycle the diaphragm is off its seat at full blow, 0..1.
@@ -82,6 +91,7 @@ public sealed record ChimeHornSpec
     /// reciprocal of its width. That is the difference between a chime and a trumpet: the same
     /// column, blatted instead of blown.
     /// </summary>
+    [Tunable("", 0.05, 0.9, "How much of each cycle the diaphragm is off its seat at full blow. Wide is a mellow chime, narrow is a brassy trumpet.", Label = "reed open fraction", Step = 0.01)]
     public float ReedOpenFraction { get; init; } = 0.46f;
     /// <summary>
     /// How far flat the note sits when the air has only just reached the reed, as a fraction of the
@@ -90,13 +100,17 @@ public sealed record ChimeHornSpec
     /// down, so the level drops in and out and the horn sounds weak at both ends. (6.5% was tried
     /// on every air horn and heard that way.)
     /// </summary>
+    [Tunable("", 0, 0.03, "How far flat the note sits while the air is only just reaching the reed, as a fraction of the note. Keep it under 0.01.", Label = "pitch bend at start and end", Step = 0.001)]
     public float PitchBend { get; init; } = 0.008f;
     /// <summary>How long the valve takes to reach full pressure, seconds, and to fall. A slow valve
     /// is heard as a weak start and a tail that hangs on 15-25 dB down for half a second.</summary>
+    [Tunable("s", 0.002, 0.5, "How long the valve takes to bring the horn up to full pressure. A slow valve is a weak start.", Label = "valve rise time", Step = 0.005)]
     public float RiseSeconds { get; init; } = 0.025f;
+    [Tunable("s", 0.002, 0.5, "How long the pressure takes to fall when the valve closes. A slow valve leaves a tail.", Label = "valve fall time", Step = 0.005)]
     public float FallSeconds { get; init; } = 0.03f;
     /// <summary>SPL at one metre on axis with every bell blowing. A locomotive horn is required to
     /// make 96-110 dBA at 100 feet ahead of it, which is 125-140 at a metre.</summary>
+    [Tunable("dB", 100, 150, "Sound level at one metre on axis with every bell blowing.", Label = "level at one metre", Step = 1, Source = "locomotive horn requirement: 96 to 110 dBA at 100 feet ahead, 125 to 140 dB at a metre")]
     public float ReferenceDb { get; init; } = 138f;
 
     // ── Presets ─────────────────────────────────────────────────────────────────────────────────
@@ -400,9 +414,12 @@ public sealed record ElectricHornSpec
 public sealed record WhistleBellSpec
 {
     /// <summary>The sounding length from the lip to the closed top, metres.</summary>
+    [Tunable("m", 0.05, 1.2, "Sounding length from the lip to the closed top. A stopped pipe sounds a quarter wave of it: longer is lower.", Label = "length", Step = 0.005)]
     public required float LengthMetres { get; init; }
+    [Tunable("m", 0.02, 0.25, "Inside diameter of the bell. It adds to the sounding length through the end correction.", Label = "bore", Step = 0.002)]
     public float BoreMetres { get; init; } = 0.075f;
     /// <summary>Level adjustment against the others, dB.</summary>
+    [Tunable("dB", -12, 6, "This bell's level against the others.", Label = "level against the others", Step = 0.5)]
     public float LevelTrimDb { get; init; }
 
     [JsonIgnore]
@@ -414,21 +431,27 @@ public sealed record WhistleBellSpec
 /// <summary>A steam whistle: one or more stopped bells over a common annular steam jet.</summary>
 public sealed record WhistleSpec
 {
+    [Tunable("", 0, 0, "The whistle's name as it is said.")]
     public required string Name { get; init; }
     public required WhistleBellSpec[] Bells { get; init; }
     /// <summary>Boiler pressure at the whistle valve, kPa gauge. Sets the jet speed and so how hard
     /// the whistle is driven and how much of it is noise rather than note.</summary>
+    [Tunable("kPa", 300, 2100, "Boiler pressure at the whistle valve, gauge. It sets the jet speed: more pressure drives the whistle harder and makes more of it noise.", Label = "steam pressure", Step = 10)]
     public float SupplyKPa { get; init; } = 1380f;
     /// <summary>The steam's temperature once the bell is hot, Kelvin. This sets the sound speed in
     /// the bell, and so the PITCH: steam at 430 K carries sound at about 510 m/s against air's 343,
     /// so a whistle sounds half again as sharp as a pipe organ of the same length.</summary>
+    [Tunable("K", 373, 650, "Temperature of the steam once the bell is hot. It sets the sound speed in the bell, so hotter steam sounds higher.", Label = "steam temperature", Step = 5)]
     public float SteamKelvin { get; init; } = 430f;
     /// <summary>How long the bell takes to fill and warm, seconds. The first moment of a whistle is
     /// cold air, and the pitch climbs as the steam displaces it — the wail into the note.</summary>
+    [Tunable("s", 0.05, 3, "How long the bell takes to fill with steam and warm. The pitch climbs over this time.", Label = "warm-up time", Step = 0.05)]
     public float WarmSeconds { get; init; } = 0.55f;
     /// <summary>How much of the output is the jet's turbulence rather than the pipe's note, 0..1.
     /// A big chime whistle on wet steam is half noise, which is why it sounds like weather.</summary>
+    [Tunable("", 0, 1, "How much of the sound is the turbulence of the jet rather than the note of the pipes.", Step = 0.02)]
     public float Breathiness { get; init; } = 0.4f;
+    [Tunable("dB", 100, 150, "Sound level at one metre with every bell blowing.", Label = "level at one metre", Step = 1)]
     public float ReferenceDb { get; init; } = 132f;
 
     // ── Presets ─────────────────────────────────────────────────────────────────────────────────
@@ -515,41 +538,54 @@ public sealed record WhistleSpec
 /// </summary>
 public sealed record StruckBellSpec
 {
+    [Tunable("", 0, 0, "The bell's name as it is said.")]
     public required string Name { get; init; }
     /// <summary>The mouth, metres. A grade-crossing gong is 250-300 mm; a locomotive bell 400.</summary>
+    [Tunable("m", 0.05, 1.5, "Diameter of the mouth. A crossing gong is 0.25 to 0.3, a locomotive bell 0.4. Bigger is lower.", Label = "diameter", Step = 0.01)]
     public required float DiameterMetres { get; init; }
     /// <summary>Wall thickness at the rim, metres. With the diameter this is the whole note: the
     /// plate family goes as h/a^2, so halving the diameter of the same casting raises it two
     /// octaves.</summary>
+    [Tunable("m", 0.001, 0.05, "Wall thickness at the rim. Thicker is higher: the note goes as thickness over diameter squared.", Label = "rim thickness", Step = 0.0005)]
     public required float ThicknessMetres { get; init; }
     /// <summary>How deep the dome is, metres — the rise of the crown above the rim. Zero is a flat
     /// plate. The membrane stiffness it adds is what separates a gong from a bell.</summary>
+    [Tunable("m", 0, 0.5, "Height of the crown above the rim. Zero is a flat plate; a deeper dome is more of a bell and less of a gong.", Label = "dome rise", Step = 0.005)]
     public float RiseMetres { get; init; } = 0.05f;
     /// <summary>Young's modulus (Pa), density (kg/m^3): bell bronze 105 GPa and 8800, steel 210 and
     /// 7850. Bronze is slower and denser, so a bronze bell of the same size is lower — and it has an
     /// internal loss twenty times smaller than steel's, which is why it rings for seconds.</summary>
+    [Tunable("Pa", 5e10, 2.5e11, "Stiffness of the metal. Bell bronze is 105 billion, steel 210 billion. Stiffer is higher.", Label = "Young's modulus", Step = 1e9)]
     public float YoungsPa { get; init; } = 105e9f;
+    [Tunable("kg/m³", 2000, 12000, "Density of the metal. Bell bronze is 8800, steel 7850. Denser is lower.", Label = "density", Step = 50)]
     public float DensityKgM3 { get; init; } = 8800f;
     /// <summary>Internal loss factor. Bell bronze is about 3e-5; cast iron 1e-3; steel 2e-4.</summary>
+    [Tunable("", 0.00001, 0.01, "Internal loss of the metal. Bell bronze is about 0.00003, steel 0.0002, cast iron 0.001. Higher dies away sooner.", Label = "internal loss factor", Step = 0.00001)]
     public float LossFactor { get; init; } = 4e-5f;
     /// <summary>Where the clapper lands as a fraction of the radius: 1 is the rim, 0 the crown. The
     /// strike point decides which modes answer — a bell struck at its crown is a thud.</summary>
+    [Tunable("", 0, 1, "Where the clapper lands, as a fraction of the radius: 1 is the rim, 0 the crown. Struck at the crown it is a thud.", Label = "strike point", Step = 0.01)]
     public float StrikeRadiusFraction { get; init; } = 0.92f;
     /// <summary>The clapper: mass in kg and how fast it arrives, m/s. The contact time follows from
     /// the Hertzian stiffness of steel on bronze and it is what sets the brightness — a soft heavy
     /// clapper cannot excite a mode whose period is shorter than the contact.</summary>
+    [Tunable("kg", 0.01, 10, "Mass of the clapper. A heavy clapper stays in contact longer and the blow is darker.", Label = "clapper mass", Step = 0.01)]
     public float ClapperKg { get; init; } = 0.35f;
+    [Tunable("m/s", 0.1, 10, "How fast the clapper arrives. Faster is a harder, brighter blow.", Label = "clapper speed", Step = 0.1)]
     public float ClapperMps { get; init; } = 2.2f;
     /// <summary>Whether the clapper stays on the bell after the blow (an electric gong's does not;
     /// a hand bell's often does), 0..1 of the ring damped away.</summary>
+    [Tunable("", 0, 1, "How much of the ring the clapper takes away by resting on the bell after the blow.", Label = "clapper damping", Step = 0.01)]
     public float ClapperDamping { get; init; } = 0.06f;
     /// <summary>How much the mounting takes out of it. A gong is bolted through its crown, which
     /// is a node for every mode with two or more nodal diameters and an antinode for the ones with
     /// none — so the bolt kills the low breathing modes and barely touches the ones that sing. That
     /// is why a bell screwed to a mast still rings.</summary>
+    [Tunable("", 0, 0.2, "How much the mounting bolt through the crown takes out of the ring. It damps the low breathing modes most.", Label = "mounting loss", Step = 0.005)]
     public float MountLossFactor { get; init; } = 0.02f;
     /// <summary>Strikes a second when it is ringing continuously. A North American crossing gong
     /// runs at about 2.3.</summary>
+    [Tunable("per second", 0.2, 10, "Blows a second while it is ringing continuously. A North American crossing gong runs at about 2.3.", Label = "strike rate", Step = 0.1)]
     public float StrikesPerSecond { get; init; } = 2.3f;
     /// <summary>
     /// SPL at one metre, RMS, while it is RINGING — not the height of one blow. That is what a
@@ -558,6 +594,7 @@ public sealed record StruckBellSpec
     /// use. A struck bell's crest factor is twenty-odd decibels, so anchoring the peak instead
     /// hides it completely under anything else that is happening.
     /// </summary>
+    [Tunable("dB", 60, 130, "RMS sound level at one metre while it is ringing, not the peak of one blow.", Label = "ringing level at one metre", Step = 1, Source = "required levels: a crossing gong about 75 dB at 3 m, a locomotive bell 80 dB at 30 m")]
     public float ReferenceDb { get; init; } = 86f;
 
     /// <summary>

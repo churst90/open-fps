@@ -29,6 +29,9 @@ DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
 for d in maps prefabs composites machines; do cp -r "$REPO/OpenFPS.Server/$d" "$OUT/"; done
 # Maps players made on this machine (/map new) stay here: the server's own are on the server.
 rm -rf "$OUT/maps/players"
+# Nor the world editor's overlays from this machine: unpacked over the VPS they would replace the edits
+# made there (model_versions/ is in the working folder, never copied).
+rm -rf "$OUT/maps/overlays"
 cp "$REPO/OpenFPS.Server/motd.txt" "$OUT/"
 BUILD=$(grep -rho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Common/*/WireContract.g.cs | head -1 | tr -d '"')
 echo "$BUILD" > "$OUT/BUILD.txt"
