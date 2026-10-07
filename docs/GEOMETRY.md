@@ -1290,7 +1290,7 @@ Measured besides:
 - The capsule's rounded foot, if wanted: it needs a ground probe the shape of the foot and a step rule
   for it, and changes every kerb.
 
-### 10.10 Decisions for Cody
+### 10.10 Decisions for Cody (decided: see "Stage 2 decisions" at the end)
 
 1. **The body**: the cylinder's foot under a rounded head, measured against both the cylinder and the
    full capsule (10.4). Keep this, or go to the full capsule (every kerb and step changes; ledges caught
@@ -1360,3 +1360,10 @@ From a survey of the code (2026-10-06). Line numbers drift; the names do not.
   lidar where it exists; 0.5 m voxels; glTF/OBJ import as an offline tool; triangle budgets 150k per
   full tile, 20k per coarse tile, 50k per imported mesh; Steam Audio on Embree (x86/x64 clients);
   our own BVH and movement rather than Jolt; rooms authored as seeds.
+
+## Stage 2 decisions (Cody, 2026-10-06)
+
+"For the 5 decisions, go with your recommendations." All five of 10.10 stay as built: the cylinder's
+foot under a rounded head; stairs at 0.45 of the walk up, 0.65 down, a 1 in 12 ramp at 0.86; two
+treads a footfall on a flight at the game's speeds; a driven car pitches and rolls on its wheels, its
+sound positions and passengers with it; the speedway's ground is dirt between its own surfaces.
