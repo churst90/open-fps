@@ -2354,10 +2354,9 @@ public partial class FmodAudioProvider : IAudioProvider
         }
 
         // No binaural voice left: not started, rather than played without HRTF, flat and in the middle of
-        // the head ("the sound went mono" with a freight on the city: 60-84 voices past the pool). The
-        // budgets see it not playing and give voices up when the pool runs low (ClientAudioSystem,
-        // HrtfLowWater). Your own steps and speech (Essential) still play, and a reflection is refused by
-        // the pool's reserve already.
+        // the head. The budgets see it not playing and give voices up when the pool runs low
+        // (ClientAudioSystem.HrtfLowWater). Your own steps and speech (Essential) still play; a reflection
+        // is refused by the pool's reserve already.
         if (_steamAudioEnabled && emitter.Type is EmitterType.EntityAttached or EmitterType.WorldLocked
             && !emitter.IsReflection && !emitter.Essential && SpatialVoicesFree == 0)
         {

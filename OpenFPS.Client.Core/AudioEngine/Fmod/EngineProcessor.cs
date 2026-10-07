@@ -137,8 +137,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     }
 
     /// <summary>Where in the ring the fade-out reached silence, or -1: the voice is released once the
-    /// mixer has played that far, not when the producer rendered it up to 0.7 s earlier (released then,
-    /// a car let go by the budget was cut at full level and its fade never heard).</summary>
+    /// mixer has played that far, not when it was rendered up to 0.7 s earlier, which cut it at full level.</summary>
     private long _silentFrom = -1;
 
     private float _envelope;

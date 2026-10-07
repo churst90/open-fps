@@ -9,10 +9,8 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// A train, heard as a handful of voices however long it is (docs/TRAINS.md, "Voicing a train").
 ///
 /// The server places one entity per source of the train (TrainLayout): 12 for a light rail set, 160 for
-/// a fifty-wagon freight. Each was once a voice of its own, a binaural slot and a channel each, all of
-/// them stepping one synth under one lock: the freight took 130 voices, emptied the binaural pool so
-/// everything after it played without HRTF, and needed two and a half cores on one thread, so every
-/// worker that reached for it waited and every car on those workers starved.
+/// a fifty-wagon freight. None is a voice of its own: a voice per source empties the binaural pool, and
+/// one synth stepped under one lock stalls every render worker that reaches it.
 ///
 /// Now the train has at most <see cref="TrainVoicing.MaxFieldVoices"/> voices for its rolling stock and
 /// engines, and one each for its horn and its bell while they sound (<see cref="TrainSlotState"/>).

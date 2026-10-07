@@ -421,11 +421,8 @@ public sealed record TrainProfile
     /// <summary>
     /// Per wheelset at one metre at 100 km/h on reference-rough rail, disc braked: the rail model's one
     /// anchor. Anchored against a pass-by, the measurement that exists (82 dBA at 7.5 m from a
-    /// disc-braked passenger train at 80 km/h). It was 104 until 2026-10-07, and one axle extrapolated
-    /// to a metre and back read twelve decibels light against the pass-by. That gap was not the line of
-    /// sources: every bogie of a train shared one track's filters, stepped once per bogie per sample, and
-    /// lost most of what the rail radiates. With a track to each bogie the six-coach train passed at
-    /// 92 dB with 104 and reads 82 with 92, near where one axle says it should be.
+    /// disc-braked passenger train at 80 km/h), which one axle extrapolated agrees with. The 104 it once
+    /// was made up for bogies sharing one track's filters (docs/TRAINS.md, "Levels").
     /// </summary>
     [Tunable("dB", 80, 120, "Rolling noise per wheelset at one metre at 100 km/h on reference rail, disc braked. The one level anchor of the rail model.", Label = "rolling noise per wheelset", Step = 1, Source = "pass-by measurement: 82 dBA at 7.5 m from a disc-braked passenger train at 80 km/h")]
     public float RollingReferenceDb { get; init; } = 92f;

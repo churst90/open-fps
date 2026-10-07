@@ -49,10 +49,9 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>True once a fade-out has been HEARD to its end and the voice can be released.</summary>
     public volatile bool FadedOut;
 
-    /// <summary>Where in the ring the fade-out reached silence, or -1. The producer renders up to 0.7 s
-    /// ahead of the mixer, so the fade was rendered long before it played: released when it was rendered,
-    /// every voice the budget let go was cut at full level a quarter to three quarters of a second before
-    /// its fade would have been heard (the fountain, the crossing bell, a car out of budget "cutting out").</summary>
+    /// <summary>Where in the ring the fade-out reached silence, or -1: the voice is released once the mixer
+    /// has played that far. The fade is rendered up to 0.7 s before it is played, and released when it was
+    /// rendered, a voice was cut at full level.</summary>
     private long _silentFrom = -1;
 
     /// <summary>Brings a fading voice back to full. Without it a source that loses and regains a slot

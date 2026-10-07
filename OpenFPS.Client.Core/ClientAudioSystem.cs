@@ -252,9 +252,8 @@ public partial class ClientAudioSystem
     /// machines (the city has 114 window units). Ranked not by distance but by how loud each would be here,
     /// at the ear (Loudness.RenderedGain, then Loudness.HeardGain): a rooftop condenser at 65 dB 80 m away
     /// beats a 59 dB window unit behind a hedge. Counted in voices, not things: a fountain is five and a
-    /// train up to six (TrainVoicing), and counted as things ten let one train shut out the fountain, the
-    /// crossing's bell and everything else. OPENFPS_MACHINE_VOICES overrides, and 0 is a valid answer:
-    /// every machine and aircraft voice off.
+    /// train up to six (TrainVoicing). OPENFPS_MACHINE_VOICES overrides, and 0 is a valid answer: every
+    /// machine and aircraft voice off.
     /// </summary>
     public static readonly int MachineVoiceBudget =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MACHINE_VOICES"), out int mbudget) && mbudget >= 0
@@ -293,12 +292,9 @@ public partial class ClientAudioSystem
     private const float MixerLoadCeiling = 0.70f;
     /// <summary>
     /// And this far under the ceiling, held for <see cref="RestoreAfterSeconds"/>, there is room to take a
-    /// voice back. It was an absolute 45 %, under what the city's mixer costs with nothing playing (its
-    /// reverbs, its traced tail and echoes: about 55 %), so nothing given up was ever taken back: on
-    /// 2026-10-07 the machines went from ten to one in the first thirty seconds on the city and stayed
-    /// there for the hour, the fountain, the crossing bell, the trees and every train sharing one voice.
-    /// A voice costs the mixer about 0.3 % (60 voices at 60 %, 200 at 100 %), so eight points is room for
-    /// twenty.
+    /// voice back: a voice costs the mixer about 0.3 % (60 voices at 60 %, 200 at 100 %). Not an absolute
+    /// floor: under what the city costs with little playing, nothing given up comes back
+    /// (docs/CLIENT_NOTES.md, "The budgets").
     /// </summary>
     private const float RestoreMargin = 0.08f;
     private const double RestoreAfterSeconds = 3.0;
@@ -338,9 +334,8 @@ public partial class ClientAudioSystem
     private double _overCeilingSince = -1;
 
     /// <summary>Called when a map starts loading and again at spawn: the mixer's load reading cannot be
-    /// trusted for a while (BudgetHoldSeconds). Thirty seconds: on the city the bake, the scene build and
-    /// the decodes held the mixer at 74-108 % for the first twenty-five, and three seconds' hold let the
-    /// budget shed everything it could in that time.</summary>
+    /// trusted for a while (BudgetHoldSeconds): on the city the bake, the scene build and the decodes hold
+    /// the mixer at 74-108 % for the first twenty-five seconds.</summary>
     public void NoteSceneLoading() => _budgetHeldUntil = _now() + BudgetHoldSeconds;
     private readonly UpdateThrottle _throttle = new(UpdateHz);
     /// <summary>Seconds since this system was built. A stopwatch in the game; a test hands in its

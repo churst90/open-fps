@@ -148,9 +148,8 @@ public sealed class TrainSynth
             case RailTraction.DieselElectric when tr.EngineKey != null:
             {
                 var eng = new EngineSynth(EngineProfile.ByName(tr.EngineKey), _rate, seed++) { Ignition = true };
-                // Already running at its notch: a train is first heard on the move, and from rest the
-                // engine cranked and caught each time the train came into earshot (the freight on
-                // 2026-10-07 rose 17 dB over its first three seconds while still 340 m off).
+                // Already running at its notch: a train is first heard on the move, and from rest the engine
+                // cranks and catches each time a train comes into earshot.
                 if (tr.NotchRpm.Length > 0)
                     eng.SpinTo(tr.NotchRpm[Math.Clamp((int)MathF.Round(Notch), 0, tr.NotchRpm.Length - 1)]);
                 _diesel ??= eng;

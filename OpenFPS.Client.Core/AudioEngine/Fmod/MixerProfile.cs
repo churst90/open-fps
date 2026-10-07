@@ -6,9 +6,7 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// <summary>
 /// Where the mixer's time goes: each of our DSP callbacks adds what it took, by kind, and the mixer
 /// load line says it as a share of the time that passed. What FMOD's own units take (the three-band EQ,
-/// the low-pass, the reverb units, the mixing itself) is the rest of the dsp figure. On 2026-10-07 the
-/// city's mixer ran at about 60 % with as few as 40 voices and at 100 % with 200, and nothing said which
-/// part of it was the voices and which the room.
+/// the low-pass, the reverb units, the mixing itself) is the rest of the dsp figure.
 /// </summary>
 internal static class MixerProfile
 {

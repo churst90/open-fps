@@ -23,10 +23,8 @@ public readonly record struct WheelStrike(int Wheel, double At, float Pascals, f
 /// A force that slow has almost nothing at 200 Hz, and what the cavity does is carried into the car by
 /// the wheel, not out of the tyre.</item>
 /// </list>
-/// Until 2026-10-07 it was the thump alone: the slap was multiplied by the patch's 6 ms onset, which
-/// took it 30 dB down, and the cavity rang at full weight for 32 ms; the strike measured 62 dB of one
-/// line over the rest of its spectrum and nothing above 250 Hz within 40 dB ("too tonal, like hollow;
-/// it should be more like a clack").
+/// The slap must not be put under the patch's onset: there it is 30 dB down, and the two modes alone
+/// are a hollow note, not a clack (--wheel-strike measures it).
 ///
 /// Strikes are queued ahead with their time; the render thread places each at the sample that will be
 /// played then, so the rhythm over two rails comes out as it happened however far ahead the voice is

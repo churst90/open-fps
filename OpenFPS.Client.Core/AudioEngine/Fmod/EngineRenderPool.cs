@@ -84,10 +84,9 @@ public sealed class EngineRenderPool : IDisposable
 
     /// <summary>
     /// Every worker takes the next voice of one shared sweep down the list, nearest first, rather than a
-    /// fixed share of it. With fixed shares a worker held up by one slow voice (a train's tap waiting on its
-    /// train's lock, on 2026-10-07) starved every other voice of its share while eleven workers had time;
-    /// now the others take them. And when the pool cannot fill every ring in time, the voices at the end of
-    /// the list, the furthest, are the ones that starve, and the budget gives those up (ChooseLiveEngines).
+    /// fixed share of it: with fixed shares, a worker held up by one slow voice starves every voice in its
+    /// share while the others have time. When the pool cannot fill every ring in time, the voices at the
+    /// end of the list, the furthest, are the ones that starve, and the budget gives those up.
     /// </summary>
     private void Work(int id, int stride)
     {
