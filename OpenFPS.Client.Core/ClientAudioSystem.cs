@@ -1304,6 +1304,20 @@ public class ClientAudioSystem
     /// nothing else makes it slap — so that comes from the same two numbers.
     /// </summary>
     private readonly Dictionary<int, (float Speed, double At)> _lastRailSpeed = new();
+    private readonly Dictionary<int, (float Speed, double At)> _lastAirSpeed = new();
+
+    /// <summary>
+    /// The power lever of an aeroplane on its wheels, from what it is doing (AircraftGroundRun): pulling
+    /// away down the runway is take-off power; slowing hard from speed after touchdown is the reversers,
+    /// which run the engines up again; taxiing is idle with a little breakaway thrust; standing is idle.
+    /// </summary>
+    internal static float GroundPower(float speed, float accel)
+    {
+        if (accel > 0.4f && speed > 3f) return 1f;
+        if (accel < -0.8f && speed > 30f) return 0.55f;
+        if (speed > 0.5f) return 0.3f;
+        return 0.25f;
+    }
 
     private static (float Lever, float Wake) FlightPower(Vector3 velocity)
     {
@@ -2986,6 +3000,14 @@ public class ClientAudioSystem
                 {
                     (powerLever, rotorWake) = FlightPower(snap.Velocity);
                     onGround = OnTheWheels(snap, world, eyePos);
+                    // On its wheels the climb angle says nothing; what it is doing does. Read off the
+                    // speed's change, the same way a train's notch is.
+                    float groundSpeed = snap.Velocity.Length();
+                    float accel = 0f;
+                    if (_lastAirSpeed.TryGetValue(snap.Id, out var was) && world.PositionsSampledAt > was.At)
+                        accel = (groundSpeed - was.Speed) / (float)Math.Max(0.02, world.PositionsSampledAt - was.At);
+                    _lastAirSpeed[snap.Id] = (groundSpeed, world.PositionsSampledAt);
+                    if (onGround) powerLever = GroundPower(groundSpeed, accel);
                 }
                 else if (physicalKey.StartsWith("rail:", StringComparison.OrdinalIgnoreCase))
                 {
