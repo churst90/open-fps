@@ -231,9 +231,20 @@ public sealed class DrivingAids
 
         float heading = MathF.Atan2(forward.X, forward.Z);
         Indicators(heading, speed);
+        // How fast the car is turning, smoothed over a few updates: with the speed, what the turn it is
+        // in already asks of its tyres.
+        double since = _now - _lastPlanAt;
+        if (!float.IsNaN(_lastHeading) && since > 1e-3 && since < 0.5)
+        {
+            float rate = MathF.IEEERemainder(heading - _lastHeading, 2f * MathF.PI) / (float)since;
+            _yawRate += (rate - _yawRate) * MathF.Min(1f, (float)since / 0.15f);
+        }
+        _lastPlanAt = _now;
         _lastHeading = heading;
+        if (_planner != null && profile != null)
+            _planner.MinTurnRadius = MathF.Max(6f, 1.6f * profile.Running.Wheelbase / MathF.Tan(MathF.Max(0.1f, profile.Running.MaxSteerAngleRad)));
         Plan = _planner?.Update(at, forward, speed, AvailableDecel(car, profile, speed),
-                                (profile?.LengthMetres ?? 4.4f) * 0.5f, c => CrossingClosed(world, c));
+                                (profile?.LengthMetres ?? 4.4f) * 0.5f, c => CrossingClosed(world, c), _yawRate);
         if (Plan is { Located: false }) Plan = null;
         SpeedLimit(speed);
         BrakeCue(at, speed);
@@ -721,6 +732,8 @@ public sealed class DrivingAids
         Flash(_flashOn);
     }
     private double _lastIndicatorAt;
+    private double _lastPlanAt;
+    private float _yawRate;
 
     /// <summary>The relay closing (tick) or opening (tock), in the dash a little ahead.</summary>
     private void Flash(bool on)

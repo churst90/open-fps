@@ -40,7 +40,8 @@ public sealed class DrivingCuePlan
     public float NeededDecel;
     /// <summary>What the tyres can give on this road now, m/s².</summary>
     public float AvailableDecel;
-    /// <summary>The share of the grip the turn the car is in already asks for (v^2 k over the grip).</summary>
+    /// <summary>The share of the grip the turn the car is in already asks for (speed times yaw rate over
+    /// the grip).</summary>
     public float LateralRatio;
     /// <summary>Needed over available (see <see cref="DrivingCueBands"/>): 1 is everything the tyres
     /// have. The larger of that and the turn under the car.</summary>
@@ -72,8 +73,8 @@ public sealed class DrivingCuePlan
 /// <summary>
 /// The line ahead of a car on a road network, and how hard it will have to brake to take it.
 ///
-/// No audio and no client: the same roads the traffic drives (<see cref="RoadNetwork"/>), the same turn
-/// a car makes from one lane into the next (<see cref="LaneRoutes.Connector"/>), the same comfortable
+/// No audio and no client: the same roads the traffic drives (<see cref="RoadNetwork"/>), a turn from
+/// one lane into the next that a car can make (<see cref="TurnCurve"/>), the same comfortable
 /// cornering speed traffic slows to (<see cref="DriverSteering.ComfortTurnSpeed"/>). What it adds is the
 /// question a driver who can see answers by looking: at the speed I am doing, how soon and how hard do I
 /// need to brake for what is coming — a turn, a give-way line, a closed level crossing, the end of the road.
@@ -130,6 +131,26 @@ public sealed class DrivingCuePlanner
     /// <summary>Where the guide sits ahead of the car, metres: further the faster it goes.</summary>
     public static float GuideDistance(float speed) => Math.Clamp(8f + speed * 0.8f, 8f, 30f);
 
+    /// <summary>
+    /// How far along the line the guide sits: <see cref="GuideDistance"/> on the straight, and closer
+    /// round a tight turn, no more than 0.7 of the tightest radius within that reach. Steering for a
+    /// point a long way round a corner cuts it: twelve metres ahead on a six-metre turn put a car's wheels
+    /// five metres over the kerb inside (DrivingCueDrillTests); at 0.7 of the radius the cut is a
+    /// third of a metre.
+    /// </summary>
+    public static float GuideReach(IReadOnlyList<Vector3> path, float speed)
+    {
+        float reach = GuideDistance(speed);
+        float along = 0f, tightest = float.MaxValue;
+        for (int i = 2; i < path.Count - 2 && along <= reach; i++)
+        {
+            along += Flat(path[i] - path[i - 1]).Length();
+            float k = Menger(path[i - 2], path[i], path[i + 2]);
+            if (k > 1e-4f) tightest = MathF.Min(tightest, 1f / k);
+        }
+        return tightest < float.MaxValue ? Math.Clamp(0.7f * tightest, 4f, reach) : reach;
+    }
+
     /// <summary>How far ahead the line is planned, metres: three seconds and a gentle stop, at least forty.</summary>
     public static float LookAhead(float speed) => Math.Clamp(speed * 3f + speed * speed / 3f, 40f, 250f);
 
@@ -139,10 +160,13 @@ public sealed class DrivingCuePlanner
     /// <param name="availableDecel">What its tyres can give on this road now, m/s² (grip times g, wet or dry).</param>
     /// <param name="halfLength">Half the car's length, metres: its nose is this far ahead of its middle.</param>
     /// <param name="closed">Whether a crossing's bells are ringing; null for none ever.</param>
+    /// <param name="yawRate">How fast the car is turning now, rad/s: with the speed, what the turn it is
+    /// in asks of the tyres (<see cref="DrivingCuePlan.LateralRatio"/>). Zero when not known.</param>
     public DrivingCuePlan Update(Vector3 at, Vector3 forward, float speed, float availableDecel, float halfLength,
-                                 Func<CrossingRails, bool>? closed = null)
+                                 Func<CrossingRails, bool>? closed = null, float yawRate = 0f)
     {
         var plan = new DrivingCuePlan { AvailableDecel = MathF.Max(0.1f, availableDecel) };
+        plan.LateralRatio = MathF.Abs(speed * yawRate) / plan.AvailableDecel;
         forward = Flat(forward);
         if (forward.LengthSquared() < 1e-6f) forward = Vector3.UnitZ;
         forward = Vector3.Normalize(forward);
@@ -159,7 +183,8 @@ public sealed class DrivingCuePlanner
             if (!ReferenceEquals(lane, _lane)) { _lane = lane; _laneHeading = Heading(lane, along); }
             plan.RoadName = lane.Road.Name;
             plan.SpeedLimitMps = lane.Lane.SpeedLimitKmh / 3.6f;
-            plan.Path.Add(Flat(at, lane.Path[0].Y));
+            // The line starts on the lane beside the car: from the car itself, a car a metre off the middle
+            // would put a kink in the first metre of its own line and read it as a hairpin.
             AppendSlice(plan.Path, lane.Path, along, lane.LengthMetres);
             Continue(plan, lane, reach, turnSpans, targets, halfLength);
         }
@@ -171,18 +196,18 @@ public sealed class DrivingCuePlanner
             plan.RoadName = _lane.Road.Name;
             plan.SpeedLimitMps = _lane.Lane.SpeedLimitKmh / 3.6f;
             var exit = ChooseExit(_lane, TurnedSoFar(forward));
-            plan.Path.Add(Flat(at, j.Position.Y));
             if (exit != null)
             {
-                var curve = LaneRoutes.Connector(_lane.Path, exit.Path);
+                // From the point of the turn beside the car, on round it.
+                var curve = TurnCurve(_lane.Path, exit.Path, out _, out float skipOut);
                 int nearest = Nearest(curve, at);
-                for (int k = nearest + 1; k < curve.Count; k++) plan.Path.Add(curve[k]);
+                for (int k = nearest; k < curve.Count; k++) plan.Path.Add(curve[k]);
                 turnSpans.Add((0f, PathLength(plan.Path)));
                 plan.NextTurn = TurnOf(_lane, exit);
                 plan.NextRoad = exit.Road.Name;
                 plan.Junction = j;
                 plan.JunctionDistance = 0f;
-                AppendSlice(plan.Path, exit.Path, 0f, exit.LengthMetres);
+                AppendSlice(plan.Path, exit.Path, skipOut, exit.LengthMetres);
                 Continue(plan, exit, reach, turnSpans, targets, halfLength, skipJunctionInfo: true);
             }
         }
@@ -219,7 +244,7 @@ public sealed class DrivingCuePlanner
         Crossings_(plan, halfLength, closed, targets);
         Curvatures(plan, turnSpans, targets);
         Brake(plan, speed, targets);
-        plan.GuidePoint = PointAlong(plan.Path, GuideDistance(speed));
+        plan.GuidePoint = PointAlong(plan.Path, GuideReach(plan.Path, speed));
         return plan;
     }
 
@@ -312,16 +337,25 @@ public sealed class DrivingCuePlanner
                 // braking is for the slower of the ways out.
                 float slowest = float.MaxValue;
                 foreach (var (next, _) in current.Next)
-                    slowest = MathF.Min(slowest, TurnSpeed(LaneRoutes.Connector(current.Path, next.Path)));
+                    slowest = MathF.Min(slowest, TurnSpeed(TurnCurve(current.Path, next.Path, out _, out _)));
                 if (slowest < float.MaxValue) targets.Add((laneEnd + j.RadiusMetres * 0.5f, slowest, CueHazard.Turn));
                 plan.Path.Add(Flat(j.Position, current.Path[^1].Y));
                 break;
             }
-            var curve = LaneRoutes.Connector(current.Path, exit.Path);
-            for (int k = 1; k < curve.Count; k++) plan.Path.Add(curve[k]);
+            var curve = TurnCurve(current.Path, exit.Path, out float trimIn, out float skipOut);
+            // A turn wider than the junction starts before the lane's end: the line leaves the lane there.
+            int fromPoint = 1;
+            if (trimIn > 0f)
+            {
+                // Already past where the turn begins: join the arc where the car is.
+                if (PathLength(plan.Path) <= trimIn + 0.01f) { fromPoint = Nearest(curve, plan.Path[0]) + 1; plan.Path.RemoveRange(1, plan.Path.Count - 1); }
+                else TrimEnd(plan.Path, trimIn);
+            }
+            float turnStart = PathLength(plan.Path);
+            for (int k = fromPoint; k < curve.Count; k++) plan.Path.Add(curve[k]);
             float turnEnd = PathLength(plan.Path);
-            if (TurnOf(current, exit) != Turn.Straight) turnSpans.Add((laneEnd, turnEnd));
-            AppendSlice(plan.Path, exit.Path, 0f, exit.LengthMetres);
+            if (TurnOf(current, exit) != Turn.Straight) turnSpans.Add((turnStart, turnEnd));
+            AppendSlice(plan.Path, exit.Path, skipOut, exit.LengthMetres);
             current = exit;
         }
         Trim(plan.Path, reach);
@@ -466,13 +500,9 @@ public sealed class DrivingCuePlanner
         {
             if (d < near)
             {
-                if (kind is CueHazard.Bend or CueHazard.Turn && vt > 0f && float.IsFinite(vt))
-                {
-                    // v^2 k = f g at the comfortable speed, so the demand here is (v / vt)^2 of that friction.
-                    float k = CurvatureFor(vt);
-                    plan.LateralRatio = MathF.Max(plan.LateralRatio, v * v * k / plan.AvailableDecel);
-                }
-                else if (kind is CueHazard.Stop or CueHazard.Crossing or CueHazard.RoadEnd && v > 0.5f)
+                // A bend already under the car is not something to brake for any more; what it asks of
+                // the tyres is the car's own turning (LateralRatio, from the yaw rate).
+                if (kind is CueHazard.Stop or CueHazard.Crossing or CueHazard.RoadEnd && v > 0.5f)
                 {
                     float a = v * v / (2f * MathF.Max(0.3f, d));
                     if (a > plan.NeededDecel) Set(plan, a, d, vt, kind);
@@ -494,16 +524,100 @@ public sealed class DrivingCuePlanner
         plan.HazardPoint = PointAlong(plan.Path, d);
     }
 
-    /// <summary>The curvature whose comfortable speed is <paramref name="speed"/>: v^2 k = f(v) g.</summary>
-    private static float CurvatureFor(float speed)
-        => DriverSteering.ComfortSideFriction(speed) * WheelDynamics.G / MathF.Max(0.25f, speed * speed);
-
     /// <summary>The comfortable speed through the tightest part of a turn's curve.</summary>
     private static float TurnSpeed(List<Vector3> curve)
     {
         float k = 0f;
         for (int i = 2; i < curve.Count - 2; i++) k = MathF.Max(k, Menger(curve[i - 2], curve[i], curve[i + 2]));
         return k < 2e-3f ? float.MaxValue : DriverSteering.ComfortTurnSpeed(k);
+    }
+
+    // ── The turn a car can make ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The tightest a car takes a junction turn, metres (the path of its middle): a car's kerb-to-kerb
+    /// turning circle is about 11 m across, and nobody drives a junction at full lock. A bigger vehicle
+    /// sets its own (DrivingAids, from the chassis).
+    /// </summary>
+    public float MinTurnRadius { get; set; } = 6f;
+
+    /// <summary>
+    /// The line a car drives from one lane into the next: an arc tangent to both lanes' lines.
+    ///
+    /// Where the lanes leave room, it is the widest arc that starts and ends inside the junction. Where
+    /// they do not — a kerb lane turning into the kerb lane round the near corner, whose lines meet a few
+    /// metres from the lane ends — it is no tighter than <see cref="MinTurnRadius"/>, starting that much
+    /// before the lane ends (<paramref name="trimIn"/>, metres to cut off the end of the lane) and joining
+    /// the next lane that far along it (<paramref name="skipOut"/>). (Traffic drives the quadratic curve
+    /// between the lane ends, LaneRoutes.Connector; at the near corner of a city junction that curve is
+    /// a metre or two of radius, a turn no car can make.) Straight on, the straight line.
+    /// </summary>
+    public List<Vector3> TurnCurve(IReadOnlyList<Vector3> inPath, IReadOnlyList<Vector3> outPath, out float trimIn, out float skipOut)
+    {
+        trimIn = 0f; skipOut = 0f;
+        Vector3 a = inPath[^1], b = outPath[0];
+        Vector3 da = Flat(inPath[^1] - inPath[^2]), db = Flat(outPath[1] - outPath[0]);
+        if (da.LengthSquared() < 1e-8f || db.LengthSquared() < 1e-8f) return LaneRoutes.Connector(inPath, outPath);
+        da = Vector3.Normalize(da); db = Vector3.Normalize(db);
+        float cross = da.X * db.Z - da.Z * db.X, dot = Vector3.Dot(da, db);
+        if (MathF.Abs(cross) < 0.05f && dot > 0f) return LaneRoutes.Connector(inPath, outPath);
+        // Where the two lanes' lines meet.
+        Vector3 w = Flat(b - a);
+        float t = (w.X * db.Z - w.Z * db.X) / cross;
+        float u = (w.X * da.Z - w.Z * da.X) / cross;
+        if (t < 0f || u > 0f) return LaneRoutes.Connector(inPath, outPath);
+        var corner = a + da * t;
+        corner.Y = 0.5f * (a.Y + b.Y);
+        float turn = MathF.Acos(Math.Clamp(dot, -1f, 1f));                 // 0..pi
+        float half = MathF.Tan(turn * 0.5f);
+        if (half < 1e-3f) return LaneRoutes.Connector(inPath, outPath);
+        // The widest arc inside the junction, and no tighter than a car turns.
+        float room = MathF.Min(t, -u);
+        float r = MathF.Max(room / half, MinTurnRadius);
+        float tangent = r * half;
+        trimIn = MathF.Max(0f, tangent - t);
+        skipOut = MathF.Max(0f, tangent + u);
+        var start = corner - da * tangent;
+        var end = corner + db * tangent;
+        // The centre is r to the inside of the turn from the start: right for a right turn.
+        var inward = cross < 0f ? new Vector3(da.Z, 0f, -da.X) : new Vector3(-da.Z, 0f, da.X);
+        var centre = start + inward * r;
+        var from = start - centre;
+        var to = end - centre;
+        float a0 = MathF.Atan2(from.X, from.Z), a1 = MathF.Atan2(to.X, to.Z);
+        float sweep = MathF.IEEERemainder(a1 - a0, 2f * MathF.PI);
+        int n = Math.Max(2, (int)MathF.Ceiling(MathF.Abs(sweep) * r / 0.5f));
+        var pts = new List<Vector3>(n + 1);
+        for (int k = 0; k <= n; k++)
+        {
+            float ang = a0 + sweep * k / n;
+            var p = centre + new Vector3(MathF.Sin(ang), 0f, MathF.Cos(ang)) * r;
+            p.Y = corner.Y;
+            pts.Add(p);
+        }
+        // The lane ends inside the arc's straight run: join them with what is left of the lines.
+        if (trimIn <= 0f && t - tangent > 0.05f) pts.Insert(0, a);
+        if (skipOut <= 0f && -u - tangent > 0.05f) pts.Add(b);
+        return pts;
+    }
+
+    /// <summary>Cuts the last <paramref name="metres"/> off a line.</summary>
+    private static void TrimEnd(List<Vector3> path, float metres)
+    {
+        float keep = PathLength(path) - metres;
+        if (keep <= 0f) { if (path.Count > 1) path.RemoveRange(1, path.Count - 1); return; }
+        var end = RoadNetwork.PointAt(path, keep);
+        float along = 0f;
+        for (int i = 1; i < path.Count; i++)
+        {
+            along += Flat(path[i] - path[i - 1]).Length();
+            if (along >= keep)
+            {
+                path.RemoveRange(i, path.Count - i);
+                path.Add(end);
+                return;
+            }
+        }
     }
 
     // ── Geometry ────────────────────────────────────────────────────────────────────────────────

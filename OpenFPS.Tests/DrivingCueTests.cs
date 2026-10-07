@@ -95,9 +95,9 @@ public class DrivingCueTests
         Assert.Equal(CueHazard.Turn, close.Hazard);
         Assert.True(close.BrakeRatio > DrivingCueBands.Brake);
         // ...and the line goes right: the guide is east of the lane once the turn is inside its reach.
-        var inTurn = p.Update(MainStreetNorth(6f), Vector3.UnitZ, 4f, Dry, HalfCar);
-        _o.WriteLine($"guide at {inTurn.GuidePoint} from {MainStreetNorth(6f)}");
-        Assert.True(inTurn.GuidePoint.X > 6f);
+        var inTurn = p.Update(MainStreetNorth(3f), Vector3.UnitZ, 4f, Dry, HalfCar);
+        _o.WriteLine($"guide at {inTurn.GuidePoint} from {MainStreetNorth(3f)}");
+        Assert.True(inTurn.GuidePoint.X > 5f);
     }
 
     [Fact]
