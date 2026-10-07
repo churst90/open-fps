@@ -521,7 +521,11 @@ internal sealed class BladeRow
             {
                 double at = (k + _trackScatter[k] * scatter * 0.5) / b;
                 double crossing = Math.Floor(before) + at;
-                if (crossing < before) crossing += 1.0;
+                // The next crossing AFTER where the row was. A blade tracking a little ahead of its
+                // slot (at < 0) sits just under a whole turn once one is added, and while the row was
+                // in that sliver it was found again on every sample: twenty pulses stacked on one
+                // blade a revolution, a condenser fan 11 dB over its level for half the seeds.
+                while (crossing <= before) crossing += 1.0;
                 if (crossing <= _phase)
                 {
                     // Sub-sample time of the passage.
