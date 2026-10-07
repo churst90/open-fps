@@ -12,7 +12,8 @@ public enum FieldNodeKind : byte { Scalar, Group, List }
 /// <summary>
 /// One property of a model, as the editor sees it. A scalar has a <see cref="Field"/>; a group (a
 /// record inside the model: a compressor, a casing) and a list (an array of records: a fountain's
-/// falls) have the properties of their own type as <see cref="Children"/>.
+/// falls) have the properties of their own type as <see cref="Children"/>. A list of values (a room's
+/// six materials) has no children: its <see cref="Field"/> describes each item.
 /// </summary>
 public sealed class FieldNode
 {
@@ -24,6 +25,9 @@ public sealed class FieldNode
     public IReadOnlyList<FieldNode> Children { get; init; } = Array.Empty<FieldNode>();
     /// <summary>An enum's type, so its value can be said and set by name.</summary>
     public Type? EnumType { get; init; }
+
+    /// <summary>A list whose items are values, not records.</summary>
+    public bool IsValueList => Kind == FieldNodeKind.List && Field != null;
 }
 
 /// <summary>
@@ -182,7 +186,9 @@ public static class ModelKinds
             }
             level = node.Children;
         }
-        if (node?.Field != null) field = node.Field with { Path = string.Join(".", canonical) };
+        // A list of values is a field item by item ("RoomMaterials[2]"), never as a whole.
+        if (node?.Field != null && (node.Kind == FieldNodeKind.Scalar || segments[^1].Index >= 0))
+            field = node.Field with { Path = string.Join(".", canonical) };
         return node;
     }
 
@@ -243,6 +249,11 @@ public static class ModelKinds
             if (index >= 0)
             {
                 if (next is not JsonArray arr || index >= arr.Count) { error = $"There is no item {index + 1} of {FieldDescriptor.Words(name)}."; return false; }
+                if (last && node?.IsValueList == true)
+                {
+                    arr[index] = ToJson(stored, field, node);
+                    return true;
+                }
                 next = arr[index];
             }
             if (next == null) { error = $"This model has no {FieldDescriptor.Words(name)}, so {field.Label} cannot be set."; return false; }
@@ -250,6 +261,39 @@ public static class ModelKinds
         }
         error = $"There is no {path} here.";
         return false;
+    }
+
+    /// <summary>
+    /// Puts values (stored forms) on the end of a list of values, making the list if the model has none
+    /// yet. Refused, with the reason, if a part on the way to it is absent.
+    /// </summary>
+    public static bool TryAppend(JsonNode root, string listPath, IReadOnlyList<string> stored, FieldDescriptor field, FieldNode node, out int count, out string error)
+    {
+        count = 0;
+        if (!TryList(root, listPath, create: true, out var arr, out error)) return false;
+        foreach (var v in stored) arr!.Add(ToJson(v, field, node));
+        count = arr!.Count;
+        return true;
+    }
+
+    /// <summary>
+    /// The array at a path ("Falls", "Bells[0].Partials"), made empty there if it is absent and
+    /// <paramref name="create"/> says so.
+    /// </summary>
+    public static bool TryList(JsonNode root, string listPath, bool create, out JsonArray? list, out string error)
+    {
+        list = null;
+        error = "";
+        if (!TryParsePath(listPath, out var segments) || segments[^1].Index >= 0) { error = $"{listPath} is not a list."; return false; }
+        int dot = listPath.LastIndexOf('.');
+        var parent = dot < 0 ? root : Get(root, listPath[..dot]);
+        if (parent is not JsonObject obj) { error = $"This model has no {FieldDescriptor.Words(segments[^2].Name)}."; return false; }
+        string name = segments[^1].Name;
+        string key = obj.Select(kv => kv.Key).FirstOrDefault(k => k.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? name;
+        if (obj[key] is JsonArray arr) { list = arr; return true; }
+        if (obj[key] != null || !create) { error = $"This model has no {FieldDescriptor.Words(name)}."; return false; }
+        obj[key] = list = new JsonArray();
+        return true;
     }
 
     private static JsonNode? ToJson(string stored, FieldDescriptor field, FieldNode? node)
