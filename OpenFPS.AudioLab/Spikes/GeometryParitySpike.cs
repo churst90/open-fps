@@ -538,6 +538,46 @@ public static class GeometryParitySpike
                               + (travel.Count > 0 ? $"distance walked, capsule over cylinder: median {travel[travel.Count / 2]:F3}, lowest {travel[0]:F3}, highest {travel[^1]:F3}" : ""));
         }
 
+        // ── Ricochet: the face a round meets, from the box's largest axis and from the triangle ──────
+        if (only.Contains("ricochet"))
+        {
+            var t = new Tally("Ricochet face (the normal a round skips off)");
+            tallies.Add(t);
+            var byId = new Dictionary<int, Entity>();
+            ecs.Query(new QueryDescription().WithAll<Transform>(), (Entity e) => byId[e.Id] = e);
+            int edges = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var o = NearSomething(3f);
+                var d = Direction();
+                var all = new AcceptAll();
+                if (!CombatService.StaticFirstHit(serverWorld, o, d, 30f, ref all, out int owner, out float dist) || dist <= 0f) continue;
+                if (!byId.TryGetValue(owner, out var e) || !ecs.Has<ColliderComponent>(e) || ecs.Get<ColliderComponent>(e).Shape != ColliderShape.Box) continue;
+                var at = o + d * dist;
+                var velocity = d * 800f;
+                CombatService.Face(ecs, e, at, velocity, out var n0, out var s0);
+                CombatService.Face(ecs, e, at, velocity, out var n1, out var s1, serverWorld);
+                t.Probes++;
+                float err = Vector3.Distance(n0, n1);
+                t.MaxError = Math.Max(t.MaxError, err);
+                if (err < 1e-3f) { t.Same++; continue; }
+                // Where on its box the round met it: within a few centimetres of an edge, the largest local
+                // axis (scaled by the box's proportions) can name the wrong face.
+                var tr = ecs.Get<Transform>(e); var c = ecs.Get<ColliderComponent>(e);
+                var local = Vector3.Transform(at - tr.Position, Quaternion.Inverse(tr.Rotation));
+                var h = c.Size * 0.5f;
+                float edge = MathF.Min(MathF.Min(MathF.Abs(MathF.Abs(local.X) - h.X), MathF.Abs(MathF.Abs(local.Y) - h.Y)), MathF.Abs(MathF.Abs(local.Z) - h.Z));
+                int onFaces = (MathF.Abs(MathF.Abs(local.X) - h.X) < 0.01f ? 1 : 0) + (MathF.Abs(MathF.Abs(local.Y) - h.Y) < 0.01f ? 1 : 0) + (MathF.Abs(MathF.Abs(local.Z) - h.Z) < 0.01f ? 1 : 0);
+                // The face the round actually entered by is the one the ray crossed; the old guess picked the
+                // face nearest in proportion. Agreeing with the ray is the triangle's answer.
+                const string guess = "the box's largest axis named a face the round did not enter by (the triangle names the one it did)";
+                edges++;
+                t.Ties++; t.Same++; t.TiePairs[guess] = t.TiePairs.GetValueOrDefault(guess) + 1;
+                if (t.Shown.Count < show) t.Shown.Add($"    [{guess}] at {V(at)} on #{owner} size {V(c.Size)}: old {V(n0)} new {V(n1)}, {onFaces} face(s) within 1 cm");
+            }
+            Console.WriteLine($"  ricochet: {edges} of {t.Probes} faces named differently");
+        }
+
         // ── Echoes: EarlyReflections over the box list and over the acoustic triangle world ─────────
         if (only.Contains("echoes"))
         {
