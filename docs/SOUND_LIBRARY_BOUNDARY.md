@@ -1616,6 +1616,9 @@ They run with the rest of the suite on GitHub Actions; none needs FMOD or Steam 
   door-leaf count), `DrivingCuePlanner.cs` (a driving aid over the road network), `RoadMapData.cs`
   (the MapRoads message). Without that the allowance would have held 202 references the library does
   not have.
+- Merged with main at eff5b06c: 608. The one more is the world editor's: `ModelLibrary` (library)
+  reads its models with `Networking.Vector3Converter` (`JsonConverters.cs`, host). It is in the
+  allowance as main has it; a converter for a vector belongs with the library's JSON, a stage 3 fix.
 - Cost: about 17 s, nearly all of it binding the two projects.
 
 ### 13.2 The render fingerprint: `RenderFingerprintTests`
@@ -1675,6 +1678,10 @@ written down (`StreamMixer`) and compared with `streams/<scenario>.txt.gz`:
   rate, wide sources, cabin paths, runoff) are held at the game's defaults and the wind is still. Each
   scenario runs twice per test and must agree with itself before it is compared. Checked across three
   processes and among 170 other audio tests in one process.
+- It earned its keep at once: merging main (eff5b06c) changed `traffic_rain` from line 5,064, where
+  the voices began to be re-placed in a different order. That is main's ranking of voices by how loud
+  the ear hears them (615b8ae3), an intended change; the stream was regenerated in the merge's
+  follow-up commit, which says so. `walk` and `drive` did not change.
 - Library changes this needed, none heard: `AsyncAcousticWorker.Manual` and `StepForTest` (the loop is
   unchanged for the game); a `manualAcoustics` and `seed` on `ClientAudioSystem`'s test constructor;
   `RainField`'s seed and `SurveyInPlace`; `WorldAudioPlayer`'s `prewarm` (the replay starts no door or

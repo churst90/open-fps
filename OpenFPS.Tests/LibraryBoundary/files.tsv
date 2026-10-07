@@ -33,8 +33,10 @@ OpenFPS.Client.Core/AudioEngine/Core/Nature/EarWindSynth.cs	lib	Sound
 OpenFPS.Client.Core/AudioEngine/Core/Nature/EventSum.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Nature/ExtendedSources.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Nature/FallingWaterSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/FireReferences.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Nature/FireSynth.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Nature/FoliageSynth.cs	lib	Sound	
+OpenFPS.Client.Core/AudioEngine/Core/Nature/PowerLawNoise.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Nature/RainPatch.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Nature/RainSynth.cs	lib	Sound	
 OpenFPS.Client.Core/AudioEngine/Core/Nature/Resonator.cs	lib	Sound	
@@ -120,6 +122,7 @@ OpenFPS.Client.Core/ClientWorldState.cs	host
 OpenFPS.Client.Core/DiagnosticSwitches.cs	host		
 OpenFPS.Client.Core/DrivingAids.cs	host		
 OpenFPS.Client.Core/DrivingCueSounds.cs	host		
+OpenFPS.Client.Core/EditorKeys.cs	host		
 OpenFPS.Client.Core/Input/InputCommandMapper.cs	host		
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	host		
 OpenFPS.Client.Core/ListMenu.cs	host		
@@ -202,6 +205,7 @@ OpenFPS.Common/Enclosure.cs	lib	Acoustics
 OpenFPS.Common/Engines.cs	lib	Sound	
 OpenFPS.Common/EntityGeometry.cs	host		
 OpenFPS.Common/ExternalBallistics.cs	lib	Sound	
+OpenFPS.Common/Fire.cs	lib	Sound	
 OpenFPS.Common/Footsteps.cs	lib	Sound	
 OpenFPS.Common/Glass.cs	lib	Sound	
 OpenFPS.Common/GlassDoor.cs	lib	Sound	
@@ -272,6 +276,7 @@ OpenFPS.Common/UpdateThrottle.cs	host
 OpenFPS.Common/VehicleBody.cs	lib	Sound	
 OpenFPS.Common/VehicleCabin.cs	lib	Sound	
 OpenFPS.Common/VehicleSignalBits.cs	lib	Sound	
+OpenFPS.Common/VehicleSpec.cs	lib	Sound	
 OpenFPS.Common/Vehicles.cs	lib	Sound	
 OpenFPS.Common/WallTransmission.cs	lib	Acoustics	
 OpenFPS.Common/Waves.cs	lib	Sound	

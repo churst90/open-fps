@@ -64,6 +64,7 @@ OpenFPS.Common/Glass.cs	OpenFPS.Common.PhysicsConstants	6
 OpenFPS.Common/Hearing/EarModel.cs	OpenFPS.Common.Speech	2
 OpenFPS.Common/Loudness.cs	OpenFPS.Common.Speech	8
 OpenFPS.Common/Messages.cs	OpenFPS.Common.Networking.EntityState	2
+OpenFPS.Common/ModelLibrary.cs	OpenFPS.Common.Networking.Vector3Converter	1
 OpenFPS.Common/OpeningRoutes.cs	OpenFPS.Common.Components.RegionComponent	15
 OpenFPS.Common/RoadWater.cs	OpenFPS.Common.RoadData	12
 OpenFPS.Common/RoomAcoustics.cs	OpenFPS.Common.Components.RegionComponent	15
