@@ -223,6 +223,44 @@ the car keeps its own direction. A grandstand gives a detour the barrier ceiling
 and any real opening beats it. Nothing in it knows what a wall or a doorway is.
 (AsyncAcousticWorker.RunSteamAudio.)
 
+## Steam Audio pathing is off (a decision for Cody)
+
+The worker makes its simulator with `enablePathing: false`, so Steam Audio's pathing never runs: no probe
+grid, no bake, no route search. The code to bake and stage it is still in SteamAudioSimulator
+(BeginProbeBake, CommitPendingProbes, the pathing inputs in SetSourceInputs); the reader of its answer
+(GetPathing) went in the 2026-10-07 housekeeping, since nothing called it. What it would take and cost,
+for deciding whether to turn it on. Not turned on.
+
+What it does: a grid of probes on the floors, a baked visibility graph between them, and each tick, for
+each source, the shortest routes between the probes nearest the source and the listener, given as a
+per-band level (its eq) and an arrival direction (first-order SH).
+
+What already does that job here, without it:
+- The level and bearing of a blocked source: the barrier search over the edges in the way
+  (BarrierPathDifference) and the routes through openings (OpeningRoutes, the portal graph). The two
+  compete for both (see "The bearing follows the level" above).
+- Engines and physical models are placed at their emitter whatever a path says; only recordings and
+  one-offs take an apparent position from the path.
+
+What turning it on would take:
+1. A reader again: the eq and direction into AcousticPathData, and a rule for how it competes with
+   OpeningRoutes and the barrier search for the level and the bearing. Without that rule the three
+   disagree and a bearing flips between them (the speedway's "car stopping", above).
+2. Probes fine enough to mean something: the grid is sized to the map and capped at 8,192 probes, so the
+   speedway's was 7.3 m apart (thirty degrees of bearing quantisation at fifteen metres) and a city's
+   coarser. Two metres everywhere is 75,000 probes on a 720 x 420 m map. Streamed maps would need a probe
+   batch per tile, baked when the tile arrives and removed when it goes.
+3. Doors: the bake sees the scene it was given; a door leaf swinging changes the routes. Either rebake
+   round each door or turn on validation (`enableValidation`), which casts rays
+   along every route every tick.
+
+What it would cost, measured before it was turned off (docs/AUDIO_GHOSTS_AND_STUTTERS.md, issues 1 and
+2): the bake on one thread took about 100 s at 2 m over the speedway, during which every source played
+unoccluded until the bake was moved off the worker; at 6.8 m it was 0.5 s for 1,719 probes. The bake
+grows worse than linearly in the probe count. The per-tick route search was never measured on its own.
+Making it safe also took a fix of its own (a source staged without probes in the tick the batch arrived
+crashed the native library; Postscript 2 there).
+
 ## Engine render pool
 
 EngineRenderPool removed the ceiling on how many vehicles a map may carry. A physical engine is a
@@ -386,7 +424,10 @@ boundary copies (`/copies <dB>`, OPENFPS_COPIES_DB). `/reflections <dB>` sets bo
 image-source level, physical to within a couple of decibels wherever measured (--clap-room,
 --traced-reverb).
 
-Both are -6, set by ear in a flat, a tunnel and a street (settled 2026-09-30). A trim further down was
+Both are -6, set by ear in a flat, a tunnel and a street (settled 2026-09-30). The tail was then 3 dB
+under that: the traced stage averaged its bus's two channels, and FMOD puts a mono send into a stereo bus
+at -3.01 dB a channel. Summed at constant power since 2026-10-07 (TracedReverbDsp.DownmixGain), so -6
+now means what it says and is 3 dB wetter than what was approved; Cody to judge. A trim further down was
 hiding faults, not setting a level: with the tail parametric it was 14-20 dB too loud in the tunnel; with
 the tail spread evenly it was "centralised"; with sample-identical copies the ear heard separate events.
 If the tail sounds like a wash at a level near 0, look for something non-physical before trimming. One is

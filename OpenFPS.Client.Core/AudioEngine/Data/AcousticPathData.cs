@@ -25,10 +25,12 @@ public struct AcousticPathData
     public float EqHigh;
 
     public bool IsReflection;
-    // TODO: ReflectionId and Scattering are written (AsyncAcousticWorker, SpatialAcoustics) and read nowhere.
+    /// <summary>The surface a reflection came off (EarlyReflections.SurfaceId): what keeps a wall on one
+    /// voice (ClientAudioSystem.AssignReflectionSlots).</summary>
     public int ReflectionId;
     public float ReflectionDelayMs;
-    public int ReflectionIndex;
+    // TODO: a recorded loop's copy is not smeared by it, as an engine's echo is (EngineEchoState.Scattering).
+    /// <summary>How rough the surface is, 0..1; the copy's width (<see cref="Spread"/>) is made from it.</summary>
     public float Scattering;
     public float Spread; // degrees, 0-360: the sound's width
 
@@ -49,7 +51,6 @@ public struct AcousticPathData
         IsReflection = false;
         ReflectionId = 0;
         ReflectionDelayMs = 0;
-        ReflectionIndex = 0;
         Scattering = 0;
         Spread = 0;
     }

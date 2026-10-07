@@ -83,6 +83,67 @@ Recent work, newest first. `git log` has the rest.
     WheelDynamicsTests.Circle, BeaconAidsMutationTests.TransientSynthRoundTrip); write-only state in
     five spikes and a test fixture; parameters no body read in ten lab helpers and four spike entry
     points; unused locals in tests.
+- The probable bugs the Client.Core housekeeping pass reported, one commit each (tests in
+  ProbableBugsTests; renders in inbox/probable-bugs-2026-10-07).
+  - A map change forgets the old map's one-off sounds. `WorldAudioPlayer.Clear` had no caller, so on
+    /join a sound queued for its moment, a first hearing still rendering, a line or a part of the
+    thunder being followed, and thunder still being worked out all carried into the new map, placed by
+    the old one's positions. It now runs on travel and on leaving the world, and stops the voices it
+    was following.
+  - `[MethodImpl(AggressiveOptimization)]` moved from `EngineVoiceState.QueueStrikes` (a game-thread
+    one-liner) to `Synthesize`, the per-sample loop it was meant for. No sound change. `--engine-cost`
+    (Release, three runs each): steady state unchanged; at tier 0 (tiering pinned) 1-2 % less per
+    block (i4_economy 1,202 to 1,175 us, diesel_truck 1,521 to 1,503, v8_muscle 2,176 to 2,161 leaving
+    out a 2,752 outlier). The rest of the tier-0 penalty, about 30 %, is in what the loop calls.
+  - Steam Audio pathing stays off. docs/CLIENT_NOTES.md, "Steam Audio pathing is off", says what turning
+    it on would take (a reader, a rule against OpeningRoutes and the barrier search, probes fine enough,
+    doors) and what it cost when it ran, for Cody to decide.
+  - A footstep model's key keeps its speed to the half metre a second (`Footsteps.Key`): it doubled it,
+    so a walk at 1.4 m/s named itself "3" and read back at 3 m/s. AudioLab only; the game plays the bank.
+  - A map entry's own form (a ramp laid as stairs, `Form` over the prefab's) is kept when the world editor
+    makes the thing again (a new prefab version), copies it, puts a deletion back, and when the overlay
+    copies the entry. Each of them made the prefab's form, or a box. Server only.
+  - A jump's landing plays a take from the LANDING bank: it asked for an impact of force 0, a footstep,
+    so every landing was a step take. Placed at a step's level as before; the landing takes are recorded
+    7 to 10 dB over the walk banks' medians. Your own landing still has no bone-conduction lift (your
+    steps have 8 dB), so at your own feet a landing comes out about as loud as a step. Unheard; renders in
+    inbox/probable-bugs-2026-10-07/3-landing.
+  - A sustained recording gets no ground reflection: only engines and physical models do, inside their
+    voices. The test was `physicalKey != null` of a string that starts empty, so every looping recording
+    had one: the speedway's four PA speakers played their speech over the asphalt's bounce, the comb that
+    flanged when speech had one (docs/CLIENT_NOTES.md, "Speech has no ground reflection"). One-off sounds
+    are unchanged (impulses keep theirs). Unheard; renders in inbox/probable-bugs-2026-10-07/2-ground.
+  - A struck bell's clapper rests on it for its 12 ms (StruckBell): the end of the blow's contact, a fifth
+    of a millisecond in, used to lift the clapper's damping again, so the hold did nothing. Held, the fast
+    top modes lose more of the first milliseconds (the tram gong's first 11 ms fall 2.4 dB less steeply
+    against the next 10), the ring is calibrated to the same RMS, and the blows stand higher over it:
+    31.8 to 36.4 dB, where they measured 28.7 to 30.1. The bells' render headroom follows (crossing gong
+    29 to 32, locomotive bell 31 to 35, tram gong 31 to 37); under the old figures the tram gong's blows
+    were squared off by up to 5 dB. In the game at 5 m the tram gong's sharper blows push the master
+    limiter (10 dB of gain reduction, 5 before), so its average comes out 4.5 dB lower. Unheard; renders
+    in inbox/probable-bugs-2026-10-07/5-bell.
+  - Not a bug: `SetSimulatedReverbDecay` ignores its high and low decay ratios, and a room's colour still
+    reaches the reverb. The tail is the traced response (no parametric unit is left), coloured by the
+    materials it is traced with. Measured through the whole mixer (`--probable-bugs scene=rooms`), a clap's
+    tail per octave: the carpeted flat decays 0.6 to 0.8 s, the tiled stairwell 1.35 to 2.2 s, its top
+    octaves shorter than its middle (air and the tiles). The TODO is now a comment saying so. Renders
+    in inbox/probable-bugs-2026-10-07/4-reverb-colour.
+  - A sustained recording's copy off a wall stays on its own voice. The voices were numbered by the copy's
+    place in the list of the four loudest arrivals sorted by surface, so a wall joining or leaving the
+    list moved every wall after it to the next voice, which jumped from one wall's image to another's while
+    it played (in a test yard, from the west wall's image to the north wall's, 42 m apart). Each voice now
+    keeps its surface (`AcousticPathData.ReflectionId`, written and never read until now); a new wall
+    takes a voice that is free and silent, or waits for one. `ReflectionIndex` is gone. Scattering is read
+    only as the copy's width (`Spread`); unlike an engine's echo the copy is not smeared by it (a TODO).
+    Unheard; renders in inbox/probable-bugs-2026-10-07/7-reflection-slots. The emitter streams were
+    regenerated for the field that went (no other line changed).
+  - The traced reverb's input is the bus's channels summed at constant power, not averaged (found by the
+    todo audit). A room's bus is stereo in the game (two input channels with only mono claps sending),
+    and FMOD upmixes a mono send to it at -3.01 dB a channel (`--probable-bugs scene=upmix`), so the
+    average took every mono source's tail 3 dB under the -6 dB trim. The trim stays -6, so the tail is
+    3 dB wetter than what was approved by ear on 2026-09-30 (Cody to judge whether -6 still holds). A
+    clap's tail 150-400 ms after it, three renders each: the flat +3.3 dB, a street +1.6 (the facades'
+    placed echoes share that window). Unheard; renders in inbox/probable-bugs-2026-10-07/traced-reverb-input.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream

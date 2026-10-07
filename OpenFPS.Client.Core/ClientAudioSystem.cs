@@ -52,13 +52,71 @@ public class ClientAudioSystem
     /// <summary>The walls answering the live engines. See EngineReflections.</summary>
     private readonly EngineReflections _engineEchoes = new();
 
-    /// <summary>The voice id of one image-source reflection slot of a source. Slots are ordered by
-    /// surface (see EarlyReflections), so a slot is the same wall from tick to tick.</summary>
+    /// <summary>The voice id of one image-source reflection slot of a source. A slot keeps its wall
+    /// (<see cref="AssignReflectionSlots"/>).</summary>
     private static int ReflectionVoiceId(int sourceId, int slot)
         => -30000 - (sourceId * (EarlyReflections.MaxArrivals + 1)) - slot;
 
     /// <summary>Which of a source's reflection slots answered this frame; the rest are retired.</summary>
     private readonly bool[] _slotLive = new bool[EarlyReflections.MaxArrivals];
+
+    /// <summary>The surface (AcousticPathData.ReflectionId) each reflection slot of a source plays, -1
+    /// for none yet. Kept after the wall stops answering, so it gets its own voice back if it returns.</summary>
+    private readonly Dictionary<int, int[]> _reflectionSlots = new();
+
+    /// <summary>This frame's slot for each path of a source (-1: none), by <see cref="AssignReflectionSlots"/>.</summary>
+    private int[] _pathSlot = new int[8];
+
+    /// <summary>Whether a source's reflection slot still has a voice (fading out counts), made once.</summary>
+    private Func<int, int, bool> _reflectionSounding => _reflectionSoundingCached ??= (source, slot) => _audio.IsPlaying(ReflectionVoiceId(source, slot));
+    private Func<int, int, bool>? _reflectionSoundingCached;
+
+    /// <summary>
+    /// Whether a source's reflections are played as copies of it. A synthesised source has no file to play
+    /// a delayed copy of: its id names a model, and playing it as a sample failed every frame per source
+    /// (121 window units retrying a file load is most of a game loop). Decided by IsSynth, not by a prefix
+    /// list that misses new kinds. A rendered source is answered by its own path (EngineReflections) or by
+    /// nothing.
+    /// </summary>
+    private static bool PlaysCopies(WorldSnapshot world, int id)
+    {
+        if (!world.Entities.TryGetValue(id, out var snap)) return false;
+        var emitter = snap.Definition.SoundEmitter;
+        string sound = emitter.SoundId ?? "";
+        return !emitter.IsSynth
+            && !sound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+            && !sound.StartsWith("ENGINE/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Gives each reflection a slot by its surface: a wall keeps the slot it had, and a new wall takes a
+    /// slot that is free and silent, or waits. By position in the list instead, a wall joining or leaving
+    /// the four loudest moved every wall after it to the next voice, which jumped from one image to
+    /// another while it played. <paramref name="slotOf"/> gets each path's slot, -1 for none.
+    /// </summary>
+    internal static void AssignReflectionSlots(int[] surfaceBySlot, IReadOnlyList<AcousticPathData> paths,
+                                               int[] slotOf, int sourceId, Func<int, int, bool> sounding)
+    {
+        Span<bool> taken = stackalloc bool[surfaceBySlot.Length];
+        for (int i = 0; i < paths.Count; i++)
+        {
+            slotOf[i] = -1;
+            if (!paths[i].IsReflection) continue;
+            int s = Array.IndexOf(surfaceBySlot, paths[i].ReflectionId);
+            if (s >= 0 && !taken[s]) { slotOf[i] = s; taken[s] = true; }
+        }
+        for (int i = 0; i < paths.Count; i++)
+        {
+            if (!paths[i].IsReflection || slotOf[i] >= 0) continue;
+            for (int s = 0; s < surfaceBySlot.Length; s++)
+            {
+                if (taken[s] || sounding(sourceId, s)) continue;
+                surfaceBySlot[s] = paths[i].ReflectionId;
+                slotOf[i] = s; taken[s] = true;
+                break;
+            }
+        }
+    }
 
     /// <summary>How far a result's source may be from where a non-entity voice is now and still be
     /// taken as that voice's own. A pooled one-shot id reused a few seconds later is almost always
@@ -359,6 +417,7 @@ public class ClientAudioSystem
         _engineStarted.Remove(entityId);
         _engineRetiring.Remove(entityId);
         _engineEchoes.Forget(entityId, _audio);
+        _reflectionSlots.Remove(entityId);
         int distant = DistantVoiceBase - Math.Abs(entityId);
         if (_distantBoundTo.Remove(distant)) _audio.StopSound(distant);
         if (_frontVoiced.Remove(entityId)) _audio.StopSound(IntakeVoiceBase - Math.Abs(entityId));
@@ -386,6 +445,7 @@ public class ClientAudioSystem
     public void LeaveWorld(IEnumerable<int> entityIds)
     {
         foreach (int id in entityIds) ForgetEntity(id);
+        WorldAudio.Clear();
         if (_mapAmbienceId.Length > 0) _audio.StopAmbientBed(_mapAmbienceId);
         if (_regionAmbienceId.Length > 0) _audio.StopAmbientBed(_regionAmbienceId);
         _mapAmbienceId = "";
@@ -601,8 +661,17 @@ public class ClientAudioSystem
             if (_acousticWorker.TryGetResult(id, out var paths) && ResultIsForThisVoice(world, id, sourcePos, paths))
             {
                 Array.Clear(_slotLive);
-                foreach (var path in paths)
+                if (_pathSlot.Length < paths.Count) _pathSlot = new int[paths.Count * 2];
+                if (PlaysCopies(world, id))
                 {
+                    if (!_reflectionSlots.TryGetValue(id, out var slots))
+                        _reflectionSlots[id] = slots = Enumerable.Repeat(-1, EarlyReflections.MaxArrivals).ToArray();
+                    AssignReflectionSlots(slots, paths, _pathSlot, id, _reflectionSounding);
+                }
+                else Array.Fill(_pathSlot, -1);
+                for (int pi = 0; pi < paths.Count; pi++)
+                {
+                    var path = paths[pi];
                     if (!path.IsReflection)
                     {
                         // What moves is not in the acoustic scene, so a bus between you and a car
@@ -639,26 +708,16 @@ public class ClientAudioSystem
                     // A reflection: an image source off the scene's surfaces (EarlyReflections) under Steam
                     // Audio, the hand-rolled tracer's otherwise. The tail does not carry this energy: without
                     // these a room answers from everywhere at once and a doorway is inaudible from outside.
-                    if (!world.Entities.TryGetValue(id, out var originalSnap)) continue;
-
-                    // A synthesised source has no file to play a delayed copy of: its id names a model, and
-                    // playing it as a sample failed every frame per source (121 window units retrying a file
-                    // load is most of a game loop). Decided by IsSynth, not by a prefix list that misses new
-                    // kinds. A rendered source is answered by its own path (EngineReflections) or by nothing.
-                    var sourceEmitter = originalSnap.Definition.SoundEmitter;
-                    string sourceSound = sourceEmitter.SoundId ?? "";
-                    if (sourceEmitter.IsSynth
-                        || sourceSound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-                        || sourceSound.StartsWith("ENGINE/", StringComparison.OrdinalIgnoreCase)) continue;
-                    if ((uint)path.ReflectionIndex >= (uint)EarlyReflections.MaxArrivals) continue;
+                    int slot = _pathSlot[pi];
+                    if (slot < 0 || !world.Entities.TryGetValue(id, out var originalSnap)) continue;
                     // Everywhere: the listener's traced stage plays the late tail alone, so a sustained
                     // source's first bounces are these, indoors as out.
-                    _slotLive[path.ReflectionIndex] = true;
+                    _slotLive[slot] = true;
 
-                    // One voice per slot; slots are ordered by surface (EarlyReflections), so a slot is
-                    // the same wall from tick to tick. Keyed by index, which cannot collide, not by a hash
-                    // of the surface id, which can: one voice flickering between two opposite walls.
-                    int reflectId = ReflectionVoiceId(id, path.ReflectionIndex);
+                    // One voice per slot and one wall per slot (AssignReflectionSlots). Keyed by slot, which
+                    // cannot collide, not by a hash of the surface id, which can: one voice flickering
+                    // between two opposite walls.
+                    int reflectId = ReflectionVoiceId(id, slot);
                     var placed = _placed.TryGetValue(id, out var p)
                         ? p : (originalSnap.Definition.SoundEmitter.Volume, originalSnap.Definition.SoundEmitter.MinDistance);
                     var echo = LoopEchoLevel(path, placed.Volume, placed.MinDistance, dist);
@@ -2860,9 +2919,11 @@ public class ClientAudioSystem
             if (_audio.IsPlaying(snap.Id)) return;    // still saying the last one
         }
 
-        // The road under a machine hands its sound back a moment later; see GroundReflection.
+        // The road under a machine hands its sound back a moment later; see GroundReflection. Engines and
+        // physical models only: a sustained recording (a PA's speech) gets none, as speech flanged with
+        // one (docs/CLIENT_NOTES.md, "Speech has no ground reflection").
         long groundAt = System.Diagnostics.Stopwatch.GetTimestamp();
-        if (engineKey.Length > 0 || physicalKey != null) ApplyGround(ref emitter, world);
+        if (engineKey.Length > 0 || physicalKey.Length > 0) ApplyGround(ref emitter, world);
         _partMs[1] += Ms(groundAt);
         Spreading? spreading = extentLayout != null ? SpreadOf(snap, extentLayout, ref emitter, eyePos, engineDt, now) : null;
         _placed[snap.Id] = (emitter.Volume, emitter.MinDistance);
@@ -3766,13 +3827,12 @@ public class ClientAudioSystem
 
     private void SubmitLanding(Vector3 nudgePos, string mat, bool follows, Vector3 offset)
     {
-        string impactSound = _sounds.GetImpactSoundId(mat, 0f);
-        string resolved = _sounds.ResolvePath(impactSound);
-        
+        string resolved = _sounds.ResolvePath(_sounds.GetLandingSoundId(mat));
+
         if (!string.IsNullOrEmpty(resolved))
         {
-            // Placed like a step (SubmitFootstep), at a step's level.
-            // TODO: force 0 picks the FOOTSTEPS bank, so a landing plays a step take, never LANDING.
+            // Placed like a step (SubmitFootstep), at a step's level; the landing takes are recorded 7 to
+            // 10 dB over the walk banks' medians, and that difference is kept.
             var (landGain, landReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb);
             var landEmitter = new SpatialEmitter
             {

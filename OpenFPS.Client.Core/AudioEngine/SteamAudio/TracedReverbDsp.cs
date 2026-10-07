@@ -636,6 +636,14 @@ internal static class TracedReverbDsp
             s.ResetAfterFault();
     }
 
+    /// <summary>
+    /// What the bus's channels are summed with to make the tracer's one: 1/sqrt(channels), FMOD's own
+    /// constant-power law. A bus is mono until a stereo voice sends to it, and then FMOD upmixes each mono
+    /// send at -3.01 dB a channel (--probable-bugs scene=upmix); averaging the two took every mono source's
+    /// tail 3 dB down for as long as a stereo voice was in the room.
+    /// </summary>
+    internal static float DownmixGain(int channels) => 1f / MathF.Sqrt(Math.Max(1, channels));
+
     private static unsafe RESULT ReadCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
         if (outchannels == 0) outchannels = 2;
@@ -661,6 +669,7 @@ internal static class TracedReverbDsp
         var st = s.StereoScratch;
         int sub = s.SubFrame > 0 ? s.SubFrame : n;
         int inCh = Math.Max(1, inchannels);
+        float down = DownmixGain(inCh);
         float g = s.Gain;
         double inSum = 0, outSum = 0, chSum = 0;
         var dp = new Phonon.IPLAmbisonicsDecodeEffectParams
@@ -673,7 +682,7 @@ internal static class TracedReverbDsp
             {
                 float v = 0f;
                 for (int c = 0; c < inCh; c++) { float x = i[(at + k) * inCh + c]; v += x; chSum += x * (double)x; }
-                v /= inCh;
+                v *= down;
                 if (s.Delay != null) v = s.Delay.Process(v);
                 mono[k] = v;
                 inSum += v * (double)v;

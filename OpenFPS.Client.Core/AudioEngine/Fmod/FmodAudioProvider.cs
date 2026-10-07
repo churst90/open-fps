@@ -1107,7 +1107,9 @@ public partial class FmodAudioProvider : IAudioProvider
     private readonly float[] _simReverbHistory = new float[5];
     private int _simReverbCount;
 
-    // TODO: hfDecayRatio and lfDecayRatio are passed in and not used here.
+    // hfDecayRatio and lfDecayRatio are not used, and need not be: the tail is the traced response, whose
+    // colour per band comes from the materials it was traced with (docs/CLIENT_NOTES.md, "Traced reverb
+    // everywhere"). Measured with --probable-bugs scene=rooms: a carpeted flat and a tiled stairwell.
     /// <summary>
     /// The ray tracer's reverberation time for the listener's surroundings, median-filtered over the
     /// last five readings. The measurement is stochastic (one street canyon gave 1729, 2725 and 2800 ms)
