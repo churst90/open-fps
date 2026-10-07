@@ -400,6 +400,8 @@ public sealed partial class WorldEditor
         catch (Exception) { made = Entity.Null; }
         if (made == Entity.Null) { authored.Remove(id); return Entity.Null; }
 
+        // A form the map gave it over its prefab's (a ramp laid as stairs), checked against the new box.
+        if (data?.Form != null) MapManager.ApplyForm(world, made, data, mapId);
         if (portal is { } p)
         {
             if (world.Has<PortalComponent>(made)) world.Get<PortalComponent>(made) = p;
@@ -610,6 +612,7 @@ public sealed partial class WorldEditor
         try { e = _maps.SpawnPrefab(mapId, d.PrefabId, d.Position, d.Rotation, d.Scale, d.Name); }
         catch (Exception ex) { why = ex.Message; return false; }
         if (e == Entity.Null) { why = "it could not be made."; return false; }
+        if (d.Form != null) MapManager.ApplyForm(world, e, d, mapId);
         if (thing.Settings != null)
             foreach (var (path, value) in thing.Settings) EntitySettings.TrySet(world, e, path, value, out _);
         _maps.AuthoredEntities(mapId)[thing.Id] = e;

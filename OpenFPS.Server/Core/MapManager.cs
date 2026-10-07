@@ -50,7 +50,7 @@ public class MapManager
     /// A map entity's form over its prefab's (a ramp, a flight of stairs, an arch), and either one checked
     /// against the box it must fill: a form that cannot be made is said, and the entity is a box.
     /// </summary>
-    private static void ApplyForm(World world, Entity entity, Repositories.EntityData entityData, string mapId)
+    internal static void ApplyForm(World world, Entity entity, Repositories.EntityData entityData, string mapId)
     {
         if (!world.Has<ColliderComponent>(entity)) return;
         ref var col = ref world.Get<ColliderComponent>(entity);

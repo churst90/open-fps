@@ -21,6 +21,9 @@ Recent work, newest first. `git log` has the rest.
     doors) and what it cost when it ran, for Cody to decide.
   - A footstep model's key keeps its speed to the half metre a second (`Footsteps.Key`): it doubled it,
     so a walk at 1.4 m/s named itself "3" and read back at 3 m/s. AudioLab only; the game plays the bank.
+  - A map entry's own form (a ramp laid as stairs, `Form` over the prefab's) is kept when the world editor
+    makes the thing again (a new prefab version), copies it, puts a deletion back, and when the overlay
+    copies the entry. Each of them made the prefab's form, or a box. Server only.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream
