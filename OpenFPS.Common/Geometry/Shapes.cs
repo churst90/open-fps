@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 using MemoryPack;
@@ -67,8 +66,13 @@ public sealed class ShapeMesh
 /// <summary>The shapes of stage 2, made from their numbers by the same code on the server and every client.</summary>
 public static class Shapes
 {
-    /// <summary>Why a shape's numbers cannot make it, or null when they can.</summary>
-    public static string? Problem(ShapeSpec? spec, Vector3 size)
+    /// <summary>The highest riser a flight may have, metres: what a walking body steps up (the game's
+    /// StepHeight, 0.4 m) unless a caller says otherwise.</summary>
+    public const float DefaultMaxRise = 0.4f;
+
+    /// <summary>Why a shape's numbers cannot make it, or null when they can. A flight whose risers are over
+    /// <paramref name="maxRise"/> cannot be climbed, and is refused.</summary>
+    public static string? Problem(ShapeSpec? spec, Vector3 size, float maxRise = DefaultMaxRise)
     {
         if (spec == null || spec.Kind == ShapeKind.Box) return null;
         if (!(size.X > 0f && size.Y > 0f && size.Z > 0f)) return "a shape needs a collider size in all three directions";
@@ -78,8 +82,8 @@ public static class Shapes
             case ShapeKind.Stairs:
                 if (spec.Steps < 1 || spec.Steps > 200) return "stairs need between 1 and 200 steps";
                 if (spec.Landing < 0f || spec.Landing >= size.Z) return "a landing must be shorter than the stairs";
-                if (size.Y / spec.Steps > PhysicsConstants.StepHeight)
-                    return $"each rise is {size.Y / spec.Steps:0.###} m, over the {PhysicsConstants.StepHeight} m a body can step";
+                if (size.Y / spec.Steps > maxRise)
+                    return $"each rise is {size.Y / spec.Steps:0.###} m, over the {maxRise} m a body can step";
                 return null;
             case ShapeKind.Arch:
                 if (spec.Thickness <= 0f) return "an arch needs a thickness";
@@ -90,25 +94,22 @@ public static class Shapes
         }
     }
 
-    private static readonly ConcurrentDictionary<(ShapeKind, int, int, int, int, int, int, int), ShapeMesh> Cache = new();
-
     /// <summary>
     /// The triangles of <paramref name="spec"/> filling a box of <paramref name="size"/> centred on its own
     /// origin, or null for a box (or a shape that cannot be made: see <see cref="Problem"/>). The same
-    /// numbers give the same bits everywhere, and the same object while the process runs.
+    /// numbers give the same bits everywhere (the mesh's hash says so). Made each time it is asked: a flight
+    /// of sixteen steps is a few hundred triangles, and only things that have a form ask.
     /// </summary>
     public static ShapeMesh? Make(ShapeSpec? spec, Vector3 size)
     {
-        if (spec == null || spec.Kind == ShapeKind.Box || Problem(spec, size) != null) return null;
-        var key = (spec.Kind, spec.Steps, Bits(spec.Landing), Bits(spec.Thickness), spec.Segments, Bits(size.X), Bits(size.Y), Bits(size.Z));
-        return Cache.GetOrAdd(key, _ => spec.Kind switch
+        if (spec == null || spec.Kind == ShapeKind.Box || Problem(spec, size, float.MaxValue) != null) return null;
+        return spec.Kind switch
         {
             ShapeKind.Wedge => Wedge(size),
             ShapeKind.Stairs => Stairs(size, spec.Steps, spec.Landing),
             ShapeKind.Arch => Arch(size, spec.Thickness, spec.Segments > 0 ? spec.Segments : 12),
-            _ => throw new ArgumentOutOfRangeException(nameof(spec)),
-        });
-        static int Bits(float f) => BitConverter.SingleToInt32Bits(f);
+            _ => null,
+        };
     }
 
     // ── Builders: every face wound counter-clockwise seen from outside ─────────────────────────────

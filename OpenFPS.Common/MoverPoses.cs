@@ -1,6 +1,6 @@
 using System.Threading;
 
-namespace OpenFPS.Common.Geometry;
+namespace OpenFPS.Common;
 
 /// <summary>
 /// Counts the times anything has moved a mover (a door leaf) on the server. The triangle world places a

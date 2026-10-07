@@ -145,7 +145,8 @@ public class GeometryStage2Tests : IDisposable
         var size = new Vector3(1.2f, 2.8f, 4.48f);
         var a = Shapes.Make(new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }, size)!;
         var b = Shapes.Make(new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }, size)!;
-        Assert.Same(a, b);
+        Assert.Equal(a.Outer.Hash, b.Outer.Hash);
+        Assert.Equal(a.Parts!.Select(m => m.Hash), b.Parts!.Select(m => m.Hash));
         var w1 = WorldOf(Shaped(7, new Vector3(3.3f, 1.4f, 4.1f), size, new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }, 0.7f));
         var w2 = WorldOf(Shaped(7, new Vector3(3.3f, 1.4f, 4.1f), size, new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }, 0.7f));
         Assert.Equal(w1.Instance(w1.InstanceOfTile(new TileKey(0, 0))).Piece.Signature, w2.Instance(w2.InstanceOfTile(new TileKey(0, 0))).Piece.Signature);

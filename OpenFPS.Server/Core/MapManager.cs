@@ -88,7 +88,7 @@ public class MapManager
         if (entityData.Form != null) col.Form = entityData.Form;
         if (col.Form == null) return;
         if (col.Form.Kind == OpenFPS.Common.Geometry.ShapeKind.Box) { col.Form = null; return; }
-        if (OpenFPS.Common.Geometry.Shapes.Problem(col.Form, col.Size) is { } problem)
+        if (OpenFPS.Common.Geometry.Shapes.Problem(col.Form, col.Size, PhysicsConstants.StepHeight) is { } problem)
         {
             Log.Warning("MapManager: '{Map}' entity {Id} ({Prefab}): its form ({Form}) cannot be made: {Problem}. It is a box.",
                         mapId, entityData.EntityId, entityData.PrefabId, col.Form, problem);

@@ -458,6 +458,75 @@ public static class GeometryParitySpike
             Console.WriteLine($"  walks: the box path started 0.1 mm aside parted from itself by over 1 mm in {walksControlParted} of {walks.Probes}");
         }
 
+        // ── The capsule (stage 2) against the cylinder, both on the triangles: does it feel the same? ──
+        if (only.Contains("capsule"))
+        {
+            var steps = new Tally("Movement step, the capsule (and the grade) against the cylinder");
+            var walks = new Tally("Walks of 90 steps, the capsule against the cylinder");
+            tallies.Add(steps); tallies.Add(walks);
+            var geo = grid.Geometry!;
+            int onFlights = 0, controlParted = 0;
+            double capMs = 0, cylMs = 0;
+            var travel = new List<float>();
+            for (int i = 0; i < n; i++)
+            {
+                var p = NearSomething(1.5f);
+                float f = PhysicsUtils.GetGroundHeight(ecs, grid, p + new Vector3(0, 3f, 0), out _);
+                if (f < -900f) continue;
+                p.Y = f;
+                var input = Vector3.Normalize(new Vector3((float)(rng.NextDouble() * 2 - 1), 0, (float)(rng.NextDouble() * 2 - 1)));
+                var vel = (i % 5) switch { 0 => new Vector3(0, -6f, 0), 1 => new Vector3(0, 4.5f, 0), _ => Vector3.Zero };
+                if (i % 5 == 0) p.Y += 0.3f;
+                bool sprint = i % 3 == 0;
+                var c = Stopwatch.StartNew();
+                var (p0, v0, g0) = StepOnServer(ecs, grid, geo, serverUnindexed, p, vel, input, sprint, data, BodyShape.Cylinder);
+                cylMs += c.Elapsed.TotalMilliseconds; c.Restart();
+                var (p1, v1, g1) = StepOnServer(ecs, grid, geo, serverUnindexed, p, vel, input, sprint, data, BodyShape.Capsule, out float grade);
+                capMs += c.Elapsed.TotalMilliseconds;
+                steps.OldMs += 0; steps.Probes++;
+                float err = Vector3.Distance(p0, p1);
+                steps.MaxError = Math.Max(steps.MaxError, err);
+                if (err <= 1e-3f && g0 == g1) { steps.Same++; }
+                else if (grade != 0f) { steps.Ties++; steps.Same++; steps.TiePairs["on a flight or a slope: slower by the grade"] = steps.TiePairs.GetValueOrDefault("on a flight or a slope: slower by the grade") + 1; }
+                else steps.Differ(CapsuleWhy(geo, p, p0, p1), $"from {V(p)} vel {V(vel)} input {V(input)}: cylinder {V(p0)} {g0}, capsule {V(p1)} {g1} ({err * 1000:F1} mm)", show);
+
+                if (i % 10 != 0) continue;
+                Vector3 a = p, av = Vector3.Zero, b = p, bv = Vector3.Zero, cc = p + new Vector3(1e-4f, 0, 0), cv = Vector3.Zero;
+                var dirNow = input;
+                float worst = 0f, worstControl = 0f; int partedAt = -1; bool flight = false;
+                float distA = 0f, distB = 0f;
+                var trace = args.Contains("capsuledebug") ? new List<string>() : null;
+                for (int k = 0; k < 90; k++)
+                {
+                    if (k % 20 == 0) dirNow = Vector3.Normalize(new Vector3((float)(rng.NextDouble() * 2 - 1), 0, (float)(rng.NextDouble() * 2 - 1)));
+                    var (wasA, wasB) = (a, b);
+                    trace?.Add($"    {k}: dir {V(dirNow)} cylinder {a.X:F3},{a.Y:F3},{a.Z:F3} capsule {b.X:F3},{b.Y:F3},{b.Z:F3}");
+                    (a, av, _) = StepOnServer(ecs, grid, geo, serverUnindexed, a, av, dirNow, sprint, data, BodyShape.Cylinder);
+                    (cc, cv, _) = StepOnServer(ecs, grid, geo, serverUnindexed, cc, cv, dirNow, sprint, data, BodyShape.Cylinder);
+                    (b, bv, _) = StepOnServer(ecs, grid, geo, serverUnindexed, b, bv, dirNow, sprint, data, BodyShape.Capsule, out float gr);
+                    if (gr != 0f) flight = true;
+                    distA += new Vector2(a.X - wasA.X, a.Z - wasA.Z).Length(); distB += new Vector2(b.X - wasB.X, b.Z - wasB.Z).Length();
+                    worstControl = MathF.Max(worstControl, Vector3.Distance(a, cc) - 1e-4f);
+                    float e = Vector3.Distance(a, b);
+                    if (e > worst) worst = e;
+                    if (e > 1e-2f && partedAt < 0) partedAt = k;
+                }
+                walks.Probes++;
+                walks.MaxError = Math.Max(walks.MaxError, worst);
+                if (worstControl > 1e-2f) controlParted++;
+                if (distA > 0.5f) travel.Add(distB / distA);
+                if (partedAt < 0) { walks.Same++; continue; }
+                if (flight) { onFlights++; walks.Ties++; walks.Same++; walks.TiePairs["on a flight or a slope: slower by the grade"] = walks.TiePairs.GetValueOrDefault("on a flight or a slope: slower by the grade") + 1; continue; }
+                walks.Differ("parted by over 1 cm", $"from {V(p)}: at step {partedAt}, worst {worst * 1000:F0} mm; the capsule walked {distB:F2} m, the cylinder {distA:F2} m"
+                                                    + $" (the cylinder from 0.1 mm aside: {worstControl * 1000:F1} mm)"
+                                                    + (trace != null && walks.Shown.Count < show ? "\n" + string.Join("\n", trace.Skip(Math.Max(0, partedAt - 4)).Take(10)) + WhatTouches(geo, trace.Count > 0 ? b : b) : ""), show);
+            }
+            travel.Sort();
+            Console.WriteLine($"  capsule: a step {capMs * 1000 / Math.Max(1, steps.Probes):F1} us against the cylinder's {cylMs * 1000 / Math.Max(1, steps.Probes):F1} us; "
+                              + $"walks on a flight or slope {onFlights}; the cylinder from 0.1 mm aside parted from itself by over 1 cm in {controlParted} of {walks.Probes}; "
+                              + (travel.Count > 0 ? $"distance walked, capsule over cylinder: median {travel[travel.Count / 2]:F3}, lowest {travel[0]:F3}, highest {travel[^1]:F3}" : ""));
+        }
+
         // ── Echoes: EarlyReflections over the box list and over the acoustic triangle world ─────────
         if (only.Contains("echoes"))
         {
@@ -1079,8 +1148,17 @@ public static class GeometryParitySpike
     }
 
     private static (Vector3, Vector3, bool) StepOnServer(World ecs, SpatialGrid<Entity> grid, TriangleWorld? geometry, List<Entity> unindexed,
-                                                         Vector3 pos, Vector3 vel, Vector3 input, bool sprint, MapData data)
+                                                         Vector3 pos, Vector3 vel, Vector3 input, bool sprint, MapData data,
+                                                         BodyShape body = BodyShape.Cylinder)
+        => StepOnServer(ecs, grid, geometry, unindexed, pos, vel, input, sprint, data, body, out _);
+
+    /// <summary>One server step as MovementSystem takes it: with a triangle world and the capsule, the grade
+    /// too (<paramref name="grade"/>, what it was).</summary>
+    private static (Vector3, Vector3, bool) StepOnServer(World ecs, SpatialGrid<Entity> grid, TriangleWorld? geometry, List<Entity> unindexed,
+                                                         Vector3 pos, Vector3 vel, Vector3 input, bool sprint, MapData data,
+                                                         BodyShape body, out float grade)
     {
+        grade = 0f;
         SetGrid(grid, geometry, unindexed);
         float ground = PhysicsUtils.GetGroundHeight(ecs, grid, pos, out _);
         var near = new List<Entity>(); var seen = new HashSet<Entity>();
@@ -1108,6 +1186,11 @@ public static class GeometryParitySpike
         if (geometry != null)
         {
             var all = new AcceptAll();
+            if (body == BodyShape.Capsule)
+            {
+                ctx.Body = BodyShape.Capsule;
+                ctx.Grade = grade = SharedMovementEngine.GradeAlong(geometry, ref all, pos, input);
+            }
             SharedMovementEngine.GatherSolids(ctx, geometry, ref all, solids);
             obstacles = new SharedMovementEngine.Obstacles(span, geometry, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(solids));
         }
@@ -1232,6 +1315,23 @@ public static class GeometryParitySpike
                 }
             }
         }
+    }
+
+    /// <summary>Why a step parts the capsule from the cylinder: what each touches at the end.</summary>
+    private static string CapsuleWhy(TriangleWorld world, Vector3 from, Vector3 cyl, Vector3 cap)
+    {
+        // An edge met by the rounded bottom (below the knee) or top (above the brow) of the capsule.
+        var near = new List<SolidRef>(); var all = new AcceptAll();
+        world.Overlapping(from - new Vector3(1, 1, 1), from + new Vector3(1, 2.5f, 1), GeometryLayers.Movement, ref all, near);
+        bool low = false, high = false;
+        foreach (var s in near)
+        {
+            var (bmin, bmax) = world.BoundsOf(s);
+            float top = bmax.Y - from.Y, bottom = bmin.Y - from.Y;
+            if (top > 0.15f && top < 0.45f) low = true;
+            if (bottom > 1.5f && bottom < PhysicsConstants.PlayerHeight) high = true;
+        }
+        return low && high ? "an edge at the knee and at the brow" : low ? "an edge below the knee (the rounded bottom)" : high ? "an edge above the brow (the rounded top)" : "other";
     }
 
     /// <summary>The solids within a metre of a body, with how far each one's turn is from unit length.</summary>

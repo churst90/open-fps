@@ -251,7 +251,7 @@ public class SpatialGrid<T>
     private OpenFPS.Common.Geometry.TriangleWorld? _geometry;
 
     /// <summary>Run before <see cref="Geometry"/> is handed out: the owner places the movers again if any
-    /// has moved since it last did (ServerGeometry, Geometry.MoverPoses).</summary>
+    /// has moved since it last did (ServerGeometry, MoverPoses).</summary>
     public Action? BeforeGeometry { get; set; }
 
     /// <summary>Static items <see cref="Geometry"/> does not hold: test them as the grid always did.</summary>

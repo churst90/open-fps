@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Geometry;
 using OpenFPS.Common.Networking;
