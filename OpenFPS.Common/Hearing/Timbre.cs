@@ -203,6 +203,62 @@ public sealed class Timbre
         return 0.5f * (a + b);
     }
 
+    // ── How loud it is heard, for ranking ───────────────────────────────────────────────────────
+    //
+    // The voice budget ranks every voice by how loud it is to the ear (docs/EAR_MODEL.md, Ranking).
+    // ISO 532-1 calls everything under the threshold of hearing zero sone, so far and quiet voices would
+    // all tie there and trade slots on nothing. Below a low loudness level the ranking goes on one phon a
+    // decibel instead: an inaudible voice still ranks above a quieter inaudible one, and nothing audible
+    // is moved.
+
+    /// <summary>The loudness level, phon, under which <see cref="HeardPhons"/> goes on one phon a decibel.
+    /// 10 phon is just above where ISO 532-1's loudness reaches zero (<see cref="SilentPhons"/>, 2.8).</summary>
+    public const float RankFloorPhons = 10f;
+
+    private const float HeardStep = 0.25f;
+    private float _floorLevel = float.NaN;
+    private ConcurrentDictionary<int, float>? _heard;
+
+    /// <summary>
+    /// The loudness level, phon, of this sound at <paramref name="levelDb"/> dB SPL, continued below
+    /// <see cref="RankFloorPhons"/> at one phon a decibel so that it never stops falling with level.
+    /// Read from a grid a quarter of a decibel apart, cached on the timbre: ranking asks it of every
+    /// voice on every audio update.
+    /// </summary>
+    public float HeardPhons(float levelDb)
+    {
+        if (float.IsNaN(levelDb)) return float.NegativeInfinity;
+        levelDb = Math.Clamp(levelDb, -400f, 400f);
+        float x = levelDb / HeardStep;
+        int i = (int)MathF.Floor(x);
+        float a = HeardAt(i), b = HeardAt(i + 1);
+        return a + (b - a) * (x - i);
+    }
+
+    /// <summary>The inverse of <see cref="HeardPhons"/>: the level at which this sound is heard at
+    /// <paramref name="phons"/>.</summary>
+    public float LevelForHeardPhons(float phons)
+        => phons >= RankFloorPhons ? LevelForPhons(phons) : FloorLevel() - (RankFloorPhons - phons);
+
+    private float HeardAt(int step)
+    {
+        var cache = _heard ?? System.Threading.Interlocked.CompareExchange(ref _heard, new(), null) ?? _heard!;
+        if (cache.TryGetValue(step, out float hit)) return hit;
+        float level = step * HeardStep, floor = FloorLevel();
+        float value = level >= floor ? MathF.Max(RankFloorPhons, Phons(level)) : RankFloorPhons - (floor - level);
+        if (cache.Count > 4096) cache.Clear();
+        cache[step] = value;
+        return value;
+    }
+
+    /// <summary>The level at which this sound reaches <see cref="RankFloorPhons"/>, worked out once.</summary>
+    private float FloorLevel()
+    {
+        float f = _floorLevel;
+        if (float.IsNaN(f)) _floorLevel = f = LevelForPhons(RankFloorPhons);
+        return f;
+    }
+
     // ── A table, for a sound asked about often (the reference) ──────────────────────────────────
 
     private const float TableLow = -30f, TableStep = 0.25f;

@@ -421,20 +421,31 @@ public class VoiceManager
     internal static float Audibility(in SpatialEmitter e, float distance, bool playing)
     {
         float level = OpenFPS.Common.Loudness.RenderedGain(e.Volume, e.MinDistance, e.Range, distance);
-        // In loudness, not level: the law's correction for what the voice is made of, when that has
-        // been measured (docs/EAR_MODEL.md). A pure tone and a broadband sound of one level are not
-        // equally loud, and the one that is heard more ranks higher.
+        level *= 1f - Math.Clamp(e.Occlusion, 0f, 1f);
+        // In loudness, not level (docs/EAR_MODEL.md, Ranking). The gain the voice plays at, the law's
+        // correction for what it is made of included, is turned into how loud that is to the ear, from
+        // its measured spectrum: a pure tone and a broadband sound of one level are not equally loud,
+        // and the one that is heard more ranks higher. Not the correction itself: the law plays a sound
+        // the ear hears LESS of louder (a 25 Hz rumble about 21 dB up), and ranking on that gain put
+        // the rumble at the top.
         if (e.EarLevelDb > 0f)
         {
-            float db = EarTimbres.CorrectionDb(string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId : e.PhysicalKey, e.EarLevelDb);
+            string key = string.IsNullOrEmpty(e.PhysicalKey) ? e.SoundId : e.PhysicalKey;
+            float db = EarTimbres.CorrectionDb(key, e.EarLevelDb);
             if (db != 0f) level *= MathF.Pow(10f, db / 20f);
+            level = OpenFPS.Common.Loudness.HeardGain(level, EarTimbres.Find(key), IsPhysical(e));
         }
-        level *= 1f - Math.Clamp(e.Occlusion, 0f, 1f);
         if (playing) level *= PlayingHysteresis;
         // Pinned, not weighted: an essential voice ranks above every voice that is merely loud, and
         // among themselves they still rank on what can be heard.
         return e.Essential ? level + EssentialPin : level;
     }
+
+    /// <summary>Whether a voice is a physical one (its declared level is its RMS) rather than a recording
+    /// (its declared level is its buffer's full scale): what the provider's ear stage decides by its
+    /// DSP, read here from what will build that DSP. Only consulted until its spectrum is measured.</summary>
+    private static bool IsPhysical(in SpatialEmitter e)
+        => e.IsSynth || e.IsGranular || !string.IsNullOrEmpty(e.PhysicalKey) || !string.IsNullOrEmpty(e.EngineKey);
 
     /// <summary>About two decibels. See <see cref="Audibility"/>.</summary>
     private const float PlayingHysteresis = 1.26f;

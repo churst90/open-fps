@@ -31,7 +31,10 @@ public static class EarTimbres
         if (string.IsNullOrEmpty(soundId)) return null;
         if (_bySound.TryGetValue(soundId, out var t)) return t;
         string folder = Folder(soundId);
-        return folder.Length > 0 && _byFolder.TryGetValue(folder, out var f) ? f : null;
+        if (folder.Length > 0 && _byFolder.TryGetValue(folder, out var f)) return f;
+        // An id that is itself a folder of measured sounds: a model's prefab key ("shore:sea_sand"),
+        // whose stretches on a map play under keys that carry their geometry ("shore:sea_sand/300/90/20").
+        return _byFolder.TryGetValue(soundId, out var own) ? own : null;
     }
 
     /// <summary>Whether this exact sound has been measured.</summary>

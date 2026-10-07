@@ -269,10 +269,52 @@ and treble back) and the loudness figures the instruments report.
 
 ## Ranking
 
-The voice budget ranks on what each voice delivers to the ear (`VoiceManager.Audibility`); it now
-adds the voice's loudness correction when the voice's spectrum is known (from an earlier play of the
-same sound, or a live voice's latest measurement), so a pure tone and a broadband source of the same
-level rank by loudness. Engines are ranked by their declared level as before.
+The voice budget (`VoiceManager.Audibility`) and the machine budget (`ClientAudioSystem`'s machine
+ranking) rank a voice by how loud it is to the ear: a sound you would hear as louder wins a voice
+(decided by Cody 2026-10-07). `Loudness.HeardGain`:
+
+1. the gain the voice plays at: the law's placement, the law's correction for its spectrum
+   (`TimbreCorrectionDb`), the distance and the path (occlusion);
+2. its level at the ear at the designed playback (K + that gain + where its RMS sits under full
+   scale: the gated RMS for a recording, -16 dB for a physical voice);
+3. its loudness level, ISO 532-1 with its own measured spectrum (`Timbre.HeardPhons`);
+4. the gain at which a speech line would play exactly as loud. That is the rank.
+
+A speech line, or a recording not measured yet (taken as one), ranks at exactly its played gain, as
+before. Because the law makes every source as loud as the speech line it places, the rank is the old
+law's gain for the speech line that is as loud as the source.
+
+Why not the corrected gain (the rank until 2026-10-07): the correction is the extra gain the law gives
+a sound the ear hears less of, so that it is heard at its real loudness. Ranked on that gain, a 65 dB
+rumble at 25 Hz (+20.8 dB of correction) ranked about 20 dB above an unmeasured sound of the same
+level, and above a 60 dB 1 kHz tone at the same distance, which is heard far louder. Tests:
+`EarModelTests.ARumbleRanksBelowAQuieterToneAtTheSameDistance`,
+`ClientAudioSelectionTests.ARumbleLosesTheLastMachineSlotToAQuieterToneAtTheSameDistance`.
+
+Two consequences beyond the rumble:
+
+- Physical voices and recordings are compared on one scale. A physical voice declares its RMS and plays
+  it 16 dB under full scale; a recording declares its full scale and sits about 28 dB under it. At the
+  shipped /levels a physical voice and a speech line of the same real level play equally loud, but the
+  line's gain was about 12.6 dB higher, so on gain the line outranked the physical voice by 12.6 dB.
+  On loudness they rank level. The same holds for the silence floor (`Loudness.SilenceGain`): it is now
+  "as loud as a speech line at -74 dB", for every voice.
+- Tonal sounds the law lifts (beacons, UI-like sine blips, +7 to +9 dB of correction) rank by how loud
+  they are heard, about 8 dB lower than before against broadband sounds. Only matters when the budget
+  is full.
+
+Below the threshold of hearing ISO 532-1 gives zero sone, so the loudness level is continued one phon
+a decibel below 10 phon: inaudible voices keep their order and do not tie. Hysteresis (a playing voice
+is worth about 2 dB more), the machine budget's keep bias and hold are unchanged; they now act on
+loudness. Engines are ranked by their declared level as before. `/ear off` ranks on the played gain.
+
+Measured on the city (RankingByLoudnessProbe, 2026-10-07; inbox/ranking-2026-10-07/ranking.txt): every
+standing source there is broadband (corrections -0.3 to -1.5 dB), so the machine budget changes only at
+its edge, one source in four of six spots, each 2 to 3 dB from the line: at Alder Street and the 58
+Alder Street garden a tree 120 m off takes the place of a condenser 300 m off; at the Foundry Street
+spawn a window unit at 63 m takes the place of a condenser at 85 m; at the Mill Road crossing the Elm
+Park fountain (432 m) takes the place of a window unit at 186 m. Elm Park and Market Square are
+unchanged.
 
 ## Cost and threads
 
