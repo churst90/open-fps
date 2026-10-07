@@ -82,7 +82,7 @@ public static class PushBarRefSpike
                 if (only != null && !name.Contains(only, StringComparison.Ordinal) && !$"v{v}".Equals(only, StringComparison.Ordinal)) continue;
                 var door = new PushBarDoor.Door { Variant = v, Seed = 1 + v };
                 var rep = new PushBarDoor.Report();
-                var pcm = closing ? PushBarDoor.RenderClose(door, 48000, 1.4, rep) : PushBarDoor.RenderOpen(door, 48000, 1.4, rep);
+                var pcm = closing ? PushBarDoor.RenderClose(door, 48000, rep) : PushBarDoor.RenderOpen(door, 48000, 1.4, rep);
                 ours.Add((name, pcm, rep));
                 Print(name, Clusters(pcm, 48000), 0);
                 Console.WriteLine($"    LAFmax {LafDbfs(pcm) + 20 * Math.Log10(PushBarDoor.PascalsAtFullScale / 2e-5):F1} dB at 1 m");

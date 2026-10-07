@@ -1,24 +1,19 @@
-using System;
 using System.Numerics;
 using static OpenFPS.Common.DesignedSoundKit;
 
 namespace OpenFPS.Common;
 
 /// <summary>
-/// The teleporter's four sounds, reasoned from what the device would physically do where it can be.
+/// The teleporter's four sounds, reasoned from what the device would physically do.
 ///
-/// - Charging: a photoflash-style charger, a small transformer switching a capacitor up to a few
-///   hundred volts. The core sings at the switching frequency, and a self-oscillating charger switches
-///   faster as the capacitor's voltage rises, so the whine climbs: here from 2 to 10 kHz over two
-///   seconds, following the square root of time as a constant-power charge does, over a faint buzz.
-/// - Leaving: about 75 litres of air (a body) rush into where the body was. The far field of a sink of
-///   air is the rate of change of its flow (a monopole): while the inflow speeds up the pressure dips a
-///   little, and when the air meets in the middle and stops all at once it gives a sharp compression.
-///   A short low thump at the end of a faint rush.
-/// - Arriving: the same air shoved out of the way. Time reversed: the shove starts all at once, which is
-///   the sharp compression, a pop, and the outflow then slows, a small dip; brighter, because the shove
-///   is faster than the inrush.
-/// - Ready: a small tone: two soft notes rising a fourth.
+/// - Charging: a photoflash-style charger whose transformer sings at its switching frequency, which
+///   climbs as the capacitor charges: 2 to 10 kHz over two seconds, as the square root of time.
+/// - Leaving: about 75 litres of air (a body) rush into where the body was. A monopole's far field is
+///   the rate of change of its flow: a small dip while the inflow speeds up, then a sharp compression
+///   when it meets and stops, a low thump.
+/// - Arriving: the same air shoved away, time reversed: a pop, then a small dip; brighter, because
+///   the shove is faster than the inrush.
+/// - Ready: two soft notes rising a fourth.
 ///
 /// A body vanishing instantly would leave a vacuum that collapses in about a millisecond, a blast near
 /// 170 dB. The teleporter is taken to fade the body over tens of milliseconds; the levels below are set
@@ -39,9 +34,6 @@ public static class TeleporterSounds
         kind = key[Prefix.Length..];
         return kind is Charge or Leave or Arrive or Ready;
     }
-
-    /// <summary>The volume of air that moves, litres: a person.</summary>
-    public const float BodyLitres = 75f;
 
     /// <summary>How long the charge takes, seconds.</summary>
     public const float ChargeSeconds = 2f;

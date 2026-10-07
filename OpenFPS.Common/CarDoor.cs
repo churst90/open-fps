@@ -1,25 +1,17 @@
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A car door opening or shutting, built from octave bands of noise.
+/// A car door opening or shutting, built from octave bands of noise: fitted to a recording
+/// (approved/car-door; the fit is in tools/car_door_fit) and approved by ear on 2026-09-28. Nothing rings
+/// at a pitch: a version built from resonators was "an instrument... too tonal and not mechanical", its
+/// narrow peaks 22 dB over the spectrum around them 50-140 ms after the slam against 9 dB in the recording.
 ///
-/// Fitted to a recording of a car door (approved/car-door, see approved/README.md) and approved by ear on
-/// 2026-09-28. The fit and its instruments are in tools/car_door_fit. The first version rang a set of
-/// resonators at the door skin's and the cabin's modes, matched the recording's band levels, and was
-/// rejected: "it sounds like an instrument... too tonal and not mechanical". A few fixed modes ringing
-/// for half a second are a chord. Measured, its strongest narrow peaks stood 22 dB over the spectrum
-/// around them 50-140 ms after the slam, against 9 dB in the recording. So nothing here rings at a
-/// pitch: every part is noise, given a spectrum (a level per octave band) and a decay per band.
-///
-/// Shutting: four hits over 75 ms (first touch, the latch's secondary catch, the door seating on its
-/// primary catch, a rebound), the cabin answering in the three lowest bands as the seal pushes air
-/// into it, and the body settling with a few small dull knocks. Opening: the handle and the rod
-/// working the latch, the latch letting go, and the check strap's roller dropping into its detent as
-/// the door swings.
-///
-/// One car's door, for now. Every vehicle uses it until there are recordings of others (a van's
-/// sliding door, a truck's cab door) to fit.
+/// Shutting: four hits over 75 ms (first touch, the secondary catch, seating on the primary catch, a
+/// rebound), the cabin answering in the three lowest bands, and the body settling in small dull knocks.
+/// Opening: the handle and rod, the latch letting go, and the check strap's detent as the door swings.
 /// </summary>
+/// <remarks>TODO: one car's door for every vehicle, until there are recordings of others (a van's sliding
+/// door, a truck's cab door) to fit.</remarks>
 public static class CarDoor
 {
     public const string KeyPrefix = "cardoor:";
@@ -64,10 +56,8 @@ public static class CarDoor
     private const float DetentAt = 0.386f, DetentDb = -0.06f, DetentT60 = 0.081f;
     private static readonly float[] DetentShape = { -9.91f, 7.11f, -10.14f, -18.96f, 10f, -5.86f, -0.66f, -4.31f, -9.87f };
 
-    /// <summary>
-    /// Renders one, normalised to a peak of one. The sound starts a few milliseconds before its first
-    /// event: shutting, the first touch; opening, the handle.
-    /// </summary>
+    /// <summary>Renders one, normalised to a peak of one, starting a few milliseconds before the first
+    /// touch (shutting) or the handle (opening).</summary>
     public static float[] Render(bool closing, int sampleRate, int seed)
     {
         var rng = new Random(seed);

@@ -1,42 +1,27 @@
-using System;
-
 namespace OpenFPS.Common;
 
 /// <summary>How hard it is raining, by the usual classes of rain rate.</summary>
 public enum RainCategory { None, Light, Moderate, Heavy, Violent }
 
 /// <summary>
-/// Rain as the thing it is: a rate of water arriving, carried by drops of a spread of sizes falling at
-/// the speed their size allows. Everything heard of rain is those drops landing on things, so
-/// everything here is about how many drops land on a square metre in a second and how big and fast
-/// each one is. The sound of a drop on a surface is the surface's business (see
-/// <see cref="RainSurfaces"/>); this is the sky's.
+/// Rain as the sky makes it: how many drops land on a square metre a second, how big and how fast. What
+/// a drop sounds like on a surface is <see cref="RainSurfaces"/>' business.
 ///
-/// THE RATE. The server's weather carries a precipitation intensity, 0 to 1, that moves slowly
-/// toward the front's target (WorldEnvironmentSystem). It is turned into a rain rate in millimetres an
-/// hour, which is what rain is measured in, log-linear in the intensity from a drizzle at
-/// <see cref="DrizzleIntensity"/> to a cloudburst at full intensity, because rain rates in nature span
-/// two decades and the ear hears them as steps, not as a line. The classes: light under 2.5 mm/h,
-/// moderate to 10, heavy to 50, violent above. The light line is the AMS Glossary's (it puts the
-/// moderate/heavy line at 7.6 mm/h; 10 is the rounder figure many services use), and "violent" over
-/// 50 mm/h is the Met Office's class for showers.
+/// The rate. The server's precipitation intensity (0 to 1) becomes mm/h log-linearly from a drizzle at
+/// <see cref="DrizzleIntensity"/> to a cloudburst: rates span two decades and the ear hears steps, not a
+/// line. Light under 2.5 mm/h (AMS Glossary, which puts moderate/heavy at 7.6; 10 is the rounder figure
+/// many services use), heavy to 50, violent above (the Met Office's class for showers).
 ///
-/// THE DROPS. Marshall and Palmer (1948, "The distribution of raindrops with size", J. Meteorology 5,
-/// 165-166): the number of drops per cubic metre of air per millimetre of diameter is
-/// N(D) = N0 exp(−Λ D), N0 = 8000 m⁻³ mm⁻¹, Λ = 4.1 R^−0.21 mm⁻¹ with R in mm/h. Heavier rain has
-/// the same number of small drops and many more big ones. Each falls at its terminal speed, from
-/// Gunn and Kinzer's (1949, J. Meteorology 6, 243-248) measurements as Atlas, Srivastava and Sekhon fitted
-/// them (1973, Rev. Geophys. 11, 1-35): v = 9.65 − 10.3 exp(−0.6 D) m/s, D in mm — four metres a
-/// second for a millimetre drop, nine for a five-millimetre one. Drops under
-/// <see cref="SmallestDropMm"/> make no sound worth rendering (Medwin et al. 1992 found almost nothing
-/// from drops under 0.8 mm on water save the one bubble), and drops over <see cref="LargestDropMm"/>
-/// break up in the air.
+/// The drops. Marshall and Palmer (1948, J. Meteorology 5, 165-166): N(D) = N0 exp(−Λ D), N0 = 8000
+/// m⁻³ mm⁻¹, Λ = 4.1 R^−0.21 mm⁻¹; heavier rain has the same small drops and many more big ones. Terminal
+/// speed from Gunn and Kinzer (1949, J. Meteorology 6, 243-248) as Atlas, Srivastava and Sekhon fitted it
+/// (1973, Rev. Geophys. 11, 1-35): v = 9.65 − 10.3 exp(−0.6 D), 4 m/s at 1 mm, 9 at 5 mm. Under
+/// <see cref="SmallestDropMm"/> nothing worth rendering (Medwin et al. 1992: almost nothing under 0.8 mm
+/// on water save the one bubble); over <see cref="LargestDropMm"/> drops break up in the air.
 ///
-/// THE CLOSURE. Marshall-Palmer is a fit and does not quite give back the rate it was asked for
-/// when its drops are carried down at Gunn-Kinzer speeds between these limits. The number of drops is
-/// scaled so that the water they carry IS the rate: the volume flux of the drops, (π/6) D³ N(D) v(D)
-/// summed over the sizes, equals R. That fixes how many drops land on a square metre a second, which
-/// is the number everything heard depends on — a few hundred in light rain, a few thousand in heavy.
+/// The closure. Marshall-Palmer at these speeds and limits does not quite give back its rate, so the
+/// drop count is scaled until the volume flux, Σ (π/6) D³ N(D) v(D), is R: a few hundred drops a square
+/// metre a second in light rain, a few thousand in heavy.
 /// </summary>
 public static class Rainfall
 {
@@ -62,9 +47,8 @@ public static class Rainfall
     /// full intensity, so a storm is violent rain; the Rain front's 0.6 is moderate (about 7 mm/h).</summary>
     public const float FullIntensityRate = 60f;
 
-    /// <summary>Below this air temperature what falls is snow, and snow makes no rain sound, °C. The
-    /// same line the footsteps draw (SoundMappingService), so the ground does not turn to snow under
-    /// your feet while you hear rain on it.</summary>
+    /// <summary>Below this air temperature what falls is snow, °C: the same line the footsteps draw
+    /// (SoundMappingService), so you never hear rain on snow under your feet.</summary>
     public const float SnowBelowCelsius = 2f;
 
     /// <summary>The rain rate for a precipitation intensity, mm/h. See the class summary.</summary>
@@ -85,23 +69,6 @@ public static class Rainfall
         if (rate <= DrizzleRate) return DrizzleIntensity * rate / DrizzleRate;
         float k = MathF.Log(FullIntensityRate / DrizzleRate) / (1f - DrizzleIntensity);
         return MathF.Min(1f, DrizzleIntensity + MathF.Log(rate / DrizzleRate) / k);
-    }
-
-    /// <summary>A rate by its class's word (light, moderate, heavy, violent), or a number of mm/h.</summary>
-    public static bool TryParseRate(string word, out float rate)
-    {
-        rate = word.ToLowerInvariant() switch
-        {
-            "light" or "drizzle" => LightRate,
-            "moderate" => ModerateRate,
-            "heavy" => HeavyRate,
-            "violent" or "torrential" => ViolentRate,
-            _ => float.NaN,
-        };
-        if (!float.IsNaN(rate)) return true;
-        string n = word.ToLowerInvariant().Replace("mm/h", "").Replace("mm", "");
-        return float.TryParse(n, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out rate)
-               && float.IsFinite(rate) && rate > 0f && rate <= FullIntensityRate;
     }
 
     /// <summary>The class's word, for saying.</summary>
@@ -273,11 +240,9 @@ public sealed class DropSizeTable
     }
 
     /// <summary>
-    /// The size classes drops are drawn in, mm. A drop's sound grows as a high power of its size (its
-    /// blow's energy as D⁵ v³), so the few big drops carry most of the sound and the many small ones
-    /// almost none of it. Drawn one class at a time, every big drop that falls can be rendered, and
-    /// only the swarm of small ones is stood for by a few — where drawing from the whole spread, a few
-    /// at a time, stood a big drop for twenty when one came up and left long gaps when none did.
+    /// The size classes drops are drawn in, mm. A drop's blow carries D⁵ v³, so the few big drops are most
+    /// of the sound: drawn a class at a time, every big one is rendered and only the small ones are stood
+    /// for by a few. Drawn from the whole spread, one big drop stood for twenty and left long gaps.
     /// </summary>
     public static readonly float[] ClassEdgesMm = { 0.3f, 0.8f, 1.3f, 2.0f, 3.0f, 4.2f, 6.0f };
 

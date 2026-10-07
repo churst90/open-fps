@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
@@ -65,12 +64,9 @@ public sealed record VehicleIntakeSpec
 
 /// <summary>
 /// A road vehicle as the world editor edits it (docs/WORLD_EDITOR.md section 11.1): the engine by name,
-/// the chassis, where the exhaust and intake are, and the tyres, body and gearbox records as they are.
-/// Everything else a vehicle has (its siren, its air system, its fan, its starter, where its engine sits)
-/// comes from <see cref="Base"/>, the way MachineRegistry's parts lists take it from their base machine.
-///
-/// It is a library kind (ModelLibrary.Kinds.Vehicle). An edited one is what MachineRegistry.VehicleFor
-/// gives, on the server (the physics) and on every client (the sound).
+/// the chassis, exhaust and intake places, and the tyres, body and gearbox. Everything else (siren, air
+/// system, fan, starter) comes from <see cref="Base"/>. An edited one is what
+/// MachineRegistry.VehicleFor gives on the server and every client.
 /// </summary>
 public sealed record VehicleSpec
 {

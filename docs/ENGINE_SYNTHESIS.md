@@ -415,6 +415,49 @@ Ported from the Resonance patches. Every built-in vehicle is unchanged at 44.1 k
 - **Road air horns from the model library.** `HornVoiceState` and `Honk.LevelDb` ask
   `ModelLibrary.Horn`, as trains do, so an authored horn reaches buses and lorries at its own level.
 
+## The body and the muffler case
+
+The body (VehicleBody) is the car the engine's sound gets out through, and unlike the gas path it is
+linear and time-invariant, so it is an impulse response; it runs as a bank of resonators because a modal
+response is a sum of decaying sinusoids (six multiply-adds per mode against 2,600 taps per sample for a
+60 ms response at 44.1 kHz).
+
+The first body render had the roof's whole dimensions as its panel spans and put 97 % of its energy below
+200 Hz: a door skin 1.2 m across, taken as a flat plate, has a fundamental around four hertz. A car panel
+is divided by swages, beads, curvature and spot welds; what sets its note is the distance between
+stiffeners, 150 to 400 mm.
+
+The muffler case, settled by ear over several rounds:
+
+- The big face first. A case is not one panel: its big flat face spans the whole length and rings near
+  73 Hz, its end caps, seams, baffle-welded strips and pinched edges ring from a few hundred hertz to
+  several kilohertz. Emphasising the big face (DeepMufflerCase, which shipped for about an hour) made the
+  exhaust muffled rather than fuller: energy piled into 75-180 Hz pulls everything above 750 Hz down once
+  the render normalises by peak, audible as a duller car and measured 4 to 13 dB off the top.
+- An earlier reading had the largest span at 0.23 m, putting the lowest mode at 179 Hz, inside the band
+  the exhaust already dominates (the rendered exhaust peaks at 237-562 Hz and is 12-20 dB thinner between
+  75 and 180 Hz), so it changed nothing audible; a 300 mm span (a 40-series case is about 360 by 250 mm,
+  its big face not heavily braced) put the lowest mode near 105 Hz. That was the big-face direction,
+  later rejected as above.
+- The spans that shipped are the small ones, widened 30 % over the first tried, which drops every mode
+  about five semitones together. Span is the tube's note and the loss factor its Q: confusing them cost
+  several rounds ("a longer tube" was heard when the ring was made longer, and a wider one was wanted).
+- The loss, settled last: at 0.030 the small spans ring about 220 ms at 330 Hz falling to 25 ms at
+  3 kHz, which read as "a Flowmaster" rather than a coloured engine. Doubling the ring at the same level
+  did it; six more decibels of the same shape did not. Those are different knobs, and "more aggressive"
+  meant the ring.
+- Light damping is dangerous only for low modes: at 0.04 a mode at 133 Hz has a half-second T60, and a
+  mode that rings that long integrates the firing harmonics sweeping through it across a rev until it
+  carries the whole spectrum with the rest 12 to 18 dB beneath it: a gong, which is what the big-face
+  case did.
+- Sealed was tried: a welded can with gas inside looks like a sealed box, but removing the (ka)² edge
+  short-circuit gave the deep modes about 16 dB, one of them took 97 % of the spectrum, and the car
+  became one droning note at every level. A muffler hung under a car is a box strapped to a large
+  structure with its panels loaded on both sides.
+
+BodyResonator was first normalised by the sum of the mode weights: sixteen modes summing to one leave
+the loudest around a tenth, and a tenth of a coupling of 0.25 is thirty decibels down, inaudible.
+
 ## Dead ends and cautions
 
 - The linear waveguide plus a choked valve has no solution for a large sustained inflow; the Mach

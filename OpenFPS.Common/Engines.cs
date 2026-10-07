@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -6,18 +5,11 @@ using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
-//  An engine, described as the machine it is — not as the sound it makes.
-//
-//  Every number here is a physical quantity with a unit: a bore in millimetres, a cam duration in
-//  crank degrees, a pipe length in metres, a pressure in bar. The synthesis (EngineSynth, ExhaustNetwork,
-//  IntakeNetwork) integrates the gas through those dimensions, so changing a value changes the sound
-//  the way changing the part would. There are no "tone" or "brightness" knobs; the closest things to
-//  taste controls are the few scale factors that stand in for physics the model does not carry
-//  (turbulence strength, mechanical noise level) and they are marked as such.
-//
-//  Everything is a record with init-only properties, so any preset can be varied with `with { }`.
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// An engine, described as the machine it is, not as the sound it makes. Every number is a physical
+// quantity with a unit, and the synthesis (EngineSynth, ExhaustNetwork, IntakeNetwork) integrates the
+// gas through them, so changing a value changes the sound the way changing the part would. The only
+// taste controls are the few scale factors standing in for physics the model does not carry
+// (turbulence strength, mechanical noise level), and they say so.
 
 public enum EngineLayout { Inline, Vee, Flat }
 public enum FuelType { Petrol, Diesel }
@@ -65,10 +57,8 @@ public sealed record CamLobe
     /// the main lobe, 0..0.5. Aggressive roller cams have short ramps and reach lift fast.</summary>
     [Tunable("", 0, 0.5, "Share of the duration spent on the slow opening and closing ramps. Short ramps open the valve faster.", Step = 0.01)]
     public float RampFraction { get; init; } = 0.22f;
-    /// <summary>Lobe centreline, crank degrees from TDC of the firing stroke: BEFORE for exhaust
-    /// (positive means the exhaust lobe centres before BDC... expressed as degrees ATDC-firing, so an
-    /// exhaust lobe centred 110 degrees before overlap TDC sits at 250 ATDC-firing), AFTER for intake
-    /// (an intake lobe centred 106 ATDC of the overlap TDC sits at 466).</summary>
+    /// <summary>Lobe centreline, crank degrees after the firing TDC: an exhaust lobe centred 110 degrees
+    /// before the overlap TDC sits at 250, an intake lobe centred 106 after it at 466.</summary>
     [Tunable("degrees", 90, 540, "Where the lobe is centred, in crank degrees after the firing top dead centre. Moving the two lobes closer together adds overlap.", Label = "lobe centre", Step = 1)]
     public required float CentrelineDegrees { get; init; }
 
@@ -121,35 +111,21 @@ public sealed record MufflerSpec
     public float ResonatorQ { get; init; } = 5f;
 
     /// <summary>
-    /// The CAN ITSELF, as metal that rings — null for a muffler whose case is not worth modelling.
-    ///
-    /// Everything above this line describes what the muffler does to the GAS: chambers that cancel,
-    /// packing that absorbs, a resonator that notches a drone. None of it is the case: without this a
-    /// Flowmaster is a set of gas volumes with no steel around them. But the case is a bare steel box driven from the inside by the full pressure wave, and
-    /// it is most of what people mean by a metallic exhaust note.
-    ///
-    /// It matters that the case is driven by the pressure INSIDE rather than by what comes out of the
-    /// tailpipe. Those are different signals: the chambers cancel particular frequencies on the way
-    /// through, so a note can be quiet at the pipe and still ring loudly off the can. A muffler that
-    /// cancels well can still be the loudest-sounding thing on the car.
+    /// The can itself, as metal that rings, or null. Everything above is what the muffler does to the
+    /// gas; the case is a bare steel box driven by the pressure inside, most of what people mean by a
+    /// metallic exhaust. Driven from inside, not by the tailpipe: a note the chambers cancel at the pipe
+    /// can still ring loudly off the can.
     /// </summary>
     public VehicleBody? Shell { get; init; }
 
-    /// <summary>
-    /// How loud the case is against the tailpipe, as a fraction of the internal pressure that ends up
-    /// radiating at one metre.
-    ///
-    /// A ratio rather than a level, because the internal wave and the radiated pressure at a metre are
-    /// not in the same units by a long way — the number folds together transmission through the steel,
-    /// the case's radiating area and the spreading out to a metre. Measured rather than chosen: see
-    /// the calibration note in ExhaustNetwork.
-    /// </summary>
+    /// <summary>How loud the case is: the fraction of the internal pressure that radiates at one metre,
+    /// folding together the steel, the radiating area and the spreading (the calibration note in
+    /// ExhaustNetwork).</summary>
     public float ShellLevel { get; init; } = 0f;
 
     public static MufflerSpec StraightPipe => new() { Kind = MufflerKind.None };
 
-    /// <summary>A two-chamber 40-series style muffler: aggressive, short, and loud — and a bare
-    /// steel case with nothing in it to stop the case ringing, which is the metallic half of it.</summary>
+    /// <summary>A two-chamber 40-series style muffler: short, loud, and a bare ringing case.</summary>
     public static MufflerSpec Chambered40 => new()
     {
         Kind = MufflerKind.Chambered,
@@ -160,19 +136,12 @@ public sealed record MufflerSpec
         ShellLevel = ShellCalibration,
     };
 
-    /// <summary>
-    /// What one pascal inside the can becomes at one metre outside it — measured, not chosen.
-    ///
-    /// The internal wave runs to thousands of pascals and a metre away is tens, so this carries the
-    /// whole conversion: how much gets through the steel, how much of the case radiates, and the
-    /// spreading out to a metre. It is one ratio because measuring one ratio is honest and guessing
-    /// three factors is not. See the calibration run in the vehicles notes.
-    /// </summary>
+    /// <summary>What one pascal inside the can becomes at one metre outside it, measured (the
+    /// calibration note in ExhaustNetwork): one ratio measured rather than three factors guessed.</summary>
     public const float ShellCalibration = 0.035f;
 
-    /// <summary>A packed straight-through can: deep, less rasp — and the packing is pressed against
-    /// the case, so the case is damped too. Its shell is the same model with a loss factor ten times
-    /// higher, which is the whole of the difference.</summary>
+    /// <summary>A packed straight-through can: deep, less rasp, and the packing damps the case too (its
+    /// shell's loss factor is ten times higher).</summary>
     public static MufflerSpec Glasspack => new()
     {
         Shell = VehicleBody.PackedMufflerCase,
@@ -204,10 +173,8 @@ public sealed record ExhaustSpec
     public float[]? PrimaryLengthsMetres { get; init; }
     [Tunable("m", 0.05, 2.5, "Length of each primary pipe from the valve to the collector, when the lengths are not listed one by one.", Label = "primary length", Step = 0.01)]
     public float PrimaryLengthMetres { get; init; } = 0.80f;
-    /// <summary>How unequal the primaries are, as a fraction of their length. A fabricated header
-    /// holds them within 0.05-0.15; a cast log manifold is 0.4 and up — and the manifold sounds
-    /// coarser and burblier for it, because eight pipes at eight pitches is a band and eight at one
-    /// pitch is a tube.</summary>
+    /// <summary>How unequal the primaries are, as a fraction of their length: a fabricated header
+    /// 0.05-0.15, a cast log manifold 0.4 and up, coarser because eight pitches are a band.</summary>
     [Tunable("", 0, 0.8, "How unequal the primaries are, as a share of their length. A fabricated header is 0.05 to 0.15, a cast log manifold 0.4 and up.", Label = "primary length spread", Step = 0.01)]
     public float PrimarySpread { get; init; } = 0.12f;
     [Tunable("mm", 15, 150, "Inside diameter of each primary pipe.", Label = "primary diameter", Step = 0.5)]
@@ -215,7 +182,7 @@ public sealed record ExhaustSpec
 
     /// <summary>Which cylinders join which collector, as lists of cylinder indices. Null means one
     /// collector per bank. An inline-6 with two 3-into-1 headers is {{0,1,2},{3,4,5}}; a 4-2-1 header
-    /// on an inline-4 is {{0,3},{1,2}} — and that grouping is most of why those sound the way they do.</summary>
+    /// on an inline-4 is {{0,3},{1,2}}.</summary>
     public int[][]? CollectorGroups { get; init; }
     [Tunable("mm", 15, 250, "Inside diameter of the collector and the pipe after it.", Label = "collector diameter", Step = 1)]
     public float CollectorDiameterMm { get; init; } = 63f;
@@ -244,30 +211,18 @@ public sealed record ExhaustSpec
     public float TailpipeDiameterMm { get; init; } = 63f;
 
     /// <summary>
-    /// WHERE each tailpipe leaves the car, metres, in the machine's frame (x across the car, y up,
-    /// z forward) relative to the exhaust part's position. One entry per branch. Null puts every exit
-    /// at the same point.
-    ///
-    /// This is not decoration. Two pipes are two sources, and what a listener hears is the two
-    /// arriving with the path difference their spacing and the listener's bearing imply. Summed at
-    /// one point — which is what null does — the two
-    /// banks of an even-firing V10 are exactly anti-phase at the bank firing rate, so the sum cancels
-    /// the engine's own fundamental and leaves the next harmonic alone: measured, order 2.5 sat
-    /// 12-19 dB under order 5 on the sum and level with it on one pipe. The ear pitches that an
-    /// octave up, and a single partial gliding is a siren. A real car's pipes are half a metre or
-    /// more apart, so from anywhere off the centre line they do not cancel, and on a pass-by the
-    /// balance between them sweeps with the angle. See ExhaustNetwork.SetListener.
-    ///
-    /// Cross-plane V8s have no such symmetry to lose, which is why the field is null on presets that
-    /// sound right as one point, and set only where the geometry is proven to matter.
+    /// Where each tailpipe leaves the car, metres, in the machine's frame (x across, y up, z forward)
+    /// from the exhaust part's position, one per branch; null puts every exit at one point. Summed at one
+    /// point, an even-firing V10's banks are anti-phase at the bank firing rate and cancel the engine's
+    /// fundamental: order 2.5 measured 12-19 dB under order 5 on the sum and level with it on one pipe,
+    /// heard an octave up as a gliding siren. Set only where the geometry is proven to matter; a
+    /// cross-plane V8 has no such symmetry (ExhaustNetwork.SetListener).
     /// </summary>
     public Vector3[]? TailpipeExitsMetres { get; init; }
-    /// <summary>Second exhaust system count for engines that split by bank. Derived: it is the number
-    /// of collector groups unless <see cref="Crossover"/> is Merged.</summary>
 
     /// <summary>Exhaust gas temperature at the port, Celsius, idling and at full load. The speed of
-    /// sound in every pipe follows the square root of the absolute temperature, so the whole system
-    /// speaks nearly half an octave higher working than idling.</summary>
+    /// sound goes as the root of the absolute temperature, so the system speaks nearly half an octave
+    /// higher working than idling.</summary>
     [Tunable("°C", 50, 700, "Exhaust gas temperature at the port when idling. Hotter gas raises every pipe resonance.", Label = "gas temperature at idle", Step = 10)]
     public float GasCelsiusIdle { get; init; } = 330f;
     [Tunable("°C", 300, 1100, "Exhaust gas temperature at the port at full load.", Label = "gas temperature at full load", Step = 10)]
@@ -281,28 +236,26 @@ public sealed record ExhaustSpec
     /// production system with four bends and two flanges.</summary>
     [Tunable("", 0.5, 4, "Wall loss against a straight smooth pipe, for bends, joints and flex sections. 1 is a straight smooth pipe; 2 to 3 is a production system with four bends and two flanges.", Label = "wall loss", Step = 0.05)]
     public float WallLossMultiplier { get; init; } = 1.8f;
-    /// <summary>Scale on the finite-amplitude steepening of the wave fronts, 0..1. 1 is the physics —
-    /// a half-bar pulse arrives noticeably sharper than it left. It is the mechanism behind the rasp
-    /// and crackle of an engine under load, and it is why headers sound hard and a stock manifold at
-    /// idle does not.</summary>
+    /// <summary>Scale on the finite-amplitude steepening of the wave fronts, 0..1; 1 is the physics (a
+    /// half-bar pulse arrives sharper than it left). The rasp and crackle of an engine under load.</summary>
     public float Steepening { get; init; } = 1f;
     /// <summary>Resistive loss at junctions from the mean flow, as a fraction of the junction's
     /// admittance at full load. Stands in for vortex shedding at the collector and muffler inlet.</summary>
     public float FlowLoss { get; init; } = 0.12f;
 
-    /// <summary>Turbulent mixing noise at the tailpipe orifice, as a level scale. This is the jet noise
-    /// of the exhaust leaving the pipe; it goes as a high power of the exit velocity so it is
-    /// negligible at idle and part of the roar at full load. The exponent is physics; this scale
-    /// stands in for the nozzle detail the model does not carry.</summary>
+    /// <summary>Jet noise of the exhaust leaving the tailpipe, a level scale standing in for nozzle
+    /// detail; the exponent on exit velocity is physics, so it is nothing at idle.</summary>
     public float JetNoiseLevel { get; init; } = 1f;
-    /// <summary>Turbulence generated at the valve seat during blowdown, level scale. The flow is sonic
-    /// through a narrow curtain and it is not quiet.</summary>
+    /// <summary>Turbulence at the valve seat during blowdown, sonic through a narrow curtain; a level
+    /// scale.</summary>
     public float PortNoiseLevel { get; init; } = 1f;
 
     /// <summary>Chance per second of unburnt fuel lighting in the hot pipe on the overrun.</summary>
     [Tunable("per second", 0, 30, "How often unburnt fuel lights in the hot pipe with the throttle shut. Zero for an engine that cuts its fuel.", Label = "overrun pops", Step = 0.5)]
     public float OverrunPopRate { get; init; } = 6f;
 
+    /// <summary>How many separate systems reach the air: one per collector group unless
+    /// <see cref="Crossover"/> is Merged.</summary>
     public int TailpipeCount(int collectors)
         => Crossover == CrossoverKind.Merged ? 1 : collectors;
 }
@@ -332,29 +285,15 @@ public sealed record IntakeSpec
     public float Level { get; init; } = 0.6f;
 
     /// <summary>
-    /// What the AIRBOX ITSELF takes out on the way past, dB — derived from its geometry, not
-    /// declared.
+    /// What the airbox takes out on the way past, dB, from its geometry: an expansion chamber,
+    /// TL = 10 log10[1 + (1/4)(m - 1/m)^2 sin^2(kL)] with m = A_box / A_snorkel, averaged over frequency
+    /// (sin^2 -> 1/2), the box taken as a cube (A_box = V^(2/3)).
     ///
-    /// A box in the middle of a duct is an expansion chamber, and an expansion chamber is a
-    /// silencer. Its transmission loss is set by one number, the area ratio between the box and
-    /// the pipe it sits in:
-    ///
-    ///     TL = 10 log10[ 1 + (1/4)(m - 1/m)^2 sin^2(kL) ]      m = A_box / A_snorkel
-    ///
-    /// averaged over frequency (sin^2 -> 1/2). The box is taken as cubic — the volume is declared
-    /// and its proportions are not — so A_box = V^(2/3).
-    ///
-    /// Without it a stock road car sounds like a race car. The EXHAUST side has a muffler model, so
-    /// silencing an exhaust works; <see cref="Level"/> is only a hand-set escape fraction, and no
-    /// preset sets it low enough to stand in for a silencer. Measured with `--voice-levels parts`
-    /// and no airbox loss, every car with a silenced exhaust radiates MORE from its airbox than
-    /// from its tailpipe — economy four +8 dB, V6 +11, road police +10 — where a real one is eight
-    /// to fifteen below.
-    ///
-    /// A blanket correction is wrong: it moves the race engines too, and they are not the problem.
-    /// What separates them is exactly what this formula reads — a big box
-    /// on a small snorkel silences (an economy four, 13 dB) and a small box on a big one barely
-    /// does (a big-block with an open element, 4 dB). Nothing is declared per preset.
+    /// Without it every car with a silenced exhaust radiated more from its airbox than its tailpipe
+    /// (--voice-levels parts: economy four +8 dB, V6 +11, road police +10) where a real one is eight to
+    /// fifteen below. A blanket correction would move the race engines too: a big box on a small
+    /// snorkel silences (an economy four, 13 dB), a small box on a big one barely does (an open-element
+    /// big-block, 4 dB).
     /// </summary>
     public float AirboxLossDb
     {
@@ -371,26 +310,12 @@ public sealed record IntakeSpec
     }
 
     /// <summary>
-    /// Turbulence at the throttle plate, as a multiple of what the flow predicts. 0 for none.
-    ///
-    /// The counterpart of the exhaust's <see cref="ExhaustSpec.JetNoiseLevel"/>. Without it the
-    /// airbox never speaks. An airbox on a snorkel
-    /// is a resonator, and the engine breathing through it drives it only at the firing rate and its
-    /// harmonics — which on a fast engine is a kilohertz and more, nowhere near the tens of hertz the
-    /// box is tuned to. A resonator nothing drives at its own note is silent however well it is
-    /// built. The plate is what drives it: a sharp-edged orifice with the whole of the engine's air
-    /// going through it, and the broadband it makes is the one source in the tract with energy
-    /// everywhere, including down where the box lives.
-    ///
-    /// It is also why a throttle HISSES when it is nearly shut, without anybody writing that down:
-    /// the peak frequency follows the velocity over the gap divided by the size of the gap, and a
-    /// shut plate is a fast jet through a slot.
-    ///
-    /// It is a PART-THROTTLE sound and only that. The term is a separated jet beating on an edge, so
-    /// it is scaled by the pressure drop across the plate — large at idle, a few per cent at wide
-    /// open, and zero on a diesel, which has no plate at all and whose intake is open for ever.
-    /// Without that scaling the diesels get the turbulence of a throttle they do not have, and an
-    /// intake tract with modes at 300-460 Hz turns it into an audible note.
+    /// Turbulence at the throttle plate, as a multiple of what the flow predicts; 0 for none. The
+    /// counterpart of <see cref="ExhaustSpec.JetNoiseLevel"/>, and the only drive the airbox resonator
+    /// gets at its own tens of hertz (the firing harmonics are far above it). Its peak follows gap
+    /// velocity over gap size, so a nearly shut throttle hisses. Scaled by the pressure drop across the
+    /// plate, so zero on a diesel, which has no plate: unscaled, a diesel's 300-460 Hz tract modes made
+    /// an audible note of it.
     /// </summary>
     public float FlowNoiseLevel { get; init; } = 1f;
 }
@@ -417,11 +342,9 @@ public sealed record MechanicalSpec
     [Tunable("s", 0.05, 6, "How long the turbo shaft takes to spool up to boost.", Label = "turbo lag", Step = 0.05)]
     public float TurboLagSeconds { get; init; } = 0.8f;
     /// <summary>
-    /// How fast the turbo's shaft turns at idle, as a fraction of its speed at full boost. A turbine
-    /// is spun by the exhaust, and an idling engine still has exhaust: a small turbo sized for
-    /// response barely turns, but a big one — or the pair on a compound setup — freewheels at a
-    /// third of its speed, and that whistle is heard with the truck sitting still ("even at idle you
-    /// could hear the whistle from the turbos"). Zero keeps the spool on the throttle alone.
+    /// How fast the turbo's shaft turns at idle, as a fraction of its speed at full boost. A small turbo
+    /// barely turns; a big one, or a compound pair, freewheels at a third and whistles standing still
+    /// ("even at idle you could hear the whistle from the turbos"). Zero spools on the throttle alone.
     /// </summary>
     [Tunable("", 0, 0.8, "Turbo shaft speed at idle as a share of its speed at full boost. A big turbo freewheels at a third.", Label = "turbo speed at idle", Step = 0.05)]
     public float TurboIdleSpool { get; init; } = 0f;
@@ -476,15 +399,14 @@ public sealed record EngineProfile
     public ValveSpec IntakeValve { get; init; } = new() { DiameterMm = 46f };
 
     /// <summary>
-    /// Valve overlap in crank degrees: how long both valves are open across TDC. THE number behind a
-    /// lopey idle. With a lot of overlap and little exhaust velocity at idle, exhaust gas is pushed back
-    /// into the cylinder and the intake charge is diluted, cycle by cycle and unevenly — which is what
-    /// a lope is. Stock is 20-40, a street cam 50-70, a race cam 80 and up.
+    /// Valve overlap in crank degrees, both valves open across TDC: the number behind a lopey idle, where
+    /// exhaust pushed back into the cylinder dilutes the charge unevenly. Stock is 20-40, a street cam
+    /// 50-70, a race cam 80 and up.
     /// </summary>
     public float OverlapDegrees => MathF.Max(0f, ExhaustCam.ClosesDegrees - IntakeCam.OpensDegrees);
 
-    /// <summary>The lope, 0..1, derived from overlap. Kept as a derived number so a preset's idle
-    /// character can be read at a glance; the synthesis uses the overlap itself.</summary>
+    /// <summary>The lope, 0..1, from overlap, for reading a preset at a glance; the synthesis uses the
+    /// overlap itself.</summary>
     public float CamLope => Math.Clamp((OverlapDegrees - 30f) / 60f, 0f, 1f);
 
     // ── Combustion ──────────────────────────────────────────────────────────────────────────────
@@ -513,20 +435,17 @@ public sealed record EngineProfile
     [Tunable("rpm", 50, 1000, "How fast the starter turns the engine: 150 to 250 for a diesel, 200 to 300 for petrol.", Label = "cranking speed", Step = 10, Source = "Pearson, Diesel Engine Starting Systems; six recorded starts at 150 to 225")]
     public float CrankingRpm { get; init; } = 200f;
     /// <summary>
-    /// Crank revolutions the starter turns before the first cylinder fires. An engine computer
-    /// fuels and sparks nothing until it has found the crank and the cam — up to a whole cycle, two
-    /// revolutions — and injects on the next intake stroke after that. A common-rail diesel must
-    /// also raise its rail to injection pressure. Without it the synthesis fires on the first
-    /// compression at cranking speed and catches in 50 ms, too fast to hear a car start. NaN takes the default for the fuel: three for petrol, four for diesel, which
-    /// at the declared cranking speeds is about 0.9 s for a car and two seconds for a bus (a
-    /// port-injected engine starts in 0.66-0.95 s, US5088465).
+    /// Crank revolutions the starter turns before the first cylinder fires: the engine computer finds
+    /// crank and cam (up to two revolutions) first, and a common-rail diesel raises its rail. Firing on
+    /// the first compression, the synthesis caught in 50 ms, too fast to hear a start. NaN takes three
+    /// for petrol and four for diesel, about 0.9 s for a car and two for a bus (a port-injected engine
+    /// starts in 0.66-0.95 s, US5088465).
     /// </summary>
     public float RevolutionsBeforeFiring { get; init; } = float.NaN;
     public float FiringAfterRevolutions => float.IsNaN(RevolutionsBeforeFiring)
         ? (Fuel == FuelType.Diesel ? 4f : 3f) : RevolutionsBeforeFiring;
-    /// <summary>Rotating inertia of crank, flywheel, clutch and damper, kg m^2. A heavy flywheel
-    /// is 0.35-0.5, a race one 0.1. It decides how fast a free rev climbs and how much the crank
-    /// speed ripples between firings.</summary>
+    /// <summary>Rotating inertia of crank, flywheel, clutch and damper, kg m^2: a heavy flywheel is
+    /// 0.35-0.5, a race one 0.1.</summary>
     [Tunable("kg m²", 0.005, 250, "Rotating inertia of crank, flywheel, clutch and damper. Less makes the revs climb and fall faster.", Label = "inertia", Step = 0.01)]
     public float InertiaKgM2 { get; init; } = 0.30f;
     /// <summary>Mechanical friction torque, Nm, at rest and per 1000 rpm. About 0.95 bar of friction
@@ -576,8 +495,7 @@ public sealed record EngineProfile
         }
     }
 
-    /// <summary>Firing angles of the cylinders in one collector group, sorted, so the pattern a
-    /// listener hears down one pipe can be printed.</summary>
+    /// <summary>The intervals between firings down one collector group's pipe, degrees.</summary>
     public float[] GroupIntervals(int group)
     {
         var angles = CollectorGroups[group].Select(c => FiringAngles[c]).OrderBy(a => a).ToArray();
@@ -621,14 +539,12 @@ public sealed record EngineProfile
     public static int[] HalfBanks(int n) => Enumerable.Range(0, n).Select(i => i < n / 2 ? 0 : 1).ToArray();
     public static int[] OneBank(int n) => new int[n];
 
-    // ═══════════════════════════════════════════════════════════════════════════════════════════
-    //  Presets. Each is a real kind of engine, with numbers from the kind of engine it is.
-    // ═══════════════════════════════════════════════════════════════════════════════════════════
+    // ── Presets: each a real kind of engine ─────────────────────────────────────────────────────
 
     /// <summary>
     /// A 7-litre big-block V8 with a long cam, long-tube headers, true duals and chambered mufflers.
     /// Cross-plane crank, GM firing order 1-8-4-3-6-5-7-2: each bank fires at 90/180/180/270 degree
-    /// intervals, and that unevenness, heard down its own pipe, is the American V8 burble.
+    /// intervals, and that unevenness down its own pipe is the American V8 burble.
     /// </summary>
     public static EngineProfile V8MuscleBigBlock => new()
     {
@@ -648,8 +564,7 @@ public sealed record EngineProfile
         PeakTorqueNm = 750f, PeakTorqueRpm = 3600f,
         Exhaust = new ExhaustSpec
         {
-            // Unequal enough to growl: the half-orders live in the difference between the primaries,
-            // and a stock cast manifold is far less even than a fabricated header.
+            // Unequal enough to growl: the half-orders live in the difference between the primaries.
             PrimaryLengthMetres = 0.92f, PrimarySpread = 0.24f, PrimaryDiameterMm = 47.6f,
             CollectorDiameterMm = 76f, CollectorPipeMetres = 0.9f,
             Crossover = CrossoverKind.None,
@@ -666,37 +581,14 @@ public sealed record EngineProfile
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.9f, CombustionKnock = 0.06f, AccessoryWhineLevel = 0.08f },
     };
 
-    /// <summary>
-    /// A 7.0 police interceptor: the big block, but with a cam that has no business in a road car.
-    ///
-    /// The thump is OVERLAP, and overlap is the lobe centres, not the duration. The stock big block
-    /// above runs 306/300 degrees on 108-degree centres; this runs longer AND tighter — 320/316 on
-    /// 102 — which puts roughly 116 degrees of overlap in it against the stock engine's 68. At idle
-    /// that means exhaust blowing back through the intake and a cylinder that only sometimes gets a
-    /// clean charge, so it lopes: the classic cammed-V8 thump, and it comes out of the model on its
-    /// own because the model is running the valves.
-    ///
-    /// Cross-plane firing (1-8-4-3-6-5-7-2) is what makes it BIG rather than flat: the banks fire
-    /// unevenly, so each side of the car has its own ragged half-order pattern and the two beat
-    /// against each other. Open collectors and a straight pipe take the muffler out of the way of
-    /// all of it.
-    /// </summary>
     // ── Four ways to exhaust the same V8 ────────────────────────────────────────────────────────
     //
-    // Each of these changes the HARDWARE and nothing else: the same cylinders, the same firing
-    // order, the same cam unless it is stated. They exist because a field of one car cannot show
-    // that the character comes from the mechanism, and because the difference between open headers
-    // and a packed can is the single clearest demonstration this engine has that nothing here is a
-    // recording — no sample library ships the same engine four ways.
+    // Each changes the hardware and nothing else (the same cylinders, firing order and cam unless
+    // stated), so the character is heard to come from the mechanism.
 
     /// <summary>
-    /// OPEN HEADERS. The primaries dump straight into the air at the collector — no mid-pipe, no
-    /// crossover, no muffler, no tailpipe.
-    ///
-    /// What you should hear: everything, unfiltered. Nothing cancels the harmonics and nothing
-    /// absorbs them, so the whole series survives and the overrun cracks. It is also the only one
-    /// with no muffler CASE, so none of the metallic ring the others have — the rawness is the
-    /// absence of hardware, not the addition of any.
+    /// Open headers: the primaries dump into the air at the collector, with no mid-pipe, crossover,
+    /// muffler or tailpipe. Nothing cancels or absorbs, the overrun cracks, and there is no can to ring.
     /// </summary>
     public static EngineProfile V8OpenHeaders => V8MuscleBigBlock with
     {
@@ -712,13 +604,8 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// The same big block through GLASSPACKS: a packed straight-through can either side.
-    ///
-    /// What you should hear: the same engine, mellowed. The packing absorbs the top of the band
-    /// rather than cancelling bands out of it, so the harmonics thin from the top down instead of
-    /// being notched — and the packing is pressed against the case, so it damps that too and the
-    /// metallic ring goes with it. Mellow is an ABSENCE here, which is why it cannot be faked by
-    /// turning something down.
+    /// The same big block through glasspacks, a packed straight-through can either side: the packing
+    /// thins the harmonics from the top down instead of notching them, and damps the case's ring.
     /// </summary>
     public static EngineProfile V8BigBlockGlasspack => V8MuscleBigBlock with
     {
@@ -731,12 +618,8 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// A MILD small block: shorter cam, smaller valves, stock manifolds rather than headers.
-    ///
-    /// What you should hear: the least dramatic car on the circuit, and deliberately. Cast log
-    /// manifolds hold their primaries nowhere near equal — PrimarySpread 0.42 against a fabricated
-    /// header's 0.12 — and eight pipes at eight pitches is a band where eight at one pitch is a
-    /// tube. It idles straight because the cam is short, and it runs out of breath early.
+    /// A mild small block: a short cam, smaller valves and cast log manifolds (PrimarySpread 0.42 against
+    /// a header's 0.12). It idles straight and runs out of breath early.
     /// </summary>
     public static EngineProfile V8MildSmallBlock => V8SportsFlowmaster40 with
     {
@@ -754,13 +637,9 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// The beefiest of them: a big block on a LONG cam, through 40-series chambered cans.
-    ///
-    /// What you should hear: an idle that will not sit still. A 330-degree cam overlaps so much at
-    /// low lift that a cylinder breathes its neighbour's exhaust, the burn goes ragged, and the
-    /// engine hunts — the lope is a misfire that nobody fixed because it is what the cam is for.
-    /// Everything above the idle is the chambered can: notches where the chambers cancel, the
-    /// harmonics between them surviving intact because nothing absorbs, and the case ringing.
+    /// A big block on a long cam through 40-series chambered cans. The 330-degree cam overlaps so much
+    /// that a cylinder breathes its neighbour's exhaust and the idle hunts; above it, the chambers notch,
+    /// the harmonics between survive, and the case rings.
     /// </summary>
     public static EngineProfile V8BigCam => V8MuscleBigBlock with
     {
@@ -780,16 +659,8 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// A litre sports bike: an inline four that revs to fourteen and a half thousand.
-    ///
-    /// The reason it sounds nothing like a car is not that it is small, it is that it is FAST. Four
-    /// cylinders firing every 180 degrees at 14,500 rpm is a firing rate of 483 Hz — above the note
-    /// of most cars' third harmonic — so the fundamental itself is a pitch rather than a beat, and
-    /// the orders above it run into the kilohertz where the ear is most sensitive. Its valvetrain is
-    /// busy for the same reason: sixteen valves closing 120 times a second each.
-    ///
-    /// Almost no exhaust to speak of. A short 4-into-1 and a can the size of a shoe, so nothing
-    /// cancels and nothing absorbs.
+    /// A litre sports bike: an inline four to 14,500 rpm, a firing rate of 483 Hz, so the fundamental is
+    /// a pitch and the orders run into the kilohertz; sixteen valves each closing 120 times a second.
     /// </summary>
     public static EngineProfile SportBike => new()
     {
@@ -803,19 +674,14 @@ public sealed record EngineProfile
         ExhaustValve = new ValveSpec { DiameterMm = 24f, DischargeCoefficient = 0.70f },
         IntakeValve = new ValveSpec { DiameterMm = 30f, DischargeCoefficient = 0.72f },
         EvoTemperatureK = 1180f, IdleMapBar = 0.34f,
-        // A stiff governor, because a bike has almost no flywheel — 0.055 kg m² against a big block's
-        // 0.42 — so the same disturbance moves it eight times as far and a lazy governor lets the
-        // idle hunt up past 2,500. Modern bikes hold theirs with an idle-air valve for exactly this
-        // reason; it is the low inertia that makes the stiffness necessary, not the revs.
+        // A stiff governor because the flywheel is tiny (0.055 kg m² against a big block's 0.42): the
+        // same disturbance moves it eight times as far, and a lazy governor let the idle hunt past 2,500.
         IdleRoughness = 0.15f, IdleGovernorGain = 14f,
         IdleRpm = 1300f, RedlineRpm = 14500f,
-        // Low inertia: the crank is a tenth of a big block's, 0.055 against 0.42, so the revs rise
-        // and fall fast. Friction is what a short-stroke four really loses: its 55 mm stroke at
-        // 11,000 rpm moves the pistons at 20 m/s, where the fleet's engines run 2-4 bar of friction
-        // mean effective pressure; this is 3.2 bar there, about 26 Nm.
+        // At 11,000 rpm the 55 mm stroke moves the pistons at 20 m/s, where engines run 2-4 bar of
+        // friction mean effective pressure: 3.2 bar here, about 26 Nm.
         InertiaKgM2 = 0.055f, FrictionNm = 6f, FrictionNmPerKrpm = 1.8f,
         PeakTorqueNm = 112f, PeakTorqueRpm = 11000f,
-        // Sixteen valves at very high speed: a bike's top end is a large part of its voice.
         Mechanical = new MechanicalSpec { ValvetrainLevel = 1.0f, CombustionKnock = 0.08f, AccessoryWhineLevel = 0.15f, AccessoryWhineOrder = 2.5f },
         Exhaust = new ExhaustSpec
         {
@@ -824,15 +690,13 @@ public sealed record EngineProfile
             CollectorDiameterMm = 50f, CollectorPipeMetres = 0.12f,
             Crossover = CrossoverKind.None,
             MidPipeMetres = 0.04f,
-            // A stock system: the pre-chamber under the engine (catalyst and two short expansions)
-            // and a packed can. A quarter-packed glasspack would be 119 dB at a metre flat out —
-            // twenty over a stock litre bike, which passes at about 80 at 7.5 m — and nothing but
-            // pipe. The volume is under the bike, so the system is not for it.
+            // A stock system: the pre-chamber under the engine (catalyst and two short expansions) and
+            // a packed can. A quarter-packed glasspack was 119 dB at a metre flat out, twenty over a
+            // stock litre bike (which passes at about 80 at 7.5 m).
             Muffler = MufflerSpec.Stock with { ChamberLengthsMetres = new[] { 0.10f, 0.14f }, ExpansionRatio = 7f },
             TailpipeMetres = new[] { 0.08f },
             TailpipeDiameterMm = 50f,
-            // Short, thin, hot pipes and a hard blowdown: a bike keeps its top end where a saloon's
-            // long system loses it.
+            // Short, thin, hot pipes and a hard blowdown keep the top end.
             WallLossMultiplier = 1.0f,
             Steepening = 1.6f,
             OverrunPopRate = 12f,
@@ -841,17 +705,9 @@ public sealed record EngineProfile
 
 
     /// <summary>
-    /// A blown big block: 7.4 litres with a Roots supercharger sitting on top of it.
-    ///
-    /// The blower is the point, and it is two sounds rather than one. It WHINES, because a pair of
-    /// meshing rotors pumps in discrete gulps and that gulp rate is a high multiple of engine speed —
-    /// a pitch that rises with the revs and sits right on top of the exhaust note. And it MOVES AIR,
-    /// so every cylinder gets more of it: more pressure, more torque, a harder blowdown into the
-    /// pipes. The whine is what everyone recognises; the second is what makes it sound heavy.
-    ///
-    /// Unlike a turbo it has no lag worth the name. It is geared to the crank, so it is making boost
-    /// at idle and there is nothing to spool — which is exactly why it sounds instant and a turbo
-    /// does not.
+    /// A blown big block: 7.4 litres with a Roots supercharger on top. The rotors whine at a high order
+    /// of engine speed, and the boost gives every cylinder a harder blowdown. Geared to the crank, it
+    /// has no lag.
     /// </summary>
     public static EngineProfile V8Blown => V8BigCam with
     {
@@ -866,6 +722,11 @@ public sealed record EngineProfile
         Mechanical = V8BigCam.Mechanical with { BlowerWhineOrder = 12f, BlowerWhineLevel = 0.85f },
     };
 
+    /// <summary>
+    /// The pace car's 7.0 V8: the big block with a race cam. Overlap is the lobe centres, not the
+    /// duration: 320/316 degrees on 102 centres (against the big block's 306/300 on 108) gives about 116
+    /// degrees of overlap to its 68, and the lope comes out of the valves. Open collectors, straight pipe.
+    /// </summary>
     public static EngineProfile PoliceV8 => new()
     {
         Name = "7.0 interceptor V8, lopey cam, open pipes",
@@ -879,14 +740,13 @@ public sealed record EngineProfile
         ExhaustValve = new ValveSpec { DiameterMm = 50f, DischargeCoefficient = 0.70f },
         IntakeValve = new ValveSpec { DiameterMm = 58f, DischargeCoefficient = 0.70f },
         EvoTemperatureK = 1240f, IdleMapBar = 0.42f,
-        // It cannot idle smoothly and should not pretend to. This is the lope.
         IdleRoughness = 1.0f, IdleGovernorGain = 1.2f,
         IdleRpm = 950f, RedlineRpm = 6800f,
         InertiaKgM2 = 0.38f, FrictionNm = 55f, FrictionNmPerKrpm = 20f,
         PeakTorqueNm = 810f, PeakTorqueRpm = 4200f,
         Exhaust = new ExhaustSpec
         {
-            // Long tube headers into a short collector and then out. No muffler: this is the scream.
+            // Long tube headers into a short collector, no muffler.
             PrimaryLengthMetres = 0.95f, PrimarySpread = 0.06f, PrimaryDiameterMm = 50.8f,
             CollectorDiameterMm = 89f, CollectorPipeMetres = 0.40f,
             Crossover = CrossoverKind.None,
@@ -897,7 +757,6 @@ public sealed record EngineProfile
             TailpipeDiameterMm = 89f,
             GasCelsiusIdle = 400f, GasCelsiusFull = 950f,
             WallLossMultiplier = 1.15f,
-            // A big cam on a closed throttle at speed is where the bangs come from.
             OverrunPopRate = 14f,
         },
         Intake = new IntakeSpec { RunnerLengthMetres = 0.20f, RunnerDiameterMm = 54f, PlenumLitres = 7f, ThrottleDiameterMm = 105f, AirboxLitres = 6f, SnorkelLengthMetres = 0.25f, SnorkelDiameterMm = 110f, Level = 1.0f, Absorption = 0.1f },
@@ -905,14 +764,9 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// The SAME interceptor V8 as a road car has it: stock cam, stock manifolds, a catalyst and a
-    /// silencer. Everything that makes <see cref="PoliceV8"/> loud is aftermarket, and this is the
-    /// engine before any of it went on.
-    ///
-    /// The differences are all real parts, not a level knob: 290-degree cams instead of 320 (so it
-    /// idles, and idles smoothly); 5.0 litres instead of 7.0; cast manifolds with short primaries
-    /// into a single 63 mm pipe; and a stock muffler where the pace car has straight pipe.
-    /// That last one is most of the thirty-five decibels.
+    /// The interceptor V8 as a road car has it: 5.0 litres, a stock cam, cast manifolds with short
+    /// primaries, and a muffler where <see cref="PoliceV8"/> has straight pipe, which is most of the
+    /// difference between them.
     /// </summary>
     public static EngineProfile PoliceInterceptorV8 => new()
     {
@@ -926,21 +780,19 @@ public sealed record EngineProfile
         ExhaustValve = new ValveSpec { DiameterMm = 33f, DischargeCoefficient = 0.66f },
         IntakeValve = new ValveSpec { DiameterMm = 37f, DischargeCoefficient = 0.68f },
         EvoTemperatureK = 1180f, IdleMapBar = 0.32f,
-        // A stock cam and a stock idle: it does not lope, because nothing about it is lopey.
         IdleRoughness = 0.12f, IdleGovernorGain = 0.8f,
         IdleRpm = 680f, RedlineRpm = 6500f,
         InertiaKgM2 = 0.30f, FrictionNm = 42f, FrictionNmPerKrpm = 16f,
         PeakTorqueNm = 530f, PeakTorqueRpm = 4250f,
         Exhaust = new ExhaustSpec
         {
-            // Cast manifolds: short, fat, and nothing like a header.
+            // Cast manifolds: short and fat.
             PrimaryLengthMetres = 0.34f, PrimarySpread = 0.05f, PrimaryDiameterMm = 42f,
             CollectorDiameterMm = 63f, CollectorPipeMetres = 0.55f,
             Crossover = CrossoverKind.HPipe,
             MidPipeMetres = 1.6f,
-            // A pursuit exhaust: a straight-through performance can in place of the baffled factory
-            // one, so the V8 is heard working away from the kerb. Tuned on the live voice to 99.6 dB
-            // flat out: seven over a fully stock saloon (93), still fourteen under a mild muscle car.
+            // A pursuit exhaust, a straight-through can in place of the baffled one: 99.6 dB flat out
+            // on the live voice, seven over a fully stock saloon (93), fourteen under a mild muscle car.
             Muffler = MufflerSpec.Stock with { BaffleLoss = 0.04f, Absorption = 0.08f },
             Steepening = 0.9f,
             TailpipeMetres = new[] { 0.60f, 0.60f },
@@ -949,26 +801,16 @@ public sealed record EngineProfile
             WallLossMultiplier = 1.0f,
             OverrunPopRate = 0.5f,
         },
-        // Level 0.12: a sealed factory airbox with a Helmholtz resonator in a long snorkel behind
-        // the headlight, which is what IntakeSpec.Level means ("an open filter under the bonnet is
-        // 1; a factory airbox with a resonator in the snorkel is 0.25") and this is quieter than
-        // that. Worth saying because it is doing a lot of work: at 0.55 the intake measured 109 dB
-        // against an 86 dB exhaust and this stock saloon came out louder than a muscle car.
+        // Level 0.12, a sealed airbox with a Helmholtz resonator in a long snorkel: at 0.55 the intake
+        // measured 109 dB against an 86 dB exhaust and this saloon came out louder than a muscle car.
         Intake = new IntakeSpec { RunnerLengthMetres = 0.26f, RunnerDiameterMm = 44f, PlenumLitres = 5.5f, ThrottleDiameterMm = 80f, AirboxLitres = 12f, SnorkelLengthMetres = 0.35f, SnorkelDiameterMm = 85f, Level = 0.12f, Absorption = 0.65f },
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.45f, CombustionKnock = 0.04f, AccessoryWhineLevel = 0.12f },
     };
 
     /// <summary>
-    /// A 1969 big-block Charger's 7.2-litre V8 with Flowmaster chambered mufflers — the car people
-    /// actually drive on a street, as against a race saloon.
-    ///
-    /// Everything about it is street spec and every difference from the race engines is a part:
-    /// a 284-degree hydraulic cam (it idles, with a little lope, rather than loping so hard it will
-    /// not hold a light), cast-iron exhaust manifolds instead of long-tube headers, an H-pipe
-    /// crossover between the banks — which is what gives a big-block its cross-plane burble rather
-    /// than the flat bark of two separate fours — and a pair of chambered cans on 2.5 inch pipe.
-    /// The cans are the whole difference between this and an open-headered car, and they are worth
-    /// well over ten decibels.
+    /// A 1969 Charger's 7.2-litre V8 in street spec: a 284-degree hydraulic cam (a little lope), cast
+    /// manifolds, an H-pipe, and chambered cans on 2.5 inch pipe worth well over ten decibels against
+    /// open headers.
     /// </summary>
     public static EngineProfile V8Charger440 => new()
     {
@@ -983,19 +825,16 @@ public sealed record EngineProfile
         ExhaustValve = new ValveSpec { DiameterMm = 44.5f, DischargeCoefficient = 0.67f },
         IntakeValve = new ValveSpec { DiameterMm = 54f, DischargeCoefficient = 0.69f },
         EvoTemperatureK = 1210f, IdleMapBar = 0.38f,
-        // A street cam in a big block: it lopes, but it idles.
         IdleRoughness = 0.42f, IdleGovernorGain = 0.9f,
         IdleRpm = 750f, RedlineRpm = 5600f,
         InertiaKgM2 = 0.42f, FrictionNm = 52f, FrictionNmPerKrpm = 18f,
         PeakTorqueNm = 664f, PeakTorqueRpm = 3200f,
         Exhaust = new ExhaustSpec
         {
-            // Cast manifolds: short and fat, nothing like a header, and a good part of why a stock
-            // muscle car rumbles where a race car barks.
+            // Cast manifolds, short and fat: part of why a stock muscle car rumbles where a race car barks.
             PrimaryLengthMetres = 0.38f, PrimarySpread = 0.05f, PrimaryDiameterMm = 45f,
             CollectorDiameterMm = 64f, CollectorPipeMetres = 0.5f,
-            // The H. Coupling the banks lets the two firing sequences share pulses, which is the
-            // cross-plane burble; without it a V8 is two inline fours pointing the same way.
+            // The H lets the banks share pulses: the cross-plane burble, not two inline fours.
             Crossover = CrossoverKind.HPipe,
             MidPipeMetres = 1.2f,
             Muffler = MufflerSpec.Chambered40,
@@ -1011,13 +850,8 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// The same 45-degree V-twin as <see cref="VTwin45"/> with the mufflers the factory fits.
-    ///
-    /// Same engine, same 315/405 firing interval — that uneven beat is the crank, not the pipes,
-    /// and it survives any exhaust — but through a pair of baffled cans instead of straight pipe.
-    /// A motorcycle has to pass 80 dB(A) at fifty feet to be sold, which is about 104 at a metre,
-    /// and that is the difference between the bike in a showroom and the one that sets off car
-    /// alarms.
+    /// <see cref="VTwin45"/> with the factory's baffled cans; the 315/405 beat is the crank and survives
+    /// any exhaust. A motorcycle must pass 80 dB(A) at fifty feet to be sold, about 104 at a metre.
     /// </summary>
     public static EngineProfile VTwin45Stock => VTwin45 with
     {
@@ -1032,20 +866,15 @@ public sealed record EngineProfile
         Intake = VTwin45.Intake with { Level = 0.35f, Absorption = 0.5f },
     };
 
-    /// <summary>
-    /// And the one most of them are actually riding: stock head pipes with aftermarket slip-on
-    /// cans. Straight-through, packed, and a great deal louder than stock without being open pipe.
-    /// </summary>
+    /// <summary>The V-twin on stock head pipes with aftermarket slip-on cans: packed, straight-through,
+    /// between stock and open pipe.</summary>
     public static EngineProfile VTwin45SlipOn => VTwin45 with
     {
         Name = "1.75 V-twin, 45 degrees, slip-on cans",
         Exhaust = VTwin45.Exhaust with
         {
-            // A slip-on is a packed straight-through can, but a SHORT one with a dense pack — a
-            // 350 mm muffler on a motorcycle, not the 500 mm glasspack under a car. Measured at
-            // Glasspack's own 0.62 absorption it came out within four decibels of open pipe, which
-            // is not what a slip-on is: it is halfway between stock and straight, and the length
-            // and density of the packing are what put it there.
+            // A short dense pack, 350 mm against a car glasspack's 500: at Glasspack's 0.62 it came
+            // out within four decibels of open pipe, where a slip-on is halfway to stock.
             Muffler = MufflerSpec.Glasspack with { Absorption = 0.86f, AbsorptiveLengthMetres = 0.35f },
             TailpipeMetres = new[] { 0.22f, 0.30f },
             TailpipeDiameterMm = 48f,
@@ -1196,20 +1025,9 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// The same 2.0 four with a turbo bolted to it — and almost everything about how it SOUNDS
-    /// follows from that one change rather than from any of it being described separately.
-    ///
-    /// Compression comes down (9.4 from 11.5) because you cannot run eleven-to-one on boost, which
-    /// takes some of the hard edge off the combustion event. The cam loses overlap, because a turbo
-    /// engine does not want exhaust reversion diluting a pressurised intake charge, and less overlap
-    /// is a cleaner idle — a boosted engine idles smoother than the naturally aspirated version of
-    /// itself, which surprises people. The exhaust gets bigger and quieter downstream because the
-    /// turbine is a muffler: it takes the sharp pressure pulses and turns them into shaft work, which
-    /// is why a turbo car sounds flat and woofly next to the crack of an atmospheric one, and why the
-    /// interesting noise moves to the INTAKE side.
-    ///
-    /// The whistle, the spool lag and the way boost raises airbox pressure are already in the
-    /// synthesis; this is the first petrol engine to ask for them.
+    /// The same 2.0 four with a turbo, and what follows from it: compression down to 9.4 from 11.5, less
+    /// overlap (no reversion into a pressurised charge, so a cleaner idle), and a turbine that turns the
+    /// sharp pulses into shaft work, so it sounds flat and woofly and the interest moves to the intake.
     /// </summary>
     public static EngineProfile I4Turbo => new()
     {
@@ -1229,8 +1047,7 @@ public sealed record EngineProfile
         IdleRoughness = 0.09f, IdleGovernorGain = 3.5f,
         IdleRpm = 820f, RedlineRpm = 6800f,
         InertiaKgM2 = 0.11f, FrictionNm = 16f, FrictionNmPerKrpm = 5.2f,
-        // Torque arrives early and stays: the defining shape of a boosted engine, and the reason it
-        // needs fewer gears and pulls from nothing.
+        // Torque arrives early and stays: the shape of a boosted engine.
         PeakTorqueNm = 380f, PeakTorqueRpm = 3200f,
         Exhaust = new ExhaustSpec
         {
@@ -1288,8 +1105,8 @@ public sealed record EngineProfile
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.4f, CombustionKnock = 0.03f },
     };
 
-    /// <summary>A 3.5-litre 60-degree V6 with a stock system: even 120-degree firing, each bank an
-    /// uneven... no — each bank fires evenly every 240 with the order 1-2-3-4-5-6 and alternating banks.</summary>
+    /// <summary>A 3.5-litre 60-degree V6 with a stock system: even 120-degree firing, 1-2-3-4-5-6 on
+    /// alternating banks, so each bank fires evenly every 240.</summary>
     public static EngineProfile V6Sedan => new()
     {
         Name = "3.5 V6, stock",
@@ -1349,38 +1166,26 @@ public sealed record EngineProfile
             CollectorDiameterMm = 45f, CollectorPipeMetres = 0.10f,
             Crossover = CrossoverKind.None,
             MidPipeMetres = 0.05f,
-            // STRAIGHT PIPES, which is what its own name says.
             Muffler = MufflerSpec.StraightPipe,
             TailpipeMetres = new[] { 0.25f, 0.35f },
             TailpipeDiameterMm = 50f,
             GasCelsiusIdle = 330f, GasCelsiusFull = 800f,
 
-            // A big slow twin is the HARDEST case for keeping the top of the band, and the reason is
-            // arithmetic. Its harmonics are spaced by its firing rate, and at 3,000 rpm a twin fires
-            // 50 times a second where a V8 fires 200. So to have any energy at a kilohertz a twin
-            // needs its TWENTIETH harmonic where the V8 needs its fifth — and any per-harmonic
-            // rolloff therefore hits it four times as hard. Without the two settings below the
-            // exhaust measures 76.5 % below 200 Hz with half a per cent between 800 Hz and 2.5 kHz:
-            // pure rumble, no bark.
-            //
-            // Two things push back, and both are properties of this exact pipe rather than taste.
-            // The pipes are SHORT, smooth and very hot, so there is little wall loss to take the top
-            // off — a straight pipe on a cruiser is under a metre from valve to air. And the blowdown
-            // is ENORMOUS: 1.75 litres across two cylinders is the largest single-cylinder charge in
-            // the catalogue, and a finite-amplitude wave that big STEEPENS as it travels, converting
-            // its own energy upward into exactly the harmonics that would be missing. Steepening is
-            // the mechanism behind a big twin's bark, so it is set well above the default.
+            // A slow twin fires 50 times a second at 3,000 rpm to a V8's 200, so a kilohertz is its
+            // twentieth harmonic and any per-harmonic rolloff hits it four times as hard: without these
+            // two it measured 76.5 % below 200 Hz and half a per cent at 800 Hz-2.5 kHz. The pipes are
+            // short, smooth and hot (little wall loss), and the biggest single-cylinder charge in the
+            // catalogue steepens as it travels: the bark.
             WallLossMultiplier = 0.85f,
             Steepening = 2.0f,
-            // ...and they pop on a closed throttle, which is most of what "popping" means here.
             OverrunPopRate = 16f,
         },
         Intake = new IntakeSpec { RunnerLengthMetres = 0.12f, RunnerDiameterMm = 45f, PlenumLitres = 0.6f, ThrottleDiameterMm = 50f, AirboxLitres = 2f, SnorkelLengthMetres = 0.15f, SnorkelDiameterMm = 60f, Level = 1f, Absorption = 0.1f },
         Mechanical = new MechanicalSpec { ValvetrainLevel = 1.2f, CombustionKnock = 0.08f, AccessoryWhineLevel = 0.05f },
     };
 
-    /// <summary>A 450 cc single: one bang every 720 degrees, a short pipe and a small can. The
-    /// crank speed ripples enormously between firings, which is most of what a thumper sounds like.</summary>
+    /// <summary>A 450 cc single: one bang every 720 degrees, a short pipe and a small can, the crank
+    /// speed rippling hard between firings.</summary>
     public static EngineProfile Single450 => new()
     {
         Name = "450 single",
@@ -1399,8 +1204,8 @@ public sealed record EngineProfile
         PeakTorqueNm = 48f, PeakTorqueRpm = 7000f,
         Exhaust = new ExhaustSpec
         {
-            // About half a metre end to end; at a metre or more it sounds like farting through a
-            // straw. Header 0.22, collector 0.06, mid 0.02, silencer 0.15, tail 0.05.
+            // About half a metre end to end (at a metre or more it sounded like a straw): header 0.22,
+            // collector 0.06, mid 0.02, silencer 0.15, tail 0.05.
             PrimaryLengthMetres = 0.22f, PrimaryDiameterMm = 42f,
             CollectorGroups = new[] { new[] { 0 } },
             CollectorDiameterMm = 42f, CollectorPipeMetres = 0.06f,
@@ -1597,20 +1402,10 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// A NASCAR Cup V8: 358 cubic inches, pushrod, two valves, a cross-plane crank and NO MUFFLER.
-    ///
-    /// The crank is the whole point, and it is what separates this from every other race engine. A
-    /// 90-degree cross-plane crank fires each BANK at 90/180/180/270 degree intervals, so a bank's
-    /// own pipe hears an uneven pattern that only repeats every two revolutions — which puts energy on
-    /// the half orders, and the half orders are the rumble. An F1 V10 fires its banks evenly and has
-    /// none of it. That is why a stock car at nine thousand rpm still sounds like a big American V8
-    /// and a formula car at nine thousand sounds like a siren.
-    ///
-    /// Everything else is a race engine: a solid roller cam with enormous duration and lift, valves
-    /// filling the bore, 12:1 compression, a tiny flywheel, and long equal-length 4-into-1 headers
-    /// dumping out of the side of the car about a metre past the collector with nothing in the way.
-    /// No muffler at all is worth 20-30 dB over a street car, and it is most of why a Cup car measures
-    /// 130 dB in the grandstand.
+    /// A NASCAR Cup V8: 358 cubic inches, pushrod, two valves, no muffler. The cross-plane crank fires
+    /// each bank at 90/180/180/270, a pattern repeating every two revolutions that puts energy on the
+    /// half orders, the rumble an evenly firing F1 V10 lacks. Long equal 4-into-1 headers dump out of the
+    /// side; no muffler is worth 20-30 dB over a street car, most of a Cup car's 130 dB.
     /// </summary>
     public static EngineProfile NascarV8 => new()
     {
@@ -1619,12 +1414,9 @@ public sealed record EngineProfile
         FiringAngles = EvenFire(new[] { 1, 8, 7, 3, 6, 5, 4, 2 }),
         Bank = AlternatingBanks(8),
         BoreMm = 106.3f, StrokeMm = 82.55f, RodRatio = 1.95f, CompressionRatio = 12f,
-        // A solid roller with 280-plus degrees at fifty thou: well over 320 advertised, and lift
-        // approaching an inch at the valve. The overlap that comes with it is why it cannot idle
-        // below about 1200 and why it sounds ragged when it does.
-        // Wide lobe centres: a restricted race engine spreads them to about 116 degrees, which keeps
-        // the duration without the overlap of a drag cam. Overlap still lands near 80 — twice a
-        // street car's, and audible as a ragged, diluted idle.
+        // A solid roller, 280-plus degrees at fifty thou, lift near an inch, on wide (about 116 degree)
+        // lobe centres: overlap still near 80, twice a street car's, so it cannot idle below about 1200
+        // and is ragged when it does.
         ExhaustCam = new CamLobe { DurationDegrees = 316f, MaxLiftMm = 20f, RampFraction = 0.12f, CentrelineDegrees = 244f },
         IntakeCam = new CamLobe { DurationDegrees = 312f, MaxLiftMm = 21f, RampFraction = 0.12f, CentrelineDegrees = 478f },
         ExhaustValve = new ValveSpec { DiameterMm = 41.3f, DischargeCoefficient = 0.74f },
@@ -1632,17 +1424,15 @@ public sealed record EngineProfile
         EvoTemperatureK = 1280f, IdleMapBar = 0.58f,
         IdleRoughness = 0.5f, IdleGovernorGain = 3f,
         IdleRpm = 1300f, RedlineRpm = 9200f,
-        // A Cup flywheel is thin, but the damper, clutch pack and crank are not: light for a road
-        // car, and light enough to hear on a gearchange, without being so light that the idle cannot
-        // be held between firings.
+        // A thin flywheel, but the damper, clutch pack and crank are not: light enough to hear on a
+        // gearchange, heavy enough to hold the idle between firings.
         InertiaKgM2 = 0.15f,
         FrictionNm = 44.5f, FrictionNmPerKrpm = 18f,
         // About 13.5 bar BMEP, which is where a restricted Cup engine actually lives.
         PeakTorqueNm = 620f, PeakTorqueRpm = 7600f,
         Exhaust = new ExhaustSpec
         {
-            // Long equal-length primaries into one collector per bank, and then almost nothing: the
-            // collector turns straight out through the side of the car behind the door.
+            // Long equal primaries into one collector per bank, which turns out through the side.
             PrimaryLengthMetres = 1.02f, PrimarySpread = 0.04f, PrimaryDiameterMm = 47.6f,
             CollectorDiameterMm = 89f, CollectorPipeMetres = 0.35f,
             Crossover = CrossoverKind.None,
@@ -1653,64 +1443,43 @@ public sealed record EngineProfile
             GasCelsiusIdle = 420f, GasCelsiusFull = 980f,
             // Fabricated, mandrel-bent, two bends and no joints.
             WallLossMultiplier = 1.1f,
-            // Nothing between the port and the air, so the pulses arrive at the end still steep
-            // enough to shock — the hard crack a stock car has and a muffled one never does.
+            // Nothing between port and air, so the pulses arrive steep enough to shock: the crack.
             Steepening = 1.3f,
             FlowLoss = 0.08f,
             JetNoiseLevel = 1.4f, PortNoiseLevel = 1.3f,
             OverrunPopRate = 14f,
         },
-        // One big throttle body on a tall single-plane plenum, and a cowl the size of a suitcase.
+        // One big throttle body on a tall single-plane plenum, and a suitcase-sized cowl.
         Intake = new IntakeSpec { RunnerLengthMetres = 0.20f, RunnerDiameterMm = 54f, PlenumLitres = 7f, ThrottleDiameterMm = 100f, AirboxLitres = 20f, SnorkelLengthMetres = 0.55f, SnorkelDiameterMm = 120f, Level = 1f, Absorption = 0.1f },
         Mechanical = new MechanicalSpec { ValvetrainLevel = 1.3f, CombustionKnock = 0.07f, AccessoryWhineOrder = 9.5f, AccessoryWhineLevel = 0.12f },
     };
 
     /// <summary>
-    /// A three-litre Formula One V10: pneumatic valves, four valves a cylinder, individual trumpets
-    /// in an airbox over the driver's head, and ten unsilenced pipes.
+    /// A three-litre Formula One V10: pneumatic valves, four a cylinder, trumpets in an airbox over the
+    /// driver's head, ten unsilenced pipes. Bore two and a half times the stroke; the banks fire evenly,
+    /// 144 degrees apart, so no half orders and no rumble, only the fifth order: the scream. It idles at
+    /// 4000 rpm because the overlap dilutes the charge past burning below that.
     ///
-    /// It is the opposite engine to the stock car in every way that matters to the ear. The bore is
-    /// two and a half times the stroke, so the piston can be asked to do three hundred revolutions a
-    /// second. The banks fire EVENLY — 144 degrees apart down each pipe — so there is no half-order
-    /// energy and no rumble at all: what comes out is the firing order itself, a pure fifth order,
-    /// 1580 Hz at the limiter. That is the scream, and it is not a timbre choice, it is what an
-    /// even-firing ten-cylinder does.
-    ///
-    /// It idles at 4000 rpm because it cannot idle lower: the cams are enormous, the flywheel is a
-    /// carbon disc, and at anything less the overlap dilutes the charge past the point of burning.
-    ///
-    /// The real thing turned 19,000 and made about 950 hp; BMW's 2005 V10 shared this engine's 98 mm
-    /// bore and quoted 350 Nm. This one is limited to 15,500, and the limit is the SYNTHESIS rather
-    /// than the engine, measured with `--engine-alias`:
+    /// The real one turned 19,000 (BMW's 2005 V10, the same 98 mm bore, quoted 350 Nm). This one stops
+    /// at 15,500 because the synthesis does, measured with --engine-alias:
     ///
     ///     held at 19,000 rpm     samples/firing   half/whole   structure
     ///       44,100 Hz                      27.7      +1.1 dB     13.4 dB
     ///       88,200 Hz                      55.3      -5.7 dB     13.6 dB
     ///
-    /// An even-firing ten can have NO half-order energy — five evenly spaced firings a bank cannot
-    /// make a component at half the crank order — so half orders sitting ABOVE whole ones at 44.1 kHz
-    /// is the integrator failing, and it recovers by 6.8 dB when the rate doubles. That is aliasing
-    /// of the firing events, and the fix is TWO times oversampling, not four: at 176.4 kHz nothing
-    /// further is gained.
-    ///
-    /// Held at 15,500 the same measurement reads half/whole -5.8 dB and structure 52.5, which is a
-    /// clean engine. So 15,500 is where the model stops being able to tell the truth, and the firing
-    /// frequency there is still 1,304 Hz, which is the scream.
+    /// An even ten has no half-order energy, so half orders over whole ones is the integrator aliasing
+    /// the firing events; two times oversampling fixes it and four gains nothing. At 15,500 the same
+    /// reads -5.8 dB and structure 52.5, a clean engine, firing at 1,304 Hz.
     /// </summary>
     public static EngineProfile F1V10 => new()
     {
         Name = "3.0 V10, 15,500 rpm, open pipes",
         Layout = EngineLayout.Vee,
         FiringAngles = EvenFire(new[] { 1, 6, 5, 10, 2, 7, 3, 8, 4, 9 }),
-        // Cylinders 1-5 down one bank and 6-10 down the other, which with this order gives each
-        // bank an EVEN 144 degrees between firings. No half orders, no rumble — just order five...
-        // ...on the CENTRE LINE. Each bank's own pipe carries five firings a cycle, order 2.5, and
-        // the two pipes are anti-phase there. Summed at one point that fundamental cancels and the
-        // engine is a single partial an octave up: a siren. With the two exits placed
-        // (TailpipeExitsMetres) it is there from anywhere off the centre line.
+        // 1-5 down one bank and 6-10 the other: an even 144 degrees each. Each pipe's order 2.5 is
+        // anti-phase with the other's, so the exits are placed (TailpipeExitsMetres) or it is a siren.
         Bank = HalfBanks(10),
-        // 98 mm bore on a 39.75 mm stroke: 300 cc a cylinder, and a mean piston speed at 19,000 rpm
-        // that is only just past what a road engine sees at 8,000.
+        // 300 cc a cylinder: mean piston speed at 19,000 rpm just past a road engine's at 8,000.
         BoreMm = 98f, StrokeMm = 39.75f, RodRatio = 2.6f, CompressionRatio = 13.5f,
         ExhaustCam = new CamLobe { DurationDegrees = 300f, MaxLiftMm = 13f, RampFraction = 0.1f, CentrelineDegrees = 252f },
         IntakeCam = new CamLobe { DurationDegrees = 296f, MaxLiftMm = 14f, RampFraction = 0.1f, CentrelineDegrees = 466f },
@@ -1721,13 +1490,11 @@ public sealed record EngineProfile
         IdleRpm = 4000f, RedlineRpm = 15500f,
         InertiaKgM2 = 0.035f,
         FrictionNm = 22.8f, FrictionNmPerKrpm = 9f,
-        // BMW quoted 350 Nm for its 3.0 V10, which is 14.7 bar BMEP — where a naturally aspirated
-        // racing V10 lives. Taken from the real engine rather than fitted to a power figure.
+        // BMW's quoted 350 Nm: 14.7 bar BMEP, where a naturally aspirated racing V10 lives.
         PeakTorqueNm = 350f, PeakTorqueRpm = 13500f,
         Exhaust = new ExhaustSpec
         {
-            // Equal-length 5-into-1 per bank, tuned for the top of the range, then straight out the
-            // back. There is nothing downstream of the collector but a few centimetres of pipe.
+            // Equal-length 5-into-1 per bank, then a few centimetres of pipe.
             PrimaryLengthMetres = 0.62f, PrimarySpread = 0.02f, PrimaryDiameterMm = 40f,
             CollectorDiameterMm = 72f, CollectorPipeMetres = 0.22f,
             Crossover = CrossoverKind.None,
@@ -1735,60 +1502,32 @@ public sealed record EngineProfile
             Muffler = MufflerSpec.StraightPipe,
             TailpipeMetres = new[] { 0.18f, 0.20f },
             TailpipeDiameterMm = 72f,
-            // One exit each side of the gearbox, about sixty centimetres apart. This is the field
-            // that undoes the siren: see TailpipeExitsMetres.
+            // One exit each side of the gearbox, about sixty centimetres apart.
             TailpipeExitsMetres = new[] { new Vector3(-0.30f, 0f, 0f), new Vector3(0.30f, 0f, 0f) },
             GasCelsiusIdle = 520f, GasCelsiusFull = 1020f,
             WallLossMultiplier = 1.0f,
             Steepening = 1.25f,
             FlowLoss = 0.06f,
             JetNoiseLevel = 1.5f, PortNoiseLevel = 1.4f,
-            // It does not pop on the overrun the way a carburetted V8 does; the fuelling is cut.
-            OverrunPopRate = 3f,
+            OverrunPopRate = 3f,   // the fuelling is cut on the overrun
         },
-        // Ten short trumpets standing in a big airbox: the runners are barely longer than the port,
-        // which puts the intake's own resonance up where the engine actually runs.
-        // Ten individual 46 mm throttles, which the model carries as the ONE throttle of the same
-        // total area — 145 mm. Sized as a single 46 the engine strangles above 12,000 and the
-        // manifold never reaches atmosphere at full throttle, which is audible as a V10 that will
-        // not pull to the limiter.
-        // THE AIRBOX.
-        //
-        // The exhaust alone is high-end heavy with no real body: ninety per cent of its energy in
-        // 0.8-2.5 kHz and nothing below 200 Hz. That is structural and correct — a V10 at 15,500 rpm
-        // fires 1,292 times a second, so its fundamental IS 1.3 kHz and there is nothing lower for
-        // the exhaust to make.
-        //
-        // The 26-litre box on a 0.8 m snorkel is a Helmholtz resonator near fifty hertz, the lowest
-        // thing on the car by an order of magnitude. The model does build it: measured with
-        // `--intake-ir f1_v10`, the tract's own modes are 45.4, 206, 393, 530 and 631 Hz against a
-        // lumped prediction of 48, and thumped it puts 14.9 per cent of its energy below 200 Hz.
-        //
-        // What it needs is something to DRIVE it. The engine breathing through the tract excites it
-        // only at the firing rate and its harmonics, which on this engine is 1.3 kHz — nowhere near
-        // where the box is tuned. A resonator nothing drives at its own note is silent however well
-        // it is built. See IntakeSpec.FlowNoiseLevel: the throttle plate is the broadband source.
+        // Ten short trumpets in a big airbox, the intake's resonance up where the engine runs. Ten 46 mm
+        // throttles carried as one of the same area, 145 mm: as a single 46 it strangled above 12,000.
+        // The exhaust has nothing below 200 Hz (ninety per cent in 0.8-2.5 kHz; it fires 1,292 times a
+        // second at 15,500). The 26-litre box on a 0.8 m snorkel is the body: --intake-ir f1_v10
+        // measures modes at 45.4, 206, 393, 530 and 631 Hz (48 predicted), 14.9 % of a thump below
+        // 200 Hz, driven by the throttle plate (IntakeSpec.FlowNoiseLevel).
         Intake = new IntakeSpec { RunnerLengthMetres = 0.11f, RunnerDiameterMm = 50f, PlenumLitres = 3f, ThrottleDiameterMm = 145f, AirboxLitres = 26f, SnorkelLengthMetres = 0.8f, SnorkelDiameterMm = 150f, Level = 1f, Absorption = 0.08f },
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.9f, CombustionKnock = 0.02f, AccessoryWhineOrder = 22f, AccessoryWhineLevel = 0.18f },
     };
 
     /// <summary>
-    /// The 5.9 Cummins 6BT out of a Dodge Ram, straight-piped.
-    ///
-    /// Real numbers: 102 x 120 mm on six cylinders for 5.88 litres, 17.0:1, TWO valves a cylinder —
-    /// it is the twelve-valve — firing 1-5-3-6-2-4, and 460 lb-ft (624 Nm) at 1,600 rpm. It is
-    /// governed just under three thousand and everything about it is slow and enormous.
-    ///
-    /// What makes it that engine rather than any other diesel is the exhaust, or the lack of one.
-    /// A log manifold into the turbo and then five inches of straight pipe the length of the truck:
-    /// no chambers, no packing, nothing between the turbine and the air but a tube whose
-    /// half-wavelength is 27 Hz. And the knock that goes with a 102 mm bore lands near 5.2 kHz,
-    /// where a school bus's 116 mm bore puts it at 4.5 — the same mechanism, two different engines,
-    /// nothing in either preset saying so.
-    ///
-    /// The turbo sits between the ports and the pipe and eats most of the pulse energy, which is why
-    /// a turbo diesel sounds more like rush than like beats. That comes from the exhaust network's
-    /// turbine stage, which every <see cref="Induction.Turbocharged"/> engine gets.
+    /// The 5.9 Cummins 6BT out of a Dodge Ram, straight-piped: 102 x 120 mm, 5.88 litres, 17.0:1, two
+    /// valves a cylinder (the twelve-valve), 1-5-3-6-2-4, 460 lb-ft (624 Nm) at 1,600, governed under
+    /// 3,000. A log manifold, the turbo, then five inches of pipe whose half-wavelength is 27 Hz. Its
+    /// 102 mm bore knocks near 5.2 kHz where the bus's 116 mm does at 4.5, from the bore alone. The
+    /// turbine stage every <see cref="Induction.Turbocharged"/> engine gets eats the pulses: rush, not
+    /// beats.
     /// </summary>
     public static EngineProfile DieselCumminsI6 => new()
     {
@@ -1798,7 +1537,6 @@ public sealed record EngineProfile
         FiringAngles = EvenFire(new[] { 1, 5, 3, 6, 2, 4 }),
         Bank = OneBank(6),
         BoreMm = 102f, StrokeMm = 120f, RodRatio = 1.7f, CompressionRatio = 17f,
-        // Two valves a cylinder, and big slow ones: this head has no room for four and never did.
         ExhaustCam = new CamLobe { DurationDegrees = 236f, MaxLiftMm = 11f, RampFraction = 0.26f, CentrelineDegrees = 256f },
         IntakeCam = new CamLobe { DurationDegrees = 232f, MaxLiftMm = 11f, RampFraction = 0.26f, CentrelineDegrees = 478f },
         ExhaustValve = new ValveSpec { Count = 1, DiameterMm = 40f, DischargeCoefficient = 0.6f },
@@ -1810,7 +1548,7 @@ public sealed record EngineProfile
         PeakTorqueNm = 624f, PeakTorqueRpm = 1600f,
         Exhaust = new ExhaustSpec
         {
-            // A cast log, not a header: short, fat, and all six into one.
+            // A cast log: short, fat, all six into one.
             PrimaryLengthMetres = 0.18f, PrimarySpread = 0.55f, PrimaryDiameterMm = 48f,
             CollectorGroups = new[] { new[] { 0, 1, 2, 3, 4, 5 } },
             CollectorDiameterMm = 90f, CollectorPipeMetres = 0.35f,
@@ -1824,7 +1562,6 @@ public sealed record EngineProfile
             OverrunPopRate = 0f,
         },
         Intake = new IntakeSpec { RunnerLengthMetres = 0.2f, RunnerDiameterMm = 45f, PlenumLitres = 6f, ThrottleDiameterMm = 76f, AirboxLitres = 18f, SnorkelLengthMetres = 0.9f, SnorkelDiameterMm = 90f, Level = 0.45f, Absorption = 0.4f },
-        // The HX35's whistle is half of why people know this engine by ear.
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.75f, CombustionKnock = 1.5f, AccessoryWhineLevel = 0.15f, TurboWhistleLevel = 1.0f, TurboLagSeconds = 1.0f },
     };
 
@@ -1832,7 +1569,7 @@ public sealed record EngineProfile
     /// The 7.3 Power Stroke (Navistar T444E) of the late-1990s Ford Super Duty: a 90-degree V8 diesel,
     /// 104.4 x 106.2 mm, 17.5:1, one Garrett turbo fed by both banks' up-pipes, HEUI injectors, about
     /// 500 lb-ft (680 Nm) at 1,600 and governed near 3,300. Stock exhaust: a muffler and a four-inch
-    /// pipe. What people know it by is the turbo's whistle, which is there at idle, and the clatter.
+    /// pipe. Known by the turbo's whistle, there at idle, and the clatter.
     /// </summary>
     public static EngineProfile PowerStroke73 => DieselCumminsI6 with
     {
@@ -1874,8 +1611,7 @@ public sealed record EngineProfile
         BoostBar = 3.2f,
         IdleRpm = 680f, RedlineRpm = 3400f,
         PeakTorqueNm = 1220f, PeakTorqueRpm = 1900f,
-        // A five-inch straight pipe, and less lost to its walls: +3 dB over a four-inch one, and
-        // more aggressive, which is what this truck is built for.
+        // A five-inch straight pipe, less lost to its walls: +3 dB over a four-inch one.
         Exhaust = PowerStroke73.Exhaust with
         {
             Muffler = MufflerSpec.StraightPipe, TailpipeDiameterMm = 127f, Steepening = 1.5f, WallLossMultiplier = 0.8f,
@@ -1905,10 +1641,8 @@ public sealed record EngineProfile
         },
     };
 
-    /// <summary>
-    /// The 5.9 Cummins ISB (24 valves) in a parcel step van: a muffler, a long pipe to the back, a
-    /// modest turbo. The engine behind a great many brown and white delivery trucks.
-    /// </summary>
+    /// <summary>The 5.9 Cummins ISB (24 valves) in a parcel step van: a muffler, a long pipe to the
+    /// back, a modest turbo.</summary>
     public static EngineProfile CumminsIsbStepVan => DieselCumminsI6 with
     {
         Name = "5.9 Cummins ISB, step van",
@@ -1989,18 +1723,10 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// The International DT466 out of a school bus.
-    ///
-    /// Real numbers: 116.5 x 118.9 mm on six for 7.63 litres, 16.5:1, 800 lb-ft (1,085 Nm), governed
-    /// around 2,500. Almost square, where the Cummins is long-stroke, and half a litre a cylinder
-    /// bigger.
-    ///
-    /// It is the same kind of engine as the Cummins and sounds nothing like it, and the reasons are
-    /// all geometry. The bore is 14 mm wider, so the gas rings lower — 4.5 kHz of knock against
-    /// 5.2. And it has a SILENCER and a long one: a bus runs four metres of pipe under the floor into
-    /// a full chambered can, where the pickup runs five inches of tube straight out. That is the
-    /// difference between a clatter you hear across a car park and the soft chuffing idle of a bus
-    /// at a stop.
+    /// The International DT466 out of a school bus: 116.5 x 118.9 mm on six, 7.63 litres, 16.5:1,
+    /// 800 lb-ft (1,085 Nm), governed around 2,500. Against the Cummins, geometry: a bore 14 mm wider
+    /// knocks lower (4.5 kHz against 5.2), and four metres of pipe into a chambered can make the soft
+    /// chuffing idle of a bus at a stop.
     /// </summary>
     public static EngineProfile DieselBusI6 => new()
     {
@@ -2025,8 +1751,7 @@ public sealed record EngineProfile
             CollectorGroups = new[] { new[] { 0, 1, 2, 3, 4, 5 } },
             CollectorDiameterMm = 102f, CollectorPipeMetres = 0.5f,
             Crossover = CrossoverKind.Merged,
-            // The whole length of a bus, under the floor, into a big can and out at the back.
-            MidPipeMetres = 4.0f,
+            MidPipeMetres = 4.0f,   // under the floor to a big can at the back
             Muffler = MufflerSpec.Stock with { ChamberLengthsMetres = new[] { 0.35f, 0.45f }, ExpansionRatio = 8f, Absorption = 0.55f, ResonatorHz = 45f },
             TailpipeMetres = new[] { 0.7f },
             TailpipeDiameterMm = 102f,
@@ -2039,26 +1764,11 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// The same 5.9 Cummins with the turbo taken off — a real engine, the 6B, not a thought
-    /// experiment. Sold by the thousand in tractors and boats and gensets.
-    ///
-    /// Losing a turbo is not losing a noise. It changes four things and every one is audible:
-    ///
-    /// THE COMPRESSION GOES UP, 17:1 to 19:1. A naturally aspirated diesel has only the piston to
-    /// heat its air with, so it needs more squeeze to light at all — and higher compression means a
-    /// shorter ignition delay, less fuel accumulated before it lights, and a SMALLER premixed spike.
-    /// The engine that sounds like it should clatter more clatters less.
-    ///
-    /// THE TORQUE GOES DOWN by a third, because there is only an atmosphere of air to burn.
-    ///
-    /// THE TURBINE LEAVES THE EXHAUST, so every pulse the cylinders make goes straight out of the
-    /// pipe instead of spinning a wheel. This is the loud one: nothing is absorbing the pulse energy
-    /// any more, and nothing is low-passing the crack off the front of it.
-    ///
-    /// AND THE COMPRESSOR LEAVES THE INTAKE, so the runners and the plenum are no longer speaking
-    /// through a rotor. An NA diesel honks where a turbo one whooshes.
-    ///
-    /// None of that is written here. It falls out of Induction and the compression ratio.
+    /// The 5.9 Cummins without the turbo: the 6B, sold in tractors, boats and gensets. Compression up to
+    /// 19:1 (only the piston heats the air), so a shorter ignition delay and a smaller premixed spike:
+    /// it clatters less. A third less torque. Every pulse goes out the pipe with no turbine to absorb it
+    /// (the loud part), and the intake honks where a turbo one whooshes. All of it from Induction and
+    /// the compression ratio.
     /// </summary>
     public static EngineProfile DieselCumminsNaI6 => DieselCumminsI6 with
     {
@@ -2069,9 +1779,8 @@ public sealed record EngineProfile
         Mechanical = DieselCumminsI6.Mechanical with { TurboWhistleLevel = 0f },
     };
 
-    /// <summary>The DT466 as it was first sold: naturally aspirated, 17.5:1, and about two thirds of
-    /// the torque. Same argument as <see cref="DieselCumminsNaI6"/> — the turbo leaves both gas
-    /// paths, and the compression comes up to compensate for the air it is no longer being given.</summary>
+    /// <summary>The DT466 as first sold: naturally aspirated, 17.5:1, about two thirds of the torque
+    /// (as <see cref="DieselCumminsNaI6"/>).</summary>
     public static EngineProfile DieselBusNaI6 => DieselBusI6 with
     {
         Name = "7.6 DT466, no turbo",
@@ -2085,14 +1794,9 @@ public sealed record EngineProfile
     /// A GE 7FDL16: the prime mover in an Amtrak Genesis and in thousands of freight locomotives.
     /// Sixteen cylinders of 229 mm bore and 267 mm stroke — 175 litres — turbocharged, four-stroke,
     /// and governed to eight fixed notches from 440 rpm to 1,050. Its firing rate is therefore 59 Hz
-    /// at idle and 140 Hz flat out, and because a governor holds a NOTCH rather than following a
-    /// pedal, a locomotive changes speed in steps you can count.
-    ///
-    /// Everything about the sound is the size. A 229 mm bore has a knock frequency about a third of
-    /// a truck engine's, so the clatter is a thud. The exhaust leaves through a turbine the size of a
-    /// dustbin and out a stack half a metre across and less than a metre long, which is why there is
-    /// almost no pipe tuning in it at all and why what you hear is the ports and the turbo rather
-    /// than a note.
+    /// at idle and 140 Hz flat out, in notches you can count. A 229 mm bore knocks at about a third of a
+    /// truck engine's frequency, a thud; a dustbin-sized turbine and a short half-metre stack leave
+    /// almost no pipe tuning, so you hear the ports and the turbo, not a note.
     /// </summary>
     public static EngineProfile Ge7Fdl16 => new()
     {
@@ -2118,8 +1822,7 @@ public sealed record EngineProfile
             CollectorDiameterMm = 185f, CollectorPipeMetres = 1.3f,
             Crossover = CrossoverKind.Merged, CrossoverTubeMetres = 0.5f, CrossoverArea = 0.9f,
             MidPipeMetres = 0.7f,
-            // Not a muffler: a turbine wheel, which is a big absorptive expansion with a great deal
-            // of loss and no tuning worth the name.
+            // Not a muffler but the turbine: a big lossy absorptive expansion with no tuning to speak of.
             Muffler = MufflerSpec.Chambered40 with
             {
                 Kind = MufflerKind.Absorptive, ChamberLengthsMetres = new[] { 0.42f },
@@ -2144,17 +1847,10 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// An EMD 645E3: sixteen cylinders, 230 mm by 254 mm, and a TWO-STROKE — every cylinder fires
-    /// every revolution instead of every other one. That single fact is why an EMD does not sound
-    /// like any four-stroke: at its 900 rpm maximum it fires 240 times a second where a GE at 1,050
-    /// manages 140, so the beat is not a beat any more, it is a pitch, and the engine hums where the
-    /// other one hammers.
-    ///
-    /// Uniflow scavenged: four poppet exhaust valves in the head, opening 75 degrees before bottom
-    /// centre, and a ring of ports in the liner that the piston uncovers around bottom centre, fed by
-    /// a Roots blower. So the "intake cam" here is the piston edge, with a duration and a centre that
-    /// are geometry rather than a camshaft, and it closes AFTER the exhaust valves do, which is how
-    /// the cylinder ends up with more air in it than it swept.
+    /// An EMD 645E3: sixteen cylinders, 230 by 254 mm, a two-stroke. At its 900 rpm maximum it fires 240
+    /// times a second to a GE's 140 at 1,050, so it hums where the GE hammers. Uniflow scavenged: four
+    /// exhaust valves in the head and a ring of liner ports the piston uncovers round bottom centre, fed
+    /// by a Roots blower, so the "intake cam" is the piston edge.
     /// </summary>
     public static EngineProfile Emd645E3 => new()
     {
@@ -2167,8 +1863,7 @@ public sealed record EngineProfile
         BoreMm = 230.2f, StrokeMm = 254f, RodRatio = 2.0f, CompressionRatio = 14.5f,
         // Exhaust valves open 75 degrees before bottom centre and shut 45 after: centred on BDC.
         ExhaustCam = new CamLobe { DurationDegrees = 150f, MaxLiftMm = 20f, RampFraction = 0.3f, CentrelineDegrees = 182f },
-        // The ports: the piston uncovers them 55 degrees before bottom centre and covers them 55
-        // after, so they are square about BDC by construction. Nothing chooses this; the crank does.
+        // The ports: uncovered 55 degrees before bottom centre and covered 55 after, square about BDC.
         IntakeCam = new CamLobe { DurationDegrees = 110f, MaxLiftMm = 40f, RampFraction = 0.12f, CentrelineDegrees = 180f },
         ExhaustValve = new ValveSpec { Count = 4, DiameterMm = 62f, DischargeCoefficient = 0.62f },
         IntakeValve = new ValveSpec { Count = 1, DiameterMm = 170f, DischargeCoefficient = 0.72f },
@@ -2202,26 +1897,19 @@ public sealed record EngineProfile
         Mechanical = new MechanicalSpec
         {
             ValvetrainLevel = 1.0f, CombustionKnock = 1.3f,
-            // The Roots blower is geared off the crank and its three lobes make a tone at three
-            // times shaft speed on each of two rotors: the whine under every EMD.
+            // The Roots blower's three lobes on each of two rotors: the whine under every EMD.
             AccessoryWhineOrder = 6f, AccessoryWhineLevel = 0.2f,
             BlowerWhineOrder = 15.6f, BlowerWhineLevel = 0.45f,
-            // The turbo is geared to the crank through an overrunning clutch until the exhaust can
-            // carry it, so it is blowing from the first turn: a two-stroke has no other way to clear
-            // its cylinders. Under 0.4 the cylinders stay too full of exhaust here to fire at idle.
+            // The turbo is geared to the crank through an overrunning clutch until the exhaust carries
+            // it: a two-stroke cannot otherwise clear its cylinders. Under 0.4 it will not fire at idle.
             TurboWhistleLevel = 0.5f, TurboLagSeconds = 2.5f, TurboIdleSpool = 0.45f,
         },
     };
 
-    /// <summary>Every preset, by a short key a map or a command line can name.</summary>
     /// <summary>
-    /// A 5.2 litre aviation flat-four — the Lycoming O-320 kind of engine: 130 mm bore on a 98 mm
-    /// stroke, 8.5:1 on 100 octane, two big valves a cylinder, a mild cam, magnetos, and a redline of
-    /// 2,700 because the propeller is bolted straight to the crank and its tips are already at
-    /// Mach 0.8. Four short stubs into a small muffler each side and out under the cowl. It is
-    /// slow, big-bore and even-firing, and at 2,700 rpm its firing rate is 90 Hz — right on top of a
-    /// two-blade prop's 90 Hz blade-passing, which is why the two are so hard to tell apart on the
-    /// ground and why a light aircraft sounds like one thing.
+    /// A 5.2 litre aviation flat-four, the Lycoming O-320 kind: 130 by 98 mm, 8.5:1, two big valves a
+    /// cylinder, magnetos, redline 2,700 because the prop on the crank has its tips at Mach 0.8. At
+    /// 2,700 rpm it fires at 90 Hz, on top of a two-blade prop's 90 Hz blade passing: one sound.
     /// </summary>
     public static EngineProfile AeroFlat4 => new()
     {
@@ -2260,34 +1948,21 @@ public sealed record EngineProfile
     };
 
     /// <summary>
-    /// A 163 cc overhead-valve single: the engine on a walk-behind mower, a pressure washer and half
-    /// the small machinery in a garden.
-    ///
-    /// Everything about it is small and slow, and that is what it sounds like. It fires once every
-    /// two revolutions, so at its governed 2,900 rpm the firing rate is 24 Hz — below the bottom of
-    /// pitch, which is why a mower is a *chuffing* rather than a note, and why its second order
-    /// (48 Hz) and the blade's 97 Hz are what you actually hear of it. The exhaust is fifteen
-    /// centimetres of 22 mm pipe into a stamped steel can the size of a fist, which will not silence
-    /// anything but takes the sharpness off; the intake is a 20 mm carburettor behind a paper element
-    /// in a plastic box, and at this size the intake is nearly as loud as the exhaust.
-    ///
-    /// There is no idle preset worth having here because these engines are never idled: the throttle
-    /// is a governor's to move and it holds one speed from the moment it starts. See
-    /// <see cref="GovernorSpec"/>.
+    /// A 163 cc overhead-valve single: a walk-behind mower's engine. Governed at 2,900 rpm it fires at
+    /// 24 Hz, below pitch, so a mower chuffs and you hear its second order (48 Hz) and the blade's 97 Hz.
+    /// Fifteen centimetres of pipe into a fist-sized can; the intake nearly as loud as the exhaust. The
+    /// governor holds one speed from the start (<see cref="GovernorSpec"/>).
     /// </summary>
     public static EngineProfile MowerSingle => new()
     {
         Name = "163 cc OHV single",
         Layout = EngineLayout.Inline,
-        // A pull cord spins it hard for a moment, and a magneto sparks on the first compression:
-        // nothing to synchronise, no rail to pressurise.
+        // A pull cord and a magneto sparking on the first compression.
         CrankingRpm = 600f, RevolutionsBeforeFiring = 1f,
         FiringAngles = new[] { 0f },
         Bank = new[] { 0 },
         BoreMm = 68f, StrokeMm = 45f, RodRatio = 1.9f, CompressionRatio = 8.5f,
-        // A mower cam is as mild as a cam gets: almost no overlap, because an engine that must make
-        // its torque at 2,600 rpm and idle at nothing gains nothing from scavenging and loses
-        // everything to reversion.
+        // As mild as a cam gets: almost no overlap.
         ExhaustCam = new CamLobe { DurationDegrees = 216f, MaxLiftMm = 6.2f, RampFraction = 0.25f, CentrelineDegrees = 246f },
         IntakeCam = new CamLobe { DurationDegrees = 212f, MaxLiftMm = 6.0f, RampFraction = 0.25f, CentrelineDegrees = 478f },
         ExhaustValve = new ValveSpec { Count = 1, DiameterMm = 23f, DischargeCoefficient = 0.6f },
@@ -2295,9 +1970,7 @@ public sealed record EngineProfile
         EvoTemperatureK = 1050f, IdleMapBar = 0.5f,
         IdleRoughness = 0.35f, IdleGovernorGain = 2f,
         IdleRpm = 1600f, RedlineRpm = 3600f,
-        // The flywheel is a cast lump on the crank with the magneto in it, and on a mower the BLADE
-        // is bolted to the other end and is more inertia again — that part is the machine's, not the
-        // engine's, and arrives as ExternalInertia.
+        // The flywheel only; the blade's inertia is the machine's (ExternalInertia).
         InertiaKgM2 = 0.011f, FrictionNm = 0.8f, FrictionNmPerKrpm = 0.5f,
         PeakTorqueNm = 7.4f, PeakTorqueRpm = 2600f,
         Exhaust = new ExhaustSpec
@@ -2307,8 +1980,7 @@ public sealed record EngineProfile
             CollectorDiameterMm = 22f, CollectorPipeMetres = 0.05f,
             Crossover = CrossoverKind.None,
             MidPipeMetres = 0.04f,
-            // A stamped can with two baffles and no packing: it reflects, it does not absorb, which
-            // is why a mower muffler is tinny rather than quiet.
+            // A stamped can with two baffles and no packing: tinny rather than quiet.
             Muffler = new MufflerSpec
             {
                 Kind = MufflerKind.Baffled,
@@ -2320,38 +1992,26 @@ public sealed record EngineProfile
             TailpipeMetres = new[] { 0.04f },
             TailpipeDiameterMm = 24f,
             GasCelsiusIdle = 260f, GasCelsiusFull = 620f,
-            // Thin steel, air-cooled, and a very short run: it loses heat fast but has almost no
-            // length to lose the top of the band over.
-            WallLossMultiplier = 1.1f,
+            WallLossMultiplier = 1.1f,   // too short a run to lose the top
             OverrunPopRate = 1f,
         },
         Intake = new IntakeSpec { RunnerLengthMetres = 0.06f, RunnerDiameterMm = 20f, PlenumLitres = 0.15f, ThrottleDiameterMm = 20f, AirboxLitres = 1.1f, SnorkelLengthMetres = 0.06f, SnorkelDiameterMm = 26f, Level = 1.0f, Absorption = 0.25f },
-        // An OHV single with a pushrod each way and solid lifters: audible tappets, and at this
-        // compression no knock to speak of.
+        // Solid lifters: audible tappets.
         Mechanical = new MechanicalSpec { ValvetrainLevel = 1.1f, CombustionKnock = 0.03f },
     };
 
     /// <summary>
-    /// A 500 cc air-cooled V-twin at 90 degrees: the engine in a lawn tractor.
-    ///
-    /// The one thing that matters against the 163 single is that it fires TWICE per two revolutions
-    /// instead of once, so at 3,200 rpm the firing rate is 53 Hz rather than 24 — an octave up and
-    /// into the bottom of pitch, which is why a lawn tractor drones where a push mower chuffs. Its
-    /// two pipes are unequal and join late, and 90 degrees between the cylinders means the two bangs
-    /// are unevenly spaced within the cycle, so the "note" is really two interleaved series a fifth
-    /// of a revolution apart. That uneven spacing IS the loping sound, and it comes from the vee
-    /// angle in the firing table rather than from anything added.
+    /// A 500 cc air-cooled 90-degree V-twin: a lawn tractor's engine. Firing twice per cycle, 53 Hz at
+    /// 3,200 rpm, it drones where a push mower chuffs; the vee angle spaces the two bangs unevenly, the
+    /// lope.
     /// </summary>
     public static EngineProfile MowerTwin => new()
     {
         Name = "500 cc air-cooled V-twin",
         Layout = EngineLayout.Vee,
-        // A small electric starter on a small engine turns it faster than a car's turns a car, and
-        // the magneto fires on the first compression.
+        // A small electric starter, and the magneto fires on the first compression.
         CrankingRpm = 300f, RevolutionsBeforeFiring = 1f,
-        // Both rods on one crankpin with 90 degrees between the cylinders: the rear fires 270
-        // degrees after the front, and then there are 450 before the front comes round again. That
-        // uneven pair is what a V-twin IS, and it is written here as the two intervals it is.
+        // Both rods on one crankpin, 90 degrees apart: 270 then 450.
         FiringAngles = IntervalFire(new[] { 1, 2 }, new[] { 270f, 450f }),
         Bank = new[] { 0, 1 },
         BoreMm = 68f, StrokeMm = 68f, RodRatio = 1.8f, CompressionRatio = 8.8f,
@@ -2389,6 +2049,7 @@ public sealed record EngineProfile
         Mechanical = new MechanicalSpec { ValvetrainLevel = 1.0f, CombustionKnock = 0.035f },
     };
 
+    /// <summary>Every preset by a short key: an engine a machine's parts list names needs one here.</summary>
     public static IReadOnlyDictionary<string, Func<EngineProfile>> Presets { get; } =
         new Dictionary<string, Func<EngineProfile>>(StringComparer.OrdinalIgnoreCase)
         {
@@ -2404,8 +2065,6 @@ public sealed record EngineProfile
             ["boxer4_street"] = () => Boxer4Street,
             ["i6_street"] = () => Inline6Street,
             ["i4_sport"] = () => Inline4Sport,
-            // Every engine a machine's parts list can name needs a key here, or the parts list cannot
-            // say what is in the vehicle.
             ["i4_turbo"] = () => I4Turbo,
             ["i6"] = () => Inline6,
             ["v6"] = () => V6Sedan,

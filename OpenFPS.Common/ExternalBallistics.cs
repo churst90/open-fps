@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Concurrent;
 using System.Numerics;
 
@@ -42,12 +41,9 @@ public readonly record struct FlightPoint(float Range, float Height, float Drift
 /// air, which is all that wind drift is: a crosswind gives the bullet a sideways airspeed that the drag
 /// spends turning into a sideways velocity, a little at a time, for as long as it is in flight.
 ///
-/// Gravity is the real 9.81 m/s², which the walking physics now uses too (it was 15, a choice about
-/// how a jump felt). This is a claim about where a .308 lands at 600 metres, and the player who learns
-/// the drop here has learned the real one.
-///
-/// Pure and deterministic, so the server flies the authoritative bullet with it and the client
-/// computes what its turret is zeroed for with the same numbers.
+/// Gravity is the real one: a player who learns where a .308 lands at 600 metres here has learned the
+/// real drop. Pure and deterministic, so the server flies the authoritative bullet with it and the
+/// client works out its turret's zero with the same numbers.
 /// </summary>
 public static class ExternalBallistics
 {
@@ -243,9 +239,8 @@ public static class ExternalBallistics
     /// <paramref name="radius"/> and <paramref name="height"/>.
     ///
     /// Done in the body's own frame, where it stands still and the bullet's path is shifted back by how
-    /// far the body moved. That is what makes a walking target need leading: test the bullet against
-    /// where the body WAS when the trigger broke and it is hit every time, which is the hitscan this
-    /// replaces. <paramref name="fraction"/> is how far along the segment it struck, and
+    /// far the body moved: that is what makes a walking target need leading. <paramref name="fraction"/>
+    /// is how far along the segment it struck, and
     /// <paramref name="heightOnBody"/> how high above the feet.
     /// </summary>
     public static bool SegmentHitsBody(Vector3 from, Vector3 to, float seconds, Vector3 feet, Vector3 bodyVelocity,

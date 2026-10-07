@@ -25,7 +25,7 @@ public class PushBarDoorTests
     {
         var report = new PushBarDoor.Report();
         var door = new PushBarDoor.Door { Variant = variant, Seed = 1 + variant };
-        var pcm = closing ? PushBarDoor.RenderClose(door, 48000, 1.4, report) : PushBarDoor.RenderOpen(door, 48000, 1.4, report);
+        var pcm = closing ? PushBarDoor.RenderClose(door, 48000, report) : PushBarDoor.RenderOpen(door, 48000, 1.4, report);
         return (pcm, report);
     }
 

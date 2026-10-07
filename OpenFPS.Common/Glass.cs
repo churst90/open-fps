@@ -1,46 +1,37 @@
-using System;
 using System.Numerics;
 
 namespace OpenFPS.Common;
 
-/// <summary>
-/// What kind of glass it is, which decides almost everything about what happens when you shoot it.
-/// These are genuinely different materials, not difficulty settings, and they sound different enough
-/// that a player can learn to tell a shop front from a car window by what happens to it.
-/// </summary>
+/// <summary>What kind of glass it is, which decides almost everything about what happens when you
+/// shoot it: a player can learn to tell a shop front from a car window by ear.</summary>
 public enum GlassType
 {
-    /// <summary>Ordinary plate glass — old windows, picture frames, cabinets. Brittle and unstressed,
-    /// so it cracks from the impact point and comes down in large, irregular, noisy shards.</summary>
+    /// <summary>Ordinary plate glass: old windows, picture frames, cabinets. Cracks from the impact
+    /// point and comes down in large, irregular shards.</summary>
     Annealed,
-    /// <summary>Toughened glass — car side windows, shop fronts, balustrades. Held in compression, so
-    /// the whole pane fails at once the instant it is breached and collapses into small blunt cubes.
-    /// It cannot be punctured: there is no such thing as a neat hole in tempered glass.</summary>
+    /// <summary>Toughened glass: car side windows, shop fronts, balustrades. Held in compression, so the
+    /// whole pane fails the instant it is breached, into small blunt cubes; it cannot be punctured.</summary>
     Tempered,
-    /// <summary>Two sheets bonded to a plastic interlayer — windscreens, security glazing. It takes the
-    /// hole and keeps the pane: a dull crunch and no fall at all, which is a very distinctive absence
-    /// and tells a listener something about the building they are shooting at.</summary>
+    /// <summary>Two sheets on a plastic interlayer: windscreens, security glazing. Takes the hole and
+    /// keeps the pane: a dull crunch and no fall at all.</summary>
     Laminated,
 }
 
 /// <summary>One sound the breaking of a pane produces.</summary>
 public enum GlassEventKind
 {
-    /// <summary>A round going through without destroying the pane. Small, sharp, immediate.</summary>
+    /// <summary>A round going through without destroying the pane.</summary>
     Puncture,
-    /// <summary>The pane failing. At the window.</summary>
+    /// <summary>The pane failing, at the window.</summary>
     Shatter,
-    /// <summary>Fragments leaving the frame and falling. A shower, at the window, moving downward.</summary>
+    /// <summary>Fragments leaving the frame: a shower at the window, moving downward.</summary>
     Shard,
-    /// <summary>A fragment reaching the ground. At the FOOT of the wall, not at the window.</summary>
+    /// <summary>A fragment reaching the ground, at the foot of the wall.</summary>
     Landing,
 }
 
-/// <summary>
-/// One sound, when it happens and where.
-/// <paramref name="Pitch"/> varies per fragment so twenty-four recordings do not read as twenty-four
-/// recordings.
-/// </summary>
+/// <summary>One sound, when it happens and where. <paramref name="Pitch"/> varies per fragment so the
+/// recordings do not repeat.</summary>
 public readonly record struct GlassEvent(
     GlassEventKind Kind,
     float DelaySeconds,
@@ -49,16 +40,16 @@ public readonly record struct GlassEvent(
     float Pitch);
 
 /// <summary>A pane, as the acoustics need to know it.</summary>
+/// <param name="Centre">Centre of the pane in world space.</param>
+/// <param name="Size">Width and height of the opening, metres.</param>
+/// <param name="Normal">Outward normal: which way the fragments go when it fails.</param>
+/// <param name="HeightAboveGround">Height of the bottom edge above the ground it will fall to, metres:
+/// what the delay before the landing encodes.</param>
 public readonly record struct GlassPane(
-    /// <summary>Centre of the pane in world space.</summary>
     Vector3 Centre,
-    /// <summary>Width and height of the opening, metres.</summary>
     Vector2 Size,
-    /// <summary>Outward normal — which way the fragments go when it fails.</summary>
     Vector3 Normal,
     GlassType Type,
-    /// <summary>Height of the pane's bottom edge above the ground it will fall to, metres. THE number
-    /// that makes this worth modelling: it is what the delay before the landing encodes.</summary>
     float HeightAboveGround);
 
 /// <summary>
@@ -69,15 +60,11 @@ public readonly record struct GlassPane(
 public readonly record struct GlazedPart(string PrefabId, string Name, string OwnerTemplate, Vector3 LocalPosition, Vector3 Size);
 
 /// <summary>
-/// What kind of glass a glazed part is, from what the map says it is. One place, so the server, the lab and
-/// the tests agree.
-///
-/// Glass is chosen by where it is, because that is how it is chosen in buildings and cars: safety glazing is
-/// required in doors, side panels beside doors, shop fronts and other glass people can walk into (building
-/// regulations: in the US the CPSC's 16 CFR 1201 for doors and storm doors, in England Approved Document K),
-/// and that is toughened (tempered) glass in practice; a house or a flat's ordinary window is float glass,
-/// annealed. A car's side and rear windows are toughened and its windscreen laminated (UN ECE R43; FMVSS 205
-/// in the US), so a windscreen cracks round the hole and stays in its frame.
+/// What kind of glass a glazed part is, from what the map says it is, chosen by where it is as buildings
+/// and cars choose it. Safety glazing is required in doors, beside doors, shop fronts and other glass people
+/// can walk into (US CPSC 16 CFR 1201; England, Approved Document K), toughened in practice; a home's
+/// ordinary window is annealed float glass. A car's side and rear windows are toughened and its windscreen
+/// laminated (UN ECE R43; FMVSS 205).
 ///
 /// The rules, in order:
 ///   a part of a vehicle: across the car (thinnest front to back) and forward of the cabin's middle, the
@@ -120,49 +107,29 @@ public static class GlassKind
 }
 
 /// <summary>
-/// Shooting out a window, as a sequence of sounds with times and places.
-///
-/// The reason this is worth doing properly rather than playing one crash sample: a window shot out
-/// five floors up makes TWO sounds separated by most of two seconds, and they come from two different
-/// places. The break is up at the window. Then nothing. Then the glass arrives at the pavement, at the
-/// foot of the wall, and the gap between them is sqrt(2h/g) — a direct readout of how high up the shot
-/// was. A player who cannot see the building can hear which floor someone is on.
-///
-/// That is the same trick as the crack-to-report gap in <see cref="Ballistics"/>, and it comes from
-/// the same place: let the physics be real and the information falls out of it for free. One crash
-/// sample at the window throws it away, and a sighted game would never notice.
-///
-/// Pure and deterministic given a seed, so the server and every client agree about where the glass
-/// went and a test can assert on the timing rather than on a description of it.
+/// Shooting out a window, as a sequence of sounds with times and places. A window five floors up makes
+/// two sounds from two places: the break at the window, then, sqrt(2h/g) later, the glass at the foot of
+/// the wall. The gap tells a player who cannot see the building which floor it was, as the crack-to-report
+/// gap does in <see cref="Ballistics"/>. Deterministic given a seed, so server and clients agree.
 /// </summary>
 public static class GlassBreak
 {
     public const int MaxEventsPerBreak = 32;
 
-    /// <summary>How long a fragment takes to fall <paramref name="height"/> metres: sqrt(2h/g).
-    /// Gravity is passed in because the world's gravity is a map property and glass should fall at the
-    /// same rate as everything else in it, not at a rate of its own.</summary>
+    /// <summary>How long a fragment takes to fall <paramref name="height"/> metres: sqrt(2h/g), with the
+    /// map's gravity.</summary>
     public static float FallSeconds(float height, float gravity = PhysicsConstants.Gravity)
     {
         if (height <= 0f || gravity <= 0.01f) return 0f;
         return MathF.Sqrt(2f * height / gravity);
     }
 
-    /// <summary>The inverse: how high the window was, from the gap a listener heard. This is the sum
-    /// the player's ear is doing, written down — for a spoken readout, for tuning, and for checking
-    /// that the timing encodes what it claims to.</summary>
+    /// <summary>The inverse: how high the window was, from the gap a listener heard.</summary>
     public static float HeightFromFallDelay(float seconds, float gravity = PhysicsConstants.Gravity)
         => seconds <= 0f ? 0f : 0.5f * gravity * seconds * seconds;
 
-    /// <summary>
-    /// Whether a hit destroys the pane or merely goes through it.
-    ///
-    /// Tempered glass always fails completely — it is held in compression and breaching it anywhere
-    /// releases the whole sheet, which is why a car window becomes a pile of cubes and never a pane
-    /// with a hole in it. Laminated never fails: the interlayer holds the pieces. Annealed depends on
-    /// what hit it — a fast small round can punch a surprisingly clean hole in old plate glass, while
-    /// buckshot takes the whole thing out.
-    /// </summary>
+    /// <summary>Whether a hit destroys the pane or goes through it. Tempered always fails, laminated
+    /// never; annealed shatters to buckshot or a slow heavy round, and a fast light one drills it.</summary>
     public static bool Shatters(GlassType type, WeaponDefinition weapon)
     {
         switch (type)
@@ -170,19 +137,13 @@ public static class GlassBreak
             case GlassType.Tempered: return true;
             case GlassType.Laminated: return false;
             default:
-                // Buckshot spreads its energy over nine impacts across a wide area, which is far more
-                // destructive to a brittle sheet than one fast round through the middle of it.
                 if (weapon.PelletsPerShot > 1) return true;
-                // A slow heavy pistol round smashes; a fast light rifle round tends to drill.
                 return weapon.MuzzleVelocity < 500f;
         }
     }
 
-    /// <summary>
-    /// The whole sequence for one round striking one pane. Returns how many events were written.
-    ///
-    /// <paramref name="impact"/> is where the round hit, in world space.
-    /// </summary>
+    /// <summary>The whole sequence for one round striking one pane at <paramref name="impact"/>, world
+    /// space. Returns how many events were written.</summary>
     public static int Resolve(GlassPane pane, Vector3 impact, WeaponDefinition weapon, int seed,
                               Span<GlassEvent> events, float gravity = PhysicsConstants.Gravity)
     {
@@ -191,19 +152,16 @@ public static class GlassBreak
 
         if (!Shatters(pane.Type, weapon))
         {
-            // A hole, and the pane stays up. For laminated that is the whole event — and the SILENCE
-            // where a listener expected glass to arrive is itself the information.
+            // A hole, and the pane stays up: the silence where glass was expected is the information.
             events[n++] = new GlassEvent(GlassEventKind.Puncture, 0f, impact,
                                          pane.Type == GlassType.Laminated ? 0.8f : 1f,
                                          Pitch(rng, 1.15f, 0.12f));
             return n;
         }
 
-        // 1. The pane fails, at the window.
         events[n++] = new GlassEvent(GlassEventKind.Shatter, 0f, pane.Centre, 1f, Pitch(rng, 1f, 0.08f));
 
-        // 2. Fragments leaving the frame — a shower over the first fraction of a second, spreading
-        //    out and down from the opening rather than all issuing from one point.
+        // Fragments leaving the frame over the first fraction of a second, spread over the opening.
         int shards = pane.Type == GlassType.Tempered ? 8 : 5;
         float area = MathF.Max(0.2f, pane.Size.X * pane.Size.Y);
         shards = Math.Min(shards + (int)(area / 1.5f), 12);
@@ -219,27 +177,22 @@ public static class GlassBreak
                                          Pitch(rng, 1.1f, 0.35f));
         }
 
-        // 3. The arrival. This is the part that carries the height.
-        //
-        //    It lands at the FOOT of the wall, displaced outward by however far the fragments were
-        //    thrown — not at the window, and not under the listener. A pile of glass hitting the
-        //    pavement forty metres away and five floors down is a completely different direction from
-        //    the break that caused it, and hearing the two separately is the whole point.
+        // The arrival, which carries the height: at the foot of the wall, thrown a little outward, a
+        // different direction from the break.
         float fall = FallSeconds(pane.HeightAboveGround, gravity);
         if (fall <= 0.01f) return n;
 
         Vector3 ground = new(pane.Centre.X, pane.Centre.Y - pane.HeightAboveGround, pane.Centre.Z);
         ground += pane.Normal * 0.8f;
 
-        // The fragments do not all arrive together: they leave over a couple of hundred milliseconds
-        // and from slightly different heights, so the landing is a scatter, longer from higher up.
+        // A scatter, longer from higher up: the fragments left over a couple of hundred milliseconds.
         int landings = Math.Min(events.Length - n, pane.Type == GlassType.Tempered ? 6 : 4);
         float spread = 0.18f + fall * 0.35f;
         for (int i = 0; i < landings; i++)
         {
             float t = fall + (float)rng.NextDouble() * spread;
             Vector3 at = ground + Offset(rng, 1.2f, 0f) + pane.Normal * (float)(rng.NextDouble() * 1.4f);
-            // The first arrivals are the big pieces and the loudest.
+            // The big pieces arrive first and loudest.
             float vol = (i == 0 ? 0.9f : 0.4f + (float)rng.NextDouble() * 0.3f);
             events[n++] = new GlassEvent(GlassEventKind.Landing, t, at, vol, Pitch(rng, 1f, 0.3f));
         }
@@ -250,14 +203,14 @@ public static class GlassBreak
     private static float Pitch(Random rng, float centre, float spread)
         => centre * (1f - spread * 0.5f + (float)rng.NextDouble() * spread);
 
-    /// <summary>A random offset within a rectangle, used to spread fragments over the opening and the
-    /// landing over the pavement. Horizontal only when <paramref name="halfHeight"/> is zero.</summary>
+    /// <summary>A random offset within a rectangle; horizontal only when <paramref name="halfHeight"/> is
+    /// zero.</summary>
     private static Vector3 Offset(Random rng, float halfWidth, float halfHeight)
         => new((float)(rng.NextDouble() * 2 - 1) * halfWidth,
                (float)(rng.NextDouble() * 2 - 1) * halfHeight,
                (float)(rng.NextDouble() * 2 - 1) * halfWidth);
 
-    /// <summary>The folder a glass event plays from. One place, so nothing can drift.</summary>
+    /// <summary>The folder a glass event plays from.</summary>
     public static string SoundFolderFor(GlassEventKind kind) => kind switch
     {
         GlassEventKind.Puncture => "GLASS/TINKLE",     // a short bright tick; the pool has plenty

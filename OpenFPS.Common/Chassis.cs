@@ -3,13 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace OpenFPS.Common;
 
-// ── The running gear, as data ───────────────────────────────────────────────────────────────────
-//
-// What a vehicle stands on: its axles, the tyres on them, which ones drive, steer and brake, and
-// where its weight is. Every number here is a fact about a real vehicle, declared on its preset
-// with the source beside it, so the wheel model (WheelDynamics) has nothing of its own to invent.
-//
-// See docs/NEXT_BODIES_WHEELS_ROADS.md, stage 3.
+// The running gear as data: axles, tyres, which drive, steer and brake, and where the weight is.
+// Every number is declared on a real vehicle's preset with its source, so WheelDynamics invents
+// nothing (docs/NEXT_BODIES_WHEELS_ROADS.md, stage 3).
 
 /// <summary>How a wheel is braked. Discs on cars; drums behind air on most heavy vehicles.</summary>
 public enum BrakeKind { Disc, Drum }
@@ -26,16 +22,12 @@ public sealed record TyreSize
     public required float RimInches { get; init; }
 
     /// <summary>
-    /// The effective rolling radius over the unloaded radius: distance travelled per radian of wheel
-    /// rotation, against the radius of the tyre standing free.
-    ///
-    /// A loaded tyre is flattened at the contact patch, but its tread belt hardly stretches, so it
-    /// rolls further per turn than its loaded height suggests: the effective rolling radius of a
-    /// radial tyre is close to the free radius less a third of its vertical deflection (r_e = R0 -
-    /// d/3; Jazar, Vehicle Dynamics: Theory and Application, 2008 — to confirm). With a static
-    /// deflection of 3 to 6 % of the radius that is 0.98 to 0.99 of R0. At 0.98 the 255/40R19 the
-    /// tread tone always assumed rolls at the 0.337 m it used.
+    /// The effective rolling radius over the unloaded radius. The tread belt hardly stretches, so a
+    /// radial tyre rolls at about the free radius less a third of its deflection (r_e = R0 - d/3;
+    /// Jazar, Vehicle Dynamics: Theory and Application, 2008): 0.98 to 0.99 of R0 for a static
+    /// deflection of 3 to 6 %. At 0.98 the 255/40R19 the tread tone assumed rolls at its 0.337 m.
     /// </summary>
+    // TODO: confirm r_e = R0 - d/3 against Jazar 2008.
     public float RollingRadiusFactor { get; init; } = 0.98f;
 
     /// <summary>Half the rim diameter plus the sidewall, metres.</summary>
@@ -79,10 +71,9 @@ public sealed record TyreSize
 public sealed record AxleSpec
 {
     /// <summary>
-    /// Metres forward of the body's centre (the frame of <see cref="VehicleProfile.FrontAxleZ"/>).
-    /// Unset, it is placed from the profile: the first axle at <see cref="VehicleProfile.FrontAxleZ"/>,
-    /// any other at <see cref="VehicleProfile.RearAxleZ"/> plus <see cref="TandemOffset"/> — so the
-    /// wheels stand where the sound rig already puts the axles.
+    /// Metres forward of the body's centre. Unset, it is placed from the profile, where the sound rig
+    /// puts the axles: the first at <see cref="VehicleProfile.FrontAxleZ"/>, any other at
+    /// <see cref="VehicleProfile.RearAxleZ"/> plus <see cref="TandemOffset"/>.
     /// </summary>
     public float Z { get; init; } = float.NaN;
 
@@ -90,10 +81,8 @@ public sealed record AxleSpec
     /// profile's rear axle position, which is then the middle of the pair.</summary>
     public float TandemOffset { get; init; }
 
-    /// <summary>
-    /// Centre of the left tyre's contact patch to centre of the right's, metres. For dual wheels, to
-    /// the middle of each pair. Zero is one wheel on the centreline: a motorcycle.
-    /// </summary>
+    /// <summary>Contact patch centre to contact patch centre across the axle, metres (duals: the middle
+    /// of each pair). Zero is one wheel on the centreline: a motorcycle.</summary>
     public float TrackMetres { get; init; }
 
     public required TyreSize Tyre { get; init; }
@@ -117,24 +106,16 @@ public sealed record ChassisSpec
     /// <summary>Front to back.</summary>
     public required AxleSpec[] Axles { get; init; }
 
-    /// <summary>
-    /// Height of the centre of gravity above the ground, metres. It decides how much load moves
-    /// between the wheels when the vehicle brakes, accelerates or corners: m a h / wheelbase
-    /// fore and aft, m a h / track side to side.
-    /// </summary>
+    /// <summary>Height of the centre of gravity, metres. The load transfer: m a h / wheelbase fore and
+    /// aft, m a h / track side to side.</summary>
     public float CentreOfGravityHeightMetres { get; init; } = 0.55f;
 
-    /// <summary>
-    /// The share of the weight on the front axle group standing still, 0..1: the published front/rear
-    /// split. Null puts the centre of gravity at the middle of the body, as it always was.
-    /// </summary>
+    /// <summary>The published front/rear weight split: the front axle group's share standing still,
+    /// 0..1. Null puts the centre of gravity at the middle of the body.</summary>
     public float? FrontWeightShare { get; init; }
 
-    /// <summary>
-    /// Metres forward of the body's centre that the centre of gravity sits: from
-    /// <see cref="FrontWeightShare"/>, between the middles of the front and rear axle groups
-    /// (z = rear + share x (front - rear)); zero without one.
-    /// </summary>
+    /// <summary>The centre of gravity, metres forward of the body's centre: rear + share x (front -
+    /// rear) between the axle groups' middles; zero without <see cref="FrontWeightShare"/>.</summary>
     public float CentreOfGravityZ
     {
         get
@@ -159,10 +140,7 @@ public sealed record ChassisSpec
         return true;
     }
 
-    /// <summary>
-    /// This chassis with every axle placed: those declared without a position go where the profile's
-    /// axle positions say (see <see cref="AxleSpec.Z"/>).
-    /// </summary>
+    /// <summary>This chassis with every axle placed (see <see cref="AxleSpec.Z"/>).</summary>
     public ChassisSpec PlacedOn(VehicleProfile p)
     {
         if (Axles.All(a => !float.IsNaN(a.Z))) return this;
@@ -192,11 +170,8 @@ public sealed record ChassisSpec
     /// <summary>Road-wheel angle at full lock, radians.</summary>
     public float MaxSteerAngleRad { get; init; } = 0.61f;
 
-    /// <summary>
-    /// The front axle's share of the body's roll stiffness, 0..1, which is how the lateral load
-    /// transfer divides between the axles. Null when nothing is published for the vehicle: the
-    /// transfer then divides in proportion to the static axle loads.
-    /// </summary>
+    /// <summary>The front axle's share of the roll stiffness, 0..1: how the lateral load transfer
+    /// divides between the axles. Null when unpublished: it divides by the static axle loads.</summary>
     public float? FrontRollStiffnessShare { get; init; }
 
     /// <summary>
@@ -215,11 +190,10 @@ public sealed record ChassisSpec
     public float Ackermann { get; init; } = 1f;
 
     /// <summary>
-    /// A chassis for a preset that declares none, built from what it does declare so that nothing
-    /// about it changes: two axles at its axle positions, rear-wheel drive, its width less the tyres
-    /// as the track (the mean track-to-width ratio of the declared presets, 0.85), the centre of
-    /// gravity in the middle of the body, and the 255/40R19 whose 0.337 m rolling radius the tyre
-    /// tone always assumed. Drums above five tonnes, discs below — the rule the brake squeal used.
+    /// A chassis for a preset that declares none, from what it does declare: two axles at its axle
+    /// positions, rear-wheel drive, a track of <see cref="DefaultTrackOverWidth"/> of its width, the
+    /// centre of gravity mid-body, and the 255/40R19 (0.337 m rolling radius) the tyre tone assumed.
+    /// Drums above five tonnes, discs below, as the brake squeal had it.
     /// </summary>
     public static ChassisSpec Default(VehicleProfile p)
     {
@@ -242,11 +216,8 @@ public sealed record ChassisSpec
     /// and widths are both published among the presets (0.85).</summary>
     public const float DefaultTrackOverWidth = 0.85f;
 
-    /// <summary>
-    /// The effective wheelbase, metres: from the middle of the front axle group to the middle of the
-    /// rear one. Two axles, it is the distance between them; a tandem counts as the point between its
-    /// pair. Of a placed chassis (<see cref="PlacedOn"/>).
-    /// </summary>
+    /// <summary>The effective wheelbase of a placed chassis (<see cref="PlacedOn"/>), metres: middle of
+    /// the front axle group to middle of the rear; a tandem counts as the point between its pair.</summary>
     public float Wheelbase => Groups(out float front, out float rear) ? front - rear : 0f;
 
     /// <summary>Tyres on steered axles: the front tyre voice's share of the rolling noise.</summary>
@@ -257,27 +228,21 @@ public sealed record ChassisSpec
 }
 
 /// <summary>
-/// The road surfaces a wheel can stand on, as an index the wire can carry in a byte, and how much
-/// grip each gives against dry asphalt.
-///
-/// The ratios are the average peak coefficients of road adhesion in Wong, Theory of Ground Vehicles
-/// (2nd ed. 1993, p. 26, as reproduced at hpwizard.com/tire-friction-coefficient.html; the table's
-/// number in later editions to confirm): asphalt and concrete (dry) 0.8-0.9, gravel 0.6, earth road (dry) 0.68,
-/// snow (hard-packed) 0.2, ice 0.1, each divided by the 0.85 middle of the dry asphalt range. A
-/// preset's tyre grip is its grip on dry asphalt; anything the table does not cover rolls as
-/// asphalt does.
+/// The road surfaces a wheel can stand on, as a byte for the wire, and each one's grip against dry
+/// asphalt: Wong's average peak adhesion (Theory of Ground Vehicles, 2nd ed. 1993, p. 26, as at
+/// hpwizard.com/tire-friction-coefficient.html), dry asphalt and concrete 0.8-0.9, gravel 0.6, dry
+/// earth 0.68, packed snow 0.2, ice 0.1, each over 0.85. Anything else rolls as asphalt.
 /// </summary>
+// TODO: confirm the table's number in later editions of Wong.
 public static class RoadSurfaces
 {
     /// <summary>Not on the ground, or a material the table does not know.</summary>
     public const byte Unknown = 0;
 
-    // StickSlip: whether the rubber keeps sticking and slipping on the surface once the whole contact
-    // patch slides. On a coherent dry surface it does, and a locked or spinning tyre goes on screeching
-    // at its stick-slip note: under dry braking the squeal holds a fundamental near 800 Hz with its
-    // harmonic, rising as the tyre brakes harder (Tan Li, "Tire Braking/Cornering Noise Analysis:
-    // Stick/Slip Mechanism", NOISE-CON 2019), and the stick-snap is strongest on smooth, clean, dry
-    // surfaces. A loose or icy surface shears instead of gripping back, so the slide there is noise.
+    // StickSlip: whether a fully sliding tyre keeps sticking and slipping. On a dry coherent surface it
+    // screeches on at a fundamental near 800 Hz with its harmonic, rising with braking (Tan Li, "Tire
+    // Braking/Cornering Noise Analysis: Stick/Slip Mechanism", NOISE-CON 2019); loose or icy ground
+    // shears instead, so the slide there is noise.
     private static readonly (string Material, float Grip, float StickSlip)[] Table =
     {
         ("", 1f, 1f),                 // 0: unknown, rolls as asphalt

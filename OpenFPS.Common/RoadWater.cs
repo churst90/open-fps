@@ -2,39 +2,13 @@ using System.Numerics;
 
 namespace OpenFPS.Common;
 
-// ── Water on the road ───────────────────────────────────────────────────────────────────────────
-//
-// What the rain leaves on a carriageway, and what that does to a tyre: how much water there is under
-// each wheel, how much grip is left, and (on the client) how much noise the water makes. One state,
-// worked out on the server and sent to every client (WorldStateUpdate.RoadWater, and per wheel in
-// WheelState.Water), so the grip the server drives with and the hiss a client hears come from the
-// same millimetres. See docs/WET_ROADS.md.
-//
-// Three stores, each with its own published law:
-//
-//   * The TEXTURE: the voids of the surface between the stones. The sand-patch mean texture depth
-//     (MTD, ISO 10844 / ASTM E965) is by definition a volume of voids per area, so a road holds MTD
-//     millimetres of water in its texture before any film stands above it. Rain fills it directly;
-//     only evaporation empties it. This is the "damp" road that stays noisy for an hour after the rain.
-//
-//   * The SHEET: the film running across the road to its edge while it rains. Its depth above the
-//     texture at a distance L down the cross-fall is Gallaway et al.'s equation 16 (FHWA-RD-79-31, 1979,
-//     p. 79, fitted to 335 measurements):
-//         WD = 0.00338 TXD^0.11 L^0.43 I^0.59 / S^0.42 - TXD      (inches, feet, in/h, ft/ft)
-//     which in millimetres, metres and mm/h has the constant 0.01485.
-//     It comes up to that depth over the kinematic-wave time to equilibrium of overland flow,
-//     t_e = (n L / sqrt S)^0.6 / i^0.4 (Woolhiser and Liggett 1967; HEC-22 eq. 3-4), a minute or two,
-//     and drains away over the same once the rain stops. Rain is passed through the same ladder of
-//     linear reservoirs the running water uses (Runoff.Rungs), read at that time constant.
-//
-//   * The GUTTER and the PUDDLES. The flow collected along a kerb between two inlets spreads into the
-//     road by Izzard's kerb-gutter equation (HEC-22 eq. 4-2: Q = (0.376 / n) Sx^1.67 SL^0.5 T^2.67, SI),
-//     so in heavy rain the kerb-side wheels run in it. Puddles are depressions along the kerbs
-//     (PuddleField): they fill from the gutter and empty by evaporation and seepage, over hours.
-//
-// Evaporation is Penman's (1948) combination equation with his wind function, as Shuttleworth gives
-// it (Handbook of Hydrology, 1993, ch. 4): E = (Δ Rn / λ + γ f(u) (es − ea)) / (Δ + γ), f(u) = 0.26
-// (1 + 0.54 u2) mm/day/hPa. So a road dries in the sun and the wind and stays wet on a still, humid night.
+// Water on the road: how much is under each wheel and how much grip is left. Worked out on the server
+// and sent to every client (WorldStateUpdate.RoadWater, WheelState.Water), so the grip the server drives
+// with and the hiss a client hears come from the same millimetres. Three stores, each with its published
+// law (docs/WET_ROADS.md): the texture's voids (sand-patch MTD, ASTM E965), filled by rain and emptied
+// only by evaporation, the damp road that stays noisy for an hour; the sheet running to the edge while it
+// rains (Gallaway et al. 1979, FHWA-RD-79-31, eq. 16); the gutter (Izzard, HEC-22 eq. 4-2) and the
+// puddles along the kerbs (PuddleField). Drying is Penman's (1948) equation.
 
 /// <summary>A surface's water-holding: its texture, its roughness to sheet flow, how much grip it keeps wet.</summary>
 /// <param name="TextureDepthMm">Sand-patch mean texture depth, mm: the water the voids hold before a film forms.</param>
@@ -108,9 +82,9 @@ public static class RoadWaterLaw
     }
 
     /// <summary>
-    /// Gallaway's water film depth above the texture, mm, for rain <paramref name="rainMmPerHour"/>
-    /// running <paramref name="drainMetres"/> down a cross-fall <paramref name="crossSlope"/> over
-    /// texture <paramref name="textureMm"/> deep. Zero when the rain is too light for a film.
+    /// Gallaway's water film depth above the texture, mm, <paramref name="drainMetres"/> down the
+    /// cross-fall: WD = 0.00338 TXD^0.11 L^0.43 I^0.59 / S^0.42 − TXD in inches, feet and in/h (FHWA-RD-79-31,
+    /// eq. 16, fitted to 335 measurements). Zero when the rain is too light for a film.
     /// </summary>
     public static float SheetDepthMm(float rainMmPerHour, float drainMetres, float textureMm, float crossSlope)
     {
@@ -124,7 +98,8 @@ public static class RoadWaterLaw
 
     /// <summary>
     /// The kinematic-wave time to equilibrium of sheet flow, s: t_e = (n L / sqrt S)^0.6 / i^0.4 with
-    /// i in m/s (Woolhiser and Liggett 1967; HEC-22 eq. 3-4 is the same in its own units).
+    /// i in m/s (Woolhiser and Liggett 1967; HEC-22 eq. 3-4). A minute or two; the sheet drains over the
+    /// same, read off the Runoff.Rungs ladder at this time constant.
     /// </summary>
     public static float EquilibriumSeconds(float drainMetres, float rainMmPerHour, float manningN, float crossSlope)
     {
@@ -148,10 +123,10 @@ public static class RoadWaterLaw
     public static float SaturationHpa(float celsius) => 6.108f * MathF.Exp(17.27f * celsius / (celsius + 237.3f));
 
     /// <summary>
-    /// Evaporation from a wet surface, mm/h: Penman's combination equation (Shuttleworth 1993, eq.
-    /// 4.2.27 with the 1948 wind function), from the air's temperature and relative humidity, the wind at
-    /// two metres, and the net radiation the surface takes in (W/m²; zero at night and under cloud the
-    /// longwave loss makes it negative, and evaporation then stops rather than going to dew).
+    /// Evaporation from a wet surface, mm/h: Penman's combination equation, E = (Δ Rn / λ + γ f(u) (es − ea))
+    /// / (Δ + γ), f(u) = 0.26 (1 + 0.54 u2) mm/day/hPa (Shuttleworth 1993, Handbook of Hydrology eq. 4.2.27,
+    /// with the 1948 wind function), the wind at two metres. Where the longwave loss makes the net
+    /// radiation negative, evaporation stops rather than going to dew.
     /// </summary>
     public static float EvaporationMmPerHour(float airCelsius, float relativeHumidity, float windMps, float netRadiationWm2)
     {
@@ -182,11 +157,8 @@ public static class RoadWaterLaw
         return shortwave - longwave;
     }
 
-    /// <summary>
-    /// How cloudy it is, 0..1, from the weather the server keeps (which has no clouds yet): overcast
-    /// while anything falls, otherwise read off the humidity, clear at 50 % and overcast at 95 %.
-    /// A stand-in until the sky has a cloud cover of its own.
-    /// </summary>
+    /// <summary>How cloudy it is, 0..1: overcast while anything falls, else from the humidity, clear at
+    /// 50 % and overcast at 95 %. A stand-in until the weather has a cloud cover of its own.</summary>
     public static float CloudFrom(float precipitationIntensity, float relativeHumidity)
         => MathF.Max(Math.Clamp(precipitationIntensity * 4f, 0f, 1f), Math.Clamp((relativeHumidity - 0.5f) / 0.45f, 0f, 1f));
 
@@ -459,7 +431,6 @@ public sealed class PuddleField
     }
 
     public IReadOnlyList<Puddle> PuddlesOn(int road) => road >= 0 && road < _puddles.Length ? _puddles[road] : Array.Empty<Puddle>();
-    public int RoadCount => _roads.Count;
 
     private List<Puddle> Draw(int r, float length)
     {

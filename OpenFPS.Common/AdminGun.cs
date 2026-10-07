@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 using static OpenFPS.Common.DesignedSoundKit;
@@ -466,12 +465,4 @@ public static class AdminGun
         }
         return Finish(y, sr, fadeOutMs: 10f);
     }
-
-    // ── The report as a world sound ───────────────────────────────────────────────────────────
-
-    /// <summary>Whether a synth key is any of the admin gun's: the client routes it here.</summary>
-    public static bool IsKey(string? key)
-        => !string.IsNullOrEmpty(key) && (key.StartsWith(ReportPrefix, StringComparison.Ordinal)
-                                          || key.StartsWith(ModePrefix, StringComparison.Ordinal)
-                                          || key.StartsWith(HitPrefix, StringComparison.Ordinal));
 }

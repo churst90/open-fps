@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -7,40 +6,24 @@ namespace OpenFPS.Common;
 
 /// <summary>
 /// A car's power window: the openings it makes in the cabin, and the sound of it going down and up,
-/// simulated as the mechanism the way the doors are (<see cref="SlidingDoor"/>, <see cref="KnobDoor"/>).
-///
-/// The parts:
-///
-///   The MOTOR: a 12 V permanent-magnet DC motor with its armature's resistance and inductance and its
-///   back EMF, so it slows and draws more current as the load rises, and stalls when the glass can go no
-///   further. Its can is pulled out of round by the torque ripple at the commutator's bar rate and
-///   knocked by the brushes crossing the bars; its rotor is not perfectly balanced. That is the whine
-///   and its harmonics, and the pitch falls as the glass binds.
-///
-///   The WORM GEAR: a single-start worm on a plastic wheel at 87:1, about 45 per cent efficient and so
-///   self-locking: the weight of the glass cannot drive it backwards, which is why a window stays where
-///   it was left and why lowering one still takes the motor's torque. The wheel's tooth error is a force
-///   between worm and wheel at the worm's own rotation rate, ringing the gearbox housing, and a ripple
-///   in the pull on the cable.
-///
-///   The REGULATOR: a cable round a drum, carrying the glass on a clamp. The cable is a spring, so the
-///   glass rides on it, and a glass that sticks in its channels and lets go judders on it.
-///
-///   The GLASS: 4 mm toughened side glass sliding in flocked run channels at its front and rear edges,
-///   with a rubber sweep pressed on each face at the waist of the door. The channels' friction is the
-///   load the motor feels; the sweeps' lips stick and slip on the glass, which is the squeak, and only
-///   where the lip is pressed hard and its flocking is worn. The pane's own bending field radiates into
-///   the cabin.
-///
-///   The ENDS: at the top the glass edge runs into the header channel, which pinches it, and seats on
-///   the channel's rubber floor: a soft thud and the seal squeezing, then the motor stalls against it
-///   until the door module sees the stall and cuts it. At the bottom the glass clamp lands on the
-///   regulator's rubber stop: a thunk through the door, and the same stall.
-///
-///   The DOOR: the motor and regulator are bolted to the door's inner panel, a damped 0.7 mm steel
-///   sheet, and everything inside the door reaches the cabin through the trim card in front of it.
-///
-/// One door's window, for now: every vehicle uses it, as every vehicle uses the one car door.
+/// simulated as the mechanism, as the doors are (<see cref="SlidingDoor"/>, <see cref="KnobDoor"/>).
+/// <list type="bullet">
+/// <item>The motor: 12 V permanent-magnet DC with armature resistance, inductance and back EMF, so it slows
+/// under load and stalls at the end. Torque ripple at the bar rate, the brushes crossing the bars and the
+/// rotor's unbalance are the whine and its harmonics, falling as the glass binds.</item>
+/// <item>The worm: single start on a plastic wheel at 87:1, about 45 % efficient and so self-locking: the
+/// glass's weight cannot drive it back, so lowering still takes the motor. Tooth error rings the gearbox
+/// and ripples the cable's pull.</item>
+/// <item>The regulator: a cable round a drum, the glass riding on it as on a spring, juddering when it
+/// sticks and lets go.</item>
+/// <item>The glass: 4 mm toughened, in flocked run channels, a rubber sweep on each face at the waist. The
+/// channels are the load; the sweeps' stick-slip is the squeak, where pressed hard and worn.</item>
+/// <item>The ends: the header channel pinches and seats the glass, the bottom stop takes the clamp, and
+/// the motor stalls until the door module cuts it.</item>
+/// <item>The door: everything is bolted to a damped 0.7 mm steel inner panel and reaches the cabin through
+/// the trim card.</item>
+/// </list>
+/// Every vehicle uses this one window, as every vehicle uses the one car door.
 /// </summary>
 public static class CarWindow
 {
@@ -57,10 +40,8 @@ public static class CarWindow
     /// the roof and the rear of a back door's glass the wheel arch, so it is not a rectangle.</summary>
     public const float ShapeShare = 0.85f;
 
-    /// <summary>
-    /// What a vehicle's side windows are: how many (one each side of each row of seats), how big each
-    /// is when fully down, and the cabin they open: its whole wall area and its volume.
-    /// </summary>
+    /// <summary>A vehicle's side windows: how many (one each side of each row), how big each is fully down,
+    /// and the cabin they open (wall area and volume).</summary>
     public readonly record struct Openings(int Count, float AreaEachM2, float CabinSurfaceM2, float CabinVolumeM3,
                                            float GlassHeightM, int Rows);
 
@@ -77,11 +58,8 @@ public static class CarWindow
         return new Openings(2 * rows, length * height * ShapeShare, surface, g.Lc * g.Wc * g.Hc, height, rows);
     }
 
-    /// <summary>
-    /// The share of the cabin's wall that is a hole, with every side window <paramref name="open"/> of the
-    /// way down. A hole has no mass and passes everything, so this is also the share of the power outside
-    /// that reaches the inside through it, and of the power inside that gets out.
-    /// </summary>
+    /// <summary>The share of the cabin's wall that is a hole, every side window <paramref name="open"/> of the
+    /// way down; a hole passes everything, so also the share of the power that passes through it.</summary>
     public static float OpenShare(VehicleProfile v, float open)
         => Measure(v) is { } o ? Math.Clamp(open, 0f, 1f) * o.Count * o.AreaEachM2 / o.CabinSurfaceM2 : 0f;
 
@@ -90,13 +68,10 @@ public static class CarWindow
     public const float GlassThicknessM = 0.004f;
 
     /// <summary>
-    /// What the cabin's walls take off a sound passing through them, either way, dB (negative) at the
-    /// mixer's three bands (150 Hz, 1 kHz, 4 kHz).
-    ///
-    /// Three paths in parallel, as power: the glass by its mass (transmission falls as rho*c / (pi*f*m)),
-    /// the seals (<see cref="VehicleBody.SealLeak"/>, which have no mass and let a little of everything
-    /// through), and whatever is simply open, <paramref name="openShare"/> of the wall: a window down, a
-    /// bus's doorway. What is open is no longer glass, so the glass's share shrinks by as much.
+    /// What the cabin's walls take off a sound passing through them, either way, dB (negative) at the mixer's
+    /// three bands (150 Hz, 1 kHz, 4 kHz). Three paths in parallel, as power: the glass by its mass
+    /// (rho c / (pi f m)), the seals (<see cref="VehicleBody.SealLeak"/>), and <paramref name="openShare"/> of
+    /// the wall simply open, which is that much less glass.
     /// </summary>
     public static (float Low, float Mid, float High) CabinLossDb(VehicleBody body, float openShare)
     {
@@ -111,11 +86,8 @@ public static class CarWindow
         return (Loss(150f), Loss(1000f), Loss(4000f));
     }
 
-    /// <summary>
-    /// Moves a window's open fraction toward where it is going at the motor's own pace: the server
-    /// moves the glass with this, and a client follows the same glass from the same two numbers, so
-    /// what is heard opening and the opening itself arrive together.
-    /// </summary>
+    /// <summary>Moves a window's open fraction toward its target at the motor's own pace. Server and
+    /// client both use it, so the sound and the opening arrive together.</summary>
     public static float Glide(float open, float target, float dt)
     {
         if (open < target) return MathF.Min(target, open + dt / DownSeconds);
@@ -136,8 +108,7 @@ public static class CarWindow
     public const string KeyPrefix = "carwindow:";
     public const int Variants = 4;
 
-    /// <summary>A window's stroke is named to the nearest quarter: every stroke a player can ask for is
-    /// one of a handful, and each can be rendered once and kept.</summary>
+    /// <summary>A stroke is named to the nearest quarter, so each can be rendered once and kept.</summary>
     public static float Quarter(float open) => MathF.Round(Math.Clamp(open, 0f, 1f) * 4f) / 4f;
 
     public static string Key(int variant, float from, float to)
@@ -169,10 +140,9 @@ public static class CarWindow
     }
 
     /// <summary>
-    /// The loudest a stroke is at a metre from the door on the cabin side, dB SPL peak: the model's own,
-    /// by variant (all the old character since 2026-10-04, each its own seed) and by how the stroke ends, read off the renders with no
-    /// calibration (CarWindowTests holds them to it). Fully down, the clamp landing on its stop; fully up,
-    /// the glass seating and the header's lips squeezing; part way, the motor running and nothing hit.
+    /// The loudest a stroke is at a metre from the door on the cabin side, dB SPL peak, read off the renders
+    /// by variant's seed and by how the stroke ends (CarWindowTests holds them to it): fully down, the clamp
+    /// on its stop; fully up, the glass seating; part way, the motor alone.
     /// </summary>
     public static float LevelDb(int variant, float to)
     {
@@ -180,8 +150,7 @@ public static class CarWindow
         return to >= 1f ? BottomDb[v] : to <= 0f ? TopDb[v] : BetweenDb[v];
     }
 
-    // By seed now that every window is the old one (2026-10-04); part way is the mean of the stroke down
-    // and the stroke up, which differ by up to 3 dB.
+    // Part way is the mean of the strokes down and up, which differ by up to 3 dB.
     private static readonly float[] BottomDb = { 87.1f, 83.6f, 86.6f, 86.2f };
     private static readonly float[] TopDb = { 83.1f, 80.6f, 80.1f, 80.9f };
     private static readonly float[] BetweenDb = { 76.9f, 72.7f, 76.7f, 75.4f };
@@ -235,10 +204,8 @@ public static class CarWindow
 
     // ── Constants, each a property of a part ─────────────────────────────────────────────────────
 
-    /// <summary>Internal steps per output sample. Nothing here is stiff the way a steel latch on a steel
-    /// strike is: the stiffest parts are a rubber lip (about 500 Hz, its bristles a few kilohertz) and the
-    /// brushes' 0.2 ms knocks, which the output rate itself follows. A window is rendered as it is first
-    /// heard, so every step it does not need is a step the game is not waiting for.</summary>
+    /// <summary>Internal steps per output sample: one, as the stiffest parts are a rubber lip (about 500 Hz,
+    /// its bristles a few kilohertz) and the brushes' 0.2 ms knocks, and a window renders when first heard.</summary>
     private const int Over = 1;
     private const double G = 9.81;
     private const double GlassE = 70e9, GlassRho = 2500, SteelE = 200e9, SteelRho = 7850;
@@ -302,29 +269,19 @@ public static class CarWindow
     /// <summary>Silence before the switch, and after the motor stops.</summary>
     private const float PreRoll = 0.03f, TailSeconds = 0.35f;
 
-    /// <summary>
-    /// What wear does to a window, by character: new, standard, worn, old. The run channels' preload and
-    /// friction (static and sliding), the sweeps' load each and their friction, the gear's tooth error,
-    /// and the step between commutator bars the brushes fall over.
-    /// </summary>
+    /// <summary>What wear does to a window: the run channels' preload and friction (static, sliding), each
+    /// sweep's load and friction, the gear's tooth error, and the step between commutator bars.</summary>
     private readonly record struct Character(double ChannelN, double ChannelMuS, double ChannelMuK,
         double LipN, double LipMuS, double LipMuK, double ToothM, double BarStepM);
 
-    /// <summary>
-    /// Every window is the old one now: Cody, 2026-10-04, of the four characters rendered on 10-03,
-    /// "the car window v3 sounds the best, use that". The variant still seeds the random detail (Sim's
-    /// rng), so two windows rolling together are two windows and never one sound copied to two places.
-    /// The other three are kept here for the record: new, standard, worn.
-    /// </summary>
-    private static Character Of(int variant) => Old;
-
+    /// <summary>Every window has the old window's character: Cody, 2026-10-04, "the car window v3 sounds
+    /// the best, use that" (the other three are in docs/COMMON_NOTES.md). The variant still seeds the
+    /// random detail, so two windows rolling together are never one sound copied to two places.</summary>
     private static readonly Character Old = new(65, 0.62, 0.48, 5.0, 1.00, 0.62, 18e-6, 8e-6);
-    // Not used since 2026-10-04: new (45, 0.42, 0.36, 3.0, 0.40, 0.36, 6e-6, 3e-6), standard (50, 0.48,
-    // 0.40, 3.5, 0.50, 0.42, 9e-6, 4e-6), worn (55, 0.55, 0.44, 4.5, 0.85, 0.55, 12e-6, 5e-6).
 
     private sealed class Sim
     {
-        private readonly int sampleRate, rate;
+        private readonly int rate;
         private readonly double dt;
         private readonly bool quiet;
         private readonly Report? report;
@@ -364,15 +321,15 @@ public static class CarWindow
         private readonly HighPass? carrierHigh;
         private readonly double[] toothError = new double[(int)Ratio];
         private readonly double[] profilePhase = new double[8];
-        private double meshTurns, lastBar, brushLeft, brushPeak, trimLow, flock, cableForce;
+        private double meshTurns, lastBar, brushLeft, brushPeak, trimLow, flock;
         private double peakGlass, peakDoor, peakMotor;
 
         public Sim(int variant, int sampleRate, Report? report, bool quiet)
         {
-            this.sampleRate = sampleRate; this.report = report; this.quiet = quiet;
+            this.report = report; this.quiet = quiet;
             rate = sampleRate * Over; dt = 1.0 / rate;
             rng = new Random(1 + ((variant % Variants) + Variants) % Variants);
-            ch = Of(variant);
+            ch = Old;
             glassKg = PaneW * PaneH * PaneT * GlassRho + CarrierKg;
             wFree = (Volts - Ohms * BrushDragNm / MotorK) / MotorK;
 
@@ -381,9 +338,8 @@ public static class CarWindow
             for (int i = 0; i < Lips; i++)
                 lip[i] = new LuGre { MuStatic = ch.LipMuS, MuSliding = ch.LipMuK, StribeckSpeed = 0.01,
                                      Viscous = 0.05, Bristle = LipBristle };
-            // How hard the channels and the sweeps press varies along the glass: a curved pane in channels
-            // that are not quite the same curve, and sweeps whose lips are not quite straight. Smooth over
-            // a few centimetres; the same window every time it runs.
+            // How hard channels and sweeps press varies smoothly along the glass (a curved pane in channels
+            // not quite the same curve), the same every time the window runs.
             profileStep = 0.005;
             int n = (int)((Drop + 0.1) / profileStep) + 2;
             channelProfile = Smooth(n, 8); lipProfile0 = Smooth(n, 5); lipProfile1 = Smooth(n, 5);
@@ -464,17 +420,15 @@ public static class CarWindow
         public void Run(float from, float to)
         {
             from = Math.Clamp(from, 0f, 1f); to = Math.Clamp(to, 0f, 1f);
-            // Where the glass starts: shut, it is pressed into the header seal by however hard the motor
-            // stalled it there; fully down, it sits on its stop.
+            // Shut, the glass is pressed into the header seal; fully down, it sits on its stop.
             x = Drop * (1 - from);
             if (from <= 0f) x = Drop + 0.002;
             if (from >= 1f) x = 0;
-            // The drum where the cable holds the glass there, so nothing jumps as the simulation starts.
             theta = x / DrumR * Ratio;
             double target = Drop * (1 - to);
             bool toEnd = to <= 0f || to >= 1f;
             drive = 0;
-            // Let it settle on its cable and its seal before anything is listened to.
+            // Settle on the cable and seal before anything is listened to.
             for (double t = 0; t < 0.3; t += dt) Step();
             recording = true;
             time = 0;
@@ -496,7 +450,6 @@ public static class CarWindow
                 {
                     bool atEnd = dir > 0 ? x >= Drop - 0.0005 : x <= 0.0005;
                     if (atEnd && arrivedAt < 0) { arrivedAt = time; Log($"glass at the {(dir > 0 ? "top" : "bottom")} at {elapsed:F2} s"); }
-                    // The module cuts a motor that has stopped turning, once it is sure.
                     if (elapsed > 0.25 && Math.Abs(w) < StallShare * wFree) stalledFor += dt; else stalledFor = 0;
                     if (stalledFor >= StallCutSeconds) { Log($"stall cut at {elapsed:F2} s, {Math.Abs(amps):F1} A"); break; }
                 }
@@ -523,8 +476,8 @@ public static class CarWindow
         private void Step()
         {
             // ── The motor's circuit ──
-            // Switched on, the battery across the armature; released, the switch shorts its terminals, so
-            // the back EMF drives a current that brakes it to a stop in a few hundredths of a second.
+            // Released, the switch shorts the terminals and the back EMF brakes the motor in a few
+            // hundredths of a second.
             double emf = MotorK * w;
             double steady = (Volts * drive - emf) / Ohms;
             amps = steady + (amps - steady) * Math.Exp(-dt * Ohms / Henries);
@@ -544,12 +497,10 @@ public static class CarWindow
             double drumRate = w / Ratio * DrumR;
             double cableC = 2 * CableZeta * Math.Sqrt(CableK * glassKg);
             double cable = CableK * (drum - x) + cableC * (drumRate - v);
-            cableForce = cable;
 
             // ── The rotor, through a self-locking worm ──
-            // What the cable asks of the drum, seen at the worm: divided by the ratio and the efficiency when
-            // the motor drives it, and still a drag of (1/eta - 2) of it when the glass's weight would like
-            // to run it the other way, because a worm under half efficient cannot be driven backwards.
+            // The cable's load at the worm: over ratio times efficiency when driven, and still a drag of
+            // (1/eta - 2) of it when the glass's weight pulls the other way.
             double tOut = cable * DrumR;                    // resists turning up
             double ResistIn(double s)
             {
@@ -565,7 +516,6 @@ public static class CarWindow
             }
             else
             {
-                // At rest it turns only if the motor beats the load AND the friction in the chosen direction.
                 double s = torque >= 0 ? 1 : -1;
                 double net = torque * s - ResistIn(s) - BrushDragNm;
                 w = net > 0 ? s * net / RotorJ * dt : 0;
@@ -585,7 +535,7 @@ public static class CarWindow
                 double press = i < 2 ? ch.LipN * Math.Max(0.1, 1 + 0.5 * ProfileAt(i == 0 ? lipProfile0 : lipProfile1, x))
                                      : pinch;
                 double rel = v - lipV[i];
-                // Quiet, only the drag matters, and the lip's own motion is too small to change it.
+                // Quiet, only the drag matters.
                 double f = quiet ? (press > 0 ? lip[i].Force(v, press, glassKg, dt) : 0) : lip[i].Force(rel, press, LipKg, dt);
                 lipsOnGlass += f;
                 if (quiet) continue;
@@ -599,17 +549,15 @@ public static class CarWindow
             if (quiet) { time += dt; return; }
 
             // ── What it all does to the panels ──
-            // The motor on its bracket: the rotor's unbalance at the rotation rate, the reaction of the
-            // torque ripple at the bar rate, and the mesh force, through the bracket into the door's panel.
+            // The motor on its bracket: unbalance, torque ripple and mesh force, into the door's panel.
             double turning = Math.Tanh(Math.Abs(w) / 50);
             mount!.F += Unbalance * w * w * Math.Sin(theta)
                       + Ripple * torque / DriveArm * Math.Sin(Bars * theta)
                       + MeshK * te * turning;
             mount.Step(dt);
             doorField!.Modes.Push(mountHit, mountPort!.Step(mount.Reaction, dt, out _));
-            // The gearbox housing, rung by the mesh, the harder the more it carries.
             gearbox!.Push(gearShape, MeshK * te * turning * (0.5 + Math.Abs(tOut) / 2));
-            // The brushes: a knock as each bar passes under them; the can pulled out of round by the ripple.
+            // The brushes knock as each bar passes; the ripple pulls the can out of round.
             double surface = Math.Abs(w) * CommutatorR;
             double bar = Math.Floor(theta * Bars / (2 * Math.PI));
             if (bar != lastBar && surface > 0.05)
@@ -623,7 +571,6 @@ public static class CarWindow
             brush += Ripple * torque / CanR * (Math.Sin(Bars * theta) + 0.5 * Math.Sin(2 * Bars * theta + 0.7));
             can!.Push(canShape, brush);
 
-            // The glass: the clamp's pull wavering with the mesh, the sweeps' lips, the flock, the seal.
             glassField!.Modes.Push(carrierHit, carrierPort!.Step(CarrierEccentricity * carrierHigh!.Next(cable), dt, out _));
             for (int i = 0; i < Lips; i++)
             {
@@ -635,18 +582,13 @@ public static class CarWindow
             flock += a1 * (white - flock);
             double moving = Math.Tanh(Math.Abs(v) / 0.02);
             glassField.Modes.Push(flockHit, friction * moving * 0.3 / Math.Sqrt(FlockFibres) * flock / Math.Sqrt(a1 / (2 - a1)));
-            // The ends. The header channel is the top of the door's steel frame and the stop is on the
-            // regulator's rail, bolted to the inner panel at its flange. Both are where the door is stiff:
-            // most of a blow moves the whole 20 kg door on its hinges and latch, and only the share that
-            // reaches the open sheet bends it (fed the whole blow, the bottom stop came out at 97 dB).
-            // The glass edge seating in the channel rocks the pane in its channels a little as well.
+            // The ends are where the door is stiff: most of a blow moves the whole 20 kg door, and only
+            // FrameShare bends the open sheet (fed the whole blow, the bottom stop came out at 97 dB).
             glassField.Modes.Push(sealHit, sealPort!.Step(0.3 * seal, dt, out _));
             doorField.Modes.Push(sealFrameHit, FrameShare * seal);
             doorField.Modes.Push(stopHit, FrameShare * stop);
 
-            // ── Radiate ──
-            // The glass straight into the cabin; the door's panel, the can and the gearbox through the
-            // trim card.
+            // ── Radiate: the glass straight into the cabin, the rest through the trim card ──
             double pGlass = glassField.Modes.Step();
             double pDoor = doorField.Modes.Step();
             double pMotor = can.Step() + gearbox.Step();

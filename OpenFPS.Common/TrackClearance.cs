@@ -1,24 +1,13 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 
 namespace OpenFPS.Common;
 
 /// <summary>
-/// Does the route the map says things drive on actually fit?
-///
-/// The server already validates prefabs at load, and it validated everything about the speedway
-/// except the one thing that made it sound broken: a hundred and twenty metres of the front straight
-/// ran THROUGH the grandstand deck. Every car on that stretch was inside a solid box, the acoustic
-/// model — quite correctly — rendered a source inside a building as a source inside a building, and
-/// the report that came back was "the cars vanish and I only hear their reflections".
-///
-/// Nothing in the audio engine could have been right about that, and no amount of tuning it would
-/// have helped. It is a map fault, and a map fault should be caught when the map is loaded, in terms
-/// the person who built it can act on, rather than heard four minutes into a session as a mystery.
-///
-/// Deliberately general: a track is a list of points with a width, an obstacle is a solid box, and a
-/// vehicle is something with a width. Nothing here knows about ovals, grandstands or this map.
+/// Whether a map's drive route fits, checked at load in terms its author can act on. A hundred and
+/// twenty metres of the speedway's front straight ran through the grandstand deck, and the cars on it,
+/// rightly rendered inside a solid box, were heard as "the cars vanish and I only hear their
+/// reflections".
 /// </summary>
 public static class TrackClearance
 {
@@ -30,9 +19,8 @@ public static class TrackClearance
     /// coarse enough that a two-kilometre lap is a few hundred tests.</summary>
     public const float SampleSpacing = 4.0f;
 
-    /// <summary>The band of heights a vehicle's body occupies above the surface, metres. The check is
-    /// made across it, not at a point: testing at the surface would collide with the road itself, and
-    /// testing at one height would miss a gantry at head height or a kerb at axle height.</summary>
+    /// <summary>The band of heights a vehicle's body occupies, metres: at the surface the test meets
+    /// the road itself, and at one height it misses a gantry or a kerb.</summary>
     public const float BodyBottom = 0.4f;
     public const float BodyTop = 1.6f;
 
@@ -42,13 +30,8 @@ public static class TrackClearance
     /// <summary>A solid box in the world, as the check sees it.</summary>
     public readonly record struct Solid(Vector3 Centre, Vector3 Size, Quaternion Rotation);
 
-    /// <summary>
-    /// Walks the closed route and reports every place a vehicle of the given width could not pass.
-    ///
-    /// The lane band is tested, not just the centreline, because a route is a SURFACE: a car on the
-    /// outside line is a car's width nearer whatever is beside the track, and "the middle is clear" is
-    /// not the property that matters to it.
-    /// </summary>
+    /// <summary>Every place on the closed route a vehicle of the given width could not pass, across the
+    /// lane band and not only the centreline: a car on the outside line is a car's width nearer the side.</summary>
     public static List<Obstruction> Check(IReadOnlyList<Vector3> waypoints, float widthMetres,
                                           IReadOnlyList<Solid> solids,
                                           float vehicleHalfWidth = DefaultVehicleHalfWidth)
@@ -56,9 +39,8 @@ public static class TrackClearance
         var found = new List<Obstruction>();
         if (waypoints == null || waypoints.Count < 3 || solids == null || solids.Count == 0) return found;
 
-        // The solids grown sideways by the vehicle's width, as the test below grows them, in a tree over
-        // their bounds (docs/GEOMETRY.md stage 1): each point asks the few whose bounds hold it, in the
-        // order the list has them, instead of every solid on the map.
+        // The grown solids in a tree over their bounds (docs/GEOMETRY.md stage 1): each point asks the few
+        // whose bounds hold it, in list order.
         var bmin = new Vector3[solids.Count]; var bmax = new Vector3[solids.Count];
         for (int b = 0; b < solids.Count; b++)
         {
@@ -98,8 +80,7 @@ public static class TrackClearance
             for (int s = 0; s < steps; s++)
             {
                 Vector3 centre = here + along * (span * s / steps);
-                // The centreline and both edges of the usable band. Three is enough to catch anything
-                // wide enough to be a building and cheap enough to run on every load.
+                // The centreline and both edges of the band: enough to catch a building.
                 for (int lane = -1; lane <= 1; lane++)
                 {
                     float offset = lane * halfLane;
@@ -121,11 +102,8 @@ public static class TrackClearance
                     {
                         if (hit) break;
                         var solid = solids[b];
-                        // Grown SIDEWAYS only, by the vehicle's own width, so "close enough to clip
-                        // it" fails as well as "inside it" — a route that passes a wall by ten
-                        // centimetres is not a route, whatever a point test says. Never grown
-                        // vertically: the road a vehicle drives on is a solid box directly beneath it,
-                        // and a vertical margin would report every metre of every track as obstructed.
+                        // Grown sideways by the vehicle's width, so clipping fails as well as inside.
+                        // Never vertically: the road is a solid box beneath, and every metre would fail.
                         var grown = new Vector3(solid.Size.X + vehicleHalfWidth * 2f,
                                                 solid.Size.Y,
                                                 solid.Size.Z + vehicleHalfWidth * 2f);

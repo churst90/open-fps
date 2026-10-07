@@ -1,21 +1,13 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 using MemoryPack;
-using OpenFPS.Common;
 
 
 namespace OpenFPS.Common
 {
 /// <summary>
-/// What a short sound IS, physically — not what made it.
-///
-/// Four of these cover everything in the game that happens and stops. A door latch and a bullet
-/// striking a wall are both knocks; a struck panel and a bell are both rings; air leaving a door seal
-/// and a tyre letting go are a hiss and a scrape. Naming them by their physics rather than by their
-/// source is the whole point: a synthesiser that knows about "doors" needs a new case for every new
-/// thing in the world, and one that knows about knocks and rings already handles the ball somebody
-/// has not invented yet.
+/// What a short sound is physically, not what made it: a latch and a bullet strike are both knocks, a
+/// panel and a bell both ring. Named by physics so the synthesiser needs no case per new thing.
 /// </summary>
 public enum SoundCharacter
 {
@@ -30,12 +22,8 @@ public enum SoundCharacter
 }
 
 /// <summary>
-/// One short sound, described by its physics rather than by a file name.
-///
-/// This is deliberately the same handful of numbers for every source in the game. A door's panel
-/// ring, a pane of glass landing, a round hitting concrete and two cars meeting all reduce to: what
-/// kind of thing it is, when, where, how loud, what note, how long, and how noisy. Anything that can
-/// say that can be heard, without the audio engine being told what it was.
+/// One short sound, described by its physics rather than by a file name: the same handful of numbers
+/// for every source, so anything that can say them is heard without the audio engine knowing what it was.
 /// </summary>
 [MemoryPackable]
 public partial struct TransientSound
@@ -46,8 +34,8 @@ public partial struct TransientSound
     /// lands a second and a half after the pane broke.</summary>
     public float DelaySeconds { get; set; }
 
-    /// <summary>Where it comes from. Not necessarily where the thing that caused it is — a door's
-    /// latch is at its latch edge, and glass lands at the foot of the wall.</summary>
+    /// <summary>Where it comes from, not necessarily where its cause is: a door's latch is at its latch
+    /// edge, and glass lands at the foot of the wall.</summary>
     public Vector3 Position { get; set; }
 
     /// <summary>Peak level at one metre, dB SPL.</summary>
@@ -63,34 +51,16 @@ public partial struct TransientSound
     public float Noisiness { get; set; }
 
     /// <summary>
-    /// A richer model to render this with, or empty for the four generic characters.
-    ///
-    /// The escape hatch, and it is deliberately narrow. Four characters and seven numbers describe
-    /// almost everything that happens in a world, and a few things they cannot: a gunshot is a blast
-    /// wave, a body resonance, a brightness sweep and the action working, and flattening that to one
-    /// knock would throw away a model that already exists and is better. So a sound may name one —
-    /// "weapon:akm" — the same way an engine emitter names "engine:v8_sports", and the client routes
-    /// it to the model that knows.
-    ///
-    /// Everything else about it still applies: the level, the position, the delay and the acoustic
-    /// path are the channel's, and only the waveform comes from elsewhere.
+    /// A richer model to render this with ("weapon:akm"), or empty for the four characters: a gunshot is
+    /// more than one knock. The level, position, delay and acoustic path are still the channel's; only
+    /// the waveform comes from the model.
     /// </summary>
     public string SynthKey { get; set; } = "";
 
     /// <summary>
-    /// How big the thing making it is, metres. Zero — a point — for almost everything.
-    ///
-    /// A door latch, a shell casing and a rifle are points: a metre away you are outside them, and
-    /// from there the level falls by six decibels every time the distance doubles. A GRANDSTAND FULL
-    /// OF PEOPLE is not a point, and neither is a waterfall, a motorway or a river. Inside its own
-    /// size the level barely changes at all, because walking a metre closer to one clapper walks you a
-    /// metre further from another, and the inverse law only starts once the whole thing is in front of
-    /// you.
-    ///
-    /// What it changes is the NEAR field — stand under the grandstand and four hundred people are not
-    /// a firework two metres from your ear — and what it must not change is the far field, because a
-    /// crowd and a point source of the same power sound the same once you are well outside them. See
-    /// <see cref="Loudness.Place(float, float)"/>, which holds one and fixes the other.
+    /// How big the thing making it is, metres; zero, a point, for almost everything. A grandstand of
+    /// people is not a point: the size changes the near field (four hundred people are not a firework at
+    /// your ear) and must not change the far field (<see cref="Loudness.Place(float, float)"/>).
     /// </summary>
     public float ExtentMetres { get; set; }
 
@@ -102,22 +72,18 @@ public partial struct TransientSound
     public Vector3 BodyOffset { get; set; }
 
     /// <summary>
-    /// Where the sound has got to by the end of <see cref="MoveSeconds"/>: a sliding door's run is one
-    /// sound, and the handle it comes from travels the width of the doorway while it plays. The listener
-    /// moves it from <see cref="Position"/> to here, at an even speed, as the leaf goes.
+    /// Where the sound has got to by the end of <see cref="MoveSeconds"/>, moved evenly from
+    /// <see cref="Position"/>: a sliding door's handle crosses the doorway while its run plays.
     /// </summary>
     public Vector3 MovesTo { get; set; }
     /// <summary>How long it takes to get to <see cref="MovesTo"/>, seconds. Zero: it stays where it is.</summary>
     public float MoveSeconds { get; set; }
 
     /// <summary>
-    /// A sound made in a panel that radiates from both its faces — a door leaf — given as the panel's
-    /// normal, as long as the distance its sound is placed off the panel. Zero: not one.
-    ///
-    /// Each listener hears it from the face on their own side, <see cref="FaceNormal"/> off the panel
-    /// toward them. Placed on the panel itself it was inside the leaf and the jamb it lapped, and the
-    /// acoustics heard it through both: a front door from three metres in plain view came through at
-    /// −46 dB in the middle of the band.
+    /// For a panel that radiates from both faces (a door leaf), its normal, as long as the distance the
+    /// sound is placed off it; zero otherwise. Each listener hears it off the face on their side: placed
+    /// on the panel it was heard through the leaf and jamb, a front door in plain view at three metres
+    /// −46 dB mid-band.
     /// </summary>
     public Vector3 FaceNormal { get; set; }
 
@@ -142,44 +108,26 @@ namespace OpenFPS.Common.Networking
 {
 
 /// <summary>
-/// Something happened somewhere, and it made a noise.
-///
-/// The one channel for every short sound the world produces. Before this there was no way at all for
-/// the server to say "that just happened" — an entity could carry a looping emitter, and that was the
-/// whole vocabulary, which is why glass breakage, gunfire and collisions are all written, tested and
-/// completely silent.
-///
-/// It carries no sound id, and that is the point. A file name would mean every new thing in the world
-/// needs a recording of itself, made in advance, at one size and one material and one force. The
-/// parameters mean a door somebody builds out of a material somebody else invented is audible the
-/// first time it shuts.
+/// Something happened somewhere and made a noise: the one channel for every short sound the world
+/// produces. No sound id: the parameters make a door of a material somebody invented audible the first
+/// time it shuts, with no recording made in advance.
 /// </summary>
 [MemoryPackable]
 public partial class WorldAudioEvent : IMessage
 {
-    /// <summary>
-    /// What made it, or -1.
-    ///
-    /// Used for two things and neither is playback: the sound must not be occluded by the very object
-    /// that made it, and a player asking what they just heard deserves an answer better than "a
-    /// noise".
-    /// </summary>
+    /// <summary>What made it, or -1: so the sound is not occluded by its own maker, and so a player can
+    /// be told what they heard.</summary>
     public int SourceEntityId { get; set; } = -1;
 
     /// <summary>What it was, in words: "door", "glass", "impact". For speech and for logs.</summary>
     public string Label { get; set; } = "";
 
-    /// <summary>The sounds themselves, which are usually several. One event, several noises, is the
-    /// normal case rather than the exception — almost nothing in the world makes exactly one.</summary>
+    /// <summary>The sounds themselves, usually several.</summary>
     public List<TransientSound> Sounds { get; set; } = new();
 
     /// <summary>
-    /// Makes the rendering repeatable, and makes it VARY.
-    ///
-    /// Two of the same event should not be bit-identical — twenty rounds from one rifle that are the
-    /// same twenty samples read as a recording, which is the thing this engine exists not to do. The
-    /// seed travels so that everyone hears the same variation of the same event, which matters the
-    /// moment two players are standing next to each other.
+    /// Makes the rendering vary between events (twenty identical rounds read as a recording) and repeat
+    /// between listeners, so two players side by side hear the same event.
     /// </summary>
     public int Seed { get; set; }
 

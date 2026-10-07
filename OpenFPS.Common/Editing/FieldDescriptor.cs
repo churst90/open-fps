@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 
 namespace OpenFPS.Common.Editing;
@@ -117,9 +115,8 @@ public sealed record FieldDescriptor
     }
 
     /// <summary>
-    /// Reads what somebody typed as a value of this field, in the form it is stored ("66", "true",
-    /// "Metal", "Fountain"): checked against the type and the range, and refused with the reason said
-    /// when it is not one. The range is the field's sensible range, so a refusal says what it is.
+    /// Reads what somebody typed as a value of this field, in its stored form ("66", "true", "Metal"),
+    /// checked against the type and the range; a refusal says why and what the range is.
     /// </summary>
     public bool TryParse(string typed, out string value, out string error)
     {

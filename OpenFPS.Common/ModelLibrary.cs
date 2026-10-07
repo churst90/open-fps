@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,16 +7,9 @@ using System.Text.Json.Serialization;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// The models a map can name: trains, rail vehicles, track, horns, whistles, bells and air systems.
-///
-/// Every one of these is already a parts list with dimensions rather than a bag of tuning — that is
-/// the rule the whole audio engine is built on. What this adds is the other half of the same idea:
-/// **a model is DATA, so it can be written, shared and overridden without recompiling anything.**
-/// `MachineRegistry` did it for vehicles, and had to do real work to get there, because
-/// `VehicleProfile` is not a data shape — it needed a `Describe`/`Assemble` translation and a round
-/// trip to prove the vocabulary was sufficient. These specs were written as records of scalars from
-/// the start, so the translation is the serializer, and the round trip is the test that they really
-/// were.
+/// The models a map can name (trains, track, horns, bells, machines, water, engines, vehicles...), as
+/// data that can be written, shared and overridden without recompiling. The specs are records of
+/// scalars, so the serializer is the translation and the round trip is its test.
 ///
 /// One directory, one file per model, each saying what kind of thing it is:
 ///
@@ -25,16 +17,14 @@ namespace OpenFPS.Common;
 /// { "kind": "horn", "id": "k3la", "spec": { "Name": "...", "Bells": [ ... ] } }
 /// </code>
 ///
-/// **An authored model of the same name OVERRIDES the built-in**, which is how a map replaces the
-/// crossing bell on one line without touching the library — and it is also the trap: never check an
-/// exported copy of the library back into the load directory, because a generated file freezes every
-/// model at the numbers it had the day it was written. <see cref="Export"/> writes somewhere else to
-/// read and copy from. (The same warning is on MachineRegistry, in blood.)
+/// An authored model of the same name overrides the built-in. Never put an exported copy of the library
+/// in the load directory: it freezes every model at that day's numbers (<see cref="Export"/>; the same
+/// warning is on MachineRegistry).
 /// </summary>
 public static class ModelLibrary
 {
-    /// <summary>The kinds of model this library holds. A string, not an enum, for the same reason
-    /// <see cref="MachineModels"/> uses strings: the list is going to grow.</summary>
+    /// <summary>The kinds of model this library holds; strings, as <see cref="MachineModels"/> uses,
+    /// because the list grows.</summary>
     public static class Kinds
     {
         public const string Train = "train";
@@ -45,9 +35,7 @@ public static class ModelLibrary
         public const string Bell = "bell";
         public const string Air = "air";
 
-        /// <summary>A machine that stands still and runs: a mower, a condenser unit, a generator.
-        /// A city is full of them and every one is a parts list, so a map should be able to write
-        /// its own without touching C#.</summary>
+        /// <summary>A machine that stands still and runs: a mower, a condenser unit, a generator.</summary>
         public const string SmallMachine = "small_machine";
 
         /// <summary>Water falling into water: a fountain, a cascade, a weir.</summary>
@@ -102,10 +90,8 @@ public static class ModelLibrary
 
     // ── The built-in library ────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Every model that ships in C#, by kind. Rail vehicles are named individually because a consist
-    /// is assembled from them and an author wants to say "a Genesis and six of MY coaches".
-    /// </summary>
+    /// <summary>Every model that ships in C#, by kind. Rail vehicles are named one by one, so a consist
+    /// can be "a Genesis and six of my coaches".</summary>
     private static readonly Dictionary<string, Dictionary<string, Func<object>>> BuiltIn = new(StringComparer.OrdinalIgnoreCase)
     {
         [Kinds.Train] = TrainProfile.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
@@ -164,11 +150,8 @@ public static class ModelLibrary
 
     // ── Loading ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Reads every <c>*.json</c> in a directory. Additive, and never fatal: a file that will not
-    /// parse is named and stepped over, because one bad model in an author's folder should not take
-    /// the rest of the map's sounds with it.
-    /// </summary>
+    /// <summary>Reads every <c>*.json</c> in a directory, additively. A file that will not parse is named
+    /// and stepped over, so one bad model does not take the map's other sounds with it.</summary>
     public static int Load(string directory)
     {
         if (!Directory.Exists(directory)) return 0;
@@ -207,11 +190,8 @@ public static class ModelLibrary
         }
     }
 
-    /// <summary>
-    /// Loads the authored library once, from the well-known folder next to the maps. Called by
-    /// whatever starts up — server, client, lab — because all three have to agree what a model name
-    /// means.
-    /// </summary>
+    /// <summary>Loads the authored library once, from the folder next to the maps: server, client and lab
+    /// must agree what a model name means.</summary>
     public static void EnsureLoaded(string directory = "models")
     {
         if (_loadedFrom == directory) return;
@@ -254,10 +234,6 @@ public static class ModelLibrary
     /// <summary>Whether a model of this kind and name has been put in from data (a file, a map, the world
     /// editor) rather than being only the built-in.</summary>
     public static bool IsAuthored(string kind, string id) => !string.IsNullOrEmpty(id) && _authored.ContainsKey(Key(kind, id));
-
-    /// <summary>Whether a model of this kind and name ships in C#.</summary>
-    public static bool IsBuiltIn(string kind, string id)
-        => !string.IsNullOrEmpty(id) && BuiltIn.TryGetValue(kind, out var lib) && lib.ContainsKey(id);
 
     /// <summary>The built-in model of this kind and name, as it ships (never an authored one), or null.</summary>
     public static object? BuiltInModel(string kind, string id)
@@ -310,10 +286,7 @@ public static class ModelLibrary
     /// <summary>A model by kind and name as the base type, for code that does not know the kind's type.</summary>
     public static object Model(string kind, string id) => Get<object>(kind, id);
 
-    /// <summary>
-    /// A model by kind and name. Authored first, always: that is what lets a map replace one without
-    /// editing the library.
-    /// </summary>
+    /// <summary>A model by kind and name, the authored one first, so a map can replace a built-in.</summary>
     public static T Get<T>(string kind, string id) where T : class
     {
         if (_authored.TryGetValue(Key(kind, id), out var authored) && authored is T typed) return typed;
@@ -348,13 +321,9 @@ public static class ModelLibrary
         }, Json);
 
     /// <summary>
-    /// Writes every built-in model to a directory, one file each, in exactly the form the loader
-    /// reads.
-    ///
-    /// **Not into the load directory.** An authored file overrides the built-in of the same name, so
-    /// a generated copy of the library silently freezes every model at the numbers it had the day it
-    /// was written — the next time somebody improves the bell, every map that has this folder keeps
-    /// the old one and nobody can see why. Export somewhere to READ and copy the one line you want.
+    /// Writes every built-in model to a directory, one file each, as the loader reads them. Never into
+    /// the load directory: authored files override the built-ins, so the copy would silently keep every
+    /// model at today's numbers after the library improves. Export somewhere to read and copy from.
     /// </summary>
     public static int Export(string directory)
     {
@@ -370,13 +339,8 @@ public static class ModelLibrary
     }
 
     /// <summary>
-    /// The round trip, as a question a test can ask: does this model survive being written out and
-    /// read back unchanged?
-    ///
-    /// Comparing the two JSON texts rather than the two objects, because a record's equality compares
-    /// its arrays BY REFERENCE — so a spec holding an array of bells would report itself unequal to a
-    /// perfect copy, and a test written the obvious way would fail for a reason that has nothing to
-    /// do with the model.
+    /// Whether this model survives being written out and read back unchanged. Compares the JSON texts:
+    /// a record compares its arrays by reference, so a perfect copy of a spec with bells is unequal.
     /// </summary>
     public static bool RoundTrips(string kind, object spec, out string before, out string after)
     {

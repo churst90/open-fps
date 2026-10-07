@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Common.Hearing;
 
 /// <summary>

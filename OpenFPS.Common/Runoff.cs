@@ -1,28 +1,14 @@
-using System;
 using System.Threading;
 
 namespace OpenFPS.Common;
 
 /// <summary>
-/// The rain that has landed and is on its way somewhere: what fills a gutter, a drain and a downpipe,
-/// and what keeps them running after the rain stops (docs/RUNNING_WATER.md, "Run-off").
-///
-/// A catchment (a roof, a stretch of road) turns rain into flow through a store: water wets the
-/// surface, runs across it, collects at its low edge and leaves. The simplest store that behaves like
-/// one is the LINEAR RESERVOIR of hydrology, outflow proportional to what is held (Nash 1957; the
-/// unit hydrograph of a small urban catchment is close to its exponential): its outflow O follows the
-/// rain i through dO/dt = (i − O) / τ. So a gutter takes a few τ to come up to the rain after a shower
-/// starts, and after it stops runs on, falling by e every τ: a downpipe dribbling for minutes, the
-/// gutter trickling long after the rain has gone quiet.
-///
-/// τ is the catchment's own: about a minute for a house roof and its gutter, several for a street,
-/// longer for a creek's whole valley (which is why a creek's base flow is declared, not run off).
-/// The field keeps one reservoir per rung of a ladder of time constants, all fed the same rain, and a
-/// catchment reads between the two rungs either side of its own, so every source on the map agrees on
-/// what the rain has done and a voice made in the middle of a downpour starts already running.
-///
-/// Fed by the client once a frame from the world's rain (ClientAudioSystem); read from the render
-/// threads. Snow lands and stays: it is not run-off (snowmelt is not modelled).
+/// The rain that has landed and is on its way to a gutter, a drain or a downpipe, and keeps them running
+/// after it stops (docs/RUNNING_WATER.md, "Run-off"). Each catchment is a linear reservoir (Nash 1957; a
+/// small urban catchment's unit hydrograph is close to its exponential): dO/dt = (i − O) / τ, τ about a
+/// minute for a roof, several for a street. One reservoir per rung of a ladder of τ, a catchment reading
+/// between the rungs either side, so every source agrees and a voice made mid-downpour starts running.
+/// Fed by the client once a frame (ClientAudioSystem), read from the render threads. Snow is not run-off.
 /// </summary>
 public static class Runoff
 {

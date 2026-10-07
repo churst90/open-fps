@@ -1,26 +1,15 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 
 namespace OpenFPS.Common.Systems;
 
 /// <summary>
-/// The gaps in a room's walls: every part of its five faces above the floor that nothing closes in,
-/// as rectangles, each with the place that lies beyond it.
-///
-/// A room is a box the map drew, and its walls are the solid boxes round it. Each face is cut into
-/// cells along the edges of the walls that cover it (so a doorway's jambs are exact, not rounded to
-/// a grid) and along the map's own resolution (so a gap that looks into two rooms is split where
-/// they meet). A cell no wall covers is open. Open cells that look into the same place are merged
-/// into rectangles, and each rectangle is one opening, as wide and as high as the gap and placed in
-/// it. A door's leaf is a wall here, standing shut where its doorway is: the doorway is the door's
-/// own opening, with the leaf in it.
-///
-/// Nothing is assumed about which faces are open. A face the region names as open and the geometry
-/// leaves bare is one gap the size of the face; a face named as a wall with a hole in the geometry
-/// has that hole. The one thing geometry cannot overrule is a face named as a wall that has NO
-/// geometry at all on it: that region describes a surface the map never built, and its author's
-/// word is all there is.
+/// The gaps in a room's walls: every part of its five faces above the floor that nothing closes in, as
+/// rectangles, each with the place beyond it. Each face is cut into cells along the covering walls'
+/// edges (so a doorway's jambs are exact) and the map's resolution (so a gap into two rooms splits where
+/// they meet); open cells looking into the same place merge into one opening. A door's leaf stands shut
+/// in its doorway as a wall. The geometry decides which faces are open, except a face named as a wall
+/// with no geometry on it at all: the author's word is all there is.
 /// </summary>
 public static class FaceOpenings
 {
@@ -46,11 +35,9 @@ public static class FaceOpenings
         public Vector3 Normal => Vector3.Transform(Vector3.UnitZ, Rotation);
     }
 
-    /// <summary>
-    /// The narrowest a gap may be and still be an opening, metres: half a wavelength of the mixer's
-    /// middle band (<see cref="Diffraction.MidBandHz"/>). A slot narrower than that is closed to the
-    /// low and middle bands, and in a map it is a misfit between two boxes, not a hole somebody built.
-    /// </summary>
+    /// <summary>The narrowest gap that is an opening, metres: half a wavelength of the mixer's middle band
+    /// (<see cref="Diffraction.MidBandHz"/>). Narrower is closed to the low and middle bands, and in a map
+    /// it is a misfit between two boxes.</summary>
     public static readonly float MinimumGapMetres = 343f / Diffraction.MidBandHz * 0.5f;
 
     /// <summary>How far from a room's face a wall may stand and still be that face's wall, metres. A
@@ -67,13 +54,11 @@ public static class FaceOpenings
 
     /// <summary>
     /// The gaps in one room's faces. <paramref name="solids"/> need only be the boxes near the room;
-    /// <paramref name="places"/> every region whose box could lie beyond one of its faces (the room
-    /// itself may be among them). Where regions overlap, a point belongs to the smallest that holds it,
-    /// as SpatialService.GetRegionAt has it, and a part of a face that belongs to a smaller region than
-    /// this one is that region's boundary, not this one's. A wall is a face's when it stands within
-    /// <see cref="WallReachMetres"/> of it. <paramref name="resolution"/> is the map's voxel size: what
-    /// lies beyond a gap is looked for out to two of it past the wall. <paramref name="outside"/> is what lies beyond when no
-    /// region does.
+    /// <paramref name="places"/> every region whose box could lie beyond one of its faces. A point
+    /// belongs to the smallest region that holds it (SpatialService.GetRegionAt), so part of a face inside
+    /// a smaller region is that region's boundary. <paramref name="resolution"/> is the map's voxel size:
+    /// what lies beyond a gap is looked for two of it past the wall. <paramref name="outside"/> is what lies
+    /// beyond when no region does.
     /// </summary>
     public static List<Gap> Find(Place room, int[]? materials, IReadOnlyList<Box> solids, IReadOnlyList<Place> places,
                                  float resolution, int outside)
@@ -87,7 +72,6 @@ public static class FaceOpenings
         var inv = Quaternion.Inverse(q);
         Vector3 half = room.Size * 0.5f;
 
-        // Every solid in the room's own frame, as the box that contains it there.
         var local = new (Vector3 C, Vector3 H)[solids.Count];
         for (int i = 0; i < solids.Count; i++)
         {
@@ -97,13 +81,10 @@ public static class FaceOpenings
         }
 
         // ── Where the room's surfaces really are ─────────────────────────────────────────────────
-        // A region is drawn round a room by hand, a little bigger or smaller than it: below its floor
-        // slab, up past the tops of roofless walls, half into a wall. Measured from the drawn box, every
-        // room had a strip of "gap" round it where the box overhung its own walls. So each face is first
-        // moved to the inner surface of its wall — the box that covers most of it and is a wall (thinner
-        // through the face than across it) — and the gaps are looked for in that box. A face the region
-        // names as a wall that was never built has no surface to move to; the room ends there where the
-        // walls round it end (a roofless demo room with "Concrete" for a ceiling ends at the wall tops).
+        // A region is drawn by hand, a little off its room: from the drawn box every room had a strip
+        // of "gap" where the box overhung its walls. So each face moves to the inner surface of the wall
+        // covering most of it. A named wall never built ends where the walls round it end (a roofless
+        // demo room with "Concrete" for a ceiling ends at the wall tops).
         var lo = -half;
         var hi = half;
         var unbuilt = new bool[6];
@@ -122,8 +103,7 @@ public static class FaceOpenings
                 float area = Overlap(C(c, u), C(h, u), -C(half, u), C(half, u)) * Overlap(C(c, v), C(h, v), -C(half, v), C(half, v));
                 if (area <= 1e-4f) continue;
                 built = true;
-                // Its inner surface, out from the drawn face. A wall that reaches further into the
-                // room than a wall's reach is something standing in it, not the surface of this face.
+                // Reaching further in than a wall's reach, it stands in the room, not on this face.
                 float near = MathF.Min(side * (bLo - plane), side * (bHi - plane));
                 if (near < -WallReachMetres || area <= best) continue;
                 best = area; inner = near;
@@ -172,10 +152,8 @@ public static class FaceOpenings
             if (uHi - uLo < MinimumGapMetres || vHi - vLo < MinimumGapMetres) continue;
 
             // ── What covers it ───────────────────────────────────────────────────────────────────
-            // Anything near the face and across it covers it, a slab running through it as much as a
-            // wall standing in it. Only a WALL can be what an opening is cut through, though: a box
-            // thinner through the face than it is across it. A tunnel's side wall at its open end and the
-            // road laid along it cover their slivers of the end, and are not a wall that end is cut in.
+            // Anything near and across the face covers it, but only a wall is cut through: a tunnel's
+            // side wall and road cover slivers of its open end and are not a wall the end is cut in.
             covering.Clear();
             float deepest = 0f;
             foreach (var (c, h) in local)
@@ -220,8 +198,7 @@ public static class FaceOpenings
                 Set(ref p, u, cu);
                 Set(ref p, v, cv);
                 Vector3 onFace = room.Centre + Vector3.Transform(p, q);
-                // Only where the face is this room's own boundary: just inside it, and inside the
-                // region's own box, the smallest place there must be this one.
+                // Only where the face is this room's own boundary: just inside, the smallest place is this.
                 var inside = Vector3.Zero;
                 float depthIn = MathF.Min(side * plane, C(half, a)) - MathF.Min(0.05f, C(half, a));
                 Set(ref inside, a, side * depthIn);
@@ -270,10 +247,8 @@ public static class FaceOpenings
                 float g0 = us[i], g1 = us[i2 + 1], h0 = vs[j], h1 = vs[j2 + 1];
                 float w = g1 - g0, ht = h1 - h0;
                 if (w < MinimumGapMetres || ht < MinimumGapMetres) continue;
-                // Cut through a wall when walls close it on two opposite sides — a doorway's jambs, a
-                // window's sill and lintel — and then as deep as they are and in the middle of them.
-                // Otherwise it is the open part of the face: beside a wall's end, under a slab's edge,
-                // a whole open side. It is on the face, with no depth.
+                // Cut through a wall when walls close it on two opposite sides (jambs, sill and lintel),
+                // as deep as they are; otherwise it is open face, with no depth.
                 bool left = false, right = false, below = false, above = false;
                 float dIn = float.MaxValue, dOut = 0f;
                 foreach (var cv in covering)
@@ -290,9 +265,7 @@ public static class FaceOpenings
                 }
                 bool cut = (left && right) || (below && above);
                 if (!cut) dIn = dOut = 0f;
-                // Through as far as the drawn face as well, where that is not the wall's: the region
-                // says where its own place ends, and an opening that stopped short of that would have
-                // the same place on both sides of it.
+                // Through to the drawn face too: stopping short would leave the same place on both sides.
                 float drawn = C(half, a) - side * plane;
                 dIn = MathF.Min(dIn, drawn);
                 dOut = MathF.Max(dOut, drawn);
@@ -338,7 +311,7 @@ public static class FaceOpenings
         return lo;
     }
 
-    /// <summary>The smallest place that holds a point, or <paramref name="none"/>.</summary>
+    /// <summary>The places, for asking which is the smallest that holds a point.</summary>
     private sealed class PlaceIndex
     {
         private readonly int[] _id;

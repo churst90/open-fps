@@ -1,24 +1,18 @@
-using System;
 using System.Numerics;
 
 namespace OpenFPS.Common;
 
 /// <summary>
-/// The three bands a path's gains are applied in, and what each band's single figure means.
+/// The three bands a path's gains are applied in: FMOD's THREE_EQ, split at <see cref="LowCrossoverHz"/>
+/// and <see cref="HighCrossoverHz"/> (set explicitly where the DSP is made, so they cannot drift). A
+/// wall's loss moves tens of decibels within a band, so a band's figure is the transmitted energy averaged
+/// over its one-third octaves (ISO 266), equal weight each: a pink spectrum, ISO 717-1's reference. The low
+/// band starts at 50 Hz, the bottom of ISO 717-1's extended range; the high band stops at 12.5 kHz.
 ///
-/// The mixer filters every voice with FMOD's THREE_EQ, which splits at <see cref="LowCrossoverHz"/> and
-/// <see cref="HighCrossoverHz"/> (its defaults, set explicitly where the DSP is made so the two cannot
-/// drift apart). A wall's loss changes by tens of decibels across each of those bands, so a band's figure
-/// is not the loss at one frequency in it: it is the transmitted ENERGY averaged over the band's
-/// one-third octaves (ISO 266 centres), with equal weight per third octave — a pink spectrum, the
-/// reference spectrum of ISO 717-1's spectrum adaptation terms. The low band starts at 50 Hz, the bottom
-/// of ISO 717-1's extended range; the high band stops at 12.5 kHz.
-///
-/// Steam Audio's direct simulation does not filter anything itself here: it multiplies the transmission
-/// figures of the faces its rays cross and the engine reads the products back
-/// (SteamAudioSimulator.GetResult), so the triple handed to a Steam Audio material IS these three bands,
-/// whatever Steam Audio's own band centres are. Its reflection simulation never reads transmission, so
-/// absorption stays at Steam Audio's centres (SteamAudioScene.SteamAudioBandsHz).
+/// Steam Audio's direct simulation only multiplies the transmission figures of the faces its rays cross
+/// (SteamAudioSimulator.GetResult), so a material's triple is these bands whatever Steam Audio's own
+/// centres are. Its reflections never read transmission, so absorption stays at Steam Audio's centres
+/// (SteamAudioScene.SteamAudioBandsHz).
 /// </summary>
 public static class AcousticBands
 {
@@ -48,9 +42,8 @@ public static class AcousticBands
 }
 
 /// <summary>
-/// What gets through a wall, per band, from what the wall is made of, how thick it is and how it is
-/// built. Used by the Steam Audio scene's materials and by the hand-rolled tracer, so the two answer the
-/// same question with one model.
+/// What gets through a wall, per band, from its material, thickness and build: one model for the Steam
+/// Audio scene's materials and the hand-rolled tracer.
 ///
 /// SINGLE PANEL — Sharp, "Prediction methods for the sound transmission of building elements", Noise
 /// Control Engineering 11 (1978) 53-63; also Bies &amp; Hansen, Engineering Noise Control, ch. 7:
@@ -77,9 +70,8 @@ public static class AcousticBands
 /// are not in the data, so they are taken to be of the same construction (R_i = R_j = R), joined at
 /// rigid cross junctions of equal mass (EN 12354-1 Annex E, E.3 with M = 0): K = 8.7 dB straight on
 /// (Ff) and 5.7 dB round the corner (Fd, Df). S and the edge lengths are the box's own faces. Flanking
-/// then adds a share of the direct transmission that is the same at every frequency (about 2 dB on a
-/// storey-high wall), so the wall's figure keeps rising with frequency as the direct path's does —
-/// there is no flat ceiling on what a wall takes.
+/// adds the same share at every frequency (about 2 dB on a storey-high wall), so there is no flat
+/// ceiling on what a wall takes.
 ///
 /// Gaps, vents and the leaks round a door are not in the data and are not modelled.
 /// </summary>
@@ -158,8 +150,7 @@ public static class WallTransmission
         float r1 = SinglePanelDb(m, criticalHz, internalLoss, hz);
         float fl = SoundSpeed / (2f * MathF.PI * cavity);
         float ideal = hz < fl ? 2f * r1 + 20f * MathF.Log10(hz * cavity) - 29f : 2f * r1 + 6f;
-        // The resonance itself is not modelled below the mass law of the whole: a cavity with anything
-        // in it damps it.
+        // Never below the whole's mass law at the resonance: anything in a cavity damps it.
         ideal = MathF.Max(ideal, rM);
         float bridge = MathF.Max(0f, 10f * MathF.Log10(bridgeSpacing * criticalHz) + 20f * MathF.Log10(0.5f) - 18f);
         return MathF.Max(rM, MathF.Min(ideal, rM + bridge));
@@ -220,8 +211,7 @@ public static class WallTransmission
         if (leaf > 0f && t >= 2f * leaf + MinCavityMetres)
         {
             float cavity = t - 2f * leaf;
-            // Studs where there are studs; otherwise the leaves meet at the panel's edges, and the
-            // nearest two edges are its narrower span apart.
+            // Without studs the leaves meet at the panel's edges, its narrower span apart.
             float bridge = build.StudSpacingMetres > 0f ? build.StudSpacingMetres : MathF.Min(faceA, faceB);
             r = DoubleLeafDb(rho * leaf, CriticalHz(e, rho, leaf), eta, cavity, bridge, hz);
         }

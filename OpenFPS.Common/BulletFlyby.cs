@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
@@ -12,18 +11,12 @@ public readonly record struct FlightSample(float Seconds, Vector3 Position, Vect
 /// What a bullet sounds like as it goes past somebody: the CRACK of a supersonic round's shock wave,
 /// and the WHIZZ of a subsonic one's wake. Neither comes from the shooter.
 ///
-/// THE CRACK. A round faster than sound drags a Mach cone, and a listener hears it when the cone
-/// sweeps over them. Which point of the flight that sound left from, and when it arrives, is one
-/// statement: the first sound of the flight to reach the ear is the one that minimises
-/// <c>t + |ear − P(t)| / c</c> over the flight (Fermat). Where that minimum is inside the flight its
-/// derivative is zero, <c>1 − (v/c)·cos θ = 0</c>, which is the cone: the ray from the emission point
-/// to the ear leaves at the Mach angle to the flight. A slowing, falling bullet is handled by the same
-/// sum, because it is evaluated on the flown path. A round that never outruns sound has no interior
-/// minimum (the derivative is positive everywhere), and neither does a listener the cone has not yet
-/// swept when the bullet stops in a wall. Placed at the emission point and delayed by the bullet's
-/// time to get there, the client's own flight-time delay (distance over the speed of sound) then
-/// brings it in at the right moment and from the right direction, before the muzzle's report for
-/// anyone downrange.
+/// THE CRACK. A round faster than sound drags a Mach cone. The first sound of the flight to reach the
+/// ear minimises <c>t + |ear − P(t)| / c</c> over the flown path (Fermat); inside the flight the
+/// derivative is zero, <c>1 − (v/c)·cos θ = 0</c>, which is the cone, and a slowing, falling bullet is
+/// handled by the same sum. A subsonic round, or a listener the cone has not reached when the bullet
+/// stops, has no interior minimum. Placed at the emission point and delayed by the bullet's time to get
+/// there, the client's own flight-time delay brings it in at the right moment and direction.
 ///
 /// Its strength and length are Whitham's far-field N-wave (G. B. Whitham, "The flow pattern of a
 /// supersonic projectile", Comm. Pure Appl. Math. 5, 1952), in the form used for small arms by
@@ -53,15 +46,12 @@ public readonly record struct FlightSample(float Seconds, Vector3 Position, Vect
 /// and precession (from the rifling's spin) swing its yaw, and with it the side force: a 15 % and a
 /// 10 % flutter on the noise.
 ///
-/// It is heard through the moving source's own geometry: each instant of the pass is heard when its
-/// sound arrives, so the approach is compressed in time and raised in pitch and the retreat stretched
-/// and lowered (the Doppler fall of a whizz), louder ahead by the convective factor (1 − M cos θ)^-2.
-/// Noise of a moving source is noise of the Doppler-shifted spectrum, so it is rendered as noise whose
-/// spectrum is the source's at f/D for the Doppler factor D of the moment that sound left
-/// (<see cref="ShapedNoise"/>). It was a sum of 96 sine partials wandering about the shedding
-/// frequency, and that was heard as one tone sweeping from 9.9 to 2.8 kHz, "a quick laser" (Cody,
-/// 2026-10-04). It is played as three pieces from three places along the path (approach, abeam, going
-/// away), crossfaded, so it moves past the listener rather than coming from one point.
+/// Each instant of the pass is heard when its sound arrives: the approach compressed and raised, the
+/// retreat stretched and lowered, louder ahead by the convective factor (1 − M cos θ)^-2. It is
+/// rendered as noise whose spectrum is the source's at f/D for the Doppler factor D of the moment
+/// (<see cref="ShapedNoise"/>): 96 sine partials about the shedding frequency were heard as one tone
+/// sweeping from 9.9 to 2.8 kHz, "a quick laser". It is played as three crossfaded pieces from three
+/// places along the path (approach, abeam, going away), so it moves past the listener.
 ///
 /// Both are rendered on the client from their keys; nothing here is recorded.
 /// </summary>

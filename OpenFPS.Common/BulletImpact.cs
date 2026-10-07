@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
@@ -7,12 +6,10 @@ namespace OpenFPS.Common;
 
 /// <summary>
 /// A round striking something, as its own physical event: what the slug and the struck stuff do in the
-/// fraction of a millisecond they meet, and what is thrown off and falls afterwards.
-///
-/// It was <see cref="ImpactAcoustics.Between"/> with a small steel object for the hitter, which is a
-/// tap: the same small metal tick on brick, grass and water (Cody, 2026-10-04). A bullet is 3-15 grams
-/// arriving at 250-900 m/s and stopping in tens of microseconds, and what the struck stuff does with
-/// that is most of the sound:
+/// fraction of a millisecond they meet, and what is thrown off and falls afterwards. A bullet is 3-15
+/// grams arriving at 250-900 m/s and stopping in tens of microseconds, and what the struck stuff does
+/// with that is most of the sound; struck as a small steel object (ImpactAcoustics) it was the same
+/// metal tick on brick, grass and water.
 ///
 ///   BRITTLE (concrete, brick, stone, tile, asphalt): the slug stops over its own length and the
 ///   crater's depth, which is the CRACK; the struck face fractures, a crackle of micro-cracks over a few milliseconds; the
@@ -27,8 +24,8 @@ namespace OpenFPS.Common;
 ///
 ///   WATER: a sharp slap as the nose enters, the cavity opening (a thud), the pinch-off bubble ringing at
 ///   its Minnaert frequency (the plop), the crown and jet tearing into spray (a rush), and the splash's
-///   drops falling back, hundreds of broadband splats, one in twenty ringing a small bubble. It was a
-///   few dozen drops a third of which rang, and Cody heard it as "just tinkling", not splashing.
+///   drops falling back, hundreds of broadband splats, one in twenty ringing a small bubble (a few dozen
+///   drops a third of which rang was heard as "just tinkling", not splashing).
 ///
 ///   WOOD: a short crack, the board's own modes (the thunk: wood is light and lossy, so they are low and
 ///   short), a crackle of splintering fibres, and a few splinters falling.
@@ -47,9 +44,8 @@ namespace OpenFPS.Common;
 ///   A ringing plate: the energy a short blow puts into a plate through its point mobility
 ///   Y = 1/(8√(Bρh)) is I²·Y/τ (Cremer and Heckl, Structure-Borne Sound); each mode's share radiates at
 ///   ρc·η_rad·ω, η_rad = ρc·σ/(ρh·ω), its radiation efficiency σ rising to one at coincidence. The modes
-///   reach the listener with their own signs (where the listener stands puts them either side of each
-///   mode's nodal lines), so they add like noise: summed in step, a 9 mm on 6 mm steel came out at
-///   162 dB. The same peak by another road: a point force F on a plate of surface mass ρh radiates
+///   reach the listener with their own signs, so they add like noise (see Pascals). The same peak by
+///   another road: a point force F on a plate of surface mass ρh radiates
 ///   ρ0·F/(2π·ρh·r) (the infinite plate below coincidence), 120 dB at a metre off a 20 cm concrete wall
 ///   and 141 dB off 6 mm steel for a 9 mm's 54 kN, where this model declares 122 and 144.
 ///   The share of the round's energy that leaves as sound (<see cref="Radiated"/>) comes out about 1e-6

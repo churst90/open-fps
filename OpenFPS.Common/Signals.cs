@@ -1,47 +1,31 @@
-using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
-//  Things built to be heard: air horns, steam whistles and struck bells.
-//
-//  Same rule as Engines.cs and Aircraft.cs — a part with dimensions, never a note. A horn is a
-//  length of tapered pipe with a steel reed across its throat, and its note is c/2L, so the chord a
-//  five-chime plays is a consequence of five lengths of brass and nothing declares it. A steam
-//  whistle is a pipe CLOSED at the top, so it sounds c/4L and its odd harmonics, and it sits a long
-//  way sharp of the same length in air because the sound speed in hot steam is half as much again as
-//  in air — which is also why a whistle rises in pitch through its first second, as the bell fills
-//  and warms. A bell is a shell, and what makes it a bell rather than a drum is that a shell's modes
-//  are not harmonic.
-//
-//  The one number in each that is not a dimension is the level anchor (ReferenceDb): the SPL at one
-//  metre, on axis, blown properly. Radiation integrals for a flaring horn are not worth pretending
-//  to know to a decibel, and a locomotive horn has a legal level, which is a better figure than
-//  anything I would derive.
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// Things built to be heard: air horns, steam whistles and struck bells. As in Engines.cs, a part has
+// dimensions, never a note: a horn sounds c/2L, a steam whistle (closed at the top) c/4L and its odd
+// harmonics, sharp because sound is half again as fast in hot steam; a bell's shell modes are not
+// harmonic. The one number that is not a dimension is the level anchor (ReferenceDb, SPL at a metre on
+// axis), because a horn's legal level is a better figure than a radiation integral.
 
 /// <summary>One bell of a chime horn: a tapered pipe with a reed across its small end.</summary>
 public sealed record ChimeBellSpec
 {
-    /// <summary>Throat to mouth along the axis, metres. THIS is the note: a horn flaring from a
-    /// small throat behaves like a full cone, so it sounds c/2L and all of its harmonics — unlike a
-    /// cylinder with a reed on it, which sounds c/4L and only the odd ones.</summary>
+    /// <summary>Throat to mouth along the axis, metres: the note. A horn flaring from a small throat
+    /// behaves like a full cone, c/2L and all harmonics; a cylinder with a reed is c/4L, odd ones only.</summary>
     [Tunable("m", 0.1, 1.5, "Throat to mouth along the bell's axis. This sets the note: a longer bell is lower.", Label = "length", Step = 0.005)]
     public required float LengthMetres { get; init; }
-    /// <summary>The mouth, metres. Sets the end correction, the horn's low cutoff and how hard it
-    /// beams: a horn is a directional thing, which is why one coming at you is bright and the same
-    /// horn going away is dull.</summary>
+    /// <summary>The mouth, metres: the end correction, the low cutoff and how hard it beams (bright
+    /// coming at you, dull going away).</summary>
     [Tunable("m", 0.03, 0.3, "Diameter of the bell's mouth. It sets the low cutoff and how hard the bell beams forward.", Label = "mouth diameter", Step = 0.002)]
     public float MouthDiameterMetres { get; init; } = 0.11f;
     /// <summary>The throat, metres, where the reed sits.</summary>
     [Tunable("m", 0.005, 0.05, "Diameter of the throat, where the reed sits.", Label = "throat diameter", Step = 0.001)]
     public float ThroatDiameterMetres { get; init; } = 0.022f;
-    /// <summary>When air reaches this bell relative to the first, seconds. The manifold does not
-    /// feed them all at once and they do not start together — the little upward smear at the
-    /// beginning of a horn blast, and its mirror at the end.</summary>
+    /// <summary>When air reaches this bell relative to the first, seconds: the manifold's smear at the
+    /// start of a blast, and its mirror at the end.</summary>
     [Tunable("s", 0, 0.2, "How long after the first bell the air reaches this one. Spread bells swell into the chord.", Label = "start delay", Step = 0.002)]
     public float StartDelaySeconds { get; init; }
     /// <summary>Per-bell level adjustment, dB. Big bells breathe more air and are louder.</summary>
@@ -62,43 +46,29 @@ public sealed record ChimeHornSpec
     [Tunable("", 0, 0, "The horn's name as it is said.")]
     public required string Name { get; init; }
     public required ChimeBellSpec[] Bells { get; init; }
-    /// <summary>Supply pressure, kPa gauge. A locomotive blows its horn on 140 psi of main
-    /// reservoir air; a truck on 120. Pressure decides how hard the reed is driven, which decides
-    /// the harmonics — and it is why a horn on a leaking line goes flat and breathy.</summary>
+    /// <summary>Supply pressure, kPa gauge: a locomotive's main reservoir is 140 psi, a truck's 120. It
+    /// drives the reed, and so the harmonics; a horn on a leaking line goes flat and breathy.</summary>
     [Tunable("kPa", 200, 1200, "Air pressure at the horn valve, gauge. A locomotive blows on about 965, a truck on about 830. More pressure drives the reed harder and brightens the note.", Label = "supply pressure", Step = 10)]
     public float SupplyKPa { get; init; } = 965f;
     /// <summary>
-    /// The reed's own resonance as a multiple of the bell's note, and it is BELOW it.
-    ///
-    /// A diaphragm lying over a port is an outward-striking valve: pressure in the throat pushes it
-    /// back onto its seat. Such a valve only pumps energy into a pipe when it is driven ABOVE its
-    /// own resonance, where it is mass-controlled and its motion lags the pressure by half a cycle —
-    /// the same reason a brass player's lips buzz below the note they are playing, and why a
-    /// floppier diaphragm plays a lower chime rather than a duller one. Tune the reed above the
-    /// column instead and the whole thing damps and you get a hiss; that is exactly what the first
-    /// version of this model did, and the measured note in Describe() is what caught it.
+    /// The reed's own resonance as a multiple of the bell's note, and below it. A diaphragm over a port
+    /// is an outward-striking valve, which pumps energy into the pipe only when driven above its own
+    /// resonance (as a brass player's lips). Tuned above the column it damps to a hiss, as the first
+    /// version did; the measured note in Describe() caught it.
     /// </summary>
     [Tunable("", 0.3, 0.95, "The diaphragm's own resonance as a fraction of the bell's note. It must sit below the note; a floppier diaphragm is lower.", Label = "reed tuning", Step = 0.01)]
     public float ReedRatio { get; init; } = 0.62f;
     /// <summary>
-    /// How much of each cycle the diaphragm is off its seat at full blow, 0..1.
-    ///
-    /// A beating valve makes a pulse, and the pulse's width is its timbre: a wide pulse is little
-    /// more than a half-wave sine — fundamental, an octave, and almost nothing above the third
-    /// harmonic, the mellow round tone a locomotive CHIME is built to make, with its big soft
-    /// diaphragm over a wide port. A stiff small diaphragm over a narrow port lifts late and slams
-    /// back early; its pulse is short, and a short pulse keeps its harmonics level up to about the
-    /// reciprocal of its width. That is the difference between a chime and a trumpet: the same
-    /// column, blatted instead of blown.
+    /// How much of each cycle the diaphragm is off its seat at full blow, 0..1: the pulse width is the
+    /// timbre. A wide pulse is nearly a half-wave sine, the mellow locomotive chime; a short one keeps
+    /// its harmonics level up to about one over its width, a trumpet.
     /// </summary>
     [Tunable("", 0.05, 0.9, "How much of each cycle the diaphragm is off its seat at full blow. Wide is a mellow chime, narrow is a brassy trumpet.", Label = "reed open fraction", Step = 0.01)]
     public float ReedOpenFraction { get; init; } = 0.46f;
     /// <summary>
-    /// How far flat the note sits when the air has only just reached the reed, as a fraction of the
-    /// note, and how ragged it goes there. Under 1%: the column's resonances are each about 3% wide,
-    /// and a larger bend drags every harmonic off its resonance while the air comes up and goes
-    /// down, so the level drops in and out and the horn sounds weak at both ends. (6.5% was tried
-    /// on every air horn and heard that way.)
+    /// How far flat the note sits while the air is only just reaching the reed, as a fraction of the
+    /// note. Under 1%: the column's resonances are about 3% wide, and a larger bend drags the harmonics
+    /// off them so the horn is weak at both ends (6.5% was tried on every air horn and heard that way).
     /// </summary>
     [Tunable("", 0, 0.03, "How far flat the note sits while the air is only just reaching the reed, as a fraction of the note. Keep it under 0.01.", Label = "pitch bend at start and end", Step = 0.001)]
     public float PitchBend { get; init; } = 0.008f;
@@ -116,12 +86,10 @@ public sealed record ChimeHornSpec
     // ── Presets ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The Nathan AirChime K5LA: the five-chime on most Amtrak power and a great many freight
-    /// locomotives, and the sound most people in North America mean by "train horn". Five bells tuned
-    /// D#4 F#4 G#4 B4 D#5 (311, 370, 415, 494, 622 Hz): a B major sixth over a D# bass. A#4 and C#5
-    /// on top would make a D# minor seventh, which is a Leslie S-4T's chord and not this horn's
-    /// (train-horn.com's K3LA/K5LA and Nathan/Leslie guides). The bells are spread across
-    /// the manifold and speak over about forty milliseconds, so it swells into the chord.
+    /// The Nathan AirChime K5LA, the five-chime on most Amtrak and much freight power. D#4 F#4 G#4 B4 D#5
+    /// (311, 370, 415, 494, 622 Hz), a B major sixth over a D# bass; A#4 and C#5 on top would be a Leslie
+    /// S-4T's D# minor seventh (train-horn.com's K3LA/K5LA and Nathan/Leslie guides). The bells speak
+    /// over about forty milliseconds.
     /// </summary>
     public static ChimeHornSpec NathanK5LA => new()
     {
@@ -138,10 +106,9 @@ public sealed record ChimeHornSpec
     };
 
     /// <summary>
-    /// A Leslie three-chime, the other voice of North American railroading: fewer bells, wider
-    /// spacing, and a harder edge because the bells are shorter for their mouths. Common on transit
-    /// and on older passenger power. Leslie numbers its bells by pitch; the RS3L's 25, 31 and 44 sound
-    /// C4, D#4 and A4 (262, 311, 440 Hz — locomotivehorns.info).
+    /// A Leslie three-chime, common on transit and older passenger power: harder-edged, the bells short
+    /// for their mouths. The RS3L's bells 25, 31 and 44 sound C4, D#4 and A4 (262, 311, 440 Hz,
+    /// locomotivehorns.info).
     /// </summary>
     public static ChimeHornSpec LeslieRS3L => new()
     {
@@ -171,10 +138,9 @@ public sealed record ChimeHornSpec
     };
 
     /// <summary>
-    /// A North American light-rail vehicle's horn: a small two-chime on the car's own air, D#4 and
-    /// A4 (311 and 440 Hz), the pairing of the Leslie S-2M that transit work has long used.
-    /// No maker's figure was found for the S70, SD160 or Flexity; this is the documented
-    /// transit horn, and the European urban-rail standard (EN 15153-4) puts its low tone at 370.
+    /// A North American light-rail vehicle's two-chime: D#4 and A4 (311 and 440 Hz), the Leslie S-2M
+    /// pairing. No maker's figure was found for the S70, SD160 or Flexity; EN 15153-4 puts the urban-rail
+    /// low tone at 370.
     /// </summary>
     public static ChimeHornSpec LightRailTwoChime => new()
     {
@@ -188,15 +154,10 @@ public sealed record ChimeHornSpec
     };
 
     /// <summary>
-    /// The pair of trumpets on the roof of a tractor unit, pulled with a lanyard, on 120 psi of the
-    /// same air that works the brakes. Less pressure than a locomotive's, so it is louder in the top
-    /// than at the bottom and carries nothing like as far.
-    ///
-    /// Pitched at 173 and 228 Hz. Real roof trumpets are 0.55-0.95 m long (Grover's common pair is
-    /// 24.5 and 21.5 in) and speak around 150-250 Hz; Leslie's own table puts a 24.9 in Tyfon at
-    /// 156 Hz. A reed horn with a
-    /// flare speaks nearer c/3L than the c/2L of a plain cone, so these lengths are the model's
-    /// EFFECTIVE lengths for the measured notes, not the metal.
+    /// A tractor unit's roof trumpets on 120 psi of brake air, 173 and 228 Hz. Real ones are 0.55-0.95 m
+    /// (Grover's common pair 24.5 and 21.5 in) and speak around 150-250 Hz; Leslie's table puts a 24.9 in
+    /// Tyfon at 156 Hz. A flared reed horn speaks nearer c/3L than c/2L, so these lengths are effective
+    /// lengths for the measured notes, not the metal.
     /// </summary>
     public static ChimeHornSpec TruckDualTrumpet => new()
     {
@@ -239,28 +200,12 @@ public sealed record ChimeHornSpec
          : throw new ArgumentException($"No horn preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
-//  The electric horn: what nearly every car, pickup and motorcycle has under its grille.
-//
-//  Not an air horn. There is no air supply and no reed: it is a BUZZER — a coil, an iron armature
-//  riveted to a steel diaphragm, and a pair of contact points the armature itself pushes open. The
-//  coil pulls, the armature moves, the points open, the coil lets go, the diaphragm springs back, the
-//  points close, and the coil pulls again. The note is near the diaphragm's own resonance and is set
-//  at the factory with an adjusting screw on the points, which is why horns are sold as a nominal
-//  "H" and "L" and why the note here is DECLARED rather than derived: it is a setting, not a length.
-//
-//  What makes it a car horn rather than a doorbell is that the armature is set to STRIKE the pole
-//  piece every cycle. Steel on steel with almost no bounce, four or five hundred times a second: a
-//  hard stop is where the buzz comes from. Two ways of letting that out:
-//
-//    DISC — a flat spring-steel tone disc on the end of the armature, which rings at its own modes
-//    around 2-4 kHz each time the armature hits. That is the brassy, nasal formant of a normal car
-//    horn, and the reason two of them a third apart sound like a car and not like a chord.
-//
-//    TRUMPET (snail) — the diaphragm drives a coiled exponential horn instead. The column only lets
-//    out what is near its own resonances, n·c/2L, and nothing below its flare cutoff, so the strike
-//    is filtered into a rounder, louder note. The "European" horn on a Mercedes or a Fiat.
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// The electric horn under nearly every car's grille: a buzzer, a coil whose armature on a steel
+// diaphragm opens its own contact points, and strikes the pole piece every cycle, steel on steel four
+// or five hundred times a second. The note is a factory setting of the points' screw (sold as "H" and
+// "L"), so it is declared, not derived. A disc horn's tone disc rings at 2-4 kHz on each strike, the
+// brassy formant; a trumpet (snail) horn's coiled column lets out only its resonances, n·c/2L, above
+// its flare cutoff: rounder and louder.
 
 /// <summary>How an electric horn lets the diaphragm's motion out.</summary>
 public enum ElectricHornKind
@@ -274,12 +219,8 @@ public enum ElectricHornKind
 /// <summary>One horn of a set: a coil, an armature on a diaphragm, and a pair of contact points.</summary>
 public sealed record ElectricHornUnitSpec
 {
-    /// <summary>
-    /// The note, hertz. Set at the factory by the screw on the contact points, near the
-    /// diaphragm-and-armature's own resonance; the label on the horn is "H" or "L" and this.
-    /// Declared, because it is a SETTING — nothing about the steel would tell you which way the
-    /// screw was turned.
-    /// </summary>
+    /// <summary>The note, hertz: a factory setting of the contact points' screw, near the diaphragm's
+    /// own resonance.</summary>
     public required float Hz { get; init; }
     /// <summary>Level of this horn against the others in the set, dB. The low horn of a pair is
     /// usually the bigger and a decibel or two louder.</summary>
@@ -287,20 +228,17 @@ public sealed record ElectricHornUnitSpec
     /// <summary>The diaphragm, metres. Sets where the radiator starts to beam.</summary>
     public float DiaphragmDiameterMetres { get; init; } = 0.090f;
     /// <summary>
-    /// DISC horns: the tone disc's first ringing mode, hertz. A disc clamped at its centre and free
-    /// at its rim; its note depends on diameter, thickness and the dish pressed into it, and the
-    /// makers do not publish any of the three, so it is declared from what disc horns measure at:
-    /// 2-4 kHz. The disc's next axisymmetric mode is about 6.3 times higher (a clamped-free plate
-    /// behaves like a cantilever there), which is mostly past hearing.
+    /// Disc horns: the tone disc's first mode, hertz, declared from what disc horns measure (2-4 kHz)
+    /// because makers publish none of its dimensions. The next axisymmetric mode is about 6.3 times
+    /// higher, mostly past hearing.
     /// </summary>
     public float ToneDiscHz { get; init; } = 2600f;
-    /// <summary>TRUMPET horns: the mouth of the coiled horn, metres.</summary>
+    /// <summary>Trumpet horns: the mouth of the coiled horn, metres.</summary>
     public float MouthDiameterMetres { get; init; } = 0.075f;
-    /// <summary>TRUMPET horns: the throat where the diaphragm's chamber opens into it, metres.</summary>
+    /// <summary>Trumpet horns: the throat where the diaphragm's chamber opens into it, metres.</summary>
     public float ThroatDiameterMetres { get; init; } = 0.010f;
 
-    /// <summary>TRUMPET horns: the length of the coiled column. It is cut to the note — a trumpet
-    /// horn's column and its diaphragm are made to agree — so this is c/2f less the mouth's end
+    /// <summary>Trumpet horns: the coiled column, cut to the note: c/2f less the mouth's end
     /// correction.</summary>
     [JsonIgnore]
     public float ColumnLengthMetres => MathF.Max(0.05f, 343f / (2f * MathF.Max(50f, Hz)) - 0.3f * MouthDiameterMetres);
@@ -318,28 +256,19 @@ public sealed record ElectricHornSpec
     /// <summary>How much of each cycle the points are closed. Wider points, harder pull.</summary>
     public float ContactDuty { get; init; } = 0.5f;
     /// <summary>
-    /// How long the supply takes to come up at the horn when the button is pressed, seconds (a time
-    /// constant). The horn is not wired to the button: the button pulls in a relay, the relay's
-    /// armature travels, its contacts touch, bounce and seat, and the battery then pushes several
-    /// amps through the harness into a coil that is still settling. The diaphragm meanwhile builds
-    /// from rest over its first few cycles, swinging short of the pole until the pull is strong
-    /// enough to throw it all the way. Together that is a swell of a couple of dozen milliseconds —
-    /// short enough to be heard as instant, long enough not to be a click.
+    /// How long the supply takes to come up when the button is pressed, seconds (a time constant): the
+    /// relay pulling in and its contacts bouncing, and the diaphragm building over its first cycles. A
+    /// swell of a couple of dozen milliseconds, heard as instant but not a click.
     /// </summary>
     public float RelayMakeSeconds { get; init; } = 0.010f;
     /// <summary>
-    /// How long the supply takes to die away when the button is let go, seconds (a time constant).
-    /// A horn relay's coil carries a suppression diode, which lets its current — and so its grip —
-    /// decay slowly rather than snap; the contacts part while the arc between them still carries a
-    /// falling current; and the buzzer keeps interrupting all the way down, striking softer and then
-    /// not at all as the pull fades, until the diaphragm and the tone disc ring down on their own.
+    /// How long the supply takes to die away when the button is let go, seconds (a time constant): the
+    /// relay's suppression diode lets its grip decay slowly, and the buzzer strikes softer until the
+    /// diaphragm and disc ring down on their own.
     /// </summary>
     public float RelayBreakSeconds { get; init; } = 0.018f;
-    /// <summary>
-    /// SPL, RMS, at one metre on axis with every horn in the set sounding. Legal horns are
-    /// 93-112 dBA at two metres (ECE R28, FMVSS), which is 99-118 at one. An anchor rather than a
-    /// radiation integral, for the same reason as the air horns: the law is a better number.
-    /// </summary>
+    /// <summary>SPL, RMS, at one metre on axis with every horn sounding. Legal horns are 93-112 dBA at
+    /// two metres (ECE R28, FMVSS), 99-118 at one.</summary>
     public float ReferenceDb { get; init; } = 110f;
 
     /// <summary>The notes of the set, hertz, in the order the units are declared.</summary>
@@ -348,11 +277,8 @@ public sealed record ElectricHornSpec
 
     // ── Presets ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The pair behind the grille of most cars and pickups: a high and a low disc horn, about 510 and
-    /// 410 Hz, roughly a major third apart. They beat against each other, and that roughness is the
-    /// sound of a car horn as much as either note is.
-    /// </summary>
+    /// <summary>Most cars' and pickups' pair: disc horns at about 410 and 510 Hz, roughly a major third,
+    /// beating against each other.</summary>
     public static ElectricHornSpec DiscPair => new()
     {
         Name = "car disc horns, high and low",
@@ -438,13 +364,12 @@ public sealed record WhistleSpec
     /// the whistle is driven and how much of it is noise rather than note.</summary>
     [Tunable("kPa", 300, 2100, "Boiler pressure at the whistle valve, gauge. It sets the jet speed: more pressure drives the whistle harder and makes more of it noise.", Label = "steam pressure", Step = 10)]
     public float SupplyKPa { get; init; } = 1380f;
-    /// <summary>The steam's temperature once the bell is hot, Kelvin. This sets the sound speed in
-    /// the bell, and so the PITCH: steam at 430 K carries sound at about 510 m/s against air's 343,
-    /// so a whistle sounds half again as sharp as a pipe organ of the same length.</summary>
+    /// <summary>The steam's temperature once the bell is hot, Kelvin: the sound speed, and so the pitch.
+    /// At 430 K it is about 510 m/s against air's 343, half again as sharp as an organ pipe.</summary>
     [Tunable("K", 373, 650, "Temperature of the steam once the bell is hot. It sets the sound speed in the bell, so hotter steam sounds higher.", Label = "steam temperature", Step = 5)]
     public float SteamKelvin { get; init; } = 430f;
-    /// <summary>How long the bell takes to fill and warm, seconds. The first moment of a whistle is
-    /// cold air, and the pitch climbs as the steam displaces it — the wail into the note.</summary>
+    /// <summary>How long the bell takes to fill and warm, seconds: the pitch climbs as steam displaces
+    /// the cold air.</summary>
     [Tunable("s", 0.05, 3, "How long the bell takes to fill with steam and warm. The pitch climbs over this time.", Label = "warm-up time", Step = 0.05)]
     public float WarmSeconds { get; init; } = 0.55f;
     /// <summary>How much of the output is the jet's turbulence rather than the pipe's note, 0..1.
@@ -456,12 +381,8 @@ public sealed record WhistleSpec
 
     // ── Presets ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A big American three-chime passenger whistle, the kind on a Northern: three stopped bells of
-    /// 300, 238 and 200 mm which at 510 m/s sound 400, 500 and 590 Hz — a rough minor triad, and
-    /// deliberately not a clean one. Odd harmonics from the stopped pipes and a great deal of jet
-    /// noise; it is a chord and a roar at the same time.
-    /// </summary>
+    /// <summary>A big American three-chime passenger whistle, as on a Northern: stopped bells of 300, 238
+    /// and 200 mm, at 510 m/s 400, 500 and 590 Hz, a deliberately rough minor triad.</summary>
     public static WhistleSpec ThreeChimePassenger => new()
     {
         Name = "three-chime passenger whistle",
@@ -474,11 +395,8 @@ public sealed record WhistleSpec
         SupplyKPa = 1550f, SteamKelvin = 445f, Breathiness = 0.34f, ReferenceDb = 133f,
     };
 
-    /// <summary>
-    /// A five-chime freight whistle: five short bells, higher and harder, meant to be heard over a
-    /// mile of coal train. More bells is not more chord — it is more beating between bells that are
-    /// close together, which is where the "hollow" in a big whistle comes from.
-    /// </summary>
+    /// <summary>A five-chime freight whistle: five short bells, higher and harder. The beating between
+    /// close bells is the "hollow" of a big whistle.</summary>
     public static WhistleSpec FiveChimeFreight => new()
     {
         Name = "five-chime freight whistle",
@@ -493,11 +411,7 @@ public sealed record WhistleSpec
         SupplyKPa = 1550f, SteamKelvin = 445f, Breathiness = 0.32f, ReferenceDb = 134f,
     };
 
-    /// <summary>
-    /// A single-note "banshee" hooter: one long bell, no chord at all, and nothing to hide behind.
-    /// A 560 mm stopped pipe sounds 215 Hz, which is low enough to carry for miles and mournful
-    /// enough that railroads that used them are remembered for it.
-    /// </summary>
+    /// <summary>A single-note "banshee" hooter: one 560 mm stopped bell, 215 Hz.</summary>
     public static WhistleSpec SingleNoteHooter => new()
     {
         Name = "single-note hooter",
@@ -528,13 +442,9 @@ public sealed record WhistleSpec
 }
 
 /// <summary>
-/// A struck bell — a crossing gong, a locomotive bell, a tram's foot gong.
-///
-/// What makes a bell a bell is that it is a SHELL and not a plate: the modes of a flat disc are one
-/// family, and curving it adds a membrane stiffness that pushes the low modes up and leaves the high
-/// ones nearly alone. So the partials of a bell are neither harmonic nor the plate's — they are
-/// somewhere between, and how far between is the rise of the dome. Flatten a gong and it becomes a
-/// cymbal; deepen it and it becomes a church bell.
+/// A struck bell: a crossing gong, a locomotive bell, a tram's foot gong. A shell, not a plate: the
+/// dome's membrane stiffness pushes the low modes up and leaves the high ones nearly alone, so the rise
+/// decides how far the partials sit between a cymbal's and a church bell's.
 /// </summary>
 public sealed record StruckBellSpec
 {
@@ -543,18 +453,15 @@ public sealed record StruckBellSpec
     /// <summary>The mouth, metres. A grade-crossing gong is 250-300 mm; a locomotive bell 400.</summary>
     [Tunable("m", 0.05, 1.5, "Diameter of the mouth. A crossing gong is 0.25 to 0.3, a locomotive bell 0.4. Bigger is lower.", Label = "diameter", Step = 0.01)]
     public required float DiameterMetres { get; init; }
-    /// <summary>Wall thickness at the rim, metres. With the diameter this is the whole note: the
-    /// plate family goes as h/a^2, so halving the diameter of the same casting raises it two
-    /// octaves.</summary>
+    /// <summary>Wall thickness at the rim, metres. The note goes as h/a², so halving the diameter of the
+    /// same casting raises it two octaves.</summary>
     [Tunable("m", 0.001, 0.05, "Wall thickness at the rim. Thicker is higher: the note goes as thickness over diameter squared.", Label = "rim thickness", Step = 0.0005)]
     public required float ThicknessMetres { get; init; }
-    /// <summary>How deep the dome is, metres — the rise of the crown above the rim. Zero is a flat
-    /// plate. The membrane stiffness it adds is what separates a gong from a bell.</summary>
+    /// <summary>The rise of the crown above the rim, metres. Zero is a flat plate.</summary>
     [Tunable("m", 0, 0.5, "Height of the crown above the rim. Zero is a flat plate; a deeper dome is more of a bell and less of a gong.", Label = "dome rise", Step = 0.005)]
     public float RiseMetres { get; init; } = 0.05f;
-    /// <summary>Young's modulus (Pa), density (kg/m^3): bell bronze 105 GPa and 8800, steel 210 and
-    /// 7850. Bronze is slower and denser, so a bronze bell of the same size is lower — and it has an
-    /// internal loss twenty times smaller than steel's, which is why it rings for seconds.</summary>
+    /// <summary>Young's modulus (Pa), density (kg/m³): bell bronze 105 GPa and 8800, steel 210 and 7850.
+    /// Bronze is lower for its size, and its internal loss is twenty times smaller than steel's.</summary>
     [Tunable("Pa", 5e10, 2.5e11, "Stiffness of the metal. Bell bronze is 105 billion, steel 210 billion. Stiffer is higher.", Label = "Young's modulus", Step = 1e9)]
     public float YoungsPa { get; init; } = 105e9f;
     [Tunable("kg/m³", 2000, 12000, "Density of the metal. Bell bronze is 8800, steel 7850. Denser is lower.", Label = "density", Step = 50)]
@@ -562,13 +469,12 @@ public sealed record StruckBellSpec
     /// <summary>Internal loss factor. Bell bronze is about 3e-5; cast iron 1e-3; steel 2e-4.</summary>
     [Tunable("", 0.00001, 0.01, "Internal loss of the metal. Bell bronze is about 0.00003, steel 0.0002, cast iron 0.001. Higher dies away sooner.", Label = "internal loss factor", Step = 0.00001)]
     public float LossFactor { get; init; } = 4e-5f;
-    /// <summary>Where the clapper lands as a fraction of the radius: 1 is the rim, 0 the crown. The
-    /// strike point decides which modes answer — a bell struck at its crown is a thud.</summary>
+    /// <summary>Where the clapper lands as a fraction of the radius: 1 is the rim, 0 the crown (a
+    /// thud).</summary>
     [Tunable("", 0, 1, "Where the clapper lands, as a fraction of the radius: 1 is the rim, 0 the crown. Struck at the crown it is a thud.", Label = "strike point", Step = 0.01)]
     public float StrikeRadiusFraction { get; init; } = 0.92f;
-    /// <summary>The clapper: mass in kg and how fast it arrives, m/s. The contact time follows from
-    /// the Hertzian stiffness of steel on bronze and it is what sets the brightness — a soft heavy
-    /// clapper cannot excite a mode whose period is shorter than the contact.</summary>
+    /// <summary>The clapper: mass in kg and how fast it arrives, m/s. The Hertzian contact time sets the
+    /// brightness: no mode whose period is shorter than the contact is excited.</summary>
     [Tunable("kg", 0.01, 10, "Mass of the clapper. A heavy clapper stays in contact longer and the blow is darker.", Label = "clapper mass", Step = 0.01)]
     public float ClapperKg { get; init; } = 0.35f;
     [Tunable("m/s", 0.1, 10, "How fast the clapper arrives. Faster is a harder, brighter blow.", Label = "clapper speed", Step = 0.1)]
@@ -577,10 +483,9 @@ public sealed record StruckBellSpec
     /// a hand bell's often does), 0..1 of the ring damped away.</summary>
     [Tunable("", 0, 1, "How much of the ring the clapper takes away by resting on the bell after the blow.", Label = "clapper damping", Step = 0.01)]
     public float ClapperDamping { get; init; } = 0.06f;
-    /// <summary>How much the mounting takes out of it. A gong is bolted through its crown, which
-    /// is a node for every mode with two or more nodal diameters and an antinode for the ones with
-    /// none — so the bolt kills the low breathing modes and barely touches the ones that sing. That
-    /// is why a bell screwed to a mast still rings.</summary>
+    /// <summary>How much the mounting takes out of it. The crown bolt is a node for every mode with two
+    /// or more nodal diameters, so it kills the low breathing modes and barely touches the ones that
+    /// sing.</summary>
     [Tunable("", 0, 0.2, "How much the mounting bolt through the crown takes out of the ring. It damps the low breathing modes most.", Label = "mounting loss", Step = 0.005)]
     public float MountLossFactor { get; init; } = 0.02f;
     /// <summary>Strikes a second when it is ringing continuously. A North American crossing gong
@@ -588,20 +493,17 @@ public sealed record StruckBellSpec
     [Tunable("per second", 0.2, 10, "Blows a second while it is ringing continuously. A North American crossing gong runs at about 2.3.", Label = "strike rate", Step = 0.1)]
     public float StrikesPerSecond { get; init; } = 2.3f;
     /// <summary>
-    /// SPL at one metre, RMS, while it is RINGING — not the height of one blow. That is what a
-    /// bell's published figure means: a crossing gong is required to make about 75 dB at three
-    /// metres and a locomotive bell 80 at thirty, and both of those are meter readings of a bell in
-    /// use. A struck bell's crest factor is twenty-odd decibels, so anchoring the peak instead
-    /// hides it completely under anything else that is happening.
+    /// SPL at one metre, RMS, while it is ringing, not the peak of one blow: the published figures (a
+    /// crossing gong about 75 dB at 3 m, a locomotive bell 80 at 30 m) are meter readings in use. The
+    /// crest factor is twenty-odd decibels, so anchoring the peak would bury the bell.
     /// </summary>
     [Tunable("dB", 60, 130, "RMS sound level at one metre while it is ringing, not the peak of one blow.", Label = "ringing level at one metre", Step = 1, Source = "required levels: a crossing gong about 75 dB at 3 m, a locomotive bell 80 dB at 30 m")]
     public float ReferenceDb { get; init; } = 86f;
 
     /// <summary>
-    /// How far its blows stand over <see cref="ReferenceDb"/>, dB: the room its voice renders with.
-    /// Every blow is a peak, so this is the loudest of them over the RMS, measured over twenty
-    /// seconds of ringing and rounded up. The presets measure 28.7 to 30.1; a bell that does not say
-    /// is given the largest of them. Under the fleet's shared 16 every blow was squared off.
+    /// How far its blows stand over <see cref="ReferenceDb"/>, dB: the headroom its voice renders with,
+    /// the loudest blow over the RMS across twenty seconds, rounded up. The presets measure 28.7 to 30.1;
+    /// under the fleet's shared 16 every blow was squared off.
     /// </summary>
     public float PeakHeadroomDb { get; init; } = 31f;
 
@@ -611,12 +513,8 @@ public sealed record StruckBellSpec
 
     // ── Presets ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The grade-crossing gong: a 260 mm bronze casting on a shallow dome, rung by a solenoid about
-    /// twice a second, mounted on a mast under the flashers. Small, thin, and struck hard, so it is
-    /// bright and its partials are wide apart — it is the least bell-like bell on the railway and
-    /// carries a mile down a quiet street.
-    /// </summary>
+    /// <summary>The grade-crossing gong: a 260 mm bronze casting on a shallow dome, rung by a solenoid
+    /// about twice a second. Small, thin and struck hard, so bright, its partials wide apart.</summary>
     public static StruckBellSpec CrossingGong => new()
     {
         Name = "grade-crossing gong, 10 inch bronze",
@@ -627,11 +525,8 @@ public sealed record StruckBellSpec
         PeakHeadroomDb = 29f,
     };
 
-    /// <summary>
-    /// The bell on the front of a locomotive: 400 mm of bronze, thick, swung or air-rung at about
-    /// 1.6 a second. Twice the gong's diameter and three times its wall, so it sounds an octave and
-    /// a half lower and holds on much longer.
-    /// </summary>
+    /// <summary>A locomotive's bell: 400 mm of thick bronze rung about 1.6 times a second, an octave and
+    /// a half below the gong and much longer.</summary>
     public static StruckBellSpec LocomotiveBell => new()
     {
         Name = "locomotive bell, 16 inch bronze",
@@ -665,34 +560,11 @@ public sealed record StruckBellSpec
          : throw new ArgumentException($"No bell preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
-//  THE ELECTRONIC SIREN
-//
-//  Everything above this line is a pneumatic instrument — air through a reed into a pipe. A police
-//  siren is not: it is an amplifier driving a compression driver into a horn, and every part of
-//  what it sounds like comes from that chain rather than from a recording of one.
-//
-//    THE OSCILLATOR. A siren amplifier's tone generator does not make a sine. The classic heads
-//    (and the DSP ones that imitate them) put out a sawtooth, because a sawtooth has every harmonic
-//    and a siren's whole job is to be heard through traffic — a sine at 900 Hz disappears behind a
-//    bus and a sawtooth at 900 Hz does not. What SWEEPS is that oscillator's frequency, and the
-//    different "sounds" on a siren head are nothing but different sweep rates over the same range.
-//
-//    THE DRIVER. A hundred watts into a one-inch compression driver is well past where the
-//    diaphragm moves linearly, so the wave is squashed on the way out. That is why a siren at full
-//    power has a hard, brassy edge that the same head at low volume does not.
-//
-//    THE HORN. This is the part that makes it a siren rather than a loudspeaker. A horn will not
-//    radiate below its flare cutoff — the mouth has to be about a wavelength over pi across before
-//    the air will take the energy — so everything under about five hundred hertz is simply gone,
-//    which is why a siren has no body at all and is all bite. At the top, the driver's diaphragm
-//    mass rolls it off above four or five kilohertz. What is left is a band from roughly 500 Hz to
-//    4 kHz: exactly where the ear is most sensitive and where engine and tyre noise are weakest.
-//    Nothing about that band is an equaliser setting; it is the geometry of the horn.
-//
-//    AND IT POINTS FORWARD. A horn under a bumper beams. Ten decibels front to back, which is why
-//    you hear one coming long before it is a problem and why it drops away so fast once past.
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// The electronic siren: an oscillator whose frequency sweeps (the head's modes are only sweep rates),
+// a compression driver pushed past linear at full power (the brassy edge), and a horn that will not
+// radiate below its flare cutoff, about 500 Hz, while the driver rolls off above 4-5 kHz. The band left
+// is where the ear is most sensitive and engines and tyres are weakest. The horn beams, about ten
+// decibels front to back.
 
 /// <summary>Which sound the head is making. The hardware is identical; only the sweep rate changes.</summary>
 public enum SirenMode
@@ -701,8 +573,8 @@ public enum SirenMode
     Off,
     /// <summary>The long one: about twelve sweeps a minute. What a car uses on an open road.</summary>
     Wail,
-    /// <summary>Three sweeps a second. What it changes to at a junction, because a fast sweep is far
-    /// easier to localise — the ear gets many onsets a second instead of one every five.</summary>
+    /// <summary>Three sweeps a second, at a junction: many onsets a second are far easier to
+    /// localise.</summary>
     Yelp,
     /// <summary>Ten sweeps a second: the hard stutter, for the last few metres when nobody has moved.</summary>
     Phaser,
@@ -711,60 +583,34 @@ public enum SirenMode
 }
 
 /// <summary>
-/// An electronic siren head: an amplifier, a compression driver and a horn.
-///
-/// Levels are anchored the way certification anchors them — the legal figure is measured at TEN
-/// FEET on axis, not at a metre, because a metre from a horn mouth is inside its near field and
-/// means nothing. <see cref="ReferenceDbAt3m"/> holds the spec figure and the model converts.
+/// An electronic siren head: an amplifier, a compression driver and a horn. Levels are anchored as
+/// certification does, at ten feet on axis: a metre from a horn mouth is inside its near field.
 /// </summary>
 public sealed record SirenSpec
 {
     public required string Name { get; init; }
 
-    /// <summary>
-    /// On-axis SPL at ten feet (3.05 m), dB — the figure sirens are actually specified and type-
-    /// approved at. California Title 13 and SAE J1849 want at least 110; a 100 W head on a modern
-    /// speaker makes 118-123, and that is what these presets carry.
-    /// </summary>
+    /// <summary>On-axis SPL at ten feet (3.05 m), dB. California Title 13 and SAE J1849 want at least
+    /// 110; a 100 W head on a modern speaker makes 118-123.</summary>
     public float ReferenceDbAt3m { get; init; } = 120f;
 
-    /// <summary>Mouth diameter of the horn, metres. It SETS THE CUTOFF — see
-    /// <see cref="FlareCutoffHz"/> — so a bigger horn is not a louder siren, it is a deeper one.</summary>
+    /// <summary>Mouth diameter of the horn, metres. It sets <see cref="FlareCutoffHz"/>: a bigger horn
+    /// is a deeper siren, not a louder one.</summary>
     public float HornMouthMetres { get; init; } = 0.20f;
 
     /// <summary>Where the compression driver runs out, Hz: diaphragm mass and the phase plug.</summary>
     public float DriverTopHz { get; init; } = 4500f;
 
-    /// <summary>
-    /// How hard the driver is being pushed, 0..1 — how much of the wave is squashed flat. A siren
-    /// head at full volume is well into this and it is most of the brassiness.
-    /// </summary>
+    /// <summary>How hard the driver is being pushed, 0..1: how much of the wave is squashed flat, most
+    /// of the brassiness at full volume.</summary>
     public float Compression { get; init; } = 0.55f;
 
     /// <summary>
-    /// Duty cycle of the oscillator, 0..1 — and this is what decides whether it is a SQUARE or a
-    /// sawtooth, which is the difference between a siren and a trumpet.
-    ///
-    /// Not a sawtooth, though a sawtooth has every harmonic and a siren's job is to be heard. That
-    /// is true of the job and wrong about the hardware. The instrument every electronic siren was built to imitate is a ROTARY CHOPPER —
-    /// a rotor spinning inside a stator, both cut with ports, so the airflow is switched fully on
-    /// and fully off once per port per revolution. Ports and lands are cut about equally wide, so
-    /// what comes out is very nearly a square wave at fifty per cent duty, and a square wave has
-    /// ODD HARMONICS ONLY: 1, 3, 5, 7, at 1/n. The analogue tone generators in the electronic heads
-    /// that replaced it were built to match, and the modern DSP ones to match those.
-    ///
-    /// Odd-harmonic and all-harmonic are not a subtle difference. A sawtooth's even harmonics fill
-    /// in the octave above every partial and the result reads as BRASSY — a horn, a trumpet. A
-    /// square leaves those gaps open and reads as hollow and hard, which is the siren sound.
-    ///
-    /// Exactly a half is a pure odd series. Real ports are not machined perfectly, and a hair off
-    /// centre puts a little of the even series back, which is what stops it sounding synthetic.
-    ///
-    /// A HAIR. The series amplitude is sin(pi k d)/(pi k), and how far d sits from a half is
-    /// multiplied by k — so a two per cent error that is inaudible on the 2nd harmonic has grown
-    /// eight times over by the 8th, and the odd-harmonic character quietly disappears up the
-    /// series. Measured with duty 0.48: the 3rd stood 14 dB over the 2nd and the 5th only 8.7 dB
-    /// over the 4th, which is halfway back to a sawtooth. One per cent holds it.
+    /// Duty cycle of the oscillator, 0..1. The electronic siren imitates a rotary chopper, whose equal
+    /// ports and lands make nearly a square wave: odd harmonics only, hollow and hard, where a
+    /// sawtooth's even ones read as brassy, a trumpet. A hair off a half stops it sounding synthetic,
+    /// but only a hair: the error grows with harmonic number, and at 0.48 the 3rd stood 14 dB over the
+    /// 2nd and the 5th only 8.7 dB over the 4th, halfway back to a sawtooth.
     /// </summary>
     public float Duty { get; init; } = 0.49f;
 
@@ -782,15 +628,12 @@ public sealed record SirenSpec
     public float HiLoRatio { get; init; } = 1.5f;      // a fifth
     public float HiLoHoldSeconds { get; init; } = 0.55f;
 
-    /// <summary>
-    /// The horn's flare cutoff, Hz — DERIVED, not declared. A horn radiates only once its mouth
-    /// circumference is comparable with the wavelength: f = c / (pi * D). A 0.2 m mouth cuts off at
-    /// 546 Hz, which is why a siren has no bottom end at all.
-    /// </summary>
+    /// <summary>The horn's flare cutoff, Hz: f = c / (π D), where the mouth's circumference reaches the
+    /// wavelength. A 0.2 m mouth cuts off at 546 Hz.</summary>
     public float FlareCutoffHz => 343f / (MathF.PI * MathF.Max(0.05f, HornMouthMetres));
 
-    /// <summary>The spec figure carried back to one metre, for the emitter placement that wants it
-    /// there. A near-field fiction, like a jet's, and honest about being one.</summary>
+    /// <summary>The spec figure carried back to one metre for the emitter: a near-field fiction, like a
+    /// jet's.</summary>
     public float SourceLevelDb => ReferenceDbAt3m + 20f * MathF.Log10(3.05f);
 
     /// <summary>Seconds per sweep for a mode, or zero if the mode does not sweep.</summary>
@@ -813,16 +656,13 @@ public sealed record SirenSpec
     {
         Name = "100 W patrol siren, grille horn",
         ReferenceDbAt3m = 120f,
-        // An eleven-inch speaker assembly, which is what a 100 W siren is fitted with, not an eight-
-        // inch one. It matters twice over: the cutoff falls to
-        // 390 Hz, so the bottom of the wail actually radiates instead of being filtered away, and
-        // the beam is correspondingly wider at the low end.
+        // An eleven-inch speaker assembly, as a 100 W siren has: a 390 Hz cutoff, so the bottom of the
+        // wail radiates.
         HornMouthMetres = 0.28f,
         DriverTopHz = 4500f,
         Compression = 0.55f,
-        // 500 to 1500. The old 650 bottom sat only a quarter-octave over a 546 Hz cutoff, so the
-        // wail's descent ran straight into the horn's own high-pass and stopped sounding like it
-        // was going down — "on the down wail I think it should go a little lower".
+        // Down to 500: a 650 bottom a quarter-octave over the cutoff stopped sounding like it was going
+        // down (Cody: "on the down wail I think it should go a little lower").
         SweepLowHz = 500f, SweepHighHz = 1500f,
         WailSeconds = 5.0f, YelpSeconds = 0.31f, PhaserSeconds = 0.10f,
     };
@@ -847,9 +687,8 @@ public sealed record SirenSpec
     {
         Name = "European two-tone",
         ReferenceDbAt3m = 118f,
-        // Wide enough to radiate its own low note: a 435 Hz tone needs a cutoff below 435, and
-        // a 240 mm mouth cuts off at 455. Caught by TheBottomOfTheWailIsAboveTheHornsCutoff,
-        // which exists because a note under the cutoff does not sound low, it sounds absent.
+        // Wide enough to radiate its 435 Hz low note (a 240 mm mouth cuts off at 455): a note under the
+        // cutoff sounds absent (TheBottomOfTheWailIsAboveTheHornsCutoff).
         HornMouthMetres = 0.30f,
         DriverTopHz = 4200f,
         Compression = 0.5f,
@@ -870,53 +709,32 @@ public sealed record SirenSpec
 }
 
 /// <summary>
-/// Which sound a siren head is making, decided from what the vehicle is DOING.
-///
-/// Nothing on the wire carries a siren mode and nothing scripts one, which is the same rule the
-/// aircraft power lever and the air brakes follow. But unlike those, this one is a PERSON'S
-/// decision, and a person's decision has hysteresis in it: a crew that switches to yelp for a
-/// junction holds it through the junction and out the other side. Read straight off the
-/// instantaneous deceleration it does not — on a city lap the racing line brakes for every corner,
-/// so the head flipped between wail and yelp several times a lap and sounded like it could not
-/// make up its mind. That is what "the sirens are still wrong on the map" was.
-///
-/// So this smooths what it is looking at, requires the braking to be SUSTAINED rather than
-/// momentary, and then holds whatever it chose. It lives here, in Common, rather than in the audio
-/// system because a decision with state in it is a thing a test can drive — see the siren tests,
-/// which run it against the city's own racing line and count the changes per lap.
+/// Which sound a siren head is making, decided from what the vehicle is doing; nothing on the wire
+/// carries a mode. A crew's choice has hysteresis: read straight off the deceleration, the head flipped
+/// between wail and yelp several times a city lap ("the sirens are still wrong on the map"). So the
+/// speed is smoothed, the braking must be sustained, and the choice is held. In Common so tests can
+/// drive it against the city's racing line.
 /// </summary>
 public sealed class SirenController
 {
     /// <summary>Under this, the vehicle is parked and the head is off.</summary>
     public float MovingMps { get; init; } = 2f;
-    /// <summary>
-    /// Deceleration that counts as "coming up on something", m/s².
-    ///
-    /// High on purpose. A racing line brakes for every corner, and taking every corner as a
-    /// junction is what made the head change character nine times in two laps — measured, in
-    /// ASirenDoesNotChangeItsMindEveryCorner. Only the hardest braking on the route is a crew
-    /// arriving somewhere; the rest is just driving round a block.
-    /// </summary>
+    /// <summary>Deceleration that counts as coming up on something, m/s². High, so only the hardest
+    /// braking on the route counts: taking every corner as a junction changed the mode nine times in two
+    /// laps (ASirenDoesNotChangeItsMindEveryCorner).</summary>
     public float BrakingMps2 { get; init; } = 2.3f;
     /// <summary>How long it has to keep braking before the crew reaches for the switch.</summary>
     public float SustainSeconds { get; init; } = 0.9f;
-    /// <summary>
-    /// The shortest a chosen mode lasts. Long enough to be recognised as a mode rather than as a
-    /// glitch, short enough that a junction gets its own sound.
-    /// </summary>
+    /// <summary>The shortest a chosen mode lasts: heard as a mode, not a glitch.</summary>
     public float HoldSeconds { get; init; } = 6f;
-    /// <summary>Time constant on the speed the decision looks at. A network speed is a sampled,
-    /// dead-reckoned quantity and differencing it raw is mostly noise.</summary>
+    /// <summary>Time constant on the speed the decision looks at: a dead-reckoned network speed
+    /// differenced raw is mostly noise.</summary>
     public float SmoothSeconds { get; init; } = 0.35f;
 
     /// <summary>
-    /// How long a call lasts and how long the car goes about its business between calls, seconds.
-    ///
-    /// THIS IS THE ONE THAT MATTERS. A patrol car with its siren on for ever is not a patrol car,
-    /// and it is not what a street sounds like: the head is 130 dB and the car is 95, so a siren
-    /// that never stops means the engine is never heard. The answer is not to turn the siren down
-    /// (it is the right level, it is a siren) but to turn it OFF most of the time, which is what a
-    /// real one is.
+    /// How long a call lasts and how long the car goes about its business between calls, seconds. The
+    /// head is 130 dB and the car 95, so a siren that never stops hides the engine: the answer is off
+    /// most of the time, as a real one is, not quieter.
     /// </summary>
     public float CallSecondsMin { get; init; } = 35f;
     public float CallSecondsMax { get; init; } = 80f;
@@ -932,8 +750,7 @@ public sealed class SirenController
     private readonly Random _rng;
     private float _speed = float.NaN, _decel, _braking, _held = float.MaxValue, _phaseLeft;
 
-    /// <summary>Seeded per vehicle, so two cars on the same street are never in step — and so the
-    /// same car does the same thing twice, which is what makes a fault reproducible.</summary>
+    /// <summary>Seeded per vehicle, so two cars are never in step and a fault is reproducible.</summary>
     public SirenController(int seed = 0)
     {
         _rng = new Random(seed * 2654435761u.GetHashCode() ^ 0x5f3a);
@@ -952,8 +769,7 @@ public sealed class SirenController
         _braking = _decel > BrakingMps2 ? _braking + dt : 0f;
         _held += dt;
 
-        // On a call, or going about its business. Nothing observable decides this — a call is not
-        // a property of the road — so it is a clock, seeded per car so no two are in step.
+        // A call is not a property of the road, so it is a clock.
         _phaseLeft -= dt;
         if (_phaseLeft <= 0f)
         {
@@ -967,17 +783,14 @@ public sealed class SirenController
         if (Mode == SirenMode.Off) { Set(Cruising()); return Mode; }
         if (_held < HoldSeconds) return Mode;
 
-        // Coming up on a junction: the crew goes to a fast sweep, because a fast sweep is far
-        // easier for anyone in the way to place. WHICH fast sweep is a person's habit rather than
-        // a rule, so it is drawn rather than fixed — some crews yelp, some run the phaser.
+        // Coming up on a junction: a fast sweep, easier to place. Which one is a crew's habit, so drawn.
         Set(_braking >= SustainSeconds
             ? (_rng.NextDouble() < 0.35 ? SirenMode.Phaser : SirenMode.Yelp)
             : Cruising());
         return Mode;
     }
 
-    /// <summary>What it runs between junctions. Mostly the long one, occasionally not — a siren
-    /// held on one sound for a whole shift is as wrong as one that changes every corner.</summary>
+    /// <summary>What it runs between junctions: mostly the wail, sometimes the yelp.</summary>
     private SirenMode Cruising() => _rng.NextDouble() < 0.22 ? SirenMode.Yelp : SirenMode.Wail;
 
     private static float Lerp(float a, float b, float t) => a + (b - a) * t;
@@ -992,20 +805,9 @@ public sealed class SirenController
 }
 
 /// <summary>
-/// The beeper on a bus door — the "beep beep beep" while it kneels and the doors are open.
-///
-/// It is not pneumatic and it is not part of the air system; it is a piezo disc with a square wave
-/// on it, behind a grille over the doorway. Which matters, because a piezo is a RESONATOR: it is
-/// driven at its own mechanical resonance (that is the only place it is efficient) and what comes
-/// out is very nearly a pure tone with a hard edge to it, not a buzzer's rasp. The frequency is
-/// chosen high — two and a half to three kilohertz — for exactly the reason the siren's band is
-/// chosen: it is where the ear is most sensitive and where a diesel is weakest, so it cuts through
-/// the bus it is bolted to.
-///
-/// And it answers a question that comes up whenever this sort of thing is added: NO, none of this
-/// is the inside of the bus. The kneel, the doors and this are all heard from the pavement — they
-/// are what a bus does at a stop, from outside it. What the cabin does to the engine when you are
-/// sitting IN one is a different model entirely.
+/// The beeper on a bus door while it kneels and the doors are open: a piezo disc driven at its own
+/// resonance, so nearly a pure tone with a hard edge, at 2.5-3 kHz where the ear is most sensitive and
+/// a diesel weakest. Heard from the pavement; it is not the inside of the bus.
 /// </summary>
 public sealed record DoorChimeSpec
 {
@@ -1015,14 +817,12 @@ public sealed record DoorChimeSpec
     public float RateHz { get; init; } = 2.0f;
     /// <summary>How much of each cycle is sounding, 0..1.</summary>
     public float Duty { get; init; } = 0.45f;
-    /// <summary>Rise and fall of each beep, seconds. A piezo is light and starts fast, but not
-    /// instantly, and a truly instant edge is a click rather than a beep.</summary>
+    /// <summary>Rise and fall of each beep, seconds: an instant edge is a click.</summary>
     public float EdgeSeconds { get; init; } = 0.004f;
-    /// <summary>SPL at one metre. A door beeper is made to be heard across a pavement and no
-    /// further: 80 dB is the usual figure and it is what this is.</summary>
+    /// <summary>SPL at one metre: 80 dB, the usual figure, heard across a pavement and no further.</summary>
     public float ReferenceDb { get; init; } = 80f;
-    /// <summary>How much of the square's second harmonic survives the disc. A piezo is a narrow
-    /// resonator, so not much — but enough to give it the edge that makes it a warning.</summary>
+    /// <summary>How much of the square's second harmonic survives the narrow resonator: the warning's
+    /// edge.</summary>
     public float SecondHarmonic { get; init; } = 0.3f;
 
     /// <summary>A transit bus's door beeper.</summary>

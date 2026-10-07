@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
@@ -17,16 +16,11 @@ public enum FlashKind
 }
 
 /// <summary>
-/// One lightning flash, as the server decides it and every client hears it.
-///
-/// Everything a client needs to rebuild the same channel and the same thunder: the seed, the kind,
-/// the channel's two ends (for a ground flash <see cref="To"/> is the strike point on the ground and
-/// <see cref="From"/> the top of the channel in the cloud), the energy each metre of channel took on
-/// the first stroke, and how many strokes there were. The channel's tortuous shape, its branches and
-/// the time between strokes are all drawn from <see cref="Seed"/> (<see cref="LightningChannel.Build"/>),
-/// so two players standing together hear the same flash.
-///
-/// Positions are metres in the map's own frame, y up, the ground at y = 0.
+/// One lightning flash, as the server decides it and every client hears it. For a ground flash
+/// <see cref="To"/> is the strike point and <see cref="From"/> the channel's top; the energy is per metre
+/// on the first stroke. The channel's shape, branches and stroke times are drawn from
+/// <see cref="Seed"/> (<see cref="LightningChannel.Build"/>), so two players together hear the same flash.
+/// Metres in the map's frame, y up, the ground at y = 0.
 /// </summary>
 public readonly record struct LightningStrike(int Seed, FlashKind Kind, Vector3 From, Vector3 To,
                                               float EnergyPerMetre, int Strokes)
@@ -91,11 +85,10 @@ public static class LightningPhysics
     /// LightningTests.ChannelDeflectionIsHills.</summary>
     public const float TurnSigmaDegrees = 21.5f;
 
-    /// <summary>How hard a step is pulled back toward the far end of the channel, as a share of a unit
-    /// direction. Without it a random walk wanders off; Lacroix et al. (2019) bias theirs to the
-    /// vertical with a memory term for the same reason. This sets how far the channel strays from the
-    /// straight line, and with it the channel's length against its height: they report about 8 km of
-    /// channel for a 5 km drop, and this gives 1.56 times the straight line (--thunder in the AudioLab).</summary>
+    /// <summary>How hard a step is pulled toward the channel's far end, as a share of a unit direction;
+    /// without it the walk wanders off (Lacroix et al. 2019 bias theirs to the vertical for the same
+    /// reason). They report about 8 km of channel for a 5 km drop; this gives 1.56 times the straight
+    /// line (AudioLab --thunder).</summary>
     public const float HomingShare = 0.19f;
 
     /// <summary>Where a negative ground flash starts, metres up: the lower negative charge, about
@@ -129,11 +122,10 @@ public static class LightningPhysics
     public const float BranchLengthMedianMetres = 500f, BranchLengthSigma = 0.6f;
     public const float CloudBranchLengthMedianMetres = 1500f;
 
-    /// <summary>A branch's share of the main channel's energy per metre. A branch carries only the
-    /// current the return stroke drains from it, a small part of the main channel's, and the energy is
-    /// taken to scale with the current, as for subsequent strokes. It is heard on the first stroke only:
-    /// subsequent strokes follow the main channel alone (Rakov and Uman, "Lightning: Physics and
-    /// Effects", 2003, ch. 4). The figure is a judgement, not a measurement.</summary>
+    /// <summary>A branch's share of the main channel's energy per metre: it carries only the current the
+    /// return stroke drains from it, energy taken to scale with current. Heard on the first stroke only;
+    /// subsequent strokes follow the main channel (Rakov and Uman, "Lightning: Physics and Effects",
+    /// 2003, ch. 4). The figure is a judgement, not a measurement.</summary>
     public const float BranchEnergyShare = 0.15f;
 
     // ── The strokes ──────────────────────────────────────────────────────────────────────────────
@@ -172,11 +164,9 @@ public static class LightningPhysics
     public const float AmbientPressurePa = 101325f;
 
     /// <summary>
-    /// Few's peak frequency of thunder, Hz, for a channel that took <paramref name="energyPerMetre"/>:
-    /// f_m = 0.63 c0 (P0 / E_l)^1/2 (Few, J. Geophys. Res. 74, 1969; Rakov and Uman 2003, eq. 11.3).
-    /// It is the cylindrical relaxation radius R_c = (E_l / (pi P0))^1/2 turned into a frequency: the
-    /// more energy a metre of channel took, the bigger the column of air it shocked and the longer the
-    /// wave that comes out of it.
+    /// Few's peak frequency of thunder, Hz: f_m = 0.63 c0 (P0 / E_l)^1/2 (Few, J. Geophys. Res. 74, 1969;
+    /// Rakov and Uman 2003, eq. 11.3), the relaxation radius R_c = (E_l / (pi P0))^1/2 as a frequency: more
+    /// energy per metre shocks a bigger column of air and makes a longer wave.
     /// </summary>
     public static float PeakFrequencyHz(float energyPerMetre, float speedOfSound = 343f)
         => 0.63f * speedOfSound * MathF.Sqrt(AmbientPressurePa / MathF.Max(1f, energyPerMetre));
@@ -233,9 +223,8 @@ public static class LightningPhysics
     public const float CellFormsUpwindMinMetres = 8000f, CellFormsUpwindMaxMetres = 25000f;
     public const float CellFormsAcrossMetres = 10000f;
 
-    /// <summary>A cell moves with the wind that steers it. The server has one wind, at the ground; the
-    /// steering wind aloft is usually the same direction and somewhat faster, so the ground wind is
-    /// used as it is, held between these speeds, m/s.</summary>
+    /// <summary>A cell drifts with the ground wind (the only one the server has; the steering wind aloft
+    /// is usually the same way and somewhat faster), held between these speeds, m/s.</summary>
     public const float CellDriftMinSpeed = 3f, CellDriftMaxSpeed = 20f;
 
     /// <summary>How far away a strike is still sent at all, metres: past this nothing of it is audible
@@ -282,12 +271,9 @@ public static class LightningPhysics
 public readonly record struct StormSky(WeatherType Scenario, float Precipitation, Vector3 Wind);
 
 /// <summary>
-/// A storm's flashes, in time and place: one convective cell at a time, drifting with the wind across
-/// and past the map, flashing at a rate that rises and falls over its life.
-///
-/// Deterministic from its seed and what it is fed: two schedules given the same seed and the same
-/// sky produce the same strikes, which is what the tests hold it to. Positions are relative to the
-/// map's centre (the server adds each map's own), heights above the ground.
+/// A storm's flashes: one convective cell at a time, drifting with the wind across the map, flashing at a
+/// rate that rises and falls over its life. Deterministic from its seed and the sky it is fed (the tests
+/// hold it to that). Positions are relative to the map's centre, heights above the ground.
 /// </summary>
 public sealed class LightningSchedule
 {
@@ -301,10 +287,6 @@ public sealed class LightningSchedule
     public float CellLife { get; private set; }
 
     public LightningSchedule(int seed) { _rng = new Random(seed); }
-
-    /// <summary>The expected flash rate now, flashes per second.</summary>
-    public float RateNow(in StormSky sky)
-        => HasCell ? LightningPhysics.PeakFlashRate(sky.Scenario, sky.Precipitation) * LightningPhysics.CellActivity(CellAge, CellLife) : 0f;
 
     /// <summary>
     /// Moves the storm on by <paramref name="dt"/> seconds and adds any flashes in that time to
@@ -344,8 +326,7 @@ public sealed class LightningSchedule
         float side = Lerp(-LightningPhysics.CellFormsAcrossMetres, LightningPhysics.CellFormsAcrossMetres, (float)_rng.NextDouble());
         CellCentre = -dir * upwind + across * side;
         CellLife = Lerp(LightningPhysics.CellLifeMinSeconds, LightningPhysics.CellLifeMaxSeconds, (float)_rng.NextDouble());
-        // A cell forms upwind and grows as it comes; it is already a little way into its life when it
-        // first flashes, so the first strikes are not all on the far edge.
+        // Born young and upwind: CellActivity is near zero at first, so it flashes little until it nears.
         CellAge = 0f;
         HasCell = true;
     }
@@ -395,13 +376,10 @@ public sealed class LightningSchedule
 }
 
 /// <summary>
-/// A flash's channel: the tortuous main path, its branches, and its strokes, rebuilt from the strike
-/// alone so every client has the same one.
-///
-/// The channel is a random walk of straight <see cref="LightningPhysics.StepMetres"/> steps, each
-/// turned from the last by a random angle about a random axis (Ribner and Roy 1982; Lacroix et al.
-/// 2019), with a pull toward the channel's far end so it arrives there. A ground flash is walked UP
-/// from its strike point, so the point on the ground is exact.
+/// A flash's channel, branches and strokes, rebuilt from the strike alone so every client has the same:
+/// a random walk of <see cref="LightningPhysics.StepMetres"/> steps turned about random axes (Ribner and
+/// Roy 1982; Lacroix et al. 2019), pulled toward its far end. A ground flash is walked up from its strike
+/// point, so the point on the ground is exact.
 /// </summary>
 public sealed class LightningChannel
 {

@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Common;
 
 /// <summary>
@@ -13,13 +11,9 @@ namespace OpenFPS.Common;
 /// density 2/fs) with an equivalent noise bandwidth of (π/2)·fc/Q, and a third octave is fc/Q wide, so
 /// a band carrying density S over its width needs a gain of √(S·fs/π), whatever its centre.
 ///
-/// The spectrum is a density in units² per hertz; the output is in those units. Set it as often as it
-/// changes (every few dozen samples is plenty): the gains glide to the new value over the next block,
-/// so a sweeping spectrum does not step.
-///
-/// Why not a sum of sine partials: a few dozen sines wandering about a centre frequency are heard as a
-/// tone at that centre, however much they wander. That was the subsonic whizz, and it was heard as a
-/// laser (Cody, 2026-10-04). Noise of the same spectrum is heard as a rush.
+/// The spectrum is a density in units² per hertz, and the gains glide to each new one over the next
+/// block, so a sweep does not step. Not a sum of sine partials: wandering sines are heard as a tone at
+/// their centre, and the subsonic whizz was heard as a laser (Cody, 2026-10-04).
 /// </summary>
 public sealed class ShapedNoise
 {

@@ -1,4 +1,3 @@
-using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -6,127 +5,80 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// The first thing a room does to a sound: sends you a copy of it off every surface.
-///
-/// A reflection is not an effect applied to a signal. It is the SAME sound arriving a second time,
-/// from somewhere else, a little later and a little duller — and that is all a first-order image
-/// source is. Mirror the source through the plane of a wall and you have a second source standing
-/// behind that wall; the path from it to the ear, through the point where it crosses, is exactly the
-/// path the reflection took. Nothing about it is a guess: the position is geometry, the delay is the
-/// extra distance over the speed of sound, and what is missing from it is what the wall absorbed.
-///
-/// Why reflections and not a reverb. A parametric reverb tail has no direction in it at all, so a
-/// room answers a sound from everywhere at once and a doorway cannot be heard from outside. And it
-/// must be deterministic: a ray tracer that jitters every surface normal with a fresh random seed per
-/// call moves a wall's reflection every frame.
-///
-/// One model, deterministic, driven by the boxes a map is built from and the materials they are made
-/// of. A corridor answers like a corridor because it has walls close on both sides, a field answers
-/// with nothing because there is nothing to mirror through, and neither case is written down anywhere.
+/// A room's first answer: a copy of the sound off every surface, by image sources (mirror the source
+/// through a face; the delay is the extra distance, the loss what the face absorbed). Deterministic
+/// and directional, which a parametric tail is not: a ray tracer that jittered its normals per call
+/// moved a wall's reflection every frame. Driven only by the map's boxes and their materials.
 /// </summary>
 public static class EarlyReflections
 {
-    /// <summary>A surface sound can come off: where it is, how big, how it is turned, what it is made
-    /// of. The same shape the acoustic scene and <see cref="Enclosure"/> already use.</summary>
+    /// <summary>A surface sound can come off, in the shape the acoustic scene and
+    /// <see cref="Enclosure"/> use.</summary>
     public readonly record struct Solid(Vector3 Center, Vector3 Size, Quaternion Rotation, string Material);
 
-    /// <summary>
-    /// One arrival: where it appears to come from, how far it travelled, and what survived the trip.
-    /// </summary>
-    /// <param name="ImagePosition">The mirrored source — where the ear should place this arrival.</param>
-    /// <param name="PathLength">Total distance travelled, metres: source to surface to ear.</param>
+    /// <summary>One arrival: where it appears to come from, how far it travelled, what survived.</summary>
+    /// <param name="ImagePosition">The mirrored source, where the ear should place this arrival.</param>
+    /// <param name="PathLength">Source to surface to ear, metres.</param>
     /// <param name="ExtraDelaySeconds">How much later than the direct sound it arrives.</param>
-    /// <param name="SurfaceId">Stable identity of the surface it came off, so a wall's reflection keeps
-    /// one voice from frame to frame instead of being torn down and rebuilt.</param>
+    /// <param name="SurfaceId">Stable per surface, so a wall's reflection keeps one voice from frame to
+    /// frame.</param>
     public readonly record struct Arrival(Vector3 ImagePosition, Vector3 HitPoint, float PathLength,
                                           float ExtraDelaySeconds, float GainLow, float GainMid,
                                           float GainHigh, float Scattering, int SurfaceId, int Order = 1);
 
     /// <summary>
-    /// How many surfaces a copy may have come off on its way: one is the classic first-order image;
-    /// two and three are the copies of copies.
-    ///
-    /// Indoors they do not matter as separate events — a second bounce in a ten-metre room arrives
-    /// inside the fusion window and is the room's tail, which the reverb already is. Outdoors they are
-    /// the sound of the place: two facades across a street hand a clap back and forth, and each
-    /// crossing arrives a street's width later than the last. That flutter is second- and third-order
-    /// and nothing else in the model makes it.
+    /// How many surfaces a copy may come off. Indoors a second bounce is inside the fusion window and is
+    /// the reverb's; outdoors the second and third orders are the flutter between facing facades, which
+    /// nothing else makes.
     /// </summary>
     public const int MaxOrder = 3;
 
     /// <summary>
-    /// How many surfaces the higher orders are built from: the loudest first-order mirrors.
-    ///
-    /// The count of images grows as K for first order, K² for second and K³ for third, and a city
-    /// has thousands of faces in range. The copies of copies that are loud enough to hear come off
-    /// the surfaces that already reflect the sound loudly once — a weak mirror's third-order copy has
-    /// lost three surfaces' worth — so the dozen strongest carry them, and the geometry prunes most of
-    /// the 1,700 chains before any line of sight is cast.
+    /// How many of the loudest first-order mirrors the higher orders are built from. Images grow as K,
+    /// K² and K³ and a city has thousands of faces in range; a weak mirror's third-order copy has lost
+    /// three surfaces' worth, and the geometry prunes most of the 1,700 chains before any line of sight.
     /// </summary>
     public const int HigherOrderSurfaces = 8;
 
     /// <summary>
-    /// How far the search looks, metres. A bound on the work, not a statement about audibility.
-    ///
-    /// What decides whether a copy is worth having is <see cref="MinRelativeAmplitude"/>, and that
-    /// prunes by itself: a copy that travelled ten times as far as the direct sound arrives twenty
-    /// decibels down and falls out on its own. So this wants to be generous rather than tight — it was
-    /// sixty metres, borrowed from <see cref="Enclosure.ReverberantRangeMetres"/>, and that is the
-    /// horizon for a REVERBERANT field, which is a different question. A facade a hundred metres down
-    /// a street and a grandstand across a racetrack are the clearest thing a listener has to go on out
-    /// there, and sixty metres cannot reach either of them.
+    /// How far the search looks, metres: a bound on the work, not on audibility, which
+    /// <see cref="MinRelativeAmplitude"/> decides. Sixty metres (<see cref="Enclosure.ReverberantRangeMetres"/>,
+    /// the horizon of a reverberant field) could not reach a facade a hundred metres down a street or a
+    /// grandstand across a racetrack.
     /// </summary>
     public const float RangeMetres = 200f;
 
-    /// <summary>
-    /// How many arrivals to keep, loudest first.
-    ///
-    /// A room has six surfaces and a street has two that matter; past a handful the copies are closer
-    /// together than the ear resolves and belong in the tail. This is what stops a scene of a hundred
-    /// boxes turning into a hundred voices.
-    /// </summary>
+    /// <summary>How many arrivals to keep, loudest first: past a handful they are closer together than
+    /// the ear resolves and belong in the tail.</summary>
     public const int MaxArrivals = 4;
 
-    /// <summary>
-    /// Quietest arrival worth a voice, as a fraction of the direct sound's amplitude at the same
-    /// distance. Below this it is inaudible under the sound it is a copy of.
-    /// </summary>
+    /// <summary>Quietest arrival worth a voice, as a fraction of the direct sound's amplitude at the same
+    /// distance.</summary>
     public const float MinRelativeAmplitude = 0.05f;
 
     /// <summary>
-    /// The distance the direct sound is judged from when a copy is asked whether it is worth having.
-    ///
-    /// A copy's reported gain is the surface's loss times <c>direct / pathLength</c>, and that ratio
-    /// must not be what MinRelativeAmplitude is tested against. For a sound at arm's length that test
-    /// throws the room away: your own clap is half a metre from your ear, so a wall six metres off, a
-    /// twelve-metre round trip, comes back at 0.5 / 12 = 0.04 and is dropped as inaudible, while the
-    /// engine renders the direct sound flat inside its reference distance (Loudness.Place, at least
-    /// 1.2 m) and would play that wall's answer at -27 dB, a slap any ear picks out. In Marlow flat
-    /// 01F, 8.65 by 17.86 m, neither end wall would be placed; the room's length would be left to the
-    /// omnidirectional tail, which is heard in the middle of the head. So audibility is judged against the direct sound as it is heard,
-    /// never nearer than a metre; the gains themselves are unchanged.
+    /// The distance the direct sound is judged from when deciding whether a copy is audible: as heard,
+    /// never nearer than a metre. Judged by direct / pathLength, your own clap half a metre from the ear
+    /// dropped a wall six metres off (0.5 / 12 = 0.04) that the engine, flat inside its reference
+    /// distance, would play at -27 dB; in Marlow flat 01F (8.65 by 17.86 m) neither end wall was placed.
+    /// The gains themselves are unchanged.
     /// </summary>
     public static float HeardReference(float direct) => MathF.Max(direct, 1f);
 
     /// <summary>
-    /// The gain a copy is placed with, at its image, for it to arrive <paramref name="relative"/> of
-    /// the direct sound (a reported gain: the surface's loss times direct / pathLength).
-    ///
-    /// The engine renders both the direct sound and the copy with the SOURCE's reference distance R
-    /// (Loudness.Place, a copy keeps its source's placement): flat inside R, 1/r beyond. So the copy
-    /// must be scaled by what the engine will do at the two distances, max(L,R)/max(d,R), not by L/d.
-    /// L/d is the same thing only when both are past R, and R reaches 40 m for a loud source: a
-    /// gunshot's copies inside it would come out 8-11 dB hotter than the surfaces allow.
-    /// <paramref name="direct"/> is the true source-listener distance the relative gain was taken at.
-    /// </summary>
-    /// <summary>
-    /// The AMPLITUDE a surface sends back, from the ENERGY it absorbs: sqrt(1 - alpha). An absorption
-    /// coefficient is a share of power, and every gain here is a pressure (they are summed as
-    /// 20·log10). 1 - alpha would take twice the decibels it should: carpet 3 dB a bounce too many,
-    /// 9 at third order.
+    /// The amplitude a surface sends back from the energy it absorbs: sqrt(1 - alpha). Absorption is a
+    /// share of power and every gain here is a pressure; 1 - alpha took twice the decibels, carpet 3 dB
+    /// a bounce too many, 9 at third order.
     /// </summary>
     public static float Keep(float absorption) => MathF.Sqrt(1f - Math.Clamp(absorption, 0f, 1f));
 
+    /// <summary>
+    /// The gain a copy is placed with, at its image, to arrive <paramref name="relative"/> of the direct
+    /// sound. The engine renders both with the source's reference distance R (flat inside R, 1/r beyond),
+    /// so the copy is scaled by max(L,R)/max(d,R), not L/d: R reaches 40 m for a loud source, and a
+    /// gunshot's copies inside it came out 8-11 dB hot. <paramref name="direct"/> is the true distance the
+    /// relative gain was taken at.
+    /// </summary>
     public static float PlacedCopyGain(float relative, float pathLength, float direct, float reference)
     {
         float r = MathF.Max(0.1f, reference);
@@ -134,50 +86,29 @@ public static class EarlyReflections
     }
 
     /// <summary>
-    /// How late a copy has to be before the ear hears it as a SEPARATE arrival, seconds.
-    ///
-    /// This is the line between a reflection and an echo, and it is a fact about hearing rather than
-    /// about geometry. Inside about fifty milliseconds the ear fuses a copy with the sound it is a copy
-    /// of — it does not perceive two events, it perceives one event that is wider, and slightly
-    /// coloured, and located where the FIRST arrival came from. Past it, the copy is a second event
-    /// with a place of its own, which is what a slapback off a distant wall is.
-    ///
-    /// It matters here because a fused reflection cannot be rendered as another voice. Two voices are
-    /// two independent playbacks: even scheduled to start at the right moment, they are two reads of
-    /// the same sound at unrelated positions in it, and for anything sustained — a siren, a machine, a
-    /// megaphone repeating an announcement — that is not a reflection, it is a second copy of the
-    /// announcement. Reported exactly so: "the megaphone is like repeating echoing, not an
-    /// environmental reverb... if I stand by the megaphone, I hear it repeat softer but in the same
-    /// place". Every arrival in a ten-metre room is inside 30 ms.
-    ///
-    /// So a fused arrival is not a voice. It is the room, and it goes to the room — which is measured
-    /// from the same surfaces (see <see cref="Enclosure.Look"/>). Only an arrival late enough to be its
-    /// own event gets its own voice, and out there it genuinely is one.
-    ///
-    /// The search itself does not apply this. It reports what the geometry does, every arrival of it,
-    /// because that is a fact about the room; how each one is RENDERED is a decision about the ear and
-    /// belongs to whatever is rendering. <see cref="IsSeparateEvent"/> is that decision, written once.
+    /// How late a copy must be to be heard as a separate arrival, seconds. Inside about 50 ms the ear
+    /// fuses it with the first arrival, one wider event placed where the first came from. A fused copy
+    /// must not be a voice: two voices are two unrelated reads of the same sound, and a sustained source
+    /// repeats ("if I stand by the megaphone, I hear it repeat softer but in the same place"). Fused
+    /// arrivals are the room's (<see cref="Enclosure"/>). The search reports every arrival; rendering
+    /// decides, through <see cref="IsSeparateEvent"/>.
     /// </summary>
     public const float FusionSeconds = 0.05f;
 
-    /// <summary>Is this arrival late enough to be heard as an event of its own, and therefore to be
-    /// worth a voice? See <see cref="FusionSeconds"/>. Everything else is the room.</summary>
+    /// <summary>Whether this arrival is late enough to be an event of its own and worth a voice
+    /// (<see cref="FusionSeconds"/>).</summary>
     public static bool IsSeparateEvent(in Arrival a) => a.ExtraDelaySeconds >= FusionSeconds;
 
     /// <summary>
-    /// Every first-order reflection of <paramref name="source"/> that reaches <paramref name="listener"/>,
-    /// strongest first.
-    ///
-    /// <paramref name="into"/> is cleared and filled, so a caller on the audio worker can keep one list
-    /// and never allocate.
+    /// Every reflection of <paramref name="source"/> that reaches <paramref name="listener"/>, strongest
+    /// first. <paramref name="into"/> is cleared and filled, so a caller on the audio worker never
+    /// allocates.
     /// </summary>
-    /// <param name="maxOrder">How many surfaces a copy may come off: 1 (the default) for first-order
-    /// only; up to <see cref="MaxOrder"/>. A caller asks for more only where the copies of copies are
-    /// SPARSE — out in the open, between facades — because in a room they are dense, they are the
-    /// room's tail, and the reverb already is that.</param>
-    /// <param name="separateFirst">Rank arrivals the ear hears as separate events ahead of fused ones
-    /// when the budget cuts. A renderer that only voices separate events wants this; one that renders
-    /// the near surfaces (your own footsteps off the ceiling a metre overhead) does not.</param>
+    /// <param name="maxOrder">How many surfaces a copy may come off, 1 to <see cref="MaxOrder"/>. More
+    /// only where copies of copies are sparse (out in the open); in a room they are the reverb's.</param>
+    /// <param name="separateFirst">Rank separate events ahead of fused ones when the budget cuts: for a
+    /// renderer that voices only separate events, not one that renders the near surfaces (your own
+    /// footsteps off the ceiling).</param>
     /// <param name="flutter">Also follow the sound back and forth between facing facades, past
     /// <see cref="MaxOrder"/> (see <see cref="FindFlutter"/>), and keep up to
     /// <see cref="MaxFlutterArrivals"/> arrivals rather than <see cref="MaxArrivals"/>. For one-off
@@ -193,10 +124,9 @@ public static class EarlyReflections
     }
 
     /// <summary>
-    /// The same, asked of a triangle world's acoustic solids (geometry stage 2): the surfaces near the path
-    /// found by its tree rather than by a pass over every solid, and each leg asked of the tree rather than
-    /// of every near solid, so the cost no longer grows with the square of what is near (a call in dense
-    /// woods). The mirrors are each solid's box faces, as before; a surface's identity is its owner's.
+    /// The same, asked of a triangle world's acoustic solids: near surfaces and each leg found by its
+    /// tree, so the cost does not grow with the square of what is near (a call in dense woods). The
+    /// mirrors are each solid's box faces; a surface's identity is its owner's.
     /// </summary>
     public static void Find(Vector3 source, Vector3 listener, Geometry.TriangleWorld world,
                             List<Arrival> into, float speedOfSound = 343.0f,
@@ -208,10 +138,8 @@ public static class EarlyReflections
         FindIn(new Scene(null, world), source, listener, into, speedOfSound, maxOrder, separateFirst, flutter, keep, maxExtraPathMetres);
     }
 
-    /// <summary>
-    /// Where the surfaces come from: a list of boxes (each known by its index in it), or a triangle world's
-    /// acoustic layer (each known by its owner). Either way the near ones are handed back as boxes.
-    /// </summary>
+    /// <summary>The surfaces: a list of boxes (known by index) or a triangle world's acoustic layer (known
+    /// by owner), the near ones handed back as boxes.</summary>
     private readonly struct Scene
     {
         public readonly IReadOnlyList<Solid>? List;
@@ -250,8 +178,7 @@ public static class EarlyReflections
             float len = d.Length();
             if (len < 2f * LegEndSlack) return true;
             var except = new Geometry.ExceptOwners(skip, skip2);
-            // A leg begins and ends on a face (the one reflecting, and the source or the ear): a face it
-            // only touches at an end is not in its way, as the box test did not count a touch.
+            // A leg begins and ends on a face: a face it only touches at an end is not in its way.
             return !World.Any(a, d / len, len - LegEndSlack, Geometry.GeometryLayers.Acoustics, Geometry.RayFaces.Both, ref except,
                               tMin: LegEndSlack);
         }
@@ -270,11 +197,10 @@ public static class EarlyReflections
         (_mirrors ??= new List<(Solid, int, int, float)>()).Clear();
         (_footprints ??= new List<float>()).Clear();
 
-        // The solids that can matter, once. Any surface on a path no longer than direct + extra
-        // lies inside the ellipsoid with the source and the listener at its foci, and that sits
-        // inside a sphere of half that length about their midpoint. In a room asked for its first
-        // 80 ms (27 m of extra path) that is a few dozen boxes out of a city's five thousand, and
-        // every leg test below walks this list and not the city: 73 ms a footstep down to about 1.
+        // A surface on a path no longer than direct + extra lies in the ellipsoid with the source and
+        // listener at its foci, inside a sphere of half that length about their midpoint. In a room
+        // asked for 80 ms (27 m of extra path) that is a few dozen boxes of a city's five thousand:
+        // 73 ms a footstep down to about 1.
         var near = _local ??= new List<Solid>(256);
         var nearIndex = _localIndex ??= new List<int>(256);
         var candidates = _candidates ??= new List<Solid>(256);
@@ -298,14 +224,11 @@ public static class EarlyReflections
             var s = near[li];
 
             var p = AcousticRegistry.GetProperties(s.Material);
-            // What the surface sends back, per band. The registry's absorption is what it TAKES.
             float keepLow = Keep(p.AbsorptionLow);
             float keepMid = Keep(p.AbsorptionMid);
             float keepHigh = Keep(p.AbsorptionHigh);
             if (MathF.Max(keepLow, MathF.Max(keepMid, keepHigh)) < MinRelativeAmplitude) continue;
 
-            // Each of the six faces is a mirror. Only the one facing the listener can send anything
-            // back, which the plane test below decides for itself.
             for (int f = 0; f < 6; f++)
             {
                 if (!FacePlane(s, f, out Vector3 faceCentre, out Vector3 normal, out Vector3 uAxis,
@@ -313,15 +236,12 @@ public static class EarlyReflections
 
                 float dSource = Vector3.Dot(source - faceCentre, normal);
                 float dListener = Vector3.Dot(listener - faceCentre, normal);
-                // Both have to be in FRONT of the face. Behind it is inside the solid, and a mirror
-                // has no back.
+                // Both in front of the face: behind it is inside the solid.
                 if (dSource <= 0.01f || dListener <= 0.01f) continue;
 
                 Vector3 image = source - 2f * dSource * normal;
 
-                // Where the straight line from the image to the ear crosses the plane is the point the
-                // sound bounced off. If that point is off the edge of the face, this surface is not in
-                // the way of this particular reflection and there is nothing to hear.
+                // The bounce point must be on the face.
                 float denom = dListener + dSource;
                 if (denom < 1e-4f) continue;
                 Vector3 hit = image + (listener - image) * (dSource / denom);
@@ -333,15 +253,11 @@ public static class EarlyReflections
                 float pathLength = Vector3.Distance(source, hit) + Vector3.Distance(hit, listener);
                 if (pathLength - direct > maxExtraPathMetres) continue;   // extra path, as ImageSource.MaxPathLength
 
-                // Spherical spreading: the copy travelled further than the direct sound, so it arrives
-                // quieter in exactly that proportion. Nothing else is applied here — air absorption and
-                // the distance model belong to whatever renders the arrival, which already does both.
+                // Spreading only: air absorption and the distance model are the renderer's.
                 float spread = direct / pathLength;
                 float gLow = keepLow * spread, gMid = keepMid * spread, gHigh = keepHigh * spread;
                 if (MathF.Max(keepLow, MathF.Max(keepMid, keepHigh)) * heard / pathLength < MinRelativeAmplitude) continue;
 
-                // Both legs have to be clear of everything else, or this is a reflection off a wall
-                // with a building in front of it.
                 if (!scene.Clear(source, hit, near, nearIndex, i, -1)) continue;
                 if (!scene.Clear(hit, listener, near, nearIndex, i, -1)) continue;
 
@@ -351,9 +267,9 @@ public static class EarlyReflections
                     gLow, gMid, gHigh,
                     Math.Clamp(p.Scattering, 0f, 1f),
                     SurfaceId(i, f));
-                // Two faces in the same place (a lawn laid flush on the ground, a slab on a slab) are one
-                // surface, and send one copy back: the smaller patch's, the one a ray meets (Geometry.Ties),
-                // then the lower id's. Both used to be kept, a second coherent copy of the same reflection.
+                // Two faces in the same place (a lawn flush on the ground) send one copy: the smaller
+                // patch's, the one a ray meets (Geometry.Ties), then the lower id's. Two would be a
+                // coherent copy of the same reflection.
                 float footprint = s.Size.X * s.Size.Z;
                 int same = -1;
                 for (int k = 0; k < into.Count; k++)
@@ -378,14 +294,8 @@ public static class EarlyReflections
         if (flutter)
             FindFlutter(scene, source, listener, direct, into, speedOfSound);
 
-        // Only as many as a listener can tell apart, and the ones they CAN tell apart first.
-        //
-        // Not simply the loudest: those are the ground and the nearest wall, a few milliseconds
-        // behind the direct sound, inside the fusion window: the room, which the renderer drops,
-        // because a fused copy is not a voice. A loudest-first cap spends its slots on arrivals that
-        // never play, and cuts the far facade's slapback and the flutter between two facades — the
-        // echoes you actually hear as echoes — to make room for them. Separate
-        // events first, then loudest; a budget cut has to take what nobody would have heard.
+        // Separate events first, then loudest. Loudest alone keeps the ground and the nearest wall,
+        // inside the fusion window and never played, and cuts the far facade's slapback and the flutter.
         into.Sort((a, b) =>
         {
             bool sa = separateFirst && IsSeparateEvent(a), sb = separateFirst && IsSeparateEvent(b);
@@ -397,14 +307,8 @@ public static class EarlyReflections
         if (keep <= 0) keep = flutter ? MaxFlutterArrivals : MaxArrivals;
         if (into.Count > keep) into.RemoveRange(keep, into.Count - keep);
 
-        // ── Then back into surface order, and that is not cosmetic ──────────────────────────────
-        //
-        // What survives is rendered into a small fixed set of voices, one per slot. If the slots are
-        // filled in LOUDNESS order, two arrivals of nearly equal strength swap places the moment the
-        // listener shifts a little — and a swap means each voice is suddenly playing the other one's
-        // reflection, from somewhere else in the room. Ordering the survivors by the surface they came
-        // off makes a slot mean the same wall from one tick to the next, for as long as the same walls
-        // are answering, which is the whole of the time it matters.
+        // Back into surface order, so a voice slot means the same wall from tick to tick: in loudness
+        // order two near-equal arrivals swap slots when the listener shifts, and each voice jumps.
         into.Sort(static (a, b) => a.SurfaceId.CompareTo(b.SurfaceId));
     }
 
@@ -427,24 +331,18 @@ public static class EarlyReflections
     [ThreadStatic] private static List<int>? _localIndex, _candidateIds;
 
     /// <summary>
-    /// The copies of copies: every chain of two or three surfaces, drawn from the nearest dozen, that
-    /// sends a sound from the source to the ear. The image-source method, applied again: mirror the
-    /// source through the first face, mirror THAT through the second, and so on; the ear hears the
-    /// last image, and the path is found by walking back from the ear through each face in turn. Any
-    /// step whose crossing point falls off its face, or whose leg is blocked, and the chain is not a
-    /// path.
+    /// The copies of copies: every chain of two or three of the strongest mirrors that sends the sound
+    /// to the ear. Mirror through each face in turn, then walk back from the ear through them; a crossing
+    /// off its face or a blocked leg and the chain is not a path.
     /// </summary>
     private static void FindHigherOrders(Scene scene, Vector3 source, Vector3 listener, float direct,
                                          List<Solid> local, List<int> index,
                                          List<Arrival> into, float speedOfSound,
                                          int maxOrder, float maxExtraPathMetres)
     {
-        // The mirrors are the surfaces that already sent this sound to this ear once: every face that
-        // gave a valid first-order copy. That is the whole of "a surface that can take part", and it
-        // is found, not guessed — scoring faces by size and distance picked the ground and the floor
-        // slabs INSIDE the towers on Main Street (huge, near, and behind the facade), and not one
-        // chain survived. A face that cannot reflect the sound to you directly is either hidden or
-        // facing away, and a chain through it is very nearly always one or the other too.
+        // The mirrors are the faces that gave a valid first-order copy. Scoring faces by size and
+        // distance picked the ground and the floor slabs inside the towers on Main Street, and not one
+        // chain survived.
         var cand = _mirrorScratch ??= new List<(Mirror, float)>(64);
         cand.Clear();
         foreach (var (s, si, f, gain) in _mirrors ?? new List<(Solid, int, int, float)>())
@@ -465,7 +363,6 @@ public static class EarlyReflections
 
         void Try(int order)
         {
-            // The images, forward from the source.
             images[0] = source;
             float keepL = 1f, keepM = 1f, keepH = 1f, scatter = 0f;
             for (int j = 0; j < order; j++)
@@ -556,34 +453,21 @@ public static class EarlyReflections
     public const float FlutterRangeMetres = 343f;
 
     /// <summary>
-    /// The sound handed back and forth across a street: the flutter.
-    ///
-    /// A shot in a city street has a wash after it: many cracks off every surface, all at slightly
-    /// different times. Two rows of facades across a street return a
-    /// shot to each other a crossing at a time, each copy a street's width of travel later and a
-    /// little weaker and more smeared than the last, until it is a roll rather than a train. The chain
-    /// search above stops at three surfaces and at the eight strongest single faces, and a street is
-    /// not eight faces — it is two PLANES, each made of every building along one side. A copy that
-    /// crosses the street a dozen times lands on a dozen different buildings.
-    ///
-    /// So this finds the planes: every vertical face in range with both ends in front of it, grouped
-    /// by where it lies. Pairs of planes that face each other are the streets. For each, the images
-    /// alternate from one side to the other; the path back from the ear has to land on SOME building
-    /// in each plane at every crossing — a gap between buildings is where the sound leaves the street,
-    /// and a chain through it is not a path — and every leg has to be clear. What each crossing keeps
-    /// is the building it actually hit. Each crossing also scatters: the copy is made a little more
-    /// diffuse per bounce, which is what turns a train of cracks into a wash.
+    /// The flutter: a sound handed back and forth across a street, each copy a street's width later and
+    /// weaker and more smeared, until it is a roll. A street is two planes, each every building along
+    /// one side, so the chain search (three surfaces, eight faces) cannot follow it. Vertical faces are
+    /// grouped into walls; facing pairs are streets; the path back from the ear must land on some
+    /// building at every crossing (a gap is where the sound leaves), each leg clear, keeping what that
+    /// building keeps and scattering a little more per bounce.
     /// </summary>
     private static void FindFlutter(Scene scene, Vector3 source, Vector3 listener, float direct,
                                     List<Arrival> into, float speedOfSound)
     {
-        // Every vertical face with both ends in front of it, by the way it faces.
         var byNormal = _planes ??= new Dictionary<long, List<(Mirror M, float Offset)>>();
         foreach (var l in byNormal.Values) l.Clear();
         var solids = _flutterSolids ??= new List<Solid>(256);
         var solidIds = _flutterIds ??= new List<int>(256);
-        // Within the widest street's half (60 m) of the line from the source to the ear, and a solid's
-        // own size: what the bounds of the line, grown by that, can meet.
+        // Within half the widest street (60 m) of the line from the source to the ear, plus a solid's size.
         scene.Within(Vector3.Min(source, listener) - new Vector3(60f + MaxSolidReach), Vector3.Max(source, listener) + new Vector3(60f + MaxSolidReach),
                      solids, solidIds);
         for (int si = 0; si < solids.Count; si++)
@@ -591,8 +475,6 @@ public static class EarlyReflections
             int i = solidIds[si];
             var s = solids[si];
             if (s.Size.X <= 0f || s.Size.Y <= 0f || s.Size.Z <= 0f) continue;
-            // A wall of the street the sound is in lies within half the widest street of the line
-            // from the source to the ear.
             float reach = 60f + s.Size.Length() * 0.5f;
             if (DistanceSquaredToSegment(s.Center, source, listener) > reach * reach) continue;
             for (int f = 0; f < 6; f++)
@@ -611,21 +493,17 @@ public static class EarlyReflections
             }
         }
 
-        // A WALL is every face facing that way within a metre and a half of the nearest: a street's
-        // facade is storeys stacked on each other, shopfront glass set back from the brick, a door
-        // in its reveal. Asked to be exactly coplanar it fell apart into dozens of little walls and a
-        // copy at head height landed on "nothing" at every shop window. For each direction, the wall
-        // that bounds the listener is the NEAREST one in front of them; the next street over is not
-        // the street they are standing in.
+        // A wall is every face facing that way within 1.5 m of the nearest (glass set back from brick,
+        // a door in its reveal): exactly coplanar, a copy at head height landed on nothing at every shop
+        // window. Per direction, the nearest wall in front of the listener bounds their street.
         var walls = _planeList ??= new List<List<(Mirror M, float Offset)>>();
         walls.Clear();
         foreach (var l in byNormal.Values)
         {
             if (l.Count == 0) continue;
             l.Sort(static (x, y) => x.Offset.CompareTo(y.Offset));
-            // Nearest first, in clusters a metre and a half deep; the first cluster with a wall's worth
-            // of face in it is the wall. A railing, a shelter's back panel or a bollard is nearer than
-            // the buildings and is not what the street is made of.
+            // The first cluster with a wall's worth of face: a railing or a bollard is nearer than the
+            // buildings and is not the street.
             int i = 0;
             while (i < l.Count)
             {
@@ -666,9 +544,9 @@ public static class EarlyReflections
         pairList.Sort(static (x, y) => x.Width.CompareTo(y.Width));
         if (pairList.Count == 0) return;
 
-        // Every leg of every chain runs between the two walls and between the source and the ear, so
-        // only what stands in that stretch of street can block one. Found once here: testing each leg
-        // against every solid within range cost 30 ms a shot on Main Street, 160 at worst.
+        // Only what stands between the two walls, along the stretch from the source to the ear, can
+        // block a leg: found once per street, since testing each leg against everything in range (both
+        // facades' every storey) cost 30 ms a shot on Main Street, 160 at worst.
         var legSolids = _legSolids ??= new List<Solid>();
         var localIndex = _legIndex ??= new List<int>();
         var streetSolids = _streetSolids ??= new List<Solid>();
@@ -678,9 +556,6 @@ public static class EarlyReflections
             int a = pairList[pi].A, b = pairList[pi].B;
             var na = groups[a][0].M.Normal;
             float width = pairList[pi].Width;
-            // Only what stands IN this street — between its two walls, along the stretch between the
-            // source and the ear — can block a crossing. The buildings behind the walls cannot, and
-            // testing every storey of both facades for every leg was most of the cost.
             legSolids.Clear(); localIndex.Clear();
             {
                 var wa = groups[a][0].M; var wb = groups[b][0].M;
@@ -714,7 +589,7 @@ public static class EarlyReflections
                     float spread = direct / path;
                     if (HeardReference(direct) / path < MinRelativeAmplitude) break;
 
-                    // Back from the ear, crossing by crossing: which building did it hit each time?
+                    // Back from the ear: which building each crossing hit.
                     Vector3 toward = listener;
                     bool ok = true;
                     float keepL = 1f, keepM = 1f, keepH = 1f, clean = 1f;
@@ -759,8 +634,7 @@ public static class EarlyReflections
                     }
                     if (!ok) continue;
 
-                    // Every crossing scatters some of what is left: a mirror at the first, a wash by
-                    // the tenth. What stays coherent is what the surfaces did not scatter.
+                    // Every crossing scatters some of what is left: a mirror at the first, a wash by the tenth.
                     float scatter = Math.Clamp(1f - clean * MathF.Pow(0.85f, n), 0f, 1f);
                     int id = FirstOrderIdSpace + (int)((uint)unchecked((a * 7919 + b) * 131 + start * 37 + n) % (uint)(int.MaxValue - FirstOrderIdSpace));
                     into.Add(new Arrival(images[n], hits[n - 1], path, (path - direct) / MathF.Max(1f, speedOfSound),
@@ -791,7 +665,8 @@ public static class EarlyReflections
         return Vector3.DistanceSquared(p, a + ab * t);
     }
 
-    /// <summary><see cref="LegIsClear"/> over a pre-filtered list, skipping by the original index.</summary>
+    /// <summary>Whether the run a-b is clear of every solid in a pre-filtered list but the two skipped,
+    /// named by their original index.</summary>
     private static bool LegIsClearAmong(Vector3 a, Vector3 b, List<Solid> local, List<int> index, int skip, int skip2)
     {
         for (int i = 0; i < local.Count; i++)
@@ -810,14 +685,11 @@ public static class EarlyReflections
     /// can never name the same voice.</summary>
     private const int FirstOrderIdSpace = 1 << 28;
 
-    /// <summary>A surface's identity, stable for the life of a scene: which box, which face. A wall's
-    /// reflection has to keep the same voice as the listener moves, or it restarts every frame.</summary>
+    /// <summary>A surface's identity for the life of a scene, box and face, so a wall's reflection keeps
+    /// its voice as the listener moves.</summary>
     public static int SurfaceId(int solidIndex, int face) => solidIndex * 6 + face;
 
-    /// <summary>
-    /// One face of a box, in world space: its centre, its outward normal, and the two axes and half
-    /// extents that say where its edges are.
-    /// </summary>
+    /// <summary>One face of a box in world space: centre, outward normal, in-plane axes and half extents.</summary>
     private static bool FacePlane(in Solid s, int face, out Vector3 centre, out Vector3 normal,
                                   out Vector3 uAxis, out Vector3 vAxis, out float halfU, out float halfV)
     {
@@ -840,19 +712,6 @@ public static class EarlyReflections
         uAxis = Vector3.Transform(lu, s.Rotation);
         vAxis = Vector3.Transform(lv, s.Rotation);
         centre = s.Center + normal * offset;
-        return true;
-    }
-
-    /// <summary>Is the straight run between two points clear of every solid except the one being
-    /// reflected off? Its own face is the thing the sound is touching, so it cannot block itself.</summary>
-    private static bool LegIsClear(Vector3 a, Vector3 b, IReadOnlyList<Solid> solids, int skip, int skip2 = -1)
-    {
-        for (int i = 0; i < solids.Count; i++)
-        {
-            if (i == skip || i == skip2) continue;
-            var s = solids[i];
-            if (GeometryUtils.LineIntersectsOBB(a, b, s.Center, s.Size, s.Rotation)) return false;
-        }
         return true;
     }
 }

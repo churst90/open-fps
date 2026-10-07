@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Reflection;
 
 namespace OpenFPS.Common;
 
@@ -28,26 +27,17 @@ public static class Speech
     public const float ShoutDb = 82.3f;
 
     /// <summary>
-    /// The level a line sits at once the client has loaded it, dBFS RMS, on average: each line is
-    /// brought to <see cref="BufferLoudnessLufs"/>, which for the shipped set is this RMS within a
-    /// decibel or so either way.
-    ///
-    /// The recordings are made at about -20, but not all of them: a take whose peaks would pass
-    /// -1 dBFS was left quieter rather than clipped, and a yell is peakier than talk. Every line is
-    /// brought to -28, which leaves room for the peakiest take in the set (26.3 dB from RMS to peak,
-    /// measured with --speech-lines on 2026-09-27) with 1.7 dB to spare.
+    /// Where a loaded line sits on average, dBFS RMS: lines are brought to <see cref="BufferLoudnessLufs"/>,
+    /// which for the shipped set is this within a decibel or so. -28 leaves room for the peakiest take
+    /// (26.3 dB from RMS to peak, --speech-lines, 2026-09-27) with 1.7 dB to spare.
     /// </summary>
     public const float BufferRmsDbfs = -28f;
 
     /// <summary>
-    /// The loudness a line is actually brought to, LUFS (ITU-R BS.1770 K-weighted, ungated: the lines
-    /// are a few seconds of speech with no pauses worth gating).
-    ///
-    /// Matching lines by RMS made voices up to 2.6 dB apart to the ear (measured 2026-09-27: seanterry
-    /// at -28.0 LUFS and joel at -25.4, all at -28 dBFS RMS), because RMS counts energy the ear weighs
-    /// less and misses the presence band it weighs more. By loudness they are equal. The target is the
-    /// median of the set as it was, -27.2, so a talker at a given effort is as loud as before on
-    /// average and the ANSI levels in <see cref="LevelDb"/> keep their meaning.
+    /// The loudness a line is brought to, LUFS (ITU-R BS.1770 K-weighted, ungated: a few seconds of
+    /// speech). Matched by RMS, voices were up to 2.6 dB apart to the ear (2026-09-27: seanterry at -28.0
+    /// LUFS, joel at -25.4). -27.2 is the set's median, so the ANSI levels in <see cref="LevelDb"/> keep
+    /// their meaning.
     /// </summary>
     public const float BufferLoudnessLufs = -27.2f;
 
@@ -99,11 +89,8 @@ public static class Speech
         return true;
     }
 
-    /// <summary>
-    /// How far off a normal voice on a street can still be made out word for word, metres. Past this it
-    /// is heard as somebody talking, not as what they said, so a text player is only told the words
-    /// inside it.
-    /// </summary>
+    /// <summary>How far off a normal voice on a street is made out word for word, metres: a text player is
+    /// told the words only inside it.</summary>
     public const float MadeOutMetres = 10f;
 
     // ── Which way the mouth faces ───────────────────────────────────────────────────────────────

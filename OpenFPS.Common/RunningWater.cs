@@ -1,16 +1,11 @@
-using System;
 using System.Collections.Generic;
 using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
-// Water that runs: a creek over its stones, a street's gutter in the rain, the drain it pours into, a
-// downpipe off a roof, a fountain basin's overflow. Like WaterFeatureSpec these say what the water and
-// its channel ARE — how much flows, how wide and steep and rough the channel is, what stands in it,
-// where it falls and into what — and RunningWaterSynth works the sound out from that through the
-// hydraulics (Hydraulics, below) and the bubbles and splashes the flow makes. The one level here,
-// SourceLevelDb, is what the model was MEASURED to make (AudioLab --running-water levels). See
-// docs/RUNNING_WATER.md.
+// Water that runs: a creek, a gutter, a drain, a downpipe, a basin's overflow, a sink. The specs say what
+// the water and its channel are; RunningWaterSynth works the sound out through Hydraulics. The one level,
+// SourceLevelDb, is measured (AudioLab --running-water levels). See docs/RUNNING_WATER.md.
 
 /// <summary>What carries the water, which decides how its depth and speed follow from its flow.</summary>
 public enum FlowChannel
@@ -36,24 +31,18 @@ public enum FlowLayout
 }
 
 /// <summary>
-/// What stands in the flow and breaks its surface: stones in a riffle, grit, a leaf dam or a lip at a
-/// joint in a gutter. At each the water speeds up over or round it and drops into the slower water in
-/// its lee, a little plunging jet; if that jet is fast enough it drives air under and the bubbles ring.
-/// That is where a stream's sound comes from (docs/RUNNING_WATER.md): a smooth reach is nearly silent.
+/// What stands in the flow and breaks its surface: stones, grit, a leaf dam, a joint in a gutter. Water
+/// drops into each one's lee as a little plunging jet, and a fast enough jet drives air under and the
+/// bubbles ring. That is where a stream's sound comes from: a smooth reach is nearly silent.
 /// </summary>
 public sealed record FlowObstacles
 {
-    /// <summary>How many a metre of channel that break the surface.</summary>
     [Tunable("per m", 0, 50, "How many obstacles a metre of channel break the surface. Each is a small plunging jet, which is where a stream's sound comes from.", Label = "obstacles per metre", Step = 0.5)]
     public float PerMetre { get; init; } = 2f;
-    /// <summary>The median drop into an obstacle's lee, m: how far the water falls over it.</summary>
     [Tunable("m", 0.001, 2, "The median drop into an obstacle's lee: how far the water falls over it.", Label = "median drop", Step = 0.005)]
     public float MedianDropMetres { get; init; } = 0.05f;
-    /// <summary>How the drops vary, the standard deviation of their natural log: a bed of stones is a
-    /// few big ones among many small, which is what makes some places in a stream louder than others.</summary>
     [Tunable("", 0, 2, "How the drops vary, the standard deviation of their natural log. Larger means a few big drops among many small, so some places are louder than others.", Step = 0.05)]
     public float DropSpread { get; init; } = 0.6f;
-    /// <summary>How wide a strip of the flow each one gathers, m: the width of a stone.</summary>
     [Tunable("m", 0.01, 2, "How wide a strip of the flow each obstacle gathers: the width of a stone.", Label = "obstacle width", Step = 0.01)]
     public float WidthMetres { get; init; } = 0.15f;
 }
@@ -67,36 +56,25 @@ public sealed record FlowFall
 {
     [Tunable("", 0, 0, "What this fall is called.")]
     public string Name { get; init; } = "";
-    /// <summary>The share of the source's flow that goes this way.</summary>
     [Tunable("", 0, 1, "The share of the source's flow that goes this way.", Step = 0.05)]
     public float FlowShare { get; init; } = 1f;
-    /// <summary>How far it falls, m.</summary>
     [Tunable("m", 0.005, 30, "How far it falls.", Label = "fall height", Step = 0.01)]
     public required float DropMetres { get; init; }
-    /// <summary>What it lands on.</summary>
     [Tunable("", 0, 0, "What it lands on: a pool, or a wet hard surface.", Label = "lands on")]
     public WaterSurface Onto { get; init; } = WaterSurface.Pool;
-    /// <summary>The width of the lip it leaves over, m. With the flow, the sheet's thickness: thin
-    /// sheets finger into strands and beads (drops), thick ones fall coherent and plunge.</summary>
     [Tunable("m", 0.01, 20, "The width of the lip it leaves over. With the flow it sets the sheet's thickness: thin sheets break into drops, thick ones fall coherent and plunge.", Label = "lip width", Step = 0.01)]
     public float LipWidthMetres { get; init; } = 0.3f;
-    /// <summary>How many separate strands it falls as (the gaps of a grate, a weir's fingers).</summary>
     [Tunable("", 1, 500, "How many separate strands it falls as: the gaps of a grate, a weir's fingers.", Step = 1)]
     public int Streams { get; init; } = 1;
-    /// <summary>It lands INSIDE the source's cavity (a gully pot under its grate, the foot of a
-    /// downpipe) and is heard through it (<see cref="FlowCavity"/>).</summary>
+    /// <summary>Heard through the source's <see cref="FlowCavity"/>.</summary>
     [Tunable("", 0, 1, "It lands inside the source's cavity, a gully pot or the foot of a downpipe, and is heard through it.", Label = "lands inside")]
     public bool Inside { get; init; }
-    /// <summary>It arrives as a film held to a wall, however thin (the water down a pipe's wall striking
-    /// its bend): a sheet that has had nowhere to tear into drops.</summary>
+    /// <summary>A sheet that has had nowhere to tear into drops.</summary>
     [Tunable("", 0, 1, "It arrives as a film held to a wall, however thin, as the water down a pipe's wall does.", Label = "film")]
     public bool Film { get; init; }
-    /// <summary>It leaves the foot of the source's pipe (a downpipe's shoe): already moving at the film's
-    /// terminal speed before it falls <see cref="DropMetres"/>.</summary>
     [Tunable("", 0, 1, "It leaves the foot of the source's pipe, already moving at the film's terminal speed before it falls.", Label = "from a pipe")]
     public bool FromPipe { get; init; }
-    /// <summary>Where its water comes from (<see cref="FallFeed"/>): a share of the source's flow, or a
-    /// tap's jet and the drain of a basin, whose flows the synth works out as the basin fills and empties.</summary>
+    /// <summary>A tap's and a drain's flows the synth works out as the basin fills and empties.</summary>
     [Tunable("", 0, 0, "Where its water comes from: a share of the source's flow, a tap's jet onto the basin or into its water, or the drain.")]
     public FallFeed Feed { get; init; } = FallFeed.Source;
 }
@@ -117,36 +95,24 @@ public enum FallFeed
 }
 
 /// <summary>
-/// Where the water leaves: a sink's waste through its strainer, a roof gutter's outlet into its downpipe.
-/// What it sounds like depends on how deep the water stands over it (docs/RUNNING_WATER.md, round 2):
-/// shallow, it spills over the rim with the air core open, a weir round a hole; deeper, the water
-/// closes over the hole and air is drawn down in gulps (the gurgle), round a vortex whose air core
-/// reaches the outlet now and then; deep enough, the vortex can no longer reach it and the outlet runs
-/// full and quiet.
+/// Where the water leaves: a sink's waste, a gutter's outlet. Shallow, it spills over the rim, a weir
+/// round a hole; deeper, it closes over the hole and air goes down in gulps round a vortex (the gurgle);
+/// deep enough, the vortex no longer reaches it and it runs full and quiet (docs/RUNNING_WATER.md, round 2).
 /// </summary>
 public sealed record FlowInlet
 {
-    /// <summary>The hole's diameter, m: a sink's waste 32-40 mm, a roof gutter's outlet 50-68 mm.</summary>
     [Tunable("m", 0.01, 0.5, "The hole's diameter: a sink's waste 32 to 40 mm, a roof gutter's outlet 50 to 68 mm.", Label = "hole diameter", Step = 0.001)]
     public required float DiameterMetres { get; init; }
-    /// <summary>The share of the hole left open by a strainer's bars or a leaf guard.</summary>
     [Tunable("", 0.05, 1, "The share of the hole left open by a strainer's bars or a leaf guard.", Step = 0.05)]
     public float OpenShare { get; init; } = 1f;
-    /// <summary>The length of edge the water spills over while it is shallow, m: π D for a plain outlet
-    /// (zero takes that), several times it for a basket strainer whose slots each have their own edges.</summary>
     [Tunable("m", 0, 5, "The length of edge the water spills over while it is shallow. Zero takes the hole's circumference; a basket strainer's slots give several times that.", Label = "spill edge length", Step = 0.05)]
     public float RimMetres { get; init; }
-    /// <summary>
-    /// How strongly the water swirls as it comes to the hole: Gordon's C in the vortex's critical
-    /// submergence S = C v √D (SI; Gordon 1970: 0.54 for a symmetric approach, 0.72 for an asymmetric one,
-    /// as water arriving along a gutter does). Water draining from rest in a basin has almost no
-    /// circulation (a bathtub vortex needs rotation to reach the drain: Andersen, Lautrup and Bohr 2003),
-    /// so its vortex reaches the hole only when it is shallow: taken as 0.25, a judgement.
-    /// </summary>
+    /// <summary>Gordon's C in the vortex's critical submergence S = C v √D (SI; Gordon 1970). A basin
+    /// draining from rest has almost no circulation (a bathtub vortex needs rotation to reach the drain:
+    /// Andersen, Lautrup and Bohr 2003), hence the judged 0.25.</summary>
     [Tunable("", 0, 1.5, "How strongly the water swirls as it comes to the hole, Gordon's C: 0.54 for a symmetric approach, 0.72 for water arriving along a gutter, about 0.25 for a basin draining from rest. More swirl lets the vortex reach the hole from deeper water.", Step = 0.01, Source = "Gordon 1970; 0.25 for a basin draining from rest is a judgement")]
     public float Swirl { get; init; } = 0.72f;
-    /// <summary>How long the pipe below it is before the water meets standing water or turns, m: the air
-    /// a gulp is heard through (with <see cref="RunningWaterSpec.Cavity"/> if the source has one).</summary>
+    /// <summary>With <see cref="RunningWaterSpec.Cavity"/> if the source has one.</summary>
     [Tunable("m", 0.05, 20, "How long the pipe below the hole is before the water meets standing water or turns: the air a gulp is heard through.", Label = "pipe length", Step = 0.05)]
     public float PipeMetres { get; init; } = 0.4f;
 }
@@ -158,42 +124,32 @@ public sealed record FlowInlet
 /// </summary>
 public sealed record FlowBasin
 {
-    /// <summary>What it is made of, by material name (AcousticRegistry): "Metal" for a stainless sink (a thin plate that
-    /// rings), "Tile" for a ceramic washbasin (thick and stiff: a hard surface that barely rings).</summary>
+    /// <summary>A material name (AcousticRegistry).</summary>
     [Tunable("", 0, 0, "What the basin is made of. Metal for a stainless sink, a thin plate that rings; Tile for a ceramic basin, which barely rings.", Choices = "materials")]
     public string Material { get; init; } = "Metal";
-    /// <summary>The thickness of its bottom, m: 0.7-1 mm for a steel sink, 6-10 mm for a ceramic basin.</summary>
     [Tunable("m", 0.0003, 0.03, "The thickness of the bottom: 0.7 to 1 mm for a steel sink, 6 to 10 mm for a ceramic basin. Thinner rings lower.", Label = "bottom thickness", Step = 0.0001)]
     public float SkinMetres { get; init; } = 0.0009f;
-    /// <summary>Its bottom's sides and its depth, m.</summary>
     [Tunable("m", 0.1, 3, "The length of the basin's bottom.", Step = 0.01)]
     public float LengthMetres { get; init; } = 0.45f;
     [Tunable("m", 0.1, 3, "The width of the basin's bottom.", Step = 0.01)]
     public float WidthMetres { get; init; } = 0.38f;
     [Tunable("m", 0.01, 1, "The basin's depth.", Step = 0.01)]
     public float DepthMetres { get; init; } = 0.18f;
-    /// <summary>The loss factor of the bottom in place: a stainless sink with its anti-drum pads about
-    /// 0.03-0.05; bare steel 0.002.</summary>
     [Tunable("", 0.0001, 0.5, "How fast the bottom's ringing dies in place: about 0.03 to 0.05 for a stainless sink with its anti-drum pads, 0.002 for bare steel.", Step = 0.001)]
     public float LossFactor { get; init; } = 0.04f;
-    /// <summary>The flat of the bottom that rings, m: a pressed bowl is stiffened by its radiused sides and
-    /// the strainer's dished boss, and what drums is the flat panel between them, not the whole bottom.</summary>
+    /// <summary>A pressed bowl is stiffened by its radiused sides and the strainer's boss: what drums is
+    /// the flat between them, not the whole bottom.</summary>
     [Tunable("m", 0.02, 2, "The size of the flat of the bottom that rings, between the radiused sides and the dished boss over the waste.", Label = "ringing panel size", Step = 0.01)]
     public float PanelMetres { get; init; } = 0.2f;
-    /// <summary>The dished middle over the waste where the first water gathers, m², and how far the bottom
-    /// falls to it, m: below that depth the water stands in the dish, not over the whole bottom.</summary>
     [Tunable("m²", 0, 0.5, "The area of the dished middle over the waste where the first water gathers.", Label = "sump area", Step = 0.001)]
     public float SumpSquareMetres { get; init; } = 0.012f;
     [Tunable("m", 0, 0.05, "How far the bottom falls to the waste. Below that depth the water stands in the dish, not over the whole bottom.", Label = "fall to the waste", Step = 0.001)]
     public float FallToWasteMetres { get; init; } = 0.006f;
-    /// <summary>The plug is in: nothing leaves but over the overflow.</summary>
     [Tunable("", 0, 1, "The plug is in: nothing leaves but over the overflow.", Label = "plug in")]
     public bool PlugIn { get; init; }
-    /// <summary>The plug goes in while the tap runs and comes out when it is shut: a person filling the
-    /// basin to use it and letting it go after. One key does both (the game's interact key on the tap).</summary>
+    /// <summary>One key does both: the game's interact key on the tap.</summary>
     [Tunable("", 0, 1, "The plug goes in while the tap runs and comes out when it is shut, as when someone fills the basin and lets it go after.", Label = "plug in while running")]
     public bool PlugWhileRunning { get; init; }
-    /// <summary>Where the overflow slot is, m above the bottom.</summary>
     [Tunable("m", 0.01, 1, "How high the overflow slot is above the bottom.", Label = "overflow height", Step = 0.01)]
     public float OverflowMetres { get; init; } = 0.15f;
 }
@@ -201,48 +157,35 @@ public sealed record FlowBasin
 /// <summary>A tap over a basin: how much it lets through open, and what its stream is like.</summary>
 public sealed record FlowTap
 {
-    /// <summary>The flow fully open, L/s: a kitchen tap 0.1-0.15, a washbasin 0.07-0.1, a shower 0.13-0.2.</summary>
     [Tunable("L/s", 0.01, 1, "The flow fully open: a kitchen tap 0.1 to 0.15, a washbasin 0.07 to 0.1, a shower 0.13 to 0.2.", Label = "open flow", Step = 0.01)]
     public float OpenLitresPerSecond { get; init; } = 0.12f;
-    /// <summary>The spout's bore, mm.</summary>
     [Tunable("mm", 0.5, 50, "The spout's bore.", Label = "spout bore", Step = 0.5)]
     public float NozzleMm { get; init; } = 16f;
-    /// <summary>It has an aerator: the stream comes out white, air and water mixed, and lands soft and hissing
-    /// instead of as a glassy column.</summary>
     [Tunable("", 0, 1, "It has an aerator: the stream comes out white, air and water mixed, and lands soft and hissing instead of as a glassy column.")]
     public bool Aerated { get; init; } = true;
-    /// <summary>A shower rose: the water leaves as many fine jets that break into drops.</summary>
     [Tunable("", 1, 300, "How many jets the water leaves as: one for a spout, many for a shower rose.", Step = 1)]
     public int Jets { get; init; } = 1;
-    /// <summary>How far the spout stands over the basin's bottom, m.</summary>
     [Tunable("m", 0.02, 3, "How far the spout stands over the basin's bottom.", Label = "spout height", Step = 0.01)]
     public float HeightMetres { get; init; } = 0.3f;
-    /// <summary>What a worn washer lets past when it is shut, L/s: a drip every second or two is about
-    /// 0.0001.</summary>
     [Tunable("L/s", 0, 0.01, "What a worn washer lets past when the tap is shut. A drip every second or two is about 0.0001.", Label = "leak when shut", Step = 0.00001)]
     public float LeakLitresPerSecond { get; init; }
 }
 
 /// <summary>
-/// An air space the falling water is heard through: a gully pot under a grate, a downpipe. A tube,
-/// open at the top (the grate, the pipe's outlet) and closed by the water or open at the far end: its
-/// air column rings at its own modes, and the sound leaves through the opening.
+/// An air space the falling water is heard through: a gully pot, a downpipe. A tube open at the top and
+/// closed by the water or open at the far end, ringing at its own modes.
 /// </summary>
 public sealed record FlowCavity
 {
-    /// <summary>The air column's length, m: the grate to the water in the pot, or the pipe's length.</summary>
     [Tunable("m", 0.05, 30, "The air column's length: the grate to the water in the pot, or the pipe's length. Longer rings lower.", Label = "air column length", Step = 0.05)]
     public required float LengthMetres { get; init; }
-    /// <summary>Its diameter, m.</summary>
     [Tunable("m", 0.01, 2, "The air column's diameter.", Label = "air column diameter", Step = 0.001)]
     public required float DiameterMetres { get; init; }
-    /// <summary>The far end is open (a downpipe open at the top to its gutter) rather than closed by
-    /// water (a gully pot).</summary>
     [Tunable("", 0, 1, "The far end is open, as a downpipe open at the top to its gutter, rather than closed by water, as a gully pot is.", Label = "far end open")]
     public bool FarEndOpen { get; init; }
 }
 
-/// <summary>Running water as a parts list. See the file's head and docs/RUNNING_WATER.md.</summary>
+/// <summary>Running water as a parts list (docs/RUNNING_WATER.md).</summary>
 public sealed record RunningWaterSpec
 {
     [Tunable("", 0, 0, "What this running water is called.")]
@@ -250,29 +193,20 @@ public sealed record RunningWaterSpec
 
     // ── How much water ──────────────────────────────────────────────────────────────────────────
 
-    /// <summary>Flow whatever the weather, L/s: a creek's base flow, a fountain's pump.</summary>
     [Tunable("L/s", 0, 5000, "Flow whatever the weather: a creek's base flow, a fountain's pump.", Label = "base flow", Step = 0.5)]
     public float BaseFlowLitresPerSecond { get; init; }
-    /// <summary>The ground or roof whose rain it carries, m² (plan area). Zero for a source the rain
-    /// does not feed.</summary>
     [Tunable("m²", 0, 100000, "The plan area of ground or roof whose rain it carries. Zero for a source the rain does not feed.", Label = "catchment area", Step = 5)]
     public float CatchmentSquareMetres { get; init; }
-    /// <summary>The share of the rain that runs off: about 0.95 for a roof, 0.9 for asphalt.</summary>
     [Tunable("", 0, 1, "The share of the rain that runs off: about 0.95 for a roof, 0.9 for asphalt.", Step = 0.01)]
     public float RunoffCoefficient { get; init; } = 0.9f;
-    /// <summary>The catchment's time constant, s (Runoff): how long it takes to come up to the rain and
-    /// how long it runs on after.</summary>
+    /// <summary>The time constant of <see cref="Runoff"/>.</summary>
     [Tunable("s", 5, 7200, "The catchment's time constant: how long it takes to come up to the rain and how long it runs on after.", Label = "catchment time", Step = 10)]
     public float CatchmentSeconds { get; init; } = 120f;
-    /// <summary>The rain the declared level was measured at, mm/h (a rain-fed source).</summary>
     [Tunable("mm/h", 0.1, 150, "The rain the source level was measured at, for a rain-fed source. Change it only with a new measurement.", Label = "reference rain", Step = 0.5)]
     public float ReferenceRainMmPerHour { get; init; } = Rainfall.ModerateRate;
-    /// <summary>The share of the run-off held back in a slow store (water standing in a roof gutter's
-    /// sag, soaked into moss and grit) that drains over <see cref="SlowSeconds"/>: what keeps a downpipe
-    /// dripping long after the roof has run off (round 2: two-stage drainage).</summary>
+    /// <summary>Drains over <see cref="SlowSeconds"/> (docs/RUNNING_WATER.md, round 2: two-stage drainage).</summary>
     [Tunable("", 0, 1, "The share of the run-off held back in a slow store, water standing in a gutter's sags or soaked into moss and grit, that drains over the slow store's time. It keeps a downpipe dripping long after the rain.", Label = "slow store share", Step = 0.01)]
     public float SlowShare { get; init; }
-    /// <summary>The slow store's time constant, s.</summary>
     [Tunable("s", 60, 14400, "The slow store's time constant.", Label = "slow store time", Step = 60)]
     public float SlowSeconds { get; init; } = 1800f;
 
@@ -280,42 +214,30 @@ public sealed record RunningWaterSpec
 
     [Tunable("", 0, 0, "What carries the water: a stream bed, a street gutter against a kerb, or nothing, where the source is only where the water falls.")]
     public FlowChannel Channel { get; init; } = FlowChannel.None;
-    /// <summary>A stream bed's width, m.</summary>
     [Tunable("m", 0.05, 100, "A stream bed's width.", Label = "bed width", Step = 0.1)]
     public float WidthMetres { get; init; } = 2f;
-    /// <summary>The slope along the flow (a fraction: 0.02 is 2 %).</summary>
     [Tunable("", 0.0001, 0.5, "The slope along the flow, a fraction: 0.02 is 2 per cent. Steeper runs faster and shallower.", Step = 0.001)]
     public float Slope { get; init; } = 0.01f;
-    /// <summary>A gutter's cross-fall into the kerb (a fraction).</summary>
     [Tunable("", 0.005, 0.2, "A gutter's cross-fall into the kerb, a fraction.", Label = "cross-fall", Step = 0.005)]
     public float CrossSlope { get; init; } = 0.03f;
-    /// <summary>Manning's n: 0.013 smooth concrete, 0.016 asphalt, 0.035-0.05 a cobble bed.</summary>
     [Tunable("", 0.008, 0.2, "Manning's roughness: 0.013 smooth concrete, 0.016 asphalt, 0.035 to 0.05 a cobble bed. Rougher runs slower and deeper.", Label = "Manning's n", Step = 0.001, Source = "Manning 1891")]
     public float ManningN { get; init; } = 0.035f;
-    /// <summary>The length of channel this source is, m.</summary>
     [Tunable("m", 0.5, 500, "The length of channel this source is.", Label = "channel length", Step = 0.5)]
     public float LengthMetres { get; init; } = 10f;
-    /// <summary>The flow at this stretch is the catchment's times this: half way down the gutter that
-    /// feeds a grate it has gathered half its water.</summary>
     [Tunable("", 0, 1, "The share of the catchment's water that has reached this stretch: half way down the gutter that feeds a grate it has gathered half.", Step = 0.05)]
     public float ShareOfCatchment { get; init; } = 1f;
 
-    /// <summary>What breaks the surface along it. Null for a source with no channel.</summary>
+    /// <summary>Null for a source with no channel.</summary>
     public FlowObstacles? Obstacles { get; init; }
-    /// <summary>Where it falls.</summary>
     public FlowFall[] Falls { get; init; } = Array.Empty<FlowFall>();
     /// <summary>The air space the inside falls are heard through.</summary>
     public FlowCavity? Cavity { get; init; }
-    /// <summary>The radius of the lip it drips from when the flow is too small to run, mm (a
-    /// downpipe's shoe, a grate's bars). Zero: no drips.</summary>
     [Tunable("mm", 0, 10, "The radius of the lip it drips from when the flow is too small to run, such as a downpipe's shoe or a grate's bars. Zero: no drips.", Label = "drip lip radius", Step = 0.5)]
     public float DripLipMm { get; init; }
-    /// <summary>How far the drips fall, m, and onto what.</summary>
     [Tunable("m", 0.01, 10, "How far the drips fall.", Label = "drip fall", Step = 0.01)]
     public float DripFallMetres { get; init; } = 0.2f;
     [Tunable("", 0, 0, "What the drips land on: a pool, or a wet hard surface.", Label = "drips land on")]
     public WaterSurface DripOnto { get; init; } = WaterSurface.Pool;
-    /// <summary>The drips land inside the cavity (a grate's bars over its pot), not outside (a shoe).</summary>
     [Tunable("", 0, 1, "The drips land inside the cavity, as off a grate's bars into its pot, not outside, as off a downpipe's shoe.", Label = "drips inside")]
     public bool DripsInside { get; init; }
 
@@ -323,20 +245,19 @@ public sealed record RunningWaterSpec
     public FlowInlet? Inlet { get; init; }
     /// <summary>The basin it gathers in, for a sink, a washbasin or a shower tray.</summary>
     public FlowBasin? Basin { get; init; }
-    /// <summary>The tap over it: this source runs when somebody turns it on (SoundEmitterComponent.SynthRunning),
+    /// <summary>With a tap, the source runs when somebody turns it on (SoundEmitterComponent.SynthRunning),
     /// not with the rain.</summary>
     public FlowTap? Tap { get; init; }
 
     // ── How it is heard ─────────────────────────────────────────────────────────────────────────
 
-    /// <summary>Overall level at one metre, dB, the whole source as if at one point: MEASURED with
-    /// <c>--running-water levels</c> at its base flow, or at <see cref="ReferenceRainMmPerHour"/>.</summary>
+    /// <summary>Measured with <c>--running-water levels</c> at its base flow, or at
+    /// <see cref="ReferenceRainMmPerHour"/>.</summary>
     [Tunable("dB", 10, 120, "Overall level at one metre, the whole source as if at one point, measured with --running-water levels at its base flow or at the reference rain. Change it only after measuring the model again.", Step = 0.5, Source = "MEASURED with --running-water levels")]
     public required float SourceLevelDb { get; init; }
     /// <summary>How far its loudest moments stand over the level, dB (the 99.9th percentile of its
     /// 10 ms peaks). Never under the fleet's shared 16.</summary>
     public float PeakHeadroomDb { get; init; } = 16f;
-    /// <summary>How big it is, m: the voice is flat inside it.</summary>
     [Tunable("m", 0.1, 50, "How big it is. Inside it the sound is flat.", Step = 0.05)]
     public float ExtentMetres { get; init; } = 2f;
     /// <summary>How many places it is heard from (ExtendedSources), its middle included.</summary>
@@ -391,14 +312,11 @@ public sealed record RunningWaterSpec
     };
 
     /// <summary>
-    /// A street gutter in the rain: the fifteen metres of kerb above a drain, carrying what runs off its
-    /// half of the road and its pavement — thirty metres of 6 m of asphalt and 3.5 m of paving between
-    /// drains, 285 m² at 0.9. A 3 % cross-fall into the kerb and a 1 % fall along it. In moderate rain
-    /// (5 mm/h) 0.36 L/s reaches the drain: a strip of water a third of a metre wide and a centimetre
-    /// deep at the kerb, at 0.2 m/s. What it trips over is the road's own roughness, grit, leaves, joints
-    /// and the odd broken edge: ten a metre, mostly under a centimetre, a few of several. Deeper water in
-    /// heavier rain drowns the small ones (RunningWaterSynth: their lee jets fall under the breaking
-    /// Froude number), so a gutter does not simply grow louder with the rain.
+    /// A street gutter in the rain: the fifteen metres of kerb above a drain, carrying half the road and
+    /// its pavement (30 m of 6 m asphalt and 3.5 m paving, 285 m² at 0.9), 3 % cross-fall, 1 % fall. At
+    /// 5 mm/h 0.36 L/s reaches the drain, a strip a third of a metre wide and a centimetre deep at 0.2 m/s,
+    /// tripping on grit, leaves and joints, ten a metre. Heavier rain drowns the small ones (their lee jets
+    /// fall under the breaking Froude number), so a gutter does not simply grow louder with the rain.
     /// </summary>
     public static RunningWaterSpec KerbGutter => new()
     {
@@ -519,7 +437,6 @@ public sealed record RunningWaterSpec
         Layout = FlowLayout.Ring,
     };
 
-
     /// <summary>
     /// Where a house's roof gutter empties into its downpipe: a 63 mm outlet in the bottom of a half-round
     /// gutter, a swan-neck offset 0.3 m below it, then the pipe (the same 45 m² of roof as
@@ -592,10 +509,9 @@ public sealed record RunningWaterSpec
     {
         Name = "Kitchen sink, dripping tap",
         Tap = KitchenSink.Tap! with { LeakLitresPerSecond = 0.00005f },
-        // Declared at the drip, which is what it is there for (MEASURED, `--running-water cycle dripping_sink
-        // on=0 off=60`: Leq 21.4 dB, its 10 ms peaks 36.8 dB over): placed by its level the mixer gives a
-        // quiet drip the law's lift, where declared at the running tap's 57 dB it would play 36 dB under that,
-        // unheard. Turned on, it runs 35 dB over the drip, and the headroom is the room for that and its peaks.
+        // Declared at the drip (MEASURED, `--running-water cycle dripping_sink on=0 off=60`: Leq 21.4 dB,
+        // peaks 36.8 dB over), so the mixer gives it the law's lift; at the running tap's 57 dB it played 36 dB
+        // under that, unheard. Turned on it runs 35 dB over the drip: the headroom is room for that.
         SourceLevelDb = 21.5f,
         PeakHeadroomDb = 62f,
     };
@@ -691,8 +607,6 @@ public static class Hydraulics
     public readonly record struct State(float DepthMetres, float SpeedMetresPerSecond, float WettedWidthMetres)
     {
         public float Froude => DepthMetres > 0f ? SpeedMetresPerSecond / MathF.Sqrt(Gravity * DepthMetres) : 0f;
-        /// <summary>Flow per metre of width, m²/s.</summary>
-        public float UnitFlow => DepthMetres * SpeedMetresPerSecond;
     }
 
     /// <summary>The state of <paramref name="litresPerSecond"/> in this channel.</summary>

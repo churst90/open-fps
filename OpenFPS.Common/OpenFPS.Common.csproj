@@ -29,17 +29,13 @@
   </ItemGroup>
 
   <!-- ── THE WIRE CONTRACT ────────────────────────────────────────────────────────────────────────
-       Messages and components serialise positionally, so a client and a server built from different
-       versions of this project do not fail: they misread each other. This hashes every source file
-       of this project, and of the library projects it references (sorted by path from the repository's
-       root, line endings normalised, so a Windows checkout hashes the same), into WireContract.Hash.
-       The client sends it with its login and the server refuses a mismatch by name, instead of a
-       friend's out-of-date build spawning into garbage.
+       Messages and components serialise positionally, so builds from different versions do not fail,
+       they misread each other. This hashes every source file of this project and its library projects
+       (sorted by path from the repository's root, line endings normalised so a Windows checkout hashes
+       the same) into WireContract.Hash; the server refuses a login whose hash differs.
 
-       The library's files are in it because their types are on the wire too (a collider's ShapeSpec,
-       TileKey's numbers in the tile messages) and because the client predicts movement with the same
-       geometry the server moves bodies with: two builds whose geometry differs disagree about where a
-       body is (docs/SOUND_LIBRARY_BOUNDARY.md, 15.3). -->
+       The library is in it because its types are on the wire (a collider's ShapeSpec, TileKey) and the
+       client predicts movement with the server's geometry (docs/SOUND_LIBRARY_BOUNDARY.md, 15.3). -->
   <ItemGroup>
     <WireLibrarySource Include="..\OpenFPS.Geometry\**\*.cs" />
   </ItemGroup>
@@ -58,10 +54,8 @@
       <Code Type="Fragment" Language="cs"><![CDATA[
         var root = Path.GetFullPath(Root).TrimEnd('/', '\\') + Path.DirectorySeparatorChar;
         var paths = Files.Select(f => Path.GetFullPath(f.ItemSpec))
-                         // Only sources under the root. The SDK also compiles generated files (global
-                         // usings, assembly info) from the output folder, which is somewhere else for
-                         // every build (or under a project's obj/) and would make two builds of the same
-                         // code disagree.
+                         // Only sources under the root: the SDK's generated files live in each build's
+                         // output folder and would make two builds of the same code disagree.
                          .Where(p => p.StartsWith(root))
                          .Select(p => new { Full = p, Rel = p.Substring(root.Length).Replace('\\', '/') })
                          .Where(p => !p.Rel.Split('/').Any(s => s == "obj" || s == "bin"))
@@ -78,8 +72,8 @@
     </Task>
   </UsingTask>
 
-  <!-- The project file is an input too: a change to how the hash is made must remake it, or a build
-       folder keeps the old answer while a fresh one gets the new, and the two refuse each other. -->
+  <!-- The project file is an input too: otherwise a change to how the hash is made leaves an old build
+       folder with the old answer, and it refuses a fresh one. -->
   <Target Name="GenerateWireContract" BeforeTargets="CoreCompile" Inputs="@(Compile);@(WireLibrarySource);$(MSBuildProjectFullPath)"
           Outputs="$(IntermediateOutputPath)WireContract.g.cs">
     <HashWireContract Files="@(Compile);@(WireLibrarySource)" Root="$(MSBuildProjectDirectory)\..">
@@ -96,12 +90,10 @@
   </Target>
 
   <!-- ── THE DOOR MODELS' FINGERPRINT ─────────────────────────────────────────────────────────────
-       The client keeps every door model render on disk (DoorRenderCache), and a render only changes
-       when a door model does. Named by WireContract.Hash, the whole cache was thrown away by every
-       change anywhere in this project, and the next launch rendered all of it again (Cody, 2026-10-06:
-       "generate them once and keep them"). This hashes only the sources a door render is made from:
-       the models and what they call. A new model file, or one that starts using another file, belongs
-       in this list; DoorRenderCache.Version is the manual lever for anything else. -->
+       Names the client's door render cache (DoorRenderCache). Named by WireContract.Hash, every change
+       to this project rendered it all again (Cody, 2026-10-06: "generate them once and keep them"), so
+       this hashes only the sources a door render is made from. A new model file, or one a model starts
+       using, belongs in this list; DoorRenderCache.Version is the manual lever for anything else. -->
   <ItemGroup>
     <DoorModelSource Include="KnobDoor.cs;PushBarDoor.cs;SlidingDoor.cs;GlassDoor.cs;LockCylinder.cs;ElevatorDoor.cs;CarWindow.cs;GlassFracture.cs;DoorPhysics.cs;Doors.cs;Glass.cs;AcousticRegistry.cs;VehicleCabin.cs;VehicleBody.cs" />
   </ItemGroup>

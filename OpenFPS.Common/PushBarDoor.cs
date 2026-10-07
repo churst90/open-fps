@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -6,31 +5,20 @@ using static OpenFPS.Common.DoorPhysics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A steel push-bar door with a closer, simulated as the object, the way <see cref="KnobDoor"/> is.
-///
-/// The parts:
-///
-///   The LEAF: a hollow metal door, two 1.2 mm steel skins on welded steel stiffeners with its edge
-///   channels, about 46 kg. A steel sandwich is stiff for its weight, so it radiates well from about
-///   180 Hz up: that is its boom. Above about 1.5 kHz the core shears and the modes crowd together.
-///
-///   The PUSH BAR: an aluminium touchpad on a spring in a steel case screwed to the leaf. Pushing it
-///   moves it 14 mm; after 4 mm of play its linkage draws the latch bolt in. It bottoms on its case and,
-///   let go, springs back against its outer stop. Every one of those forces is square to the leaf's
-///   face, which is why a push bar is heard through the whole door. The push is also what opens the
-///   door: before the bolt is clear it presses the bolt's flat face on the strike, which is the drag
-///   and then the lurch.
-///
-///   The LATCH and STRIKE: a rim latch, a heavier bolt and spring than a knob door's, into a steel rim
-///   strike on the frame.
-///
-///   The FRAME: a pressed steel channel set in the wall, with three rubber silencers on its stop that
-///   the leaf lands on before it can reach the steel. A door whose silencers are gone lands steel on
-///   steel.
-///
-///   The CLOSER: a spring pushing oil through a valve. In its last ten degrees it is the latch valve's
-///   speed and its spring that carry the door into the latch, and the spring keeps pressing after.
-///
+/// A steel push-bar door with a closer, simulated as the object, as <see cref="KnobDoor"/> is.
+/// <list type="bullet">
+/// <item>The leaf: two 1.2 mm steel skins on welded stiffeners, about 46 kg; stiff for its weight, so it
+/// radiates well from about 180 Hz (its boom); above about 1.5 kHz the core shears and the modes crowd.</item>
+/// <item>The push bar: a plastic touchpad on a spring in a steel case. It travels 19 mm, drawing the latch
+/// after 4 mm of play, bottoms on its case and springs back to its outer stop; every force is square to the
+/// leaf, so a push bar is heard through the whole door. Before the bolt clears, the push presses it on the
+/// strike: the drag, then the lurch.</item>
+/// <item>The latch and strike: a rim latch, heavier than a knob door's, into a steel rim strike.</item>
+/// <item>The frame: a pressed steel channel with three rubber silencers on its stop; without them the
+/// leaf lands steel on steel.</item>
+/// <item>The closer: a spring pushing oil through a valve; the latch valve's speed carries the last ten
+/// degrees into the latch, and the spring keeps pressing after.</item>
+/// </list>
 /// Hinges are ball-bearing butts: no squeak, no friction worth having.
 /// </summary>
 public static class PushBarDoor
@@ -64,26 +52,21 @@ public static class PushBarDoor
     public const int Variants = 4;
 
     /// <summary>
-    /// Each character: how far its silencers stand proud of the stop, how hard the pad's plastic sides strike
-    /// its guide rails (Hertz stiffness, N/m^1.5: new and resilient up to old and brittle), how much of a
-    /// metal blow comes back. (Round 8 of 2026-10-04 put the pad's landings on its steel lever tabs; the
-    /// plastic is now only what knocks on the rails.)
-    /// Round 1 put every bar on soft urethane and Cody heard no push at all; bare metal on every one rang
-    /// the case's walls at 134 dBA. A new device, nylon; a standard one, acetal; a worn one with its
-    /// silencers half gone and its slider worn thin; an old one with no silencers and its slider worn to
-    /// almost nothing (bare metal rang the case at 134 dBA: even old devices keep a slider).
+    /// Each character (new, standard, worn, old): how far the silencers stand proud of the stop, mm; how hard
+    /// the pad's plastic sides strike its guide rails (Hertz, N/m^1.5, resilient to brittle; since round 8 of
+    /// 2026-10-04 the pad lands on steel lever tabs and the plastic only knocks on the rails); the closer's
+    /// latch-zone speed at the latch edge, m/s; and the bar's looseness, mm, in the cranks and on the rails.
     /// </summary>
-    /// The fourth figure is the closer's latch-zone speed at the latch edge, m/s. The ADA setting (0.05-0.08)
-    /// creeps; a fire door in use is set to shut itself firmly and comes in at 0.25-0.8, and that clunk is
-    /// what Cody expects of one ("they should close on their own and clunk, not sound thin").
-    /// The last two are how loose the bar is, mm: the play in the cranks between pad and drive bar, and the
-    /// pad's play either side on its guide rails. Wear opens both: a new device is tight, an old one rattles.
-    private static (double SilencerMm, double Bumper, double MetalLambda, double LatchSpeed, double CrankPlayMm, double GuidePlayMm) Character(int variant) => (variant % Variants) switch
+    /// <remarks>Soft urethane stops gave no push Cody could hear; bare metal rang the case at 134 dBA, so even
+    /// old devices keep a slider. The ADA closer setting (0.05-0.08 m/s) creeps; a fire door in use comes in at
+    /// 0.25-0.8, and that clunk is what Cody expects ("they should close on their own and clunk, not sound
+    /// thin").</remarks>
+    private static (double SilencerMm, double Bumper, double LatchSpeed, double CrankPlayMm, double GuidePlayMm) Character(int variant) => (variant % Variants) switch
     {
-        0 => (2.5, 1.5e8, 0.3, 0.25, 0.5, 0.15),
-        1 => (2.5, 2e8, 0.3, 0.35, 1.0, 0.25),
-        2 => (1.2, 3e8, 0.2, 0.5, 1.5, 0.35),
-        _ => (0.0, 8e8, 0.1, 0.8, 2.0, 0.5),
+        0 => (2.5, 1.5e8, 0.25, 0.5, 0.15),
+        1 => (2.5, 2e8, 0.35, 1.0, 0.25),
+        2 => (1.2, 3e8, 0.5, 1.5, 0.35),
+        _ => (0.0, 8e8, 0.8, 2.0, 0.5),
     };
 
     /// <summary>Opening: shove the bar, the bolt draws back, the door goes, the bar is let go at 20 degrees. With
@@ -98,11 +81,11 @@ public static class PushBarDoor
     }
 
     /// <summary>
-    /// Shutting on the closer: the last few degrees at the latch valve's speed (the whole swing would take
-    /// <paramref name="latchSwingSeconds"/>), into the latch and the silencers. It starts a few hundredths
-    /// of a second before the bolt touches, so the server sends it when the leaf arrives.
+    /// Shutting on the closer: the last few degrees at the latch valve's speed, into the latch and the
+    /// silencers. It starts a few hundredths of a second before the bolt touches, so the server sends it
+    /// when the leaf arrives.
     /// </summary>
-    public static float[] RenderClose(Door door, int sampleRate, double latchSwingSeconds = 1.4, Report? report = null)
+    public static float[] RenderClose(Door door, int sampleRate, Report? report = null)
     {
         var sim = new Sim(door, sampleRate, report);
         sim.ScriptCloserLatch();
@@ -113,12 +96,11 @@ public static class PushBarDoor
 
     public const string KeyPrefix = "pushbardoor:";
 
-    /// <summary>Declared levels, dB at a metre, by character: the render's peak, which is what its buffer's
-    /// full scale stands for (a world sound's level is its full scale; see <see cref="KnobDoor.OpenLevelDb"/>).
-    /// Measured at the lab's 1.0 by 2.1 m leaf (AudioLab --heard-levels survey only=pushbardoor, round 8 of
-    /// 2026-10-04); the client puts each render's own peak in its place. Opening is the push; closing is the closer bringing it in, from
-    /// a well-set closer (quiet) to a fast one onto bare steel. These were the model's LAFmax less a 20 dB
-    /// calibration, which with the crack's 20-28 dB over its LAFmax played a push 40 dB under the model.</summary>
+    /// <summary>Declared levels, dB at a metre, by character: the render's peak, which its full scale stands
+    /// for (<see cref="KnobDoor.OpenLevelDb"/>). Measured at a 1.0 by 2.1 m leaf (AudioLab --heard-levels survey
+    /// only=pushbardoor, round 8 of 2026-10-04); the client puts each render's own peak in its place. Closing
+    /// runs from a well-set closer to a fast one onto bare steel. Never the LAFmax less a calibration: with the
+    /// crack 20-28 dB over its LAFmax, that played a push 40 dB under the model.</summary>
     public static float OpenLevelDb(int variant) => (variant % Variants) switch
     {
         0 => 121.7f, 1 => 121.5f, 2 => 121.4f, _ => 121.2f,
@@ -128,9 +110,9 @@ public static class PushBarDoor
         0 => 120.4f, 1 => 126.0f, 2 => 133.6f, _ => 137.8f,
     };
 
-    /// <summary>What the model puts at a metre, LAFmax: what is heard on "real" a metre off. The model's own;
-    /// the one published figure (a patent: ordinary exit devices 73-79 for the push) is some 20 dB under
-    /// the push, which is the physics' to answer for, not a calibration's.</summary>
+    /// <summary>What the model puts at a metre, LAFmax. The one published figure (a patent: ordinary exit
+    /// devices 73-79 for the push) is some 20 dB under it, which is the physics' to answer for, not a
+    /// calibration's.</summary>
     public static float OpenLafDb(int variant) => (variant % Variants) switch
     {
         0 => 98.8f, 1 => 100.5f, 2 => 99.2f, _ => 99.4f,
@@ -140,8 +122,7 @@ public static class PushBarDoor
         0 => 97.6f, 1 => 100.0f, 2 => 109.4f, _ => 113.5f,
     };
 
-    /// <remarks>An opening pulled from the trim side ends ":pull"; the bar's push (the approved one) has no sixth
-    /// field, so its keys are as they were.</remarks>
+    /// <remarks>An opening pulled from the trim side ends ":pull"; the bar's push has no sixth field.</remarks>
     public static string Key(bool closing, int variant, float swingSeconds, float width, float height, bool pull = false)
         => FormattableString.Invariant(
             $"{KeyPrefix}{(closing ? "close" : "open")}:{((variant % Variants) + Variants) % Variants}:{(int)MathF.Round(swingSeconds * 100f)}:{(int)MathF.Round(width * 100f)}:{(int)MathF.Round(height * 100f)}{(pull && !closing ? ":pull" : "")}");
@@ -172,38 +153,32 @@ public static class PushBarDoor
     {
         fullScaleDb = 0f;
         if (!TryParseKey(key, out bool closing, out var door, out float swing, out bool pull)) return new float[16];
-        float[] pcm = closing ? RenderClose(door, sampleRate, swing) : RenderOpen(door, sampleRate, swing, null, pull);
+        float[] pcm = closing ? RenderClose(door, sampleRate) : RenderOpen(door, sampleRate, swing, null, pull);
         return KnobDoor.PeakToFullScale(pcm, PascalsAtFullScale, out fullScaleDb);
     }
 
     // ── Constants, each a property of a part ─────────────────────────────────────────────────────
 
-    // Leaf: 1.2 mm steel skins, 44 mm between their centres, on welded steel stiffeners (hat sections
-    // every 150 mm, the usual fire door core), edge channels and stiffeners 7 kg. Its shear stiffness
-    // is that of the stiffeners, about 500 MPa through the depth: a paper honeycomb (40 MPa) would put
-    // nearly every mode in the core's shear and crowd sixteen thousand of them under 14 kHz.
+    // Leaf: 1.2 mm skins 44 mm apart on hat-section stiffeners every 150 mm (the usual fire door core),
+    // channels and stiffeners 7 kg, shear stiffness about 500 MPa. A paper honeycomb (40 MPa) would crowd
+    // sixteen thousand modes under 14 kHz.
     private const double SkinE = 200e9, SkinRho = 7850, SkinT = 0.0012, SkinSpacing = 0.0444, CoreShearModulus = 500e6;
     private const double CoreAndChannelsKg = 7.0;
-    /// <summary>Steel skins bonded to their stiffeners: the adhesive takes a little; steel doors ring.
-    /// The leaf's own modes stop at 4 kHz: above about 1.5 kHz the core shears and the skins between the
-    /// stiffeners ring as panels of their own, which the skin field carries. (Its modes taken on to 10 kHz
-    /// were counted twice, and fed back into a leaf resting on bare steel a step late they pumped the stop
-    /// into a 10 kHz sizzle for half a second after every old door's slam, louder than the slam.)</summary>
+    /// <summary>The leaf's own modes stop at 4 kHz; above about 1.5 kHz the skin field carries the skins
+    /// ringing between stiffeners. Taken on to 10 kHz the modes were counted twice and, fed back a step late
+    /// into a leaf on bare steel, pumped a 10 kHz sizzle louder than an old door's slam.</summary>
     private const double LeafLoss = 0.008, MountingLoss = 0.005, LeafModeMaxHz = 4000, SkinCrossoverHz = 1500;
     /// <summary>The patch of skin and edge channel a hard blow moves before the rest of the leaf knows:
     /// bending waves in 1.2 mm steel cover about 16 mm in the 50 us of a steel contact, so about 10 g,
     /// on the leaf through the skin's own bending, a resonance near 8 kHz.</summary>
     private const double SkinPatchMass = 0.01, SkinPatchStiffness = 2.5e7, SkinPatchTravel = 0.0001;
-    /// <summary>The skin between the edge channel and the first stiffener, and its loss: bonded steel.</summary>
-    private const double SkinPanelWidth = 0.15, SkinLoss = 0.01;
 
     // Silencers: neoprene domes 12 mm across, E about 5 MPa; three on the strike jamb.
     private static readonly double[] SilencerHeights = { 0.35, 1.05, 1.75 };
     private const double SilencerK = 6.9e5, SilencerLambda = 1.5;
     private const double SteelContactK = 2e10, SteelContactLambda = 0.2;
 
-    // Rim latch: 30 g bolt, 16 mm throw, stiff spring.
-    /// <summary>A Von Duprin 99-type rim latch: 3/4 in throw.</summary>
+    /// <summary>A Von Duprin 99-type rim latch: a 30 g bolt, 3/4 in throw, stiff spring.</summary>
     private const double BoltMass = 0.03, Throw = 0.019, SpringPreload = 8, SpringRate = 500;
     private const double LatchGap = 0.004, LatchHeight = 1.0;
     /// <summary>Where the drawn-back bolt meets the back of its case: 2 mm out, inside the linkage's reach,
@@ -215,33 +190,28 @@ public static class PushBarDoor
     private const double LatchCaseMass = 0.25, LatchCaseStiffness = 3e7, LatchCaseDamping = 2500, LatchCaseArea = 0.12 * 0.05;
     private const double LatchBending = 0.1;   // a rim case is on the face: its blows are not in the leaf's plane
 
-    // The push bar: touchpad 0.35 kg, 14 mm travel, 4 mm play, return spring 20 N preload and 2 N/mm.
-    /// <summary>The touchpad: 19 mm of stroke (3-13/16 in to 3-1/16 in projection), 4 mm of it taking up the
-    /// linkage before the latch moves. Its return spring starts at 10 N and reaches about 25 N at the bottom:
-    /// the whole push may need no more than 67 N with the latch's spring (A156.3). (At 58 N it threw the pad
-    /// back at nearly 3 m/s and the release was 15 dB over the push, where real ones are the other way.)</summary>
+    /// <summary>The touchpad: 19 mm of stroke (3-13/16 in to 3-1/16 in projection), 4 mm taking up the linkage
+    /// before the latch moves; its spring 10 N rising to about 25 N, as the whole push may need no more than
+    /// 67 N with the latch's spring (A156.3). At 58 N it threw the pad back at nearly 3 m/s and the release
+    /// was 15 dB over the push, where real ones are the other way.</summary>
     private const double BarMass = 0.2, BarTravel = 0.019, BarPlay = 0.004, BarPreload = 10, BarRate = 800;
     /// <summary>The moulded pad: ABS or nylon, about 2.5 GPa and 1150 kg/m3, losing about 0.03.</summary>
     private const double PadE = 2.5e9, PadRho = 1150, PadLoss = 0.03;
-    /// <summary>Inside the case the pad drives a steel drive bar (0.2 kg) through bell cranks with play (by
-    /// character, half a millimetre to two); the drive bar has its own stops at both ends of its stroke. Its
-    /// knock against them, a moment apart from the pad's, is the second half of the ka-chunk. The cranks are
-    /// pressed steel, about 2 N/mm along the drive, and once their play is taken up steel meets steel with
-    /// only a grease film between (Cody: "think of the bar being loose ... remove the dampening"; at 0.2 N/mm
-    /// and 0.7 of critical the cranks were a rubber coupling).</summary>
+    /// <summary>The pad drives a 0.2 kg steel drive bar through bell cranks with play (0.5 to 2 mm by
+    /// character); the drive bar's knock on its own stops is the second half of the ka-chunk. Pressed steel
+    /// cranks, steel on steel through a grease film once the play is taken up (Cody: "think of the bar being
+    /// loose ... remove the dampening"; at 0.7 of critical they were a rubber coupling).</summary>
     private const double DriveBarMass = 0.2, DriveBarLink = 2e6;
     private const double CrankDamping = 0.05;
-    /// <summary>The pad's lever arms and the drive bar slide in their guides pressed sideways by their springs
-    /// (about 25 N) at a steel-on-steel friction of 0.2: 5 N against each, whichever way it goes. That, not
-    /// damping in the stops, is what ends a release: the stops give back nine tenths of a blow, and the pad
-    /// thrown back by its springs comes off its stop once or twice and lies still. (Without it the pad and
-    /// drive bar bounced on their stops every 30 ms for a quarter of a second: a rattle.)</summary>
+    /// <summary>Guide friction on the lever arms and drive bar: about 25 N sideways at steel-on-steel 0.2. This,
+    /// not damping in the stops (which give back nine tenths of a blow), ends a release; without it they
+    /// bounced every 30 ms for a quarter second, a rattle.</summary>
     private const double GuideFriction = 5;
     /// <summary>The air in the hollow case: its length modes (0.8 m, from 214 Hz) and its cross modes (845,
     /// 2450, 2860 Hz), pumped by the walls when the mechanism knocks and heard through the pad's slot.</summary>
     private static readonly double[] CaseAirHz = { 214, 428, 642, 845, 856, 1070, 1284, 1498, 2450, 2860 };
-    /// <summary>The air in the case leaks out of the pad's slot and round the mechanism that fills it: its
-    /// modes are broad (0.05 rang as clean tones).</summary>
+    /// <summary>The case's air leaks out of the pad's slot, so its modes are broad (0.05 rang as clean
+    /// tones).</summary>
     private const double CaseAirLoss = 0.2, CaseToAir = 0.02, CaseSlotArea = 0.6 * 0.005;
     /// <summary>The case is a pressed channel, not a sheet: its faces between the folds are about 60 mm wide,
     /// and each fold is an edge it radiates from below coincidence.</summary>
@@ -250,44 +220,35 @@ public static class PushBarDoor
     /// <summary>What holds a patch of the case's wall where the stops are: the stops sit on the chassis
     /// bolted through the door, so the blow goes into the door, N/m.</summary>
     private const double PortStiffness = 2e7;
-    /// <summary>What a stop's blow meets first: a steel tab, about 20 g, pressed out of the chassis. (The
-    /// chassis as a tenth of a kilogram under every stop took the blow on a lump: nothing above 2 kHz reached
-    /// the case's walls.)</summary>
+    /// <summary>What a stop's blow meets first: a steel tab, about 20 g, pressed out of the chassis. As a
+    /// tenth of a kilogram, nothing above 2 kHz reached the case's walls.</summary>
     private const double StopTab = 0.02;
-    /// <summary>The pad lands through its lever arms' steel tabs, and the drive bar is steel: every stop of the
-    /// mechanism is steel on steel. A 2 mm tab edge on flat steel is about 5e9 N/m^1.5, and steel gives back
-    /// about nine tenths of a 1 m/s blow: a contact of a tenth of a millisecond, the "white noise type
-    /// transient" Cody asked for. (Plastic stops at a fifth of the stiffness, damped to half a plastic's
-    /// return, lasted a millisecond each: a padded clunk with nothing over 4 kHz.)</summary>
+    /// <summary>Every stop of the mechanism is steel on steel: a 2 mm tab edge on flat steel, about 5e9
+    /// N/m^1.5, giving back nine tenths of a 1 m/s blow in a tenth of a millisecond, the "white noise type
+    /// transient" Cody asked for. Plastic stops lasted a millisecond each: a padded clunk, nothing over 4 kHz.</summary>
     private const double StopK = 5e9, StopLambda = 0.1;
     /// <summary>Plastic on steel: E* about 2.8 GPa on a 3 mm rib edge gives about 2e8 N/m^1.5; a plastic
     /// gives back about half its speed (0.5 s/m).</summary>
     private const double PlasticLambda = 0.25;
-    /// <summary>The pad rides its guide rails with play either side (by character): a loose bar, which knocks
-    /// on its rails when it is shoved and when it lands. A hand never pushes quite square: a tenth of the push
-    /// goes sideways, and a landing jolts it sideways by a fifth of the blow.</summary>
+    /// <summary>The pad knocks on its rails, in their play, when shoved and when it lands: a tenth of a hand's
+    /// push goes sideways, and a landing jolts it sideways by a fifth of the blow.</summary>
     private const double SidePush = 0.1, SideJolt = 0.2, RailGrease = 0.3;
-    /// <summary>The case is not an empty sheet: the drive bar, cranks, springs and their grease touch its
-    /// walls, which takes its ring within a few tenths of a second (a bare sheet's 0.005 rang on and on).</summary>
+    /// <summary>The mechanism and its grease touch the case's walls and end its ring within a few tenths of a
+    /// second (a bare sheet's 0.005 rang on and on).</summary>
     private const double MechanismLoss = 0.01;
     private const double LinkStiffness = 1e6, LinkDamping = 80;
     /// <summary>The case's two end brackets across the leaf, and how far across its push acts.</summary>
     private const double MountNear = 0.3, MountFar = 0.9;
-    // The case: a 0.75 m pressed steel channel between screws 0.25 m apart; the bar an aluminium extrusion.
-    private const double CaseLoss = 0.02, BarLoss = 0.01;
 
-    // The frame: pressed 1.5 mm steel channel, about 2e-7 m^4, 2.9 kg/m, anchored every 0.7 m; it radiates
-    // as its 0.1 m face.
-    // Anchored in masonry and partly filled with mortar where it is grouted: it does not ring like a bell.
+    // The frame: pressed 1.5 mm steel channel, about 2e-7 m^4, 2.9 kg/m, anchored in masonry every 0.7 m and
+    // partly grouted, so it does not ring like a bell; it radiates as its 0.1 m face.
     private const double FrameEI = 40000, FrameKgPerM = 2.9, FrameSpan = 0.7, FrameFace = 0.1, FrameLoss = 0.04;
     /// <summary>The frame's own thin walls: 1.5 mm steel, its 0.1 m face between anchors. Their dense high
     /// modes are the clang of a hollow metal frame; the beam's few modes cannot carry it. Part grouted.</summary>
     private const double FrameWallT = 0.0015, FrameWallLoss = 0.02;
 
-    // The closer: size 3, 18 N m at the latch and rising 6 N m per radian open; its latch valve sets the
-    // speed in the last ten degrees.
-    /// <summary>A size 3-4 closer: 35 N m at the latch, enough to drive a 3/4 in latch home against the
-    /// up to 20 N it may take (A156.3) with friction on top.</summary>
+    /// <summary>A size 3-4 closer: 35 N m at the latch, rising 6 N m per radian open, enough to drive a 3/4 in
+    /// latch home against the up to 20 N it may take (A156.3) with friction on top.</summary>
     private const double CloserTorque = 35, CloserRate = 6, CloserShoeX = 0.25;
     private const double CloserOpening = 2;   // N m s: the check valve lets it open easily
     /// <summary>The hiss of the closer's oil through its latch valve at 0.1 rad/s, Pa at a metre: about 35 dB.</summary>
@@ -300,22 +261,20 @@ public static class PushBarDoor
     /// turns it (the closer holds the leaf with 35 N m); let go, its spring takes it and the cam back in about
     /// 25 ms.</summary>
     private const double TrimPull = 60, TrimInset = 0.07, LeverReturnSpeed = (Throw + 0.002) / 0.025;
-    /// <summary>The hand meets the bar through the palm, about 50 N/mm when it shoves, and the arm drives
-    /// it at 1.5 m/s, a 19 mm stroke in about 15 ms, until the palm carries what the arm wants: a person
-    /// going through a fire door shoves the bar, and its bottoming is a clack.</summary>
+    /// <summary>The palm, about 50 N/mm, driven at 1.5 m/s (the 19 mm stroke in about 15 ms): a person going
+    /// through a fire door shoves the bar, and its bottoming is a clack.</summary>
     private const double PalmStiffness = 5e4, PalmDamping = 150, ArmSpeed = 1.5;
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
     private sealed class Sim
     {
-        private readonly Door door;
         private readonly int rate;
         private readonly double dt;
         private readonly Report? report;
         private readonly Random rng;
         private readonly double width, height, mass, inertia;
-        private readonly double silencer, bumper, metalLambda, keeperPlay, latchSpeed, crankPlay, guidePlay;
+        private readonly double silencer, bumper, keeperPlay, latchSpeed, crankPlay, guidePlay;
         private double theta, omega;
 
         private readonly Modes leaf, frame, strike, caseAir;
@@ -327,7 +286,6 @@ public static class PushBarDoor
         private double[] padSideHit = Array.Empty<double>(), railHit = Array.Empty<double>();
         private AccelerationNoise padSideNoise = null!;
         private Port padSidePort = null!;
-        private readonly SmallRadiator slotSound;
         private readonly Port padPort, casePad, caseDrive2, rimStop;
         private readonly double[] rimHit;
         private readonly HighPass[] skinHigh;
@@ -368,11 +326,11 @@ public static class PushBarDoor
 
         public Sim(Door door, int sampleRate, Report? report)
         {
-            this.door = door; this.report = report;
+            this.report = report;
             rate = sampleRate * Oversample; dt = 1.0 / rate;
             rng = new Random(door.Seed);
             width = door.Width; height = door.Height;
-            (double silencerMm, bumper, metalLambda, latchSpeed, double crankPlayMm, double guidePlayMm) = Character(door.Variant);
+            (double silencerMm, bumper, latchSpeed, double crankPlayMm, double guidePlayMm) = Character(door.Variant);
             silencer = silencerMm / 1000;
             crankPlay = crankPlayMm / 1000; guidePlay = guidePlayMm / 1000;
             // The strike is set so the bolt drops in as the silencers take the closer's push.
@@ -385,8 +343,7 @@ public static class PushBarDoor
             inertia = mass * width * width / 3;
             var plate = new Plate(width, height, d, rhoH, LeafLoss + MountingLoss, LeafModeMaxHz, true, rng, 0.03,
                                   CoreShearModulus * SkinSpacing);
-            // A cored steel door's loss (0.05 below 500 Hz, falling as 1/f), not a bare sheet's: it clunks,
-            // it does not bong.
+            // A cored steel door's loss, not a bare sheet's: it clunks, it does not bong.
             for (int k = 0; k < plate.Loss.Count; k++) plate.Loss[k] += SandwichLoss(plate.Hz[k]) - LeafLoss;
             leaf = new Modes(plate.Hz, plate.Loss, plate.Mass, plate.Gain, dt, plate.GainQuad);
             rigidGain = Rho0 / (2 * Math.PI) * height * width * width / 2;
@@ -410,13 +367,9 @@ public static class PushBarDoor
             skinPatches = new Mount[stops.Length];
             for (int i = 0; i < stops.Length; i++) skinPatches[i] = new Mount(SkinPatchMass, SkinPatchStiffness, 0.1);
 
-            // The exit device is a hollow box: a 2 mm aluminium case (about 0.2 m2 of wall) over the
-            // mechanism, and a pressed aluminium pad. Their walls ring at a thin plate's own density, with
-            // a bare panel's loss, and the air inside the case has its own modes.
-            // The mechanism case is pressed steel, 1.5 mm, with the mechanism in it; the pad an aluminium
-            // extrusion with 3 mm walls. (Thin aluminium for both rang long and high: "a spoon in the sink".)
-            // Both at their true density (a mode every 23 Hz on the case): thinned to one in 40 Hz and left to
-            // ring, the modes stood apart as notes.
+            // The exit device is a hollow box: a 1.5 mm pressed steel case over the mechanism, its air with
+            // modes of its own. Thin aluminium rang long and high, "a spoon in the sink". At true density (a
+            // mode every 23 Hz): thinned to one in 40 Hz, the modes stood apart as notes.
             caseField = new DenseField(0.25, 0.8, 0.0015, SkinE, SkinRho, Poisson, f => Math.Max(ThinPanelLoss(f), MechanismLoss), 300, 16000, rng, dt, 15,
                                        CaseFaceWidth);
             // The pad is moulded plastic (Cody: "the push bar that gets pushed in is usually plastic, the
@@ -428,20 +381,18 @@ public static class PushBarDoor
             caseAir = new Modes(CaseAirHz, airLoss, airMass, airGain, dt);
             padNoise = new AccelerationNoise(BarMass / PadRho, dt);
             padSideNoise = new AccelerationNoise(BarMass / PadRho, dt);
+            // railHit is never read, but drawing it keeps the generator's sequence, and so the approved render.
             padSideHit = padField.Point(); railHit = caseField.Point();
             padSidePort = new Port(Math.Max(padField.PatchMass, 0.02), PortStiffness, padField.Impedance);
             sideSign = rng.NextDouble() < 0.5 ? -1 : 1;
             driveNoise = new AccelerationNoise(DriveBarMass / 7850, dt);
             boltNoise = new AccelerationNoise(BoltMass / 7850, dt);
             strikeNoise = new AccelerationNoise(StrikeMass / 7850, dt);
-            slotSound = new SmallRadiator(CaseSlotArea, dt);
             padPort = new Port(padField.PatchMass, PortStiffness, padField.Impedance);
-            // The stops are tabs pressed out of the device's steel chassis: what a blow moves first is the tab.
             casePad = new Port(StopTab, PortStiffness, caseField.Impedance);
             caseDrive2 = new Port(StopTab, PortStiffness, caseField.Impedance);
-            // A rim device's latch is in its own chassis, at the end of the case: the bolt's stops are tabs of
-            // that steel, and its blows ring the case as the pad's do. (As a damped lump on a spring the latch
-            // case passed its bolt's 0.1 ms stop on as a thud under 2 kHz.)
+            // The rim latch's bolt stops are steel tabs at the end of the case and ring it as the pad's do (as a
+            // damped lump on a spring, the 0.1 ms stop came out a thud under 2 kHz).
             rimStop = new Port(StopTab, PortStiffness, caseField.Impedance);
             rimHit = caseField.Point();
             // The rim strike: a steel block on the frame; what rings is its lip.
@@ -455,8 +406,8 @@ public static class PushBarDoor
             latchSound = new SmallRadiator(LatchCaseArea, dt);
             keeperFriction = new LuGre { MuStatic = 0.4, MuSliding = 0.25, StribeckSpeed = 0.01, Viscous = 0 };
 
-            // The leaf's skins: 1.2 mm steel, a mode every 1.7 Hz, overlapping (modal overlap 2-3) from
-            // 100 Hz up: the tinny wash of a steel door. Above 1.5 kHz, where the sandwich's own modes stop.
+            // The skins: a mode every 1.7 Hz, modal overlap 2-3 from 100 Hz, the tinny wash of a steel door;
+            // carried above 1.5 kHz, where the sandwich's own modes stop.
             skinField = new DenseField(width, height, SkinT, SkinE, SkinRho, Poisson, SandwichLoss, SkinCrossoverHz, 16000, rng, dt);
             skinMid = skinField.Point();
             skinAtLatch = skinField.Point();
@@ -466,23 +417,6 @@ public static class PushBarDoor
             for (int i = 0; i < skinHigh.Length; i++) skinHigh[i] = new HighPass(SkinCrossoverHz, rate);
             handK = 170 * inertia;
             handC = 2 * 0.7 * Math.Sqrt(handK * inertia);
-        }
-
-        /// <summary>A bar or channel standing in the open: it radiates as its swept area only where it is
-        /// a wavelength across; below that air slips round its edges, as it does round the frame's face.</summary>
-        private static Modes BeamModes(double[] betaL, double span, double ei, double mu, double loss, double area, double dt)
-        {
-            double halfWidth = area / span / 2;
-            var hz = new double[betaL.Length]; var m = new double[betaL.Length];
-            var l = new double[betaL.Length]; var g = new double[betaL.Length];
-            for (int i = 0; i < betaL.Length; i++)
-            {
-                hz[i] = betaL[i] * betaL[i] / (2 * Math.PI * span * span) * Math.Sqrt(ei / mu);
-                m[i] = 0.4 * mu * span; l[i] = loss;
-                double ka = 2 * Math.PI * hz[i] / C0 * halfWidth;
-                g[i] = SmallPlateGain(area, 0.4 / (i + 1)) * ka / Math.Sqrt(1 + ka * ka);
-            }
-            return new Modes(hz, l, m, g, dt);
         }
 
         /// <summary>The frame channel between anchors, as a clamped beam radiating as its face.</summary>
@@ -549,12 +483,11 @@ public static class PushBarDoor
                 }
                 if (cleared > 0 && released < 0)
                 {
-                    // Walking through: the hand keeps the bar down and the door going at the server's pace.
+                    // The hand keeps the bar down and the door going at the server's pace, and comes off at 20
+                    // degrees, about a quarter second after the bolt clears, as in the recordings.
                     var (a, r) = leafPath!(time);
                     double need = (handK * (a - theta) + handC * (r - omega) + CloserTorque + CloserRate * theta) / (0.5 * (MountNear + MountFar));
                     handForce = Math.Clamp(need, HandHold, 200);
-                    // The hand comes off the bar once the door is going, as in the recordings: about a
-                    // quarter of a second after the bolt clears.
                     if (theta > 20 * Math.PI / 180)
                     {
                         released = time; handForce = 0;
@@ -566,12 +499,9 @@ public static class PushBarDoor
             }
         }
 
-        /// <summary>
-        /// From the trim side: the lever turned over 0.2 s, its cam drawing the bolt through the device's own
-        /// latch (the pad does not move); the hand pulls on the lever until the bolt is clear, then carries the
-        /// leaf open, and lets the lever go a moment later: the lever's spring takes the cam back and the bolt
-        /// follows it out against its stop. (The lever's own knock on its rose is not modelled.)
-        /// </summary>
+        /// <summary>From the trim side: the lever turned over 0.2 s draws the bolt through the device's latch
+        /// (the pad does not move); the hand pulls the leaf open and lets the lever go, and the bolt follows
+        /// the cam back out against its stop. The lever's knock on its rose is not modelled.</summary>
         public void ScriptTrimPull(double swingSeconds)
         {
             const double grip = 0.05, turn = 0.2;
@@ -639,7 +569,6 @@ public static class PushBarDoor
         {
             double torque = 0, latchEdgeForce = 0, frameLatch = 0;
 
-            // The closer, always: its spring toward shut, its oil against motion.
             double closer = -(CloserTorque + CloserRate * Math.Max(0, theta));
             if (omega > 0) closer -= CloserOpening * omega;
             else if (closerLatchValve) closer -= latchDamping * omega;
@@ -647,14 +576,13 @@ public static class PushBarDoor
             leaf.Push(shoeShape, closer / CloserShoeX);
             double faceForce = closer / CloserShoeX;
 
-            // The stop: silencers, then steel.
             bool near = theta * width < 0.02;
             double silencerSum = 0, steelSum = 0;
             if (near)
                 for (int i = 0; i < stops.Length; i++)
                 {
                     var s = stops[i];
-                    // The stop meets the skin patch, which gives before the leaf does.
+                    // The skin patch gives before the leaf does.
                     var patch = skinPatches[i];
                     double pos = s.X * theta + leaf.At(s.Shape) + s.Warp + patch.X;
                     double vel = s.X * omega + leaf.RateAt(s.Shape) + patch.V;
@@ -689,7 +617,6 @@ public static class PushBarDoor
             Note("silencer", silencerSum);
             Note("steel", steelSum);
 
-            // The latch, as on the knob door but heavier.
             double latchW = near ? leaf.At(latchShape) : 0, latchWRate = near ? leaf.RateAt(latchShape) : 0;
             double edge = width * theta + latchW, edgeRate = width * omega + latchWRate;
             double boltForce = SpringPreload + SpringRate * (Throw - bolt);
@@ -724,7 +651,6 @@ public static class PushBarDoor
             }
             else if (boltInStrike) { Note("keeper", 0); boltInStrike = false; Log($"{time * 1000:F1} ms  bolt in"); }
 
-            // The push bar and its linkage.
             double palm = 0;
             if (handForce > 0)
             {
@@ -733,8 +659,8 @@ public static class PushBarDoor
                 handX += handV * dt;
             }
             else { handX = Math.Min(handX, bar - 0.005); handV = 0; }
-            // The bar rides on the leaf: when the leaf is stopped dead, the bar is thrown on its stops.
-            // Where the case pushes, and only the leaf's slower motion: that is what throws the bar.
+            // The bar rides on the leaf: the leaf's slower motion where the case pushes throws it on its stops
+            // when the leaf is stopped dead.
             double leafAccAtBar = lastAlpha * 0.5 * (MountNear + MountFar);
             for (int k = 0; k < leaf.N; k++) leafAccAtBar += 0.5 * (nearShape[k] + farShape[k]) * leaf.Acc[k];
             barAccLow += (1 - Math.Exp(-2 * Math.PI * 500 * dt)) * (leafAccAtBar - barAccLow);
@@ -767,8 +693,7 @@ public static class PushBarDoor
             driveForce -= fLink * ratio;
             caseForce += fLink * ratio;
             Note("link", fLink);
-            // The pad's stops are on the case's thin wall and the pad is a thin pressing: each side of the
-            // blow is a patch that gives and passes into its panel through the panel's impedance.
+            // Each side of a stop's blow is a patch passing into its panel through the panel's impedance.
             double padAt = bar + padPort.X, padAtRate = barRate + padPort.V;
             double fIn = BarStop(padAt - BarTravel - casePad.X, padAtRate - casePad.V);
             double fOut = BarStop(casePad.X - padAt, casePad.V - padAtRate);
@@ -784,8 +709,6 @@ public static class PushBarDoor
             Note("bar-bottom", fIn); Note("bar-back", fOut); Note("drive-stop", dIn + dOut);
             padField.Modes.Push(padHit, padDrive);
 
-            // The loose pad on its rails: pushed a little sideways by the hand and jolted sideways by every
-            // landing, it knocks across its play.
             double side = SidePush * palm * sideSign + SideJolt * (fIn + fOut) * sideSign;
             double sideAt = padSide + padSidePort.X, sideAtRate = padSideRate + padSidePort.V;
             double guide = Contact(bumper, PlasticLambda, Math.Abs(sideAt) - guidePlay, Math.Sign(sideAt) * sideAtRate);
@@ -799,7 +722,6 @@ public static class PushBarDoor
             Note("rail", guide);
             caseField.Modes.Push(caseHit, caseDrive);
             caseField.Modes.Push(driveHit, caseDrive2Force);
-            // The walls pump the air inside; it answers at the case's own air modes.
             caseAir.Push(ones, (Math.Abs(caseDrive) + Math.Abs(caseDrive2Force)) * CaseToAir);
             driveRate += driveForce / DriveBarMass * dt; driveBar += driveRate * dt;
             double driveAcc = driveForce / DriveBarMass;
@@ -810,9 +732,8 @@ public static class PushBarDoor
             faceForce += caseForce;
 
 
-            // The bolt's own stops in its rim case: thrown out to full throw, and yanked back in against the
-            // case's back when the bar is shoved (the "chunk" of the push: the pad's landing alone, under a
-            // pressing palm, was 14 dB below the release).
+            // The bolt's stops in its rim case: yanked back against the case's back when the bar is shoved, the
+            // "chunk" of the push (the pad's landing alone, under a pressing palm, was 14 dB below the release).
             double stopAt = latchCase.X + rimStop.X, stopRate = latchCase.V + rimStop.V;
             double fStop = Contact(MetalContactK, BoltStopLambda, bolt - Throw - stopAt, boltRate - stopRate);
             double fBack = Contact(MetalContactK, BoltStopLambda, -(bolt - RetractedAt) + stopAt, -(boltRate - stopRate));
@@ -821,7 +742,6 @@ public static class PushBarDoor
             latchCase.F += rimHost + fLink * 0.5;
             Note("bolt-stop", fStop); Note("bolt-back", fBack);
 
-            // Mounts into their hosts.
             latchEdgeForce += boltSide.Reaction;
             frameLatch += strikeBody.Reaction;
             torque += latchEdgeForce * width;
@@ -831,20 +751,15 @@ public static class PushBarDoor
             if (strikeForce != 0) strike.Push(ones, strikeForce);
             if (frameLatch != 0) { frame.Push(frameAtLatch, frameLatch); frameWall.Push(WallShape(LatchHeight), frameLatch); }
 
-            // A hand on the leaf only while a script holds a path and the bar is not doing the work.
-            // (Opening drives through the bar; closing is the closer's.)
-
-            // The hand on the trim's lever, pulling.
+            // No hand on the leaf itself: opening drives through the bar or the trim, closing is the closer's.
             if (trimOn)
             {
                 torque += trimTorque;
                 leaf.Push(latchShape, trimTorque / (width - TrimInset));
             }
 
-            // Air.
             torque -= 0.5 * Rho0 * 1.2 * height * Math.Pow(width, 4) / 4 * omega * Math.Abs(omega);
 
-            // Rigid motion.
             double alpha = torque / inertia;
             lastAlpha = alpha;
             omega += alpha * dt; theta += omega * dt;
@@ -854,14 +769,13 @@ public static class PushBarDoor
             boltSide.Step(dt); strikeBody.Step(dt); latchCase.Step(dt);
             if (near) foreach (var patch in skinPatches) patch.Step(dt);
 
-            // Radiate.
             double pLeaf = leaf.Step(), pFrame = frame.Step() + frameWall.Step(), pStrike = strike.Step() + strikeSound.Pressure(strikeBody.Acc);
             double barAcc = (barRate - lastBarRate) / dt; lastBarRate = barRate;
             double pLatch = latchSound.Pressure(latchCase.Acc) + boltNoise.Pressure(boltAccNow);
             double pBar = padField.Modes.Step() + padNoise.Pressure(barAcc) + padSideNoise.Pressure(padSideAcc) + driveNoise.Pressure(driveAcc);
             double pCase = caseField.Modes.Step() + caseAir.Step();
             pStrike += strikeNoise.Pressure(strikeBody.Acc);
-            // The closer's oil through its latch valve: turbulence, its pressure going as the flow cubed.
+            // The closer's oil through its latch valve: turbulence, pressure as the flow cubed.
             if (!opening && omega < 0)
             {
                 double flow = -omega / 0.1;
@@ -871,10 +785,8 @@ public static class PushBarDoor
             double corner = C0 / (2 * Math.PI * Math.Sqrt(width * height / Math.PI));
             rigidLow += (1 - Math.Exp(-2 * Math.PI * corner * dt)) * (alpha - rigidLow);
             double pRigid = rigidGain * rigidLow * Math.Clamp(1 - theta / 0.15, 0, 1);
-            // The skins between the stiffeners: a thin steel sheet's dense high modes, the tinny ring of a
-            // steel door, which the sandwich's modes cannot describe.
-            // The skins ride on the leaf: where it moves fast, above where the sandwich's own modes stop,
-            // they are driven by its motion there through their impedance.
+            // The skins between the stiffeners, the tinny ring the sandwich's modes cannot describe, driven
+            // through their impedance by the leaf's motion above where its own modes stop.
             for (int i = 0; i < stops.Length; i++)
             {
                 double v = stops[i].X * omega + leaf.RateAt(stops[i].Shape) + skinPatches[i].V;

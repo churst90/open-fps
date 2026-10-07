@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
@@ -84,7 +83,7 @@ public static class Ricochet
 
     /// <summary>A face's part in a ricochet: the critical angle off the face (degrees; zero: never),
     /// the departure angle as a share of the incidence, the share of its speed it loses at the critical
-    /// angle, and the share of its mass the slug keeps.</summary>
+    /// angle, the share of its mass the slug keeps, and how much the face flattens it.</summary>
     public readonly record struct Face(float CriticalDegrees, float DepartureRatio, float LossAtCritical, float MassKept, float Flatten);
 
     private static readonly Dictionary<string, Face> _faces = new(StringComparer.OrdinalIgnoreCase)

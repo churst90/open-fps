@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 
@@ -191,12 +190,10 @@ public static class ScopeMath
 /// held breath stills it inside about half a second and keeps it still for <see cref="HoldSeconds"/>;
 /// after that the body wants air, and the hold turns into a shake that grows until the breath is let
 /// go. Letting it go costs a recovery, longer the longer it was held past the limit. Moving or having
-/// just run makes everything bigger. There is no crouching or lying down in the game yet; when there
-/// is, it belongs in <see cref="Amplitude"/>.
-///
-/// Applied as an offset to the aim at the moment of the shot, and to the guidance tone, so the tone
-/// steadies when the breath is held and a shot taken mid-breath goes where the crosshair was.
+/// just run makes everything bigger. Applied to the aim at the shot and to the guidance tone, so a shot
+/// taken mid-breath goes where the crosshair was.
 /// </summary>
+// TODO: crouching and lying down belong in Amplitude when the game has them.
 public sealed class ScopeSway
 {
     /// <summary>How long a breath can be held still, seconds.</summary>
@@ -213,10 +210,9 @@ public sealed class ScopeSway
 
     /// <summary>Whether the breath is being held now.</summary>
     public bool Holding => _holdFor > 0f;
-    /// <summary>Seconds the current hold has lasted.</summary>
-    public float HeldFor => _holdFor;
 
-    /// <summary>The sway at the top of a breath, milliradians, for how hard the body is working.</summary>
+    /// <summary>The sway at the top of a breath as a multiple of a rested shooter's, for how hard the
+    /// body is working.</summary>
     public static float Amplitude(float exertion, float speed)
         => 1f + 2.5f * Math.Clamp(exertion, 0f, 1f) + (speed > 0.5f ? 2f : 0f);
 

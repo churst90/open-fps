@@ -1,23 +1,14 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A train sounding its own horn (or whistle) and ringing its own bell: which train, the rhythm of the
-/// hand on the horn valve, and how long the bell rings.
-///
-/// It travels like <see cref="Honk"/>, as a <see cref="TransientSound.SynthKey"/> on the channel every
-/// short sound already uses, and for the same reason: the server decides that a train sounds for a
-/// crossing and how, and the client plays it ON the train. Not on a borrowed road horn at the lead
-/// bogie — a train has outlets of its own, a horn on the cab roof aimed down the track, a whistle on a
-/// steam engine's boiler, a bell under the running board, and they are sources of the train
-/// (<see cref="TrainLayout"/>), placed where they are on it and rendered by the train's one synth.
-///
-/// The key names the train (<c>preset/train</c>, as the sources' SoundIds do), because the client's
-/// synth is the train's and not any one entity's: whichever of its sources has a voice hears it.
+/// A train sounding its own horn (or whistle) and ringing its own bell: which train, the rhythm on the
+/// horn valve, and how long the bell rings. Sent like <see cref="Honk"/>, as a
+/// <see cref="TransientSound.SynthKey"/>; the client plays it on the train's own horn, whistle and bell
+/// sources (<see cref="TrainLayout"/>). The key names the train (<c>preset/train</c>, as the sources'
+/// SoundIds do), because the synth is the train's, not any one entity's.
 /// </summary>
 public static class TrainSignal
 {

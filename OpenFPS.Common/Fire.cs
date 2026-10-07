@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using OpenFPS.Common.Editing;
@@ -27,87 +26,62 @@ public enum FireFuel
 }
 
 /// <summary>
-/// A fire, from a campfire to a forest's crown fire (docs/FIRE.md).
-///
-/// What it is made of decides what it sounds like. The FLAMES are buoyant plumes over the burning area:
-/// each body of fire as wide as <see cref="BaseDiameterMetres"/> necks and breaks off a puff at a rate
-/// set only by its width (about 1.5 / √D Hz), and its heat release is unsteady, which radiates as a
-/// monopole: the low, fluttering roar. A fire much wider than one body is many of them side by side,
-/// each puffing in its own time. The FUEL is wet inside: water and resin trapped in its cells boil, the
-/// pressure builds until a cell wall gives, and the pocket bursts: the crackle, of every size, the big
-/// ones throwing an ember. And each kind of fuel has its own events (<see cref="FireFuel"/>).
-///
-/// The fields say what the fire IS; <see cref="SourceLevelDb"/> and <see cref="PeakHeadroomDb"/> are
-/// what the model was MEASURED to make (AudioLab --fire levels), so the mixer can place it.
+/// A fire, from a campfire to a crown fire (docs/FIRE.md). The flames are buoyant plumes: each body as
+/// wide as <see cref="BaseDiameterMetres"/> puffs at about 1.5 / √D Hz, and its unsteady heat release
+/// radiates as a monopole, the low fluttering roar; a wider fire is many bodies, each in its own time.
+/// Water and resin in the fuel boil until a cell wall gives: the crackle, the big ones throwing an
+/// ember. Each fuel has its own events (<see cref="FireFuel"/>). <see cref="SourceLevelDb"/> and
+/// <see cref="PeakHeadroomDb"/> are measured (AudioLab --fire levels).
 /// </summary>
 public sealed record FireSpec
 {
     [Tunable("", 0, 0, "What this fire is called.")]
     public string Name { get; init; } = "";
-    /// <summary>What is burning.</summary>
     [Tunable("", 0, 0, "What is burning: logs, a vehicle, a building, trees or a crown fire. Decides what is heard besides the flames.")]
     public FireFuel Fuel { get; init; } = FireFuel.Logs;
-    /// <summary>The width of one body of fire that puffs as one, m: a hearth's bed, a bonfire's pile, a
-    /// car, a tree's crown, the depth of a crown fire's flaming zone. Sets the puffing rate and the roar's
-    /// pitch.</summary>
+    /// <summary>A hearth's bed, a bonfire's pile, a car, a crown, the depth of a crown fire's flaming zone.</summary>
     [Tunable("m", 0.1, 100, "The width of one body of fire that puffs as one. Sets the puffing rate and the pitch of the roar.", Label = "body width", Step = 0.1)]
     public required float BaseDiameterMetres { get; init; }
-    /// <summary>How wide the burning area is, m, across (x). Zero is one body, <see cref="BaseDiameterMetres"/>.</summary>
+    /// <summary>Across (x).</summary>
     [Tunable("m", 0, 1000, "How wide the burning area is across. Zero is one body.", Label = "area width", Step = 0.5)]
     public float WidthMetres { get; init; }
-    /// <summary>How deep the burning area is, m, along (z). Zero is one body, <see cref="BaseDiameterMetres"/>.</summary>
+    /// <summary>Along (z).</summary>
     [Tunable("m", 0, 1000, "How deep the burning area is. Zero is one body.", Label = "area depth", Step = 0.5)]
     public float DepthMetres { get; init; }
-    /// <summary>How hard it is burning when fully developed, kW: the whole fire.</summary>
     [Tunable("kW", 1, 20000000, "How hard the whole fire burns when fully developed. A garden fire pit is 50 to 150 kW.", Label = "heat release", Step = 10)]
     public required float HeatReleaseKw { get; init; }
-    /// <summary>Moisture in the fuel, a fraction of its dry mass. Seasoned firewood is 0.15-0.20, green
-    /// wood 0.4 and over; living foliage 0.8-1.2. More water is more crackle and more hiss.</summary>
     [Tunable("", 0, 2, "Water in the fuel as a fraction of its dry mass: seasoned wood 0.15 to 0.2, green wood 0.4, living leaves 0.8 to 1.2. More water is more crackle and hiss.", Step = 0.01)]
     public float Moisture { get; init; } = 0.18f;
-    /// <summary>How resinous the fuel is, 0 (a dense hardwood: oak, ash) to 1 (pine, spruce). Resin
-    /// pockets are what pop loudest.</summary>
     [Tunable("", 0, 1, "How resinous the fuel is, 0 for oak or ash to 1 for pine. Resin pockets pop loudest.", Step = 0.05)]
     public float Resin { get; init; } = 0.3f;
-    /// <summary>How tall the flames stand, m: where the wind that fans them is taken.</summary>
     [Tunable("m", 0.05, 100, "How tall the flames stand: where the wind that fans them is taken.", Label = "flame height", Step = 0.1)]
     public float FlameHeightMetres { get; init; } = 0.8f;
-    /// <summary>How high the burning fuel stands, m: the top of a pile, a crown, a roof. What falls,
-    /// falls from under it.</summary>
     [Tunable("m", 0, 100, "How high the burning fuel stands. What falls, falls from under it.", Label = "fuel height", Step = 0.1)]
     public float FuelHeightMetres { get; init; } = 0.3f;
-    /// <summary>What is round it and under it, by material name: what embers tick on and what falls
-    /// lands on.</summary>
+    /// <summary>A material name.</summary>
     [Tunable("", 0, 0, "What is round it and under it: what embers tick on and what falls lands on.", Choices = "materials")]
     public string Surround { get; init; } = "Brick";
     /// <summary>How many places it is heard from, the middle included (ExtendedSources): at most 12. Nine
     /// stand for an area's spread at 1-4 kHz within 0.03 of a continuous one (docs/FIRE.md 7.2).</summary>
     public int Places { get; init; } = 9;
-    /// <summary>Panes of glass in it (a building's windows, a car's side and rear windows): each cracks
-    /// in the heat and, in a building, falls out later.</summary>
     [Tunable("", 0, 500, "Panes of glass in it. Each cracks in the heat, and in a building falls out later.")]
     public int Panes { get; init; }
-    /// <summary>A pane's width and height, m, and its thickness, mm.</summary>
     [Tunable("m", 0.05, 5, "The width of one pane.", Label = "pane width", Step = 0.05)]
     public float PaneWidthMetres { get; init; } = 1f;
     [Tunable("m", 0.05, 5, "The height of one pane.", Label = "pane height", Step = 0.05)]
     public float PaneHeightMetres { get; init; } = 1.2f;
     [Tunable("mm", 1, 25, "The thickness of one pane.", Label = "pane thickness", Step = 0.5)]
     public float PaneThicknessMm { get; init; } = 4f;
-    /// <summary>How far a pane's bottom edge is above the ground, m.</summary>
     [Tunable("m", 0, 100, "How far a pane's bottom edge is above the ground: how far it falls.", Label = "pane drop", Step = 0.1)]
     public float PaneDropMetres { get; init; } = 1f;
-    /// <summary>Sealed gas containers that burst in the heat: a car's gas struts and bumper absorbers, its
-    /// tyres. Each bursts at most once.</summary>
     [Tunable("", 0, 50, "Sealed gas struts and absorbers that burst in the heat, each once.")]
     public int Struts { get; init; }
     [Tunable("", 0, 50, "Tyres that burst in the heat, each once.")]
     public int Tyres { get; init; }
 
-    /// <summary>The fire's life, s, when it is lit at a known moment (<see cref="KeyFor"/>): growing as
-    /// t² to its full heat release over <see cref="GrowthSeconds"/>, burning fully for
-    /// <see cref="SteadySeconds"/>, dying over <see cref="DecaySeconds"/>, then smouldering. A fire with
-    /// no known lighting (a map's) is always fully developed.</summary>
+    /// <summary>The life of a fire lit at a known moment (<see cref="KeyFor"/>): growing as t² over this,
+    /// steady for <see cref="SteadySeconds"/>, dying over <see cref="DecaySeconds"/>, then smouldering. A
+    /// map's fire, with no known lighting, is always fully developed.</summary>
     [Tunable("s", 1, 36000, "How long a fire lit at a known moment takes to grow to its full heat release.", Label = "growth time", Step = 10)]
     public float GrowthSeconds { get; init; } = 120f;
     [Tunable("s", 0, 86400, "How long it then burns fully.", Label = "steady time", Step = 60)]
@@ -115,15 +89,12 @@ public sealed record FireSpec
     [Tunable("s", 1, 86400, "How long it then takes to die down to smouldering.", Label = "decay time", Step = 60)]
     public float DecaySeconds { get; init; } = 600f;
 
-    /// <summary>Overall level at one metre, dB, fully developed, every place summed. MEASURED with
-    /// <c>--fire levels</c>.</summary>
+    /// <summary>Every place summed.</summary>
     [Tunable("dB", 10, 170, "Overall level at one metre, fully developed. Measured with --fire levels; change it only after measuring again.", Label = "level at one metre", Step = 0.5, Source = "MEASURED with --fire levels")]
     public required float SourceLevelDb { get; init; }
-    /// <summary>How far its loudest moments stand over <see cref="SourceLevelDb"/>, dB: the room its
-    /// voice renders with (the 99.9th percentile of its 10 ms peaks, measured with --fire levels).
-    /// Never under the fleet's shared 16.</summary>
+    /// <summary>How far its loudest moments stand over <see cref="SourceLevelDb"/>, dB (the 99.9th
+    /// percentile of its 10 ms peaks, --fire levels). Never under the fleet's shared 16.</summary>
     public float PeakHeadroomDb { get; init; } = 16f;
-    /// <summary>How big the source is, m: inside it the level is flat.</summary>
     [Tunable("m", 0.05, 1000, "How big the source is: inside it the level is flat.", Label = "extent", Step = 0.1)]
     public float ExtentMetres { get; init; } = 0.6f;
 
@@ -150,9 +121,9 @@ public sealed record FireSpec
         FlameHeightMetres = 0.8f,
         Surround = "Brick",
         // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed: Leq 68.6 dB, 60.0 dB(A)
-        // over ten minutes at 3 m/s, 66.0 dB in the field's wind (NatureTests); its 10 ms peaks' 99.9th percentile
-        // 37 dB over, crest 42. Was 59.5 dB (57.2 dB(A)) with the roar a band at 70 / √D Hz; the roar is now dQ/dt's
-        // tail from 20 Hz up, whose bottom octaves carry most of the difference.
+        // over ten minutes at 3 m/s, 66.0 dB in the field's wind (NatureTests); 10 ms peaks' 99.9th percentile
+        // 37 dB over, crest 42. The roar is dQ/dt's tail from 20 Hz up; its bottom octaves carry the 9 dB over
+        // the old band at 70 / √D Hz (59.5 dB, 57.2 dB(A)).
         SourceLevelDb = 67f,
         PeakHeadroomDb = 45f,
         ExtentMetres = 0.5f,
@@ -226,8 +197,7 @@ public sealed record FireSpec
         SteadySeconds = 600f,
         DecaySeconds = 4200f,
         // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed (wind 3 m/s): Leq 93.2 dB,
-        // 77.8 dB(A);
-        // ten minutes from 700 s after lighting, its struts, tyres and windows going, crest 34 dB.
+        // 77.8 dB(A); ten minutes from 700 s after lighting, struts, tyres and windows going, crest 34 dB.
         SourceLevelDb = 93f,
         PeakHeadroomDb = 36f,
         ExtentMetres = 2.2f,
@@ -256,8 +226,7 @@ public sealed record FireSpec
         SteadySeconds = 3600f,
         DecaySeconds = 7200f,
         // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed (wind 3 m/s): Leq 97.8 dB,
-        // 87.4 dB(A);
-        // ten minutes from 1200 s after lighting, windows and a collapse, crest 23 dB.
+        // 87.4 dB(A); ten minutes from 1200 s after lighting, windows and a collapse, crest 23 dB.
         SourceLevelDb = 98f,
         PeakHeadroomDb = 24f,
         ExtentMetres = 6f,

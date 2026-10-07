@@ -1,6 +1,4 @@
-using System;
 using System.Numerics;
-using System.Threading;
 
 namespace OpenFPS.Common.Hearing;
 
@@ -309,9 +307,6 @@ public sealed class LiveBands
         _primed = true;
         return true;
     }
-
-    /// <summary>Whether a shape has been measured yet.</summary>
-    public bool HasShape => _primed;
 
     /// <summary>The smoothed band powers (relative; the shape is what counts).</summary>
     public ReadOnlySpan<double> BandPowers => _smoothed;

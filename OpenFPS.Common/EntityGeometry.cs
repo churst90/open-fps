@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common.Geometry;
 
@@ -29,10 +28,9 @@ public enum GeometryRole
 public static class EntityGeometry
 {
     /// <summary>
-    /// Where an entity goes. A fixed object (<see cref="Components.EntityType.StaticObject"/>, not moving)
-    /// that is a solid box is in the triangle world, a door leaf (one with a portal) as a mover; any other
-    /// solid that does not move is tested the old way. Players, people, vehicles and everything else that
-    /// moves are not geometry here.
+    /// Where an entity goes: a fixed solid box (<see cref="Components.EntityType.StaticObject"/>) is in the
+    /// triangle world, a door leaf (one with a portal) as a mover; any other solid that does not move is
+    /// unindexed; anything that moves is not geometry here.
     /// </summary>
     public static GeometryRole Classify(Components.EntityType type, bool moves, in Components.ColliderComponent collider,
                                         int portalRegionA, int portalRegionB, bool announced = false)
@@ -40,8 +38,7 @@ public static class EntityGeometry
         if (moves) return GeometryRole.None;
         if (!collider.IsSolid)
         {
-            // Not solid, but a look should find it (SightGrid's index, geometry stage 2): a fixed box said by
-            // name. Not an opening.
+            // A fixed box said by name, not an opening: a look finds it (SightGrid's index).
             var n = collider.Size;
             return announced && type == Components.EntityType.StaticObject && collider.Shape == Components.ColliderShape.Box
                    && n.X > 0f && n.Y > 0f && n.Z > 0f && portalRegionA == 0 && portalRegionB == 0
@@ -83,8 +80,7 @@ public static class EntityGeometry
                                     bool hollow, float shellThickness, float absorption, bool emitter, bool moves,
                                     bool doorLeaf, string? name)
     {
-        // As the entity has it, empty and all: each query reads it as the box path did (some say
-        // "Generic" for an empty one, some pass it on as it is).
+        // Kept empty when empty: some queries read that as "Generic", some pass it on.
         var mat = material ?? "";
         var layers = GeometryLayers.Physical;
         if (!emitter && !moves) layers |= GeometryLayers.Acoustics;

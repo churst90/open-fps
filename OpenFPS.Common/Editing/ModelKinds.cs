@@ -1,10 +1,6 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace OpenFPS.Common.Editing;
@@ -31,13 +27,10 @@ public sealed class FieldNode
 }
 
 /// <summary>
-/// Every kind of model describes itself, and this reads the description: the properties of the
-/// model's type, with what <see cref="TunableAttribute"/> says about each. The editor's menus are made
-/// from it, so a kind added to <see cref="ModelLibrary"/> is in the editor with no code of its own
-/// (docs/WORLD_EDITOR.md section 4).
-///
-/// Values are read and changed on the model's JSON, the same round trip ModelLibrary already tests for
-/// every built-in model: write it out, set the one value at its path, read it back.
+/// Reads a model's description of itself: its type's properties, with what <see cref="TunableAttribute"/>
+/// says about each. The editor's menus are made from it, so a kind added to <see cref="ModelLibrary"/>
+/// needs no editor code (docs/WORLD_EDITOR.md section 4). Values are changed on the model's JSON, the
+/// round trip ModelLibrary tests for every built-in model.
 /// </summary>
 public static class ModelKinds
 {
@@ -312,20 +305,6 @@ public static class ModelKinds
         id = key;
         return kind.Length > 0 && ModelLibrary.Knows(kind, id);
     }
-
-    /// <summary>The sound-id prefix a kind's things carry, for counting where a model is used.</summary>
-    public static string? SoundPrefix(string kind) => kind switch
-    {
-        ModelLibrary.Kinds.SmallMachine => "machine:",
-        ModelLibrary.Kinds.Water => "water:",
-        ModelLibrary.Kinds.Fire => "fire:",
-        ModelLibrary.Kinds.Foliage => "foliage:",
-        ModelLibrary.Kinds.Flow => "flow:",
-        ModelLibrary.Kinds.Bell => "bell:",
-        ModelLibrary.Kinds.Shore => "shore:",
-        ModelLibrary.Kinds.Vehicle => "engine:",
-        _ => null,
-    };
 
     /// <summary>A sound id with the model it names changed to another of the same kind:
     /// "water:park_fountain/elm_park/0" with "pond_jet" is "water:pond_jet/elm_park/0". Null if the

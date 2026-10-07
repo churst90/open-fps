@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -6,34 +5,20 @@ using static OpenFPS.Common.DoorPhysics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A key unlocking a door, simulated as the objects, the way the doors are: a hand bringing a ring of keys up
-/// to a pin-tumbler cylinder, the key pushed into the keyway, its pins riding over the cuts, the shoulder
-/// meeting the plug's face, the key turned until its cam picks up the lock and draws the latch, and held.
-/// Usable on any keyed door: what the cylinder is set in (an aluminium stile, a steel door, a wooden one) is
-/// what its blows ring.
-///
-/// The parts:
-///
-///   The KEYRING: a 25 mm steel split ring hanging from the bow of the key in the hand, with the other keys
-///   on it. Each hanging key is a pendulum on the ring, swinging across the door's face and towards it; they
-///   strike each other and the door when the hand moves and when it stops. Each key is a free brass plate
-///   that rings at its own bending modes (about 2.3, 6.4 and 12.6 kHz for a 55 mm key) with almost no loss:
-///   the jingle.
-///
-///   The KEY in the hand: its blade cut to its bitting (five cuts, 0.38 mm a step, 3.96 mm apart, 100 degree
-///   V cuts), its bow held in the fingers.
-///
-///   The PINS: five stacks of a brass key pin and a driver on a spring, each riding the blade's top edge as
-///   the key goes in. Where a cut's flank turns from falling to rising, the pin's motion reverses at once:
-///   each a small blow on the key and, through the spring, on the plug. Those, over a quarter of a second, are
-///   the zip of a key going in.
-///
-///   The PLUG and its CAM: once the pins are at the shear line the plug turns with the key. The cam on its
-///   back turns free through its play, picks up the lock's hub with a knock, and draws the latch in against
-///   its spring until the hub meets its stop.
-///
-///   The HOST: the door the cylinder is set in, as a dense field struck through a patch where the cylinder's
-///   collar sits.
+/// A key unlocking a door, simulated as the objects: the ring brought up to a pin-tumbler cylinder, the key
+/// pushed in over the pins, the shoulder on the plug's face, the key turned until the cam draws the latch.
+/// Usable on any keyed door; what the cylinder is set in is what its blows ring.
+/// <list type="bullet">
+/// <item>The keyring: a 25 mm steel split ring on the bow; each hanging key is a pendulum that strikes its
+/// neighbours and the door, and a free plate ringing at its bending modes (about 2.3, 6.4 and 12.6 kHz for a
+/// 55 mm key) with almost no loss: the jingle.</item>
+/// <item>The key: five cuts to its bitting, 0.38 mm a step, 3.96 mm apart, 100 degree V cuts.</item>
+/// <item>The pins: five stacks on springs riding the blade; where a flank turns from falling to rising each
+/// reverses at once, a small blow on key and plug. Over a quarter second these are the zip of a key going in.</item>
+/// <item>The plug and cam: the cam turns free through its play, picks up the hub with a knock, and draws the
+/// latch against its spring until the hub meets its stop.</item>
+/// <item>The host: the door, a dense field struck where the cylinder's collar sits.</item>
+/// </list>
 /// </summary>
 public static class LockCylinder
 {
@@ -68,24 +53,18 @@ public static class LockCylinder
         }
     }
 
-    /// <summary>
-    /// When, in a render, the latch is drawn and the key held: the door can be opened from here. The server
-    /// sends the door's opening this long after the key.
-    /// </summary>
+    /// <summary>When, in a render, the latch is drawn: the server sends the door's opening this long after
+    /// the key.</summary>
     public const float UnlockSeconds = 0.7f;
 
     /// <summary>When, after the tip meets the keyway, the hand turns the key (DoorSystem.KeyTurnSeconds).</summary>
     public const float TurnSeconds = 0.45f;
 
-    /// <summary>
-    /// Each character: how many keys hang on the ring besides the one in the lock, how long the hand takes to
-    /// bring it up (s), how fast it pushes the key in (m/s), the lock's wear (how rounded a worn key's crests
-    /// are, mm), and the key's bitting.
-    /// </summary>
-    /// <remarks>One key hangs on every ring. With two, four and six, the bunch struck itself as the key went
-    /// home and the free keys rang on at 63-82 dB through the whole unlock: Cody, 2026-10-05, "a key being
-    /// inserted then like a coin dropping on the ground". The worn character's single key, which strikes
-    /// nothing, was the one he wanted for every door.</remarks>
+    /// <summary>Each character: keys hanging besides the one in the lock, the reach (s), the push (m/s), the
+    /// wear (crest rounding, mm) and the bitting.</summary>
+    /// <remarks>One key on every ring: with two, four and six the free keys rang on at 63-82 dB through the
+    /// unlock, "like a coin dropping on the ground" (Cody, 2026-10-05), and the single key was the one he
+    /// wanted for every door.</remarks>
     private static (int Keys, double Reach, double Insert, double WearMm, int[] Bitting) Character(int variant)
         => (((variant % Variants) + Variants) % Variants) switch
         {
@@ -158,8 +137,8 @@ public static class LockCylinder
     /// <summary>How far the hanging keys sit off the door's face (the bow of the key in the lock stands
     /// 25 mm out, and the ring hangs below it), m.</summary>
     private const double OffFace = 0.012;
-    /// <summary>The ring's friction on the bows and the keys rubbing each other take a swinging key's motion: about
-    /// three tenths of critical (at a tenth they chattered on for a second after the hand stopped).</summary>
+    /// <summary>The ring's friction takes a swinging key's motion, about 0.3 of critical (at 0.1 they chattered
+    /// on for a second after the hand stopped).</summary>
     private const double SwingZeta = 0.3;
 
     // The cylinder: Schlage-type spacing, five pins.
@@ -171,7 +150,7 @@ public static class LockCylinder
     /// <summary>A pin stack: brass key pin and driver, 0.115 in across, about 0.7 g; its spring about 0.6 N at
     /// rest and 120 N/m more as it is lifted.</summary>
     private const double PinKg = 0.0007, PinPreload = 0.6, PinRate = 120;
-    private const double PinContactK = 3e9, PinContactLambda = 0.2;
+    private const double PinContactK = 3e9;
     /// <summary>The blade slides on the keyway's wards and the pins' tips: brass on brass, a little grease.</summary>
     private const double BladeFriction = 0.15;
     /// <summary>The plug and shell, brass, about 60 g together, held in the lock body by its set screw: how
@@ -189,7 +168,6 @@ public static class LockCylinder
 
     private sealed class Sim
     {
-        private readonly Host host;
         private readonly int rate;
         private readonly double dt;
         private readonly Report? report;
@@ -204,8 +182,6 @@ public static class LockCylinder
         private readonly double[] kx, kz, kvx, kvz, hang;    // each hanging key's offset from below the ring
         private readonly Modes[] keyModes;
         private readonly Modes ring;
-        private readonly double[] keyApproach;
-        private readonly double[] doorApproach;
 
         // The key in the lock and the pins.
         private double depth, depthRate;
@@ -217,7 +193,7 @@ public static class LockCylinder
         private readonly AccelerationNoise[] pinNoise;
 
         // The turn.
-        private double turn, turnRate, hub, hubRate, turnAim, camApproach, stopApproach;
+        private double turn, turnRate, hub, hubRate, turnAim;
         private bool turning, drawn;
 
         // The host.
@@ -233,11 +209,10 @@ public static class LockCylinder
         private static readonly string[] PeakNames = { "keys", "ring", "pins", "cylinder", "door" };
         private readonly double[] peaks = new double[PeakNames.Length];
         private List<float>[]? stems;
-        private readonly double[] one = { 1 };
 
         public Sim(Host host, int variant, int sampleRate, Report? report)
         {
-            this.host = host; this.report = report;
+            this.report = report;
             rate = sampleRate * Oversample; dt = 1.0 / rate;
             rng = new Random(7001 + 13 * (((variant % Variants) + Variants) % Variants) + (int)host);
             (keys, reach, insert, double wearMm, bitting) = Character(variant);
@@ -246,7 +221,6 @@ public static class LockCylinder
             // The hanging keys: each a free plate, its bending modes along its length and one across.
             kx = new double[keys]; kz = new double[keys]; hang = new double[keys]; kvx = new double[keys]; kvz = new double[keys];
             keyModes = new Modes[keys];
-            keyApproach = new double[keys]; doorApproach = new double[keys];
             for (int i = 0; i < keys; i++)
             {
                 double len = KeyLength * (0.85 + 0.3 * rng.NextDouble()), t = KeyT * (0.9 + 0.2 * rng.NextDouble());
@@ -256,12 +230,10 @@ public static class LockCylinder
                 // Across the bow: a 22 mm free plate, a third of the way along its first bending mode.
                 AddFreeMode(hzs, l, m, g, Beam(KeyWide, t, KeyRho, KeyE, 4.730), len * KeyWide);
                 keyModes[i] = new Modes(hzs, l, m, g, dt);
-                // Keys sit round the ring, not stacked flat: about 1.5 mm between neighbours' faces, each hanging
-                // its own length, so each swings at its own rate and they meet as they drift apart in phase.
+                // About 1.5 mm between neighbours' faces, each hanging its own length, so they drift in phase.
                 kx[i] = (i - (keys - 1) / 2.0) * (KeyT + 0.0015);
                 hang[i] = HangLength * (0.75 + 0.5 * rng.NextDouble());
             }
-            // The ring: its bending modes n = 2-4.
             {
                 var hzs = new List<double>(); var l = new List<double>(); var m = new List<double>(); var g = new List<double>();
                 for (int n = 2; n <= 4; n++)
@@ -274,8 +246,7 @@ public static class LockCylinder
                 ring = new Modes(hzs, l, m, g, dt);
             }
 
-            // The key in the lock: clamped at its shoulder in the keyway, its bow and the shank out of it a
-            // 30 mm cantilever, held by the fingers (lossy) until they let go of it.
+            // The key in the lock: a 30 mm cantilever from its shoulder, lossy in the fingers.
             {
                 var hzs = new List<double>(); var l = new List<double>(); var m = new List<double>(); var g = new List<double>();
                 foreach (double bl in new[] { 1.875, 4.694, 7.855 })
@@ -297,7 +268,7 @@ public static class LockCylinder
             plugNoise = new AccelerationNoise(PlugVolume, dt);
             hubNoise = new AccelerationNoise(HubKg / 7850, dt);
 
-            // The host's field, built last so it draws nothing from the keys' numbers.
+            // The host has its own generator, so it draws nothing from the keys' numbers.
             var hrng = new Random(911 + (int)host);
             hostField = host switch
             {
@@ -306,7 +277,7 @@ public static class LockCylinder
                 _ => new DenseField(0.267, 4.2, 0.0032, 70e9, 2700, Poisson, f => ThinPanelLoss(f) + 0.004, 300, 16000, hrng, dt, DenseField.CapSpacing, 0.089),
             };
             hostPort = new Port(hostField.PatchMass, 2e7, hostField.Impedance);
-            // The door's leaf as a whole, bending on its hinges: what gives a lock's blows their body.
+            // The whole leaf bending on its hinges gives the lock's blows their body.
             {
                 double w = host == Host.WoodDoor ? 0.9 : 1.0, h = 2.1, d, rhoH;
                 Func<double, double> loss;
@@ -325,7 +296,7 @@ public static class LockCylinder
             facePort = new Port(hostField.PatchMass, 2e7, hostField.Impedance);
             hostHit = hostField.Point(); faceHit = hostField.Point();
 
-            // The hand starts 20 cm below and 10 cm out from the lock, the keys already in it, the bunch at rest.
+            // The hand starts 20 cm below and 10 cm out from the lock.
             hx = 0.03; hy = -0.2; hz = 0.1;
         }
 
@@ -341,7 +312,7 @@ public static class LockCylinder
 
         public void Script(bool approach)
         {
-            // 1. The ring brought up towards the lock, 30 mm short of the keyway: a minimum-jerk reach.
+            // A minimum-jerk reach to 30 mm short of the keyway, the last 30 mm slowly, the push, the turn.
             double t0 = time;
             const double shortOf = 0.03;
             if (!approach) { hx = 0; hy = 0; hz = KeyInDepth + 0.001; }
@@ -358,14 +329,12 @@ public static class LockCylinder
                 }
                 else if (insertAt < 0)
                 {
-                    // 2. The tip found the keyway: slowly, the last 30 mm.
                     double s = MinJerk(Math.Clamp((time - aimAt) / Aim, 0, 1));
                     MoveHand(0, 0, KeyInDepth + shortOf * (1 - s) + 0.001 * s);
                     if (time - aimAt >= Aim) { insertAt = time; Log($"{time * 1000:F0} ms  the tip at the keyway"); }
                 }
                 else if (shoulder < 0)
                 {
-                    // 3. Pushed in at the hand's own pace.
                     depthRate = insert * Math.Clamp((time - insertAt) / 0.02, 0, 1);
                     depth += depthRate * dt;
                     if (depth >= KeyInDepth)
@@ -383,7 +352,7 @@ public static class LockCylinder
                 }
                 else
                 {
-                    // 4. Turned until it will go no further; the ring goes round with the bow.
+                    // Turned until it will go no further; the ring goes round with the bow.
                     double tu = Math.Clamp((time - turnAt) / TurnTime, 0, 1);
                     turnAim = MinJerk(tu) * (CamPlay + CamDraw + 0.6);
                     double r = 0.02;
@@ -401,7 +370,7 @@ public static class LockCylinder
         private void MoveHand(double x, double y, double z)
         {
             double vx = (x - hx) / dt, vy = (y - hy) / dt, vz = (z - hz) / dt;
-            // The arm is not a servo: what it does is smooth over about 10 ms.
+            // The arm is not a servo: its motion smooths over about 10 ms.
             double a = 1 - Math.Exp(-dt / 0.004);
             double nvx = hvx + a * (vx - hvx), nvy = hvy + a * (vy - hvy), nvz = hvz + a * (vz - hvz);
             hax = (nvx - hvx) / dt; hay = (nvy - hvy) / dt; haz = (nvz - hvz) / dt;
@@ -415,16 +384,14 @@ public static class LockCylinder
         {
             double hostForce = 0, faceForce = 0, ringForce = 0;
 
-            // The hanging keys: pendulums on the ring, driven by its acceleration, against each other and the face.
-
+            // The hanging keys: pendulums driven by the ring's acceleration.
             var fx = new double[keys]; var fz = new double[keys];
             Array.Clear(fx); Array.Clear(fz);
             double keySum = 0;
             for (int i = 0; i + 1 < keys; i++)
             {
-                // Where they touch, each key's face is where its body is plus how far it has bent there: the blow
-                // bends them as it pushes them apart, and gives the bending back (fed one way, a 6 g key struck at
-                // half a metre a second rang with nine times the energy it came in with).
+                // The contact includes each key's bending, so the blow takes it back (fed one way, a 6 g key
+                // struck at 0.5 m/s rang with nine times the energy it came in with).
                 double gap = kx[i + 1] + keyModes[i + 1].At(keyPoint) - kx[i] - keyModes[i].At(keyPoint) - KeyT;
                 double gapRate = kvx[i + 1] + keyModes[i + 1].RateAt(keyPoint) - kvx[i] - keyModes[i].RateAt(keyPoint);
                 double f = Contact(KeyContactK, KeyContactLambda, -gap, -gapRate);
@@ -448,7 +415,6 @@ public static class LockCylinder
                 if (f > 0) { fz[i] += f; keyModes[i].Push(keyPoint, f); faceForce -= f; doorSum += f; }
                 double ax = -w0 * w0 * kx[i] - 2 * SwingZeta * w0 * kvx[i] - hax + fx[i] / KeyKg;
                 double az = -w0 * w0 * kz[i] - 2 * SwingZeta * w0 * kvz[i] - haz + fz[i] / KeyKg;
-                // The ring's lift jerks the bunch up and down too: that tugs the keys on the ring.
                 ringForce += Math.Abs(KeyKg * hay) * 0.05;
                 kvx[i] += ax * dt; kx[i] += kvx[i] * dt;
                 kvz[i] += az * dt; kz[i] += kvz[i] * dt;
@@ -456,14 +422,13 @@ public static class LockCylinder
             Note("key-on-door", doorSum);
             if (ringForce != 0) ring.Push(one3, ringForce);
 
-            // The pins on the blade.
             double plugForce = 0, bladeForce = 0, pinsP = 0;
             for (int k = 0; k < Pins; k++)
             {
                 double s = depth - pinAt[k];                  // how far along the key from its tip this pin sits
-                double top = s < 0 ? 0 : Profile(s, k);
+                double top = s < 0 ? 0 : Profile(s);
                 double over = top - pinY[k];
-                double rateTop = s < 0 ? 0 : (Profile(s + depthRate * dt, k) - top) / dt;
+                double rateTop = s < 0 ? 0 : (Profile(s + depthRate * dt) - top) / dt;
                 double f = ContactRestitution(PinContactK, 0.5, over, rateTop - pinV[k], ref pinApproach[k]);
                 double spring = PinPreload + PinRate * Math.Max(0, pinY[k]);
                 double acc = (f - spring) / PinKg;
@@ -477,11 +442,10 @@ public static class LockCylinder
             keyInLock.Push(one3, bladeForce * 0.3);
             if (depthRate > 0) keyInLock.Push(one3, BladeFriction * bladeForce * 0.2);
 
-            // The shoulder on the plug's face, as the hand brings the key home.
+            // The shoulder on the plug's face: a short blow, brass on brass through the fingers.
             if (depth >= KeyInDepth && !shoulderDone)
             {
                 shoulderDone = true;
-                // The key's speed stopped by brass on brass through the fingers: a short blow on the plug.
                 shoulderLeft = 2e-4; shoulderForce = KeyKg * 3 * insert / 2e-4 * 1.5;
             }
             if (shoulderLeft > 0)
@@ -493,8 +457,6 @@ public static class LockCylinder
                 Note("shoulder", f);
             }
 
-            // The turn: the fingers turn the key, the plug turns with it, the cam takes up its play, picks up the
-            // hub and draws the latch until the hub meets its stop.
             double tq = 0, hubForce = 0;
             if (turning)
             {
@@ -519,9 +481,7 @@ public static class LockCylinder
                 pinsP += hubNoise.Pressure(hubAcc);
             }
 
-            // The cylinder in its door: the plug's shell on its set screw passes its blows to the door's patch.
-            // The cylinder is held in the lock's body (a 0.35 kg steel case), and the body on its screws in the
-            // door: the blows reach the door through both.
+            // The blows reach the door through the plug's set screw and the lock body (a 0.35 kg steel case).
             plug.F += plugForce;
             plug.Step(dt);
             lockBody.F += plug.Reaction;
@@ -531,7 +491,6 @@ public static class LockCylinder
             hostField.Modes.Push(faceHit, facePort.Step(faceForce, dt, out double toLeaf2));
             hostLeaf.Push(leafAtLock, toLeaf); hostLeaf.Push(leafBelow, toLeaf2);
 
-            // Radiate.
             double pKeys = 0;
             for (int i = 0; i < keys; i++) pKeys += keyModes[i].Step();
             pKeys += keyInLock.Step();
@@ -555,15 +514,12 @@ public static class LockCylinder
         private readonly double[] one3 = { 1, 1, 1, 1 };
         private readonly double[] keyPoint = { 1, -0.8, 0.6, 0.5 };
 
-        /// <summary>
-        /// The blade's top edge under pin <paramref name="k"/>, s metres back from the tip: the tip's ramp, then
-        /// V cuts to the bitting at each pin's place, their crests and troughs rounded by wear and by the pin's
-        /// own tip. Where the cut under this pin is, the edge comes down to it.
-        /// </summary>
-        private double Profile(double s, int k)
+        /// <summary>The blade's top edge <paramref name="s"/> metres back from the tip: the tip's ramp, then
+        /// V cuts to the bitting, crests and troughs rounded by wear and the pin's tip.</summary>
+        private double Profile(double s)
         {
             double ramp = Math.Min(1, s / TipRamp) * BladeTop;
-            // The cuts are at the pins' places when the key is home: cut j is at KeyInDepth - pinAt[j] from the tip.
+            // Cut j is where pin j sits when the key is home: KeyInDepth - pinAt[j] from the tip.
             double h = BladeTop;
             for (int j = 0; j < Pins; j++)
             {
@@ -578,7 +534,7 @@ public static class LockCylinder
 
         private static double SmoothMin(double a, double b, double r)
         {
-            // The polynomial smooth minimum: a crest rounded to about r.
+            // Polynomial smooth minimum: a crest rounded to about r.
             double h = Math.Max(r - Math.Abs(a - b), 0) / r;
             return Math.Min(a, b) - h * h * r / 4;
         }

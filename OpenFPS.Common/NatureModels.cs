@@ -1,90 +1,62 @@
-using System;
 using System.Collections.Generic;
 using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
-// Water, fire and the wind in leaves, as parts lists. Like a SmallMachineSpec these say what the
-// thing IS — how much water falls how far, how big the fire is and how wet its wood, how big the
-// tree is and what its leaves are — and the synthesiser works the sound out from that. Nothing here
-// is a level per mechanism or an equaliser setting; the one number that is a level, SourceLevelDb,
-// is what the model was MEASURED to make (the lab's --nature levels), so the mixer can place it.
+// Water, fire and the wind in leaves, as parts lists: what the thing is, and the synthesiser works the
+// sound out from that. No level per mechanism and no equaliser; the one level, SourceLevelDb, is what the
+// model was measured to make (AudioLab --nature levels).
 
 /// <summary>
-/// One body of water falling into a pool: a jet coming down, a bowl overflowing, a spout.
-///
-/// Water arrives at a surface in two ways and they sound different. As DROPS — a jet that has broken
-/// up at its top, a thin curtain that has torn into strands and beads — each drop is a click as it
-/// strikes, and now and then it traps a bubble that rings. As a COHERENT body — the collapsing
-/// column of a jet, a thick sheet, a spout — it drives a line of air down into the pool and makes a
-/// cloud of bubbles of every size at once, which is the low gurgle under the patter.
+/// One body of water falling into a pool: a jet, a bowl overflowing, a spout. As drops, each is a click
+/// that now and then traps a ringing bubble; as a coherent body it drives air down into the pool in a
+/// cloud of bubbles of every size, the low gurgle under the patter.
 /// </summary>
 public sealed record WaterFallSpec
 {
     [Tunable("", 0, 0, "What this fall of water is called.")]
     public string Name { get; init; } = "";
-    /// <summary>How much water, litres a second.</summary>
     [Tunable("L/s", 0, 200, "How much water this fall carries. More water is more drops and lumps striking.", Label = "flow", Step = 0.01)]
     public required float FlowLitresPerSecond { get; init; }
-    /// <summary>How far it falls before it meets the surface, m: from a jet's apex, or a lip.</summary>
     [Tunable("m", 0.01, 30, "How far the water falls before it meets the surface, from a jet's apex or a lip. A longer fall strikes harder.", Label = "fall height", Step = 0.05)]
     public required float FallMetres { get; init; }
-    /// <summary>The share of the flow that arrives as separate drops; the rest arrives coherent.</summary>
     [Tunable("", 0, 1, "The share of the flow that arrives as separate drops. The rest arrives as coherent lumps that plunge and gurgle.", Step = 0.05)]
     public float DropShare { get; init; } = 1f;
-    /// <summary>The mean radius of the drops over the smallest (0.2 mm), mm. How they spread about it
-    /// is <see cref="DropSizeOrder"/>.</summary>
+    /// <summary>Spread about it by <see cref="DropSizeOrder"/>.</summary>
     [Tunable("mm", 0.05, 4, "How far the drops' mean radius stands over the smallest drop, 0.2 mm. Bigger drops click louder and lower.", Label = "mean drop radius", Step = 0.1)]
     public float MeanDropRadiusMm { get; init; } = 1.2f;
-    /// <summary>The order n of the gamma law the drop sizes follow. A jet or a sheet breaks up through
-    /// ligaments, and the drops one ligament makes follow a gamma law whose order is set by how
-    /// corrugated the ligament is: about 4 for the ligaments off a jet or sheet torn up in air,
-    /// higher for smooth ones (Villermaux, Marmottant and Duplat 2004, Phys. Rev. Lett. 92, 074501;
-    /// Villermaux 2007, Annu. Rev. Fluid Mech. 39). The exponential, order 1, is what RAIN looks
-    /// like: the overlap of many breakups of many sizes (Villermaux and Bossa 2009, Nature Physics
-    /// 5), not one fountain's. The exponential's long tail of big drops, each a click carrying its
-    /// r³ of energy, was part of the grain in the fountain's hiss: order 4 takes the 8-16 kHz
-    /// kurtosis over 10 ms windows from 3.76 to 3.52 (recorded fountains 3.45-3.75).</summary>
+    /// <summary>The gamma law's order is set by how corrugated the breakup's ligaments are (Villermaux,
+    /// Marmottant and Duplat 2004; Villermaux 2007). Order 1, the exponential, is rain: many breakups
+    /// overlapped (Villermaux and Bossa 2009, Nature Physics 5), not one fountain's. Its tail of big drops
+    /// was grain in the fountain's hiss: order 4 takes the 8-16 kHz kurtosis over 10 ms windows from 3.76
+    /// to 3.52 (recorded fountains 3.45-3.75).</summary>
     [Tunable("", 1, 20, "The order of the gamma law the drop sizes follow: about 4 for a jet or sheet torn up in air, higher for smooth breakup, 1 for rain. A lower order has more big drops.", Label = "drop size order", Step = 1, Source = "Villermaux, Marmottant and Duplat 2004, Phys. Rev. Lett. 92, 074501; Villermaux 2007, Annu. Rev. Fluid Mech. 39")]
     public int DropSizeOrder { get; init; } = 4;
-    /// <summary>The largest drop, mm. Above about 4 mm a falling drop breaks up in the air.</summary>
     [Tunable("mm", 0.5, 6, "The largest drop. Above about 4 mm a falling drop breaks up in the air.", Label = "largest drop radius", Step = 0.1)]
     public float MaxDropRadiusMm { get; init; } = 4f;
-    /// <summary>The size the coherent water arrives in, mm: the lumps a collapsing column or a
-    /// wavering sheet hits the pool as. Each strikes like a big drop and opens a crater.</summary>
     [Tunable("mm", 1, 50, "The mean radius of the lumps the coherent water hits the pool as. Each opens a crater like a big drop.", Label = "lump radius", Step = 0.5)]
     public float ChunkRadiusMm { get; init; } = 5f;
-    /// <summary>The share of the drops the wind can lift onto the paving round the pool, per metre a
-    /// second of wind over two. Small drops falling far go first. Zero for a fall under a canopy or
-    /// into a deep basin.</summary>
+    /// <summary>Small drops falling far go first.</summary>
     [Tunable("per m/s", 0, 0.2, "The share of the drops the wind lifts onto the paving, per metre a second of wind over two. Zero for a fall under a canopy or into a deep basin.", Label = "wind drift", Step = 0.005)]
     public float DriftPerMetrePerSecond { get; init; } = 0.03f;
-    /// <summary>How many separate jets or strands this fall stands for. Each one necks and bursts
-    /// in its own time, so the bunching of its drops and the wandering of where it breaks up are
-    /// independent from one to the next, and the more of them there are the steadier their sum: the
-    /// fluctuation of the whole goes down as one over the square root of the count.</summary>
+    /// <summary>Each necks and bursts in its own time, so the fluctuation of the sum goes as one over the
+    /// square root of the count.</summary>
     [Tunable("", 1, 500, "How many separate jets or strands this fall stands for. More of them make a steadier sum.", Step = 1)]
     public int Streams { get; init; } = 1;
-    /// <summary>What it lands on: the pool, or wet stone (<see cref="WaterSurface"/>).</summary>
     [Tunable("", 0, 0, "What the water lands on: the pool, or wet rock.", Label = "lands on")]
     public WaterSurface Onto { get; init; } = WaterSurface.Pool;
-    /// <summary>Which of the feature's <see cref="WaterFeatureSpec.Taps"/> it is heard from: where on the
-    /// feature this water lands. A map places one emitter per tap at that place.</summary>
+    /// <summary>Which of <see cref="WaterFeatureSpec.Taps"/>: a map places one emitter per tap.</summary>
     [Tunable("", 0, 31, "Which of the feature's taps this water is heard from, counted from 0.", Step = 1)]
     public int Tap { get; init; }
-    /// <summary>The order of the gamma law the coherent lumps' radii follow about
-    /// <see cref="ChunkRadiusMm"/>. A column collapsing at a jet's apex, or a sheet tearing off a lip,
-    /// comes apart into irregular fragments, and coarse, corrugated fragmentation gives the broad end of
-    /// Villermaux's family (Villermaux 2007, Annu. Rev. Fluid Mech. 39: order 2-5, lower the more
-    /// corrugated): order 2. Its tail matters: a lump's splash goes as its volume, r³, so the few big
-    /// lumps are the few loud splashes a real fountain has, where lumps all one size (the first model:
-    /// uniform 0.5-1.5 of the mean) summed to a steady hiss.</summary>
+    /// <summary>Coarse, corrugated fragmentation (a column collapsing at an apex, a sheet tearing off a
+    /// lip) gives the broad end of Villermaux's family (Villermaux 2007: order 2-5, lower the more
+    /// corrugated). A lump's splash goes as r³, so the few big lumps are a fountain's few loud splashes;
+    /// lumps all one size summed to a steady hiss.</summary>
     [Tunable("", 1, 20, "The order of the gamma law the lump sizes follow. Coarse, corrugated breakup is about 2, which gives a few big loud splashes.", Label = "lump size order", Step = 1, Source = "Villermaux 2007, Annu. Rev. Fluid Mech. 39")]
     public int LumpSizeOrder { get; init; } = 2;
 
-    /// <summary>A vertical jet from a nozzle, worked out from the nozzle and how high the water
-    /// goes: the exit speed is what lifts it there, √(2 g h), and the flow is that speed through the
-    /// nozzle. It falls from its apex, the rise plus how far the nozzle stands above the water.</summary>
+    /// <summary>A vertical jet from a nozzle: exit speed √(2 g h) for the rise, flow that speed through
+    /// the nozzle, falling from its apex.</summary>
     public static WaterFallSpec Jet(string name, float nozzleMm, float riseMetres, float nozzleAboveWaterMetres,
                                     float dropShare = 0.55f, float meanDropRadiusMm = 1.4f, float chunkRadiusMm = 5f)
     {
@@ -118,7 +90,6 @@ public sealed record WaterTapSpec
 {
     [Tunable("", 0, 0, "What this place on the feature is called.")]
     public string Name { get; init; } = "";
-    /// <summary>How big this landing place is, m: the voice is flat inside it.</summary>
     [Tunable("m", 0.1, 20, "How big this landing place is. Inside it the sound is flat.", Step = 0.1)]
     public float ExtentMetres { get; init; } = 1.2f;
 }
@@ -129,19 +100,13 @@ public sealed record WaterFeatureSpec
     [Tunable("", 0, 0, "What this water feature is called.")]
     public string Name { get; init; } = "";
     public required WaterFallSpec[] Falls { get; init; }
-    /// <summary>Overall level at one metre from the edge of the pool, dB. MEASURED with
-    /// <c>--nature levels</c>, not chosen.</summary>
     [Tunable("dB", 20, 120, "Overall level at one metre from the pool's edge, measured with --nature levels. Change it only after measuring the model again.", Step = 0.5, Source = "MEASURED with --nature levels")]
     public required float SourceLevelDb { get; init; }
-    /// <summary>How far its loudest moments stand over <see cref="SourceLevelDb"/>, dB: the room its
-    /// voice renders with (the 99.9th percentile of its 10 ms peaks, measured with --nature levels).
-    /// Never under the fleet's shared 16.</summary>
+    /// <summary>How far its loudest moments stand over <see cref="SourceLevelDb"/>, dB (the 99.9th
+    /// percentile of its 10 ms peaks, --nature levels). Never under the fleet's shared 16.</summary>
     public float PeakHeadroomDb { get; init; } = 16f;
-    /// <summary>The radius of the pool, m: the sound comes off the whole surface, so inside it the
-    /// level is flat.</summary>
     [Tunable("m", 0.2, 50, "The radius of the pool. The sound comes off the whole surface, so inside it the level is flat.", Label = "pool radius", Step = 0.1)]
     public float ExtentMetres { get; init; } = 2f;
-    /// <summary>The height the wind that moves the spray is taken at, m.</summary>
     [Tunable("m", 0.1, 20, "The height the wind that moves the spray is taken at.", Label = "wind height", Step = 0.1)]
     public float WindHeightMetres { get; init; } = 1.5f;
     /// <summary>Where on the feature its water lands, one voice each (<see cref="WaterFallSpec.Tap"/>).
@@ -262,16 +227,11 @@ public enum LeafKind
 }
 
 /// <summary>
-/// A tree, or a hedge, that the wind blows through.
-///
-/// Two mechanisms, both set by the plant's own parts. Leaves on stalks FLUTTER, and fluttering
-/// leaves touch: each touch is a tiny strike on a light membrane, a click in the low kilohertz, and
-/// thousands of them a second are the rustle. How many, and how hard, both grow with the wind, so
-/// the rustle grows much faster than the wind does. And air flowing past anything round sheds
-/// vortices off it at a frequency set by the speed over the thickness (St = f d / U ≈ 0.2): over
-/// twigs a few millimetres thick that is a low whoosh, over needles a millimetre thick it is the
-/// higher sigh a pine wood makes. The branches SWAY at their own frequencies, and the leaves on a
-/// branch that is swinging are moving faster through the air, which is why a rustle comes in surges.
+/// A tree or a hedge the wind blows through. Leaves on stalks flutter and touch, each touch a click in
+/// the low kilohertz, thousands a second the rustle; number and force both grow with the wind, so the
+/// rustle grows much faster than it. Air past twigs and needles sheds vortices at St = f d / U ≈ 0.2: a
+/// low whoosh off twigs, the higher sigh of a pine wood off needles. A swinging branch moves its leaves
+/// faster through the air, which is why a rustle comes in surges.
 /// </summary>
 public sealed record FoliageSpec
 {
@@ -279,44 +239,30 @@ public sealed record FoliageSpec
     public string Name { get; init; } = "";
     [Tunable("", 0, 0, "Broad leaves on stalks flutter and strike each other, the rustle. Needles do not; the sound is the air shedding vortices off them, the sough.")]
     public LeafKind Leaves { get; init; } = LeafKind.Broadleaf;
-    /// <summary>The crown's radius, m.</summary>
     [Tunable("m", 0.2, 20, "The crown's radius.", Step = 0.1)]
     public required float CrownRadiusMetres { get; init; }
-    /// <summary>The height of the middle of the crown, m: where the wind it feels is taken.</summary>
     [Tunable("m", 0.3, 60, "The height of the middle of the crown, where the wind it feels is taken.", Step = 0.5)]
     public required float CrownHeightMetres { get; init; }
-    /// <summary>The leaf area index: leaf area over the ground the crown covers. 3-6 for a tree in leaf.</summary>
     [Tunable("", 0.1, 12, "Leaf area over the ground the crown covers: 3 to 6 for a tree in leaf. More leaves, more strikes.", Step = 0.1)]
     public float LeafAreaIndex { get; init; } = 4f;
-    /// <summary>One leaf's area, cm². A lime or a maple leaf is 50-100; a birch leaf 15.</summary>
     [Tunable("cm²", 0.05, 1000, "One leaf's area. A lime or maple leaf is 50 to 100, a birch leaf 15.", Label = "leaf area", Step = 0.5)]
     public float LeafAreaCm2 { get; init; } = 40f;
-    /// <summary>The typical thickness of what the air sheds vortices off, mm: twigs for a broadleaf,
-    /// needles for a conifer.</summary>
     [Tunable("mm", 0.3, 50, "The typical thickness of what the air sheds vortices off: twigs for a broadleaf, needles for a conifer. Thinner sheds at a higher pitch.", Label = "twig or needle thickness", Step = 0.1)]
     public float ShedDiameterMm { get; init; } = 5f;
-    /// <summary>The wind speed below which leaves do not touch, m/s.</summary>
     [Tunable("m/s", 0, 5, "The wind speed below which the leaves do not touch.", Label = "still wind speed", Step = 0.1)]
     public float StillSpeed { get; init; } = 1f;
-    /// <summary>How fast the main branches swing, Hz. A big tree's crown sways at 0.3-0.6 Hz and
-    /// its outer branches at a few hertz.</summary>
     [Tunable("Hz", 0.05, 5, "How fast the main branches swing. A big tree's crown sways at 0.3 to 0.6 Hz, its outer branches at a few hertz. The rustle surges with it.", Label = "sway", Step = 0.05)]
     public float SwayHz { get; init; } = 0.5f;
-    /// <summary>Vogel's exponent V: the crown's leaves and twigs fold and streamline as the wind
-    /// rises, so its drag goes as U^(2+V) rather than U². Measured from about −0.5 to −1.2 for
-    /// broad leaves and their clusters (Vogel 1989, J. Exp. Bot. 40) and in the same range for
-    /// whole plants (de Langre 2008, Annu. Rev. Fluid Mech. 40). It sets how fast the sound grows
-    /// with the wind: the shedding's power goes as U^(5+2V).</summary>
+    /// <summary>Vogel's exponent V: drag goes as U^(2+V) as leaves fold and streamline, measured about
+    /// −0.5 to −1.2 for broad leaves (Vogel 1989, J. Exp. Bot. 40) and whole plants (de Langre 2008,
+    /// Annu. Rev. Fluid Mech. 40). The shedding's power goes as U^(5+2V).</summary>
     [Tunable("", -1.5, 0, "How the crown folds and streamlines as the wind rises: its drag goes as the wind speed to the power 2 plus this. Measured from -0.5 to -1.2. More negative, the sound grows more slowly with the wind.", Label = "Vogel exponent", Step = 0.05, Source = "Vogel 1989, J. Exp. Bot. 40; de Langre 2008, Annu. Rev. Fluid Mech. 40")]
     public float VogelExponent { get; init; } = -0.7f;
-    /// <summary>Level at one metre from the crown with the wind at the field's mean, dB. MEASURED.</summary>
     [Tunable("dB", 10, 100, "Level at one metre from the crown with the wind at the field's mean, measured with --nature levels. Change it only after measuring the model again.", Step = 0.5, Source = "MEASURED with --nature levels")]
     public required float SourceLevelDb { get; init; }
-    /// <summary>How far its loudest moments stand over <see cref="SourceLevelDb"/>, dB: the room its
-    /// voice renders with (the 99.9th percentile of its 10 ms peaks, measured with --nature levels).
-    /// Never under the fleet's shared 16.</summary>
+    /// <summary>How far its loudest moments stand over <see cref="SourceLevelDb"/>, dB (the 99.9th
+    /// percentile of its 10 ms peaks, --nature levels). Never under the fleet's shared 16.</summary>
     public float PeakHeadroomDb { get; init; } = 16f;
-    /// <summary>How big the source is, m: the crown.</summary>
     [Tunable("m", 0.2, 30, "How big the source is: the crown. Inside it the level is flat.", Step = 0.1)]
     public float ExtentMetres { get; init; } = 3f;
 
@@ -332,21 +278,14 @@ public sealed record FoliageSpec
         ShedDiameterMm = 5f,
         StillSpeed = 1f,
         SwayHz = 0.45f,
-        // Big soft leaves on long stalks fold further than a stiff leaf does: the strong end of
-        // Vogel's range. At −0.7 (taken before for every tree) the crown grew 10.8 dB from 3 to
-        // 6 m/s, Fégeant's birch, and the gusts in an ordinary breeze swung it 4.4 dB (the standard
-        // deviation of its 400 ms level within a minute, over ten minutes) against 1.3-4.2 dB in
-        // recordings of leaves in wind; Cody heard the swings as too obvious. At −0.9 it grows 9.5 dB
-        // (32 dB a decade, between Fégeant's oak at 30 and birch at 36) and swings 4.0 dB.
+        // Big soft leaves on long stalks fold further: the strong end of Vogel's range. At −0.9 the crown
+        // grows 9.5 dB from 3 to 6 m/s (32 dB a decade, between Fégeant's oak at 30 and birch at 36) and
+        // its gusts swing it 4.0 dB; at −0.7 Cody heard the swings as too obvious (docs/COMMON_NOTES.md,
+        // The park tree).
         VogelExponent = -0.9f,
-        // MEASURED with `--nature levels park_tree sec=600`, 2026-10-04: over ten minutes of the field
-        // (4.1 m/s mean at the crown) Leq 48.2 dB, 46.7 dB(A); the gustiest second 7.5 dB over that. A
-        // minute is not enough to measure it by — a minute of gusts read 2.3 dB high. Re-measured
-        // 2026-10-05 with the boughs reading the wind across the crown and the field's turbulence at
-        // 0.25: Leq 47.9 dB, 46.3 dB(A), the gustiest second 6.6 dB over. Round 3 (Vogel −0.9, strikes
-        // by contact angle): 47.8 dB, 46.2 dB(A), the gustiest second 6.7 dB over. Texture round 1
-        // (2026-10-06: strikes and twig episodes from exponential-tailed turbulent increments), five
-        // minutes: 47.4 dB, 45.7 dB(A), its 10 ms peaks' 99.9th percentile 21.1 dB over, so 22 of room.
+        // MEASURED with `--nature levels park_tree`, texture round 1 (2026-10-06), five minutes of the
+        // field: Leq 47.4 dB, 45.7 dB(A), 10 ms peaks' 99.9th percentile 21.1 dB over. Measure over ten
+        // minutes, not one: a minute of gusts read 2.3 dB high.
         SourceLevelDb = 48f,
         PeakHeadroomDb = 22f,
         ExtentMetres = 4f,

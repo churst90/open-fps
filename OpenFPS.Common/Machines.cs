@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,12 +8,8 @@ using System.Text.Json.Serialization;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// The kinds of part a machine can be assembled from.
-///
-/// A vocabulary rather than a type hierarchy, because the list is going to grow — a rotor, a
-/// turbine, a fountain's jet — and every one of those is "a model, a profile for it, and where it
-/// sits". Strings keep that open to data: a map author writes the model's name and nothing in C#
-/// has to be recompiled for a machine that uses it.
+/// The kinds of part a machine can be assembled from. Strings, not a type hierarchy, so a map author
+/// can name a model in data and nothing in C# is recompiled for it.
 /// </summary>
 public static class MachineModels
 {
@@ -37,25 +32,22 @@ public static class MachineModels
     /// <summary>The gearbox. <see cref="MachinePart.Series"/> is its ratios, first gear first.</summary>
     public const string Gearbox = "gearbox";
 
-    /// <summary>Mass, drag, and where the axles are — everything about the machine that is not a
-    /// sound but decides how it moves, and therefore what the sounds do.</summary>
+    /// <summary>Mass, drag, and where the axles are: how it moves, and so what the sounds do.</summary>
     public const string Chassis = "chassis";
 
     /// <summary>A bogie: a frame with wheelsets in it. Profile is a rail vehicle in the
     /// <see cref="ModelLibrary"/>, which carries the wheel and where the axles sit.</summary>
     public const string Bogie = "bogie";
 
-    /// <summary>What it runs on. Profile is a track in the <see cref="ModelLibrary"/> — this is the
-    /// one "part" that belongs to the WORLD rather than to the machine, and it is here because what
-    /// a wheel sounds like is half the rail's doing.</summary>
+    /// <summary>What it runs on. Profile is a track in the <see cref="ModelLibrary"/>: the one part
+    /// that belongs to the world, here because what a wheel sounds like is half the rail's doing.</summary>
     public const string Track = "track";
 
     /// <summary>A prime mover that is not a road engine: a diesel-electric's alternator set, an
     /// electric drive, a steam front end. Profile names which.</summary>
     public const string Traction = "traction";
 
-    /// <summary>An air horn. Profile is a horn in the <see cref="ModelLibrary"/>. A lorry, a bus, a
-    /// locomotive and a ship all have one, which is why it is a part and not a train fitting.</summary>
+    /// <summary>An air horn. Profile is a horn in the <see cref="ModelLibrary"/>.</summary>
     public const string Horn = "horn";
 
     /// <summary>A steam whistle. Profile is a whistle in the <see cref="ModelLibrary"/>.</summary>
@@ -71,16 +63,9 @@ public static class MachineModels
 }
 
 /// <summary>
-/// One part of a machine: what kind of thing it is, which one, and where it sits.
-///
-/// The shape is deliberately the same for a tailpipe, a rotor and a fountain — a model, a profile
-/// within that model, an offset in the machine's own frame, and how big a source it is. That is what
-/// lets a helicopter, a bus and a tree be the same kind of thing rather than three subsystems.
-///
-/// <see cref="Settings"/> and <see cref="Series"/> carry the numbers a model needs that are not
-/// worth a preset of their own: a gearbox's ratios are a list, a chassis is half a dozen scalars.
-/// A setting that is absent is not zero — it means "whatever the profile said", which is what makes
-/// a machine definition able to say "a school bus, but with open pipes" in three lines.
+/// One part of a machine: what kind of thing it is, which one, and where it sits. The same shape for
+/// a tailpipe, a rotor and a fountain. <see cref="Settings"/> and <see cref="Series"/> carry the
+/// numbers not worth a preset; an absent setting means "whatever the profile said", not zero.
 /// </summary>
 public sealed record MachinePart
 {
@@ -89,23 +74,17 @@ public sealed record MachinePart
     /// <summary>A preset key within this model's registry, or empty to take the base machine's.</summary>
     public string Profile { get; init; } = "";
 
-    /// <summary>What the part is made of — a name in the <see cref="AcousticRegistry"/>. Empty means
-    /// the profile's own. A body's panels, an airframe's skin and a fountain's basin are all this.</summary>
+    /// <summary>What the part is made of, a name in the <see cref="AcousticRegistry"/>; empty for the
+    /// profile's own.</summary>
     public string Material { get; init; } = "";
 
     /// <summary>Where this part sits relative to the machine's origin, in its own frame
     /// (x right, y up, z forward). The emission point, for a part that emits.</summary>
     public Vector3 At { get; init; }
 
-    /// <summary>
-    /// How big this source is, metres. Zero means a point.
-    ///
-    /// Carried here because a source's size is a property of the source — a 40 m airliner and a
-    /// tailpipe are not the same thing at ten metres, and the crowd already proves the mixer can
-    /// place an extended source (<see cref="Loudness.Place(float, float)"/>). Nothing consumes it
-    /// yet: replacing ClientAudioSystem's car-sized `MathF.Max(reference, 3f)` with it is the next
-    /// step, where extent and audibility ranking are done together.
-    /// </summary>
+    /// <summary>How big this source is, metres; zero is a point. The mixer can place an extended source
+    /// (<see cref="Loudness.Place(float, float)"/>).</summary>
+    // TODO: nothing reads it yet; it should replace ClientAudioSystem's car-sized MathF.Max(reference, 3f), with audibility ranking.
     public float ExtentMetres { get; init; }
 
     /// <summary>What this part measures at one metre, dB SPL, where that is a property of the part
@@ -115,8 +94,7 @@ public sealed record MachinePart
     /// <summary>Scalars this model needs. Case-insensitive; an absent key means "unchanged".</summary>
     public IReadOnlyDictionary<string, float> Settings { get; init; } = EmptySettings;
 
-    /// <summary>The one thing a part can need that is a LIST of numbers: a gearbox's ratios, a
-    /// body's panel spans.</summary>
+    /// <summary>A list of numbers: a gearbox's ratios, a body's panel spans.</summary>
     public IReadOnlyList<float> Series { get; init; } = Array.Empty<float>();
 
     internal static readonly IReadOnlyDictionary<string, float> EmptySettings =
@@ -128,27 +106,16 @@ public sealed record MachinePart
 }
 
 /// <summary>
-/// A machine, as a parts list.
-///
-/// This is the thing a map can name and — the point of it — a map author can WRITE. Until now the
-/// composition of a vehicle lived in C#: <see cref="VehicleProfile.Presets"/> is a dictionary of
-/// factory functions, so a map could say "nascar_v8" and could not say "that engine, in that body,
-/// with the pipes out of the side". A definition is data, so it can come from a JSON file next to
-/// the maps, and the same structure describes a helicopter (a turbine and two rotors) or a fountain.
+/// A machine as a parts list: data a map author can write (a JSON file next to the maps), where
+/// <see cref="VehicleProfile.Presets"/> can only be named.
 /// </summary>
 public sealed record MachineDefinition
 {
     public required string Id { get; init; }
     public string Name { get; init; } = "";
 
-    /// <summary>
-    /// A machine this one starts from, or empty to build from parts alone.
-    ///
-    /// Most authored machines are a variation on something that exists — the same car with a
-    /// different exhaust, the same bus without a silencer — and saying so is both shorter and more
-    /// honest than restating every number. It is also how the built-in library stays the library:
-    /// an author's machine can lean on it instead of copying it.
-    /// </summary>
+    /// <summary>A machine this one starts from (the same car with a different exhaust), or empty to
+    /// build from parts alone.</summary>
     public string Base { get; init; } = "";
 
     public IReadOnlyList<MachinePart> Parts { get; init; } = Array.Empty<MachinePart>();
@@ -164,11 +131,8 @@ public sealed record MachineDefinition
 
 /// <summary>
 /// Machines by name: the built-in library, plus whatever a map's author has written.
-///
-/// <see cref="Describe"/> and <see cref="Assemble"/> are the two directions of one translation, and
-/// the round trip is the test that the vocabulary above is actually sufficient: every built-in
-/// vehicle preset must survive being taken apart into parts and put back together unchanged
-/// (MachineTests). That is what makes it safe for an authored machine to use the same parts.
+/// <see cref="Describe"/> and <see cref="Assemble"/> are inverses: every built-in preset survives the
+/// round trip unchanged (MachineTests), which proves the parts vocabulary holds the whole library.
 /// </summary>
 public static class MachineRegistry
 {
@@ -180,12 +144,9 @@ public static class MachineRegistry
     public static IReadOnlyDictionary<string, MachineDefinition> Authored => _authored;
 
     /// <summary>
-    /// Reads every <c>*.json</c> in a directory as a machine definition.
-    ///
-    /// Additive, and never fatal: a machine that will not parse is logged past and the rest load,
-    /// because one bad file in an author's folder should not take a map's whole field of cars with
-    /// it. Built the same way as AcousticRegistry — build a fresh dictionary and publish it — so a
-    /// reload cannot be observed half-done by the audio thread.
+    /// Reads every <c>*.json</c> in a directory as a machine definition. Additive and never fatal: a
+    /// file that will not parse is logged past. A fresh dictionary is published whole, so the audio
+    /// thread never sees a reload half done.
     /// </summary>
     public static int Load(string directory)
     {
@@ -216,13 +177,9 @@ public static class MachineRegistry
         }
     }
 
-    /// <summary>
-    /// Loads the authored library once, from the well-known folder next to the maps.
-    ///
-    /// Called by whatever starts up — server, client, lab — because all three have to agree about
-    /// what a machine name means. They resolve it relative to their own working directory, the same
-    /// way prefabs/ already does.
-    /// </summary>
+    /// <summary>Loads the authored library once, from the folder next to the maps (relative to the
+    /// working directory, as prefabs/ is). Server, client and lab all call it: they must agree on what
+    /// a machine name means.</summary>
     public static void EnsureLoaded(string directory = "machines")
     {
         if (_loadedFrom == directory) return;
@@ -256,13 +213,8 @@ public static class MachineRegistry
         }
     }
 
-    /// <summary>
-    /// A machine by name — an authored one if there is one, otherwise the built-in of that name
-    /// taken apart into its parts.
-    ///
-    /// Authored first on purpose: it is how a map replaces a car in the library without editing the
-    /// library, and how the library itself can eventually move out of C# a machine at a time.
-    /// </summary>
+    /// <summary>A machine by name: an authored one first (so a map can replace a car in the library),
+    /// otherwise the built-in of that name taken apart into its parts.</summary>
     public static MachineDefinition? Find(string id)
     {
         if (string.IsNullOrEmpty(id)) return null;
@@ -284,13 +236,8 @@ public static class MachineRegistry
                .Concat(ModelLibrary.Ids(ModelLibrary.Kinds.Vehicle)
                    .Where(k => !VehicleProfile.Presets.ContainsKey(k) && !_authored.ContainsKey(k)));
 
-    /// <summary>
-    /// The vehicle a machine names, assembled — authored parts if the machine is authored, and the
-    /// built-in preset otherwise.
-    ///
-    /// Memoised for the same reason <see cref="VehicleProfile.ByName"/> is: this is asked on the
-    /// audio path, per car per frame, and assembling one builds a whole engine.
-    /// </summary>
+    /// <summary>The vehicle a machine names, assembled. Memoised, as <see cref="VehicleProfile.ByName"/>
+    /// is: the audio path asks per car per frame, and assembling one builds a whole engine.</summary>
     public static VehicleProfile VehicleFor(string id)
     {
         // A model changed in the world editor (a vehicle, or an engine some vehicle has) makes every
@@ -318,10 +265,8 @@ public static class MachineRegistry
 
     private static volatile int _seenGeneration = int.MinValue;
 
-    /// <summary>
-    /// A vehicle as it is without the world editor: an authored parts list assembled, or the built-in
-    /// preset. What a vehicle model's version 0 is.
-    /// </summary>
+    /// <summary>A vehicle as it is without the world editor (a vehicle model's version 0): an authored
+    /// parts list assembled, or the built-in preset.</summary>
     public static VehicleProfile Unedited(string id)
     {
         if (_authored.TryGetValue(id, out var def)) return Assemble(def);
@@ -360,13 +305,9 @@ public static class MachineRegistry
     // ── Parts → machine ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Builds the vehicle a parts list describes.
-    ///
-    /// Every part is an OVERRIDE of what the base machine already had, which is why a definition can
-    /// be three lines: the machine starts as the whole base vehicle, and only what the parts name is
-    /// changed. Everything the vocabulary has no part for (the air system, the siren, the fan, where
-    /// the engine is) comes with the base. With no base, the parts have to carry an engine between
-    /// them — the one thing a vehicle cannot be assembled without.
+    /// Builds the vehicle a parts list describes. It starts as the whole base vehicle and each part
+    /// overrides only what it names; what has no part (the air system, the siren, the fan, where the
+    /// engine is) comes with the base. With no base, the parts must carry an engine.
     /// </summary>
     public static VehicleProfile Assemble(MachineDefinition def)
     {
@@ -477,15 +418,9 @@ public static class MachineRegistry
     }
 
     /// <summary>
-    /// The machine a definition starts from.
-    ///
-    /// A machine may name ITSELF as its base, and that is the override idiom rather than a mistake:
-    /// "v8_sports, but heavier" is written as a machine called v8_sports based on v8_sports, and it
-    /// means the BUILT-IN of that name. Reading it as the authored one is an infinite regress — the
-    /// first thing the test folder did was hang the test run.
-    ///
-    /// Anything deeper (a based on b based on a) is a genuine authoring error and says so, rather
-    /// than filling a stack.
+    /// The machine a definition starts from. A machine based on itself means the built-in of that
+    /// name ("v8_sports, but heavier"): read as the authored one it recursed for ever and hung the test
+    /// run. A deeper circle (a on b on a) is an authoring error and says so.
     /// </summary>
     private static VehicleProfile? ResolveBase(MachineDefinition def)
     {
@@ -506,14 +441,8 @@ public static class MachineRegistry
 
     // ── Machine → parts ─────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The same vehicle, taken apart: the parts list a built-in preset already IS.
-    ///
-    /// Nothing is invented here. A vehicle has always been a rig — an exhaust three metres behind an
-    /// intake, a body, a set of tyres — and this only says so in the vocabulary an author can use.
-    /// It is what exports the built-in library to data, and the round trip through
-    /// <see cref="Assemble"/> is the proof that the vocabulary can hold everything the library has.
-    /// </summary>
+    /// <summary>The same vehicle taken apart into parts: how the built-in library is exported to data.
+    /// The inverse of <see cref="Assemble"/>.</summary>
     public static MachineDefinition Describe(VehicleProfile v, string id)
     {
         var parts = new List<MachinePart>
@@ -602,11 +531,8 @@ public static class MachineRegistry
     }
 
     /// <summary>
-    /// Which engine preset this is, by name.
-    ///
-    /// A vehicle holds an EngineProfile, not the key it came from — and its own EngineKey is the
-    /// VEHICLE's key, which is not always the engine's (the school bus runs a "diesel_bus"). The
-    /// engine's Name is unique across the library and a test holds it that way.
+    /// Which engine preset this is, found by the engine's Name, which a test holds unique. A vehicle's
+    /// own EngineKey is the vehicle's key, not always the engine's (the school bus runs "diesel_bus").
     /// </summary>
     public static string EngineKeyOf(EngineProfile engine)
     {
@@ -621,21 +547,16 @@ public static class MachineRegistry
 
     private static Dictionary<string, string>? _engineKeys;
 
-    /// <summary>Which tyre this is. A TyreProfile is all scalars, so the record's own equality is
-    /// the whole answer — and the settings above carry every field anyway, so a miss costs nothing.</summary>
+    /// <summary>Which tyre this is, by record equality (all scalars). A miss costs nothing: the
+    /// settings carry every field anyway.</summary>
     private static string TyreKeyOf(TyreProfile t)
     {
         foreach (var kv in TyreProfile.Presets) if (kv.Value() == t) return kv.Key;
         return "";
     }
 
-    /// <summary>
-    /// Which body this is.
-    ///
-    /// Not the record's own equality: VehicleBody holds its panel spans in an ARRAY, and a record
-    /// compares arrays by reference, so two identical bodies built a moment apart are unequal. The
-    /// spans are compared as the list of numbers they are.
-    /// </summary>
+    /// <summary>Which body this is. Not by record equality: a record compares its panel-span array by
+    /// reference, so two identical bodies are unequal; the spans are compared as numbers.</summary>
     private static string BodyKeyOf(VehicleBody? body)
     {
         if (body == null) return "";
@@ -659,8 +580,7 @@ public static class MachineRegistry
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    /// <summary>What a machine looks like on disk. Nullable throughout: an omitted field means
-    /// "unchanged", and that is the whole reason a definition can be short.</summary>
+    /// <summary>A machine on disk. Nullable throughout: an omitted field means "unchanged".</summary>
     internal sealed class MachineDto
     {
         public string? Id { get; set; }
@@ -704,7 +624,7 @@ public static class MachineRegistry
         };
     }
 
-    /// <summary>A definition as it would be written on disk. The export side of the library.</summary>
+    /// <summary>A definition as it would be written on disk.</summary>
     public static string ToJson(MachineDefinition def)
     {
         var dto = new MachineDto

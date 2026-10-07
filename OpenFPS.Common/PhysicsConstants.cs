@@ -9,11 +9,9 @@ public static class PhysicsConstants
     public const float PlayerHeight = 1.8f;
 
     /// <summary>
-    /// What a person is made of, to anything that meets one: a body, soft and lossy (AcousticRegistry
-    /// "Skin"), as a dead one already was. A player used to be "Generic" — five gigapascals and
-    /// ringing, the knock of a stone pillar — and then took on whatever floor they stood on, because
-    /// movement wrote the floor under them into their own material: bumping into somebody on a
-    /// concrete roof was bumping into concrete (Cody, 2026-10-05: "am I made of concrete too?").
+    /// What a person is made of to anything that meets one: soft and lossy (AcousticRegistry "Skin").
+    /// Not "Generic", the knock of a stone pillar, and not the floor under them, which movement once
+    /// wrote into their material (Cody, 2026-10-05: "am I made of concrete too?").
     /// </summary>
     public const string PersonMaterial = "Skin";
 
@@ -23,35 +21,25 @@ public static class PhysicsConstants
     public const float WalkSpeed = 4.5f;
 
     /// <summary>
-    /// How much faster a body moves while it is running, as a multiple of <see cref="WalkSpeed"/>.
-    ///
-    /// Running is not simply "walking, but sooner". It is what decides how loud and how often a body
-    /// is heard — its footfalls come twice as often, it breathes afterwards, and it is audible from
-    /// further away — so the number is a physical claim about a body and not a tuning knob for the
-    /// feel of the keyboard. 4.5 m/s is a brisk jog; 7.2 is a hard run and about what a fit person
-    /// sustains.
+    /// The run as a multiple of <see cref="WalkSpeed"/>: a claim about a body, since it decides how
+    /// often and how loud it is heard. 4.5 m/s is a brisk jog; 7.2 a hard run a fit person sustains.
     /// </summary>
     public const float SprintMultiplier = 1.6f;
 
-    /// <summary>Metres per second at a run. One number, client and server, exactly as with the walk.</summary>
+    /// <summary>Metres per second at a run, client and server.</summary>
     public const float SprintSpeed = WalkSpeed * SprintMultiplier;
 
     /// <summary>
-    /// Metres per second at most with a person over your shoulder (anything in your arms heavier than
-    /// you could sling on your back: HandsService.CarryCapacityKg). Walking and running are the same
-    /// pace with one: nobody runs carrying a body.
-    ///
-    /// 1.0 m/s is about three quarters of an unloaded person's own walking pace (1.3 to 1.4 m/s; the
-    /// people walking the city go at 1.35), which is where self-selected speed falls under a load that
-    /// heavy: an adult casualty is about the carrier's own weight, beyond any pack in the load-carriage
-    /// studies, which already show the pace dropping as the load grows. An estimate, not a measurement.
+    /// Metres per second at most, walking or running, with a person over your shoulder (anything heavier
+    /// than HandsService.CarryCapacityKg). About three quarters of an unloaded walk (1.3 to 1.4 m/s; the
+    /// city's walkers go at 1.35): an adult is about the carrier's weight, beyond any pack in the
+    /// load-carriage studies, which show the pace falling with load. An estimate, not a measurement.
     /// </summary>
     public const float CarryingSpeed = 1.0f;
 
     /// <summary>
-    /// How fast a body moves on foot this step: the walk or the run, held under <paramref name="limit"/>
-    /// when there is one (more than zero). The client and the server both ask this, so a player carrying
-    /// a body predicts the same pace the server allows and is not pulled back every step.
+    /// How fast a body moves on foot this step: the walk or the run, held under a positive
+    /// <paramref name="limit"/>. Asked by client and server alike, or prediction is pulled back every step.
     /// </summary>
     public static float FootSpeed(bool sprint, float limit)
     {
@@ -60,17 +48,15 @@ public static class PhysicsConstants
     }
 
     /// <summary>
-    /// Metres per second straight up at the moment a standing jump leaves the ground: sqrt(2 g h)
-    /// for a rise of half a metre, about what a person manages from a standstill. It was 5.0, which
-    /// under the old gravity of 15 rose 0.83 m.
+    /// Metres per second straight up as a standing jump leaves the ground: sqrt(2 g h) for a rise of
+    /// half a metre, about what a person manages from a standstill.
     /// </summary>
     public const float JumpPower = 3.13f;
 
     /// <summary>
-    /// The Earth's, m/s². It was 15, chosen for how a jump felt; Cody (2026-10-04): "if you fall from
-    /// somewhere, shouldn't you fall at the speed of gravity on earth?" A fall is heard — how long
-    /// the drop takes before the landing, how hard the landing is — so it is a claim about the world.
-    /// The eighteen metres off the Brandt Court roof take 1.92 s at this, 1.55 s at the old 15.
+    /// The Earth's, m/s² (Cody, 2026-10-04: "shouldn't you fall at the speed of gravity on earth?"). A
+    /// fall is heard, so it is a claim about the world: the eighteen metres off the Brandt Court roof
+    /// take 1.92 s, against 1.55 s at the 15 once chosen for how a jump felt.
     /// </summary>
     public const float Gravity = 9.81f;
     public const float StepHeight = 0.4f;
@@ -83,24 +69,18 @@ public static class PhysicsConstants
     /// <summary>How far E reaches for something on the ground, metres: an arm and a step. The client
     /// chooses which thing within it (PickUp); the server counts what is left within it.</summary>
     public const float PickUpReach = 2.0f;
-    public const float EarshotRange = 200.0f;
     public const float CollisionSearchRadius = 5.0f;
 
     // --- Simulation Timing ---
-    // ONE rate for the whole game: the server's authoritative tick, the client's fixed
-    // prediction step, and the tick period the interpolator reconstructs server time from.
-    // A mismatch here is not a smoothness problem, it is a divergence problem — the client
-    // integrates WalkSpeed over its own step while the server integrates it over the tick,
-    // so the two disagree about how far a held key moves you.
+    // One rate for the server's tick, the client's prediction step and the interpolator: a mismatch
+    // makes the two disagree about how far a held key moves you.
     public const int TickRate = 30; // 30 ticks per second, client and server
     public const float FixedDeltaTime = 1.0f / TickRate; // ~0.0333s
 
     /// <summary>
-    /// Longest real interval a fixed-step loop may bank before it stops trying to catch up.
-    /// A GC pause, a debugger break or a suspended laptop hands the loop an arbitrarily large
-    /// elapsed time; without this the next iteration runs hundreds of ticks back to back, which
-    /// looks to every connected player like the world fast-forwarding. Both client heads already
-    /// clamp here — the server clamps to the same number so the three agree about the worst case.
+    /// Longest real interval a fixed-step loop banks before it stops catching up: after a GC pause or a
+    /// suspended laptop it would run hundreds of ticks back to back, the world fast-forwarding. Both
+    /// client heads and the server clamp here.
     /// </summary>
     public const float MaxCatchUpSeconds = 0.2f;
 

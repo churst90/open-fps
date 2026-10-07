@@ -1,20 +1,12 @@
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A level crossing's gate mechanism: the arm, the motor that lifts it and the stop it lands on.
-///
-/// What a gate does is fixed by the rules a crossing is built to (49 CFR 234.223 and the AREMA
-/// signal manual): the arm starts down no sooner than three seconds after the lights and bells start,
-/// is down in ten to fifteen seconds, and is horizontal at least five seconds before the train. It goes
-/// down under its own weight — the counterweights leave it a little arm-heavy — with the motor run as a
-/// brake (snubbing) so it settles onto its rest rather than falling onto it; and it is driven up by the
-/// motor through a reduction gearbox, faster than it came down, until it reaches the vertical and the
-/// hold-clear device takes it.
-///
-/// What is heard is the mechanism in its case at the foot of the mast: a small DC motor (a commutator
-/// buzz and the first gear mesh, both following its speed), its brushes, and the clunk of the arm
-/// arriving at each end. Levels are an assumption, to be judged by ear: no measured figure for a gate
-/// mechanism was found. The motor's figure is a small geared DC motor in a closed steel case.
+/// A level crossing's gate mechanism: the arm, the motor that lifts it and the stop it lands on. By
+/// 49 CFR 234.223 and the AREMA signal manual the arm starts down at least three seconds after the
+/// lights and bells, is down in ten to fifteen, and is horizontal at least five before the train. It
+/// falls under its own weight with the motor snubbing it, and is driven up faster through a gearbox.
+/// Heard: the motor's commutator buzz and first gear mesh in its case, and the clunk at each end. The
+/// levels are an assumption to judge by ear; no measured figure for a gate mechanism was found.
 /// </summary>
 public sealed record CrossingGateSpec
 {
@@ -99,8 +91,7 @@ public sealed class GateArm
             case Phase.Lowering:
             {
                 if (!closed) { State = Phase.Raising; _t = 0f; _from = Raised; Driving = true; break; }
-                // Under its own weight, snubbed: a smooth start and a smooth arrival, the whole way in
-                // DownSeconds (from part way up, in that share of it).
+                // Snubbed, smooth at both ends; from part way up, in that share of DownSeconds.
                 float span = MathF.Max(0.1f, Spec.DownSeconds * _from);
                 float f = Math.Clamp(_t / span, 0f, 1f);
                 Raised = _from * 0.5f * (1f + MathF.Cos(MathF.PI * f));

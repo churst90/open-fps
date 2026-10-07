@@ -1,36 +1,22 @@
-using System;
-
 namespace OpenFPS.Common;
 
 /// <summary>What a body just did with its lungs, if anything.</summary>
 public readonly record struct Breath(bool Taken, bool IsInhale, float LevelDb, float Hz, float DecaySeconds);
 
 /// <summary>
-/// How hard a body is working, and the sound that makes.
-///
-/// A body that has been running is audible after it stops, and that is information rather than
-/// decoration: it says somebody came this way at speed, it says which of two people is the one who
-/// has been chasing you, and it is the only thing a body still makes once it has stopped moving and
-/// gone quiet. A body standing still in a room with you is otherwise completely silent.
-///
-/// Nothing here needs a recording. A breath is turbulent air through a narrow aperture, which is a
-/// HISS — one of the four characters the transient synthesiser already has — and the three numbers
-/// that separate a gasp from a sigh are its level, its brightness and how long it lasts. What makes
-/// it sound like effort is not the timbre of any one breath but the RATE and the depth, and both of
-/// those come out of the model below rather than being chosen.
-///
-/// Exertion is an integrator with two time constants, because getting out of breath and getting your
-/// breath back are not the same process at the same speed: a hard run has you breathing heavily
-/// within half a minute and you are still recovering a minute after you stop. That asymmetry is most
-/// of why a winded body is a useful signal — it outlasts the running by long enough to find.
+/// How hard a body is working, and the breathing that makes. A body that has been running is audible
+/// after it stops: somebody came this way at speed, or this is the one who was chasing you. A breath is
+/// turbulent air through a narrow opening, a hiss whose level, brightness and length separate a gasp
+/// from a sigh; effort is heard in the rate and depth, which come out of the model. Exertion rises over
+/// <see cref="OnsetSeconds"/> and falls over the longer <see cref="RecoverySeconds"/>, so a winded body
+/// outlasts its running by long enough to find.
 /// </summary>
 public sealed class Breathing
 {
-    /// <summary>Seconds for exertion to close most of the gap UP toward what the body is demanding.</summary>
+    /// <summary>The time constant of exertion rising toward what the body demands, s.</summary>
     public const float OnsetSeconds = 15f;
 
-    /// <summary>Seconds for it to fall back down at rest. Longer than the onset: recovery is slower
-    /// than exhaustion, which is what makes a body that has been running findable after it stops.</summary>
+    /// <summary>The time constant of exertion falling at rest, s: recovery is slower than exhaustion.</summary>
     public const float RecoverySeconds = 35f;
 
     /// <summary>Breaths per second at complete rest — about fifteen a minute.</summary>
@@ -39,8 +25,7 @@ public sealed class Breathing
     /// <summary>Breaths per second flat out — about fifty a minute.</summary>
     public const float MaxRateHz = 0.83f;
 
-    /// <summary>Peak level of an exhale at one metre with the body at rest, dB SPL. Inaudible across
-    /// a room, which is correct: a resting body's breathing is not a cue, it is a fact about it.</summary>
+    /// <summary>Peak level of an exhale at one metre at rest, dB SPL: inaudible across a room.</summary>
     public const float RestingLevelDb = 22f;
 
     /// <summary>Peak level at full exertion, dB SPL. Loud enough to place someone in a corridor.</summary>
@@ -52,12 +37,10 @@ public sealed class Breathing
     private float _exertion;
     private float _phase;
 
-    /// <summary>How hard the body is working, 0 at rest and 1 flat out. Lags the effort in both
-    /// directions, which is the point of it.</summary>
+    /// <summary>How hard the body is working, 0 at rest and 1 flat out, lagging the effort both ways.</summary>
     public float Exertion => _exertion;
 
-    /// <summary>Forgets the body's state, for a spawn or a teleport — a body that arrives somewhere
-    /// has not just run there.</summary>
+    /// <summary>For a spawn or a teleport: a body that arrives somewhere has not just run there.</summary>
     public void Forget()
     {
         _exertion = 0f;
@@ -65,18 +48,15 @@ public sealed class Breathing
     }
 
     /// <summary>
-    /// Advances one step. <paramref name="speed"/> is the body's own horizontal speed in m/s;
-    /// <paramref name="topSpeed"/> is what the body can do flat out, so that "working hard" means the
-    /// same thing for anything that moves under its own power rather than being a number about players.
+    /// Advances one step. <paramref name="topSpeed"/> is what this body can do flat out, so "working
+    /// hard" means the same for anything that moves under its own power.
     /// </summary>
     public bool Update(float speed, float dt, out Breath breath, float topSpeed = PhysicsConstants.SprintSpeed)
     {
         breath = default;
         if (dt <= 0f) return false;
 
-        // What the body is asking of itself, 0 to 1. Effort goes with speed; standing still asks
-        // nothing. Clamped rather than extrapolated, because a body carried faster than it can run is
-        // not working harder — it is not working at all.
+        // Clamped: a body carried faster than it can run is not working harder.
         float demand = topSpeed > 0.01f ? Math.Clamp(speed / topSpeed, 0f, 1f) : 0f;
 
         float tau = demand > _exertion ? OnsetSeconds : RecoverySeconds;
@@ -87,18 +67,15 @@ public sealed class Breathing
         float was = _phase;
         _phase += rate * dt;
 
-        // One cycle is an inhale and, a little under half a cycle later, an exhale. Which of the two
-        // is louder moves with effort: at rest the exhale is the audible half and the inhale is
-        // nothing, and a winded body is the other way round — the gasp going IN is the loud part.
+        // At rest the exhale is the audible half; winded, the gasp going in is the loud part.
         bool inhale = _phase >= 1f;
         bool exhale = was < 0.45f && _phase >= 0.45f;
         if (_phase >= 1f) _phase -= 1f;
         if (!inhale && !exhale) return false;
 
-        // An inhale is drawn through a narrower opening than an exhale is pushed through, so it is
-        // both brighter and shorter. Everything else about a breath is how hard the body is working.
+        // An inhale is drawn through a narrower opening than an exhale, so it is brighter and shorter.
         float level = RestingLevelDb + (MaxLevelDb - RestingLevelDb) * _exertion;
-        if (inhale) level -= 8f * (1f - _exertion);   // quiet at rest, equal to the exhale flat out
+        if (inhale) level -= 8f * (1f - _exertion);   // 8 dB under at rest, 2 dB over the exhale flat out
         else        level -= 2f * _exertion;
 
         if (level < AudibleFloorDb) return false;

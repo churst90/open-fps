@@ -1,9 +1,7 @@
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A vehicle's horn and siren as one byte on the wire (EntityState.Signals).
-///
-/// Bit 0 the horn is held, bit 1 the siren is switched on, bits 2-4 its tone (a <see cref="SirenMode"/>),
+/// A vehicle's horn and siren as one byte on the wire (EntityState.Signals). Bit 0 the horn is held, bit 1 the siren is switched on, bits 2-4 its tone (a <see cref="SirenMode"/>),
 /// bit 7 the switches are a driver's. A vehicle somebody can drive always carries bit 7, so its siren
 /// follows its switch whether or not anybody is in it now; traffic never does, and its siren is read
 /// off what it is doing (<see cref="SirenController"/>).

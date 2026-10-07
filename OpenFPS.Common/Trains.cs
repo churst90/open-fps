@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
@@ -6,49 +5,17 @@ using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
-//  A train, described as the machine it is.
-//
-//  The first thing to get right about a train is that MOST OF IT IS NOT THE ENGINE. A locomotive
-//  under power is one source among forty, and from the lineside the sound of a train going past is
-//  overwhelmingly steel wheels on steel rail. Every vehicle makes it, whether it is driven or towed,
-//  loaded or empty; a hundred cars of unpowered freight are deafening. So the parts list here starts
-//  with the wheels and the track and treats traction as something some vehicles happen to have.
-//
-//  ROLLING NOISE is roughness. Neither the wheel nor the rail is smooth: both carry a corrugation
-//  spectrum a few microns deep, and rolling one over the other at V metres a second turns a
-//  wavelength of lambda metres into a frequency of V/lambda hertz. That single sentence explains why
-//  rolling noise is broadband from a hundred hertz to five kilohertz, why the whole spectrum slides
-//  UP as the train speeds up, and why a train is quieter on new rail. Three things then radiate it:
-//  the RAIL, which rings from a couple of hundred hertz to a kilohertz and carries several metres of
-//  itself into the sound; the SLEEPERS, which are big flat things and radiate the bottom; and the
-//  WHEEL, which is a steel ring with almost no damping and owns everything above about a kilohertz.
-//
-//  Two details that are not details:
-//
-//    THE CONTACT PATCH FILTERS IT. Wheel and rail touch over an ellipse about a centimetre long, and
-//    an irregularity shorter than that is averaged away instead of being ridden over. So there is a
-//    low-pass in WAVELENGTH, which means its corner in HERTZ rises with speed — and it is why a slow
-//    train rumbles and a fast one hisses, rather than simply being a louder version of the same thing.
-//
-//    TREAD BRAKES ROUGHEN WHEELS. A cast-iron block dragging on the tread wears it into corrugations;
-//    a disc brake leaves the tread alone. That is the whole reason a freight train is ten decibels
-//    louder than a passenger train at the same speed, and it is a property of the BRAKE, in the parts
-//    list, not a "freight is louder" rule.
-//
-//  IMPACTS are geometry. Jointed rail has a gap every rail length, and the wheel drops into it: the
-//  impulse is the unsprung mass meeting the Hertzian contact spring, which gives a force of a couple
-//  of hundred kilonewtons over two or three milliseconds and rings the same wheel and the same rail
-//  that the roughness does. Everything about the RHYTHM — the two-and-two of a bogie, the gap to the
-//  next car, how it all speeds up — falls out of the wheelbase, the bogie centres, the car length,
-//  the rail length and the speed. Nothing sequences it.
-//
-//  CURVE SQUEAL is a wheelset being asked to go round a corner it cannot steer into. The axle is
-//  rigid, so on a curve the wheels have to creep sideways; past a few milliradians the friction
-//  saturates and stick-slip drives one of the wheel's own modes into a limit cycle. Whether a train
-//  squeals is therefore a question about the curve radius and the bogie wheelbase, and about nothing
-//  else.
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// A train as the machine it is (docs/TRAINS.md). Most of it is not the engine: from the lineside a
+// train is steel wheels on steel rail, so the parts list starts with the wheels and the track.
+// - Rolling noise is roughness, a wavelength λ ridden at V becoming V/λ Hz, radiated by the rail, the
+//   sleepers and the wheel. The centimetre-long contact patch averages shorter wavelengths away, so a
+//   slow train rumbles and a fast one hisses.
+// - Tread brakes corrugate the wheels: about ten decibels between freight and passenger, a property
+//   of the brake, not a rule about freight.
+// - Joint impacts (a couple of hundred kilonewtons over 2-3 ms) and their rhythm fall out of the
+//   wheelbase, bogie centres, car length, rail length and speed.
+// - Curve squeal is a rigid wheelset creeping sideways on a curve until stick-slip locks a wheel mode:
+//   the curve radius and the bogie wheelbase decide it.
 
 public enum RailTraction { None, DieselElectric, Electric, Steam }
 public enum SleeperKind { Timber, Concrete, SlabTrack }
@@ -58,32 +25,27 @@ public sealed record WheelsetSpec
 {
     [Tunable("m", 0.3, 2.2, "Wheel diameter on the tread. A small wheel rings higher.", Label = "diameter", Step = 0.005)]
     public required float DiameterMetres { get; init; }
-    /// <summary>The rim, metres: how thick radially and how wide across the tread. These two and the
-    /// diameter are the wheel's NOTE — an out-of-plane ring's modes go as n(n^2-1)/sqrt(n^2+1) times
-    /// the square root of its bending stiffness over its mass, divided by the square of its radius,
-    /// so a tram's small wheel rings a good deal higher than a locomotive's.</summary>
+    /// <summary>The rim, metres, radially: with its width and the diameter, the wheel's note. A ring's
+    /// out-of-plane modes go as n(n²-1)/√(n²+1) √(EI/m) / r², so a tram's small wheel rings higher.</summary>
     [Tunable("m", 0.01, 0.1, "Radial thickness of the rim. With the width and diameter it sets the wheel's ring.", Label = "rim thickness", Step = 0.001)]
     public float RimThicknessMetres { get; init; } = 0.030f;
     [Tunable("m", 0.05, 0.2, "Width of the rim across the tread.", Label = "rim width", Step = 0.001)]
     public float RimWidthMetres { get; init; } = 0.135f;
-    /// <summary>Unsprung mass per wheel, kg: the wheel, its share of the axle and of the gear. This
-    /// is what meets the rail at a joint, and with the Hertzian contact stiffness it sets both how
-    /// hard and how LONG the blow is.</summary>
+    /// <summary>Unsprung mass per wheel, kg: with the Hertzian contact stiffness, how hard and how long
+    /// the blow at a joint is.</summary>
     [Tunable("kg", 100, 4000, "Unsprung mass per wheel: the wheel, its share of the axle and the gear. More mass hits a rail joint harder and longer.", Label = "unsprung mass per wheel", Step = 10)]
     public float UnsprungKg { get; init; } = 900f;
     [Tunable("t", 1, 40, "Weight carried by one axle.", Label = "axle load", Step = 0.5)]
     public float AxleLoadTonnes { get; init; } = 16f;
-    /// <summary>Braked on the tread by a cast-iron block, which corrugates it. Worth eight to ten
-    /// decibels over a disc-braked wheel and it is the single biggest difference between a freight
-    /// train and a passenger train.</summary>
+    /// <summary>Braked on the tread by a cast-iron block, which corrugates it: eight to ten decibels over
+    /// a disc-braked wheel.</summary>
     [Tunable("", 0, 1, "Braked by a cast-iron block on the tread, which roughens it: eight to ten decibels louder than a disc-braked wheel.", Label = "tread braked")]
     public bool TreadBraked { get; init; }
-    /// <summary>Damping in the wheel. Bare steel is about 1e-4 — nothing at all, which is why wheels
-    /// squeal; a ring damper or a resilient wheel takes it to 1e-2 and they stop.</summary>
+    /// <summary>Damping in the wheel: bare steel about 1e-4, and squeals; a ring damper or a resilient
+    /// wheel about 1e-2, and does not.</summary>
     [Tunable("", 0.00001, 0.05, "Damping in the wheel. Bare steel is about 0.0001 and squeals; a damped or resilient wheel is about 0.01 and does not.", Label = "wheel loss factor", Step = 0.00001)]
     public float LossFactor { get; init; } = 1.2e-4f;
-    /// <summary>A flat spot worn on the tread, metres. It bangs once a revolution. Zero for a wheel
-    /// in good order.</summary>
+    /// <summary>A flat spot worn on the tread, metres, banging once a revolution; zero for none.</summary>
     [Tunable("m", 0, 0.1, "Length of a flat spot worn on the tread. It bangs once a revolution. Zero for a wheel in good order.", Label = "wheel flat length", Step = 0.005)]
     public float FlatLengthMetres { get; init; }
 }
@@ -104,13 +66,12 @@ public sealed record TrackSpec
     public float SleeperSpacingMetres { get; init; } = 0.60f;
     [Tunable("", 0, 0, "What the rail is laid on: timber, concrete or slab.")]
     public SleeperKind Sleepers { get; init; } = SleeperKind.Concrete;
-    /// <summary>Rail length between joints, metres. ZERO means continuous welded rail and no
-    /// clatter at all — which is most modern main line, and is why a train on good track is a hiss
-    /// and a roar rather than the sound everybody thinks a train makes.</summary>
+    /// <summary>Rail length between joints, metres. Zero is continuous welded rail, most modern main
+    /// line, with no clatter at all.</summary>
     [Tunable("m", 0, 50, "Rail length between joints. Zero is continuous welded rail with no clatter.", Label = "joint spacing", Step = 0.1)]
     public float JointSpacingMetres { get; init; }
-    /// <summary>The dip at a joint, radians of angle the wheel drops through. A tight new joint is
-    /// 3 milliradians, a hammered old one 15. This times the speed IS the impact velocity.</summary>
+    /// <summary>The angle the wheel drops through at a joint, radians: 3 milliradians for a tight new
+    /// joint, 15 for a hammered old one. Times the speed, the impact velocity.</summary>
     [Tunable("rad", 0, 0.03, "Angle the wheel drops through at a joint. A tight new joint is 0.003, a hammered old one 0.015.", Label = "joint dip", Step = 0.001)]
     public float JointDipRadians { get; init; } = 0.008f;
     /// <summary>Joints on the two rails offset by half a rail length, so the bangs come twice as
@@ -125,18 +86,13 @@ public sealed record TrackSpec
     /// wheelset has to creep sideways enough to squeal.</summary>
     [Tunable("m", 0, 5000, "Curve radius. Zero is straight. Below about 400 m a rigid wheelset creeps sideways enough to squeal.", Label = "curve radius", Step = 5)]
     public float CurveRadiusMetres { get; init; }
-    /// <summary>A rail bolted to a bridge deck, or a train in a cutting or a tunnel, radiates into
-    /// something. This is the extra, dB, and it is the reason a bridge is audible from a mile off.
-    /// </summary>
+    /// <summary>The extra, dB, when the rail radiates into a structure: a bridge deck, a cutting or a
+    /// tunnel.</summary>
     [Tunable("dB", 0, 20, "Extra level from a structure the rail radiates into: a bridge deck, a cutting or a tunnel. Zero on open ground.", Label = "bridge or tunnel extra", Step = 1)]
     public float StructureDb { get; init; }
 
-    /// <summary>
-    /// The pinned-pinned resonance: where half a bending wavelength in the rail equals one sleeper
-    /// bay, so the rail flaps between its supports and radiates hard. It is the peak in the middle
-    /// of every rolling-noise spectrum and it is a property of the rail section and the sleeper
-    /// spacing, nothing else.
-    /// </summary>
+    /// <summary>The pinned-pinned resonance, where half a bending wavelength in the rail is one sleeper
+    /// bay: the peak in the middle of every rolling-noise spectrum.</summary>
     [JsonIgnore]
     public float PinnedPinnedHz
     {
@@ -149,7 +105,7 @@ public sealed record TrackSpec
         }
     }
 
-    /// <summary>The sleepers going under at this speed — the low flutter under a slow train.</summary>
+    /// <summary>The sleepers going under at this speed: the low flutter under a slow train.</summary>
     public float SleeperPassHz(float mps) => mps / MathF.Max(0.2f, SleeperSpacingMetres);
 
     public static TrackSpec WeldedMainLine => new()
@@ -159,11 +115,8 @@ public sealed record TrackSpec
         JointSpacingMetres = 0f, RoughnessDb = 0f,
     };
 
-    /// <summary>
-    /// Jointed rail in thirty-nine foot lengths — the North American standard, because that is what
-    /// fit in a gondola. At 25 m/s a bogie's two axles are 0.10 s apart and the two bogies of an
-    /// 85 foot car 0.74 s apart, which is the clickety-clack exactly: two quick, a gap, two quick.
-    /// </summary>
+    /// <summary>Jointed rail in 39 ft lengths, the North American standard (what fit in a gondola). At
+    /// 25 m/s a bogie's axles are 0.10 s apart and an 85 ft car's bogies 0.74 s: clickety-clack.</summary>
     public static TrackSpec JointedTimber => new()
     {
         Name = "jointed rail, 39 ft lengths on timber",
@@ -195,31 +148,28 @@ public sealed record TrackSpec
 /// <summary>Electric traction: a motor, a gearbox and the inverter that feeds it.</summary>
 public sealed record ElectricDriveSpec
 {
-    /// <summary>Teeth on the pinion and on the gearwheel. Their ratio is the gearing and the PINION
-    /// COUNT times the motor's revolutions is the mesh frequency — the whine that rises smoothly
-    /// with speed and is the most recognisable thing about an electric train.</summary>
+    /// <summary>Teeth on the pinion and the gearwheel. Pinion teeth times motor revolutions is the mesh
+    /// whine that rises with speed.</summary>
     [Tunable("", 8, 40, "Teeth on the motor pinion. Pinion teeth times motor revolutions is the gear whine.", Label = "pinion teeth")]
     public int PinionTeeth { get; init; } = 17;
     [Tunable("", 30, 150, "Teeth on the axle gearwheel. With the pinion this is the gear ratio.", Label = "gearwheel teeth")]
     public int GearTeeth { get; init; } = 96;
-    /// <summary>Pole PAIRS. The magnetic pull in the air gap goes round at the electrical frequency
-    /// and pulses at twice it, so a four-pole motor at 3,000 rpm hums at 200 Hz.</summary>
+    /// <summary>Pole pairs. The air-gap pull pulses at twice the electrical frequency: a four-pole motor
+    /// at 3,000 rpm hums at 200 Hz.</summary>
     [Tunable("", 1, 6, "Pole pairs of the traction motor. The magnetic hum is at twice the electrical frequency.", Label = "pole pairs")]
     public int PolePairs { get; init; } = 2;
-    /// <summary>Stator slots. The rotor's teeth going past them is a much higher tone and it is the
-    /// thin edge on top of the hum.</summary>
+    /// <summary>Stator slots: the rotor passing them is the thin high tone over the hum.</summary>
     [Tunable("", 12, 120, "Slots in the stator. The rotor passing them is the thin high tone over the hum.", Label = "stator slots")]
     public int StatorSlots { get; init; } = 48;
     [Tunable("rpm", 1000, 8000, "Motor speed at the vehicle's top speed.", Label = "motor top speed", Step = 100)]
     public float MotorMaxRpm { get; init; } = 4200f;
-    /// <summary>The inverter's carrier, Hz, while it is modulating asynchronously — the FIXED tone
-    /// at a standstill and at low speed, before it locks to the motor.</summary>
+    /// <summary>The inverter's carrier, Hz, while modulating asynchronously: the fixed tone at a
+    /// standstill and low speed, before it locks to the motor.</summary>
     [Tunable("Hz", 0, 5000, "The inverter's fixed switching tone at a standstill and low speed. Zero for no inverter.", Label = "inverter carrier", Step = 10)]
     public float CarrierHz { get; init; } = 1050f;
-    /// <summary>Pulse counts the inverter steps down through as the output frequency rises. In each
-    /// mode the carrier is that many times the motor's electrical frequency, so the tone RISES
-    /// through the mode and DROPS at each change — the staircase everybody knows from a modern train
-    /// pulling out, and an emergent thing: the drive is trying to keep its switching losses down.</summary>
+    /// <summary>Pulse counts the inverter steps down through as the output frequency rises. In each mode
+    /// the carrier is that many times the electrical frequency, so the tone rises through a mode and
+    /// drops at each change: the staircase of a modern train pulling out.</summary>
     public int[] PulseModes { get; init; } = { 27, 15, 9, 5, 3, 1 };
     /// <summary>Motor output frequency at which asynchronous modulation gives way, Hz.</summary>
     public float SyncFromHz { get; init; } = 20f;
@@ -239,34 +189,30 @@ public sealed record SteamLocoSpec
 {
     [Tunable("m", 0.8, 2.4, "Diameter of the driving wheels. With the speed it sets how fast the engine barks.", Label = "driving wheel diameter", Step = 0.01)]
     public required float DriverDiameterMetres { get; init; }
-    /// <summary>Cylinders. Two is the usual; each is double-acting, so each gives TWO exhaust beats
-    /// per revolution of the drivers and a two-cylinder engine barks four times a turn.</summary>
+    /// <summary>Cylinders, each double-acting: a two-cylinder engine barks four times a turn.</summary>
     [Tunable("", 1, 4, "Cylinders. Each is double acting, so a two-cylinder engine barks four times a turn.")]
     public int Cylinders { get; init; } = 2;
     [Tunable("m", 0.2, 1, "Cylinder bore.", Label = "cylinder bore", Step = 0.005)]
     public float CylinderBoreMetres { get; init; } = 0.635f;
     [Tunable("m", 0.3, 1.1, "Piston stroke.", Label = "cylinder stroke", Step = 0.005)]
     public float CylinderStrokeMetres { get; init; } = 0.762f;
-    /// <summary>The blast nozzle at the top of the exhaust pipe, metres. Small nozzle, fast jet,
-    /// sharp bark and a fierce draught on the fire; big nozzle, soft exhaust, lazy fire. Draughting
-    /// a locomotive was the whole art, and it is audible.</summary>
+    /// <summary>The blast nozzle at the top of the exhaust pipe, metres: small is a fast jet and a sharp
+    /// bark, big a soft exhaust.</summary>
     [Tunable("m", 0.05, 0.3, "Diameter of the blast nozzle under the chimney. Smaller is a faster jet and a sharper bark.", Label = "blast nozzle diameter", Step = 0.005)]
     public float BlastNozzleMetres { get; init; } = 0.135f;
-    /// <summary>The chimney above it: a pipe open at both ends, so the chuff is tuned to c/2L of it.
-    /// A tall thin stack rings; a short wide one barks.</summary>
+    /// <summary>The chimney, open at both ends, so the chuff is tuned to c/2L. A tall thin stack rings; a
+    /// short wide one barks.</summary>
     [Tunable("m", 0.2, 1, "Inside diameter of the chimney. A short wide stack barks; a tall thin one rings.", Label = "chimney diameter", Step = 0.01)]
     public float StackDiameterMetres { get; init; } = 0.48f;
     [Tunable("m", 0.3, 3, "Length of the chimney. It is open at both ends, so the chuff is tuned to a half wave of it.", Label = "chimney length", Step = 0.01)]
     public float StackLengthMetres { get; init; } = 0.95f;
     [Tunable("kPa", 500, 2200, "Boiler pressure, gauge.", Label = "boiler pressure", Step = 10)]
     public float BoilerKPa { get; init; } = 1550f;
-    /// <summary>How far the valve gear is out of square, as a fraction of a beat. No locomotive was
-    /// ever perfect and the uneven beat is most of the character — a engine with a bad setting limps
-    /// audibly at every revolution.</summary>
+    /// <summary>How far the valve gear is out of square, as a fraction of a beat: the uneven beat is most
+    /// of the character, and a bad setting limps every revolution.</summary>
     [Tunable("", 0, 0.2, "How far the valve gear is out of square, as a fraction of a beat. Larger makes the engine limp at every turn.", Label = "valve setting error", Step = 0.005)]
     public float ValveSettingError { get; init; } = 0.035f;
-    /// <summary>The blower, and every joint in the thing: a continuous hiss that is there even when
-    /// the regulator is shut, which is why a steam locomotive drifting is not silent.</summary>
+    /// <summary>The blower and every leaking joint: a hiss even with the regulator shut.</summary>
     [Tunable("dB", 50, 110, "Level at one metre of the blower and leaking joints: a hiss that is there even with the regulator shut.", Label = "steam leak level", Step = 1)]
     public float LeakageDb { get; init; } = 86f;
     /// <summary>Rods, crossheads and axleboxes, all with play in them: a metallic clank at the
@@ -280,7 +226,7 @@ public sealed record SteamLocoSpec
 
     /// <summary>Exhaust beats a second at this speed. Two cylinders, double acting: four a turn.</summary>
     public float ChuffHz(float mps) => 2f * Cylinders * mps / (MathF.PI * MathF.Max(0.3f, DriverDiameterMetres));
-    /// <summary>The chimney's first resonance — the note in the bark.</summary>
+    /// <summary>The chimney's first resonance: the note in the bark.</summary>
     [JsonIgnore]
     public float StackHz => 343f / (2f * MathF.Max(0.1f, StackLengthMetres + 0.3f * StackDiameterMetres));
 }
@@ -290,16 +236,15 @@ public sealed record RailTractionSpec
 {
     [Tunable("", 0, 0, "What drives the vehicle: nothing, diesel-electric, electric or steam.", Label = "traction")]
     public required RailTraction Kind { get; init; }
-    /// <summary>Diesel-electric: the prime mover, as an ordinary EngineProfile key. A locomotive
-    /// diesel is a diesel — very big, very slow and governed to fixed notches, and the same cylinder
-    /// model runs it.</summary>
+    /// <summary>Diesel-electric: the prime mover, an ordinary EngineProfile key run by the same cylinder
+    /// model.</summary>
     [Tunable("", 0, 0, "The diesel prime mover, as an engine model.", Label = "engine", Choices = "models:engine")]
     public string? EngineKey { get; init; }
-    /// <summary>The notches the governor will hold, rpm. A diesel-electric does not have a throttle,
-    /// it has eight steps, and that is why it changes speed in audible jumps.</summary>
+    /// <summary>The notches the governor will hold, rpm: eight steps, not a throttle, so it changes
+    /// speed in audible jumps.</summary>
     public float[] NotchRpm { get; init; } = Array.Empty<float>();
-    /// <summary>Radiator fans: how many blades, how fast, and how loud. On a big locomotive these
-    /// are a metre and a half across and they are most of what you hear at idle.</summary>
+    /// <summary>Radiator fans: blades, speed and level. On a big locomotive they are a metre and a half
+    /// across and most of what you hear at idle.</summary>
     [Tunable("", 2, 20, "Blades on each radiator fan. Blades times fan speed is the blade tone.", Label = "radiator fan blades")]
     public int FanBlades { get; init; } = 10;
     [Tunable("rpm", 200, 3000, "Radiator fan speed.", Label = "radiator fan speed", Step = 10)]
@@ -321,12 +266,11 @@ public sealed record RailVehicleSpec
     public required string Name { get; init; }
     [Tunable("m", 3, 40, "Length over the couplers.", Label = "length", Step = 0.1)]
     public required float LengthMetres { get; init; }
-    /// <summary>Distance between the two bogie centres. With the length this is the whole rhythm of
-    /// a passing train.</summary>
+    /// <summary>Distance between the two bogie centres: with the length, the rhythm of a passing
+    /// train.</summary>
     [Tunable("m", 1, 30, "Distance between the two bogie centres. With the length this sets the rhythm of a passing train.", Label = "bogie centres", Step = 0.1)]
     public required float BogieCentresMetres { get; init; }
-    /// <summary>Axle spacing within a bogie. This is the "clack-CLACK" — the two axles of one bogie
-    /// hitting the same joint a tenth of a second apart.</summary>
+    /// <summary>Axle spacing within a bogie: the "clack-CLACK" of its two axles at one joint.</summary>
     [Tunable("m", 0.8, 8, "Axle spacing within a bogie: the gap between the two clacks of one bogie at a joint.", Label = "bogie wheelbase", Step = 0.05)]
     public float BogieWheelbaseMetres { get; init; } = 2.56f;
     [Tunable("", 1, 6, "Bogies under the vehicle.")]
@@ -337,8 +281,7 @@ public sealed record RailVehicleSpec
     [Tunable("t", 5, 300, "Mass of the whole vehicle.", Label = "mass", Step = 1)]
     public float MassTonnes { get; init; } = 45f;
     public RailTractionSpec? Traction { get; init; }
-    /// <summary>An empty steel box drums; a loaded one does not. This is the level of the body's own
-    /// ring, dB, excited by everything the bogies do.</summary>
+    /// <summary>The level of the body's own ring, dB, excited by the bogies: an empty steel box drums.</summary>
     [Tunable("dB", 0, 100, "Level at one metre of the body's own ring. An empty steel box drums; zero for none.", Label = "body drum level", Step = 1)]
     public float BodyDrumDb { get; init; }
     [Tunable("Hz", 20, 200, "Where the body rings when it drums.", Label = "body drum pitch", Step = 1)]
@@ -348,9 +291,7 @@ public sealed record RailVehicleSpec
     public int Axles => Bogies * AxlesPerBogie;
 }
 
-/// <summary>A train: vehicles in order, on a track.</summary>
-/// <summary>How many of one vehicle, in a row. A named pair rather than a tuple, because this is a
-/// thing an author writes in a file.</summary>
+/// <summary>How many of one vehicle, in a row: a named pair, because an author writes it in a file.</summary>
 public sealed record ConsistEntry
 {
     public required RailVehicleSpec Vehicle { get; init; }
@@ -360,14 +301,11 @@ public sealed record ConsistEntry
 }
 
 /// <summary>
-/// Where a train's sound comes from, as a list a SERVER can place and a CLIENT can index — the same
-/// list, in the same order, that <c>TrainSynth</c> builds its sources in. A train is not one pressure
-/// at one point: it is a line of bogies, drives, a body drum, a horn and a bell spread over the
-/// consist, each with its own place along it. The server spawns one entity per entry here at
-/// <c>head − Along</c> round the track (so a 55 m set wraps a 26 m corner correctly), and the client
-/// runs ONE synth for the whole train and gives entity <c>i</c> source <c>i</c>. If this and
-/// <c>TrainSynth.BuildVehicle</c> ever disagree about the order, every bogie plays the wrong place;
-/// <c>RailAndSignalTests</c> holds them together.
+/// Where a train's sound comes from (bogies, drives, body drums, horn, bell along the consist), as a
+/// list the server places and the client indexes. The server spawns one entity per entry at
+/// <c>head − Along</c> round the track, so a 55 m set wraps a 26 m corner; the client runs one synth
+/// and gives entity <c>i</c> source <c>i</c>. This order must match <c>TrainSynth.BuildVehicle</c>'s,
+/// or every bogie plays in the wrong place (<c>RailAndSignalTests</c> holds them together).
 /// </summary>
 public static class TrainLayout
 {
@@ -383,15 +321,15 @@ public static class TrainLayout
         public bool IsSignal => Kind is Kind.Horn or Kind.Whistle or Kind.Bell;
     }
 
-    /// <summary>
-    /// The rolling noise of one bogie at 1 m, at the profile's typical speed. The reference is per
-    /// axle at 100 km/h and the speed law the model measures is 28·log10(V) (see docs/TRAINS.md), so
-    /// this is the same number the synth will actually make, which is what a level for ranking must be.
-    /// </summary>
     /// <summary>A road locomotive's exhaust stack in run 8, at 1 m: certification-style figures put
     /// the whole locomotive at 90-96 dBA at 30 m, which is about this at the stack.</summary>
     public const float LocomotiveStackDb = 112f;
 
+    /// <summary>
+    /// The rolling noise of one bogie at 1 m, at the profile's typical speed: the per-axle reference at
+    /// 100 km/h under the speed law the model measures, 28·log10(V) (docs/TRAINS.md), so the level used
+    /// for ranking is what the synth makes.
+    /// </summary>
     public static float BogieLevelDb(TrainProfile p, RailVehicleSpec v)
         => p.RollingReferenceDb
          + 10f * MathF.Log10(MathF.Max(1, v.AxlesPerBogie))
@@ -467,6 +405,7 @@ public static class TrainLayout
     }
 }
 
+/// <summary>A train: vehicles in order, on a track.</summary>
 public sealed record TrainProfile
 {
     [Tunable("", 0, 0, "The train's name as it is said.")]
@@ -477,18 +416,10 @@ public sealed record TrainProfile
     [Tunable("m/s", 1, 90, "The speed the train usually runs at. Rolling noise rises with it.", Label = "typical speed", Step = 0.5)]
     public float TypicalSpeedMps { get; init; } = 25f;
     /// <summary>
-    /// Per wheelset at one metre at 100 km/h on reference-rough rail, disc braked.
-    ///
-    /// The one anchor in the whole rail model. The SHAPE and the way it changes with speed come out
-    /// of the roughness spectrum, the contact patch and the three radiators; the absolute level is
-    /// taken from what a train measures at the lineside, because the radiation integrals for a rail
-    /// on ballast are not worth pretending to know to a decibel.
-    ///
-    /// And it is anchored against a PASS-BY and not against a single axle, because that is the
-    /// measurement that exists: eighty-two A-weighted decibels at 7.5 metres from a disc-braked
-    /// passenger train at 80 km/h. Setting it by extrapolating one axle back to a metre and then
-    /// forward again put it twelve decibels light, which is what a line of sources does to anybody
-    /// who reasons about one of them.
+    /// Per wheelset at one metre at 100 km/h on reference-rough rail, disc braked: the rail model's one
+    /// anchor. Anchored against a pass-by, the measurement that exists (82 dBA at 7.5 m from a
+    /// disc-braked passenger train at 80 km/h); extrapolating one axle to a metre and back put it twelve
+    /// decibels light.
     /// </summary>
     [Tunable("dB", 80, 120, "Rolling noise per wheelset at one metre at 100 km/h on reference rail, disc braked. The one level anchor of the rail model.", Label = "rolling noise per wheelset", Step = 1, Source = "pass-by measurement: 82 dBA at 7.5 m from a disc-braked passenger train at 80 km/h")]
     public float RollingReferenceDb { get; init; } = 104f;
@@ -501,11 +432,9 @@ public sealed record TrainProfile
     // ── The vehicles ────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// A GE Genesis: the cowl-bodied diesel-electric on the front of most Amtrak trains away from
-    /// the wires. A 7FDL16 — sixteen cylinders of 228 mm bore and 267 mm stroke, turbocharged,
-    /// governed from 440 rpm at idle to 1,050 in notch 8, which is a firing rate of 59 Hz to 140 Hz.
-    /// Disc-braked wheels, so it is quiet on the rail for its weight; and two radiator fans that are
-    /// most of what you hear when it is standing.
+    /// A GE Genesis, on most Amtrak trains away from the wires: a turbocharged 7FDL16 (228 mm bore,
+    /// 267 mm stroke) from 440 rpm at idle to 1,050 in notch 8, firing 59 to 140 Hz. Disc-braked; its
+    /// radiator fans are most of what you hear when it stands.
     /// </summary>
     public static RailVehicleSpec GenesisP42 => new()
     {
@@ -528,10 +457,8 @@ public sealed record TrainProfile
     };
 
     /// <summary>
-    /// An EMD road switcher on a freight: a 645E3 two-stroke V16, which fires every cylinder every
-    /// revolution and so makes twice the firing rate of a four-stroke of the same size — 240 Hz at
-    /// its 900 rpm maximum against a Genesis's 140. That, and the Roots blower geared off the crank,
-    /// is the whole of why an EMD sounds like an EMD.
+    /// An EMD road switcher: a 645E3 two-stroke V16 firing every cylinder every revolution, 240 Hz at
+    /// its 900 rpm maximum against a Genesis's 140. That and the Roots blower are the EMD sound.
     /// </summary>
     public static RailVehicleSpec EmdRoadSwitcher => new()
     {
@@ -568,10 +495,8 @@ public sealed record TrainProfile
         BodyDrumDb = 74f, BodyDrumHz = 55f,
     };
 
-    /// <summary>
-    /// A freight wagon: shorter, stiffer, tread-braked and usually empty. The tread brakes are worth
-    /// nine decibels over the coach on their own, and an empty steel body drums under it.
-    /// </summary>
+    /// <summary>A freight wagon: shorter, stiffer, tread-braked (nine decibels over the coach) and
+    /// usually empty, so its body drums.</summary>
     public static RailVehicleSpec FreightWagon => new()
     {
         Name = "bogie freight wagon, tread braked",
@@ -586,11 +511,8 @@ public sealed record TrainProfile
         BodyDrumDb = 80f, BodyDrumHz = 44f,
     };
 
-    /// <summary>
-    /// A low-floor tram: small wheels, resilient (rubber-sprung) so they do NOT squeal the way a
-    /// solid wheel would, a four-pole motor through a 5.6:1 gearbox, and an inverter stepping down
-    /// its pulse count as it accelerates.
-    /// </summary>
+    /// <summary>A low-floor tram: small resilient wheels that do not squeal, a four-pole motor through a
+    /// 5.6:1 gearbox, and an inverter stepping down its pulse count as it accelerates.</summary>
     public static RailVehicleSpec LightRailCar => new()
     {
         Name = "low-floor light rail vehicle",
@@ -616,10 +538,8 @@ public sealed record TrainProfile
         BodyDrumDb = 70f, BodyDrumHz = 60f,
     };
 
-    /// <summary>
-    /// A heavy metro car on older chopper-fed DC motors: no inverter staircase, just the gear whine
-    /// and the motor growl, solid wheels that squeal on every curve, and slab track in a tunnel.
-    /// </summary>
+    /// <summary>A heavy metro car on chopper-fed DC motors: no inverter staircase, gear whine and motor
+    /// growl, and solid wheels that squeal on every curve.</summary>
     public static RailVehicleSpec MetroCar => new()
     {
         Name = "heavy metro car, DC traction",
@@ -646,10 +566,8 @@ public sealed record TrainProfile
     };
 
     /// <summary>
-    /// A 4-8-4: two cylinders of 25 by 30 inches on 1.85 m drivers, 225 psi, a 135 mm blast nozzle
-    /// under a 0.95 m chimney. At 25 m/s the drivers turn 4.3 times a second and it barks 17 times —
-    /// fast enough that the beats have started to run together into a roar, which is what a big
-    /// engine at speed actually sounds like and not what people expect.
+    /// A 4-8-4: two 25 by 30 inch cylinders, 1.85 m drivers, 225 psi, a 135 mm blast nozzle under a
+    /// 0.95 m chimney. At 25 m/s it barks 17 times a second, the beats running together into a roar.
     /// </summary>
     public static RailVehicleSpec SteamNorthern => new()
     {

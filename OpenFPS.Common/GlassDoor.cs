@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -6,49 +5,28 @@ using static OpenFPS.Common.DoorPhysics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A glass storefront or building entrance door, simulated as the object, the way <see cref="KnobDoor"/> and
-/// <see cref="PushBarDoor"/> are: the city's apartment towers' front doors (glass-pushbar: a key outside, a
-/// push bar inside) and the shops' pull doors (glass-pull: a pull handle each side, no latch).
-///
-/// The parts:
-///
-///   The LEAF: a medium-stile aluminium door (stiles and top rail 89 mm by 44.5 mm, bottom rail 254 mm,
-///   extruded 6063 with 3.2 mm walls), about 15 kg of frame round a 12 mm toughened pane (or a 6+6 laminated
-///   one) in EPDM glazing gaskets. The frame bends as a hinged plate with the stiles' and rails' stiffness and
-///   the whole door's mass; the pane is a second plate, simply supported in its gaskets, riding on the frame:
-///   when the frame is jolted the pane is thrown about in its own modes from 50 Hz up. Those are the "thunk"
-///   of a glass door. The frame's tube walls ring at a thin aluminium plate's density: its clank.
-///
-///   The FRAME the leaf shuts into: an aluminium storefront frame (44.5 by 114 mm tubes, 3.2 mm walls)
-///   anchored in the opening, with a weatherstrip along the stop on the lock jamb and the head: an EPDM
-///   compression bulb (fresh, or taken a set), or a polypropylene pile, or on an old door none left. The leaf
-///   lands on the seal; squashed flat, a bulb is still a rubber pad, a pile a mat of fibres; with none the
-///   stile meets the stop leg aluminium on aluminium.
-///
-///   The LATCH (glass-pushbar only): a narrow-stile deadlatch (Adams Rite 4900 type), a 20 g bolt thrown
-///   12.7 mm by its spring, with a 45 degree bevel, into a stainless strike in the jamb. The key outside or
-///   the bar inside draws it in.
-///
-///   The PUSH BAR (inside, glass-pushbar): a narrow-stile rim exit device's touchbar, an extruded aluminium
-///   case on the stiles with a steel mechanism and a plastic pad, as on the steel push-bar door.
-///
-///   The PULL HANDLE: a 25 mm stainless tube on two posts 305 mm apart, bolted through the lock stile with
-///   a little play. Gripped, the hand damps it; let go, it rings at its clamped-tube modes (1.6, 4.5, 8.8
-///   kHz).
-///
-///   The CLOSER: a hydraulic overhead closer, size 4: a spring through a rack and pinion, oil through a sweep
-///   valve and a latch valve, a check valve that lets it open easily and a backcheck past 70 degrees.
-///
-///   The SWEEP: a brush sweep on the bottom rail that wipes the threshold for the first few centimetres of
-///   travel: a soft hiss from its fibres catching and letting go, the only noise in a pull door.
-///
-/// Offset pivots, ball-bearing: they are silent.
-///
-/// Push and pull: a door opens away from the side its stop is on. From that side it is pushed (the bar, or a
-/// hand shoving the push side's handle); from the other it is pulled (a hand gripping the pull handle and
-/// drawing the leaf). From the keyed side of a front door the key has drawn the latch first (see
-/// <see cref="LockCylinder"/>): the hand pulls on the handle with the key held turned, and lets the key go
-/// once the leaf is clear, and the latch springs back out against its stop.
+/// A glass storefront or entrance door, simulated as the object, as <see cref="KnobDoor"/> and
+/// <see cref="PushBarDoor"/> are: the towers' front doors (glass-pushbar: a key outside, a push bar inside)
+/// and the shops' pull doors (glass-pull: a handle each side, no latch).
+/// <list type="bullet">
+/// <item>The leaf: a medium-stile aluminium door (6063, 3.2 mm walls), about 15 kg of frame round a 12 mm
+/// toughened pane (or 6+6 laminated) in EPDM gaskets. The pane rides on the frame as a second plate and,
+/// jolted, is thrown about in its own modes from 50 Hz: the thunk of a glass door. The tube walls are its
+/// clank.</item>
+/// <item>The frame it shuts into: 44.5 by 114 mm aluminium tubes with a weatherstrip on the stop: an EPDM
+/// bulb (fresh or set), a polypropylene pile, or on an old door none, aluminium on aluminium.</item>
+/// <item>The latch (glass-pushbar): an Adams Rite 4900 type deadlatch, a 20 g bolt thrown 12.7 mm with a 45
+/// degree bevel, into a stainless strike; the key or the bar draws it.</item>
+/// <item>The push bar (inside): a narrow-stile rim device's touchbar, as on the steel door.</item>
+/// <item>The pull handle: a 25 mm stainless tube on posts 305 mm apart, bolted through with a little play;
+/// the grip damps it, and let go it rings at its clamped-tube modes (1.6, 4.5, 8.8 kHz).</item>
+/// <item>The closer: hydraulic overhead, size 4, with a sweep and a latch valve, a check valve, and a
+/// backcheck past 70 degrees.</item>
+/// <item>The sweep: a brush wiping the threshold for the first few centimetres, the only noise in a pull door.</item>
+/// </list>
+/// Offset ball-bearing pivots are silent. A door is pushed from its stop side and pulled from the other; from
+/// the keyed side the key has drawn the latch first (<see cref="LockCylinder"/>) and is let go once the leaf
+/// is clear.
 /// </summary>
 public static class GlassDoor
 {
@@ -106,13 +84,9 @@ public static class GlassDoor
 
     private enum Seal { Bulb, Pile, None }
 
-    /// <summary>
-    /// Each character: the stop's seal and how far it stands proud of the aluminium stop leg, mm (a new EPDM
-    /// bulb 3.5, one taken a compression set 2.5, a pile weatherstrip 3, none at all on an old door); how fast
-    /// the closer's latch valve brings the latch edge in, m/s (a well-set closer 0.2, one opened up to slam
-    /// 0.7); the pull handle's play on its through-bolts, mm (none on a tight one); the bar's crank play, mm;
-    /// the sweep's drag, N.
-    /// </summary>
+    /// <summary>Each character: the seal and how proud of the stop it stands, mm (a new bulb 3.5, a set one
+    /// 2.5, a pile 3, none); the closer's latch-zone speed at the edge, m/s (well set 0.2, opened up to slam
+    /// 0.7); the handle's play on its bolts, mm; the bar's crank play, mm; the sweep's drag, N.</summary>
     private static (Seal Seal, double SealMm, double LatchSpeed, double HandlePlayMm, double CrankPlayMm, double SweepDrag) Character(int variant)
         => (((variant % Variants) + Variants) % Variants) switch
         {
@@ -133,9 +107,8 @@ public static class GlassDoor
         return sim.Output();
     }
 
-    /// <summary>Shutting on the closer: the last few degrees at the latch valve's speed, onto the bulb and
-    /// into the latch. It starts a few hundredths of a second before the first contact, so the server sends
-    /// it when the leaf arrives.</summary>
+    /// <summary>Shutting on the closer: the last few degrees at the latch valve's speed, onto the seal and
+    /// into the latch, starting a few hundredths of a second before the first contact.</summary>
     public static float[] RenderClose(Door door, int sampleRate, Report? report = null)
     {
         var sim = new Sim(door, sampleRate, report);
@@ -147,9 +120,9 @@ public static class GlassDoor
 
     public const string KeyPrefix = "glassdoor:";
 
-    /// <summary>Declared levels, dB at a metre: the render's peak, which is what its buffer's full scale stands
-    /// for (see <see cref="KnobDoor.OpenLevelDb"/>); the client puts each render's own peak in its place.
-    /// Measured at the prefab's 1.0 by 2.1 m leaf (AudioLab --door-models, 2026-10-05).</summary>
+    /// <summary>Declared levels, dB at a metre: the render's peak (<see cref="KnobDoor.OpenLevelDb"/>), the
+    /// client putting each render's own in its place. Measured at a 1.0 by 2.1 m leaf (AudioLab --door-models,
+    /// 2026-10-05).</summary>
     public static float OpenLevelDb(Kind kind, Opening how) => (kind, how) switch
     {
         (Kind.PushBar, Opening.Push) => 122f,
@@ -207,7 +180,6 @@ public static class GlassDoor
 
     // ── Constants, each a property of a part ─────────────────────────────────────────────────────
 
-    private const double G = 9.81;
     private const double AlE = 70e9, AlRho = 2700, GlassE = 70e9, GlassRho = 2500, GlassPoisson = 0.22;
     /// <summary>The leaf's sections: stiles and top rail 89 by 44.5 mm, bottom rail 254 by 44.5 mm, 3.2 mm
     /// (0.125 in) walls: 2.2 and 5.4 kg a metre.</summary>
@@ -216,11 +188,9 @@ public static class GlassDoor
     private const double PaneT = 0.012;
     /// <summary>Hardware on the leaf (the lock body, the pivots' arms, the handle, the bar), kg.</summary>
     private const double HardwareKg = 3;
-    /// <summary>
-    /// The frame's bending stiffness as a plate, N m: two stiles of EI 19,100 N m^2 each across a metre, and
-    /// the rails' (19,100 and 50,700 N m^2) over the leaf's height, about the same, with the pane's own
-    /// 10,600 N m stiffening it through its setting blocks and gaskets. Orthotropy is not modelled.
-    /// </summary>
+    /// <summary>The frame's bending stiffness as a plate, N m: two stiles of EI 19,100 N m^2 across a metre,
+    /// the rails' (19,100 and 50,700) over the height about the same, and the pane's 10,600 N m through its
+    /// gaskets. Orthotropy is not modelled.</summary>
     private const double FrameD = 45000;
     /// <summary>The frame's loss: aluminium itself barely loses; its corner joints, the gaskets and the pane
     /// rubbing in them take about 0.03, and more where they move slowly.</summary>
@@ -254,7 +224,7 @@ public static class GlassDoor
     private const double AlContactK = 3e9, AlContactLambda = 0.15;
     private static readonly double[] JambStops = { 0.3, 1.05, 1.8 };
 
-    // The latch: Adams Rite 4900 type, 1/2 in throw, a stainless bolt, in a lock body in the lock stile.
+    // The latch: Adams Rite 4900 type, 1/2 in throw, a stainless bolt.
     private const double BoltMass = 0.02, Throw = 0.0127, SpringPreload = 6, SpringRate = 400;
     private const double LatchGap = 0.003, LatchHeight = 1.0;
     private const double RetractedAt = 0.0015;
@@ -300,9 +270,8 @@ public static class GlassDoor
     /// <summary>The hand on a handle: about half a kilogram moving with the palm, and an arm that gives way to
     /// the door at about 150 N s/m while it takes it up (ISO 10068, as the knob door's hand).</summary>
     private const double HandKg = 0.5, ArmGive = 150;
-    /// <summary>A shove on a bar (as the steel door's), a shove on a push handle, and a grip's pull, N, with the
-    /// time each comes up over. A hand pulls a door more slowly than it shoves one: the fingers close on the
-    /// handle first.</summary>
+    /// <summary>A shove on a bar, a shove on a push handle and a grip's pull, N, and their ramps: a pull comes
+    /// up more slowly, as the fingers close first.</summary>
     private const double BarShove = 200, HandleShove = 120, HandlePull = 90, ShoveRamp = 0.05, PullRamp = 0.15;
 
     // The sweep: a brush of nylon fibres 0.15 mm thick, 6 mm long, about 100 000 of them over the bottom rail.
@@ -312,7 +281,6 @@ public static class GlassDoor
 
     private sealed class Sim
     {
-        private readonly Door door;
         private readonly int rate;
         private readonly double dt;
         private readonly Report? report;
@@ -387,22 +355,19 @@ public static class GlassDoor
         private static readonly string[] PeakNames = { "frame", "pane", "walls", "jamb", "latch", "bar", "handle", "piston" };
         private readonly double[] peaks = new double[PeakNames.Length];
         private List<float>[]? stems;
-        private readonly double[] ones = { 1 };
 
         public Sim(Door door, int sampleRate, Report? report)
         {
-            this.door = door; this.report = report;
+            this.report = report;
             rate = sampleRate * Oversample; dt = 1.0 / rate;
             rng = new Random(door.Seed);
             width = door.Width; height = door.Height;
             (seal, double bulbMm, latchSpeed, double handlePlayMm, double crankPlayMm, sweepDrag) = Character(door.Variant);
             bulb = bulbMm / 1000; handlePlay = handlePlayMm / 1000; crankPlay = crankPlayMm / 1000;
             hasLatch = door.Kind == Kind.PushBar;
-            // The strike is set so the bolt drops in as the bulb takes the closer's push, and does not bind
-            // on the keeper when the leaf rests on a fresh bulb.
+            // The bolt drops in as the seal takes the closer's push, without binding on a fresh bulb.
             keeperPlay = Math.Max(bulb, 0.0015) + 0.0005;
 
-            // Mass: the pane, the frame's sections round it, the hardware.
             double paneW = width - 2 * Stile, paneH = height - Stile - BottomRail;
             bool laminated = door.Glass == Glazing.Laminated;
             double paneKg = paneW * paneH * (PaneT * GlassRho + (laminated ? 0.00076 * 1070 : 0));
@@ -416,7 +381,6 @@ public static class GlassDoor
             leaf = new Modes(plate.Hz, plate.Loss, plate.Mass, plate.Gain, dt, plate.GainQuad);
             rigidGain = Rho0 / (2 * Math.PI) * height * width * width / 2;
 
-            // The pane: simply supported in its gaskets, carried by the frame.
             double paneD = GlassE * PaneT * PaneT * PaneT / (12 * (1 - GlassPoisson * GlassPoisson)) * (laminated ? LaminatedStiffness : 1);
             paneRhoH = paneKg / (paneW * paneH);
             var panePlate = new Plate(paneW, paneH, paneD, paneRhoH, 0, PaneModeMaxHz, false, rng, 0.02);
@@ -445,7 +409,6 @@ public static class GlassDoor
                     }
                 }
 
-            // The frame's walls and the jamb's, as dense fields struck through patches.
             frameField = new DenseField(FrameGirth, 2 * (width + height), Wall, AlE, AlRho, Poisson,
                                         f => ThinPanelLoss(f) + FrameWallLoss, 300, 16000, rng, dt, DenseField.CapSpacing, FrameFace);
             jambField = new DenseField(JambGirth, 2 * height + width, Wall, AlE, AlRho, Poisson,
@@ -467,7 +430,6 @@ public static class GlassDoor
                 leafHit[i] = frameField.Point(); jambHit[i] = jambField.Point();
             }
 
-            // Latch, strike, lock body.
             latchShape = plate.Shape(width - 0.02, LatchHeight);
             rimHit = frameField.Point();
             latchHit = frameField.Point(); strikeHit = jambField.Point(); strikeBeam = JambShape(LatchHeight);
@@ -477,8 +439,8 @@ public static class GlassDoor
             boltSide = new Mount(BoltMass, BoltSideStiffness, 0.2);
             strikeBody = new Mount(StrikeMass, StrikeMountStiffness, 0.15);
             lockBody = new Mount(LockBodyKg, LockBodyStiffness, LockBodyZeta);
-            // The lock body's case: 1.5 mm steel walls 25 by 120 mm, their first modes from about 5 kHz, damped by
-            // the mechanism packed inside and the stile's pocket round them.
+            // The lock body's case: 1.5 mm steel walls 25 by 120 mm, modes from about 5 kHz, damped by the
+            // mechanism inside and the stile's pocket.
             {
                 var hz = new List<double>(); var l = new List<double>(); var m = new List<double>(); var g = new List<double>();
                 for (int i = 0; i < 8; i++)
@@ -500,7 +462,6 @@ public static class GlassDoor
             rimStop = new Port(StopTab, PortStiffness, frameField.Impedance);
             keeperFriction = new LuGre { MuStatic = 0.4, MuSliding = 0.25, StribeckSpeed = 0.01, Viscous = 0 };
 
-            // The bar, on a front door.
             nearShape = plate.Shape(MountNear, LatchHeight);
             farShape = plate.Shape(width - MountFarInset, LatchHeight);
             padNoise = new AccelerationNoise(BarMass / PadRho, dt);
@@ -516,8 +477,7 @@ public static class GlassDoor
                 caseDrive = new Port(StopTab, PortStiffness, caseField.Impedance);
             }
 
-            // The handle: a clamped tube between its posts, radiating as a cylinder (a dipole until it is a
-            // wavelength round).
+            // The handle radiates as a cylinder: a dipole until it is a wavelength round.
             handleArm = width - HandleInset;
             handleShape = plate.Shape(handleArm, HandleHeight);
             handleHit = frameField.Point();
@@ -573,7 +533,7 @@ public static class GlassDoor
 
         public void StartShut(Opening how)
         {
-            // Resting on its bulbs under the closer's push, nowhere in the aluminium.
+            // On its seal under the closer, nowhere in the aluminium.
             theta = Math.Max(0, bulb - 0.0008) / width;
             foreach (var s in stops) theta = Math.Max(theta, -s.Warp / s.X + 1e-6);
             omega = 0;
@@ -587,10 +547,8 @@ public static class GlassDoor
             }
         }
 
-        /// <summary>
-        /// The leaf let down onto its seals under the closer, a hand on its edge taking out its motion, and
-        /// nothing of it kept: a shut door at rest is where every opening starts.
-        /// </summary>
+        /// <summary>The leaf let down onto its seals, its motion taken out and nothing of it kept: every opening
+        /// starts from a shut door at rest.</summary>
         private void Settle()
         {
             settling = true;
@@ -602,8 +560,7 @@ public static class GlassDoor
         }
         private bool settling;
 
-        /// <summary>A front door from inside: shove the bar, the bolt draws back, the door goes, the bar is let
-        /// go at 20 degrees. (The steel door's script on this door's hardware.)</summary>
+        /// <summary>A front door from inside: the steel door's script, bar let go at 20 degrees.</summary>
         public void ScriptBar(double swingSeconds)
         {
             const double reach = 0.02;
@@ -638,11 +595,8 @@ public static class GlassDoor
             }
         }
 
-        /// <summary>
-        /// A hand on the handle: a pull (fingers round the tube, drawing it), or a push on the push side's
-        /// handle (a shove), until the leaf is clear of its stop; then it carries the leaf to about 85 degrees
-        /// over <paramref name="swingSeconds"/>. With a key, the key is let go once the leaf is 20 mm out.
-        /// </summary>
+        /// <summary>A hand pulls or shoves the handle until the leaf is off its stop, then carries it to about
+        /// 85 degrees over <paramref name="swingSeconds"/>; a key is let go once the leaf is 20 mm out.</summary>
         public void ScriptHandle(Opening how, double swingSeconds)
         {
             const double reach = 0.04;
@@ -715,14 +669,12 @@ public static class GlassDoor
         {
             double torque = 0;
 
-            // The closer: its spring toward shut, its oil against motion.
             double closer = -(CloserTorque + CloserRate * Math.Max(0, theta));
             if (omega > 0) closer -= (CloserOpening + BackcheckShare(theta) * Backcheck) * omega;
             else if (closerLatchValve) closer -= latchDamping * omega;
             torque += closer;
             leaf.Push(shoeShape, closer / CloserShoeX);
 
-            // The stops: the bulb, then aluminium.
             bool near = theta * width < 0.03;
             double bulbSum = 0, alSum = 0;
             for (int i = 0; i < stops.Length; i++)
@@ -756,7 +708,6 @@ public static class GlassDoor
             Note(seal == Seal.None ? "frame-on-frame" : "seal-flat", alSum);
             if (settling) torque -= 300 * omega;
 
-            // The latch.
             double latchEdgeForce = 0, strikeForce = 0, boltForce = 0;
             if (hasLatch)
             {
@@ -794,34 +745,28 @@ public static class GlassDoor
                 }
                 else if (boltInStrike) { Note("keeper", 0); boltInStrike = false; Log($"{time * 1000:F1} ms  bolt in"); }
 
-                // The key, or the dogging, holding the bolt in.
+                // The key or the dogging holds the bolt in; let go, the key turns back at the hand's pace and
+                // the latch spring follows it out.
                 if (keyHeld || dogged || keyReturn > 0)
                 {
-                    // Let go, the key is turned back by the hand to come out: the hold goes back out at the hand's
-                    // pace and the latch spring follows it to its stop.
                     if (!keyHeld && !dogged) keyReturn = Math.Min(Throw + 0.002, keyReturn + KeyBackSpeed * dt);
                     double depth = bolt - (RetractedAt + (keyHeld || dogged ? 0 : keyReturn));
                     if (depth > 0) boltForce -= Math.Max(0, KeyHoldStiffness * depth + KeyHoldDamping * boltRate);
                 }
 
-                // The bolt's own stops in the lock body: out at full throw, and in against the body's back.
-                // They are in the lock body, a steel case on its screws in the stile's pocket: the blow moves the
-                // body, and the body's screws pass it to the stile.
-                // What the bolt meets first is a tab of the body's steel, which passes the blow into the stile's
-                // walls round it. (As a 0.35 kg lump on its screws the body took the highs out of the bolt's 0.1 ms
-                // stop, as the steel door's latch case did before its round 8.)
+                // The bolt's stops are tabs of the lock body's steel, passing the blow into the stile's walls
+                // and the body. As a 0.35 kg lump on its screws the body took the highs out of the 0.1 ms stop.
                 double stopAt = rimStop.X, stopRate = rimStop.V;
                 double fStop = Contact(MetalContactK, BoltStopLambda, bolt - Throw - stopAt, boltRate - stopRate);
                 double fBack = Contact(MetalContactK, BoltStopLambda, -(bolt - RetractedAt * 0.5) + stopAt, -(boltRate - stopRate));
                 boltForce += fBack - fStop;
-                // The blow is along the bolt, in the stile's plane: a tenth of it bends the stile's walls.
+                // Along the bolt, in the stile's plane: a tenth of it bends the walls.
                 frameField.Modes.Push(rimHit, LatchBending * rimStop.Step(fStop - fBack, dt, out double rimHost));
                 lockBody.F += rimHost;
                 lockCase.Push(lockCaseHit, fStop + fBack);
                 Note("bolt-stop", fStop); Note("bolt-back", fBack);
             }
 
-            // The bar and its linkage.
             double caseForce = 0;
             if (hasLatch && caseField != null)
             {
@@ -872,7 +817,6 @@ public static class GlassDoor
                 pBarNow = padField.Modes.Step() + caseField.Modes.Step() + padNoise.Pressure(barAcc) + driveNoise.Pressure(driveAcc);
             }
 
-            // The handle on its posts, and the hand on the handle.
             {
                 double at = handleArm * theta + leaf.At(handleShape), atRate = handleArm * omega + leaf.RateAt(handleShape);
                 if (!handleSeated) { handleY = at; handleV = atRate; handleSeated = true; }
@@ -892,9 +836,8 @@ public static class GlassDoor
                 double palm = 0;
                 if (this.onHandle && handForce > 0)
                 {
-                    // The hand is a mass on the end of the arm: the arm pulls (or shoves) with what the script
-                    // wants and gives way to its own motion while it takes up the door; the palm is a spring
-                    // between it and the tube, which a grip holds both ways.
+                    // The hand is a mass on the arm, which gives way while it takes up the door; the palm is a
+                    // spring to the tube, held both ways by a grip.
                     double sq = PalmStiffness * (handX - handleY) + PalmDamping * (handV - handleV);
                     palm = gripped ? sq : Math.Max(0, sq);
                     double fArm = handForce - (leafPath == null ? ArmGive * handV : 0);
@@ -906,7 +849,6 @@ public static class GlassDoor
                 onHandle += palm;
                 handleAcc = onHandle / HandleKg;
                 handleV += handleAcc * dt; handleY += handleV * dt;
-                // What the posts take, into the stile.
                 frameField.Modes.Push(handleHit, handlePort.Step(-(onHandle - palm), dt, out double hostH));
                 torque += hostH * handleArm; leaf.Push(handleShape, hostH);
                 if (post > 0) handle.Push(new[] { 0.5, 0.0, 0.5, 0.0 }, post);
@@ -914,10 +856,8 @@ public static class GlassDoor
                 SetHandleLoss(this.onHandle && (gripped || palm > 0));
             }
 
-            // Air, the pivots silent.
             torque -= 0.5 * Rho0 * 1.2 * height * Math.Pow(width, 4) / 4 * omega * Math.Abs(omega);
 
-            // Mounts into their hosts.
             if (hasLatch)
             {
                 latchEdgeForce += boltSide.Reaction;
@@ -931,8 +871,8 @@ public static class GlassDoor
                 if (strikeHost != 0) jambBeam.Push(strikeBeam, strikeHost);
             }
 
-            // The pane rides on the frame. Its drive is the frame's acceleration, whose modes stop at 1.5 kHz: it
-            // is worked out at the output rate and held between.
+            // The pane's drive is the frame's acceleration, whose modes stop at 1.5 kHz, so it is worked out at
+            // the output rate and held between.
             if ((paneTick++ & 3) == 0)
                 for (int k = 0; k < pane.N; k++)
                 {
@@ -942,7 +882,6 @@ public static class GlassDoor
                 }
             for (int k = 0; k < pane.N; k++) pane.F[k] += paneDrive[k];
 
-            // Rigid motion.
             double alpha = torque / inertia;
             lastAlpha = alpha;
             omega += alpha * dt; theta += omega * dt;
@@ -953,9 +892,8 @@ public static class GlassDoor
                 boltSide.Step(dt); strikeBody.Step(dt); lockBody.Step(dt);
             }
 
-            // The sweep on the threshold: its fibres catch and let go while it is on it (as the patio door's
-            // pile: a fibre slips every 0.15 mm of travel, and the drag flutters by 0.3 / sqrt(N) of itself in
-            // the band that slip rate makes, through the fibres' own bending).
+            // The sweep on the threshold, as the patio door's pile: a fibre slips every 0.15 mm, and the drag
+            // flutters by 0.3 / sqrt(N) of itself in the band that slip rate makes.
             double sweepEdge = theta * width;
             double v = Math.Abs(omega) * width * 0.6;
             double slipHz = Math.Min(20000, v / SweepSlip);
@@ -970,7 +908,6 @@ public static class GlassDoor
             frameField.Modes.Push(sweepHit, sweepState);
             double pSweep = 0;
 
-            // Radiate.
             double pFrame = leaf.Step(), pPane = pane.Step(), pWalls = frameField.Modes.Step();
             double pJamb = jambField.Modes.Step() + jambBeam.Step();
             double pLatch = 0;
@@ -1002,8 +939,8 @@ public static class GlassDoor
 
         private double pBarNow;
 
-        /// <summary>The backcheck's valve is a port the piston uncovers over its travel: it comes in over about
-        /// ten degrees from 70, not at once (at once, its step of torque rang the leaf at the end of every opening).</summary>
+        /// <summary>The backcheck's port opens over about ten degrees from 70: at once, its step of torque rang
+        /// the leaf at the end of every opening.</summary>
         private static double BackcheckShare(double theta) => Math.Clamp((theta - BackcheckFrom) / (10 * Math.PI / 180), 0, 1);
         private readonly double[] ones2 = { 1, 1 };
 

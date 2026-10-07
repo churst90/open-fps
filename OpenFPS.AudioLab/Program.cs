@@ -962,7 +962,7 @@ if (args.Contains("--pushbar-door"))
             var door = new OpenFPS.Common.PushBarDoor.Door { Variant = v, Seed = 1 + v };
             var rep = new OpenFPS.Common.PushBarDoor.Report();
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var pcm = closing ? OpenFPS.Common.PushBarDoor.RenderClose(door, 48000, 1.4, rep)
+            var pcm = closing ? OpenFPS.Common.PushBarDoor.RenderClose(door, 48000, rep)
                               : OpenFPS.Common.PushBarDoor.RenderOpen(door, 48000, 1.4, rep);
             made.Add((name, pcm));
             Console.WriteLine($"{name}  ({pcm.Length / 48000.0:F2} s, rendered in {sw.ElapsedMilliseconds} ms)");

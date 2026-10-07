@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
@@ -6,35 +5,22 @@ using static OpenFPS.Common.DoorPhysics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// One leaf of a lift's centre-opening landing doors, simulated as the object, the way <see cref="SlidingDoor"/>
-/// is: a stainless panel hung on two rollers from a steel track, guided at its foot by nylon shoes in the
-/// sill's groove, run by the car's door operator through its coupler, and meeting its partner at a rubber
-/// astragal.
-///
-/// The parts:
-///
-///   The PANEL: 0.55 by 2.1 m, a 1.2 mm stainless face on pressed steel stiffeners with sound-deadening on its
-///   back, about 25 kg. Its low modes are the stiffened panel's; above them its face rings at a thin sheet's
-///   density, lightly damped where the deadening does not reach: the long steel ring after a lift door shuts.
-///
-///   The HANGER: two 65 mm polyurethane-tyred rollers on a bracket, rolling on a steel track under the header.
-///   What a roller rolls over is the track's roughness and its own out-of-round, through a Hertz contact under
-///   half the panel's weight, and the panel bounces on them. The track and the header round it ring as a
-///   steel box's walls.
-///
-///   The SHOES: two nylon guide shoes sliding in the aluminium sill's groove: a drag and the scuff of their
-///   asperities catching and letting go, into the sill.
-///
-///   The OPERATOR (on the car, heard through the gap; one leaf of a pair carries it): a VVVF motor and a
-///   toothed belt, following its controller's speed profile: an S-curve, a run, a check speed into each end
-///   and a slow creep before the leaves meet (closing energy is held under 10 J). The motor's torque ripple at
-///   its rotor slots rings its cast housing; the belt's teeth seat on the pulley.
-///
-///   The COUPLER and LOCK: opening, the car's vane closes on the landing door's rubber-tyred rollers (the clunk
-///   before a lift door moves) and lifts the landing lock's hook off its keeper; shut, the hook drops back.
-///
-///   The ASTRAGAL: a hollow rubber section on the leading edge. Two leaves meeting are each a leaf meeting the
-///   middle plane, through two astragals in series. The open end has a rubber bumper.
+/// One leaf of a lift's centre-opening landing doors, simulated as the object, as <see cref="SlidingDoor"/> is.
+/// <list type="bullet">
+/// <item>The panel: 0.55 by 2.1 m, a 1.2 mm stainless face on pressed stiffeners with deadening, about 25 kg;
+/// above the stiffened panel's low modes the face rings at a thin sheet's density: the long steel ring after
+/// a lift door shuts.</item>
+/// <item>The hanger: two 65 mm polyurethane-tyred rollers on a steel track, a Hertz contact under half the
+/// weight over the track's roughness and the tyres' out-of-round; the track and header ring as a steel box.</item>
+/// <item>The shoes: nylon in the aluminium sill's groove, a drag and the scuff of asperities.</item>
+/// <item>The operator (on the car, heard through the gap; one leaf of a pair carries it): a VVVF motor and a
+/// toothed belt on an S-curve profile, a check speed into each end and a creep before the leaves meet
+/// (closing energy under 10 J). Torque ripple at the rotor slots rings its cast housing.</item>
+/// <item>The coupler and lock: opening, the car's vane closes on the landing rollers (the clunk before a lift
+/// door moves) and lifts the lock's hook; shut, the hook drops back.</item>
+/// <item>The astragal: hollow rubber on the leading edge; two leaves meeting are each a leaf meeting the
+/// middle plane through two astragals in series. The open end has a rubber bumper.</item>
+/// </list>
 /// </summary>
 public static class ElevatorDoor
 {
@@ -64,10 +50,8 @@ public static class ElevatorDoor
         }
     }
 
-    /// <summary>
-    /// Each character: the track's and the tyres' roughness (RMS, um), a flat on the tyres (um), the shoes'
-    /// drag (N), and the astragal's rubber (new and soft, or hardened with age, as a Hertz stiffness).
-    /// </summary>
+    /// <summary>Each character: the track's and tyres' roughness (RMS, um), a flat on the tyres (um), the
+    /// shoes' drag (N), and the astragal's Hertz stiffness (soft when new, hardened with age).</summary>
     private static (double RailMicron, double WheelMicron, double FlatMicron, double ShoeDrag, double AstragalK) Character(int variant)
         => (((variant % Variants) + Variants) % Variants) switch
         {
@@ -167,7 +151,7 @@ public static class ElevatorDoor
     /// <summary>The coupler's vane closing on the landing rollers: 0.25 kg of vane at 0.15 m/s onto rubber
     /// tyres; the landing lock's hook, 40 g, lifted 6 mm and dropped back onto its steel keeper.</summary>
     private const double VaneKg = 0.25, VaneSpeed = 0.15, RollerK = 3e7, RollerLambda = 1.0, HookKg = 0.04, HookDrop = 0.006;
-    private const double HookK = 4e9, HookLambda = 0.3, HookLower = 0.1;
+    private const double HookK = 4e9, HookLower = 0.1;
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -183,7 +167,7 @@ public static class ElevatorDoor
         private double time;
 
         // Motion along the track and the controller.
-        private double x, v, motorX, motorV, motorA;
+        private double x, v, motorX, motorV;
         // Each roller: its vertical place and speed on its bracket; the panel's heave.
         private readonly double[] wz = new double[2], wv = new double[2], wArm = new double[2];
         private double heave, heaveRate;
@@ -239,6 +223,7 @@ public static class ElevatorDoor
             heave = -mass * G / (2 * BracketK);
             panelAtEdge = plate.Shape(width - 0.01, height / 2);
             panelAtFoot = plate.Shape(width / 2, 0.02);
+            // faceAtFoot is never read, but drawing it keeps the generator's sequence, and so the approved render.
             faceAtEdge = faceField.Point(); faceAtFoot = faceField.Point();
             headerHit0 = headerField.Point(); headerHit1 = headerField.Point(); sillHit = sillField.Point(); pulleyHit = headerField.Point();
             edgePort = new Port(faceField.PatchMass, 2e7, faceField.Impedance);
@@ -248,7 +233,6 @@ public static class ElevatorDoor
             pulleyPort = new Port(headerField.PatchMass, 2e7, headerField.Impedance);
             keeperHit = headerField.Point();
 
-            // The motor's housing: a cast box's walls, from 1.1 kHz.
             var hz = new List<double>(); var l = new List<double>(); var m = new List<double>(); var g = new List<double>();
             for (int i = 0; i < 14; i++)
             {
@@ -316,13 +300,12 @@ public static class ElevatorDoor
             double start = 0, end = 10;
             if (opening)
             {
-                // The vane closes on the landing door's rollers, and lifts the hook.
                 vaneOn = true; vaneX = -0.003; vaneV = VaneSpeed;
                 hook = 0;
-                while (time < 0.18) Tick(opening, 0);
+                while (time < 0.18) Tick();
                 start = time;
             }
-            double profU = 0, profA = 0; bool arrived = false; double arrivedAt = -1;
+            double profU = 0, profA = 0; bool arrived = false;
             while (time < end)
             {
                 if (!arrived)
@@ -337,20 +320,19 @@ public static class ElevatorDoor
                     double aWant = Math.Clamp((want - profU) / 0.05, -Accel, Accel);
                     profA += Math.Clamp(aWant - profA, -Jerk * dt, Jerk * dt);
                     profU = Math.Max(0, profU + profA * dt);
-                    motorV = dir * profU; motorA = dir * profA;
+                    motorV = dir * profU;
                     motorX += motorV * dt;
                     if ((opening && motorX >= to - 0.002) || (!opening && motorX <= to + 0.001))
                     {
-                        arrived = true; arrivedAt = time; motorV = 0; motorA = 0;
+                        arrived = true; motorV = 0;
                         Log($"{time * 1000:F0} ms  the operator at its end ({(time - start):F2} s of travel), leaf edge {x * 1000:F1} mm, {v:F3} m/s");
                         end = time + (opening ? 0.6 : 1.4);
-                        // Shut: the operator leans on the leaves with about 60 N through its belt, and a moment later
-                        // the vane opens and the landing lock's hook falls into its keeper.
+                        // Shut: the operator leans on the leaves with about 60 N, then the hook falls.
                         if (!opening) { motorX = -60 / BeltK; hookAt = time + 0.3; }
                     }
                 }
                 if (hookAt > 0 && time >= hookAt) { hookAt = -1; hookFalling = true; hook = HookDrop; Log($"{time * 1000:F0} ms  the hook falls"); }
-                Tick(opening, motorV);
+                Tick();
             }
         }
         private double hookAt = -1;
@@ -374,7 +356,7 @@ public static class ElevatorDoor
 
         // ── One step ─────────────────────────────────────────────────────────────────────────────
 
-        private void Tick(bool opening, double motorSpeed)
+        private void Tick()
         {
             double fx = 0, pLock = 0, pOp = 0;
 
@@ -405,18 +387,15 @@ public static class ElevatorDoor
             faceField.Modes.Push(faceAtEdge, edgeDrive);
             panel.Push(panelAtEdge, edgeHost * 0.2 + fB * 0.1);
 
-            // A blow along the track at the leaf's edge (the astragal, the bumper) is at mid-height, a metre under the
-            // hangers: it rocks the leaf on its two rollers, loading one and lifting the other.
+            // A blow at the edge lands a metre under the hangers and rocks the leaf on its two rollers.
             double rock = (fA - fB) * (height / 2) / (wArm[1] - wArm[0]);
-            // The rollers on the track: Hertz under the panel's weight, over the track's and the tyre's roughness.
             double heaveForce = -mass * G;
             for (int i = 0; i < 2; i++)
             {
                 double s = x + wArm[i] + 0.5;
                 double rough = Lookup(railRough, railStep, s) + Lookup(i == 0 ? wheelRough0 : wheelRough1, wheelStep, x);
                 double sink0 = Math.Pow(mass * G / 2 / TyreK, 2.0 / 3);
-                // z up: the tyre is pressed into the track by what it carries; the bracket pulls the wheel towards
-                // the panel hanging under it.
+                // z up; the bracket pulls the wheel toward the panel hanging under it.
                 double depth = sink0 + rough + trackPort[i].X - wz[i];
                 double rateD = trackPort[i].V - wv[i] + (Lookup(railRough, railStep, s + v * dt) - Lookup(railRough, railStep, s)) / dt;
                 double fc = Contact(TyreK, TyreLambda, depth, rateD);
@@ -439,10 +418,9 @@ public static class ElevatorDoor
             heaveRate += heaveForce / mass * dt;
             heave += heaveRate * dt;
 
-            // The coupler's vane closing on the landing rollers, and the hook.
             if (vaneOn)
             {
-                // It comes in at its own speed, and once on the rollers its mechanism presses with about 20 N.
+                // Once on the rollers the vane's mechanism presses with about 20 N.
                 double fv = Contact(RollerK, RollerLambda, vaneX, vaneV);
                 vaneV += ((vaneX > 0 ? 20 : 0) - fv) / VaneKg * dt;
                 vaneX += vaneV * dt;
@@ -457,8 +435,7 @@ public static class ElevatorDoor
             }
             if (hookFalling)
             {
-                // The hook comes down on the coupler's roller as the vane opens, no faster than the vane lets it
-                // (about 0.1 m/s), and lands on its keeper.
+                // Down no faster than the opening vane lets it (about 0.1 m/s), onto its keeper.
                 double fk = ContactRestitution(HookK, 0.35, -hook, -hookRate, ref hookApproach);
                 double ha = -G * 3 + fk / HookKg;     // a spring helps gravity
                 hookRate += ha * dt;
@@ -469,11 +446,10 @@ public static class ElevatorDoor
                 Note("hook-drop", fk);
             }
 
-            // The panel along the track.
             double ax = fx / mass;
             v += ax * dt; x += v * dt;
 
-            // The operator: the motor's torque ripple at its slot rate, and the belt's teeth on the pulley.
+            // The operator: torque ripple at the slot rate, and the belt's teeth on the pulley.
             if (door.Operator)
             {
                 double rev = Math.Abs(motorV) * MotorRevPerMetre;

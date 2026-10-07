@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenFPS.Common;
 
 /// <summary>What is falling.</summary>
@@ -18,12 +16,10 @@ public enum PrecipitationKind
 }
 
 /// <summary>
-/// The weather's precipitation as the sound needs it: what kind, how much (a rate in millimetres of
-/// water an hour), and how big the particles are — the median volume diameter D0 of the drops (zero:
-/// the size Marshall and Palmer give that rate), and for hail the median stone. Rate and size are
-/// separate because they are in nature: drizzle is many tiny drops at a low rate, a convective
-/// downpour fewer and much bigger ones than a stratiform rain of the same rate (Ulbrich 1983; Bringi
-/// et al. 2003, J. Atmos. Sci. 60, 354-365).
+/// The weather's precipitation as the sound needs it: kind, rate (mm of water an hour), median volume
+/// diameter D0 (zero: Marshall-Palmer's for the rate) and the median hailstone. Rate and size are
+/// separate in nature: a convective downpour has fewer, much bigger drops than a stratiform rain of the
+/// same rate (Ulbrich 1983; Bringi et al. 2003, J. Atmos. Sci. 60, 354-365).
 /// </summary>
 public readonly record struct Precipitation(PrecipitationKind Kind, float RateMmPerHour, float MedianDropMm = 0f, float HailMm = 0f)
 {
@@ -45,12 +41,10 @@ public static class Hydrometeors
     // ── Size ────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The shape μ of the gamma drop-size spectrum, N(D) = N0 D^μ exp(−(3.67 + μ) D / D0) (Ulbrich
-    /// 1983, J. Climate Appl. Meteor. 22, 1764-1775). Marshall-Palmer is μ = 0; disdrometers find μ
-    /// mostly between 0 and 5 in rain of every kind, and 3 is the value the normalised-gamma work
-    /// settles on when one value has to serve (Testud et al. 2001, J. Appl. Meteor. 40, 1118-1140;
-    /// Bringi and Chandrasekar 2001). A narrower spread: fewer of the very small drops and fewer of the
-    /// very large.
+    /// The shape μ of the gamma drop-size spectrum, N(D) = N0 D^μ exp(−(3.67 + μ) D / D0) (Ulbrich 1983,
+    /// J. Climate Appl. Meteor. 22, 1764-1775). Marshall-Palmer is μ = 0; disdrometers find 0 to 5, and 3
+    /// is the normalised-gamma work's single value (Testud et al. 2001, J. Appl. Meteor. 40, 1118-1140;
+    /// Bringi and Chandrasekar 2001): fewer very small and very large drops.
     /// </summary>
     public const float GammaShape = 3f;
 
@@ -247,17 +241,12 @@ public static class Hydrometeors
 }
 
 /// <summary>
-/// The particles of one precipitation, by size, for drawing them one at a time and for counting them:
-/// how many fall on a square metre a second, how they spread over sizes, and what a radar would see.
-///
-/// Rain, freezing rain and sleet: a gamma spectrum of the given median (Hydrometeors.GammaShape),
-/// scaled so the water it carries is the rate. Snow: Gunn and Marshall's exponential in melted
-/// diameter, scaled the same way. Hail: an exponential of the given median at Cheng and English's
-/// concentration, which does not depend on any rate.
-///
-/// Drawn in six size classes, log-spaced over the spectrum's range: a particle's sound grows as a high
-/// power of its size, so the few big ones carry most of it, and drawing one class at a time lets every
-/// big one be rendered while the swarm of small ones is stood for by a few.
+/// The particles of one precipitation by size: how many fall on a square metre a second, how they spread
+/// over sizes, what a radar would see. Rain and sleet are a gamma spectrum (Hydrometeors.GammaShape)
+/// scaled so the water carried is the rate; snow Gunn and Marshall's exponential in melted diameter;
+/// hail an exponential at Cheng and English's concentration, whatever the rate. Six log-spaced size
+/// classes: a particle's sound grows as a high power of its size, so every big one is rendered while
+/// the swarm of small ones is stood for by a few.
 /// </summary>
 public sealed class ParticleSpectrum
 {
