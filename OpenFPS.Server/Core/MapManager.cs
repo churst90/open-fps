@@ -77,6 +77,77 @@ public class MapManager
     /// is the difference between a fifteen-minute fix and a session spent believing the audio engine
     /// has gone wrong.
     /// </summary>
+    /// <summary>The prefab the loader lays as a map's ground where it has none: dirt, ten metres square,
+    /// scaled to the bounds. Later the top of a soil profile (docs/GEOMETRY.md, stage 5).</summary>
+    public const string NaturalGroundPrefab = "dirt_floor";
+
+    /// <summary>Every entity's turn made unit length, a zero turn the identity. Once per load.</summary>
+    internal static void NormaliseTurns(MapData m)
+    {
+        foreach (var e in m.Entities)
+        {
+            var q = e.Rotation;
+            float l2 = q.LengthSquared();
+            if (l2 < 1e-12f || !float.IsFinite(l2)) e.Rotation = Quaternion.Identity;
+            else if (l2 != 1f) e.Rotation = Quaternion.Normalize(q);
+        }
+    }
+
+    /// <summary>
+    /// Whether the solid floors at ground level (a top between a metre below and half a metre above 0)
+    /// cover the whole of [min, max] seen from above, sampled at cell centres no more than 2 m apart
+    /// (at most 128 a side). A ground made of many slabs counts as well as one.
+    /// </summary>
+    internal static bool GroundCovers(World world, Vector3 min, Vector3 max)
+    {
+        var floors = new List<(Vector3 Centre, Vector2 Half, Quaternion Inverse, Vector2 Lo, Vector2 Hi)>();
+        var q = new QueryDescription().WithAll<Transform, ColliderComponent>();
+        world.Query(in q, (Entity e, ref Transform t, ref ColliderComponent c) =>
+        {
+            if (!c.IsSolid || c.Shape != ColliderShape.Box) return;
+            if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<DoorComponent>(e)) return;
+            if (world.Has<EntityType>(e) && world.Get<EntityType>(e) != EntityType.StaticObject) return;
+            float top = t.Position.Y + c.Size.Y / 2f;
+            if (top < -1f || top > 0.5f) return;
+            var rot = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(t.Rotation);
+            var half = OpenFPS.Common.Systems.FaceOpenings.AxisAlignedHalfExtents(c.Size * 0.5f, rot);
+            floors.Add((t.Position, new Vector2(c.Size.X / 2f, c.Size.Z / 2f), Quaternion.Inverse(rot),
+                        new Vector2(t.Position.X - half.X, t.Position.Z - half.Z), new Vector2(t.Position.X + half.X, t.Position.Z + half.Z)));
+        });
+        if (floors.Count == 0) return false;
+
+        float w = max.X - min.X, d = max.Z - min.Z;
+        if (w <= 0f || d <= 0f) return true;
+        int nx = Math.Clamp((int)MathF.Ceiling(w / 2f), 1, 128), nz = Math.Clamp((int)MathF.Ceiling(d / 2f), 1, 128);
+        // Bucket the floors by the sample columns they can cover, so a town of slabs is not a scan of
+        // all of them at every point.
+        var buckets = new List<int>[nx * nz];
+        for (int i = 0; i < floors.Count; i++)
+        {
+            var f = floors[i];
+            int x0 = Math.Max(0, (int)MathF.Floor((f.Lo.X - min.X) / w * nx)), x1 = Math.Min(nx - 1, (int)MathF.Floor((f.Hi.X - min.X) / w * nx));
+            int z0 = Math.Max(0, (int)MathF.Floor((f.Lo.Y - min.Z) / d * nz)), z1 = Math.Min(nz - 1, (int)MathF.Floor((f.Hi.Y - min.Z) / d * nz));
+            for (int z = z0; z <= z1; z++)
+                for (int x = x0; x <= x1; x++)
+                    (buckets[z * nx + x] ??= new List<int>()).Add(i);
+        }
+        for (int z = 0; z < nz; z++)
+            for (int x = 0; x < nx; x++)
+            {
+                var p = new Vector3(min.X + (x + 0.5f) * w / nx, 0f, min.Z + (z + 0.5f) * d / nz);
+                bool covered = false;
+                if (buckets[z * nx + x] is { } list)
+                    foreach (int i in list)
+                    {
+                        var f = floors[i];
+                        var local = Vector3.Transform(new Vector3(p.X - f.Centre.X, 0f, p.Z - f.Centre.Z), f.Inverse);
+                        if (MathF.Abs(local.X) <= f.Half.X + 1e-3f && MathF.Abs(local.Z) <= f.Half.Y + 1e-3f) { covered = true; break; }
+                    }
+                if (!covered) return false;
+            }
+        return true;
+    }
+
     private void ValidateTracks(MapData m, World world)
     {
         if (m.Tracks == null || m.Tracks.Count == 0) return;
@@ -230,8 +301,13 @@ public class MapManager
         // On a map streamed in tiles, the layer of everything that came from the file (MapTiles).
         var layers = m.TileMetres > 0f ? new Dictionary<int, string?>() : null;
 
-        bool foundationExists = false;
-        
+        // Every turn made unit length before anything reads it. Maps write quaternions in six digits
+        // (0.707082, 0.707131 is not unit length), and code that turns a box by such a quaternion with
+        // Vector3.Transform scales it by the length squared: a slab's top a float's last bit low on
+        // one path and not on another. Once, here, so the server, its triangles, its boxes and every
+        // client (sent the same floats) all read the same turn.
+        NormaliseTurns(m);
+
         // 1st Pass: Spawn everything
         foreach (var entityData in m.Entities)
         {
@@ -271,12 +347,6 @@ public class MapManager
                     ref var r = ref world.Get<RegionComponent>(entity);
                     r.IsIndoor = entityData.IsIndoor.Value;
                     indoorAuthored.Add(entity.Id);
-                }
-
-                if (entityData.PrefabId.Equals("concrete_floor", StringComparison.OrdinalIgnoreCase) && 
-                    Vector3.Distance(entityData.Position, Vector3.Zero) < 0.1f)
-                {
-                    foundationExists = true;
                 }
 
                 // Track minimum Y for safety floor
@@ -375,16 +445,19 @@ public class MapManager
 
         SurveyRegions(world, m, materialsAuthored, indoorAuthored);
 
-        // AUTO-GENERATE FOUNDATION if missing
-        if (!foundationExists)
+        // The ground, where the map has none of its own. A new world is dirt: natural ground, on which
+        // concrete, grass and asphalt are laid (Cody, 2026-10-06). A map whose own ground covers the
+        // whole of where people can walk gets nothing: the city, Magnolia and Albany each lay their
+        // own, and a concrete slab added flush under it was met wherever ties went its way.
+        if (!GroundCovers(world, m.WalkMin, m.WalkMax))
         {
-            Log.Information("MapManager: No foundation detected for '{Id}'. Injecting auto-scaled foundation.", m.Id);
+            Log.Information("MapManager: '{Id}' has no ground of its own under all of its play area. Laying natural ground (Dirt) under its bounds.", m.Id);
             Vector3 mapSize = m.MaxBound - m.MinBound;
             // Under the whole of the bounds, top surface at Y=0. Centred on the bounds, not on the
             // origin: the speedway's bounds are not centred on 0, nor the city's, and a foundation
             // centred on 0 left a strip along one edge with no floor — walk into it and you fell.
             Vector3 centre = (m.MinBound + m.MaxBound) * 0.5f;
-            var foundation = _prefabRepo.Spawn(world, "concrete_floor", new Vector3(centre.X, -0.05f, centre.Z), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
+            var foundation = _prefabRepo.Spawn(world, NaturalGroundPrefab, new Vector3(centre.X, -0.05f, centre.Z), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
             // It is the ground, and is called so: a round that ends in it was "Hit Concrete Floor at 9
             // metres", out on the city's open grass.
             if (world.Has<IdentityComponent>(foundation)) world.Get<IdentityComponent>(foundation).Name = "Ground";
