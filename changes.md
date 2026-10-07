@@ -19,6 +19,8 @@ Recent work, newest first. `git log` has the rest.
   - Steam Audio pathing stays off. docs/CLIENT_NOTES.md, "Steam Audio pathing is off", says what turning
     it on would take (a reader, a rule against OpeningRoutes and the barrier search, probes fine enough,
     doors) and what it cost when it ran, for Cody to decide.
+  - A footstep model's key keeps its speed to the half metre a second (`Footsteps.Key`): it doubled it,
+    so a walk at 1.4 m/s named itself "3" and read back at 3 m/s. AudioLab only; the game plays the bank.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream

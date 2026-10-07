@@ -569,7 +569,8 @@ public static class Footsteps
         => string.Format(CultureInfo.InvariantCulture, "footstep:{0}:{1}:{2}:{3}:{4}",
             step.Surface.ToLowerInvariant(), step.Shoe.Name.Replace(' ', '_'),
             (int)MathF.Round(step.BodyMassKg / 10f) * 10,
-            (int)MathF.Round(step.SpeedMps * 2f) / 2f * 2,
+            // To the half metre a second: a walk at 1.4 is "1.5", not a run.
+            MathF.Round(step.SpeedMps * 2f) / 2f,
             step.Seed & 7);
 
     /// <summary>Reads one back. False for anything that is not a footstep key.</summary>
