@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -7,45 +6,30 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// <summary>
 /// Waves at the water's edge, as the events they are made of (docs/WAVES_AND_SHORES.md).
 ///
-/// THE WAVES. The wind raises a sea over the water upwind of the edge, its height and period set by the
-/// wind and the fetch (WindWaves, the fetch-limited JONSWAP relations); the sea's swell arrives from far
-/// away whatever the wind; a river's current sheds eddies off the bank's roots and stones that rock the
-/// water at the edge. Each is a spectrum, and the water at a place along the edge is a sum of a few
-/// dozen of its components with their own phases: so the waves come in groups, a few big ones every
-/// five or ten, the way a real sea does, without anything here saying so. Each wave is found as it
-/// arrives (a zero up-crossing of the surface at the place), with its own height and period.
+/// The water at each place along the edge is a sum of a few dozen components of its spectra: the sea the
+/// wind raises over the fetch (WindWaves, JONSWAP), the swell, a river's eddies off the bank. So the waves
+/// come in groups without anything here saying so. Each wave is found as it arrives (a zero up-crossing of
+/// the surface at the place), with its own height and period, and what it does depends on the edge:
+///  * On a beach (<see cref="ShoreFace.Beach"/>) it breaks by its Iribarren number, folding air under
+///    (the Deane and Stokes sizes) if its crest is fast enough; a plunger's jet lands as spray. Its bore
+///    runs up, the front breaking like a creek's lee jet (RunningWaterSynth.BreakingAirShare), and back:
+///    sand lets out its pore air as a fizz, gravel and shingle click as the backwash drags them.
+///  * At a wall or a rock (<see cref="ShoreFace.Wall"/>) it slaps and throws up spray that falls back,
+///    and some crests close on a pocket of air in a crack, which rings (the clop).
+///  * Against a hull (<see cref="ShoreFace.Hull"/>) the same, and the planking rings (HullSpec).
+///  * Out on the water a steep young sea breaks in whitecaps (Banner, Babanin and Young 2000).
 ///
-/// WHAT EACH WAVE DOES depends on the edge:
-///  * On a beach (<see cref="ShoreFace.Beach"/>) it shoals and breaks: spilling, plunging or surging by
-///    its Iribarren number. A breaker fast enough (its crest over 0.8 m/s, a plunging jet's onset of air)
-///    folds air under, a plume of bubbles of the Deane and Stokes sizes; a plunger's jet lands as a crash
-///    of spray. Its bore then runs up the beach (Hunt's run-up), the front breaking like the lee jet of a
-///    stone in a creek (the running water's law, RunningWaterSynth.BreakingAirShare), and runs back.
-///    Sand drinks the swash and lets out the air in its pores as a fizz of bursting bubbles; gravel and
-///    shingle are dragged by the backwash and click against each other.
-///  * At a wall or a rock (<see cref="ShoreFace.Wall"/>) it is thrown back: it slaps, throws up spray
-///    that falls back, and some crests close on a pocket of air in a crack or under an overhang, which
-///    rings (the clop).
-///  * Against a hull (<see cref="ShoreFace.Hull"/>) the same, and the planking rings: the crest's blow
-///    and the pocket's oscillation drive the bay's modes (HullSpec, RainPlate's physics, loaded by the
-///    water on its wetted share).
-///  * Out on the water, a steep young sea breaks in whitecaps (Banner, Babanin and Young 2000).
+/// Every population (bubbles by octave of size, bursting bubbles, stone clicks) is rendered event by event
+/// while it is sparse and as band noise of the same power once it is a crowd, its envelope still moving
+/// with the waves and with the turbulence's own unevenness, which glides and never steps.
 ///
-/// CROWDS AND SINGLES. A surf plume is millions of bubbles; a lake's lap a few. Every population here
-/// (bubbles by octave of size, bursting bubbles, stone clicks) is rendered event by event while it is
-/// sparse, and as band noise of the same power once there are more than a few to a block in a band:
-/// a crowd too dense to tell apart is noise, and its envelope still moves with the waves and their
-/// groups, and with the turbulence's own unevenness, which glides and never steps.
+/// A stretch is heard from places along it, each its own column of water (ExtendedSources), and a surf
+/// beach also from a row on its break line. A swell reaches each column a little later than the last, so
+/// a break runs along the beach.
 ///
-/// EXTENDED (ExtendedSources). A stretch of edge is heard from places along it, each its own column of
-/// water with its own waves; a surf beach also from a row on its break line. Every event belongs to one
-/// place, heard there with the spread, otherwise at the middle. A swell's crests are long: every column
-/// shares the swell, each a little later than the last by the angle its crests come in at, so a break
-/// runs along the beach.
-///
-/// WHAT IS FITTED is named here and nowhere else: <see cref="PlumeShellMetres"/>, <see cref="PopPascalsPerMm"/>,
-/// <see cref="Flicker"/>. Every bubble's loudness for its size, the splash's efficiency and the breaking
-/// front's air are the fountain's and the creek's, fitted there and not refitted here.
+/// Fitted here and nowhere else: <see cref="PlumeShellMetres"/>, <see cref="PopPascalsPerMm"/>,
+/// <see cref="Flicker"/> and the other FITTED knobs below. A bubble's loudness, the splash's efficiency
+/// and the breaking front's air are the fountain's and the creek's, not refitted here.
 /// </summary>
 public sealed class ShoreSynth
 {
@@ -71,7 +55,7 @@ public sealed class ShoreSynth
 
     /// <summary>How unevenly a crowd of events comes, the standard deviation of the log of its rate:
     /// turbulent intermittency is log-normal (Kolmogorov 1962). It glides, over about
-    /// <see cref="FlickerSeconds"/> (until 2026-10-06 it was drawn afresh every 40 ms and stepped). FITTED.</summary>
+    /// <see cref="FlickerSeconds"/>. FITTED.</summary>
     public static readonly float Flicker = Knob("FLICKER", 1.3f);
 
     /// <summary>How much of that unevenness every size of bubble shares (the rest each octave of sizes has
@@ -275,7 +259,7 @@ public sealed class ShoreSynth
                 Width = length / _along,
                 Swash = j,
                 Break = _rows > 1 ? _along + j : j,
-                Along = LineOffset(j, _along, length),
+                Along = RunningWaterSynth.LineOffset(j, _along, length),
                 Wind = Train.Jonswap(16, _rng),
             };
             if (spec.CurrentMetresPerSecond > 0.05f) c.Eddy = Train.Narrow(8, 0.12f, _rng);
@@ -301,19 +285,6 @@ public sealed class ShoreSynth
         _hullOut = new float[_hull != null ? _places.Length * Block : 0];
     }
 
-    /// <summary>Where place <paramref name="k"/> of <paramref name="places"/> sits along a line source
-    /// of this length, m from its middle: the line cut into equal pieces, each place in the middle of its
-    /// own, nearest the middle first (RunningWaterSynth.LineOffset's rule).</summary>
-    public static float LineOffset(int k, int places, float lengthMetres)
-    {
-        if (places <= 1 || k <= 0) return 0f;
-        float piece = lengthMetres / places;
-        Span<float> centres = stackalloc float[places];
-        for (int i = 0; i < places; i++) centres[i] = (i + 0.5f) * piece - 0.5f * lengthMetres;
-        centres.Sort((a, b) => MathF.Abs(a) != MathF.Abs(b) ? MathF.Abs(a).CompareTo(MathF.Abs(b)) : b.CompareTo(a));
-        return centres[Math.Min(k, places - 1)];
-    }
-
     /// <summary>The places of a source, as offsets from its middle in its own frame: x along the edge,
     /// z out over the water (the break row).</summary>
     public static Vector3[] Layout(ShoreSpec spec, float lengthMetres)
@@ -322,7 +293,7 @@ public sealed class ShoreSynth
         var at = new Vector3[n * rows];
         for (int r = 0; r < rows; r++)
             for (int k = 0; k < n; k++)
-                at[r * n + k] = new Vector3(LineOffset(k, n, lengthMetres), 0f, r * spec.BreakRowMetres);
+                at[r * n + k] = new Vector3(RunningWaterSynth.LineOffset(k, n, lengthMetres), 0f, r * spec.BreakRowMetres);
         return at;
     }
 
@@ -492,14 +463,10 @@ public sealed class ShoreSynth
 
     // ── Starting mid-sea ─────────────────────────────────────────────────────────────────────────
     //
-    // A shore is never silent. The sea is a sum of components at random phases, but a wave is found at
-    // an up-crossing of the surface and measured from the one before, so a synth that starts from
-    // nothing hears its first wave at its SECOND up-crossing, and that wave's swash only after the bore
-    // has run in from the break line: a sandy beach under a 9 s swell was exact silence for about 11 s
-    // after its voice started (2026-10-07). So before its first sample the sea is run on for a few of
-    // its longest periods, waves found and their processes started exactly as they would be, nothing
-    // rendered: the voice starts with the waves already arriving and the last ones' swash still
-    // running. The pre-roll only decides WHEN the first sound is; every wave after it is made as before.
+    // A wave is found at its second up-crossing and its swash heard only after the bore has run in, so a
+    // synth started from nothing was silent for about 11 s under a 9 s swell. Before its first sample the
+    // sea is run on for a few of its longest periods, waves found and processes started, nothing rendered.
+    // The pre-roll decides only when the first sound is (docs/WAVES_AND_SHORES.md 5.1).
 
     /// <summary>How many of its longest periods the sea is run on before the first sample.</summary>
     private const float UnderWayPeriods = 4f;
@@ -674,13 +641,11 @@ public sealed class ShoreSynth
             ? 0.2f * Spec.CurrentMetresPerSecond / MathF.Max(0.05f, Spec.BankFeatureMetres) : 0f;
         // The surface rocked at the bank by an eddy: of the order of its velocity head, U² / 2g.
         float eddyHs = Spec.CurrentMetresPerSecond * Spec.CurrentMetresPerSecond / (2f * WindWaves.Gravity);
-        // Where the edge takes the waves one by one, the wind sea's and the swell's are each found on their
-        // own: a wall or a hull throws back every crest that reaches it, and a steep beach where the wind
-        // sea plunges (an Iribarren number of 0.5 or more, Battjes 1974) takes each wave at its step. On
-        // a gentle beach where it spills, the short waves are spent across a wide surf zone and what
-        // reaches the edge is the long waves' swash: there a wave is the sum's own up-crossing. Found as
-        // one sum on shingle and at the harbour wall, a wind wave riding a swell was never a wave of its
-        // own, so each place broke once a swell period and fell silent between (2026-10-06).
+        // Where the edge takes the waves one by one (a wall, a hull, a steep beach where the wind sea
+        // plunges, Iribarren 0.5 or more, Battjes 1974) the wind sea's and the swell's are found apart; on
+        // a gentle beach the short waves are spent across the surf zone and a wave is the sum's own
+        // up-crossing. Found as one sum at a wall, each place broke once a swell period and fell silent
+        // between (docs/WAVES_AND_SHORES.md 1.3).
         bool apart = _swell != null && windHs > 0f
                      && (Spec.Face != ShoreFace.Beach || WindWaves.Iribarren(MathF.Max(0.005f, Spec.BeachSlope), windHs, 1f / windHz) >= 0.5f);
         foreach (var c in _columns)
@@ -790,9 +755,8 @@ public sealed class ShoreSynth
             float crossing = MathF.Max(0.8f * period, breaksAt / MathF.Max(0.3f, MathF.Sqrt(g * WindWaves.BreakerDepth(hb) * 0.5f)));
             float jetShare = plunging ? 0.5f : 0f;
             float roller = (1f - jetShare) * plumeAir;
-            // A swell's crest comes in at an angle, so the break runs along the column's width over its
-            // Sweep: the column breaks a piece at a time, each piece its own share of the crest, rather
-            // than all of it in one instant (Cody, 2026-10-06: "waves are a wash, not jumpy events").
+            // A swell's crest comes in at an angle, so the column breaks a piece at a time over its Sweep,
+            // each piece its own share of the crest, not all in one instant (Cody: "waves are a wash").
             int pieces = c.Sweep > 0.05f ? SweepPieces : 1;
             float piece = 1f / pieces;
             for (int k = 0; k < pieces; k++)
@@ -814,7 +778,7 @@ public sealed class ShoreSynth
                                FallingWaterSynth.PoolCrownShare, CrashPart);
                 }
             }
-            CloudOscillation(c.Break, at, h0, period, hb, plunging, plumeAir, w);
+            CloudOscillation(c.Break, at, period, hb, plunging, plumeAir, w);
             if (plunging && CrashPart > 0f)
             {
                 // The air tube the jet closes on: its pulsation, as a large bubble that breaks up within
@@ -926,7 +890,7 @@ public sealed class ShoreSynth
     /// for a spiller, heard after the plume has formed (the low sound lags the breaking by up to a third of
     /// a period, Loewen and Melville 1994). Each radiated as a band of noise an octave wide.
     /// </summary>
-    private void CloudOscillation(int place, int at, float h0, float period, float hb, bool plunging, float air, float width)
+    private void CloudOscillation(int place, int at, float period, float hb, bool plunging, float air, float width)
     {
         if (CloudPart <= 0f || air <= 0f || _preRolling) return;
         float energy = (plunging ? 1f : SpillingAirShare) * CloudEfficiency
@@ -1113,8 +1077,8 @@ public sealed class ShoreSynth
     }
 
     /// <summary>The share of a process's events in [t0, t1): a quick rise over the first sixth, then a
-    /// fall of three time constants over the rest that comes down to nothing at its end. (It was cut off
-    /// at the end still at e^-3 of its peak rate, so every break's hiss stopped on the same 13 dB step.)</summary>
+    /// fall of three time constants over the rest that comes down to nothing at its end (cut off at e^-3,
+    /// every break's hiss stopped on the same 13 dB step).</summary>
     private static float Share(in Proc p, double t0, double t1)
     {
         double a = Math.Max(0, t0 - p.Start), b = Math.Min(p.Length, t1 - p.Start);
@@ -1142,9 +1106,8 @@ public sealed class ShoreSynth
             if (t0 >= p.Start + p.Length) { p.Kind = Kind.None; continue; }
             if (t1 <= p.Start) continue;
             // A burst of turbulence makes bubbles of every size at once, and each size also comes and
-            // goes on its own: a common factor and one per band, log-normal, mean one. They glide from
-            // block to block; drawn afresh every 40 ms as steps, a breaker's hiss came and went in
-            // jumps (Cody, 2026-10-06: "very steppy/jumpy ... waves are a wash, not jumpy events").
+            // goes on its own: a common factor and one per band, log-normal, mean one. They glide: drawn
+            // afresh every 40 ms, a breaker's hiss came and went in jumps (Cody: "waves are a wash").
             for (int b = 0; b <= Bands; b++)
             {
                 _flickA[i, b] = _flickPole * _flickA[i, b] + _flickDrive * Gauss();
@@ -1165,7 +1128,6 @@ public sealed class ShoreSynth
             }
         }
     }
-
 
     private EventSum Place(int place) => _places[HomePlace(place)];
 
@@ -1333,8 +1295,6 @@ public sealed class ShoreSynth
         return a * a / 9f / (4f * FallingWaterSynth.BubbleDecay(mm));
     }
 
-    /// <summary>The Deane-Stokes spectrum (R^-3/2 under the Hinze scale, R^-10/3 over it) from the smallest
-    /// bubble to <paramref name="maxMm"/>: each octave band's share of the count, and the mean volume, m³.</summary>
     /// <summary>Bubbles about one size (log-normal, σ 0.35): each octave band's share of the count, and the
     /// mean volume, m³.</summary>
     private static float NoteShares(float noteMm, Span<float> share)
@@ -1355,6 +1315,8 @@ public sealed class ShoreSynth
         return total > 0 ? (float)(volume / total) : 1e-9f;
     }
 
+    /// <summary>The Deane-Stokes spectrum (R^-3/2 under the Hinze scale, R^-10/3 over it) from the smallest
+    /// bubble to <paramref name="maxMm"/>: each octave band's share of the count, and the mean volume, m³.</summary>
     private static float CloudShares(float maxMm, Span<float> share)
     {
         double total = 0, volume = 0;
@@ -1387,9 +1349,8 @@ public sealed class ShoreSynth
     // ── The unevenness of a crowd ────────────────────────────────────────────────────────────────
     //
     // Two one-pole stages in cascade, each with the pole e^(−block / FlickerSeconds), driven by Gaussian
-    // noise: a process with a unit standard deviation whose path is smooth (its slope is finite, where
-    // one stage alone is as rough as a random walk inside its time constant). The first
-    // stage has a unit variance; _flickA2B hands it to the second so that the second's is one too.
+    // noise: a unit standard deviation and a smooth path (one stage alone is as rough as a random walk
+    // inside its time constant). _flickA2B scales the first stage so the second's variance is one too.
 
     private readonly float _flickPole, _flickDrive, _flickA2B;
     private static readonly float FlickerCommonSigma = Flicker * MathF.Sqrt(FlickerCommon);
@@ -1489,6 +1450,7 @@ public sealed class ShoreSynth
         }
 
         /// <summary>A blow of this momentum (N·s) lasting about τ, at a sample of the coming block.</summary>
+        // TODO: `at` is not read; every blow lands at the start of its block (up to 2.7 ms early).
         public void Blow(int place, int at, float impulse, float tau)
         {
             if (place < 0 || place >= _re.GetLength(0)) return;

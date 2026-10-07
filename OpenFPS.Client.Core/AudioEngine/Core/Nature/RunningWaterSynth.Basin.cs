@@ -1,40 +1,29 @@
-using System;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
 
 /// <summary>
-/// Round 2 (docs/RUNNING_WATER.md section 10): water that leaves through a hole, and a tap over a basin.
+/// Water that leaves through a hole, and a tap over a basin (docs/RUNNING_WATER.md section 10).
 ///
-/// THE INLET. Water leaving through a hole — a sink's waste, a roof gutter's outlet into its downpipe —
-/// sounds by how deep it stands over the hole. Shallow, it spills over the rim as a weir round an open air
-/// core (Q = Cw π D h^1.5) and slides down the pipe quietly. Deeper, the water closes over the hole and the
-/// hole runs as an orifice (Q = Cd A √(2 g h)); a free-surface vortex forms over it and, while the water
-/// is shallower than the vortex's critical submergence, its air core reaches the hole now and then and
-/// air is drawn down in gulps: the gurgle. Deeper still the vortex cannot reach it and the hole runs full
-/// and quiet. A gulp is a pocket of air a good fraction of the hole across pinched off at the surface: a
-/// large bubble ringing at its Minnaert note with the steep climb of a bubble let go at the surface, a
-/// rush of air through the closing gap, and a knock in the air of the pipe below, which rings at its own
-/// modes. They come in a rhythm, the column in the hole and the air beneath it pushing each other.
+/// A hole sounds by how deep the water stands over it. Shallow, it spills over the rim as a weir round an
+/// open air core and slides down the pipe quietly. Deeper, the water closes over it and it runs as an
+/// orifice; a free-surface vortex forms, and while the water is shallower than the vortex's critical
+/// submergence its air core reaches the hole now and then and air goes down in gulps: the gurgle. Each
+/// gulp is a pocket about the hole's size ringing as it pinches off at the surface, a rush of air through
+/// the closing gap, and a knock in the pipe's air below. Deeper still the hole runs full and quiet.
 ///
-/// THE BASIN. A sink's water rises and falls with what the tap puts in and what the inlet lets out (with
-/// the plug in, only the overflow). The tap's jet strikes the bare bottom while the water over it is
-/// thinner than the jet (the circular hydraulic jump of a tap into a sink: the jet still meets the steel),
-/// and plunges into the water once it is deeper. A stainless bottom is a thin plate, struck by every lump
-/// of the jet: it rings at its own modes, lowered and damped as water lies on it (its added mass), which is
-/// the drumming of a tap into an empty sink going dull as the sink fills. A ceramic basin, thick and stiff,
-/// barely rings at all.
-///
-/// When the tap is shut the basin empties through its inlet: the level falls, the vortex reaches the hole,
-/// and the last of it goes in a gurgle and a slurp. That is what a sink sounds like with the plug out, and
-/// nothing in it is a recording or a script: the gulps come and go with the level.
+/// A basin's water rises and falls with what the tap puts in and the inlet lets out. The tap's jet strikes
+/// the bare bottom while the water is thinner than the jet, and plunges into it once it is deeper. A
+/// stainless bottom is a thin plate that rings at its modes, lowered and damped as water lies on it: the
+/// drumming of a tap into an empty sink going dull as it fills. Shut the tap and the basin empties through
+/// its inlet, the last of it in a gurgle and a slurp; nothing in it is a recording or a script.
 /// </summary>
 public sealed partial class RunningWaterSynth
 {
     // ── The inlet: fitted ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>The volume of air the vortex draws down, per volume of water through the hole, at the
-    /// height of the gurgle. FITTED (2026-10-06, docs/RUNNING_WATER.md 10.8) between seven recorded drains
+    /// height of the gurgle. FITTED (docs/RUNNING_WATER.md 10.8) between seven recorded drains
     /// and bottles, which wanted 0.6 for their weight at 125-500 Hz, and four recorded downpipe and gutter
     /// gurgles, which at 0.6 stood 10 dB too heavy there in a downpour. A bottle lets in as much air as water
     /// leaves; an outlet's vortex less.</summary>
@@ -108,7 +97,7 @@ public sealed partial class RunningWaterSynth
     /// <summary>What leaves through the inlet now, L/s.</summary>
     public float InletFlow => _inletFlow;
 
-    /// <summary>The gurgle's share, for the lab. One in the game.</summary>
+    /// <summary>The gurgle's and the plate's shares, for the lab. One in the game.</summary>
     public float GurglePart = 1f, PlatePart = 1f;
 
     private void InitBasin(float sampleRate, int seed)
@@ -267,7 +256,7 @@ public sealed partial class RunningWaterSynth
     /// breakup length is many diameters, Rayleigh-Plateau); an aerated stream is air and water mixed and
     /// lands as a soft spray of millimetre drops round a core; a shower rose's jets break into drops.
     /// </summary>
-    public static FallShape TapShape(RunningWaterSpec spec, FlowTap tap, float litresPerSecond, float level)
+    public static FallShape TapShape(FlowTap tap, float litresPerSecond, float level)
     {
         int jets = Math.Max(1, tap.Jets);
         float d0 = MathF.Max(0.002f, tap.NozzleMm * 1e-3f / MathF.Sqrt(jets));
@@ -340,10 +329,8 @@ public sealed partial class RunningWaterSynth
         float air = _gulpAir;
         _gulpAir = 0f;
         if (air <= 0f) return;
-        // The pocket the rim pinches off: about the hole's size; more air owed is more pockets, not a
-        // bigger one.
-        // No bigger than a bottle's glug, though: 17 mL through a 40 mm neck as through a 20 mm one (Perez et al.
-        // 2026), a sphere of 1.6 cm. A wide outlet lets more pockets down, not bigger ones.
+        // The pocket the rim pinches off: about the hole's size, and no bigger than a bottle's glug (17 mL
+        // through a 40 mm neck as through a 20 mm one, Perez et al. 2026). More air is more pockets.
         float pocketR = MathF.Min(GulpPocketShare * 0.5f * holeDiameter, LargestPocketMetres) * MathF.Exp(GulpPocketSpread * Gauss(_rng));
         float pocketV = 4f / 3f * MathF.PI * pocketR * pocketR * pocketR;
         int pockets = Math.Clamp((int)MathF.Round(air / pocketV), 1, 4);
