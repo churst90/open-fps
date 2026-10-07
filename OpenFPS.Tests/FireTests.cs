@@ -76,7 +76,14 @@ public class FireTests : IDisposable
             var layout = ExtendedSources.Layout("fire:" + name);
             Assert.NotNull(layout);
             Assert.Equal(Math.Clamp(spec.Places, 1, FireSynth.MaxPlaces), layout!.Length);
-            Assert.True(layout.Length <= 8, $"{name} has {layout.Length} places; a source has eight voice ids");
+            Assert.True(layout.Length <= ExtendedSources.MaxPlaces, $"{name} has {layout.Length} places; a source has {ExtendedSources.MaxPlaces} voice ids");
+            // The places, each an equal share, spread across and along as the burning area does (w²/12, d²/12),
+            // a front along its length; so the ears hear the fire as wide as it is.
+            double vx = layout.Average(p => (double)p.X * p.X), vz = layout.Average(p => (double)p.Z * p.Z);
+            double ax = spec.AreaWidth * spec.AreaWidth / 12.0, az = spec.AreaDepth * spec.AreaDepth / 12.0;
+            _o.WriteLine($"  spread across {Math.Sqrt(vx):F2} m against the area's {Math.Sqrt(ax):F2}, along {Math.Sqrt(vz):F2} against {Math.Sqrt(az):F2}");
+            Assert.InRange(vx / ax, 0.8, 1.2);
+            if (spec.AreaWidth < 2.5f * spec.AreaDepth) Assert.InRange(vz / az, 0.8, 1.2);
             Assert.Equal(Vector3.Zero, layout[0]);
             // Every place over the burning area.
             foreach (var p in layout)
@@ -322,7 +329,9 @@ public class FireTests : IDisposable
             var spec = make();
             var f = new FireSynth(spec, Rate, 5, FireSynth.Layout(spec).Length) { Spread = 1f };
             // Declared at 3 m/s at the flames; a crown fire in the field's own wind, which its spread follows.
-            var x = spec.Fuel == FireFuel.Crown ? Render(f, 60f, each: (s, t) => s.ReadWind(0f, 0f, t)) : Render(f, 60f, wind: 3f);
+            // Trees torch in turn, a minute or two apart: their level is a long one.
+            float seconds = spec.Fuel == FireFuel.Trees ? 240f : 60f;
+            var x = spec.Fuel == FireFuel.Crown ? Render(f, seconds, each: (s, t) => s.ReadWind(0f, 0f, t)) : Render(f, seconds, wind: 3f);
             double db = Db(x);
             _o.WriteLine($"{name}: {db:F1} dB against {spec.SourceLevelDb:F1}");
             Assert.InRange(db, spec.SourceLevelDb - 3, spec.SourceLevelDb + 3);

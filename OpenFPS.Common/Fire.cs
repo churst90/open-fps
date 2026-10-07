@@ -68,8 +68,9 @@ public sealed record FireSpec
     /// <summary>What is round it and under it, by material name: what embers tick on and what falls
     /// lands on.</summary>
     public string Surround { get; init; } = "Brick";
-    /// <summary>How many places it is heard from, the middle included (ExtendedSources): at most 8.</summary>
-    public int Places { get; init; } = 4;
+    /// <summary>How many places it is heard from, the middle included (ExtendedSources): at most 12. Nine
+    /// stand for an area's spread at 1-4 kHz within 0.03 of a continuous one (docs/FIRE.md 7.2).</summary>
+    public int Places { get; init; } = 9;
     /// <summary>Panes of glass in it (a building's windows, a car's side and rear windows): each cracks
     /// in the heat and, in a building, falls out later.</summary>
     public int Panes { get; init; }
@@ -165,7 +166,6 @@ public sealed record FireSpec
         FlameHeightMetres = 5f,
         FuelHeightMetres = 2f,
         Surround = "Dirt",
-        Places = 6,
         GrowthSeconds = 600f,
         SteadySeconds = 3600f,
         DecaySeconds = 1800f,
@@ -191,7 +191,6 @@ public sealed record FireSpec
         FlameHeightMetres = 3f,
         FuelHeightMetres = 1.4f,
         Surround = "Asphalt",
-        Places = 4,
         Panes = 4,
         PaneWidthMetres = 0.8f,
         PaneHeightMetres = 0.45f,
@@ -224,7 +223,6 @@ public sealed record FireSpec
         FlameHeightMetres = 10f,
         FuelHeightMetres = 7f,
         Surround = "Grass",
-        Places = 7,
         Panes = 16,
         PaneWidthMetres = 1f,
         PaneHeightMetres = 1.2f,
@@ -256,7 +254,6 @@ public sealed record FireSpec
         FlameHeightMetres = 20f,
         FuelHeightMetres = 14f,
         Surround = "Dirt",
-        Places = 7,
         GrowthSeconds = 300f,
         SteadySeconds = 1800f,
         DecaySeconds = 1800f,
@@ -282,7 +279,6 @@ public sealed record FireSpec
         FlameHeightMetres = 45f,
         FuelHeightMetres = 20f,
         Surround = "Dirt",
-        Places = 7,
         // MEASURED with `--fire levels` 2026-10-06, fully developed, every place summed, in the field's own
         // wind (4.5 m/s at 10 m, so 5.8 GW): Leq 123.0 dB, 107.3 dB(A); peaks 13 dB over, crest 15.
         SourceLevelDb = 123f,

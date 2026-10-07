@@ -108,8 +108,8 @@ public sealed class FireSynth
     public const float MaxDrawnCrackles = 240f;
     /// <summary>The most bodies of fire a synth keeps; a bigger area is cut into fewer, bigger ones.</summary>
     public const int MaxCells = 48;
-    /// <summary>The most places, the middle included (ClientAudioSystem gives a source eight voice ids).</summary>
-    public const int MaxPlaces = 8;
+    /// <summary>The most places, the middle included: the voice ids the client gives a source.</summary>
+    public const int MaxPlaces = ExtendedSources.MaxPlaces;
 
     private const float Gamma = 1.4f, SoundSpeed = 343f;
     private const int Block = 128;
@@ -309,7 +309,9 @@ public sealed class FireSynth
             {
                 float dx = _cells[c].X - _layout[p].X, dz = _cells[c].Z - _layout[p].Z;
                 float dd = dx * dx + dz * dz;
-                float wgt = MathF.Exp(-0.5f * dd / (sigma * sigma));
+                // One body of fire (a hearth, a pile) burns all over its bed, so it is heard from every place
+                // alike; a fire of many bodies, each from the places near it.
+                float wgt = _cells.Length == 1 ? 1f : MathF.Exp(-0.5f * dd / (sigma * sigma));
                 _weights[c * places + p] = wgt;
                 sum += wgt;
                 if (dd < best) { best = dd; _cells[c].NearestPlace = p; }
@@ -478,10 +480,17 @@ public sealed class FireSynth
             }
             return places;
         }
+        // Round the middle, on an ellipse whose places, each an equal share, spread as the area itself does:
+        // a uniform w x d area has a variance of w²/12 across and d²/12 along, and the middle and m places
+        // on a ring of half-axes k w and k d have m k² w² / 2(m + 1), so k = √((m + 1) / 6m). The ring sits
+        // at 0.87-0.94 of the half-widths. At 0.75 (round 1) the places spread less than the fire: the
+        // ears were 0.1-0.2 more alike at 1-4 kHz than the area they stood for would make them
+        // (docs/FIRE.md 7.2).
+        float spreadK = MathF.Sqrt((outer + 1f) / (6f * outer));
         for (int j = 0; j < outer; j++)
         {
             float a = MathF.Tau * (j + 0.25f) / outer;
-            places[1 + j] = new Vector3(MathF.Cos(a) * 0.75f * 0.5f * w, 0f, MathF.Sin(a) * 0.75f * 0.5f * dep);
+            places[1 + j] = new Vector3(MathF.Cos(a) * spreadK * w, 0f, MathF.Sin(a) * spreadK * dep);
         }
         return places;
     }

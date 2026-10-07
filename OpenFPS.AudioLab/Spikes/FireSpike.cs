@@ -43,6 +43,7 @@ public static class FireSpike
     {
         AcousticRegistry.Initialize();
         if (args.Contains("game")) return Game(args);
+        if (args.Contains("hrtf")) return FireHrtfProbe.Run(args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..] ?? "/tmp/openfps-fire-hrtf");
         float sec = Arg(args, "sec=", 30f);
         float wind = Arg(args, "wind=", float.NaN);
         float age = Arg(args, "age=", float.NaN);
@@ -104,6 +105,16 @@ public static class FireSpike
                                      .Select(i => $"{(i < 4 ? 63 << i : 1000 << (i - 4))} Hz {oct[i]:F1} [{or.Min[i]:F0}, {or.Max[i]:F0}]").ToList();
                 Console.WriteLine($"  octaves inside the recordings': {8 - miss.Count}/8" + (miss.Count > 0 ? "; outside: " + string.Join("; ", miss) : ""));
             }
+            if (dir != null && args.Contains("places=1") && LastPlaces != null)
+            {
+                // Every place its own channel, pascals at a metre from it scaled as the mono file.
+                int ch = LastPlaces.Length, len = LastPlaces[0].Length;
+                var inter = new float[ch * len];
+                for (int i = 0; i < len; i++) for (int c = 0; c < ch; c++) inter[i * ch + c] = LastPlaces[c][i] * PascalsToFull;
+                string pp = Path.Combine(dir, "fire_" + key + "_places.wav");
+                WavesSpike.WriteFloatWav(pp, inter, ch);
+                Console.WriteLine($"  wrote {pp}");
+            }
             if (dir != null)
             {
                 string path = Path.Combine(dir, "fire_" + key + (heard > 0f ? $"_{heard:0}m" : "") + ".wav");
@@ -117,6 +128,9 @@ public static class FireSpike
     private static float Settle(FireSpec spec) => 8f;
 
     /// <summary>A fire at a metre (every place summed), or heard from <paramref name="heard"/> m: pascals.</summary>
+    /// <summary>The last render's places, each its own stream, for the lab to write out.</summary>
+    public static float[][]? LastPlaces;
+
     public static (float[] Pa, string Census) Render(FireSpec spec, float sec, int seed, float wind, float age, float heard, string[]? parts = null)
     {
         var layout = FireSynth.Layout(spec);
@@ -145,6 +159,7 @@ public static class FireSpike
             s.NextPlaces(out1);
             if (i >= lead) for (int p = 0; p < out1.Length; p++) places[p][i - lead] = out1[p];
         }
+        LastPlaces = places;
         var pa = new float[n];
         if (heard <= 0f)
         {
@@ -281,7 +296,7 @@ public static class FireSpike
         }
         // A fire as the server would send it: its box the burning area, not solid, lit `age` seconds ago if
         // its life matters (FireSpec.KeyFor).
-        int Add(string preset, Vector3 at)
+        int Add(string preset, Vector3 at, float yawDegrees = 0f)
         {
             var spec = FireSpec.ByName(preset);
             double age = GameAge(spec);
@@ -290,7 +305,7 @@ public static class FireSpike
             var def = new EntityDefinition
             {
                 EntityId = id, Type = EntityType.StaticObject,
-                Transform = new Transform { Position = at, Rotation = Quaternion.Identity, Scale = Vector3.One },
+                Transform = new Transform { Position = at, Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, yawDegrees * MathF.PI / 180f), Scale = Vector3.One },
                 Collider = new ColliderComponent
                 {
                     Shape = ColliderShape.Box, IsSolid = false,
@@ -312,11 +327,13 @@ public static class FireSpike
             Pump(2.0);
         }
         // One preset heard from each distance (m from its middle, on its near side), facing it.
-        void Fire(string preset, params float[] distances)
+        void Fire(string preset, params float[] distances) => FireTurned(preset, 0f, distances);
+        // Turned by yaw: a car turned 90 degrees is seen side-on, its length across the way you face.
+        void FireTurned(string preset, float yawDegrees, params float[] distances)
         {
             var spec = FireSpec.ByName(preset);
             var middle = new Vector3(0f, Height(spec), 0f);
-            int id = Add(preset, middle);
+            int id = Add(preset, middle, yawDegrees);
             Pump(4.0);
             foreach (float d in distances)
             {
@@ -331,22 +348,57 @@ public static class FireSpike
         {
             Pump(2.0);
             Record("silence", 2.0);
+            if (set is "scale")
+            {
+                // The house at 30 m with its places spread 1, 2 and 4 times as wide: how the ears follow the angle.
+                foreach (float k in new[] { 1f, 2f, 4f })
+                {
+                    ExtendedSources.LayoutScale = k;
+                    Fire("house_fire", 30f);
+                    segments[^1] = segments[^1] with { Name = $"house_fire x{k:0} 30m" };
+                }
+                ExtendedSources.LayoutScale = 1f;
+            }
+            if (set is "check")
+            {
+                // Are the places independent, and do the ears hear the geometry? The house at 30 m as it is, with
+                // its places all at its middle (independent streams from one point), and as one voice; then
+                // standing among a crown fire's front, its places to either side.
+                Fire("house_fire", 30f);
+                ExtendedSources.LayoutScale = 0f;
+                Fire("house_fire", 30f);
+                segments[^1] = segments[^1] with { Name = "house_fire collapsed 30m" };
+                ExtendedSources.LayoutScale = 1f;
+                ExtendedSources.Enabled = false;
+                Fire("house_fire", 30f);
+                segments[^1] = segments[^1] with { Name = "house_fire one voice 30m" };
+                ExtendedSources.Enabled = true;
+                var crown = FireSpec.ByName("crown_fire");
+                var cm = new Vector3(0f, Height(crown), 0f);
+                int cid = Add("crown_fire", cm);
+                Pump(4.0);
+                Stand(new Vector3(21f, 0f, -30f), new Vector3(21f, 0f, 100f));
+                Pump(3.0);
+                Record("crown_fire among the front 30m", sec);
+                Remove(cid);
+            }
             if (set is "all" or "near")
             {
                 Fire("campfire", 2f);
                 Fire("fire_pit", 2f);
                 Fire("bonfire", 5f);
-                Fire("burning_car", 10f);
+                FireTurned("burning_car", 90f, 10f);
             }
             if (set is "all" or "far")
             {
-                Fire("house_fire", 30f, 150f);
+                Fire("house_fire", 12f, 30f, 150f);
                 Fire("burning_trees", 50f);
                 Fire("crown_fire", 300f, 1000f);
             }
             if (set is "all" or "walk")
             {
-                // Walking up to a burning wood from 150 m to 25 m from its middle at an ordinary pace.
+                // Walking up to a burning wood from 150 m to 10 m from its middle (2.5 m from its edge) at an
+                // ordinary pace.
                 var spec = FireSpec.ByName("burning_trees");
                 var middle = new Vector3(0f, Height(spec), 0f);
                 int id = Add("burning_trees", middle);
@@ -354,7 +406,7 @@ public static class FireSpike
                 Pump(4.0);
                 double t0 = clock.Elapsed.TotalSeconds;
                 perFrame = t => Stand(new Vector3(0f, 0f, -150f + 1.4f * (float)(t - t0)), middle);
-                Record("walk toward a burning wood", 125.0 / 1.4);
+                Record("walk toward a burning wood", 140.0 / 1.4);
                 perFrame = null;
                 Remove(id);
             }

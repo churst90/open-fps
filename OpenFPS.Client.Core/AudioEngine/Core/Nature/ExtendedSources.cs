@@ -54,7 +54,7 @@ public static class ExtendedSources
 
     /// <summary>How many places a fire pit's bed is heard from round its flames; a bigger fire says its own
     /// (FireSpec.Places, FireSynth.Layout).</summary>
-    public const int FirePlaces = 3;
+    public const int FirePlaces = 8;
 
     /// <summary>How many places each tap of a water feature is heard from round its middle.</summary>
     public const int WaterTapPlaces = 3;
