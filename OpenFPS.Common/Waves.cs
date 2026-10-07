@@ -422,7 +422,8 @@ public sealed record ShoreSpec
         StoneMm = 30f,
         TrapShare = 0.05f,
         // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 93.3 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 25.7 dB over.
-        SourceLevelDb = 93.5f,
+        // Again once the wind sea's waves were found on their own (ShoreSynth.Seas): Leq 92.3 dB, peaks 19.9 dB over.
+        SourceLevelDb = 92.5f,
         PeakHeadroomDb = 26f,
         LengthMetres = 20f,
         Places = 5,
@@ -449,7 +450,8 @@ public sealed record ShoreSpec
         StoneMm = 600f,
         TrapShare = 0.25f,
         // MEASURED with `--waves levels sec=60`, 2026-10-06: Leq 64.7 dB at a metre at 5 m/s onshore; 10 ms peaks' 99.9th percentile 22.4 dB over.
-        SourceLevelDb = 64.5f,
+        // Again once the wind sea's waves were found on their own (ShoreSynth.Seas): Leq 65.8 dB, peaks 21.9 dB over.
+        SourceLevelDb = 66f,
         PeakHeadroomDb = 22.5f,
         LengthMetres = 20f,
         Places = 5,

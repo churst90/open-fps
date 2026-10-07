@@ -444,6 +444,8 @@ public sealed class ShoreSynth
         public double LastUp = double.NaN;
         public float EddyPrev, EddyCrest = float.MinValue, EddyTrough = float.MaxValue;
         public double EddyLastUp = double.NaN;
+        public float SwellPrev, SwellCrest = float.MinValue, SwellTrough = float.MaxValue;
+        public double SwellLastUp = double.NaN;
     }
 
     /// <summary>
@@ -565,10 +567,28 @@ public sealed class ShoreSynth
             ? 0.2f * Spec.CurrentMetresPerSecond / MathF.Max(0.05f, Spec.BankFeatureMetres) : 0f;
         // The surface rocked at the bank by an eddy: of the order of its velocity head, U² / 2g.
         float eddyHs = Spec.CurrentMetresPerSecond * Spec.CurrentMetresPerSecond / (2f * WindWaves.Gravity);
+        // Where the edge takes the waves one by one, the wind sea's and the swell's are each found on their
+        // own: a wall or a hull throws back every crest that reaches it, and a steep beach where the wind
+        // sea plunges (an Iribarren number of 0.5 or more, Battjes 1974) takes each wave at its step. On
+        // a gentle beach where it spills, the short waves are spent across a wide surf zone and what
+        // reaches the edge is the long waves' swash: there a wave is the sum's own up-crossing. Found as
+        // one sum on shingle and at the harbour wall, a wind wave riding a swell was never a wave of its
+        // own, so each place broke once a swell period and fell silent between (2026-10-06).
+        bool apart = _swell != null && windHs > 0f
+                     && (Spec.Face != ShoreFace.Beach || WindWaves.Iribarren(MathF.Max(0.005f, Spec.BeachSlope), windHs, 1f / windHz) >= 0.5f);
         foreach (var c in _columns)
         {
             float eta = windHs > 0f ? windHs * c.Wind.Advance(windHz, dt, _rng) : 0f;
-            if (_swell != null) eta += Spec.SwellHeightMetres * _swell.At(swellHz, c.SwellDelay);
+            if (apart)
+            {
+                float sw = Spec.SwellHeightMetres * _swell!.At(swellHz, c.SwellDelay);
+                Find(c, sw, ref c.SwellPrev, ref c.SwellCrest, ref c.SwellTrough, ref c.SwellLastUp, eddy: false);
+            }
+            else if (_swell != null)
+            {
+                eta += Spec.SwellHeightMetres * _swell.At(swellHz, c.SwellDelay);
+                c.SwellLastUp = double.NaN;
+            }
             Find(c, eta, ref c.Prev, ref c.Crest, ref c.Trough, ref c.LastUp, eddy: false);
             if (c.Eddy != null)
             {
