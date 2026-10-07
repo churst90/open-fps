@@ -153,10 +153,11 @@ public sealed partial class WorldEditor
     public const string ModelUsage =
         "Say /edit model show KIND ID, set KIND ID FIELD VALUE, up|down KIND ID FIELD, versions KIND ID, where KIND ID, "
         + "use KIND ID VERSION, pin KIND ID VERSION, unpin KIND ID, new KIND TEMPLATE NEWID, copy KIND ID NEWID, "
-        + "replace KIND ID with OTHER [here|everywhere], retire KIND ID, or restore KIND ID.";
+        + "replace KIND ID with OTHER [here|everywhere], retire KIND ID, restore KIND ID, "
+        + "add KIND ID LIST [VALUES], or remove KIND ID LIST[N].";
 
     private static readonly HashSet<string> ModelVerbs = new(StringComparer.OrdinalIgnoreCase)
-        { "show", "set", "up", "down", "versions", "where", "use", "pin", "unpin", "new", "copy", "replace", "retire", "restore", "remove" };
+        { "show", "set", "up", "down", "versions", "where", "use", "pin", "unpin", "new", "copy", "replace", "retire", "restore", "remove", "add" };
 
     private void ModelCommand(UserSession s, string[] args, Action<IMessage> reply)
     {
@@ -221,6 +222,9 @@ public sealed partial class WorldEditor
             case "remove":
                 RemoveItem(s, kind, id, args.Length > 3 ? args[3] : "", reply);
                 return;
+            case "add":
+                AddItem(s, kind, id, args.Length > 3 ? args[3] : "", args.Length > 4 ? args[4..] : Array.Empty<string>(), reply);
+                return;
         }
         if (args.Length < 4 || (verb == "set" && args.Length < 5))
         { Say(reply, verb == "set" ? "Say /edit model set KIND ID FIELD VALUE." : $"Say /edit model {verb} KIND ID FIELD."); return; }
@@ -266,9 +270,12 @@ public sealed partial class WorldEditor
         var root = JsonNode.Parse(kind.CurrentJson(id))!;
         string listPath = path[..path.LastIndexOf('[')];
         if (ModelKinds.Get(root, listPath) is not JsonArray arr || segments[^1].Index >= arr.Count) { Say(reply, $"{Capital(spoken)} has no item {segments[^1].Index + 1} there."); return; }
-        if (arr.Count == 1) { Say(reply, $"That is the only one; {spoken} keeps at least one."); return; }
+        // A list of records keeps one to copy; a list of values may be emptied, which leaves it out.
+        if (arr.Count == 1 && !node.IsValueList) { Say(reply, $"That is the only one; {spoken} keeps at least one."); return; }
         int index = segments[^1].Index;
         arr.RemoveAt(index);
+        if (arr.Count == 0 && arr.Parent is JsonObject holder)
+            foreach (var key in holder.Where(kv => kv.Value == arr).Select(kv => kv.Key).ToList()) holder.Remove(key);
         string label = $"{FullLabel(kind.Fields, listPath)} {index + 1}";
         int beforeVersion = Models.CurrentVersion(kind.Kind, id);
         ModelUpdate update;
@@ -279,6 +286,54 @@ public sealed partial class WorldEditor
         Say(reply, $"Took {label} out of {spoken}. Version {update.Version}; {arr.Count} left.");
         Notify(s, $"{s.Username} took {label} out of {spoken}.");
         if (!s.IsTextClient) SendMenu(s, $"model:{kind.Kind}:{id}:{listPath}", reply, refresh: false);
+    }
+
+    /// <summary>
+    /// /edit model add KIND ID LIST [VALUES]: values on the end of a list of values (a prefab's missing
+    /// faces, its six room materials at once), or a copy of the last item of a list of records (a
+    /// fountain's fall, a group's part) to change after. A new version, checked whole by the kind
+    /// (PrefabValidator for a prefab).
+    /// </summary>
+    private void AddItem(UserSession s, EditorKind kind, string id, string path, string[] values, Action<IMessage> reply)
+    {
+        string spoken = $"the {kind.Spoken} {id}";
+        var node = ModelKinds.NodeAt(kind.Fields, path, out _);
+        if (!ModelKinds.TryParsePath(path, out var segments) || segments[^1].Index >= 0 || node is not { Kind: FieldNodeKind.List })
+        { Say(reply, $"{Capital(spoken)} has no list {path}. Say /edit model add KIND ID LIST, and the values for a list of values."); return; }
+        var root = JsonNode.Parse(kind.CurrentJson(id))!;
+        string label = FullLabel(kind.Fields, path);
+        string what;
+        int count;
+        if (node.IsValueList)
+        {
+            if (values.Length == 0) { Say(reply, $"Say /edit model add {kind.Kind} {id} {path} and one or more values: {node.Field!.RangeText}."); return; }
+            var item = node.Field! with { Label = label };
+            var stored = new List<string>();
+            foreach (var typed in values)
+            {
+                if (!item.TryParse(typed, out string value, out string error)) { Say(reply, error); return; }
+                stored.Add(value);
+            }
+            if (!ModelKinds.TryAppend(root, path, stored, item, node, out count, out string why)) { Say(reply, why); return; }
+            what = string.Join(", ", stored.Select(item.Say));
+        }
+        else
+        {
+            if (values.Length > 0) { Say(reply, $"The {label} are not single values: /edit model add {kind.Kind} {id} {path} copies the last one, to change after."); return; }
+            if (!ModelKinds.TryList(root, path, create: false, out var arr, out string why) || arr!.Count == 0) { Say(reply, $"{Capital(spoken)} has no {label} to copy."); return; }
+            arr.Add(arr[^1]!.DeepClone());
+            count = arr.Count;
+            what = $"a copy of {label} {count - 1}";
+        }
+        int beforeVersion = Models.CurrentVersion(kind.Kind, id);
+        ModelUpdate update;
+        try { update = Models.Commit(kind.Kind, id, root.ToJsonString(), s.Username, $"added {what} to {label}"); }
+        catch (Exception ex) { Say(reply, $"Not changed: {Reason(ex)}"); return; }
+        Publish(update);
+        Push(s, new ModelOp(s.CurrentMapId, kind.Kind, id, label, beforeVersion, update.Version));
+        Say(reply, $"Added {what} to the {label} of {spoken}. Version {update.Version}; {count} now.");
+        Notify(s, $"{s.Username} added to the {label} of {spoken}.");
+        Refresh(s, reply);
     }
 
     /// <summary>Why a model would not be kept, in words: the first line of what refused it.</summary>

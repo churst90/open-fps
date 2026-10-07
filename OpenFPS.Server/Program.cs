@@ -265,16 +265,32 @@ public class GameServer
         }
     }
 
+    private readonly List<HeldSky> _heldSkies = new();
+
+    /// <summary>One tick of lightning: the server's storm, and the storm of each map that holds its own weather.</summary>
+    internal void Lightning(float dt)
+    {
+        _heldSkies.Clear();
+        foreach (var entry in _maps.GetAllMaps())
+            if (OpenFPS.Server.Editor.MapSettings.WeatherOf(entry.Value.data.HeldWeather) is WeatherType held)
+                _heldSkies.Add(new HeldSky(entry.Key, held, _environment.GetStateForMap(MapAtmosphere.Of(entry.Value.data))));
+        _lightning.Update(dt, _environment.CurrentScenario, _environment.GetCurrentState(), _heldSkies, EmitStrike);
+    }
+
     /// <summary>
-    /// A lightning flash, told to everyone on every map. Not through <see cref="EmitWorldAudio"/>: thunder
-    /// carries twenty kilometres, far past any broadcast radius. The storm is drawn round each map's
-    /// centre; each client renders the thunder where its listener stands, and a text player is not sent it.
+    /// A lightning flash, told to everyone on the maps under that sky: every map that follows the server's
+    /// (<paramref name="mapId"/> null), or the one map that holds the weather it came from. Not through
+    /// <see cref="EmitWorldAudio"/>: thunder carries twenty kilometres, far past any broadcast radius. The
+    /// storm is drawn round each map's centre; each client renders the thunder where its listener stands,
+    /// and a text player is not sent it.
     /// </summary>
-    private void EmitStrike(LightningStrike strike)
+    internal void EmitStrike(LightningStrike strike, string? mapId)
     {
         foreach (var entry in _maps.GetAllMaps())
         {
             var data = entry.Value.data;
+            bool holds = OpenFPS.Server.Editor.MapSettings.WeatherOf(data.HeldWeather) != null;
+            if (mapId == null ? holds : !entry.Key.Equals(mapId, StringComparison.OrdinalIgnoreCase)) continue;
             var world = entry.Value.world;
             var centre = (data.MinBound + data.MaxBound) * 0.5f;
             var placed = strike.Offset(new Vector3(centre.X, 0f, centre.Z));
@@ -736,7 +752,7 @@ public class GameServer
 
             float dt = FixedDeltaTime;
             _environment.Update(dt);
-            _lightning.Update(dt, _environment.CurrentScenario, _environment.GetCurrentState(), EmitStrike);
+            Lightning(dt);
             // Horns whose key has not been reported down for a few ticks are let go.
             VehicleSignals.Update(dt);
 

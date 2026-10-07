@@ -362,6 +362,16 @@ public sealed class DoorSystem
 
     // ── Where things are ────────────────────────────────────────────────────────────────────────
 
+    /// <summary>A door made again shut where its doorway is, given the openness it had: its shut pose
+    /// taken there, and its leaf put where the openness says (WorldEditor.Remake).</summary>
+    internal static void Settle(World world, Entity entity)
+    {
+        ref var door = ref world.Get<DoorComponent>(entity);
+        bool parented = world.Has<ParentComponent>(entity);
+        if (!door.Captured) Capture(world, entity, ref door, parented);
+        Place(world, entity, door, parented);
+    }
+
     /// <summary>
     /// Records where "shut" is, the first time a door is looked at: wherever it actually stands, so a
     /// door from a prefab, the build cursor or a template is shut where it was put.

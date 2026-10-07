@@ -503,7 +503,7 @@ here has been tried in the game client yet, only by tests and through the MUD ga
   base and forgets what it assembled whenever the library changes. A client restarts the voices of the
   vehicles and machines on an engine that changed.
 - Prefabs are kind `prefab` (ModelCatalog.cs, PrefabKind): fields from prefab-schema.json (vectors are
-  groups of X, Y and Z; lists such as RoomMaterials are not shown), checked by PrefabValidator. Id,
+  groups of X, Y and Z; its lists are editable since section 13), checked by PrefabValidator. Id,
   Type, IsItem, Premium, WeaponId and Hands are shown, not changed. A version is the server's alone and
   makes every thing made from the prefab again where it stands (Remake), keeping its name, settings, a
   doorway's rooms, a door's sides and a room's materials, and joining doorways to a room made again.
@@ -601,14 +601,11 @@ here has been tried in the game client yet, only by tests and through the MUD ga
 
 ### What is left
 
-- Groups as one thing (CompositeService composites with a root), if Cody wants a placed house to move
-  as one; a new group version changing placed copies.
-- Prefab lists (RoomMaterials, MissingFaces) are not editable in a prefab model; a room's six materials
-  are settings of the placed room instead.
-- Remaking a thing (a prefab's new version, a new model) starts it again: a door that was open is shut,
-  a fire lit at a known moment is lit again.
-- Vehicles written as parts lists in machines/ (not built in) are not listed as library vehicles.
-- A held weather holds the front's intensity, wind and humidity; lightning follows the server's front.
+Five leftovers from this list were built the same day: section 13. Still left:
+
+- Groups as one thing (CompositeService composites with a root), and a new group version changing the
+  copies already placed. Not to be built unless building houses shows the need (decision 2 below); a
+  placed group can be held and moved as one instead (section 13).
 - Previews are for things with a sound of their own; there is no preview of a wall being struck.
 - Phase 3 as in section 9.
 
@@ -627,3 +624,91 @@ Phase 2 decided (Cody, 2026-10-07): "go with your recommendations on the editor 
 hear; the server's simulation uses the current version on every map. Groups place as separate things until
 building houses shows one-piece composites are needed. Direct keys stay off until Cody has tried them with Orca
 and then NVDA, and any key a screen reader takes is moved first.
+
+## 13. Phase 2 leftovers as built
+
+Built 2026-10-07, after section 12, each with a test in `OpenFPS.Tests/WorldEditorLeftoversTests.cs`
+that failed before it. Unheard: tried by tests only.
+
+### A thing made again keeps what it is doing
+
+- `WorldEditor.Remake` (a prefab's new version, a thing's new model) carries the running state of the
+  thing across (`LiveState`, OpenFPS.Server/Editor/LiveState.cs). What the model says comes from the new
+  version; what the thing is doing comes from the old one.
+- A door: its openness, where it is swinging to, its closer's and motor's clock, which hand has it, the
+  key being turned and whether a key was used. Its locked side and push side were already settings. An
+  open door is made shut at its doorway (its shut pose, not where the leaf has swung to) and swung open
+  again at once (`DoorSystem.Settle`), so a new version does not move the doorway or slam the door.
+- A fire: the moment it was lit (`fire:PRESET/lit=SECONDS`), and so its stage of growth, kept across a
+  new model or a new prefab version.
+- An emitter's running state: on or off (`SynthRunning`: a machine, a tap, a crossing), standing at a
+  stop, the windows. Health, kept within the new maximum.
+- Found on the way and fixed: moving or turning a door with the editor moved its leaf but not its
+  doorway (the shut pose DoorSystem took when it first saw it), so the leaf went back to the old place
+  the next time it swung, and a new version would have made it there. `ApplyPose` now moves and turns
+  the shut pose and the doorway's opening with the leaf, and what the overlay keeps of a door, and what
+  a copy, a deletion or a group is made from, is its doorway, not where its leaf hangs open
+  (`RestOf`).
+
+### Parts-list vehicles are library vehicles
+
+- `ModelLibrary` lists every vehicle in `machines/` (MachineRegistry.Authored) as a vehicle model, with
+  the built-in presets: `Ids`, `Knows`, `BuiltInModel` and `Get` ask MachineRegistry each time, since its
+  folder is loaded after the library is made. Version 0 is `VehicleSpec.Of(id)`: the parts list
+  assembled on its base.
+- Edited through the same `VehicleSpec` path as a built-in: an edited one is built on its parts list
+  (`MachineRegistry.Unedited`), so what the editor does not show (its engine's place, its siren) stays
+  what the file says. New, copy, versions, use, pin and where all work, and clients restart its voices.
+
+### A held weather holds its lightning
+
+- `LightningSystem` keeps the server's storm for every map that follows the server's sky, and a storm of
+  its own for each map that holds a weather, advanced from that map's held sky (`HeldSky`). A map that
+  stops holding a weather loses its storm.
+- `GameServer.EmitStrike(strike, mapId)`: a flash of the server's storm goes to every map that does not
+  hold a weather; a flash of a held storm goes to that map only. A map holding a storm flashes while the
+  server is clear; a map holding a clear sky has none while the server storms.
+
+### A prefab's lists
+
+- `PrefabSchema` describes an array as a list: RoomMaterials (materials, from AcousticRegistry) and
+  MissingFaces (the face names) are lists of values (`FieldNode.IsValueList`, with the item's
+  description as its `Field`). A list of objects would be a list of groups.
+- `/edit model set KIND ID LIST[N] VALUE` changes one item; `/edit model add KIND ID LIST VALUE...`
+  puts one or more values on the end, making the list if the model has none (a room's six materials go
+  in together); `/edit model remove KIND ID LIST[N]` takes one out, and taking the last one out of a list
+  of values leaves the list out. Every change is checked whole by PrefabValidator (PrefabRepository
+  .FromJson), so five room materials are refused with its reason.
+- `/edit model add KIND ID LIST` on a list of records (a fountain's falls, a group's parts) adds a copy
+  of the last item, to change after. Any kind, not only prefabs.
+- Menus: a list of values shows each item with its value and opens it as a field (choose a value, or
+  take it out); a short list of choices (the faces) offers "Add North" and so on, a long one (materials)
+  a typed add. The list's help is said in it (the room's face order).
+
+### A placed group, held and moved as one
+
+- Each thing placed by `/edit place group` keeps which placing it came from (`OverlayAddition.Placement`,
+  "yard@900000004": the group and the number of its first part), in the overlay, through undo and redo.
+  Copies and rows are not part of it.
+- `/edit select group`: with one part selected, every part of that placing still on the map is held. The
+  Selected menu offers it as "Hold its whole group".
+- `/edit held move EAST NORTH UP`, `/edit held nudge DIRECTION [METRES]`, `/edit held turn DEGREES`:
+  everything held moves or turns together (turning is about their middle, across the ground), all or
+  none: if one would go through a player or out of reach, nothing moves. One undo for all. Works on any
+  held things, not only a group's. The Held menu has them, with nudge and turn submenus. Each costs 5
+  against the editor's limit (as placing a group does).
+- Still separate things (Cody's decision): no composite, no root; a new version of the group changes the
+  next placing only.
+
+### Wire
+
+No change. No message, member or union tag was added; the overlay file gained `Placement` on an
+addition (a file, not the wire, and absent on old files). `ModelUpdate` now also carries parts-list
+vehicles, which old clients read as any vehicle model. The server and client should still be rebuilt
+together for the vehicle library to agree (both read machines/).
+
+### For Cody
+
+1. **Map-file `Form` (a ramp's shape on a map entry) is not carried by Remake or by duplicate.** Found
+   while doing item 1: `MapOverlayStore.Clone` and `Remake` copy every other map-entry field but not
+   `Form`. Recommendation: carry it; no map in the repository uses `Form` on an entry yet.

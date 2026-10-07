@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Text.Json;
+using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Editing;
@@ -130,7 +131,7 @@ public sealed partial class WorldEditor
         var o = Overlays.Get(s.CurrentMapId);
         var parts = things.Select(t =>
         {
-            var tr = world.Get<Transform>(t.E);
+            var tr = RestOf(world, t.E);
             var off = tr.Position - origin;
             float turn = Degrees(YawOf(tr.Rotation)) - frame;
             turn = ((turn % 360f) + 540f) % 360f - 180f;
@@ -175,12 +176,13 @@ public sealed partial class WorldEditor
         var origin = feet + forward * (PhysicsConstants.PlayerRadius + 1f + MathF.Max(0f, back));
         var ops = new List<EditOp>();
         var placedIds = new List<int>();
+        string placement = $"{id}@{Overlays.Get(s.CurrentMapId).NextId}";
         foreach (var p in spec.Parts)
         {
             if (!_maps.Prefabs.TryGetValue(p.PrefabId.ToLowerInvariant(), out var t)) continue;
             var at = origin + right * p.RightMetres + forward * p.ForwardMetres + Vector3.UnitY * p.UpMetres;
             var rotation = Quaternion.CreateFromYawPitchRoll((q * 90f + p.TurnDegrees) * MathF.PI / 180f, 0f, 0f);
-            if (!PlaceOne(s.CurrentMapId, t, new Pose(at, rotation, p.Scale), p.Name, p.Settings, out var thing, out string why))
+            if (!PlaceOne(s.CurrentMapId, t, new Pose(at, rotation, p.Scale), p.Name, p.Settings, out var thing, out string why, placement))
             {
                 // All or nothing: a group half placed is not the group.
                 foreach (var done in ops.AsEnumerable().Reverse()) Reverse(s, done, forward: false, out _);
@@ -196,11 +198,132 @@ public sealed partial class WorldEditor
         hand.Held.Clear();
         hand.Held.AddRange(placedIds);
         hand.Selected = placedIds[0];
-        Say(reply, $"Placed the group {id}, {Plural(ops.Count, "thing")}, in front of you, facing {Compass4Names[q]}. They are held; each is its own thing now.");
+        Say(reply, $"Placed the group {id}, {Plural(ops.Count, "thing")}, in front of you, facing {Compass4Names[q]}. They are held: /edit held move, nudge or turn moves them as one, and each is its own thing too.");
         Notify(s, $"{s.Username} placed the group {id}.");
         Refresh(s, reply);
     }
 
     private float HalfDepth(GroupPart p)
         => _maps.Prefabs.TryGetValue(p.PrefabId.ToLowerInvariant(), out var t) && t.ColliderSize is { } z ? MathF.Max(z.X, z.Z) * 0.5f : 0.5f;
+
+    // ── A placed group, held and moved as one ───────────────────────────────────────────────────
+
+    /// <summary>The group placing a thing was put down by, or null.</summary>
+    private string? PlacementOf(string mapId, int id) => Overlays.Get(mapId).AdditionFor(id)?.Placement;
+
+    /// <summary>The things of one group placing still on the map.</summary>
+    private List<int> PartsOf(string mapId, string placement)
+        => Overlays.Get(mapId).Added.Where(a => a.Placement == placement).Select(a => a.Entity.EntityId)
+               .Where(i => _maps.AuthoredEntities(mapId).ContainsKey(i)).ToList();
+
+    /// <summary>/edit select group: every thing put down by the same group placing as the selected one, held.</summary>
+    private void HoldPlacement(UserSession s, Action<IMessage> reply)
+    {
+        if (!TrySelected(s, reply, out var world, out var e, out int id)) return;
+        if (PlacementOf(s.CurrentMapId, id) is not { } placement)
+        { Say(reply, $"{NameOf(world, e)} was not placed as part of a group. /edit select add holds things one at a time."); return; }
+        var hand = HandOf(s);
+        hand.Held.Clear();
+        hand.Held.AddRange(PartsOf(s.CurrentMapId, placement));
+        Say(reply, $"Holding the {Plural(hand.Held.Count, "thing")} of the group {GroupWord(placement)} placed with {NameOf(world, e)}. "
+                 + "/edit held move, nudge or turn moves them as one.");
+        Refresh(s, reply);
+    }
+
+    /// <summary>"yard" from "yard@900000004".</summary>
+    private static string GroupWord(string placement) => placement[..Math.Max(0, placement.LastIndexOf('@'))];
+
+    /// <summary>/edit held move|nudge|turn ...: the held things moved or turned together, one undo for all.</summary>
+    private void HeldCommand(UserSession s, string[] args, Action<IMessage> reply)
+    {
+        string verb = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+        string[] rest = args.Length > 1 ? args[1..] : Array.Empty<string>();
+        switch (verb)
+        {
+            case "move":
+            {
+                if (rest.Length < 3 || !TryNumber(rest[0], out float east) || !TryNumber(rest[1], out float north) || !TryNumber(rest[2], out float up))
+                { Say(reply, "Say /edit held move EAST NORTH UP, in metres. Negative goes west, south, down."); return; }
+                if (MathF.Abs(east) > 1000 || MathF.Abs(north) > 1000 || MathF.Abs(up) > 1000) { Say(reply, "A move is at most 1000 metres each way."); return; }
+                var by = PlayerCoordinates.ToWorld(east, north, up);
+                MoveHeld(s, reply, "moved", (_, p) => p with { Position = p.Position + by }, what => $"Moved {what} {Offset(by)}.");
+                return;
+            }
+            case "nudge":
+            {
+                if (!TryBody(s, reply, out _, out _, out float yaw)) return;
+                if (rest.Length == 0 || !TryDirection(rest[0], yaw, out var dir))
+                { Say(reply, "Say /edit held nudge north, south, east, west, up, down, forward, back, left or right, and metres if not the step."); return; }
+                float metres = HandOf(s).Step;
+                if (rest.Length > 1 && (!TryNumber(rest[1], out metres) || metres <= 0 || metres > 50)) { Say(reply, "A nudge is up to 50 metres."); return; }
+                var by = dir * metres;
+                MoveHeld(s, reply, "moved", (_, p) => p with { Position = p.Position + by }, what => $"Moved {what} {Offset(by)}.");
+                return;
+            }
+            case "turn":
+            {
+                if (rest.Length == 0 || !TryNumber(rest[0], out float degrees) || MathF.Abs(degrees) > 360)
+                { Say(reply, "Say /edit held turn DEGREES: positive is clockwise, negative anticlockwise, about the middle of them."); return; }
+                var turn = Quaternion.CreateFromAxisAngle(Vector3.UnitY, degrees * MathF.PI / 180f);
+                MoveHeld(s, reply, "turned", (centre, p) => p with
+                {
+                    Position = centre + Vector3.Transform(p.Position - centre, turn),
+                    Rotation = Quaternion.Normalize(Quaternion.Concatenate(p.Rotation, turn)),
+                }, what => $"Turned {what} {FieldDescriptor.Format(MathF.Abs(degrees))} degrees {(degrees >= 0 ? "clockwise" : "anticlockwise")} about their middle.");
+                return;
+            }
+            default:
+                Say(reply, "Say /edit held move EAST NORTH UP, /edit held nudge DIRECTION [METRES], or /edit held turn DEGREES: the held things together.");
+                return;
+        }
+    }
+
+    /// <summary>
+    /// Moves every held thing to a pose worked out from its own and from the middle of them all (across
+    /// the ground, at their lowest point), all or none: if one would go out of reach or through somebody,
+    /// nothing moves.
+    /// </summary>
+    private void MoveHeld(UserSession s, Action<IMessage> reply, string verb, Func<Vector3, Pose, Pose> to, Func<string, string> said)
+    {
+        if (!_maps.TryGetMap(s.CurrentMapId, out var world, out _, out _, out _)) { Say(reply, $"Map '{s.CurrentMapId}' is not loaded."); return; }
+        var hand = HandOf(s);
+        var things = hand.Held.Select(i => (Id: i, Found: _maps.AuthoredEntities(s.CurrentMapId).TryGetValue(i, out var e) && Editable(world, e), E: e))
+                              .Where(x => x.Found).Select(x => (x.Id, x.E)).ToList();
+        if (things.Count == 0) { Say(reply, "Nothing is held. /edit select group holds a placed group; /edit select add holds one thing more."); return; }
+
+        var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
+        foreach (var (_, e) in things) { var (a, b) = Box(world, e); lo = Vector3.Min(lo, a); hi = Vector3.Max(hi, b); }
+        var centre = new Vector3((lo.X + hi.X) * 0.5f, lo.Y, (lo.Z + hi.Z) * 0.5f);
+
+        string what = HeldWords(s.CurrentMapId, things.Select(t => t.Id).ToList());
+        var moves = new List<(int Id, Entity E, string Name, Pose Before, Pose After)>();
+        foreach (var (id, e) in things)
+        {
+            var before = PoseOf(world, e);
+            var after = to(centre, before);
+            string name = NameOf(world, e);
+            if (!InReach(after.Position)) { Say(reply, $"Not {verb}: for {name}, {TooFar}"); return; }
+            if (BlockedBy(world, e, after) is { } who) { Say(reply, $"Not {verb}: that would put {name} through {who}."); return; }
+            moves.Add((id, e, name, before, after));
+        }
+        var ops = new List<EditOp>();
+        foreach (var m in moves)
+        {
+            ApplyPose(s.CurrentMapId, world, m.E, m.After);
+            Record(s.CurrentMapId, m.Id, world, m.E);
+            ops.Add(new PoseOp(s.CurrentMapId, m.Id, m.Name, verb, m.Before, m.After));
+        }
+        Push(s, new BatchOp(s.CurrentMapId, ops, $"{verb} {what}"));
+        Say(reply, said(what) + " One undo puts them back.");
+        Notify(s, $"{s.Username} {verb} {what}.");
+        Refresh(s, reply);
+    }
+
+    /// <summary>"the group yard" when the things are the whole of one group placing, "the 3 held things" otherwise.</summary>
+    private string HeldWords(string mapId, List<int> ids)
+    {
+        var placements = ids.Select(i => PlacementOf(mapId, i)).Distinct().ToList();
+        if (placements is [{ } one] && PartsOf(mapId, one).Count == ids.Count) return $"the group {GroupWord(one)}";
+        return ids.Count == 1 ? "the held thing" : $"the {ids.Count} held things";
+    }
 }

@@ -29,6 +29,22 @@ Recent work, newest first. `git log` has the rest.
     boundary processor's per-sample loudest tally); parameters no body read (EarWindSynth.Control's dt,
     its AudioLab and test callers updated); 296 unused usings. LibraryBoundary's file list and one
     allowance follow.
+- World editor, the phase 2 leftovers (docs/WORLD_EDITOR.md section 13), each with a test that failed
+  before it (WorldEditorLeftoversTests). Unheard.
+  - A thing made again by a new prefab version or a new model carries on as it was: an open door stays
+    open (made shut at its doorway and swung open again) with its lock, a fire keeps the moment it was
+    lit, a machine or a tap that was off stays off.
+  - Vehicles written as parts lists in machines/ are library vehicles: listed, edited through VehicleSpec
+    on their parts list, with versions, pins and templates.
+  - A map holding a weather has its own lightning: a held storm flashes while the server is clear, a
+    held clear sky has none while the server storms.
+  - A prefab's lists (MissingFaces, RoomMaterials) are editable item by item: `/edit model set KIND ID
+    LIST[N] VALUE`, the new `/edit model add KIND ID LIST [VALUES]` (a copy of the last item for a list
+    of records, such as a fountain's falls), and `remove`, every change checked whole by PrefabValidator.
+  - A placed group can be held again (`/edit select group`) and moved, nudged or turned as one
+    (`/edit held move|nudge|turn`), one undo; the overlay keeps which placing each part came from. Still
+    separate things, not a composite.
+  - No wire change.
 - The CI hang (run 37576816453, shard 2: `PresenceTests.ALoginIsAnnouncedToEveryoneElseOnTheAllChannel`
   silent for 30 minutes). Not SQLite: every `ClientGameSession` a test built, sound or not, queued the
   whole door prewarm (164 renders) on the thread pool, and a pool thread that finished one took the next

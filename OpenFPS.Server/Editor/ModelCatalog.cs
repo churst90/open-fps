@@ -150,7 +150,8 @@ public sealed class ModelCatalog
 /// <summary>
 /// The fields of a prefab, read from prefab-schema.json: a number with its minimum and maximum, a whole
 /// number, on or off, a choice from an enum (materials from AcousticRegistry), words; a vector is a
-/// group of x, y and z. Lists (a room's six materials, missing faces) are not shown here. A prefab's
+/// group of x, y and z; a list (a room's six materials, the missing faces) is its items, each one of
+/// those, changed with /edit model set, add and remove and checked whole by PrefabValidator. A prefab's
 /// identity (its id, its type, whether it is an item or a weapon) is shown and not changed: changing
 /// those makes a different thing, which is a new prefab.
 /// </summary>
@@ -217,7 +218,17 @@ public static class PrefabSchema
                     ? new FieldNode { Name = name, Label = derived, Kind = FieldNodeKind.Group, Children = Properties(inner, defs, unit) }
                     : null;
             case "array":
-                return null;
+            {
+                if (p["items"] is not JsonObject items || Node(name, items, defs, unit) is not { } item) return null;
+                if (item.Kind == FieldNodeKind.Group)
+                    return new FieldNode { Name = name, Label = derived, Kind = FieldNodeKind.List, Children = item.Children };
+                if (item.Field == null) return null;
+                return new FieldNode
+                {
+                    Name = name, Label = derived, Kind = FieldNodeKind.List,
+                    Field = item.Field with { Label = derived, Help = help.Length > 0 ? help : item.Field.Help, ReadOnly = Fixed.Contains(name) },
+                };
+            }
             case "boolean":
                 return Scalar(name, derived, new FieldDescriptor { Path = name, Label = derived, Type = FieldType.Bool, Help = help, ReadOnly = Fixed.Contains(name) });
             case "string":

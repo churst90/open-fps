@@ -252,11 +252,15 @@ public static class MachineRegistry
         {
             if (ModelLibrary.IsAuthored(ModelLibrary.Kinds.Vehicle, k))
             {
+                var spec = ModelLibrary.Get<VehicleSpec>(ModelLibrary.Kinds.Vehicle, k);
+                // Built on itself it starts from the unedited vehicle, which never asks for this one
+                // again; marked as assembling, a parts list's own base check took it for a circle.
+                if (spec.Base.Length == 0 || spec.Base.Equals(k, StringComparison.OrdinalIgnoreCase)) return spec.Build(k);
                 _assembling ??= new List<string>();
                 if (_assembling.Contains(k, StringComparer.OrdinalIgnoreCase))
                     throw new ArgumentException($"Vehicles are built on each other in a circle: {string.Join(" -> ", _assembling)} -> {k}.");
                 _assembling.Add(k);
-                try { return ModelLibrary.Get<VehicleSpec>(ModelLibrary.Kinds.Vehicle, k).Build(k); }
+                try { return spec.Build(k); }
                 finally { _assembling.Remove(k); }
             }
             return WithEditedEngine(Unedited(k));
