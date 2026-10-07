@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
@@ -82,6 +83,54 @@ public class WheelSquealTests
         return at;
     }
 
+    /// <summary>The power-weighted mean frequency between <paramref name="lo"/> and <paramref name="hi"/>:
+    /// where a note whose pitch wanders (VehicleSynth.StickSlipTone, 5 % either way) sits on average,
+    /// which its single strongest bin over a second need not be.</summary>
+    private static double CentroidHz(float[] x, float rate, double lo, double hi)
+    {
+        const int N = 8192;
+        double sum = 0, weight = 0;
+        for (double f = lo; f <= hi; f += 2)
+        {
+            double w = 2 * Math.PI * f / rate, c = 2 * Math.Cos(w), e = 0;
+            for (int start = 0; start + N <= x.Length && start < 8 * N / 2; start += N / 2)
+            {
+                double s1 = 0, s2 = 0;
+                for (int i = 0; i < N; i++) { double hann = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / N), s0 = x[start + i] * hann + c * s1 - s2; s2 = s1; s1 = s0; }
+                e += s1 * s1 + s2 * s2 - c * s1 * s2;
+            }
+            sum += f * e; weight += e;
+        }
+        return sum / Math.Max(1e-30, weight);
+    }
+
+    /// <summary>
+    /// A squeal is a note, not a band of noise. It was noise through a resonance, whose amplitude
+    /// jumps at the resonance's bandwidth: measured in 5 ms blocks its level swung by 28 % of its
+    /// mean, which Cody heard on an airliner's touchdown as gravel and on the cars as a hiss
+    /// (2026-10-07). The stick-slip note's holds (14 %, most of it the scrub under it); its pitch moves.
+    /// </summary>
+    [Fact]
+    public void A_squeal_holds_its_level_like_a_note()
+    {
+        var tyre = VehicleProfile.ByName("i4_midsize").Tyres;
+        var v = new VehicleSynth.WheelSquealVoice { Demand = 1.0f, SlipVelocity = 1.4f };
+        var rng = new Random(5);
+        int block = Rate / 200;
+        var levels = new System.Collections.Generic.List<double>();
+        double e = 0; int n = 0;
+        for (int i = 0; i < Rate * 2; i++)
+        {
+            float y = VehicleSynth.WheelSqueal(tyre, 1.0f, 1.4f, 1f, 1.4f, 4, rng, ref v);
+            if (i < Rate / 2) continue;
+            e += y * y;
+            if (++n == block) { levels.Add(Math.Sqrt(e / n)); e = 0; n = 0; }
+        }
+        double mean = levels.Average(), sd = Math.Sqrt(levels.Average(l => (l - mean) * (l - mean)));
+        _o.WriteLine($"5 ms level: standard deviation {sd / mean:P0} of its mean");
+        Assert.True(sd / mean < 0.2, $"the squeal's level swings by {sd / mean:P0} of its mean every 5 ms: a band of noise");
+    }
+
     /// <summary>
     /// A tyre is in hertz whatever rate the device runs at. The mixer runs at the device's rate, often
     /// 48 kHz, and the tread tone, the rolling high-pass and the squeal's resonators were worked out at
@@ -112,10 +161,10 @@ public class WheelSquealTests
             // The squeal, from the axle voice and from one wheel: a note at its pitch for the demand.
             double squealHz = tyre.SquealHz * TyreFriction.SquealPitch(0.95f);
             var axle = new VehicleSynth.TyreVoice { SlipSmooth = 0.95f };
-            double axleNote = PeakHz(Run(r => VehicleSynth.Tyre(slick, 20f, 0.95f, r, ref axle, sampleRate: rate)), rate,
+            double axleNote = CentroidHz(Run(r => VehicleSynth.Tyre(slick, 20f, 0.95f, r, ref axle, sampleRate: rate)), rate,
                                      squealHz * 0.8, squealHz * 1.25);
             var wheel = new VehicleSynth.WheelSquealVoice { Demand = 0.95f, SlipVelocity = 1.4f };
-            double wheelNote = PeakHz(Run(r => VehicleSynth.WheelSqueal(tyre, 0.95f, 1.4f, 1f, 1.4f, 4, r, ref wheel, sampleRate: rate)),
+            double wheelNote = CentroidHz(Run(r => VehicleSynth.WheelSqueal(tyre, 0.95f, 1.4f, 1f, 1.4f, 4, r, ref wheel, sampleRate: rate)),
                                       rate, squealHz * 0.8, squealHz * 1.25);
 
             // The rolling roar's high-pass, from its coefficient at this rate.

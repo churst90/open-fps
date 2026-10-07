@@ -475,6 +475,59 @@ public static class GameLevelsSpike
             }, AudioClock.Now);
         }
 
+        // A car driven on the per-wheel model (WheelDynamics), its wheels sent with its state as the
+        // server sends them, so the squeal is the game's own. `plan` gives, at each 30 Hz tick, the
+        // speed wanted at its end and the path's curvature (1/m, negative turning left). The car starts
+        // at `from` heading +X; the listener stands at `ear`, facing +Z.
+        void CarDrive(string label, string preset, float grip, float startSpeed, Vector3 from, Vector3 ear, double seconds,
+                      Func<WheelDynamics, float, (float Speed, float Curvature)> plan)
+        {
+            var profile = MachineRegistry.VehicleFor(preset);
+            var body = new WheelDynamics(profile, grip) { ForwardOnly = true, Vx = startSpeed };
+            Stand(ear, 0f);
+            float heading = MathF.PI / 2f, steer = 0f;
+            Vector3 at = from;
+            var wire = new WheelState[body.Wheels.Length];
+            Quaternion Rot() => Quaternion.CreateFromAxisAngle(Vector3.UnitY, heading);
+            Vector3 Vel() => new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)) * body.Vx
+                           + new Vector3(MathF.Cos(heading), 0f, -MathF.Sin(heading)) * body.Vy;
+            int id = AddCar(preset, at, Vel());
+            double start = clock.Elapsed.TotalSeconds + 1.5;
+            int ticks = 0;
+            perFrame = t =>
+            {
+                // Held at its start until the recording begins, then driven at 30 Hz of its own time.
+                while (t >= start && start + ticks / 30.0 <= t)
+                {
+                    float tt = ticks / 30f;
+                    var (want, curvature) = plan(body, tt);
+                    float target = MathF.Atan(body.Wheelbase * curvature) + body.UndersteerGradient * body.Vx * body.Vx * curvature;
+                    steer += Math.Clamp(target - steer, -0.9f / 30f, 0.9f / 30f);
+                    body.Step(1f / 30f, steer, (want - body.Vx) * 30f);
+                    var fwd = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading));
+                    var right = new Vector3(MathF.Cos(heading), 0f, -MathF.Sin(heading));
+                    at += fwd * body.TickForward + right * body.TickRight;
+                    heading += body.TickYaw;
+                    for (int i = 0; i < wire.Length; i++)
+                    {
+                        ref var w = ref body.Wheels[i];
+                        wire[i] = WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand);
+                    }
+                    ticks++;
+                }
+                world.SyncState(new[] { new EntityState
+                {
+                    EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = at, Rotation = Rot() }),
+                    LinearVelocity = Vel(), Wheels = ticks > 0 ? (WheelState[])wire.Clone() : null,
+                } });
+            };
+            Pump(1.5);
+            Record(label, seconds);
+            perFrame = null;
+            Remove(id);
+            Pump(1.5);
+        }
+
         // Two of the same machine side by side, 1.8 m apart, 3 m in front of you, on a warm day.
         void TwoMachines(string preset, float celsius, double seconds)
         {
@@ -503,6 +556,19 @@ public static class GameLevelsSpike
             }
             // A day hot enough that both thermostats call (Thermostat): the two compressors together.
             if (set is "faults" or "faults-ac") TwoMachines("ac_window", 36f, 20.0);
+            if (set is "faults-squeal")
+            {
+                // The round-3 set: both touchdowns, and a car's own squeal on asphalt.
+                Landing("piston_single", 40f, 7.0, 9.0);
+                Landing("airliner", 60f, 7.0, 9.0);
+                // A hard stop from 70 km/h, standing on the pedal 2 s in, 7.5 m beside where it stops.
+                CarDrive("car hard stop 7.5m", "i4_midsize", 0.85f, 70f / 3.6f, new Vector3(-60f, 0f, 0f), new Vector3(-10f, 0f, -7.5f), 8.0,
+                         (b, t) => t < 2f ? (70f / 3.6f, 0f) : (MathF.Max(0f, b.Vx - 11f / 30f), 0f));
+                // A 40 m left-hand bend taken at a speed rising from 0.3 g to past the limit, 7.5 m
+                // outside its middle.
+                CarDrive("car cornering 7.5m", "i4_midsize", 0.85f, MathF.Sqrt(0.3f * 9.81f * 40f), new Vector3(-60f, 0f, -40f), new Vector3(0f, 0f, 7.5f), 10.0,
+                         (b, t) => (MathF.Sqrt(MathF.Min(1.05f, 0.3f + 0.09f * t) * 9.81f * 40f), t < 1.5f ? 0f : -1f / 40f));
+            }
             if (set is "faults-landing")
             {
                 Landing("piston_single", 40f, 7.0, 9.0);
