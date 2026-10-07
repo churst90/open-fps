@@ -10,14 +10,11 @@ namespace OpenFPS.Common;
 ///   * The bullet itself outruns it. Everywhere it passes it drags a shock cone behind it — the CRACK —
 ///     and the crack you hear is made at the moment the bullet passes YOU, arriving at roughly d/v.
 ///
-/// Since v &gt; c the crack arrives FIRST, and the gap between them is d·(1/c − 1/v): about 1.7 ms per
-/// metre for a rifle. At a hundred metres that is a sixth of a second — comfortably perceivable, and a
-/// direct readout of how far away the shooter is. Sighted games throw this away; here it is a genuine
-/// instrument. Crack-then-thump close together means someone near. A long gap means someone far. No
-/// crack at all means the round did not pass close to you, or was subsonic.
+/// Since v &gt; c the crack arrives first, and the gap between them is d·(1/c − 1/v): about 1.7 ms per
+/// metre for a rifle, a sixth of a second at a hundred metres, and a direct readout of how far away the
+/// shooter is. No crack at all means the round did not pass close, or was subsonic.
 ///
-/// All pure and deterministic, so the server can use it for authoritative timing and the client for the
-/// same numbers without either of them drifting.
+/// Pure and deterministic, so the server's timing and the client's agree.
 /// </summary>
 public static class Ballistics
 {
@@ -73,9 +70,8 @@ public static class Ballistics
     }
 
     /// <summary>
-    /// The inverse: how far away the shooter was, given the gap the listener heard. This is the sum the
-    /// player's ear is doing, written down — useful for tuning, for a spoken range readout, and for
-    /// checking that the timing actually encodes what it claims to.
+    /// The inverse: how far away the shooter was, given the gap the listener heard. The sum the
+    /// player's ear does, written down.
     /// </summary>
     public static float DistanceFromCrackToReport(float gapSeconds, float muzzleVelocity, float speedOfSound)
     {
@@ -98,8 +94,8 @@ public static class Ballistics
     /// <summary>
     /// Duration of the N-wave a passing round makes, in seconds. It grows with how far away the round
     /// passes and shrinks with velocity, which is what makes a near miss a sharp tearing CRACK and a
-    /// distant one a flatter, duller snap. Derived from the classical N-wave width; the constant is
-    /// folded from the round's calibre and length, which this game does not model separately.
+    /// distant one a flatter, duller snap. A rough stand-in with no calibre in it; the rendered crack
+    /// uses Whitham's law with the bullet's own size (<see cref="BulletFlyby.CrackSeconds"/>).
     /// </summary>
     public static float CrackDurationSeconds(float missDistance, float muzzleVelocity, float speedOfSound)
     {

@@ -3,15 +3,9 @@ using System.Collections.Generic;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// One weapon, as numbers: what the audio needs to know, and nothing that is specific to a renderer
-/// or a head.
-///
-/// The velocities are real. That matters more here than in a sighted game, because the muzzle velocity
-/// is not a damage stat — it is what decides whether the round cracks as it goes past a listener, how
-/// tight that crack is, and how big the gap is between the crack and the report. A player who learns
-/// what an AKM sounds like at two hundred metres has learned something true about a 7.62x39 round, and
-/// if the numbers were invented that knowledge would not transfer between weapons. See
-/// <see cref="Ballistics"/> for what is done with them.
+/// One weapon, as numbers. The figures are real: the muzzle velocity decides whether a round cracks
+/// past a listener, how tight the crack is and the gap to the report, and a player who learns an AKM
+/// by ear has learned something true about a 7.62x39 (see <see cref="Ballistics"/>).
 /// </summary>
 public sealed record WeaponDefinition
 {
@@ -29,12 +23,9 @@ public sealed record WeaponDefinition
 
     // ── What the blast sounds like ──────────────────────────────────────────────────────────────
     //
-    // On the weapon, not in a separate table keyed by name. There was a table, and within a day it had
-    // produced both kinds of bug the arrangement invites: the Glock's definition said 375 m/s while the
-    // profile it named said 340, so the engine scheduled a crack and rendered silence into it; and
-    // five weapons sharing three profiles meant the Glock and the .45 came out of the synthesizer
-    // BYTE-IDENTICAL. A 9 mm and a .45 are not the same sound, and in a game played by ear the whole
-    // point of having five weapons is that they are five things to recognise.
+    // On the weapon, never in a separate table keyed by name: such a table gave the Glock 340 m/s
+    // against its own 375 (a crack scheduled and silence rendered into it), and made the Glock and the
+    // .45 byte-identical.
 
     /// <summary>
     /// The shock's positive phase at the source, milliseconds: where its pulse first crosses zero,
@@ -76,10 +67,7 @@ public sealed record WeaponDefinition
         MuzzleVelocity > speedOfSound + Ballistics.SubsonicMarginMetresPerSecond;
 
     // ── Carrying it and loading it ──────────────────────────────────────────────────────────────
-    //
-    // Real figures, for the same reason the velocities are real: a player who learns that a Glock
-    // holds seventeen and a pump gun is loaded a shell at a time has learned something true, and can
-    // plan a fight around it by ear.
+    // Real figures too: a Glock holds seventeen and a pump gun is loaded a shell at a time.
 
     /// <summary>Which ammunition it takes: a key into <see cref="Ammunition"/>.</summary>
     public required string AmmoId { get; init; }
@@ -331,11 +319,8 @@ public static class Ammunition
         => $"{count} {(count == 1 ? ammo.UnitSingular : ammo.Unit)} of {ammo.SpokenName}";
 }
 
-/// <summary>
-/// The weapons that exist, and the one place that decides so.
-///
-/// Five measured on their own guns in the NIJ recordings, and a shotgun estimated from the physics.
-/// </summary>
+/// <summary>The weapons that exist. Five reports are measured on their own guns in the NIJ recordings;
+/// the shotgun's and the M700's are estimated from the physics.</summary>
 public static class WeaponRegistry
 {
     /// <summary>One grain, kg: what bullet weights are published in.</summary>
@@ -419,9 +404,8 @@ public static class WeaponRegistry
         BulletMassKg = 124f * Grain, RiflingTwistMetres = 0.250f,
     };
 
-    /// <summary>.45 ACP from a hammer-fired service pistol: heavy, slow and SUBSONIC. It makes no crack
-    /// at all — only the report — so its range cannot be read off the gap the way a rifle's can. That
-    /// is a real property of the cartridge and it is worth having a weapon that demonstrates it.</summary>
+    /// <summary>.45 ACP from a hammer-fired service pistol: heavy, slow and subsonic. No crack, only the
+    /// report, so its range cannot be read off the gap the way a rifle's can.</summary>
     public static readonly WeaponDefinition ServicePistol = new()
     {
         Id = "pistol",
@@ -539,9 +523,8 @@ public static class WeaponRegistry
     public static bool TryGet(string id, out WeaponDefinition weapon) =>
         _byId.TryGetValue(id ?? "", out weapon!);
 
-    /// <summary>The weapon by id, or null. Callers that cannot proceed without one should say which id
-    /// they were given — a weapon that silently becomes a different weapon is a bug you hear once, in
-    /// the middle of a firefight, and cannot reproduce.</summary>
+    /// <summary>The weapon by id, or null. A caller that cannot go on without one should say which id it
+    /// was given: a weapon that silently becomes another is a bug heard once and never reproduced.</summary>
     public static WeaponDefinition? Get(string id) =>
         _byId.TryGetValue(id ?? "", out var w) ? w : null;
 }

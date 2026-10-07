@@ -2,18 +2,17 @@ using System.Collections.Generic;
 
 namespace OpenFPS.Common;
 
-/// <summary>What a handling sound is: a reload of so many rounds, from empty or not, or a dry fire.</summary>
+/// <summary>What a handling sound is: a reload of so many rounds, from empty or not, a dry fire, a bolt
+/// cycled, the selector moved or the action worked.</summary>
 public readonly record struct HandlingSpec(string WeaponId, bool IsReload, int Rounds, bool FromEmpty, bool IsCycle = false,
                                           bool IsSelector = false, bool IsAction = false);
 
 /// <summary>
-/// The noises of working a gun by hand: a reload and the click of a trigger on an empty chamber.
+/// The noises of working a gun by hand: reloads, dry fire, a bolt cycled, the selector, the action.
 ///
-/// Each is a ROUTINE, the steps a pair of hands goes through in order (press the release, the
-/// magazine comes out, a new one is fetched and seated, the bolt is sent home), and each step is a
-/// contact between two pieces of metal or a slide of one along another. The routine is the one
-/// source of the reload's length: the server finishes a reload when the routine ends, and the sound
-/// IS the routine, so what a player hears and when the gun is ready cannot disagree.
+/// Each is a routine, the steps a pair of hands goes through in order, each step a contact between two
+/// pieces of metal or a slide of one along another. The routine is the one source of a reload's length:
+/// the server finishes a reload when it ends, so what a player hears and when the gun is ready agree.
 ///
 /// Every contact is made the way the approved door knock and car door are made: a burst of noise in
 /// every octave band at the band's own level, falling at its own rate. No resonators: small steel

@@ -9,10 +9,6 @@ namespace OpenFPS.Common;
 /// and the sill, falling with drag, and landing on whatever is under the window with bounces, breakage,
 /// skittering and a pile that builds. The sound is the sum of what every body does, in pascals at a metre.
 ///
-/// Cody, 2026-10-04: the old glass "sounds fake and not realistic". It was one hiss for the break and a
-/// handful of single-mode knocks for the pieces (GlassSound before this), which is a description of glass
-/// rather than glass.
-///
 /// THE PANE. A clamped rectangular plate (glazing bead), its bending modes from E, rho and the thickness:
 /// f_mn = (pi/2) sqrt(D/m'') [((m+0.35)/a)^2 + ((n+0.35)/b)^2], the 0.35 standing in for clamped edges
 /// (it puts a clamped square's fundamental at 1.82 times the simply supported one, Leissa's 35.99/19.74).
@@ -240,8 +236,6 @@ public static class GlassFracture
         public double GroundH, GroundR;
     }
 
-    /// <summary>One contact's click: when, its acceleration-noise scale (Pa s at a metre per unit-area pulse
-    /// derivative), its duration.</summary>
     /// <summary>
     /// One contact's click: when; its scale (pascals at a metre per unit of the kernel); its duration; and its
     /// mirror: a copy of itself, <see cref="MirrorGain"/> times as strong and <see cref="MirrorDelay"/>
@@ -393,11 +387,7 @@ public static class GlassFracture
         return (times.Count, best * 10.0, times[0] - (s.Part == Part.Land ? sim.T0 : 0), times[^1] - (s.Part == Part.Land ? sim.T0 : 0));
     }
 
-    /// <summary>
-    /// Lab: the kinetic energy everything brings to the ground (each piece's mass and arrival speed, the loose
-    /// dice at their mean drop), joules; and the acoustic efficiency of a render, the sound energy it radiates
-    /// (pressure at a metre over a hemisphere for a landing, a sphere for a break) over that energy.
-    /// </summary>
+    /// <summary>Lab: a landing's sound energy by the second estimate (see Sim.PointForceJoules), joules.</summary>
     public static double PointForceJoules(Spec s)
     {
         var sim = new Sim(s);
@@ -408,6 +398,8 @@ public static class GlassFracture
         return sim.PointForceJoules;
     }
 
+    /// <summary>Lab: the kinetic energy everything brings to the ground (each piece's mass and arrival speed,
+    /// the loose dice at their mean drop), joules: what a render's acoustic efficiency is measured against.</summary>
     public static double ArrivingJoules(Spec s)
     {
         var sim = new Sim(s);
@@ -865,7 +857,8 @@ public static class GlassFracture
     /// <summary>
     /// A contact: its click (rigid-body acceleration noise) into <paramref name="clicks"/>, and its ringing as
     /// an impulse into each body it touches. <paramref name="volume"/> is the moving body's volume with its
-    /// added mass of air. Estimate: a tenth of the contact's energy goes into the bodies' ringing.
+    /// added mass of air. The share that rings the bodies is <see cref="RingShare"/> unless
+    /// <paramref name="vibShare"/> says otherwise.
     /// </summary>
     private static void Hit(Sim sim, List<Click> clicks, double t, double mass, double volume, double dv, double eStar,
                             double radius, double restitution, double reflector, Frag? a, Frag? b, double vibShare = -1,
@@ -938,9 +931,8 @@ public static class GlassFracture
                 Hit(sim, clicks, t, Math.Min(f.Mass, other.Mass), VolumeOf(f.Mass < other.Mass ? f : other, 0.5), U(r, 0.1, 0.5),
                     sim.GlassEStar, 0.0005, 0.5, 0, f, other, -1, h);
             }
-            // Some of the lowest pieces come down on the sill on their way (estimate: three in ten of the bottom
-            // quarter), from where they were.
-            // A long dagger stands on the bead and topples rather than dropping on the sill.
+            // Some of the lowest pieces come down on the sill (estimate: three in ten of the bottom quarter); a
+            // long dagger stands on the bead and topples instead.
             if (f.Y < 0.25 * sim.S.Height && f.Lx < 0.12 && r.NextDouble() < 0.3)
                 Hit(sim, clicks, f.Release + Math.Sqrt(2 * Math.Max(0.02, f.Y) / G), f.Mass, VolumeOf(f, U(r, 0, 1)),
                     Math.Sqrt(2 * G * Math.Max(0.02, f.Y)), 2.2e10, 0.0005, 0.3, 1, f, null, -1, f.H);   // the sill: hard
@@ -1323,9 +1315,8 @@ public static class GlassFracture
                 double decay = Math.Exp(-eta * w / 2 / rate);
                 double c = Math.Cos(w / rate), sn = Math.Sin(w / rate);
                 // Struck, a mode's volume velocity jumps to q and swings as q cos(wt); the pressure is its rate
-                // of change, -w q sin(wt), from zero, plus the jump itself, which all the modes make together
-                // and which is the force pulse added above. (Started at q w cos(wt), every mode peaked at t = 0
-                // in step, a spike far over the plate's own pulse.)
+                // of change, -w q sin(wt), from zero; the jump itself is the force pulse added above. Started
+                // at q w cos(wt), every mode peaked at t = 0 in step, a spike far over the plate's own pulse.
                 double re = 0, im = p;
                 for (int i = 0; i < nMax; i++)
                 {
