@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Nature;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -193,9 +188,9 @@ public class RunningWaterRound2Tests
     /// <summary>
     /// "the down pipe drains still flange" (Cody, 2026-10-07). The gutter outlet's gulps and the film
     /// striking the shoe are heard through the downpipe's 5.5 m of air, whose round trip is 32.3 ms. Its
-    /// open ends let the high notes out (an unflanged pipe's reflection falls as e^(−(ka)²/2)); the old
-    /// loop kept a fifth to a third of them up to 6 kHz, so every splash came back every 32 ms: the
-    /// cepstrum of 8192-sample frames peaked there in more than half of them. The pipe's low modes stay.
+    /// open ends let the high notes out (an unflanged pipe's reflection falls as e^(−(ka)²/2)); a loop that
+    /// kept a fifth to a third of them up to 6 kHz handed every splash back every 32 ms, and the cepstrum
+    /// of 8192-sample frames peaked there in more than half of them. The pipe's low modes stay.
     /// </summary>
     [Fact]
     public void A_downpipe_does_not_hand_its_splashes_back_every_round_trip()

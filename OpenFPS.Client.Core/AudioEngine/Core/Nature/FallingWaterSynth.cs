@@ -1,122 +1,50 @@
-using System;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
 
 /// <summary>
-/// Water falling into water, and onto stone, as the events it is made of.
+/// Water falling into water, and onto stone, as the events it is made of (docs/RUNNING_WATER.md
+/// section 12: the physics, the sources and how each constant was fitted).
 ///
-/// WHAT MAKES THE SOUND. Almost none of it is the water itself. A drop hitting a pool makes a short
-/// click as it strikes — the impact — and sometimes, as the crater it opened closes, it traps a
-/// little air. That bubble is a spring of air in a mass of water, and it rings at its Minnaert
-/// frequency, 3.26 / R hertz for a radius R in metres, for a few dozen cycles, its note climbing as
-/// it rises toward the surface. A millimetre bubble is a 3.3 kHz "plink"; a 5 mm one is a 650 Hz
-/// "bloop". A coherent body of water — a jet's collapsing column, a sheet — drives a whole line of
-/// air under and makes bubbles of every size at once, more small than large (Deane and Stokes 2002:
-/// the count goes as R^-3/2 below about a millimetre and R^-10/3 above). The sum of those is a
-/// fountain.
+/// A drop striking a pool clicks and sometimes traps a bubble, which rings at its Minnaert note as it
+/// rises; a lump throws a crown that tears into spray and pinches off a burst of bubbles of every size;
+/// on stone there is no crater, only a sharper click and a splash. A bubble's loudness is skewed by the
+/// depth it was made at: a few plinks over a bed of faint ones is the difference between water and a hiss.
 ///
-/// WHAT DECIDES HOW MANY AND HOW BIG. The flow and the fall. A litre a second as 1.4 mm drops is
-/// tens of thousands of drops a second; they arrive at the speed the fall gives them, never more than
-/// their terminal velocity (Atlas, Srivastava and Sekhon 1973: 9.65 − 10.3 e^−0.6D m/s, D in mm);
-/// a drop of 0.8-1.1 mm diameter arriving near its terminal speed traps a bubble every time and the
-/// same size of bubble every time (Pumphrey and Elmore 1990, the "regular" entrainment that makes
-/// rain on a lake ring at 14 kHz). Medwin et al. (1992) sorted drops by what they do: under 0.8 mm
-/// diameter almost nothing; 0.8-1.1 mm the regular bubble near 15 kHz; 1.1-2.2 mm the impact and no
-/// bubble; over 2.2 mm the impact and a loud "type II" bubble at 2-10 kHz, lower for a bigger drop.
-/// A fountain's drops, a millimetre or two in radius falling a metre or two, are mostly the last.
+/// Each fall lands at one of the spec's <see cref="WaterFeatureSpec.Taps"/>, and with more than one place
+/// a tap each event lands at one place of its tap (<see cref="SetSpread"/>): the places add up to the tap.
+/// <see cref="NextPlaces"/> hands out every place, <see cref="NextTaps"/> each tap, <see cref="Next"/>
+/// the whole at one point.
 ///
-/// HOW LOUD EACH BUBBLE IS depends on how deep under the surface it was made, and that is close to
-/// random and very skewed: most are made shallow and are faint, a few deep and loud (van den Doel
-/// 2005 draws the factor as u^β with u uniform). That skew is the difference between water and a
-/// hiss: a few plinks stand out of a bed of faint ones.
-///
-/// THE LUMPS SPLASH, AND THEIR BUBBLES COME IN BURSTS (texture round 1, 2026-10-06). Measured on the
-/// cochlear statistics listeners recognise a texture by (McDermott and Simoncelli 2011; see
-/// <see cref="TextureStatistics"/>), recorded fountains have spiky band envelopes above 1 kHz: the
-/// loud moments at 4 and 8 kHz stand 4-15 times the median for 3-4 ms, and lift the bands an octave
-/// either side with them. Rounds 1-3 of this model made 87,000 similar events a second and summed to
-/// Gaussian noise (envelope spread 0.07 at 6-12 kHz against the recordings' 0.10-0.19, skew 0.1-0.2
-/// against 0.2-1.2, neighbouring bands moving together 0.20 against 0.26-0.52). Two things the
-/// physics has and the model did not:
-///   * A lump of coherent water striking the pool throws a crown, and the crown's rim tears into
-///     secondary droplets in the first few milliseconds (Worthington 1908; Engel 1966; Deegan, Brunet
-///     and Eggers 2008): a burst of tiny strikes and tiny bubbles too fast to tell apart, carrying the
-///     energy the crown took. One burst per lump, as loud as the lump is big — and the lumps of a
-///     coarse fragmentation are of every size (<see cref="WaterFallSpec.LumpSizeOrder"/>), so a few
-///     are loud. These are the spikes.
-///   * A plunging body of water does not make bubbles steadily: its cavity closes and pinches them
-///     off in a burst (Deane and Stokes 2002 found bubble creation in a breaking wave confined to the
-///     short "acoustically active" phase as the cavity collapses; Chanson 2004 for plunging jets). So
-///     a lump's share of the plunge's bubbles, as many as its volume carries, ring together within the
-///     few milliseconds of its cavity, and every band they reach rises at once.
-///
-/// ON STONE (<see cref="WaterSurface.Rock"/>). Water striking wet rock opens no crater and traps no
-/// air. A drop stops in its own length on the film and splashes flat, a sharper click than into a
-/// pool; a lump spreads into a lamella that lifts off the stone and breaks into spray — the "prompt
-/// splash" that a rough surface makes at far lower speeds than a smooth one (Xu, Zhang and Nagel 2005;
-/// Range and Feuillebois 1998) — and on a solid that sheet takes the energy a pool's crater would
-/// have held, so the splash is the larger share of what the lump brought (<see cref="RockCrownShare"/>).
-///
-/// TAPS. A feature metres across is heard from more than one place: each fall lands at one of the
-/// spec's <see cref="WaterFeatureSpec.Taps"/>, writes its events into that tap's own sum, and
-/// <see cref="NextTaps"/> hands each tap its own pressure. Different events at each, so the voices
-/// are decorrelated as the water is. <see cref="Next"/> is all of them at one point.
-///
-/// PLACES (2026-10-06). A tap is itself a metre and a half of rock face and rim jets, and was one point.
-/// With more than one place a tap (ExtendedSources), each drop's and each lump's sound (its impact, its
-/// splash, its bubbles) lands at one place of its tap: the tap's middle by the middle's share, otherwise
-/// one of the places round it, as the tap's spread says (<see cref="SetSpread"/>). Every event goes to
-/// one place, so the places add up to the tap. <see cref="NextPlaces"/> hands out every place;
-/// <see cref="NextTaps"/> sums each tap's. One place a tap is the fountain as it was.
-///
-/// WHAT IS FITTED. Three constants and the plunge's air share, named here and nowhere else. The
-/// first two were fitted together on 2026-10-04 to a recording of a dozen jets falling back into their
-/// pool (its octaves 500 Hz-16 kHz within 4 dB) and then brought to 71 dB(A) at the kerb, from Watts
-/// et al. (2009): 1.1 L/s falling 30 cm into water measured 67 dB(A) at a metre. They are: how loud a
-/// bubble is for its size in air at a metre, and how loud an impact is for its size and speed. Their
-/// LAWS are physical — a bubble's first peak goes as its radius (ρ ω² R² ξ with ωR fixed and the
-/// wall's travel ξ a fixed fraction of R), an impact's as r v² (its energy as m v³, Franz 1959,
-/// delivered over r / v) — and the numbers are set against measured fountains, not chosen. The third,
-/// <see cref="SplashEfficiency"/>, was fitted on 2026-10-06 to the three recorded fountains' envelope
-/// statistics with the spectrum held. Re-fit them; never nudge them. The rain shares the first two
-/// (RainSynth).
+/// Fitted, here and nowhere else: <see cref="BubblePascalsPerMm"/>, <see cref="ImpactPascals"/>,
+/// <see cref="SplashEfficiency"/> and the plunge's air share, against measured and recorded fountains.
+/// Their laws are physical; re-fit them, never nudge them. The rain (RainSynth) shares the first two.
 /// </summary>
 public sealed class FallingWaterSynth
 {
     // ── The fitted constants ─────────────────────────────────────────────────────────────────────
 
-    /// <summary>A 1 mm bubble's first peak at its deepest, Pa at a metre in air. Goes as R (a wall
-    /// travel that is a fixed fraction of the radius, ρ ω² R² ξ with ωR fixed), times the depth
-    /// factor. van den Doel's predicted R^1.5 put so much of the energy in the largest bubbles that
-    /// they rang as a steady note.</summary>
+    /// <summary>A 1 mm bubble's first peak at its deepest, Pa at a metre in air. Goes as R, times the
+    /// depth factor: van den Doel's R^1.5 put so much energy in the largest bubbles that they rang as a
+    /// steady note.</summary>
     public const float BubblePascalsPerMm = 0.015f;
 
-    /// <summary>An impact's spike into a POOL, Pa at a metre in air, for a 1 mm radius drop at 5 m/s.
+    /// <summary>An impact's spike into a pool, Pa at a metre in air, for a 1 mm radius drop at 5 m/s.
     /// Its energy goes as m v³ (Franz 1959) and a drop's rise is fixed, so its peak goes as (r v)^1.5.
-    ///
-    /// Round 1 of the texture fit (2026-10-06) took it from 0.0142 to this (-13.5 dB), fitted with the splash. Off a pool, most of what
-    /// a drop's blow does goes into the crater, and in air the impact is quiet beside the bubble it
-    /// may trap: Phillips, Agarwal and Jordan (2018, Sci. Rep. 8, 9515), filming a drip into a pool
-    /// with the sound, found the airborne "plink" made by the trapped bubble driving the surface, not
-    /// by the impact or the cavity. At 0.0142 sixty thousand drop clicks a second were half the
-    /// fountain's top octaves and summed to Gaussian noise; the recordings' top end comes in loud
-    /// moments (the splashes). A drop on stone has no crater to take its blow, and its click is
-    /// <see cref="HardImpactPascals"/>, unchanged.</summary>
+    /// Quiet: a drip's plink is its trapped bubble, not its impact (Phillips, Agarwal and Jordan 2018),
+    /// and at 0.0142 the drop clicks summed to Gaussian noise. On stone, <see cref="HardImpactPascals"/>.</summary>
     public const float ImpactPascals = 0.003f;
 
-    /// <summary>A drop's click on a HARD surface (stone, a road, a roof's top face), Pa at a metre for
-    /// 1 mm at 5 m/s: it stops in its own length on the film and splashes flat. 1.2 times the pool's
-    /// click as it stood until 2026-10-06, the figure the rain on streets and roofs was fitted with
-    /// (RainSynth), kept when the pool's was refitted.</summary>
+    /// <summary>A drop's click on a hard surface (stone, a road, a roof's top face), Pa at a metre for
+    /// 1 mm at 5 m/s: it stops in its own length on the film and splashes flat. 1.2 times the pool's old
+    /// 0.0142, which the rain on streets and roofs was fitted with (RainSynth).</summary>
     public const float HardImpactPascals = 0.01704f;
 
     /// <summary>
-    /// The share of the energy a lump's crown (or, on stone, its lamella) takes that leaves as sound:
-    /// the acoustic efficiency of a splash. FITTED 2026-10-06 (texture round 1) so the fountain's band
-    /// envelopes above 1 kHz move as the recordings' do while its octave balance stays within the
-    /// earlier fit. For scale: a drop's whole impact radiates 10⁻⁶ to 10⁻⁵ of its kinetic energy in
-    /// water (Franz 1959; Nystuen 1986), and only a small part of that crosses into air.
+    /// The share of the energy a lump's crown (or, on stone, its lamella) takes that leaves as sound.
+    /// FITTED so the band envelopes above 1 kHz move as the recordings' do. For scale: a drop's whole
+    /// impact radiates 10⁻⁶ to 10⁻⁵ of its kinetic energy in water (Franz 1959; Nystuen 1986), and only a
+    /// small part of that crosses into air.
     /// </summary>
     public const float SplashEfficiency = 1.5e-5f;
 
@@ -124,17 +52,9 @@ public sealed class FallingWaterSynth
     private const float ImpactRise = 16e-6f;
 
     /// <summary>A coherent lump's force rise as a share of its r / v: it lands in the froth of the one
-    /// before it, not on still water. Set by measuring, not by ear. With the lumps striking as
-    /// sharply as drops, a 6 mm lump's spike carried a hundred times a drop's energy in one click,
-    /// and the few of them were the static in the hiss: lump impacts alone have a 2-8 kHz kurtosis
-    /// of 5.8 over 10 ms windows, drop impacts 3.3, recorded fountains 3.0-3.4 all told. Round 2
-    /// (2026-10-05) set a fiftieth, which left the whole fountain at 3.7 with a 10 ms crest of
-    /// 11.1 dB. Round 3 sets 0.07: the 2-8 kHz band at 3.06 and 10.0 dB, the recordings' own (white
-    /// noise reads 2.96 and 9.9 dB on the same measure), and the octaves 500 Hz-8 kHz within 1.3 dB
-    /// of the fountain the constants were fitted to, the top octave 2.2 dB under it. Anything from
-    /// 0.05 to 0.12 measures the same texture; 0.07 is where the octaves fit best. Small lumps still
-    /// strike in the drop's own rise. (The lump's top end is not lost: it is in its splash, which
-    /// takes milliseconds, not microseconds — see the class summary.)</summary>
+    /// before it, not on still water. Measured, not set by ear: lumps striking as sharply as drops were
+    /// the static in the hiss (a 2-8 kHz kurtosis of 5.8 over 10 ms); at 0.07 it is 3.06, the recordings'
+    /// own, and 0.05-0.12 measure the same. Small lumps still strike in a drop's rise.</summary>
     private const float LumpCushion = 0.07f;
 
     /// <summary>β in the depth factor u^β: how skewed the bubbles' loudness is.</summary>
@@ -153,9 +73,8 @@ public sealed class FallingWaterSynth
     public const float RockCrownShare = 0.8f;
 
     /// <summary>How long a crown sheds its spray, in units of the lump's r / v, plus a floor: the rim
-    /// breaks up while the crown rises, a couple of r / v (Deegan et al. 2008): 1.5-4 ms decay for a
-    /// fountain's lumps, as the recordings' loud moments last (3-4 ms wide at half height). Fitted
-    /// within that: 3 r / v and a 0.8 ms floor made the 3-6 kHz envelopes too smooth.</summary>
+    /// breaks up while the crown rises, a couple of r / v (Deegan et al. 2008), 1.5-4 ms for a fountain's
+    /// lumps, as the recordings' loud moments last (3-4 ms wide at half height). Fitted within that.</summary>
     private const float SplashDurations = 1.5f;
     private const float SplashFloorSeconds = 0.0004f;
 
@@ -165,10 +84,8 @@ public sealed class FallingWaterSynth
     private const float SplashCentreReferenceHz = 2700f;
 
     /// <summary>How far one splash's band middle scatters about that, the standard deviation of its
-    /// natural log, and how far its band reaches either side of its middle (a factor; a resonant band,
-    /// EventSum.Burst steep). Fitted: one gentle band of 1-16 kHz for every splash moved the bands an
-    /// octave apart together (envelope correlation 0.35 against the recordings' 0.05-0.18); a band of
-    /// its own an octave wide, 0.13.</summary>
+    /// natural log, and how far its band reaches either side of its middle (a factor; EventSum.Burst
+    /// steep). Fitted so bands an octave apart move apart, as the recordings' do.</summary>
     private const float SplashScatter = 0.7f, SplashBandHalfWidth = 1.6f;
 
     /// <summary>ρ c of air, Pa s/m: the impedance a radiated power meets.</summary>
@@ -198,16 +115,14 @@ public sealed class FallingWaterSynth
     /// <summary>The chance a large drop's crater also sheds a weaker second bubble.</summary>
     private const float SecondaryShare = 0.3f;
 
-    /// <summary>The share of a coherent lump's craters that trap one. Fitted, 2026-10-06: the lumps are
-    /// now drawn from a broad law (some three times the mean), and a trapped bubble goes up to the lump's
-    /// own size, so at the 0.6 that suited lumps all about one size the big ones' "glugs" stood 250-500 Hz
-    /// 5-8 dB over every recorded fountain. A lump lands in the aerated froth of the ones before it,
-    /// and a crater in bubbly water closes on a cloud more often than on one big bubble.</summary>
+    /// <summary>The share of a coherent lump's craters that trap one. Fitted: a crater in the froth of the
+    /// lumps before it closes on a cloud more often than on one big bubble, and at 0.6 the big lumps'
+    /// glugs stood 5-8 dB over every recorded fountain at 250-500 Hz.</summary>
     private const float ChunkShare = 0.2f;
 
     /// <summary>How much air a plunge drives under, per litre of water, at 3 m/s over the 1 m/s
-    /// below which a falling sheet enters without entraining: about one per cent, fitted with the
-    /// two constants above against a recorded fountain of jets falling back into their pool.</summary>
+    /// below which a falling sheet enters without entraining: about one per cent, fitted with
+    /// <see cref="BubblePascalsPerMm"/> and <see cref="ImpactPascals"/>.</summary>
     private const float PlungeAirShare = 0.012f;
 
     /// <summary>How long a lump's cavity takes to close and pinch off its bubbles, s, for a 5 mm lump:
@@ -218,18 +133,15 @@ public sealed class FallingWaterSynth
     /// √(real / rendered) of them.</summary>
     private const int MaxPerBurst = 4;
 
-    /// <summary>The most BUBBLES of one kind a fall renders per block; more are stood for, each
+    /// <summary>The most bubbles of one kind a fall renders per block; more are stood for, each
     /// carrying √(real / rendered) of them so the energy is kept. Bubbles ring for milliseconds and
     /// are most of the cost; their notes are spread in pitch and time, so a dozen a block of each
     /// kind already sum to a wash.</summary>
     private const int MaxPerBlock = 12;
 
-    /// <summary>The most IMPACTS a fall renders per block: in practice every one. An impact is a few
-    /// samples of spike and a short tail, and it is what the hiss of a fountain is made of, so it is
-    /// not thinned the way the bubbles are. Thinning it was grain in the whoosh: twelve clicks a block
-    /// each twice as loud as a drop stand out of the sum where fifty clicks of their own size merge
-    /// into it — a sum of many small independent events tends to Gaussian noise, a sum of a few large
-    /// ones does not.</summary>
+    /// <summary>The most impacts a fall renders per block: in practice every one. They are what the hiss
+    /// is made of and are not thinned as the bubbles are: a few large clicks standing for many were
+    /// grain in the whoosh, where many of their own size merge into it.</summary>
     private const int MaxImpactsPerBlock = 256;
 
     /// <summary>How unevenly ONE jet sheds its drops: the standard deviation of the log of its rate
@@ -257,7 +169,7 @@ public sealed class FallingWaterSynth
     /// drops' bubbles, the lumps' bubbles, the plunge's, and the lumps' splashes. One in the game.</summary>
     public float ImpactPart = 1f, DropBubblePart = 1f, LumpBubblePart = 1f, PlungePart = 1f, SplashPart = 1f;
 
-    /// <summary>How many places the feature is heard from (<see cref="WaterFeatureSpec.Taps"/>).</summary>
+    /// <summary>How many taps the feature is heard from (<see cref="WaterFeatureSpec.Taps"/>).</summary>
     public int TapCount => _taps;
 
     /// <summary>How many places each tap is heard from (its middle first): one unless made with more.</summary>
@@ -273,9 +185,9 @@ public sealed class FallingWaterSynth
         if (tap >= 0 && tap < _taps) _tapSpread[tap] = Math.Clamp(spread, 0f, 1f);
     }
 
-    /// <summary>How much of the spec's flow is falling now, as a share (1: as the spec says). Running water
-    /// (RunningWaterSynth) sets it from the flow it carries, so its falls follow the rain: every rate
-    /// goes as the flow, the sizes do not.</summary>
+    /// <summary>How much of the spec's flow is falling now, as a share (1: as the spec says): every rate
+    /// goes as it, the sizes do not. Running water holds it at 0 until its first control call and at 1
+    /// after, and follows its flow with <see cref="Retune"/>.</summary>
     public float FlowScale = 1f;
 
     /// <summary>For running water: where an event of the fall feeding tap <c>tap</c> is written, if not
@@ -291,11 +203,9 @@ public sealed class FallingWaterSynth
     /// 0.2 r / v).</summary>
     public float HardCushion;
 
-    /// <summary>The share of a drop's blow on wet stone heard as its spray, and the spray's band and
-    /// time: the rain's on a wet street (RainSynth.SprayShare, SprayLowHz, SprayHighHz,
-    /// SprayRiseSeconds, SprayDecaySeconds, fitted there to recorded rain, 2026-10-06), used only with a
-    /// cushioned blow (<see cref="HardCushion"/>): the cushion takes the top octaves out of the click,
-    /// and the secondary droplets the crown throws off the film put them back, over milliseconds.</summary>
+    /// <summary>The share of a drop's blow on wet stone heard as its spray: the rain's on a wet street
+    /// (RainSynth.SprayShare, fitted to recorded rain), only with a cushioned blow (<see cref="HardCushion"/>).
+    /// The cushion takes the top octaves out of the click; the droplets thrown off the film put them back.</summary>
     private const float WetSprayShare = RainSynth.SprayShare;
 
     /// <summary>The most wet sprays a fall renders a block; more are stood for by energy.</summary>
@@ -304,8 +214,7 @@ public sealed class FallingWaterSynth
     private float _sprayCarry;
 
     /// <summary>A drop's spray off wet stone: band noise rising over a millisecond and dying over a few,
-    /// carrying <see cref="WetSprayShare"/> of the energy its blow would have had as a bare spike (a
-    /// Gaussian of the first-contact time, ImpactRise, at this peak).</summary>
+    /// carrying <see cref="WetSprayShare"/> of the energy its blow would have had as a bare spike.</summary>
     private void WetSpray(EventSum place, int at, float peakPascals)
     {
         float energy = peakPascals * peakPascals * ImpactRise * 1.7724539f * WetSprayShare + _sprayCarry;
@@ -370,7 +279,7 @@ public sealed class FallingWaterSynth
         _tapMiddle = new float[taps];
         Array.Fill(_tapMiddle, 1f);
         _sums = new EventSum[taps * _placesPerTap];
-        // A tap's middle keeps the seed it always had; its other places have their own.
+        // A tap's middle has the seed a one-place tap has, so adding places leaves it as it was.
         for (int t = 0; t < taps; t++)
             for (int k = 0; k < _placesPerTap; k++)
                 _sums[t * _placesPerTap + k] = new EventSum(sampleRate, seed * 7919 + t * 104729 + 1 + k * 15485863);
@@ -385,8 +294,6 @@ public sealed class FallingWaterSynth
                 Sum = _sums[Math.Clamp(f.Tap, 0, taps - 1) * _placesPerTap],
                 Tap = Math.Clamp(f.Tap, 0, taps - 1),
                 Rock = f.Onto == WaterSurface.Rock,
-                DropMean = f.MeanDropRadiusMm * 1e-3f,
-                DropMax = MathF.Max(f.MeanDropRadiusMm, f.MaxDropRadiusMm) * 1e-3f,
                 Spread = 1f / MathF.Sqrt(Math.Max(1, f.Streams)),
                 Order = Math.Clamp(f.DropSizeOrder, 1, 16),
                 LumpOrder = Math.Clamp(f.LumpSizeOrder, 1, 16),
@@ -660,13 +567,9 @@ public sealed class FallingWaterSynth
             float dropScale = f.DropShare > 0f ? share / f.DropShare : 0f;
             float coherentScale = f.DropShare < 1f ? (1f - share) / (1f - f.DropShare) : 0f;
 
-            // A jet's top does not shed drops evenly: the column necks and bursts in slugs, and a
-            // slug's drops arrive together, tens of milliseconds at a time. That bunching is what
-            // makes the hiss of spray flicker the way a real one does. A fall of many jets or
-            // strands flickers by the square root of their count less, since each bunches on its
-            // own. And a slug does not land in an instant — its drops are spread along it by their
-            // different speeds — so the rate glides from one slug's to the next rather than
-            // stepping; the steps, tens a second, were heard as a crackle in the hiss.
+            // A jet's column necks and bursts in slugs whose drops arrive together, tens of milliseconds
+            // at a time: the flicker of real spray. Many jets flicker by the root of their count less.
+            // The rate glides from slug to slug: stepped, tens a second, it was a crackle in the hiss.
             var rng = f.Sum;
             f.ClumpClock -= dt;
             if (f.ClumpClock <= 0f)
@@ -700,8 +603,7 @@ public sealed class FallingWaterSynth
             int at = (int)(sum.Uniform() * Block);
             float r = DrawRadius(sum, f.DropMean, f.DropMax, f.Order);
             float v = ArrivalSpeed(r, f.FallMetres);
-            // The impact: the force arrives as the drop's front meets the surface and goes over the
-            // time the whole drop takes to bury itself.
+            // The force arrives as the drop's front meets the surface and lasts while it buries itself.
             float tau = r / v;
             float impact = ImpactPascals * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * weight * ImpactPart;
             var place = PlaceFor(f);
@@ -757,10 +659,8 @@ public sealed class FallingWaterSynth
             int at = (int)(sum.Uniform() * Block);
             float r = DrawRadius(sum, f.ChunkMean, f.ChunkMax, f.LumpOrder);
             float v = f.ChunkSpeed * (0.9f + 0.2f * sum.Uniform());
-            // A lump lands where the column before it landed, into its own crater and the froth that
-            // left, so its force builds over a share of the time it takes to bury itself rather than
-            // in the microseconds a drop's round front meets still water. Same energy (m v³), spread
-            // over the longer rise, so the peak comes down as the root of it.
+            // Into the froth of the lump before it, its force builds over a share of r / v (LumpCushion):
+            // the same energy (m v³) over a longer rise, so the peak comes down as the root of it.
             float rise = MathF.Max(ImpactRise, LumpCushion * r / v);
             var place = PlaceFor(f);
             place.Impact(at, rise, (f.Rock ? 0.4f : 1f) * r / v,

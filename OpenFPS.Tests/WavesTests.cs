@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Nature;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -170,11 +165,10 @@ public class WavesTests
 
     /// <summary>
     /// A shore is never silent, so a shore voice starts mid-sea: waves already arriving and the last
-    /// ones' swash still running, from its first moment. It used to start from a still sea and wait for
-    /// its first wave, two up-crossings of the surface: a sandy beach under a 9 s swell was exact silence
-    /// for about 11 s after it won a voice (docs/COVERAGE_2026-10-06.md, finding 2). Through the game's
-    /// own path (PlacedNatureVoice, its control from the held weather), for several seeds: the first
-    /// sample sounds, and no second of the first fifteen is far under the sea's own level later on.
+    /// ones' swash still running. Started from a still sea, a sandy beach under a 9 s swell was silent for
+    /// about 11 s (docs/COVERAGE_2026-10-06.md, finding 2). Through the game's own path (PlacedNatureVoice,
+    /// the held weather), for several seeds: the first sample sounds, and no second of the first fifteen is
+    /// far under the sea's own level later on.
     /// </summary>
     [Fact]
     public void A_shore_voice_is_heard_from_its_first_moment()

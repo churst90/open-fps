@@ -595,3 +595,109 @@ a peak over 1 ms (above the HRTF's lags), before and after: gutter outlet heavy 
 violent 25 / 29 to 2 / 2; the house's downpipe and outlet in heavy rain 16 / 20 to 1 / 0; the downpipe
 from 1.5 m, heavy 19 / 20 to 6 / 6 (scattered lags, none at 32.3 ms), moderate 13 / 12 to 2 / 3. Every
 running-water scene within 0.5 dB of its level before. `inbox/water-smoothing-2026-10-06/round2/README.txt`.
+
+## 12. Falling water: the fountain's model (`FallingWaterSynth`)
+
+The fountain, and every fall of running water (section 5.4), is `FallingWaterSynth`. Its reasoning
+and fitting history were in the code's comments until the housekeeping of 2026-10-07; they are here.
+
+### 12.1 What makes the sound
+
+Almost none of it is the water itself. A drop hitting a pool makes a short click as it strikes, and
+sometimes, as the crater it opened closes, it traps a little air. That bubble is a spring of air in a
+mass of water and rings at its Minnaert frequency, 3.26 / R Hz for a radius R in metres, for a few dozen
+cycles, its note climbing as it rises toward the surface. A millimetre bubble is a 3.3 kHz plink; a 5 mm
+one a 650 Hz bloop. A coherent body of water (a jet's collapsing column, a sheet) drives a whole line of
+air under and makes bubbles of every size at once, more small than large (Deane and Stokes 2002: the
+count goes as R^-3/2 below about a millimetre and R^-10/3 above). The sum of those is a fountain.
+
+How many and how big follow the flow and the fall. A litre a second as 1.4 mm drops is tens of
+thousands of drops a second, arriving at the speed the fall gives them, never more than their terminal
+velocity (Atlas, Srivastava and Sekhon 1973: 9.65 - 10.3 e^-0.6D m/s, D in mm). A drop of 0.8-1.1 mm
+diameter arriving near its terminal speed traps a bubble every time and the same size every time
+(Pumphrey and Elmore 1990: the regular entrainment that makes rain on a lake ring at 14 kHz). Medwin et
+al. (1992) sorted drops by what they do: under 0.8 mm diameter almost nothing; 0.8-1.1 mm the regular
+bubble near 15 kHz; 1.1-2.2 mm the impact and no bubble; over 2.2 mm the impact and a loud type II bubble
+at 2-10 kHz, lower for a bigger drop. A fountain's drops, a millimetre or two in radius falling a metre or
+two, are mostly the last.
+
+How loud each bubble is depends on how deep under the surface it was made, close to random and very
+skewed: most are made shallow and are faint, a few deep and loud (van den Doel 2005 draws the factor as
+u^β with u uniform). That skew is the difference between water and a hiss: a few plinks stand out of a
+bed of faint ones.
+
+### 12.2 The lumps splash, and their bubbles come in bursts (texture round 1, 2026-10-06)
+
+Measured on the cochlear statistics listeners recognise a texture by (McDermott and Simoncelli 2011;
+`TextureStatistics`), recorded fountains have spiky band envelopes above 1 kHz: the loud moments at 4 and
+8 kHz stand 4-15 times the median for 3-4 ms, and lift the bands an octave either side with them. Rounds
+1-3 of the model made 87,000 similar events a second and summed to Gaussian noise (envelope spread 0.07
+at 6-12 kHz against the recordings' 0.10-0.19, skew 0.1-0.2 against 0.2-1.2, neighbouring bands moving
+together 0.20 against 0.26-0.52). Two things the physics has and the model did not:
+
+- A lump of coherent water striking the pool throws a crown, and the crown's rim tears into secondary
+  droplets in the first few milliseconds (Worthington 1908; Engel 1966; Deegan, Brunet and Eggers 2008):
+  a burst of tiny strikes and tiny bubbles too fast to tell apart, carrying the energy the crown took. One
+  burst per lump, as loud as the lump is big, and the lumps of a coarse fragmentation are of every size
+  (`WaterFallSpec.LumpSizeOrder`), so a few are loud. These are the spikes.
+- A plunging body of water does not make bubbles steadily: its cavity closes and pinches them off in a
+  burst (Deane and Stokes 2002 found bubble creation in a breaking wave confined to the short
+  acoustically active phase as the cavity collapses; Chanson 2004 for plunging jets). So a lump's share
+  of the plunge's bubbles, as many as its volume carries, ring together within the few milliseconds of
+  its cavity, and every band they reach rises at once.
+
+On stone (`WaterSurface.Rock`) water opens no crater and traps no air. A drop stops in its own length on
+the film and splashes flat, a sharper click than into a pool; a lump spreads into a lamella that lifts
+off the stone and breaks into spray, the prompt splash a rough surface makes at far lower speeds than a
+smooth one (Xu, Zhang and Nagel 2005; Range and Feuillebois 1998). On a solid that sheet takes the energy
+a pool's crater would have held, so the splash is the larger share of what the lump brought
+(`RockCrownShare`).
+
+### 12.3 Taps and places
+
+A feature metres across is heard from more than one place: each fall lands at one of the spec's
+`WaterFeatureSpec.Taps` and writes its events into that tap's own sum, so the taps are decorrelated as
+the water is. Since 2026-10-06 a tap (a metre and a half of rock face and rim jets, until then one point)
+can itself have several places (ExtendedSources): each drop's and each lump's sound lands at one place of
+its tap, the middle by the middle's share and otherwise one of the places round it. Every event goes to
+one place, so the places add up to the tap; one place a tap is the fountain as it was.
+
+### 12.4 What is fitted, and how it got there
+
+The bubble's and the impact's constants were fitted together on 2026-10-04 to a recording of a dozen jets
+falling back into their pool (its octaves 500 Hz-16 kHz within 4 dB), then brought to 71 dB(A) at the kerb
+from Watts et al. (2009): 1.1 L/s falling 30 cm into water measured 67 dB(A) at a metre. Their laws are
+physical: a bubble's first peak goes as its radius (ρ ω² R² ξ with ωR fixed and the wall's travel ξ a
+fixed fraction of R), an impact's as r v² (its energy as m v³, Franz 1959, delivered over r / v).
+`SplashEfficiency` was fitted on 2026-10-06 to the three recorded fountains' envelope statistics with the
+spectrum held. The plunge's air share was fitted with the first two. Re-fit them; never nudge them.
+
+- `BubblePascalsPerMm`: van den Doel's predicted R^1.5 put so much of the energy in the largest bubbles
+  that they rang as a steady note; the first peak goes as R.
+- `ImpactPascals`: texture round 1 took it from 0.0142 to 0.003 (-13.5 dB), fitted with the splash. Off a
+  pool, most of what a drop's blow does goes into the crater, and in air the impact is quiet beside the
+  bubble it may trap: Phillips, Agarwal and Jordan (2018, Sci. Rep. 8, 9515), filming a drip into a pool
+  with the sound, found the airborne plink made by the trapped bubble driving the surface, not by the
+  impact or the cavity. At 0.0142 sixty thousand drop clicks a second were half the fountain's top
+  octaves and summed to Gaussian noise; the recordings' top end comes in loud moments (the splashes).
+- `HardImpactPascals`: 1.2 times the pool's click as it stood until 2026-10-06 (0.0142), the figure the
+  rain on streets and roofs was fitted with (RainSynth), kept when the pool's was refitted.
+- `LumpCushion`: with the lumps striking as sharply as drops, a 6 mm lump's spike carried a hundred times
+  a drop's energy in one click, and the few of them were the static in the hiss: lump impacts alone had a
+  2-8 kHz kurtosis of 5.8 over 10 ms windows, drop impacts 3.3, recorded fountains 3.0-3.4 all told. Round
+  2 (2026-10-05) set a fiftieth, which left the whole fountain at 3.7 with a 10 ms crest of 11.1 dB. Round
+  3 set 0.07: the 2-8 kHz band at 3.06 and 10.0 dB, the recordings' own (white noise reads 2.96 and 9.9 dB
+  on the same measure), and the octaves 500 Hz-8 kHz within 1.3 dB of the fountain the constants were
+  fitted to, the top octave 2.2 dB under it. Anything from 0.05 to 0.12 measures the same texture; 0.07
+  is where the octaves fit best. The lump's top end is in its splash, which takes milliseconds.
+- `ChunkShare`: the lumps are drawn from a broad law (some three times the mean), and a trapped bubble
+  goes up to the lump's own size, so at the 0.6 that suited lumps all about one size the big ones' glugs
+  stood 250-500 Hz 5-8 dB over every recorded fountain. 0.2: a lump lands in the aerated froth of the ones
+  before it, and a crater in bubbly water closes on a cloud more often than on one big bubble.
+- `SplashDurations`: 3 r / v and a 0.8 ms floor made the 3-6 kHz envelopes too smooth.
+- `SplashScatter`, `SplashBandHalfWidth`: one gentle band of 1-16 kHz for every splash moved the bands an
+  octave apart together (envelope correlation 0.35 against the recordings' 0.05-0.18); a band of its own
+  an octave wide, 0.13.
+- `MaxImpactsPerBlock`: impacts are not thinned as the bubbles are. Thinned, they were grain in the
+  whoosh: twelve clicks a block each twice as loud as a drop stand out of the sum where fifty clicks of
+  their own size merge into it.

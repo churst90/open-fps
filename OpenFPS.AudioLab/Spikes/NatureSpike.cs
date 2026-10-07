@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Common;
@@ -12,7 +8,8 @@ namespace OpenFPS.AudioLab.Spikes;
 /// <summary>
 /// --nature: water, fire and the wind in leaves, rendered from their models and measured.
 ///
-///   --nature levels [preset ...] [sec=30] [wind=4.5]   each model's level at a metre (Leq, LAeq, the
+///   --nature levels [preset ...] [sec=30] [wind=4.5] [turb=] [steady=M] [tap=N] [parts=...]
+///                                                      each model's level at a metre (Leq, LAeq, the
 ///                                                      loudest second), its octave bands, its texture
 ///                                                      statistics and what one voice costs a core.
 ///                                                      SourceLevelDb is read from this.
@@ -31,6 +28,10 @@ namespace OpenFPS.AudioLab.Spikes;
 ///                                                      beside the model's. Recordings are a yardstick
 ///                                                      and are never played in the game.
 ///
+/// steady=M holds the wind at M m/s instead of reading the field, turb= sets the field's turbulence,
+/// tap=N renders one tap of a water feature, and parts= renders only some parts: impact, drop, lump,
+/// plunge, splash (water); roar, crackle, steam, settle (fire); leaf, shed (foliage).
+///
 /// The texture statistics are the ones the footstep rounds lacked: per octave, how PEAKY the band is
 /// (kurtosis — a dense wash is 3, separate clicks are tens), how much its envelope moves (the
 /// standard deviation of its 10 ms envelope over the mean), and how many separate transients a second
@@ -44,15 +45,8 @@ public static class NatureSpike
     /// <summary>−20 dBFS rms in the file is 94 dB SPL: a pascal is 0.1 of full scale.</summary>
     private const float PascalsToFull = 0.1f;
 
-    /// <summary>parts=impact,drop,lump,plunge (water) or roar,crackle,steam,settle (fire): render
-    /// only those parts.</summary>
     private static string[]? Parts;
-
-    /// <summary>steady=M: hold the wind at M m/s instead of reading the field. turb=T: the field's
-    /// turbulence intensity for this run.</summary>
     private static float? Steady;
-
-    /// <summary>tap=N: render only that tap of a water feature (its own voice), not all of them at one point.</summary>
     private static int? Tap;
 
     public static int Run(string[] args)

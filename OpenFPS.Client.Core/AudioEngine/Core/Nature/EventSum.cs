@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -9,20 +8,15 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// Where a texture made of many small events is summed: a bubble ringing, a drop's impact, a leaf
 /// touching a leaf, a pocket of steam bursting in a log.
 ///
-/// Water, fire and wind in leaves are all the same KIND of sound — thousands of short physical
-/// events a second, each with its own size, landing at random — and the sound of the whole is the
-/// sum of the events, not a filtered noise with the right spectrum. That distinction is the one
-/// three rounds of footstep synthesis failed on: band-filtered noise has the spectrum and none of
-/// the structure, and the ear hears structure (McDermott and Simoncelli 2011: what makes a texture
-/// sound real is that one event is broadband and hits every band at once).
+/// Water, fire and wind in leaves are thousands of short physical events a second, and the ear hears
+/// their structure, not just their spectrum: band-filtered noise is what three rounds of footstep
+/// synthesis failed with (McDermott and Simoncelli 2011: one event is broadband and hits every band at
+/// once). So each event is written whole into a ring at the sample it happens, and the output reads the
+/// ring and clears it behind itself. An event may ring on for the ring's length; the longest, a
+/// centimetre bubble, rings for about a fifth of a second.
 ///
-/// So each event is written whole into a ring the moment it is decided, at the sample it happens,
-/// and the output reads the ring and clears it behind itself. An event decided now can therefore
-/// ring on for up to the ring's length; the longest here is a centimetre-sized bubble at a few
-/// hundred hertz, about a fifth of a second.
-///
-/// Every primitive takes its amplitude in PASCALS AT A METRE, so the synth that owns this is
-/// responsible for the physics of how big each event is and nothing in here rescales it.
+/// Every primitive takes its amplitude in pascals at a metre: the owning synth decides how big each
+/// event is, and nothing here rescales it.
 /// </summary>
 public sealed class EventSum
 {
@@ -34,8 +28,8 @@ public sealed class EventSum
     private long _now;
     private uint _rng;
 
-    /// <summary>−t exp(−t²/2) from t = −4 to 4, PulseTableRes points per unit of t.</summary>
     private const int PulseTableRes = 32;
+    /// <summary>−t exp(−t²/2) from t = −4 to 4, PulseTableRes points per unit of t.</summary>
     private static readonly float[] PulseTable = MakePulseTable();
 
     // An explicit static constructor, so the table is made when the first sum is (off the audio threads),
@@ -219,6 +213,7 @@ public sealed class EventSum
     /// over (a monopole cannot pump net air). Its spectrum peaks near 1 / (2π σ): a millimetre drop at
     /// five metres a second is a click at a few kilohertz, a log settling is a thud.
     /// </summary>
+    /// <param name="offset">Samples from <see cref="Now"/>.</param>
     /// <param name="sigma">The contact time's standard deviation, seconds.</param>
     /// <param name="pascals">The peak, Pa at a metre.</param>
     public void Pulse(int offset, float sigma, float pascals)
@@ -248,6 +243,7 @@ public sealed class EventSum
     /// Above 1 / (2π τ) its energy per octave falls 3 dB an octave, up to the rise: a click with a body,
     /// where a symmetric pulse is a tone-like blip at one frequency.
     /// </summary>
+    /// <param name="offset">Samples from <see cref="Now"/>.</param>
     /// <param name="rise">The force's rise time, seconds (a standard deviation).</param>
     /// <param name="tau">How long the force takes to die, seconds.</param>
     /// <param name="pascals">The spike's peak, Pa at a metre.</param>
@@ -281,10 +277,14 @@ public sealed class EventSum
 
     /// <summary>
     /// A burst of noise in a band: what a crowd of tiny events too fast to tell apart makes — a leaf's
-    /// membrane after it is struck, the spray off an impact, a char fragment rattling. Rises over
-    /// <paramref name="rise"/> and decays with time constant <paramref name="decay"/>; its rms at the
-    /// top is <paramref name="pascals"/>.
+    /// membrane after it is struck, the spray off an impact, a char fragment rattling.
     /// </summary>
+    /// <param name="offset">Samples from <see cref="Now"/>.</param>
+    /// <param name="rise">The rise, seconds.</param>
+    /// <param name="decay">The decay's time constant, seconds.</param>
+    /// <param name="pascals">The rms at the top, Pa at a metre.</param>
+    /// <param name="lowHz">The band's low edge.</param>
+    /// <param name="highHz">The band's high edge.</param>
     /// <param name="steep">A band that is a band: two resonant band-passes (RBJ, 0 dB at the middle)
     /// between <paramref name="lowHz"/> and <paramref name="highHz"/>, falling 12 dB an octave and more
     /// outside it, for a burst that should light its own band and not the ones an octave away (a
@@ -338,7 +338,7 @@ public sealed class EventSum
             => i < _ramp ? i / rise : i == _ramp && i == _top ? 1f : before * down;
     }
 
-    /// <summary><see cref="Signed"/> on a copy of the generator, for a loop that keeps it in a register.</summary>
+    /// <summary><see cref="Signed()"/> on a copy of the generator, for a loop that keeps it in a register.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static float Signed(ref uint rng)
     {

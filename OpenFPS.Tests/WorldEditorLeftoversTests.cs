@@ -1,9 +1,7 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Editing;
 using OpenFPS.Common.Networking;
-using OpenFPS.Server.Core;
 using OpenFPS.Server.Editor;
 using OpenFPS.Server.Systems;
 using Rig = OpenFPS.Tests.WorldEditorTests.Rig;
@@ -11,7 +9,7 @@ using Rig = OpenFPS.Tests.WorldEditorTests.Rig;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The world editor's leftovers from phase 2 (docs/WORLD_EDITOR.md section 12, "What is left"): a thing
+/// The world editor's leftovers from phase 2 (docs/WORLD_EDITOR.md section 13): a thing
 /// made again keeps what it is doing, parts-list vehicles are library vehicles, a held weather holds its
 /// lightning, a prefab's lists are editable, and a placed group moves as one.
 /// </summary>

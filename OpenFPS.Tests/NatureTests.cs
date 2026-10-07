@@ -1,14 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -365,12 +360,9 @@ public class NatureTests
     };
 
     /// <summary>
-    /// The fountain is a texture of splashes, not Gaussian noise (texture round 1, 2026-10-06). Rounds
-    /// 1-3 fitted 10 ms waveform kurtosis and made 87,000 similar events a second, and the sum was as
-    /// steady as noise in every band over 1 kHz: envelope spread 0.07 at 6-12 kHz against the
-    /// recordings' 0.10-0.19, skew 0.1-0.2 against 0.2-1.2, neighbouring bands moving together 0.20
-    /// against 0.26-0.52. Cody heard it as "crunchy, static". Held now on the cochlear statistics
-    /// against the three recorded fountains.
+    /// The fountain is a texture of splashes, not Gaussian noise: made of 87,000 similar events a second
+    /// it was as steady as noise in every band over 1 kHz, and Cody heard it as "crunchy, static"
+    /// (docs/RUNNING_WATER.md 12.2). Held on the cochlear statistics against the three recorded fountains.
     /// </summary>
     [Fact]
     public void TheFountainMovesAsRecordedFountainsDo()
@@ -444,8 +436,8 @@ public class NatureTests
         for (int i = 0; i < x.Length; i++) x[i] = synth.Next();
         HoldInRange("rain", TextureStatistics.Analyse(x).Summary(), Fitted);
 
-        // And inside 10 ms (texture round 2): a wash like recorded rain, not a few needle-sharp clicks
-        // in each window. Round 1 read 9-10 here (moderate) and Cody heard "low bit rate, crunchy".
+        // And inside 10 ms: a wash like recorded rain, not a few needle-sharp clicks in each window. At
+        // 9-10 here (moderate) Cody heard "low bit rate, crunchy".
         var (kurtosis, crest) = TextureStatistics.Waveform(x);
         _o.WriteLine($"  4-16 kHz in 10 ms: kurtosis {kurtosis:F2}, crest {crest:F1} dB; recordings {TextureStatistics.RainWaveformKurtosisMin:F2}-{TextureStatistics.RainWaveformKurtosisMax:F2}");
         Assert.InRange(kurtosis, 2.8, TextureStatistics.RainWaveformKurtosisMax + 0.3);
@@ -581,8 +573,8 @@ public class NatureTests
     [Fact]
     public void TheFountainsOldHissMeasuresAreKept()
     {
-        // The round-3 measures, for the record: over 10 ms windows a fountain stays near a wash within
-        // a window (recordings 3.0-3.4 in 2-8 kHz); what moves is the envelope from window to window.
+        // Over 10 ms windows a fountain stays near a wash within a window (recordings 3.0-3.4 in 2-8 kHz);
+        // what moves is the envelope from window to window.
         var water = new FallingWaterSynth(WaterFeatureSpec.ByName("park_fountain"), Rate, 3) { Wind = 3f };
         var x = new float[Rate * 20];
         for (int i = 0; i < x.Length; i++)
@@ -604,9 +596,8 @@ public class NatureTests
     /// flutter cycle each, some thirty-odd strikes an episode. The first model gave an episode 400,
     /// so a breeze was a few loud patches a second, each heard arriving: the leaves' 2-8 kHz band
     /// flickered by 2.7 dB over 50 ms where recorded leaves flicker by 0.5-0.7 (1.7 in the busiest).
-    /// Measured on the whole tree, as the recordings are of whole trees: since texture round 1
-    /// (2026-10-06) a hard knock stands out of the leaves on their own, as it does in the recordings,
-    /// and the whoosh under them is the bed it stands out of.
+    /// Measured on the whole tree, as the recordings are of whole trees: a hard knock stands out of the
+    /// leaves on their own, as it does in the recordings, and the whoosh under them is its bed.
     /// </summary>
     [Fact]
     public void TheRustleIsNotAFewLoudPatches()
@@ -630,8 +621,8 @@ public class NatureTests
     [Fact]
     public void AGustCrossesTheCrown()
     {
-        // The boughs stand round the crown (FoliageSynth.BoughOffset, since 2026-10-06 where they are
-        // also heard from); along the wind, the most upwind and the most downwind are most of a crown apart.
+        // The boughs stand round the crown (FoliageSynth.BoughOffset, where they are also heard from);
+        // along the wind, the most upwind and the most downwind are most of a crown apart.
         var spec = FoliageSpec.ByName("park_tree");
         var (dx, dz) = WindField.Downwind;
         float Along(int b) { var o = FoliageSynth.BoughOffset(spec, b); return o.X * dx + o.Z * dz; }

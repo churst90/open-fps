@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.Core;
@@ -21,7 +16,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// --waves: lake shores, sea surf, shingle, a harbour wall, a river bank and a moored boat's hull
 /// (ShoreSynth), rendered from their models and measured (docs/WAVES_AND_SHORES.md).
 ///
-///   --waves levels [preset ...] [sec=30] [wind=5] [fetch=m] [parts=cloud,plume,crash,front,spray,foam,vent,stones,pocket,slap,hull,whitecaps]
+///   --waves levels [preset ...] [sec=30] [wind=5] [fetch=m] [heard=D] [parts=cloud,plume,crash,front,spray,foam,vent,stones,pocket,slap,hull,whitecaps]
 ///        each model's sea (Hs, Tp, Iribarren, breaker), its level at a metre (Leq, LAeq, octaves, the
 ///        headroom its peaks need), its texture statistics against the recordings of its kind, its 10 ms
 ///        4-16 kHz kurtosis and crest, and what it costs a core. SourceLevelDb and PeakHeadroomDb are
@@ -63,6 +58,7 @@ public static class WavesSpike
         float fetch = Arg(args, "fetch=", float.NaN);
         // heard=D: as a recording hears a shore, five stretches in a row (100 m of a lake's edge) from D m
         // back from the middle, each place by its own distance; else one stretch at a metre, all summed.
+        // TODO: Heard does not apply parts=; it renders every part.
         float heard = Arg(args, "heard=", 0f);
         string[]? parts = args.FirstOrDefault(a => a.StartsWith("parts=", StringComparison.Ordinal))?[6..].Split(',');
         string? dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..];
@@ -384,9 +380,8 @@ public static class WavesSpike
             }
             if (set is "start")
             {
-                // A shore voice from the moment it starts (2026-10-07): the sandy surf beach placed while
-                // you stand 10 m back from its edge in a 4.5 m/s onshore wind, recorded from the update it
-                // is placed in. It used to be exact silence for about 11 s.
+                // A shore voice from the moment it starts: the sandy surf beach placed while you stand 10 m
+                // back from its edge in a 4.5 m/s onshore wind, recorded from the update it is placed in.
                 Wind(4.5f);
                 Vector3 edge = new(0f, 0.05f, 0f);
                 Stand(new Vector3(0f, 0f, -10f), edge);

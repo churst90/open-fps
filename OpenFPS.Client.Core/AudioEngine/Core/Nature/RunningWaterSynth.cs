@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -8,52 +6,27 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// <summary>
 /// Water running in a channel and falling out of it, as the events it is made of (docs/RUNNING_WATER.md).
 ///
-/// WHERE THE SOUND IS. Water sliding smoothly over a bed is nearly silent in air: what a stream, a
-/// gutter or a drain is heard by is where its surface BREAKS. At every stone in a riffle (and every
-/// lip, leaf dam and broken edge in a gutter) the flow speeds up over or round it and drops into the
-/// slower water in its lee as a small plunging jet. Fast enough, the jet folds air under the surface,
-/// and the air breaks into bubbles, each of which rings at its Minnaert frequency for a few dozen
-/// cycles (Minnaert 1933; Leighton 1994). A brook is thousands of those a second from a few dozen
-/// places, which is the babble; the hiss on top is the smallest bubbles and the spray thrown off the
-/// steepest jets.
+/// Water sliding smoothly over a bed is nearly silent in air: a stream, a gutter or a drain is heard where
+/// its surface breaks. At every stone in a riffle (and every lip or leaf dam in a gutter) the flow drops
+/// into the slower water in its lee as a small plunging jet that, fast enough, folds air under; the air
+/// breaks into bubbles that ring at their Minnaert notes (Minnaert 1933; Leighton 1994). Each site is a
+/// fixed place that sings its own notes (Leighton and Walton 1987), a share of its bubbles about its own
+/// radius and the rest from the Deane and Stokes (2002) spectrum; and it breaks in bursts as its eddies
+/// shed (St ≈ 0.2), of very uneven size: the occasional big gulp of air is the glug.
 ///
-/// THE PLACES SING THEIR OWN NOTES. A breaking site is a fixed place with a fixed geometry, and it
-/// makes bubbles of the sizes its own jet makes, over and over: the recurring notes in a recording of
-/// a brook, a few pitches from each stone (a brook's sound is "a succession of Minnaert-like
-/// oscillations", Leighton and Walton 1987). So each site here has its own characteristic radius, drawn
-/// once, about which a share of its bubbles fall, and the rest follow the Deane and Stokes (2002) size
-/// spectrum below its own Hinze scale.
+/// Its falls (<see cref="RunningWaterSpec.Falls"/>) are the fountain's physics, written into these places
+/// through FallingWaterSynth.Placer; what lands inside a cavity (a gully pot, a pipe) is heard through a
+/// tube that rings at its air modes (<see cref="Tube"/>). A flow too small to leave a lip as a stream drips,
+/// one drop every V / Q (Tate's law).
 ///
-/// IT COMES IN BURSTS. The lee of a stone does not entrain steadily: the shear layer off the obstacle
-/// sheds eddies, and the jet's toe breaks with each one (a Strouhal frequency, St = f d / U ≈ 0.2), so
-/// a site's bubbles arrive in bursts a few times a second, of very uneven size: the occasional big
-/// gulp of air is the "glug". Bursts are drawn heavy-tailed and most of a site's air goes in them.
+/// Everything follows the flow: depth and speed from Manning's law (Hydraulics), each site's air from its
+/// jet's speed, every rate from that. A rain-fed gutter follows the rain through its catchment (Runoff).
+/// A line source is heard from places along it, each site at the place nearest it; a drain or a downpipe
+/// from a ring of places round where its water lands. No place is a copy of another.
 ///
-/// WHERE IT FALLS (<see cref="RunningWaterSpec.Falls"/>) is the fountain's physics (FallingWaterSynth):
-/// a drain's water pouring between the bars into its gully pot, a downpipe's stream leaving its shoe, a
-/// basin's overflow, written into this synth's places through FallingWaterSynth.Placer. What lands
-/// INSIDE a cavity (the gully pot, the pipe) is heard through it: a tube that rings at its own air
-/// modes and lets the sound out of its opening (<see cref="Tube"/>).
-///
-/// WHEN IT IS ALMOST NOTHING it drips: a flow too small to leave a lip as a stream leaves it as drops,
-/// one every V / Q, V the drop a lip of that size holds (Tate's law). The last of a shower running off
-/// a downpipe's shoe.
-///
-/// HOW MUCH. Everything follows the flow: depth and speed from Manning's law for the channel
-/// (Hydraulics), the air each site drives under from its jet's speed, every rate from that. A gutter
-/// fed by the rain follows the rain through its catchment (Runoff), filling over a minute or two and
-/// running on after.
-///
-/// EXTENDED (ExtendedSources). A creek or a gutter is metres long and is heard from places along it,
-/// each its own stream of events: every site belongs to the place nearest it, and with the spread
-/// (<see cref="Spread"/>) its events are heard there, otherwise at the middle. A drain or a downpipe is
-/// heard from a ring of places round where its water lands. No place is a copy of another.
-///
-/// WHAT IS FITTED is named here and nowhere else: <see cref="BreakingAirShare"/> (how much air a
-/// breaking site drives under for its jet's speed), <see cref="BurstShare"/> and
-/// <see cref="BurstSpread"/> (how bursty), <see cref="SiteNoteShare"/> (how much of a site's air goes
-/// into its own notes). The bubble's loudness for its size and the splash's efficiency are the
-/// fountain's (FallingWaterSynth), fitted there and not refitted here.
+/// Fitted here and nowhere else: <see cref="BreakingAirShare"/>, <see cref="BurstShare"/>,
+/// <see cref="BurstSpread"/>, <see cref="SiteNoteShare"/>. A bubble's loudness and the splash's
+/// efficiency are the fountain's (FallingWaterSynth), not refitted here.
 /// </summary>
 public sealed partial class RunningWaterSynth
 {
@@ -63,11 +36,10 @@ public sealed partial class RunningWaterSynth
     /// each unit its lee jet's Froude number stands over <see cref="JumpOnsetFroude"/>. The water drops
     /// into the lee and meets the slower water there in a small hydraulic jump, and a jump's air grows
     /// with its Froude number (Rajaratnam 1962; Wang and Chanson 2018 measured 24 % of the flow in a
-    /// developed jump's shear layer and 50-60 % in all at Fr 6.6 and over). FITTED 2026-10-06 with the
-    /// burst constants below to eight recorded creeks and rivers (the texture statistics, docs/
-    /// RUNNING_WATER.md section 8): the sum of many sites has to be as dense as a recorded riffle, and
-    /// 0.004 left it a few loud gurgles over silence. The creek's 40 L/s then drives 1.3 % of its flow
-    /// under as air, and stands 54 dB(A) on its bank.</summary>
+    /// developed jump's shear layer and 50-60 % in all at Fr 6.6 and over). FITTED with the burst
+    /// constants to eight recorded creeks and rivers (docs/RUNNING_WATER.md section 8): 0.004 left a few
+    /// loud gurgles over silence. The creek's 40 L/s drives 1.3 % of its flow under as air, 54 dB(A) on
+    /// its bank.</summary>
     public const float BreakingAirShare = 0.016f;
 
     /// <summary>The lee jet's Froude number under which its jump does not break: undular, with no roller
@@ -126,7 +98,7 @@ public sealed partial class RunningWaterSynth
     private const int MaxSites = 40;
     /// <summary>The most bubbles of one burst, and of one site's steady trickle in one block, rendered;
     /// more are stood for, each carrying √(real / rendered) of them. Thinned harder, the few that stand
-    /// for many are each too loud and the top octaves turn to grit (the fountain's lesson, 2026-10-05).</summary>
+    /// for many are each too loud and the top octaves turn to grit, as the fountain's did.</summary>
     private const int MaxPerBurst = 16;
     private const int MaxSteadyPerBlock = 32;
 
@@ -325,8 +297,7 @@ public sealed partial class RunningWaterSynth
     /// diameters apart). So the same lip at twice the flow throws a thicker sheet, more of it coherent
     /// and in bigger lumps, which plunge and drive air under where drops would not: a fall grows faster
     /// than its flow (Watts et al. 2009: a weir 6 dB(A) quieter at half its flow). Computed afresh as the
-    /// flow changes (round 2, 2026-10-06; round 1 fixed it at the reference flow and scaled the rates,
-    /// 3 dB a doubling).
+    /// flow changes: fixed at the reference flow with only the rates scaled, a fall grew 3 dB a doubling.
     /// </summary>
     public static FallShape Shape(RunningWaterSpec spec, FlowFall fall, float flowLitresPerSecond)
     {
@@ -335,8 +306,8 @@ public sealed partial class RunningWaterSynth
         float speed = MathF.Max(0.1f, Hydraulics.LipSpeed(head));
         float thickness = q * 1e-3f / (speed * MathF.Max(0.01f, fall.LipWidthMetres));      // m
         // Under about 2 mm a falling sheet tears into strands and beads before it lands (the fountain
-        // bowl's 30 µm sheet arrives as drops); over about 6 mm it holds together.
-        // A film held to a wall has had nowhere to tear: it arrives whole whatever its thickness.
+        // bowl's 30 µm sheet arrives as drops); over about 6 mm it holds together. A film held to a wall
+        // has had nowhere to tear: it arrives whole whatever its thickness.
         float coherent = fall.Film ? 1f : Math.Clamp((thickness * 1e3f - 2f) / 4f, 0f, 1f);
         float strandMm = Math.Clamp(thickness * 1e3f, 1f, 12f);
         // A film down a pipe does not fall freely: the wall holds it to a terminal speed after a few
@@ -363,7 +334,7 @@ public sealed partial class RunningWaterSynth
     public static WaterFallSpec FallFor(RunningWaterSpec spec, FlowFall fall, float flowLitresPerSecond)
     {
         var f = fall.Feed is FallFeed.TapOntoBasin or FallFeed.TapIntoWater && spec.Tap is { } tap
-            ? TapShape(spec, tap, flowLitresPerSecond, 0f) : Shape(spec, fall, flowLitresPerSecond);
+            ? TapShape(tap, flowLitresPerSecond, 0f) : Shape(spec, fall, flowLitresPerSecond);
         return new WaterFallSpec
         {
             Name = fall.Name,
@@ -408,9 +379,8 @@ public sealed partial class RunningWaterSynth
     {
         float target = MathF.Max(0f, float.IsFinite(Flow) ? Flow : 0f);
         if (float.IsNaN(_flow)) _flow = target;
-        // A channel takes a second or two to change its water; glide in proportion, so a trickle
-        // and a torrent settle as fast as each other.
-        // A channel takes a second or two to change its water; a tap is opened or shut in a fraction of one.
+        // A channel takes a second or two to change its water, a tap a fraction of one; in proportion, so
+        // a trickle and a torrent settle as fast as each other.
         _flow += (target - _flow) * MathF.Min(1f, dt / (Spec.Tap != null ? 0.25f : 1.5f));
         UpdateFlow(_flow);
         BasinControl(dt);
@@ -431,7 +401,7 @@ public sealed partial class RunningWaterSynth
                     var fall = Spec.Falls[i];
                     float q = dripping && fall.Feed != FallFeed.Drain ? 0f : FallFlow(i);
                     var f = fall.Feed is FallFeed.TapOntoBasin or FallFeed.TapIntoWater && Spec.Tap is { } tap
-                        ? TapShape(Spec, tap, _flow, _level) with { FlowLitresPerSecond = q }
+                        ? TapShape(tap, _flow, _level) with { FlowLitresPerSecond = q }
                         : Shape(Spec, fall, q);
                     if (q <= 0f) f = f with { FlowLitresPerSecond = 0f };
                     _falls.Retune(i, f.FlowLitresPerSecond, f.DropShare, f.MeanDropRadiusMm, f.ChunkRadiusMm, f.FallMetres);
@@ -787,13 +757,10 @@ public sealed partial class RunningWaterSynth
         }
         float impact = (onto == WaterSurface.Rock ? FallingWaterSynth.HardImpactPascals : FallingWaterSynth.ImpactPascals)
                        * MathF.Pow(r / 1e-3f * v / 5f, 1.5f) * DripPart;
-        // Onto wet stone the blow builds through the film (as the falls' do). Into a puddle too it is not a
-        // point: the air under the drop is squeezed out and a thin disc of it trapped, and the contact
-        // spreads over the drop's tip (Thoroddsen et al. 2005, as RainSynth's click). A lone drip's
-        // first-contact spike, one sample wide, measured a 10 ms kurtosis of 31: a digital tick on its
-        // own, where in rain a thousand of them merge.
-        // Onto a steel bottom that is wet but not under water the film is tens of microns: the blow keeps
-        // its sharp first contact (the √t onset that rings a plate's upper modes, RainPlate), barely cushioned.
+        // Onto wet stone the blow builds through the film (as the falls' do), and into a puddle the air
+        // squeezed out under the drop spreads the contact (Thoroddsen et al. 2005, as RainSynth's click): a
+        // lone drip's one-sample spike measured a 10 ms kurtosis of 31, a digital tick. On wet steel the film
+        // is tens of microns and the blow keeps its sharp first contact, which rings the plate's upper modes.
         float rise = MathF.Max(16e-6f, (place == _plateDrive ? PlateCushion : WetCushion) * r / v);
         place.Impact(at, rise, (onto == WaterSurface.Rock ? 0.4f : 1f) * r / v, impact * MathF.Sqrt(16e-6f / rise));
         if (onto != WaterSurface.Pool) return;
@@ -815,10 +782,9 @@ public sealed partial class RunningWaterSynth
     /// almost nothing by ka 3, so a round trip through an open end keeps e^(−(ka)²/2) and one through
     /// both e^(−(ka)²). That is the loss the loop has, as a cascade of four one-pole low-passes (their
     /// (1 + (f/f1)²)^-2 is e^(−2 (f/f1)²) where it matters); the walls and the water take a little more.
-    /// Until 2026-10-07 it was one one-pole at ka = 1, which let a 5.5 m downpipe hand its splashes back
-    /// every 32 ms at a fifth to a third of their pressure up to 6 kHz: a flutter Cody heard as the
-    /// downpipe flanging. Normalised so white noise in comes out at the same power, so a cavity colours
-    /// the sound and does not make it louder.
+    /// Less loss than that and a downpipe hands its splashes back every round trip, which Cody heard as
+    /// flanging (docs/RUNNING_WATER.md 11.1). Normalised on white noise: a cavity colours the sound and
+    /// does not make it louder.
     /// </summary>
     private sealed class Tube
     {
@@ -847,12 +813,10 @@ public sealed partial class RunningWaterSynth
             float poles = 4f / (MathF.Tau * f1) * sampleRate;
             int delay = Math.Max(2, (int)MathF.Round(2f * length / 343f * sampleRate - poles));
             _line = new float[delay];
-            // What a round trip keeps at low notes: the open end lets out (ka)²/2 of it (Levine and
-            // Schwinger), a gully pot's wide grate a sixth at its 200 Hz mode, and the walls and the
-            // water's ruffled surface take more. At 0.9 a glug that fell on a pot's mode stood 8 dB
-            // over the pour for a second.
+            // What a round trip keeps at low notes: the open end lets out (ka)²/2 (Levine and Schwinger),
+            // a gully pot's wide grate a sixth at its 200 Hz mode, the walls and the water more. At 0.9 a
+            // glug that fell on a pot's mode stood 8 dB over the pour for a second.
             _loopGain = 0.8f;
-            // Normalised on white noise: a cavity colours what falls in it, it does not make it louder.
             var noise = new EventSum(sampleRate, 99);
             double inPower = 0, outPower = 0;
             for (int i = 0; i < 4 * delay + 16384; i++)

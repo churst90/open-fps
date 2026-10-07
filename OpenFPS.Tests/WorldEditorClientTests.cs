@@ -77,7 +77,7 @@ public class WorldEditorClientTests
     [Fact]
     public void F12AsksTheServerAndTheMenuIsSpokenAndWalked()
     {
-        var (session, sent, speech, shell) = NewClient();
+        var (session, sent, speech, _) = NewClient();
         Assert.True(session.Press(GameKey.F12));
         var asked = Assert.IsType<TextCommand>(sent[^1]);
         Assert.Equal(("edit", "menu"), (asked.Command, string.Join(" ", asked.Args)));
@@ -106,7 +106,7 @@ public class WorldEditorClientTests
     [Fact]
     public void ARefreshReplacesTheOpenMenuSilentlyAndKeepsTheCursor()
     {
-        var (session, sent, speech, shell) = NewClient();
+        var (session, _, speech, _) = NewClient();
         session.HandleMessage(Root());
         session.HandleMessage(Nudge());
         session.Menus.HandleKey(GameKey.Down);
@@ -129,7 +129,7 @@ public class WorldEditorClientTests
     [Fact]
     public void AnInputItemStartsTheCommandLineAndF12AgainGoesBackToTheTop()
     {
-        var (session, sent, speech, shell) = NewClient();
+        var (session, _, _, shell) = NewClient();
         session.HandleMessage(Root());
         session.HandleMessage(Nudge());
         session.Menus.HandleKey(GameKey.Enter);
@@ -145,7 +145,7 @@ public class WorldEditorClientTests
     [Fact]
     public void ADeleteThatDoesNotStayClosesTheEditor()
     {
-        var (session, sent, speech, shell) = NewClient();
+        var (session, sent, _, _) = NewClient();
         session.HandleMessage(new EditorMenu
         {
             Path = "delete", Title = "Delete Fire?",

@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Security.Cryptography;
 using OpenFPS.Client.AudioEngine.Core.Nature;
@@ -14,7 +10,9 @@ namespace OpenFPS.AudioLab.Spikes;
 /// <summary>
 /// --water-cost: what a shore stretch (ShoreSynth) and a running water source (RunningWaterSynth) cost
 /// a core, rendered as the game renders them (every place, NextPlaces, Control every 256 samples), and a
-/// fingerprint of every sample so two builds can be compared for a null test.
+/// fingerprint of every sample so two builds can be compared for a null test. Time it with two cores or
+/// more: on one the JIT's tiering thread barely runs and the hot loops stay in their first, unoptimised
+/// code (docs/WAVES_AND_SHORES.md 8.2).
 ///
 ///   --water-cost [shore|flow] [preset ...] [sec=20] [reps=3] [wind=] [out=DIR]
 ///        each preset settled (25 s for a surf beach, 5 s for another shore, 2 s for running water),
@@ -26,7 +24,8 @@ namespace OpenFPS.AudioLab.Spikes;
 ///        the render fingerprint's three rain renders (RenderFingerprintTests: 2 s at 8 mm/h on asphalt,
 ///        steel and a puddle, seed 9) as DIR/rain_SURFACE.f32, for a null test of a change that moves them.
 ///   --water-cost bubbles
-///        what one sample of a ringing bubble (EventSum.Bubble) costs, at five sizes.
+///        what one sample of a ringing bubble (EventSum.Bubble) costs at five sizes, and of a splash's
+///        steep burst (EventSum.Burst) at two decays.
 ///   --water-cost null DIR_A DIR_B
 ///        every .f32 in both: whether they are the same to the bit, and if not, how far apart: the
 ///        difference's rms against the signal's, and its largest sample against the signal's peak.
