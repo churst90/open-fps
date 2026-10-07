@@ -22,7 +22,9 @@ public static class SpeedwaySpike
 
     public static int Run(string[] args)
     {
-        string mapName = args.FirstOrDefault(a => !a.StartsWith("--") && a.IndexOf('=') < 0) ?? "speedway";
+        // The map is the one bare word that is not a switch: `--speedway probe` is the speedway, probed.
+        string[] switches = { "probe", "walk", "noecho" };
+        string mapName = args.FirstOrDefault(a => !a.StartsWith("--") && a.IndexOf('=') < 0 && !switches.Contains(a)) ?? "speedway";
         float seconds = Arg(args, "seconds", 60f);
         int voices = (int)Arg(args, "voices", 4f);
         bool noEcho = args.Contains("noecho");     // isolate: engines only, no walls answering
