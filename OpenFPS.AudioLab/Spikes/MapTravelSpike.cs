@@ -8,11 +8,10 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --map-travel [from=city] [to=speedway] [voices=40]: Cody's trip of 2026-10-05 through the whole
-/// mixer. The first map's acoustics are loaded (every room gets its reverb bus, and each bus borrows
-/// a binaural stage from the pool), then the second map's replace them, as /join does. Then a row of
-/// steady sources plays three metres to the listener's right, and each one's two ears are read off
-/// its binaural stage. A source on the right is louder in the right ear; one that is not is mono.
+/// --map-travel [from=city] [to=speedway] [voices=40]: Cody's /join of 2026-10-05 through the whole mixer.
+/// One map's acoustics (a reverb bus per room, each borrowing a binaural stage from the pool) replaced by
+/// another's, then steady sources three metres to the right, each one's ears read off its binaural stage:
+/// a source on the right not louder in the right ear is mono.
 /// </summary>
 public static class MapTravelSpike
 {
@@ -48,13 +47,11 @@ public static class MapTravelSpike
             for (int i = 0; i < hiss.Length; i++) hiss[i] = 0.3f * (float)(rng.NextDouble() * 2 - 1);
             provider.RegisterSynthesisedSound("synth:lab:hiss", TransientSynth.ToPcm16(hiss), sr);
 
-            // The first map, with something sounding in a room of each of many regions: a room gets its
-            // reverb bus (and the bus its binaural stage) when a sound is in it, as the city's cars,
-            // walkers and doors put one in hundreds of places.
+            // A sound in each of many rooms: a room gets its bus (and the bus its binaural stage) when a
+            // sound is in it, as the city's cars, walkers and doors do in hundreds of places.
             if (first.AcousticMap != null) provider.SetAcousticMap(first.AcousticMap);
             var rooms = first.AcousticMap?.RegionPositions.Take(50).ToList() ?? new();
-            // Standing in the first of them: the room you are in passes its stereo through (blend 0),
-            // and so does every room whose field has no direction to come from.
+            // The room you are in passes its stereo through (blend 0), as does any room whose field has no direction.
             if (rooms.Count > 0) { listenerRegion = rooms[0].Key; ear = rooms[0].Value; }
             for (int k = 0; k < rooms.Count; k++)
                 provider.PlaySpatialSound(Hiss(-2000 - k, rooms[k].Value, rooms[k].Key));

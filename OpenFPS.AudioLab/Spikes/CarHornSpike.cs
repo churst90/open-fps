@@ -5,17 +5,11 @@ using OpenFPS.Client.AudioEngine.Core.Signals;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// Electric car horns on the bench, at a metre on axis, next to two air horns for comparison.
-///
-///   --car-horn [preset ...] [out=DIR] [air=KEY,KEY] [bend=F] [rise=S] [fall=S] [tag=NAME]
-///
-/// air= picks which air horns to render; bend, rise and fall override their spec's PitchBend,
-/// RiseSeconds and FallSeconds, and tag= goes into the file names, for A/B renders.
-///
-/// Each horn plays a tap (0.15 s), a double tap (0.15 on, 0.12 off, 0.2 on) and a 1.2 s hold. The
-/// hold's steady part is measured — note, crest, centroid, band balance, RMS at a metre against the
-/// declared anchor — BEFORE anything is written for listening. WAVs are normalised per horn (one
-/// gain across its three files), so tap against hold is real, horn against horn is not.
+/// --car-horn [preset ...] [out=DIR] [air=KEY,KEY] [bend=F] [rise=S] [fall=S] [tag=NAME]: electric car
+/// horns at a metre on axis beside air horns (air= picks them; bend, rise, fall override the spec; tag=
+/// names A/B files). Each plays a tap, a double tap and a 1.2 s hold; the hold is measured (note, crest,
+/// centroid, bands, level against the anchor) before anything is written. WAVs are normalised per horn,
+/// so tap against hold is real, horn against horn is not.
 /// </summary>
 public static class CarHornSpike
 {
@@ -151,8 +145,7 @@ public static class CarHornSpike
         // Centroid: a 0.2 s window (Hann main lobe +-10 Hz) swept in 5 Hz steps to 12 kHz, so no
         // harmonic can fall between the steps and leave the noise to decide the answer.
         x = x.AsSpan(0, (int)(0.2f * Sr)).ToArray();
-        // ...and the NOISE: everything further than 3% from every harmonic of every bell. A horn is
-        // a tone with some air in it; how much air is a number, not an impression.
+        // The noise: everything further than 3% from every harmonic of every bell.
         double num = 0, den = 0, noise = 0;
         for (float hz = 50f; hz < 12000f; hz += 5f)
         {

@@ -3,22 +3,13 @@ using OpenFPS.Common;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// The patio sliding door against the recording Cody named as THE patio door (goblinjack's slides), both
-/// measured the same way. The recording is a yardstick only: nothing of it is played by the game.
-///
-///   --patio-vs-ref [ref=WAV] [wav=FILE,FILE] [only=open-v1] [out=DIR]
-///
-/// Without wav= it renders the patio door in each character, opening and shutting, and measures those.
-/// Each file is cut the same way: its stops are the loud blows that follow a slide, its slides are what
-/// sounds between, away from any blow. Then, side by side:
-///   the slides' octave bands (63 Hz to 16 kHz, dB re the loudest band) and centroid;
-///   the slides' envelope modulation spectrum, 3-40 Hz: the strongest beat and how far it stands above
-///   the rest (a roller's turn is a beat at its rotation rate);
-///   each stop's ring (the strongest line from 40 to 400 Hz in the quarter second after the blow), how
-///   long its low end (below 300 Hz) takes to fall 30 dB, and the hits in its first 120 ms, counted on
-///   the part above 1 kHz where each blow is a burst of its own.
-/// With out= it writes the listening set: each character open and shut, the recording, and a file that
-/// plays a slide of the recording, then one of ours, at matched slide loudness.
+/// --patio-vs-ref [ref=WAV] [wav=FILE,FILE] [only=open-v1] [out=DIR] [stems=DIR] [events] [detail]: the patio
+/// door against the recording Cody named as the patio door (goblinjack's slides; a yardstick, never
+/// played), measured the same way. Without wav= it renders every character opening and shutting. Each file
+/// is cut into stops (loud blows after a slide) and slides (what sounds between); side by side: the slides'
+/// octave bands and centroid, their 3-40 Hz envelope beat (a roller's turn), each stop's ring (strongest
+/// 40-400 Hz line), its low end's 30 dB fall, and the hits above 1 kHz in its first 120 ms. out= writes the
+/// listening set, with the recording's slides and ours alternating at matched slide loudness.
 /// </summary>
 public static class PatioRefSpike
 {
@@ -141,10 +132,9 @@ public static class PatioRefSpike
                 onsets.Add((i, p));
             }
         }
-        // Slides: 10 ms frames 10 dB over the floor. A stop is the loudest blow in a stretch of sound, within
-        // 20 dB of the file's loudest, with the slide sounding in the 300 ms before it; it and its ring, and the
-        // latch thrown after it, are not slide, for 0.8 s. Any other loud blow (a latch before the leaf moves,
-        // a grain cracking) is not slide for 80 ms.
+        // Slides: 10 ms frames 10 dB over the floor. A stop is the loudest blow in a stretch, within 20 dB of
+        // the loudest, with slide in the 300 ms before it; it, its ring and the latch after are not slide for
+        // 0.8 s. Any other loud blow (a latch, a grain cracking) is not slide for 80 ms.
         var active = new bool[e10.Length];
         for (int i = 0; i < e10.Length; i++) active[i] = e10[i] > floor + 10;
         var sounding = (bool[])active.Clone();
@@ -180,7 +170,6 @@ public static class PatioRefSpike
                 Console.WriteLine($"  {name}: blow at {(double)frame * f2 / rate:F3} s, {p - max2:F1} dB re the loudest{(stops.Any(s => Math.Abs(s.T - (double)frame * f2 / rate) < 1e-6) ? ", a stop" : "")}");
         foreach (var (t, p) in stops) m.Stops.Add(MeasureStop(x, rate, t, p));
 
-        // Slide bands.
         double energy = 0, samples = 0;
         foreach (var (from, to) in m.Slides)
         {
@@ -400,8 +389,7 @@ public static class PatioRefSpike
         double refGain = Math.Min(Math.Pow(10, (slideTarget - refM48.SlideDbfs) / 20), Math.Pow(10, (-1 - refM48.PeakDbfs) / 20));
         Write(Path.Combine(dir, "9 reference.wav"), ref48, refGain);
 
-        // Reference, ours, reference, ours: each of the recording's slides with what follows it, then one of
-        // the standard door's, open and shut in turn, both at the same slide loudness.
+        // The recording's slides alternating with the standard door's, open and shut in turn.
         var std = ours.Where(o => o.Name.StartsWith("standard")).ToList();
         if (std.Count == 0) return;
         var stdM = std.Select(o => measured.First(x => x.Name == o.Name)).ToList();

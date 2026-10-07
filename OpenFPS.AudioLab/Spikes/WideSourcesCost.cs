@@ -7,13 +7,10 @@ using OpenFPS.Common;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --wide-sources cost: what heard-across-their-extent costs, one thread, per second of audio.
-///
-///   * The synths: a tree, the fire, the fountain and the rain over a roof and a near quarter, one place
-///     against several (their streams written separately; the events are the same, only routed).
-///   * The binaural stage: Steam Audio's HRTF per voice (and the ground's, which every placed voice has),
-///     against the alternative of encoding the same streams into one second-order ambisonic field and
-///     decoding it binaurally once (AmbisonicBedDsp's decode).
+/// --wide-sources cost: what hearing a source across its extent costs, one thread, per second of
+/// audio. The synths (a tree, the fire, the fountain, rain on a roof and a near quarter) as one place
+/// against several, and the binaural stage: an HRTF per voice (and per ground copy) against one
+/// second-order ambisonic field decoded once (AmbisonicBedDsp).
 /// </summary>
 public static class WideSourcesCost
 {

@@ -5,18 +5,11 @@ using OpenFPS.Common;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// A round going past a listener, as the game sends it and the client renders it, written out.
-///
-///   --bullet-pass [out=DIR]
-///
-/// Each scene flies the round in still standard air, asks <see cref="BulletFlyby.Sounds"/> what a
-/// listener at a point hears (the server's own call), renders each sound from its key as the client
-/// does, and lays it down at the moment it arrives: its delay from the shot plus its own distance over
-/// the speed of sound, which is what the engine adds. The report is laid down beside it, from the
-/// muzzle. Every sound is placed by the game's own law at the shipped compression (Loudness.Place,
-/// then the inverse law past its reference distance), and every file is at that one shared gain, the
-/// game's full scale. Dry and mono: no HRTF, air absorption, reflections or reverb, which the game
-/// adds on the way.
+/// --bullet-pass [out=DIR]: a round going past a listener, as the server sends it
+/// (<see cref="BulletFlyby.Sounds"/>) and the client renders it, each sound laid down when it arrives
+/// (its delay plus its distance over the speed of sound) beside the muzzle's report. Placed by the game's
+/// law at the shipped compression, every file at the game's full scale; dry and mono (no HRTF, air,
+/// reflections or reverb).
 /// </summary>
 public static class BulletPassSpike
 {

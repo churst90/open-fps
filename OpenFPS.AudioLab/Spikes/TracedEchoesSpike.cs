@@ -4,11 +4,10 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --traced-echoes: the per-source tracer, measured headless on a street canyon (two rows of brick
-/// buildings 20 m apart on asphalt). Six sources traced at once: what a trace costs, what one
-/// source's effect costs the mixer per block, and — driving one source down the street at 15 m/s
-/// past a listener on the pavement — how the echo energy and its early part move from trace to
-/// trace: smoothly, or in jumps as the mirror images did.
+/// --traced-echoes: the per-source tracer headless on a street canyon (brick rows 20 m apart on asphalt).
+/// Six sources at once: a trace's cost, one source's effect cost per block, and, with one source driven
+/// past at 15 m/s, whether the echo energy moves smoothly from trace to trace or jumps.
+/// SWAP=1 swaps the two banks' effects in the steadiness test.
 /// </summary>
 public static class TracedEchoesSpike
 {
@@ -37,8 +36,7 @@ public static class TracedEchoesSpike
         while (tr.Runs < 3 && DateTime.UtcNow < until) Thread.Sleep(50);
         Console.WriteLine($"six sources: trace {tr.LastRunMs:F0} ms (refresh every 125 ms)");
         {
-            // Does a source that has not moved come back with the same IR every trace, or does the
-            // ray sampling change it? Metered by the same impulse method, five traces in a row.
+            // Does a still source get the same IR every trace, or does ray sampling change it? Five traces.
             var au0 = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = 1024 };
             var es0 = new Phonon.IPLReflectionEffectSettings { type = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, irSize = tr.IrSize, numChannels = TracedEchoes.Channels };
             Phonon.iplReflectionEffectCreate(ctx, ref au0, ref es0, out IntPtr fx);
@@ -78,9 +76,8 @@ public static class TracedEchoesSpike
         var mono = new float[1024];
         var inter = new float[1024 * TracedEchoes.Channels];
 
-        // Drive slot 0 down the street, 15 m/s, from 45 m before the listener to 45 m past; at each
-        // trace, play an impulse through a fresh effect and meter the echo's W channel: all of it,
-        // and the first 60 ms after the direct path would have arrived.
+        // Slot 0 driven from 45 m before the listener to 45 m past; at each trace an impulse through a fresh
+        // effect, the echo's W channel metered whole and over its first 60 ms after the direct path.
         Console.WriteLine("  z (m)  dist   echo total dB   early 60 ms dB   (re the direct sound at 1 m)");
         int s0 = slots[0];
         for (float z = -45f; z <= 45f; z += 15f * 0.125f)
@@ -112,11 +109,9 @@ public static class TracedEchoesSpike
             }
             Console.WriteLine($"{z,7:F1} {d,5:F1}   {10 * Math.Log10(all + 1e-20),13:F1}   {10 * Math.Log10(early + 1e-20),14:F1}");
         }
-        // Steadiness: steady noise into a source driving down the street at 15 m/s, the echo metered in
-        // 23 ms blocks. One effect following the newest trace (the old way) against two, one per
-        // bank, crossfaded towards the newer over the refresh (the rig's way). Reported as the mean
-        // block-to-block change in level, dB, after smoothing out the noise's own fluctuation over
-        // four blocks.
+        // Steadiness: steady noise from a driven source, the echo metered in 23 ms blocks; one effect on
+        // the newest trace against two (one per bank) crossfaded over the refresh, as the rig does. The
+        // mean block-to-block change in dB, the noise's own fluctuation smoothed over four blocks.
         {
             var ra = Phonon.iplReflectionEffectCreate(ctx, ref au, ref es, out IntPtr fa);
             var rb = Phonon.iplReflectionEffectCreate(ctx, ref au, ref es, out IntPtr fb);
@@ -190,8 +185,8 @@ public static class TracedEchoesSpike
             }
             Console.WriteLine($"driving past: block-to-block change, one effect {Rough(single):F2} dB (worst {Worst(single):F2}), two banks crossfaded {Rough(dual):F2} dB (worst {Worst(dual):F2})");
         }
-        // Two stages on the listener's trace: sharing one reader (as every outdoor bus used to) and
-        // with a reader each. What each stage's effect hands back, dB, after the traces have run.
+        // Two stages on the listener's trace, sharing one reader and with a reader each: what each
+        // stage's effect hands back, dB.
         {
             using var lt = new TracedReverb(ctx, 44100, 1024);   // this stage measures readers at the mixer's block
             lt.SetScene(scene);

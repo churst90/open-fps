@@ -6,12 +6,9 @@ using OpenFPS.Client.Core;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-///   --prerender-doors out=DIR [threads=N]
-///
-/// Renders every door model sound the client renders at start (WorldAudioPlayer.PrewarmKeys) into DIR,
-/// as DoorRenderCache files for this build. publish-windows.sh puts them in the zip as
-/// ASSETS/rendercache/BUILD, so a player's first door is heard the first time it is opened. Keys already
-/// in DIR are kept.
+/// --prerender-doors out=DIR [threads=N]: every door render the client makes at start
+/// (WorldAudioPlayer.PrewarmKeys), as DoorRenderCache files for this build; keys already in DIR are
+/// kept. publish-windows.sh ships them as ASSETS/rendercache/BUILD, so a first door is heard at once.
 /// </summary>
 public static class PrerenderDoorsSpike
 {

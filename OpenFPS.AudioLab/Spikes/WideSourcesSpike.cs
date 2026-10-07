@@ -14,19 +14,13 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --wide-sources [out=DIR] [set=measure|render|all] [wide=on|off]: a tree, the Elm Park fountain, the
-/// fire pit and street rain through the game's own client path with the HRTF, captured from the master
-/// in float, for how alike the two ears are (tools/interaural.py) and for listening pairs.
-///
-/// The path is GameLevelsSpike's: a ClientAudioSystem over the AudioEngineFacade over the
-/// FmodAudioProvider, the sources as map entities exactly as the server sends them (the fountain as its
-/// five map taps at their places on the city map), the ear model on. No map, so no walls, reflections or
-/// reverb; a flat asphalt ground. The wind at the ears is switched off, because it is noise of its own at
-/// each ear and would be measured as the source's width; the tree's crown still has its breeze.
-///
-/// wide=off plays every extended source from one point (ExtendedSources.Enabled = false): the game before
-/// this change. Each scene's name and start go to DIR/segments.csv beside DIR/capture.post.wav (float,
-/// after the master limiter, the game's full scale), with the process's CPU and the mixer's load over it.
+/// --wide-sources [out=DIR] [set=measure|roofs|tree|render|level|all] [wide=on|off] [sec=] [turbulence=]
+/// [collapse=on] [spread=] | cost: a tree, the Elm Park fountain (its five map taps), the fire pit and
+/// street rain through GameLevelsSpike's client path with the HRTF, captured from the master in float, for
+/// how alike the ears are (tools/interaural.py) and for listening. No map (no walls, reflections or
+/// reverb), flat asphalt; the wind at the ears is off, since its own noise at each ear would read as width.
+/// wide=off plays every extended source from one point. DIR/segments.csv names each scene beside
+/// DIR/capture.post.wav (after the master limiter), with CPU and mixer load.
 /// </summary>
 public static class WideSourcesSpike
 {
@@ -93,9 +87,8 @@ public static class WideSourcesSpike
         int nextId = 100;
         double loadSum = 0; int loadCount = 0;
 
-        // What the mixer is placing the source at, from its voices' gains (LoudestVoices: the distance law,
-        // the path and the ear model's gain, per voice), each weighted by the share of the source its
-        // stream carries: the source's channel power, whatever its spread, without its own wandering.
+        // The source's placed power from its voices' gains (LoudestVoices), each weighted by its stream's
+        // share: its channel power whatever its spread, without its own wandering.
         string measuredSound = "";
         int measuredMiddle = 0;
         float measuredSpread = 0f;

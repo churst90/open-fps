@@ -4,10 +4,11 @@ using OpenFPS.Client.AudioEngine.Fmod;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// The game's whole vehicle voice (<see cref="EngineVoiceState"/>) driven through the same stop-go ride
-/// as `--shift-trace`, written to a WAV at a FIXED gain so variants keep their level differences.
-/// Knobs change the preset in the lab only: muffler=stock|bikestock|chambered, steep= exp= baffle= absorb= mufflen= prim= coll= mid= tail= taild= pops= cruiseup= downshift= colld= wall= knock= valve=.
-/// `--ride sportbike [knobs] out=FILE.wav [top=50]`.
+/// --ride sportbike [knobs] out=FILE.wav [top=50] [gain=1.5]: the whole vehicle voice
+/// (<see cref="EngineVoiceState"/>) through `--shift-trace`'s stop-go ride, written at a fixed gain so
+/// variants keep their level differences. Knobs change the preset in the lab only:
+/// muffler=stock|bikestock|chambered, exp= baffle= absorb= shell= mufflen= steep= taild= colld= jet= pops=
+/// wall= prim= coll= mid= tail= knock= valve= cruiseup= downshift= front= tyres= fan= body= accel=.
 /// </summary>
 public static class RideSpike
 {
@@ -28,8 +29,7 @@ public static class RideSpike
         string? muffler = args.FirstOrDefault(a => a.StartsWith("muffler="))?[8..];
         if (muffler == "stock") mf = MufflerSpec.Stock;
         else if (muffler == "bikestock")
-            // A litre bike's own: the pre-chamber under the engine (catalyst, two short expansions)
-            // and a packed can. Compact, which is the point — the volume is under the bike, not behind it.
+            // A litre bike's: a pre-chamber under the engine (catalyst, two short expansions) and a packed can.
             mf = MufflerSpec.Stock with { ChamberLengthsMetres = new[] { 0.10f, 0.14f }, ExpansionRatio = 7f };
         else if (muffler == "chambered") mf = MufflerSpec.Chambered40;
         if (Knob("exp") is { } xr) mf = mf with { ExpansionRatio = xr };
@@ -82,8 +82,7 @@ public static class RideSpike
             all.AddRange(buf);
             if (target > 0.5f) rpms.Add(voice.Engine.Rpm);
         }
-        // What it measures at a metre, flat out and at the steady cruise (the hold at the top speed,
-        // 4 + 12.5 .. 4 + 12.5 + 6 seconds in, allowing for the ramp at 2 m/s^2).
+        // At a metre, flat out and at the steady cruise (the hold at top speed, 16.5 to 22.5 s in).
         double Spl(int from, int to)
         {
             double sum = 0; int n = 0;
@@ -101,7 +100,7 @@ public static class RideSpike
             Console.WriteLine($"  moving: rpm 10/50/90 % {p10:F0} / {p50:F0} / {p90:F0}, peak {rpms[^1]:F0};"
                               + $" firing note {p10 * firing:F0} / {p50 * firing:F0} / {p90 * firing:F0} Hz");
         }
-        // Skip the first two seconds (start-up), fixed gain: full scale is the declared level.
+        // Past the start-up; fixed gain, full scale being the declared level.
         var samples = all.Skip(2 * sr).Select(x => x * (Knob("gain") ?? 1.5f)).ToArray();
         float peak = samples.Max(MathF.Abs);
         double rms = Math.Sqrt(samples.Select(x => (double)x * x).Average());

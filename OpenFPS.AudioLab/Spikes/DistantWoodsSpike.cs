@@ -15,19 +15,11 @@ namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --distant-woods [set=sum|walk|all] [out=DIR] [trees=40] [sec=30]: a wood heard from 300 to 800 m.
-///
-/// set=sum (offline, no mixer): every tree of the wood its own FoliageSynth reading the wind at its own
-/// crown, each heard as 1/d from where it stands with its own delay, summed at a listener; against the wood
-/// heard as one (WoodChorus: one synth standing for its trees, reading the wind across the wood, at the gain
-/// WoodChorus.Weigh gives). Broadband level, octave bands 125 Hz to 8 kHz, and how much the level swings
-/// (the standard deviation of its 400 ms level, which the gusts set), at 300, 500 and 800 m; and what each
-/// costs to render. No air absorption in either (it is the same path for both), no ground.
-///
-/// set=walk (through the game's client path and mixer, captured from the master): walking up to the wood
-/// from 800 m to 100 m from its middle along the ground at 10 m/s, before (each tree its own voice, as in
-/// the game until now: past 90 m every tree is too quiet to have one) and after (the woods, WoodChorus).
-/// Writes DIR/before/capture.post.wav and DIR/after/capture.post.wav, and the level every 50 m to
-/// DIR/levels.csv.
+/// set=sum, offline: every tree its own FoliageSynth at its own crown, 1/d and delayed, summed at a
+/// listener, against the wood as one (WoodChorus at WoodChorus.Weigh's gain): level, octave bands, the
+/// 400 ms level's swing, and render cost, at 300, 500 and 800 m; no air absorption, no ground.
+/// set=walk, through the game's path: walking in from 800 to 100 m at 10 m/s with each tree its own voice
+/// (none past 90 m) and with the woods, to DIR/before and DIR/after (capture.post.wav), DIR/levels.csv.
 /// </summary>
 public static class DistantWoodsSpike
 {
@@ -301,9 +293,8 @@ public static class DistantWoodsSpike
             int maxVoices = 0;
             var marks = new StringBuilder("seconds,distance_m\n");
             float lastMark = float.MaxValue;
-            // What the mixer places the trees at (every tree and wood voice's power, from its gains:
-            // LoudestVoices), against what all the trees would be at their own distances (as 1/d): the
-            // difference stays put if nothing is lost or doubled on the way in.
+            // The mixer's placed power (LoudestVoices) against every tree at 1/d: the difference holds
+            // still if nothing is lost or doubled on the way in.
             var placed = new List<(float D, double Db)>();
             int frame = 0;
             Pump(walk, t =>

@@ -10,15 +10,10 @@ using OpenFPS.Client.AudioEngine.Fmod;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// A V8 sports car with Flowmaster 40s: started, driven past, brought back hard, parked and switched
-/// off — synthesized from its own mechanism, and rendered as a RIG of emitters rather than one sound.
-///
-/// Three emitters, because a car is three sources in three places. The exhaust is at the back, the
-/// intake and engine bay at the front, three and a half metres apart, and the tyres are at the axles
-/// between them. At close range that separation is plainly audible and it tells you which way the car
-/// is pointing; on a pass, the front reaches you a beat before the back, and each Dopplers on its own
-/// schedule because each is at a different place. None of that has to be authored — it falls out of
-/// putting the sources where they actually are.
+/// --vehicle and friends: a car synthesised from its mechanism, started, driven past, brought back hard,
+/// parked and switched off, as three emitters where the sources are (exhaust at the back, intake and bay
+/// at the front 3.5 m away, tyres at the axles), so direction, the front passing first and each end's
+/// own Doppler fall out of placement.
 /// </summary>
 public static class VehicleSpike
 {
@@ -26,9 +21,8 @@ public static class VehicleSpike
     private static readonly Vector3 Ear = new(4.5f, 1.7f, 0f);
 
     /// <summary>
-    /// The GAME's path: the engine runs live inside an FMOD DSP and follows a road speed, exactly as
-    /// a vehicle entity does in the world. The car idles up the road, then passes the listener three
-    /// times at three speeds, turning round out of earshot each time. Nothing is pre-rendered.
+    /// The game's path: the engine live in an FMOD DSP following a road speed, as a vehicle entity does.
+    /// It idles up the road, then passes three times at three speeds, turning out of earshot.
     /// </summary>
     public static int RunLive(string preset, float[]? speedsKmh)
     {
@@ -124,12 +118,9 @@ public static class VehicleSpike
     }
 
     /// <summary>
-    /// Concrete Row, with cars in it. The listener stands on the pavement of Concrete Row (ConcreteRow)
-    /// — six-storey blocks both sides, side streets cut through — while vehicles drive past live.
-    /// Each car's engine is the same DSP the game uses; the buildings answer it with first- and
-    /// second-order image-source echoes, each a delayed copy of the engine placed at its mirrored
-    /// source, tracked facade by facade as the car moves so the echoes slide and Doppler with it.
-    /// On top sits the street's own reverb decay and the near-field boundary probes.
+    /// --engine-street: live cars down Concrete Row (six-storey blocks both sides) heard from its pavement.
+    /// The buildings answer with first- and second-order image-source echoes tracked facade by facade, so
+    /// they slide and Doppler with the car; the street's reverb and the boundary probes on top.
     /// </summary>
     public static int RunStreet(string[] presets, float[]? speedsKmh)
     {
@@ -222,8 +213,7 @@ public static class VehicleSpike
                     var engineEmitter = Engine(pos, vel, speed);
                     provider.UpdateSpatialAttributes(engineEmitter);
 
-                    // The buildings answering. Reflections carry their own distance in Gain; FMOD
-                    // attenuates the mirrored position itself, so hand it only the surface's share.
+                    // FMOD attenuates the mirrored position itself, so Gain carries only the surface's share.
                     float direct = MathF.Max(1f, Vector3.Distance(engineEmitter.Position, ear));
                     int nf = ImageSource.FirstOrder(surfaces, engineEmitter.Position, ear, C, first);
                     int ns = ImageSource.SecondOrder(surfaces, engineEmitter.Position, ear, C, second);
@@ -284,30 +274,22 @@ public static class VehicleSpike
     {
         AcousticRegistry.Initialize();
         var v = preset != null ? VehicleProfile.ByName(preset) : muscle ? VehicleProfile.V8Muscle : VehicleProfile.V8Sports;
-        // The same key=value sweep every other engine tool takes. A layer that can only be judged by
-        // rebuilding cannot be bracketed, and bracketing is how everything here gets settled.
+        // The key=value sweep every engine tool takes, so a layer can be bracketed without a rebuild.
         if (knobs != null) v = EngineOrderSpike.Override(v, knobs);
         EngineSynth.DebugLegacyDiesel = knobs != null && Array.IndexOf(knobs, "legacydiesel") >= 0;
-        // body=off renders the same car with its shell taken away, so the two files can be played
-        // against each other. A demo of a new layer that cannot be turned off is not a demo of it.
+        // body=off: the same car without its shell, to play against the other.
         if (!withBody) v = v with { Body = VehicleBody.None };
-        // coupling=X overrides how much of the engine gets into the structure. It is the one number
-        // in the body model still set by judgement rather than measured, so it is the one a listening
-        // test has to be able to move.
+        // coupling=X: how much of the engine gets into the structure, the body model's one number set by
+        // judgement rather than measured.
         else if (coupling.HasValue && v.Body != null) v = v with { Body = v.Body with { Coupling = coupling.Value } };
-        // shell=off silences the muffler CAN while leaving everything the gas does untouched, which
-        // is the only way to hear what the metal is contributing on its own.
-        // case=bright swaps the can's big face for its small spans, which is the difference between
-        // ring at 73 Hz and ring across the whole sound.
+        // shell=off silences the muffler can and leaves the gas alone; case=bright swaps the can's big
+        // face for its small spans (a ring at 73 Hz against one across the whole sound).
         if (shellCase != null)
             v = v with { Engine = v.Engine with { Exhaust = v.Engine.Exhaust with {
                 Muffler = v.Engine.Exhaust.Muffler with {
                     Shell = shellCase == "deep" ? VehicleBody.DeepMufflerCase : VehicleBody.MufflerCase } } } };
-        // ring=X is the case's loss factor: how LONG it rings, as against how loud. "More aggressive"
-        // can mean either, and they are different knobs with different sounds.
-        // wide=X scales the case's free spans, which moves the PITCH of its ring without touching how
-        // long it rings for. A longer tube and a wider tube are different things: ring length is the
-        // tube's Q, span is its note.
+        // ring=X is the case's loss factor (how long it rings); wide=X scales its free spans (the ring's
+        // pitch, not its length).
         if (shellWiden.HasValue && v.Engine.Exhaust.Muffler.Shell is { } wb)
         {
             var spans = wb.PanelSpansM.Select(x => x * shellWiden.Value).ToArray();
@@ -333,8 +315,7 @@ public static class VehicleSpike
             Console.Write($"{g}:{gb.SpeedFor(gb.UpshiftRpm, g) * 3.6f:F0} ");
         Console.WriteLine("km/h at the shift point\n");
 
-        // Sitting in front of you, worked through the rev range in neutral. No distance, no Doppler,
-        // no tyres — just the engine, which is the only way to judge what it actually sounds like.
+        // In front of you, worked through the rev range in neutral: the engine alone.
         if (stationary)
         {
             var revs = new List<DriveOrder>
@@ -363,7 +344,6 @@ public static class VehicleSpike
             return live ? PlayStationary(v, sd) : 0;
         }
 
-        // The drive.
         var orders = new List<DriveOrder>
         {
             new(DriverAction.Off, 0.6f),
@@ -398,12 +378,8 @@ public static class VehicleSpike
     }
 
     /// <summary>
-    /// The car parked six metres in front of the listener, revved in neutral.
-    ///
-    /// Deliberately stripped: no movement, so no Doppler; no tyres, because it is not rolling; and
-    /// only two emitters, exhaust behind and intake in front. What is left is the engine, which is the
-    /// only condition in which small changes to the synthesis can actually be judged. A drive-by
-    /// changes distance, direction, Doppler and tyre noise all at once, and buries the thing under test.
+    /// The car parked six metres in front of the listener, revved in neutral: no Doppler, no tyres, two
+    /// emitters, so small changes to the synthesis can be judged; a drive-by changes everything at once.
     /// </summary>
     private static int PlayStationary(VehicleProfile v, string dir)
     {
@@ -414,8 +390,7 @@ public static class VehicleSpike
             provider.UpdateListener(Ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
             for (int i = 0; i < 25; i++) { provider.Update(); Thread.Sleep(8); }
 
-            // Six metres ahead, facing away, so the exhaust is the near end — which is how you would
-            // stand behind a car someone is revving.
+            // Six metres ahead, facing away, the exhaust the near end, as behind a car being revved.
             var body = new Vector3(0f, 0.55f, 6f);
             Console.WriteLine("\n  LIVE. HEADPHONES. Parked six metres in front of you, facing away.\n");
             Console.WriteLine("    exhaust at the back (nearest you), intake at the front");
@@ -461,12 +436,8 @@ public static class VehicleSpike
     }
 
     /// <summary>
-    /// Drives the rendered car along the road past the listener.
-    ///
-    /// The three buffers start together and are then moved, every frame, to where that part of the car
-    /// actually is. Doppler, distance, air absorption and the building reflections all come from the
-    /// engine's ordinary spatial path — the same one the gunshots use — because the car is not a
-    /// special case, it is three emitters that happen to be moving.
+    /// Drives the rendered car past the listener: its three buffers moved every frame to where each part
+    /// is, Doppler, distance, air and reflections all from the ordinary spatial path.
     /// </summary>
     private static int Play(VehicleProfile v, VehicleRender render, string dir)
     {
@@ -477,15 +448,9 @@ public static class VehicleSpike
             provider.UpdateListener(Ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
             for (int i = 0; i < 25; i++) { provider.Update(); Thread.Sleep(8); }
 
-            // Lay the drive out in space so every phase happens within earshot.
-            //
-            // Driven as one straight line the car simply left: the second pass and the pull-up
-            // happened five hundred metres away, which is correct arithmetic and a useless demo. So
-            // the drive is two legs. The first comes up the road, passes, and carries on away while
-            // coasting; the turn happens out there where it is quiet and distant. The second comes
-            // BACK the other way, fast, and brakes to a halt beside the listener — which is why the
-            // start of that leg is computed from how far the car is about to travel rather than
-            // chosen: it has to end up here.
+            // Two legs, so every phase is within earshot: up the road, past and away while coasting (the
+            // turn out there), then back fast to halt beside the listener; the second leg's start is
+            // worked back from how far it travels so it ends here.
             const float LaneX = 0f;
             const float ParkedZ = -38f;
             const float RestZ = -9f;
@@ -509,9 +474,7 @@ public static class VehicleSpike
 
             var parts = new (string File, float OffsetZ, float Db, string What)[]
             {
-                // An aftermarket V8 exhaust measures around 110 dB at a metre under load — it is one
-                // of the loudest things on an ordinary street. 96 was far too modest and left it sitting
-                // under the tyres.
+                // An aftermarket V8 exhaust measures around 110 dB at a metre under load.
                 ("v8_exhaust.wav", v.ExhaustOffsetZ, 110f, "exhaust, at the back"),
                 ("v8_intake.wav",  v.IntakeOffsetZ,   97f, "intake and engine bay, at the front"),
                 ("v8_tyres.wav",   v.RearAxleZ,       v.Tyres.ReferenceDb, "tyres, at the axles"),
@@ -555,8 +518,7 @@ public static class VehicleSpike
                 int sample = Math.Clamp((int)(t * render.SampleRate), 0, render.Distance.Length - 1);
                 var body = Body(sample);
 
-                // Velocity from the PATH, so Doppler is the car's own motion — including its sign, so
-                // the shift inverts correctly when it turns round and comes back the other way.
+                // Velocity from the path, so Doppler inverts when it turns round.
                 var vel = (body - lastBody) / MathF.Max(1e-4f, t - lastT);
                 lastBody = body; lastT = t;
                 if (vel.Length() > 90f) vel = Vector3.Zero;      // the one frame across the turn

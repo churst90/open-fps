@@ -4,26 +4,10 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// What the reflection simulation says about a place, measured across places that differ only in how
-/// enclosed they are.
-///
-/// Written for a fault found in a live session (2026-09-18): standing on the speedway's front straight
-/// the geometry reverb read 200 to 1579 ms and swung by more than a second while the listener stood
-/// still, where the infield reads a correct 101 ms. Outdoors, beside two walls, that is a cathedral.
-///
-/// The question this answers is not "is the RT60 too long" — it is "does the RT60 mean anything here".
-/// Steam Audio's parametric estimator fits an exponential decay to the energy its rays brought back.
-/// In a room that is a real measurement. In the open, where a handful of rays return off one wall and
-/// the rest fly away for ever, the fit is made on noise: it will report SOME time, and it has no way to
-/// say that there was nothing to fit. What DOES know the difference is how enclosed the place is, which
-/// is measured from the geometry rather than inferred from a curve — so this prints both, for a ladder
-/// of places from an empty field to a sealed box, and the two columns are the whole argument.
-///
-/// (Steam Audio's reflections output carries an <c>eq</c> triple that looks like the energy this needs.
-/// It was bound and measured here: on the parametric path it is zero everywhere, field and sealed room
-/// alike. That is why the second column is a geometric measure and not that one.)
-///
-/// Run: <c>AudioLab --sim-reverbfield</c>. Headless, no ears, no server.
+/// --sim-reverbfield: the reflection simulation's RT60 beside the geometry's enclosure, for places from
+/// an empty field to a sealed box. Outdoors the parametric fit is made on noise and reports some time
+/// anyway (200 to 1579 ms on the speedway straight); enclosure knows the difference. Headless.
+/// docs/AUDIOLAB_NOTES.md, "The simulator's reverb outdoors".
 /// </summary>
 public static class SimReverbFieldSpike
 {
@@ -41,8 +25,8 @@ public static class SimReverbFieldSpike
 
         var q = Quaternion.Identity;
 
-        // A speedway straight, to the dimensions the generator actually produces: a 3.5 m outer wall,
-        // a 0.9 m pit wall about twenty metres inside it, and a grandstand deck behind the outer wall.
+        // A speedway straight as the generator builds it: a 3.5 m outer wall, a 0.9 m pit wall about
+        // twenty metres inside it, and a grandstand deck behind the outer wall.
         var floor     = new SteamAudioScene.Box(new Vector3(0, -0.25f, 0), new Vector3(400, 0.5f, 400), q, "Grass");
         var pitWall   = new SteamAudioScene.Box(new Vector3(0, 0.45f, 0), new Vector3(90, 0.9f, 0.4f), q, "Concrete");
         var outerWall = new SteamAudioScene.Box(new Vector3(0, 1.75f, -22), new Vector3(90, 3.5f, 0.6f), q, "Concrete");
@@ -132,9 +116,7 @@ public static class SimReverbFieldSpike
         IntPtr s = sim.AcquireSource();
         sim.SetSourceInputs(s, listener);
         sim.SetListener(listener);
-        // The reflection estimate is a running one — it accumulates across runs — so a single run reads
-        // whatever the first batch of rays happened to find. The worker does the same thing over time;
-        // here we just do it up front.
+        // The estimate accumulates across runs, as in the worker over time; one run is the first rays' luck.
         for (int i = 0; i < 12; i++) sim.Run();
         var r = sim.GetReverb(s);
         sim.Dispose();

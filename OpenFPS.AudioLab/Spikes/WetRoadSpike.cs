@@ -12,21 +12,15 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --wet-roads: tyres on wet roads (RoadWater, WetTyres; docs/WET_ROADS.md), measured and played
-/// through the game.
-///
-///   --wet-roads water
-///        the road's water at each rain class (texture, sheet in the wheel paths, gutter spread,
-///        puddles), how it drains and dries after rain, and the grip it leaves a car and a bus
-///   --wet-roads levels out=DIR [cars=i4_midsize,transit_bus] [sec=6]
-///        one vehicle's whole voice alone at a metre (no lift, no law, no HRTF), held at 30, 50 and
-///        80 km/h on a dry road, a damp one and the water of light, moderate and heavy rain: one mono
-///        float WAV each (pascals x 0.05) and levels.csv, for tools/wet_roads.py
-///   --wet-roads game out=DIR [set=all|passby|bus|puddle|cabin|drying]
-///        the game's own path (ClientAudioSystem over the FMOD provider: HRTF, ear model, loudness law,
-///        the rain itself when it rains), each car a client entity whose wheels carry the water
-///        the server would send. Captured from the master in float (DIR/capture.post.wav) with
-///        DIR/segments.csv. No map: no walls, echoes or reverb; flat asphalt.
+/// --wet-roads: tyres on wet roads (RoadWater, WetTyres; docs/WET_ROADS.md).
+///   water   the road's water at each rain class (texture, wheel-path sheet, gutter spread, puddles), its
+///           draining and drying, and the grip it leaves a car and a bus.
+///   levels out=DIR [cars=i4_midsize,transit_bus] [sec=6]   one vehicle's whole voice at a metre (no lift,
+///           law or HRTF) at 30, 50 and 80 km/h, dry to heavy rain: mono float WAVs (pascals x 0.05) and
+///           levels.csv, for tools/wet_roads.py.
+///   game out=DIR [set=all|passby|bus|puddle|cabin|drying]   through ClientAudioSystem and the FMOD
+///           provider, the wheels carrying the server's water, captured to DIR/capture.post.wav with
+///           DIR/segments.csv. No map: flat asphalt, no walls, echoes or reverb.
 /// </summary>
 public static class WetRoadSpike
 {
@@ -410,8 +404,8 @@ public static class WetRoadSpike
             }
             if (set is "all" or "puddle")
             {
-                // After the rain: no rain falling, the road wet, the puddles full. One puddle at the kerb
-                // in front of the listener, 3 m long and reaching 1.4 m into the road, 20 mm at its deepest.
+                // After the rain, the puddles full: one at the kerb in front of the listener, 3 m long,
+                // reaching 1.4 m into the road, 20 mm deep.
                 var road = Settled(Rainfall.HeavyRate);
                 for (int k = 0; k < 12; k++) road.Step(0f, 0.05f, 10f);
                 Weather(0f, road);

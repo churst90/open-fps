@@ -6,14 +6,9 @@ using OpenFPS.Client.AudioEngine.Fmod;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// The siren, measured and written out.
-///
-///   --siren [preset ...] [sec=12]
-///
-/// Writes one WAV per mode per preset and reports what each one measures: the level against the
-/// spec figure, the band the horn leaves, and the sweep rate actually achieved. The last of those
-/// matters because a sweep is the whole identity of a mode — a "yelp" at the wrong rate is not a
-/// slightly-off yelp, it is a different siren — and it can be counted rather than judged.
+/// --siren [preset ...] [sec=20] | drive | voice: one WAV per mode per preset, each measured: level
+/// against the spec, the share in the horn's band, and the sweep rate achieved (a yelp at the wrong rate
+/// is a different siren).
 /// </summary>
 public static class SirenSpike
 {
@@ -27,9 +22,8 @@ public static class SirenSpike
         if (args.Contains("drive")) return Drive(args, seconds);
         if (args.Contains("voice")) return ThroughTheVoice(args, seconds);
 
-        // Which vehicles actually carry one, asked through the SAME registry the client asks —
-        // because a profile declaring a siren and the registry handing one back are two different
-        // facts, and the client only ever sees the second.
+        // Asked through the registry the client asks: a profile declaring a siren and the registry
+        // handing one back are different facts, and the client sees only the second.
         Console.WriteLine("\n  Vehicles carrying a siren head, via MachineRegistry:");
         int carried = 0;
         foreach (var id in MachineRegistry.Ids)
@@ -59,14 +53,8 @@ public static class SirenSpike
             var modes = key == "two_tone"
                 ? new[] { SirenMode.HiLo }
                 : new[] { SirenMode.Wail, SirenMode.Yelp, SirenMode.Phaser, SirenMode.HiLo };
-            // How much of what comes out is NOT a harmonic of what went in.
-            //
-            // This is the number that decides whether a sweep sounds like a sweep. Anything the
-            // oscillator makes above Nyquist folds back as a partial at an unrelated frequency,
-            // and during a sweep those aliases slide DOWN while the real harmonics slide up — heard
-            // as roughness on a slow wail and as stepping on a fast one. Held at a fixed frequency
-            // the aliases are still there and still off-harmonic, so they can be counted without
-            // the sweep confusing the measurement.
+            // Off-harmonic energy is aliasing: during a sweep aliases slide down while harmonics slide up,
+            // heard as roughness on a slow wail and stepping on a fast one. Held still, they can be counted.
             Console.WriteLine($"\n      off-harmonic energy held at {spec.SweepHighHz:F0} Hz: {AliasFloor(spec):F2} %");
             Console.WriteLine();
             Console.WriteLine("      mode      level dB   peak dB    low Hz   high Hz   sweeps/min   band 0.5-4k");
@@ -83,14 +71,11 @@ public static class SirenSpike
     }
 
 
-    /// <summary>
-    /// The share of the output that is not at a harmonic of the oscillator, per cent, with the
-    /// sweep held still at the top of its range. Alias products and nothing else live there.
-    /// </summary>
+    /// <summary>The share of the output off the oscillator's harmonics, per cent, the sweep held at the top
+    /// of its range: alias products and nothing else.</summary>
     private static float AliasFloor(SirenSpec spec)
     {
-        // Hi-lo holds a fixed note, so it is the mode that can be held: put its two tones at the
-        // top of the sweep range and the oscillator runs at a constant frequency.
+        // Hi-lo with both tones at the top of the sweep: the oscillator runs at a constant frequency.
         var held = spec with { HiLoLowHz = spec.SweepHighHz, HiLoRatio = 1f, HiLoHoldSeconds = 600f };
         var siren = new ElectronicSiren(held, Sr) { Mode = SirenMode.HiLo };
         for (int i = 0; i < Sr / 2; i++) siren.Step();
@@ -131,8 +116,7 @@ public static class SirenSpike
         var pa = new float[n];
         float lo = float.MaxValue, hi = 0f, peak = 0f;
         double sum = 0;
-        // Count sweeps by counting the turning points of the oscillator's own frequency, which is
-        // the honest way: it measures what came out, not what the spec asked for.
+        // Sweeps counted by the turning points of the oscillator's own frequency, not the spec's.
         int turns = 0; float prev = 0f; int dir = 0;
 
         for (int i = 0; i < Sr / 4; i++) siren.Step();          // let the gate come up
@@ -147,10 +131,8 @@ public static class SirenSpike
             float f = siren.Hz;
             if (f < lo) lo = f;
             if (f > hi) hi = f;
-            // A five-second wail moves its oscillator less than a hundredth of a hertz per sample,
-            // so a hundredth-hertz deadband sees a flat line and counts no sweeps at all — which is
-            // what the first run of this reported for the apparatus wail. The deadband only has to
-            // reject arithmetic noise.
+            // A five-second wail moves under a hundredth of a hertz per sample, so the deadband only
+            // rejects arithmetic noise; a 0.01 Hz one counted no sweeps on the apparatus wail.
             int d = f > prev + 1e-5f ? 1 : f < prev - 1e-5f ? -1 : dir;
             if (dir != 0 && d != 0 && d != dir) turns++;
             dir = d; prev = f;
@@ -168,8 +150,8 @@ public static class SirenSpike
         return (wav, db, peakDb, lo, hi, sweepsPerMin, band);
     }
 
-    /// <summary>What share of the energy is inside a band, per cent. A siren that is not almost all
-    /// between 500 Hz and 4 kHz is not going to be heard over a bus, whatever it measures.</summary>
+    /// <summary>The share of the energy inside a band, per cent. A siren not almost all between 500 Hz and
+    /// 4 kHz is not heard over a bus, whatever it measures.</summary>
     private static float BandShare(float[] x, float lo, float hi)
     {
         double all = 0, inside = 0;
@@ -190,16 +172,9 @@ public static class SirenSpike
 
 
     /// <summary>
-    /// The siren as the MAP drives it — `--siren drive [map=city] [track=downtown] [sec=]`.
-    ///
-    /// The gap this closes is the one that let a fault through: the bench renders a head held in
-    /// one mode and it sounded right, while on the map the same head was being switched between
-    /// modes by a controller reading a racing line, and it sounded wrong. A bench that cannot
-    /// reproduce how a thing is DRIVEN can only ever exonerate it.
-    ///
-    /// So this runs the real <see cref="SirenController"/> against the map's real racing line, at
-    /// the rate the audio system sees positions, and renders the head it commands. Prints where
-    /// every change happened, and writes a WAV of the lap.
+    /// --siren drive [map=city] [track=downtown] [sec=]: the real <see cref="SirenController"/> on the map's
+    /// racing line at the audio system's position rate, rendering the head it commands; prints every mode
+    /// change and writes the lap. The bench held one mode and sounded right while the map switched modes.
     /// </summary>
     private static int Drive(string[] args, float seconds)
     {
@@ -287,17 +262,9 @@ public static class SirenSpike
 
 
     /// <summary>
-    /// The siren rendered through the object the GAME uses — `--siren voice`.
-    ///
-    /// Every other mode here drives <see cref="ElectronicSiren"/> directly, and that has been
-    /// enough to exonerate a siren that was wrong on the map twice: once because the mode was
-    /// being switched by a controller reading a racing line, and once because the whole server was
-    /// a day old. Neither was visible from a bench that instantiated the synthesiser itself.
-    ///
-    /// So this goes through <see cref="SirenVoiceState"/> — the real voice, with the real
-    /// full-scale reference derived from the spec's own level, the real per-block Control() tick,
-    /// the real ring buffer and the real soft ceiling — and reports what comes out of it. If this
-    /// and `--siren` disagree, the fault is in the voice and not in the model.
+    /// --siren voice: the siren through the game's <see cref="SirenVoiceState"/> (its full-scale
+    /// reference, per-block Control(), ring buffer and soft ceiling) rather than
+    /// <see cref="ElectronicSiren"/> directly. If this and plain --siren disagree, the fault is the voice's.
     /// </summary>
     private static int ThroughTheVoice(string[] args, float seconds)
     {
@@ -319,7 +286,6 @@ public static class SirenSpike
             voice.TargetMode = (int)mode;
             int n = (int)(seconds * Sr);
             var buf = new float[1024];
-            // Let the voice prime and the gate come up.
             for (int i = 0; i < Sr / 1024; i++) { voice.Produce(); voice.Consume(buf); }
 
             var outp = new float[n];
@@ -339,7 +305,7 @@ public static class SirenSpike
             foreach (float x in outp) { sum += (double)x * x; peak = MathF.Max(peak, MathF.Abs(x)); }
             float db = 20f * MathF.Log10(MathF.Max(1e-9f, MathF.Sqrt((float)(sum / n)) * scale) / 20e-6f);
 
-            // The square test, on the voice's own output, held at mid-sweep by using a long window.
+            // The off-harmonic test on the voice's output, held at mid-sweep.
             var hold = spec with { HiLoLowHz = 900f, HiLoRatio = 1f, HiLoHoldSeconds = 600f };
             var probe = new SirenVoiceState(hold, Sr) { Running = true, TargetMode = (int)SirenMode.HiLo };
             var pb = new float[1024];

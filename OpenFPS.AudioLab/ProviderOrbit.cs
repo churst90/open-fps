@@ -6,18 +6,14 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// Drives the REAL FmodAudioProvider headless under load, to reproduce faults on the mixer thread:
-/// voices, machines, aircraft and reverb buses made and released while the listener moves, and
-/// probes of what FMOD itself does when a channel or a send is torn down. See
-/// docs/THE_MIXER_THREAD_CRASH.md.
+/// The real FmodAudioProvider driven headless under load, and raw-FMOD probes of channel and send
+/// teardown, to reproduce faults on the mixer thread (docs/THE_MIXER_THREAD_CRASH.md).
 /// </summary>
 public static class ProviderOrbit
 {
     /// <summary>
-    /// Stress test: rapidly create and stop many transient spatial voices (footsteps + reflections)
-    /// while the FMOD mixer thread runs the Steam Audio DSP callbacks — reproducing the native crash
-    /// seen in-game when moving near walls (voice create/release churn racing the mixer callback).
-    /// Headless: survives `seconds` and prints a count, or crashes (segfault / heap corruption).
+    /// --provider-churn: transient voices (footsteps and reflections) created and stopped fast against
+    /// the Steam Audio callbacks. Survives <paramref name="seconds"/> and prints a count, or crashes.
     /// </summary>
     public static int RunChurn(double seconds = 12.0)
     {
@@ -42,11 +38,9 @@ public static class ProviderOrbit
 
         while (sw.Elapsed.TotalSeconds < seconds)
         {
-            // Burst of new voices (some flagged as reflections, like the in-game wall bounces).
             for (int k = 0; k < 10; k++) { provider.PlaySpatialSound(MakeVoice(++id, k % 2 == 0)); created++; }
             provider.Update();
             Thread.Sleep(4);
-            // Stop a batch of older voices to force release churn against the live mixer callbacks.
             for (int k = 0; k < 10; k++) provider.StopSound(id - 20 - k);
             provider.Update();
             Thread.Sleep(4);
@@ -59,17 +53,10 @@ public static class ProviderOrbit
     }
 
     /// <summary>
-    /// The same churn, against the PHYSICAL voices — standing machines and aircraft.
-    ///
-    /// Written because the client died three seconds after the first aircraft voice started on the
-    /// city, and rendering the same models offline did not fault: so whatever it is lives in the
-    /// plumbing between the model and the mixer, not in the model. That is exactly what this file
-    /// exists to exercise, and doing it headlessly is the difference between a bug you can bisect
-    /// and a bug somebody has to keep walking into.
-    ///
-    /// It creates every preset at once, at the distances and ranges the map really uses — an
-    /// airliner a kilometre away with a three-kilometre range, a window unit at arm's length — moves
-    /// them, and takes them away again.
+    /// --physical-churn: every machine and aircraft preset at once, at the distances and ranges the
+    /// map uses (an airliner a kilometre off, a window unit at arm's length), moved and retired. The
+    /// client died three seconds after its first aircraft voice while offline renders did not, so the
+    /// fault was in the plumbing between model and mixer.
     /// </summary>
     public static int RunPhysicalChurn(double seconds = 12.0)
     {
@@ -115,8 +102,7 @@ public static class ProviderOrbit
             foreach (string k in aircraft) { provider.PlaySpatialSound(Make(++id, k, flying: true)); created++; }
             provider.Update();
             Thread.Sleep(8);
-            // Move them, the way the game does every frame — PlaySpatialSound is both the create and
-            // the update, and a flying source covers ground fast between two of them.
+            // PlaySpatialSound is both the create and the update, as in the game.
             for (int back = 7; back >= 0; back--)
             {
                 int eid = id - back;
@@ -127,7 +113,6 @@ public static class ProviderOrbit
             }
             provider.Update();
             Thread.Sleep(8);
-            // ...and retire the older ones, so creation and release overlap against a live mixer.
             for (int k = 0; k < 8; k++) provider.StopSound(id - 16 - k);
             provider.Update();
             Thread.Sleep(8);
@@ -140,18 +125,9 @@ public static class ProviderOrbit
     }
 
     /// <summary>
-    /// ONE QUESTION, ASKED OF FMOD DIRECTLY: when a Channel ENDS ON ITS OWN, is a DSP that was
-    /// added to it still attached afterwards?
-    ///
-    /// Everything about the city crash hangs on the answer and it was being assumed rather than
-    /// measured. If FMOD detaches the unit itself, then `removeDSP` failing with
-    /// ERR_INVALID_HANDLE on a finished voice is harmless and the pooled DSP is clean. If it does
-    /// NOT, then every pooled DSP that outlived its channel is permanently attached to a retired
-    /// Channel object, there is no call left that can free it, and re-using it wires a live voice to
-    /// a corpse — which is what the mixer is walking when it reads a null at 0x7c.
-    ///
-    /// No provider, no acoustics, no engine: raw FMOD, one sound, one DSP, and the state of the
-    /// graph printed before and after.
+    /// --ended-channel: raw FMOD, one sound, one DSP. When a channel ends on its own, is a DSP added to
+    /// it still attached? If so, a pooled DSP that outlived its channel can never be freed and reusing
+    /// it wires a live voice to a retired channel. Prints the graph before and after.
     /// </summary>
     public static int RunEndedChannelProbe()
     {
@@ -191,7 +167,7 @@ public static class ProviderOrbit
         for (int i = 0; i < 4; i++) { sys.update(); Thread.Sleep(10); }
         Report("while playing");
 
-        // Let it FINISH. No stop() — that is the whole point.
+        // No stop(): the channel must end on its own.
         for (int i = 0; i < 60; i++) { sys.update(); Thread.Sleep(10); }
         var playing = ch.isPlaying(out bool isPlaying);
         Console.WriteLine($"  isPlaying -> {isPlaying} ({playing})");
@@ -218,20 +194,9 @@ public static class ProviderOrbit
     }
 
     /// <summary>
-    /// Voices that END ON THEIR OWN, which is the one thing none of the other harnesses did.
-    ///
-    /// Every churn in this file stops its voices by calling StopSound, and StopSound stops the
-    /// channel itself. That is the SAFE path, and it is why 42,000 voices never reproduced a crash
-    /// the client hit in sixteen seconds.
-    ///
-    /// The game's commonest voice is a one-shot — a footstep, a door, a wall reflection — which
-    /// nobody stops, because it simply finishes. FMOD then retires and RECYCLES that channel, so by
-    /// the time the reaper sees `isPlaying == false` the channel handle is already stale and every
-    /// pooled DSP hung on it (binaural, three-band EQ, diffraction) can no longer be removed from
-    /// it. The client said so once the counter existed: nineteen in one five-second report.
-    ///
-    /// So this plays short PCM one-shots, at a rate, and NEVER stops one. The only way a voice
-    /// leaves here is by ending — which is the path that was broken.
+    /// --reap-churn: short PCM one-shots that are never stopped, so every voice leaves by ending and
+    /// is collected by the reaper. StopSound is the safe path the other churns take; by the time the
+    /// reaper sees a finished one-shot, FMOD has recycled its channel and the pooled DSPs on it are stale.
     /// </summary>
     public static int RunReapChurn(double seconds = 20.0)
     {
@@ -239,8 +204,7 @@ public static class ProviderOrbit
         if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
         provider.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
 
-        // A 90 ms burst of noise with a short decay: a footstep's shape, and short enough that a
-        // voice is born and reaped several times a second.
+        // A footstep's shape, short enough that a voice is born and reaped several times a second.
         const int Rate = 44100, Len = Rate * 90 / 1000;
         var pcm = new byte[Len * 2];
         var noise = new Random(7);
@@ -267,15 +231,14 @@ public static class ProviderOrbit
                     Volume = 0.2f,
                     Position = new Vector3(rnd.Next(-9, 9), rnd.Next(-2, 3), 1 + rnd.Next(12)),
                     Range = 60f, MinDistance = 1f, IsEvent = true,
-                    // Half of them as reflections, because a wall bounce is a one-shot too and
-                    // carries the diffraction DSP the direct sound does not.
+                    // A reflection carries the diffraction DSP the direct sound does not.
                     IsReflection = k % 2 == 0,
                 });
                 created++;
             }
             provider.Update();
             Thread.Sleep(5);
-            // The listener moves, so region routing and the reverb sends churn underneath as well.
+            // The listener moves, so region routing and the reverb sends churn too.
             provider.UpdateListener(new Vector3(MathF.Sin((float)sw.Elapsed.TotalSeconds) * 5f, 0,
                                                 MathF.Cos((float)sw.Elapsed.TotalSeconds) * 5f),
                                     Quaternion.Identity, Vector3.Zero, -1);
@@ -290,27 +253,14 @@ public static class ProviderOrbit
     }
 
     /// <summary>
-    /// The whole scene at once: engines, machines, aircraft and region reverb buses, created and
-    /// released against a live mixer while the listener walks.
-    ///
-    /// Written after two client crashes that both landed on the SAME instruction — the line
-    /// immediately after "voice started", once for an aircraft and once for a diesel. A voice being
-    /// born in a busy scene is the only thing the two have in common, and neither the physical churn
-    /// (no engines, no buses) nor the reverb churn (no voices being made) reproduces it. This has
-    /// all of it running together, which is what the city is.
+    /// --scene-churn: engines, machines, aircraft and region reverb buses created and released while
+    /// the listener walks, all at once as on the city; two client crashes landed just after "voice
+    /// started" in a busy scene, which neither the physical nor the reverb churn alone reproduced.
     /// </summary>
     public static int RunSceneChurn(double seconds = 30.0)
     {
-        // EVERYTHING THE GAME HAS ON THE MASTER BUS, which the first version of this did not.
-        //
-        // The client crashes on FMOD's mixer thread and this harness would not reproduce it at
-        // 28,000 voices, so what it was missing mattered more than what it had. Two units run in
-        // every real session and in none of these runs: the CAPTURE TAP, which writes a WAV from
-        // inside the mixer callback (Cody's sessions are all `run-gtk-client.sh capture`), and the
-        // BOUNDARY unit, which is on the master bus and processes every block of the whole mix
-        // against a delay line driven by the near-field probes.
-        //
-        // Both are now on, and the probes are moved every tick the way walking moves them.
+        // Everything the game has on the master bus: the capture tap (Cody's sessions all run
+        // `run-gtk-client.sh capture`) and the boundary unit, whose delay line the near-field probes drive.
         string cap = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE")
                      ?? Path.Combine(Path.GetTempPath(), "openfps-churn-capture.wav");
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", cap);
@@ -375,13 +325,11 @@ public static class ProviderOrbit
         while (sw.Elapsed.TotalSeconds < seconds)
         {
             step++;
-            // The listener walks, which is what changes which rooms and which sources are in play.
             float t = (float)sw.Elapsed.TotalSeconds;
             provider.UpdateListener(new Vector3(MathF.Sin(t * 0.3f) * 250f, 1.8f, t * 12f - 150f),
                                     Quaternion.Identity, new Vector3(0, 0, 1.4f), 9000 + (step % regions));
 
-            // The near-field probes, moved every tick — this is what drives the boundary DSP's delay
-            // line, and a delay that glides is the part with arithmetic in it.
+            // Moved every tick: a gliding delay is the boundary DSP's arithmetic.
             var probes = new BoundaryProbe[6];
             for (int b = 0; b < probes.Length; b++)
             {
@@ -397,8 +345,7 @@ public static class ProviderOrbit
             foreach (string k in physical) { provider.PlaySpatialSound(Make(++id, k, rnd.Next(regions))); created++; }
             provider.Update();
             Thread.Sleep(6);
-            // Move everything that is still alive, then retire the oldest — creation, movement and
-            // release all overlapping, which is the state the client is in while you walk.
+            // Creation, movement and release overlapping, as while you walk.
             for (int back = 0; back < 15; back++)
             {
                 int eid = id - back;
@@ -421,17 +368,10 @@ public static class ProviderOrbit
     }
 
     /// <summary>
-    /// Reverb SENDS on voices that END ON THEIR OWN, re-routed every update.
-    ///
-    /// --reap-churn has one-shots ending on their own, but it hands the provider region -1 and no
-    /// acoustic map, so UpdateReverbRouting returns at its first line and no voice in it has ever
-    /// had a send. The client's voices all do: two SEND connections from the channel's own FADER
-    /// into the room buses, torn down and re-made whenever the listener changes room — which /tp
-    /// does for every voice in one frame. A send is an FMOD-owned connection whose input end is a
-    /// DSP FMOD frees when the channel finishes, so this is the one place the game hands FMOD a
-    /// handle it no longer owns.
-    ///
-    /// Rooms, one-shots into them, and the listener's region flipped every update.
+    /// --send-churn: reverb sends on one-shots that end on their own, re-routed as the listener's region
+    /// flips every update. Each voice has two sends from its fader into the room buses, re-made on every
+    /// room change (/tp does all voices in one frame); FMOD frees the fader when the channel finishes,
+    /// so a send is a handle the game may no longer own. --reap-churn has no map, so no sends.
     /// </summary>
     public static int RunSendChurn(double seconds = 30.0, bool flip = true, bool ownRoom = false)
     {
@@ -452,10 +392,9 @@ public static class ProviderOrbit
         }
         if (ownRoom)
         {
-            // The city names the outdoors as a region of its own, so the GLOBAL id has a bus — and
-            // that is what a stale region id resolves to. Without this entry TryGetReverbInput(-1)
-            // is false and the wrong-bus disconnect is skipped, which is why the first run of this
-            // survived. See the note on DropSend.
+            // The city's outdoors is a region, so the global id has a bus, and a stale region id
+            // resolves to it. Without it TryGetReverbInput(-1) is false and the wrong-bus disconnect
+            // (see DropSend) never happens.
             map.Regions[AcousticConstants.GlobalRegionId] = new OpenFPS.Common.Components.RegionComponent
             {
                 FriendlyName = "Outside", IsIndoor = false,
@@ -489,11 +428,9 @@ public static class ProviderOrbit
         while (sw.Elapsed.TotalSeconds < seconds)
         {
             step++;
-            // ownRoom: the city's shape. The listener is sometimes OUTDOORS (region -1, which has a bus
-            // of its own in a city), and most one-shots are in the listener's OWN room — footsteps,
-            // for one — so a voice's cross-send and source-send point at the same bus, and the
-            // listener then walks out. Without it, the listener is always in some room and every
-            // source is in a random one, which is what the first run of this survived.
+            // ownRoom: the city's shape. The listener is sometimes outdoors (region -1, with a bus of
+            // its own) and most one-shots are in the listener's own room, so a voice's cross-send and
+            // source-send point at the same bus until the listener walks out.
             int listenerRegion;
             if (ownRoom) listenerRegion = (step % 16 < 4) ? -1 : 9000 + rnd.Next(regions);
             else listenerRegion = 9000 + (flip ? rnd.Next(regions) : 0);
@@ -529,15 +466,10 @@ public static class ProviderOrbit
     }
 
     /// <summary>
-    /// The same thing with no provider in the way: FMOD alone, a reverb unit on a bus, short
-    /// one-shots each with a SEND from its fader into the unit, and the game thread doing what the
-    /// client does — fetch the fader, disconnect the send it stored last time, make a new one — as
-    /// fast as it can, so that the window between "the channel was alive when I asked" and "the
-    /// mixer applied what I queued" is hit as often as possible.
-    ///
-    /// mode: "client" = disconnectFrom the stored connection (what the game does);
-    ///       "forget" = never disconnect, just drop the handle and add a new send;
-    ///       "stop"   = stop the channel ourselves before its sound ends (the safe path).
+    /// --send-window: raw FMOD, short one-shots each sending into a reverb unit, re-routed as fast as the
+    /// game thread can, to hit the window between "the channel was alive when I asked" and "the mixer
+    /// applied what I queued". <paramref name="mode"/>: "client" disconnects the stored connection (as
+    /// the game does), "forget" drops the handle and adds a new send, "stop" stops the channel first.
     /// </summary>
     public static int RunSendWindowProbe(double seconds = 20.0, string mode = "client")
     {
@@ -568,7 +500,7 @@ public static class ProviderOrbit
             sys.createSound(pcm, FMOD.MODE.OPENMEMORY | FMOD.MODE.OPENRAW | FMOD.MODE.LOOP_OFF, ref info, out sounds[k]);
         }
 
-        // Three room buses, each a group with a reverb unit at its tail — the client's shape.
+        // Three room buses, each a group with a reverb unit at its tail, as in the client.
         sys.getMasterChannelGroup(out var master);
         var buses = new FMOD.ChannelGroup[3]; var reverbs = new FMOD.DSP[3];
         for (int b = 0; b < 3; b++)
@@ -578,7 +510,7 @@ public static class ProviderOrbit
             sys.createDSPByType(FMOD.DSP_TYPE.SFXREVERB, out reverbs[b]);
             buses[b].addDSP(FMOD.CHANNELCONTROL_DSP_INDEX.TAIL, reverbs[b]);
         }
-        // A pool of EQ units on each voice's head, the way the client pools its three-band EQ.
+        // Pooled EQ units on each voice's head, as the client pools its three-band EQ.
         var pool = new Stack<FMOD.DSP>();
         for (int i = 0; i < 128; i++) { sys.createDSPByType(FMOD.DSP_TYPE.THREE_EQ, out var d); pool.Push(d); }
 
@@ -609,7 +541,7 @@ public static class ProviderOrbit
                     continue;
                 }
                 if (mode == "stop" && rnd.Next(4) == 0) { chans[i].stop(); continue; }
-                // Re-route, the way UpdateReverbRouting does when the listener changes room.
+                // As UpdateReverbRouting does when the listener changes room.
                 var gr = chans[i].getDSP(FMOD.CHANNELCONTROL_DSP_INDEX.FADER, out var fader);
                 if (gr != FMOD.RESULT.OK || !fader.hasHandle()) { staleGetDsp++; continue; }
                 if (conns[i].hasHandle())
@@ -639,16 +571,9 @@ public static class ProviderOrbit
     }
 
     /// <summary>
-    /// ONE foreign disconnect, on purpose, and what it does to FMOD's bookkeeping.
-    ///
-    /// A send from a voice's fader into reverb A is disconnected by asking reverb B to do it —
-    /// `B.disconnectFrom(fader, connectionIntoA)` — which is what DropSend does when the bus it is
-    /// handed is not the bus the connection was made into. FMOD's queued disconnect checks only that
-    /// the connection's source is the fader, then unlinks the node from whichever list it is in (A's)
-    /// and decrements the count on the unit it was told (B's). A is then one short in its list and
-    /// not in its count; the next honest disconnect on A takes the count to 1 with an empty list, and
-    /// the cache recompute at the end of DSPI::disconnectFrom dereferences the list head's null owner
-    /// at offset 0x7c. That is the crash in every dump.
+    /// --foreign-disconnect: a send into reverb A disconnected through reverb B on purpose, as DropSend
+    /// did with the wrong bus. FMOD unlinks the node from A's list but decrements B's count; the next
+    /// honest disconnect on A reads a null owner at 0x7c. Dies by design (docs/THE_MIXER_THREAD_CRASH.md).
     /// </summary>
     public static int RunForeignDisconnectProbe()
     {
@@ -684,8 +609,7 @@ public static class ProviderOrbit
         Tick();
         var r1 = reverbA.addInput(fader1, out var c1, FMOD.DSPCONNECTION_TYPE.SEND);
         var r2 = reverbA.addInput(fader2, out var c2, FMOD.DSPCONNECTION_TYPE.SEND);
-        // B must have a send of its own: DSPI::disconnectFrom returns early when the unit it is
-        // called on has no inputs at all, which is the one case the first version of this tested.
+        // B needs a send of its own: DSPI::disconnectFrom returns early on a unit with no inputs.
         var r0 = reverbB.addInput(fader3, out _, FMOD.DSPCONNECTION_TYPE.SEND);
         Tick(); Report($"two sends into A, one into B ({r1},{r2},{r0})");
         // What DropSend's guard relies on: one update after addInput, the connection knows its owner.
@@ -707,17 +631,11 @@ public static class ProviderOrbit
     }
 
     /// <summary>
-    /// Does anything FMOD does to a channel leave a reverb unit's input COUNT above its input LIST?
-    ///
-    /// The crash state in every dump is a reverb unit with numInputs == 1 and an empty input list.
-    /// An honest disconnect keeps the two together, so something earlier took a send OUT of the list
-    /// without touching the count. Each scenario here tears a sending channel down one way, then
-    /// springs the trip-wire: one honest send added to and removed from the same unit. If the count
-    /// had drifted, that removal is the crash.
-    ///
-    /// scenario: 1 = the channel ends on its own; 2 = stop(); 3 = removeDSP of a head unit while
-    /// the send exists; 4 = the channel goes VIRTUAL (software channels exhausted) and comes back;
-    /// 5 = the channel goes virtual and is stopped while virtual; 6 = channel group release.
+    /// --send-drift scenario=N: does any channel teardown leave a reverb unit's input count above its
+    /// input list (the crash state: numInputs 1, list empty)? Each scenario tears a sending channel down
+    /// one way, then one honest send is added to and removed from the unit; a drifted count crashes there.
+    /// <paramref name="scenario"/>: 1 ends on its own, 2 stop(), 3 removeDSP of a head unit while the
+    /// send exists, 4 goes virtual and comes back, 5 goes virtual and is stopped, 6 group release.
     /// </summary>
     public static int RunSendDriftProbe(int scenario)
     {

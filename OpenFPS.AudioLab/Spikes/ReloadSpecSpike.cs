@@ -3,16 +3,10 @@ using System.Text;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// The handling noises of a gun, measured: the spec <see cref="OpenFPS.Common.WeaponHandling"/> is
-/// synthesised to, and the same measurement run over what it renders.
-///
-///   --reload-spec [refs=DIR] [only=TEXT]          the recordings (inbox/weapons), measured
-///   --reload-sounds [out=DIR]                     every reload and dry fire, rendered and measured
-///
-/// The recordings are a SPEC and nothing else: nothing here is played or shipped. For each file it
-/// finds the separate contacts (a release, a magazine seating, a bolt going home), and says for each
-/// when it came, how loud it was against the loudest, how long it took to fall 20 dB, and its octave
-/// bands against its own loudest band. Those are the numbers the synthesis is fitted to.
+/// --reload-spec [refs=DIR] [only=TEXT] measures the handling recordings (inbox/weapons) that
+/// <see cref="OpenFPS.Common.WeaponHandling"/> is fitted to; --reload-sounds [out=DIR] measures its
+/// renders the same way. The recordings are a spec only, never played or shipped. Per contact (a release,
+/// a magazine seating, a bolt home): time, level against the loudest, 20 dB fall, octave bands.
 /// </summary>
 public static class ReloadSpecSpike
 {

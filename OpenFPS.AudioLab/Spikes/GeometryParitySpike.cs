@@ -12,24 +12,14 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// The parity harness for geometry stage 1 (docs/GEOMETRY.md 7): the old box path and the triangle world
-/// run side by side on a real map over thousands of probes, and every answer that differs by more than
-/// float rounding is listed, with what it was. The gate for switching each consumer over.
-///
-///   --geometry-parity [map=city] [n=4000] [seed=1] [only=rays,ground,overlap,steps,enclosure,occlusion,bullets,collision,determinism]
-///                     [show=12] [times=1]
-///
-/// Stage 2 (docs/GEOMETRY.md 10) adds: capsule (the stage 2 body and the grade against the cylinder, steps
-/// and walks), echoes (EarlyReflections over the box list and the acoustic triangle world, in woods too),
-/// engineechoes (EngineReflections' legs against every box and the tree), sightgrid (the sight's own index
-/// and the triangle world), ricochet (a round's face from the box's axis and from the triangle), and
-/// routes, tracks as before. Debugging: capsuledebug, walkdebug, stepdebug=x,y,z,ix,iz[,vx,vy,vz,sprint].
-///
-/// Both paths are the game's own code: the server's grid with and without its triangle world, and the
-/// client's SpatialService over a snapshot with and without one. Old and new are asked the same thing
-/// from the same state, one probe at a time, so a difference is a difference in the answer and never in
-/// what happened before it. Tolerances: distances and heights 1 mm (plus 1e-5 of the distance), normals
-/// 0.001 rad, band gains 1e-4 relative.
+/// --geometry-parity [map=city] [n=4000] [seed=1] [show=12] [times=1]
+/// [only=rays,ground,overlap,steps,enclosure,occlusion,bullets,collision,determinism]: the box path and the
+/// triangle world side by side on a real map over thousands of probes, every answer that differs by more
+/// than float rounding listed; the gate for switching each consumer over (docs/GEOMETRY.md 7). Stage 2
+/// (docs/GEOMETRY.md 10) adds capsule, echoes, engineechoes, sightgrid, ricochet, routes and tracks;
+/// debugging: capsuledebug, walkdebug, raydebug=, stepdebug=x,y,z,ix,iz[,vx,vy,vz,sprint].
+/// Both paths are the game's own code, asked the same thing from the same state one probe at a time.
+/// Tolerances: distances and heights 1 mm (plus 1e-5 of the distance), normals 0.001 rad, band gains 1e-4.
 /// </summary>
 public static class GeometryParitySpike
 {
@@ -441,9 +431,8 @@ public static class GeometryParitySpike
 
                 if (i % 10 == 0)
                 {
-                    // Two bodies walking the same inputs, each on its own path: where do they part? And, for
-                    // scale, a third on the OLD path started a tenth of a millimetre aside: how often does
-                    // the box path part from itself over the same walk?
+                    // Two bodies walking the same inputs, one per path: where do they part? For scale, a third on
+                    // the box path a tenth of a millimetre aside: how often does it part from itself?
                     Vector3 a = p, av = Vector3.Zero, b = p, bv = Vector3.Zero, cc = p + new Vector3(1e-4f, 0, 0), cv = Vector3.Zero;
                     var dirNow = input;
                     float worst = 0f, worstControl = 0f; int partedAt = -1;
@@ -645,8 +634,7 @@ public static class GeometryParitySpike
                 var h = c.Size * 0.5f;
                 float edge = MathF.Min(MathF.Min(MathF.Abs(MathF.Abs(local.X) - h.X), MathF.Abs(MathF.Abs(local.Y) - h.Y)), MathF.Abs(MathF.Abs(local.Z) - h.Z));
                 int onFaces = (MathF.Abs(MathF.Abs(local.X) - h.X) < 0.01f ? 1 : 0) + (MathF.Abs(MathF.Abs(local.Y) - h.Y) < 0.01f ? 1 : 0) + (MathF.Abs(MathF.Abs(local.Z) - h.Z) < 0.01f ? 1 : 0);
-                // The face the round actually entered by is the one the ray crossed; the old guess picked the
-                // face nearest in proportion. Agreeing with the ray is the triangle's answer.
+                // The face the ray crossed is the one the round entered by; the box path guessed by proportion.
                 const string guess = "the box's largest axis named a face the round did not enter by (the triangle names the one it did)";
                 edges++;
                 t.Ties++; t.Same++; t.TiePairs[guess] = t.TiePairs.GetValueOrDefault(guess) + 1;
@@ -714,10 +702,9 @@ public static class GeometryParitySpike
                         }
                         t.MaxError = Math.Max(t.MaxError, worst);
                         if (missing == 0 && unmatched.Count == 0) { t.Same++; continue; }
-                        // A copy only the world has, off a surface laid flush on another: each leg of it begins
-                        // on the other one, which the box test counted as in its way (touching), so the list lost
-                        // both. Its legs, a tenth of a millimetre short at each end, are clear of every box. A copy
-                        // only the list has is then one the extra copy pushed out of the kept few.
+                        // A copy only the world has comes off a surface laid flush on another: the box test counted
+                        // the other as in its legs' way. Trimmed a tenth of a millimetre at each end they are clear;
+                        // a copy only the list has is then one it pushed out of the kept few.
                         bool LegsClearTrimmed(in EarlyReflections.Arrival x)
                         {
                             foreach (var (p, q) in new[] { (from, x.HitPoint), (x.HitPoint, ear) })
@@ -1082,9 +1069,8 @@ public static class GeometryParitySpike
             return;
         }
         CompareRoutes("Routes through openings (a whole build each way)", old, tiled, regionAt, new Random(5), n, show, tallies);
-        // The map writes a turn in six digits and it is not quite unit length; the box path's corners take
-        // it as it is (scaled by its length squared), the triangles make it unit first. With the box list's
-        // turns made unit, the box grid should answer as the tiles do.
+        // The map's six-digit turns are not quite unit length: the box path's corners scale by the length
+        // squared, the triangles normalise first. Made unit, the box grid should answer as the tiles do.
         var unitBoxes = boxes.Select(b => b with { Rotation = b.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(b.Rotation) }).ToList();
         var gridUnit = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, unitBoxes, regionAt);
         CompareRoutes("Box grid, turns made unit, against the tiles", gridUnit, tiled, regionAt, new Random(5), n, show, tallies);
@@ -1115,9 +1101,8 @@ public static class GeometryParitySpike
         OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
         Console.WriteLine($"  nothing changed: tile build {clock.Elapsed.TotalMilliseconds:F0} ms ({cache.Derived} derived, {cache.Kept} kept)");
         CompareRoutes("Routes through openings (after one tile changed)", oldAfter, tiledAfter, regionAt, new Random(6), n, show, tallies);
-        // The point of building tile by tile: kept and rebuilt, it answers as a build from nothing does.
-        // Both unasked: a graph keeps the legs it has worked out, coarsely by place, so one that has
-        // answered other questions first can answer this one from a neighbour's leg.
+        // Kept and rebuilt tile by tile, it must answer as a build from nothing. Both unasked: a graph
+        // keeps its legs coarsely by place, so one asked other questions first may answer from a neighbour's.
         var fresh = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, AcousticGeometry.FromBoxes(changed, data.TileMetres, leaves), null, new OpeningRoutes.TileCache());
         var kept = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
         CompareRoutes("Tile build after a change against a tile build from nothing", fresh, kept, regionAt, new Random(7), n, show, tallies, exact: true);

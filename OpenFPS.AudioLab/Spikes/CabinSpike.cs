@@ -14,28 +14,22 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --cabin: sitting in a vehicle, heard through the game (CabinPaths).
-///
-///   --cabin game out=DIR [paths=on|off] [set=all|car|bus|police|rain] [sec=10] [roof=world]
-///        the game's own path: ClientAudioSystem over the FMOD provider, the HRTF, the ear model, the
-///        loudness law, the cabin's traced reverberation (TracedReverbSet.RideIn; the vehicle's room,
-///        a trigger moving with it, as the server sends a vehicle shell's), on a street between brick
-///        facades 15 m tall, the rain when it rains. The listener sits where the server seats them
-///        (VehicleShell's rows: the driver on the left of the front row), the vehicle drives along a
-///        straight road with its wheels as the server sends them. Captured from the master in float
-///        (DIR/capture.post.wav) with DIR/segments.csv, for tools/interaural.py segments and
-///        tools/cabin.py. paths=off plays the interior from one point, as before 2026-10-06.
-///   --cabin model out=DIR [cars=i4_economy,transit_bus] [sec=8]
-///        the interior model alone, no HRTF, no mixer: the voice inside with every path summed
-///        (EngineVoiceState.Render carries the paths no tap is playing), paths on and off, one mono
-///        float WAV per condition, for the level check (tools/cabin.py model).
+/// --cabin: sitting in a vehicle (CabinPaths).
+///   game out=DIR [paths=on|off] [set=all|car|bus|police|rain] [sec=10] [roof=world] [place=one] [cabin=DB]
+///        [probe=align] [falling=0]   through ClientAudioSystem with the HRTF, ear model, loudness law and the
+///        cabin's traced reverberation (TracedReverbSet.RideIn), on a street between 15 m brick facades. The
+///        listener sits where the server seats them; the vehicle drives straight with its wheels as the server
+///        sends them. Captured to DIR/capture.post.wav with DIR/segments.csv (tools/interaural.py, tools/cabin.py).
+///        paths=off plays the interior from one point.
+///   model out=DIR [cars=i4_economy,transit_bus] [sec=8]   the interior model alone, no HRTF or mixer, every path
+///        summed, paths on and off, a mono float WAV each (tools/cabin.py model).
+///   hrtf out=DIR   the HRTF in each path's direction from each seat (tools/cabin.py hrtf).
 /// </summary>
 public static class CabinSpike
 {
     private const int Rate = 48000;
-    /// <summary>The street of the rides: brick facades 15 m tall either side, this far off the crown
-    /// (a 7 m road and a 4.5 m pavement each side), so the late field round the car is a street's, as on
-    /// the city, and not open ground's.</summary>
+    /// <summary>How far the rides' 15 m brick facades stand off the crown (a 7 m road, 4.5 m pavements), so
+    /// the late field round the car is a city street's, not open ground's.</summary>
     private const float FacadeZ = 8f;
     private static readonly byte Asphalt = RoadSurfaces.IndexOf("Asphalt");
 
@@ -49,7 +43,7 @@ public static class CabinSpike
         if (Arg(args, "cabin=") is { } cabinDb) FmodAudioProvider.CabinDb = float.Parse(cabinDb, CultureInfo.InvariantCulture);
         // probe=align: a click in the engine's voice and its negative in the exhaust's tap (EngineVoiceState.LabAlignProbe).
         if (Arg(args, "probe=") is "align") EngineVoiceState.LabAlignProbe = true;
-        // roof=world: the rain on the roof of the vehicle ridden left in the world, as before 2026-10-06.
+        // roof=world: the rain on the ridden vehicle's roof stays in the world rather than riding with the head.
         if (Arg(args, "roof=") is "world") RainField.RoofRidesWithHead = false;
         if (args.Contains("model")) return Model(args);
         if (args.Contains("hrtf")) return Hrtf(args);
@@ -129,10 +123,9 @@ public static class CabinSpike
     // ── The HRTF in each path's direction ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// --cabin hrtf out=DIR: Steam Audio's HRTF (as the game makes it) in the direction of every path
-    /// into the cabin from each seat of the renders, and in the one interior voice's: an impulse response
-    /// per direction (stereo float WAV) and hrtf.csv, for tools/cabin.py hrtf. What the directions do to
-    /// the level at the ears, apart from everything else.
+    /// --cabin hrtf out=DIR: the game's HRTF in the direction of every path into the cabin from each seat,
+    /// and the one interior voice's, as stereo float impulse responses and hrtf.csv (tools/cabin.py hrtf):
+    /// what the directions alone do to the level at the ears.
     /// </summary>
     private static int Hrtf(string[] args)
     {
@@ -208,8 +201,7 @@ public static class CabinSpike
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         Console.WriteLine($"Cabin paths {(CabinPaths.Enabled ? "on" : "off (one point)")}; ear model {(OpenFPS.Common.Hearing.EarModel.Enabled ? "on" : "off")}; /levels {Loudness.DynamicRangeCompression:F2}");
 
-        // The street the traced reverberation hears outside: open asphalt. Riding, the room is the
-        // cabin, traced from the vehicle's own shell (TracedReverbSet.RideIn).
+        // Outside, open asphalt; riding, the room is the cabin traced from the vehicle's shell.
         var cs = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no Steam Audio context"); return 1; }
         var scene = new SteamAudioScene(ctx);
@@ -411,8 +403,7 @@ public static class CabinSpike
             Record("silence", 2.0, "");
             if (set is "rain")
             {
-                // The rain ride alone, for as long as asked: the rain's level wanders a decibel or more
-                // over ten seconds (the survey, the drops), so a level check on it wants longer.
+                // The rain wanders a decibel or more over ten seconds, so a level check wants longer.
                 var road = Settled(Rainfall.HeavyRate);
                 // falling=0: the same wet road with nothing falling, to tell the rain from the road.
                 Weather(Arg(args, "falling=") is "0" ? 0f : Rainfall.HeavyRate, road);

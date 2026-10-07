@@ -9,16 +9,10 @@ using OpenFPS.Client.AudioEngine.Fmod;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// The speedway, audible, without a server and a client.
-///
-/// It reads the SHIPPED map — the same maps/speedway.json the server loads — builds its walls into
-/// image-source reflectors, puts every car on the same racing line the server would give it, and
-/// stands the listener on the grandstand deck at the map's own spawn point. What comes out of the
-/// speakers is what a player logging in hears, minus occlusion and the region reverb.
-///
-/// It exists because the alternative way to check that a wall answers a car is to start a server,
-/// start a client, log in, and listen — which is fine for the final judgement and useless for the
-/// forty times you change a number and want to know whether it helped.
+/// --speedway [map] [seconds=60] [voices=4] [probe] [walk] [noecho]: the shipped map's cars on their racing
+/// lines, its walls as image-source reflectors, heard from the map's spawn point on the grandstand, without
+/// a server or client: what a player logging in hears, less occlusion and region reverb. probe prints what
+/// the walls return; walk steps the listener back and meters each stop; noecho is the engines alone.
 /// </summary>
 public static class SpeedwaySpike
 {
@@ -26,7 +20,6 @@ public static class SpeedwaySpike
 
     private sealed record Car(string Name, string Preset, RaceLine Line, float Start);
 
-    /// <summary>Command line: --speedway [map] [seconds=60] [voices=4]</summary>
     public static int Run(string[] args)
     {
         string mapName = args.FirstOrDefault(a => !a.StartsWith("--") && a.IndexOf('=') < 0) ?? "speedway";
@@ -94,9 +87,8 @@ public static class SpeedwaySpike
 
         if (args.Contains("probe"))
         {
-            // Stand a car at a few places round the lap and print, in full, what comes back and
-            // from where. When "the walls are not answering" this is the difference between a
-            // geometry bug, a gain below the threshold and a path too long to count.
+            // A car at a few places round the lap and everything that comes back: tells a geometry bug
+            // from a gain below the threshold or a path too long to count.
             Span<Reflection> got = stackalloc Reflection[6];
             foreach (var (label, src) in new (string, Vector3)[]
             {
@@ -118,9 +110,7 @@ public static class SpeedwaySpike
             return 0;
         }
 
-        // --speedway speedway walk: step the listener back from the track and meter the mix at each
-        // stop. The only honest answer to "it sounds the same however far away I am" is a column of
-        // numbers that either fall or do not.
+        // walk: the listener stepped back from the track, the mix metered at each stop.
         float[]? walk = args.Contains("walk") ? new[] { 0f, 40f, 100f, 200f, 400f, 700f } : null;
 
         Console.WriteLine($"\n  {mapName}: {cars.Count} cars, {surfaces.Count} reflecting faces, listener at {ear}.");
@@ -137,8 +127,7 @@ public static class SpeedwaySpike
             provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
             for (int i = 0; i < 30; i++) { provider.Update(); Thread.Sleep(8); }
 
-            // Per vehicle, the same way the client does it: a stock car and a muscle car are
-            // fourteen decibels apart and placing both at one level throws the field's balance away.
+            // Per vehicle, as the client does: a stock car and a muscle car are fourteen decibels apart.
             var place = new Dictionary<string, (float Gain, float Reference, float Range)>();
             foreach (var key in cars.Select(c => c.Preset).Distinct())
             {
@@ -189,7 +178,6 @@ public static class SpeedwaySpike
                 float dt = (float)Math.Min(0.05, now - last);
                 last = now;
 
-                // Advance every car, whether or not it can be heard.
                 var pos = new Vector3[cars.Count];
                 var head = new float[cars.Count];
                 for (int i = 0; i < cars.Count; i++)
@@ -205,8 +193,7 @@ public static class SpeedwaySpike
                     line.Sample(lap[i], out pos[i], out head[i], out _);
                 }
 
-                // The nearest few get a voice — with the same hysteresis the client uses, or the cars
-                // trade places several times a lap and every trade restarts a synthesis.
+                // The nearest few get a voice, with the client's hysteresis: every trade restarts a synthesis.
                 var order = Enumerable.Range(0, cars.Count)
                     .OrderBy(i => Vector3.DistanceSquared(pos[i], earNow)
                                   * (live.Contains(i) && now - started[i] > 0 ? 0.5625f : 1f))
@@ -214,8 +201,7 @@ public static class SpeedwaySpike
                 foreach (int i in live.Except(order).ToList())
                 {
                     if (now - started[i] < 2.5) { order.Add(i); continue; }   // minimum hold
-                    // Faded, not cut — the same way the client does it. A synthesized engine has no
-                    // zero-crossing to stop on, so cutting one is a step in the waveform.
+                    // Faded, not cut: a synthesised engine has no zero-crossing to stop on.
                     if (!provider.FadeOutEngine(-91000 - i)) { order.Add(i); continue; }
                     provider.StopSound(-91000 - i);
                     foreach (var k in echoes.Keys.Where(k => k.Car == i).ToList())
@@ -243,7 +229,6 @@ public static class SpeedwaySpike
                     if (live.Add(i)) { started[i] = now; provider.PlaySpatialSound(em); }
                     else provider.UpdateSpatialAttributes(em);
 
-                    // ...and the walls answer it.
                     if (noEcho) continue;
                     Vector3 mid = (p + earNow) * 0.5f;
                     near.Clear();
@@ -286,9 +271,8 @@ public static class SpeedwaySpike
                 {
                     lastReport = now;
                     int nearest = order.OrderBy(i => Vector3.DistanceSquared(pos[i], earNow)).First();
-                    // What the ENGINE is doing, not just what the car is doing. A car that is
-                    // genuinely lifting for a turn and an engine that is failing to hold the speed it
-                    // was given sound exactly the same from a chair and are nothing alike in here.
+                    // The engine's state as well as the car's: a car lifting for a turn and an engine
+                    // failing to hold its speed sound the same from a chair.
                     string engineState = "";
                     if (provider.TryGetEngineTelemetry(-91000 - nearest, out float told, out float own, out float rpm, out int gear))
                         engineState = $"  engine told {told * 3.6f:F0}, driveline {own * 3.6f:F0} km/h, {rpm:F0} rpm, gear {gear}";
@@ -325,7 +309,7 @@ public static class SpeedwaySpike
                 var r = d.RootElement;
                 if (!r.TryGetProperty("Id", out var idj)) continue;
                 if (!r.TryGetProperty("ColliderSize", out var cs)) continue;
-                // A prefab that emits sound is a source, not geometry — the same rule the game uses.
+                // A prefab that emits sound is a source, not geometry, as in the game.
                 if (r.TryGetProperty("HasEmitter", out var he) && he.ValueKind == JsonValueKind.True) continue;
                 bool solid = !r.TryGetProperty("IsSolid", out var sj) || sj.ValueKind != JsonValueKind.False;
                 if (!solid) continue;

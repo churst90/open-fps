@@ -4,19 +4,9 @@ using OpenFPS.Client.AudioEngine.Core.Engine;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// The intake tract on its own, asked what note it makes.
-///
-///   --intake-ir [preset ...] [thr=1] [sec=0.6] [out=DIR]
-///
-/// An airbox on a snorkel is a Helmholtz resonator, and on a formula car it is the lowest thing on
-/// the whole vehicle by an order of magnitude — around fifty hertz against a firing frequency of
-/// thirteen hundred. Whether the model actually PRODUCES that resonance is not something a drive
-/// render can answer, because a drive render only ever excites the tract at firing frequency and its
-/// harmonics: a resonator with nothing driving it at its own note is silent however well it is built.
-///
-/// So this shuts every valve, holds the throttle where it is asked to, thumps the plenum once
-/// through one runner, and measures what comes out of the snorkel. What it prints is the tract's own
-/// modes, which is a property of the geometry and of nothing else.
+/// --intake-ir [preset ...] [thr=1] [sec=0.6] [out=DIR]: the intake tract's own modes. Every valve shut,
+/// the plenum thumped once through one runner, the snorkel's output measured. A drive render cannot show
+/// the airbox's Helmholtz note (about 50 Hz on a formula car, against 1,300 Hz firing): nothing drives it there.
 /// </summary>
 public static class IntakeIrSpike
 {
@@ -42,7 +32,7 @@ public static class IntakeIrSpike
             string path = Path.Combine(outDir, $"intake_{name}.wav");
             WriteWav(path, ir, Sr);
 
-            // What the geometry PREDICTS, so the measurement has something to disagree with.
+            // What the geometry predicts, for the measurement to disagree with.
             float snorkelArea = Circle(s.SnorkelDiameterMm);
             float throttleArea = Circle(s.ThrottleDiameterMm);
             float boxArea = throttleArea * 5f;
@@ -65,12 +55,8 @@ public static class IntakeIrSpike
     }
 
     /// <summary>
-    /// One thump into a shut tract.
-    ///
-    /// Every valve is rigid, so nothing but the impulse ever enters: what is measured is the plenum,
-    /// the throttle plate, the airbox and the snorkel, and not the engine breathing through them.
-    /// The tract is let settle first because the plenum starts at atmosphere and the throttle then
-    /// drags it to wherever a shut engine leaves it, and that transient is not a mode.
+    /// One thump into a shut tract: only the impulse enters, so plenum, throttle, airbox and snorkel are
+    /// measured. It settles first: the plenum starts at atmosphere and that transient is not a mode.
     /// </summary>
     private static float[] Impulse(EngineProfile e, float throttle, float seconds)
     {
@@ -82,14 +68,13 @@ public static class IntakeIrSpike
 
         int n = (int)(Sr * seconds);
         var ir = new float[n];
-        // A pressure wave into one runner, sized so the plenum sees a real pulse rather than a
-        // rounding error: a tenth of an atmosphere, which is the order of a genuine intake pulse.
+        // A tenth of an atmosphere into one runner, the order of a real intake pulse.
         Shut(net, e.Cylinders);
         net.PushFromValve(0, 10_000f);
         net.Step();
         for (int i = 0; i < n; i++) { Shut(net, e.Cylinders); net.Step(); ir[i] = net.Radiated; }
 
-        // The impulse also shifts the mean, and a step is not a mode: take the DC out.
+        // The impulse shifts the mean, and a step is not a mode.
         float mean = 0f;
         foreach (float v in ir) mean += v;
         mean /= MathF.Max(1, n);
@@ -104,8 +89,7 @@ public static class IntakeIrSpike
 
     private static string Peaks(float[] x)
     {
-        // A log sweep, because the interesting span is 20 Hz to 2 kHz and a linear one spends all of
-        // its resolution at the top, where this tract has nothing to say.
+        // Log-spaced: a linear sweep spends its resolution at the top, where the tract has nothing.
         const int steps = 400;
         var f = new float[steps];
         var mag = new float[steps];

@@ -16,18 +16,12 @@ using OpenFPS.Server.Systems;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --driving out=DIR [set=all|horn|siren|bend|rails|gates|aircraft]: the driving controls and aids of
-/// docs/DRIVING_AIDS.md, heard through the game: ClientAudioSystem over the FMOD provider, the HRTF, the
-/// loudness law, the cabin when sitting in a vehicle. Each scene is driven the way the server drives it
-/// (the horn and siren switches on EntityState.Signals, the wheels on the wire, a crossing's closed
-/// signal on its emitters, the roads as MapRoads sends them) and captured from the master
-/// (DIR/capture.post.wav) with DIR/segments.csv, and what the driving aids said with when (DIR/speech.csv).
-///
-/// Scenes: a car's and a bus's horn held, from the kerb and the driver's seat; the police car's siren
-/// through its tones, from the kerb and the seat; a right turn off Main Street from 65 km/h by a driver
-/// who brakes on the spoken junction alone, and by one who brakes on the brake cue; a car over a level
-/// crossing's rails from the kerb and the seat; a crossing's gates going down and up with the bell; a
-/// light single landing, rolling out, turning round and taking off again, from beside the runway.
+/// --driving out=DIR [set=all|horn|siren|bend|lines|rails|gates|aircraft] [compare]: the driving controls
+/// and aids (docs/DRIVING_AIDS.md) through ClientAudioSystem, the HRTF, the loudness law and the cabin,
+/// each scene driven as the server drives it, captured to DIR/capture.post.wav with DIR/segments.csv
+/// and the aids' speech in DIR/speech.csv. Scenes: horns and the siren from kerb and seat (compare adds
+/// street life's honk), a right turn off Main Street with and without the brake cue, drifting onto the
+/// lines, rails, a crossing's gates and bell, a light single landing and taking off.
 /// </summary>
 public static class DrivingSpike
 {
@@ -109,8 +103,7 @@ public static class DrivingSpike
             Type = EntityType.StaticObject,
             Transform = new Transform { Position = new Vector3(0f, -0.5f, 0f), Rotation = Quaternion.Identity, Scale = Vector3.One },
             Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(4000f, 1f, 4000f), IsSolid = true },
-            // Concrete in the client's world: the driving aids read any square of asphalt with no name as
-            // a junction, and four kilometres of it would be one.
+            // Concrete: the driving aids read any unnamed square of asphalt as a junction.
             Material = new MaterialComponent { Material = "Concrete" },
         });
         WindField.Weather = WindWeather.Steady(0f, 250f, 0f);
@@ -133,8 +126,7 @@ public static class DrivingSpike
                 Thread.Sleep(4);
             }
         }
-        // Each scene starts recording a moment after it is set up: a vehicle's voice made in the same
-        // frame as the listener is seated in it starts as the outside of the car for a fifth of a second.
+        // A voice made in the frame the listener is seated starts as the car's outside for a fifth of a second.
         const double Preroll = 0.8;
         void Record(string name, double seconds, string note)
         {

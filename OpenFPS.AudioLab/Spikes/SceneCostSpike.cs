@@ -3,10 +3,9 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// What a door costs: the Steam Audio scene and the listener's ground-free scene rebuilt from the
-/// real map, as AsyncAcousticWorker.RebuildSceneIfNeeded does whenever a leaf near the listener moves.
-///
-///   --scene-cost [map=city]
+/// --scene-cost [map=city]: what a door costs, the Steam Audio scene and the listener's ground-free
+/// scene rebuilt from the real map, as AsyncAcousticWorker.RebuildSceneIfNeeded does when a leaf near
+/// the listener moves.
 /// </summary>
 public static class SceneCostSpike
 {

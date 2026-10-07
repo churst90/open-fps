@@ -5,13 +5,10 @@ using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// What the late tail of the room you stand in costs the mixer, per 256-sample piece, on one thread
-/// with nothing else running: the one-channel late part (LateTailConvolver, then DiffuseTail's velvet
-/// branches, head responses and ear velvet) against the late field (DiffuseLateConvolver, then a head
-/// response per direction). A synthetic room, 60 dB down in <c>t60</c> seconds, so the whole two
-/// seconds are in use at the default.
-///
-///   --tail-cost [t60=2] [seconds=20]
+/// --tail-cost [t60=2] [seconds=20]: the late tail's cost per 256-sample piece on one idle thread, the
+/// one-channel late part (LateTailConvolver, DiffuseTail's velvet branches, head responses, ear velvet)
+/// against the late field (DiffuseLateConvolver, a head response per direction). A synthetic room 60 dB
+/// down in t60 seconds, so at the default the whole two seconds are in use.
 /// </summary>
 public static class TailCostSpike
 {
@@ -28,7 +25,6 @@ public static class TailCostSpike
         var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
         Phonon.iplHRTFCreate(ctx, ref au, ref hs, out IntPtr hrtf);
 
-        // One trace of a room from everywhere, decaying 60 dB in t60.
         var rng = new Random(3);
         var w = new float[len];
         for (int i = 0; i < len; i++)
@@ -97,7 +93,7 @@ public static class TailCostSpike
             df.Release();
         }
 
-        // The pieces of it.
+        // The field's pieces, one at a time.
         {
             var fft = new Fft(2 * DiffuseLateNoise.Block);
             var re = new float[2 * DiffuseLateNoise.Block]; var im = new float[2 * DiffuseLateNoise.Block];

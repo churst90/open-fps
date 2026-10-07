@@ -13,25 +13,16 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// A streamed map walked through the real server and the client's world and occlusion worker, with
-/// Steam Audio, in real time (docs/WORLD_STREAMING.md, stage 1). The server streams tiles as the body
-/// moves; the client files them, rebuilds its acoustic map in the background, and the worker rebuilds
-/// its scene in the background. Reports what each costs, and how long the worker left its sources
-/// without a fresh answer, before and while tiles change: the worker's own "placement stalled".
-///
-///   --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [heading=east|north|west|south]
-///                 [churn=N] [keep=old] [stops=M]
-///
-/// churn=N asks about N one-off sources a frame (a fraction: one every so many frames) besides the twenty that stay, each once and never again,
-/// as footsteps and birds come and go; the managed heap after a full collection is said every ten
-/// seconds. keep=old keeps route answers as they were kept before 2026-10-06 (RouteAnswers), for the
-/// before-and-after of a stopped voice holding the graph it was asked of.
-///
-/// stops=M stops every M metres walked until the tiles, the client's acoustic map and the worker's scene
-/// have all settled, then asks about the twenty sources afresh and prints the occlusion and band gains
-/// of each, with how many scenes the worker has swapped in so far. The stops fall at the same places on
-/// every run, so two runs (OPENFPS_TILE_SCENES=0 and on) can be compared stop by stop: tile scenes must
-/// answer as the whole-scene build does however many tile changes they have been through.
+/// --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [heading=east|north|west|south]
+/// [churn=N] [keep=old] [stops=M]: a streamed map walked in real time through the real server, the
+/// client's world and the occlusion worker with Steam Audio (docs/WORLD_STREAMING.md, stage 1). Reports
+/// what each rebuild costs and how long the worker left sources without a fresh answer.
+/// churn=N: N one-off sources a frame (a fraction is one every so many frames) besides the twenty that
+/// stay, as footsteps and birds come and go; the heap after a full collection every ten seconds.
+/// keep=old: route answers kept as before 2026-10-06 (RouteAnswers), a stopped voice holding its graph.
+/// stops=M: every M metres, once everything has settled, the twenty sources asked afresh, their occlusion
+/// and band gains printed; the stops fall in the same places, so runs with OPENFPS_TILE_SCENES=0 and on
+/// compare stop by stop (tile scenes must answer as the whole-scene build does).
 /// </summary>
 public static class StreamWalkSpike
 {
@@ -127,8 +118,7 @@ public static class StreamWalkSpike
         worker.UpdateWorld(client.GetSnapshot());
         worker.Start();
 
-        // Twenty sources round the walker, a few metres to forty away, asked about every frame as the
-        // audio system asks: the worker's answers for them are what the mixer would place them by.
+        // Twenty sources a few metres to forty away, asked about every frame as the audio system asks.
         var offsets = Enumerable.Range(0, 20).Select(i =>
         {
             float a = i * 2.4f, r = 4f + 2f * i;
@@ -137,7 +127,6 @@ public static class StreamWalkSpike
         var lastResult = new object?[offsets.Length];
         var lastFresh = new double[offsets.Length];
 
-        // Wait for the first scene.
         var settle = Stopwatch.StartNew();
         while (!worker.SteamAudioActive && settle.ElapsedMilliseconds < 5000) Thread.Sleep(20);
         Console.WriteLine($"  Steam Audio {(worker.SteamAudioActive ? "on" : "OFF (hand-rolled tracer)")}");

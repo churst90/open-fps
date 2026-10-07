@@ -5,18 +5,11 @@ using OpenFPS.Common;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// The scope's sounds as the game plays them, written out and measured.
-///
-///   --scope-sounds [out=DIR]
-///
-/// The guidance tone is two loops played at a rate (ScopeSounds); this plays them the way the mixer
-/// does, resampling the loop at the rate the closeness asks for and fading each one in and out over
-/// 20 ms, at the gain the game sends them at (interface volume 0.5 times the scope's 0.7). Each state
-/// on its own, an approach from the edge of the view onto a body, and the breath caught and let go.
-/// The M700's report, its bolt worked after a shot, its reload and its dry fire are written beside
-/// them, peak-normalised as the other weapon renders are. Every file is measured: peak, RMS, and the
-/// largest step from one sample to the next against what the tone's own waveform makes, which is
-/// what a click would show as.
+/// --scope-sounds [out=DIR]: the scope's guidance loops (ScopeSounds) played as the mixer plays them,
+/// resampled at the rate closeness asks for, 20 ms fades, at the game's gain (interface 0.5 times the
+/// scope's 0.7): each state, an approach onto a body, the breath held and let go; and the M700's report,
+/// bolt, reload and dry fire, peak-normalised. Each file's peak, RMS and largest sample step against
+/// the tone's own, which is where a click shows.
 /// </summary>
 public static class ScopeSoundsSpike
 {
@@ -104,10 +97,8 @@ public static class ScopeSoundsSpike
     }
 
     /// <summary>
-    /// The crosshair drawn in from the edge of the view onto a body: the pulses quicken and rise, the
-    /// held note takes over (the pulse loop fading out as it fades in, as the slot does), holds, and
-    /// goes when the crosshair slips off. The guidance is looked at ten times a second, so the rate
-    /// steps in tenths, as it does in the game.
+    /// The crosshair drawn from the edge of the view onto a body and off again: pulses quicken, the held
+    /// note crossfades in, holds, and goes. The rate steps every tenth of a second, as the game polls it.
     /// </summary>
     private static float[] Approach(float[] pulse, float[] steady)
     {
