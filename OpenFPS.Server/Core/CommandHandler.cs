@@ -577,6 +577,7 @@ public partial class CommandHandler
     private void HandlePlayFolder(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (args.Length < 1) { Say(reply, "Usage: /play_folder [FolderId]"); return; }
+        if (!SafeText.IsSoundId(args[0])) { Say(reply, NotASoundId(args[0])); return; }
         if (!TryGetBody(session, reply, out var world, out _, out var playerPos)) return;
 
         var nearest = FindNearestObject(world, session.Entity, playerPos);
@@ -594,6 +595,7 @@ public partial class CommandHandler
     private void HandleStartState(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (args.Length < 2) { Say(reply, "Usage: /start_state [StartSoundId] [LoopSoundId]"); return; }
+        if (!SafeText.IsSoundId(args[0]) || !SafeText.IsSoundId(args[1])) { Say(reply, NotASoundId(SafeText.IsSoundId(args[0]) ? args[1] : args[0])); return; }
         if (!TryGetBody(session, reply, out var world, out _, out var playerPos)) return;
 
         var nearest = FindNearestObject(world, session.Entity, playerPos);
@@ -664,6 +666,10 @@ public partial class CommandHandler
         Say(reply, $"Spawned {material} {shape} (entity {e.Id}) at {PlayerCoordinates.Format(spawnPos)}");
     }
 
+    /// <summary>Every client on the map opens a sound id as a file, so only a relative name under its sounds folder.</summary>
+    private static string NotASoundId(string id)
+        => $"'{AuthService.ForLog(id)}' is not a sound id: a name under the sounds folder, like AMBIENCE/woods_mid_day.";
+
     private void HandleSetSound(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (args.Length < 2)
@@ -672,7 +678,8 @@ public partial class CommandHandler
             return;
         }
 
-        if (!float.TryParse(args[1], out float vol)) { Say(reply, $"'{args[1]}' is not a volume."); return; }
+        if (!SafeText.IsSoundId(args[0])) { Say(reply, NotASoundId(args[0])); return; }
+        if (!SafeText.TryVolume(args[1], out float vol)) { Say(reply, $"'{args[1]}' is not a volume: a number from 0 to 4."); return; }
         if (!TryGetBody(session, reply, out var world, out _, out var playerPos)) return;
 
         var nearest = FindNearestObject(world, session.Entity, playerPos);
@@ -855,6 +862,8 @@ public partial class CommandHandler
     {
         var svc = Composites(reply); if (svc == null) return;
         if (args.Length < 1) { Say(reply, "Usage: /saveas id"); return; }
+        // The id is the design's file name.
+        if (!SafeText.IsFileName(args[0])) { Say(reply, "A design's name is letters, digits, _ and -, up to 64."); return; }
         if (!TryGetBody(session, reply, out _, out _, out var position)) return;
 
         int root = svc.NearestRoot(session.CurrentMapId, position, CompositeReachRadius);

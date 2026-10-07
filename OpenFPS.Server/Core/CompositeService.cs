@@ -346,6 +346,7 @@ public class CompositeService
                                out int partCount, out string error)
     {
         partCount = 0; error = "";
+        if (!SafeText.IsFileName(templateId)) { error = "a design's name is letters, digits, _ and -, up to 64"; return false; }
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) { error = "map not loaded"; return false; }
         if (!lookup.TryGetValue(rootId, out var root) || !world.IsAlive(root) || !world.Has<CompositeComponent>(root))
         { error = "that is not a composite"; return false; }

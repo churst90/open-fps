@@ -117,12 +117,10 @@ public class GranularBank : IDisposable
 
     private string ResolvePath(string soundId)
     {
-        if (string.IsNullOrEmpty(soundId)) return string.Empty;
-        if (soundId.Contains("ASSETS", StringComparison.OrdinalIgnoreCase)) return soundId;
+        string path = FmodAudioProvider.SoundFilePath(soundId);
+        if (path.Length == 0) return string.Empty;
+        if (soundId.Contains("ASSETS", StringComparison.OrdinalIgnoreCase)) return path;
 
-        string normId = soundId.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
-        string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ASSETS", "SOUNDS", normId);
-        
         if (File.Exists(path)) return path;
 
         string[] extensions = { ".wav", ".ogg", ".mp3" };

@@ -161,6 +161,8 @@ public class CompositeRepository
     /// thing somebody built out of parts becomes a thing anybody can place again.</summary>
     public void Save(CompositeTemplate template)
     {
+        if (!OpenFPS.Server.Core.SafeText.IsFileName(template.Id))
+            throw new ArgumentException($"'{template.Id}' is not a design name: letters, digits, _ and - only.");
         Directory.CreateDirectory(_directory);
         string path = Path.Combine(_directory, $"{template.Id}.json");
         var options = new JsonSerializerOptions(MapRepository.JsonOptions) { WriteIndented = true };
