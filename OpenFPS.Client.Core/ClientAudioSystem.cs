@@ -1701,11 +1701,25 @@ public class ClientAudioSystem
 
         int keep = Math.Min(_adaptiveBudget, _engineDistances.Count);
 
+        // The cars kept outside the budget as their preset's only engine (see below). Found before
+        // anything is let go, so a donor that is still the donor keeps its engine and its start time.
+        // Let go and re-admitted, it was stamped as newly built every time its hold ran out: held
+        // again, ranked first, and given a slot INSIDE the budget, which turned out the car at the
+        // budget's edge — that car's engine faded and rebuilt from nothing every 2.5 s, and every
+        // borrowed voice restarted with it, for as long as the field stood still.
+        _presetsKept.Clear();
+        _presetDonors.Clear();
+        for (int i = 0; i < _engineDistances.Count; i++)
+        {
+            if (!_carPreset.TryGetValue(_engineDistances[i].Id, out string? kept)) continue;
+            if (_presetsKept.Add(kept) && i >= keep) _presetDonors.Add(_engineDistances[i].Id);
+        }
+
         // Cars that have lost their engine fade it out rather than being cut mid-waveform.
         foreach (int id in _liveEngines)
         {
-            bool survives = false;
-            for (int i = 0; i < keep; i++) if (_engineDistances[i].Id == id) { survives = true; break; }
+            bool survives = _presetDonors.Contains(id);
+            for (int i = 0; i < keep && !survives; i++) if (_engineDistances[i].Id == id) { survives = true; break; }
             if (survives) continue;
             _engineEchoes.Forget(id, _audio);
             _engineStarted.Remove(id);
@@ -1714,8 +1728,8 @@ public class ClientAudioSystem
         for (int i = _engineRetiring.Count - 1; i >= 0; i--)
         {
             int id = _engineRetiring[i];
-            bool wanted = false;
-            for (int k = 0; k < keep; k++) if (_engineDistances[k].Id == id) { wanted = true; break; }
+            bool wanted = _presetDonors.Contains(id);
+            for (int k = 0; k < keep && !wanted; k++) if (_engineDistances[k].Id == id) { wanted = true; break; }
             if (wanted) { _engineRetiring.RemoveAt(i); continue; }
             if (_audio.FadeOutEngine(id)) { _audio.StopSound(id); _engineRetiring.RemoveAt(i); }
         }
@@ -1895,6 +1909,10 @@ public class ClientAudioSystem
 
     private readonly Dictionary<int, string> _carPreset = new();
     private readonly Dictionary<string, int> _engineSourceByPreset = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Presets met so far in this pass's ranking, and the cars outside the budget kept as their
+    /// preset's only engine. See ChooseLiveEngines.</summary>
+    private readonly HashSet<string> _presetsKept = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<int> _presetDonors = new();
     private readonly HashSet<int> _liveEngines = new();
     private readonly Dictionary<int, double> _engineStarted = new();
     private readonly List<int> _engineRetiring = new();

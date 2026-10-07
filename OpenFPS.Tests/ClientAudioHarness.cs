@@ -179,7 +179,9 @@ internal sealed class RecordingMixer : IAudioProvider
     public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) { }
     public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres, float surfaceAreaSquareMetres = 0f) { }
     public void SetAirTemperature(float c) { }
-    public float MixerLoad => 0f;
+    /// <summary>The mixer's load as the budget reads it, 0..1. A test sets it to drive the control loop.</summary>
+    public float Load;
+    public float MixerLoad => Load;
     public void ReviveEngine(int id) { }
     public bool FadeOutEngine(int id) => true;
     public int SpatialVoicesFree => 256;
