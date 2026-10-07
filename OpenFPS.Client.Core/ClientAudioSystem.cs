@@ -1208,6 +1208,13 @@ public class ClientAudioSystem
                 var bell = OpenFPS.Common.ModelLibrary.Bell(soundId[5..]);
                 return (bell.ReferenceDb, MathF.Max(0.5f, bell.DiameterMetres));
             }
+            if (soundId.StartsWith("gate:", StringComparison.OrdinalIgnoreCase))
+            {
+                // A level crossing's gate mechanism, placed by its motor's level; the case at the
+                // foot of the mast is half a metre of steel.
+                var gate = OpenFPS.Common.CrossingGateSpec.ByName(soundId[5..]);
+                return (gate.SourceLevelDb, 0.5f);
+            }
             // Water, fire and the wind in a tree: nobody made them, and they are placed like a
             // machine all the same, at their declared level and their own size. A fountain's size
             // is its basin, a fire's its hearth, a tree's its crown.

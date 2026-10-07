@@ -2910,6 +2910,9 @@ public partial class FmodAudioProvider : IAudioProvider
                     // BellVoiceState for why this one cannot be worked out locally.
                     "bell" => new BellVoiceState(OpenFPS.Common.ModelLibrary.Bell(preset),
                                                  mrate, emitter.EntityId * 13 + 5),
+                    // A level crossing's gate: the arm follows the crossing's closed signal (the
+                    // emitter's Running, the server's word), so it starts where the crossing is.
+                    "gate" => new GateVoiceState(OpenFPS.Common.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
                     // Water, fire and wind in leaves read the wind where they stand, so they are
                     // given their place. See NatureVoiceState.
                     "water" => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position, emitter),

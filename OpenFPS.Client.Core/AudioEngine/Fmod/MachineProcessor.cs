@@ -590,6 +590,102 @@ public sealed class BellVoiceState : PhysicalVoiceState
 }
 
 /// <summary>
+/// A level crossing's gate mechanism (CrossingGateSpec): the arm going down under its own weight with
+/// the motor braking it, the motor driving it back up, and the clunk at each end. Like the bell, its
+/// Running flag is the server's word that the crossing is closed (SoundEmitterComponent.SynthRunning),
+/// and the arm's motion follows from that one signal by the same rules a real gate keeps (GateArm).
+///
+/// The motor is a small DC gear motor in a steel case: a commutator buzz (a pulse per segment per turn)
+/// and the pinion's mesh, eleven teeth against twelve segments so the two beat, brush noise, all
+/// following the motor's speed, through the case's resonance. Driving the arm up it works; braking the
+/// arm on the way down it whirs more quietly. Allocation-free once built.
+/// </summary>
+public sealed class GateVoiceState : PhysicalVoiceState
+{
+    public readonly CrossingGateSpec Spec;
+    public readonly GateArm Arm;
+    private readonly float _rate;
+    private readonly float _motorPa, _clunkPa;
+    private double _phase;
+    private float _speed, _speedTarget, _work;
+    private uint _noise = 0x2545F491u;
+    private float _bpX1, _bpX2, _bpY1, _bpY2;
+    private readonly float _b0, _b2, _a1, _a2;
+    // The clunk: three struck modes of the mast, the arm's hub and the case.
+    private float _clunkT = -1f, _clunkAmp;
+
+    public GateVoiceState(CrossingGateSpec spec, float sampleRate, bool closed)
+        : base(spec.MotorDb, sampleRate, spec.ClunkDb - spec.MotorDb + 6f)
+    {
+        Spec = spec;
+        Arm = new GateArm(spec, closed);
+        _rate = sampleRate;
+        _motorPa = 20e-6f * MathF.Pow(10f, spec.MotorDb / 20f);
+        _clunkPa = 20e-6f * MathF.Pow(10f, spec.ClunkDb / 20f);
+        // The case: a two-pole band-pass at its resonance, Q 3 (RBJ cookbook, constant peak gain).
+        float w0 = MathF.Tau * spec.CaseHz / sampleRate, alpha = MathF.Sin(w0) / (2f * 3f), a0 = 1f + alpha;
+        _b0 = alpha / a0; _b2 = -alpha / a0; _a1 = -2f * MathF.Cos(w0) / a0; _a2 = (1f - alpha) / a0;
+    }
+
+    protected override void PushListener(Vector3 frame) { }
+
+    protected override void Control(float seconds, float dt)
+    {
+        Arm.Update(Running, dt);
+        _speedTarget = Arm.MotorSpeed;
+        _work = Arm.Driving ? 1f : 0.45f;
+        if (Arm.Arrived is { } down)
+        {
+            // Landing on the rest is the heavier blow: the arm's whole weight. Reaching the top, the
+            // counterweights take most of it.
+            _clunkT = 0f;
+            _clunkAmp = _clunkPa * (down ? 1f : 0.6f);
+        }
+    }
+
+    protected override float StepSynth()
+    {
+        float dt = 1f / _rate;
+        // The motor spins up and down with its own inertia, about 50 ms.
+        _speed += (_speedTarget - _speed) * MathF.Min(1f, dt / 0.05f);
+        float outPa = 0f;
+        if (_speed > 1e-3f)
+        {
+            float rps = Spec.MotorRpm / 60f * _speed;
+            _phase += rps * dt;
+            if (_phase > 1e6) _phase -= 1e6;
+            float turn = (float)(_phase - Math.Floor(_phase)) * MathF.Tau;
+            float bars = Spec.CommutatorBars, teeth = Spec.PinionTeeth;
+            float comm = MathF.Sin(bars * turn) + 0.5f * MathF.Sin(2f * bars * turn) + 0.33f * MathF.Sin(3f * bars * turn)
+                       + 0.25f * MathF.Sin(4f * bars * turn);
+            float mesh = 0.5f * MathF.Sin(teeth * turn);
+            _noise = _noise * 1664525u + 1013904223u;
+            float brush = ((_noise >> 8) / 8388608f - 1f) * 0.3f;
+            float raw = comm + mesh + brush;
+            // Through the case's resonance, and a little straight out of the louvres.
+            float y = _b0 * raw + _b2 * _bpX2 - _a1 * _bpY1 - _a2 * _bpY2;
+            _bpX2 = _bpX1; _bpX1 = raw; _bpY2 = _bpY1; _bpY1 = y;
+            // About 1 RMS at full speed for the raw sum: the motor's level, as hard as it is working.
+            outPa = _motorPa * _speed * _work * (0.7f * y * 2.2f + 0.3f * raw);
+        }
+        if (_clunkT >= 0f)
+        {
+            float t = _clunkT;
+            _clunkT += dt;
+            if (t > 0.4f) _clunkT = -1f;
+            _noise = _noise * 1664525u + 1013904223u;
+            float n = (_noise >> 8) / 8388608f - 1f;
+            float s = 0.55f * MathF.Sin(MathF.Tau * 140f * t) * MathF.Exp(-t / 0.06f)
+                    + 0.35f * MathF.Sin(MathF.Tau * 420f * t) * MathF.Exp(-t / 0.025f)
+                    + 0.25f * MathF.Sin(MathF.Tau * 1600f * t) * MathF.Exp(-t / 0.008f)
+                    + 0.3f * n * MathF.Exp(-t / 0.003f);
+            outPa += _clunkAmp * s * MathF.Min(1f, t / 0.0005f);
+        }
+        return outPa;
+    }
+}
+
+/// <summary>
 /// The FMOD side of a physical voice — machine or aircraft: a read callback that copies out of the
 /// ring and nothing else.
 /// Mirrors <c>EngineProcessor</c>, which is the point.
