@@ -9,9 +9,8 @@ public enum BodyShape : byte
     /// <summary>An upright cylinder from a hand's breadth above the feet to the head: the body of stage 1
     /// and of the box path.</summary>
     Cylinder = 0,
-    /// <summary>A capsule over the same span (docs/GEOMETRY.md 3.1): rounded at the bottom and the top, so
-    /// an edge below the knee or above the brow is met by the curve, and every contact has a normal that
-    /// says whether it is a floor, a wall or a ceiling.</summary>
+    /// <summary>The same span with a rounded head (docs/GEOMETRY.md stage 2 as built): the cylinder's flat
+    /// foot and trunk, the top a half sphere, so an edge above the brow is met by the curve.</summary>
     Capsule = 1,
 }
 
@@ -25,12 +24,16 @@ public enum BodyShape : byte
 /// from its nearest point, inside it out by its nearest edge; a solid above the middle of a body that can
 /// go down is a ceiling, one below the middle with the axis over it a floor.</para>
 ///
-/// <para><b>The capsule</b> (<see cref="CapsuleOverlap"/>) is stage 2's: the nearest point of the solid to
-/// the body's axis segment, and the contact classified by the direction from it. A floor (within the
-/// walkable slope of up) is left to the ground probe while the body is on the ground and lands it while
-/// it is not; a ceiling pushes an airborne body down; everything else is a wall and pushes out
-/// horizontally only, so a steep bank slides a body down it rather than lifting it. Against a box's
-/// vertical face it is the cylinder to rounding; it differs only where an edge meets the rounded ends.</para>
+/// <para><b>The capsule</b> (<see cref="CapsuleOverlap"/>) is stage 2's, as built: a cylinder's foot and trunk
+/// under a rounded head. The design asked for a capsule rounded at both ends (docs/GEOMETRY.md 3.1); that was
+/// built and measured on the four maps against the cylinder (AudioLab --geometry-parity only=capsule), and its
+/// rounded foot changed how a body meets every kerb, step and ledge: a falling body caught ledges the cylinder
+/// fell past and rode up roof edges, the step-up climbed 56 cm where the cylinder stopped, and 3 to 15 walks
+/// in 400 parted by metres. The ground probe and the step rule are a flat foot's, a body's radius wide, so the
+/// foot is flat. The head is round: an edge over the brow (a beam, a lintel, a sloped ceiling, an arch's
+/// curve) is met by the curve, a ceiling straight over a body on the ground is left alone, and a ceiling over
+/// one in the air pushes it down. Slopes too steep to walk are walls to the trunk, pushed off across the
+/// ground; the ground probe stands only on faces within the walkable slope.</para>
 ///
 /// <para>A solid that is not convex (stairs, an arch) is met piece by piece: its convex pieces, the
 /// deepest contact of them. Allocation-free up to <see cref="StackTriangles"/> triangles a piece.</para>
@@ -43,6 +46,10 @@ public static class SolidContact
 
     /// <summary>The largest piece taken on the stack, in triangles; bigger ones are taken on the heap.</summary>
     private const int StackTriangles = 64;
+
+    /// <summary>How far across the ground from the axis a floor the capsule comes down on may be met and
+    /// still be landed on, metres: under the axis, as the cylinder landed only on a solid its axis was over.</summary>
+    private const float LandingReach = 1e-3f;
 
     /// <summary>The steepest a floor may be, as the cosine of its tilt from level: 45 degrees.</summary>
     public const float WalkableCos = 0.70710678f;
@@ -100,7 +107,7 @@ public static class SolidContact
     /// <paramref name="y1"/> along it, its middle at <paramref name="mid"/>.
     /// </summary>
     private static GeometryUtils.CollisionResult CylinderCore(ReadOnlySpan<Vector3> v, ReadOnlySpan<Vector4> planes, float radius,
-                                                             float y0, float y1, float mid, bool canGoDown)
+                                                             float y0, float y1, float mid, bool canGoDown, float ceilingTop = float.NaN)
     {
         var result = new GeometryUtils.CollisionResult { IsColliding = false, Normal = Vector3.Zero, Penetration = 0f };
         int tc = v.Length / 3;
@@ -193,7 +200,7 @@ public static class SolidContact
         }
 
         // A solid above the middle of the body that the top of it reaches into is a ceiling.
-        float intoCeiling = y1 - minY;
+        float intoCeiling = (float.IsNaN(ceilingTop) ? y1 : ceilingTop) - minY;
         if (canGoDown && minY > mid && intoCeiling < result.Penetration)
         {
             result.Normal = -Vector3.UnitY;
@@ -223,15 +230,10 @@ public static class SolidContact
         public float AxisHigh => MathF.Max(Bottom + Radius, Top - Radius);
     }
 
-    /// <summary>What the capsule meets in one convex piece.</summary>
-    private readonly record struct CapsuleTouch(bool Touching, bool Inside, Vector3 Point, Vector3 OnAxis, float Distance);
-
     /// <summary>
-    /// How a capsule body with its feet at <paramref name="feet"/> overlaps a solid, and the way out (see the
-    /// class remarks): a wall horizontally by how far it must move to clear it, a ceiling down while
-    /// <paramref name="airborne"/>, a floor (only while airborne) up by how far its feet must rise to stand
-    /// on the point it came down on. A floor met on the ground is no contact: the ground probe stands on it.
-    /// A body whose axis is inside the solid is let out as the cylinder would be.
+    /// How the body with its feet at <paramref name="feet"/> overlaps a solid, and the way out (see the class
+    /// remarks): the trunk as the cylinder, the head by its curve. A floor the body comes down on lifts its
+    /// feet by the penetration itself (the cylinder's floor lifts the bottom of the trunk).
     /// </summary>
     public static GeometryUtils.CollisionResult CapsuleOverlap(TriangleWorld world, SolidRef solid, Vector3 feet, Capsule body, bool airborne)
         => CapsuleOverlap(world, solid, feet, body, airborne, out _);
@@ -321,135 +323,85 @@ public static class SolidContact
     }
 
     /// <summary>
-    /// The capsule against one convex piece whose corners and planes are relative to the feet. The nearest
-    /// point of the piece to the axis segment decides: see <see cref="CapsuleOverlap"/>.
+    /// The body against one convex piece whose corners and planes are relative to the feet: the foot and
+    /// trunk as the cylinder (from <see cref="Capsule.Bottom"/> to where the head's dome begins), and the
+    /// dome over them; the deeper of the two contacts. A floor the foot comes down on lifts the feet onto it
+    /// (the cylinder's floor, with the hand's breadth under it added back).
     /// </summary>
     private static GeometryUtils.CollisionResult CapsuleCore(ReadOnlySpan<Vector3> v, ReadOnlySpan<Vector4> planes, Capsule body,
                                                             bool airborne, out float depth)
     {
+        var none = new GeometryUtils.CollisionResult { IsColliding = false, Normal = Vector3.Zero, Penetration = 0f };
+        depth = 0f;
+        float r = body.Radius, dome = body.AxisHigh;
+        // The trunk is the cylinder's, its middle where the whole body's is (the cylinder's floor and ceiling
+        // rules ask which half a solid is in), and a ceiling met by it pushes down as far as the head's top.
+        var foot = CylinderCore(v, planes, r, body.Bottom, dome, 0.5f * (body.Bottom + body.Top), airborne, ceilingTop: body.Top);
+        float footDepth = 0f;
+        if (foot.IsColliding)
+        {
+            footDepth = foot.Penetration;
+            if (foot.Normal.Y > 0.5f) foot.Penetration += body.Bottom;
+        }
+        var head = Dome(v, planes, r, dome, airborne, out float headDepth);
+        if (foot.IsColliding && (!head.IsColliding || footDepth >= headDepth)) { depth = footDepth; return foot; }
+        if (head.IsColliding) { depth = headDepth; return head; }
+        return none;
+    }
+
+    /// <summary>
+    /// The head's dome, the half sphere of <paramref name="r"/> over (0, <paramref name="centreY"/>, 0),
+    /// against one convex piece: its nearest point above the dome's rim. Over a body in the air, a ceiling
+    /// pushes it down until the top of the head clears it; straight over a body on the ground it is left
+    /// alone (standing on a sofa under a low ceiling: the cylinder took the slab's nearest end as the way
+    /// out, a metre and a half in a step); anything else pushes across the ground until it clears the curve.
+    /// </summary>
+    private static GeometryUtils.CollisionResult Dome(ReadOnlySpan<Vector3> v, ReadOnlySpan<Vector4> planes, float r, float centreY,
+                                                     bool airborne, out float depth)
+    {
         var result = new GeometryUtils.CollisionResult { IsColliding = false, Normal = Vector3.Zero, Penetration = 0f };
         depth = 0f;
-        float r = body.Radius, a = body.AxisLow, b = body.AxisHigh;
-        var touch = Nearest(v, planes, a, b, r);
-        if (!touch.Touching) return result;
-
-        if (touch.Inside || touch.Distance < 1e-6f)
+        var c = new Vector3(0f, centreY, 0f);
+        var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
+        foreach (var q in v) { lo = Vector3.Min(lo, q); hi = Vector3.Max(hi, q); }
+        if (hi.Y <= centreY) return result;                              // all of it under the rim: the trunk's
+        float gx = MathF.Max(0f, MathF.Max(lo.X, -hi.X)), gz = MathF.Max(0f, MathF.Max(lo.Z, -hi.Z));
+        float gy = MathF.Max(0f, lo.Y - centreY);
+        if (gx * gx + gz * gz + gy * gy >= r * r) return result;
+        // The dome's centre inside it is the trunk's top inside it: the trunk answers that.
+        if (planes.Length > 0)
         {
-            // The axis is in it: let out as the cylinder over the same span would be. Its floor lifts the
-            // bottom of the body onto the top; the feet go that much further, to stand on it.
-            var c = CylinderCore(v, planes, r, body.Bottom, body.Top, 0.5f * (body.Bottom + body.Top), airborne);
-            if (!c.IsColliding) return result;
-            if (c.Normal.Y > 0.5f) c.Penetration += body.Bottom;
-            depth = r + c.Penetration;
-            return c;
+            bool inside = true;
+            foreach (var q in planes) if (q.X * c.X + q.Y * c.Y + q.Z * c.Z - q.W > 0f) { inside = false; break; }
+            if (inside) return result;
         }
-
-        float d = touch.Distance;
-        var n = (touch.OnAxis - touch.Point) / d;
+        float best = float.MaxValue;
+        Vector3 p = default;
+        for (int t = 0; t + 2 < v.Length; t += 3)
+        {
+            var q = ClosestOnTriangle(c, v[t], v[t + 1], v[t + 2]);
+            float d2 = Vector3.DistanceSquared(q, c);
+            if (d2 < best) { best = d2; p = q; }
+        }
+        if (best >= r * r || p.Y <= centreY) return result;
+        float d = MathF.Sqrt(best);
         depth = r - d;
-        float vy = touch.OnAxis.Y - touch.Point.Y;
-        float hx = touch.OnAxis.X - touch.Point.X, hz = touch.OnAxis.Z - touch.Point.Z;
+        float vy = centreY - p.Y;                                         // negative: the point is above the rim
+        float hx = -p.X, hz = -p.Z;
         float hh = MathF.Sqrt(hx * hx + hz * hz);
-
-        if (n.Y >= WalkableCos)
+        if (airborne && d > 1e-6f && vy / d <= -WalkableCos)
         {
-            // A floor. On the ground the probe stands on it; coming down, the feet land on the point met.
-            if (!airborne || touch.Point.Y <= 0f) return result;
-            result.IsColliding = true;
-            result.Normal = Vector3.UnitY;
-            result.Penetration = touch.Point.Y;
-            return result;
-        }
-        if (n.Y <= -WalkableCos && airborne)
-        {
-            // A ceiling over a body in the air: down until its top clears it.
             result.IsColliding = true;
             result.Normal = -Vector3.UnitY;
             result.Penetration = MathF.Sqrt(MathF.Max(0f, r * r - hh * hh)) + vy;
             return result;
         }
-        // A wall (or a ceiling over a body on the ground): out across the ground until the distance from the
-        // axis is the radius, at the height it was met.
-        if (hh < 1e-6f)
-        {
-            // Straight over or under the axis with no way across given: as the cylinder.
-            var c = CylinderCore(v, planes, r, body.Bottom, body.Top, 0.5f * (body.Bottom + body.Top), canGoDown: false);
-            if (c.IsColliding && c.Normal.Y == 0f) return c;
-            return result;
-        }
+        if (hh <= LandingReach) { depth = 0f; return result; }
+        result.Penetration = MathF.Sqrt(MathF.Max(0f, r * r - vy * vy)) - hh;
+        if (result.Penetration <= 0f) { depth = 0f; return result; }
         result.IsColliding = true;
         result.Normal = new Vector3(hx / hh, 0f, hz / hh);
-        result.Penetration = MathF.Sqrt(MathF.Max(0f, r * r - vy * vy)) - hh;
-        if (result.Penetration <= 0f) result.IsColliding = false;
         return result;
-    }
-
-    /// <summary>
-    /// The nearest point of a convex piece to the vertical segment x = z = 0, y in [a, b], within
-    /// <paramref name="r"/> of it, and whether the segment passes through the piece.
-    /// </summary>
-    private static CapsuleTouch Nearest(ReadOnlySpan<Vector3> v, ReadOnlySpan<Vector4> planes, float a, float b, float r)
-    {
-        // Bounds first: most pieces near a body are not within its radius.
-        var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
-        foreach (var p in v) { lo = Vector3.Min(lo, p); hi = Vector3.Max(hi, p); }
-        float gx = MathF.Max(0f, MathF.Max(lo.X, -hi.X)), gz = MathF.Max(0f, MathF.Max(lo.Z, -hi.Z));
-        float gy = MathF.Max(0f, MathF.Max(lo.Y - b, a - hi.Y));
-        if (gx * gx + gz * gz + gy * gy >= r * r) return default;
-        if (planes.Length > 0 && AxisInside(planes, a, b)) return new CapsuleTouch(true, true, default, default, 0f);
-
-        float best = float.MaxValue;
-        Vector3 bp = default, bq = default;
-        var s0 = new Vector3(0f, a, 0f); var s1 = new Vector3(0f, b, 0f);
-        for (int t = 0; t + 2 < v.Length; t += 3)
-        {
-            Vector3 p0 = v[t], p1 = v[t + 1], p2 = v[t + 2];
-            // The segment's ends against the triangle, and the segment against each edge.
-            Consider(ClosestOnTriangle(s0, p0, p1, p2), s0, ref best, ref bp, ref bq);
-            Consider(ClosestOnTriangle(s1, p0, p1, p2), s1, ref best, ref bp, ref bq);
-            SegmentEdge(a, b, p0, p1, ref best, ref bp, ref bq);
-            SegmentEdge(a, b, p1, p2, ref best, ref bp, ref bq);
-            SegmentEdge(a, b, p2, p0, ref best, ref bp, ref bq);
-            // A face the segment passes straight through would put the axis inside; the planes said not.
-        }
-        if (best >= r * r) return default;
-        return new CapsuleTouch(true, false, bp, bq, MathF.Sqrt(best));
-    }
-
-    private static void Consider(Vector3 onPiece, Vector3 onAxis, ref float best, ref Vector3 bp, ref Vector3 bq)
-    {
-        float d = Vector3.DistanceSquared(onPiece, onAxis);
-        if (d < best) { best = d; bp = onPiece; bq = onAxis; }
-    }
-
-    /// <summary>The nearest points between the axis segment (0, a..b, 0) and the edge p-q.</summary>
-    private static void SegmentEdge(float a, float b, Vector3 p, Vector3 q, ref float best, ref Vector3 bp, ref Vector3 bq)
-    {
-        // Ericson, Real-Time Collision Detection 5.1.9, with the first segment vertical.
-        var d1 = new Vector3(0f, b - a, 0f);
-        var d2 = q - p;
-        var rr = new Vector3(0f, a, 0f) - p;
-        float aa = d1.Y * d1.Y, e = Vector3.Dot(d2, d2), f = Vector3.Dot(d2, rr);
-        float s, t;
-        if (aa <= 1e-12f && e <= 1e-12f) { s = t = 0f; }
-        else if (aa <= 1e-12f) { s = 0f; t = Math.Clamp(f / e, 0f, 1f); }
-        else
-        {
-            float c = d1.Y * rr.Y;
-            if (e <= 1e-12f) { t = 0f; s = Math.Clamp(-c / aa, 0f, 1f); }
-            else
-            {
-                float bb = d1.Y * d2.Y;
-                float denom = aa * e - bb * bb;
-                s = denom != 0f ? Math.Clamp((bb * f - c * e) / denom, 0f, 1f) : 0f;
-                t = (bb * s + f) / e;
-                if (t < 0f) { t = 0f; s = Math.Clamp(-c / aa, 0f, 1f); }
-                else if (t > 1f) { t = 1f; s = Math.Clamp((bb - c) / aa, 0f, 1f); }
-            }
-        }
-        var onAxis = new Vector3(0f, a + s * (b - a), 0f);
-        var onEdge = p + d2 * t;
-        Consider(onEdge, onAxis, ref best, ref bp, ref bq);
     }
 
     /// <summary>The point of triangle abc nearest to p (Ericson 5.1.5).</summary>

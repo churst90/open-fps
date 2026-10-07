@@ -494,14 +494,15 @@ public static class GeometryParitySpike
                 Vector3 a = p, av = Vector3.Zero, b = p, bv = Vector3.Zero, cc = p + new Vector3(1e-4f, 0, 0), cv = Vector3.Zero;
                 var dirNow = input;
                 float worst = 0f, worstControl = 0f; int partedAt = -1; bool flight = false;
-                float distA = 0f, distB = 0f;
+                float distA = 0f, distB = 0f, firstCylinderStep = 0f;
                 var trace = args.Contains("capsuledebug") ? new List<string>() : null;
                 for (int k = 0; k < 90; k++)
                 {
                     if (k % 20 == 0) dirNow = Vector3.Normalize(new Vector3((float)(rng.NextDouble() * 2 - 1), 0, (float)(rng.NextDouble() * 2 - 1)));
                     var (wasA, wasB) = (a, b);
-                    trace?.Add($"    {k}: dir {V(dirNow)} cylinder {a.X:F3},{a.Y:F3},{a.Z:F3} capsule {b.X:F3},{b.Y:F3},{b.Z:F3}");
+                    trace?.Add($"    {k}: dir {V(dirNow)} cylinder {a.X:F3},{a.Y:F3},{a.Z:F3} capsule {b.X:F3},{b.Y:F3},{b.Z:F3}" + (k == 0 ? SolidsNear(geo, b) : ""));
                     (a, av, _) = StepOnServer(ecs, grid, geo, serverUnindexed, a, av, dirNow, sprint, data, BodyShape.Cylinder);
+                    if (k == 0) firstCylinderStep = new Vector2(a.X - wasA.X, a.Z - wasA.Z).Length();
                     (cc, cv, _) = StepOnServer(ecs, grid, geo, serverUnindexed, cc, cv, dirNow, sprint, data, BodyShape.Cylinder);
                     (b, bv, _) = StepOnServer(ecs, grid, geo, serverUnindexed, b, bv, dirNow, sprint, data, BodyShape.Capsule, out float gr);
                     if (gr != 0f) flight = true;
@@ -517,6 +518,16 @@ public static class GeometryParitySpike
                 if (distA > 0.5f) travel.Add(distB / distA);
                 if (partedAt < 0) { walks.Same++; continue; }
                 if (flight) { onFlights++; walks.Ties++; walks.Same++; walks.TiePairs["on a flight or a slope: slower by the grade"] = walks.TiePairs.GetValueOrDefault("on a flight or a slope: slower by the grade") + 1; continue; }
+                if (partedAt <= 1 && firstCylinderStep > 0.5f)
+                {
+                    const string eject = "the cylinder put out through a wall by a ceiling over its head (standing on a sofa); the capsule stays";
+                    walks.Ties++; walks.Same++; walks.TiePairs[eject] = walks.TiePairs.GetValueOrDefault(eject) + 1; continue;
+                }
+                if (Vector3.Distance(a, b) < 0.01f)
+                {
+                    const string tick = "the same walk, a step up a tick apart (the cylinder lifted for a tick; the probe stood the capsule on it)";
+                    walks.Ties++; walks.Same++; walks.TiePairs[tick] = walks.TiePairs.GetValueOrDefault(tick) + 1; continue;
+                }
                 walks.Differ("parted by over 1 cm", $"from {V(p)}: at step {partedAt}, worst {worst * 1000:F0} mm; the capsule walked {distB:F2} m, the cylinder {distA:F2} m"
                                                     + $" (the cylinder from 0.1 mm aside: {worstControl * 1000:F1} mm)"
                                                     + (trace != null && walks.Shown.Count < show ? "\n" + string.Join("\n", trace.Skip(Math.Max(0, partedAt - 4)).Take(10)) + WhatTouches(geo, trace.Count > 0 ? b : b) : ""), show);
@@ -1315,6 +1326,14 @@ public static class GeometryParitySpike
                 }
             }
         }
+    }
+
+    /// <summary>Every solid whose bounds come within half a metre of a body standing at <paramref name="feet"/>.</summary>
+    private static string SolidsNear(TriangleWorld world, Vector3 feet)
+    {
+        var near = new List<SolidRef>(); var all = new AcceptAll();
+        world.Overlapping(feet - new Vector3(0.8f, 0.5f, 0.8f), feet + new Vector3(0.8f, 2.3f, 0.8f), GeometryLayers.Movement, ref all, near);
+        return string.Concat(near.Select(s => { var (lo, hi) = world.BoundsOf(s); return $"\n        #{world.OwnerOf(s)} {V(lo)} to {V(hi)} {world.SurfaceOf(s).Material}"; }));
     }
 
     /// <summary>Why a step parts the capsule from the cylinder: what each touches at the end.</summary>

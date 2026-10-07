@@ -287,17 +287,7 @@ public static class SharedMovementEngine
         // Only for a body that is NOT already going up or down: one that has jumped, or is genuinely
         // falling, keeps the old tolerance, so walking off a roof is still walking off a roof.
         float stepDown = vel.Y > -0.01f && vel.Y < 0.01f ? MathF.Max(0.1f, ctx.StepHeight) : 0.1f;
-        // ── A falling capsule is not lifted onto a ledge beside it ──────────────────────────────
-        //
-        // The probe looks a body's radius out on every side, which is the cylinder's footprint: the
-        // cylinder was kept that far from any wall it fell past, so whatever a probe found under it
-        // was under its feet. The capsule's rounded bottom lets a falling body come within a few
-        // centimetres of a ledge just above its feet, a probe finds the ledge, and the body was put
-        // up on it, over and over, all the way along a building's wall (RoofEdgeFallTests). A body on
-        // its way down stands on something above its feet only if it comes down on it, which its own
-        // contact with it says (SolidContact.CapsuleOverlap's floor).
-        bool falling = ctx.Body == OpenFPS.Common.Geometry.BodyShape.Capsule && vel.Y < -0.01f && ctx.GroundHeight > pos.Y;
-        if (pos.Y <= ctx.GroundHeight + stepDown && vel.Y <= 0.1f && !falling)
+        if (pos.Y <= ctx.GroundHeight + stepDown && vel.Y <= 0.1f)
         {
             if (ctx.GroundHeight > DefaultGroundCheckLimit) // Valid ground check
             {
@@ -418,10 +408,14 @@ public static class SharedMovementEngine
             {
                 Vector3 stepTarget = nextPos + new Vector3(0, ctx.StepHeight, 0);
                 bool stepBlocked = false;
+                // Whether the body fits up there is asked of the cylinder, whatever the body: its flat
+                // bottom a hand's breadth over the lifted feet is what makes StepHeight the most a body
+                // climbs. The capsule's rounded bottom fits past an edge up to 0.85 m high when it is not
+                // right against it, and the ground probe then stood it on top: a body walked up a 56 cm
+                // ledge the cylinder could not (the parity harness, the city's Kestrel Street steps).
                 for (int j = 0; j < nearbyColliders.Count; j++)
                 {
-                    if (capsule ? nearbyColliders.CapsuleDepth(j, stepTarget, body) > 0f
-                                : nearbyColliders.Intersects(j, stepTarget + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight))
+                    if (nearbyColliders.Intersects(j, stepTarget + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight))
                     {
                         stepBlocked = true;
                         break;
@@ -508,8 +502,7 @@ public static class SharedMovementEngine
         if (pos.Z > maxZ) { pos.Z = maxZ; vel.Z = 0; }
 
         // --- 5. FINAL POST-STEP GROUND CHECK ---
-        // (Not for a capsule falling past a ledge above its feet: see the top of the step.)
-        if (ctx.GroundHeight > DefaultGroundCheckLimit && pos.Y < ctx.GroundHeight && !falling)
+        if (ctx.GroundHeight > DefaultGroundCheckLimit && pos.Y < ctx.GroundHeight)
         {
             pos.Y = ctx.GroundHeight;
             if (vel.Y < 0) vel.Y = 0;

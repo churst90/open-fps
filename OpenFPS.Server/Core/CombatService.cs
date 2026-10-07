@@ -673,7 +673,7 @@ public sealed partial class CombatService
                 float u = along / MathF.Max(1e-6f, length);
                 var at = new FlightSample(before.Seconds - t0 + u * SegmentSeconds,
                                           Vector3.Lerp(before.Position, state.Position, u), Vector3.Lerp(before.Velocity, state.Velocity, u));
-                if (!body && !IsGlass(world, hit) && (f.Admin is null or AdminGunMode.Kill) && TryRicochet(f.Seed, bounces, slug, world, hit, at.Position, at.Velocity, out var o, out var normal, out _))
+                if (!body && !IsGlass(world, hit) && (f.Admin is null or AdminGunMode.Kill) && TryRicochet(f.Seed, bounces, slug, world, GeometryOf(grid), hit, at.Position, at.Velocity, out var o, out var normal, out _))
                 {
                     path.Add(at);
                     slug = o.Slug;
@@ -721,11 +721,11 @@ public sealed partial class CombatService
     /// face's material and the grazing angle (<see cref="Ricochet.TryBounce"/>), with dice that are the
     /// flight's own for this bounce, so the flight flown ahead and the real one bounce alike.
     /// </summary>
-    private static bool TryRicochet(int seed, int bounces, Slug slug, World world, Entity hit, Vector3 at, Vector3 velocity,
-                                    out Ricochet.Outcome outcome, out Vector3 normal, out Vector3 face)
+    private static bool TryRicochet(int seed, int bounces, Slug slug, World world, OpenFPS.Common.Geometry.TriangleWorld? geometry, Entity hit,
+                                    Vector3 at, Vector3 velocity, out Ricochet.Outcome outcome, out Vector3 normal, out Vector3 face)
     {
         outcome = default;
-        Face(world, hit, at, velocity, out normal, out face);
+        Face(world, hit, at, velocity, out normal, out face, geometry);
         if (bounces >= MaxBounces || IsPerson(world, hit)) return false;
         var dice = new Random((int)(BulletFlyby.Mix((uint)seed, (uint)bounces + 1u) & 0x7fffffff));
         return Ricochet.TryBounce(MaterialOf(world, hit), velocity, normal, slug, dice, out outcome);
@@ -739,7 +739,8 @@ public sealed partial class CombatService
     /// way), and its size as width, height and thickness, the thickness being the part's extent along
     /// the normal (a wall's face is its length by its height, a floor's its length by its depth).
     /// </summary>
-    internal static void Face(World world, Entity e, Vector3 at, Vector3 velocity, out Vector3 normal, out Vector3 size)
+    internal static void Face(World world, Entity e, Vector3 at, Vector3 velocity, out Vector3 normal, out Vector3 size,
+                              OpenFPS.Common.Geometry.TriangleWorld? geometry = null)
     {
         normal = -Vector3.Normalize(velocity + new Vector3(0f, 0f, 1e-9f));
         size = new Vector3(1f, 1f, 0.1f);
@@ -747,6 +748,20 @@ public sealed partial class CombatService
         var t = world.Get<Transform>(e);
         var c = world.Get<ColliderComponent>(e);
         Vector3 rel = at - t.Position;
+        // The face the round met, from the triangle it met (docs/GEOMETRY.md 3.6): its own normal, right at
+        // an edge and on any shape. The box's largest local axis guessed it, and near an edge of a long wall
+        // the guess was the end of the wall rather than its face.
+        if (c.Shape == ColliderShape.Box && geometry != null && TriangleNormal(geometry, e.Id, at, velocity, out var met))
+        {
+            var local = Vector3.Transform(met, Quaternion.Inverse(t.Rotation));
+            float ax = MathF.Abs(local.X), ay = MathF.Abs(local.Y), az = MathF.Abs(local.Z);
+            if (ax >= ay && ax >= az) size = new Vector3(c.Size.Z, c.Size.Y, c.Size.X);
+            else if (ay >= az) size = new Vector3(c.Size.X, c.Size.Z, c.Size.Y);
+            else size = new Vector3(c.Size.X, c.Size.Y, c.Size.Z);
+            normal = met;
+            if (Vector3.Dot(normal, velocity) > 0f) normal = -normal;
+            return;
+        }
         if (c.Shape == ColliderShape.Box)
         {
             var inverse = Quaternion.Inverse(t.Rotation);
@@ -774,6 +789,32 @@ public sealed partial class CombatService
             size = new Vector3(c.Size.X, c.Size.X, c.Size.X);
         }
         if (Vector3.Dot(normal, velocity) > 0f) normal = -normal;
+    }
+
+    /// <summary>The triangle world a map's grid has, when the game asks it.</summary>
+    private static OpenFPS.Common.Geometry.TriangleWorld? GeometryOf(SpatialGrid<Entity> grid)
+        => OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
+
+    /// <summary>The outward normal of the face of <paramref name="owner"/>'s solid a round met at
+    /// <paramref name="at"/>: a short ray along its way, from just before the point to just past it.</summary>
+    internal static bool TriangleNormal(OpenFPS.Common.Geometry.TriangleWorld geometry, int owner, Vector3 at, Vector3 velocity, out Vector3 normal)
+    {
+        normal = default;
+        float speed = velocity.Length();
+        if (speed < 1e-6f) return false;
+        var d = velocity / speed;
+        var only = new OnlyOwner(owner);
+        if (!geometry.Closest(at - d * 0.05f, d, 0.1f, OpenFPS.Common.Geometry.GeometryLayers.Bullets, OpenFPS.Common.Geometry.RayFaces.Front,
+                              ref only, out var hit)) return false;
+        normal = hit.Normal;
+        return true;
+    }
+
+    private readonly struct OnlyOwner : OpenFPS.Common.Geometry.IGeometryFilter
+    {
+        private readonly int _owner;
+        public OnlyOwner(int owner) => _owner = owner;
+        public bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface) => owner == _owner;
     }
 
     private static bool IsGlass(World world, Entity e)
@@ -906,7 +947,7 @@ public sealed partial class CombatService
         Vector3 velocity = Vector3.Lerp(before.Velocity, after.Velocity, nearest / length);
         float speed = velocity.Length();
         float frac = nearest / length;
-        if (TryRicochet(f.Seed, f.Bounces, f.Slug, world, hitEntity, at, velocity, out var bounce, out var normal, out var face))
+        if (TryRicochet(f.Seed, f.Bounces, f.Slug, world, GeometryOf(grid), hitEntity, at, velocity, out var bounce, out var normal, out var face))
         {
             // It skips: the strike is heard at the face with the energy it left there, and the slug
             // flies on from just off the face, tumbling, to be met by whatever is in its new way.
