@@ -83,6 +83,44 @@ Recent work, newest first. `git log` has the rest.
     Magnolia's buildings and 138 of Albany's stood across a 250 m edge; both maps regenerated (only
     Tile tags moved). The server's MapTiles works from geometry and is unchanged.
   - AudioLab `--game-levels set=faults|faults-ac` renders the scenes.
+- Driving controls and aids (docs/DRIVING_AIDS.md). Not yet heard by Cody.
+  - Horn: hold H in the driver's seat. The vehicle's own horn (electric on cars, air on trucks and
+    buses) sounds for as long as the key is down, from the front of the vehicle, for everyone near.
+    `/horn` gives a half-second blast. H on foot still says your health; Shift+H says it in a seat.
+  - Siren: U switches it on or off, Shift+U steps wail, yelp, phaser. `/siren` takes a tone by name
+    (and `hilo`). It stays on when you get out. Traffic police cars still decide for themselves.
+  - Horns and siren heads sit a quarter of a metre in from the nose of the body, not 1.9 m ahead of
+    the middle of every vehicle: a bus's horn was 3.8 m inside the bus.
+  - The map's roads, junctions, level crossings and drivable tracks now go to the client (a new
+    MapRoads message), and the driving sounds plan from them:
+    - J and L are the indicators in the driver's seat, with a flasher relay in the dash. The
+      indicator says which way you will turn at the next junction; it switches itself off after the
+      turn.
+    - The guide beep follows the line through bends and into the indicated turn, closer in on a
+      tight turn.
+    - The brake cue: a falling note toward what you must slow for (a bend or turn, a give-way line,
+      a closed crossing, the end of the road), faster and higher as the braking needed nears the
+      tyres' grip, sooner on a wet road.
+    - A wheel on the centre line clacks over raised markers; on the edge, a rumble strip.
+    - The speed limit is spoken with the road name; two notes play when you are 5 km/h over.
+    - "Give way" and "Turning right onto ..." with the junction; "Level crossing in N metres", and
+      "closed" while its bells ring.
+    - Shift+K switches every driving sound; `/drivecues` and the settings switch each one.
+  - A scripted drive (DrivingCueDrillTests) into a right turn at 40, 50 and 65 km/h, dry and wet:
+    braking on the spoken junction alone ran 1.8 m (dry) and 25.8 m (wet) over the centre line from
+    65 km/h; braking on the brake cue it never crossed it and used at most 72 % of the grip.
+  - Level crossings: each tyre strikes each rail (a tread and cavity thump through the wheel's own
+    tyre path, inside and out). A gate on each road approach goes down 4 s after the bells, in 12 s,
+    and rises in 9 s, with its motor and the clunk at each end.
+  - Main Street crossed the rail line at grade with no crossing declared; it has one now, with bells
+    and gates, and its traffic stops for the trams.
+  - Aircraft land: an approach flies down to the runway at its approach speed, touches down, rolls
+    out on its type's landing roll, turns round on the runway, holds, and takes off back up the line
+    (piston single, turboprop, airliner; the helicopter as before). On the ground the power follows
+    what the aeroplane is doing: take-off power, reversers, idle.
+  - AudioLab `--driving out=DIR [set=horn|siren|bend|rails|gates|aircraft]`. Renders and
+    measurements: inbox/driving-2026-10-06 with a README.
+
 - Inside a vehicle, its sound comes from where it gets in (unheard). Cody: "the inside of the cab of
   the cars sounds mono". It was one voice from one point ahead of you and below; the ears matched 0.97
   to 1.00 from 125 Hz to 1 kHz at a cruise. The interior model is now split into its paths, each played

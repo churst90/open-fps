@@ -132,6 +132,7 @@ public static class MovementSystem
                         && world.IsAlive(vehicle))
                     {
                         DrivingSystem.ApplyControls(world, vehicle, input);
+                        VehicleSignals.Horn(vehicle.Id, input.Horn);
                     }
                     continue;
                 }

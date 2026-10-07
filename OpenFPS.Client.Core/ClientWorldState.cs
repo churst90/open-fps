@@ -26,6 +26,8 @@ public class ClientWorldState
         => _serverTransforms.TryGetValue(entityId, out transform);
     private readonly ConcurrentDictionary<int, Vector3> _serverVelocities = new();
     private readonly ConcurrentDictionary<int, float> _serverTyreDemand = new();
+    /// <summary>Each vehicle's horn and siren switches as last sent (EntityState.Signals).</summary>
+    private readonly ConcurrentDictionary<int, byte> _serverSignals = new();
     /// <summary>Each vehicle's wheels, as last sent. Not interpolated: a wheel's load and slip are
     /// read for sound, which smooths what it reads.</summary>
     private readonly ConcurrentDictionary<int, WheelState[]> _serverWheels = new();
@@ -216,6 +218,7 @@ public class ClientWorldState
         _serverTransforms.Clear();
         _serverVelocities.Clear();
         _serverTyreDemand.Clear();
+        _serverSignals.Clear();
         _serverWheels.Clear();
         _audioEntityIds.Clear();
         _regionEntityIds.Clear();
@@ -453,6 +456,7 @@ public class ClientWorldState
             known |= _serverTransforms.TryRemove(id, out _);
             _serverVelocities.TryRemove(id, out _);
             _serverTyreDemand.TryRemove(id, out _);
+            _serverSignals.TryRemove(id, out _);
             _serverWheels.TryRemove(id, out _);
             _audioEntityIds.TryRemove(id, out _);
             _regionEntityIds.TryRemove(id, out _);
@@ -631,6 +635,7 @@ public class ClientWorldState
                         Geometry.NoteMoved(stateTo.EntityId);
                         _serverVelocities[stateTo.EntityId] = Vector3.Lerp(stateFrom.LinearVelocity, stateTo.LinearVelocity, a);
                         _serverTyreDemand[stateTo.EntityId] = stateTo.TyreDemandFraction;
+                        _serverSignals[stateTo.EntityId] = stateTo.Signals;
                         if (stateTo.Wheels != null) _serverWheels[stateTo.EntityId] = stateTo.Wheels;
                     }
                     else
@@ -640,6 +645,7 @@ public class ClientWorldState
                         Geometry.NoteMoved(stateTo.EntityId);
                         _serverVelocities[stateTo.EntityId] = stateTo.LinearVelocity;
                         _serverTyreDemand[stateTo.EntityId] = stateTo.TyreDemandFraction;
+                        _serverSignals[stateTo.EntityId] = stateTo.Signals;
                         if (stateTo.Wheels != null) _serverWheels[stateTo.EntityId] = stateTo.Wheels;
                     }
                 }
@@ -702,6 +708,7 @@ public class ClientWorldState
             Geometry.NoteMoved(id);
             _serverVelocities[id] = state.LinearVelocity;
             _serverTyreDemand[id] = state.TyreDemandFraction;
+            _serverSignals[id] = state.Signals;
             any = true;
         }
         return any;
@@ -715,6 +722,7 @@ public class ClientWorldState
             Geometry.NoteMoved(s.EntityId);
             _serverVelocities[s.EntityId] = s.LinearVelocity;
             _serverTyreDemand[s.EntityId] = s.TyreDemandFraction;
+            _serverSignals[s.EntityId] = s.Signals;
             if (s.Wheels != null) _serverWheels[s.EntityId] = s.Wheels;
         }
         _positionsSampledAt = OpenFPS.Common.AudioClock.Now;
@@ -796,6 +804,7 @@ public class ClientWorldState
                 Transform = _serverTransforms.GetValueOrDefault(id, kvp.Value.Transform),
                 Velocity = _serverVelocities.GetValueOrDefault(id, Vector3.Zero),
                 TyreDemand = _serverTyreDemand.GetValueOrDefault(id, 0f),
+                Signals = _serverSignals.GetValueOrDefault(id),
                 Wheels = _serverWheels.GetValueOrDefault(id),
             };
             snap.Entities[id] = s;

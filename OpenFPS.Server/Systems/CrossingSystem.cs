@@ -37,6 +37,8 @@ public sealed class CrossingSystem
         /// <summary>Where this crossing sits along each rail line that runs through it, metres.</summary>
         public readonly List<(string Track, float At)> OnRail = new();
         public Entity Bell = Entity.Null;
+        /// <summary>A gate on each road approach (see SpawnGates).</summary>
+        public readonly List<Entity> Gates = new();
         public bool Closed;
         /// <summary>How long it has been closed, so a crossing cannot chatter shut and open.</summary>
         public float ClosedFor;
@@ -131,13 +133,92 @@ public sealed class CrossingSystem
                         MinDistance = 3f,
                     }));
 
+                SpawnGates(maps, mapId, c);
                 _crossings.Add(c);
                 Log.Information("Map {Map}: {Name} at {Pos} — on {Rails} rail line(s), bells from {W:F0} m out; "
-                              + "bell entity {Bell} ('{Sound}').",
+                              + "bell entity {Bell} ('{Sound}'), {Gates} gate(s).",
                                 mapId, c.Name, cd.Position, c.OnRail.Count, c.WarningMetres,
                                 c.Bell == Entity.Null ? -1 : c.Bell.Id,
-                                cd.Bell ?? "crossing_gong");
+                                cd.Bell ?? "crossing_gong", c.Gates.Count);
             }
+        }
+    }
+
+    /// <summary>How far from the nearest rail a gate stands, along the road, metres: 12 feet, the usual
+    /// clearance from the rail to the gate mast, inside the 15-foot stop line.</summary>
+    public const float GateFromRail = 3.7f;
+
+    /// <summary>
+    /// A gate on each road approach to the crossing: on the right of the traffic coming toward the
+    /// rails, its mast just off the carriageway, GateFromRail short of the nearest rail. Derived from the
+    /// roads through the crossing, nothing declared, the same way the bell's rails are derived. Each is an
+    /// emitter whose SynthRunning is the crossing's closed state, as the bell's is; the client moves the
+    /// arm and runs its motor from that (GateArm).
+    /// </summary>
+    private void SpawnGates(MapManager maps, string mapId, Crossing c)
+    {
+        if (!maps.TryGetRoads(mapId, out var net)) return;
+        // The rails' direction at the crossing, from the rail line.
+        var (track, at) = c.OnRail[0];
+        Vector3 along = Vector3.UnitX;
+        foreach (var (t, line) in _rail.Lines(mapId))
+            if (string.Equals(t, track, StringComparison.OrdinalIgnoreCase))
+            {
+                line.Sample(at, out _, out float h, out _);
+                along = new Vector3(MathF.Sin(h), 0f, MathF.Cos(h));
+                break;
+            }
+        var railsAcross = new Vector3(along.Z, 0f, -along.X);
+        foreach (var road in net.Roads)
+        {
+            if (road.Centreline.Count < 2) continue;
+            var (s, off) = RoadNetwork.Project(road.Centreline, c.Position);
+            if (off > road.WidthMetres * 0.5f) continue;
+            var dir = RoadNetwork.PointAt(road.Centreline, s + 1f) - RoadNetwork.PointAt(road.Centreline, MathF.Max(0f, s - 1f));
+            dir.Y = 0f;
+            if (dir.LengthSquared() < 1e-6f) continue;
+            dir = Vector3.Normalize(dir);
+            // Along the road, the rails are a rail-centre's half apart over the sine of the angle between.
+            float sin = MathF.Max(0.3f, MathF.Abs(Vector3.Dot(dir, railsAcross)));
+            float back = (CrossingRails.StandardRailCentres * 0.5f + GateFromRail) / sin;
+            var centre = RoadNetwork.PointAt(road.Centreline, s);
+            foreach (float sign in new[] { 1f, -1f })
+            {
+                // Traffic coming toward the rails along `approach`: the gate is behind the rails from
+                // it, on its right.
+                var approach = dir * sign;
+                var right = new Vector3(approach.Z, 0f, -approach.X);
+                var post = centre - approach * back + right * (road.WidthMetres * 0.5f + 0.6f);
+                post.Y = c.Position.Y;
+                var gate = maps.SpawnEntity(mapId, w => w.Create(
+                    EntityType.StaticObject,
+                    new Transform { Position = post + new Vector3(0f, 0.6f, 0f), Rotation = Quaternion.CreateFromYawPitchRoll(MathF.Atan2(-approach.X, -approach.Z), 0f, 0f) },
+                    new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(0.5f, 1.2f, 0.5f), IsSolid = false },
+                    new NameComponent { Name = $"{c.Name} gate" },
+                    new IdentityComponent { Name = $"{c.Name} gate", Description = "a level crossing gate" },
+                    new SoundEmitterComponent
+                    {
+                        IsSynth = true,
+                        SoundId = "gate:" + CrossingGateSpec.Standard.Name,
+                        Mode = PlaybackMode.LoopOne,
+                        Volume = 1f,
+                        Range = Loudness.AudibleRange(CrossingGateSpec.Standard.ClunkDb),
+                        MinDistance = 1f,
+                        SynthRunning = false,
+                    }));
+                if (gate != Entity.Null) c.Gates.Add(gate);
+            }
+        }
+    }
+
+    /// <summary>The gates' posts on a map, for tests and the lab.</summary>
+    public IEnumerable<(string Crossing, Vector3 At)> GatePosts(string mapId, World world)
+    {
+        foreach (var c in _crossings)
+        {
+            if (c.MapId != mapId) continue;
+            foreach (var g in c.Gates)
+                if (world.IsAlive(g)) yield return (c.Name, world.Get<Transform>(g).Position);
         }
     }
 
@@ -220,6 +301,14 @@ public sealed class CrossingSystem
                 }
             }
 
+            foreach (var gate in c.Gates)
+            {
+                if (!world.IsAlive(gate)) continue;
+                ref var gem = ref world.Get<SoundEmitterComponent>(gate);
+                if (gem.SynthRunning == c.Closed) continue;
+                gem.SynthRunning = c.Closed;
+                _resendDefinition?.Invoke(gate.Id);
+            }
             if (c.Bell != Entity.Null && world.IsAlive(c.Bell))
             {
                 ref var em = ref world.Get<SoundEmitterComponent>(c.Bell);
@@ -254,4 +343,42 @@ public sealed class CrossingSystem
     }
 
     public int Count => _crossings.Count;
+
+    /// <summary>
+    /// This map's crossings as the rails lie across the road: the middle of the track at each, from the
+    /// rail line itself rather than the declared point, and the direction the rails run there. What a
+    /// client needs to put a tyre's thump on each rail and a crossing in a driver's path.
+    /// </summary>
+    public IEnumerable<CrossingRails> Rails(string mapId)
+    {
+        foreach (var c in _crossings)
+        {
+            if (c.MapId != mapId) continue;
+            var (track, at) = c.OnRail[0];
+            foreach (var (t, line) in _rail.Lines(mapId))
+            {
+                if (!string.Equals(t, track, StringComparison.OrdinalIgnoreCase)) continue;
+                line.Sample(at, out var centre, out float heading, out _);
+                // Nearest the declared point to a few centimetres: the line is sampled every 2 m.
+                for (float step = 1f; step > 0.02f; step *= 0.5f)
+                {
+                    foreach (float d in new[] { at - step, at + step })
+                    {
+                        line.Sample(d, out var q, out float h, out _);
+                        if (Flat(q - c.Position) < Flat(centre - c.Position)) { centre = q; heading = h; at = d; }
+                    }
+                }
+                yield return new CrossingRails
+                {
+                    Name = c.Name,
+                    Centre = centre,
+                    // A line's heading runs from +z toward +x: (sin h, cos h) on the ground.
+                    Along = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)),
+                };
+                break;
+            }
+        }
+    }
+
+    private static float Flat(Vector3 v) => MathF.Sqrt(v.X * v.X + v.Z * v.Z);
 }

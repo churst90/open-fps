@@ -151287,6 +151287,17 @@
    "WarningSeconds": 20.0,
    "ClearMetres": 35.0,
    "Bell": "crossing_gong"
+  },
+  {
+   "Name": "Main Street crossing",
+   "Position": {
+    "X": 0.0,
+    "Y": 0.95,
+    "Z": -180.0
+   },
+   "WarningSeconds": 20.0,
+   "ClearMetres": 35.0,
+   "Bell": "crossing_gong"
   }
  ],
  "Composites": [

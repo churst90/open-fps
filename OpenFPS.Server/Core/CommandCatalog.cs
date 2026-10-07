@@ -65,6 +65,8 @@ public static class CommandCatalog
         E("Doors and vehicles", "seats", "/seats", "the seats of the vehicle beside you"),
         E("Doors and vehicles", "window", "/window [down|up|half]", "roll the side windows the other way, or down, up or half way; R in a vehicle", "windows"),
         E("Doors and vehicles", "ignition", "/ignition [on|off]", "start or stop the engine from the driver's seat", "key"),
+        E("Doors and vehicles", "horn", "/horn", "a short blast on the horn from the driver's seat; hold H to sound it for as long as you like"),
+        E("Doors and vehicles", "siren", "/siren [on|off|wail|yelp|phaser|hilo|next]", "the siren, on a vehicle that has one: U switches it, Shift+U changes the tone"),
         E("People", "friend", "/friend add NAME, /friend remove NAME", "your friends list", "unfriend"),
         E("People", "friends", "/friends", "your friends and who is online"),
         E("People", "profile", "/profile [NAME]", "a player's role, status and map", "whois"),

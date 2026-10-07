@@ -28,6 +28,7 @@ namespace OpenFPS.Common.Networking;
 /// step is 0.03 m/s² — under every threshold that reads it. Fast things (a car on the speedway, an
 /// aircraft, a bullet) keep their floats, so nothing there changes at all;</item>
 /// <item>the tyre demand byte, when it is not zero;</item>
+/// <item>the horn and siren byte (EntityState.Signals), when it is not zero;</item>
 /// <item>the wheels, a count and eight bytes each, when they are sent.</item>
 /// </list>
 ///
@@ -40,7 +41,7 @@ public static class StatePacking
     public const float MillimetreRange = short.MaxValue / 1000f;
 
     private const byte VelocityNone = 0, VelocityMillimetres = 1, VelocityFloats = 2, VelocityMask = 3;
-    private const byte HasTyreDemand = 4, HasWheels = 8;
+    private const byte HasTyreDemand = 4, HasWheels = 8, HasSignals = 16;
 
     /// <summary>One wheel on the wire, as its bytes: the struct's own size, which grows when a field is
     /// appended to it (WheelState.Water made it ten).</summary>
@@ -48,7 +49,7 @@ public static class StatePacking
 
     /// <summary>The largest one state can pack to: id, flags, position, rotation, float velocity,
     /// demand, and a count. Wheels are on top of this.</summary>
-    private const int MaxFixedBytes = 5 + 1 + 12 + 6 + 12 + 1 + 1;
+    private const int MaxFixedBytes = 5 + 1 + 12 + 6 + 12 + 1 + 1 + 1;
 
     /// <summary>
     /// The velocity the client will be given for this one: what the wire carries, so that the server can
@@ -124,6 +125,7 @@ public static class StatePacking
                 break;
         }
         if (s.TyreDemand != 0) { flags |= HasTyreDemand; into[at++] = s.TyreDemand; }
+        if (s.Signals != 0) { flags |= HasSignals; into[at++] = s.Signals; }
         if (s.Wheels != null)
         {
             flags |= HasWheels;
@@ -173,6 +175,7 @@ public static class StatePacking
                     break;
             }
             if ((flags & HasTyreDemand) != 0) s.TyreDemand = data[at++];
+            if ((flags & HasSignals) != 0) s.Signals = data[at++];
             if ((flags & HasWheels) != 0)
             {
                 int n = data[at++];

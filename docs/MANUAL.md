@@ -115,7 +115,7 @@ degrees a second. You cannot turn while riding in a vehicle: you face the way it
 | Comma, period | Step to the previous or next thing of the chosen kind, nearest first: its name, direction, distance and floor, and its beacon once |
 | Shift+comma, Shift+period | Change the kind: doors, entrances, stairs, items, people, vehicles, places |
 | N | Narration of what is ahead on or off (on by default) |
-| H | Health, in percent |
+| H | Health, in percent (in the driver's seat H is the horn; Shift+H is your health there) |
 | B | How out of breath you are |
 | I | Your inventory as a list (see Lists) |
 | Shift+I | What you are carrying, in one sentence |
@@ -339,6 +339,11 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/seats`: the seats and who is in them.
 - `/ignition on|off` (or `/key on|off`): the engine, from the driver's seat.
 - `/window [down|up|half]` (or `/windows`): the side windows. On its own it winds them the other way.
+- `/horn`: a half-second blast on the horn, from the driver's seat (H held sounds it for as long as you hold it).
+- `/siren [on|off|wail|yelp|phaser|hilo|next]`: the siren, on a vehicle that has one (U and Shift+U).
+  On its own it switches the siren on or off. Naming a tone switches it on in that tone.
+- `/drivecues`: which driving sounds are on. `/drivecues on` or `off` switches all of them (Shift+K);
+  `/drivecues guide|lines|clicks|brake|speed [on|off]` switches one. Saved.
 
 ### Carrying
 - `/take [name]` (or `/get`, `/grab`, `/pickup`).
@@ -580,7 +585,7 @@ value.
 - `/valveflow on|off`: the rush of gas through each exhaust valve as it opens, on every engine.
 
 `/tail`, `/copies`, `/reflections`, `/cabin`, `/echoes` and `/valveflow` last until you quit.
-`/levels`, `/listening`, `/beacons`, `/narrate`, `/bumps`, `/aimassist`, `/detail` and `/track` are saved.
+`/levels`, `/listening`, `/beacons`, `/narrate`, `/bumps`, `/aimassist`, `/detail`, `/track` and `/drivecues` are saved.
 
 `/track KIND` chooses what comma and period step through, like Shift+comma and Shift+period.
 
@@ -631,11 +636,25 @@ In a text (MUD) session you are told the words of anything said within 10 metres
 | A / D, or Left / Right | Steer |
 | Space | Brake (with neither W nor S held) |
 | T / Shift+T | Engine on / off |
+| H, held | Horn, for as long as you hold it |
+| U | Siren on / off (vehicles that have one: the police car) |
+| Shift+U | Next siren tone: wail, yelp, phaser |
+| J / L | Left / right indicator on or off |
 | K | Lane assist on / off |
+| Shift+K | All driving sounds on / off (the spoken road stays) |
 | R | Windows down / up |
-| Z | Road, heading, lane and speed |
+| Z | Road, heading, lane, speed and limit, and the junction and crossing ahead |
+| Shift+H | Your health |
 
-Let go of the keys to coast. There is no horn key yet.
+Let go of the keys to coast.
+
+- **Horn.** Every vehicle has its own: a car's electric horn, an air horn on a truck or a bus.
+  Everyone near hears it, from the front of the vehicle. From inside you hear it through the glass.
+- **Siren.** It keeps sounding when you get out, until you switch it off. Wail is the long sweep,
+  yelp the fast one, phaser the fastest.
+- **Indicators.** The relay ticks in the dashboard. The indicator tells the driving sounds which
+  way you mean to turn at the next junction. It switches itself off once you have turned through
+  45 degrees and straightened up.
 
 ### Driving sounds
 
@@ -646,12 +665,35 @@ Let go of the keys to coast. There is no horn key yet.
 - **Kerb** (low, buzzy): the same for the edge of the road. A steady tone means you are over it.
 - **Turn clicks**: a click for every 15 degrees the car turns; six clicks make a right angle. A
   rising chime when you are lined up with the road.
+- **Guide beep through turns**: on a map with road data the guide beep sits on the line you should
+  drive: down your lane, and at a junction round the turn your indicator points to (straight on
+  without one). Round a tight turn it sits closer to you.
+- **Brake cue**: a short falling note from the direction of whatever you need to slow for: a bend,
+  the turn you have indicated, a give-way line, a closed level crossing, the end of the road. It is
+  silent while nothing ahead needs more than coasting. As the braking you need grows, the notes come
+  faster and higher:
+  - slow, low notes: lift off;
+  - quicker notes: brake now, as for a junction;
+  - fast, high notes: brake hard;
+  - a near-continuous run of notes: you are near the limit of the tyres' grip and may not make it.
+
+  It takes the road's wetness into account: on a wet road it starts sooner.
+- **Rumble**: with a wheel on the centre line you hear raised markers clacking from that side; with
+  a wheel on the kerb-side edge, a rumble strip. Both go faster the faster you drive. Standing still
+  on a line you hear the steady tone as before.
+- **Speed limit**: two falling notes when you are more than 5 km/h over the limit, and again every
+  10 seconds while you stay over.
+- **Rails**: crossing a level crossing you hear each tyre strike each rail.
 
 ### What is spoken
 - The road name and your heading when you join a road.
 - "Junction in" some metres, and which ways you can go.
 - "Road ends in" some metres.
 - "Off the road", then the nearest road and "Follow the beep".
+- The speed limit, with the road name, and again when it changes ("Limit 40").
+- "Junction in N metres, give way" when your road gives way there, and "Turning right onto ..." when
+  your indicator is on.
+- "Level crossing in N metres", and "closed. Stop before it." while its bells ring.
 
 **Lane assist** is on when you start. It keeps you in the middle of your lane unless you steer.
 Press K to switch it off or on.
@@ -666,6 +708,9 @@ Choose Settings from the main menu.
 - **Say what is ahead as you turn and move**: the narration N switches.
 - **Bump and name what you walk into**: the knock and name when you walk into something.
 - **Aim assistance from the hip**: see Guns.
+- **Driving sounds**, and one switch each for **Driving: guide beep**, **line beeps and rumble**,
+  **turn clicks**, **brake cue** and **speed limit warning**. Shift+K in the driver's seat switches
+  them all; `/drivecues` switches one.
 - **Interface sound volume, percent**: 0 to 100.
 - **Open log folder**: opens the folder of the log file the client is writing (set by
   `run-gtk-client.sh`).
@@ -810,6 +855,14 @@ generated map stays what its generator wrote.
 - `Entities`: the objects, each with `PrefabId`, `Position`, `Rotation`, `Scale`, `Name`, and room
   and material settings.
 - `Vehicles`, `Trains`, `Tracks` (routes with waypoints, width, banking and stops), `Crossings`.
+  A crossing is a point on a rail line; the server works out the rest. Each road through it gets a
+  gate on each approach (on the right of the traffic, 3.7 m before the nearest rail); the gates go
+  down 4 s after the bells start, in 12 s, and rise in 9 s once the train has cleared.
+- An aircraft vehicle whose road comes down from the air to within 5 m of the ground is an
+  approach: it lands there, rolls out down the runway on its type's landing roll, turns round,
+  waits `WaitSeconds`, and takes off back up the same line. The runway must be long enough for the
+  type: about 300 m for the light single, 1,000 m for the turboprop, 1,900 m for the airliner. A
+  helicopter, and an aircraft flying level, turn round at the end of their line as before.
 - `Roads` (centreline, type, lanes with direction, width and speed limit, surface stretches) and
   `Junctions` (where roads meet: a point, a radius, a control, the `PriorityRoads` whose traffic
   does not give way, and `GiveWaySeconds`). The server works out the lanes between junctions and

@@ -25,6 +25,20 @@ public static class Honk
     public static string Key(string horn, float[] pattern)
         => Prefix + horn + ":" + string.Join(",", pattern.Select(p => p.ToString("0.###", CultureInfo.InvariantCulture)));
 
+    /// <summary>The word that stands for a rhythm in a held horn's key: blowing for as long as the
+    /// hand is on it, which only the voice's Running flag knows.</summary>
+    public const string HoldWord = "hold";
+
+    /// <summary>
+    /// The key for a horn a driver is holding down. Its pattern is one blast that never ends; the voice
+    /// blows while it is told to run and lets go when it is not, so the horn's own valve or relay ends
+    /// the note (<see cref="Held"/>).
+    /// </summary>
+    public static string HoldKey(string horn) => Prefix + horn + ":" + HoldWord;
+
+    /// <summary>The pattern a held horn parses to: one blast with no end.</summary>
+    public static bool Held(float[] pattern) => pattern.Length == 1 && float.IsPositiveInfinity(pattern[0]);
+
     public static bool TryParse(string? key, out string horn, out float[] pattern)
     {
         horn = ""; pattern = Array.Empty<float>();
@@ -32,6 +46,12 @@ public static class Honk
         string body = key[Prefix.Length..];
         int cut = body.LastIndexOf(':');
         if (cut <= 0) return false;
+        if (string.Equals(body[(cut + 1)..], HoldWord, StringComparison.OrdinalIgnoreCase))
+        {
+            horn = body[..cut];
+            pattern = new[] { float.PositiveInfinity };
+            return true;
+        }
         var parts = body[(cut + 1)..].Split(',', StringSplitOptions.RemoveEmptyEntries);
         var values = new float[parts.Length];
         for (int i = 0; i < parts.Length; i++)

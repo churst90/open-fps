@@ -263,7 +263,10 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.C,
             () => Say(OpenFPS.Common.PlayerCoordinates.Format(_state.Position)));
         _bindings.Bind(InputContext.Gameplay, GameKey.F, () => Say(_state.GetCompassDirection()));
-        _bindings.Bind(InputContext.Gameplay, GameKey.H, () => Say($"{_state.Health} percent"));
+        // H is the horn in the driver's seat (held: GatherInput reads it), and your health everywhere
+        // else. Shift+H is your health in the driver's seat too.
+        _bindings.Bind(InputContext.Gameplay, GameKey.H, () => { if (!_state.RidingControls) Say($"{_state.Health} percent"); });
+        _bindings.Bind(InputContext.Gameplay, GameKey.H, KeyModifiers.Shift, () => Say($"{_state.Health} percent"));
         // Driving, Z is the road: which one, which way, which lane, how fast. On foot it is the area.
         _bindings.Bind(InputContext.Gameplay, GameKey.Z, () =>
             Say(_state.RidingControls && _audioSystem.Driving.Readout is { } road ? road : _state.CurrentRegion));
@@ -311,6 +314,29 @@ public sealed partial class ClientGameSession : IDisposable
         });
         _bindings.Bind(InputContext.Gameplay, GameKey.T, KeyModifiers.Shift,
             () => _network.Send(new TextCommand { Command = "ignition", Args = new[] { "off" } }));
+        // Shift+K: every driving sound on or off at once (the spoken road stays). Saved.
+        _bindings.Bind(InputContext.Gameplay, GameKey.K, KeyModifiers.Shift, () =>
+        {
+            if (!_state.RidingControls) return;
+            DrivingCues.Enabled = !DrivingCues.Enabled;
+            SaveSettings();
+            Say(DrivingCues.Enabled ? "Driving sounds on." : "Driving sounds off.");
+        });
+        // J and L: the left and right indicator in the driver's seat (they turn you on foot, which is
+        // read as a held key and does nothing in a seat). Which way you mean to turn is what the
+        // guide and the brake cue plan the junction ahead by.
+        _bindings.Bind(InputContext.Gameplay, GameKey.J, () => { if (_state.RidingControls) Say(_audioSystem.Driving.ToggleIndicator(-1)); });
+        _bindings.Bind(InputContext.Gameplay, GameKey.L, () => { if (_state.RidingControls) Say(_audioSystem.Driving.ToggleIndicator(+1)); });
+        // U: the siren on or off, on a vehicle that has one; Shift+U its next tone (wail, yelp,
+        // phaser). The server holds the switch and says what it did.
+        _bindings.Bind(InputContext.Gameplay, GameKey.U, () =>
+        {
+            if (_state.RidingControls) _network.Send(new TextCommand { Command = "siren" });
+        });
+        _bindings.Bind(InputContext.Gameplay, GameKey.U, KeyModifiers.Shift, () =>
+        {
+            if (_state.RidingControls) _network.Send(new TextCommand { Command = "siren", Args = new[] { "next" } });
+        });
         _bindings.Bind(InputContext.Gameplay, GameKey.Q, () => _network.Send(new TextCommand { Command = "drop" }));
         // R does what the moment calls for: in a seat it winds the window, with a gun in your hands it
         // reloads it, and otherwise it slings what you hold onto your back. One key for the three,
@@ -889,6 +915,9 @@ public sealed partial class ClientGameSession : IDisposable
                 : Vector3.Normalize(move);
 
         if (held.Contains(GameKey.Space)) input.Jump = true;
+        // The horn, for as long as H is down, in the driver's seat. Every packet says so; the server
+        // lets go of it a few ticks after they stop saying it.
+        input.Horn = _state.RidingControls && !fine && Pressed(GameKey.H);
 
         // Running is a claim about a key, not about a speed: the speed is the server's to apply, and
         // prediction reads the same flag so a stride does not mispredict.
@@ -964,6 +993,9 @@ public sealed partial class ClientGameSession : IDisposable
                 // rather than a boundary the world stops at.
                 _audioSystem.SetMapAmbience(manifest.AmbienceId);
                 _audioSystem.Beacons.SetMapPolicy(manifest.BeaconPolicy);
+                // A new map's roads come with its data; until then there are none.
+                _audioSystem.Driving.SetRoads(null);
+                _audioSystem.SetCrossings(null);
 
                 _expectedEntityCount = manifest.ExpectedEntityCount;
                 _voxelResolution = manifest.VoxelResolution;
@@ -1029,6 +1061,18 @@ public sealed partial class ClientGameSession : IDisposable
                 {
                     _audioSystem.ForgetEntity(goneId);
                     _announcedNearby.Remove(goneId);
+                }
+                break;
+
+            case MapRoads roads:
+                // The roads the driving cues plan from (docs/DRIVING_AIDS.md), and the rails the tyres
+                // strike at a level crossing.
+                {
+                    var data = OpenFPS.Common.RoadMapData.FromJson(roads.Json);
+                    _audioSystem.Driving.SetRoads(data);
+                    _audioSystem.SetCrossings(data?.Crossings);
+                    Serilog.Log.Information("MapRoads for {Map}: {Roads} roads, {Crossings} level crossings, {Tracks} tracks.",
+                                            roads.MapName, data?.Roads.Count ?? 0, data?.Crossings.Count ?? 0, data?.Tracks.Count ?? 0);
                 }
                 break;
 
@@ -1406,6 +1450,31 @@ public sealed partial class ClientGameSession : IDisposable
         }
         send = new TextCommand { Command = "detail", Args = new[] { WorldDetail.Level } };
         return null;
+    }
+
+    /// <summary>
+    /// /drivecues [NAME on|off | on|off]: the driving sounds. On its own, which are on; with a name
+    /// (guide, lines, clicks, brake, speed) that one; with only on or off, all of them (Shift+K). Saved.
+    /// </summary>
+    internal static string DriveCuesCommand(string[] args, Action? save = null)
+    {
+        string Each() => string.Join(", ", DrivingCues.Names.Select(n => $"{n.What} {(DrivingCues.Get(n.Name) ? "on" : "off")}"));
+        if (args.Length == 0)
+            return $"Driving sounds {(DrivingCues.Enabled ? "on" : "off")}: {Each()}.";
+        string first = args[0].ToLowerInvariant();
+        if (first is "on" or "off")
+        {
+            DrivingCues.Enabled = first == "on";
+            (save ?? SaveSettings)();
+            return DrivingCues.Enabled ? "Driving sounds on." : "Driving sounds off.";
+        }
+        var named = DrivingCues.Names.FirstOrDefault(n => n.Name == first);
+        if (named.Name == null)
+            return "Say /drivecues, /drivecues on or off, or /drivecues guide, lines, clicks, brake or speed, then on or off.";
+        bool now = args.Length > 1 ? args[1].ToLowerInvariant() == "on" : !DrivingCues.Get(first);
+        DrivingCues.Set(first, now);
+        (save ?? SaveSettings)();
+        return $"{char.ToUpperInvariant(named.What[0])}{named.What[1..]} {(now ? "on" : "off")}.";
     }
 
     /// <summary>/narrate on|off and /bumps on|off: the two navigation aids, switched and saved.</summary>
@@ -1803,6 +1872,12 @@ public sealed partial class ClientGameSession : IDisposable
             if (parts[0].ToLowerInvariant() is "scope" or "zoom" or "range" or "zero")
             {
                 if (ScopeCommand(parts[0].ToLowerInvariant(), parts.Skip(1).ToArray()) is { } answer) Say(answer);
+                return;
+            }
+            // So are the driving sounds.
+            if (parts[0].Equals("drivecues", StringComparison.OrdinalIgnoreCase))
+            {
+                Say(DriveCuesCommand(parts.Skip(1).ToArray()));
                 return;
             }
             // So are the navigation aids.

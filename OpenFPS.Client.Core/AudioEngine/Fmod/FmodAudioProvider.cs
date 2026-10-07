@@ -116,8 +116,14 @@ internal class FmodResourceManager : IDisposable
             return false;
         }
         _cache[soundId] = sound;
+        _registeredPcm.Add(soundId);
         return true;
     }
+
+    /// <summary>Sounds made in memory (RegisterPcmFloat). One of these asked for as a loop is the same
+    /// sound with its channel set to loop: there is no file to load a looping copy from.</summary>
+    private readonly HashSet<string> _registeredPcm = new();
+    public bool IsRegisteredPcm(string soundId) => _registeredPcm.Contains(soundId);
 
     public bool RegisterPcm(string soundId, byte[] pcm16Mono, int sampleRate)
     {
@@ -171,6 +177,7 @@ internal class FmodResourceManager : IDisposable
         if (string.IsNullOrEmpty(soundId)) return SoundLoadState.Missing;
 
         string cacheKey = soundId + (loop ? "_L" : "");
+        if (loop && _registeredPcm.Contains(soundId)) cacheKey = soundId;
         if (_cache.TryGetValue(cacheKey, out sound))
         {
             // NONBLOCKING loads complete asynchronously — verify the sound is ready before use.
@@ -577,6 +584,9 @@ public partial class FmodAudioProvider : IAudioProvider
         public bool FollowsListener;
         public bool InsideListenersVehicle;
         public Vector3 ListenerOffset;
+        /// <summary>The last batch of wheel strikes handed to this voice's engine: an emitter is applied
+        /// over and over until the next one comes, and a batch must be queued once.</summary>
+        public OpenFPS.Client.AudioEngine.Core.WheelStrike[]? LastStrikes;
         /// <summary>The direction (Steam Audio's frame) the cabin path's HRTF trim was last worked out for.</summary>
         public Vector3 CabinTrimDir;
 
@@ -2928,6 +2938,9 @@ public partial class FmodAudioProvider : IAudioProvider
                     // BellVoiceState for why this one cannot be worked out locally.
                     "bell" => new BellVoiceState(OpenFPS.Common.ModelLibrary.Bell(preset),
                                                  mrate, emitter.EntityId * 13 + 5),
+                    // A level crossing's gate: the arm follows the crossing's closed signal (the
+                    // emitter's Running, the server's word), so it starts where the crossing is.
+                    "gate" => new GateVoiceState(OpenFPS.Common.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
                     // Water, fire and wind in leaves read the wind where they stand, so they are
                     // given their place. See NatureVoiceState.
                     "water" => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position, emitter),
@@ -2996,6 +3009,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // The car is already doing this speed; start the engine in that state rather than
             // spinning it up from rest inside the first eighty milliseconds.
             engineState.PlaceAtSpeed(emitter.EngineSpeed);
+            if (emitter.WheelStrikes != null) engineState.QueueStrikes(emitter.WheelStrikes);
             if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var localListener))
                 engineState.SetListener(localListener);
             if (EngineProcessor.CreateDSP(_system, engineState, out engineDsp, out engineHandle) != RESULT.OK) return;
@@ -3058,6 +3072,12 @@ public partial class FmodAudioProvider : IAudioProvider
                 return;
             }
             channel.setMode(MODE._3D | Rolloff.Mode);
+            // A sound made in memory has no looping copy: its channel loops instead.
+            if (loopNative && _resources.IsRegisteredPcm(emitter.SoundId))
+            {
+                channel.setMode(MODE.LOOP_NORMAL);
+                channel.setLoopCount(-1);
+            }
         }
 
         if (_audioDebug && emitter.Mode == PlaybackMode.LoopOne)
@@ -3211,7 +3231,8 @@ public partial class FmodAudioProvider : IAudioProvider
         }
 
         lock (_lock) { 
-            var activeSound = new ActiveSound { 
+            var activeSound = new ActiveSound {
+                LastStrikes = emitter.WheelStrikes, 
                 EntityId = emitter.EntityId, SoundId = emitter.SoundId, Type = emitter.Type, 
                 OverloadExempt = overDb > 0f,
                 Channel = channel, ThreeEqDsp = threeEqDsp, DiffractionDsp = diffractionDsp,
@@ -3414,6 +3435,11 @@ public partial class FmodAudioProvider : IAudioProvider
                     active.EngineState.WindowsOpen = emitter.WindowsOpen;
                     active.EngineState.RoadSlip = emitter.TyreSlip;
                     active.EngineState.Wheels = emitter.Wheels;
+                    if (emitter.WheelStrikes != null && !ReferenceEquals(emitter.WheelStrikes, active.LastStrikes))
+                    {
+                        active.EngineState.QueueStrikes(emitter.WheelStrikes);
+                        active.LastStrikes = emitter.WheelStrikes;
+                    }
                     active.EngineState.RoadWaterMm = emitter.RoadWaterMm;
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var local))
                         active.EngineState.SetListener(local);

@@ -795,6 +795,8 @@ public class GameServer
             float dt = FixedDeltaTime;
             _environment.Update(dt);
             _lightning.Update(dt, _environment.CurrentScenario, _environment.GetCurrentState(), EmitStrike);
+            // Horns whose key has not been reported down for a few ticks are let go.
+            VehicleSignals.Update(dt);
 
             foreach (var entry in _maps.GetAllMaps())
             {
@@ -1286,7 +1288,16 @@ public class GameServer
         }
         else Log.Information("Join of {Map} for {User}: {Count} entities, {KB:F0} KB, {Ms} ms.",
                              session.CurrentMapId, session.Username, staticEntities.Count, bytes / 1024.0, started.ElapsedMilliseconds);
+        bytes += SendCounted(session, RoadsFor(session.CurrentMapId));
         SendToSession(session, new MapLoadComplete());
+    }
+
+    /// <summary>The map's roads, junctions, level crossings and drivable tracks, for a driver's cues.</summary>
+    internal MapRoads RoadsFor(string mapId)
+    {
+        _maps.TryGetMapData(mapId, out var map);
+        var data = MapRoadsBuilder.Build(map, _crossings.Rails(mapId));
+        return new MapRoads { MapName = mapId, Json = data.IsEmpty ? "" : data.ToJson() };
     }
 
     /// <summary>
@@ -1659,6 +1670,9 @@ public class GameServer
                         // Each wheel: its load, slip, speed and the surface under it (WheelDynamics).
                         if (_vehicles.TryGetWheels(e.Id, out var wheels) || DrivingSystem.TryGetWheels(e.Id, out wheels))
                             state.Wheels = wheels;
+                        // A driven vehicle's horn and siren switches: nothing a listener can observe
+                        // says a hand is on the horn.
+                        if (isDynamic) state.Signals = VehicleSignals.WireByte(world, e);
 
                         // A dynamic entity is corrected by the next tick's packet, so losing one costs
                         // nothing. A static entity that moved is a one-off event that nothing will ever

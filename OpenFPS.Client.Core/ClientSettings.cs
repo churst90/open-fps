@@ -78,6 +78,13 @@ public sealed class ClientSettings
     /// <summary>How far round you a large map is loaded: "low", "medium" or "high" (/detail in game).
     /// See <see cref="Core.WorldDetail"/>.</summary>
     public string WorldDetail { get; set; } = "medium";
+    /// <summary>The driving sounds (see <see cref="DrivingCues"/>): all of them (Shift+K), and each one.</summary>
+    public bool DriveCues { get; set; } = true;
+    public bool DriveGuide { get; set; } = true;
+    public bool DriveLineSensors { get; set; } = true;
+    public bool DriveTurnClicks { get; set; } = true;
+    public bool DriveBrakeCue { get; set; } = true;
+    public bool DriveSpeedWarning { get; set; } = true;
 
     /// <summary>Puts this file's navigation aids into play. Each head calls it once, after loading.</summary>
     public void ApplyNavigationAids()
@@ -86,6 +93,12 @@ public sealed class ClientSettings
         NavigationAids.WallBumps = WallBumps;
         NavigationAids.AimAssist = AimAssist;
         NavigationAids.Track = MapTracker.Parse(TrackCategory) ?? Core.TrackCategory.Doors;
+        DrivingCues.Enabled = DriveCues;
+        DrivingCues.Guide = DriveGuide;
+        DrivingCues.LineSensors = DriveLineSensors;
+        DrivingCues.TurnClicks = DriveTurnClicks;
+        DrivingCues.BrakeCue = DriveBrakeCue;
+        DrivingCues.SpeedWarning = DriveSpeedWarning;
         Core.WorldDetail.Level = OpenFPS.Common.StreamRadii.Named(WorldDetail) != null ? WorldDetail.Trim().ToLowerInvariant() : "medium";
     }
 
@@ -155,6 +168,12 @@ public sealed class ClientSettings
         WallBumps = NavigationAids.WallBumps;
         AimAssist = NavigationAids.AimAssist;
         TrackCategory = NavigationAids.Track.ToString();
+        DriveCues = DrivingCues.Enabled;
+        DriveGuide = DrivingCues.Guide;
+        DriveLineSensors = DrivingCues.LineSensors;
+        DriveTurnClicks = DrivingCues.TurnClicks;
+        DriveBrakeCue = DrivingCues.BrakeCue;
+        DriveSpeedWarning = DrivingCues.SpeedWarning;
         WorldDetail = Core.WorldDetail.Level;
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
@@ -179,6 +198,53 @@ public static class NavigationAids
     public static bool AimAssist { get; set; } = true;
     /// <summary>The kind of thing comma and period step through.</summary>
     public static TrackCategory Track { get; set; } = TrackCategory.Doors;
+}
+
+/// <summary>
+/// The driving sounds, each on or off (docs/DRIVING_AIDS.md). <see cref="Enabled"/> is Shift+K: every
+/// one of them at once, the spoken road and the car's own sounds aside. Static for the same reason as
+/// <see cref="NavigationAids"/>.
+/// </summary>
+public static class DrivingCues
+{
+    public static bool Enabled { get; set; } = true;
+    /// <summary>The guide beep on the line ahead.</summary>
+    public static bool Guide { get; set; } = true;
+    /// <summary>The centre-line and kerb beeps, and the rumble of a wheel on a line.</summary>
+    public static bool LineSensors { get; set; } = true;
+    /// <summary>A click every 15 degrees of turn, and the chime when lined up with the road.</summary>
+    public static bool TurnClicks { get; set; } = true;
+    /// <summary>How hard to brake for what is ahead.</summary>
+    public static bool BrakeCue { get; set; } = true;
+    /// <summary>The two notes when you go over the speed limit.</summary>
+    public static bool SpeedWarning { get; set; } = true;
+
+    /// <summary>The names /drivecues takes, and what each one is.</summary>
+    public static readonly (string Name, string What)[] Names =
+    {
+        ("guide", "the guide beep"), ("lines", "line beeps and rumble"), ("clicks", "turn clicks"),
+        ("brake", "the brake cue"), ("speed", "the speed limit warning"),
+    };
+
+    public static bool Get(string name) => name switch
+    {
+        "guide" => Guide, "lines" => LineSensors, "clicks" => TurnClicks, "brake" => BrakeCue, "speed" => SpeedWarning,
+        _ => Enabled,
+    };
+
+    public static bool Set(string name, bool on)
+    {
+        switch (name)
+        {
+            case "guide": Guide = on; return true;
+            case "lines": LineSensors = on; return true;
+            case "clicks": TurnClicks = on; return true;
+            case "brake": BrakeCue = on; return true;
+            case "speed": SpeedWarning = on; return true;
+            case "all": Enabled = on; return true;
+            default: return false;
+        }
+    }
 }
 
 /// <summary>

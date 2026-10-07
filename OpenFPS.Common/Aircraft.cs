@@ -309,6 +309,10 @@ public sealed record AircraftProfile
     /// <summary>The undercarriage, if this aeroplane's is modelled. Only heard on arrival.</summary>
     public LandingGearSpec? Gear { get; init; }
 
+    /// <summary>How it lands, turns round and takes off on a runway (AircraftGroundRun); null for an
+    /// aircraft that does not roll (a helicopter).</summary>
+    public GroundRunSpec? Ground { get; init; }
+
     /// <summary>Overall level at one metre at full power, for placing the voice.</summary>
     public required float SourceLevelDb { get; init; }
 
@@ -339,6 +343,15 @@ public sealed record AircraftProfile
         // stopping a three-foot-a-second sink puts most of the aeroplane's weight on the wheels, and
         // they are up to speed in a twentieth of a second: why a light aircraft's arrival is a
         // chirp and not a scrub.
+        // Cessna 172S Information Manual, sections 4 and 5, at sea level and gross weight: touchdown
+        // about 50 KIAS after a 61 KIAS approach, landing ground roll 575 ft with flaps 30 and maximum
+        // braking; take-off ground roll 960 ft, rotating at 55 KIAS. Taxied at a brisk walk.
+        Ground = new GroundRunSpec
+        {
+            TouchdownSpeedMps = 26f, LandingRollMetres = 175f,
+            RotateSpeedMps = 28f, TakeoffRollMetres = 293f,
+            TaxiSpeedMps = 5f, TurnRadiusMetres = 5f,
+        },
         Gear = new LandingGearSpec
         {
             Tyre = TyreProfile.SportsOnAsphalt with { TreadBlocks = 0, SquealHz = 1250f, SquealQ = 9f, SquealDb = 88f, PeakGripG = 0.7f },
@@ -383,6 +396,16 @@ public sealed record AircraftProfile
         Synchrophased = true,
         EngineSpanMetres = 8.1f,
         WingspanMetres = 27.05f, LengthMetres = 25.7f,
+        // ATR 72-600 (ATR airport planning manual and type figures, sea level, typical weights):
+        // touchdown about 105 kt after a 117 kt approach, landing ground roll about 600 m on the
+        // brakes with ground idle; rotation about 110 kt and a take-off ground roll of about 1,000 m.
+        // Taxied at 15 kt; a 180-degree turn needs about 25 m of pavement.
+        Ground = new GroundRunSpec
+        {
+            TouchdownSpeedMps = 54f, LandingRollMetres = 600f,
+            RotateSpeedMps = 57f, TakeoffRollMetres = 1000f,
+            TaxiSpeedMps = 8f, TurnRadiusMetres = 12f,
+        },
         Gear = new LandingGearSpec
         {
             Tyre = TyreProfile.TruckOnAsphalt with { TreadBlocks = 0, SquealHz = 620f, SquealQ = 7f, SquealDb = 98f, PeakGripG = 0.65f },
@@ -437,6 +460,17 @@ public sealed record AircraftProfile
         // Four main wheels, a hundred and ten kilos each, sixty-five tonnes arriving on them at a
         // hundred and thirty-eight knots, on a third of a metre of oleo. Three tenths of a second of
         // sliding rubber: the touchdown.
+        // A320 (Airbus aircraft characteristics for airport planning, sea level, typical weights):
+        // touchdown about 130 kt after a 138 kt approach, landing ground roll about 1,100 m with
+        // autobrake low and idle reverse (about 0.2 g); rotation about 145 kt and a take-off ground
+        // roll of about 1,800 m. Taxied at 20 kt; a 180-degree turn needs about 23 m of pavement
+        // either side of the nose wheel's path.
+        Ground = new GroundRunSpec
+        {
+            TouchdownSpeedMps = 67f, LandingRollMetres = 1100f,
+            RotateSpeedMps = 75f, TakeoffRollMetres = 1800f,
+            TaxiSpeedMps = 10f, TurnRadiusMetres = 15f,
+        },
         Gear = new LandingGearSpec
         {
             Tyre = TyreProfile.TruckOnAsphalt with { TreadBlocks = 0, SquealHz = 430f, SquealQ = 6f, SquealDb = 108f, PeakGripG = 0.6f },
@@ -498,4 +532,32 @@ public sealed record AircraftProfile
     public static AircraftProfile ByName(string key)
         => Presets.TryGetValue(key, out var make) ? make()
          : throw new ArgumentException($"No aircraft preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
+}
+
+/// <summary>
+/// What an aeroplane does on a runway: how fast it touches down and how far it rolls stopping, how
+/// fast it rotates and how far it runs to get there, the pace it taxis at and how tight it turns.
+/// From each type's published performance; the decelerations and accelerations follow from them
+/// (v^2 / 2s), so nothing about the motion is tuned.
+/// </summary>
+public sealed record GroundRunSpec
+{
+    /// <summary>At the wheels touching, m/s: a little under the approach speed, after the flare.</summary>
+    public required float TouchdownSpeedMps { get; init; }
+    /// <summary>From touchdown to taxi speed, metres.</summary>
+    public required float LandingRollMetres { get; init; }
+    /// <summary>Where the nose comes up and the wheels leave, m/s.</summary>
+    public required float RotateSpeedMps { get; init; }
+    /// <summary>From standing to rotation, metres.</summary>
+    public required float TakeoffRollMetres { get; init; }
+    public float TaxiSpeedMps { get; init; } = 8f;
+    /// <summary>The path of its middle in a 180-degree turn, metres.</summary>
+    public float TurnRadiusMetres { get; init; } = 10f;
+
+    /// <summary>The landing roll's steady deceleration, m/s².</summary>
+    public float LandingDecel => (TouchdownSpeedMps * TouchdownSpeedMps - TaxiSpeedMps * TaxiSpeedMps) / (2f * MathF.Max(1f, LandingRollMetres));
+    /// <summary>The take-off roll's mean acceleration, m/s².</summary>
+    public float TakeoffAccel => RotateSpeedMps * RotateSpeedMps / (2f * MathF.Max(1f, TakeoffRollMetres));
+    /// <summary>The speed it takes the turn at: no more than taxi speed, and no more than a tenth of a g sideways.</summary>
+    public float TurnSpeedMps => MathF.Min(TaxiSpeedMps, MathF.Sqrt(0.1f * 9.80665f * TurnRadiusMetres));
 }

@@ -15,6 +15,8 @@ public sealed class SentState
     /// <summary>As the wire carries it (<see cref="StatePacking.WireVelocity"/>).</summary>
     public Vector3 Velocity;
     public byte TyreDemand;
+    /// <summary>The horn and siren byte (EntityState.Signals).</summary>
+    public byte Signals;
     /// <summary>A copy: the vehicle systems refill one array in place every tick.</summary>
     public WheelState[]? Wheels;
     /// <summary>The tick the state (or the wheels) last differed from the one before it.</summary>
@@ -69,11 +71,13 @@ public static class RestingStates
         bool fresh = !sent.TryGetValue(id, out var last);
         if (fresh) sent[id] = last = new SentState();
 
-        if (fresh || !Same(last!.Transform, state.Transform) || last.Velocity != velocity || last.TyreDemand != state.TyreDemand)
+        if (fresh || !Same(last!.Transform, state.Transform) || last.Velocity != velocity || last.TyreDemand != state.TyreDemand
+            || last.Signals != state.Signals)
         {
             last!.Transform = state.Transform;
             last.Velocity = velocity;
             last.TyreDemand = state.TyreDemand;
+            last.Signals = state.Signals;
             last.ChangedAt = tick;
         }
         if (state.Wheels != null && (last.Wheels == null || !MemoryMarshal.AsBytes(last.Wheels.AsSpan()).SequenceEqual(MemoryMarshal.AsBytes(state.Wheels.AsSpan()))))

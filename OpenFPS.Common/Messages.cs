@@ -47,6 +47,8 @@ namespace OpenFPS.Common.Networking;
 // The world editor (docs/WORLD_EDITOR.md section 6).
 [MemoryPackUnion(40, typeof(EditorMenu))]
 [MemoryPackUnion(41, typeof(ModelUpdate))]
+// 42-43 are free; 44 is the driving aids'.
+[MemoryPackUnion(44, typeof(MapRoads))]
 public partial interface IMessage { }
 
 /// <summary>What choosing an item of the world editor's menu does.</summary>
@@ -244,6 +246,19 @@ public partial class MapManifest : IMessage
     public float TileMetres;
 
     public MapManifest() { }
+}
+
+/// <summary>
+/// The map's roads, junctions, level crossings and drivable tracks (<see cref="OpenFPS.Common.RoadMapData"/>
+/// as JSON), sent with the map's data before MapLoadComplete. A driver's client plans its cues from them:
+/// the lane ahead, the turn, the give-way line, the speed limit, the rails. Empty for a map without.
+/// </summary>
+[MemoryPackable]
+public partial class MapRoads : IMessage
+{
+    public string MapName = "";
+    public string Json = "";
+    public MapRoads() { }
 }
 
 [MemoryPackable]
@@ -488,6 +503,13 @@ public partial struct EntityState
     /// </summary>
     public WheelState[]? Wheels;
 
+    /// <summary>
+    /// A vehicle's horn and siren, as the driver has them switched (<see cref="OpenFPS.Common.VehicleSignalBits"/>):
+    /// the horn held, the siren on, which tone. Zero for anything that is not a player's vehicle. Sent
+    /// because nothing the client can observe says a hand is on the horn. Packed only when not zero.
+    /// </summary>
+    public byte Signals;
+
     public EntityState()
     {
         EntityId = 0;
@@ -683,6 +705,10 @@ public partial class ClientInputUpdate : IMessage
     /// claim that the key was held, and prediction and the authority must read it the same way or
     /// every stride mispredicts.</summary>
     public bool Sprint;
+
+    /// <summary>The horn key is down. Only a driver's counts; the server sounds the horn of the vehicle
+    /// they are driving for as long as it stays down.</summary>
+    public bool Horn;
 }
 
 /// <summary>

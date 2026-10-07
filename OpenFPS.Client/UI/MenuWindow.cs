@@ -320,6 +320,14 @@ public sealed class MenuWindow : Form
         var bumps = Check(layout, "Bump and name what you walk into", NavigationAids.WallBumps);
         // Aim assistance from the hip, which the server applies; /aimassist in game.
         var assist = Check(layout, "Aim assistance from the hip", NavigationAids.AimAssist);
+        // The driving sounds, one each (docs/DRIVING_AIDS.md). Shift+K switches all of them in a car.
+        var driveChecks = new List<(string Name, CheckBox Box)>();
+        foreach (var (name, label) in new[]
+                 {
+                     ("all", "Driving sounds"), ("guide", "Driving: guide beep"), ("lines", "Driving: line beeps and rumble"),
+                     ("clicks", "Driving: turn clicks"), ("brake", "Driving: brake cue"), ("speed", "Driving: speed limit warning"),
+                 })
+            driveChecks.Add((name, Check(layout, label, DrivingCues.Get(name))));
 
         layout.Controls.Add(new Label { Text = "Interface sound volume, percent", AutoSize = true });
         var volume = new NumericUpDown
@@ -343,6 +351,7 @@ public sealed class MenuWindow : Form
             NavigationAids.TurnNarration = narration.Checked;
             NavigationAids.WallBumps = bumps.Checked;
             NavigationAids.AimAssist = assist.Checked;
+            foreach (var (name, box) in driveChecks) DrivingCues.Set(name, box.Checked);
             _settings.Save();
             _services.ApplySettings();
             form.DialogResult = DialogResult.OK;
