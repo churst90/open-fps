@@ -4,6 +4,23 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- Server fixes from todo Now 4-6 and 13, each with a test that failed before it. Wire: one field
+  appended (`ServerStateUpdate.Held`); client and server must be rebuilt together.
+  - `/spawn` on a shipped map (the city, the speedway, the real places) no longer records the walker,
+    train, vehicle or aircraft in the map's data, so `/savemap` does not write it into a generated file.
+    It lasts until a restart, and the reply says so. On a player's map `/savemap` keeps it as before.
+  - A parked aircraft from `/spawn` or `/give` is kept by `/savemap` on a player's map, as a placement
+    `aircraft:PRESET`, and is parked again at load.
+  - Logging out dead, or travelling dead, no longer skips the 60 s wait: the time left is kept with the
+    player and they come back dead at the spawn until it is over.
+  - Nothing can be given to a dead player (`/give` says they are dead); it used to get up with them.
+  - A frozen or dead player's own state says so (`Held`), and the client neither walks nor turns while
+    it is set. It used to predict movement the server refused, and was pulled back every tick.
+  - A huge finite look turn is wrapped to one turn, in double: it used to drive the yaw without bound,
+    and past about 2e38 to NaN.
+  - Phone stories that say "this morning", "today" or "tonight" are told only when that is true, and
+    muttered remarks, thoughts and texts read out are checked against the hour and the weather as the
+    homeless lines are ("Bread, and something for dinner" not at nine in the morning).
 - Sound library, stage 0: three guards for the moves to come (docs/SOUND_LIBRARY_BOUNDARY.md, section
   13). `LibraryBoundaryTests` sorts every file of Common and Client.Core into library or host and fails
   when a library file gains a reference to a host type (607 today, the survey's count exactly).
