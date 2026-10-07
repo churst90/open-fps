@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Threading;
 using Gtk;
 using Serilog;
 using OpenFPS.Common;
@@ -44,7 +41,6 @@ internal static partial class GtkClientProgram
     private static bool _loginRegister;
     /// <summary>The server's shortest password (AuthService.MinPasswordLength).</summary>
     private const int MinPassword = 8;
-    private static Entry? _loginUser;
     private static Label? _loginStatus;
     private static string _loginStatusText = "";
 
@@ -405,7 +401,7 @@ internal static partial class GtkClientProgram
         dialog.SetTransientFor(_mainWindow);
         dialog.SetModal(true);
         dialog.SetDefaultSize(420, 320);
-        dialog.OnCloseRequest += (_, _) => { _loginDialog = null; _loginUser = null; _loginStatus = null; return false; };
+        dialog.OnCloseRequest += (_, _) => { _loginDialog = null; _loginStatus = null; return false; };
         CloseOnEscape(dialog);
 
         var box = VBox(16);
@@ -428,7 +424,6 @@ internal static partial class GtkClientProgram
         remember.SetActive(saved?.RememberPassword ?? false);
         SpeakOnFocus(remember, () => $"Remember password, {(remember.GetActive() ? "checked" : "not checked")}");
         box.Append(remember);
-        _loginUser = user;
 
         void Submit(bool register)
         {
@@ -486,7 +481,7 @@ internal static partial class GtkClientProgram
     private static void CloseLoginDialog()
     {
         var dialog = _loginDialog;
-        _loginDialog = null; _loginUser = null; _loginStatus = null;
+        _loginDialog = null; _loginStatus = null;
         dialog?.Close();
     }
 

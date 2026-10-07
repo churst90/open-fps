@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Gtk.Platform;

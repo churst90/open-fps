@@ -1,4 +1,3 @@
-using System;
 using NAudio.Wave;
 using OpenFPS.Client.Core.Platform;
 

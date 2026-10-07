@@ -1,5 +1,3 @@
-using System;
-using System.Threading;
 using Gtk;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Input;

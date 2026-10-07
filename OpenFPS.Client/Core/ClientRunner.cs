@@ -1,12 +1,7 @@
-using System;
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Windows.Forms;
 using Microsoft.Win32.SafeHandles;
 using OpenFPS.Common;
-using OpenFPS.Common.Networking;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.Core.Session;
@@ -87,7 +82,7 @@ public class ClientRunner
             loadingFactory: () => new LoadingWindow(_speech),
             gameFactory: () => new MainWindow(_session.Input, _speech, cue => _session.Ui.Play(cue)));
 
-        var shell = new WinFormsClientShell(_navigation, _speech, cue => _session?.Ui.Play(cue),
+        var shell = new WinFormsClientShell(_navigation, _speech,
                                             quit: () => _navigation.EnqueueUIAction(Application.Exit));
 
         _session = new ClientGameSession(_network, _speech, shell, _audio, _microphone);

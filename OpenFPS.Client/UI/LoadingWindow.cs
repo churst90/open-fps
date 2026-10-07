@@ -1,6 +1,3 @@
-using System;
-using System.Drawing;
-using System.Windows.Forms;
 using OpenFPS.Client.Services;
 
 namespace OpenFPS.Client.UI;

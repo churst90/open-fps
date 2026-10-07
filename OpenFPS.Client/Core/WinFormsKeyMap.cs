@@ -1,4 +1,3 @@
-using System.Windows.Forms;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Core;

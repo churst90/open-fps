@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Gtk.Platform;

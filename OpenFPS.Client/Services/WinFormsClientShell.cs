@@ -1,6 +1,3 @@
-using System;
-using System.Windows.Forms;
-using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.UI;
 
@@ -18,17 +15,15 @@ public sealed class WinFormsClientShell : IClientShell
 {
     private readonly ClientNavigationService _navigation;
     private readonly NvdaSpeechOutput _speech;
-    private readonly Action<UiCue> _cue;
     private readonly Action _quit;
     private MainWindow? _gameWindow;
 
     public event Action<string>? CommandEntered;
 
-    public WinFormsClientShell(ClientNavigationService navigation, NvdaSpeechOutput speech, Action<UiCue> cue, Action quit)
+    public WinFormsClientShell(ClientNavigationService navigation, NvdaSpeechOutput speech, Action quit)
     {
         _navigation = navigation;
         _speech = speech;
-        _cue = cue;
         _quit = quit;
     }
 
