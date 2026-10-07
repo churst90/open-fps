@@ -232,6 +232,18 @@ public partial class FmodAudioProvider : IAudioProvider
     private int _saPoolMisses, _lastSaPoolMisses;
     /// <summary>Voices not started because no binaural voice was left (PlaySpatialSound).</summary>
     private int _refusedForHrtf, _lastRefusedForHrtf;
+
+    /// <summary>For the lab: the voices playing, how many of them direct sounds without HRTF, how many
+    /// voices were refused for want of a binaural voice since the start, and how many binaural voices are free.</summary>
+    internal (int Active, int NoHrtf, int Refused, int BinauralFree) VoiceCensus()
+    {
+        lock (_lock)
+        {
+            int noHrtf = 0;
+            foreach (var a in _activeSounds) if (a.SaState == null && !a.IsReflection && a.Channel.hasHandle()) noHrtf++;
+            return (_activeSounds.Count, noHrtf, _refusedForHrtf, SpatialVoicesFree);
+        }
+    }
     // Pooled DSPs that could not be detached and were thrown away. Should stay zero; see Detach.
     private int _failedDetaches, _lastFailedDetaches;
     // Pooled DSPs cut loose from the DSP side because their channel was already recycled: the ordinary
@@ -3189,6 +3201,10 @@ public partial class FmodAudioProvider : IAudioProvider
                         starves - _lastStarves, gen2 - _lastGen2, pauseMs - _lastPauseMs,
                         _lateDetaches - _lastLateDetaches, _failedDetaches - _lastFailedDetaches,
                         _sendDropsOnWrongBus, _enginePool?.TakeBusy() ?? 0f);
+        // Where the mixer's time went: our own units by kind; the rest of the dsp figure is FMOD's.
+        string profile = MixerProfile.Take(out float ours);
+        Log.Information("Mixer time: ours {Ours:F1} % ({Profile}); FMOD's own units and mixing about {Theirs:F1} %",
+                        ours * 100f, profile, Math.Max(0f, cpu.dsp - ours * 100f));
         _lastSaPoolMisses = _saPoolMisses; _lastFailedDetaches = _failedDetaches;
         _lastRefusedForHrtf = _refusedForHrtf;
         _lastLateDetaches = _lateDetaches;

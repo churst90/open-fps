@@ -80,23 +80,28 @@ public static class SynthProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
-            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "synth voice", ref _nonFiniteOther);
-            return r;
-        }
-        catch (Exception ex)
-        {
-            unsafe
+            try
             {
-                int ch = outchannels > 0 ? outchannels : (inchannels > 0 ? inchannels : 2);
-                if (outbuffer != IntPtr.Zero)
-                    new Span<float>((void*)outbuffer, (int)length * ch).Clear();
+                var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+                NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "synth voice", ref _nonFiniteOther);
+                return r;
             }
-            DspFault.Record("SynthProcessor", ex);
-            return RESULT.OK;
+            catch (Exception ex)
+            {
+                unsafe
+                {
+                    int ch = outchannels > 0 ? outchannels : (inchannels > 0 ? inchannels : 2);
+                    if (outbuffer != IntPtr.Zero)
+                        new Span<float>((void*)outbuffer, (int)length * ch).Clear();
+                }
+                DspFault.Record("SynthProcessor", ex);
+                return RESULT.OK;
+            }
         }
+        finally { MixerProfile.Stop(MixerProfile.Kind.Synth, profiled); }
     }
 
 

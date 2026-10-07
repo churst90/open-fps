@@ -690,23 +690,28 @@ public static class MachineProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
-            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "machine voice", ref _nonFiniteOther);
-            return r;
-        }
-        catch (Exception ex)
-        {
-            DspFault.Record("MachineProcessor", ex);
-            unsafe
+            try
             {
-                if (outchannels == 0) outchannels = 1;
-                float* outBuf = (float*)outbuffer;
-                for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+                var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+                NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "machine voice", ref _nonFiniteOther);
+                return r;
             }
-            return RESULT.OK;
+            catch (Exception ex)
+            {
+                DspFault.Record("MachineProcessor", ex);
+                unsafe
+                {
+                    if (outchannels == 0) outchannels = 1;
+                    float* outBuf = (float*)outbuffer;
+                    for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+                }
+                return RESULT.OK;
+            }
         }
+        finally { MixerProfile.Stop(MixerProfile.Kind.Physical, profiled); }
     }
 
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,

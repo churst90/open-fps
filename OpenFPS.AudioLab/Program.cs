@@ -547,6 +547,16 @@ if (args.Contains("--waves"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.WavesSpike.Run(args));
 }
 
+if (args.Contains("--train-scene"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.TrainSceneSpike.Run(args));
+}
+
+if (args.Contains("--wheel-strike"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WheelStrikeSpike.Run(args));
+}
+
 if (args.Contains("--rail-cost"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.RailCostSpike.Run(args));

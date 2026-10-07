@@ -47,6 +47,8 @@ public class TrainVoicesInTheMixTests
             }
         });
 
+        if (Environment.GetEnvironmentVariable("OPENFPS_TRAIN_MIX_DUMP") is { Length: > 0 } dump)
+            File.WriteAllLines(dump, r.Mixer.Lines.Where(l => l.Contains("PlanTrain") || l.Contains(" -23000")));
         var playing = new HashSet<int>();
         int most = 0, trainStarts = 0, sourceVoices = 0, signalSeen = 0;
         foreach (var line in r.Mixer.Lines)

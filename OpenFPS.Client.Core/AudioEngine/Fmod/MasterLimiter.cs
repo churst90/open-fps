@@ -310,30 +310,35 @@ public sealed class MasterLimiter : IDisposable
     private static RESULT ReadCallback(ref DSP_STATE state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            if (outchannels == 0) outchannels = inchannels;
-            IntPtr user = DspCallback.UserData(ref state);
-            var self = user != IntPtr.Zero ? GCHandle.FromIntPtr(user).Target as MasterLimiter : null;
-            if (self == null || inbuffer == IntPtr.Zero || outbuffer == IntPtr.Zero || inchannels != outchannels)
+            try
             {
-                DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels);
+                if (outchannels == 0) outchannels = inchannels;
+                IntPtr user = DspCallback.UserData(ref state);
+                var self = user != IntPtr.Zero ? GCHandle.FromIntPtr(user).Target as MasterLimiter : null;
+                if (self == null || inbuffer == IntPtr.Zero || outbuffer == IntPtr.Zero || inchannels != outchannels)
+                {
+                    DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels);
+                    return RESULT.OK;
+                }
+                unsafe { self.Core.Process((float*)inbuffer, (float*)outbuffer, (int)length, inchannels); }
+                if (self.Core.NonFiniteSamples > 0)
+                {
+                    self.Core.NonFiniteSamples = 0;
+                    NonFinite.Report(ref self._faultReported, "MasterLimiter input");
+                }
                 return RESULT.OK;
             }
-            unsafe { self.Core.Process((float*)inbuffer, (float*)outbuffer, (int)length, inchannels); }
-            if (self.Core.NonFiniteSamples > 0)
+            catch (Exception ex)
             {
-                self.Core.NonFiniteSamples = 0;
-                NonFinite.Report(ref self._faultReported, "MasterLimiter input");
+                DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels > 0 ? outchannels : inchannels);
+                DspFault.Record("MasterLimiter", ex);
+                return RESULT.OK;
             }
-            return RESULT.OK;
         }
-        catch (Exception ex)
-        {
-            DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels > 0 ? outchannels : inchannels);
-            DspFault.Record("MasterLimiter", ex);
-            return RESULT.OK;
-        }
+        finally { MixerProfile.Stop(MixerProfile.Kind.Master, profiled); }
     }
 
     public void Release()

@@ -64,40 +64,45 @@ public sealed class MasterDither : IDisposable
     private static RESULT ReadCallback(ref DSP_STATE state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
+        long profiled = MixerProfile.Start();
         try
         {
-            if (outchannels == 0) outchannels = inchannels;
-            int total = (int)length * inchannels;
-            IntPtr user = DspCallback.UserData(ref state);
-            var self = user != IntPtr.Zero ? GCHandle.FromIntPtr(user).Target as MasterDither : null;
-            unsafe
+            try
             {
-                float* src = (float*)inbuffer, dst = (float*)outbuffer;
-                if (self == null) { for (int i = 0; i < total; i++) dst[i] = src[i]; return RESULT.OK; }
-                uint a = self._a, b = self._b;
-                for (int i = 0; i < total; i++)
+                if (outchannels == 0) outchannels = inchannels;
+                int total = (int)length * inchannels;
+                IntPtr user = DspCallback.UserData(ref state);
+                var self = user != IntPtr.Zero ? GCHandle.FromIntPtr(user).Target as MasterDither : null;
+                unsafe
                 {
-                    // Two independent uniforms, differenced: triangular, one step either way.
-                    a ^= a << 13; a ^= a >> 17; a ^= a << 5;
-                    b ^= b << 13; b ^= b >> 17; b ^= b << 5;
-                    float tpdf = ((a >> 8) - (float)(b >> 8)) * (Step / 16777216f);
-                    dst[i] = src[i] + tpdf;
+                    float* src = (float*)inbuffer, dst = (float*)outbuffer;
+                    if (self == null) { for (int i = 0; i < total; i++) dst[i] = src[i]; return RESULT.OK; }
+                    uint a = self._a, b = self._b;
+                    for (int i = 0; i < total; i++)
+                    {
+                        // Two independent uniforms, differenced: triangular, one step either way.
+                        a ^= a << 13; a ^= a >> 17; a ^= a << 5;
+                        b ^= b << 13; b ^= b >> 17; b ^= b << 5;
+                        float tpdf = ((a >> 8) - (float)(b >> 8)) * (Step / 16777216f);
+                        dst[i] = src[i] + tpdf;
+                    }
+                    self._a = a; self._b = b;
                 }
-                self._a = a; self._b = b;
+                return RESULT.OK;
             }
-            return RESULT.OK;
-        }
-        catch (Exception ex)
-        {
-            unsafe
+            catch (Exception ex)
             {
-                int ch = outchannels > 0 ? outchannels : (inchannels > 0 ? inchannels : 2);
-                if (outbuffer != IntPtr.Zero && inbuffer != IntPtr.Zero)
-                    new Span<float>((void*)inbuffer, (int)length * ch).CopyTo(new Span<float>((void*)outbuffer, (int)length * ch));
+                unsafe
+                {
+                    int ch = outchannels > 0 ? outchannels : (inchannels > 0 ? inchannels : 2);
+                    if (outbuffer != IntPtr.Zero && inbuffer != IntPtr.Zero)
+                        new Span<float>((void*)inbuffer, (int)length * ch).CopyTo(new Span<float>((void*)outbuffer, (int)length * ch));
+                }
+                DspFault.Record("MasterDither", ex);
+                return RESULT.OK;
             }
-            DspFault.Record("MasterDither", ex);
-            return RESULT.OK;
         }
+        finally { MixerProfile.Stop(MixerProfile.Kind.Master, profiled); }
     }
 
     /// <summary>Takes the unit off the master and releases it. The handle the callback resolves is kept

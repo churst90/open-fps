@@ -19,6 +19,19 @@ public static class RailCostSpike
     public static int Run(string[] args)
     {
         AcousticRegistry.Initialize();
+        if (args.Contains("law"))
+        {
+            // What the mixer plays a train's sources at, by distance, and what the ear model adds.
+            var layout = TrainLayout.Sources(TrainProfile.ByName(args.FirstOrDefault(a => ModelLibrary.Knows(ModelLibrary.Kinds.Train, a)) ?? "freight"));
+            foreach (var e in layout.Where(e => e.Index < 12 || e.Index % 40 == 0))
+            {
+                float corr = OpenFPS.Client.AudioEngine.Core.EarTimbres.CorrectionDb("rail:freight/x/" + e.Index, e.LevelDb);
+                var (g, r) = Loudness.Place(e.LevelDb, e.ExtentMetres);
+                Console.WriteLine($"  {e.Index,3} {e.Kind,-12} {e.LevelDb,6:F1} dB  extent {e.ExtentMetres,4:F1}  place gain {20 * MathF.Log10(g),6:F1} dB ref {r,5:F1} m  ear {corr,+5:F1} dB  "
+                    + string.Join("  ", new[] { 3f, 30f, 100f, 360f }.Select(d => $"{d,4:F0} m {20 * MathF.Log10(MathF.Max(1e-9f, OpenFPS.Client.AudioEngine.Core.Rail.TrainVoicing.LawGain(e.LevelDb, e.ExtentMetres, d))) + corr - 16f,6:F1} dBFS")));
+            }
+            return 0;
+        }
         float sec = 5f;
         foreach (var a in args)
             if (a.StartsWith("sec=", StringComparison.Ordinal)) float.TryParse(a[4..], System.Globalization.CultureInfo.InvariantCulture, out sec);
@@ -45,7 +58,7 @@ public static class RailCostSpike
             {
                 string kind = Kind(s.Label);
                 var t = Stopwatch.StartNew();
-                for (int i = 0; i < m; i++) _ = s.Render();
+                for (int i = 0; i < m; i++) _ = s.Render(p.TypicalSpeedMps);
                 var e = byKind.GetValueOrDefault(kind);
                 byKind[kind] = (e.Count + 1, e.Seconds + t.Elapsed.TotalSeconds);
             }
