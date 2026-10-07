@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 
+using OpenFPS.Common.Editing;
+
 namespace OpenFPS.Common;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -43,17 +45,24 @@ public enum AircraftPower { Piston, Turboprop, Turbofan, Turboshaft }
 /// <summary>A row of blades in rotation: a propeller, a fan, a main rotor or a tail rotor.</summary>
 public sealed record BladeRowSpec
 {
+    [Tunable("", 1, 16, "How many blades in the row.", Label = "blades")]
     public required int Blades { get; init; }
+    [Tunable("m", 0.05, 20, "Tip to tip.", Label = "diameter", Step = 0.01)]
     public required float DiameterMetres { get; init; }
     /// <summary>Blade chord near the tip, metres. Sets the pulse width: chord over tip speed.</summary>
+    [Tunable("m", 0.01, 1, "Blade chord near the tip; sets the pulse width.", Label = "chord", Step = 0.005)]
     public float ChordMetres { get; init; } = 0.15f;
     /// <summary>Thickness to chord of the tip section. Thickness noise scales with it.</summary>
+    [Tunable("", 0.02, 0.4, "Thickness to chord of the tip section. Thickness noise scales with it.", Label = "thickness ratio", Step = 0.01)]
     public float ThicknessRatio { get; init; } = 0.08f;
+    [Tunable("rpm", 50, 30000, "The fastest the row turns.", Label = "top speed", Step = 10)]
     public required float RpmMax { get; init; }
     /// <summary>The slowest the row turns while it is turning at all.</summary>
+    [Tunable("rpm", 0, 30000, "The slowest the row turns while it is turning at all.", Label = "idle speed", Step = 10)]
     public float RpmIdle { get; init; }
     /// <summary>Sound pressure level at one metre, in the plane of the disc, at RpmMax and full
     /// loading. The anchor; everything else is relative to it.</summary>
+    [Tunable("dB", 30, 160, "Level at one metre in the plane of the disc, at top speed and full loading.", Label = "tone level", Step = 1)]
     public float ReferenceDb { get; init; } = 110f;
     /// <summary>How hard the blades meet the tip vortices of the blades ahead of them, 0..1. A rotor
     /// in a descent or fast forward flight slaps; a propeller or a hovering rotor does not.</summary>
@@ -64,6 +73,7 @@ public sealed record BladeRowSpec
     /// <summary>Per-blade differences in pitch and track, as a fraction, fixed for the life of the
     /// machine. Real rows are never identical, and the difference is the once-per-revolution "wow"
     /// under a propeller's note and the whole of the buzz-saw comb on a supersonic fan.</summary>
+    [Tunable("", 0, 0.2, "Per-blade differences in pitch and track, as a fraction.", Label = "blade scatter", Step = 0.005)]
     public float BladeScatter { get; init; } = 0.015f;
 
     /// <summary>
@@ -85,6 +95,7 @@ public sealed record BladeRowSpec
     /// vortices are shed on: f = 0.2 U / t. That is why a thin fast fan hisses and a blunt slow
     /// mower blade roars, and neither is an equaliser setting.
     /// </summary>
+    [Tunable("dB", 0, 160, "Broadband self-noise at one metre at top speed; 0 for none.", Label = "rush level", Step = 1)]
     public float SelfNoiseDb { get; init; }
 
 

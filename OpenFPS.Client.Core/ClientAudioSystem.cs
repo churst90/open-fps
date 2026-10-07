@@ -397,6 +397,28 @@ public class ClientAudioSystem
     /// despawned object would otherwise sit in the world for the rest of the session. The reflection
     /// voices derived from that id are stopped too — they carry synthetic ids, not the entity's own.
     /// </summary>
+    /// <summary>
+    /// A model was changed in the world editor (ModelUpdate): every voice playing it is stopped, and the
+    /// next update starts it again from the new model, so the change is heard at once. The levels and
+    /// headroom read from models are forgotten too, since they are the old model's. Returns the
+    /// entities whose voices were restarted.
+    /// </summary>
+    public List<int> ModelChanged(string kind, string id, WorldSnapshot snapshot)
+    {
+        _physicalLevels.Clear();
+        _physicalHeadroom.Clear();
+        var restarted = new List<int>();
+        foreach (var (entityId, entity) in snapshot.Entities)
+        {
+            string sound = entity.Definition?.SoundEmitter.SoundId ?? "";
+            if (!OpenFPS.Common.Editing.ModelKinds.TryModelOfSound(sound, out var k, out var i)) continue;
+            if (k != kind || !i.Equals(id, StringComparison.OrdinalIgnoreCase)) continue;
+            ForgetEntity(entityId);
+            restarted.Add(entityId);
+        }
+        return restarted;
+    }
+
     public void ForgetEntity(int entityId)
     {
         _groundCache.Remove(entityId);

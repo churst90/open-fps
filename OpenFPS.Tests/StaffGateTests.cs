@@ -71,6 +71,7 @@ public class StaffGateTests : IDisposable
         { "removeseat", new[] { "driver" }, UserRole.Dev },
         { "drivable", new[] { "v8_sports" }, UserRole.Dev },
         { "savemap", Array.Empty<string>(), UserRole.Dev },
+        { "edit", new[] { "place", "concrete_wall" }, UserRole.Dev },
         { "weather", new[] { "storm" }, UserRole.Dev },
         { "sessions", Array.Empty<string>(), UserRole.Admin },
         { "user", new[] { "other" }, UserRole.Admin },

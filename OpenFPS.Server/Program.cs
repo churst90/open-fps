@@ -214,6 +214,17 @@ public class GameServer
         _dirtyAudioEntities.Enqueue(entityId);
     }
 
+    /// <summary>The models the world editor has changed, every version kept (model_versions/). In memory
+    /// only until <see cref="Start"/> gives it its folder.</summary>
+    public OpenFPS.Server.Editor.ModelStore Models { get; set; } = new(null);
+
+    /// <summary>A model's new version, to every game client on every map: the change is heard at once.</summary>
+    public void BroadcastModel(ModelUpdate update)
+    {
+        foreach (var session in _sessions.GetAllSessions().ToList())
+            if (!session.IsTextClient) SendToSession(session, update);
+    }
+
     /// <summary>The entities whose definitions go out again at the next broadcast. For tests.</summary>
     internal IReadOnlyCollection<int> PendingDefinitionResends => _dirtyAudioEntities.ToArray();
 
@@ -345,14 +356,19 @@ public class GameServer
         // cars, a composite made drivable, and /drivable all resolve through the registry.
         OpenFPS.Common.MachineRegistry.EnsureLoaded();
         OpenFPS.Common.ModelLibrary.EnsureLoaded();
+        // The world editor's changed models, over the library, before anything asks what a model is.
+        Models = new OpenFPS.Server.Editor.ModelStore("model_versions");
+        Models.LoadAll();
         var prefabRepo = new PrefabRepository("prefabs");
         _mapRepo = new MapRepository("maps");
         // Who owns each map, whether it is public and who is invited: beside teams.json, and laid over
-        // each map's own file as it loads (MapAccessRepository).
+        // each map's own file as it loads (MapAccessRepository). The world editor's edits are laid over
+        // it too, from maps/overlays (docs/WORLD_EDITOR.md section 7).
         _maps = new MapManager(_mapRepo, prefabRepo)
         {
             RequestedMapId = RequestedMapId,
             Access = new MapAccessRepository("map_access.json"),
+            Overlays = new OpenFPS.Server.Editor.MapOverlayStore(_mapRepo.OverlayDirectory),
         };
         _maps.Initialize();
         // Composites BEFORE vehicles and before the earshot pass: a placed building is geometry that
@@ -1131,6 +1147,9 @@ public class GameServer
             SendToSession(session, new TextEvent { Text = $"Map '{mapId}' is not loaded on this server." });
             return;
         }
+
+        // The models changed in the world editor, before anything on the map is heard with them.
+        foreach (var model in Models.Updates()) SendToSession(session, model);
 
         int staticCount = 0;
         bool streamed = _maps.TryGetTiles(mapId, out var tiles);

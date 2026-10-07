@@ -22,6 +22,8 @@ public class MapAccessRepository
         public string Owner { get; set; } = "";
         public bool Public { get; set; } = true;
         public List<string> Invited { get; set; } = new();
+        /// <summary>Who the owner has asked to edit the map with the world editor (/map editor add).</summary>
+        public List<string> Editors { get; set; } = new();
     }
 
     private readonly string? _path;
@@ -69,6 +71,7 @@ public class MapAccessRepository
             map.OwnerId = e.Owner;
             map.IsPublic = e.Public;
             map.Invited = new List<string>(e.Invited);
+            map.Editors = new List<string>(e.Editors ?? new List<string>());
         }
     }
 
@@ -77,7 +80,11 @@ public class MapAccessRepository
     {
         lock (_lock)
         {
-            _maps[map.Id] = new Entry { Owner = map.OwnerId ?? "", Public = map.IsPublic, Invited = new List<string>(map.Invited) };
+            _maps[map.Id] = new Entry
+            {
+                Owner = map.OwnerId ?? "", Public = map.IsPublic, Invited = new List<string>(map.Invited),
+                Editors = new List<string>(map.Editors),
+            };
             try { Write(); }
             catch (Exception ex) { Log.Error("MapAccessRepository: could not write {Path}: {Error}", _path, ex.Message); }
         }

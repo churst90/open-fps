@@ -12,7 +12,8 @@ public partial class CommandHandler
 {
     private const string MapUsage =
         "Usage: /map on its own says where you are; /map new NAME, /map public, /map private, "
-        + "/map invite PLAYER, /map uninvite PLAYER. /maps lists the maps you can go to, /maps mine your own.";
+        + "/map invite PLAYER, /map uninvite PLAYER, /map editor add PLAYER, /map editor remove PLAYER. "
+        + "/maps lists the maps you can go to, /maps mine your own.";
 
     private void HandleMap(UserSession session, string[] args, Action<IMessage> reply)
     {
@@ -87,6 +88,49 @@ public partial class CommandHandler
                     });
                 Say(reply, invite ? $"{username} may come into {data.Id}." + (data.IsPublic ? " It is public, so anybody may anyway." : "")
                                   : $"{username} is no longer invited to {data.Id}.");
+                return;
+            }
+
+            // Who may edit the map with the world editor (docs/WORLD_EDITOR.md): the owner names them.
+            case "editor":
+            case "editors":
+            {
+                string action = args.Length > 1 ? args[1].ToLowerInvariant() : "";
+                if (action is not ("add" or "remove"))
+                {
+                    if (!_maps.TryGetMapData(session.CurrentMapId, out var here)) { Say(reply, $"Map '{session.CurrentMapId}' is not loaded."); return; }
+                    Say(reply, here.Editors.Count == 0
+                        ? $"Nobody besides its owner edits {here.Id}. /map editor add PLAYER asks somebody to."
+                        : $"Editors of {here.Id}: {string.Join(", ", here.Editors)}.");
+                    return;
+                }
+                if (args.Length < 3) { Say(reply, $"Usage: /map editor {action} PLAYER"); return; }
+                string mapId = args.Length > 3 ? args[3] : session.CurrentMapId;
+                if (!TryManageMap(session, mapId, reply, out var data)) return;
+                if (!TryFindUser(args[2], out var username, out _)) { Say(reply, $"There is no player called {args[2]}."); return; }
+                int at = data.Editors.FindIndex(n => n.Equals(username, StringComparison.OrdinalIgnoreCase));
+                bool add = action == "add";
+                if (add)
+                {
+                    if (username.Equals(data.OwnerId, StringComparison.OrdinalIgnoreCase)) { Say(reply, $"{data.Id} is {username}'s own map."); return; }
+                    if (at >= 0) { Say(reply, $"{username} already edits {data.Id}."); return; }
+                    data.Editors.Add(username);
+                    // An editor has to be able to come in.
+                    if (!data.Invited.Any(n => n.Equals(username, StringComparison.OrdinalIgnoreCase))) data.Invited.Add(username);
+                }
+                else
+                {
+                    if (at < 0) { Say(reply, $"{username} does not edit {data.Id}."); return; }
+                    data.Editors.RemoveAt(at);
+                }
+                _maps.RecordAccess(data.Id);
+                if (OnlineSession(username) is { } online && online != session)
+                    _server.SendToSession(online, new TextEvent
+                    {
+                        Text = add ? $"{session.Username} asked you to edit the map {data.Id}. On it, F12 opens the world editor."
+                                   : $"{session.Username} took back your editing of the map {data.Id}.",
+                    });
+                Say(reply, add ? $"{username} may edit {data.Id} with the world editor." : $"{username} no longer edits {data.Id}.");
                 return;
             }
 

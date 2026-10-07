@@ -85,7 +85,14 @@ public partial class CommandHandler
         // single ones. docs/SERVER_SECURITY.md has the table; keep it in step. One check, here, for
         // every gated command, so a new case cannot forget its own. Building, spawning, moving
         // yourself, saving and the sound tools are everybody's on a map they own (the scope half).
-        if (!MayHere(session, Permissions.Canonical(commandName))) { DenyCommand(reply); return; }
+        if (!MayHere(session, Permissions.Canonical(commandName)))
+        {
+            // F12 is answered in words of its own: who the editor is for.
+            if (commandName == Permissions.Edit && OpenFPS.Server.Editor.WorldEditor.AsksForMenu(args))
+                Say(reply, OpenFPS.Server.Editor.WorldEditor.Refusal);
+            else DenyCommand(reply);
+            return;
+        }
         switch (commandName)
         {
             case "scan": HandleScan(session, reply); break;
@@ -173,6 +180,11 @@ public partial class CommandHandler
                 break;
             case "room":
                 HandleRoom(session, args, reply);
+                break;
+            // The world editor: F12 and /edit (docs/WORLD_EDITOR.md). Gated above: the edit permission,
+            // the map's owner, or an editor the owner named.
+            case "edit":
+                Editor.Handle(session, args, reply);
                 break;
             // The whole server's weather, for testing: developers and administrators (Permissions).
             case "weather":

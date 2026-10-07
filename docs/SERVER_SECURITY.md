@@ -35,6 +35,12 @@ the maps you can go to, `/maps mine` your own. Player maps are files in `maps/pl
 not in the server package); owner, public flag and invitations are in `map_access.json` beside
 `teams.json`. A private map lets in its owner, the people invited, and `join-private`.
 
+**The world editor.** F12 and `/edit` (docs/WORLD_EDITOR.md) need `edit`: Dev and Admin on any map,
+everybody on a map they own, and the people a map's owner names with `/map editor add NAME` on that map
+only. Naming an editor also invites them; it gives them `edit` there and nothing else (not `/spawn`,
+not `/savemap`). Editors are kept in `map_access.json` with the invitations. Changing a model in the
+library changes it on every map, so it needs `edit-models` (Dev and Admin).
+
 **Custom roles.** An Admin can make roles of their own, each a name and a set of permissions on top
 of Player: `/role create builder move spawn put`, `/role add builder savemap`, `/role remove builder
 put`, `/role show builder`, `/role list`, `/role delete builder` (its holders become players). Give
@@ -67,6 +73,8 @@ hold, only for players, and never for somebody whose custom role can do somethin
 | `origin`, `at`, `put`, `undo`, `savemap`, `move` (`/move x y z`, `/move NAME`), on any map | no | no | yes | yes |
 | `weather`: `/weather` says and sets the weather and the wind for the whole server | no | no | yes | yes |
 | `edit-any`: change things other people built | no | no | yes | yes |
+| `edit`: the world editor (F12, `/edit`) on any map; everybody on maps they own or are editors of | no | no | yes | yes |
+| `edit-models`: change a model in the library (`/edit model set`), which changes it on every map | no | no | yes | yes |
 | `grant`, `revoke`: only what you hold, only for players | no | no | yes | yes |
 | `perms-any`: `/perms NAME` | no | no | yes | yes |
 | `give-premium`: give a premium item (a prefab with `"Premium": true`, today the teleporter), `/give NAME vehicle PRESET` | no | no | no | yes |

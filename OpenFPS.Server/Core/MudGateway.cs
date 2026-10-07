@@ -367,6 +367,9 @@ public class MudGateway
                 ? string.Join(", ", f.Friends.Select((name, i) => i < f.Online.Length && f.Online[i] ? $"{name} (online)" : name))
                 : "None"),
             MapListResponse m => FormatMaps(m),
+            // A refresh is a game client's menu catching up with a change; a text player has the result.
+            EditorMenu { Refresh: true } => "",
+            EditorMenu e => FormatEditorMenu(e),
             LoginResponse l => l.Success ? "Login successful." : "Login failed: " + l.Message,
             RegisterResponse r => r.Success ? "Registration successful." : "Registration failed: " + r.Message,
             PlayerSpawned => "You are now in the world. Try 'scan'.",
@@ -387,6 +390,29 @@ public class MudGateway
             },
             _ => "" // Movement and world state updates are not converted to text for performance/verbosity reasons.
         };
+    }
+
+    /// <summary>
+    /// A world editor menu as numbered lines, each with what to type for it: the same menu the game
+    /// client shows, so a text player can do everything the menu does.
+    /// </summary>
+    public static string FormatEditorMenu(EditorMenu menu)
+    {
+        var lines = new List<string> { $"{menu.Title}:" };
+        for (int i = 0; i < menu.Items.Length; i++)
+        {
+            var item = menu.Items[i];
+            string how = item.Kind switch
+            {
+                EditorItemKind.Menu => $" (type: edit menu {item.Command})",
+                EditorItemKind.Action => $" (type: {item.Command})",
+                EditorItemKind.Input => $" (type: {item.Command.TrimStart('/').TrimEnd()} and a value)",
+                _ => "",
+            };
+            lines.Add($"  {i + 1}. {item.Label}{how}");
+        }
+        if (menu.Items.Length == 0) lines.Add("  Nothing here.");
+        return string.Join("\n", lines);
     }
 
     private static string FormatMaps(MapListResponse response)
