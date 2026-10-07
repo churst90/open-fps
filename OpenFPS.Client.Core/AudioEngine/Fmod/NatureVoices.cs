@@ -439,6 +439,9 @@ public sealed class NaturePlaceState : NatureVoiceState
     {
         Shared = shared;
         Place = place;
+        // Running water is a texture of events spread over its water: the ground hands back its power,
+        // not a copy of it (GroundReflection.Texture).
+        if (shared.Flow != null) Ground.Texture = true;
         _cursor = shared.Newest;
         Interlocked.Increment(ref shared.Voices);
     }

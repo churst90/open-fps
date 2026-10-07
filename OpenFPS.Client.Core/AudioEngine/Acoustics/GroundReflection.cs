@@ -37,6 +37,7 @@ public sealed class GroundReflection
     private readonly float[] _line = new float[Size];
     private int _w;
     private float _delay = -1f, _low, _high, _lp;
+    private float _texLp, _texInc, _texCut = -1f, _texDelay = -1f;
     private readonly float _lpA, _glide, _rate;
 
     /// <summary>The extra path, in samples. Game thread writes.</summary>
@@ -56,6 +57,22 @@ public sealed class GroundReflection
     /// of the reflection is added without the delay.
     /// </summary>
     public volatile float NearGroundShare;
+
+    /// <summary>
+    /// The voice is a texture: thousands of independent events a second, spread over the water that
+    /// makes them (a downpipe's splash, a gutter outlet's gulps, a sink's stream). Set once by the voice.
+    ///
+    /// Its reflection is then not a copy. Below a quarter of the period of the extra path, c / 4Δ, the
+    /// two paths are within a quarter-cycle of each other wherever on the source an event happens, and
+    /// the ground lifts the bass by its full pressure, as for any source. Above it, where the events'
+    /// own places, the water's movement and the listener's head move the reflection's phase by more
+    /// than that, what the ground adds is its power, not its waveform: Nord2000's incoherent term
+    /// (|p_d + F p_r|² + (1 − F²) |p_r|², with F → 0). Without this a gutter outlet 2.8 m up and
+    /// 1.8 m away was one stream heard twice 8 ms apart, a comb at 125 Hz that Cody heard as a fast
+    /// flanging repeat (2026-10-06), as he had heard speech through the same copy flange
+    /// (docs/RUNNING_WATER.md section 12).
+    /// </summary>
+    public volatile bool Texture;
 
     public GroundReflection(float sampleRate)
     {
@@ -86,7 +103,8 @@ public sealed class GroundReflection
     {
         Array.Clear(_line);
         _w = 0; _delay = -1f; _low = _high = _lp = 0f;
-        TargetDelaySamples = 0f; TargetLowGain = 0f; TargetHighGain = 0f; NearGroundShare = 0f;
+        _texLp = _texInc = 0f; _texCut = _texDelay = -1f;
+        TargetDelaySamples = 0f; TargetLowGain = 0f; TargetHighGain = 0f; NearGroundShare = 0f; Texture = false;
     }
 
     /// <summary>The direct sample in; the direct sample plus what the ground sends back out.</summary>
@@ -101,7 +119,8 @@ public sealed class GroundReflection
         _high += (TargetHighGain - _high) * _glide;
 
         float y = x;
-        if (_low > 1e-4f || _high > 1e-4f)
+        if (Texture && (_low > 1e-4f || _high > 1e-4f)) y = TextureGround(x);
+        else if (_low > 1e-4f || _high > 1e-4f)
         {
             // The read point is _w - _delay. Worked out as a FLOAT it was exact for 6.3 minutes:
             // past 2^24 samples a float has no fraction left, the point snapped to every second
@@ -119,5 +138,30 @@ public sealed class GroundReflection
         }
         _w++;
         return y;
+    }
+
+    /// <summary>A texture's ground (see <see cref="Texture"/>): in phase below c / 4Δ, its power above.</summary>
+    private float TextureGround(float x)
+    {
+        // The corner follows the delay as it glides; worked out again only when it has moved by a
+        // hundredth, not every sample.
+        float delay = MathF.Max(0.25f, _delay);
+        if (_texDelay < 0f || MathF.Abs(delay - _texDelay) > 0.01f * _texDelay)
+        {
+            _texDelay = delay;
+            // A one-pole at f = rate / 4Δ: 1 − e^(−2π f / rate) = 1 − e^(−π / 2Δ).
+            _texCut = 1f - MathF.Exp(-MathF.PI / (2f * delay));
+        }
+        _texLp += _texCut * (x - _texLp);
+        float near = NearGroundShare;
+        // Below the corner: the reflection in phase, through the surface's two bands as a copy would be.
+        float r = near * x + (1f - near) * _texLp;
+        _lp += _lpA * (r - _lp);
+        float y = x + _high * r + (_low - _high) * _lp;
+        // Above it: the reflection's power, sqrt(1 + g²) on the direct, per band.
+        float inc = (1f - near) * (x - _texLp);
+        _texInc += _lpA * (inc - _texInc);
+        float kHigh = MathF.Sqrt(1f + _high * _high) - 1f, kLow = MathF.Sqrt(1f + _low * _low) - 1f;
+        return y + kHigh * inc + (kLow - kHigh) * _texInc;
     }
 }
