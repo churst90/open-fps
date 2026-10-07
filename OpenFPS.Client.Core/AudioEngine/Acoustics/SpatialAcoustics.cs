@@ -50,7 +50,7 @@ public class SpatialAcoustics
         // the same every tick for the same geometry, and it needs no merging because a surface
         // produces one arrival by construction.
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
-        EarlyReflections.Find(sourcePos, listenerPos, ReflectionSolids(world), _reflectionScratch);
+        FindReflections(world, sourcePos, listenerPos, _reflectionScratch, 343.0f);
         for (int i = 0; i < _reflectionScratch.Count; i++)
         {
             var a = _reflectionScratch[i];
@@ -89,6 +89,46 @@ public class SpatialAcoustics
     /// <summary>The world's solid boxes as the reflection model wants them, rebuilt only when the
     /// acoustic map changes. The same definition of "audio geometry" the simulator's scene uses, so the
     /// two paths cannot disagree about what a wall is.</summary>
+    // ── The surfaces as the occlusion worker's acoustic triangle world (geometry stage 2) ─────────
+    //
+    // The worker keeps the scene's solids as a triangle world (AcousticGeometry): the same boxes
+    // ReflectionSolids makes a list of, door leaves where they stand, no sound source's own box and
+    // nothing that moves. The image-source search asks its tree for what is near a path and whether a
+    // leg is clear, instead of passing over every solid and testing every leg against every near one
+    // (a one-off call in dense woods grew with the square of what was near). Handed here with the map
+    // it was built for; a snapshot of any other map is answered from the list until the worker catches up.
+    private sealed record ReflectionScene(OpenFPS.Common.Geometry.TriangleWorld World, object? Map);
+    private volatile ReflectionScene? _reflectionWorld;
+
+    /// <summary>The worker's acoustic triangle world, and the map it was built for.</summary>
+    public void PublishReflectionWorld(OpenFPS.Common.Geometry.TriangleWorld? world, object? map)
+        => _reflectionWorld = world == null ? null : new ReflectionScene(world, map);
+
+    /// <summary>The acoustic triangle world for this snapshot's map, if the worker has one built.</summary>
+    public OpenFPS.Common.Geometry.TriangleWorld? ReflectionWorldFor(WorldSnapshot world)
+    {
+        var r = _reflectionWorld;
+        return r != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled && ReferenceEquals(r.Map, world.AcousticMap) ? r.World : null;
+    }
+
+    /// <summary>
+    /// The copies of a sound off the surfaces (EarlyReflections.Find): asked of the worker's acoustic
+    /// triangle world when it has one for this map, of the list of boxes otherwise.
+    /// </summary>
+    public void FindReflections(WorldSnapshot world, Vector3 source, Vector3 listener, List<EarlyReflections.Arrival> into,
+                                float speedOfSound, int maxOrder = 1, bool separateFirst = false, bool flutter = false, int keep = 0,
+                                float maxExtraPathMetres = EarlyReflections.RangeMetres)
+    {
+        var geo = ReflectionWorldFor(world);
+        if (geo != null)
+        {
+            EarlyReflections.Find(source, listener, geo, into, speedOfSound, maxOrder, separateFirst, flutter, keep, maxExtraPathMetres);
+            return;
+        }
+        var solids = ReflectionSolids(world);
+        EarlyReflections.Find(source, listener, solids, into, speedOfSound, maxOrder, separateFirst, flutter, keep, maxExtraPathMetres);
+    }
+
     public IReadOnlyList<EarlyReflections.Solid> ReflectionSolids(WorldSnapshot world)
     {
         // The map, and its version: tiles of a streamed map arrive and leave under the same map object.

@@ -77,6 +77,25 @@ public class MapManager
     /// is the difference between a fifteen-minute fix and a session spent believing the audio engine
     /// has gone wrong.
     /// </summary>
+    /// <summary>
+    /// A map entity's form over its prefab's (a ramp, a flight of stairs, an arch), and either one checked
+    /// against the box it must fill: a form that cannot be made is said, and the entity is a box.
+    /// </summary>
+    private static void ApplyForm(World world, Entity entity, Repositories.EntityData entityData, string mapId)
+    {
+        if (!world.Has<ColliderComponent>(entity)) return;
+        ref var col = ref world.Get<ColliderComponent>(entity);
+        if (entityData.Form != null) col.Form = entityData.Form;
+        if (col.Form == null) return;
+        if (col.Form.Kind == OpenFPS.Common.Geometry.ShapeKind.Box) { col.Form = null; return; }
+        if (OpenFPS.Common.Geometry.Shapes.Problem(col.Form, col.Size) is { } problem)
+        {
+            Log.Warning("MapManager: '{Map}' entity {Id} ({Prefab}): its form ({Form}) cannot be made: {Problem}. It is a box.",
+                        mapId, entityData.EntityId, entityData.PrefabId, col.Form, problem);
+            col.Form = null;
+        }
+    }
+
     /// <summary>The prefab the loader lays as a map's ground where it has none: dirt, ten metres square,
     /// scaled to the bounds. Later the top of a soil profile (docs/GEOMETRY.md, stage 5).</summary>
     public const string NaturalGroundPrefab = "dirt_floor";
@@ -329,6 +348,7 @@ public class MapManager
                 }
 
                 ApplyRoomMaterials(world, entity, entityData, m.Id);
+                ApplyForm(world, entity, entityData, m.Id);
 
                 // Which side of THIS door is locked, and which way it is pushed: where a door is put
                 // decides both, so the map may say, over the prefab.

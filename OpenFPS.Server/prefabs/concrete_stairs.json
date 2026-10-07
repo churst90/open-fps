@@ -1,0 +1,19 @@
+{
+  "Id": "concrete_stairs",
+  "Name": "Concrete Stairs",
+  "Description": "A storey's flight of solid concrete steps, 1.2 m wide, climbing toward its +Z end: 16 risers of 17.5 cm on goings of 28 cm. Walked up and down as it is, a footfall on each tread.",
+  "Material": "Concrete",
+  "ColliderSize": {
+    "X": 1.2,
+    "Y": 2.8,
+    "Z": 4.48
+  },
+  "Form": {
+    "Kind": "Stairs",
+    "Steps": 16
+  },
+  "Type": "StaticObject",
+  "TransmissionLow": 0.05,
+  "TransmissionMid": 0.02,
+  "TransmissionHigh": 0.01
+}

@@ -1,0 +1,16 @@
+{
+  "Id": "wooden_stairs",
+  "Name": "Wooden Stairs",
+  "Description": "A house's flight of wooden steps, a metre wide, climbing toward its +Z end: 15 risers of 17.3 cm on goings of 26 cm.",
+  "Material": "Wood",
+  "ColliderSize": {
+    "X": 1.0,
+    "Y": 2.6,
+    "Z": 3.9
+  },
+  "Form": {
+    "Kind": "Stairs",
+    "Steps": 15
+  },
+  "Type": "StaticObject"
+}

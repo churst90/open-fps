@@ -6,6 +6,7 @@ using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
+using OpenFPS.Common.Geometry;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Xunit;
@@ -82,6 +83,222 @@ public class GeometryStage2Tests : IDisposable
         var ground = Assert.Single(solids);
         Assert.Equal("Dirt", world.Get<MaterialComponent>(ground).Material);
         Assert.Equal("Ground", world.Get<IdentityComponent>(ground).Name);
+    }
+
+    // ═══ Shapes ══════════════════════════════════════════════════════════════════════════════════
+
+    private static Surface Concrete(Vector3 size) => EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false, null);
+
+    private static SolidSpec Shaped(int owner, Vector3 at, Vector3 size, ShapeSpec? form, float yaw = 0f)
+        => SolidSpec.Of(owner, at, Quaternion.CreateFromYawPitchRoll(yaw, 0, 0), size, Concrete(size), Shapes.Make(form, size));
+
+    private static TriangleWorld WorldOf(params SolidSpec[] solids)
+    {
+        var all = new List<SolidSpec> { Shaped(1, new Vector3(0, -0.05f, 0), new Vector3(200, 0.1f, 200), null) };
+        all.AddRange(solids);
+        return new TriangleWorldBuilder(250f).Build(all, Array.Empty<SolidSpec>());
+    }
+
+    public static IEnumerable<object[]> Forms() => new[]
+    {
+        new object[] { new ShapeSpec { Kind = ShapeKind.Wedge }, new Vector3(1.5f, 0.5f, 6f) },
+        new object[] { new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }, new Vector3(1.2f, 2.8f, 4.48f) },
+        new object[] { new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 10, Landing = 1.2f }, new Vector3(1.0f, 1.75f, 4.0f) },
+        new object[] { new ShapeSpec { Kind = ShapeKind.Arch, Thickness = 0.5f }, new Vector3(3f, 3.5f, 0.6f) },
+    };
+
+    /// <summary>Every shape is a closed solid: a ray from outside enters and leaves it as often, and a
+    /// point is inside one of its convex pieces exactly when a ray from it crosses its surface an odd number
+    /// of times.</summary>
+    [Theory]
+    [MemberData(nameof(Forms))]
+    public void AShapeIsClosedAndItsPiecesFillIt(ShapeSpec form, Vector3 size)
+    {
+        Assert.Null(Shapes.Problem(form, size));
+        var world = WorldOf(Shaped(7, new Vector3(3, size.Y / 2f, 4), size, form, yaw: 0.4f));
+        var only = new ExceptOwners(1);
+        var crossings = new List<GeometryCrossing>();
+        var inside = new List<SolidRef>();
+        var rng = new Random(11);
+        int insideCount = 0;
+        for (int i = 0; i < 3000; i++)
+        {
+            var p = new Vector3(3, size.Y / 2f, 4) + new Vector3((float)(rng.NextDouble() * 2 - 1) * size.X, (float)(rng.NextDouble() * 2 - 1) * size.Y * 0.6f,
+                                                                 (float)(rng.NextDouble() * 2 - 1) * size.Z);
+            var d = Vector3.Normalize(new Vector3((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f));
+            world.All(p, d, 50f, GeometryLayers.Physical, ref only, crossings);
+            int front = crossings.Count(c => c.Front), back = crossings.Count - front;
+            inside.Clear();
+            world.Containing(p, GeometryLayers.Physical, ref only, inside);
+            bool isIn = inside.Count > 0;
+            if (isIn) insideCount++;
+            // From inside, one more face is left than entered; from outside, as many.
+            Assert.Equal(isIn ? 1 : 0, back - front);
+        }
+        Assert.True(insideCount > 100, $"only {insideCount} of 3000 points fell inside");
+    }
+
+    /// <summary>The same numbers make the same triangles, bit for bit, wherever and however often.</summary>
+    [Fact]
+    public void AShapeIsTheSameEverywhere()
+    {
+        var size = new Vector3(1.2f, 2.8f, 4.48f);
+        var a = Shapes.Make(new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }, size)!;
+        var b = Shapes.Make(new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }, size)!;
+        Assert.Same(a, b);
+        var w1 = WorldOf(Shaped(7, new Vector3(3.3f, 1.4f, 4.1f), size, new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }, 0.7f));
+        var w2 = WorldOf(Shaped(7, new Vector3(3.3f, 1.4f, 4.1f), size, new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }, 0.7f));
+        Assert.Equal(w1.Instance(w1.InstanceOfTile(new TileKey(0, 0))).Piece.Signature, w2.Instance(w2.InstanceOfTile(new TileKey(0, 0))).Piece.Signature);
+    }
+
+    /// <summary>A ramp is ground with a slope; a bank steeper than one can walk is not ground at all, and the
+    /// probe goes on down past it to what is under it.</summary>
+    [Fact]
+    public void ARampIsGroundAndABankTooSteepIsNot()
+    {
+        var ramp = Shaped(7, new Vector3(0, 0.25f, 3f), new Vector3(1.5f, 0.5f, 6f), new ShapeSpec { Kind = ShapeKind.Wedge });
+        var bank = Shaped(8, new Vector3(10, 1f, 3f), new Vector3(2f, 2f, 1f), new ShapeSpec { Kind = ShapeKind.Wedge });   // 63 degrees
+        var world = WorldOf(ramp, bank);
+        var all = new AcceptAll();
+        // Halfway up the ramp: a quarter of a metre, and its normal leans back down the slope.
+        float y = world.FloorAt(0f, 3f, 2f, GeometryLayers.Ground, ref all, out var hit);
+        Assert.Equal(0.25f, y, 3);
+        Assert.True(hit.Normal.Y > 0.99f && hit.Normal.Z < -0.08f, $"normal {hit.Normal}");
+        // On the bank: the ground under it, not its face.
+        float under = world.FloorAt(10f, 3f, 3f, GeometryLayers.Ground, ref all, out var floor);
+        Assert.Equal(0f, under, 4);
+        Assert.Equal(1, floor.Owner);
+    }
+
+    private sealed record Walked(List<Vector3> Path, Vector3 End, bool Grounded);
+
+    /// <summary>A body walking on a little world as the server walks one: the ground under it, the grade,
+    /// the capsule, the solids within reach.</summary>
+    private static Walked Walk(TriangleWorld world, Vector3 from, Vector3 direction, int ticks, bool sprint = false,
+                               BodyShape body = BodyShape.Capsule)
+    {
+        var path = new List<Vector3>();
+        Vector3 pos = from, vel = Vector3.Zero;
+        bool grounded = false;
+        var all = new AcceptAll();
+        var solids = new List<SolidRef>();
+        for (int t = 0; t < ticks; t++)
+        {
+            float ground = world.Ground(pos, PhysicsConstants.PlayerRadius, PhysicsConstants.StepHeight, GeometryLayers.Ground, ref all, out _, out _);
+            var ctx = new SharedMovementEngine.MovementContext
+            {
+                Position = pos, Velocity = vel, InputDirection = direction, DeltaTime = PhysicsConstants.FixedDeltaTime, GroundHeight = ground,
+                Gravity = PhysicsConstants.Gravity, JumpForce = PhysicsConstants.JumpPower, Speed = PhysicsConstants.FootSpeed(sprint, float.MaxValue),
+                PlayerRadius = PhysicsConstants.PlayerRadius, PlayerHeight = PhysicsConstants.PlayerHeight, StepHeight = PhysicsConstants.StepHeight,
+                MapMin = new Vector3(-100, -100, -100), MapMax = new Vector3(100, 100, 100), Body = body,
+            };
+            if (body == BodyShape.Capsule) ctx.Grade = SharedMovementEngine.GradeAlong(world, ref all, pos, direction);
+            SharedMovementEngine.GatherSolids(ctx, world, ref all, solids);
+            var obstacles = new SharedMovementEngine.Obstacles(ReadOnlySpan<SharedMovementEngine.Collider>.Empty, world,
+                                                               System.Runtime.InteropServices.CollectionsMarshal.AsSpan(solids));
+            (pos, vel, grounded) = SharedMovementEngine.Step(ctx, obstacles, out _);
+            path.Add(pos);
+        }
+        return new Walked(path, pos, grounded);
+    }
+
+    /// <summary>Up a ramp of one in twelve at a walk: onto the top, a little slower than on the level, and
+    /// down it again a little faster.</summary>
+    [Fact]
+    public void AWalkUpARampIsSlowerAndDownItFaster()
+    {
+        var world = WorldOf(Shaped(7, new Vector3(0, 0.25f, 3f), new Vector3(1.5f, 0.5f, 6f), new ShapeSpec { Kind = ShapeKind.Wedge }),
+                            Shaped(8, new Vector3(0, 0.45f, 8f), new Vector3(1.5f, 0.1f, 4f), null));   // the landing at the top
+        var up = Walk(world, new Vector3(0, 0, -1f), Vector3.UnitZ, 70);
+        Assert.True(up.End.Z > 6f, $"ended at {up.End}");
+        Assert.Equal(0.5f, up.End.Y, 3);
+        // On the slope, a tick covers 1 / (1 + 2/12) of a level tick.
+        int onSlope = up.Path.FindIndex(p => p.Z > 1.5f);
+        float tick = up.Path[onSlope + 1].Z - up.Path[onSlope].Z;
+        float level = PhysicsConstants.WalkSpeed * PhysicsConstants.FixedDeltaTime;
+        Assert.Equal(level * SharedMovementEngine.GradeSpeed(1f / 12f), tick, 3);
+        Assert.True(tick < level);
+        var down = Walk(world, new Vector3(0, 0.5f, 6.5f), -Vector3.UnitZ, 70);
+        Assert.True(down.End.Z < 0f && down.End.Y == 0f, $"ended at {down.End}");
+        int descending = down.Path.FindIndex(p => p.Z < 4.5f);
+        Assert.True(down.Path[descending].Z - down.Path[descending + 1].Z > level, "down a gentle ramp is a little faster");
+    }
+
+    /// <summary>
+    /// Up a flight of real treads with W held, and down again: the body climbs onto each tread in turn
+    /// (its feet only ever on a tread's height between steps), reaches the top, and is slower on the
+    /// flight than on the level.
+    /// </summary>
+    [Fact]
+    public void AFlightIsClimbedTreadByTreadAndComeDown()
+    {
+        var size = new Vector3(1.2f, 2.8f, 4.48f);
+        var world = WorldOf(Shaped(7, new Vector3(0, 1.4f, 2.24f), size, new ShapeSpec { Kind = ShapeKind.Stairs, Steps = 16 }),
+                            Shaped(8, new Vector3(0, 2.75f, 6.5f), new Vector3(1.2f, 0.1f, 4f), null));   // the landing at the top
+        var up = Walk(world, new Vector3(0, 0, -1f), Vector3.UnitZ, 90);
+        Assert.True(MathF.Abs(up.End.Y - 2.8f) < 1e-3f, $"ended at {up.End}: " + string.Join(" ", up.Path.Select(p => $"({p.Y:F3},{p.Z:F2})")));
+        Assert.True(up.End.Z > 4.6f, $"stopped at {up.End}");
+        var treads = Enumerable.Range(0, 17).Select(i => i * 0.175f).ToArray();
+        foreach (var p in up.Path)
+            if (p.Z > 0.3f && p.Z < 4.2f)
+                Assert.True(treads.Any(t => MathF.Abs(p.Y - t) < 1e-3f) || treads.Any(t => MathF.Abs(p.Y - (t + PhysicsConstants.StepHeight)) < 1e-3f),
+                            $"feet at {p.Y:F3} at z {p.Z:F2}: not on a tread, nor stepping up from one");
+        // Slower on the flight: it takes longer than its length at a walk.
+        int first = up.Path.FindIndex(p => p.Z > 0.5f), last = up.Path.FindIndex(p => p.Z > 4.0f);
+        Assert.True((last - first) * PhysicsConstants.FixedDeltaTime > 3.5f / PhysicsConstants.WalkSpeed * 1.8f,
+                    $"{last - first} ticks for 3.5 m of stairs");
+
+        var down = Walk(world, new Vector3(0, 2.8f, 6f), -Vector3.UnitZ, 150);
+        Assert.Equal(0f, down.End.Y, 3);
+        Assert.True(down.End.Z < -0.5f, $"stopped at {down.End}");
+    }
+
+    /// <summary>A bank too steep to walk is a wall: walked at, it is not climbed.</summary>
+    [Fact]
+    public void ABankTooSteepToWalkIsNotClimbed()
+    {
+        var world = WorldOf(Shaped(8, new Vector3(0, 1f, 3f), new Vector3(2f, 2f, 1f), new ShapeSpec { Kind = ShapeKind.Wedge }));
+        var walk = Walk(world, new Vector3(0, 0, 0f), Vector3.UnitZ, 60);
+        Assert.True(walk.End.Y < 0.45f, $"climbed to {walk.End}");
+        Assert.True(walk.End.Z < 3.2f, $"went through to {walk.End}");
+    }
+
+    /// <summary>Through an arch's opening, and not through its piers.</summary>
+    [Fact]
+    public void AnArchIsWalkedThroughItsOpening()
+    {
+        var world = WorldOf(Shaped(9, new Vector3(0, 1.75f, 2f), new Vector3(3f, 3.5f, 0.6f), new ShapeSpec { Kind = ShapeKind.Arch, Thickness = 0.5f }));
+        var through = Walk(world, new Vector3(0, 0, 0), Vector3.UnitZ, 40);
+        Assert.True(through.End.Z > 3f, $"stopped at {through.End}");
+        var pier = Walk(world, new Vector3(1.2f, 0, 0), Vector3.UnitZ, 40);
+        Assert.True(pier.End.Z < 1.71f, $"walked into the pier to {pier.End}");
+    }
+
+    /// <summary>Against a box's upright face the capsule is met as the cylinder was: the same way out, the
+    /// same distance.</summary>
+    [Fact]
+    public void TheCapsuleMeetsAWallAsTheCylinderDid()
+    {
+        var world = WorldOf(Shaped(5, new Vector3(0, 1.5f, 2f), new Vector3(4f, 3f, 0.3f), null, yaw: 0.3f));
+        var all = new AcceptAll();
+        var near = new List<SolidRef>();
+        world.Overlapping(new Vector3(-5, -1, -5), new Vector3(5, 5, 5), GeometryLayers.Movement, ref all, near);
+        var wall = near.Single(s => world.OwnerOf(s) == 5);
+        var rng = new Random(3);
+        var capsule = new SolidContact.Capsule(PhysicsConstants.PlayerRadius, 0.15f, PhysicsConstants.PlayerHeight);
+        int compared = 0;
+        for (int i = 0; i < 2000; i++)
+        {
+            var feet = new Vector3((float)(rng.NextDouble() * 4 - 2), 0f, 2f + (float)(rng.NextDouble() * 1.2 - 0.6));
+            var cyl = SolidContact.CylinderOverlap(world, wall, feet + new Vector3(0, 0.15f + 0.825f, 0), 0.3f, 1.65f);
+            var cap = SolidContact.CapsuleOverlap(world, wall, feet, capsule, airborne: false);
+            Assert.Equal(cyl.IsColliding, cap.IsColliding);
+            if (!cyl.IsColliding || cyl.Penetration >= 0.3f) continue;   // the axis inside: the capsule is the cylinder there by rule
+            compared++;
+            Assert.True(Vector3.Distance(cyl.Normal, cap.Normal) < 1e-3f, $"normal {cyl.Normal} vs {cap.Normal}");
+            Assert.Equal(cyl.Penetration, cap.Penetration, 3);
+        }
+        Assert.True(compared > 100);
     }
 
     /// <summary>Maps write turns in six digits (Magnolia's 0.707082, 0.707131 is not unit length); every

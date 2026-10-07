@@ -63,7 +63,7 @@ public sealed class ServerGeometry
         foreach (var s in solids)
         {
             var h = new HashCode();
-            h.Add(s.Owner); h.Add(s.BoxSize); h.Add(s.Surface);
+            h.Add(s.Owner); h.Add(s.BoxSize); h.Add(s.Surface); h.Add(s.Mesh?.Hash ?? 0UL);
             if (poses) { h.Add(s.Position); h.Add(s.Rotation); }
             sum += h.ToHashCode();
         }
@@ -131,6 +131,6 @@ public sealed class ServerGeometry
         string? name = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e).Name : null;
         var surface = EntityGeometry.SurfaceOf(material, c.Size, a.LeafMetres, a.StudSpacingMetres, a.IsHollow, a.ShellThickness,
                                                a.Absorption, emitter, moves: false, doorLeaf: leaf, name);
-        return new SolidSpec(e.Id, t.Position, t.Rotation, c.Size, surface);
+        return SolidSpec.Of(e.Id, t.Position, t.Rotation, c.Size, surface, Shapes.Make(c.Form, c.Size));
     }
 }

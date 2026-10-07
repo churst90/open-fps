@@ -280,6 +280,15 @@ public partial struct ColliderComponent
     public Vector3 Size { get; set; }
     public bool IsSolid { get; set; }
     public ColliderComponent() { }
+
+    // APPENDED (component-wire-format: positional, append only).
+
+    /// <summary>
+    /// The solid's form from the shape library (docs/GEOMETRY.md 2.6, stage 2): a ramp, a flight of stairs,
+    /// an arch, filling the box of <see cref="Size"/>. Null for a plain box, which is every entity that
+    /// names none. Code that reads boxes still sees the box of <see cref="Size"/>.
+    /// </summary>
+    public OpenFPS.Common.Geometry.ShapeSpec? Form { get; set; }
 }
 
 [MemoryPackable]

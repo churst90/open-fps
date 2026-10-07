@@ -1137,9 +1137,7 @@ public sealed class WorldAudioPlayer
     {
         if (ListenerEnclosed(world, listenerPosition)) return;
 
-        var solids = _acoustics.ReflectionSolids(world);
-        if (solids.Count == 0) return;
-        EarlyReflections.Find(item.Sound.Position, listenerPosition, solids, _higher, AudioPhysics.CurrentSpeedOfSound,
+        _acoustics.FindReflections(world, item.Sound.Position, listenerPosition, _higher, AudioPhysics.CurrentSpeedOfSound,
                               maxOrder: EarlyReflections.MaxOrder, separateFirst: true,
                               // The long roll down a street is for an IMPULSE: a shot, a slam, a clap.
                               // Two dozen overlapping copies of a two-second horn are a cloud, not a
@@ -1227,10 +1225,8 @@ public sealed class WorldAudioPlayer
                                   int maxMirrors = int.MaxValue, bool washes = true)
     {
         int mirrors = 0;
-        var solids = _acoustics.ReflectionSolids(world);
-        if (solids.Count == 0) return;
         Vector3 src = item.Sound.Position;
-        EarlyReflections.Find(src, listenerPosition, solids, _room, AudioPhysics.CurrentSpeedOfSound,
+        _acoustics.FindReflections(world, src, listenerPosition, _room, AudioPhysics.CurrentSpeedOfSound,
                               maxOrder: 2, keep: MaxRoomEchoes * 2,
                               maxExtraPathMetres: RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
         float direct = Vector3.Distance(src, listenerPosition);

@@ -1,0 +1,18 @@
+{
+  "Id": "concrete_ramp",
+  "Name": "Concrete Ramp",
+  "Description": "A ramp of concrete 1.5 m wide rising half a metre over six toward its +Z end: one in twelve, the slope a wheelchair ramp is built to.",
+  "Material": "Concrete",
+  "ColliderSize": {
+    "X": 1.5,
+    "Y": 0.5,
+    "Z": 6.0
+  },
+  "Form": {
+    "Kind": "Wedge"
+  },
+  "Type": "StaticObject",
+  "TransmissionLow": 0.05,
+  "TransmissionMid": 0.02,
+  "TransmissionHigh": 0.01
+}

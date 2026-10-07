@@ -458,6 +458,96 @@ public static class GeometryParitySpike
             Console.WriteLine($"  walks: the box path started 0.1 mm aside parted from itself by over 1 mm in {walksControlParted} of {walks.Probes}");
         }
 
+        // ── Echoes: EarlyReflections over the box list and over the acoustic triangle world ─────────
+        if (only.Contains("echoes"))
+        {
+            var boxes = SteamAudioScene.BoxesFromWorld(newSnap);
+            var list = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();
+            var acoustic = AcousticGeometry.FromBoxes(boxes, data.TileMetres);
+            // In woods (a tree's crown, Foliage) and anywhere: a source within forty metres of a listener.
+            // Crowns and woods are not solid (no surface sends a sound back off them): where they stand.
+            var crowns = newSnap.Entities.Values.Where(e => e.Definition != null && string.Equals(e.Definition.Material.Material, "Foliage", StringComparison.OrdinalIgnoreCase))
+                .Select(e => new SteamAudioScene.Box(e.Transform.Position, Vector3.Max(e.Definition!.Collider.Size, new Vector3(1f)), e.Transform.Rotation, "Foliage")).ToList();
+            var kinds = new (string Name, int Order, bool Flutter, bool Separate, float Extra)[]
+            {
+                ("first order (a sustained sound, the worker)", 1, false, false, EarlyReflections.RangeMetres),
+                ("to second order in the room window (a footfall, a word)", 2, false, false, WorldAudioPlayer.RoomEchoWindowSeconds * 343f),
+                ("to third order with the flutter (a one-off sound outdoors)", EarlyReflections.MaxOrder, true, true, EarlyReflections.RangeMetres),
+            };
+            var a0 = new List<EarlyReflections.Arrival>(); var a1 = new List<EarlyReflections.Arrival>();
+            foreach (var where in new[] { "anywhere", "in woods" })
+            {
+                if (where == "in woods" && crowns.Count == 0) continue;
+                foreach (var kind in kinds)
+                {
+                    var t = new Tally($"Echoes {where}, {kind.Name}");
+                    tallies.Add(t);
+                    double worstOld = 0, worstNew = 0;
+                    int count = Math.Max(50, n / 20);
+                    for (int i = 0; i < count; i++)
+                    {
+                        Vector3 from;
+                        if (where == "in woods")
+                        {
+                            var c = crowns[rng.Next(crowns.Count)];
+                            from = c.Center + new Vector3((float)(rng.NextDouble() * 2 - 1) * (c.Size.X / 2 + 3f), 0, (float)(rng.NextDouble() * 2 - 1) * (c.Size.Z / 2 + 3f));
+                            from.Y = 1.6f;
+                        }
+                        else { from = NearSomething(3f); from.Y = MathF.Max(1.2f, from.Y); }
+                        var way = Direction(); way.Y = 0f;
+                        if (way.LengthSquared() < 1e-4f) way = Vector3.UnitX;
+                        var ear = from + Vector3.Normalize(way) * (5f + (float)rng.NextDouble() * 35f);
+                        ear.Y = from.Y + 0.2f;
+                        var c0 = Stopwatch.StartNew();
+                        EarlyReflections.Find(from, ear, list, a0, 343f, kind.Order, kind.Separate, kind.Flutter, 0, kind.Extra);
+                        double o = c0.Elapsed.TotalMilliseconds; c0.Restart();
+                        EarlyReflections.Find(from, ear, acoustic, a1, 343f, kind.Order, kind.Separate, kind.Flutter, 0, kind.Extra);
+                        double w = c0.Elapsed.TotalMilliseconds;
+                        t.OldMs += o; t.NewMs += w; worstOld = Math.Max(worstOld, o); worstNew = Math.Max(worstNew, w);
+                        t.Probes++;
+                        // The same arrivals, whatever their ids: each matched by where its image is and what it keeps.
+                        var unmatched = new List<EarlyReflections.Arrival>(a1);
+                        int missing = 0; float worst = 0f;
+                        foreach (var x in a0)
+                        {
+                            int k = unmatched.FindIndex(y => Vector3.Distance(x.ImagePosition, y.ImagePosition) < 2e-3f && MathF.Abs(x.GainMid - y.GainMid) < 1e-4f && x.Order == y.Order);
+                            if (k < 0) { missing++; continue; }
+                            worst = MathF.Max(worst, Vector3.Distance(x.HitPoint, unmatched[k].HitPoint));
+                            unmatched.RemoveAt(k);
+                        }
+                        t.MaxError = Math.Max(t.MaxError, worst);
+                        if (missing == 0 && unmatched.Count == 0) { t.Same++; continue; }
+                        // A copy only the world has, off a surface laid flush on another: each leg of it begins
+                        // on the other one, which the box test counted as in its way (touching), so the list lost
+                        // both. Its legs, a tenth of a millimetre short at each end, are clear of every box. A copy
+                        // only the list has is then one the extra copy pushed out of the kept few.
+                        bool LegsClearTrimmed(in EarlyReflections.Arrival x)
+                        {
+                            foreach (var (p, q) in new[] { (from, x.HitPoint), (x.HitPoint, ear) })
+                            {
+                                var d = q - p; float len = d.Length(); if (len < 1e-3f) continue;
+                                var a = p + d / len * 1e-4f; var b = q - d / len * 1e-4f;
+                                foreach (var sb in list) if (GeometryUtils.LineIntersectsOBB(a, b, sb.Center, sb.Size, sb.Rotation)) return false;
+                            }
+                            return true;
+                        }
+                        var worldOnlyFirst = unmatched.Where(x => x.Order == 1).ToList();
+                        bool explained = worldOnlyFirst.Count > 0 && worldOnlyFirst.All(x => LegsClearTrimmed(x))
+                                         && (missing == 0 || a0.Count >= (kind.Flutter ? EarlyReflections.MaxFlutterArrivals : kind.Order == 1 ? EarlyReflections.MaxArrivals : WorldAudioPlayer.MaxRoomEchoes * 2) - 1 || missing <= unmatched.Count);
+                        if (explained)
+                        {
+                            t.Ties++; t.Same++;
+                            t.TiePairs["a copy off a surface laid flush on another, which the box test lost"] = t.TiePairs.GetValueOrDefault("a copy off a surface laid flush on another, which the box test lost") + 1;
+                            continue;
+                        }
+                        t.Differ("arrivals", $"{V(from)} to {V(ear)}: {a0.Count} from the list, {a1.Count} from the world, {missing} of the list's not found, {unmatched.Count} of the world's extra"
+                                             + (t.Shown.Count < show ? $"\n        list: {string.Join("; ", a0.Select(x => $"o{x.Order} {V(x.HitPoint)} {x.GainMid:F3}"))}\n        world: {string.Join("; ", a1.Select(x => $"o{x.Order} {V(x.HitPoint)} {x.GainMid:F3}"))}" : ""), show);
+                    }
+                    Console.WriteLine($"  echoes {where}, {kind.Name}: worst {worstOld:F1} ms over the list, {worstNew:F1} ms over the world");
+                }
+            }
+        }
+
         // ── Enclosure surveys ────────────────────────────────────────────────────────────────────
         if (only.Contains("enclosure"))
         {

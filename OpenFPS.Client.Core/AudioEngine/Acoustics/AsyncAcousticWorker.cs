@@ -847,8 +847,9 @@ public class AsyncAcousticWorker : IDisposable
     private void AddEarlyReflections(List<AcousticPathData> into, WorldSnapshot world,
                                      AcousticRequest req, int region, bool listenerEnclosed)
     {
-        var solids = ReflectionSolids();
-        if (solids.Count == 0) return;
+        var geometry = _enclosureWorld;
+        var solids = geometry != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? null : ReflectionSolids();
+        if (solids != null && solids.Count == 0) return;
 
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
         // FIRST ORDER, in EarlyReflections' own order, for a sound that goes on. With third order and
@@ -858,7 +859,8 @@ public class AsyncAcousticWorker : IDisposable
         // echo of a SUSTAINED sound is not heard as an event; it is part of the field, which the
         // reverb is. Copies of copies belong to one-off sounds (WorldAudioPlayer), where an echo
         // happens once and is gone.
-        EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
+        if (solids != null) EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
+        else EarlyReflections.Find(req.SourcePos, req.ListenerPos, geometry!, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
 
         _lastReflectionCount = 0;
         for (int i = 0; i < _reflectionScratch.Count; i++)
@@ -1268,6 +1270,7 @@ public class AsyncAcousticWorker : IDisposable
         OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.ConfigureInBackground(_saContext, full, listener.IsBuilt ? listener : null);
         _barrierBoxes = boxes;
         _enclosureWorld = geometry;
+        _acoustics.PublishReflectionWorld(geometry, map);
         _lastSceneBoxes = boxes.Count;
         PublishRoutes(routes);
         SceneBuildMsTotal += (DateTime.UtcNow.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
@@ -1386,6 +1389,7 @@ public class AsyncAcousticWorker : IDisposable
             _saScene.Build(boxes);
         }
         _enclosureWorld = GeometryFor(_tileScenes, _acousticStore, boxes, mapLeaves);
+        _acoustics.PublishReflectionWorld(_enclosureWorld, world.AcousticMap);
         _routeTiles = new OpeningRoutes.TileCache();
         _saSceneMap = world.AcousticMap;
         if (_saScene.IsBuilt)

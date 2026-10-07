@@ -20,7 +20,8 @@ public sealed class SteamAudioScene : IDisposable
     /// and how it is built (solid, or two leaves over a cavity: <see cref="WallBuild"/>). <paramref name="EntityId"/>
     /// is the entity it was taken from, 0 for one made by hand.</summary>
     public readonly record struct Box(Vector3 Center, Vector3 Size, Quaternion Rotation, string Material,
-                                      WallBuild Build = default, int EntityId = 0);
+                                      WallBuild Build = default, int EntityId = 0,
+                                      OpenFPS.Common.Geometry.ShapeSpec? Form = null);
 
     private readonly IntPtr _context;
     private IntPtr _scene;
@@ -128,7 +129,7 @@ public sealed class SteamAudioScene : IDisposable
             var size = def.Collider.Size;
             if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) continue;
             boxes.Add(new Box(snap.Transform.Position, size, snap.Transform.Rotation, def.Material.Material,
-                              new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres), snap.Id));
+                              new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres), snap.Id, def.Collider.Form));
         }
         return boxes;
     }

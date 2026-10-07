@@ -236,6 +236,7 @@ public sealed class TriangleWorldBuilder
         S(sf.Material); V(sf.Construction.PanelSize); F(sf.Construction.Build.LeafMetres); F(sf.Construction.Build.StudSpacingMetres);
         F(sf.Construction.ShellThickness); Mix((uint)sf.Layers); Mix((uint)sf.Flags); F(sf.Absorption);
         if (s.Mesh != null) { Mix((uint)(s.Mesh.Hash >> 32)); Mix((uint)s.Mesh.Hash); }
+        if (s.Parts != null) foreach (var part in s.Parts) { Mix((uint)(part.Hash >> 32)); Mix((uint)part.Hash); }
         return h;
     }
 }
@@ -286,7 +287,8 @@ public static class EntityGeometry
         var surface = SurfaceOf(def.Material.Material, def.Collider.Size, a.LeafMetres, a.StudSpacingMetres, a.IsHollow,
                                 a.ShellThickness, a.Absorption, emitter, moves: false, doorLeaf: role == GeometryRole.Mover,
                                 def.Identity.Name);
-        return new SolidSpec(def.EntityId, transform.Position, transform.Rotation, def.Collider.Size, surface);
+        return SolidSpec.Of(def.EntityId, transform.Position, transform.Rotation, def.Collider.Size, surface,
+                            Shapes.Make(def.Collider.Form, def.Collider.Size));
     }
 
     /// <summary>
