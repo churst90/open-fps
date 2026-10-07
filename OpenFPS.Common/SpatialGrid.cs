@@ -13,7 +13,21 @@ public class SpatialGrid<T>
 {
     private readonly float _cellSize;
     private readonly Dictionary<(int, int), List<T>> _staticGrid = new();
-    private readonly Dictionary<(int, int), List<T>> _dynamicGrid = new();
+
+    // ── What moves: a tree, not cells (geometry stage 2) ─────────────────────────────────────────────
+    //
+    // The dynamic half was a dictionary of cells torn down and filled again every tick. What moves is now
+    // a list of the cells each thing covers, as it was filed, and a tree over them built the first time
+    // it is asked after a change (the triangle world's BVH builder): a question about the cells within a
+    // radius hands back exactly the things the cells did, in the order they were filed.
+    private readonly List<(T Item, int X0, int Z0, int X1, int Z1)> _dynamic = new();
+    private OpenFPS.Common.Geometry.BvhNode[]? _dynamicNodes;
+    private int[] _dynamicOrder = Array.Empty<int>();
+    private readonly object _dynamicBuild = new();
+    [ThreadStatic] private static List<int>? _dynamicHits;
+
+    /// <summary>How many moving things are filed this tick.</summary>
+    public int DynamicCount => _dynamic.Count;
 
     /// <summary>Where each static item was filed: the cells (x0, z0) to (x1, z1), or the oversize list, so
     /// one can be taken out again without rebuilding the grid (<see cref="RemoveStatic"/>).</summary>
@@ -69,7 +83,8 @@ public class SpatialGrid<T>
     public void Add(Vector3 pos, T item, bool isStatic = false)
     {
         var cell = GetCell(pos);
-        var grid = isStatic ? _staticGrid : _dynamicGrid;
+        if (!isStatic) { AddDynamic(item, cell.Item1, cell.Item2, cell.Item1, cell.Item2); return; }
+        var grid = _staticGrid;
         if (!grid.TryGetValue(cell, out var list))
         {
             list = new List<T>();
@@ -120,7 +135,8 @@ public class SpatialGrid<T>
         int maxX = (int)Math.Floor(max.X / _cellSize);
         int maxZ = (int)Math.Floor(max.Z / _cellSize);
 
-        var grid = isStatic ? _staticGrid : _dynamicGrid;
+        if (!isStatic) { AddDynamic(item, minX, minZ, maxX, maxZ); return; }
+        var grid = _staticGrid;
 
         if (isStatic && _oversizeCells > 0 && (long)(maxX - minX + 1) * (maxZ - minZ + 1) > _oversizeCells)
         {
@@ -145,6 +161,64 @@ public class SpatialGrid<T>
         }
 
         if (isStatic) { _staticSpans[item] = (minX, minZ, maxX, maxZ, false); StaticVersion++; }
+    }
+
+    private void AddDynamic(T item, int x0, int z0, int x1, int z1)
+    {
+        _dynamic.Add((item, x0, z0, x1, z1));
+        _dynamicNodes = null;
+    }
+
+    /// <summary>The moving things filed in any of the cells (x0..x1, z0..z1), in the order they were filed,
+    /// each once, into <paramref name="into"/> (and <paramref name="seen"/>) after what is there.</summary>
+    private void DynamicIn(int x0, int z0, int x1, int z1, List<T> into, HashSet<T> seen)
+    {
+        if (_dynamic.Count == 0) return;
+        var nodes = _dynamicNodes;
+        if (nodes == null)
+            lock (_dynamicBuild)
+            {
+                nodes = _dynamicNodes;
+                if (nodes == null)
+                {
+                    var lo = new Vector3[_dynamic.Count]; var hi = new Vector3[_dynamic.Count];
+                    for (int i = 0; i < _dynamic.Count; i++)
+                    {
+                        var d = _dynamic[i];
+                        lo[i] = new Vector3(d.X0, 0f, d.Z0); hi[i] = new Vector3(d.X1, 0f, d.Z1);
+                    }
+                    nodes = OpenFPS.Common.Geometry.BvhBuilder.Build(lo, hi, _dynamic.Count, 4, out _dynamicOrder);
+                    _dynamicNodes = nodes;
+                }
+            }
+        var order = _dynamicOrder;
+        var hits = _dynamicHits ??= new List<int>(32);
+        hits.Clear();
+        Span<int> stack = stackalloc int[OpenFPS.Common.Geometry.BvhBuilder.MaxDepth + 2];
+        int sp = 0;
+        stack[sp++] = 0;
+        while (sp > 0)
+        {
+            ref readonly var n = ref nodes[stack[--sp]];
+            if (n.Max.X < x0 || n.Min.X > x1 || n.Max.Z < z0 || n.Min.Z > z1) continue;
+            if (n.Count > 0)
+            {
+                for (int i = n.LeftFirst; i < n.LeftFirst + n.Count; i++)
+                {
+                    var d = _dynamic[order[i]];
+                    if (d.X1 < x0 || d.X0 > x1 || d.Z1 < z0 || d.Z0 > z1) continue;
+                    hits.Add(order[i]);
+                }
+                continue;
+            }
+            stack[sp++] = n.LeftFirst + 1; stack[sp++] = n.LeftFirst;
+        }
+        hits.Sort();
+        foreach (int i in hits)
+        {
+            var item = _dynamic[i].Item;
+            if (seen.Add(item)) into.Add(item);
+        }
     }
 
     /// <summary>
@@ -186,12 +260,11 @@ public class SpatialGrid<T>
                 {
                     foreach (var item in staticList) yield return item;
                 }
-                if (_dynamicGrid.TryGetValue(cell, out var dynamicList))
-                {
-                    foreach (var item in dynamicList) yield return item;
-                }
             }
         }
+        var moving = new List<T>(); var seen = new HashSet<T>();
+        DynamicIn(centerCell.Item1 - cellRadius, centerCell.Item2 - cellRadius, centerCell.Item1 + cellRadius, centerCell.Item2 + cellRadius, moving, seen);
+        foreach (var item in moving) yield return item;
     }
 
     /// <summary>
@@ -227,13 +300,9 @@ public class SpatialGrid<T>
                     for (int i = 0; i < staticList.Count; i++)
                         if (seen.Add(staticList[i])) into.Add(staticList[i]);
                 }
-                if (_dynamicGrid.TryGetValue(cell, out var dynamicList))
-                {
-                    for (int i = 0; i < dynamicList.Count; i++)
-                        if (seen.Add(dynamicList[i])) into.Add(dynamicList[i]);
-                }
             }
         }
+        DynamicIn(centerCell.Item1 - cellRadius, centerCell.Item2 - cellRadius, centerCell.Item1 + cellRadius, centerCell.Item2 + cellRadius, into, seen);
     }
 
     /// <summary>
@@ -242,7 +311,8 @@ public class SpatialGrid<T>
     /// </summary>
     public void Clear()
     {
-        _dynamicGrid.Clear();
+        _dynamic.Clear();
+        _dynamicNodes = null;
     }
 
     /// <summary>
@@ -251,7 +321,8 @@ public class SpatialGrid<T>
     public void ClearAll()
     {
         _staticGrid.Clear();
-        _dynamicGrid.Clear();
+        _dynamic.Clear();
+        _dynamicNodes = null;
         _oversize.Clear();
         _unindexed.Clear();
         _staticSpans.Clear();
@@ -319,14 +390,6 @@ public class SpatialGrid<T>
             if (seen.Add(_unindexed[i])) into.Add(_unindexed[i]);
         int cellRadius = (int)Math.Ceiling(radius / _cellSize);
         var centerCell = GetCell(pos);
-        for (int x = -cellRadius; x <= cellRadius; x++)
-        {
-            for (int z = -cellRadius; z <= cellRadius; z++)
-            {
-                if (_dynamicGrid.TryGetValue((centerCell.Item1 + x, centerCell.Item2 + z), out var dynamicList))
-                    for (int i = 0; i < dynamicList.Count; i++)
-                        if (seen.Add(dynamicList[i])) into.Add(dynamicList[i]);
-            }
-        }
+        DynamicIn(centerCell.Item1 - cellRadius, centerCell.Item2 - cellRadius, centerCell.Item1 + cellRadius, centerCell.Item2 + cellRadius, into, seen);
     }
 }
