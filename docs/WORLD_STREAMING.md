@@ -438,7 +438,8 @@ Risks:
 - Acoustics at the loaded edge. A room whose walls are half loaded has openings that are not there;
   the radius keeps this 300 m away, but a low setting brings it to 150 m.
 - Steam Audio rebuild cost grows with the radius (a whole-scene rebuild per tile change) until stage
-  3's instanced meshes. Measured below for stage 1.
+  3's instanced meshes. Measured below for stage 1. Stage 1b (2026-10-06, below) brought the instanced
+  sub-scene per tile forward, so a tile change rebuilds only that tile.
 - The server keeps the whole map in stage 1; a whole town (a ZIP area) would be hundreds of thousands
   of entities and needs stage 2's server-side unloading before it is practical.
 - Per-tile generation that does not depend on order is the hardest part of stage 2: lots, address

@@ -9,9 +9,10 @@ and 4), which was written on 2026-09-22 and never built. Each stage below says w
 what it adds, and how it is checked. Numbers marked *to confirm* are taken from their source before
 they go in the code.
 
-**Status (2026-10-05).** Stage 1 (roads as data, following, junctions, crossings) built. Stage 3
-(per-wheel physics) built and merged 2026-10-01. Stage 4 partly built: squeal per wheel, rolling noise
-still per axle. Stage 2 (physical bodies for traffic and people) and stage 5 (traffic lights and
+**Status (2026-10-07).** Stage 1 (roads as data, following, junctions, crossings) built. Stage 3
+(per-wheel physics) built and merged 2026-10-01. Stage 4 partly built: squeal per wheel; since
+2026-10-06 wet tyre noise per wheel from its own water (docs/WET_ROADS.md), and inside a vehicle each
+wheel heard through its own arch (CabinPaths); dry rolling noise outside still per axle. Stage 2 (physical bodies for traffic and people) and stage 5 (traffic lights and
 accessible pedestrian signals) not started. The bodies left when somebody is killed
 (`OpenFPS.Server/Core/Bodies.cs`) are a different thing, an item, not stage 2. "What exists today"
 below is as of 2026-09-27.

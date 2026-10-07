@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- todo.md audited: every item checked against the code, `git log`, this file and Cody's approvals.
+  Done items (19, and the finished halves of 22 more) went to the new docs/DONE_2026-10.md, one line
+  each with the commit or approval that closes them; partly done items say only what is left. New: a
+  "Next, in order" section at the top and what waits on Cody's ear; the probable bugs, decisions and
+  housekeeping finds from today's work; open items from the water, fire and wet-road docs. Docs
+  corrected where the audit found them stale: docs/RUNNING_WATER.md (sections 5.4, 7 and 8: round 2
+  built fall sizes that follow the flow, the gutter outlet's gurgle, the drip tail and taps),
+  docs/SOUND_INVENTORY.md (rain and ear wind are built; the newer models listed),
+  docs/COVERAGE_2026-10-06.md (TyreDemand and OnBreath removed), docs/WORLD_STREAMING.md (per-tile
+  scenes came in stage 1b) and docs/NEXT_BODIES_WHEELS_ROADS.md (stage 4 status).
 - Housekeeping (docs/HOUSEKEEPING.md) of the files the earlier passes left for others: the water synths
   (ShoreSynth, RunningWaterSynth and its Basin, EventSum, PowerLawNoise, Resonator, FallingWaterSynth),
   the water and texture spikes (WavesSpike, RunningWaterSpike, WaterCostSpike, NatureSpike, TextureSpike)
