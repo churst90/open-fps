@@ -848,7 +848,7 @@ public class ClientAudioSystem
         ChooseLiveMachines(world, visualEyePos);
         ChoosePlaces(world, visualEyePos);
         _engineEchoes.EchoesPerEngine = _adaptiveEchoes;
-        _engineEchoes.SyncGeometry(world);
+        _engineEchoes.SyncGeometry(world, _acoustics.ReflectionWorldFor(world));
         float engineDt = (float)Math.Max(1e-3, _now() - _lastEngineTime);
         _lastEngineTime = _now();
 
@@ -3648,10 +3648,8 @@ public class ClientAudioSystem
                                  float gain, float reference, float alreadyLateSeconds,
                                  int firstId, bool[] on, string key, string soundId, int regionId, float range = 30f)
     {
-        var solids = _acoustics.ReflectionSolids(world);
         arrivals.Clear();
-        if (solids.Count > 0)
-            OpenFPS.Common.EarlyReflections.Find(mouth, ear, solids, arrivals, AudioPhysics.CurrentSpeedOfSound,
+        _acoustics.FindReflections(world, mouth, ear, arrivals, AudioPhysics.CurrentSpeedOfSound,
                                                  maxOrder: 2, keep: OwnVoiceCopies * 2,
                                                  maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
         arrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
@@ -3734,9 +3732,7 @@ public class ClientAudioSystem
     /// window before the tail, each from its own wall's direction with that wall's colour.</summary>
     private void SubmitRoomStepEchoes(Vector3 stepPos, Vector3 ear, string soundId, float stepGain, float stepReference, float stepLevelDb, WorldSnapshot world)
     {
-        var solids = _acoustics.ReflectionSolids(world);
-        if (solids.Count == 0) return;
-        OpenFPS.Common.EarlyReflections.Find(stepPos, ear, solids, _stepArrivals, AudioPhysics.CurrentSpeedOfSound,
+        _acoustics.FindReflections(world, stepPos, ear, _stepArrivals, AudioPhysics.CurrentSpeedOfSound,
                                              maxOrder: 2, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
                                              maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
         _stepArrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));

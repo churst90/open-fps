@@ -6,7 +6,7 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Server.Core;
 
 /// <summary>
-/// What a new map starts as (/map new). One template for now: flat ground a hundred metres square,
+/// What a new map starts as (/map new). One template for now: flat dirt a hundred metres square,
 /// open sky, nothing on it, the spawn in the middle. A player builds the rest.
 /// </summary>
 public static class MapTemplates
@@ -29,8 +29,9 @@ public static class MapTemplates
         IsPublic = false,
         Entities = new List<EntityData>
         {
-            // The default map's foundation: one concrete slab, ten metres scaled ten times.
-            new() { EntityId = 1, PrefabId = "concrete_floor", Position = Vector3.Zero, Scale = new Vector3(10, 1, 10) },
+            // The ground: natural ground, dirt, ten metres scaled ten times. Concrete, grass and asphalt
+            // are laid on it, as a world is built (Cody, 2026-10-06).
+            new() { EntityId = 1, PrefabId = "dirt_floor", Name = "Ground", Position = Vector3.Zero, Scale = new Vector3(10, 1, 10) },
         },
     };
 }

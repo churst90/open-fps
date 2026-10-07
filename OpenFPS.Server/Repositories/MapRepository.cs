@@ -49,6 +49,10 @@ public class EntityData
     /// <summary>What a generated map's entity is part of ("roads", "zones", "structure", "rooms",
     /// "interiors", "trees", ...). MapTiles reads it for a tile's coarse level.</summary>
     public string? Layer { get; set; }
+
+    /// <summary>Over its prefab: a solid form from the shape library filling the collider's box
+    /// (PrefabTemplate.Form): a ramp, a flight of stairs, an arch.</summary>
+    public OpenFPS.Common.Geometry.ShapeSpec? Form { get; set; }
 }
 
 /// <summary>Where a map made from a real place sits on the Earth: its (0, 0) in degrees, WGS84.</summary>

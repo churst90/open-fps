@@ -46,6 +46,13 @@ public class LocalPlayerController
         _state = state;
     }
 
+    /// <summary>
+    /// Where a foot goes down and on what, given where the stride put it, the body's feet and the way it is
+    /// going (PhysicsUtils.FootOnFloor over the session's snapshot): the floor under the foot, a tread on a
+    /// flight. Null leaves the foot where the stride put it, on the body's floor.
+    /// </summary>
+    public Func<Vector3, Vector3, Vector3, (Vector3 At, string? Material)>? Footing { get; set; }
+
     public void Update(Vector3 newPosition, Vector3 velocity)
     {
         Breathe(newPosition, velocity);
@@ -58,7 +65,17 @@ public class LocalPlayerController
         string mat = _state.CurrentMaterial == "None" ? "Generic" : _state.CurrentMaterial;
 
         if (fall.Landed) OnLandTriggered?.Invoke(newPosition, mat, _state.CurrentVariant);
-        if (fall.Stepped) OnStepTriggered?.Invoke(fall.StepPosition, mat, _state.CurrentVariant, fall.Slope);
+        if (fall.Stepped)
+        {
+            var at = fall.StepPosition;
+            if (Footing != null)
+            {
+                var (foot, footMaterial) = Footing(at, newPosition, velocity);
+                at = foot;
+                if (!string.IsNullOrEmpty(footMaterial) && footMaterial != "None") mat = footMaterial;
+            }
+            OnStepTriggered?.Invoke(at, mat, _state.CurrentVariant, fall.Slope);
+        }
     }
 
     /// <summary>

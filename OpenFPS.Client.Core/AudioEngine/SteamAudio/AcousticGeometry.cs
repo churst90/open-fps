@@ -148,14 +148,14 @@ public sealed class AcousticGeometry
     {
         var flags = (openGround ? SurfaceFlags.OpenGround : SurfaceFlags.None) | (leaf ? SurfaceFlags.DoorLeaf : SurfaceFlags.None);
         var surface = new Surface(b.Material ?? "", new Construction(b.Size, b.Build), GeometryLayers.Acoustics, flags);
-        return new SolidSpec(b.EntityId, b.Center, b.Rotation, b.Size, surface);
+        return SolidSpec.Of(b.EntityId, b.Center, b.Rotation, b.Size, surface, Shapes.Make(b.Form, b.Size));
     }
 
     private static long Hash(in SteamAudioScene.Box b)
     {
         var h = new HashCode();
         h.Add(b.Center); h.Add(b.Size); h.Add(b.Rotation);
-        h.Add(b.Material); h.Add(b.Build); h.Add(b.EntityId);
+        h.Add(b.Material); h.Add(b.Build); h.Add(b.EntityId); h.Add(b.Form);
         return h.ToHashCode();
     }
 }

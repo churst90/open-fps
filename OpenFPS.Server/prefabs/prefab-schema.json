@@ -99,6 +99,19 @@
         "Polygon"
       ]
     },
+    "Form": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A solid form from the shape library filling the collider's box (docs/GEOMETRY.md 4.1). Omit for a box. Wedge: a ramp rising toward +Z. Stairs: a flight climbing toward +Z, each rise the height over Steps. Arch: a block with a half-elliptical opening through it along Z.",
+      "properties": {
+        "Kind": { "type": "string", "enum": ["Box", "Wedge", "Stairs", "Arch"] },
+        "Steps": { "type": "integer", "minimum": 1, "maximum": 200, "description": "Stairs: how many steps." },
+        "Landing": { "type": "number", "minimum": 0, "description": "Stairs: a flat landing at the top, metres along Z." },
+        "Thickness": { "type": "number", "exclusiveMinimum": 0, "description": "Arch: the ring's and the piers' thickness, metres." },
+        "Segments": { "type": "integer", "minimum": 0, "maximum": 64, "description": "Arch: straight pieces in the curve (12 if 0)." }
+      },
+      "required": ["Kind"]
+    },
     "IsSolid": {
       "type": "boolean",
       "description": "Whether the collider blocks movement. Defaults to true when ColliderSize is given. A region or portal must set this false — unless it is a door, which is a portal that blocks its own opening until the leaf swings aside."

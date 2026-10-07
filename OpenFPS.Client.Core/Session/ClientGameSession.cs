@@ -175,6 +175,12 @@ public sealed partial class ClientGameSession : IDisposable
         // Your own feet ride with your head (see ClientAudioSystem.OnOwnFootstep); everybody
         // else's are sounds at places in the world.
         _controller.OnStepTriggered += _audioSystem.OnOwnFootstep;
+        // Your own foot on the floor under it, off the latest snapshot: a tread on a flight.
+        _controller.Footing = (foot, feet, way) =>
+        {
+            var at = PhysicsUtils.FootOnFloor(_world.GetSnapshot(), foot, feet, way, _ownEntityId, out var m);
+            return (at, m);
+        };
         _controller.OnLandTriggered += _audioSystem.OnOwnLand;
         // What the road says to a driver — its name, the junction ahead — spoken without cutting off
         // whatever was being said, because two of them can arrive together at a corner.

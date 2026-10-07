@@ -366,6 +366,13 @@ public sealed class WheelDynamics
         }
     }
 
+    /// <summary>Sets the surface under one wheel (the ground under each wheel, geometry stage 2).</summary>
+    public void SetSurface(int wheel, byte surface)
+    {
+        Wheels[wheel].Surface = surface;
+        Wheels[wheel].SurfaceGrip = RoadSurfaces.GripOf(surface);
+    }
+
     /// <summary>Sets the surface under every wheel.</summary>
     public void SetSurface(byte surface)
     {

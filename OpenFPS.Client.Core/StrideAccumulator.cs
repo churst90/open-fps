@@ -164,6 +164,19 @@ public sealed class StrideAccumulator
     /// </summary>
     public const float TreadWaitMetres = 0.35f;
 
+    /// <summary>
+    /// How many treads a footfall takes on a flight: the step the speed asks for (<see cref="StepLength"/>)
+    /// over the flight's going, to the nearest whole tread, and never more than two (a leg spans two
+    /// risers at a run, not three) nor fewer than one. At the game's walk a flight is taken two treads at
+    /// a time, as a runner takes them; the foot always lands on a tread (docs/GEOMETRY.md stage 2).
+    /// </summary>
+    public static int TreadsPerStep(float speedMps, float goingMetres)
+        => goingMetres <= 0f ? 1 : Math.Clamp((int)MathF.Round(StepLength(speedMps) / goingMetres, MidpointRounding.AwayFromZero), 1, 2);
+
+    /// <summary>Furthest apart two treads can be and be a flight's, metres along the way: past this a
+    /// rise is a kerb or a doorstep on its own, walked over at the walk's own cadence.</summary>
+    public const float FlightGoingMetres = 0.6f;
+
     /// <summary>How fast a foot meets the floor, m/s: walking on the level, going up a stair, coming down one.</summary>
     public const float LevelFootMps = 0.6f, UpFootMps = 0.4f, DownFootMps = 1.0f;
 
@@ -199,6 +212,10 @@ public sealed class StrideAccumulator
 
     private float? _lastStepY;
     private int _treadsSinceStep;
+    /// <summary>The floor the body last settled on, for when it arrives on the next tread; how far it has
+    /// walked since; and the going between the last two treads (0 when they were not a flight's).</summary>
+    private float? _treadRef;
+    private float _sinceTread = float.MaxValue, _going;
     private Vector3? _lastPosition;
     private float _accumulatedDistance;
     private int _stepCount;
@@ -227,6 +244,9 @@ public sealed class StrideAccumulator
         _lastPosition = null;
         _lastStepY = null;
         _treadsSinceStep = 0;
+        _treadRef = null;
+        _sinceTread = float.MaxValue;
+        _going = 0f;
         _accumulatedDistance = 0f;
         _wasInAir = false;
         _feetMoving = false;
@@ -290,10 +310,38 @@ public sealed class StrideAccumulator
         if (isGrounded && walking) _feetMoving = true;
 
         // A jump in height on the ground is the body arriving on a tread (see TreadJump). Not a jump
-        // bigger than a step: that is a teleport or a correction, not a stair.
-        float dy = _lastPosition.HasValue ? MathF.Abs(position.Y - _lastPosition.Value.Y) : 0f;
-        bool treadNow = isGrounded && dy >= TreadJump && dy <= PhysicsConstants.StepHeight + 0.05f;
-        if (treadNow) _treadsSinceStep++;
+        // bigger than a step: that is a teleport or a correction, not a stair. Measured from the floor the
+        // body last settled on, not from an update ago: the movement engine lifts a body the whole
+        // StepHeight for one update when it steps up and the probe settles it on the tread the next, and
+        // that lift and settle are one tread, not two.
+        bool treadNow = false;
+        if (isGrounded)
+        {
+            if (_treadRef is float settled)
+            {
+                float rise = position.Y - settled;
+                bool lifted = MathF.Abs(rise - PhysicsConstants.StepHeight) < 0.01f;
+                if (!lifted)
+                {
+                    float dy = MathF.Abs(rise);
+                    treadNow = dy >= TreadJump && dy <= PhysicsConstants.StepHeight + 0.05f;
+                    _treadRef = position.Y;
+                }
+            }
+            else _treadRef = position.Y;
+        }
+        else _treadRef = null;
+        if (treadNow)
+        {
+            _treadsSinceStep++;
+            // Two treads within a flight's going of each other are a flight; its going is the distance between them.
+            // This update's own way counts: two treads arrived on in updates one after the other are a going apart.
+            float movedNow = _lastPosition.HasValue
+                ? new Vector2(position.X - _lastPosition.Value.X, position.Z - _lastPosition.Value.Z).Length() : 0f;
+            float going = _sinceTread == float.MaxValue ? float.MaxValue : _sinceTread + movedNow;
+            _going = going <= FlightGoingMetres ? going : 0f;
+            _sinceTread = 0f;
+        }
 
         // How high the foot is, for whether this footfall went up or down: the lower of where the body
         // is and where it was an update ago. The movement engine takes a step up by lifting the body
@@ -315,6 +363,7 @@ public sealed class StrideAccumulator
 
                 if (!plausible || !walking) _accumulatedDistance = 0f;
                 else if (moved > 0.001f) _accumulatedDistance += moved;
+                if (plausible && !treadNow && _sinceTread < float.MaxValue) _sinceTread += moved;
             }
             else
             {
@@ -338,11 +387,17 @@ public sealed class StrideAccumulator
         // a pendulum, so a fast body takes longer steps rather than more of them, and the cadence
         // comes out under four a second on its own without anything watching a timer.
         bool due = startedWalking || (isGrounded && _accumulatedDistance >= StepLength(ownSpeed));
-        // On a flight a foot goes down on a tread: a step that falls due between treads waits for the
-        // next one, up to TreadWaitMetres further on. A flight is two treads or more since the last
-        // footfall; one is a kerb or a doorstep, and a level walk past it keeps its own cadence.
-        if (due && !startedWalking && _treadsSinceStep >= 2 && !treadNow
-            && _accumulatedDistance < StepLength(ownSpeed) + TreadWaitMetres)
+        // On a flight a foot goes down on a tread, every TreadsPerStep treads: the flight's goings decide
+        // the cadence, not the distance. A flight is a tread arrived on within a going of the one before;
+        // off it (a landing, the floor at the top) the walk's own cadence comes back.
+        bool onFlight = _going > 0f && _sinceTread <= FlightGoingMetres;
+        if (onFlight && !startedWalking)
+            due = isGrounded && treadNow && _treadsSinceStep >= TreadsPerStep(ownSpeed, _going);
+        // A step that falls due between treads waits for the next one, up to TreadWaitMetres further on: a
+        // flight's first treads, before its going is known. Two treads or more since the last footfall; one
+        // is a kerb or a doorstep, and a level walk past it keeps its own cadence.
+        else if (due && !startedWalking && _treadsSinceStep >= 2 && !treadNow
+                 && _accumulatedDistance < StepLength(ownSpeed) + TreadWaitMetres)
             due = false;
 
         var slope = StepSlope.Level;

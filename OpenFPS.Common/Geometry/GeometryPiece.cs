@@ -57,6 +57,17 @@ public struct SolidRecord
     /// <see cref="BoxCentre"/> is that to a float's rounding, and code that still reads boxes meets their
     /// edges exactly where the box test did (a wall ending at x = -11.5 ends there, not a hair past it).</summary>
     public Vector3 PlacedAt;
+    /// <summary>The convex pieces of a solid that is not convex (stairs, an arch), as a range of the
+    /// piece's <see cref="SolidPart"/>s; none for a convex solid, which is its own one piece.</summary>
+    public int PartStart, PartCount;
+}
+
+/// <summary>One convex piece of a solid that is not convex: its triangles (in the piece's part list, not
+/// the tree rays walk) and the planes of its faces.</summary>
+public struct SolidPart
+{
+    public int TriStart, TriCount;
+    public int PlaneStart, PlaneCount;
 }
 
 /// <summary>A triangle as the ray test wants it: one corner, the two edges from it, and its solid.</summary>
@@ -75,7 +86,12 @@ public struct GeometryTriangle
 /// stands and how it is turned, and its surface.
 /// </summary>
 public readonly record struct SolidSpec(int Owner, Vector3 Position, Quaternion Rotation, Vector3 BoxSize,
-                                        Surface Surface, MeshAsset? Mesh = null);
+                                        Surface Surface, MeshAsset? Mesh = null, MeshAsset[]? Parts = null)
+{
+    /// <summary>A solid of a shape from the library (null for a box), filling a box of <paramref name="size"/>.</summary>
+    public static SolidSpec Of(int owner, Vector3 position, Quaternion rotation, Vector3 size, Surface surface, ShapeMesh? shape)
+        => new(owner, position, rotation, size, surface, shape?.Outer, shape?.Parts);
+}
 
 /// <summary>
 /// The bottom level of the two-level BVH (docs/GEOMETRY.md 2.2): an immutable set of solids in one frame,
@@ -100,6 +116,8 @@ public sealed class GeometryPiece
     internal readonly Vector4[] Planes;
     internal readonly BvhNode[] SolidNodes;
     internal readonly int[] SolidOrder;
+    internal readonly SolidPart[] Parts;
+    internal readonly GeometryTriangle[] PartTris;
     public Surface[] Surfaces { get; }
 
     public int TriangleCount => Tris.Length;
@@ -109,16 +127,17 @@ public sealed class GeometryPiece
     /// <summary>What the piece holds in memory, bytes (arrays only).</summary>
     public long Bytes => (long)Tris.Length * 40 + TriSurface.Length * 2 + (long)TriNodes.Length * 32
                          + (long)Solids.Length * 124 + SolidTris.Length * 4 + Planes.Length * 16
-                         + (long)SolidNodes.Length * 32 + SolidOrder.Length * 4;
+                         + (long)SolidNodes.Length * 32 + SolidOrder.Length * 4 + (long)Parts.Length * 16 + (long)PartTris.Length * 40;
 
     private GeometryPiece(TileKey key, Vector3 origin, ulong signature, GeometryTriangle[] tris, ushort[] triSurface, BvhNode[] triNodes,
                           SolidRecord[] solids, int[] solidTris, Vector4[] planes, BvhNode[] solidNodes, int[] solidOrder,
-                          Surface[] surfaces)
+                          Surface[] surfaces, SolidPart[] parts, GeometryTriangle[] partTris)
     {
         Key = key; Origin = origin; Signature = signature;
         Tris = tris; TriSurface = triSurface; TriNodes = triNodes;
         Solids = solids; SolidTris = solidTris; Planes = planes;
         SolidNodes = solidNodes; SolidOrder = solidOrder; Surfaces = surfaces;
+        Parts = parts; PartTris = partTris;
         if (solids.Length > 0) { BoundsMin = triNodes[0].Min; BoundsMax = triNodes[0].Max; }
     }
 
@@ -129,6 +148,8 @@ public sealed class GeometryPiece
     public ReadOnlySpan<int> TrianglesOf(int solid) => new(SolidTris, Solids[solid].TriStart, Solids[solid].TriCount);
     /// <summary>The face planes of a convex solid (normal, offset; a point p is inside when n·p - d &lt; 0 for all).</summary>
     public ReadOnlySpan<Vector4> PlanesOf(int solid) => new(Planes, Solids[solid].PlaneStart, Solids[solid].PlaneCount);
+    /// <summary>The convex pieces of a solid: empty for a convex one.</summary>
+    public ReadOnlySpan<SolidPart> PartsOf(int solid) => new(Parts, Solids[solid].PartStart, Solids[solid].PartCount);
 
     // ═══ Building ════════════════════════════════════════════════════════════════════════════════
 
@@ -154,6 +175,8 @@ public sealed class GeometryPiece
         var triSurface = new ushort[triCount];
         var records = new SolidRecord[solids.Count];
         var planes = new List<Vector4>(solids.Count * 6);
+        var parts = new List<SolidPart>();
+        var partTris = new List<GeometryTriangle>();
         Span<Vector3> corners = stackalloc Vector3[8];
         int t = 0;
         for (int si = 0; si < solids.Count; si++)
@@ -167,7 +190,8 @@ public sealed class GeometryPiece
             rec.Owner = s.Owner; rec.Surface = surface; rec.TriStart = t;
             rec.Closed = s.Mesh?.Closed ?? true; rec.Convex = s.Mesh?.Convex ?? true;
             rec.BoxCentre = s.Position - origin; rec.BoxRotation = rotation; rec.PlacedAt = s.Position;
-            rec.BoxSize = s.Mesh == null ? s.BoxSize : Vector3.Zero;
+            // A shape fills its collider's box, and code that still reads boxes sees that box.
+            rec.BoxSize = s.BoxSize;
             var lo = new Vector3(float.MaxValue); var hi = new Vector3(float.MinValue);
             if (s.Mesh == null)
             {
@@ -203,11 +227,33 @@ public sealed class GeometryPiece
             }
             rec.TriCount = t - rec.TriStart;
             rec.Min = lo; rec.Max = hi;
-            var extent = s.Mesh == null ? s.BoxSize : hi - lo;
+            var extent = s.BoxSize.X > 0f && s.BoxSize.Z > 0f ? s.BoxSize : hi - lo;
             rec.Footprint = extent.X * extent.Z;
             rec.PlaneStart = planes.Count;
             if (rec.Convex && rec.Closed) AddPlanes(tris, rec.TriStart, rec.TriCount, planes);
             rec.PlaneCount = planes.Count - rec.PlaneStart;
+            rec.PartStart = parts.Count;
+            if (s.Parts != null && !(rec.Convex && rec.Closed))
+            {
+                // The convex pieces a body is met against, placed exactly as the outer triangles are.
+                var at = s.Position - origin;
+                foreach (var m in s.Parts)
+                {
+                    var part = new SolidPart { TriStart = partTris.Count, PlaneStart = planes.Count };
+                    for (int k = 0; k < m.Indices.Length; k += 3)
+                    {
+                        Vector3 a = at + Vector3.TransformNormal(m.Vertices[m.Indices[k]], turn);
+                        Vector3 b = at + Vector3.TransformNormal(m.Vertices[m.Indices[k + 1]], turn);
+                        Vector3 c = at + Vector3.TransformNormal(m.Vertices[m.Indices[k + 2]], turn);
+                        partTris.Add(new GeometryTriangle { V0 = a, E1 = b - a, E2 = c - a, Solid = si });
+                    }
+                    part.TriCount = partTris.Count - part.TriStart;
+                    AddPlanes(partTris, part.TriStart, part.TriCount, planes);
+                    part.PlaneCount = planes.Count - part.PlaneStart;
+                    parts.Add(part);
+                }
+            }
+            rec.PartCount = parts.Count - rec.PartStart;
         }
 
         // The tree over triangles, and the triangles put in its leaf order.
@@ -234,11 +280,11 @@ public sealed class GeometryPiece
         var solidNodes = BvhBuilder.Build(smin, smax, records.Length, 2, out var solidOrder);
 
         return new GeometryPiece(key, origin, signature, sortedTris, sortedSurface, triNodes, records, solidTris,
-                                 planes.ToArray(), solidNodes, solidOrder, surfaces.ToArray());
+                                 planes.ToArray(), solidNodes, solidOrder, surfaces.ToArray(), parts.ToArray(), partTris.ToArray());
     }
 
     /// <summary>The distinct face planes of a convex solid, from its triangles.</summary>
-    private static void AddPlanes(GeometryTriangle[] tris, int start, int count, List<Vector4> planes)
+    private static void AddPlanes(IReadOnlyList<GeometryTriangle> tris, int start, int count, List<Vector4> planes)
     {
         int first = planes.Count;
         for (int i = start; i < start + count; i++)
@@ -397,12 +443,24 @@ public sealed class GeometryPiece
         }
     }
 
-    /// <summary>Whether a point is inside a convex solid, by more than <paramref name="slack"/>.</summary>
+    /// <summary>Whether a point is inside a solid, by more than <paramref name="slack"/>: inside its planes
+    /// when it is convex, inside one of its convex pieces when it is not.</summary>
     internal bool Inside(int solid, Vector3 p, float slack)
     {
         ref readonly var s = ref Solids[solid];
-        if (s.PlaneCount == 0) return false;
-        for (int i = s.PlaneStart; i < s.PlaneStart + s.PlaneCount; i++)
+        if (s.PartCount > 0)
+        {
+            for (int k = s.PartStart; k < s.PartStart + s.PartCount; k++)
+                if (InsidePlanes(Parts[k].PlaneStart, Parts[k].PlaneCount, p, slack)) return true;
+            return false;
+        }
+        return InsidePlanes(s.PlaneStart, s.PlaneCount, p, slack);
+    }
+
+    private bool InsidePlanes(int start, int count, Vector3 p, float slack)
+    {
+        if (count == 0) return false;
+        for (int i = start; i < start + count; i++)
         {
             var q = Planes[i];
             if (q.X * p.X + q.Y * p.Y + q.Z * p.Z - q.W > -slack) return false;

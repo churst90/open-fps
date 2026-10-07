@@ -4,6 +4,26 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Geometry stage 2 (docs/GEOMETRY.md, "Stage 2 as built"; unheard, unplayed):
+  - Stage 1's decisions: the loader no longer lays a concrete foundation under a map that has its own
+    ground; where a map needs one it is dirt (the speedway). `/map new` starts on dirt. Every turn in a
+    map is made unit length at load, on the server and the client, so the routes agree with the old box
+    grid exactly. A ricochet skips off the face's own normal.
+  - Shapes: a solid can be a wedge (a ramp), a flight of stairs with real treads, or an arch, as well as a
+    box (`Form` on a collider; prefabs `concrete_ramp`, `concrete_stairs`, `wooden_stairs`, `brick_arch`).
+    The ground probe follows a slope, walking slows uphill and down a flight by the grade, and stairs are
+    climbed by the step rule with W alone, up or down.
+  - The body is the old cylinder's foot and trunk under a rounded head: a head meets a beam's or lintel's
+    edge on its curve, and standing on a sofa under a low ceiling no longer throws you through a wall.
+    On box maps it walks as before except at those edges (city: 31 single steps in 4,000; 3 walks in 400).
+  - Footsteps on stairs land on the tread under the foot, at its height and of its material, one footfall
+    every two treads at the game's speeds (AudioLab `--stair-walk`: 154 of 154 on a city stairwell).
+  - A driven car sits on four wheel rays: it pitches on a slope, rolls with a wheel on a kerb, and each
+    wheel grips by the surface under it.
+  - Cheaper: a one-off sound's echoes (the worst on the city 55 ms to 14 ms on the game thread), engine
+    echoes 2.4 to 0.3 ms, the server's grid refresh after a pick-up 104 to 25 ms on Magnolia.
+  - Memory: a stopped voice no longer keeps old route graphs and their tiles alive; 160 MB to 86 MB at
+    the end of a 2 km drive across Magnolia.
 - Inside a vehicle, its sound comes from where it gets in (unheard). Cody: "the inside of the cab of
   the cars sounds mono". It was one voice from one point ahead of you and below; the ears matched 0.97
   to 1.00 from 125 Hz to 1 kHz at a cruise. The interior model is now split into its paths, each played

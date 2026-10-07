@@ -61,6 +61,12 @@ public class PrefabTemplate
     /// only, so a solid sphere is walked around but not *heard* as an obstruction.</summary>
     public ColliderShape? Shape { get; set; }
 
+    /// <summary>A solid form from the shape library filling the collider's box (docs/GEOMETRY.md 4.1):
+    /// { "Kind": "Wedge" } for a ramp rising toward +Z, { "Kind": "Stairs", "Steps": 14 } for a flight
+    /// climbing toward +Z, { "Kind": "Arch", "Thickness": 0.5 }. Omit for a box. Named Form because
+    /// <see cref="Shape"/> already names the collider's round or square shape.</summary>
+    public OpenFPS.Common.Geometry.ShapeSpec? Form { get; set; }
+
     /// <summary>Whether the collider blocks movement. Defaults to true when a ColliderSize is given.
     /// A region volume or a portal must set this false.</summary>
     public bool? IsSolid { get; set; }

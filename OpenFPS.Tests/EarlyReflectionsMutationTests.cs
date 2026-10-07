@@ -44,7 +44,7 @@ public class EarlyReflectionsMutationTests
     public void NoSolidsClearsTheListAndFindsNothing()
     {
         _found.Add(new EarlyReflections.Arrival(Vector3.One, Vector3.One, 1f, 0.1f, 1f, 1f, 1f, 0f, 1));
-        EarlyReflections.Find(Source, Listener, null!, _found);
+        EarlyReflections.Find(Source, Listener, (IReadOnlyList<EarlyReflections.Solid>)null!, _found);
         Assert.Empty(_found);
     }
 

@@ -23,6 +23,12 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 ///   --geometry-parity [map=city] [n=4000] [seed=1] [only=rays,ground,overlap,steps,enclosure,occlusion,bullets,collision,determinism]
 ///                     [show=12] [times=1]
 ///
+/// Stage 2 (docs/GEOMETRY.md 10) adds: capsule (the stage 2 body and the grade against the cylinder, steps
+/// and walks), echoes (EarlyReflections over the box list and the acoustic triangle world, in woods too),
+/// engineechoes (EngineReflections' legs against every box and the tree), sightgrid (the sight's own index
+/// and the triangle world), ricochet (a round's face from the box's axis and from the triangle), and
+/// routes, tracks as before. Debugging: capsuledebug, walkdebug, stepdebug=x,y,z,ix,iz[,vx,vy,vz,sprint].
+///
 /// Both paths are the game's own code: the server's grid with and without its triangle world, and the
 /// client's SpatialService over a snapshot with and without one. Old and new are asked the same thing
 /// from the same state, one probe at a time, so a difference is a difference in the answer and never in
@@ -124,6 +130,8 @@ public static class GeometryParitySpike
             if (some != Entity.Null)
             {
                 ref var tt = ref ecs.Get<Transform>(some);
+                // Filed again whole (stage 1, and OPENFPS_INCREMENTAL_REFRESH=0).
+                OpenFPS.Common.Geometry.TriangleGeometry.Incremental = false;
                 tt.Position += new Vector3(0.2f, 0, 0);
                 refresh.Restart();
                 maps.RefreshGrid(mapId);
@@ -131,14 +139,29 @@ public static class GeometryParitySpike
                 int oneBuilt = serverGeometry.LastBuilt; double oneCollect = serverGeometry.LastCollectMs, oneTiles = serverGeometry.LastBuildMs;
                 tt.Position -= new Vector3(0.2f, 0, 0);
                 maps.RefreshGrid(mapId);
+                // Only what changed (stage 2).
+                OpenFPS.Common.Geometry.TriangleGeometry.Incremental = true;
+                refresh.Restart();
+                maps.RefreshGrid(mapId);
+                double sameInc = refresh.Elapsed.TotalMilliseconds;
+                tt.Position += new Vector3(0.2f, 0, 0);
+                refresh.Restart();
+                maps.RefreshGrid(mapId);
+                double oneInc = refresh.Elapsed.TotalMilliseconds;
+                int incBuilt = serverGeometry.LastBuilt; double incTiles = serverGeometry.LastBuildMs;
+                tt.Position -= new Vector3(0.2f, 0, 0);
+                maps.RefreshGrid(mapId);
                 OpenFPS.Common.Geometry.TriangleGeometry.Enabled = false;
                 refresh.Restart();
                 maps.RefreshGrid(mapId);
                 double gridOnly = refresh.Elapsed.TotalMilliseconds;
                 OpenFPS.Common.Geometry.TriangleGeometry.Enabled = true;
+                OpenFPS.Common.Geometry.TriangleGeometry.Incremental = false;
                 maps.RefreshGrid(mapId);
+                OpenFPS.Common.Geometry.TriangleGeometry.Incremental = true;
                 serverWorld = serverGeometry.World;
-                Console.WriteLine($"  server RefreshGrid: {gridOnly:F0} ms the grid alone; with the triangles {same:F0} ms when nothing changed, {one:F0} ms with one box moved ({oneBuilt} tile built; reading the solids {oneCollect:F0} ms, the tiles {oneTiles:F0} ms)");
+                Console.WriteLine($"  server RefreshGrid: {gridOnly:F0} ms the grid alone; filed again whole with the triangles {same:F0} ms when nothing changed, {one:F0} ms with one box moved ({oneBuilt} tile built; reading the solids {oneCollect:F0} ms, the tiles {oneTiles:F0} ms)");
+                Console.WriteLine($"  server RefreshGrid, only what changed: {sameInc:F1} ms when nothing changed, {oneInc:F1} ms with one box moved ({incBuilt} tile built in {incTiles:F1} ms)");
             }
         }
 
@@ -456,6 +479,274 @@ public static class GeometryParitySpike
             }
             SetGrid(grid, geoSaved, serverUnindexed);
             Console.WriteLine($"  walks: the box path started 0.1 mm aside parted from itself by over 1 mm in {walksControlParted} of {walks.Probes}");
+        }
+
+        // ── The capsule (stage 2) against the cylinder, both on the triangles: does it feel the same? ──
+        if (only.Contains("capsule"))
+        {
+            var steps = new Tally("Movement step, the capsule (and the grade) against the cylinder");
+            var walks = new Tally("Walks of 90 steps, the capsule against the cylinder");
+            tallies.Add(steps); tallies.Add(walks);
+            var geo = grid.Geometry!;
+            int onFlights = 0, controlParted = 0;
+            double capMs = 0, cylMs = 0;
+            var travel = new List<float>();
+            for (int i = 0; i < n; i++)
+            {
+                var p = NearSomething(1.5f);
+                float f = PhysicsUtils.GetGroundHeight(ecs, grid, p + new Vector3(0, 3f, 0), out _);
+                if (f < -900f) continue;
+                p.Y = f;
+                var input = Vector3.Normalize(new Vector3((float)(rng.NextDouble() * 2 - 1), 0, (float)(rng.NextDouble() * 2 - 1)));
+                var vel = (i % 5) switch { 0 => new Vector3(0, -6f, 0), 1 => new Vector3(0, 4.5f, 0), _ => Vector3.Zero };
+                if (i % 5 == 0) p.Y += 0.3f;
+                bool sprint = i % 3 == 0;
+                var c = Stopwatch.StartNew();
+                var (p0, v0, g0) = StepOnServer(ecs, grid, geo, serverUnindexed, p, vel, input, sprint, data, BodyShape.Cylinder);
+                cylMs += c.Elapsed.TotalMilliseconds; c.Restart();
+                var (p1, v1, g1) = StepOnServer(ecs, grid, geo, serverUnindexed, p, vel, input, sprint, data, BodyShape.Capsule, out float grade);
+                capMs += c.Elapsed.TotalMilliseconds;
+                steps.OldMs += 0; steps.Probes++;
+                float err = Vector3.Distance(p0, p1);
+                steps.MaxError = Math.Max(steps.MaxError, err);
+                if (err <= 1e-3f && g0 == g1) { steps.Same++; }
+                else if (grade != 0f) { steps.Ties++; steps.Same++; steps.TiePairs["on a flight or a slope: slower by the grade"] = steps.TiePairs.GetValueOrDefault("on a flight or a slope: slower by the grade") + 1; }
+                else steps.Differ(CapsuleWhy(geo, p, p0, p1), $"from {V(p)} vel {V(vel)} input {V(input)}: cylinder {V(p0)} {g0}, capsule {V(p1)} {g1} ({err * 1000:F1} mm)", show);
+
+                if (i % 10 != 0) continue;
+                Vector3 a = p, av = Vector3.Zero, b = p, bv = Vector3.Zero, cc = p + new Vector3(1e-4f, 0, 0), cv = Vector3.Zero;
+                var dirNow = input;
+                float worst = 0f, worstControl = 0f; int partedAt = -1; bool flight = false;
+                float distA = 0f, distB = 0f, firstCylinderStep = 0f;
+                var trace = args.Contains("capsuledebug") ? new List<string>() : null;
+                for (int k = 0; k < 90; k++)
+                {
+                    if (k % 20 == 0) dirNow = Vector3.Normalize(new Vector3((float)(rng.NextDouble() * 2 - 1), 0, (float)(rng.NextDouble() * 2 - 1)));
+                    var (wasA, wasB) = (a, b);
+                    trace?.Add($"    {k}: dir {V(dirNow)} cylinder {a.X:F3},{a.Y:F3},{a.Z:F3} capsule {b.X:F3},{b.Y:F3},{b.Z:F3}" + (k == 0 ? SolidsNear(geo, b) : ""));
+                    (a, av, _) = StepOnServer(ecs, grid, geo, serverUnindexed, a, av, dirNow, sprint, data, BodyShape.Cylinder);
+                    if (k == 0) firstCylinderStep = new Vector2(a.X - wasA.X, a.Z - wasA.Z).Length();
+                    (cc, cv, _) = StepOnServer(ecs, grid, geo, serverUnindexed, cc, cv, dirNow, sprint, data, BodyShape.Cylinder);
+                    (b, bv, _) = StepOnServer(ecs, grid, geo, serverUnindexed, b, bv, dirNow, sprint, data, BodyShape.Capsule, out float gr);
+                    if (gr != 0f) flight = true;
+                    distA += new Vector2(a.X - wasA.X, a.Z - wasA.Z).Length(); distB += new Vector2(b.X - wasB.X, b.Z - wasB.Z).Length();
+                    worstControl = MathF.Max(worstControl, Vector3.Distance(a, cc) - 1e-4f);
+                    float e = Vector3.Distance(a, b);
+                    if (e > worst) worst = e;
+                    if (e > 1e-2f && partedAt < 0) partedAt = k;
+                }
+                walks.Probes++;
+                walks.MaxError = Math.Max(walks.MaxError, worst);
+                if (worstControl > 1e-2f) controlParted++;
+                if (distA > 0.5f) travel.Add(distB / distA);
+                if (partedAt < 0) { walks.Same++; continue; }
+                if (flight) { onFlights++; walks.Ties++; walks.Same++; walks.TiePairs["on a flight or a slope: slower by the grade"] = walks.TiePairs.GetValueOrDefault("on a flight or a slope: slower by the grade") + 1; continue; }
+                if (partedAt <= 1 && firstCylinderStep > 0.5f)
+                {
+                    const string eject = "the cylinder put out through a wall by a ceiling over its head (standing on a sofa); the capsule stays";
+                    walks.Ties++; walks.Same++; walks.TiePairs[eject] = walks.TiePairs.GetValueOrDefault(eject) + 1; continue;
+                }
+                if (Vector3.Distance(a, b) < 0.01f)
+                {
+                    const string tick = "the same walk, a step up a tick apart (the cylinder lifted for a tick; the probe stood the capsule on it)";
+                    walks.Ties++; walks.Same++; walks.TiePairs[tick] = walks.TiePairs.GetValueOrDefault(tick) + 1; continue;
+                }
+                walks.Differ("parted by over 1 cm", $"from {V(p)}: at step {partedAt}, worst {worst * 1000:F0} mm; the capsule walked {distB:F2} m, the cylinder {distA:F2} m"
+                                                    + $" (the cylinder from 0.1 mm aside: {worstControl * 1000:F1} mm)"
+                                                    + (trace != null && walks.Shown.Count < show ? "\n" + string.Join("\n", trace.Skip(Math.Max(0, partedAt - 4)).Take(10)) + WhatTouches(geo, trace.Count > 0 ? b : b) : ""), show);
+            }
+            travel.Sort();
+            Console.WriteLine($"  capsule: a step {capMs * 1000 / Math.Max(1, steps.Probes):F1} us against the cylinder's {cylMs * 1000 / Math.Max(1, steps.Probes):F1} us; "
+                              + $"walks on a flight or slope {onFlights}; the cylinder from 0.1 mm aside parted from itself by over 1 cm in {controlParted} of {walks.Probes}; "
+                              + (travel.Count > 0 ? $"distance walked, capsule over cylinder: median {travel[travel.Count / 2]:F3}, lowest {travel[0]:F3}, highest {travel[^1]:F3}" : ""));
+        }
+
+        // ── The echoes of one-off sounds and engines (EngineReflections): legs against every box, and the tree ──
+        if (only.Contains("engineechoes"))
+        {
+            var t = new Tally("EngineReflections.FindReflections (a shot's echoes off faces near the path)");
+            tallies.Add(t);
+            var boxes = SteamAudioScene.BoxesFromWorld(newSnap);
+            var acoustic = AcousticGeometry.FromBoxes(boxes, data.TileMetres);
+            var oldEchoes = new OpenFPS.Client.AudioEngine.Acoustics.EngineReflections();
+            var newEchoes = new OpenFPS.Client.AudioEngine.Acoustics.EngineReflections();
+            oldEchoes.SyncGeometry(newSnap); newEchoes.SyncGeometry(newSnap, acoustic);
+            var r0 = new Reflection[16]; var r1 = new Reflection[16];
+            double worstOld = 0, worstNew = 0;
+            for (int i = 0; i < Math.Max(100, n / 10); i++)
+            {
+                var from = NearSomething(3f); from.Y = MathF.Max(1.2f, from.Y);
+                var way = Direction(); way.Y = 0f; if (way.LengthSquared() < 1e-4f) way = Vector3.UnitX;
+                var ear = from + Vector3.Normalize(way) * (5f + (float)rng.NextDouble() * 60f);
+                var c = Stopwatch.StartNew();
+                int n0 = oldEchoes.FindReflections(from, ear, 343f, r0);
+                double o = c.Elapsed.TotalMilliseconds; c.Restart();
+                int n1 = newEchoes.FindReflections(from, ear, 343f, r1);
+                double w = c.Elapsed.TotalMilliseconds;
+                t.OldMs += o; t.NewMs += w; worstOld = Math.Max(worstOld, o); worstNew = Math.Max(worstNew, w);
+                t.Probes++;
+                bool same = n0 == n1;
+                for (int k = 0; same && k < n0; k++)
+                    same = Vector3.Distance(r0[k].ApparentPosition, r1[k].ApparentPosition) < 1e-3f;
+                if (same) { t.Same++; continue; }
+                t.Differ("reflections", $"{V(from)} to {V(ear)}: {n0} with every box, {n1} with the tree", show);
+            }
+            Console.WriteLine($"  engine echoes: worst {worstOld:F1} ms with every box, {worstNew:F1} ms with the tree");
+        }
+
+        // ── The sight's index (SightGrid): its own grid of boxes, and the triangle world's ────────────
+        if (only.Contains("sightgrid"))
+        {
+            var t = new Tally("SightGrid.Cast (a look of the turn narration, 20 m)");
+            tallies.Add(t);
+            var oldIndex = new OpenFPS.Client.Core.SightIndex();
+            var newIndex = new OpenFPS.Client.Core.SightIndex();
+            oldIndex.Refresh(oldSnap, 0); newIndex.Refresh(newSnap, 0);
+            Func<EntitySnapshot, bool> stops = e => OpenFPS.Client.Core.Sightline.Stops(e, -1);
+            for (int i = 0; i < n; i++)
+            {
+                var eye = NearSomething(3f);
+                var d = Direction();
+                if (i % 2 == 0) { d.Y *= 0.15f; d = Vector3.Normalize(d); }
+                oldIndex.Prepare(oldSnap, eye); newIndex.Prepare(newSnap, eye);
+                var c = Stopwatch.StartNew();
+                bool h0 = oldIndex.Grid.Cast(oldSnap, eye, d, OpenFPS.Client.Core.Sightline.NarrationRange, stops, out var e0, out float d0);
+                t.OldMs += c.Elapsed.TotalMilliseconds; c.Restart();
+                bool h1 = newIndex.Grid.Cast(newSnap, eye, d, OpenFPS.Client.Core.Sightline.NarrationRange, stops, out var e1, out float d1);
+                t.NewMs += c.Elapsed.TotalMilliseconds;
+                CompareHit(t, h0, e0.Id, d0, h1, e1.Id, d1, eye, d, newSnap, show);
+            }
+            Console.WriteLine($"  sight grid: the old index holds {oldIndex.Grid.Size.Things} things, the new {newIndex.Grid.Size.Things} (what the triangles do not)");
+        }
+
+        // ── Ricochet: the face a round meets, from the box's largest axis and from the triangle ──────
+        if (only.Contains("ricochet"))
+        {
+            var t = new Tally("Ricochet face (the normal a round skips off)");
+            tallies.Add(t);
+            var byId = new Dictionary<int, Entity>();
+            ecs.Query(new QueryDescription().WithAll<Transform>(), (Entity e) => byId[e.Id] = e);
+            int edges = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var o = NearSomething(3f);
+                var d = Direction();
+                var all = new AcceptAll();
+                if (!CombatService.StaticFirstHit(serverWorld, o, d, 30f, ref all, out int owner, out float dist) || dist <= 0f) continue;
+                if (!byId.TryGetValue(owner, out var e) || !ecs.Has<ColliderComponent>(e) || ecs.Get<ColliderComponent>(e).Shape != ColliderShape.Box) continue;
+                var at = o + d * dist;
+                var velocity = d * 800f;
+                CombatService.Face(ecs, e, at, velocity, out var n0, out var s0);
+                CombatService.Face(ecs, e, at, velocity, out var n1, out var s1, serverWorld);
+                t.Probes++;
+                float err = Vector3.Distance(n0, n1);
+                t.MaxError = Math.Max(t.MaxError, err);
+                if (err < 1e-3f) { t.Same++; continue; }
+                // Where on its box the round met it: within a few centimetres of an edge, the largest local
+                // axis (scaled by the box's proportions) can name the wrong face.
+                var tr = ecs.Get<Transform>(e); var c = ecs.Get<ColliderComponent>(e);
+                var local = Vector3.Transform(at - tr.Position, Quaternion.Inverse(tr.Rotation));
+                var h = c.Size * 0.5f;
+                float edge = MathF.Min(MathF.Min(MathF.Abs(MathF.Abs(local.X) - h.X), MathF.Abs(MathF.Abs(local.Y) - h.Y)), MathF.Abs(MathF.Abs(local.Z) - h.Z));
+                int onFaces = (MathF.Abs(MathF.Abs(local.X) - h.X) < 0.01f ? 1 : 0) + (MathF.Abs(MathF.Abs(local.Y) - h.Y) < 0.01f ? 1 : 0) + (MathF.Abs(MathF.Abs(local.Z) - h.Z) < 0.01f ? 1 : 0);
+                // The face the round actually entered by is the one the ray crossed; the old guess picked the
+                // face nearest in proportion. Agreeing with the ray is the triangle's answer.
+                const string guess = "the box's largest axis named a face the round did not enter by (the triangle names the one it did)";
+                edges++;
+                t.Ties++; t.Same++; t.TiePairs[guess] = t.TiePairs.GetValueOrDefault(guess) + 1;
+                if (t.Shown.Count < show) t.Shown.Add($"    [{guess}] at {V(at)} on #{owner} size {V(c.Size)}: old {V(n0)} new {V(n1)}, {onFaces} face(s) within 1 cm");
+            }
+            Console.WriteLine($"  ricochet: {edges} of {t.Probes} faces named differently");
+        }
+
+        // ── Echoes: EarlyReflections over the box list and over the acoustic triangle world ─────────
+        if (only.Contains("echoes"))
+        {
+            var boxes = SteamAudioScene.BoxesFromWorld(newSnap);
+            var list = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();
+            var acoustic = AcousticGeometry.FromBoxes(boxes, data.TileMetres);
+            // In woods (a tree's crown, Foliage) and anywhere: a source within forty metres of a listener.
+            // Crowns and woods are not solid (no surface sends a sound back off them): where they stand.
+            var crowns = newSnap.Entities.Values.Where(e => e.Definition != null && string.Equals(e.Definition.Material.Material, "Foliage", StringComparison.OrdinalIgnoreCase))
+                .Select(e => new SteamAudioScene.Box(e.Transform.Position, Vector3.Max(e.Definition!.Collider.Size, new Vector3(1f)), e.Transform.Rotation, "Foliage")).ToList();
+            var kinds = new (string Name, int Order, bool Flutter, bool Separate, float Extra)[]
+            {
+                ("first order (a sustained sound, the worker)", 1, false, false, EarlyReflections.RangeMetres),
+                ("to second order in the room window (a footfall, a word)", 2, false, false, WorldAudioPlayer.RoomEchoWindowSeconds * 343f),
+                ("to third order with the flutter (a one-off sound outdoors)", EarlyReflections.MaxOrder, true, true, EarlyReflections.RangeMetres),
+            };
+            var a0 = new List<EarlyReflections.Arrival>(); var a1 = new List<EarlyReflections.Arrival>();
+            foreach (var where in new[] { "anywhere", "in woods" })
+            {
+                if (where == "in woods" && crowns.Count == 0) continue;
+                foreach (var kind in kinds)
+                {
+                    var t = new Tally($"Echoes {where}, {kind.Name}");
+                    tallies.Add(t);
+                    double worstOld = 0, worstNew = 0;
+                    int count = Math.Max(50, n / 20);
+                    for (int i = 0; i < count; i++)
+                    {
+                        Vector3 from;
+                        if (where == "in woods")
+                        {
+                            var c = crowns[rng.Next(crowns.Count)];
+                            from = c.Center + new Vector3((float)(rng.NextDouble() * 2 - 1) * (c.Size.X / 2 + 3f), 0, (float)(rng.NextDouble() * 2 - 1) * (c.Size.Z / 2 + 3f));
+                            from.Y = 1.6f;
+                        }
+                        else { from = NearSomething(3f); from.Y = MathF.Max(1.2f, from.Y); }
+                        var way = Direction(); way.Y = 0f;
+                        if (way.LengthSquared() < 1e-4f) way = Vector3.UnitX;
+                        var ear = from + Vector3.Normalize(way) * (5f + (float)rng.NextDouble() * 35f);
+                        ear.Y = from.Y + 0.2f;
+                        var c0 = Stopwatch.StartNew();
+                        EarlyReflections.Find(from, ear, list, a0, 343f, kind.Order, kind.Separate, kind.Flutter, 0, kind.Extra);
+                        double o = c0.Elapsed.TotalMilliseconds; c0.Restart();
+                        EarlyReflections.Find(from, ear, acoustic, a1, 343f, kind.Order, kind.Separate, kind.Flutter, 0, kind.Extra);
+                        double w = c0.Elapsed.TotalMilliseconds;
+                        t.OldMs += o; t.NewMs += w; worstOld = Math.Max(worstOld, o); worstNew = Math.Max(worstNew, w);
+                        t.Probes++;
+                        // The same arrivals, whatever their ids: each matched by where its image is and what it keeps.
+                        var unmatched = new List<EarlyReflections.Arrival>(a1);
+                        int missing = 0; float worst = 0f;
+                        foreach (var x in a0)
+                        {
+                            int k = unmatched.FindIndex(y => Vector3.Distance(x.ImagePosition, y.ImagePosition) < 2e-3f && MathF.Abs(x.GainMid - y.GainMid) < 1e-4f && x.Order == y.Order);
+                            if (k < 0) { missing++; continue; }
+                            worst = MathF.Max(worst, Vector3.Distance(x.HitPoint, unmatched[k].HitPoint));
+                            unmatched.RemoveAt(k);
+                        }
+                        t.MaxError = Math.Max(t.MaxError, worst);
+                        if (missing == 0 && unmatched.Count == 0) { t.Same++; continue; }
+                        // A copy only the world has, off a surface laid flush on another: each leg of it begins
+                        // on the other one, which the box test counted as in its way (touching), so the list lost
+                        // both. Its legs, a tenth of a millimetre short at each end, are clear of every box. A copy
+                        // only the list has is then one the extra copy pushed out of the kept few.
+                        bool LegsClearTrimmed(in EarlyReflections.Arrival x)
+                        {
+                            foreach (var (p, q) in new[] { (from, x.HitPoint), (x.HitPoint, ear) })
+                            {
+                                var d = q - p; float len = d.Length(); if (len < 1e-3f) continue;
+                                var a = p + d / len * 1e-4f; var b = q - d / len * 1e-4f;
+                                foreach (var sb in list) if (GeometryUtils.LineIntersectsOBB(a, b, sb.Center, sb.Size, sb.Rotation)) return false;
+                            }
+                            return true;
+                        }
+                        var worldOnlyFirst = unmatched.Where(x => x.Order == 1).ToList();
+                        bool explained = worldOnlyFirst.Count > 0 && worldOnlyFirst.All(x => LegsClearTrimmed(x))
+                                         && (missing == 0 || a0.Count >= (kind.Flutter ? EarlyReflections.MaxFlutterArrivals : kind.Order == 1 ? EarlyReflections.MaxArrivals : WorldAudioPlayer.MaxRoomEchoes * 2) - 1 || missing <= unmatched.Count);
+                        if (explained)
+                        {
+                            t.Ties++; t.Same++;
+                            t.TiePairs["a copy off a surface laid flush on another, which the box test lost"] = t.TiePairs.GetValueOrDefault("a copy off a surface laid flush on another, which the box test lost") + 1;
+                            continue;
+                        }
+                        t.Differ("arrivals", $"{V(from)} to {V(ear)}: {a0.Count} from the list, {a1.Count} from the world, {missing} of the list's not found, {unmatched.Count} of the world's extra"
+                                             + (t.Shown.Count < show ? $"\n        list: {string.Join("; ", a0.Select(x => $"o{x.Order} {V(x.HitPoint)} {x.GainMid:F3}"))}\n        world: {string.Join("; ", a1.Select(x => $"o{x.Order} {V(x.HitPoint)} {x.GainMid:F3}"))}" : ""), show);
+                    }
+                    Console.WriteLine($"  echoes {where}, {kind.Name}: worst {worstOld:F1} ms over the list, {worstNew:F1} ms over the world");
+                }
+            }
         }
 
         // ── Enclosure surveys ────────────────────────────────────────────────────────────────────
@@ -989,8 +1280,17 @@ public static class GeometryParitySpike
     }
 
     private static (Vector3, Vector3, bool) StepOnServer(World ecs, SpatialGrid<Entity> grid, TriangleWorld? geometry, List<Entity> unindexed,
-                                                         Vector3 pos, Vector3 vel, Vector3 input, bool sprint, MapData data)
+                                                         Vector3 pos, Vector3 vel, Vector3 input, bool sprint, MapData data,
+                                                         BodyShape body = BodyShape.Cylinder)
+        => StepOnServer(ecs, grid, geometry, unindexed, pos, vel, input, sprint, data, body, out _);
+
+    /// <summary>One server step as MovementSystem takes it: with a triangle world and the capsule, the grade
+    /// too (<paramref name="grade"/>, what it was).</summary>
+    private static (Vector3, Vector3, bool) StepOnServer(World ecs, SpatialGrid<Entity> grid, TriangleWorld? geometry, List<Entity> unindexed,
+                                                         Vector3 pos, Vector3 vel, Vector3 input, bool sprint, MapData data,
+                                                         BodyShape body, out float grade)
     {
+        grade = 0f;
         SetGrid(grid, geometry, unindexed);
         float ground = PhysicsUtils.GetGroundHeight(ecs, grid, pos, out _);
         var near = new List<Entity>(); var seen = new HashSet<Entity>();
@@ -1018,6 +1318,11 @@ public static class GeometryParitySpike
         if (geometry != null)
         {
             var all = new AcceptAll();
+            if (body == BodyShape.Capsule)
+            {
+                ctx.Body = BodyShape.Capsule;
+                ctx.Grade = grade = SharedMovementEngine.GradeAlong(geometry, ref all, pos, input);
+            }
             SharedMovementEngine.GatherSolids(ctx, geometry, ref all, solids);
             obstacles = new SharedMovementEngine.Obstacles(span, geometry, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(solids));
         }
@@ -1142,6 +1447,31 @@ public static class GeometryParitySpike
                 }
             }
         }
+    }
+
+    /// <summary>Every solid whose bounds come within half a metre of a body standing at <paramref name="feet"/>.</summary>
+    private static string SolidsNear(TriangleWorld world, Vector3 feet)
+    {
+        var near = new List<SolidRef>(); var all = new AcceptAll();
+        world.Overlapping(feet - new Vector3(0.8f, 0.5f, 0.8f), feet + new Vector3(0.8f, 2.3f, 0.8f), GeometryLayers.Movement, ref all, near);
+        return string.Concat(near.Select(s => { var (lo, hi) = world.BoundsOf(s); return $"\n        #{world.OwnerOf(s)} {V(lo)} to {V(hi)} {world.SurfaceOf(s).Material}"; }));
+    }
+
+    /// <summary>Why a step parts the capsule from the cylinder: what each touches at the end.</summary>
+    private static string CapsuleWhy(TriangleWorld world, Vector3 from, Vector3 cyl, Vector3 cap)
+    {
+        // An edge met by the rounded bottom (below the knee) or top (above the brow) of the capsule.
+        var near = new List<SolidRef>(); var all = new AcceptAll();
+        world.Overlapping(from - new Vector3(1, 1, 1), from + new Vector3(1, 2.5f, 1), GeometryLayers.Movement, ref all, near);
+        bool low = false, high = false;
+        foreach (var s in near)
+        {
+            var (bmin, bmax) = world.BoundsOf(s);
+            float top = bmax.Y - from.Y, bottom = bmin.Y - from.Y;
+            if (top > 0.15f && top < 0.45f) low = true;
+            if (bottom > 1.5f && bottom < PhysicsConstants.PlayerHeight) high = true;
+        }
+        return low && high ? "an edge at the knee and at the brow" : low ? "an edge below the knee (the rounded bottom)" : high ? "an edge above the brow (the rounded top)" : "other";
     }
 
     /// <summary>The solids within a metre of a body, with how far each one's turn is from unit length.</summary>

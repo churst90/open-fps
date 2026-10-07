@@ -847,8 +847,9 @@ public class AsyncAcousticWorker : IDisposable
     private void AddEarlyReflections(List<AcousticPathData> into, WorldSnapshot world,
                                      AcousticRequest req, int region, bool listenerEnclosed)
     {
-        var solids = ReflectionSolids();
-        if (solids.Count == 0) return;
+        var geometry = _enclosureWorld;
+        var solids = geometry != null && OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? null : ReflectionSolids();
+        if (solids != null && solids.Count == 0) return;
 
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
         // FIRST ORDER, in EarlyReflections' own order, for a sound that goes on. With third order and
@@ -858,7 +859,8 @@ public class AsyncAcousticWorker : IDisposable
         // echo of a SUSTAINED sound is not heard as an event; it is part of the field, which the
         // reverb is. Copies of copies belong to one-off sounds (WorldAudioPlayer), where an echo
         // happens once and is gone.
-        EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
+        if (solids != null) EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
+        else EarlyReflections.Find(req.SourcePos, req.ListenerPos, geometry!, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
 
         _lastReflectionCount = 0;
         for (int i = 0; i < _reflectionScratch.Count; i++)
@@ -944,7 +946,7 @@ public class AsyncAcousticWorker : IDisposable
     // few Dijkstra steps and a handful of segment tests, but there are dozens of sources a tick: an
     // answer is kept while neither end has moved enough to change it.
     private volatile OpeningRoutes? _routes;
-    private readonly Dictionary<int, (OpeningRoutes Model, Vector3 Source, Vector3 Listener, OpeningRoutes.Answer? Answer, long At)> _routeCache = new();
+    private readonly RouteAnswers _routeCache = new();
     /// <summary>How far either end may move before a source's route is asked again, metres: well under a
     /// doorway's width, so the crossing it reports cannot be a different opening.</summary>
     private const float RouteReuseMetres = 0.25f;
@@ -972,7 +974,7 @@ public class AsyncAcousticWorker : IDisposable
     private OpeningRoutes.Answer? AskRoutes(OpeningRoutes routes, WorldSnapshot world, int id, Vector3 source, Vector3 listener, int listenerRegion)
     {
         long now = Environment.TickCount64;
-        if (_routeCache.TryGetValue(id, out var held) && ReferenceEquals(held.Model, routes))
+        if (_routeCache.TryGet(id, routes, out var held))
         {
             bool still = now - held.At < RouteReuseMs
                          && Vector3.DistanceSquared(held.Source, source) < RouteReuseMetres * RouteReuseMetres
@@ -996,10 +998,8 @@ public class AsyncAcousticWorker : IDisposable
         _routeTicks += spent;
         _routeTicksThisTick += spent;
         _routeQueries++;
-        _routeCache[id] = (routes, source, listener, answer, now);
-        if (_routeCache.Count > 1024)
-            foreach (var k in _routeCache.Where(e => now - e.Value.At > RouteReuseMs).Select(e => e.Key).ToList())
-                _routeCache.Remove(k);
+        _routeCache.Put(id, new RouteAnswers.Held(routes, source, listener, answer, now));
+        _routeCache.Trim(now, RouteReuseMs, 1024);
         if ((_saDebug || PerfProbe.Enabled) && now - _lastRouteReport > 30_000)
         {
             _lastRouteReport = now;
@@ -1039,6 +1039,8 @@ public class AsyncAcousticWorker : IDisposable
     {
         _routes = model;
         _acoustics.Routes = model;
+        // Answers about the graph before are no use now, and each one holds that graph and its scene.
+        _routeCache.Published(model);
     }
 
     private void EnsureSteamAudio()
@@ -1268,6 +1270,7 @@ public class AsyncAcousticWorker : IDisposable
         OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.ConfigureInBackground(_saContext, full, listener.IsBuilt ? listener : null);
         _barrierBoxes = boxes;
         _enclosureWorld = geometry;
+        _acoustics.PublishReflectionWorld(geometry, map);
         _lastSceneBoxes = boxes.Count;
         PublishRoutes(routes);
         SceneBuildMsTotal += (DateTime.UtcNow.Ticks - _buildStartedTicks) / (double)TimeSpan.TicksPerMillisecond;
@@ -1386,6 +1389,7 @@ public class AsyncAcousticWorker : IDisposable
             _saScene.Build(boxes);
         }
         _enclosureWorld = GeometryFor(_tileScenes, _acousticStore, boxes, mapLeaves);
+        _acoustics.PublishReflectionWorld(_enclosureWorld, world.AcousticMap);
         _routeTiles = new OpeningRoutes.TileCache();
         _saSceneMap = world.AcousticMap;
         if (_saScene.IsBuilt)
@@ -1568,6 +1572,7 @@ public class AsyncAcousticWorker : IDisposable
             _saLastSeen.Remove(id);
             _saDebugLastPrint.Remove(id);
             _results.TryRemove(id, out _);
+            _routeCache.Forget(id);
         }
     }
 

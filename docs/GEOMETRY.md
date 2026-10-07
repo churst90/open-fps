@@ -29,6 +29,7 @@ AudioLab `--geometry map=<id> [terrain=<metres>]`.
 7. Stages, effort and risks
 8. Decisions for Cody
 9. Stage 1 as built (2026-10-06)
+10. Stage 2 as built (2026-10-06)
 
 ---
 
@@ -1040,6 +1041,268 @@ which no longer rebuild, more than pay for it. Nothing new runs on the audio thr
    not injecting it when the map has a ground of its own.
 5. **Six-digit quaternions**: the triangles read every turn as unit length; the box tests still in use
    read it as written. Worth normalising turns at map load for everything.
+
+## 10. Stage 2 as built (2026-10-06)
+
+Walking on slopes, ramps and stairs, the vehicle's wheels, the remaining box readers, and Cody's
+decisions on stage 1. Every switch was gated by the parity harness (AudioLab `--geometry-parity`, the
+kinds named in 10.8) on the city, the speedway, Magnolia and Albany.
+
+### 10.1 Stage 1's decisions, carried out
+
+- **Two surfaces in the same place**: the smaller patch is met. Kept.
+- **The ground is dirt.** The loader lays no foundation under a map whose own ground covers its play
+  area (the city, Magnolia, Albany each lay a dirt ground of their own; the concrete slab flush under it
+  is gone, 12 triangles a map). Where a map has no ground under all of it (the speedway), the loader lays
+  natural ground, dirt, under its bounds, top at 0, named Ground. Coverage is sampled at most 2 m apart
+  over the play area from the solid floors at ground level, so a ground made of many slabs counts. A new
+  map (`/map new`) starts as dirt, and grass, concrete or asphalt laid on it are met where they lie (the
+  smaller patch). On the speedway the ground between its own surfaces is dirt instead of concrete.
+- **Ricochet off the triangle's normal** (`CombatService.Face` with the map's triangle world): the face
+  the round's path enters by. On the city 2,520 strikes gave no difference from the box's largest axis;
+  the two disagree only within a hair of an edge.
+- **Turns made unit length at load** (`MapManager.NormaliseTurns`), once, before anything reads them:
+  every reader on the server and every client (sent the same floats) reads the same turn.
+- **Over-the-top routes** do not depend on box order. Kept.
+
+### 10.2 Shapes
+
+`OpenFPS.Common/Geometry/Shapes.cs`. A map entity or a prefab names a **form** that fills its collider's
+box (`Form`, not `Shape`: `Shape` already names the collider's round or square shape):
+
+```json
+{ "PrefabId": "concrete_stairs", "Position": {...}, "Form": { "Kind": "Stairs", "Steps": 16, "Landing": 0 } }
+```
+
+- `Wedge`: a ramp, height 0 along its -Z edge rising to full height along +Z.
+- `Stairs`: solid steps climbing toward +Z, each rise the height over the steps, each going the length
+  less the landing over the steps. Refused at load (and by the prefab validator) when a rise is over the
+  step a body can take.
+- `Arch`: a block with a half-elliptical opening along Z springing from the ground, `Thickness` of ring and
+  piers, the curve in `Segments` straight pieces (12).
+- New prefabs: `concrete_stairs` (16 risers of 17.5 cm on 28 cm goings), `wooden_stairs` (15 of 17.3 cm on
+  26 cm), `concrete_ramp` (1 in 12), `brick_arch` (2 m by 3 m opening).
+
+`ColliderComponent.Form` is on the wire (appended); `ColliderSize` stays the bounding box every box
+reader sees. A shape is its outer triangles (what rays, sound and the ground meet) and, for stairs and an
+arch, its convex pieces (each step's column, each piece of the arch's curve and its piers), which a body
+and containment are met against. The tests check every shape closed (a ray from inside crosses out one
+more time than in) and its pieces filling it exactly.
+
+### 10.3 Ground, slopes and the grade
+
+- **Walkable ground**: `TriangleWorld.Ground` and `FloorAt` stand only on faces within 45 degrees of
+  level, and return the face's normal. A probe that meets a steeper face goes on past it to what is under
+  it, so a bank too steep to walk is a wall: walked at, it is not climbed. A box's top is level, so on a map
+  of boxes nothing changes.
+- **Speed on a grade** (`SharedMovementEngine.GradeAlong`, `GradeSpeed`): the slope along the way the body
+  is going, from the floors under its feet and a body's radius ahead and behind, the gentler half when
+  both climb or both fall and nothing when they disagree. On a ramp both halves are its slope; on a flight
+  each is a riser over a going, the flight's pitch; at a lone kerb one half is level, so a kerb is stepped
+  as before, not slowed for. Up: 1 / (1 + 2g) (a ramp of 1 in 12 at 0.86, a stair's pitch of about 0.6 at
+  0.45). Down: up to 1.05 on a gentle slope, then 1.05 / (1 + 1.2 (|g| - 0.1)), a stair down at 0.65.
+  People measured on stairs go up at a little under half their level speed and down at about two thirds
+  (Fruin 1971). On the server and in the client's prediction alike.
+
+### 10.4 The body
+
+The design asked for a capsule (3.1). It was built and measured on the four maps against the cylinder
+(harness `only=capsule`): its rounded foot changed how a body meets every kerb, step and ledge. A falling
+body caught ledges the cylinder fell past and rode back up a roof's edge; the step-up climbed a 56 cm ledge
+the cylinder could not; 3 to 15 walks in 400 parted by metres on each map, and on the city 181 single
+steps in 4,000 differed. The ground probe and the step rule are a flat foot's, a body's radius wide, so
+**the body is the cylinder's foot and trunk under a rounded head** (`BodyShape.Capsule`, SolidContact):
+
+- The trunk is the cylinder from a hand's breadth over the feet to where the head's dome begins: its
+  contacts, floors and ceilings are the cylinder's.
+- The head is a half sphere: an edge over the brow (a beam, a lintel, a sloped ceiling, an arch's curve) is
+  met by its curve; a ceiling straight over a body on the ground (standing on a sofa under a low ceiling)
+  is left alone, where the cylinder took the ceiling slab's nearest end as the way out and put the body a
+  metre and a half away, through a wall; a ceiling over a body in the air pushes it down.
+- Whether a body fits on a step is asked of the cylinder whatever the body (its flat bottom is what makes
+  StepHeight the most a body climbs).
+- Contacts are ranked by depth; a floor's lift is not a depth.
+
+Against the cylinder, on box maps (harness, 4,000 single steps and 400 walks of 90 steps a map; walks that
+part by over a centimetre):
+
+| Map | Steps that differ | Steps slower by the grade | Walks that part | Walks explained: on a flight / a ceiling over the head / a step up a tick apart |
+|---|---|---|---|---|
+| city | 31 | 65 | 3 | 33 / 1 / 4 |
+| speedway | 0 | 1 | 0 | 0 / 0 / 0 |
+| Magnolia | 1 | 3 | 0 | 4 / 1 / 1 |
+| Albany | 1 | 2 | 0 | 11 / 1 / 0 |
+
+Of the city's 31 steps, 26 are an edge above the brow (the head meets a slab's or lintel's edge on its
+curve and comes closer before it is stopped, 13 to 190 mm), 3 an edge at the knee and the brow at once,
+1 below the knee, 1 other; one of the 26 is a cylinder put 7.6 m along by a slab at its head, where the
+capsule moves 0.2 m. The city's three walks that part (by 75 mm, 1.5 m and 2 m) were not followed step by
+step; in the two that part by metres the capsule walked about a metre further, as a head that slides past
+an edge does. The cylinder from 0.1 mm aside parts from itself in none of them. A step costs about the same
+(city 37 / 41 us, Magnolia 6.9 / 7.8, Albany 8.5 / 11.2, speedway 7.1 / 3.0 capsule / cylinder). The
+city's box stairwells slow a body by the grade as any flight does.
+
+### 10.5 Stairs and footfalls
+
+Real treads, climbed by the step rule and the ground probe as box treads always were; W walks up or down.
+Footfalls (the client's `StrideAccumulator`, and `PhysicsUtils.FootOnFloor` in `LocalPlayerController`
+and `OtherBodies`):
+
+- **The foot goes down on the floor under it**: under the foot if that floor is the body's height, a
+  body's radius ahead (the tread a body climbing is stepping onto), or whatever is under the foot within a
+  step (going down, the body is held at the tread it is leaving until its whole footprint is past it, and
+  the foot is already on the one below). Its height is that floor's, its material that floor's surface.
+  A body on something the triangles do not hold (a vehicle's floor) keeps its foot where it was.
+- **On a flight the cadence is the treads'**: a footfall on arriving at every `TreadsPerStep` treads, the
+  step the speed asks for over the flight's going, rounded, one or two (a leg spans two risers at a run,
+  not three). At the game's walk a flight is taken two treads at a time. A tread arrival is counted from
+  the floor the body last settled on, so the step rule's lift and settle are one tread. A kerb or a
+  doorstep alone is walked over at the walk's own cadence.
+
+AudioLab `--stair-walk [scene=shapes|city] [sprint]` walks a concrete flight up and a wooden flight down
+(shapes), or a block of flats' stairwell to the top storey and back (city), through the server's movement
+and the client's stride, and checks every footfall:
+
+| Walk | Footfalls | On a tread at the foot's height, of the flight's material |
+|---|---|---|
+| shapes, walking | 21 | 21 (concrete up, every 2 treads, 0.27 s apart; wood down, 0.17 s apart) |
+| shapes, running | 20 | 20 |
+| city stairwell, up and down | 154 | 154 |
+
+Before the foot was put on the floor under it, 8 of 21 on the shapes were 17 to 58 cm above the tread
+under them, and the flight's footfalls came every 3 to 4 treads.
+
+### 10.6 Vehicles: four wheel rays
+
+`OpenFPS.Common/Geometry/WheelRays.cs`: a ray down at each wheel, each its own height, normal and surface
+(walkable faces only), and the body's rest from them: the mean height, pitch from the axles, roll from the
+sides. A driven car (DrivingSystem) sits on its wheels: a slope pitches it, a wheel up a kerb rolls it,
+each wheel's surface sets that wheel's grip (gravel under one side is gravel under that side). The box
+path's car sat level at the floor under its middle. Traffic still rides its lines (stage 3 drapes them).
+
+### 10.7 The readers that read boxes
+
+| Reader | Now |
+|---|---|
+| `SightGrid` (the look of the turn narration) | the triangle world: solid fixed boxes in their layers, fixed things said by name but not solid in a sight-only layer (`GeometryLayers.Announced`, in no other query's mask); the index keeps only what the triangles do not hold |
+| `BoxColumns` (the room surveys at load) | a tree over the boxes' extents (the BVH builder): the same boxes in the same order |
+| `EarlyReflections` (one-off echoes on the game thread, the worker's first order) | the acoustic triangle world, published by the occlusion worker: near surfaces from its tree, legs asked of it; one copy per place where two faces lie flush |
+| `ImageSource` via `EngineReflections` (engine and one-off echoes) | faces near the path from a tree over them, legs asked of the acoustic triangle world |
+| Ricochet's face | the triangle's normal |
+| `Diffraction` round a box, `CompositeAcoustics`' faces, `VehicleShadow` | kept: every solid a map holds is a box or a shape bounded by one, a composite is built of boxes, a moving body is its box; facets and sections for shapes come with stage 4, bodies with stage 6 |
+| `SpatialGrid`'s dynamic half | a tree, not cells: what moves is filed as the cells it covers and a BVH over them answers the same questions with the same things in the order they were filed |
+| Server `RefreshGrid` | incremental: each fixed thing remembered as filed, only what changed filed again and its tiles built (`OPENFPS_INCREMENTAL_REFRESH=0` files whole); a test checks the grid and the triangles against a whole refresh after a wall moved, one destroyed, one given a form and stairs put up |
+
+Moving things are not instances in the top tree: a body and a vehicle are boxes, so a box test answers
+what a triangle instance would, and building the top tree again every tick for them buys nothing until
+vehicles have body meshes (stage 6). The grid's dynamic half no longer has cells.
+
+### 10.8 The harness and the measurements
+
+`--geometry-parity map=<id> n=4000 only=rays,ground,overlap,steps,capsule,enclosure,occlusion,bullets,
+collision,determinism,tracks,routes,echoes,engineechoes,sightgrid,ricochet`, on the stage 2 build. A cell
+is the cases that differ, with the ties (explained classes, listed in the log) in brackets; the box path is
+the old side except where a row says otherwise.
+
+| Comparison | Cases | city | speedway | Magnolia | Albany |
+|---|---|---|---|---|---|
+| RaycastSingle (60 m) | 4,000 | 0 (35) | 0 (1) | 0 (36) | 0 (42) |
+| RaycastMaterial (60 m) | 4,000 | 0 (22) | 0 | 0 (33) | 0 (30) |
+| CastSight (600 m, glass seen through) | 4,000 | 0 (27) | 0 (4) | 1 (44) | 0 (49) |
+| RaycastAll (8 rays, 60 m) | 8,000 | 0 (43) | 0 | 0 (104) | 0 (56) |
+| Ground height, server / client | 4,000 each | 0 (2) / 0 (2) | 0 / 0 | 0 (1) / 0 (2) | 0 (3) / 0 (5) |
+| Body overlap per solid, both ways out | 13-27,000 | 0 (2) | 0 (2) | 6 (2) | 4 |
+| Body intersects per solid (the step test) | 7-14,000 | 0 | 0 | 0 | 0 |
+| Movement step, cylinder, server gather | 4,000 | 0 | 0 | 0 | 0 |
+| Walks of 90 steps, cylinder | 400 | 0 | 0 | 4 | 2 |
+| Movement step, the body against the cylinder | 4,000 | 31 (65) | 0 (1) | 1 (3) | 1 (2) |
+| Walks of 90 steps, the body against the cylinder | 400 | 3 (38) | 0 | 0 (6) | 0 (12) |
+| EngineReflections, every box / the face tree | 400 | 0 | 0 | 0 | 0 |
+| SightGrid.Cast, the index / the triangles | 4,000 | 0 (40) | 0 | 0 (48) | 0 (52) |
+| Ricochet face, the box's axis / the triangle's normal | 1.8-2.5k | 0 | 0 | 0 | 0 |
+| Echoes, first order, the list / the world | 200 | 1 (1) | 2 | 0 (4) | 0 (2) |
+| Echoes, second order in the room window | 200 | 1 (2) | 3 | 0 (1) | 1 (2) |
+| Echoes, third order with the flutter | 200 | 3 (2) | 2 | 1 (1) | 2 (2) |
+| Echoes in woods, first / second / third | 200 each | 0 (4) / 0 (4) / 1 (5) | - | 0 (5) / 1 (2) / 4 (3) | 0 (1) / 1 / 2 (1) |
+| Enclosure survey | 80 | 0 (7) | 0 | 0 (2) | 0 (3) |
+| Occlusion, one ray / five rays | 4,000 / 1,000 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
+| Bullet segment, first static solid | 4,000 | 0 (28) | 0 (6) | 0 (23) | 0 (25) |
+| CheckCollision | 4,000 | 0 | 0 | 0 | 0 |
+| Server and client worlds, same bits | 4,000 | 0 | 0 | 0 | 0 |
+| TrackClearance | every point | 0 | 0 | - | - |
+| Routes, whole build each way (openings, routes, legs, barriers) | 1,000 each | 0 | 0 | 0 | 0 |
+| Routes after one tile changed | 1,000 each | 0 | 0 | 1 leg (0.003) | 0 |
+| A tile built after a change / from nothing | 1,000 each | 0 | 0 | 0 | 0 |
+| A streamed client at the spawn, rays within 250 m | 4,000 | - | - | 0 | 0 |
+
+What differs:
+
+- **Far from the origin** (stage 1's class): Magnolia's one CastSight is 1.2 mm on a wall 1.9 km out, its
+  6 and Albany's 4 body contacts are 0.02 mm and a tenth of a degree apart, 1.1 to 1.5 km out.
+- **Walks of the cylinder** part by over a millimetre as often as the box path parts from itself started
+  0.1 mm aside (Magnolia 4 of 400 against 4, Albany 2 against 2); the worst, 40 mm, the box path's own is
+  39.9 mm.
+- **Echoes**: 0 to 4 of 200 a kind, nearly all the world finding a copy the list does not: a second
+  order copy off the ground, or every copy where the source stands a centimetre or two over a roof or a
+  floor (the list's leg test begins inside the solid it leaves and counts it in the way). Two cases find
+  the same number at slightly different points (a gain 0.069 against 0.070). The ties are a copy off a
+  surface laid flush on another, which the box test lost.
+- **Routes after one tile changed**: one leg on Magnolia, 0.003 dB, on the box grid's side; the tile
+  built after the change is the tile built from nothing on every map.
+- **The six-digit turns are gone**: with turns normalised at load, the routes against the box grid are
+  exact on every map (stage 1 had 0-6 of 1,000 differ and 8-17 within 0.3 dB, all from them).
+- The SightGrid's index now holds nothing on any map (it held 111 to 30,245 things): every fixed thing is
+  in the triangles, solid or sight-only.
+
+Measured besides:
+
+- **One-off echoes on the game thread** (`EarlyReflections`, a source within 40 m of the listener):
+  on Magnolia a one-off sound outdoors to third order with the flutter cost 1.47 ms on average and 17 ms at
+  worst over the box list, 0.57 and 11 ms on the tree; first order 0.93 / 0.27 ms; the room window 0.35 /
+  0.04 ms. On the city the worst one-off went from 55 ms to 14 ms. In Magnolia's woods (crowns and woods
+  are not solid, so nothing reflects there and the search is cheap either way) 0.77 / 0.17 ms. The list
+  lost a copy wherever two surfaces lie flush (each leg began on the other, which the box test counted as in
+  its way); the tree keeps one.
+- **Engine echoes** (`EngineReflections`, Magnolia): 2.4 ms a search with every box, 0.32 ms with the tree;
+  the same reflections, 400 of 400.
+- **The server's RefreshGrid** (one box moved / nothing changed): Magnolia 104 / 28 ms filed whole, 24.7 /
+  19.8 ms incremental; Albany 89 / 27 to 22.9 / 17.1 ms; city 31 / 8 to 10.5 / 8.8 ms. What is left is
+  reading every fixed thing to see what changed.
+- **Route answers and the heap** (found by the Resonance team): a voice's kept answer held the graph of
+  routes it was asked of, and the graph its scene; a stopped voice kept them alive until a thousand answers
+  had piled up. A new graph now lets every answer about an old one go, and a voice the worker forgets takes
+  its answer with it (`RouteAnswers`; a test checks a superseded graph is collected). Over a 2 km drive
+  across Magnolia at 15 m/s with a one-off source every tenth frame (`--stream-walk churn=0.1`, heap after a
+  full collection every 10 s): 203-285 MB through the drive and 160 MB at the end before, 129-278 MB and 86
+  MB after; with three one-off sources a frame the thousand-answer trim kept both about the same (92 and 88
+  MB at the end).
+- **Loading** (server map load / the client's acoustic map at the join): Magnolia 944 ms / 361 ms, Albany
+  1,209 / 544 ms, city 408 ms, within a few per cent of stage 1.
+
+### 10.9 Left after stage 2
+
+- Facets: coplanar triangles merged into mirrors for image sources and early reflections, so a wedge's
+  slope or a stair's treads reflect as themselves; sections for diffraction round a shape (stage 4).
+- Moving bodies as instances in the top tree, with their meshes (stage 6); VehicleShadow with them.
+- Traffic on draped roads and the wheel rays under it (stage 3).
+- Stairs in the generators: gen_city.py's flights are box treads, which walk and sound the same; a
+  `Stairs` form would make each flight one entity.
+- The capsule's rounded foot, if wanted: it needs a ground probe the shape of the foot and a step rule
+  for it, and changes every kerb.
+
+### 10.10 Decisions for Cody
+
+1. **The body**: the cylinder's foot under a rounded head, measured against both the cylinder and the
+   full capsule (10.4). Keep this, or go to the full capsule (every kerb and step changes; ledges caught
+   while falling)?
+2. **Speed on stairs and slopes**: up a flight at 0.45 of the walk, down at 0.65, a 1 in 12 ramp at 0.86.
+   At the game's walk (a jog) a flight is still 2 m/s up, two treads a footfall. Slower, faster, or none
+   on stairs?
+3. **Footfall cadence on a flight**: two treads a footfall at the game's speeds (it never comes out one,
+   since the game's walk is three times a real one). One tread a footfall would be 7 a second.
+4. **A driven car pitches and rolls** on its wheels (kerbs included); its sound positions and its
+   passengers turn with it. Keep?
+5. **The speedway's ground is dirt** between its own surfaces (where the loader's concrete was).
 
 ## Appendix: box-geometry consumers today
 
