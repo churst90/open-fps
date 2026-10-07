@@ -173,7 +173,7 @@ public class WorldEditorTests : IDisposable
         Assert.Equal("Undid: copied Concrete Wall.", rig.Run("edit", "undo"));
         Assert.False(rig.Exists(copy));
 
-        // The map's own ground (dirt since geometry stage 2): deleted, and put back where it was.
+        // The map's own ground (dirt): deleted, and put back where it was.
         Assert.StartsWith("Selected Ground", rig.Run("edit", "select", "#1"));
         var floor = rig.PoseOf(1);
         Assert.Equal("Deleted Ground. Undo puts it back.", rig.Run("edit", "delete"));
