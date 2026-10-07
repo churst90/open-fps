@@ -23,9 +23,6 @@ public sealed class BoxColumns
     private BvhNode[]? _nodes;
     private int[] _order = System.Array.Empty<int>();
 
-    /// <summary><paramref name="cellMetres"/> is kept for the callers that name it; the tree needs none.</summary>
-    public BoxColumns(float cellMetres) { }
-
     /// <summary>Files box number <paramref name="index"/>, given its extent. Add them in order.</summary>
     public void Add(int index, Vector3 lo, Vector3 hi)
     {

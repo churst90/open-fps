@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 
 namespace OpenFPS.Common.Geometry;
@@ -67,7 +66,6 @@ public readonly record struct Surface(string Material, Construction Construction
                                       SurfaceFlags Flags, float Absorption = 0f)
 {
     public bool Is(SurfaceFlags flag) => (Flags & flag) != 0;
-    public bool Sees(GeometryLayers layers) => (Layers & layers) != 0;
 }
 
 /// <summary>

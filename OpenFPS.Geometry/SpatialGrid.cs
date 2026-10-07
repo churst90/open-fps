@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 
 namespace OpenFPS.Common;
@@ -25,9 +23,6 @@ public class SpatialGrid<T>
     private int[] _dynamicOrder = Array.Empty<int>();
     private readonly object _dynamicBuild = new();
     [ThreadStatic] private static List<int>? _dynamicHits;
-
-    /// <summary>How many moving things are filed this tick.</summary>
-    public int DynamicCount => _dynamic.Count;
 
     /// <summary>Where each static item was filed: the cells (x0, z0) to (x1, z1), or the oversize list, so
     /// one can be taken out again without rebuilding the grid (<see cref="RemoveStatic"/>).</summary>

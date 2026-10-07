@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 
 namespace OpenFPS.Common.Geometry;
@@ -226,7 +225,6 @@ public static class SolidContact
     /// </summary>
     public readonly record struct Capsule(float Radius, float Bottom, float Top)
     {
-        public float AxisLow => Bottom + Radius;
         public float AxisHigh => MathF.Max(Bottom + Radius, Top - Radius);
     }
 
@@ -255,10 +253,6 @@ public static class SolidContact
         }
         return best;
     }
-
-    /// <summary>Whether the capsule shares any volume with the solid.</summary>
-    public static bool CapsuleIntersects(TriangleWorld world, SolidRef solid, Vector3 feet, Capsule body)
-        => CapsuleDepth(world, solid, feet, body) > 0f;
 
     /// <summary>How deep the capsule is in the solid: its radius less the distance from its axis, or more
     /// than its radius when its axis is inside. 0 when clear.</summary>

@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -139,15 +137,6 @@ public sealed class TriangleWorld
     private Dictionary<int, int>? _movers;
 
     internal TriangleWorld WithMoverIndex(Dictionary<int, int> movers) { _movers = movers; return this; }
-
-    /// <summary>Whether an owner is a mover here, and which instance places it.</summary>
-    public bool TryGetMover(int owner, out int instance)
-    {
-        instance = -1;
-        return _movers != null && _movers.TryGetValue(owner, out instance);
-    }
-
-    public int MoverCount => _movers?.Count ?? 0;
 
     /// <summary>
     /// The same world with its movers at the poses <paramref name="poseOf"/> gives (false: leave it where

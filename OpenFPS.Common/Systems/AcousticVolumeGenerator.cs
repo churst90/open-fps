@@ -306,9 +306,9 @@ public static class AcousticVolumeGenerator
         var nearPlaces = new List<FaceOpenings.Place>();
         // The walls and the places filed by where they stand, so each room asks about its neighbours
         // and not the whole map (BoxColumns): the same ones, in the same order, as a scan of all.
-        var solidColumns = new BoxColumns(10f);
+        var solidColumns = new BoxColumns();
         for (int i = 0; i < solids.Count; i++) solidColumns.Add(i, solids[i].Min, solids[i].Max);
-        var placeColumns = new BoxColumns(10f);
+        var placeColumns = new BoxColumns();
         for (int i = 0; i < places.Count; i++) placeColumns.Add(i, places[i].Min, places[i].Max);
         var candidates = new List<int>();
         foreach (var (room, rMin, rMax) in places)

@@ -1,6 +1,4 @@
-using System;
 using System.Runtime.InteropServices;
-using System.Threading;
 using Serilog;
 
 namespace OpenFPS.Client.Core.Platform;

@@ -1,9 +1,7 @@
 using Arch.Core;
-using Arch.Core.Utils;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Networking;
 using OpenFPS.Server.Repositories;
 using Serilog;
 
@@ -598,7 +596,7 @@ public class MapManager
         // and thousands of regions, and asking each region about every box took 18 s for one. The
         // answer is the same set in the same order as the scan it replaces.
         var extents = new (Vector3 Lo, Vector3 Hi)[solids.Count];
-        var columns = new BoxColumns(10f);
+        var columns = new BoxColumns();
         for (int i = 0; i < solids.Count; i++)
         {
             var et = world.Get<Transform>(solids[i]);
