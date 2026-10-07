@@ -502,6 +502,8 @@ public sealed class DoorSystem
             t.Rotation = rotation;
             t.IsDirty = true;
         }
+        // The triangle world places the leaf again before its next answer (geometry stage 1).
+        OpenFPS.Common.Geometry.MoverPoses.Moved();
     }
 
     /// <summary>

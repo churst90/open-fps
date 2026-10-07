@@ -88,7 +88,7 @@ public static class TileScenesSpike
         set.Assemble();
         tiled = set.Assemble();
         Console.WriteLine($"  build: default one mesh {tDefault:F0} ms; Embree one mesh {tEmbree:F0} ms; Embree, {set.TileCount} tiles {tTiles:F0} ms; " +
-                          $"one tile changed {tOne:F0} ms ({set.LastBuilt} rebuilt) and {tOneAssemble:F2} ms to swap it in; assemble with nothing changed median {assembles[assembles.Count / 2]:F2} ms, worst {assembles[^1]:F2} ms");
+                          $"one tile changed {tOne:F0} ms ({set.LastBuilt} rebuilt; the triangle store {set.LastStoreMs:F0} ms of it: open ground in {set.Store.LastDirtyTiles} tile(s) {set.Store.LastFlagsMs:F0} ms, tiles {set.Store.Builder.LastBuildMs:F0} ms) and {tOneAssemble:F2} ms to swap it in; assemble with nothing changed median {assembles[assembles.Count / 2]:F2} ms, worst {assembles[^1]:F2} ms");
 
         Console.WriteLine($"  listener scene: {tiled.Listener.Solids.Count} boxes tiled, {SteamAudioScene.WithoutOpenGround(boxes).Count} by the whole-map filter; full {tiled.Full.Solids.Count} of {boxes.Count}");
 

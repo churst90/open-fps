@@ -27,6 +27,17 @@ public class ClientPhysicsSystem
     public Vector3 MapMax { get; set; } = new(50, 20, 50);
     public float Gravity { get; set; } = PhysicsConstants.Gravity;
 
+    private readonly List<OpenFPS.Common.Geometry.SolidRef> _solids = new(32);
+
+    /// <summary>Every solid but the body's own and those the triangle world is rebuilding.</summary>
+    private struct OwnAndStale : OpenFPS.Common.Geometry.IGeometryFilter
+    {
+        public int Own;
+        public IReadOnlySet<int>? Stale;
+        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
+            => owner != Own && (Stale == null || !Stale.Contains(owner));
+    }
+
     public ClientPhysicsSystem(LocalPlayerState state, SpatialService spatial)
     {
         _state = state;
@@ -90,8 +101,21 @@ public class ClientPhysicsSystem
         // is a rubber band rather than a car. The moving set is tens of things, not thousands, and
         // only those within reach are kept.
         IEnumerable<EntitySnapshot> candidates;
-        var gridResults = snapshot.StaticGrid?.GetItemsInRadius(_state.Position, CollisionSearchRadius);
-        if (gridResults != null)
+        bool triangles = SpatialService.UsesTriangles(snapshot);
+        var gridResults = triangles ? null : snapshot.StaticGrid?.GetItemsInRadius(_state.Position, CollisionSearchRadius);
+        if (triangles)
+        {
+            // The static solids from the triangle world (gathered below, once the step's reach is known);
+            // here only the statics it does not hold and what moves near enough to walk into.
+            float reach = CollisionSearchRadius;
+            var unindexed = snapshot.UnindexedStatics.Where(id => snapshot.Entities.ContainsKey(id)).Select(id => snapshot.Entities[id]);
+            var moving = snapshot.DynamicEntities.Where(d =>
+                d.Definition.Collider.IsSolid
+                && Vector3.Distance(d.Transform.Position, _state.Position)
+                   <= reach + d.Definition.Collider.Size.Length() * 0.5f);
+            candidates = unindexed.Concat(moving);
+        }
+        else if (gridResults != null)
         {
             float reach = CollisionSearchRadius;
             var moving = snapshot.DynamicEntities.Where(d =>
@@ -144,14 +168,28 @@ public class ClientPhysicsSystem
             };
 
             var collidersSlice = new ReadOnlySpan<SharedMovementEngine.Collider>(colliderArray, 0, colliderCount);
-            var result = SharedMovementEngine.Step(ctx, collidersSlice, out var contact);
+            var obstacles = new SharedMovementEngine.Obstacles(collidersSlice);
+            var solids = _solids;
+            solids.Clear();
+            if (triangles)
+            {
+                var filter = new OwnAndStale { Own = OwnEntityId, Stale = snapshot.GeometryStale };
+                SharedMovementEngine.GatherSolids(ctx, snapshot.Geometry!, ref filter, solids);
+                obstacles = new SharedMovementEngine.Obstacles(collidersSlice, snapshot.Geometry,
+                    System.Runtime.InteropServices.CollectionsMarshal.AsSpan(solids));
+            }
+            var result = SharedMovementEngine.Step(ctx, obstacles, out var contact);
 
             _state.Position = result.NewPosition;
             _state.Velocity = result.NewVelocity;
             _state.IsGrounded = result.IsGrounded;
 
-            if (!contact.Blocked || contact.ColliderIndex < 0 || contact.ColliderIndex >= colliderCount) return null;
-            return new BodyContact(idArray[contact.ColliderIndex], contact.Normal, contact.IntoSpeed, ctx.Speed, result.NewPosition);
+            if (!contact.Blocked || contact.ColliderIndex < 0) return null;
+            int hitId;
+            if (contact.ColliderIndex < colliderCount) hitId = idArray[contact.ColliderIndex];
+            else if (contact.ColliderIndex - colliderCount < solids.Count) hitId = snapshot.Geometry!.OwnerOf(solids[contact.ColliderIndex - colliderCount]);
+            else return null;
+            return new BodyContact(hitId, contact.Normal, contact.IntoSpeed, ctx.Speed, result.NewPosition);
         }
         finally
         {

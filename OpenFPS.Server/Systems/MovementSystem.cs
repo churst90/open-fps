@@ -27,6 +27,7 @@ public static class MovementSystem
     // was copied into the collider array four times, quadrupling the work the physics step then did.
     private static readonly List<Entity> _nearbyScratch = new(64);
     private static readonly HashSet<Entity> _nearbySeen = new();
+    private static readonly List<OpenFPS.Common.Geometry.SolidRef> _solidScratch = new(32);
 
     /// <summary>Faster across the ground than any person moves on foot, m/s: a sprint is about 6.</summary>
     public const float FlingSpeed = 12f;
@@ -178,7 +179,11 @@ public static class MovementSystem
                 }
 
                 // 3. COLLISION GATHERING
-                grid.CollectInRadius(transform.Position, CollisionSearchRadius, _nearbyScratch, _nearbySeen);
+                // With a triangle world, the static solids come from it (GatherSolids, below) and the grid
+                // is asked only for what moves and the statics the triangles do not hold.
+                var geometry = OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
+                if (geometry != null) grid.CollectDynamicInRadius(transform.Position, CollisionSearchRadius, _nearbyScratch, _nearbySeen);
+                else grid.CollectInRadius(transform.Position, CollisionSearchRadius, _nearbyScratch, _nearbySeen);
                 var colliderArray = ArrayPool<SharedMovementEngine.Collider>.Shared.Rent(Math.Max(1, _nearbyScratch.Count));
                 int colliderCount = 0;
 
@@ -222,7 +227,15 @@ public static class MovementSystem
                     };
 
                     // 4. PHYSICS STEP
-                    var result = SharedMovementEngine.Step(ctx, collidersSlice);
+                    var obstacles = new SharedMovementEngine.Obstacles(collidersSlice);
+                    if (geometry != null)
+                    {
+                        var self = new OpenFPS.Common.Geometry.ExceptOwners(e.Id);
+                        SharedMovementEngine.GatherSolids(ctx, geometry, ref self, _solidScratch);
+                        obstacles = new SharedMovementEngine.Obstacles(collidersSlice, geometry,
+                            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_solidScratch));
+                    }
+                    var result = SharedMovementEngine.Step(ctx, obstacles, out _);
                     NoteFling(session, player.Username, transform.Position, result.NewPosition, stepDt, input, groundY, colliderCount);
 
                     transform.Position = result.NewPosition;
@@ -248,7 +261,24 @@ public static class MovementSystem
         float checkHeight = height - footPadding;
         Vector3 checkCylCenter = pos + new Vector3(0, footPadding + (checkHeight / 2f), 0);
 
-        foreach (var e in grid.GetItemsInRadius(pos, 10.0f))
+        IEnumerable<Entity> candidates;
+        var geometry = OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
+        if (geometry != null)
+        {
+            // The static solids from the triangle world; the grid for what moves and what it does not hold.
+            var near = new List<OpenFPS.Common.Geometry.SolidRef>();
+            var filter = new OpenFPS.Common.Geometry.ExceptOwners(ignoreEntity?.Id ?? int.MinValue);
+            var reach = new Vector3(radius, checkHeight * 0.5f, radius);
+            geometry.Overlapping(checkCylCenter - reach, checkCylCenter + reach, OpenFPS.Common.Geometry.GeometryLayers.Movement, ref filter, near);
+            foreach (var s in near)
+                if (OpenFPS.Common.Geometry.SolidContact.CylinderIntersects(geometry, s, checkCylCenter, radius, checkHeight)) return true;
+            var others = new List<Entity>();
+            grid.CollectDynamicInRadius(pos, 10.0f, others, new HashSet<Entity>());
+            candidates = others;
+        }
+        else candidates = grid.GetItemsInRadius(pos, 10.0f);
+
+        foreach (var e in candidates)
         {
             if (ignoreEntity.HasValue && e.Id == ignoreEntity.Value.Id) continue;
             if (!world.Has<ColliderComponent>(e)) continue;

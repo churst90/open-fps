@@ -37,7 +37,32 @@ Recent work, newest first. `git log` has the rest.
     boom the interior model already has), so it is unchanged for now; it is most of what spreads a real
     cabin out from 250 Hz to 1 kHz. The tread tone is one tone in phase on every tyre; real tyres drift
     and beat.
-
+- Geometry stage 1 (docs/GEOMETRY.md, "Stage 1 as built"): the world's static solid boxes are now
+  triangles, 12 a box, in a tree per 250 m tile under one tree over the tiles, on the server and the
+  client alike. Ground heights, walking (the same upright body, met against each solid's triangles),
+  teleport checks, a bullet's static hits, the client's rays, sight and occlusion, the room survey
+  behind the reverb, the Steam Audio tiles, the routes through doorways and the track check all ask
+  it. Door leaves are placed in it where they stand, with no rebuild. A tile is built again only when
+  its own boxes change. Maps are unchanged; `OPENFPS_TRIANGLES=0` puts everything back on the boxes.
+  - Same answers: AudioLab `--geometry-parity` asks the old and new paths the same questions on the
+    city, the speedway, Magnolia and Albany (rays, ground, a body against each wall, steps and walks,
+    the survey, occlusion, bullets, teleport checks, tracks, routes) and lists every difference. What
+    is left is rounding, explained by kind: a ray glancing along a face, a walk that parts by
+    millimetres as often as the old path parts from itself when started a tenth of a millimetre aside,
+    and the map's six-digit quaternions, which the box path read slightly out of square.
+  - Heard differently, to be listened for: where two surfaces lie flush in the same place, the one
+    covering less ground is the one met. The client already did this at the ground (Dirt over the
+    loader's concrete foundation), and the server now agrees with it: bullets striking open ground at
+    the edge of the city or on Magnolia strike dirt, not concrete, and other players' steps there are
+    dirt. A rug or tiled floor laid flush on another floor is the rug or the tiles.
+  - Cheaper: the reverb survey 14 to 35 times (0.25 ms instead of 3.4 to 11 ms), rays 5 to 40 times,
+    occlusion 5 to 10 times, ground and a step about a quarter. While driving across Magnolia the
+    background acoustic work fell from 151-177 ms a second to 59-68 (routes 82-97 to 2), because the
+    routes are kept per tile: a tile arriving costs them 5 ms instead of 100-230. A track's check at
+    load: 3.5 ms instead of 426 on the city.
+  - Found by the harness in the routes: two roof slabs side by side at one height held each other up
+    only in one order, so a route over the top of a house depended on the order a grid listed boxes
+    in. It no longer does.
 - Waves at the water's edge (unheard). A physical model of waves meeting an edge: a lake's sandy beach,
   a rocky lake edge, a pond's grassed bank and a reedy one, a big river's bank, sea surf on sand, a
   shingle beach, a harbour wall, and wavelets against a moored wooden or aluminium boat (lab only: there

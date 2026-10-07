@@ -70,6 +70,11 @@ public class ClientWorldState
     
     private readonly object _gridLock = new();
     private SpatialGrid<int>? _staticGrid;
+
+    /// <summary>The static solids as a triangle world (docs/GEOMETRY.md stage 1), built off the game
+    /// thread and handed to every snapshot.</summary>
+    public ClientGeometry Geometry { get; } = new(250f);
+    private bool _geometryHooked;
     private bool _gridNeedsRebuild = false;
 
     private readonly object _metaLock = new();
@@ -236,6 +241,7 @@ public class ClientWorldState
             _staticGrid = new SpatialGrid<int>(10.0f);
             _gridNeedsRebuild = true;
         }
+        Geometry.Reset(TileMetres);
 
         Touch();
     }
@@ -257,8 +263,10 @@ public class ClientWorldState
     /// </param>
     public void RegisterDefinition(EntityDefinition def, bool deferAcoustics = false)
     {
+        _definitions.TryGetValue(def.EntityId, out var before);
         _definitions[def.EntityId] = def;
         _serverTransforms[def.EntityId] = def.Transform;
+        Geometry.Note(before, def);
 
         // A room that turned up after the map was baked — a building somebody put down while we were
         // standing here, or the inside of a car, which is never in the bake at all because it moves.
@@ -440,7 +448,8 @@ public class ClientWorldState
         var removed = new List<int>();
         foreach (int id in entityIds)
         {
-            bool known = _definitions.TryRemove(id, out _);
+            bool known = _definitions.TryRemove(id, out var gone);
+            if (gone != null) Geometry.Note(gone, null);
             known |= _serverTransforms.TryRemove(id, out _);
             _serverVelocities.TryRemove(id, out _);
             _serverTyreDemand.TryRemove(id, out _);
@@ -619,6 +628,7 @@ public class ClientWorldState
                         var lerpedRot = Quaternion.Slerp(transFrom.Rotation, transTo.Rotation, a);
 
                         _serverTransforms[stateTo.EntityId] = new Transform { Position = lerpedPos, Rotation = lerpedRot };
+                        Geometry.NoteMoved(stateTo.EntityId);
                         _serverVelocities[stateTo.EntityId] = Vector3.Lerp(stateFrom.LinearVelocity, stateTo.LinearVelocity, a);
                         _serverTyreDemand[stateTo.EntityId] = stateTo.TyreDemandFraction;
                         if (stateTo.Wheels != null) _serverWheels[stateTo.EntityId] = stateTo.Wheels;
@@ -627,6 +637,7 @@ public class ClientWorldState
                     {
                         // Never heard of before: it starts where it is.
                         _serverTransforms[stateTo.EntityId] = stateTo.Transform.ToTransform();
+                        Geometry.NoteMoved(stateTo.EntityId);
                         _serverVelocities[stateTo.EntityId] = stateTo.LinearVelocity;
                         _serverTyreDemand[stateTo.EntityId] = stateTo.TyreDemandFraction;
                         if (stateTo.Wheels != null) _serverWheels[stateTo.EntityId] = stateTo.Wheels;
@@ -688,6 +699,7 @@ public class ClientWorldState
             if (id == localPlayerId || _inTo.Contains(id)) continue;
             var state = _held[id].State;
             _serverTransforms[id] = state.Transform.ToTransform();
+            Geometry.NoteMoved(id);
             _serverVelocities[id] = state.LinearVelocity;
             _serverTyreDemand[id] = state.TyreDemandFraction;
             any = true;
@@ -700,6 +712,7 @@ public class ClientWorldState
         foreach (var s in states)
         {
             _serverTransforms[s.EntityId] = s.Transform.ToTransform();
+            Geometry.NoteMoved(s.EntityId);
             _serverVelocities[s.EntityId] = s.LinearVelocity;
             _serverTyreDemand[s.EntityId] = s.TyreDemandFraction;
             if (s.Wheels != null) _serverWheels[s.EntityId] = s.Wheels;
@@ -792,7 +805,27 @@ public class ClientWorldState
         snap.AudioEntityIds.AddRange(_audioEntityIds.Keys);
         snap.RegionEntityIds.AddRange(_regionEntityIds.Keys);
         snap.MarkerEntityIds.AddRange(_markerEntityIds.Keys);
+
+        // The static solids as triangles, as far as the last build has them (ClientGeometry).
+        if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled)
+        {
+            if (!_geometryHooked) { Geometry.Published = Touch; _geometryHooked = true; }
+            var (world, stale, unindexed) = Geometry.ForSnapshot(
+                CollectForGeometry,
+                id => _definitions.ContainsKey(id),
+                id => _serverTransforms.TryGetValue(id, out var t) ? (true, t.Position, t.Rotation) : (false, default, default));
+            snap.Geometry = world;
+            snap.GeometryStale = stale;
+            snap.UnindexedStatics = unindexed;
+        }
         return snap;
+    }
+
+    /// <summary>Every definition with the transform a snapshot would give it: what a geometry build reads.</summary>
+    private IEnumerable<(EntityDefinition, Transform)> CollectForGeometry()
+    {
+        foreach (var kv in _definitions)
+            yield return (kv.Value, _serverTransforms.GetValueOrDefault(kv.Key, kv.Value.Transform));
     }
 
     /// <summary>A fixed thing nothing can bump into, in neither the static grid nor the moving things,
@@ -883,6 +916,7 @@ public class ClientWorldState
             _occlusionFloor = occlusionFloor;
             TileMetres = tileMetres;
         }
+        Geometry.Retile(tileMetres);
     }
 
     /// <summary>Notes the tiles a TileStreamUpdate says changed.</summary>

@@ -981,7 +981,19 @@ public sealed partial class CombatService
         float length = path.Length();
         if (length < 1e-5f) return false;
         Vector3 dir = path / length;
-        grid.CollectInRadius(a + path * 0.5f, length * 0.5f + 3f, _near, _nearSeen);
+        var geometry = OpenFPS.Common.Geometry.TriangleGeometry.Enabled ? grid.Geometry : null;
+        if (geometry != null && LookupFor(world) is { } lookup)
+        {
+            // The static solids from the triangle world (docs/GEOMETRY.md 3.6): where the path enters the
+            // nearest one, or at once if it starts inside one, as the box test had it.
+            var filter = new StaticStrike { Shooter = shooterId, Ride = rideId, Passed = passed, World = world, Lookup = lookup };
+            if (StaticFirstHit(geometry, a, dir, length, ref filter, out var s, out float d) && lookup.TryGetValue(s, out var struck))
+            {
+                nearest = d; hit = struck; hitBody = false; bodyHeight = 0f;
+            }
+            grid.CollectDynamicInRadius(a + path * 0.5f, length * 0.5f + 3f, _near, _nearSeen);
+        }
+        else grid.CollectInRadius(a + path * 0.5f, length * 0.5f + 3f, _near, _nearSeen);
         foreach (var e in _near)
         {
             if (e.Id == shooterId || !world.IsAlive(e) || !world.Has<Transform>(e)) continue;
@@ -1016,6 +1028,52 @@ public sealed partial class CombatService
         }
         return hit != Entity.Null;
     }
+
+    /// <summary>
+    /// The first static solid a round's straight path from <paramref name="a"/> along <paramref name="dir"/>
+    /// meets within <paramref name="length"/>: its owner and how far along. Public for the parity harness.
+    /// </summary>
+    public static bool StaticFirstHit<F>(OpenFPS.Common.Geometry.TriangleWorld geometry, Vector3 a, Vector3 dir, float length,
+                                         ref F filter, out int owner, out float distance)
+        where F : OpenFPS.Common.Geometry.IGeometryFilter
+    {
+        owner = -1; distance = float.MaxValue;
+        if (!geometry.Enter(a, dir, length, OpenFPS.Common.Geometry.GeometryLayers.Bullets, ref filter, out var h)) return false;
+        owner = h.Owner; distance = h.T;
+        return true;
+    }
+
+    /// <summary>What a round strikes among the static solids: not its shooter, not what they ride in,
+    /// not a pane it has already gone through.</summary>
+    public struct StaticStrike : OpenFPS.Common.Geometry.IGeometryFilter
+    {
+        public int Shooter, Ride;
+        public HashSet<int>? Passed;
+        public World World;
+        public Dictionary<int, Entity> Lookup;
+        public readonly bool Accept(int owner, in OpenFPS.Common.Geometry.Surface surface)
+        {
+            if (owner == Shooter) return false;
+            if (Passed != null && Passed.Contains(owner)) return false;
+            if (Ride >= 0)
+            {
+                if (owner == Ride) return false;
+                if (Lookup.TryGetValue(owner, out var e) && World.IsAlive(e) && PartOf(World, e, Ride)) return false;
+            }
+            return true;
+        }
+    }
+
+    /// <summary>The id-to-entity table of the map a world belongs to.</summary>
+    private Dictionary<int, Entity>? LookupFor(World world)
+    {
+        if (ReferenceEquals(_lookupWorld, world)) return _lookup;
+        foreach (var kv in _maps.GetAllMaps())
+            if (ReferenceEquals(kv.Value.world, world)) { _lookupWorld = world; _lookup = kv.Value.lookup; return _lookup; }
+        return null;
+    }
+    private World? _lookupWorld;
+    private Dictionary<int, Entity>? _lookup;
 
     /// <summary>Whether an entity is a composite or one of its parts.</summary>
     private static bool PartOf(World world, Entity e, int rootId)

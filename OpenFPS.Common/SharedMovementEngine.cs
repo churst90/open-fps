@@ -62,6 +62,128 @@ public static class SharedMovementEngine
         => Step(ctx, nearbyColliders, out _);
 
     public static (Vector3 NewPosition, Vector3 NewVelocity, bool IsGrounded) Step(MovementContext ctx, ReadOnlySpan<Collider> nearbyColliders, out Contact contact)
+        => Step(ctx, new Obstacles(nearbyColliders), out contact);
+
+    /// <summary>
+    /// What a body can walk into this step: boxes (things that move, and every static thing on the old
+    /// path) and solids of the triangle world (docs/GEOMETRY.md 3.1). An obstacle's index in
+    /// <see cref="Contact.ColliderIndex"/> counts the boxes first, then the solids.
+    /// </summary>
+    public readonly ref struct Obstacles
+    {
+        public readonly ReadOnlySpan<Collider> Boxes;
+        public readonly OpenFPS.Common.Geometry.TriangleWorld? World;
+        public readonly ReadOnlySpan<OpenFPS.Common.Geometry.SolidRef> Solids;
+
+        public Obstacles(ReadOnlySpan<Collider> boxes) { Boxes = boxes; World = null; Solids = default; }
+
+        public Obstacles(ReadOnlySpan<Collider> boxes, OpenFPS.Common.Geometry.TriangleWorld? world,
+                         ReadOnlySpan<OpenFPS.Common.Geometry.SolidRef> solids)
+        {
+            Boxes = boxes; World = world; Solids = world == null ? default : solids;
+        }
+
+        public int Count => Boxes.Length + Solids.Length;
+
+        /// <summary>How the cylinder whose middle is at <paramref name="centre"/> overlaps obstacle
+        /// <paramref name="j"/>, and the way out, in the world.</summary>
+        public GeometryUtils.CollisionResult Overlap(int j, Vector3 centre, float radius, float height, bool canGoDown)
+        {
+            if (j < Boxes.Length)
+            {
+                var col = Boxes[j];
+                // Create a robust World-to-Local matrix
+                Matrix4x4 worldToLocal = Matrix4x4.CreateTranslation(-col.Position) *
+                                         Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(col.Rotation));
+                // Transform current cylinder center to local space
+                Vector3 localPos = Vector3.Transform(centre, worldToLocal);
+                var hit = GeometryUtils.GetCylinderAABBOverlap(-col.Size / 2f, col.Size / 2f, localPos, radius, height, canGoDown);
+                if (hit.IsColliding)
+                {
+                    // Transform normal back to world space
+                    hit.Normal = Vector3.TransformNormal(hit.Normal, Matrix4x4.CreateFromQuaternion(col.Rotation));
+                    hit.Material = col.Material;
+                }
+                return hit;
+            }
+            var solid = Solids[j - Boxes.Length];
+            var r = OpenFPS.Common.Geometry.SolidContact.CylinderOverlap(World!, solid, centre, radius, height, canGoDown);
+            if (r.IsColliding) r.Material = World!.SurfaceOf(solid).Material;
+            return r;
+        }
+
+        /// <summary>Whether the cylinder shares any volume with obstacle <paramref name="j"/>.</summary>
+        public bool Intersects(int j, Vector3 centre, float radius, float height)
+        {
+            if (j < Boxes.Length)
+            {
+                var col = Boxes[j];
+                Matrix4x4 worldToLocal = Matrix4x4.CreateTranslation(-col.Position) *
+                                         Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(col.Rotation));
+                Vector3 localStepPos = Vector3.Transform(centre, worldToLocal);
+                return GeometryUtils.AABBIntersectsCylinder(-col.Size / 2f, col.Size / 2f, localStepPos, radius, height);
+            }
+            return OpenFPS.Common.Geometry.SolidContact.CylinderIntersects(World!, Solids[j - Boxes.Length], centre, radius, height);
+        }
+
+        /// <summary>How deep the cylinder is in obstacle <paramref name="j"/> (0 when clear of it).</summary>
+        public float Depth(int j, Vector3 centre, float radius, float height)
+        {
+            if (j < Boxes.Length) return SharedMovementEngine.Depth(Boxes[j], centre, radius, height);
+            var r = OpenFPS.Common.Geometry.SolidContact.CylinderOverlap(World!, Solids[j - Boxes.Length], centre, radius, height);
+            return r.IsColliding ? r.Penetration : 0f;
+        }
+    }
+
+    /// <summary>
+    /// The solids of <paramref name="world"/> that a body at <paramref name="ctx"/>'s position could meet
+    /// this step, sorted by owner so the server and a client meet them in the same order: everything whose
+    /// bounds come within reach of the body over the step, in the movement layer.
+    /// </summary>
+    public static void GatherSolids<F>(in MovementContext ctx, OpenFPS.Common.Geometry.TriangleWorld world, ref F filter,
+                                       List<OpenFPS.Common.Geometry.SolidRef> into)
+        where F : OpenFPS.Common.Geometry.IGeometryFilter
+    {
+        into.Clear();
+        // Exactly the reach the grid gather had: every cell of 10 m within CollisionSearchRadius of the
+        // body's cell, at every height. A push out of the middle of something big carries the body
+        // metres, and the guard against ending deeper in anything (PushedDeeperIntoAnything) can only see
+        // what is in this list; the grid's reach is what every past fix was heard with.
+        int cells = (int)MathF.Ceiling(CollisionSearchRadius / GatherCell);
+        float cx = MathF.Floor(ctx.Position.X / GatherCell), cz = MathF.Floor(ctx.Position.Z / GatherCell);
+        var min = new Vector3((cx - cells) * GatherCell, float.MinValue, (cz - cells) * GatherCell);
+        var max = new Vector3((cx + cells + 1) * GatherCell, float.MaxValue, (cz + cells + 1) * GatherCell);
+        // A step longer than that (it never is on foot) reaches as far as it goes.
+        float dt = MathF.Max(0f, ctx.DeltaTime);
+        float across = ctx.PlayerRadius + ctx.Speed * dt + MathF.Abs(ctx.Velocity.X * dt) + MathF.Abs(ctx.Velocity.Z * dt) + GatherMargin;
+        min = new Vector3(MathF.Min(min.X, ctx.Position.X - across), float.MinValue, MathF.Min(min.Z, ctx.Position.Z - across));
+        max = new Vector3(MathF.Max(max.X, ctx.Position.X + across), float.MaxValue, MathF.Max(max.Z, ctx.Position.Z + across));
+        world.Overlapping(min, max, OpenFPS.Common.Geometry.GeometryLayers.Movement, ref filter, into);
+        // A handful: an insertion sort, and no comparer to allocate.
+        for (int i = 1; i < into.Count; i++)
+        {
+            var x = into[i];
+            int ox = world.OwnerOf(x);
+            int j = i - 1;
+            while (j >= 0 && Before(world, ox, x, into[j])) { into[j + 1] = into[j]; j--; }
+            into[j + 1] = x;
+        }
+
+        static bool Before(OpenFPS.Common.Geometry.TriangleWorld w, int ox, OpenFPS.Common.Geometry.SolidRef x, OpenFPS.Common.Geometry.SolidRef y)
+        {
+            int oy = w.OwnerOf(y);
+            if (ox != oy) return ox < oy;
+            return x.Instance != y.Instance ? x.Instance < y.Instance : x.Solid < y.Solid;
+        }
+    }
+
+    /// <summary>How much further than the step can reach a solid is still gathered, metres.</summary>
+    private const float GatherMargin = 0.5f;
+
+    /// <summary>The cell of the grid the static gather used to walk (SpatialGrid, 10 m).</summary>
+    private const float GatherCell = 10f;
+
+    public static (Vector3 NewPosition, Vector3 NewVelocity, bool IsGrounded) Step(MovementContext ctx, Obstacles nearbyColliders, out Contact contact)
     {
         contact = default;
         Vector3 pos = ctx.Position;
@@ -167,25 +289,11 @@ public static class SharedMovementEngine
             GeometryUtils.CollisionResult bestHit = new() { IsColliding = false };
             int bestIndex = -1;
 
-            for (int j = 0; j < nearbyColliders.Length; j++)
+            for (int j = 0; j < nearbyColliders.Count; j++)
             {
-                var col = nearbyColliders[j];
-                // Create a robust World-to-Local matrix
-                Matrix4x4 worldToLocal = Matrix4x4.CreateTranslation(-col.Position) * 
-                                         Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(col.Rotation));
-                
-                // Transform current cylinder center to local space
-                Vector3 localPos = Vector3.Transform(nextPos + cylinderCenterOffset, worldToLocal);
-                
-                var hit = GeometryUtils.GetCylinderAABBOverlap(-col.Size/2f, col.Size/2f, localPos, ctx.PlayerRadius, collisionHeight,
-                                                              canGoDown: !isGrounded);
-                
+                var hit = nearbyColliders.Overlap(j, nextPos + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight, canGoDown: !isGrounded);
                 if (hit.IsColliding)
                 {
-                    // Transform normal back to world space
-                    hit.Normal = Vector3.TransformNormal(hit.Normal, Matrix4x4.CreateFromQuaternion(col.Rotation));
-                    hit.Material = col.Material;
-
                     if (!bestHit.IsColliding || hit.Penetration > bestHit.Penetration)
                     {
                         bestHit = hit;
@@ -208,14 +316,9 @@ public static class SharedMovementEngine
             {
                 Vector3 stepTarget = nextPos + new Vector3(0, ctx.StepHeight, 0);
                 bool stepBlocked = false;
-                for (int j = 0; j < nearbyColliders.Length; j++)
+                for (int j = 0; j < nearbyColliders.Count; j++)
                 {
-                    var col = nearbyColliders[j];
-                    Matrix4x4 worldToLocal = Matrix4x4.CreateTranslation(-col.Position) * 
-                                             Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(col.Rotation));
-                    Vector3 localStepPos = Vector3.Transform(stepTarget + cylinderCenterOffset, worldToLocal);
-                    
-                    if (GeometryUtils.AABBIntersectsCylinder(-col.Size/2f, col.Size/2f, localStepPos, ctx.PlayerRadius, collisionHeight))
+                    if (nearbyColliders.Intersects(j, stepTarget + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight))
                     {
                         stepBlocked = true;
                         break;
@@ -318,14 +421,14 @@ public static class SharedMovementEngine
     /// Whether the body at <paramref name="end"/> is further into any collider than it was where the
     /// step began (<see cref="MovementContext.Position"/>), by more than <see cref="DeeperTolerance"/>.
     /// </summary>
-    private static bool PushedDeeperIntoAnything(in MovementContext ctx, ReadOnlySpan<Collider> colliders, Vector3 end,
+    private static bool PushedDeeperIntoAnything(in MovementContext ctx, Obstacles colliders, Vector3 end,
                                                  Vector3 cylinderCenterOffset, float collisionHeight)
     {
-        for (int j = 0; j < colliders.Length; j++)
+        for (int j = 0; j < colliders.Count; j++)
         {
-            float there = Depth(colliders[j], end + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight);
+            float there = colliders.Depth(j, end + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight);
             if (there <= DeeperTolerance) continue;
-            float before = Depth(colliders[j], ctx.Position + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight);
+            float before = colliders.Depth(j, ctx.Position + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight);
             if (there > before + DeeperTolerance) return true;
         }
         return false;

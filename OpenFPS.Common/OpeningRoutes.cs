@@ -87,6 +87,9 @@ public sealed class OpeningRoutes
         public string? Problem;
 
         public int Other(int node) => node == NodeA ? NodeB : NodeA;
+
+        /// <summary>A copy to fill in again (a tile build's kept opening): every field, the arrays shared.</summary>
+        public Opening Copy() => (Opening)MemberwiseClone();
     }
 
     /// <summary>The node every unbounded place belongs to: the global region, and any named patch of
@@ -103,7 +106,7 @@ public sealed class OpeningRoutes
     private readonly Solid[] _solids;
     private readonly Vector3[] _solidGains;        // amplitude transmission per band
     private readonly Frame[] _frames;
-    private readonly SolidGrid _grid;
+    private readonly ISolidIndex _grid;
     private readonly List<Opening> _openings;
     private readonly Dictionary<int, List<int>> _byNode = new();
     private readonly Dictionary<int, Vector3> _absorption = new();   // node -> Sabine absorption area per band, m²
@@ -115,6 +118,11 @@ public sealed class OpeningRoutes
     /// <summary>The problems found validating the declared openings against the geometry, one line each.</summary>
     public IReadOnlyList<string> Problems { get; }
 
+    /// <summary>What making this graph cost, milliseconds: the index of the boxes, each box's frame and
+    /// transmission, deriving the openings from the walls round them, checking their sides, and in all.</summary>
+    public readonly record struct BuildCost(double IndexMs, double SolidsMs, double DeriveMs, double SidesMs, double TotalMs);
+    public BuildCost BuildTimes { get; private set; }
+
     /// <summary>A room's Sabine absorption area per band (low, mid, high), m², openings included; false
     /// for the outdoors.</summary>
     public bool TryGetAbsorption(int node, out Vector3 area) => _absorption.TryGetValue(node, out area);
@@ -122,7 +130,7 @@ public sealed class OpeningRoutes
     /// <summary>Which graph node a region belongs to.</summary>
     public int NodeOf(int regionId) => _nodeOf.TryGetValue(regionId, out int n) ? n : Outside;
 
-    private OpeningRoutes(Solid[] solids, SolidGrid grid, List<Opening> openings, List<string> problems)
+    private OpeningRoutes(Solid[] solids, ISolidIndex grid, List<Opening> openings, List<string> problems)
     {
         _solids = solids;
         _grid = grid;
@@ -132,10 +140,23 @@ public sealed class OpeningRoutes
         _frames = new Frame[solids.Length];
         for (int i = 0; i < solids.Length; i++)
         {
-            _frames[i] = new Frame(solids[i].Center, solids[i].Size * 0.5f, Quaternion.Inverse(Quaternion.Normalize(solids[i].Rotation)));
-            var (l, m, h) = WallTransmission.BandGains(solids[i].Material, solids[i].Size, solids[i].Build);
-            _solidGains[i] = new Vector3(l, m, h);
+            _frames[i] = FrameOf(solids[i]);
+            _solidGains[i] = GainsOf(solids[i]);
         }
+    }
+
+    private OpeningRoutes(Solid[] solids, Frame[] frames, Vector3[] gains, ISolidIndex grid, List<Opening> openings, List<string> problems)
+    {
+        _solids = solids; _frames = frames; _solidGains = gains;
+        _grid = grid; _openings = openings; Problems = problems;
+    }
+
+    private static Frame FrameOf(in Solid s) => new(s.Center, s.Size * 0.5f, Quaternion.Inverse(Quaternion.Normalize(s.Rotation)));
+
+    private static Vector3 GainsOf(in Solid s)
+    {
+        var (l, m, h) = WallTransmission.BandGains(s.Material, s.Size, s.Build);
+        return new Vector3(l, m, h);
     }
 
     // ═══ Building the graph ═══════════════════════════════════════════════════════════════════════
@@ -148,14 +169,277 @@ public sealed class OpeningRoutes
     public static OpeningRoutes Build(IReadOnlyList<Solid> solids, AcousticMap? map, IEnumerable<Declared> declared,
                                       Func<Vector3, int>? regionAt = null)
     {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         var arr = new Solid[solids.Count];
         for (int i = 0; i < arr.Length; i++) arr[i] = solids[i];
         var grid = new SolidGrid(arr);
+        double gridMs = clock.Elapsed.TotalMilliseconds;
         var problems = new List<string>();
         var openings = new List<Opening>();
         var model = new OpeningRoutes(arr, grid, openings, problems);
+        double solidsMs = clock.Elapsed.TotalMilliseconds - gridMs;
+        model.Fill(map, declared, regionAt, null, clock, gridMs, solidsMs);
+        return model;
+    }
 
-        // ── The places ──────────────────────────────────────────────────────────────────────────
+    // ═══ Built tile by tile (docs/GEOMETRY.md stage 1) ════════════════════════════════════════════
+    //
+    // The acoustic triangle store already holds the scene a tile at a time, its pieces kept while their
+    // boxes stay the same. The graph is made from it in the same way: the boxes are asked of the store's
+    // trees instead of a grid built over all of them, each tile's boxes keep their frames and
+    // transmissions while its piece does, and an opening is derived again only when a tile its walls
+    // could be in has changed. What a route answers is the same as a whole rebuild's (AudioLab
+    // --geometry-parity only=routes): the same boxes, met by the same tests.
+
+    /// <summary>What a tile-by-tile build keeps from one build to the next. One per map; not shared
+    /// between threads (one build at a time, as the worker has it).</summary>
+    public sealed class TileCache
+    {
+        internal readonly Dictionary<Geometry.GeometryPiece, (Solid[] Solids, Frame[] Frames, Vector3[] Gains)> Pieces
+            = new(ReferenceEqualityComparer.Instance);
+        internal readonly Dictionary<int, CachedOpening> Openings = new();
+        /// <summary>Openings derived again by the last build, and kept from the one before.</summary>
+        public int Derived { get; internal set; }
+        public int Kept { get; internal set; }
+    }
+
+    internal sealed class CachedOpening
+    {
+        public long Declared;
+        public Vector3 RegionMin, RegionMax;
+        public (TileKey Key, ulong Signature)[] Tiles = Array.Empty<(TileKey, ulong)>();
+        public Opening? Template;
+        public (Geometry.GeometryPiece Piece, int Solid)[] Contents = Array.Empty<(Geometry.GeometryPiece, int)>();
+    }
+
+    /// <summary>
+    /// The graph for the scene the acoustic triangle store holds (its tiles' boxes, door leaves where
+    /// they stand and marked as leaves), as <see cref="Build(IReadOnlyList{Solid}, AcousticMap?, IEnumerable{Declared}, Func{Vector3, int}?)"/>
+    /// makes it from a box list, with what did not change since the last build kept in
+    /// <paramref name="cache"/>.
+    /// </summary>
+    public static OpeningRoutes Build(Geometry.TriangleWorld scene, AcousticMap? map, IEnumerable<Declared> declared,
+                                      Func<Vector3, int>? regionAt, TileCache cache)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        int count = 0;
+        var offsets = new int[scene.InstanceCount];
+        for (int i = 0; i < scene.InstanceCount; i++) { offsets[i] = count; count += scene.Instance(i).Piece.SolidCount; }
+        var solids = new Solid[count];
+        var frames = new Frame[count];
+        var gains = new Vector3[count];
+        var instanceOf = new Dictionary<Geometry.GeometryPiece, int>(ReferenceEqualityComparer.Instance);
+        var live = new HashSet<Geometry.GeometryPiece>(ReferenceEqualityComparer.Instance);
+        for (int i = 0; i < scene.InstanceCount; i++)
+        {
+            ref readonly var inst = ref scene.Instance(i);
+            var piece = inst.Piece;
+            bool placed = !inst.Rotated && inst.Position == piece.Origin;
+            if (placed) instanceOf[piece] = i;
+            if (!placed || !cache.Pieces.TryGetValue(piece, out var kept))
+            {
+                kept = (new Solid[piece.SolidCount], new Frame[piece.SolidCount], new Vector3[piece.SolidCount]);
+                for (int s = 0; s < piece.SolidCount; s++)
+                {
+                    var (centre, size, rotation) = scene.BoxOf(new Geometry.SolidRef(i, s));
+                    var surface = piece.Surfaces[piece.Solid(s).Surface];
+                    var solid = new Solid(centre, size, rotation, surface.Material, surface.Construction.Build,
+                                          surface.Is(Geometry.SurfaceFlags.DoorLeaf));
+                    kept.Solids[s] = solid;
+                    kept.Frames[s] = FrameOf(solid);
+                    kept.Gains[s] = GainsOf(solid);
+                }
+                if (placed) cache.Pieces[piece] = kept;
+            }
+            if (placed) live.Add(piece);
+            Array.Copy(kept.Solids, 0, solids, offsets[i], piece.SolidCount);
+            Array.Copy(kept.Frames, 0, frames, offsets[i], piece.SolidCount);
+            Array.Copy(kept.Gains, 0, gains, offsets[i], piece.SolidCount);
+        }
+        foreach (var p in new List<Geometry.GeometryPiece>(cache.Pieces.Keys))
+            if (!live.Contains(p)) cache.Pieces.Remove(p);
+        double solidsMs = clock.Elapsed.TotalMilliseconds;
+
+        var index = new TileIndex(scene, offsets);
+        var model = new OpeningRoutes(solids, frames, gains, index, new List<Opening>(), new List<string>());
+        var seen = new HashSet<int>();
+        int derived = 0, keptCount = 0;
+        Opening? Derive(Declared d)
+        {
+            seen.Add(d.Id);
+            long key = DeclaredHash(d, map);
+            if (cache.Openings.TryGetValue(d.Id, out var c) && c.Declared == key && c.Template != null
+                && SameTiles(scene, c.RegionMin, c.RegionMax, c.Tiles))
+            {
+                var contents = new int[c.Contents.Length];
+                bool ok = true;
+                for (int k = 0; k < contents.Length && ok; k++)
+                {
+                    if (instanceOf.TryGetValue(c.Contents[k].Piece, out int ii)) contents[k] = offsets[ii] + c.Contents[k].Solid;
+                    else ok = false;
+                }
+                if (ok)
+                {
+                    keptCount++;
+                    var o = c.Template.Copy();
+                    o.Contents = contents;
+                    return o;
+                }
+            }
+            derived++;
+            var fresh = model.Derive(d, map);
+            if (fresh == null) { cache.Openings.Remove(d.Id); return null; }
+            // What it was derived from: every tile whose boxes the derivation could have met.
+            float reach = MathF.Max(MathF.Max(fresh.HalfWidth, fresh.HalfHeight), fresh.HalfDepth + 0.05f);
+            reach = MathF.Max(reach, MathF.Max(d.Size.X, MathF.Max(d.Size.Y, MathF.Max(d.Size.Z, d.Aperture))));
+            reach += FrameSearchMetres + 1f + FaceReach(d, map);
+            var lo = Vector3.Min(fresh.Centre, d.Centre) - new Vector3(reach);
+            var hi = Vector3.Max(fresh.Centre, d.Centre) + new Vector3(reach);
+            var stable = new (Geometry.GeometryPiece, int)[fresh.Contents.Length];
+            for (int k = 0; k < stable.Length; k++)
+            {
+                int ii = InstanceAt(offsets, fresh.Contents[k]);
+                stable[k] = (scene.Instance(ii).Piece, fresh.Contents[k] - offsets[ii]);
+            }
+            cache.Openings[d.Id] = new CachedOpening
+            {
+                Declared = key, RegionMin = lo, RegionMax = hi, Tiles = TilesIn(scene, lo, hi),
+                Template = fresh.Copy(), Contents = stable,
+            };
+            return fresh;
+        }
+        model.Fill(map, declared, regionAt, Derive, clock, 0, solidsMs);
+        foreach (int id in new List<int>(cache.Openings.Keys))
+            if (!seen.Contains(id)) cache.Openings.Remove(id);
+        cache.Derived = derived;
+        cache.Kept = keptCount;
+        return model;
+    }
+
+    /// <summary>How far round a doorway with no frame of its own its room's face reaches (FaceOfRoom).</summary>
+    private static float FaceReach(in Declared d, AcousticMap? map)
+    {
+        if (d.Rotation != default || map == null) return 0f;
+        float r = 0f;
+        foreach (int id in new[] { d.RegionA, d.RegionB })
+            if (map.Regions.TryGetValue(id, out var region))
+                r = MathF.Max(r, MathF.Max(region.RoomSize.X, MathF.Max(region.RoomSize.Y, region.RoomSize.Z)));
+        return r;
+    }
+
+    /// <summary>Everything an opening's derivation reads apart from the boxes: its declaration, and for
+    /// one with no frame of its own the places it sits on the face of.</summary>
+    private static long DeclaredHash(in Declared d, AcousticMap? map)
+    {
+        var h = new HashCode();
+        h.Add(d.Id); h.Add(d.Kind); h.Add(d.Centre); h.Add(d.Rotation); h.Add(d.Size); h.Add(d.Aperture); h.Add(d.RegionA); h.Add(d.RegionB);
+        if (d.Rotation == default && map != null)
+            foreach (int r in new[] { d.RegionA, d.RegionB })
+            {
+                if (map.Regions.TryGetValue(r, out var region)) { h.Add(region.RoomSize); h.Add(RoomAcoustics.OpenFaceCount(region)); }
+                if (map.RegionPositions.TryGetValue(r, out var c)) h.Add(c);
+                if (map.RegionRotations.TryGetValue(r, out var q)) h.Add(q);
+            }
+        return h.ToHashCode();
+    }
+
+    /// <summary>The tiles (their keys and signatures) whose pieces stand within a box.</summary>
+    private static (TileKey, ulong)[] TilesIn(Geometry.TriangleWorld scene, Vector3 lo, Vector3 hi)
+    {
+        var list = new List<(TileKey, ulong)>();
+        foreach (var inst in scene.Instances)
+            if (inst.Max.X >= lo.X && inst.Min.X <= hi.X && inst.Max.Y >= lo.Y && inst.Min.Y <= hi.Y && inst.Max.Z >= lo.Z && inst.Min.Z <= hi.Z)
+                list.Add((inst.Piece.Key, inst.Piece.Signature));
+        list.Sort((a, b) => a.Item1.X != b.Item1.X ? a.Item1.X.CompareTo(b.Item1.X) : a.Item1.Z.CompareTo(b.Item1.Z));
+        return list.ToArray();
+    }
+
+    private static bool SameTiles(Geometry.TriangleWorld scene, Vector3 lo, Vector3 hi, (TileKey, ulong)[] had)
+    {
+        var now = TilesIn(scene, lo, hi);
+        if (now.Length != had.Length) return false;
+        for (int i = 0; i < now.Length; i++) if (now[i] != had[i]) return false;
+        return true;
+    }
+
+    private static int InstanceAt(int[] offsets, int index)
+    {
+        int i = Array.BinarySearch(offsets, index);
+        if (i >= 0)
+        {
+            while (i + 1 < offsets.Length && offsets[i + 1] == index) i++;   // pieces with no solids share an offset
+            return i;
+        }
+        return ~i - 1;
+    }
+
+    /// <summary>The boxes near a segment, asked of the acoustic store's trees (geometry stage 1).</summary>
+    private sealed class TileIndex : ISolidIndex
+    {
+        private readonly Geometry.TriangleWorld _scene;
+        private readonly int[] _offsets;
+        [ThreadStatic] private static List<Geometry.SolidRef>? _refs;
+
+        public TileIndex(Geometry.TriangleWorld scene, int[] offsets) { _scene = scene; _offsets = offsets; }
+
+        public void Along(Vector3 a, Vector3 b, List<int> into)
+        {
+            var refs = _refs ??= new List<Geometry.SolidRef>(64);
+            refs.Clear(); into.Clear();
+            var all = new Geometry.AcceptAll();
+            _scene.Along(a, b, IndexMargin, Geometry.GeometryLayers.All, ref all, refs);
+            Gather(refs, into);
+        }
+
+        public void Column(Vector3 a, Vector3 b, float fromY, List<int> into)
+        {
+            var refs = _refs ??= new List<Geometry.SolidRef>(64);
+            refs.Clear(); into.Clear();
+            var all = new Geometry.AcceptAll();
+            _scene.Column(a, b, fromY, IndexMargin, Geometry.GeometryLayers.All, ref all, refs);
+            Gather(refs, into);
+        }
+
+        // In index order: the order the boxes are listed in, as a scan of all of them would meet them.
+        private void Gather(List<Geometry.SolidRef> refs, List<int> into)
+        {
+            foreach (var r in refs) into.Add(_offsets[r.Instance] + r.Solid);
+            into.Sort();
+        }
+    }
+
+    /// <summary>
+    /// For the parity harness only: the box grid hands its boxes back in the reverse of its walk order,
+    /// so the harness can measure how far the answers depend on the order the boxes are met in (the
+    /// barrier search tries a bounded number of ways round). Never set in the game.
+    /// </summary>
+    public static bool ReverseGridOrderForParity;
+
+    /// <summary>For the parity harness only: told every box the over-the-top search crosses.</summary>
+    public static Action<string>? DebugOverTheTop;
+
+    /// <summary>How much bigger than a box its bounds are taken to be when finding the boxes near a
+    /// segment, metres: a route is checked against boxes grown by its joint, less than this.</summary>
+    private const float IndexMargin = 0.1f;
+
+    /// <summary>What finds the boxes a segment, or the vertical plane over one, could meet.</summary>
+    private interface ISolidIndex
+    {
+        void Along(Vector3 a, Vector3 b, List<int> into);
+        void Column(Vector3 a, Vector3 b, float fromY, List<int> into);
+    }
+
+    /// <summary>
+    /// The places, the openings and the graph between them, for a model whose boxes are in place.
+    /// <paramref name="derive"/>, when given, stands in for <see cref="Derive"/> (the tile build's cache).
+    /// </summary>
+    private void Fill(AcousticMap? map, IEnumerable<Declared> declared, Func<Vector3, int>? regionAt,
+                      Func<Declared, Opening?>? derive, System.Diagnostics.Stopwatch clock, double gridMs, double solidsMs)
+    {
+        var model = this;
+        var openings = _openings;
+        var problems = (List<string>)Problems;
+        double deriveMs = 0, sidesMs = 0;
         var faceAbsorption = new Dictionary<int, Vector3>();
         if (map != null)
         {
@@ -183,12 +467,16 @@ public sealed class OpeningRoutes
         // ── The openings ────────────────────────────────────────────────────────────────────────
         foreach (var d in declared)
         {
-            var o = model.Derive(d, map);
+            double t0 = clock.Elapsed.TotalMilliseconds;
+            var o = derive != null ? derive(d) : model.Derive(d, map);
+            deriveMs += clock.Elapsed.TotalMilliseconds - t0;
             if (o == null) continue;
             o.NodeA = model.NodeOf(o.RegionA);
             o.NodeB = model.NodeOf(o.RegionB);
             if (o.NodeA == o.NodeB) continue;              // a doorway between two named bits of street
+            t0 = clock.Elapsed.TotalMilliseconds;
             if (regionAt != null) model.CheckSides(o, regionAt);
+            sidesMs += clock.Elapsed.TotalMilliseconds - t0;
             if (o.Problem != null) problems.Add($"{o.Kind} {o.Id} at ({o.Centre.X:F1}, {o.Centre.Y:F1}, {o.Centre.Z:F1}): {o.Problem}");
             openings.Add(o);
         }
@@ -208,7 +496,7 @@ public sealed class OpeningRoutes
                 foreach (int i in list) total += openings[i].Area * openings[i].Tau;
             model._absorption[node] = Vector3.Max(total, new Vector3(1e-3f));
         }
-        return model;
+        model.BuildTimes = new BuildCost(gridMs, solidsMs, deriveMs, sidesMs, clock.Elapsed.TotalMilliseconds);
 
         static void Add(Dictionary<int, List<int>> into, int node, int i)
         {
@@ -1165,15 +1453,28 @@ public sealed class OpeningRoutes
         }
         var included = scratch.Included;
         included.Clear();
-        foreach (var c in crossings)
+        // Swept again until nothing more is held up: two slabs side by side at the same height (two roofs
+        // of one house) hold each other up whichever is met first. A single sweep took the one met second
+        // and left the other out, so which boxes the string went over depended on the order the index
+        // happened to list them in (found by the geometry parity harness, 2026-10-06).
+        for (bool more = true; more;)
         {
-            int k0 = Math.Clamp((int)(c.S0 / run * bins), 0, bins - 1), k1 = Math.Clamp((int)(c.S1 / run * bins), 0, bins - 1);
-            float support = float.MinValue;
-            for (int k = k0; k <= k1; k++) support = MathF.Max(support, held[k]);
-            if (c.Bottom > support + 2f * RouteJointMetres) continue;
-            included.Add(c.Box);
-            for (int k = k0; k <= k1; k++) held[k] = MathF.Max(held[k], c.Top);
+            more = false;
+            foreach (var c in crossings)
+            {
+                if (included.Contains(c.Box)) continue;
+                int k0 = Math.Clamp((int)(c.S0 / run * bins), 0, bins - 1), k1 = Math.Clamp((int)(c.S1 / run * bins), 0, bins - 1);
+                float support = float.MinValue;
+                for (int k = k0; k <= k1; k++) support = MathF.Max(support, held[k]);
+                if (c.Bottom > support + 2f * RouteJointMetres) continue;
+                included.Add(c.Box);
+                for (int k = k0; k <= k1; k++) held[k] = MathF.Max(held[k], c.Top);
+                more = true;
+            }
         }
+        if (DebugOverTheTop != null)
+            foreach (var c in crossings)
+                DebugOverTheTop($"crossing {_solids[c.Box].Center} size {_solids[c.Box].Size} s {c.S0:F3}-{c.S1:F3} y {c.Bottom:F3}-{c.Top:F3} included {included.Contains(c.Box)}");
         if (included.Count == 0) return -1f;
         // Something over an end's own head — a ceiling, a canopy, a balcony — and the string could only
         // leave that end straight up through it. From under a roof the way out is sideways first, which
@@ -1199,7 +1500,9 @@ public sealed class OpeningRoutes
                 pts.Add((MathF.Max(c.S0, 1e-3f), c.Top + RouteJointMetres, c.Box));
                 pts.Add((MathF.Min(c.S1, run - 1e-3f), c.Top + RouteJointMetres, c.Box));
             }
-            pts.Sort((x, y) => x.S.CompareTo(y.S));
+            // By distance along, then height: the monotone chain wants them in that order, and two at the
+            // same distance (two boxes ending at one place) otherwise came in whatever order the index gave.
+            pts.Sort((x, y) => x.S != y.S ? x.S.CompareTo(y.S) : x.Y.CompareTo(y.Y));
             // Upper hull, left to right (Andrew's monotone chain).
             hull.Clear();
             foreach (var p in pts)
@@ -1308,6 +1611,28 @@ public sealed class OpeningRoutes
 
     /// <summary>For the lab: the barrier search spelled out — every box on the line with its shortest way
     /// round, and for the routes tried, which other box (if any) each one ran into.</summary>
+    /// <summary>The boxes a straight leg runs through, with what each lets through (the parity harness's
+    /// look at a leg).</summary>
+    public List<(Solid Box, Vector3 Gains)> LegBoxes(Vector3 a, Vector3 b)
+    {
+        var into = new List<int>();
+        _grid.Along(a, b, into);
+        var list = new List<(Solid, Vector3)>();
+        foreach (int i in into) if (SegmentHits(i, a, b)) list.Add((_solids[i], _solidGains[i]));
+        return list;
+    }
+
+    /// <summary>The boxes the index hands back for the vertical plane between two points (the parity
+    /// harness's look at what over-the-top is given).</summary>
+    public List<Solid> ColumnCandidates(Vector3 a, Vector3 b, float fromY)
+    {
+        var into = new List<int>();
+        _grid.Column(a, b, fromY, into);
+        var list = new List<Solid>();
+        foreach (int i in into) list.Add(_solids[i]);
+        return list;
+    }
+
     public string ExplainBarrier(Vector3 source, Vector3 listener)
     {
         var sb = new System.Text.StringBuilder();
@@ -1571,7 +1896,7 @@ public sealed class OpeningRoutes
         return true;
     }
 
-    private readonly record struct Frame(Vector3 Centre, Vector3 Half, Quaternion Inverse);
+    internal readonly record struct Frame(Vector3 Centre, Vector3 Half, Quaternion Inverse);
 
     /// <summary>
     /// A uniform grid of cubes over the scene, each listing the boxes whose bounds (a hair larger than the
@@ -1580,7 +1905,7 @@ public sealed class OpeningRoutes
     /// "A Fast Voxel Traversal Algorithm for Ray Tracing", Eurographics 1987). In three dimensions, so a
     /// leg along one storey of a tower is not tested against the six storeys above it.
     /// </summary>
-    private sealed class SolidGrid
+    private sealed class SolidGrid : ISolidIndex
     {
         private const float Cell = 4f;
         private const float Margin = 0.1f;
@@ -1642,6 +1967,7 @@ public sealed class OpeningRoutes
             int mark = ++_threadMark;
             if (mark == int.MaxValue) { Array.Clear(_threadStamp); _threadMark = mark = 1; }
             Walk(a, b, _threadStamp, mark, into);
+            if (ReverseGridOrderForParity) into.Reverse();
         }
 
         /// <summary>Every box in the cells over the ground between the two points, from the height
@@ -1664,6 +1990,7 @@ public sealed class OpeningRoutes
                 float y = _origin.Y + (cy + 0.5f) * Cell;
                 Walk(new Vector3(a.X, y, a.Z), new Vector3(b.X, y, b.Z), _threadStamp, mark, into);
             }
+            if (ReverseGridOrderForParity) into.Reverse();
         }
 
         private void Walk(Vector3 a, Vector3 b, int[] stamp, int mark, List<int> into)

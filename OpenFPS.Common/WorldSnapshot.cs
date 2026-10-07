@@ -40,6 +40,18 @@ public class WorldSnapshot
     public AcousticMap? AcousticMap;
 
     /// <summary>
+    /// The static solid boxes as a triangle world (docs/GEOMETRY.md stage 1), or null until one is built
+    /// (every query then answers from <see cref="StaticGrid"/> as before). Built in the background, so it
+    /// can lag the definitions by a build: the owners whose solid changed since it was started are in
+    /// <see cref="GeometryStale"/> (what it holds of them is not counted) and, where they still exist, in
+    /// <see cref="UnindexedStatics"/> with every static solid it does not hold (a shape that is not a box),
+    /// which the queries test the old way.
+    /// </summary>
+    public OpenFPS.Common.Geometry.TriangleWorld? Geometry;
+    public IReadOnlySet<int>? GeometryStale;
+    public List<int> UnindexedStatics = new();
+
+    /// <summary>
     /// Counts the times the static geometry under <see cref="AcousticMap"/> changed without the map
     /// itself being replaced: tiles of a streamed map arriving and leaving. The acoustic worker rebuilds
     /// its Steam Audio scene in the background when it moves (docs/WORLD_STREAMING.md).

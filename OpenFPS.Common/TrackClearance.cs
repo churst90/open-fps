@@ -56,6 +56,26 @@ public static class TrackClearance
         var found = new List<Obstruction>();
         if (waypoints == null || waypoints.Count < 3 || solids == null || solids.Count == 0) return found;
 
+        // The solids grown sideways by the vehicle's width, as the test below grows them, in a tree over
+        // their bounds (docs/GEOMETRY.md stage 1): each point asks the few whose bounds hold it, in the
+        // order the list has them, instead of every solid on the map.
+        var bmin = new Vector3[solids.Count]; var bmax = new Vector3[solids.Count];
+        for (int b = 0; b < solids.Count; b++)
+        {
+            var solid = solids[b];
+            var grownSize = new Vector3(solid.Size.X + vehicleHalfWidth * 2f, solid.Size.Y, solid.Size.Z + vehicleHalfWidth * 2f);
+            var r = solid.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : solid.Rotation;
+            var h = grownSize * 0.5f;
+            var e = Vector3.Abs(Vector3.Transform(new Vector3(h.X, 0, 0), r)) + Vector3.Abs(Vector3.Transform(new Vector3(0, h.Y, 0), r))
+                    + Vector3.Abs(Vector3.Transform(new Vector3(0, 0, h.Z), r));
+            // A little over: the point test reads the turn as it is, and the tree must never leave one out.
+            e = e * 1.001f + new Vector3(0.01f);
+            bmin[b] = solid.Centre - e; bmax[b] = solid.Centre + e;
+        }
+        var nodes = Geometry.BvhBuilder.Build(bmin, bmax, solids.Count, 4, out var order);
+        var candidates = new List<int>();
+        Span<int> stack = stackalloc int[Geometry.BvhBuilder.MaxDepth + 2];
+
         // Widest a vehicle may sit from the centreline and still be on the road.
         float halfLane = MathF.Max(0f, widthMetres * 0.5f - vehicleHalfWidth);
 
@@ -84,9 +104,22 @@ public static class TrackClearance
                 {
                     float offset = lane * halfLane;
                     Vector3 side = centre + lateral * offset;
-                    bool hit = false;
-                    for (int b = 0; b < solids.Count && !hit; b++)
+                    Vector3 lo = side + new Vector3(0f, BodyBottom, 0f), hi = side + new Vector3(0f, BodyTop + 1e-3f, 0f);
+                    candidates.Clear();
+                    int sp = 0;
+                    stack[sp++] = 0;
+                    while (sp > 0)
                     {
+                        ref readonly var node = ref nodes[stack[--sp]];
+                        if (node.Max.X < lo.X || node.Min.X > lo.X || node.Max.Z < lo.Z || node.Min.Z > lo.Z || node.Max.Y < lo.Y || node.Min.Y > hi.Y) continue;
+                        if (node.Count > 0) { for (int k = node.LeftFirst; k < node.LeftFirst + node.Count; k++) candidates.Add(order[k]); continue; }
+                        stack[sp++] = node.LeftFirst + 1; stack[sp++] = node.LeftFirst;
+                    }
+                    candidates.Sort();
+                    bool hit = false;
+                    foreach (int b in candidates)
+                    {
+                        if (hit) break;
                         var solid = solids[b];
                         // Grown SIDEWAYS only, by the vehicle's own width, so "close enough to clip
                         // it" fails as well as "inside it" — a route that passes a wall by ten

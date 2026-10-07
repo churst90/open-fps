@@ -22,13 +22,30 @@ public static class OpeningGraph
         => def != null && def.Collider.IsSolid && !def.Moves
            && (def.Portal.RegionAId != 0 || def.Portal.RegionBId != 0);
 
-    /// <summary>The graph for a scene built from <paramref name="boxes"/> (as <see cref="SteamAudioScene.BoxesFromWorld"/>
-    /// makes them, so the leaves stand where the scene has them), with the world's places and openings.</summary>
-    public static OpeningRoutes Build(WorldSnapshot world, IReadOnlyList<SteamAudioScene.Box> boxes, Func<Vector3, int>? regionAt)
+    /// <summary>Every door leaf the world holds, by id.</summary>
+    public static HashSet<int> LeavesOf(WorldSnapshot world)
     {
         var leaves = new HashSet<int>();
         foreach (var snap in world.Entities.Values)
             if (IsDoorLeaf(snap.Definition)) leaves.Add(snap.Id);
+        return leaves;
+    }
+
+    /// <summary>
+    /// The graph for the scene the acoustic triangle store holds (docs/GEOMETRY.md stage 1): the same
+    /// openings and places as <see cref="Build(WorldSnapshot, IReadOnlyList{SteamAudioScene.Box}, Func{Vector3, int}?)"/>,
+    /// the boxes asked of the store's tiles, and whatever did not change since the last build kept in
+    /// <paramref name="cache"/>.
+    /// </summary>
+    public static OpeningRoutes Build(WorldSnapshot world, OpenFPS.Common.Geometry.TriangleWorld scene, Func<Vector3, int>? regionAt,
+                                      OpeningRoutes.TileCache cache)
+        => OpeningRoutes.Build(scene, world.AcousticMap, Declared(world, LeavesOf(world)), regionAt, cache);
+
+    /// <summary>The graph for a scene built from <paramref name="boxes"/> (as <see cref="SteamAudioScene.BoxesFromWorld"/>
+    /// makes them, so the leaves stand where the scene has them), with the world's places and openings.</summary>
+    public static OpeningRoutes Build(WorldSnapshot world, IReadOnlyList<SteamAudioScene.Box> boxes, Func<Vector3, int>? regionAt)
+    {
+        var leaves = LeavesOf(world);
 
         var solids = new List<OpeningRoutes.Solid>(boxes.Count);
         foreach (var b in boxes)
