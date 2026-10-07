@@ -501,6 +501,8 @@ public static class GameLevelsSpike
                 TrainCrossing("amtrak", 25f, 15f, 30.0);
                 TwoMachines("ac_window", 30f, 20.0);
             }
+            // A day hot enough that both thermostats call (Thermostat): the two compressors together.
+            if (set is "faults" or "faults-ac") TwoMachines("ac_window", 36f, 20.0);
             var measureSpots = new List<(string, float)>();
             foreach (var side in new[] { "front", "side", "rear" })
                 foreach (var d in new[] { 1f, 2f, 5f, 10f })
