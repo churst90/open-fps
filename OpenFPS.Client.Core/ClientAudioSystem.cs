@@ -2181,9 +2181,12 @@ public class ClientAudioSystem
 
     // ── Extended sources: a tree's crown, a fire's bed (ExtendedSources) ───────────────────────────
 
-    /// <summary>Voice ids for the outer places of a tree or a fire: eight a source, place 1 to 7.</summary>
+    /// <summary>Voice ids for the outer places of an extended source: <see cref="ExtendedSources.MaxPlaces"/> a
+    /// source, place 1 up. Eight a source until 2026-10-06, when a surf beach had ten places and its ninth and
+    /// tenth took the next source's first two ids.</summary>
     internal const int PlaceVoiceBase = -5_000_000;
-    internal static int PlaceVoiceId(int sourceId, int place) => PlaceVoiceBase - Math.Abs(sourceId) * 8 - place;
+    internal const int PlaceIdsPerSource = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.MaxPlaces;
+    internal static int PlaceVoiceId(int sourceId, int place) => PlaceVoiceBase - Math.Abs(sourceId) * PlaceIdsPerSource - place;
 
     /// <summary>After a source merges to its middle, its outer voices are kept this long, s: what was
     /// already written to them (a twig's clatter, a crackle's rattle, up to the render lead ahead) rings
