@@ -1,7 +1,5 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Tests;
@@ -79,7 +77,7 @@ public class SharedMovementPhysicsTests
     [Fact]
     public void WithNoGroundItFallsAtG()
     {
-        var (p, v, g) = Step(At(new Vector3(0, 5f, 0), ground: DefaultGroundCheckLimit));
+        var (_, v, g) = Step(At(new Vector3(0, 5f, 0), ground: DefaultGroundCheckLimit));
         Assert.False(g);
         Assert.Equal(-Gravity * Dt, v.Y, 4);
         var (_, _, g2) = Step(At(new Vector3(0, DefaultGroundCheckLimit, 0), ground: DefaultGroundCheckLimit));

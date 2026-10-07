@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;

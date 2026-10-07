@@ -1,6 +1,4 @@
-using System;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

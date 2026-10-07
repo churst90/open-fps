@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Numerics;
 using System.Text.Json;
 using Arch.Core;
@@ -10,7 +7,6 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Tests;

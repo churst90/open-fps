@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Client.Core;
@@ -8,7 +6,6 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Systems;
-using Xunit;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Tests;
@@ -221,7 +218,7 @@ public class TickRateAndPredictionTests
     [Fact]
     public void RotationIsNotReplayedAndSoDoesNotCompound()
     {
-        var (state, physics, rec, snap) = BuildClient();
+        var (state, _, rec, snap) = BuildClient();
 
         // Three turn inputs, none acknowledged yet.
         for (int i = 0; i < 3; i++)
@@ -248,7 +245,7 @@ public class TickRateAndPredictionTests
     [Fact]
     public void ReconciliationSnapsYawWhenTheServerDisagrees()
     {
-        var (state, physics, rec, snap) = BuildClient();
+        var (state, _, rec, snap) = BuildClient();
         state.Yaw = 2.0f;
 
         // Server says we are facing 0 and has acknowledged everything.
@@ -266,7 +263,7 @@ public class TickRateAndPredictionTests
     [Fact]
     public void InputHistoryIsBounded()
     {
-        var (state, physics, rec, snap) = BuildClient();
+        var (_, _, rec, snap) = BuildClient();
 
         // The server never acknowledges anything — the old code grew this list forever.
         for (int i = 0; i < MaxInputHistory * 3; i++)

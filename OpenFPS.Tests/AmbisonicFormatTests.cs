@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Client.AudioEngine.Core;
 
 namespace OpenFPS.Tests;

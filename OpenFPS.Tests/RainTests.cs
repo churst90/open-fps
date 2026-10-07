@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using System.Numerics;
 using MemoryPack;
 using OpenFPS.Client.AudioEngine.Core.Nature;
@@ -9,7 +7,6 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Systems;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

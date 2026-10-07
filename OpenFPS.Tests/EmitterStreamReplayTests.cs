@@ -1,10 +1,6 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Text;
@@ -598,7 +594,6 @@ internal sealed class StreamMixer : IAudioProvider
     public void SetEarWind(EarWindListener? listener) => Log("EarWind", listener);
     public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes) => Log("Boundaries", probes.ToArray());
     public bool PlayAmbientBed(string id, AmbisonicLayout l, float v, bool loop = true) { Log("PlayBed", id, l, v, loop); return true; }
-    public void SetAmbientBedVolume(string id, float v) => Log("BedVolume", id, v);
     public void StopAmbientBed(string id) => Log("StopBed", id);
     public void SetAcousticMap(AcousticMap map) => Log("AcousticMap");
     public void PlaySpatialSound(SpatialEmitter e) { LogDelta("Play", e.EntityId, e, _emitterFields, whole: true); _latest[e.EntityId] = e; _live.Add(e.EntityId); }
@@ -616,7 +611,6 @@ internal sealed class StreamMixer : IAudioProvider
     public void StopSound(int id) { Log("Stop", id); _live.Remove(id); _emitterFields.Remove(id); _pathFields.Remove(id); }
     public bool IsPlaying(int id) => _live.Contains(id);
     public Vector3 GetSoundPosition(int id) => _latest.TryGetValue(id, out var e) ? e.Position : Vector3.Zero;
-    public float GetPlaybackProgress(int id) => 0f;
     public IEnumerable<int> GetActiveSpatialSoundIds() => _live.OrderBy(i => i).ToList();
     public void Preload(string id) => Log("Preload", id);
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)

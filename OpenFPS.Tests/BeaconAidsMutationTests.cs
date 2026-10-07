@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
@@ -11,7 +7,6 @@ using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -34,14 +29,12 @@ internal sealed class EmitterRecordingProvider : IAudioProvider
     public void UpdateShelter(float f) { }
     public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes) { }
     public bool PlayAmbientBed(string id, AmbisonicLayout l, float v, bool loop = true) => true;
-    public void SetAmbientBedVolume(string id, float v) { }
     public void StopAmbientBed(string id) { }
     public void SetAcousticMap(AcousticMap map) { }
     public void PlaySpatialSound(SpatialEmitter e) { Played.Add(e); Live.Add(e.EntityId); }
     public void UpdateSpatialAttributes(SpatialEmitter e) { }
     public void SetAcousticPath(int id, AcousticPathData p) { }
     public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) { }
-    public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres, float surfaceAreaSquareMetres = 0f) { }
     public void SetAirTemperature(float c) { }
     public float MixerLoad => 0f;
     public void ReviveEngine(int id) { }
@@ -53,7 +46,6 @@ internal sealed class EmitterRecordingProvider : IAudioProvider
     /// <summary>Every one-shot here is over by the next frame.</summary>
     public bool IsPlaying(int id) => false;
     public Vector3 GetSoundPosition(int id) => Vector3.Zero;
-    public float GetPlaybackProgress(int id) => 0f;
     public IEnumerable<int> GetActiveSpatialSoundIds() => new List<int>(Live);
     public void Preload(string id) { }
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
@@ -550,9 +542,6 @@ public class BeaconAidsMutationTests
         foreach (double other in new[] { 196.0, 330.0, 392.0 })        // not 523: that is its own octave
             Assert.True(At(x, 261.63) > 10 * At(x, other), $"C4 does not stand over {other} Hz");
     }
-
-    private static float[] TransientSynthRoundTrip(float[] x)
-        => EmitterRecordingProvider.Decode(OpenFPS.Client.AudioEngine.Core.TransientSynth.ToPcm16(x));
 
     // ── What the player says ────────────────────────────────────────────────────────────────
 

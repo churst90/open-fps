@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core.Aircraft;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

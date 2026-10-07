@@ -1,16 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -409,7 +403,7 @@ public class HeldItemTests : IDisposable
         Assert.True(f.Hands.Drop(player, "", out _));
         for (int i = 0; i < 6; i++)
         {
-            var torch = f.Item($"Torch {i}", new Vector3(20.2f, 0, 20), massKg: 0.3f);
+            f.Item($"Torch {i}", new Vector3(20.2f, 0, 20), massKg: 0.3f);
             Assert.True(f.Hands.Take(player, $"Torch {i}", out _));
             Assert.True(f.Hands.Stow(player, "", out string s), s);
         }

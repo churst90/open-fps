@@ -4,7 +4,6 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

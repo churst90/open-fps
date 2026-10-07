@@ -1,15 +1,10 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Text.Json;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

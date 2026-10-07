@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Client.AudioEngine.Core;
@@ -10,7 +7,6 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

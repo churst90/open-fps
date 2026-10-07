@@ -1,8 +1,5 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Common.Networking;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

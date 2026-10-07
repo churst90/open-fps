@@ -1,12 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using MemoryPack;
 using OpenFPS.Client.Core;
@@ -9,7 +6,6 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server;
 using OpenFPS.Server.Core;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

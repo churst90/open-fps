@@ -3,7 +3,6 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

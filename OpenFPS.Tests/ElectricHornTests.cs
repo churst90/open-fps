@@ -1,8 +1,5 @@
-using System;
-using System.Linq;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Signals;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

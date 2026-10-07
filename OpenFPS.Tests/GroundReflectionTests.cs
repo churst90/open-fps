@@ -1,6 +1,4 @@
-using System;
 using OpenFPS.Client.AudioEngine.Acoustics;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

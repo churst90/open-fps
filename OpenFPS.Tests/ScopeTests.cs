@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core;
@@ -10,7 +7,6 @@ using OpenFPS.Client.Core.Session;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -350,8 +346,8 @@ public class ScopeTests
         float a = 0f, b = 0f;
         for (int i = 0; i < 800; i++)
         {
-            var (r1, u1) = rested.Update(0.01f, 0f, 0f, false); a = MathF.Max(a, MathF.Abs(u1));
-            var (r2, u2) = winded.Update(0.01f, 0.9f, 0f, false); b = MathF.Max(b, MathF.Abs(u2));
+            var (_, u1) = rested.Update(0.01f, 0f, 0f, false); a = MathF.Max(a, MathF.Abs(u1));
+            var (_, u2) = winded.Update(0.01f, 0.9f, 0f, false); b = MathF.Max(b, MathF.Abs(u2));
         }
         Assert.True(b > 2f * a);
     }

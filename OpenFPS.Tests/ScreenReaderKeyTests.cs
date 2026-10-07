@@ -1,13 +1,9 @@
-using System;
-using System.Linq;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Input;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.Core.Session;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common;
-using OpenFPS.Common.Networking;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

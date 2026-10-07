@@ -1,12 +1,7 @@
-using System.Collections.Generic;
-using System;
-using System.IO;
-using System.Linq;
 using Arch.Core;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -89,7 +84,7 @@ public class CarFollowingTests
         int without = Overlaps(w0, v0, 180, out int n0);
         var (w1, v1) = City(streetLife: true);
         var where = new List<string>();
-        int with = Overlaps(w1, v1, 180, out int n1, where, Junctions());
+        int with = Overlaps(w1, v1, 180, out _, where, Junctions());
         foreach (var w in where.Take(12)) _o.WriteLine(w);
         _o.WriteLine($"overlapping pairs over {n0} one-second samples: {without} without following, {with} with it");
         Assert.Equal(0, with);

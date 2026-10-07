@@ -1,9 +1,6 @@
-using System;
-using System.Linq;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -93,7 +90,7 @@ public class BrakeSquealTests
     [Fact]
     public void AnEmergencyStopDoesNotSqueal()
     {
-        var (y, rest) = Stop(Squealer(false), from: 10f, decel: 6f);
+        var (y, _) = Stop(Squealer(false), from: 10f, decel: 6f);
         Assert.True(Db(y, 0, y.Length) < 20f);
     }
 

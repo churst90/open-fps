@@ -1,6 +1,4 @@
-using System.Linq;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

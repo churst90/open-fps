@@ -1,13 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common.Components;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

@@ -1,5 +1,4 @@
 using OpenFPS.Client.AudioEngine.Core;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

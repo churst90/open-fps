@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -40,14 +38,12 @@ public class VoiceLifecycleTests
         public void UpdateShelter(float f) { }
         public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes) { }
         public bool PlayAmbientBed(string id, AmbisonicLayout l, float v, bool loop = true) => true;
-        public void SetAmbientBedVolume(string id, float v) { }
         public void StopAmbientBed(string id) { }
         public void SetAcousticMap(AcousticMap map) { }
         public void PlaySpatialSound(SpatialEmitter e) { Played.Add(e.EntityId); PlayedSounds.Add(e.SoundId); Live.Add(e.EntityId); }
         public void UpdateSpatialAttributes(SpatialEmitter e) { }
         public void SetAcousticPath(int id, AcousticPathData p) { }
         public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) { }
-        public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres, float surfaceAreaSquareMetres = 0f) { }
         public void SetAirTemperature(float c) { }
         public float MixerLoad => 0f;
         public void ReviveEngine(int id) { }
@@ -58,7 +54,6 @@ public class VoiceLifecycleTests
         public void StopSound(int id) { Stopped.Add(id); Live.Remove(id); }
         public bool IsPlaying(int id) => Live.Contains(id);
         public Vector3 GetSoundPosition(int id) => Vector3.Zero;
-        public float GetPlaybackProgress(int id) => 0f;
         public IEnumerable<int> GetActiveSpatialSoundIds() => new List<int>(Live);
         public void Preload(string id) { }
 

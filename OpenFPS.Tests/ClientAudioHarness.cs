@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
@@ -183,11 +181,9 @@ internal sealed class RecordingMixer : IAudioProvider
     public void UpdateShelter(float f) { }
     public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes) { }
     public bool PlayAmbientBed(string id, AmbisonicLayout l, float v, bool loop = true) => true;
-    public void SetAmbientBedVolume(string id, float v) { }
     public void StopAmbientBed(string id) { }
     public void SetAcousticMap(AcousticMap map) { }
     public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) { }
-    public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres, float surfaceAreaSquareMetres = 0f) { }
     public void SetAirTemperature(float c) { }
     /// <summary>The mixer's load as the budget reads it, 0..1. A test sets it to drive the control loop.</summary>
     public float Load;
@@ -198,7 +194,6 @@ internal sealed class RecordingMixer : IAudioProvider
     public bool FadeOutVoice(int id) => true;
     public void CancelVoiceFade(int id) { }
     public Vector3 GetSoundPosition(int id) => Latest.TryGetValue(id, out var e) ? e.Position : Vector3.Zero;
-    public float GetPlaybackProgress(int id) => 0f;
     public void Preload(string id) { }
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;
     public void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume) { }

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -15,7 +11,6 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

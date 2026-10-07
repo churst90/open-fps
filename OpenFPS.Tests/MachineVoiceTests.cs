@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text.Json;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Server.Repositories;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

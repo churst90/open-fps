@@ -1,7 +1,5 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 using static OpenFPS.Common.SharedMovementEngine;
 
 namespace OpenFPS.Tests;

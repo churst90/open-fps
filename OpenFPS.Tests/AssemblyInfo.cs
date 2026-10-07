@@ -1,5 +1,3 @@
-using Xunit;
-
 // Test CLASSES run in parallel by default, and this codebase has global static state that several of
 // them reach through: PerfProbe is written to by ClientWorldState, ClientAudioSystem and PhysicsUtils,
 // and AcousticRegistry is a process-wide singleton. So HotPathTests, which asserts that PerfProbe holds

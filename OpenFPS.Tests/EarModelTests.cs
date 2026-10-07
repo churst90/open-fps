@@ -1,9 +1,7 @@
-using System;
 using OpenFPS.Common;
 using OpenFPS.Common.Hearing;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

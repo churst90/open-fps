@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -10,9 +6,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Hearing;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
