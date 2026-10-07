@@ -4,6 +4,22 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Water smoothing (unheard; renders in `inbox/water-smoothing-2026-10-06`):
+  - Waves: a breaking wave's hiss glides instead of stepping. Its unevenness was drawn afresh every
+    20-60 ms and held; it now follows a smooth process with the same spread. Each part of a break falls
+    to nothing instead of stopping on a 13 dB step, and a column of beach breaks in three pieces over
+    the time the break runs across it. Surf at 5 m: 10 ms steps of the 2-8 kHz level, 95th percentile
+    3.8 to 2.7 dB (recordings 1.7-4.2). docs/WAVES_AND_SHORES.md 8.1.
+  - Waves: on shingle and at a wall the wind's waves and the swell are found apart, so a wind wave
+    riding a swell breaks or slaps on its own. Both used to break once a swell period and fall silent
+    between. Shingle and the harbour wall remeasured: 92.5 and 66 dB at a metre. The sandy surf is
+    unchanged. Shingle costs about four times what it did, the surf half as much again (none are on a
+    map).
+  - Running water no longer flanges. Its ground reflection was a copy of the voice one path difference
+    later: a gutter outlet 2.8 m up came back 8 ms late (a comb every 125 Hz), a downpipe's shoe 0.7 ms,
+    a sink over the floor 5 ms. Running water now gets the ground's bass lift and, above c / 4Δ, its
+    power without the copy. The downpipes are 1-3 dB louder for it. Cars and machines are unchanged.
+    docs/RUNNING_WATER.md 11.
 - Geometry stage 2 (docs/GEOMETRY.md, "Stage 2 as built"; unheard, unplayed):
   - Stage 1's decisions: the loader no longer lays a concrete foundation under a map that has its own
     ground; where a map needs one it is dirt (the speedway). `/map new` starts on dirt. Every turn in a

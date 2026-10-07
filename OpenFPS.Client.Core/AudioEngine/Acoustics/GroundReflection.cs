@@ -70,7 +70,7 @@ public sealed class GroundReflection
     /// (|p_d + F p_r|² + (1 − F²) |p_r|², with F → 0). Without this a gutter outlet 2.8 m up and
     /// 1.8 m away was one stream heard twice 8 ms apart, a comb at 125 Hz that Cody heard as a fast
     /// flanging repeat (2026-10-06), as he had heard speech through the same copy flange
-    /// (docs/RUNNING_WATER.md section 12).
+    /// (docs/RUNNING_WATER.md section 11).
     /// </summary>
     public volatile bool Texture;
 
