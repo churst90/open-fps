@@ -313,11 +313,13 @@ public static class TrainLayout
 {
     public enum Kind { Bogie, Body, ExhaustStack, RadiatorFans, Traction, Chimney, Horn, Whistle, Bell }
 
+    /// <summary>One source. <paramref name="HeadroomDb"/> is how far its loudest moments stand over
+    /// <paramref name="LevelDb"/>: the shared figure, except a bell's, which is nothing but blows.</summary>
     public sealed record Entry(int Index, Kind Kind, string Label, float AlongMetres, float HeightMetres,
-                               float ExtentMetres, float LevelDb)
+                               float ExtentMetres, float LevelDb, float HeadroomDb = VehicleProfile.PeakHeadroomDb)
     {
-        /// <summary>Horns, whistles and bells make no sound until something blows them, and nothing on
-        /// a map does yet. They are listed so the indices match the synth, and not spawned.</summary>
+        /// <summary>Horns, whistles and bells make no sound until the train sounds them
+        /// (<see cref="TrainSignal"/>): silent the rest of the time, and given no voice then.</summary>
         public bool IsSignal => Kind is Kind.Horn or Kind.Whistle or Kind.Bell;
     }
 
@@ -377,20 +379,26 @@ public static class TrainLayout
                                                along + v.LengthMetres * 0.18f, 4.6f, 0.8f, tr.Steam.MotionDb + 6f));
                             break;
                     }
+                    // The signals' levels are their own models' (ModelLibrary), so a tram's two-chime
+                    // horn is placed as the 124 dB it is and not as a freight horn's 139.
                     if (tr.HornKey != null && !horn)
                     {
                         horn = true;
-                        list.Add(new Entry(list.Count, Kind.Horn, $"{v.Name} #{unit + 1} horn", along + 2.5f, 4.8f, 0.6f, 139f));
+                        list.Add(new Entry(list.Count, Kind.Horn, $"{v.Name} #{unit + 1} horn", along + 2.5f, 4.8f, 0.6f,
+                                           ModelLibrary.Horn(tr.HornKey).ReferenceDb));
                     }
-                    if (tr.Steam?.WhistleKey is not null && !whistle)
+                    if (tr.Steam?.WhistleKey is { } wk && !whistle)
                     {
                         whistle = true;
-                        list.Add(new Entry(list.Count, Kind.Whistle, $"{v.Name} #{unit + 1} whistle", along + v.LengthMetres * 0.55f, 4.4f, 0.5f, 130f));
+                        list.Add(new Entry(list.Count, Kind.Whistle, $"{v.Name} #{unit + 1} whistle", along + v.LengthMetres * 0.55f, 4.4f, 0.5f,
+                                           ModelLibrary.Whistle(wk).ReferenceDb));
                     }
-                    if ((tr.BellKey ?? tr.Steam?.BellKey) != null && !bell)
+                    if ((tr.BellKey ?? tr.Steam?.BellKey) is { } bk && !bell)
                     {
                         bell = true;
-                        list.Add(new Entry(list.Count, Kind.Bell, $"{v.Name} #{unit + 1} bell", along + 1.8f, 3.2f, 0.4f, 100f));
+                        var bellSpec = ModelLibrary.Bell(bk);
+                        list.Add(new Entry(list.Count, Kind.Bell, $"{v.Name} #{unit + 1} bell", along + 1.8f, 3.2f, 0.4f,
+                                           bellSpec.ReferenceDb, MathF.Max(VehicleProfile.PeakHeadroomDb, bellSpec.PeakHeadroomDb)));
                     }
                 }
                 along += v.LengthMetres;

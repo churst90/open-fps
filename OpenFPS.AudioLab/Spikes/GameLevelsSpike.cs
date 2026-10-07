@@ -415,7 +415,6 @@ public static class GameLevelsSpike
             for (int i = 0; i < layout.Count; i++)
             {
                 var src = layout[i];
-                if (src.IsSignal) continue;                          // as the server spawns them (before 2026-10-06)
                 int id = nextId++;
                 ids[i] = id;
                 var at = new Vector3(Head(clock.Elapsed.TotalSeconds) - src.AlongMetres, src.HeightMetres, 0f);
@@ -444,7 +443,7 @@ public static class GameLevelsSpike
                 if (!sounded && eta <= hornLead)
                 {
                     sounded = true;
-                    SoundForCrossing(profile, layout, ids, eta, new Vector3(head, 0f, 0f));
+                    SoundForCrossing(preset, trainKey, layout, ids, eta);
                 }
             };
             Pump(1.5);
@@ -453,22 +452,25 @@ public static class GameLevelsSpike
             foreach (var id in ids) if (id is int i) Remove(i);
             Pump(1.5);
         }
-        // What RailSystem.SoundForCrossings sends (before 2026-10-06): the road vehicle's horn, Honk,
-        // in the crossing rhythm, on the train's first entity.
-        void SoundForCrossing(TrainProfile profile, IReadOnlyList<TrainLayout.Entry> layout, int?[] ids, float eta, Vector3 head)
+        // What RailSystem.SoundForCrossings sends: the train's own horn (or whistle) in the crossing
+        // rhythm and its bell until it is on the crossing (TrainSignal), from its warning source.
+        // (Before 2026-10-06 it sent the road vehicle's horn, Honk, on the train's first entity, and
+        // the signal sources were not spawned.)
+        void SoundForCrossing(string preset, string trainKey, IReadOnlyList<TrainLayout.Entry> layout, int?[] ids, float eta)
         {
-            string? hk = profile.Consist.Select(c => c.Vehicle.Traction?.HornKey).FirstOrDefault(h => h != null);
-            if (hk == null) return;
-            string horn = "air:" + hk;
-            var pattern = Honk.Crossing(eta - 10f);
-            int lead = ids.First(i => i != null)!.Value;
+            int warn = TrainSignal.WarningSource(layout), bellAt = TrainSignal.BellSource(layout);
+            if (warn < 0 && bellAt < 0) return;
+            var (warning, bell) = TrainSignal.ForCrossing(eta);
+            if (warn < 0) warning = Array.Empty<float>();
+            if (bellAt < 0) bell = 0f;
+            int from = warn >= 0 ? warn : bellAt;
             audio.WorldAudio.Receive(new WorldAudioEvent
             {
-                SourceEntityId = lead, Label = "horn", Seed = 1,
+                SourceEntityId = ids[from]!.Value, Label = "horn", Seed = 1,
                 Sounds = new List<TransientSound> { new TransientSound
                 {
-                    Character = SoundCharacter.Ring, Position = head + Vector3.UnitY * 4.5f,
-                    LevelDb = Honk.LevelDb(horn), DecaySeconds = Honk.Duration(pattern), SynthKey = Honk.Key(horn, pattern),
+                    Character = SoundCharacter.Ring, Position = Vector3.Zero, LevelDb = layout[from].LevelDb,
+                    DecaySeconds = TrainSignal.Duration(warning, bell), SynthKey = TrainSignal.Key(preset, trainKey, warning, bell),
                 } },
             }, AudioClock.Now);
         }

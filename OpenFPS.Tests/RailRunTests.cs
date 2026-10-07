@@ -67,6 +67,46 @@ public class RailRunTests : IDisposable
         Assert.True(tailPastWhenReopened >= 28f, $"reopened with the tail only {tailPastWhenReopened:F1} m past");
     }
 
+    /// <summary>
+    /// A train blows for a crossing on its OWN horn and rings its own bell: the signal sources are
+    /// placed on the train with the rest, and what is sent names the train and comes from its horn.
+    /// Resonance found it (2026-10-06): the horn, whistle and bell sources were never spawned and the
+    /// crossing was sounded with Honk, the road vehicle's horn, on the leading bogie.
+    /// </summary>
+    [Fact]
+    public void A_train_sounds_its_own_horn_and_bell_for_a_crossing()
+    {
+        var f = new Fixture(_dir, topSpeedKmh: 40f, startMetres: 50f, crossingAtMetres: 400f, clearMetres: 30f);
+        var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"));
+        int horn = TrainSignal.WarningSource(layout), bell = TrainSignal.BellSource(layout);
+        Assert.True(horn >= 0 && bell >= 0, "the light rail set has a horn and a bell");
+
+        var placed = f.Sources().Select(s => s.Index).ToHashSet();
+        Assert.Contains(horn, placed);
+        Assert.Contains(bell, placed);
+
+        for (int i = 0; i < (int)(60 / Dt) && f.Heard.Count == 0; i++) f.Tick();
+        Assert.Single(f.Heard);
+        var (source, label, sounds) = f.Heard[0];
+        Assert.True(TrainSignal.TryParse(sounds[0].SynthKey, out string train, out var warning, out float bellSeconds),
+                    $"sent '{sounds[0].SynthKey}', not the train's own signal");
+        Assert.Equal("light_rail/Test_Tram", train);
+        Assert.Equal(7, warning.Length);                          // long, long, short, long
+        Assert.InRange(bellSeconds, 15f, 19f);                    // rung from the first blast to the crossing
+        Assert.False(Honk.TryParse(sounds[0].SynthKey, out _, out _));
+
+        // From the horn itself, where it is on the train.
+        string? sid = null;
+        Vector3 at = default;
+        f.World.Query(new QueryDescription().WithAll<Transform, SoundEmitterComponent>(), (Entity e, ref Transform t, ref SoundEmitterComponent em) =>
+        {
+            if (e.Id == source) { sid = em.SoundId; at = t.Position; }
+        });
+        Assert.EndsWith("/" + horn, sid);
+        Assert.True(Vector3.Distance(at, sounds[0].Position) < 0.01f);
+        _o.WriteLine($"{label}: {sounds[0].SynthKey} from {sid}");
+    }
+
     // ── Sources ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -151,6 +191,8 @@ public class RailRunTests : IDisposable
         public readonly Vector3 CrossingPosition;
         public float Distance;
         private float _lastHead;
+        /// <summary>What the trains sent to be heard: the source entity, the label and the sounds.</summary>
+        public readonly List<(int Source, string Label, IReadOnlyList<TransientSound> Sounds)> Heard = new();
 
         public Fixture(string dir, float topSpeedKmh, float startMetres, float slope = 0f,
                        float crossingAtMetres = -1f, float clearMetres = 30f, TrackStopData[]? stops = null)
@@ -183,6 +225,7 @@ public class RailRunTests : IDisposable
                         StartOffsetMetres = startMetres },
             };
             Rail.Spawn(Maps);
+            Rail.Heard = (_, source, label, sounds) => Heard.Add((source, label, sounds));
             var line = Rail.Lines(MapId).Single().Line;
 
             if (crossingAtMetres >= 0f)

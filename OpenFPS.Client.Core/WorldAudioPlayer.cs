@@ -386,6 +386,13 @@ public sealed class WorldAudioPlayer
     /// </summary>
     public Action<int, string, float[]>? HornReceived { get; set; }
 
+    /// <summary>
+    /// A train sounding its own horn (or whistle) and bell: which train ("preset/train"), the rhythm,
+    /// and how long the bell rings. Not rendered here either — the train's synth plays it on its own
+    /// outlets. See <see cref="TrainSignal"/>.
+    /// </summary>
+    public Action<string, float[], float>? TrainSignalReceived { get; set; }
+
     /// <summary>Everything the world reports, before it is played — for whatever else is listening
     /// (the birds, who go quiet at a bang).</summary>
     public Action<WorldAudioEvent>? Received { get; set; }
@@ -398,6 +405,12 @@ public sealed class WorldAudioPlayer
             && Honk.TryParse(message.Sounds[0].SynthKey, out string horn, out float[] rhythm))
         {
             HornReceived(message.SourceEntityId, horn, rhythm);
+            return;
+        }
+        if (TrainSignalReceived != null && message.Sounds.Count == 1
+            && TrainSignal.TryParse(message.Sounds[0].SynthKey, out string train, out float[] warning, out float bell))
+        {
+            TrainSignalReceived(train, warning, bell);
             return;
         }
         if (_trace)

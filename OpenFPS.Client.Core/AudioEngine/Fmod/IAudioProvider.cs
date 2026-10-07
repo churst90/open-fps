@@ -105,6 +105,10 @@ public interface IAudioProvider : IDisposable
     /// <summary>Whether a vehicle voice has its doors standing open (a bus at a stop). The voice decides
     /// that from its own speed history, so it is the one to ask.</summary>
     bool EngineDoorsOpen(int entityId) => false;
+    /// <summary>A train ("preset/train") sounds its horn or whistle in this rhythm and rings its bell
+    /// for this long, begun <paramref name="secondsAgo"/> before now (TrainSignal). Played by the train's
+    /// own synth, on its own outlets.</summary>
+    void SignalTrain(string train, float[] warning, float bellSeconds, double secondsAgo) { }
     bool TryGetEngineTelemetry(int entityId, out float toldSpeed, out float ownSpeed, out float rpm, out int gear)
     {
         toldSpeed = ownSpeed = rpm = 0f; gear = 0; return false;

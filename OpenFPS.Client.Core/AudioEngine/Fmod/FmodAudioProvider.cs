@@ -2370,6 +2370,21 @@ public partial class FmodAudioProvider : IAudioProvider
     // shared synth for <preset>/<train> is made on the first tap and kept while any tap is alive.
     private readonly Dictionary<string, TrainVoiceState> _trains = new();
 
+    /// <summary>The last signal each train was given, and when, for a synth made after it arrived.</summary>
+    private readonly Dictionary<string, (float[] Warning, float Bell, double At)> _trainSignals = new();
+
+    /// <summary>A train sounds its horn (or whistle) and bell: see TrainVoiceState.Signal.</summary>
+    public void SignalTrain(string train, float[] warning, float bellSeconds, double secondsAgo)
+    {
+        lock (_trains)
+        {
+            _trainSignals[train] = (warning, bellSeconds, OpenFPS.Common.AudioClock.Now - secondsAgo);
+            if (_trains.TryGetValue(train, out var t)) t.Signal(warning, bellSeconds, secondsAgo);
+        }
+        Log.Information("Train '{Train}' sounds: horn {Warning} s, bell {Bell:F1} s", train,
+                        string.Join(",", warning.Select(w => w.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))), bellSeconds);
+    }
+
     private PhysicalVoiceState? RailTap(string key, int rate)
     {
         if (!TrainVoiceState.ParseKey(key, out string preset, out string train, out int index)) return null;
@@ -2382,6 +2397,12 @@ public partial class FmodAudioProvider : IAudioProvider
                 _trains[shared] = t;
                 Log.Information("Train '{Train}' ({Profile}): one synth, {Sources} source(s) over {Length:F0} m",
                                 shared, t.Profile.Name, t.Layout.Count, t.Profile.LengthMetres);
+                // Sounding already: the horn came in before any of the train had a voice.
+                if (_trainSignals.TryGetValue(shared, out var sig))
+                {
+                    double ago = OpenFPS.Common.AudioClock.Now - sig.At;
+                    if (ago < OpenFPS.Common.TrainSignal.Duration(sig.Warning, sig.Bell)) t.Signal(sig.Warning, sig.Bell, ago);
+                }
             }
             if (index < 0 || index >= t.Layout.Count) return null;
             return new TrainTapState(t, index, rate);
