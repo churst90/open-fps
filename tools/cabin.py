@@ -8,7 +8,7 @@
                                           scene, the level at the ears (the two ears' mean power), A-weighted
                                           and per octave, and the difference
     cabin.py cut DIR OUT PREFIX           each scene of a game capture as its own 24-bit WAV, named
-                                          PREFIX_<scene>.wav
+                                          PREFIX_<scene>.wav, with 30 ms faded ends
     cabin.py hrtf DIR                     the HRTF in each path's direction (AudioLab --cabin hrtf): the two
                                           ears' mean power per octave, against the one interior voice's direction
     cabin.py check FILE...                every file: RMS, peak, samples at or over full scale, gaps
@@ -118,6 +118,12 @@ def cut(d, out, prefix):
         if n.startswith("silence"):
             continue
         name = f"{prefix}_{n.replace(' ', '_')}.wav"
+        # 30 ms raised-cosine ends: a scene cut out of a running capture starts and stops mid-waveform.
+        x = x.copy()
+        k = int(0.03 * sr)
+        ramp = 0.5 - 0.5 * np.cos(np.linspace(0, np.pi, k))[:, None]
+        x[:k] *= ramp
+        x[-k:] *= ramp[::-1]
         sf.write(os.path.join(out, name), x, sr, subtype="PCM_24")
         print(os.path.join(out, name))
 

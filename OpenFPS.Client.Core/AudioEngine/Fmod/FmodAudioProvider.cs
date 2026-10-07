@@ -4616,17 +4616,25 @@ public partial class FmodAudioProvider : IAudioProvider
     private readonly Dictionary<(int, int, int), float[]?> _hrtfBands = new();
     private float[]? _hrtfOnePlace;
 
-    private float[]? HrtfBandsAt(Vector3 dir)
+    /// <summary>The ears' mean power per band from <paramref name="dir"/>, measured once a direction. A
+    /// measurement is a millisecond or two of the game thread, so at most one is made every
+    /// <see cref="HrtfMeasureSeconds"/>: getting into a car asks for nine at once. False when this one
+    /// has to wait its turn.</summary>
+    private bool HrtfBandsAt(Vector3 dir, out float[]? db)
     {
         var key = ((int)MathF.Round(dir.X * 50f), (int)MathF.Round(dir.Y * 50f), (int)MathF.Round(dir.Z * 50f));
-        if (!_hrtfBands.TryGetValue(key, out var db))
-        {
-            db = HrtfBands.Measure(_saContext, _saHrtf, MixerQuality.MixerRate, _saFrameSize, dir);
-            if (_hrtfBands.Count > 512) _hrtfBands.Clear();
-            _hrtfBands[key] = db;
-        }
-        return db;
+        if (_hrtfBands.TryGetValue(key, out db)) return true;
+        double now = OpenFPS.Common.AudioClock.Now;
+        if (now - _hrtfMeasuredAt < HrtfMeasureSeconds) return false;
+        _hrtfMeasuredAt = now;
+        db = HrtfBands.Measure(_saContext, _saHrtf, MixerQuality.MixerRate, _saFrameSize, dir);
+        if (_hrtfBands.Count > 512) _hrtfBands.Clear();
+        _hrtfBands[key] = db;
+        return true;
     }
+
+    private double _hrtfMeasuredAt = double.NegativeInfinity;
+    private const double HrtfMeasureSeconds = 0.01;
 
     /// <summary>
     /// Works out, when the direction it is played from has moved by more than a couple of degrees, the
@@ -4637,10 +4645,10 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         if (!_steamAudioEnabled || _saHrtf == IntPtr.Zero) return;
         if (active.CabinTrimDir != Vector3.Zero && Vector3.Dot(dir, active.CabinTrimDir) > 0.9994f) return;   // 2 degrees
-        active.CabinTrimDir = dir;
         var one = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.OnePlace;
-        _hrtfOnePlace ??= HrtfBandsAt(Vector3.Normalize(new Vector3(one.X, one.Y, -one.Z)));
-        var here = HrtfBandsAt(dir);
+        if (_hrtfOnePlace == null && !HrtfBandsAt(Vector3.Normalize(new Vector3(one.X, one.Y, -one.Z)), out _hrtfOnePlace)) return;
+        if (!HrtfBandsAt(dir, out var here)) return;   // its turn comes next update
+        active.CabinTrimDir = dir;
         if (_hrtfOnePlace == null || here == null) return;
         Span<float> trim = stackalloc float[here.Length];
         for (int k = 0; k < trim.Length; k++) trim[k] = Math.Clamp(_hrtfOnePlace[k] - here[k], -12f, 12f);

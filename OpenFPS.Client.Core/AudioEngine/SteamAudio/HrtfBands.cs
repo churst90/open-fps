@@ -18,7 +18,8 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// </summary>
 internal static class HrtfBands
 {
-    private const int Blocks = 4, PointsPerBand = 16;
+    /// <summary>Blocks of the response read: Steam Audio's HRTF is a few hundred taps, well inside two.</summary>
+    private const int Blocks = 2, PointsPerBand = 16;
 
     /// <summary>The ears' mean power per band, dB, through <paramref name="hrtf"/> from
     /// <paramref name="direction"/> (Steam Audio's frame: x right, y up, z back). Null if Steam Audio

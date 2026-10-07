@@ -4,6 +4,40 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- Inside a vehicle, its sound comes from where it gets in (unheard). Cody: "the inside of the cab of
+  the cars sounds mono". It was one voice from one point ahead of you and below; the ears matched 0.97
+  to 1.00 from 125 Hz to 1 kHz at a cruise. The interior model is now split into its paths, each played
+  from where it comes in (CabinPaths): the engine through the firewall and dash, the exhaust under the
+  floor, each wheel through its own arch (its own tyre noise, squeal and spray), the tread tone once
+  from under the floor, the wind at each windscreen pillar (a noise each side), and a bus's door. Each
+  path is its own noise; together they are as loud as the one signal (the model alone: within 0.5 dB in
+  every octave at idle, 50 and 100 km/h, dry and wet, car and bus).
+  - Each path is a tap on the vehicle's engine voice, riding with your head and turned to its place.
+    The taps play the samples the engine's own voice plays at the same moment, put on one time line
+    from each channel's clock: on its own clock a tap sat 239 to 1024 samples off, and at idle the
+    intake and exhaust stopped cancelling (+6.5 dB). Neither the vehicle you sit in nor its taps get
+    Doppler now: they ride with you.
+  - Each path's HRTF colouring is taken back to the one voice's direction, a third of an octave at a
+    time, on its binaural stage after the room's send, so the level at your ears is the model's and
+    only the direction changes. Through the game (ear model on, a street between facades, the cabin's
+    own reverb): every scene within 0.4 dB(A), almost every octave within 0.5 dB, the rest within
+    0.8 dB (two renders of the same game differ by up to 0.2 dB, 0.9 at 63 Hz).
+  - The two ears now differ like a real cabin above 1 kHz while driving: at 50 km/h 0.59 / 0.34 / 0.15
+    at 1 / 2 / 4 kHz, from 0.97 / 0.85 / 0.67 (four in-car binaural recordings: 0.13 / 0.10 / 0.04). From
+    250 Hz to 1 kHz, and at idle, it is still more alike than a real cabin.
+  - The cabin's traced reverb is fed as it was by the one voice; the taps take no slots in the late
+    field, where they had pushed out the rain on the roof (+2 dB in heavy rain).
+  - The rain on the roof of the vehicle you sit in stays over your head. It was left a metre or two
+    behind between surveys at speed, and pitched down about 8 % at 100 km/h. Heavy rain is 0.7 dB
+    brighter at 4-8 kHz from it.
+  - OPENFPS_CABIN_PATHS=0 plays the interior from one point, as before. AudioLab `--cabin game|model|hrtf`
+    (`paths=off`, `place=one`, `probe=align`, `roof=world`, `set=rain`) and tools/cabin.py measure it.
+    Pairs and figures: inbox/cabin-2026-10-06 with a README.
+  - Open: the cabin's own reverb, at the level its trace gives, would add up to 20 dB at the bottom (the
+    boom the interior model already has), so it is unchanged for now; it is most of what spreads a real
+    cabin out from 250 Hz to 1 kHz. The tread tone is one tone in phase on every tyre; real tyres drift
+    and beat.
+
 - Waves at the water's edge (unheard). A physical model of waves meeting an edge: a lake's sandy beach,
   a rocky lake edge, a pond's grassed bank and a reedy one, a big river's bank, sea surf on sand, a
   shingle beach, a harbour wall, and wavelets against a moored wooden or aluminium boat (lab only: there
