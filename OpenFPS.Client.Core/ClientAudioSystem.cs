@@ -465,8 +465,9 @@ public class ClientAudioSystem
         var listenerRotation = _state.Rotation;
         if (_state.IsRiding && world.Entities.TryGetValue(_state.RidingEntityId, out var carrying))
         {
-            // ...and you move at its speed. A passenger is not predicted, so their own velocity reads
-            // zero, which against the vehicle's moving voice is a Doppler shift on your own bus.
+            // ...and you move at its speed, as the interpolated world has it. Your own velocity is the
+            // vehicle's too (OccupancySystem), but as of the last server state, not the frame its voice
+            // is placed in; any difference is a Doppler shift on your own bus.
             listenerVelocity = carrying.Velocity;
         }
 
