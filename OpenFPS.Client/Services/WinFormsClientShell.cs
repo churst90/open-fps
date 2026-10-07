@@ -33,7 +33,7 @@ public sealed class WinFormsClientShell : IClientShell
 
     public bool? NumLockOn => _gameWindow?.NumLockOn;
 
-    public void ShowLoading(string status, bool speak = true) => _navigation.ShowLoading(status);
+    public void ShowLoading(string status, bool speak = true) => _navigation.ShowLoading(status, speak);
 
     public void UpdateLoadingStatus(string text, int percent) => _navigation.UpdateLoadingStatus(text, percent);
 
