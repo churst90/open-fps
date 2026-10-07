@@ -10,14 +10,12 @@ namespace OpenFPS.Client.Core;
 /// The client's static geometry as a triangle world (docs/GEOMETRY.md stage 1), kept up with the
 /// definitions it holds.
 ///
-/// <para>Built off the game thread: a tile arriving is a few thousand boxes, and building their tile's
-/// tree on the thread that runs the frame would cost the frame. While a build runs, the last one serves,
-/// and the owners whose solid changed since that one was started are handed to each snapshot as stale
-/// (not counted from the triangles) and, if they still exist, as unindexed (tested the old way), so a
-/// query is never wrong while the triangles catch up; it is only slower for those few things.</para>
+/// <para>Built off the game thread: a tile is a few thousand boxes and would cost the frame. While a
+/// build runs the last one serves, and owners changed since it started are handed to each snapshot as
+/// stale and, if they still exist, as unindexed (tested the old way): a query is never wrong while the
+/// triangles catch up, only slower for those few things.</para>
 ///
-/// <para>Door leaves are movers: their poses follow the snapshot's transforms every time a snapshot is
-/// made, with no build at all.</para>
+/// <para>Door leaves are movers: their poses follow the snapshot's transforms with no build.</para>
 /// </summary>
 public sealed class ClientGeometry
 {
@@ -44,7 +42,7 @@ public sealed class ClientGeometry
     /// <summary>Called when a build has been published, so the next snapshot picks it up.</summary>
     public Action? Published { get; set; }
 
-    /// <summary>Builds finished, and how long the last took, milliseconds; pieces built by it. Diagnostic.</summary>
+    /// <summary>Builds published since the map loaded. Diagnostic.</summary>
     public int Builds { get; private set; }
 
     public ClientGeometry(float tileMetres) => _builder = new TriangleWorldBuilder(tileMetres) { Parallel = false };

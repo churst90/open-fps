@@ -5,32 +5,25 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Responsibility: The master geometry engine for the client.
-/// Provides high-performance raycasting, region detection, and portal pathfinding.
-/// Used by Physics (prediction), Input (interaction), and Audio (occlusion/diffraction).
+/// The client's geometry queries: rays, occlusion and region lookup, for prediction, sight and the
+/// acoustics.
 /// </summary>
 public class SpatialService
 {
     public int OwnEntityId { get; set; } = -1;
 
-    // Every geometry query starts by asking which entities could possibly matter, so this ran several times
-    // per ray, per source, per frame — on the game thread and the acoustic worker thread at once. Hence
-    // per-thread scratch: no allocation, no lock, no shared state between the two callers.
+    // Queried several times per ray, per source, per frame, from the game thread and the acoustic worker
+    // at once: hence per-thread scratch, with no allocation, lock or shared state.
     [ThreadStatic] private static List<EntitySnapshot>? _candidates;
     [ThreadStatic] private static List<int>? _candidateIds;
     [ThreadStatic] private static HashSet<int>? _candidateSeen;
 
     /// <summary>
-    /// The entities a query at <paramref name="center"/> could possibly hit.
+    /// The entities a query at <paramref name="center"/> could possibly hit, each once (a wall spanning
+    /// cells is filed in each of them).
     ///
-    /// Two costs came out of here. The old form asked the grid iterator whether it had anything
-    /// (<c>ids.Any()</c>) and then walked it AGAIN to project it — two full walks of every cell in radius,
-    /// per ray. And a wall wide enough to span cells is filed in each of them, so it came back four or nine
-    /// times and was ray-tested four or nine times. This walks once and returns each entity once.
-    ///
-    /// The returned list is per-thread scratch, valid until this thread calls back in. Callers must finish
-    /// with it before starting another query — which every caller does; none nests a second query inside a
-    /// walk of the first.
+    /// The returned list is per-thread scratch, valid until this thread calls back in: no caller may nest
+    /// a second query inside a walk of the first.
     /// </summary>
     private List<EntitySnapshot> GetEntitiesToTest(WorldSnapshot world, Vector3 center, float radius, bool staticOnly = false)
     {
@@ -51,29 +44,23 @@ public class SpatialService
                 for (int i = 0; i < world.DynamicEntities.Count; i++)
                     if (seen.Add(world.DynamicEntities[i].Id)) candidates.Add(world.DynamicEntities[i]);
 
-            // AN EMPTY ANSWER FROM THE GRID IS AN ANSWER, and it used to be taken as a failure.
-            //
-            // If the grid exists and finds nothing within the radius, then there IS nothing within
-            // the radius — standing in the middle of a road is exactly that. Falling through to
-            // "every entity in the world" there is wrong twice over: it is the wrong answer, and it
-            // is the wrong answer at the cost of the whole map. On a block of five hundred boxes
-            // nobody noticed; on a city of six thousand it is a freeze, and it happens precisely
-            // where a listener spends their time, which is outdoors with nothing close by.
+            // An empty answer from the grid is an answer (the middle of a road). Falling through to every
+            // entity in the world froze a city of six thousand boxes, outdoors, where a listener spends
+            // their time.
             return candidates;
         }
 
-        // No grid at all yet — the only case where the whole world is the honest answer. It lasts
-        // until the first RebuildGrid, which is seconds after a map arrives.
+        // No grid yet (until the first RebuildGrid, seconds after a map arrives): only then is the whole
+        // world the honest answer.
         foreach (var snap in world.Entities.Values) candidates.Add(snap);
         return candidates;
     }
 
     // ═══ The triangle world (docs/GEOMETRY.md stage 1) ═══════════════════════════════════════════
     //
-    // When the snapshot carries a triangle world, the static solids are asked of it and only what it does
-    // not hold — everything that moves, and the few statics it has not taken in (Unindexed) — goes through
-    // the per-entity tests below, which are the box path unchanged. The two answer the same question; the
-    // parity harness (AudioLab --geometry-parity) lists where they differ.
+    // With a triangle world the static solids are asked of it; only what it does not hold (what moves,
+    // and the Unindexed statics) goes through the per-entity box tests. AudioLab --geometry-parity lists
+    // where the two paths differ.
 
     [ThreadStatic] private static List<EntitySnapshot>? _others;
     [ThreadStatic] private static List<OpenFPS.Common.Geometry.GeometryCrossing>? _crossings;
@@ -179,10 +166,8 @@ public class SpatialService
         return inside.Contains(solid);
     }
 
-    /// <summary>
-    /// Calculates the occlusion factor (0.0 to 1.0) between two points.
-    /// Also outputs the 'bleed' factor (how much sound passes through materials).
-    /// </summary>
+    /// <summary>How blocked the line between two points is, 0 to 1, and the bleed (the mean of what the
+    /// bands let through).</summary>
     public float GetOcclusionFactor(WorldSnapshot world, Vector3 start, Vector3 end, out float bleed, int ignoreEntityId = -1, int ignoreEntityId2 = -1)
     {
         GetOcclusionData(world, start, end, out float block, out bleed, out _, out _, out _, ignoreEntityId, ignoreEntityId2);
@@ -190,9 +175,9 @@ public class SpatialService
     }
 
     /// <summary>
-    /// Performs a high-fidelity 5-ray cross-pattern sampling between two points.
-    /// Used to calculate partial occlusion when sound diffraction is relevant.
-    /// Both ignoreEntityId and ignoreEntityId2 are excluded from all rays to ensure symmetric sampling.
+    /// <see cref="GetOcclusionData"/> averaged over five rays in a cross round the end point, for partial
+    /// occlusion. Every output is the mean of the five, maxBlock included. Both ignored ids are left out
+    /// of every ray.
     /// </summary>
     public void GetMultiPointOcclusionData(WorldSnapshot world, Vector3 start, Vector3 end, out float maxBlock, out float cumulativeBleed, out float eqLow, out float eqMid, out float eqHigh, int ignoreEntityId = -1, int ignoreEntityId2 = -1)
     {
@@ -202,16 +187,13 @@ public class SpatialService
             GetOcclusionData(world, start, end, out maxBlock, out cumulativeBleed, out eqLow, out eqMid, out eqHigh, ignoreEntityId, ignoreEntityId2);
             return;
         }
-        // The cross pattern is square to the ray. Straight up or down, the ray is parallel to the world's
-        // up and the cross product with it is zero: normalised, that is NaN, four of the five rays went
-        // nowhere and hit nothing, and a floor slab passed a sound from the room above at -2 dB. Any
-        // horizontal axis will do then.
+        // Straight up or down the cross product with world up is zero, and normalised NaN: four rays went
+        // nowhere and a floor slab passed a sound from the room above at -2 dB. Any horizontal axis will do.
         Vector3 side = Vector3.Cross(dir, Vector3.UnitY);
         if (side.LengthSquared() < 1e-8f * MathF.Max(1e-8f, dir.LengthSquared())) side = Vector3.Cross(dir, Vector3.UnitX);
         Vector3 right = Vector3.Normalize(side);
         Vector3 up = Vector3.Normalize(Vector3.Cross(right, dir));
-        // C6: Adaptive spread — scale offset by distance so nearby sounds use a narrow spread
-        // and distant sounds use a wider one, matching the physical projection of the emitter.
+        // The spread grows with distance (10 degrees, 0.15 to 0.8 m), as the emitter's projection does.
         float sampleOffset = Math.Clamp(Vector3.Distance(start, end) * MathF.Tan(10f * MathF.PI / 180f), 0.15f, 0.8f);
 
         Vector3[] sourcePoints = {
@@ -242,8 +224,8 @@ public class SpatialService
     }
 
     /// <summary>
-    /// Performs an exhaustive raycast between two points to calculate cumulative transmission and frequency-specific EQ.
-    /// Supports multiple wall layers.
+    /// What every wall between two points lets through, per band (walls in a row multiply), and the
+    /// broadband block and bleed read off the bands.
     /// </summary>
     public void GetOcclusionData(WorldSnapshot world, Vector3 start, Vector3 end, out float maxBlock, out float cumulativeBleed, out float eqLow, out float eqMid, out float eqHigh, int ignoreEntityId = -1, int ignoreEntityId2 = -1)
     {
@@ -262,7 +244,7 @@ public class SpatialService
         Vector3 nudgedEnd = end - (rayDir * 0.05f);
 
         Vector3 center = (start + end) / 2.0f;
-        // Search a wider radius to ensure we catch large static objects like foundations
+        // 10 m wider than the segment, to catch large static objects such as foundations.
         List<EntitySnapshot> entitiesToTest;
         if (UsesTriangles(world))
         {
@@ -328,19 +310,13 @@ public class SpatialService
                     }
                 }
 
-                // A wall is charged wherever the ray meets it, however near a doorway. What comes in by the
-                // doorway is a ROUTE, with its own length, bend and what stands in it (OpeningRoutes); a
-                // wall skipped for being within an aperture's width of one passed every ray that grazed a
-                // facade near a door at full level, and five such rays averaged to a flat 20, 40, 60 or
-                // 80 % in every band.
+                // A wall is charged wherever the ray meets it, however near a doorway: what comes in by the
+                // doorway is a route (OpeningRoutes). Skipping walls near apertures passed every ray that
+                // grazed a facade by a door at full level, and five rays averaged to flat 20/40/60/80 %.
                 if (intersected)
                 {
-                    // ── What this wall lets through: the Steam Audio scene's panel model ──────────
-                    //
-                    // WallTransmission, from the material, the box and how it is built, so the
-                    // fallback and the simulator answer one question with one model. Walls in a row
-                    // multiply: two walls take twice what one does, in every band. The prefab's own
-                    // Transmission figures are not read; the scene never read them either.
+                    // The Steam Audio scene's panel model (WallTransmission), so the fallback and the
+                    // simulator answer with one model. The prefab's own Transmission figures are not read.
                     var (gl, gm, gh) = WallTransmission.BandGains(def.Material.Material, panel,
                                                                   new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres));
                     for (int k = 0; k < layers; k++) { eqLow *= gl; eqMid *= gm; eqHigh *= gh; }
@@ -348,20 +324,17 @@ public class SpatialService
             }
         }
 
-        // What is left, per band, is the whole answer: there is no floor that lets sound through
-        // whatever the walls are. The broadband figures are read off the bands: blocked is what the
-        // loudest band lost, bleed is the bands' mean.
+        // No floor lets sound through whatever the walls are. Blocked is what the loudest band lost;
+        // bleed is the bands' mean.
         cumulativeBleed = (eqLow + eqMid + eqHigh) / 3f;
         maxBlock = Math.Clamp(1f - MathF.Max(eqLow, MathF.Max(eqMid, eqHigh)), 0f, 1f);
     }
 
     /// <summary>
-    /// The same fan of rays, into buffers the caller owns. The allocating overload above runs on every
-    /// audio frame in one caller and every acoustic tick in another; three arrays per call, sixty times
-    /// a second, is exactly the kind of steady garbage the profiling pass exists to remove.
+    /// The first solid along each of <paramref name="directions"/>, into buffers the caller owns (it runs
+    /// every audio frame): distance, absorption and material, or maxDist, 1 and "Generic" for a miss.
+    /// <paramref name="staticOnly"/> leaves out what moves: a ray from inside a car would find the car.
     /// </summary>
-    /// <param name="staticOnly">Leave out everything that moves. The ground under a car is not the
-    /// car, and a ray that starts inside the car's own box would find it.</param>
     public void RaycastAll(WorldSnapshot world, Vector3 start, Vector3[] directions, float maxDist,
                            float[] distances, float[] absorptions, string[] materials, bool staticOnly = false)
     {
@@ -430,25 +403,19 @@ public class SpatialService
         }
     }
 
-    /// <summary>
-    /// Identifies which acoustic region a position resides in.
-    /// Prefers high-precision OBB volumes, falls back to voxel grid.
-    /// </summary>
+    /// <summary>The acoustic region a position is in: by the regions' boxes, else the voxel grid.</summary>
     public int GetRegionAt(WorldSnapshot world, Vector3 position)
     {
         if (world.AcousticMap == null) return AcousticConstants.GlobalRegionId;
 
-        // 1. High Precision: Check explicit region volumes. Where they overlap, the SMALLEST one that
-        // holds the point wins: a named spot inside a bigger zone, a room inside a hall, a shop inside
-        // a block. It used to be whichever came first in the map's list, so which name you heard and
-        // which room you were acoustically in depended on authoring order (Cody, 2026-09-28).
+        // Where boxes overlap the smallest holding the point wins (a room inside a hall), not the first
+        // in the map's list, which made the room depend on authoring order (Cody, 2026-09-28).
         int best = int.MinValue;
         float bestVolume = float.MaxValue;
         foreach (var regId in world.AcousticMap.Regions.Keys)
         {
             if (regId == AcousticConstants.GlobalRegionId) continue; 
             
-            // Try to get the region's size and transform
             Vector3 size = Vector3.Zero;
             Vector3 pos = Vector3.Zero;
             Quaternion rot = Quaternion.Identity;
@@ -457,7 +424,6 @@ public class SpatialService
             {
                 pos = snap.Transform.Position;
                 rot = snap.Transform.Rotation;
-                // Prefer explicit collider if it exists, otherwise use Region RoomSize
                 size = (snap.Definition.Collider.Size.X > 0) 
                     ? snap.Definition.Collider.Size 
                     : snap.Definition.Region.RoomSize;
@@ -465,8 +431,8 @@ public class SpatialService
             else if (world.AcousticMap.RegionPositions.TryGetValue(regId, out var regPos)
                      && world.AcousticMap.Regions.TryGetValue(regId, out var reg))
             {
-                // Both asked: a streamed map's tables are swapped one after another as tiles come and
-                // go, and for a moment one can have a room the other has not.
+                // Both asked: a streamed map swaps its tables one after another, and for a moment one can
+                // have a room the other has not.
                 pos = regPos;
                 rot = world.AcousticMap.RegionRotations.GetValueOrDefault(regId, Quaternion.Identity);
                 size = reg.RoomSize;
@@ -480,12 +446,9 @@ public class SpatialService
         }
         if (best != int.MinValue) return best;
 
-        // 2. Low Precision Fallback: Voxel grid — for a region with no box of its own to ask. A region
-        // that HAS a box and did not contain the point is not where the point is, whatever the grid
-        // says: the grid is rasterised half a metre at a time, so a voxel straddling a wall carries
-        // the room into the first half-metre outside it. Standing against the outside of a house
-        // made you acoustically INSIDE it — the walkers on the pavement beside you in the room with
-        // you, everything else muffled through walls (Cody, 64 Alder Street, 2026-09-28).
+        // The voxel grid, only for a region with no box: a region whose box did not hold the point is not
+        // where it is, whatever the grid says. Its half-metre voxels carry a room past its walls, and
+        // standing against a house put you acoustically inside it (Cody, 64 Alder Street, 2026-09-28).
         int coarse = world.AcousticMap.VoxelGrid.GetRegionAt(position);
         if (coarse != AcousticConstants.GlobalRegionId && HasBox(world, coarse))
             return AcousticConstants.GlobalRegionId;
@@ -620,14 +583,12 @@ public class SpatialService
     }
 
     /// <summary>
-    /// The first solid thing along a line of sight, out to <paramref name="maxDist"/>: what a scope
-    /// sees, or what stops it seeing something further away.
+    /// The first solid thing along a line of sight, out to <paramref name="maxDist"/>: what a scope sees,
+    /// or what stops it seeing further.
     ///
-    /// Long, so walked in stretches: <see cref="RaycastSingle"/> asks the grid for everything within
-    /// half the ray's length of its middle, which for a 600 m look over a city is the city. The static
-    /// geometry is asked for a stretch at a time and stops at the first stretch with a hit; the things
-    /// that move are tested once. People are not solid to sight here (the scope finds them itself), and
-    /// glass is seen through unless <paramref name="glassBlocks"/>.
+    /// Without triangles the static grid is walked in 40 m stretches, stopping at the first with a hit:
+    /// asking for half a 600 m ray round its middle is the whole city. Players are not solid to sight
+    /// here (the scope finds them itself), and glass is seen through unless <paramref name="glassBlocks"/>.
     /// </summary>
     public bool CastSight(WorldSnapshot world, Vector3 start, Vector3 dir, float maxDist, out EntitySnapshot hitEntity,
                           out float hitDistance, Func<EntitySnapshot, bool>? skip = null, bool glassBlocks = false)

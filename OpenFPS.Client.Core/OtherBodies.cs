@@ -5,40 +5,25 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Everybody else's feet.
+/// Everybody else's feet (and lungs), derived from their interpolated transforms.
 ///
-/// Until this existed the only body in the world that made any noise walking was your own. Another
-/// player could run past you, round you, into you, and the map stayed silent — in a game whose whole
-/// proposition is knowing where things are by ear, the things that matter most were the quietest in
-/// it. Nothing was missing to fix it: the positions, the velocities and the floor were all already on
-/// the client, being used every frame for other purposes.
+/// <para>Derived rather than sent: a footstep would be a reliable packet per body per half metre, and
+/// would arrive describing a position the listener has already heard the body leave. From the
+/// interpolated transform the step is exactly where this client has the body.</para>
 ///
-/// It is derived here rather than sent, for two reasons. A footstep would be a reliable packet per
-/// body per half metre, which is a lot of traffic for something the receiver can work out; and the
-/// step would arrive describing a position the listener has already heard the body leave. Deriving it
-/// from the interpolated transform puts the sound exactly where the body is as this client
-/// understands it, which is the only place it can be without contradicting everything else the
-/// listener is being told.
-///
-/// The rules for what counts as a stride are <see cref="StrideAccumulator"/>'s, shared with the local
-/// player, so there is one answer to "was that a step" and not two that can drift apart.
+/// <para>What counts as a stride is <see cref="StrideAccumulator"/>'s, shared with the local player.</para>
 /// </summary>
 public sealed class OtherBodies
 {
     /// <summary>
-    /// How fast a body may be moving vertically and still be standing on something, m/s.
-    ///
-    /// The server's movement step clamps a grounded body's vertical velocity to zero and lets gravity
-    /// have it otherwise, so "is it on the ground" is a fact this client is already being told — one
-    /// tick of free fall is a third of a metre a second, comfortably clear of this. Reading it off the
-    /// velocity rather than probing the floor every frame for every body matters: the probe walks the
-    /// static grid and tests five points, and at render rate across a field of bodies that is real
-    /// money for an answer that changes twice a second.
+    /// How fast a body may be moving vertically and still be standing on something, m/s. The server
+    /// zeroes a grounded body's vertical velocity, and one tick of free fall is about 0.3 m/s, so the
+    /// velocity answers it; probing the floor per body per frame (five points through the grid) costs
+    /// real time for an answer that changes twice a second.
     /// </summary>
     public const float GroundedVerticalSpeed = 0.15f;
 
-    /// <summary>How far above a body's feet its head is, metres. A breath comes from up there and a
-    /// footstep does not, and over a few metres that difference is audible in the elevation.</summary>
+    /// <summary>Head above feet, metres: where a breath comes from, audible in the elevation.</summary>
     public const float HeadHeight = 1.6f;
 
     /// <summary>One body's physical state: where its feet are in its gait, and how hard it is working.</summary>
@@ -52,16 +37,17 @@ public sealed class OtherBodies
     private readonly Dictionary<int, Body> _bodies = new();
     private readonly List<int> _departed = new();
 
-    /// <summary>A body put a foot down: where, on what, the variant, up or down, and whose body it was —
-    /// the step is heard from inside that body's own collider, which must not stand between it and you
-    /// (ClientAudioSystem.OnPlayerFootstep).</summary>
+    /// <summary>A body put a foot down: where, on what, the variant, up or down, and whose body (the step
+    /// is heard from inside that body's own collider, which must not occlude it; see
+    /// ClientAudioSystem.OnPlayerFootstep).</summary>
     public event Action<Vector3, string, string, StepSlope, int>? OnStepTriggered;
     public event Action<Vector3, string, string>? OnLandTriggered;
 
-    /// <summary>A body took a breath: who, from where, and what kind.</summary>
+    /// <summary>A body took a breath: who, from where, and what kind. Nothing subscribes: the voice was
+    /// rejected by ear (see ClientGameSession).</summary>
     public event Action<int, Vector3, Breath>? OnBreath;
 
-    /// <summary>How many bodies are currently being listened to. Diagnostic only.</summary>
+    /// <summary>Bodies being listened to. Diagnostic.</summary>
     public int Count => _bodies.Count;
 
     public void Clear() => _bodies.Clear();
@@ -74,51 +60,27 @@ public sealed class OtherBodies
         {
             if (body.Id == localPlayerId) continue;
 
-            // Anything that walks. A player and an NPC are the same animal to a listener, and neither
-            // is a crate, a door or a car — those make their own noises, by their own mechanisms.
+            // Anything that walks: players and NPCs.
             var type = body.Definition.Type;
             if (type != EntityType.Player && type != EntityType.NPC) continue;
 
-            // ── A thing with an engine does not have legs ────────────────────────────────────────
-            //
-            // The line above was meant to keep cars out and did not, because a car IS an NPC: the
-            // server drives it with the same AI type as anything else that moves under its own
-            // direction. So every vehicle on the map got a stride accumulator, and a stride is half a
-            // metre — reported from the rooms map as "the car driving by sounds like footsteps are
-            // being drug behind it", which at 30 km/h is sixteen footfalls a second trailing the car.
-            // Nothing protected against it: a car's own velocity is genuinely its own, which is the
-            // test that keeps server corrections quiet, and at render rate it moves a few centimetres
-            // an update, which is well inside what a stride explains.
-            //
-            // What actually distinguishes them is not the AI type but the machinery: an entity whose
-            // emitter is an engine is a machine, and a machine is heard through its engine, its tyres
-            // and its body — all of which it already has. This is the same test ClientAudioSystem uses
-            // to decide something is a vehicle, so the two cannot disagree about what a car is.
-            // The prefix is "engine:", which is the form the SERVER writes (VehicleSystem) and the form
-            // ClientAudioSystem tests before it resolves anything. Checked against the raw id for that
-            // reason: a first attempt at this filter matched the RESOLVED spelling, "ENGINE/", which
-            // nothing on a snapshot ever holds, so it matched nothing and the cars kept walking.
+            // A thing with an engine has no legs. A car IS an NPC to the server, and without this every
+            // car trailed footsteps ("footsteps being drug behind it", sixteen a second at 30 km/h). The
+            // same test as ClientAudioSystem's for a vehicle, on the raw "engine:" id the server writes:
+            // the resolved spelling "ENGINE/" is never on a snapshot, and matching it let cars walk.
             if (body.Definition.SoundEmitter.SoundId is { } sid &&
                 sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) continue;
-            // The same for everything else the server drives with a physical model — an aircraft, a
-            // train's bogies, a riding mower. The one exception is the push mower: it moves because
-            // somebody is walking behind it, and those are that person's footsteps.
+            // Nor anything else with a physical model (aircraft, bogies, riding mowers), except the push
+            // mower: somebody is walking behind it.
             if (body.Definition.SoundEmitter.SoundId is { } pid && body.Definition.SoundEmitter.IsSynth
                 && (pid.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase)
                     || pid.StartsWith("rail:", StringComparison.OrdinalIgnoreCase)
                     || (pid.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)
                         && !pid.Equals("machine:mower_push", StringComparison.OrdinalIgnoreCase)))) continue;
 
-            // ── Nor does somebody sitting in one ───────────────────────────────────────────────
-            //
-            // A passenger was meant to be silent for free: "the server zeroes an occupant's velocity",
-            // so a rider would be a body carried at rest, which the stride rules already refuse. It
-            // does not. OccupancySystem gives an occupant the velocity of what they are in, which is
-            // the truth about where they are going, so a seated body is a body moving at the car's
-            // speed under its own power, as far as anything here can tell. Heard (Cody and Sean, 2026-10-05) as running footsteps from the driver's seat
-            // all the way down the road. The server says who is sitting in what, in the definition;
-            // a body in a seat has no stride, and the one it had is forgotten, so getting out is not
-            // the end of a walk that started where they got in.
+            // Nor somebody sitting in one: OccupancySystem gives an occupant the vehicle's velocity, heard
+            // (Cody and Sean, 2026-10-05) as running footsteps from the driver's seat. The stride is
+            // forgotten, so getting out does not finish a walk that started where they got in.
             if (body.Definition.RidingEntityId >= 0)
             {
                 _bodies.Remove(body.Id);
@@ -128,9 +90,7 @@ public sealed class OtherBodies
             if (!_bodies.TryGetValue(body.Id, out var state))
                 _bodies[body.Id] = state = new Body();
 
-            // Lungs run on elapsed time rather than on frames, and a body seen for the first time (or
-            // after an absence) gets no elapsed time at all — it has not been running, it has just
-            // arrived.
+            // Lungs run on elapsed time; a body just seen (or back after an absence) gets none.
             float dt = state.LastSeenAt < 0 ? 0f : (float)(now - state.LastSeenAt);
             state.LastSeenAt = now;
             if (dt > 0f && dt < 1f)
@@ -144,24 +104,21 @@ public sealed class OtherBodies
             var fall = state.Stride.Update(body.Transform.Position, body.Velocity, grounded, body.Transform.Rotation);
             if (!fall.Anything) continue;
 
-            // The floor is only asked about at the moment a foot actually meets it. A body is asked
-            // twice a second at a walk, not once a frame, which is what makes this affordable.
+            // The floor is asked only when a foot meets it: twice a second at a walk, not every frame.
             PhysicsUtils.GetGroundHeight(snapshot, body.Transform.Position, body.Id, out string material);
             if (string.IsNullOrEmpty(material) || material == "None") material = "Generic";
 
             if (fall.Landed) OnLandTriggered?.Invoke(body.Transform.Position, material, "0");
             if (fall.Stepped)
             {
-                // The foot on the floor under it (a tread on a flight), and what that floor is.
                 var at = PhysicsUtils.FootOnFloor(snapshot, fall.StepPosition, body.Transform.Position, body.Velocity, body.Id, out var footMaterial);
                 if (!string.IsNullOrEmpty(footMaterial) && footMaterial != "None") material = footMaterial;
                 OnStepTriggered?.Invoke(at, material, "0", fall.Slope, body.Id);
             }
         }
 
-        // Somebody who has gone — disconnected, died, or simply walked out of the area of interest —
-        // must not keep their half-finished stride. They may be back, and when they are they will be
-        // somewhere else entirely; the distance between here and there is not something they walked.
+        // Somebody who has gone loses their half-finished stride: back somewhere else, the distance
+        // between is not something they walked.
         if (_bodies.Count == 0) return;
         _departed.Clear();
         foreach (var id in _bodies.Keys)

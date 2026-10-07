@@ -10,36 +10,32 @@ namespace OpenFPS.Client.Core;
 /// front I should know about it ... if I'm moving sideways and I'm looking for the stairs to go to the
 /// next level I need to hear them."
 ///
-/// Three things are said, and only when they CHANGE:
+/// Three things are said, and only when they change:
 ///
-/// <b>After you look somewhere</b> — a turn with J or L, a look up or down with K or O — once your
-/// head has settled (<see cref="TurnNarration"/>): what is ahead and how far, or which way is open.
-/// Looking down at the floor says nothing: the floor is never named, and level is where "open" means
-/// something.
+/// <para>After you look somewhere (J or L, K or O), once your head has settled
+/// (<see cref="TurnNarration"/>): what is ahead and how far, or which way is open. Looking down at the
+/// floor says nothing.</para>
 ///
-/// <b>When what is ahead changes for any other reason</b> — you walked, strafed, a door was opened, a
-/// car pulled up in front — the new thing and its distance, once it has held for
-/// <see cref="SightChanges.StableSeconds"/>. The same thing coming nearer is said again only as it
-/// crosses 10, 5 and 2 metres (<see cref="SightChanges.Steps"/>), as the distance alone when nothing
-/// else has been said since. Something said in the last <see cref="SightChanges.RecentSeconds"/> is
-/// not said again on coming back into view unless it is nearer by a step than when it was said, so
-/// strafing along a corridor names each door once and not the wall between every two of them.
+/// <para>When what is ahead changes for any other reason (you walked, a door opened, a car pulled up):
+/// the new thing and its distance, once held for <see cref="SightChanges.StableSeconds"/>. The same
+/// thing coming nearer is said again only at 10, 5 and 2 metres (<see cref="SightChanges.Steps"/>), as
+/// the distance alone when nothing else was said since. Something said in the last
+/// <see cref="SightChanges.RecentSeconds"/> is not said again unless nearer by a step, so strafing a
+/// corridor names each door once and not the wall between.</para>
 ///
-/// <b>Something crossing in front</b> — a car, a pedestrian, another player, moving faster than a
-/// stroll, crossing your line of sight within twenty metres and not behind a wall:
-/// "Hatchback passing, left to right, 6 metres" (<see cref="PassingWatch"/>).
+/// <para>Something on the move crossing your line of sight within twenty metres and not behind a wall:
+/// "Hatchback passing, left to right, 6 metres" (<see cref="PassingWatch"/>).</para>
 ///
-/// What "ahead" is: the line straight ahead, level, at knee, chest and eye height, plus a cone of
-/// <see cref="SightCone.ConeDegrees"/> either side in which only DOORWAYS AND STAIRS are looked for —
-/// the places you are walking to find. They win over the thing on the centre line unless that is
-/// nearer than they are by more than <see cref="SightCone.LandmarkLeadMetres"/>; so a door in the
-/// wall ahead is said rather than the wall round it, and an open doorway is said rather than the far
-/// wall seen through it. Nothing else is looked for in the cone: in a corridor it would find the side
-/// walls and say them for ever.
+/// <para>"Ahead" is the level line at knee, chest and eye height, plus a cone of
+/// <see cref="SightCone.ConeDegrees"/> either side in which only doorways and stairs are looked for.
+/// They win over the centre line unless it is nearer by more than
+/// <see cref="SightCone.LandmarkLeadMetres"/>, so a door is said rather than its wall, an open doorway
+/// rather than the wall seen through it. Anything else in the cone would find a corridor's side walls
+/// and say them for ever.</para>
 ///
-/// Never a flood: lines from walking and passing are at least <see cref="MinGapSeconds"/> apart, the
-/// newest waiting line wins, and it cuts off the stale one — unless something else (a chat line, a
-/// stair cue) was said since, which is left to finish.
+/// <para>Never a flood: walking and passing lines are at least <see cref="MinGapSeconds"/> apart, the
+/// newest waiting line wins and cuts off the stale one, unless something else (chat, a stair cue) was
+/// said since, which is left to finish.</para>
 /// </summary>
 public sealed class SightWatch
 {
@@ -183,14 +179,11 @@ public sealed class SightChanges
     public const double RecentSeconds = 8.0;
 
     /// <summary>
-    /// The distances at which the same thing, coming nearer, is said again: 10, 5 and 2 metres.
-    ///
-    /// Ten is where a room's far wall or a door down a corridor stops being "over there"; five is two
-    /// or three strides, time to line up on it; two is one stride and an arm, about to arrive. At the
-    /// game's walk of 4.5 m/s that is a line every second or two on the way in, and nothing between —
-    /// the whole metre-by-metre count was the flood to avoid. A step is said once on the way in, and
-    /// again only after backing off a quarter past it (<see cref="RearmFactor"/>), so tapping back and
-    /// forth across five metres says it once.
+    /// The distances at which the same thing, coming nearer, is said again: ten (no longer "over
+    /// there"), five (time to line up on it), two (about to arrive). At the game's walk of 4.5 m/s, a
+    /// line every second or two; a metre-by-metre count was the flood to avoid. A step is said again
+    /// only after backing off a quarter past it (<see cref="RearmFactor"/>), so tapping back and forth
+    /// across five metres says it once.
     /// </summary>
     public static readonly float[] Steps = { 10f, 5f, 2f };
     public const float RearmFactor = 1.25f;
@@ -269,12 +262,11 @@ public sealed class SightChanges
 /// <summary>
 /// Things crossing in front of you: "Hatchback passing, left to right, 6 metres".
 ///
-/// A person or vehicle on the move (<see cref="Sightline.IsOnTheMove"/>), on your level, within
-/// <see cref="Sightline.NarrationRange"/> ahead, whose bearing goes from one side of straight ahead to
-/// the other between two looks while it is within <see cref="SideMetres"/> of the line — and which you
-/// could see, with no wall between. Said once: a thing of the same name is not said passing again for
-/// <see cref="SameNameSeconds"/>, which also makes a train one line rather than one per carriage.
-/// Your own turning is not something passing, so the bearings are forgotten whenever you turn.
+/// <para>Something on the move (<see cref="Sightline.IsOnTheMove"/>), on your level, within
+/// <see cref="Sightline.NarrationRange"/> ahead, whose bearing crosses straight ahead between two looks
+/// within <see cref="SideMetres"/> of the line, with no wall between. A name is not said passing again
+/// for <see cref="SameNameSeconds"/>, which also makes a train one line, not one per carriage. Your own
+/// turning is not something passing: the bearings are forgotten whenever you turn.</para>
 /// </summary>
 public sealed class PassingWatch
 {
@@ -282,9 +274,8 @@ public sealed class PassingWatch
     /// speed covers a metre and a half between two looks a tenth of a second apart.</summary>
     public const float SideMetres = 4f;
     public const double SameNameSeconds = 10.0;
-    /// <summary>...and a thing of the same KIND for this long: on a pavement facing the road, every
-    /// pedestrian walking by crosses in front, and one "Pedestrian passing" in four seconds is the
-    /// news; a different kind — the bus behind them — is still said.</summary>
+    /// <summary>...and a thing of the same kind for this long: facing the road, one "Pedestrian passing"
+    /// in four seconds is the news; a different kind (the bus behind them) is still said.</summary>
     public const double SameKindSeconds = 4.0;
 
     private readonly Dictionary<int, (float Lateral, long Look)> _bearings = new();
@@ -448,10 +439,9 @@ public sealed class SightIndex
 public static class SightCone
 {
     /// <summary>
-    /// How far either side of straight ahead a doorway or a stair is looked for: twelve degrees. A
-    /// doorway in the wall beside a corridor, a metre to the side, comes into it about four and a half
-    /// metres ahead — two or three strides' warning that it is coming up; a stair end two metres to
-    /// the side, at nine. Much wider and every door down both walls of a corridor is ahead at once.
+    /// How far either side of straight ahead a doorway or a stair is looked for. A doorway a metre to
+    /// the side enters it about 4.5 m ahead (two or three strides' warning), a stair end two metres to
+    /// the side at nine. Much wider and every door down both walls of a corridor is ahead at once.
     /// </summary>
     public const float ConeDegrees = 12f;
     /// <summary>A doorway or stair wins over the thing on the centre line unless that thing is nearer

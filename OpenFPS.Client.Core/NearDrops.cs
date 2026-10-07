@@ -7,36 +7,29 @@ namespace OpenFPS.Client.Core;
 /// <summary>
 /// The drops close enough to hear one by one, each where and when it lands.
 ///
-/// Further off, rain is a texture: thousands of drops a second whose sum is a hiss, and the patches
-/// (RainSynth) render it as that. Close to you it is not: the drop that hits the car roof beside you,
-/// the shelter's sheet over your head, the puddle at your feet, is an event with a place. So within
-/// <see cref="NearRings"/> of the survey (2.5 m), and on the listener's own head and shoulders under
-/// the open sky (RainSurfaces.HeadSquareMetres), the loudest drops are taken out of the patches and
-/// placed one at a time, each at a random point of the surface it lands on, with its own size, as a
-/// sound of its own (DropBank).
+/// <para>Further off, rain is a texture the patches (RainSynth) render. Within <see cref="NearRings"/>
+/// of the survey (2.5 m), and on the listener's own head and shoulders under open sky
+/// (RainSurfaces.HeadSquareMetres), the loudest drops are taken out of the patches and placed one at
+/// a time, at a random point of their surface, with their own size and sound (DropBank).</para>
 ///
-/// HOW MANY. A listener resolves separate impacts only up to a rate: above roughly ten to twenty a
-/// second they stop being events and become a texture (the flutter-fusion and event-density limit;
-/// the lab's --rain resolve measures where a detector stops counting them). So the drops placed one
-/// by one are the biggest, the loudest, up to <see cref="ResolvableImpactsPerSecond"/> on all the near
-/// surfaces together, and the rest stay in the patch. In drizzle that may be only the biggest of
-/// thousands; in hail, every stone.
+/// <para>Only up to <see cref="ResolvableImpactsPerSecond"/> on all near surfaces together: above
+/// roughly ten to twenty a second, impacts stop being events and fuse into texture. In drizzle that
+/// may be only the biggest of thousands; in hail, every stone.</para>
 /// </summary>
 public sealed class NearDrops
 {
     /// <summary>Rings of the survey inside which drops are placed one by one: 2.5 m.</summary>
     public const int NearRings = 2;
 
-    /// <summary>How many separate impacts a second are placed, on every near surface together. MEASURED
-    /// with --rain resolve: a Poisson train of drops on asphalt, a puddle, a head and 0.7 mm steel,
-    /// counted by an onset detector (a 1 ms peak 12 dB over the median of the 200 ms round it, no two
-    /// within the ear's 30 ms integration window). Its count follows the true rate within a fifth up
-    /// to 12 a second (16 on steel, whose ring keeps each one apart), and never passes about 27 a
-    /// second however many fall. More than this a second are not more events, only more texture.</summary>
+    /// <summary>Separate impacts a second placed, on every near surface together. Measured with --rain
+    /// resolve (Poisson drops on asphalt, a puddle, a head and 0.7 mm steel, counted by an onset
+    /// detector: a 1 ms peak 12 dB over the median of the 200 ms round it, none within 30 ms of
+    /// another): the count follows the true rate within a fifth up to 12 a second (16 on steel) and
+    /// never passes about 27 however many fall.</summary>
     public const float ResolvableImpactsPerSecond = 12f;
 
-    /// <summary>One impact: where, on what, what, how big, how fast, when (seconds), facing the ear how
-    /// squarely, and whether it is a hailstone coming down from its bounce.</summary>
+    /// <summary>One impact: where, on what, what, how big, how fast, when (seconds), whether it strikes
+    /// from below the ear, its patch slot, and whether it is a hailstone coming down from its bounce.</summary>
     public readonly record struct Impact(Vector3 Position, RainLayer Surface, PrecipitationKind Kind, float DiameterMm,
                                          float Speed, double At, bool FromBelow, int Slot, bool Bounce);
 
@@ -44,7 +37,7 @@ public sealed class NearDrops
     private readonly ParticleSpectrum _main = new(), _stones = new();
     private readonly List<Impact> _bounces = new();
 
-    /// <summary>From what size the near drops are placed one by one, mm, for the rain and for hail.</summary>
+    /// <summary>The smallest near drop placed one by one, mm, for the rain and for hail.</summary>
     public float RainFromMm { get; private set; } = float.MaxValue;
     public float HailFromMm { get; private set; } = float.MaxValue;
 
@@ -78,13 +71,12 @@ public sealed class NearDrops
     private float[] _rainFrom = Array.Empty<float>(), _hailFrom = Array.Empty<float>(), _gain = Array.Empty<float>();
 
     /// <summary>
-    /// Which drops each near cell places one by one: the LOUDEST at the ear, up to the budget. A drop's
-    /// peak at the ear is its surface's (a drop of a reference size rendered on it, DropBank), over its
-    /// distance, by how squarely the surface faces the ear, and grows with the drop as its click law
-    /// does ((D v)^1.5). One level for every cell is found such that the drops over it, on all the
-    /// cells together, come to <see cref="ResolvableImpactsPerSecond"/>; each cell's size threshold is
-    /// the size that reaches that level there. So the sheet over your head and the car roof at your
-    /// elbow give their drops first, and the road two metres down only its biggest.
+    /// Which drops each near cell places one by one: the loudest at the ear, up to the budget. A drop's
+    /// peak at the ear is a reference drop rendered on its surface (DropBank), over distance, by how
+    /// squarely the surface faces the ear, growing as (D v)^1.5. One level is found such that the drops
+    /// over it on all cells come to <see cref="ResolvableImpactsPerSecond"/>; each cell's threshold is
+    /// the size reaching that level there. So the sheet over your head gives its drops first, and the
+    /// road two metres down only its biggest.
     /// </summary>
     private void Allocate(RainSurvey.Result survey, Precipitation falling, Vector3 ear, DropBank bank)
     {
@@ -214,8 +206,7 @@ public sealed class NearDrops
                 double airborne = 2.0 * up / 9.81;
                 if (up > 0.5f && airborne < 3.0)
                 {
-                    // It lands a short way off, thrown sideways by whatever it struck: a few tens of
-                    // centimetres for every metre a second it rebounds with.
+                    // It lands a short way off: up to 5 cm for every metre a second it rebounds with.
                     float drift = 0.05f * up * (float)_rng.NextDouble();
                     float dir = (float)(_rng.NextDouble() * MathF.Tau);
                     var land = at + new Vector3(drift * MathF.Cos(dir), 0f, drift * MathF.Sin(dir));
@@ -309,26 +300,15 @@ public sealed class DropBank
     }
 
     /// <summary>
-    /// The peak level at a metre an impact plays at, dB SPL: its sound's own, scaled from the size
-    /// it was rendered for to its own size as the click law scales (the peak as (r v)^1.5 for a drop;
-    /// as the mass and the speed for ice), and square on or not (RainLayer.Aim, the dipole's cosine).
-    /// </summary>
-    /// <summary>
-    /// The volume and reference distance a near drop plays at: in the same loudness frame as the rain
-    /// it is part of. The near drops are the loudest few of the drops on a surface, pulled out of its
-    /// patch to be heard one by one; the patch's voice is placed by the patch's level
-    /// (<paramref name="fieldLevelDb"/>, what RainVoiceState measured), and a drop that is 9 dB under
-    /// that has to arrive 9 dB under it. Placed by its own peak instead, each drop went through the
-    /// loudness law on its own and came out lifted by the compression: under a steel bus shelter the
-    /// twenty-odd drops a second played within 2 dB of the whole roof's drumming at every rate, so
-    /// heavy rain on the roof sounded like a few metallic drops, as light rain does (Cody,
-    /// 2026-10-06; texture round 2). Physically they are 5 dB under at light rain and 10 under at heavy.
-    /// With no measured field (NaN) the drop is placed by its own level.
+    /// The volume and reference distance a near drop plays at, in the loudness frame of the rain it
+    /// belongs to: placed by the patch's level (<paramref name="fieldLevelDb"/>, measured by
+    /// RainVoiceState), a drop 9 dB under it arrives 9 dB under. Placed by its own peak, each drop was
+    /// lifted by the law's compression, and under a steel shelter heavy rain sounded like a few metallic
+    /// drops (Cody, 2026-10-06; physically they are 5 dB under at light rain, 10 at heavy). With no
+    /// measured field (NaN) the drop is placed by its own level.
     ///
-    /// The two are declared differently: a drop's level is its PEAK, and its sound is normalised to
-    /// its peak; a patch's is its Leq, which its voice renders the fleet's shared headroom
-    /// (VehicleProfile.PeakHeadroomDb) under full scale. So a pascal of drop is a pascal of patch when
-    /// the drop plays at the patch's gain times its level over the patch's, less that headroom.
+    /// A drop's level is its peak (its sound is normalised to it); a patch's is its Leq, rendered the
+    /// fleet's shared headroom (VehicleProfile.PeakHeadroomDb) under full scale, hence the headroom here.
     /// </summary>
     public static (float Gain, float Reference) Placement(float dropLevelDb, float fieldLevelDb)
     {
@@ -338,6 +318,12 @@ public sealed class DropBank
         return (MathF.Min(1f, gain * MathF.Pow(10f, relative / 20f)), reference);
     }
 
+    /// <summary>
+    /// The peak level at a metre an impact plays at, dB SPL: its sound's own, scaled from the size it
+    /// was rendered for as (D v)^1.5 (for a bounce, at the bounce's speed), and by how squarely it faces
+    /// the ear (<paramref name="aim"/>, the dipole's cosine; a canopy or a strike from below counts as
+    /// square on).
+    /// </summary>
     public static float LevelDb(Sound s, in NearDrops.Impact impact, float aim)
     {
         float d = impact.DiameterMm, v = impact.Speed;

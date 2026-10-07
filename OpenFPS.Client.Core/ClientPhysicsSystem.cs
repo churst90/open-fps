@@ -7,10 +7,8 @@ using static OpenFPS.Common.PhysicsConstants;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Responsibility: Performs local physics prediction (Client-Side Prediction).
-/// Ensures the player feels immediate response while waiting for server confirmation.
-/// Now uses the unified SharedMovementEngine for sliding and step-climbing.
-/// Optimized for zero-allocation performance on the client.
+/// Client-side prediction of the player's own movement, through the server's SharedMovementEngine, so
+/// a key press moves you before the server answers.
 /// </summary>
 public class ClientPhysicsSystem
 {
@@ -41,11 +39,10 @@ public class ClientPhysicsSystem
     }
 
     /// <summary>
-    /// Applies a look delta to the player's orientation using the *same* formula the server's
-    /// MovementSystem uses — no smoothing, no target angles. Rotation is deliberately NOT part of
-    /// <see cref="Predict"/>: prediction is replayed on every server correction, and replaying a
-    /// stateful, lerped rotation made the client's heading depend on how many packets were in
-    /// flight. Call this once per input, when the input is first gathered.
+    /// Applies a look delta with the server MovementSystem's formula, no smoothing. Call once per input,
+    /// when it is gathered: rotation is not part of <see cref="Predict"/>, because prediction is
+    /// replayed on every correction and a replayed, lerped rotation made the heading depend on how many
+    /// packets were in flight.
     /// </summary>
     public void ApplyLook(ClientInputUpdate input, float dt)
     {
@@ -58,17 +55,16 @@ public class ClientPhysicsSystem
     }
 
     /// <summary>
-    /// Advances the local player one step. Pure in the state it reads: position, velocity and the
-    /// current yaw in, new position/velocity out — so replaying the same input list from the same
-    /// server state always lands in the same place.
+    /// Advances the local player one step. Pure in what it reads (position, velocity and yaw in, new
+    /// position and velocity out), so replaying the same inputs from the same server state lands in the
+    /// same place.
     /// </summary>
     /// <returns>What the body pressed into and was held off this step (see
-    /// <see cref="SharedMovementEngine.Contact"/>), with the entity it was; null when nothing stopped it.
-    /// Prediction replays inputs after every correction, so only the caller knows whether this step
-    /// was a fresh one — see <see cref="PredictionReconciler.LastContact"/>.</returns>
+    /// <see cref="SharedMovementEngine.Contact"/>), with its entity; null when nothing stopped it. Only
+    /// the caller knows whether the step was fresh or a replay: see
+    /// <see cref="PredictionReconciler.LastContact"/>.</returns>
     public BodyContact? Predict(ClientInputUpdate input, WorldSnapshot snapshot, float dt)
     {
-        // 1. Vertical Physics (Unified logic with server)
         float groundY = PhysicsUtils.GetGroundHeight(snapshot, _state.Position, OwnEntityId, out string mat);
         _state.CurrentMaterial = mat;
 
@@ -78,31 +74,18 @@ public class ClientPhysicsSystem
             inputDir = Vector3.Transform(input.MoveDirection, Quaternion.CreateFromYawPitchRoll(_state.Yaw, 0, 0));
         }
 
-        // 2. GATHER COLLIDERS from Snapshot using ArrayPool
-        // WHAT IS NEAR ENOUGH TO WALK INTO, and nothing else.
-        //
-        // The grid returning an EMPTY set is an answer: there is no static geometry within the search
-        // radius, which is what standing in the middle of a road is. Treating it as a failure and
-        // falling back to every entity in the world put the whole map through the collision solver on
-        // every physics tick, in the one place a player spends most of their time. Five hundred boxes
-        // survived it; a city of six thousand does not, and it is felt as the client locking up the
-        // moment you start moving.
-        //
-        // Only a MISSING grid — the seconds between a map arriving and the first rebuild — is a
-        // reason to consider everything.
-        //
-        // ...and what is near enough to walk into and MOVING. The static grid holds only static
-        // objects, so a car or a bus was never a candidate here even once the server made it solid:
-        // the client walked straight through it and the server pulled it back out, every tick, which
-        // is a rubber band rather than a car. The moving set is tens of things, not thousands, and
-        // only those within reach are kept.
+        // Only what is near enough to walk into. An EMPTY grid answer means no static geometry in reach
+        // (the middle of a road); reading it as a failure put the whole map through the solver every
+        // tick, and a city of six thousand boxes locked the client up. Only a MISSING grid (between a
+        // map arriving and its first rebuild) means consider everything. Moving solids are added
+        // separately: the static grid never holds them, and without them the client walked through a
+        // bus and the server pulled it back every tick.
         IEnumerable<EntitySnapshot> candidates;
         bool triangles = SpatialService.UsesTriangles(snapshot);
         var gridResults = triangles ? null : snapshot.StaticGrid?.GetItemsInRadius(_state.Position, CollisionSearchRadius);
         if (triangles)
         {
-            // The static solids from the triangle world (gathered below, once the step's reach is known);
-            // here only the statics it does not hold and what moves near enough to walk into.
+            // The triangle world's solids are gathered below; here only the statics it does not hold.
             float reach = CollisionSearchRadius;
             var unindexed = snapshot.UnindexedStatics.Where(id => snapshot.Entities.ContainsKey(id)).Select(id => snapshot.Entities[id]);
             var moving = snapshot.DynamicEntities.Where(d =>
@@ -199,10 +182,10 @@ public class ClientPhysicsSystem
 }
 
 /// <summary>
-/// The body pressed into something and was held off it: which entity, the surface's outward normal,
-/// how fast the attempted motion went INTO it, how fast the body was trying to go at all, and where
-/// its feet ended up. <see cref="Intent"/> is the share of the attempt aimed at the surface — one
-/// walking straight at a wall, near zero brushing along it.
+/// The body pressed into something and was held off it: the entity, the surface's outward normal, the
+/// attempted speed into it, the speed attempted at all, and where the feet ended up.
+/// <see cref="Intent"/> is the share aimed at the surface: one walking straight at a wall, near zero
+/// brushing along it.
 /// </summary>
 public readonly record struct BodyContact(int EntityId, Vector3 Normal, float IntoSpeed, float Speed, Vector3 Feet)
 {
