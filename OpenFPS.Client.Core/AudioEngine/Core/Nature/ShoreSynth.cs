@@ -413,6 +413,7 @@ public sealed class ShoreSynth
     {
         if (--_untilBlock > 0) return;
         _untilBlock = Block;
+        if (!_underWay) SeaUnderWay();
         // The noise gains glide from last block's to this block's over the block.
         for (int k = 0; k < _places.Length; k++)
             for (int b = 0; b < Bands; b++)
@@ -430,6 +431,55 @@ public sealed class ShoreSynth
         for (int k = 0; k < _places.Length; k++)
             for (int b = 0; b < Bands; b++)
                 _power[k, b] = _power[k, b] > 0f ? MathF.Sqrt(_power[k, b]) : 0f;
+    }
+
+    // ── Starting mid-sea ─────────────────────────────────────────────────────────────────────────
+    //
+    // A shore is never silent. The sea is a sum of components at random phases, but a wave is found at
+    // an up-crossing of the surface and measured from the one before, so a synth that starts from
+    // nothing hears its first wave at its SECOND up-crossing, and that wave's swash only after the bore
+    // has run in from the break line: a sandy beach under a 9 s swell was exact silence for about 11 s
+    // after its voice started (2026-10-07). So before its first sample the sea is run on for a few of
+    // its longest periods, waves found and their processes started exactly as they would be, nothing
+    // rendered: the voice starts with the waves already arriving and the last ones' swash still
+    // running. The pre-roll only decides WHEN the first sound is; every wave after it is made as before.
+
+    /// <summary>How many of its longest periods the sea is run on before the first sample.</summary>
+    private const float UnderWayPeriods = 4f;
+    /// <summary>Never more than this, s.</summary>
+    private const float MaxUnderWaySeconds = 60f;
+    /// <summary>The pre-roll's step, in blocks: 21 ms at 48 kHz, fine against a wave period of a second
+    /// or more, and an eighth of the work.</summary>
+    private const int UnderWayBlocks = 8;
+
+    private bool _underWay, _preRolling;
+
+    private void SeaUnderWay()
+    {
+        _underWay = true;
+        float period = 0f;
+        if (_hs > 0f && _tp > 0f) period = _tp;
+        if (_swell != null) period = MathF.Max(period, Spec.SwellPeriodSeconds);
+        if (Spec.CurrentMetresPerSecond > 0.05f)
+            period = MathF.Max(period, 5f * MathF.Max(0.05f, Spec.BankFeatureMetres) / Spec.CurrentMetresPerSecond);
+        if (!(period > 0f)) return;   // still water: nothing to have under way
+        float seconds = MathF.Min(MaxUnderWaySeconds, UnderWayPeriods * period);
+        float dt = UnderWayBlocks * Block / _rate;
+        _preRolling = true;
+        try
+        {
+            for (float t = 0f; t < seconds; t += dt)
+            {
+                _time += dt;
+                Seas(dt);
+                // What has finished makes room for what is still running when the voice starts.
+                for (int i = 0; i < MaxProcs; i++)
+                    if (_procs[i].Kind != Kind.None && _time >= _procs[i].Start + _procs[i].Length) _procs[i].Kind = Kind.None;
+            }
+        }
+        finally { _preRolling = false; }
+        // The lab's counts are of what the voice has made since it started sounding.
+        Waves = Breakers = Pockets = 0;
     }
 
     // ── The water at each column ─────────────────────────────────────────────────────────────────
@@ -798,7 +848,7 @@ public sealed class ShoreSynth
         // The face the crest wetted runs off in drops for a while after: a few dozen a metre of face for
         // each ten centimetres the crest stood up it.
         StartDrips(c.Swash, at + (int)(0.5f * period * _rate), 1.5f * period, RunOffDrops * w * h0 / 0.1f, h0, SlapPart);
-        if (_hull != null && HullPart > 0f)
+        if (_hull != null && HullPart > 0f && !_preRolling)
         {
             // The crest's blow on the planking: its momentum over the bays it strikes, delivered over the
             // time the crest takes to pass its own thickness.
@@ -821,7 +871,7 @@ public sealed class ShoreSynth
     /// </summary>
     private void CloudOscillation(int place, int at, float h0, float period, float hb, bool plunging, float air, float width)
     {
-        if (CloudPart <= 0f || air <= 0f) return;
+        if (CloudPart <= 0f || air <= 0f || _preRolling) return;
         float energy = (plunging ? 1f : SpillingAirShare) * CloudEfficiency
                        * 1000f * WindWaves.Gravity * hb * hb * WindWaves.DeepWavelength(period) / 16f * width;
         const int clouds = 4;
@@ -855,7 +905,7 @@ public sealed class ShoreSynth
             ? 1000f * hull.FlarePocketMetres * (0.3f + 0.7f * u)
             : Math.Clamp(1000f * h0 * (0.05f + 0.2f * u * u), 1f, 150f);
         Pocket(c.Swash, at, mm, part, PocketDamping);
-        if (_hull != null && HullPart > 0f)
+        if (_hull != null && HullPart > 0f && !_preRolling)
         {
             // The pocket's pressure, the crest's dynamic pressure ρ v² / 2 at the rising speed, over its
             // own area.
@@ -871,7 +921,7 @@ public sealed class ShoreSynth
     /// (its depth factor skewed), its note climbing as it rises.</summary>
     private void Pocket(int place, int at, float mm, float weight, float damping)
     {
-        if (weight <= 0f) return;
+        if (weight <= 0f || _preRolling) return;
         float depth = MathF.Pow(_rng.Uniform(), PocketSkew);
         if (depth < 0.01f) return;
         float hz = FallingWaterSynth.MinnaertHzMetres / (mm * 1e-3f);

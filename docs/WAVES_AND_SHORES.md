@@ -238,6 +238,12 @@ wind, so a big river's bank slaps and gurgles in a calm while a still pond is si
 - Each place along the edge is its own column of water: its own wind sea, the shared swell at its own
   lag, its own eddies. Each component's frequency wanders inside its slice of the spectrum so the sum
   never repeats.
+- A voice starts mid-sea (2026-10-07). Before its first sample the sea is run on for four of its
+  longest periods (at most 60 s, in 21 ms steps): waves are found and their processes started as they
+  would be, nothing is rendered, and what is still running at the start is heard from the first
+  sample. Without it a sandy surf beach was exact silence until its second up-crossing (11 s for one
+  seed) and then took about ten seconds more to build up to its own level, because a surf bore's swash
+  arrives 15 s after its break. It costs about 4 ms once, on the render thread.
 
 ### 5.2 Each wave
 
