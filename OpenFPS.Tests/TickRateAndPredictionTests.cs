@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Client.Core;
@@ -8,7 +6,6 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Systems;
-using Xunit;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Tests;
@@ -72,9 +69,8 @@ public class TickRateAndPredictionTests
 
         float travelled = world.Get<Transform>(player).Position.Z;
 
-        // The client predicts WalkSpeed by construction (SharedMovementEngine integrates
-        // Speed * dt), so the server matching WalkSpeed IS the parity assertion. Before the
-        // rates were unified the server produced WalkSpeed * 20/30 = 3.0 m here.
+        // The client predicts WalkSpeed by construction (Speed * dt), so the server matching it is the
+        // parity check; with two tick rates the server made WalkSpeed * 20/30 = 3.0 m here.
         Assert.InRange(travelled, WalkSpeed * 0.97f, WalkSpeed * 1.03f);
         World.Destroy(world);
     }
@@ -116,7 +112,7 @@ public class TickRateAndPredictionTests
         long seq = 0;
         for (int tick = 0; tick < TickRate; tick++)
         {
-            // Ten inputs per tick instead of one — a 10x speed hack under the old drain-everything loop.
+            // Ten inputs per tick instead of one: a 10x speed hack if the tick drained them all.
             for (int i = 0; i < 10; i++) session.InputQueue.Enqueue(Forward(++seq, FixedDeltaTime));
             RunServerTick(world, grid, sessions);
         }
@@ -221,7 +217,7 @@ public class TickRateAndPredictionTests
     [Fact]
     public void RotationIsNotReplayedAndSoDoesNotCompound()
     {
-        var (state, physics, rec, snap) = BuildClient();
+        var (state, _, rec, snap) = BuildClient();
 
         // Three turn inputs, none acknowledged yet.
         for (int i = 0; i < 3; i++)
@@ -248,7 +244,7 @@ public class TickRateAndPredictionTests
     [Fact]
     public void ReconciliationSnapsYawWhenTheServerDisagrees()
     {
-        var (state, physics, rec, snap) = BuildClient();
+        var (state, _, rec, snap) = BuildClient();
         state.Yaw = 2.0f;
 
         // Server says we are facing 0 and has acknowledged everything.
@@ -266,9 +262,9 @@ public class TickRateAndPredictionTests
     [Fact]
     public void InputHistoryIsBounded()
     {
-        var (state, physics, rec, snap) = BuildClient();
+        var (_, _, rec, snap) = BuildClient();
 
-        // The server never acknowledges anything — the old code grew this list forever.
+        // The server never acknowledges anything.
         for (int i = 0; i < MaxInputHistory * 3; i++)
             rec.Step(Forward(i + 1, FixedDeltaTime), snap, FixedDeltaTime);
 

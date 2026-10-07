@@ -1,12 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text;
-using System.Threading;
-using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
@@ -18,18 +12,18 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --game-levels [out=DIR] [set=measure|render|compare|all|faults] [cars=a,b,..]: what the game's own mixer puts out
+/// --game-levels [out=DIR] [set=measure|render|compare|all|ear|wind|faults|faults-ac|faults-squeal|faults-landing]
+/// [cars=a,b,..] [ear=on|off] [listening=DB] [calm=SPEED,TURBULENCE]: what the game's own mixer puts out
 /// for one thing at a time, captured from the real output. set=faults is the Resonance faults of 2026-10-06:
 /// a light single and an airliner landing, a train blowing for a crossing, two window units side by side.
+/// --game-levels spectra [preset ...]: see <see cref="Spectra"/>.
 ///
-/// The whole client path, not a model of it: a ClientAudioSystem over an AudioEngineFacade over the
-/// FmodAudioProvider, its output replaced by FMOD's WAV writer (OPENFPS_FMOD_WAV). Cars are entities in
-/// a client world exactly as the server sends them, so the voice budget, the front/rear split, the
-/// placement, the idle lift, the ground in each voice, the HRTF and the master (trim and makeup) are
-/// all the game's. Footsteps come in through OnOwnFootstep, a walker's line and a door through
-/// WorldAudioPlayer.Receive as the server's events, the fountain and the air conditioner as the
-/// map's emitters. What is NOT here: the map, so no walls, no reflections and no reverb, and no other
-/// sound. A flat asphalt ground is the only thing in the world.
+/// The whole client path: a ClientAudioSystem over an AudioEngineFacade over the FmodAudioProvider,
+/// its output to FMOD's WAV writer (OPENFPS_FMOD_WAV). Cars are entities as the server sends them, so
+/// the voice budget, the front/rear split, placement, idle lift, ground, HRTF and master are the game's.
+/// Footsteps come through OnOwnFootstep, a walker's line and a door through WorldAudioPlayer.Receive,
+/// the fountain and the air conditioner as map emitters. No map: no walls, reflections or reverb, only
+/// a flat asphalt ground.
 ///
 /// Each scene plays alone, between gaps of silence, and its name and start time are written to
 /// DIR/segments.csv beside DIR/capture.wav (stereo, the mixer's rate, the game's full scale). tools/game_levels.py
@@ -230,8 +224,8 @@ public static class GameLevelsSpike
             Pump(1.5);
         }
 
-        // A walker's line at normal effort, said facing you from d metres. The first event of a key is
-        // rendered and dropped (WorldAudioPlayer), so each is sent once to prime it.
+        // A walker's line at normal effort, facing you from d metres. WorldAudioPlayer renders and drops
+        // the first event of a key, so each is sent once to prime it.
         var takes = Speech.Takes.Where(t => t.Line.StartsWith("greet", StringComparison.Ordinal)
                                          && File.Exists(LabPaths.Sounds("VOICES", t.Voice, t.Line + ".ogg")))
                                .GroupBy(t => t.Voice).Select(g => g.First()).Take(4).ToList();
@@ -305,9 +299,8 @@ public static class GameLevelsSpike
             Pump(1.5);
         }
 
-        // The wind at the ears is a voice of its own (EarWindVoice) and blows on every outdoor listener;
-        // the client's default before the server speaks is a 4.5 m/s breeze. Calm for everything but the
-        // wind's own rows, so each scene is that one source alone.
+        // The ear wind (EarWindVoice) blows on every outdoor listener, a 4.5 m/s breeze by default: calm
+        // for everything but the wind's own rows, so each scene is one source alone.
         void Wind(float speed, double seconds)
         {
             Stand(new Vector3(60f, 0f, 60f), 0f);
@@ -454,8 +447,6 @@ public static class GameLevelsSpike
         }
         // What RailSystem.SoundForCrossings sends: the train's own horn (or whistle) in the crossing
         // rhythm and its bell until it is on the crossing (TrainSignal), from its warning source.
-        // (Before 2026-10-06 it sent the road vehicle's horn, Honk, on the train's first entity, and
-        // the signal sources were not spawned.)
         void SoundForCrossing(string preset, string trainKey, IReadOnlyList<TrainLayout.Entry> layout, int?[] ids, float eta)
         {
             int warn = TrainSignal.WarningSource(layout), bellAt = TrainSignal.BellSource(layout);
@@ -687,7 +678,7 @@ public static class GameLevelsSpike
     private sealed class AWeight
     {
         private readonly (double b0, double b1, double b2, double a1, double a2)[] _s;
-        private readonly double[] _z1, _z2;
+        private readonly double[] _z1;
         private readonly double _gain;
         public AWeight(int rate)
         {
@@ -700,7 +691,7 @@ public static class GameLevelsSpike
             void HighPass(double w) { double k = 2.0 / T; double a0 = k + w; list.Add((k / a0, -k / a0, 0, (w - k) / a0, 0)); }
             void LowPass(double w) { double k = 2.0 / T; double a0 = k + w; list.Add((w / a0, w / a0, 0, (w - k) / a0, 0)); }
             HighPass(f1); HighPass(f1); HighPass(f2); HighPass(f3); LowPass(f4); LowPass(f4);
-            _s = list.ToArray(); _z1 = new double[_s.Length]; _z2 = new double[_s.Length];
+            _s = list.ToArray(); _z1 = new double[_s.Length];
             // Normalise to 0 dB at 1 kHz.
             double g = 1;
             foreach (var (b0, b1, _, a1, _) in _s)

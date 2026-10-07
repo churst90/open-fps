@@ -1,27 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// What a clap IS, and why a crowd of them sounded like a bag being crushed.
-///
-/// Measured on the old model: a single clap put 0.4 % of its energy below 200 Hz and over forty per
-/// cent above 1.5 kHz, and it was gone in twelve milliseconds. That is not a clap, it is a tick — and
-/// a thousand ticks a second is cellophane. Two things were missing and both are mechanical:
-///
-///   THE POCKET OF AIR RINGS. The first version had a sharp resonator and a listener called it pouring
-///   water — correct, a drip IS a brief narrow resonance — so it was replaced with a plain low-pass
-///   tilt, which has no note in it at all. The question was never whether the cavity resonates but how
-///   hard it is damped: two soft leaky palms give a Q of about three.
-///
-///   AND THE FLESH THUMPS. Two palms meeting is a soft heavy impact before it is anything else. It is
-///   low, it is slow, and it is the half of a clap that survives two hundred metres of air — so a clap
-///   made only of edge arrives across a stadium as a crinkle, which is exactly what was reported.
+/// A clap is a ringing pocket of air (two leaky palms, Q about three) and a thump of flesh, measured
+/// against a recording; a clap of edge alone was a tick, and a crowd of them cellophane.
+/// docs/COMMON_NOTES.md, "The clap".
 /// </summary>
 public class ClapTests
 {
@@ -40,25 +25,17 @@ public class ClapTests
     }
 
     /// <summary>
-    /// The band balance of a MEASURED clap, from a recording of one person clapping slowly.
-    ///
-    /// Averaged over the 67 clean claps that `tools/split_footsteps.py` cut out of
-    /// `approved/applause/Slow Clapping  HQ Sound Effects.mp3` (2026-09-19). Normalised to its own total, so this
-    /// is the SHAPE of a clap and says nothing about level — that is <see cref="Applause.SingleClapDb"/>'s
-    /// job. Baked in so the test runs anywhere; re-measure with `--applause compare=DIR` if the
-    /// reference recording is ever replaced.
-    ///
-    /// What it says, in words: a clap peaks at 1-2 kHz — the same place a footstep does — with a broad
-    /// plateau of flesh from 125 to 500 Hz about eight decibels under the peak, a twelve-decibel fall
-    /// in the octave above it, and a cliff below sixty hertz. Before this was measured the model had
-    /// been settled by ear with its cavity at 800 Hz and a thump that ran for twelve milliseconds,
-    /// and it was eleven decibels heavy at 250-500 Hz, nine light at 1-2 kHz, and twice too slow.
+    /// The band balance of a measured clap: the 67 clean claps tools/split_footsteps.py cut from
+    /// `approved/applause/Slow Clapping  HQ Sound Effects.mp3` (2026-09-19), normalised to their own total,
+    /// so shape only; level is <see cref="Applause.SingleClapDb"/>'s. A peak at 1-2 kHz, flesh 8 dB under
+    /// it from 125 to 500 Hz, a cliff below 60 Hz. Baked in so the test runs anywhere; re-measure with
+    /// `--applause compare=DIR` if the recording is replaced.
     /// </summary>
     private static readonly float[] RealClap =
         { -36.3f, -22.8f, -17.4f, -15.9f, -7.2f, -2.0f, -11.5f, -13.8f, -17.5f };
 
-    /// <summary>A ratchet, not a target: fitted to 3.8 dB worst-band on 2026-09-19. It may not get
-    /// worse. Tighten it if the fit improves; four decibels is where it stops being worth arguing.</summary>
+    /// <summary>A ratchet, not a target: fitted to 3.8 dB worst band on 2026-09-19; tighten it if the fit
+    /// improves.</summary>
     private const float BandToleranceDb = 5f;
 
     [Fact]
@@ -88,11 +65,8 @@ public class ClapTests
             $"{Spectrum.BandName(worstBand)} is {worst:+0.0;-0.0} dB from a real clap, past the {BandToleranceDb:F0} dB ratchet.");
     }
 
-    /// <summary>
-    /// A real clap is twenty decibels down five milliseconds after its peak (median of the 67, 1 ms
-    /// RMS envelope). The model had taken thirteen and a half; a clap that lingers is a clap heard
-    /// in a room, and the room is the engine's job, not the clap's.
-    /// </summary>
+    /// <summary>A real clap is 20 dB down 5 ms after its peak (median of the 67, 1 ms RMS envelope); a
+    /// clap that lingers is a clap in a room, and the room is the engine's job.</summary>
     [Fact]
     public void AClapIsOverAlmostAtOnce()
     {
@@ -123,9 +97,8 @@ public class ClapTests
     public void AClapHasABodyAndNotJustAnEdge()
     {
         var (clap, _) = OneClap(5);
-        // Per OCTAVE, the way `--applause` reports it and the way the ear weighs it. Counted per hertz
-        // instead, the ten kilohertz above 1.5 kHz swamp the two octaves where hands actually are, and
-        // a clap that sounds like a paper bag measures as well balanced.
+        // Per octave, as `--applause` reports and the ear weighs: per hertz, the ten kilohertz above
+        // 1.5 kHz swamp the two octaves where hands are and a paper bag measures as balanced.
         var bands = VehicleBody.Bands(clap, Sr);
         _o.WriteLine($"below 200 Hz {bands.Low * 100:F0}%   200-1500 Hz {bands.Mid * 100:F0}%   " +
                      $"above 1.5 kHz {bands.High * 100:F0}%");
@@ -134,16 +107,14 @@ public class ClapTests
             $"only {bands.Mid * 100:F0}% of the clap is in the two octaves where hands are.");
         Assert.True(bands.Low > 0.08, "there is no weight under it at all.");
         Assert.True(bands.Low < 0.40, "it is all weight: that is a drum, not a pair of hands.");
-        // ...and it still has an edge. A clap with no top is a thud.
+        // And it still has an edge: a clap with no top is a thud.
         Assert.True(bands.High > 0.04, $"only {bands.High * 100:F0}% above 1.5 kHz — the crack has gone.");
     }
 
     /// <summary>
-    /// ...and it outlasts its own edge, but not by much. The recording (median of 67 claps, 1 ms
-    /// RMS against the peak) reads -31 dB at 8 ms, -35 at 16, -52 at 30 and -64 at 45; the slow part
-    /// of that is the room it was made in, and the room is the engine's job: the model's own flesh is
-    /// seventy decibels down by sixteen. What is held here is that there IS a tail past the crack —
-    /// the first model stopped dead at twenty-four milliseconds — and that it is gone by thirty.
+    /// A clap has a tail past its crack, gone by 30 ms. The recording reads -31 dB at 8 ms, -35 at 16, -52
+    /// at 30 and -64 at 45 (median of 67, 1 ms RMS against the peak); its slow part is the room it was
+    /// made in.
     /// </summary>
     [Fact]
     public void AClapOutlastsItsOwnEdge()
@@ -166,24 +137,16 @@ public class ClapTests
         Assert.True(At(16) < At(8), "it should be decaying, not sustaining.");
     }
 
-    /// <summary>
-    /// A crowd is not a wash, and the reason is that it has a NEAR EDGE.
-    ///
-    /// People fill an area, so the number of them at a given distance grows with it while the level
-    /// falls as 1/r: a handful of near ones are much louder than the hundreds behind them, and those
-    /// are the ones a listener picks out and counts. Measured as the spread of the loudest moments —
-    /// if every clapper were the same distance away, every clap would be the same size and the top of
-    /// the distribution would sit right on top of the middle of it.
-    /// </summary>
+    /// <summary>A crowd is not a wash because it has a near edge: people fill an area, so a handful of
+    /// near ones are much louder than the hundreds behind. Measured as the spread of the loudest
+    /// moments.</summary>
     [Fact]
     public void ACrowdHasANearEdgeAndIsNotAWash()
     {
-        // A SMALL crowd, because four hundred people clapping is fifteen hundred claps a second and
-        // at that density there is no such thing as an isolated clap — which is true of a real one and
-        // is exactly why "the moment individual claps become a roar" is a rate and not a switch.
+        // A small crowd: four hundred people is 1,500 claps a second, with no isolated clap to measure.
         var buf = Applause.Render(new CrowdApplause(40, 0.7f, 3f), Sr, 9);
 
-        // The loudest sample in each 10 ms window: roughly, the biggest clap in that window.
+        // The loudest sample in each 10 ms window, roughly its biggest clap.
         int win = Sr / 100;
         var peaks = new List<float>();
         for (int at = 0; at + win < buf.Length; at += win)
@@ -207,15 +170,13 @@ public class ClapTests
             $"the loudest claps are only {spread:F1} dB over the typical one: the crowd has no near edge.");
     }
 
-    /// <summary>Hands differ, and the sound differs with them: the same crowd twice is not the same
-    /// buffer, and a big pair of hands is lower and louder than a small one.</summary>
+    /// <summary>The same crowd rendered with two seeds is not the same buffer.</summary>
     [Fact]
     public void NoTwoClapsAreTheSame()
     {
         var a = Applause.Render(new CrowdApplause(50, 0.6f, 1f), Sr, 1);
         var b = Applause.Render(new CrowdApplause(50, 0.6f, 1f), Sr, 2);
-        // Only where there is a sound at all: a second of fifty people is mostly gaps, and two
-        // silences being equal says nothing.
+        // Only where there is sound: a second of fifty people is mostly gaps.
         int sounding = 0, same = 0;
         for (int i = 0; i < Math.Min(a.Length, b.Length); i++)
         {

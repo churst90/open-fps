@@ -1,21 +1,19 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Common;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// Does the tail hold still while you do? The listener's trace of one place, standing still, for
-/// some seconds: every trace's tail as it was played before (each trace's own samples) and as it
-/// is played now (SmoothTail: energy averaged, fixed noise), side by side, through the game's own
-/// convolvers and tail renderer (DiffuseTail) to two ears.
+/// Does the tail hold still while you do? The listener's trace of one place, standing still: each
+/// trace's own samples (raw) against SmoothTail (energy averaged, fixed noise), through the game's
+/// convolvers and DiffuseTail to two ears.
 ///
-///   --tail-steady [room=stair|flat|corridor] [seconds=10] [jitter=CM] [skip=4]
-///   jitter moves the ear that far at random each trace; skip leaves out the first traces.
+///   --tail-steady [room=stair|flat|corridor] [seconds=10] [jitter=CM] [skip=4] [late=velvet] [earvelvet=1] [early=old]
+///   jitter moves the ear that far at random each trace (a standing player does not quite stay put);
+///   skip leaves out the first traces; late=velvet renders the late part through the velvet branches
+///   instead of the late field (DiffuseLate), earvelvet=1 adds the ear velvet to the field, early=old
+///   starts the smooth tail at 50 ms (SmoothTail.FromFiftyMs), as before 2026-10-03.
 ///
 /// Reports, per octave:
 ///   steady noise: its level's s.d. in 50 ms windows at the left ear, and the left-right difference's,
@@ -54,12 +52,8 @@ public static class TailSteadySpike
     {
         AcousticRegistry.Initialize();
         string room = Arg(args, "room") ?? "stair";
-        // late=velvet: the smooth tail's late part as it was, one channel through the velvet branches
-        // and the ear velvet; the default is the game's, the late field (DiffuseLate). earvelvet=1 puts
-        // the ear velvet on the field too.
         Velvet = Arg(args, "late") == "velvet";
         DiffuseTail.LateEarVelvet = Arg(args, "earvelvet") == "1";
-        // early=old: the smooth tail as it was before 2026-10-03, from 50 ms (SmoothTail.FromFiftyMs).
         SmoothTail.FromFiftyMs = Arg(args, "early") == "old";
         double seconds = double.TryParse(Arg(args, "seconds"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double s) ? s : 10;
         var (boxes, ear) = Scene(room);
@@ -78,8 +72,7 @@ public static class TailSteadySpike
             tr.SetScene(scene);
             tr.SetListener(ear, 1);
             LateTailIr? seen = null;
-            // jitter=CM: the ear moved this far at random each trace, as a standing player's does not
-            // quite stay put (a trace from exactly the same point is the same trace).
+            // A trace from exactly the same point is the same trace.
             float jitter = float.TryParse(Arg(args, "jitter"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float jc) ? jc / 100f : 0f;
             var jr = new Random(5);
             while (traces.Count < want && sw.Elapsed.TotalSeconds < seconds * 6 + 30)
@@ -148,8 +141,8 @@ public static class TailSteadySpike
         Console.WriteLine("     band |  step raw      smooth    |  T20 raw          smooth        | late level smooth-raw (dB)");
         foreach (double f in Octaves)
         {
-            var eRaw = use.Select(t => BandEnergy(Sum(t.RawLate, t.RawDirs, coherent: true), f)).ToArray();
-            var eSmo = use.Select(t => BandEnergy(Sum(t.SmoothLate, t.SmoothDirs, coherent: false), f)).ToArray();
+            var eRaw = use.Select(t => BandEnergy(Sum(t.RawLate, t.RawDirs), f)).ToArray();
+            var eSmo = use.Select(t => BandEnergy(Sum(t.SmoothLate, t.SmoothDirs), f)).ToArray();
             var (rR, mR) = Steps(eRaw.Select(e => e.Total).ToArray());
             var (rS, mS) = Steps(eSmo.Select(e => e.Total).ToArray());
             var tR = eRaw.Select(e => e.T20).Where(v => v > 0).ToArray(); var tS = eSmo.Select(e => e.T20).Where(v => v > 0).ToArray();
@@ -196,9 +189,8 @@ public static class TailSteadySpike
         }
 
         // ── A steady hum through it: each harmonic's level, 50 ms at a time ──────────────────
-        // Noise in gives noise out whatever the response's fine structure; a tone does not. Its level
-        // is the response's gain at that frequency, and if the fine structure changes every trace,
-        // every harmonic of an engine or a voice jumps every 250 ms: the waviness.
+        // Noise hides a changing fine structure; a tone does not: each harmonic is the response's gain
+        // there, and jumps every 250 ms if the fine structure changes (the waviness).
         {
             var hum = new float[n];
             var hr = new Random(11);
@@ -234,8 +226,8 @@ public static class TailSteadySpike
                 for (int i = i0; i < i1; i++) { ab += a1[i] * (double)b1[i]; aa += a1[i] * (double)a1[i]; bb += b1[i] * (double)b1[i]; }
                 return ab / Math.Sqrt(aa * bb + 1e-30);
             }
-            var sr = use.Select(t => Sum(t.RawLate, t.RawDirs, coherent: true)).ToArray();
-            var ss = use.Select(t => Sum(t.SmoothLate, t.SmoothDirs, coherent: false)).ToArray();
+            var sr = use.Select(t => Sum(t.RawLate, t.RawDirs)).ToArray();
+            var ss = use.Select(t => Sum(t.SmoothLate, t.SmoothDirs)).ToArray();
             double cr = Enumerable.Range(1, sr.Length - 1).Average(i => Corr(sr[i - 1], sr[i]));
             double cs2 = Enumerable.Range(1, ss.Length - 1).Average(i => Corr(ss[i - 1], ss[i]));
             Console.WriteLine($"  one trace's tail (100-600 ms) against the last one's, correlation: raw {cr:F3}, smooth {cs2:F3}");
@@ -257,8 +249,8 @@ public static class TailSteadySpike
         }
 
         // ── The ring ─────────────────────────────────────────────────────────────────────────
-        var rr = use.Select(t => Ring(Sum(t.RawLate, t.RawDirs, coherent: true))).ToArray();
-        var rs = use.Select(t => Ring(Sum(t.SmoothLate, t.SmoothDirs, coherent: false))).ToArray();
+        var rr = use.Select(t => Ring(Sum(t.RawLate, t.RawDirs))).ToArray();
+        var rs = use.Select(t => Ring(Sum(t.SmoothLate, t.SmoothDirs))).ToArray();
         Console.WriteLine("  the tail 100-600 ms: bins 10 dB over local median (noise 0.10 %), 99.9th percentile over median, flatness (noise 0.56), largest repeat 0.5-30 ms");
         Console.WriteLine($"    raw    {rr.Average(r => r.Over10) * 100,5:F2} %  {rr.Average(r => r.P999),5:F1} dB  {rr.Average(r => r.Flat),5:F2}  {rr.Average(r => r.Repeat),5:F2} at {rr.OrderByDescending(r => r.Repeat).First().Lag:F1} ms");
         Console.WriteLine($"    smooth {rs.Average(r => r.Over10) * 100,5:F2} %  {rs.Average(r => r.P999),5:F1} dB  {rs.Average(r => r.Flat),5:F2}  {rs.Average(r => r.Repeat),5:F2} at {rs.OrderByDescending(r => r.Repeat).First().Lag:F1} ms");
@@ -354,7 +346,7 @@ public static class TailSteadySpike
     /// <summary>The late part and every direction's, as one response. The raw parts are pieces of the
     /// same samples and add as they are; the smooth ones are independent noise and add as they are too
     /// (their energies add). Either way the sum is what a single ear's energy follows.</summary>
-    private static float[] Sum(float[] late, float[][] dirs, bool coherent)
+    private static float[] Sum(float[] late, float[][] dirs)
     {
         int n = Math.Max(late.Length, dirs.Length == 0 ? 0 : dirs.Max(d => d.Length));
         var y = new float[Math.Max(n, 1)];

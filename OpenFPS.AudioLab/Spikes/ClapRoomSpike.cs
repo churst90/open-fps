@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
@@ -14,33 +9,20 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// A clap in Marlow Tower flat 01F, through the whole mixer: the listener's traced response of the
-/// flat, the reverb sends, the decorrelator, the master limiter, written to a WAV and read back.
-///
-///   --clap-room [out=path] [claps=4] [sound=click|<weapon id>] [dist=0.5] [bed] [tail=raw]
-///               [copies=0] [early=old] [probe=MS]
-///   tail=raw plays each trace's own samples, as before SmoothTail, for the A/B. late=velvet plays the
-///   late part as one channel through the velvet branches, as before DiffuseLate.
-///   A weapon id (glock, ar15, akm, ...) fires that gun at its own level from dist metres; bed plays a
-///   quiet 150 Hz hum at 2 m under it all and prints its level through each shot: the ear overload.
-///   Each clap gets what the game gives it: its own floor bounce (the voice's ground) and the room's
-///   placed copies and washes (WorldAudioPlayer.PlanRoomEchoes over the same boxes), each delayed by
-///   its own path as the facade does. copies=0 leaves the copies out. early=old plays the traced
-///   response as it was before 2026-10-03 (from 50 ms, nothing taken out for the copies, and 4.4 ms
-///   early against the voices: no TracedReverbDsp.StagePreDelay).
-///   probe=MS replaces the traced response with one click MS milliseconds in and reports where it
-///   lands against the dry click: the latency of the reverb bus. Use with sound=click.
-///
-///   Printed besides: the energy after the clap in 2 ms steps (mean over the claps), and per octave
-///   C50, C80, D50 with the direct sound, and the room's own early-to-late ratios (from 3 ms) against
-///   an exponential decay at the band's T20 from the first reflection.
-///
-/// Written because "a bathroom stall rather than a carpeted room" was read off captures full of city
-/// noise, where the room's answer could only be estimated. Here nothing else is playing. What it
-/// reports is the room's answer against the clap itself, in the windows the ear separates: the
-/// clap (0-6 ms), the early part (6-50 ms), the late part (50-300 ms). The traced flat on its own
-/// (--traced-reverb) answers -4.5 dB against a one-metre impulse, so a clap half a metre from the
-/// ear should have the room about ten decibels under it.
+/// --clap-room [out=path] [claps=4] [sound=click|WEAPON] [dist=0.5] [bed] [tail=raw] [late=velvet]
+/// [copies=0] [early=old] [probe=MS]: a clap in Marlow Tower flat 01F through the whole mixer (traced
+/// response, reverb sends, decorrelator, master limiter) with nothing else playing, written and read back.
+/// Each clap gets its floor bounce and the room's placed copies and washes, as in the game. Reports the
+/// room against the clap in the ear's windows (0-6, 6-50, 50-300 ms), energy in 2 ms steps, per octave
+/// C50, C80, D50 and the early-to-late ratios from 3 ms against an exponential decay at the band's T20.
+/// The traced flat answers -4.5 dB against a one-metre impulse (--traced-reverb), so a clap half a metre
+/// off should have the room about ten decibels under it.
+///   tail=raw: each trace's own samples (before SmoothTail); late=velvet: the late part as one channel
+///   (before DiffuseLate); early=old: the response before 2026-10-03 (from 50 ms, no
+///   TracedReverbDsp.StagePreDelay); copies=0: no copies.
+///   WEAPON (glock, ar15, akm...) fires that gun at its level from dist metres; bed adds a 150 Hz hum at
+///   2 m and prints its level through each shot (the ear overload).
+///   probe=MS: one click MS ms into the traced response, to time the reverb bus (with sound=click).
 /// </summary>
 public static class ClapRoomSpike
 {
@@ -54,7 +36,6 @@ public static class ClapRoomSpike
         TracedReverb.RawTail = Arg(args, "tail") == "raw";
         TracedReverb.OneChannelLate = Arg(args, "late") == "velvet";
         SmoothTail.FromFiftyMs = Arg(args, "early") == "old";
-        // early=old is the response as it was: from 50 ms, and without the wait for the voices (TracedReverbDsp.StagePreDelay).
         TracedReverbDsp.LabNoPreDelay = SmoothTail.FromFiftyMs;
         float probeMs = float.TryParse(Arg(args, "probe"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float pm) ? pm : 0f;
         TracedReverb.LabProbeSeconds = probeMs / 1000f;
@@ -101,8 +82,7 @@ public static class ClapRoomSpike
         try
         {
             provider.SetAcousticMap(BuildMap());
-            // sound=click: one sample, flat in spectrum and with no resonance of its own, so whatever
-            // rings in the answer is the room's (or the renderer's), not the clap's.
+            // sound=click: one sample, so whatever rings in the answer is the room's or the renderer's.
             float[] pcm;
             if (soundArg == "click") { pcm = new float[TransientSynth.SampleRate / 10]; pcm[0] = 1f; }
             else if (gun) { WeaponRegistry.TryGet(soundArg!, out var w); pcm = WeaponSynth.MuzzleBlast(WeaponProfile.From(w), 1); }
@@ -120,14 +100,13 @@ public static class ClapRoomSpike
                     Position = bedAt, ApparentPosition = bedAt, Volume = hum.Gain, MinDistance = hum.ReferenceDistance,
                     Range = 200f, Pitch = 1f, ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,
                     EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f, Essential = true, TargetRegionId = RoomId,
-                    // An event, so it plays without a voice budget to grant it a slot (there is none here).
+                    // An event: there is no voice budget here to grant a slot.
                     IsEvent = true,
                 });
             }
             provider.RegisterSynthesisedSound("synth:clap:lab", TransientSynth.ToPcm16(pcm), TransientSynth.SampleRate);
 
-            // The copies the game places round a clap (WorldAudioPlayer.QueueEarlyEchoes), over the same
-            // boxes, and the washes beside them, rendered as the game renders them.
+            // The copies and washes the game places round a clap (WorldAudioPlayer.QueueEarlyEchoes).
             var solids = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();
             var found = new List<EarlyReflections.Arrival>();
             var plan = new List<OpenFPS.Client.Core.WorldAudioPlayer.RoomEcho>();
@@ -329,9 +308,8 @@ public static class ClapRoomSpike
             }
             if (nc > 0) Console.WriteLine($"  late part 300-900 ms, IACC mean over the claps: {string.Join(" ", sum.Select(v => (v / nc).ToString("F2")))}");
         }
-        // The tail's decay per octave, both ears' energy from 50 ms on (the clap itself and the placed
-        // early reflections left out), to just before the next clap: EDT (0 to -10 dB) and T20 (-5 to
-        // -25), Schroeder, the mean over the claps.
+        // The tail's decay per octave from 50 ms (clap and placed copies left out) to the next clap:
+        // Schroeder EDT (0 to -10 dB) and T20 (-5 to -25), mean over the claps.
         if (decays.Count > 0)
         {
             Console.WriteLine("  tail from 50 ms, mean over the claps:  octave   EDT s   T20 s   | EDT per clap");
@@ -364,11 +342,9 @@ public static class ClapRoomSpike
     private static readonly double[] Octaves = { 125.0, 250, 500, 1000, 2000, 4000 };
 
     /// <summary>
-    /// What happens in the first tenth of a second after each clap: the energy in 2 ms steps against
-    /// the clap's own (0-6 ms), mean over the claps; per octave C50, C80 and D50 with the direct sound,
-    /// and the room's own early-to-late ratio (from 3 ms, the dry click over) against what the trace
-    /// says for the room and what an exponential decay at the band's T20 from the first reflection
-    /// gives; and, with a probe, where the probe lands.
+    /// The first tenth of a second after each clap: energy in 2 ms steps against the clap's (0-6 ms); per
+    /// octave C50, C80, D50, and the room's early-to-late ratio from 3 ms against the trace's and an
+    /// exponential decay at the band's T20; and where a probe lands.
     /// </summary>
     private static void EarlyReport(float[] l, float[] r, int sr, List<int> onsets, float probeMs, float[]? traceW,
                                     double startMs, double firstMs, Dictionary<double, double> t20s)

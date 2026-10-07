@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -8,18 +5,15 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
 /// "If vehicles are solid objects, I shouldn't be able to walk right through them."
 ///
-/// They were not solid at all: every vehicle's collider was IsSolid = false, there only so the spatial
-/// grid would carry it into earshot. And even solid, three more things had to be right before a bus
-/// could stop anybody: it had to be bus-sized rather than the one car box every vehicle was given; the
-/// grid had to file it by the ground it actually covers once it is turned; and the client had to test
-/// against things that move, not only against the static grid.
+/// A vehicle is solid, its own size rather than one car box, filed in the grid by the ground it covers
+/// once turned, and the client tests against things that move, not only the static grid. Every
+/// vehicle's collider was once not solid, there only to carry it into earshot.
 /// </summary>
 public class SolidVehicleTests
 {
@@ -77,8 +71,7 @@ public class SolidVehicleTests
 
         Assert.True(TouchesOnly(world, grid, bus, justInside),
             "a player at the back bumper of a bus is not touching it");
-        // Behind the bus is wherever the map happens to put it — a kerb, a shelter, the next car — so
-        // "clear" means clear OF THE BUS: the one thing this test is about must not reach that far.
+        // Behind the bus is whatever the map put there, so "clear" means clear of the bus.
         Assert.False(TouchesOnly(world, grid, bus, wellClear),
             "a player a metre and a half behind the bus is inside it");
     }

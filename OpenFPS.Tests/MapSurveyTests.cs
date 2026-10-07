@@ -1,28 +1,16 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// What a named place on a MAP is made of, measured from the walls that are there.
-///
-/// A composite is measured inside a box derived from its own parts — that is the whole trick of
-/// <see cref="CompositeAcoustics.Survey"/>, and it is why a shed somebody built is a room without
-/// anyone authoring one. A map is the other way round: the author draws the box (the region entity),
-/// the walls around it are SHARED — the wall between two flats belongs to both, the corridor wall
-/// runs the length of the building — and asking those parts to derive a box gives you the building.
-///
-/// So <see cref="CompositeAcoustics.SurveyBox"/> asks the same questions of a box that is already
-/// known. These hold the three things that were wrong the first time it ran over a real city block,
-/// each of which is invisible rather than obvious: a part six metres to one side is not your ceiling;
-/// a wall three metres thick is still your wall; and a survey may fill in what an author left blank
-/// but must never overrule what they said.
+/// What a named place on a map is made of, measured from the walls round its authored box
+/// (<see cref="CompositeAcoustics.SurveyBox(World, List{Entity}, Vector3, Vector3)"/>; a map's walls are
+/// shared, so deriving a box from them gives the building). Holds the faults found on the city block
+/// (docs/THE_CITY_BLOCK.md), and that a survey fills in what an author left blank but never overrules it.
 /// </summary>
 public class MapSurveyTests
 {
@@ -42,17 +30,13 @@ public class MapSurveyTests
     /// <summary>Floor, ceiling, north, south, east, west — the order the whole codebase uses.</summary>
     private const int Floor = 0, Ceiling = 1, North = 2, South = 3, East = 4, West = 5;
 
-    /// <summary>
-    /// A flat is brick outside, concrete between the storeys and concrete between the flats, because
-    /// that is what is round it. Nobody wrote any of those down.
-    /// </summary>
+    /// <summary>A flat's materials come from what is round it: brick outside, concrete between storeys and flats.</summary>
     [Fact]
     public void AFlatIsMadeOfWhatIsRoundIt()
     {
         var w = World.Create();
         var parts = new List<Entity>();
-        // A room 5 x 2.7 x 4, with a slab under and over it, brick on the east and concrete
-        // partitions north and south.
+        // A room 5 x 2.7 x 4.
         parts.Add(Slab(w, "Concrete", -3f, 3f, -0.3f, 0f, -3f, 3f));      // floor
         parts.Add(Slab(w, "Concrete", -3f, 3f, 2.7f, 3f, -3f, 3f));       // ceiling
         parts.Add(Slab(w, "Brick", 2.5f, 2.9f, 0f, 2.7f, -3f, 3f));       // outside wall, east
@@ -74,12 +58,8 @@ public class MapSurveyTests
     }
 
     /// <summary>
-    /// A slab at the right height and six metres to one side is not your ceiling.
-    ///
-    /// This is the fault that put a roof over the street. A building's first-floor slab is three
-    /// metres up, which is within tolerance of a four-metre pavement's ceiling plane — and it is
-    /// entirely inside the building. Measuring only the distance ALONG the face's axis, every stretch
-    /// of pavement in the city came back enclosed, indoors, with a concrete ceiling over it.
+    /// A slab at the right height six metres to one side is not your ceiling: measured only along the
+    /// face's axis, every pavement in the city came back indoors under a building's first-floor slab.
     /// </summary>
     [Fact]
     public void SomethingBesideYouIsNotOverYou()
@@ -99,12 +79,8 @@ public class MapSurveyTests
     }
 
     /// <summary>
-    /// A wall three and a half metres thick is still the wall of the room beside it.
-    ///
-    /// The other half of the same fault, and the one that made a tunnel read as open sky. A part used
-    /// to belong to a face if its OUTER edge was near the plane — true for a composite, whose box is
-    /// derived FROM the parts, and false for a box drawn first, where a thick wall's far side is
-    /// metres away. What faces you is the side of the wall that faces you.
+    /// A wall 3.5 m thick is still the wall of the room beside it: measured to its outer edge, as suits a
+    /// composite, a tunnel read as open sky. What faces you is the side of the wall that faces you.
     /// </summary>
     [Fact]
     public void AThickWallIsStillAWall()
@@ -129,10 +105,7 @@ public class MapSurveyTests
         Assert.Equal(4, survey.Walls);
     }
 
-    /// <summary>
-    /// Four glass sides, a metal roof and an open front is a bus shelter: enclosed, barely — which is
-    /// exactly what standing in one is.
-    /// </summary>
+    /// <summary>Glass sides, a metal roof and an open front, a bus shelter, are barely enclosed.</summary>
     [Fact]
     public void ABusShelterIsBarelyARoom()
     {
@@ -154,10 +127,7 @@ public class MapSurveyTests
         Assert.True(survey.Coverage[West] < CompositeAcoustics.FaceCoverage, "the front of a shelter is open");
     }
 
-    /// <summary>
-    /// A pillar in the middle of a room covers nothing. Held because the overlap test could be
-    /// written so that anything inside the box counts for every face.
-    /// </summary>
+    /// <summary>A pillar in the middle of a room covers no face.</summary>
     [Fact]
     public void APillarInTheMiddleIsNotAWall()
     {

@@ -1,24 +1,15 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Client.Core;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The playback clock has to stay ON the server's clock, or the world stops moving.
-///
-/// Entity positions are interpolated between two buffered server snapshots that BRACKET a playback
-/// time. That time used to be initialised once and then advanced by the client's own frame delta for
-/// ever — an independent clock, with no correction anywhere. Two clocks drift; when the drift exceeds
-/// the buffer, no pair brackets the playback time, and the interpolator's response to that is to
-/// update nothing at all: every entity in the world holds its position until a pair exists again.
-/// Silently. Heard from the speedway grandstand as some of the cars stopping in front of you for
-/// about a second and then carrying on — "some", because a frozen car passing a few metres away
-/// swings its bearing hugely and a frozen one across the infield barely moves at all.
+/// The playback clock stays on the server's clock. Advanced by the client's own frame delta, it drifted
+/// until no two snapshots bracketed it, and the interpolator then updated nothing: every entity froze,
+/// heard on the speedway as cars stopping for about a second and carrying on.
 /// </summary>
 public class InterpolationClockTests
 {
@@ -42,9 +33,8 @@ public class InterpolationClockTests
         var world = new ClientWorldState();
         const int car = 77;
 
-        // The server ticks at its fixed rate; the client renders with a delta 6 % longer, which is
-        // an ordinary amount for two unsynchronised clocks and, uncorrected, walks a third of a
-        // second out of step inside ten seconds.
+        // The client renders with a delta 6 % longer, ordinary for two unsynchronised clocks: uncorrected, a third
+        // of a second out of step within ten seconds.
         float serverDt = PhysicsConstants.FixedDeltaTime;
         float clientDt = serverDt * 1.06f;
 
@@ -61,8 +51,7 @@ public class InterpolationClockTests
             seen.Add(world.TryGetInterpolatedTransform(car, out var tr) ? tr.Position.Z : float.NaN);
         }
 
-        // The car must never stop. A run of identical positions is the world frozen; anything over a
-        // handful of frames is the failure this test exists for.
+        // A run of identical positions is the world frozen; more than a handful of frames is the failure.
         int longestStall = 0, stall = 0;
         for (int i = 1; i < seen.Count; i++)
         {

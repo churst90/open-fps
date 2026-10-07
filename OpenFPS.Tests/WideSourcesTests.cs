@@ -1,12 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -285,7 +281,7 @@ public class WideSourcesTests
         double together = e.Sum() / (Rate * 19.0);
         double alone = Render(old, 19f);
         _o.WriteLine($"tree as {n} voices {Db(together):F2} dB, as one voice {Db(alone):F2} dB");
-        // The one voice reads the field's gusts, the places a steady... both read the field: a few tenths.
+        // Both read the same held wind: a few tenths apart.
         Assert.InRange(Db(together) - Db(alone), -1.0, 1.0);
     }
 

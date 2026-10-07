@@ -1,6 +1,4 @@
-using System.Linq;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -11,11 +9,8 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class LoudnessLawTests
 {
-    /// <summary>
-    /// Inverse distance out from the reference, then a fade over the last quarter of the span between
-    /// the reference and the range: whole at the start of that quarter, half way down in its middle,
-    /// nothing at the range.
-    /// </summary>
+    /// <summary>Inverse distance out from the reference, then a fade over the last quarter of the span to the
+    /// range: whole at its start, half way down in its middle, nothing at the range.</summary>
     [Fact]
     public void TheEdgeFadeTakesTheLastQuarterOfTheSpan()
     {

@@ -1,7 +1,4 @@
-using System;
-using System.Linq;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -123,9 +120,8 @@ public class SlidingDoorTests
     [Fact]
     public void AShuttingStaysLoudIntoTheBlow()
     {
-        // Both of the recording's shuttings are at their loudest just before the stop: the leaf is pushed
-        // home, not let slow to a touch (as the model did, so a shutting faded into its stop as an opening
-        // fades to rest).
+        // Both of the recording's shuttings are loudest just before the stop: the leaf is pushed home, not let
+        // slow to a touch.
         var (pcm, home, _) = StandardClose.Value;
         double loudest = MaxFrameDb(pcm, 0.1, home - 0.05, 0.05);
         double last = MaxFrameDb(pcm, home - 0.15, home - 0.01, 0.05);
@@ -137,9 +133,8 @@ public class SlidingDoorTests
     [Fact]
     public void AnOpeningStrikesNothing()
     {
-        // Cody, 2026-10-04: "the open sound sounds like a close sound". The leaf used to be run into its
-        // bumper and let go. Now the hand brings it to rest short of it, as both of the recording's openings
-        // end: the rollers slowing to nothing, no blow.
+        // Cody, 2026-10-04: "the open sound sounds like a close sound". The hand brings the leaf to rest short
+        // of its bumper, as the recording's openings end: rollers slowing to nothing, no blow.
         var (pcm, report) = StandardOpen.Value;
         Assert.DoesNotContain(report.Events, e => e.Contains("frame-on-frame") || e.Contains("open-bumper"));
         Assert.True(ContactPeak(report, "shut-bumper") < 5, "the leaf leaves its jamb, it does not strike it");

@@ -1,16 +1,12 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Rays against a cylinder and a cone — a trunk, a post, a pole — as the client's spatial service
-/// uses them: first hit for raycasts, entry and exit for how much of a sound's path passes through.
-/// A cylinder and a cone of radius 1 and height 2 at the origin; the cone's tip at y = 1, its base at
-/// y = -1, so its radius at height y is (1 - y) / 2. Written for the 343 mutants of these functions
-/// that no test reached in the 2026-09-24 mutation run.
+/// Rays against a cylinder and a cone (trunks, posts) as the spatial service uses them: first hit, and
+/// entry and exit. Both radius 1, height 2, at the origin; the cone's tip at y = 1, so its radius at y is
+/// (1 - y) / 2. For the 343 mutants no test reached in the 2026-09-24 mutation run.
 /// </summary>
 public class RayShapeTests
 {

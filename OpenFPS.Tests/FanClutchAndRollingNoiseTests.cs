@@ -1,8 +1,6 @@
-using System;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Engine;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

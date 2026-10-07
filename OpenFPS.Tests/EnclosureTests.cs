@@ -1,25 +1,12 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Whether there is a reverberant field here, which is a different question from how long one would
-/// last, and the one the engine was not asking.
-///
-/// Reported 2026-09-18 from the speedway's front straight: the geometry reverb read up to 1579 ms and
-/// swung by more than a second while the listener stood still, where the infield correctly read 101 ms.
-/// The wet level was being taken from the decay time, and the decay time cannot carry it: Steam Audio's
-/// parametric estimator fits an exponential to whatever energy its rays bring home and cannot report
-/// that there was hardly any. Measured with AudioLab --sim-reverbfield, a walled yard with NO CEILING
-/// fitted a 1.00 s tail where the same walls with a roof on fitted 0.60 s — the roofless one reading as
-/// the more reverberant of the two, which is backwards, and which no threshold could have fixed because
-/// both sit on the same side of every threshold.
-///
-/// These hold the replacement to the thing that made it work: two bounces, so a plane is not a room.
+/// Whether there is a reverberant field here, a different question from how long one would last: the
+/// wet level taken from the decay time read a roofless yard as more reverberant than a roofed one.
+/// Two bounces, so a plane is not a room (docs/COMMON_NOTES.md, "Enclosure, not decay time").
 /// </summary>
 public class EnclosureTests
 {
@@ -38,14 +25,8 @@ public class EnclosureTests
         new(new Vector3(-5.25f, 2, 0), new Vector3(0.5f, 4, 11), Q, material),    // west
     };
 
-    /// <summary>
-    /// The fault, in one assertion. Bare hard ground is not half a room.
-    ///
-    /// Half of every direction from a standing listener ends in the ground, and concrete returns 98% of
-    /// what reaches it, so counting one bounce scores a bare plaza at 48% enclosed — measured, on the
-    /// battle spike's own geometry. It is not enclosed at all: a plane reflects sound AWAY, once, and
-    /// that energy is never heard again. Following the ray past the ground is what says so.
-    /// </summary>
+    /// <summary>Bare hard ground is not half a room: one bounce scored a bare plaza 48 % enclosed, but a
+    /// plane reflects sound away once and it is never heard again.</summary>
     [Fact]
     public void BareGroundIsNotEnclosed()
     {
@@ -53,7 +34,7 @@ public class EnclosureTests
         Assert.True(e < 0.05f, $"open concrete ground measured {e:P0} enclosed; one bounce called it 48%");
     }
 
-    /// <summary>And the inside of a hard box is, which is the other end of the same scale.</summary>
+    /// <summary>The inside of a hard box is enclosed: the other end of the same scale.</summary>
     [Fact]
     public void ASealedHardRoomIsFullyEnclosed()
     {
@@ -61,10 +42,8 @@ public class EnclosureTests
         Assert.True(e > 0.9f, $"a sealed concrete room measured only {e:P0} enclosed");
     }
 
-    /// <summary>
-    /// Take the roof off the same room and it is markedly less enclosed — the measurement the decay
-    /// time got exactly backwards.
-    /// </summary>
+    /// <summary>The same room without its roof is markedly less enclosed, which the decay time got
+    /// backwards.</summary>
     [Fact]
     public void TakingTheRoofOffOpensTheRoom()
     {
@@ -78,10 +57,8 @@ public class EnclosureTests
         Assert.True(yard > 0.15f, $"it still has four hard walls; {yard:P0} is too open");
     }
 
-    /// <summary>
-    /// What a room is made of decides it, not how big it is. The same box in carpet is a fraction of the
-    /// same box in concrete, which is the property that lets this work on a map nobody has written yet.
-    /// </summary>
+    /// <summary>What a room is made of decides it, not its size: the box in carpet is a fraction of the
+    /// box in concrete.</summary>
     [Fact]
     public void WhatTheWallsAreMadeOfDecidesIt()
     {
@@ -91,10 +68,8 @@ public class EnclosureTests
         Assert.True(soft < hard * 0.5f, $"carpet {soft:P0} against concrete {hard:P0}");
     }
 
-    /// <summary>
-    /// A single wall beside you is not a room either, however big it is. This is the speedway case: the
-    /// listener stood next to a ninety-metre concrete wall and the engine put a cathedral on the race.
-    /// </summary>
+    /// <summary>A single wall beside you is not a room, however big: on the speedway a ninety-metre concrete
+    /// wall put a cathedral on the race.</summary>
     [Fact]
     public void OneLongWallBesideYouIsNotARoom()
     {
@@ -103,10 +78,8 @@ public class EnclosureTests
         Assert.True(e < 0.2f, $"a wall and the ground measured {e:P0} enclosed");
     }
 
-    /// <summary>
-    /// The level of the field is the sum over every generation of return, which is what puts a room a
-    /// long way above a wall rather than a little above it.
-    /// </summary>
+    /// <summary>The field's level sums every generation of return, e/(1-e), which puts a room a long way
+    /// above a wall.</summary>
     [Fact]
     public void TheFieldIsTheSumOfEveryReturn()
     {
@@ -120,10 +93,8 @@ public class EnclosureTests
         Assert.True(float.IsFinite(Enclosure.ReverberantGainDb(1f)), "fully enclosed must not be infinite");
     }
 
-    /// <summary>
-    /// The same place measures the same every time. The rays are a fixed Fibonacci sphere rather than a
-    /// random sample precisely so that a listener standing still does not hear the room breathe.
-    /// </summary>
+    /// <summary>The same place measures the same every time: the rays are a fixed Fibonacci sphere, so a
+    /// listener standing still does not hear the room breathe.</summary>
     [Fact]
     public void TheSamePlaceMeasuresTheSameTwice()
     {
@@ -139,10 +110,8 @@ public class EnclosureTests
         Assert.Equal(0f, Enclosure.Measure(Vector3.Zero, Array.Empty<Enclosure.Solid>()), 6);
     }
 
-    /// <summary>
-    /// The ray-box test underneath it reports the face that was actually struck. Everything above
-    /// depends on the second bounce going the right way, and the direction comes from this normal.
-    /// </summary>
+    /// <summary>The ray-box test reports the face actually struck; the second bounce's direction comes from
+    /// its normal.</summary>
     [Fact]
     public void ARayReportsTheFaceItStruck()
     {
@@ -158,21 +127,11 @@ public class EnclosureTests
                                               new Vector3(0, 0f, 0), new Vector3(10, 1f, 10), Q, out _, out _));
     }
 
-    // ------------------------------------------------------------------------------------------
-    // The survey's known blind spot: a small enclosure standing inside a big one.
-    //
-    // Enclosure.Look counts a direction as a surface of THIS place if the ray hits anything at all
-    // within sixty metres. Standing under a bus shelter that is open at the front, the rays that
-    // leave through the front cross the street, strike the building opposite, and come home recorded
-    // as the shelter's own hard walls. Measured on the city map at <8, 1.6, -0.8>: surface 609 m2
-    // against a true 65, absorption 0.044 against a true ~0.3, mid decay 2894 ms for a glass box
-    // 3.2 x 2.4 x 4.4 — and the reverb send goes from 8% in the street to 153% against the glass,
-    // which is a cathedral opening up as you step under a bus shelter.
-    //
-    // Three fixes were tried and all three reverted, because every one of them keyed the escape on a DISTANCE and a distance cannot tell the far
-    // wall of a flat garage from a building across a street. These two tests are the pair that any
-    // fourth attempt has to satisfy: the shelter must come down, and the garage must not move.
-    // ------------------------------------------------------------------------------------------
+    // ── A small enclosure inside a big one ──────────────────────────────────────────────────────
+    // Rays leaving a bus shelter's open front strike the building across the street and came home as the
+    // shelter's own walls: a cathedral under a bus shelter. Any fix must bring the shelter down and leave the
+    // flat garage alone; three keyed on a distance and were reverted (docs/THE_CITY.md, "The bus shelter,
+    // and the gate on it").
 
     /// <summary>The city's bus shelter, with the street and the two buildings that flank it: a back
     /// pane, two end panes, a steel roof, open at the front, and a brick facade seventeen metres away
@@ -201,17 +160,11 @@ public class EnclosureTests
     };
 
     /// <summary>
-    /// A bus shelter is a box you stand under on an open street, and it rings for about a third of a
-    /// second. It does not ring for three, and it does not ring for longer than the parking garage.
-    ///
-    /// It failed until the survey could tell that a ray has left through the open front. The
-    /// honest figures for this box: surface about 65 m2, a twelfth of which is the opening, mean free
-    /// path about 2 m, mean absorption about 0.3 once the opening is counted as the perfect absorber
-    /// it is — Eyring puts that at roughly 0.2-0.3 s.
+    /// A bus shelter on an open street rings for about a third of a second, not three, and not longer than the
+    /// parking garage. Honest figures: about 65 m², a twelfth of it the opening, mean free path about 2 m, mean
+    /// absorption about 0.3 with the opening counted: Eyring gives 0.2-0.3 s. It passes on the openness
+    /// boundary (docs/THE_CITY.md).
     /// </summary>
-    // THE GATE ON THE FOURTH ATTEMPT. Skipped for three sessions while it read 1% open; it passes on
-    // the openness-boundary survey (a ray whose midpoint is much more open than the listener has
-    // left the room), and AFlatGarageStillRings below still passes beside it.
     [Fact]
     public void AStreetShelterIsNotACathedral()
     {
@@ -219,10 +172,8 @@ public class EnclosureTests
         var (_, mid, _) = Enclosure.DecaySeconds(survey);
         Console.WriteLine($"SHELTER open {survey.OpenFraction:P0} surface {survey.SurfaceAreaSquareMetres:F0} m2 mfp {survey.MeanFreePathMetres:F1} absorption {survey.AbsorptionMid:F2} mid {mid * 1000:F0} ms");
 
-        // A twelfth of the shelter's surface is its open front (this test's own honest figure, above),
-        // so a survey that sees its opening sees about 8 % open. The gate was written as 15 % before
-        // the survey could see the opening at all; measured with the boundary in place it reads 11 %,
-        // which is the front less the pavement just beyond it — that is ground, and counts as ground.
+        // A twelfth of the surface is the open front, so a survey that sees it reads about 8 % open; measured
+        // it reads 11 %, the front less the pavement beyond it, which counts as ground.
         Assert.True(survey.OpenFraction > 0.08f,
             $"the front of a shelter is open, and the survey saw {survey.OpenFraction:P0} of the sphere open");
         Assert.True(survey.SurfaceAreaSquareMetres < 150f,
@@ -231,11 +182,8 @@ public class EnclosureTests
             $"standing under a bus shelter measured a {mid * 1000:F0} ms tail");
     }
 
-    /// <summary>
-    /// And the guard on it. The garage is flat, hard and twenty metres across; its far wall IS its
-    /// own wall, and the tail it has is the longest on the map. Every attempt at the shelter so far
-    /// has taken this down with it — median-keyed shrinking put it at 0.7 s.
-    /// </summary>
+    /// <summary>The guard beside it: the garage is flat, hard and twenty metres across, its far wall is its own,
+    /// and its tail is the longest on the map. Median-keyed shrinking had put it at 0.7 s.</summary>
     [Fact]
     public void AFlatGarageStillRings()
     {

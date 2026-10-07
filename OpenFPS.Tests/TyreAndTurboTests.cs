@@ -1,27 +1,19 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A tyre that is being asked for more than it has, and an engine with a turbocharger on it.
-///
-/// Both are properties of the VEHICLE rather than of the map or the audio engine, which is the point:
-/// pick a vehicle and its grip, the note it squeals at, its boost and its lag come with it. Nothing
-/// here knows about racetracks, corners or this particular map.
+/// A tyre asked for more than it has, and an engine with a turbocharger. Both are properties of the
+/// vehicle, not of the map or the audio engine: its grip, squeal note, boost and lag come with it.
 /// </summary>
 public class TyreAndTurboTests
 {
     // ── The friction circle ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Longitudinal and lateral demand combine as a VECTOR, not a sum. A tyre at its cornering limit
-    /// has nothing left for braking — which is why trail-braking into a corner makes a car let go,
-    /// and why the same tyre can do either alone. Nobody writes that rule down; it is what taking the
-    /// magnitude of two components does.
+    /// Longitudinal and lateral demand combine as a vector, not a sum: a tyre at its cornering limit has
+    /// nothing left for braking, though it can do either alone.
     /// </summary>
     [Fact]
     public void BrakingAndCorneringShareOneFrictionBudget()
@@ -50,11 +42,6 @@ public class TyreAndTurboTests
     // ── Chirp, squeal, skid: one curve ──────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Below the onset a tyre rolls silently, at the limit it sings, and past it the note is given up
-    /// to a broadband slide. They are not three sounds to be triggered — they are one curve sampled
-    /// at three demands, and the handover has to be continuous or a corner entry clicks.
-    /// </summary>
-    /// <summary>
     /// On dry asphalt a locked or spinning tyre keeps screeching at its stick-slip note; only on a
     /// loose or icy surface does the slide become broadband noise.
     /// </summary>
@@ -69,6 +56,10 @@ public class TyreAndTurboTests
         Assert.True(TyreFriction.SkidAmount(1.8f, gravel) > 0.95f);
     }
 
+    /// <summary>
+    /// Below the onset a tyre rolls silently, at the limit it sings, and past it the note gives way to a
+    /// broadband slide: one curve at three demands, continuous, or a corner entry clicks.
+    /// </summary>
     [Fact]
     public void TheSlideCurveIsContinuousAndHandsOver()
     {
@@ -184,12 +175,9 @@ public class TyreAndTurboTests
     // ── The live path, end to end ───────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The voice the GAME renders — the same DSP state the mixer drives — has to actually get louder
-    /// when the road is working its tyres. This runs it offline, which is what its Render is for.
-    ///
-    /// Worth testing at this level rather than trusting the unit below it: the slip has to cross a
-    /// volatile field, survive being smoothed twice, and land in a synthesis that is also producing
-    /// an engine. A model that is right and a plumbing run that drops it sound identical from here.
+    /// The voice the game renders (the mixer's own DSP state, run offline) gets louder when the road
+    /// works its tyres. End to end because the slip crosses a volatile field and two smoothings into a
+    /// synthesis that also makes an engine: plumbing that drops it sounds the same as a wrong model.
     /// </summary>
     [Fact]
     public void ACarAtTheLimitIsAudiblyLouderThanOneCruising()
@@ -201,11 +189,9 @@ public class TyreAndTurboTests
             voice.PlaceAtSpeed(60f);
             voice.TargetSpeed = 60f;
             voice.RoadSlip = slip;
-            // The tyres are mixed about thirty decibels under the exhaust, which is right — a stock
-            // car's engine is 124 dB at a metre and its tyres 99 even when sliding — and it means the
-            // whole voice's level barely moves whatever the tyres do. That is a MIX balance, not the
-            // thing under test: what is under test is whether the slip reaches the synthesis at all,
-            // so the tyres are brought up to where they can be measured through the same plumbing.
+            // The tyres mix about 30 dB under the exhaust (a stock car's engine is 124 dB at a metre, its
+            // tyres 99 sliding), so they are brought up here: under test is whether the slip reaches the
+            // synthesis, not the mix balance.
             voice.TyreMix = 40f;
             // Long enough for the asymmetric smoothing inside the synthesis to settle.
             var warm = new float[44100 * 2];
@@ -243,18 +229,11 @@ public class TyreAndTurboTests
     }
 
     /// <summary>
-    /// A car going round a BANKED corner at its racing line's limit is at its limit — not half as far
-    /// past it again.
-    ///
-    /// This is the sibling of the racing-line banking bug and it survived that fix by one file. The
-    /// line learned that banking raises the cornering limit; the tyre DEMAND kept dividing lateral
-    /// acceleration by flat-ground grip. On ten degrees of bank with a 1.75 g slick that reads 1.59
-    /// against a full-slide threshold of 1.45 — so every car in every corner rendered pure broadband
-    /// skid for the length of both turns, heard as a long white-noise tail travelling with the field.
-    ///
-    /// A listener cannot fix this for itself, and that is why the number is on the wire now: a banked
-    /// constant-radius turn at constant speed and a flat one have identical accelerations, because
-    /// the bank appears in the normal load and not in the kinematics.
+    /// A car round a banked corner at its racing line's limit is at its limit, not half as far past it
+    /// again. Demand divided by flat-ground grip read 1.59 on 10 degrees of bank with a 1.75 g slick,
+    /// over the full-slide 1.45, and every car skidded through both turns. A listener cannot tell a
+    /// banked turn from a flat one by its accelerations (the bank is in the normal load), so the server
+    /// sends the demand.
     /// </summary>
     [Theory]
     [InlineData(1.75f)]   // stock car slick
@@ -300,14 +279,9 @@ public class TyreAndTurboTests
     }
 
     /// <summary>
-    /// A car flat out down a STRAIGHT is not using its cornering grip, and a car on its line through
-    /// a turn is using all of it.
-    ///
-    /// The first attempt at the banked-corner fix measured demand against the racing line's SPEED
-    /// limit, and those are different questions. The speed limit is the car's top speed on a straight
-    /// and whatever the braking pass allows into a turn, so a car doing its top speed in a straight
-    /// line came out at a demand of 1.0 — squealing all the way down the back straight. Reported, in
-    /// the plainest possible terms, as "why are they all screeching".
+    /// A car flat out down a straight uses none of its cornering grip, and a car on its line through a
+    /// turn uses all of it. Demand against the line's speed limit put a car at top speed on a straight at
+    /// 1.0, squealing down the back straight ("why are they all screeching").
     /// </summary>
     [Fact]
     public void AStraightAsksNothingOfTheTyresAndACornerAsksEverything()
@@ -336,7 +310,7 @@ public class TyreAndTurboTests
             line.Sample(d, out _, out _, out float speedLimit, out float corner);
             if (float.IsInfinity(corner)) { sawStraight = true; continue; }
 
-            // In a corner the two agree, because there the grip IS what limits the speed.
+            // TODO: in a corner speedLimit and corner should agree (the grip limits the speed); nothing asserts it.
             if (corner < 79f) { sawCorner = true; Assert.True(corner > 5f, $"absurd corner limit {corner}"); }
         }
 

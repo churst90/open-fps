@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -20,18 +16,20 @@ namespace OpenFPS.Tests;
 ///   * with it, half a second after the cue says "brake" (band 2 or above), as hard as the cue's
 ///     braking asks, and lifting off while it says "lift".
 ///
-/// Measured: the speed into the turn, the most of the tyres' grip the turn took, and how far the car
-/// ran wide over Central Street's centre line into the oncoming lanes, or cut inside its line round the corner. This is a
-/// model of a driver, not a driver: it says whether the cue carries what is needed to make the turn,
-/// not how a person will use it.
+/// Measured: the speed into the turn, the grip it took, and how far the car ran wide into the oncoming
+/// lanes or cut inside its line. A model of a driver: it says whether the cue carries what the turn
+/// needs, not how a person will use it.
 /// </summary>
 public class DrivingCueDrillTests
 {
     private readonly ITestOutputHelper _o;
     public DrivingCueDrillTests(ITestOutputHelper o) => _o = o;
 
+    /// <param name="EntryKmh">The speed into the turn.</param>
+    /// <param name="PeakGrip">The most of the tyres' grip the turn took.</param>
     /// <param name="RanWide">Metres over Central Street's centre line, into the oncoming lanes.</param>
     /// <param name="OverKerb">Metres inside the line it should have taken, round the corner: cutting it.</param>
+    /// <param name="Stopped">The car stopped short of the turn.</param>
     internal sealed record Result(float EntryKmh, float PeakGrip, float RanWide, float OverKerb, bool Stopped);
 
     internal static Result Drive(bool brakeCue, float startKmh, float wetFactor)

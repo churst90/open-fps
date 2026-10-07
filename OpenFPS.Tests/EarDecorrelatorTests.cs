@@ -1,6 +1,4 @@
-using System;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -31,8 +29,8 @@ public class EarDecorrelatorTests
     private static float[] HighPass(float[] x, float hz)
     {
         var y = new float[x.Length];
-        float a = MathF.Exp(-2f * MathF.PI * hz / 44100f), prev = 0f, lp = 0f;
-        for (int i = 0; i < x.Length; i++) { lp = (1 - a) * x[i] + a * lp; y[i] = x[i] - lp; prev = x[i]; }
+        float a = MathF.Exp(-2f * MathF.PI * hz / 44100f), lp = 0f;
+        for (int i = 0; i < x.Length; i++) { lp = (1 - a) * x[i] + a * lp; y[i] = x[i] - lp; }
         return y;
     }
 

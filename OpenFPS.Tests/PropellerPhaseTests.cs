@@ -1,26 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core.Aircraft;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// "The prop plane and the helicopter flange when they're flying." Two identical pulse trains whose
-/// relative phase drifts are a flanger. The twin turboprop's props ran half a per cent apart, and the
-/// piston single's prop ran on its own smoothed speed rather than on the crank it is bolted to, so
-/// its blade rate and the exhaust's firing rate (the same frequencies on a two-blade prop and a
-/// four-cylinder engine) slid past each other. Measured as how much the fine structure of the
-/// spectrum wanders from frame to frame with the listener still.
-/// </summary>
-/// <summary>
-/// Tests that measure a PERIODIC mechanism — a phase, a period — with the exhaust valves' flow noise
-/// switched off (EngineSynth.ValveJetNoise), because that noise is random by construction and a
-/// twelfth-octave band of noise wanders 2-3 dB from frame to frame on its own. The switch is process
-/// wide, so they run alone and put it back.
+/// For tests that measure a periodic mechanism (a phase, a period): runs with the exhaust valves' flow noise
+/// off (EngineSynth.ValveJetNoise), since a twelfth-octave band of that noise wanders 2-3 dB frame to frame
+/// on its own. The switch is process-wide, so these run alone and put it back.
 /// </summary>
 [CollectionDefinition(nameof(ValveFlowSwitch), DisableParallelization = true)]
 public class ValveFlowSwitch
@@ -34,6 +21,12 @@ public class ValveFlowSwitch
     }
 }
 
+/// <summary>
+/// "The prop plane and the helicopter flange when they're flying": two identical pulse trains whose relative
+/// phase drifts are a flanger. The twin turboprop's props ran half a per cent apart, and the piston single's
+/// prop turned on its own smoothed speed instead of its crank, so blade rate and firing rate slid past each
+/// other. Measured as the spectrum's fine structure wandering frame to frame, the listener still.
+/// </summary>
 [Collection(nameof(ValveFlowSwitch))]
 public class PropellerPhaseTests
 {

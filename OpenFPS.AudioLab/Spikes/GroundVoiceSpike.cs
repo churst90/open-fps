@@ -1,10 +1,7 @@
-using System;
 using System.Diagnostics;
-using System.IO;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.Core;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -157,8 +154,6 @@ public static class GroundVoiceSpike
         v = Vector3.Normalize(v);
         return new Phonon.IPLVector3 { x = v.X, y = v.Y, z = v.Z };
     }
-
-    static float Elevation(Vector3 v) => MathF.Asin(Vector3.Normalize(v).Y) * 180f / MathF.PI;
 
     static float[] Decode(string path)
     {

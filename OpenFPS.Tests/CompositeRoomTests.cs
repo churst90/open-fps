@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -12,22 +8,14 @@ using OpenFPS.Client.Core;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Building something you can be INSIDE, without anyone authoring the inside of it.
-///
-/// Put four walls, a floor and a roof around yourself and you are indoors. That is a fact about the
-/// geometry, not a property somebody remembered to tick, and it has to be true of a shed, a
-/// cathedral and the cab of a lorry by the same rule — otherwise every building a player makes is
-/// silent inside until a developer visits it.
-///
-/// These hold the three things that make a composite a room (big enough to be in, mostly empty,
-/// mostly covered), the things that are NOT rooms and must not become them, that the room is made of
-/// what the walls are made of, and that the whole of it survives the trip to the client's acoustic
-/// map — which is the only place any of it actually matters.
+/// A composite derives its own room from its geometry, by one rule for a shed, a cathedral and a cab:
+/// big enough to be in, mostly empty, mostly covered. These hold that rule, the things that must not
+/// become rooms, that the room is made of the walls' materials, and that it reaches the client's
+/// acoustic map.
 /// </summary>
 public class CompositeRoomTests : IDisposable
 {
@@ -48,19 +36,14 @@ public class CompositeRoomTests : IDisposable
         Assert.True(room!.Value.IsIndoor);
         Assert.Equal("shed", room.Value.FriendlyName);
 
-        // It is the size of the thing, not of a guess.
+        // The size of the thing.
         Assert.Equal(Fixture.ShedSpan, room.Value.RoomSize.X, 0);
         Assert.Equal(Fixture.ShedSpan, room.Value.RoomSize.Z, 0);
         Assert.True(room.Value.RoomSize.Y > 2.5f, $"a room {room.Value.RoomSize.Y:F1} m high is a crawlspace");
     }
 
-    /// <summary>
-    /// The room sits at the middle of the space, not at the composite's origin.
-    ///
-    /// A composite's origin is where it meets the GROUND — that is what makes a house placed at your
-    /// feet have its floor at your feet. Put the room volume there and half of it is underground and
-    /// its ceiling is at your knees, so standing up in your own building puts you outdoors.
-    /// </summary>
+    /// <summary>The room sits at the middle of the space, not at the composite's origin, which is at the
+    /// ground: centred there, half the room was underground and you stood up outdoors.</summary>
     [Fact]
     public void TheRoomIsWhereTheSpaceIsAndNotWhereTheOriginIs()
     {
@@ -70,7 +53,7 @@ public class CompositeRoomTests : IDisposable
         var (position, rotation, size) = f.RoomVolume(root);
         Assert.True(position.Y > 1.0f, $"the room's middle is {position.Y:F2} m up, so it is buried");
 
-        // Standing height, in the middle of it, is inside. That is the test the client actually runs.
+        // Standing height in the middle is inside: the client's own question.
         Assert.True(GeometryUtils.IsPointInOBB(new Vector3(120, 1.7f, -60), position, size, rotation),
                     "standing up inside your own shed puts you outdoors");
         // And well above the roof is not.
@@ -102,8 +85,7 @@ public class CompositeRoomTests : IDisposable
 
     // ── What is NOT a room ──────────────────────────────────────────────────────────────────────
 
-    /// <summary>A fence is a wall with more wall next to it. Whatever its footprint, one of its
-    /// dimensions is a wall's thickness, and you cannot be inside that.</summary>
+    /// <summary>A fence is not a room: whatever its footprint, one dimension is a wall's thickness.</summary>
     [Fact]
     public void AFenceIsNotARoom()
     {
@@ -121,9 +103,8 @@ public class CompositeRoomTests : IDisposable
         Assert.Null(f.RoomOf(root));
     }
 
-    /// <summary>Two walls facing each other across a yard are not a room. Four of the six faces is
-    /// the line, and it is drawn there on purpose — a walled courtyard genuinely does sound closer to
-    /// a room than to a field.</summary>
+    /// <summary>Two walls facing each other across a yard are not a room. Four faces of six is the line,
+    /// on purpose: a walled courtyard does sound closer to a room than to a field.</summary>
     [Fact]
     public void TwoWallsAndSkyAreNotARoom()
     {
@@ -134,10 +115,7 @@ public class CompositeRoomTests : IDisposable
 
     // ── What it is made of ──────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The room is made of the walls. Nobody authors that either: a carpeted room is dead and a
-    /// concrete one rings because of what somebody built them out of.
-    /// </summary>
+    /// <summary>The room's materials are the walls' materials.</summary>
     [Fact]
     public void TheRoomTakesItsMaterialsFromTheParts()
     {
@@ -153,7 +131,7 @@ public class CompositeRoomTests : IDisposable
         Assert.Equal(concreteIndex, hard.Materials[0]);     // floor
         Assert.Equal(carpetIndex, soft.Materials[0]);
 
-        // And the thing that matters about the difference: one of them absorbs and the other does not.
+        // One absorbs and the other does not.
         float hardAbsorption = AcousticRegistry.GetPropertiesByResonanceIndex(hard.Materials[0]).Absorption;
         float softAbsorption = AcousticRegistry.GetPropertiesByResonanceIndex(soft.Materials[0]).Absorption;
         Assert.True(softAbsorption > hardAbsorption * 4f,
@@ -162,10 +140,8 @@ public class CompositeRoomTests : IDisposable
 
     // ── The parts of it that are not parts of it ────────────────────────────────────────────────
 
-    /// <summary>
-    /// The room is carried like a part and is not one. Nobody built it, it cannot be rebuilt from a
-    /// prefab, and a template that tried to save it would fail on a wall it never had.
-    /// </summary>
+    /// <summary>The derived room is carried like a part but is not saved as one: it has no prefab to be
+    /// rebuilt from.</summary>
     [Fact]
     public void TheDerivedRoomIsNeverSavedAsAPart()
     {
@@ -180,7 +156,7 @@ public class CompositeRoomTests : IDisposable
         Assert.All(template.Parts, p => Assert.False(string.IsNullOrWhiteSpace(p.PrefabId)));
     }
 
-    /// <summary>...and a placed copy derives its own, so a shed put down twice is a room twice.</summary>
+    /// <summary>A placed copy derives its own room.</summary>
     [Fact]
     public void APlacedCopyEnclosesItsOwnRoom()
     {
@@ -194,8 +170,7 @@ public class CompositeRoomTests : IDisposable
         Assert.NotNull(f.RoomOf(copy));
     }
 
-    /// <summary>Taking a building apart takes its inside apart too. Left behind, it is an invisible
-    /// volume in an empty field that still sounds like a room.</summary>
+    /// <summary>Taking a building apart removes its room too.</summary>
     [Fact]
     public void UngroupingLeavesNoRoomBehind()
     {
@@ -212,11 +187,8 @@ public class CompositeRoomTests : IDisposable
 
     // ── All the way to the client ───────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The only place any of this matters is the client's acoustic map, so the test goes all the way
-    /// there: derive it on the server, put it on the wire as the broadcast would, and ask the map the
-    /// question the listener asks every frame.
-    /// </summary>
+    /// <summary>Derived on the server, put on the wire as the broadcast does, and found by the client's
+    /// acoustic map where the listener asks.</summary>
     [Fact]
     public void TheRoomSurvivesTheTripToTheClientsAcousticMap()
     {
@@ -237,12 +209,9 @@ public class CompositeRoomTests : IDisposable
                      map.VoxelGrid.GetRegionAt(Fixture.Clear + new Vector3(20, 1.7f, 0)));
     }
 
-    /// <summary>
-    /// A shed with one side left off is still a room (five faces walled), and its open side is OPEN: no
-    /// material, no wall, and an opening to the outdoors exactly where it is. It used to be given the
-    /// material of whatever covered most of it however little, or Generic when nothing did, so a
-    /// composite's open side was a wall to everything that asked, and its only openings were its doors.
-    /// </summary>
+    /// <summary>A shed with one side left off is still a room, and that side is open: no material, and an
+    /// opening to the outdoors where it is. It used to take the material of whatever covered most of it,
+    /// or Generic, and was a wall to everything that asked.</summary>
     [Fact]
     public void ACompositesOpenSideIsAnOpeningAndNotAWall()
     {
@@ -273,8 +242,8 @@ public class CompositeRoomTests : IDisposable
         Assert.True(frame.Size.Y > size.Y - 0.6f, $"the open side is {frame.Size.Y:F2} m high of {size.Y:F2}");
     }
 
-    /// <summary>...and one put down after the bake gets its opening when its room arrives, and loses it
-    /// when the room goes.</summary>
+    /// <summary>One put down after the bake gets its opening when its room arrives and loses it when the
+    /// room goes.</summary>
     [Fact]
     public void AnOpenSidedRoomThatArrivesAfterTheBakeGetsItsOpening()
     {
@@ -298,15 +267,8 @@ public class CompositeRoomTests : IDisposable
         Assert.DoesNotContain(client.AcousticMap.Portals.Keys, id => id <= AcousticVolumeGenerator.FirstFaceOpeningId);
     }
 
-    /// <summary>
-    /// A room that turns up AFTER the bake.
-    ///
-    /// The client bakes its acoustic map once, from the static geometry the server streams at map
-    /// load. A building somebody puts down while you are standing there is not in that, and the
-    /// inside of a car never can be — it moves, so it is not static geometry by definition. Without
-    /// the runtime registration the map never hears of either and stepping inside sounds like
-    /// stepping nowhere.
-    /// </summary>
+    /// <summary>A room that turns up after the client's one bake of static geometry (a building put down
+    /// later, a car's cabin) is registered at run time.</summary>
     [Fact]
     public void ARoomThatArrivesAfterTheBakeStillReachesTheAcousticMap()
     {
@@ -323,7 +285,7 @@ public class CompositeRoomTests : IDisposable
         Assert.True(client.AcousticMap!.Regions.ContainsKey(roomId), "the room never reached the acoustic map");
         Assert.Equal("shed", client.AcousticMap.Regions[roomId].FriendlyName);
 
-        // ...and goes again with the thing that enclosed it, or an empty field keeps sounding like a shed.
+        // And it goes with the thing that enclosed it.
         client.RemoveEntities(new[] { roomId });
         Assert.False(client.AcousticMap!.Regions.ContainsKey(roomId));
     }
@@ -335,8 +297,8 @@ public class CompositeRoomTests : IDisposable
         /// <summary>Across the flats of the shed, metres. A 10 m floor slab with walls around it.</summary>
         public const float ShedSpan = 10f;
 
-        /// <summary>Empty ground, well clear of the shipped map's own floor and grass — a sweep is
-        /// entitled to take those and this is not the test that says so.</summary>
+        /// <summary>Empty ground, clear of the shipped map's own floor and grass, which a sweep may
+        /// take.</summary>
         public static readonly Vector3 Clear = new(140, 0, 140);
 
         public readonly MapManager Maps;
@@ -381,7 +343,7 @@ public class CompositeRoomTests : IDisposable
             throw new InvalidOperationException("that composite has no room");
         }
 
-        /// <summary>Where that room actually is in the world — the question the listener asks.</summary>
+        /// <summary>Where that room is in the world.</summary>
         public (Vector3 Position, Quaternion Rotation, Vector3 Size) RoomVolume(int rootId)
         {
             foreach (var member in CompositeService.MembersOf(World, rootId))
@@ -421,15 +383,8 @@ public class CompositeRoomTests : IDisposable
             return root;
         }
 
-        /// <summary>
-        /// A run of hoardings in a line with gaps between them. Long, tall, airy, and a wall's
-        /// thickness deep.
-        ///
-        /// Spaced rather than butted together on purpose: shoulder to shoulder it is dense enough
-        /// that the hollowness rule throws it out, which would leave the minimum-dimension rule
-        /// untested and passing for free. With gaps it is hollow, its six faces are all "covered",
-        /// and the only thing standing between it and being a room is that it is half a metre thick.
-        /// </summary>
+        /// <summary>A run of hoardings with gaps, a wall's thickness deep. Spaced so the hollowness rule
+        /// passes and only the minimum-dimension rule (half a metre thick) keeps it from being a room.</summary>
         public int Fence(Vector3 where)
         {
             for (int i = 0; i < 5; i++)

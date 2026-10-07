@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Platform;
@@ -6,31 +5,20 @@ using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core.Session;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// One press of a movement key is one footstep.
-///
-/// Reported from play: *"each W A S D key press should hear a footstep, not every 2 or 3 presses"*.
-/// Two separate things were eating them, and both are arithmetic rather than taste.
-///
-/// A tap moves the player for one 30 Hz tick at 4.5 m/s, which is fifteen centimetres. A footfall
-/// was half a metre of ground counted from a standstill, so three or four taps were needed before
-/// one sounded — and a tap shorter than the 33 ms between two input drains was pressed and released
-/// before the tick ever looked at the keyboard, so it moved the player nowhere at all.
-///
-/// The fixes are in <see cref="StrideAccumulator"/> (a walk's first footfall is at the START of the
-/// walk, because a body cannot cross half a metre without having already put a foot down) and in the
-/// session's input gather (a key that went down and back up between two drains is still worth the one
-/// tick of movement it asked for).
+/// One press of a movement key is one footstep ("each W A S D key press should hear a footstep, not every
+/// 2 or 3 presses"). A tap moves 15 cm (one 30 Hz tick at 4.5 m/s) and a footfall was half a metre from a
+/// standstill; a tap shorter than the 33 ms between input drains moved nothing. Fixed in
+/// <see cref="StrideAccumulator"/> (a walk's first footfall is at its start) and the session's input gather.
 /// </summary>
 public class FootstepPerPressTests
 {
     private static readonly Quaternion Facing = Quaternion.Identity;
 
-    /// <summary>How far one tick of held W moves a body: the tap the fault was reported about.</summary>
+    /// <summary>How far one tick of held W moves a body: the reported tap.</summary>
     private const float OneTickOfWalking = PhysicsConstants.WalkSpeed * PhysicsConstants.FixedDeltaTime;
 
     /// <summary>Taps the key: one tick moving, then long enough stopped for the feet to be together.</summary>
@@ -53,8 +41,7 @@ public class FootstepPerPressTests
         var stride = new StrideAccumulator();
         var at = Vector3.Zero;
 
-        // Fifteen centimetres a tap: before the stride was phased from the start of a walk, the first
-        // several of these were silent and only the last sounded.
+        // Fifteen centimetres a tap, well under a step: only the opening footfall makes it sound.
         Assert.True(OneTickOfWalking < StrideAccumulator.StepLength(PhysicsConstants.WalkSpeed) / 3f,
             $"a tap is {OneTickOfWalking:F2} m, which is no longer small against a step");
 
@@ -62,10 +49,8 @@ public class FootstepPerPressTests
             Assert.Equal(1, Tap(stride, ref at));
     }
 
-    /// <summary>
-    /// Holding the key is one footfall a STEP, and a step is as long as the speed makes it. Ten
-    /// metres held down is the opening footfall and then one every 1.38 m.
-    /// </summary>
+    /// <summary>Holding the key is one footfall a step, as long as the speed makes it: ten metres is the
+    /// opening footfall and then one every 1.38 m.</summary>
     [Fact]
     public void HoldingTheKeyIsAFootfallEveryStep()
     {
@@ -85,11 +70,8 @@ public class FootstepPerPressTests
         Assert.InRange(steps, (int)expected, (int)expected + 2);   // plus the one that started it
     }
 
-    /// <summary>
-    /// A body being CARRIED still makes no step when it starts, which is the rule the opening
-    /// footfall must not break: a correction, a spawn slide or a car all move a body whose own
-    /// velocity is zero, and zero is not walking however far the position jumps.
-    /// </summary>
+    /// <summary>A carried body makes no opening step: a correction, a spawn slide or a car moves a body
+    /// whose own velocity is zero, and zero is not walking.</summary>
     [Fact]
     public void BeingMovedStillStartsNoWalk()
     {
@@ -103,13 +85,8 @@ public class FootstepPerPressTests
         }
     }
 
-    /// <summary>
-    /// A velocity sitting on the walking threshold does not restart the walk over and over.
-    ///
-    /// The opening footfall is a latch, and a latch that reads one number both ways chatters: a remote
-    /// body's velocity arrives a server tick at a time and can straddle the threshold for as long as
-    /// it likes. It has to fall to a stop before the feet are together again.
-    /// </summary>
+    /// <summary>A velocity on the walking threshold does not restart the walk: a remote body's velocity can
+    /// straddle it tick after tick, so the latch waits for a stop before the feet are together again.</summary>
     [Fact]
     public void HoveringOnTheWalkingThresholdIsNotAStreamOfFirstSteps()
     {
@@ -129,13 +106,8 @@ public class FootstepPerPressTests
         Assert.Equal(1, steps);   // the one that started it, and no more
     }
 
-    /// <summary>
-    /// Landing is itself a foot going down, so it does not sound beside a first step.
-    ///
-    /// Jumping from a standstill and steering in the air lands a body that is moving and whose feet
-    /// were never together on the ground — the one case where "it started walking" and "it landed"
-    /// fall on the same update.
-    /// </summary>
+    /// <summary>Landing is a foot going down, so it does not sound beside a first step (a jump from a
+    /// standstill, steered in the air, starts walking and lands on the same update).</summary>
     [Fact]
     public void LandingWhileMovingIsOneSoundAndNotTwo()
     {
@@ -144,8 +116,7 @@ public class FootstepPerPressTests
 
         stride.Update(at, Vector3.Zero, isGrounded: true, Facing);
 
-        // A body in the air is FALLING — a jump reaches about five metres a second on the way back
-        // down — and that is what makes arriving a landing rather than a blip in the floor.
+        // Falling at about 5 m/s, as after a jump: that makes arriving a landing, not a blip in the floor.
         var airborne = new Vector3(0, -5f, PhysicsConstants.WalkSpeed);
         for (int i = 0; i < 10; i++)
         {
@@ -162,13 +133,8 @@ public class FootstepPerPressTests
 
     // ── The other half: a press the tick never saw ──────────────────────────────────────────────
 
-    /// <summary>
-    /// A key pressed and released between two input drains still moves the player one tick.
-    ///
-    /// Held state is sampled once per fixed step. A tap shorter than 33 ms was over before the step
-    /// looked, so the press produced no movement, no footstep and no packet — the player pressed a
-    /// key and the world did not answer.
-    /// </summary>
+    /// <summary>A key pressed and released between two input drains still moves the player one tick: held
+    /// state is sampled once per fixed step, so a tap under 33 ms produced no movement, footstep or packet.</summary>
     [Fact]
     public void AKeyTappedBetweenTwoTicksStillMovesThePlayer()
     {

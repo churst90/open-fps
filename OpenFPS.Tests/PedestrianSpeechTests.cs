@@ -1,13 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -50,8 +45,7 @@ public class PedestrianSpeechTests
     [Fact]
     public void Every_line_the_street_can_ask_for_exists_in_every_voice()
     {
-        // Every list, under every condition that changes one, so a misspelt line name fails here and
-        // not as a person who silently says nothing.
+        // Every list under every condition that changes one, so a misspelt line name fails here.
         var lines = new HashSet<string>();
         foreach (float hour in new[] { 3f, 9f, 14f, 19f })
             foreach (float temp in new[] { 0f, 20f, 32f })
@@ -84,8 +78,8 @@ public class PedestrianSpeechTests
         // have 86, the rest 126, and the drivers only yell), and a person only picks what they have.
         foreach (var line in lines)
             Assert.True(Speech.Voices.Any(v => Speech.Find(v, line) != null), $"nobody has {line}");
-        // ...but everybody on foot can greet, apologise, say goodbye and answer the phone: from the
-        // named lines, or, for a voice recorded later, from its own lines in the same category.
+        // Everybody on foot can greet, apologise, say goodbye and answer the phone: from the named lines,
+        // or a later voice's own lines in the same category.
         foreach (var voice in PedestrianSpeech.WalkerVoices.Distinct())
             foreach (var (list, cats) in new (IReadOnlyList<string>, string[])[]
             {
@@ -345,12 +339,9 @@ public class PedestrianSpeechTests
         Assert.DoesNotContain(said, line => !HomelessLines.TrueNow(Speech.Find("joel", line)!.Text, morning));
     }
 
-    /// <summary>
-    /// Every call ends with a goodbye, and the next one waits. The ring-off used to come only if a
-    /// line happened to fall due in the last six seconds of the call; the gap to the next line is up
-    /// to ten seconds and more, so about three calls in ten ran past their end and stopped in
-    /// silence, and skipped the wait before the next call as well.
-    /// </summary>
+    /// <summary>Every call ends with a goodbye, and the next one waits. The ring-off once needed a line
+    /// due in the call's last six seconds, so about three calls in ten stopped in silence and skipped the
+    /// wait.</summary>
     [Fact]
     public void Every_phone_call_ends_with_a_goodbye_and_the_next_one_waits()
     {
@@ -414,12 +405,9 @@ public class PedestrianSpeechTests
                            : "/home/cody/external-rescue/Github/open-fps/OpenFPS.Client/ASSETS/SOUNDS";
     }
 
-    /// <summary>
-    /// No pedestrian walks through anything solid. The map generator once read a prefab with no IsSolid
-    /// as not solid, where the server reads it as solid, and routed the Main Street walks through the
-    /// tunnel's concrete sides: a player outside the tunnel heard people walking inside the wall.
-    /// Checked at knee and chest height, against the server's own entities.
-    /// </summary>
+    /// <summary>No pedestrian walks through anything solid, checked at knee and chest height against the
+    /// server's entities. The generator once read a missing IsSolid as not solid (the server reads solid)
+    /// and walked people inside the tunnel's walls.</summary>
     [Fact]
     public void NoPedestrianWalksThroughAnythingSolid()
     {

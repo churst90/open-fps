@@ -2,7 +2,6 @@ using System.Net;
 using System.Numerics;
 using Arch.Core;
 using MemoryPack;
-using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server;

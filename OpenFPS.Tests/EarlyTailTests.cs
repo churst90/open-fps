@@ -1,19 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The room answers from its first reflection on (2026-10-03, "a delay between when I clap and when I
-/// hear the reflections"). The traced response used to start at 50 ms with the first 80 ms left to a
-/// few placed copies, so a clap in flat 01F had nothing at all from 26 to 46 ms. Now the trace plays
-/// from the nearest surface's reflection, less the energy the placed copies carry (EarlyCopies), and
-/// the bus waits for the voices' binaural rendering (TracedReverbDsp.StagePreDelay).
+/// The room answers from its first reflection on (2026-10-03, "a delay between when I clap and when I hear
+/// the reflections": flat 01F had nothing from 26 to 46 ms). The trace plays from the nearest surface's
+/// reflection less the placed copies' energy (EarlyCopies), and the bus waits for the voices' binaural
+/// rendering (TracedReverbDsp.StagePreDelay).
 /// </summary>
 public class EarlyTailTests
 {
@@ -124,9 +119,8 @@ public class EarlyTailTests
     [Fact]
     public void NothingIsCountedTwice()
     {
-        // The copies' energy comes out of the trace's frames, band by band, from where the trace put
-        // it: what is left plus what was taken is what the trace had, and nothing is taken that the
-        // copies do not carry.
+        // The copies' energy comes out of the trace's frames band by band: what is left plus what was taken is
+        // what the trace had, and nothing is taken that the copies do not carry.
         var copies = EarlyCopies.From(Flat(), Ear, Rate)!;
         var s = new SmoothTail(Rate, Length, 0);
         int frames = s.Frames;

@@ -1,10 +1,7 @@
-using System;
-using System.Linq;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Pneumatics;
 using OpenFPS.Client.AudioEngine.Core.Rail;
 using OpenFPS.Client.AudioEngine.Core.Signals;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -54,15 +51,13 @@ public class RailAndSignalTests
     [Fact]
     public void TheHornsReedActuallyBeats()
     {
-        // A valve that never shuts makes a sine, and a sine is not a horn. Measured on the model
-        // itself, not asserted about the design: the reed must spend a real fraction of every cycle
-        // on its seat, and the waveform must have a crest factor well above a sine's 1.41.
+        // A valve that never shuts makes a sine, not a horn: measured on the model, the reed spends a
+        // real fraction of every cycle on its seat and the crest factor is well above a sine's 1.41.
         var horn = new ChimeHorn(ChimeHornSpec.NathanK5LA, Sr, 11);
         foreach (var l in horn.Describe()) _o.WriteLine(l);
         var text = string.Join(" ", horn.Describe());
         Assert.Contains("shut", text);
-        // And it must lock to the column rather than to the reed: the measured note is within a
-        // few per cent of the design note for every bell.
+        // It locks to the column, not the reed: every bell's note within a few per cent of the design.
         foreach (var line in horn.Describe().Skip(1))
         {
             int d = line.IndexOf("design ", StringComparison.Ordinal);
@@ -91,14 +86,11 @@ public class RailAndSignalTests
     }
 
     /// <summary>
-    /// Every air horn comes up and goes down in one smooth movement, like the electric horns. With a
-    /// 6.5% pitch bend and a slow valve the reed spent the whole swell and fade off the column's
-    /// resonances: the trucks broke up by 4-7 dB ("breaky, weak, cuts out on the fade in and fade
-    /// out") and the locomotive chimes took 190 ms to arrive and hung on 15-25 dB down for half a
-    /// second ("weak on the start and end"). In 20 ms windows (long enough to average over a chord's
-    /// beating), the level never falls back more than 3 dB while rising, never climbs back more
-    /// than 3 dB while falling, and reaches -6 dB within 70 ms (a K5LA's bells come in over 40) and
-    /// -20 dB after release within 150.
+    /// Every air horn swells and fades in one smooth movement. A 6.5% pitch bend and a slow valve once
+    /// kept the reed off the column's resonances there: trucks broke up by 4-7 dB, chimes took 190 ms to
+    /// arrive. In 20 ms windows (long enough to average a chord's beating) the level never falls back
+    /// more than 3 dB while rising nor climbs more than 3 dB while falling, reaches -6 dB within 70 ms
+    /// (a K5LA's bells come in over 40) and -20 dB after release within 150.
     /// </summary>
     [Theory, MemberData(nameof(AirHornKeys))]
     public void AirHornsSwellAndFadeWithoutBreaking(string key)
@@ -132,10 +124,9 @@ public class RailAndSignalTests
     }
 
     /// <summary>
-    /// When the air runs out the column is still ringing, and it rings down on its own. The model
-    /// used to stop computing the pipe the moment the supply fell below a thousandth, which cut
-    /// every horn off dead about 35 dB down. The last 5 ms before the output reaches zero must
-    /// already be below -70 dB of the steady blast.
+    /// When the air runs out the column rings down on its own: the last 5 ms before the output reaches
+    /// zero are below -70 dB of the steady blast. Stopping the pipe when the supply fell below a
+    /// thousandth cut every horn off dead about 35 dB down.
     /// </summary>
     [Theory, MemberData(nameof(AirHornKeys))]
     public void AnAirHornRingsOutInsteadOfStopping(string key)
@@ -151,12 +142,10 @@ public class RailAndSignalTests
     }
 
     /// <summary>
-    /// A second blast after a long gap starts from a quiet pipe with the reed at rest. The column
-    /// used to be frozen, not emptied, when the air ran out, and the next press resumed it: whatever
-    /// the pipe was doing 35 dB down the last time came back at the start of the next blast. So a
-    /// second blast swells in the way a first one does: every 10 ms of the first 60 within 2 dB.
-    /// (Truck and bus only: a chime's reed is ragged at low pressure by design, and its first
-    /// milliseconds differ from blast to blast by a few decibels.)
+    /// A second blast after a long gap starts from an emptied pipe with the reed at rest, so it swells as
+    /// the first did: every 10 ms of the first 60 within 2 dB. A frozen column once brought the last
+    /// blast's tail back at the start of the next. Truck and bus only: a chime's reed is ragged at low
+    /// pressure by design.
     /// </summary>
     [Theory]
     [InlineData("truck_dual")]
@@ -173,10 +162,9 @@ public class RailAndSignalTests
     }
 
     /// <summary>
-    /// A K5LA swells into its chord on EVERY blast: the air reaches the fifth bell 40 ms after the
-    /// first. The delay used to count from when the horn was built rather than from when the air
-    /// arrived, so only a blast in the first 40 ms of the horn's life ever had it. A late bell's
-    /// note in the first 30 ms of a second blast is no more than 3 dB above the first blast's.
+    /// A K5LA swells into its chord on every blast: the air reaches the fifth bell 40 ms after the first,
+    /// counted from when the air arrives, not from when the horn was built. A late bell's note in the
+    /// first 30 ms of a second blast is no more than 3 dB above the first blast's.
     /// </summary>
     [Fact]
     public void EveryBlastSwellsIntoItsChord()
@@ -274,9 +262,8 @@ public class RailAndSignalTests
     [Fact]
     public void ABellIsAnchoredOnItsRingingLevelNotOnOneBlow()
     {
-        // A struck bell's crest factor is twenty-odd decibels. Anchoring the peak instead of the
-        // meter reading puts it that far under and makes a locomotive bell inaudible under its own
-        // train, which is exactly what happened.
+        // A struck bell's crest factor is twenty-odd decibels: anchored on its peak, a locomotive bell
+        // was that far under and inaudible under its own train.
         var bell = new StruckBell(StruckBellSpec.LocomotiveBell, Sr, 31) { Ringing = true };
         int warm = (int)(1.5f * Sr), meas = (int)(2f * Sr);
         for (int i = 0; i < warm; i++) bell.Step();
@@ -290,12 +277,10 @@ public class RailAndSignalTests
     }
 
     /// <summary>
-    /// A rung bell's voice keeps its blows and its level. Every blow peaks about 30 dB over the
-    /// bell's RMS, and rendered with the shared 16 dB of headroom the voice's soft ceiling took ten to
-    /// twelve decibels off each one and one and a half to three off the level. The voice, rung from
-    /// the same seed as the bell on its own, must match it: its level within a tenth of a decibel and
-    /// its peak within one. And what the mixer gives back (HeadroomGain) must put its level where a
-    /// voice with the shared headroom has it, so it is placed by its level and not by its blows.
+    /// A rung bell's voice keeps its blows and its level: every blow peaks about 30 dB over the bell's
+    /// RMS, and with the shared 16 dB of headroom the soft ceiling took 10-12 dB off each. Rung from the
+    /// same seed as the bell alone, the voice matches it (level within 0.1 dB, peak within 1), and
+    /// HeadroomGain places it by its level, not its blows.
     /// </summary>
     [Theory]
     [InlineData("crossing_gong")]

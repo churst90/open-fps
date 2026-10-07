@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common;
@@ -11,15 +7,13 @@ namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
 /// --glass: the physical glass model (<see cref="GlassFracture"/>) against the hiss-and-tinkle it replaced.
-///
-///   --glass survey            every part and type at a few sizes, weapons and drops: peak dB SPL at a
-///                             metre, render time, the census of pieces; what DeclaredDb is read from.
-///   --glass round1 out=DIR    the listening set: a 6 mm annealed house window and a 10 mm tempered shop
-///                             pane, each shot with a Glock and an AKM, heard at 5 and 20 m and from the
-///                             street under a second-floor window; the old sounds of the same, and the raw
-///                             renders at a metre (raw/) for measuring. One shared gain: the game's
-///                             placement (Loudness at the shipped compression, 1/r, the travel time), then
-///                             one common gain for every file so the loudest fits. Dry, mono, direct path.
+///   survey [quick]     every part and type at a few sizes, weapons and drops: peak dB SPL at a metre,
+///                      render time, the piece census; what DeclaredDb is read from.
+///   round1 [out=DIR]   a 6 mm house window and a 10 mm tempered shop pane shot with a Glock and an AKM,
+///                      heard at 5 and 20 m and under a second-floor window, beside the old sounds, plus
+///                      raw renders at a metre (raw/); placed by the game's law, one common gain. Dry, mono.
+///   kernels            the contact kernel's peak and length per time constant.
+///   ringfit [out=FILE] forty shards dropped on cement, for ringclick.py against the recording.
 /// </summary>
 public static class GlassSpike
 {
@@ -40,8 +34,8 @@ public static class GlassSpike
         string? dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4);
         if (args.Contains("ringfit"))
         {
-            // Shards (bottle and window glass, 3 and 6 mm, 3 to 8 cm, the size whose first modes are the 8-15 kHz lines in the recording) dropped 10 to 40 cm onto cement,
-            // one after another, half a second apart: for ringclick.py to compare with the recording.
+            // Shards 3 to 8 cm (whose first modes are the recording's 8-15 kHz lines), 3 or 6 mm thick,
+            // dropped 10 to 40 cm onto cement half a second apart.
             AcousticRegistry.Initialize();
             var all = new List<float>();
             var rng = new Random(5);
@@ -138,9 +132,8 @@ public static class GlassSpike
             {
                 string paneShort = pane.Type == GlassType.Annealed ? "house-annealed" : "shop-tempered";
                 string gun = weapon == WeaponRegistry.Glock ? "glock" : "akm";
-                // The pane in a wall facing +z, the ground at y = 0. Ground floor: a 0.9 m sill. The second
-                // floor: its sill 3.9 m up. The listener 5 or 20 m out in front at ear height, or in the street
-                // 4 m out from the foot of the wall.
+                // The pane in a wall facing +z: a 0.9 m sill on the ground floor, 3.9 m on the second. The ear
+                // 5 or 20 m out at ear height, or in the street 4 m from the wall.
                 foreach (var scene in new[]
                          {
                              new Scene("5m", 0.9f, new Vector3(0, 1.6f, 5f)),

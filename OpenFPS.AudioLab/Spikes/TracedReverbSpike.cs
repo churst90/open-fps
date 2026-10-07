@@ -1,8 +1,4 @@
-using System.Linq;
-using System;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -286,8 +282,8 @@ public static class TracedReverbSpike
     /// Ambisonic Y is "left" and X is "ahead", so at the first arrival Y must agree with W in sign and
     /// at the second X must; decoded through the HRTF with the listener facing +z, the first arrival
     /// must be louder in the left ear, and with the listener turned to face -x (west) the wall ahead
-    /// is on the right and must be louder in the right ear. Before Phonon.World, the scene was handed
-    /// to Steam Audio unflipped and the wall ahead came back with X negative: BEHIND.
+    /// is on the right and must be louder in the right ear. A scene handed to Steam Audio without
+    /// Phonon.World's flip puts the wall ahead behind (X negative).
     /// </summary>
     public static int FrameCheck()
     {

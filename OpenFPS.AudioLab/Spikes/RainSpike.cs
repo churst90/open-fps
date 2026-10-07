@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core.Nature;
@@ -18,21 +14,18 @@ namespace OpenFPS.AudioLab.Spikes;
 /// --rain: rain on the surfaces round a listener, surveyed and rendered as the game does it, and
 /// measured before anybody listens.
 ///
-///   --rain [levels] [scene ...] [rate=light,moderate,heavy,violent|mm/h,...] [sec=20]
-///        each scene at each rate: the survey's patches, then the drops rendered patch by patch at
-///        the listener (RainSynth, the game's synthesiser) through each patch's path (SpatialAcoustics,
-///        the game's), summed. Leq, LAeq, octave shape, headroom and texture (NatureSpike.Report, the
-///        statistics the footstep rounds lacked), the share of each patch, and what a voice costs.
-///   --rain render out=DIR [...]          the same, written as stereo WAVs (the listener faces north;
-///        east is to the right) at the level the game plays them at its master (GameDb): the loudness
-///        law at the default /levels, and the provider's own gain as --rain live measured it.
-///   --rain live [sec=10]                 rain on the street at three rates, under a bus shelter, and an
-///        air conditioner, a fountain and a tree for scale, each through the REAL provider (the
-///        voices, the mixer, the HRTF, the master), captured and measured: what the game plays.
-///   --rain physics                      the rain itself: drops per m² per second, the drop-size
-///        closure, the kinetic energy against van Dijk et al. (2002), and the plate law for the roofs
-///        in the scenes under natural rain and under ISO 10140-1's artificial heavy rain.
-///   --rain survey map=city ear=x,y,z    the survey of a real place on a real map, and its render.
+///   --rain [levels] [scene ...] [rate=light,moderate,heavy,violent|mm/h,...] [fall=...] [sec=20] [near=on|off|only]
+///        each scene at each rate: the survey's patches rendered by RainSynth through each patch's path
+///        (SpatialAcoustics), summed: Leq, LAeq, octave shape, headroom, texture (NatureSpike.Report),
+///        each patch's share and a voice's cost.
+///   --rain render out=DIR [...]          the same as stereo WAVs (listener facing north, east to the
+///        right) at the game's master level (GameDb).
+///   --rain live [sec=10]                 the street at three rates, a bus shelter, an air conditioner,
+///        a fountain and a tree, each through the real provider, captured at the master.
+///   --rain physics                       drops per m² per second, the drop-size closure, kinetic energy
+///        against van Dijk et al. (2002), the plate law under natural rain and ISO 10140-1's heavy rain.
+///   --rain resolve [sec=10]              how many separate impacts a second can be told apart.
+///   --rain survey map=city ear=x,y,z [root=DIR]  a real place on a real map, and its render.
 ///   --rain compare=FILE.wav [...]        the same statistics for a recording (relative only).
 ///
 /// Scenes: street (open asphalt), park (open grass), tree (grass under a park tree's crown),
@@ -92,8 +85,7 @@ public static class RainSpike
         {
             _riding = -1;
             var (world, ear, about) = make();
-            // Sitting in a car, everything outside it comes through its shell, as the provider does it
-            // (ClientAudioSystem.CabinEnclosure, the windows shut).
+            // In a car everything outside comes through its shell (ClientAudioSystem.CabinEnclosure, windows shut).
             _cabinDb = (0f, 0f, 0f);
             if (_riding >= 0 && OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(world.Entities[_riding]) is { } cabin)
                 _cabinDb = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(cabin, 0f);
@@ -293,12 +285,6 @@ public static class RainSpike
     }
 
     /// <summary>
-    /// The grain of the 2-8 kHz band, where "staticy, grainy, scratchy" lives: its kurtosis (3 is a
-    /// smooth wash, tens are separate clicks), and the crest of its 10 ms windows (peak over rms in
-    /// each window; the median and the 95th percentile), computed the same way for a render and a
-    /// recording so the two compare.
-    /// </summary>
-    /// <summary>
     /// How many separate impacts a second can be told apart. A Poisson train of drops on one surface,
     /// at a metre, sizes from moderate rain's spectrum above 1.5 mm, at rising rates; counted by the
     /// same onset detector the levels report uses (a 1 ms peak 12 dB over the median of the 200 ms
@@ -392,6 +378,11 @@ public static class RainSpike
         return count;
     }
 
+    /// <summary>
+    /// The grain of the 2-8 kHz band, where "staticy, grainy, scratchy" lives: its kurtosis (3 is a
+    /// smooth wash, tens are separate clicks) and the crest of its 10 ms windows (median and 95th
+    /// percentile), the same for a render and a recording.
+    /// </summary>
     internal static string Grain(float[] x, int sr)
     {
         int n = Math.Min(x.Length, sr * 15);
@@ -436,12 +427,10 @@ public static class RainSpike
     }
 
     /// <summary>
-    /// The level a patch plays at in the game, dBFS at the master, for its pressure at the ear: the
-    /// voice measures its level (RainVoiceState) as a source at a metre placed at the patch's reference
-    /// distance, renders it a fixed headroom under full scale and is given that headroom back over the
-    /// fleet's shared one (PhysicalVoiceState.HeadroomGain); the loudness law places it (Loudness.Place
-    /// with the extent, at the default /levels, 45 per cent); and the provider's own chain — the HRTF,
-    /// the master trim — adds <see cref="ProviderDb"/>, measured with --rain live.
+    /// A patch's level in the game, dBFS at the master, for its pressure at the ear: the voice measures it
+    /// (RainVoiceState) at the patch's reference distance and gets its headroom back
+    /// (PhysicalVoiceState.HeadroomGain), the loudness law places it (Loudness.Place with the extent, at
+    /// the default /levels, 45 per cent), and the provider's chain adds <see cref="ProviderDb"/>.
     /// </summary>
     internal static double GameDb(double pascalsAtEar, float referenceDistance)
     {

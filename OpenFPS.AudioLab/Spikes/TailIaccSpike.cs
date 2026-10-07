@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
@@ -18,7 +16,7 @@ public static class TailIaccSpike
 {
     private const int Fs = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Sub = 256;
 
-    public static int Run(string[] args)
+    public static int Run()
     {
         var cs = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no context"); return 1; }

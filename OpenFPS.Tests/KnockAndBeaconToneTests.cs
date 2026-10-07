@@ -1,8 +1,5 @@
-using System;
-using System.Linq;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

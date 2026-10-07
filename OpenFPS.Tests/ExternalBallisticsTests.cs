@@ -1,26 +1,19 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The flown bullet against the published figures for the round the M700 fires.
+/// The flown bullet against Federal's table for the M700's round, Gold Medal Match 168 gr Sierra
+/// MatchKing (GM308M, federalpremium.com, read 2026-10-04): 2650 ft/s, G7 0.224, 100-yard zero, sight
+/// 1.5 in over the bore, a standard day. Velocity 2460 ft/s at 100 yd, 2103 at 300, 1778 at 500; drop
+/// 4.3 in at 200 yd and 15.3 at 300; 10 mph crosswind drift 7.4 in at 300 yd and 22.0 at 500. Past
+/// 300 yd (no clean drop given) 600 m is held by time of flight.
 ///
-/// The reference is Federal's own table for Gold Medal Match 168 grain Sierra MatchKing (GM308M,
-/// federalpremium.com, read 2026-10-04): 2650 ft/s, G7 0.224, a 100-yard zero with the sight 1.5
-/// inches over the bore, a standard day. Velocity 2460 ft/s at 100 yards, 2103 at 300 and 1778 at 500;
-/// drop 4.3 inches at 200 yards and 15.3 at 300; drift in a 10 mph full-value crosswind 7.4 inches at
-/// 300 yards and 22.0 at 500. Federal's page did not give a clean drop past 300 yards, so 600 m is held
-/// by the time of flight and by the drop that time of flight implies.
-///
-/// The drop matches to a tenth of an inch. The velocity runs a little under Federal's past 300 yards
-/// (1735 ft/s at 500 against 1778, 2.4 per cent) and the drift a little over (23.6 inches against 22):
-/// Federal's tables are computed from the G1 coefficient, 0.462, whose drag shape is a flat-based
-/// bullet's and under-reads a boat-tail's slowing once it is well below Mach 2. Solvers that fly the G7
-/// number, as this does, read the same way. The tolerances are three and nine per cent for that.
+/// The drop matches to a tenth of an inch; velocity runs 2.4 % under past 300 yd and drift a little over
+/// (23.6 in against 22), because Federal computes from G1 (0.462), a flat base's drag shape that
+/// under-reads a boat-tail's slowing well below Mach 2; G7 solvers read as this does. Hence 3 % and 9 %.
 /// </summary>
 public class ExternalBallisticsTests
 {
@@ -74,9 +67,8 @@ public class ExternalBallisticsTests
     }
 
     /// <summary>
-    /// At 600 m: about a second in the air and a drop from a 100 m zero of about three and a third
-    /// metres, 5.6 mil, which is what G7 solvers give for this load. The drop is less than half g t²
-    /// less the zero's angle, because drag slows the falling as well as the going.
+    /// At 600 m: about a second in the air and a drop from a 100 m zero of about 3.3 m (5.6 mil), as G7
+    /// solvers give; less than half g t² less the zero's angle, as drag slows the falling too.
     /// </summary>
     [Fact]
     public void SixHundredMetresIsASecondAndThreeMetresDown()

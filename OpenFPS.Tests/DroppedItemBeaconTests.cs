@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Client.AudioEngine.Core;
@@ -11,20 +8,14 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A thing you put down is heard where it lies (Cody, 2026-10-04: "when I drop items I still don't hear
-/// them"). The whole road, end to end: the server gives a gun and it is put down, the server's own
-/// broadcast says what it says, a client takes in exactly that, and its item beacon rings from the floor.
-///
-/// The definition of a dropped gun was right (ACarriedThingIsNoBeaconAndADroppedOneIs) and its re-send
-/// was asked for; what was missing was the broadcast ever choosing it. It chose from the entities with a
-/// collider, and no item has one, so a gun /give made, or one picked up and put down, never reached a
-/// client at all.
+/// A thing you put down is heard where it lies ("when I drop items I still don't hear them",
+/// 2026-10-04), end to end from the server's give and drop to the client's item beacon. The broadcast
+/// chose only from entities with a collider, and no item has one, so a dropped gun never reached a client.
 /// </summary>
 public class DroppedItemBeaconTests
 {

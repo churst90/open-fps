@@ -1,11 +1,9 @@
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -46,10 +44,9 @@ public class OverlappingZoneTests
     }
 
     /// <summary>
-    /// Standing against the outside of a room is outside it. The voxel grid is half a metre at a
-    /// time, so the first voxel beyond a wall can carry the room; a room with its own box decides
-    /// for itself (64 Alder Street, 2026-09-28: "right up against the building it sounds like I'm
-    /// inside").
+    /// Standing against the outside of a room is outside it: the half-metre voxel beyond a wall can carry
+    /// the room, so a room with its own box decides (64 Alder Street, 2026-09-28: "right up against the
+    /// building it sounds like I'm inside").
     /// </summary>
     [Fact]
     public void JustOutsideAWallIsOutside()

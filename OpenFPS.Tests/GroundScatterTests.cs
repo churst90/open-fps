@@ -1,18 +1,13 @@
-using System;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Open ground answers a shot. A shot fired in open desert still has a short wash and a trail after
-/// it: the rough ground round the bounce point scattering it back, later the further out. The
-/// ground's scatter taps used to be spread across the whole face — for a kilometre of ground, taps
-/// hundreds of metres away — and returned nothing, so open ground was silent after the direct sound
-/// and its mirror.
+/// Open ground answers a shot: a short wash and a trail, the rough ground round the bounce point
+/// scattering it back. Taps spread across a kilometre-wide face returned nothing, and open ground was
+/// silent after the direct sound and its mirror.
 /// </summary>
 public class GroundScatterTests
 {
@@ -66,11 +61,8 @@ public class GroundScatterTests
         Assert.True(Wash(0.8f) > 2f * Wash(0.2f));
     }
 
-    /// <summary>
-    /// A face is near if any part of it is near. Measured from its centre, the city's ground — one
-    /// box a kilometre across centred on the middle of the city — was out of reach for anyone more
-    /// than 260 m from the middle, and the ground there answered nothing.
-    /// </summary>
+    /// <summary>A face is near if any part of it is near: measured from its centre, the city's
+    /// kilometre-wide ground was out of reach beyond 260 m from the middle.</summary>
     [Fact]
     public void AFaceIsAsNearAsItsNearestPart()
     {

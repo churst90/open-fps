@@ -15,23 +15,16 @@ using OpenFPS.Server.Systems;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for step 7 of the engineering audit — "finish weather, converge the heads, delete the dead
-/// code".
-///
-/// Two families of defect, with one shape between them: something was written down and never read.
-/// The weather system computed a scenario temperature into a field nothing consumed, set gustiness on
-/// a state nothing modulated, and broadcast an air-absorption multiplier it never assigned — which the
-/// client's `distance / max(0.1, multiplier)` guard then turned into a TEN-FOLD absorption distance,
-/// switching air absorption off for the whole game. Meanwhile the two heads each carried their own
-/// copy of the client's game logic, and the copies had drifted: the Linux client had no chat buffers,
-/// no proximity announcements, no voice key.
+/// Step 7 of the engineering audit, "finish weather, converge the heads": values written and never read.
+/// The unassigned air-absorption multiplier became a tenfold absorption distance through the client's
+/// max(0.1, m) guard, switching air absorption off game-wide; the heads' copies of the game logic had
+/// drifted (the Linux client had no chat buffers, proximity announcements or voice key).
 /// </summary>
 public class WeatherAndConvergenceTests
 {
     // ── The gust model ──────────────────────────────────────────────────────────────────────────
-    // Gustiness is a scalar on the wire and a waveform at the listener. The server broadcasts once a
-    // second; sampling a two-second swell at 1 Hz aliases it into a stutter, so the swell is
-    // synthesized on the client and only its amplitude is transmitted.
+    // Gustiness is a scalar on the wire and a waveform at the listener: a two-second swell sampled at the
+    // 1 Hz broadcast aliases into a stutter, so the client synthesizes it and only its amplitude is sent.
 
     [Fact]
     public void GustFactorStaysWithinItsBounds()
@@ -46,8 +39,7 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void GustFactorIsDeterministic()
     {
-        // Two clients with the same clock hear the same weather; a replay of the same second is the
-        // same second. This is also what makes every assertion below reproducible.
+        // Two clients with the same clock hear the same weather, which also makes these assertions reproducible.
         Assert.Equal(WindModel.GustFactor(12.5), WindModel.GustFactor(12.5));
         Assert.NotEqual(WindModel.GustFactor(12.5), WindModel.GustFactor(13.5));
     }
@@ -94,9 +86,8 @@ public class WeatherAndConvergenceTests
 
     // ── The weather simulation ──────────────────────────────────────────────────────────────────
 
-    /// <summary>Midsummer, mid-morning: warm enough that rain stays rain. Day 1 — the system's
-    /// default — is deep winter, where every front freezes into snow and the scenario offsets are
-    /// impossible to tell apart.</summary>
+    /// <summary>Midsummer, mid-morning, so rain stays rain. Day 1, the default, is deep winter, where every
+    /// front freezes into snow and the scenarios cannot be told apart.</summary>
     private const int MidsummerDay = 172;
 
     /// <summary>A system with the clock and the dice pinned, so the scenario is the only thing moving.</summary>
@@ -119,9 +110,7 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void RainActuallyCoolsTheAir()
     {
-        // The scenario temperature was computed into `_targetTemp` and then never read: the lerp went
-        // to the bare seasonal/daily curve. Rain changed the humidity and the wind and left the
-        // temperature exactly where it was.
+        // The scenario temperature was computed and never read: rain left the temperature where it was.
         float clear = Settle(WeatherType.Clear).Temperature;
         float rain = Settle(WeatherType.Rain).Temperature;
         float storm = Settle(WeatherType.Storm).Temperature;
@@ -133,11 +122,8 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void RepeatedFrontsDoNotCompoundTheCooling()
     {
-        // `_targetTemp -= 2.0f` subtracted from a running total, so two rain fronts in a row would
-        // have cooled the world by four degrees and never given them back. The offset is now a
-        // property of the scenario, not an accumulator.
-        // Both systems run the SAME number of ticks from the same clock, so the daily curve is at the
-        // same point in both; the only difference is how many times the front was applied.
+        // `_targetTemp -= 2.0f` accumulated, so two rain fronts cooled the world by four degrees for good.
+        // Both systems run the same ticks from the same clock; only the number of fronts differs.
         const int Ticks = 16000;
 
         var once = NewPinnedSystem(seed: 7);
@@ -157,8 +143,8 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void SnowHoldsTheAirBelowFreezing()
     {
-        // Even at midsummer: the snow scenario caps the air below freezing rather than merely
-        // offsetting it, which is what stops "snow" falling into a 30 degree afternoon.
+        // Even at midsummer the snow scenario caps the air below freezing, so "snow" cannot fall into a 30 degree
+        // afternoon.
         var snow = Settle(WeatherType.Snow);
         Assert.True(snow.Temperature < 0f, $"snow settled above freezing at {snow.Temperature} C");
         Assert.True(snow.PrecipitationIntensity > 0.3f);
@@ -182,8 +168,8 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void GustinessFadesInsteadOfSnapping()
     {
-        // Gustiness was assigned straight onto the state, so a front took the air from calm to a gale
-        // between one tick and the next. It now travels with the wind it belongs to.
+        // Gustiness assigned straight onto the state took a front from calm to a gale in one tick; it travels
+        // with its wind.
         var env = NewPinnedSystem(seed: 99);
         env.SetScenario(WeatherType.Clear);
         for (int i = 0; i < 8000; i++) env.Update(0.25f);
@@ -211,11 +197,11 @@ public class WeatherAndConvergenceTests
             AirPressure: 700f,
             AirAbsorptionMultiplier: 2.5f));
 
-        // Air pressure and the absorption multiplier belong to the PLACE and are taken as authored.
+        // Air pressure and the absorption multiplier belong to the place and are taken as authored.
         Assert.Equal(700f, mountain.AirPressure);
         Assert.Equal(2.5f, mountain.AirAbsorptionMultiplier);
-        // Temperature and humidity are biases from the baseline, so a map that authors the defaults is
-        // unchanged and a map authored ten degrees colder stays ten degrees colder than the season.
+        // Temperature and humidity are biases from the baseline: a map authored ten degrees colder stays ten
+        // degrees colder than the season.
         Assert.Equal(global.Temperature - 10f, mountain.Temperature, 3);
         Assert.Equal(global.Humidity + 0.2f, mountain.Humidity, 3);
 
@@ -229,9 +215,8 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void AirPressureAuthoredInAtmospheresIsCaughtAndCorrected()
     {
-        // The shipped default was 1.0 — atmospheres — while every consumer reads millibars. Divided by
-        // 1013.25 that clamped at the floor of the normalisation, so every map on the server was
-        // silently authored as near-vacuum.
+        // The shipped default was 1.0 (atmospheres) where every consumer reads millibars: every map was authored
+        // as near-vacuum.
         var data = new MapData { Id = "thin-air", AirPressure = 1.0f };
         MapRepository.NormalizeAtmosphere(data, "thin-air.json");
         Assert.Equal(1013.25f, data.AirPressure, 2);
@@ -256,8 +241,8 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void ManifestAtmosphereAppliesBeforeTheFirstWorldStateUpdate()
     {
-        // The world state broadcast arrives once a second. Without this the first second in a map was
-        // heard through the DEFAULTS, and the map's authored air never applied at all.
+        // The broadcast comes once a second; without the manifest's atmosphere the first second in a map was heard
+        // through the defaults, and the authored air never applied.
         var world = new ClientWorldState();
         world.ApplyManifestAtmosphere(new MapManifest
         {
@@ -277,9 +262,8 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void AnUnsetAirAbsorptionMultiplierNeverReachesTheAcoustics()
     {
-        // This is the bug the whole item hangs off: BroadcastEnvironment never assigned the field, so
-        // it arrived as 0 and the client's Math.Max(0.1f, m) guard multiplied the absorption distance
-        // by ten. The guard now substitutes the NEUTRAL value, at both ends.
+        // BroadcastEnvironment never assigned the multiplier, so it arrived as 0 and the guard multiplied the
+        // absorption distance by ten. The guard substitutes the neutral value at both ends.
         var world = new ClientWorldState();
         world.UpdateAtmosphere(new WorldStateUpdate { AirPressure = 1013.25f, AirAbsorptionMultiplier = 0f });
         Assert.Equal(1.0f, world.GetSnapshot().AirAbsorptionMultiplier);
@@ -296,9 +280,8 @@ public class WeatherAndConvergenceTests
         var listener = new Vector3(0, 1.7f, 0);
         var source = new Vector3(0, 1.7f, 120);
 
-        // ISO 9613-1, in the high band (8 kHz): dry air takes more than damp (77 against 61 dB/km at
-        // 25 C) — and at the same relative humidity COLD air takes less, 21 against 87 dB/km, because it
-        // holds so little water and the water is what drives the loss up there.
+        // ISO 9613-1 at 8 kHz: dry air takes more than damp (77 against 61 dB/km at 25 C), and at the same
+        // relative humidity cold air takes less (21 against 87 dB/km): it holds so little water.
         float humid = AirAbsorptionFor(acoustics, listener, source, humidity: 0.95f, temperature: 25f, multiplier: 1f);
         float dry = AirAbsorptionFor(acoustics, listener, source, humidity: 0.05f, temperature: 25f, multiplier: 1f);
         Assert.True(dry > humid, $"dry air should take more of the top: dry {dry}, humid {humid}");
@@ -307,8 +290,7 @@ public class WeatherAndConvergenceTests
         float warm = AirAbsorptionFor(acoustics, listener, source, humidity: 0.5f, temperature: 25f, multiplier: 1f);
         Assert.True(cold < warm, $"cold air at 50% should take less of the top: cold {cold}, warm {warm}");
 
-        // A map that authors heavier absorption gets it; a map that authors nothing (0) gets the same
-        // answer as one that authors 1, rather than a tenth of the absorption.
+        // Heavier authored absorption is applied; none authored (0) answers as 1, not a tenth.
         float neutral = AirAbsorptionFor(acoustics, listener, source, 0.5f, 20f, multiplier: 1f);
         float unset = AirAbsorptionFor(acoustics, listener, source, 0.5f, 20f, multiplier: 0f);
         float heavy = AirAbsorptionFor(acoustics, listener, source, 0.5f, 20f, multiplier: 4f);
@@ -361,8 +343,8 @@ public class WeatherAndConvergenceTests
     }
 
     // ── One session class, driven by a fake head ────────────────────────────────────────────────
-    // The point of the convergence: a head is a speech backend, a shell, a microphone and a key map.
-    // Everything below is exercised through those four seams and nothing else — no WinForms, no GTK.
+    // A head is a speech backend, a shell, a microphone and a key map; everything below goes through those
+    // four seams, with no WinForms and no GTK.
 
     private sealed class FakeSpeech : ISpeechOutput
     {
@@ -431,8 +413,8 @@ public class WeatherAndConvergenceTests
         Assert.True(session.IsInGame);
         Assert.Equal(42, session.OwnEntityId);
         Assert.Equal(1, shell.EnterGameCalls);
-        // Where you are is said once the body is placed, map and zone in one sentence. This map has
-        // no zones, and "at outside" names nothing, so the map alone is said, and said once.
+        // Where you are is said once the body is placed. This map has no zones, and "at outside" names nothing,
+        // so the map alone is said, once.
         Assert.False(speech.Said("You're in"));
         Thread.Sleep(300);
         session.ContinuousUpdate();
@@ -506,8 +488,7 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void ChatArrivesInBuffersOnEveryHead()
     {
-        // The GTK head simply spoke incoming chat and kept none of it; the buffers were Windows-only
-        // because ChatManager was typed on that head's concrete TTS service.
+        // The GTK head spoke incoming chat and kept none: the buffers were typed on the Windows head's TTS.
         var (session, speech, _) = NewSession();
         session.HandleMessage(new PlayerSpawned { EntityId = 3 });
 
@@ -524,12 +505,10 @@ public class WeatherAndConvergenceTests
     public void ConsoleTextIsRoutedAsACommandOrAsChat()
     {
         var (session, _, shell) = NewSession();
-        // With no server peer these are dropped by the network service, but the parse is the part that
-        // used to live only in the Windows head's InputHandler.
+        // With no server peer these are dropped, but the parse used to live only in the Windows head.
         shell.TypeCommand("/say hello there");
         shell.TypeCommand("just chatting");
-        // No exception, and both paths accepted: the assertion is that the shell's event reaches the
-        // session at all, which is the seam being tested.
+        // No exception, and the shell's event reaches the session: the seam under test.
         session.HandleCommandEntered("/inv");
     }
 
@@ -556,8 +535,8 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void ClearingTheBufferUnsticksAnAltTabbedModifier()
     {
-        // The Alt of an Alt+Tab registers key-down while focused and key-up while not, leaving Alt
-        // stuck "held" — and a held modifier suppresses movement.
+        // Alt+Tab's Alt goes down while focused and up while not, leaving Alt held, and a held modifier
+        // suppresses movement.
         var buffer = new InputStateBuffer();
         buffer.SetKey(GameKey.AltLeft, true);
         Assert.True(InputStateBuffer.HasModifier(buffer.GetHeldSnapshot()));
@@ -598,9 +577,8 @@ public class WeatherAndConvergenceTests
     [Fact]
     public void SoundMappingServiceOnlyResolvesPaths()
     {
-        // It once also submitted emitters of its own — PlayPhysicalInteraction, PlayUiSound,
-        // PlayReflection — duplicating ClientAudioSystem's emitter construction with drifted values,
-        // and nothing had called any of them for a long time.
+        // It once also built emitters of its own (PlayPhysicalInteraction, PlayUiSound, PlayReflection) with
+        // values drifted from ClientAudioSystem's, and nothing called them.
         var methods = typeof(SoundMappingService).GetMethods(
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance |
             System.Reflection.BindingFlags.DeclaredOnly).Select(m => m.Name).ToList();
@@ -611,14 +589,14 @@ public class WeatherAndConvergenceTests
         Assert.Contains("ResolvePath", methods);
         Assert.Contains("GetImpactSoundId", methods);
 
-        // And the backward-compat three-argument constructor the Windows head needed is gone with it.
+        // And the Windows head's three-argument constructor is gone with it.
         Assert.Single(typeof(SoundMappingService).GetConstructors());
     }
 
     [Fact]
     public void NeitherHeadCarriesItsOwnSessionClassAnyMore()
     {
-        // If a head ever grows one back, this fails. The whole point of step 7 is that there is one.
+        // If a head grows its own session logic back, this fails: there is one.
         var core = typeof(ClientGameSession).Assembly;
         Assert.Single(core.GetTypes(), t => t.Name.EndsWith("GameSession") && !t.IsNested);
         Assert.DoesNotContain(core.GetTypes(), t => t.Name == "ClientSimulationSystem");

@@ -4,10 +4,7 @@ using static OpenFPS.Common.SharedMovementEngine;
 
 namespace OpenFPS.Tests;
 
-/// <summary>
-/// Unit tests for the SharedMovementEngine — the deterministic physics kernel shared
-/// between client prediction and server authoritative simulation.
-/// </summary>
+/// <summary>The movement kernel shared by client prediction and the server's simulation.</summary>
 public class SharedMovementEngineTests
 {
     // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -83,14 +80,12 @@ public class SharedMovementEngineTests
     [Fact]
     public void Jump_WhenInAir_DoesNotDoubleJump()
     {
-        // Player in the air (5m up, no valid ground)
         var ctx = DefaultContext(new Vector3(0, 5, 0)) with
         {
             IsJumpRequested = true,
             GroundHeight = PhysicsConstants.DefaultGroundCheckLimit - 1
         };
         var (_, vel, _) = Step(ctx, NoColliders());
-        // Velocity should be negative (falling), not positive (jumping)
         Assert.True(vel.Y < 0, "Should not be able to jump in mid-air");
     }
 
@@ -127,7 +122,6 @@ public class SharedMovementEngineTests
     [Fact]
     public void MapBoundary_PlayerAtEdge_ClampedToRadius()
     {
-        // Position the player at the positive X boundary of the map
         float edgeX = 50f;
         var ctx = DefaultContext(new Vector3(edgeX, 0, 0), inputDir: new Vector3(1, 0, 0));
         var (newPos, vel, _) = Step(ctx, NoColliders());
@@ -154,7 +148,6 @@ public class SharedMovementEngineTests
     [Fact]
     public void Collision_WithSolidWall_PlayerDoesNotPassThrough()
     {
-        // Player at origin moving toward a wall at X=1
         var ctx = DefaultContext(new Vector3(0, 0, 0), inputDir: new Vector3(1, 0, 0));
         var wall = new Collider
         {
@@ -166,7 +159,7 @@ public class SharedMovementEngineTests
 
         var (newPos, _, _) = Step(ctx, new[] { wall });
 
-        // Player should not have crossed x=0.7 (1m wall minus player radius 0.3m)
+        // Not past the wall's middle (its face is at x = 0.75).
         Assert.True(newPos.X < 1.0f, $"Player penetrated the wall: X={newPos.X}");
     }
 

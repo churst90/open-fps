@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Client.Core;
@@ -13,22 +9,13 @@ using OpenFPS.Server;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A door, which is two things at once and only one of them is obvious.
-///
-/// The leaf SWINGS ASIDE. It is solid the whole time; what opening changes is where it is. A door
-/// that went insubstantial instead would be one you could walk through while it was shut and standing
-/// in front of you, and one whose open leaf was in the way of nothing.
-///
-/// And the OPENING appears. A door is not really a thing you hear, it is a thing that changes what
-/// you can hear through it — so the aperture on its portal is driven by how far the leaf has swung,
-/// and the room beyond opens up gradually as it moves. That half needed no new acoustics at all, only
-/// something to move the number, and these tests follow that number the whole way to the client's
-/// acoustic map because nowhere else does it mean anything.
+/// A door is two things: a leaf that swings aside, solid the whole time, and an opening whose aperture
+/// follows how far the leaf has swung, so the room beyond opens up gradually. The aperture is followed
+/// all the way to the client's acoustic map, the only place it means anything.
 /// </summary>
 public class DoorTests : IDisposable
 {
@@ -50,10 +37,7 @@ public class DoorTests : IDisposable
         Assert.Equal(new Vector3(0, 0, 0), f.World.Get<Transform>(door).Position, Near);
     }
 
-    /// <summary>
-    /// It takes a moment. A door that teleported between two states could not be heard opening, and
-    /// hearing it open is most of what tells you it did.
-    /// </summary>
+    /// <summary>It takes a moment: a door that jumped between states could not be heard opening.</summary>
     [Fact]
     public void ItTakesAMomentToSwing()
     {
@@ -69,10 +53,8 @@ public class DoorTests : IDisposable
         Assert.Equal(1f, f.World.Get<DoorComponent>(door).Openness, 3);
     }
 
-    /// <summary>
-    /// The hinge is an EDGE. Swinging about the centre would sweep the leaf through the doorway in
-    /// both directions and leave half of it still in the way at ninety degrees.
-    /// </summary>
+    /// <summary>The hinge is an edge: swung about its centre, half the leaf would still be in the doorway
+    /// at ninety degrees.</summary>
     [Fact]
     public void ItSwingsAboutItsHingedEdgeAndNotItsMiddle()
     {
@@ -124,8 +106,8 @@ public class DoorTests : IDisposable
         Assert.Equal(new Vector3(0, 0, 0), f.World.Get<Transform>(door).Position, Near);
     }
 
-    /// <summary>Which edge it hangs on decides which way it sweeps — and for somebody navigating by
-    /// ear, an open door on your left is a different fact from one on your right.</summary>
+    /// <summary>Which edge it hangs on decides which way it sweeps: to somebody navigating by ear, an open
+    /// door on the left is a different fact from one on the right.</summary>
     [Fact]
     public void WhichEdgeItHangsOnDecidesWhichWayItSweeps()
     {
@@ -144,10 +126,7 @@ public class DoorTests : IDisposable
 
     // ── The opening ─────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The half that matters. The aperture follows the leaf, so the room beyond opens up gradually
-    /// rather than appearing the instant somebody says "open".
-    /// </summary>
+    /// <summary>The aperture follows the leaf, so the room beyond opens up gradually.</summary>
     [Fact]
     public void TheOpeningFollowsTheLeaf()
     {
@@ -167,11 +146,8 @@ public class DoorTests : IDisposable
         Assert.Equal(f.World.Get<ColliderComponent>(door).Size.X, seen.Last(), 2);
     }
 
-    /// <summary>
-    /// The client is told, and not thirty times a second. An aperture nobody hears about is a door
-    /// that opens and changes nothing; one announced every tick is thirty reliable messages for a
-    /// thing that takes a second.
-    /// </summary>
+    /// <summary>The client is told of the aperture, and not every tick: that would be thirty reliable
+    /// messages for a thing that takes a second.</summary>
     [Fact]
     public void TheClientIsToldAsItMovesButNotOnEveryTick()
     {
@@ -192,11 +168,8 @@ public class DoorTests : IDisposable
 
     // ── In a building ───────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A door in a building leads out of that building. Which room a doorway joins is a property of
-    /// WHERE IT IS, and until the room existed there was nothing for it to be a doorway into — so the
-    /// link is made when the room is derived, and remade whenever the shape changes.
-    /// </summary>
+    /// <summary>A door in a building leads out of it. Which room a doorway joins depends on where it is, so
+    /// the link is made when the room is derived and remade whenever the shape changes.</summary>
     [Fact]
     public void ADoorInABuildingLeadsOutOfIt()
     {
@@ -211,11 +184,8 @@ public class DoorTests : IDisposable
         Assert.Equal(AcousticConstants.GlobalRegionId, portal.RegionBId);
     }
 
-    /// <summary>
-    /// A door is a part like a wall, so it is carried by the building — and the swing has to be
-    /// written into the part's LOCAL pose, because ParentSystem rewrites every part's world transform
-    /// from that every tick and would otherwise overwrite the swing before anybody saw it.
-    /// </summary>
+    /// <summary>A door is a part like a wall, carried by the building, so its swing is written into the
+    /// part's local pose: ParentSystem rewrites every part's world transform from it every tick.</summary>
     [Fact]
     public void ADoorSwingsCorrectlyOnABuildingThatHasMoved()
     {
@@ -236,10 +206,8 @@ public class DoorTests : IDisposable
 
         Assert.Equal(1f, f.World.Get<DoorComponent>(door).Openness, 3);
 
-        // The assertion that matters, and it has to be on the WORLD transform after ParentSystem has
-        // run. ParentSystem rewrites every part's world pose from its local one every tick, so a
-        // swing written to the transform is overwritten before anyone sees it — and the door would
-        // still be near the building and still say it was open while standing flat in the wall.
+        // On the world transform after ParentSystem has run: a swing written to the transform would be
+        // overwritten, the door saying it was open while standing flat in the wall.
         MathHelper.ToYawPitch(f.World.Get<Transform>(door).Rotation, out float openYaw, out _);
         Assert.Equal(MathF.PI / 2f, MathF.Abs(MathHelper.WrapAngle(openYaw)), 2);
 
@@ -250,12 +218,9 @@ public class DoorTests : IDisposable
                     "the door stayed at the old site while the building drove off");
     }
 
-    /// <summary>
-    /// Grouping a building CHANGES the frame its doors live in — world becomes parent-local. A door
-    /// that kept its old record of where "shut" was would compute its local pose from a world one
-    /// and fling the leaf out of the world, which is exactly what happened the first time a shed with
-    /// a door in it was grouped: the door opened perfectly, then vanished.
-    /// </summary>
+    /// <summary>Grouping a building changes its doors' frame from world to parent-local. A door that kept
+    /// its old record of where "shut" was flung its leaf out of the world the first time a shed was
+    /// grouped: it opened, then vanished.</summary>
     [Fact]
     public void ADoorStillWorksAfterTheBuildingAroundItIsGrouped()
     {
@@ -293,11 +258,8 @@ public class DoorTests : IDisposable
 
     // ── All the way to the client ───────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The only place an aperture means anything is the client's acoustic map, so the test goes
-    /// there: swing the door on the server, put its definition on the wire as the broadcast would,
-    /// and check the opening turns up — and goes again when it shuts.
-    /// </summary>
+    /// <summary>A door swung on the server and put on the wire as the broadcast would makes an opening in
+    /// the client's acoustic map, which goes again when it shuts.</summary>
     [Fact]
     public void TheOpeningReachesTheClientsAcousticMapAndLeavesWhenItShuts()
     {
@@ -325,11 +287,8 @@ public class DoorTests : IDisposable
         Assert.False(client.AcousticMap!.Portals.ContainsKey(door.Id), "it shut and the opening stayed");
     }
 
-    /// <summary>
-    /// A refusal names the distance. "No door within five metres" while the door listing cheerfully
-    /// reports one at five and a half is the tool contradicting itself, and a player who cannot see
-    /// the door has no way to tell which of the two is lying.
-    /// </summary>
+    /// <summary>A refusal names the distance, so "no door within five metres" does not contradict a listing
+    /// that reports one at five and a half.</summary>
     [Fact]
     public void BeingOutOfReachSaysHowFarAwayItIs()
     {
@@ -467,10 +426,9 @@ public class DoorTests : IDisposable
             }
             if (withDoor) Spawn("door", where + new Vector3(0, 1.05f, -half - 0.4f), acrossZ);
 
-            // Let it stand for a moment before grouping, the way a real one does. A door records
-            // where "shut" is the first time it is looked at, so a door that is grouped in the same
-            // instant it is placed never records a LOOSE pose and never has one to go stale — which
-            // is how the frame bug survived a test suite and turned up on a live server.
+            // It stands a moment before grouping: a door records where "shut" is when first looked at,
+            // and one grouped the instant it is placed never has a loose pose to go stale (how the
+            // frame bug once got past the tests).
             Tick(2);
 
             int root = Composites.Group(MapId, where, half * 2f, "shed", anchored, "builder", out _);

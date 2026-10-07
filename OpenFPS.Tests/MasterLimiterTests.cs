@@ -1,6 +1,4 @@
-using System;
 using OpenFPS.Client.AudioEngine.Fmod;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -75,8 +73,8 @@ public class MasterLimiterTests
         return best;
     }
 
-    /// <summary>The output's peak, 8x oversampled by a long windowed sinc: a reconstruction, not the
-    /// detector's own estimate, so the test does not mark its own homework.</summary>
+    /// <summary>The output's peak, 8x oversampled by a long windowed sinc, independent of the detector's
+    /// own estimate.</summary>
     private static float TruePeak(float[] y, int from, int count)
     {
         const int Up = 8, Half = 32;
@@ -124,9 +122,8 @@ public class MasterLimiterTests
         int n = Rate / 2;
         var x = new float[n * 2];
         var rng = new Random(3);
-        // 5 ms of noise burst, 12 dB over, with nothing at the very top of the band: a shot as the
-        // mix carries it (through the head's response and the air), not white noise to Nyquist, whose
-        // peaks between samples the standard's interpolator is not made to see.
+        // 5 ms of noise 12 dB over, band-limited as the mix carries a shot: white noise to Nyquist has
+        // inter-sample peaks the standard's interpolator is not made to see.
         float prev = 0f;
         for (int i = 2000; i < 2000 + 240; i++)
         {

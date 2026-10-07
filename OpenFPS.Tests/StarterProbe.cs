@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

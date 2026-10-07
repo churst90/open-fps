@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Engine;
 

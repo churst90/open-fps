@@ -1,27 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common.Systems;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The speedway has to be able to say where you are standing.
-///
-/// It could not, and nothing caught it, because "no regions at all" is indistinguishable from
-/// "working correctly" to every other test: the map loaded, the cars ran, the walls reflected, and a
-/// player walking the whole circuit was told "Outside" once and then nothing for ever. A blind
-/// player on a two-kilometre loop of track that is the same width and the same surface the whole way
-/// round has no other way to know which part of it they are on.
+/// The speedway says where you are standing. With no regions at all the map loaded, the cars ran, and a
+/// player walking the whole circuit was told "Outside" once and then nothing: on a two-kilometre loop of
+/// one width and surface, nothing else says which part you are on.
 /// </summary>
 public class SpeedwayZoneTests
 {
@@ -57,13 +47,8 @@ public class SpeedwayZoneTests
             Assert.True(names.Contains(expected), $"the speedway has no region called '{expected}'; it has: {string.Join(", ", names)}");
     }
 
-    /// <summary>
-    /// A region placed by a map is the size the MAP asked for, not the size its prefab happens to be.
-    ///
-    /// The acoustic volume did not follow the entity's scale, so every region in every map was the
-    /// prefab's 10 x 5 x 10 however it had been scaled — while its COLLIDER scaled correctly, which
-    /// is what made it look right everywhere except where it mattered.
-    /// </summary>
+    /// <summary>A region is the size the map asked for, not its prefab's: the acoustic volume ignored the
+    /// entity's scale (every region 10 x 5 x 10) while its collider scaled.</summary>
     [Fact]
     public void ARegionIsTheSizeTheMapAskedFor()
     {
@@ -74,12 +59,8 @@ public class SpeedwayZoneTests
         Assert.True(infield.Region.RoomSize.Z > 200f);
     }
 
-    /// <summary>
-    /// Walking the racing line names all four sectors, in order, and never leaves you nameless.
-    ///
-    /// This is the test that would have caught the original fault: it walks the real centreline out
-    /// of the real map and asks the real voxel grid what it is standing in.
-    /// </summary>
+    /// <summary>Walking the real map's racing line names all four sectors in order and never leaves you
+    /// nameless.</summary>
     [Fact]
     public void WalkingTheLapNamesEverySector()
     {

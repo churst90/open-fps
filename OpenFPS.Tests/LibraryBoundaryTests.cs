@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -10,31 +6,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The ratchet on the sound library's boundary (docs/SOUND_LIBRARY_BOUNDARY.md, section 9).
-///
-/// The library (geometry, acoustics, the sound models, the native bindings and the audio runtime) is
-/// moving out of OpenFPS.Common and OpenFPS.Client.Core into projects of its own, and it may not know
-/// the game: no snapshots, entities, components, network messages, session, or open-fps's integration
-/// classes. Until the last of those references is gone the projects cannot be split, so this test holds
-/// the line where it is: every library file may reference a host type no more often than it does today,
-/// a file that references none may not start, and a new file in one of these projects has to be sorted
-/// into library or host before it is accepted.
-///
-/// Two lists, both in OpenFPS.Tests/LibraryBoundary:
-///   files.tsv    every source file of the sorted projects, library, host or mixed (written by
-///                tools/sound_boundary/run.sh, from the rules in classify.py); a mixed file names its
-///                library types, and only their declarations are read;
-///   allowed.tsv  file, host type, count: the references each library file still has, counted as the
-///                survey counts them (crossings.tsv: every name that binds to a host type or to one of
-///                its members, `var` included). It only goes down. When a fix removes some, run this
-///                test with OPENFPS_BOUNDARY_WRITE=1 and it lowers the counts (it never raises one), in
-///                the same commit as the fix. A file moved to another path takes its allowance with it:
-///                OPENFPS_BOUNDARY_WRITE=all writes the list as it is, and the diff must show only the
-///                path changing.
-///
-/// The sources are bound with Roslyn here, every sorted project in one compilation, without source
-/// generators (a call into MemoryPack's generated code does not bind; no host type is reached that way).
-/// A host type is one declared in a file the list calls host, or in a mixed file and not named as library.
+/// The ratchet on the sound library's boundary (docs/SOUND_LIBRARY_BOUNDARY.md, sections 9 and 13.1):
+/// no library file references a host type more often than allowed.tsv says, and every file of a sorted
+/// project is sorted in files.tsv. Lowering the counts (OPENFPS_BOUNDARY_WRITE=1) and moving a file
+/// (=all) are in section 13.4. Bound with Roslyn without source generators: a call into MemoryPack's
+/// generated code does not bind, and no host type is reached that way.
 /// </summary>
 public class LibraryBoundaryTests
 {
@@ -143,8 +119,7 @@ public class LibraryBoundaryTests
         string? write = Environment.GetEnvironmentVariable("OPENFPS_BOUNDARY_WRITE");
         if (write == "1" && under.Count > 0)
         {
-            // Lower every allowance to what is there now. Never raise one: a count over its allowance
-            // stays a failure below.
+            // Lower only: a count over its allowance stays a failure below.
             var lowered = new Dictionary<(string File, string Name), int>();
             foreach (var (key, may) in allowed)
             {
@@ -156,8 +131,7 @@ public class LibraryBoundaryTests
         }
         else if (write == "all")
         {
-            // The whole list as it is now, raised counts included. Only for a file moved to another path
-            // (its allowance follows it) or the first list; the diff of allowed.tsv says which.
+            // The whole list as it is, raised counts included: only for a moved file or the first list.
             WriteAllowed(counts);
             over.Clear();
             under.Clear();

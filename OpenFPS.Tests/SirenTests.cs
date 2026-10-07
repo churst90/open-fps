@@ -1,12 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Numerics;
-using System.Text.Json;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Signals;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -16,11 +9,8 @@ public class SirenTests
     private readonly ITestOutputHelper _o;
     public SirenTests(ITestOutputHelper o) => _o = o;
 
-    /// <summary>
-    /// Each mode sweeps at the rate the hardware is specified at. A "yelp" at the wrong rate is
-    /// not a slightly-off yelp, it is a different siren, so this is counted rather than judged:
-    /// the oscillator's own turning points, over a long enough run to catch the slow one.
-    /// </summary>
+    /// <summary>Each mode sweeps at the hardware's specified rate, counted from the oscillator's turning
+    /// points: a yelp at the wrong rate is a different siren.</summary>
     [Fact]
     public void EachModeSweepsAtItsSpecifiedRate()
     {
@@ -38,22 +28,13 @@ public class SirenTests
         }
     }
 
-    /// <summary>
-    /// The oscillator makes no partial that is not a harmonic of itself.
-    ///
-    /// This is the test that would have caught "the fast siren sounds like it is stepping, not
-    /// sweeping". The first version band-limited a sawtooth and then ran it through a waveshaper
-    /// for the driver's compression, which manufactures a fresh harmonic series above Nyquist that
-    /// folds straight back down. Held at a fixed frequency the aliases are still there and still
-    /// off-harmonic; during a sweep they slide the opposite way to the real partials, which is
-    /// what stepping IS.
-    /// </summary>
+    /// <summary>The oscillator makes no partial that is not a harmonic of itself: aliases slide against
+    /// the sweep and were heard as "stepping, not sweeping".</summary>
     [Fact]
     public void TheOscillatorDoesNotAlias()
     {
         var spec = SirenSpec.Patrol100W;
-        // Hi-lo holds a fixed note; put both its tones at the top of the sweep so the oscillator
-        // runs at a constant frequency and the measurement is not confused by the sweep.
+        // Hi-lo with both tones at the sweep's top: a constant frequency to measure.
         float hz = spec.SweepHighHz;
         var held = spec with { HiLoLowHz = hz, HiLoRatio = 1f, HiLoHoldSeconds = 600f };
         var siren = new ElectronicSiren(held, 44100f) { Mode = SirenMode.HiLo };
@@ -76,16 +57,9 @@ public class SirenTests
     }
 
     /// <summary>
-    /// The oscillator is a SQUARE, not a sawtooth — odd harmonics carry it.
-    ///
-    /// This is the difference between a siren and a trumpet, and it is audible long before it is
-    /// measurable: a sawtooth fills in the octave above every partial and reads as brassy, a
-    /// square leaves those gaps and reads as hollow and hard. The hardware every electronic head
-    /// imitates is a rotary chopper — ports and lands cut equally wide, airflow switched fully on
-    /// and off — and that is a square at fifty per cent duty, whose even harmonics vanish.
-    ///
-    /// Not asserted as "no even content at all": the duty is deliberately a hair off a half,
-    /// because a real machined rotor is, and that puts a little of the even series back.
+    /// The oscillator is a square, as the rotary chopper every electronic head imitates is: odd
+    /// harmonics carry it (a sawtooth reads as brassy). The duty is a hair off a half, as a machined
+    /// rotor's is, so a little even content remains.
     /// </summary>
     [Fact]
     public void TheOscillatorIsASquareNotASawtooth()
@@ -100,30 +74,22 @@ public class SirenTests
         var x = new float[n];
         for (int i = 0; i < n; i++) { siren.Step(); x[i] = siren.Output; }
 
-        // Compare like with like: the 3rd against the 2nd, and the 5th against the 4th. On a
-        // sawtooth the neighbours are comparable; on a square the odd one dwarfs the even one.
+        // The 3rd against the 2nd, the 5th against the 4th.
         double h2 = BinEnergy(x, hz * 2, n), h3 = BinEnergy(x, hz * 3, n);
         double h4 = BinEnergy(x, hz * 4, n), h5 = BinEnergy(x, hz * 5, n);
         double oddOverEvenLow = 10 * Math.Log10(Math.Max(1e-20, h3) / Math.Max(1e-20, h2));
         double oddOverEvenHigh = 10 * Math.Log10(Math.Max(1e-20, h5) / Math.Max(1e-20, h4));
         _o.WriteLine($"3rd over 2nd: {oddOverEvenLow:F1} dB; 5th over 4th: {oddOverEvenHigh:F1} dB");
 
-        // A sawtooth would put these near -3.5 dB (the 1/n step between neighbours). A square puts
-        // them far positive.
+        // A sawtooth would be near -3.5 dB (the 1/n step).
         Assert.True(oddOverEvenLow > 12.0,
             $"the 3rd harmonic is only {oddOverEvenLow:F1} dB over the 2nd — this is a sawtooth, not a square");
         Assert.True(oddOverEvenHigh > 12.0,
             $"the 5th harmonic is only {oddOverEvenHigh:F1} dB over the 4th — this is a sawtooth, not a square");
     }
 
-    /// <summary>
-    /// The wail reaches down to where it is declared to, and the horn can still radiate it.
-    ///
-    /// A sweep whose bottom sits under the horn's flare cutoff does not sound like it is going
-    /// down, it sounds like it is fading out: the mouth stops coupling to the air and the last
-    /// part of the descent is filtered away rather than heard. That is a geometry check, not a
-    /// taste one — the cutoff is c / (pi D) and nothing chooses it.
-    /// </summary>
+    /// <summary>The wail's declared bottom sits above the horn's flare cutoff, c / (pi D): below it the
+    /// descent fades out instead of going down.</summary>
     [Fact]
     public void TheBottomOfTheWailIsAboveTheHornsCutoff()
     {
@@ -139,13 +105,8 @@ public class SirenTests
         }
     }
 
-    /// <summary>
-    /// Every head makes the level it declares. A siren's figure is a legal one — 120 dB at ten
-    /// feet — and the chain between the oscillator and the air takes an unknown amount out of it,
-    /// so the model measures its own insertion loss and compensates. Without that the patrol head
-    /// was four decibels under, which places the one sound on the vehicle that exists to be heard
-    /// two decibels quieter than the law says it is.
-    /// </summary>
+    /// <summary>Every head makes its declared level (a legal one, 120 dB at ten feet): the model measures
+    /// its own insertion loss and compensates; without it the patrol head was 4 dB under.</summary>
     [Fact]
     public void EveryHeadMakesWhatItDeclares()
     {
@@ -165,16 +126,8 @@ public class SirenTests
         }
     }
 
-    /// <summary>
-    /// A patrol car lapping a city block does not change its siren's character every corner.
-    ///
-    /// The mode is read off what the car is doing, which is right — but read off the INSTANT
-    /// deceleration it is wrong, because a racing line brakes for every corner. Driven straight
-    /// from the line's own speed profile the head flipped between wail and yelp several times a
-    /// lap, and that is what was reported as the sirens being wrong on the map. This drives
-    /// SirenController with the city's real downtown loop and holds it to a rate a crew would
-    /// actually produce.
-    /// </summary>
+    /// <summary>A patrol car lapping the city's downtown loop does not change siren mode every corner:
+    /// read off instant deceleration it flipped between wail and yelp several times a lap.</summary>
     [Fact]
     public void ASirenDoesNotChangeItsMindEveryCorner()
     {
@@ -194,9 +147,7 @@ public class SirenTests
             if (lap >= line.Length) { lap -= line.Length; laps++; }
         }
         _o.WriteLine($"{siren.Changes} mode changes over two laps of {line.Length:F0} m");
-        // A handful over two laps is a crew working; dozens is a fault. Changes now include
-        // switching the head OFF at the end of a call and on at the start of the next, which is
-        // most of what a listener hears as variety.
+        // A handful over two laps is a crew working, dozens a fault; changes include off and on between calls.
         Assert.InRange(siren.Changes, 1, 14);
     }
 
@@ -213,13 +164,8 @@ public class SirenTests
         Assert.Equal(SirenMode.Off, siren.Mode);
     }
 
-    /// <summary>
-    /// A patrol car is NOT on a call most of the time, and that is the only reason its engine
-    /// exists. The head is 130 dB at a metre and the car is 95: a siren that never stops means an
-    /// engine that is never heard, which is exactly what was reported — "the police cars sound
-    /// like they have no engine, they're all siren". The answer is not a quieter siren (it is the
-    /// right level, it is a siren) but one that is off most of the time, like a real one.
-    /// </summary>
+    /// <summary>A patrol car is off a call most of the time: the head is 130 dB at a metre and the car 95,
+    /// and an always-on siren made "police cars that have no engine".</summary>
     [Fact]
     public void APatrolCarIsMostlyNotOnACall()
     {
@@ -240,7 +186,7 @@ public class SirenTests
         float share = 100f * sounding / total;
         _o.WriteLine($"siren sounding {share:F0} % of the time; modes seen: {string.Join(", ", seen)}");
         Assert.InRange(share, 15f, 55f);
-        // And it is not one sound for ever: a listener should meet more than one of them.
+        // More than one mode is heard.
         Assert.True(seen.Count >= 2, $"only ever heard {string.Join(", ", seen)}");
     }
 

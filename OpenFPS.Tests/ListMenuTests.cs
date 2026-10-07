@@ -1,7 +1,5 @@
-using System.Collections.Generic;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Platform;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

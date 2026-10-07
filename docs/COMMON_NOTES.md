@@ -252,3 +252,39 @@ Its level, measured with `--nature levels park_tree sec=600`:
 - Round 3 (Vogel −0.9, strikes by contact angle): 47.8 dB, 46.2 dB(A), the gustiest second 6.7 dB over.
 - Texture round 1 (2026-10-06: strikes and twig episodes from exponential-tailed turbulent increments),
   five minutes: 47.4 dB, 45.7 dB(A), 10 ms peaks' 99.9th percentile 21.1 dB over, so 22 of room.
+
+## Enclosure, not decay time
+
+Reported 2026-09-18 from the speedway's front straight: the geometry reverb read up to 1579 ms and
+swung by more than a second while the listener stood still, where the infield correctly read 101 ms.
+The wet level was taken from the decay time, which cannot carry it: Steam Audio's parametric
+estimator fits an exponential to whatever energy its rays bring home and cannot report that there was
+hardly any. Measured with AudioLab --sim-reverbfield, a walled yard with no ceiling fitted a 1.00 s
+tail where the same walls with a roof fitted 0.60 s: the roofless one read as the more reverberant,
+which is backwards, and no threshold could fix it because both sit on the same side of every
+threshold. Enclosure replaced it, and counts two bounces so that a plane is not a room: half of every
+direction from a standing listener ends in the ground, and concrete returns 98 %, so one bounce scored
+a bare plaza 48 % enclosed (measured on the battle spike's geometry). EnclosureTests hold it to that.
+
+## The clap
+
+Why a crowd of claps once sounded like a bag being crushed (ClapTests). Measured on the old model, a
+single clap put 0.4 % of its energy below 200 Hz and over 40 % above 1.5 kHz, and was gone in 12 ms:
+a tick, and a thousand ticks a second is cellophane. Two mechanical parts were missing.
+
+- The pocket of air between the palms rings. The first version had a sharp resonator and a listener
+  called it pouring water (a drip is a brief narrow resonance), so it was replaced by a plain low-pass
+  tilt with no note at all. The question was never whether the cavity resonates but how hard it is
+  damped: two soft leaky palms give a Q of about three.
+- The flesh thumps. Two palms meeting is a soft heavy impact first; it is low and slow, and it is the
+  half of a clap that survives 200 m of air, so a clap made only of edge arrived across a stadium as a
+  crinkle, which is what was reported.
+
+The reference (67 clean claps cut by tools/split_footsteps.py from `approved/applause/Slow Clapping  HQ
+Sound Effects.mp3`, 2026-09-19): a clap peaks at 1-2 kHz, as a footstep does, with a plateau of flesh
+from 125 to 500 Hz about 8 dB under the peak, a 12 dB fall in the octave above, and a cliff below
+60 Hz. Before it was measured the model had been settled by ear with its cavity at 800 Hz and a 12 ms
+thump, and was 11 dB heavy at 250-500 Hz, 9 dB light at 1-2 kHz, and twice too slow. A real clap is
+20 dB down 5 ms after its peak; the model had taken 13.5 ms. The recording's slow tail (-52 dB at
+30 ms, -64 at 45) is the room it was made in, which is the engine's job; the first model stopped dead
+at 24 ms.

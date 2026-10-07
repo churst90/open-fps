@@ -1,24 +1,14 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common;
 
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// Every candidate sound for the admin gun, the fire selector, the teleporter and things handed over,
-/// written out for listening and measured.
-///
-///   --admin-gun [out=DIR]
-///
-/// The report variants are written as the game renders them (the calibre's report and the layer, under
-/// the report's own ceiling) at one gain, so a variant and the plain report beside it compare as they
-/// would in the game. Everything else is brought to -3 dBFS peak: each is a designed sound whose level
-/// in the game is its declared level, not its file. 00-tour.wav says each one's name and plays it.
-/// Every file is measured: length, peak, RMS, samples at full scale, non-finite samples, octave bands.
+/// --admin-gun [out=DIR]: the admin gun, fire selector, teleporter and hand-over sounds, written and
+/// measured (length, peak, RMS, full-scale and non-finite samples, octave bands). Report variants share
+/// one gain, as the game renders them; the rest are at -3 dBFS peak, their game level being declared.
+/// 00-tour.wav names and plays each.
 /// </summary>
 public static class AdminGunSpike
 {
@@ -44,7 +34,6 @@ public static class AdminGunSpike
                 all.Add(new($"{n++:00}-report-{cal}-v{v}.wav", $"Admin gun report variant {v}, {Word(v)}, with the {calibre.DisplayName}.",
                             $"admin gun, variant {v}, {calibre.DisplayName} calibre: {AdminGun.DescribeReport(v)}", AdminGunSynth.Report(calibre, v, 1)));
         }
-        // Three shots in a row with the default, as somebody hearing a burst of them would.
         all.Add(new($"{n++:00}-report-ar15-v1-three-shots.wav", "Variant one, three shots.", "admin gun, variant 1, three shots half a second apart",
                     Sequence(Enumerable.Range(1, 3).Select(s => (AdminGunSynth.Report(WeaponRegistry.Ar15, 1, s), 0.5f)).ToList(), 1f)));
 
@@ -63,8 +52,7 @@ public static class AdminGunSpike
         // ── The teleporter ──────────────────────────────────────────────────────────────────────
         foreach (var kind in new[] { TeleporterSounds.Charge, TeleporterSounds.Leave, TeleporterSounds.Arrive, TeleporterSounds.Ready })
             all.Add(new($"{n++:00}-teleporter-{kind}.wav", $"Teleporter, {kind}.", TeleWhat(kind), Level(TeleporterSounds.Render(kind, Sr, 1))));
-        // In order, at their declared levels against each other: charge, leave; then the arrival and,
-        // a second later, the ready tone. (Heard by different people in the game; together here.)
+        // At their declared levels against each other; in the game different people hear them.
         all.Add(new($"{n++:00}-teleporter-sequence.wav", "Teleporter, the whole trip.", "charge, leave, then arrive and the ready tone a second later, at their levels against each other",
                     Level(Sequence(new List<(float[], float)>
                     {

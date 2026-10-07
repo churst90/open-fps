@@ -14,11 +14,9 @@ using LiteNetLib;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A player who leaves the world comes back to it as they left (Cody, 2026-10-04: "are inventories
-/// persisted across user logins?" — they were not: logging out put everything down). What they carry,
-/// loaded as it was, in the hands and on the back it was in, with their spare rounds; where they stood
-/// and faced; their health. Run through the real login, ready, logout and disconnect paths on a server
-/// with no sockets, over a real accounts database.
+/// A player comes back as they left (Cody, 2026-10-04: "are inventories persisted across user logins?"):
+/// what they carry, loaded, in the same hands and on the back, with spare rounds; where they stood and
+/// faced; their health. Through the real login, ready, logout and disconnect paths with no sockets.
 /// </summary>
 public class PlayerPersistenceTests : IDisposable
 {
@@ -375,10 +373,8 @@ public class PlayerPersistenceTests : IDisposable
         Assert.Equal(glocksBefore, rig.Made("default", "glock_pistol").Count);
     }
 
-    /// <summary>
-    /// Killed, a player's things go into a bag beside their body (Cody, 2026-10-05), so logging out dead
-    /// stores nothing: they do not come back with what is lying in the bag.
-    /// </summary>
+    /// <summary>Killed, a player's things go into a bag by the body (Cody, 2026-10-05), so logging out
+    /// dead stores nothing.</summary>
     [Fact]
     public async Task APlayerKilledDoesNotGetTheirThingsBackByLeaving()
     {
@@ -466,10 +462,8 @@ public class PlayerPersistenceTests : IDisposable
 
     // ── Where a new player lands on the city ────────────────────────────────────────────────────
 
-    /// <summary>
-    /// On a pavement, not in the road (Cody, 2026-10-04: "change the default spawn point for players to
-    /// be on a sidewalk somewhere like 60 122 1"). His x east, y north, z height is engine (60, _, 122).
-    /// </summary>
+    /// <summary>A new player lands on a pavement, not in the road (Cody, 2026-10-04: "somewhere like 60 122
+    /// 1"; his x east, y north, z height is engine (60, _, 122)).</summary>
     [Fact]
     public void ANewPlayerOnTheCityLandsOnTheFoundryStreetPavementAndNotInTheRoad()
     {

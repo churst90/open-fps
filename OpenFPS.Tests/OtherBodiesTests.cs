@@ -1,24 +1,14 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Everybody else's feet.
-///
-/// The only body in the world that made any noise walking used to be your own: another player could
-/// run past you, round you and into you in silence. These hold the derivation that fixed it to the
-/// two things that make it trustworthy — that a body which is WALKING is heard, from where it
-/// actually is and off the floor it is actually on, and that a body which is merely being MOVED is
-/// not, because the difference between those two is most of what a listener is being asked to
-/// believe.
+/// Everybody else's feet: a body that is walking is heard, from where it is and off the floor it is on,
+/// and a body that is only being moved is not.
 /// </summary>
 public class OtherBodiesTests
 {
@@ -89,27 +79,17 @@ public class OtherBodiesTests
         {
             at += new Vector3(0, 0, metresPerUpdate);
             others.Update(Frame(at, velocity, floorMaterial, type, includeBody: true, soundId: soundId), listenerId);
-            // Real time, because the cadence floor is real: no body puts a foot down five times a
-            // second, however fast a test loop can call this.
+            // Real time: the cadence floor is wall-clock, so a fast loop would be refused steps.
             Thread.Sleep(50);
         }
         return steps;
     }
 
     /// <summary>
-    /// A car does not walk, however the server happens to classify it.
-    ///
-    /// Reported from the rooms map, 2026-09-18: "the car driving by sounds like footsteps are being drug
-    /// behind it". `VehicleSystem` spawns vehicles as <see cref="EntityType.NPC"/> — the same type as
-    /// anything else that moves under its own direction — so every car on the map was given a stride
-    /// accumulator. A stride is half a metre, so at 30 km/h that is sixteen footfalls a second trailing
-    /// the car, and nothing stopped it: a car's velocity is genuinely its own, which is the test that
-    /// keeps passengers and server corrections quiet, and at render rate it covers a few centimetres an
-    /// update, which is well inside what a stride explains.
-    ///
-    /// The first fix matched the wrong string — "ENGINE/", which is the spelling AFTER the client
-    /// resolves a sound path, where a snapshot carries the server's "engine:". It compiled, it read
-    /// correctly, and the cars kept walking. Hence a test with the real prefix in it.
+    /// A car does not walk, though <c>VehicleSystem</c> spawns it as an <see cref="EntityType.NPC"/>
+    /// ("the car driving by sounds like footsteps are being drug behind it", 2026-09-18). The first fix
+    /// matched "ENGINE/", the client's resolved spelling, where a snapshot carries "engine:"; hence the
+    /// real prefix here.
     /// </summary>
     [Theory]
     [InlineData("engine:v8_muscle")]
@@ -123,7 +103,7 @@ public class OtherBodiesTests
         Assert.Empty(steps);
     }
 
-    /// <summary>And an NPC that is not a machine still walks, or the filter has eaten the feature.</summary>
+    /// <summary>An NPC that is not a machine still walks.</summary>
     [Fact]
     public void AnNpcOnFootIsStillHeard()
     {
@@ -161,8 +141,7 @@ public class OtherBodiesTests
         if (steps.Count >= 2) Assert.NotEqual(steps[0].Position.X, steps[1].Position.X);
     }
 
-    /// <summary>The floor a body is standing on decides what it sounds like, and nobody had to send
-    /// that — the listener's own copy of the world already knows what is under everyone's feet.</summary>
+    /// <summary>The floor under a body decides its step, from the client's own copy of the world.</summary>
     [Fact]
     public void ABodyOnGrassSoundsLikeGrass()
     {
@@ -175,13 +154,8 @@ public class OtherBodiesTests
     }
 
     /// <summary>
-    /// Being MOVED is not walking, for somebody else's body exactly as for your own.
-    ///
-    /// This is the rule that makes a passenger silent without anything here knowing what a vehicle is.
-    /// The server zeroes an occupant's velocity and leaves their body to the seat, so a rider is a
-    /// body at rest whose position is changing — which is the same shape as a teleport, a spawn and a
-    /// reconciliation, and is refused for the same reason. Without it a car at sixty miles an hour
-    /// would be a footstep every half metre of road.
+    /// A body at rest whose position changes (a teleport, a correction) is being moved, not walking.
+    /// Riders are kept out by their definition, not by this (docs/COMMON_NOTES.md, Walking).
     /// </summary>
     [Fact]
     public void ABodyThatIsBeingCarriedDoesNotWalk()
@@ -193,9 +167,8 @@ public class OtherBodiesTests
         Assert.Empty(steps);
     }
 
-    /// <summary>Your own feet are already heard, from the position this client predicts rather than
-    /// the one that had to travel. Hearing them a second time from the server's copy would be a
-    /// phantom walking a tenth of a second behind you.</summary>
+    /// <summary>Your own feet are heard from the predicted position only; the server's copy would be a
+    /// phantom a tenth of a second behind you.</summary>
     [Fact]
     public void YourOwnBodyIsNotHeardTwice()
     {
@@ -205,8 +178,7 @@ public class OtherBodiesTests
         Assert.Empty(steps);
     }
 
-    /// <summary>A thing is not a body. A crate sliding across a floor at walking pace makes whatever
-    /// noise a crate makes; it does not make footsteps.</summary>
+    /// <summary>A crate sliding at walking pace makes no footsteps.</summary>
     [Fact]
     public void SomethingThatIsNotABodyDoesNotWalk()
     {
@@ -217,8 +189,8 @@ public class OtherBodiesTests
         Assert.Empty(steps);
     }
 
-    /// <summary>A body off the ground banks no distance, and arrives with a landing rather than a
-    /// step. Vertical velocity is the signal, because the server clamps a grounded body's to zero.</summary>
+    /// <summary>A body off the ground banks no distance and arrives with a landing. Vertical velocity is
+    /// the signal: the server clamps a grounded body's to zero.</summary>
     [Fact]
     public void ABodyInTheAirLandsRatherThanStepping()
     {
@@ -238,7 +210,7 @@ public class OtherBodiesTests
         Assert.Equal(0, steps);
         Assert.Equal(0, landings);
 
-        // ...and arriving.
+        // Arriving.
         at.Y = 0f;
         others.Update(Frame(at, Vector3.Zero), Listener);
 
@@ -246,9 +218,8 @@ public class OtherBodiesTests
         Assert.Equal(0, steps);
     }
 
-    /// <summary>Somebody who walks out of earshot takes their half-finished stride with them. They
-    /// may be back, and when they are they will be somewhere else entirely — the distance between
-    /// here and there is not something they walked.</summary>
+    /// <summary>Somebody who walks out of earshot takes their half-finished stride with them: where they
+    /// come back is not a distance they walked.</summary>
     [Fact]
     public void SomebodyWhoLeavesIsForgotten()
     {

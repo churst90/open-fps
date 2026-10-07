@@ -25,6 +25,29 @@ Recent work, newest first. `git log` has the rest.
     WorldEditorClientTests; 42 unused usings.
   - Left for Cody, as `// TODO:`: a hull's blow lands at the start of its block, not at the sample it
     is given (ShoreSynth.HullPlate.Blow, up to 2.7 ms early); `--waves levels heard=` ignores `parts=`.
+- Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.AudioLab and OpenFPS.Tests, all but the water spikes
+  and tests (Waves, RunningWater, Nature, Texture) and the world editor tests, being worked on
+  elsewhere. Every spike kept. No test, assertion or tolerance changed, and no stored guard data
+  touched; every comment edit was checked to leave the code's tokens as they were.
+  - Comments: AudioLab 3,669 lines to 2,720, Tests 10,018 to 7,626. Narration and history cut; every
+    measured figure, source and regression a test guards kept in a sentence; doc comments that sat on
+    the wrong member put back on their own; the build's doc warnings in both projects are gone. About
+    thirty comments corrected to what the code does (a test summary claiming a check it does not make,
+    a lab flag advertised that nothing reads, the engine voice rendered by the pool, not in the
+    callback). A spike's summary lists the arguments it reads. Reasoning that was in no doc moved: the
+    new docs/TEST_NOTES.md and docs/AUDIOLAB_NOTES.md, docs/COMMON_NOTES.md (enclosure, not decay time;
+    the clap), docs/CLIENT_NOTES.md (screen reader keys) and docs/THE_CITY_BLOCK.md (footfalls answered
+    by the walls).
+  - `--help` lists every instrument with the arguments it reads: --fire, --glass, --driving,
+    --stair-walk, --early-tail, --map-travel, --nan-mix, --nan-walk and --mic were missing, the
+    mixer-thread harnesses have a line each, and --engine-levels takes no preset (it measures every
+    machine). The handler comments that repeated the list are cut.
+  - Dead code: 1,203 unused usings (340 AudioLab, 863 Tests); the test fakes' SetAmbientBedVolume,
+    SetListenerReverbField and GetPlaybackProgress, which implement no interface member any more;
+    TestDeadline's unused generic overload; unused helpers (GroundVoiceSpike.Elevation,
+    WheelDynamicsTests.Circle, BeaconAidsMutationTests.TransientSynthRoundTrip); write-only state in
+    five spikes and a test fixture; parameters no body read in ten lab helpers and four spike entry
+    points; unused locals in tests.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream

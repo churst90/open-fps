@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -53,9 +49,8 @@ public class RoomEchoTests
     /// <summary>
     /// Where Cody stands in the flat (/tp -14 -85 0.5 is 2.6 m from its middle along its length), a
     /// clap half a metre from the ear must have the nearer END wall placed, 6.4 m off, 36 ms after the
-    /// clap — the arrival that says how long the room is. Audibility used to be judged against the
-    /// direct sound at its true half metre, which dropped every wall past a twelve-metre round trip,
-    /// and the room's length was left to the omnidirectional tail (EarlyReflections.HeardReference).
+    /// clap, the arrival that says how long the room is. Judged against the direct sound at its true
+    /// half metre, every wall past a 12 m round trip was dropped (EarlyReflections.HeardReference).
     /// </summary>
     [Fact]
     public void TheEndWallOfALongRoomAnswersAClapAtArmsLength()
@@ -70,7 +65,7 @@ public class RoomEchoTests
         var end = early.Where(a => a.Order == 1 && a.ImagePosition.Z > ear.Z + 5f).ToList();
         Assert.True(end.Count == 1, $"the end wall ahead was placed {end.Count} times");
         Assert.InRange(end[0].ExtraDelaySeconds, 0.030f, 0.045f);
-        // ...and between the side walls' answers and the tail there is no longer a hole.
+        // No hole between the side walls' answers and the tail.
         Assert.Contains(early, a => a.ExtraDelaySeconds is > 0.02f and < 0.05f);
         // The gains themselves are still spread from the true direct distance: nothing got louder.
         Assert.All(early, a => Assert.True(a.GainMid <= 1f));

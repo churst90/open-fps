@@ -1,14 +1,9 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Client.Core;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
@@ -18,22 +13,16 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 ///
 ///   --walk [map=city] [from=x,z] [to=x,z] [seconds=12] [sprint] [stand=5]
 ///   --walk map=city from=x,z via=x,z;x,z;... [y=h] [trace]
+///   --walk ... taps=N [gap=ticks]          the key pressed for one tick, N times (Cody taps as often as he holds)
 ///
-/// via= walks a ROUTE: straight at each point in turn, turning on the spot when it gets there, the
-/// way a player holding W and tapping the turn keys does. trace prints every change of ground height
-/// rather than the first dozen, so a flight of stairs can be read tread by tread. Doors are taken as
-/// open (a door the player has opened is not in the way), and the named place at eye height is
-/// printed whenever it changes, which is what the zone announcer is given.
+/// via= walks a route, turning on the spot at each point as a player tapping the turn keys does.
+/// trace prints every change of ground height, so stairs read tread by tread. Doors are taken as
+/// open, and the named place at eye height is printed when it changes (what the zone announcer gets).
 ///
-/// Written for one report that no instrument could answer: *"walk a few steps, stop, and for like
-/// 10 seconds, periodic bangs."* A landing is a much heavier sound than a footstep and fires at most
-/// twice a second (StrideAccumulator.MinSecondsBetweenLandings), so "periodic bangs" is exactly what
-/// a body being repeatedly lifted and dropped would sound like — and whether that happens is a
-/// question about SharedMovementEngine and PhysicsUtils, not about audio at all.
-///
-/// So this runs those two, tick for tick, over the map's own boxes: nothing here is a model of the
-/// movement, it IS the movement. If a landing fires on flat ground, or the ground height under a
-/// standing body changes, it is printed with the tick it happened on.
+/// Written for "walk a few steps, stop, and for like 10 seconds, periodic bangs": a body lifted and
+/// dropped fires landings (at most two a second, StrideAccumulator.MinSecondsBetweenLandings). This
+/// runs SharedMovementEngine and PhysicsUtils tick for tick over the map's own boxes and prints any
+/// landing on flat ground, or ground moving under a standing body, with its tick.
 /// </summary>
 public static class WalkSpike
 {
@@ -44,8 +33,7 @@ public static class WalkSpike
         float seconds = Num(args, "seconds", 12f);
         float stand = Num(args, "stand", 5f);
         bool sprint = args.Contains("sprint");
-        // taps=N: the key pressed for one tick and let go, N times, gap= ticks apart — the way Cody
-        // walks as often as he holds a key. y= starts the body at that height (an upper floor).
+        // y= starts the body at that height (an upper floor).
         int taps = (int)Num(args, "taps", 0f);
         int gap = (int)Num(args, "gap", 10f);
         float startY = Num(args, "y", float.NaN);

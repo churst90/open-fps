@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core.Platform;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -76,8 +72,7 @@ public class VoiceChatTests
     [Fact]
     public void TheCodecCarriesTheWholeVoiceAtAModestRate()
     {
-        // A low voice and a sibilant together: 180 Hz and 9 kHz. Fullband keeps the second; the old
-        // narrow VOIP setting at 24 kbit/s threw it away.
+        // 180 Hz and 9 kHz together: fullband keeps the sibilant, which 24 kbit/s VOIP threw away.
         var packets = Encode(n => 0.3f * MathF.Sin(2 * MathF.PI * 180 * n / Rate) + 0.1f * MathF.Sin(2 * MathF.PI * 9000 * n / Rate), 2);
         double kbps = packets.Average(p => p.Data.Length) * 8 * 50 / 1000.0;
         Assert.InRange(kbps, 20, 80);
@@ -105,8 +100,7 @@ public class VoiceChatTests
         Assert.InRange(output.Count, Rate - 100, Rate + 10);
         var steady = output.Skip(1000).Take(Rate - 2000).ToArray();
         Assert.InRange(Rms(steady), 0.5f / MathF.Sqrt(2) * 0.99f, 0.5f / MathF.Sqrt(2) * 1.01f);
-        // A second difference grows with frequency: the tone's own value means nothing above it was made
-        // (images of a straight-line interpolation) and nothing of it was dulled.
+        // The tone's own second difference: no interpolation images above it, and it is not dulled.
         var d2 = new float[steady.Length - 2];
         for (int i = 0; i < d2.Length; i++) d2[i] = steady[i] - 2 * steady[i + 1] + steady[i + 2];
         float toneD2 = 0.5f / MathF.Sqrt(2) * (2 - 2 * MathF.Cos(2 * MathF.PI * 1000 / Rate));
@@ -131,8 +125,7 @@ public class VoiceChatTests
             Assert.True(Rms(steady.AsSpan(b, Block)) > 0.3f, $"a gap at {1 + b / (double)Rate:F2} s");
         var up = Enumerable.Range(1, steady.Length - 1).Where(i => steady[i - 1] < 0 && steady[i] >= 0).ToArray();
         var periods = up.Zip(up.Skip(1), (a, b) => (b - a) / (double)Rate).ToArray();
-        // Zero crossings of a decoded tone wander a little from sample to sample; on average the pitch
-        // is the pitch that was sent, to within the reader's pull.
+        // On average the pitch is the one sent, to within the reader's pull.
         Assert.InRange(periods.Min(), 1 / 220.0 * 0.97, 1 / 220.0 * 1.03);
         Assert.InRange(periods.Max(), 1 / 220.0 * 0.97, 1 / 220.0 * 1.03);
         Assert.InRange(periods.Average(), 1 / 220.0 * (1 - TalkerStream.MaxPull - 0.0005), 1 / 220.0 * (1 + TalkerStream.MaxPull + 0.0005));
@@ -152,8 +145,7 @@ public class VoiceChatTests
         Assert.Equal(stream.Lost, stream.Rebuilt);
         // The buffer never ran dry while they talked: the wait for the missing frame was inside the margin.
         Assert.Equal(0, stream.RanDry);
-        // And nothing fell silent. What the codec rebuilds of a pure tone can dip for a frame (a voice
-        // is not a sine); a hole in the buffer would read as nothing at all.
+        // Nothing fell silent: the codec's rebuild of a tone may dip for a frame, a hole reads as nothing.
         var steady = heard.Skip(Rate).Take(Rate * 4).ToArray();
         for (int b = 0; b + Block <= steady.Length; b += Block)
             Assert.True(Rms(steady.AsSpan(b, Block)) > 0.04f, $"a gap at {1 + b / (double)Rate:F2} s");

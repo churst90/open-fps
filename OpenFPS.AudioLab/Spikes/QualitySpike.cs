@@ -1,10 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
@@ -112,9 +107,8 @@ public static class QualitySpike
         }
         if (args.Contains("output"))
         {
-            // The real output, with nothing playing: for reading the stream's format off the sound
-            // server while it is open (pactl list sink-inputs). No voice is started and the dither is
-            // left out, so what it plays is digital silence.
+            // Digital silence on the real output (no voice, no dither), to read the stream's format off
+            // the sound server while it is open (pactl list sink-inputs).
             Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
             Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
             var p = new FmodAudioProvider();
@@ -172,8 +166,7 @@ public static class QualitySpike
         public void Dispose()
         {
             P.Dispose();
-            // The WAV writer's file is the sound card's copy of the post capture; only its format is
-            // of interest, and that is reported once by the resampler run.
+            // The WAV writer's file is the sound card's copy of the post capture; the resampler run reports its format.
             Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
             Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", null);
             Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_PRE", null);
@@ -343,9 +336,8 @@ public static class QualitySpike
             case "park": Park(s, sec); break;
             case "fountain":
             {
-                // The fountain alone, two metres off, the listener still (walk=1: walking past it at
-                // 1.2 m/s, so every sample goes through the resampler): the same model the nature
-                // renders write straight to a file, through the whole mixer.
+                // The fountain alone two metres off, through the whole mixer (walk=1: walking past at
+                // 1.2 m/s, so every sample goes through the resampler).
                 bool walk = args.Contains("walk=1");
                 var v = Nature(-650, "water:park_fountain", new Vector3(0f, 0.6f, 2f));
                 s.Pump(sec, t =>
@@ -729,11 +721,9 @@ public static class QualitySpike
     // ── A car's reflection ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// A car's echo off a wall (EngineEchoState, the reflection path) with the car itself all but
-    /// muted, so the capture is the echo: once with the car going past at 60 km/h (its channel pitched
-    /// by Doppler), once with the same engine note standing still. A reflection reads back from the
-    /// car's PLAY position, which moves by however much the car's channel consumed; a step in that
-    /// read at every mixer block would show as a residual locked to the 1024-sample block.
+    /// A car's echo off a wall (EngineEchoState) with the car all but muted, passing at 60 km/h and
+    /// standing still (modes= adds its borrowed and front voices). A reflection reads from the car's play
+    /// position, so a step in that read at every mixer block shows as a residual locked to the block.
     /// </summary>
     private static int Echo(string[] args, string dir, string tag)
     {

@@ -1,16 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
@@ -142,11 +136,9 @@ public class OpeningRoutesTests
     // ── Standing in a doorway ────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// A doorway is the wall's own thickness, in neither room's box. Read by the boxes alone it was the
-    /// outdoors, and every crossing between two rooms opened the outdoor reverberation fully for as long
-    /// as you stood in it (Cody, 2026-10-03: "bursts of outside noise when I step into different zones";
-    /// the log had the outdoor bus going from 1 % to 100 % in the stairwell's doorway). For sound it is
-    /// the room on your side; for naming it is still the doorway.
+    /// A doorway, the wall's own thickness, is the room on your side for sound and the doorway for
+    /// naming. Read by the boxes alone it was the outdoors: "bursts of outside noise when I step into
+    /// different zones" (2026-10-03), the outdoor bus going from 1 % to 100 % in the doorway.
     /// </summary>
     [Fact]
     public void ADoorwayBetweenRoomsIsNeverTheOutdoors()
@@ -161,8 +153,8 @@ public class OpeningRoutesTests
         Assert.Equal(Corridor, acoustics.GetRegionAt(world, corridorSide));
     }
 
-    /// <summary>The front door: its inner half is the stairwell, its outer half the street, as before.
-    /// And a wall with no opening in it is not a doorway: beside the building is the outdoors.</summary>
+    /// <summary>The front door's inner half is the stairwell, its outer half the street; a wall with no
+    /// opening is not a doorway.</summary>
     [Fact]
     public void TheFrontDoorwayIsHalfInAndAWallIsNotADoorway()
     {
@@ -235,10 +227,9 @@ public class OpeningRoutesTests
         Assert.True(Db(a.Low) > wall.L + 10f, $"low: route {Db(a.Low):F1}, wall {wall.L:F1}");
         Assert.True(Db(a.Mid) > wall.M + 10f, $"mid: route {Db(a.Mid):F1}, wall {wall.M:F1}");
         Assert.True(Db(a.High) > wall.H + 10f, $"high: route {Db(a.High):F1}, wall {wall.H:F1}");
-        // Heard from the doorway it comes in by.
         Assert.True(Vector3.Distance(a.Apparent, new Vector3(4.85f, 1.05f, 2.5f)) < 1.2f, $"arrives from {a.Apparent}");
 
-        // And the one-shots' path takes it: louder than through the wall, from the doorway's side.
+        // The one-shots' path takes it too: louder than through the wall, from the doorway's side.
         var p = new SpatialAcoustics().CalculateAcousticPath(world, -1, InCorridor, OnStreet);
         Assert.True(Db(p.EqMid) > wall.M + 10f, $"one-shot mid {Db(p.EqMid):F1}");
         Vector3 toDoorway = Vector3.Normalize(new Vector3(4.85f, 1.05f, 2.5f) - InCorridor);
@@ -252,8 +243,8 @@ public class OpeningRoutesTests
         var shutWorld = Building(frontDoorOpen: false);
         var shut = Ask(shutWorld, OnStreet, InCorridor);
         var tau = Graph(shutWorld).Model.Openings.Single(o => o.Id == FrontDoor).Tau;
-        // Everything on the route passes through the leaf once: what the shut door takes is its
-        // transmission, give or take what its absence from the stairwell's absorption changes.
+        // The route passes the leaf once: shutting it takes its transmission, give or take the
+        // stairwell's absorption.
         float Loss(float o, float s) => Db(s) - Db(o);
         Assert.InRange(Loss(open.Low, shut.Low), 10f * MathF.Log10(tau.X) - 3f, 10f * MathF.Log10(tau.X) + 3f);
         Assert.InRange(Loss(open.Mid, shut.Mid), 10f * MathF.Log10(tau.Y) - 3f, 10f * MathF.Log10(tau.Y) + 3f);
@@ -263,8 +254,7 @@ public class OpeningRoutesTests
     [Fact]
     public void BehindTwoWallsAndAShutDoorTheTopGoesFirst()
     {
-        // No floor under the bands: what reaches the corridor from the street, the door shut, falls
-        // with frequency — by the route and through the walls alike, on the one-shots' path.
+        // No floor under the bands: street to corridor, door shut, falls with frequency on both paths.
         var world = Building(frontDoorOpen: false);
         var p = new SpatialAcoustics().CalculateAcousticPath(world, -1, InCorridor, OnStreet);
         float l = Db(p.EqLow), m = Db(p.EqMid), h = Db(p.EqHigh);
@@ -275,8 +265,7 @@ public class OpeningRoutesTests
     [Fact]
     public void ADistantSourceBehindTheBuildingDoesNotLeakInFlat()
     {
-        // The old portal branch floored every band at one level for anything with a portal route: a
-        // horn far behind the building came into the corridor nearly whole, from the doorway.
+        // The old portal branch floored every band, and a horn far behind the building came in nearly whole.
         var world = Building(frontDoorOpen: false);
         var horn = new Vector3(60f, 1f, 150f);
         var p = new SpatialAcoustics().CalculateAcousticPath(world, -1, InCorridor, horn);
@@ -300,9 +289,8 @@ public class OpeningRoutesTests
     [Fact]
     public void TheOneShotPathAndTheSustainedPathAgree()
     {
-        // The occlusion worker publishes the graph it built with its scene and the one-shots' path asks
-        // the same one; where the simulator is not running the worker answers with the one-shots' path
-        // itself. Either way one source and one ear get one answer.
+        // The worker and the one-shots' path ask the same graph (without the simulator the worker uses the
+        // one-shots' path itself): one source and one ear get one answer.
         var world = Building(frontDoorOpen: true);
         var acoustics = new SpatialAcoustics();
         using var worker = new AsyncAcousticWorker(acoustics);

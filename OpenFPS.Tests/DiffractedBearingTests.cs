@@ -1,28 +1,13 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Where a blocked source is heard FROM.
-///
-/// Reported on the speedway, 2026-09-18: "that car stopping in front of me problem at close range".
-/// Nothing was stopping. The simulator's pathing stage was being asked to supply the arrival direction
-/// for any source whose line of sight was broken, and its probes are laid on a uniform floor grid sized
-/// to the map — 7.3 m apart over a 900 x 480 m track, measured from that session's own log. A bearing
-/// quantised to 7.3 m is four degrees of error at a hundred metres and nearly thirty at fifteen, and it
-/// holds still while the car crosses a cell and then jumps. The sound stopped tracking the car.
-///
-/// The level model already knew better. <see cref="Diffraction.PathDifferenceAroundBox"/> had been
-/// measuring the detour past each obstacle since the knee-high-wall fix, purely to decide how much got
-/// through. The same search knows WHERE it got through: the crossing point on the silhouette. An edge
-/// is a secondary source at a place, so that point is the bearing — exact geometry, continuous as the
-/// source moves, and no grid anywhere in it.
-///
-/// The three cases below are one rule, not three: a kerb, a stand and a doorway differ only in where
-/// their edge happens to be.
+/// Where a blocked source is heard from: the edge the detour crosses, from
+/// <see cref="Diffraction.PathDifferenceAroundBox(Vector3, Vector3, Quaternion, Vector3, Vector3, out float, out Vector3)"/>,
+/// exact and continuous, not the 7.3 m probe grid that made a near car seem to stop on the speedway
+/// (docs/CLIENT_NOTES.md, "The bearing follows the level"). A kerb, a stand and a doorway are one rule.
 /// </summary>
 public class DiffractedBearingTests
 {
@@ -33,13 +18,8 @@ public class DiffractedBearingTests
         return MathF.Acos(Math.Clamp(Vector3.Dot(toSource, toEdge), -1f, 1f)) * 180f / MathF.PI;
     }
 
-    /// <summary>
-    /// The reported fault. A car behind the pit wall is still a car in front of you.
-    ///
-    /// The wall breaks the sight line — that is what put the source on the redirect path in the first
-    /// place — but it is 0.9 m of it, and the route over the top leaves the straight line by a
-    /// millimetre. The bearing has to be indistinguishable from the car's own.
-    /// </summary>
+    /// <summary>The reported fault: a car behind a 0.9 m pit wall breaks the sight line, but the route over
+    /// the top leaves the straight line by a millimetre, so its bearing is the car's own.</summary>
     [Fact]
     public void ACarBehindAKneeHighWallIsStillHeardWhereItIs()
     {
@@ -51,7 +31,6 @@ public class DiffractedBearingTests
         Assert.True(Diffraction.PathDifferenceAroundBox(centre, size, Quaternion.Identity,
                                                         source, listener, out float delta, out Vector3 edge));
 
-        // On the wall's top edge, which is the only way past it.
         Assert.Equal(0.9f, edge.Y, 2);
 
         float shift = BearingShiftDegrees(listener, source, edge);
@@ -59,17 +38,12 @@ public class DiffractedBearingTests
             $"a car behind a knee-high wall must not appear to move; it shifted {shift:F1} degrees. " +
             "The probe-grid bearing this replaced moved it by tens of degrees and then held it there.");
 
-        // And it is still audible, which is the level half of the same measurement.
+        // Still audible: the level half of the same measurement.
         Assert.True(delta < 0.05f, $"path difference {delta:F3} m — a 0.9 m wall is a few centimetres of detour");
     }
 
-    /// <summary>
-    /// A grandstand is not a kerb, and the same rule says so: the sound comes off its top front corner.
-    ///
-    /// This is the part that has to keep working. A bearing rule that never moved anything would be
-    /// just as wrong as one that moved everything — a source behind a building genuinely is heard from
-    /// the building's edge, and that is a large, audible angle.
-    /// </summary>
+    /// <summary>A source behind a grandstand is heard from its top front corner, a large audible angle: a
+    /// rule that never moved a bearing would be as wrong as one that always did.</summary>
     [Fact]
     public void ASourceBehindAStandIsHeardFromItsEdge()
     {
@@ -81,7 +55,7 @@ public class DiffractedBearingTests
         Assert.True(Diffraction.PathDifferenceAroundBox(centre, size, Quaternion.Identity,
                                                         source, listener, out float delta, out Vector3 edge));
 
-        // The top edge of the face turned towards the listener — the corner the sound leaves from.
+        // The top edge of the face turned towards the listener.
         Assert.Equal(12f, edge.Y, 1);
         Assert.Equal(8f, edge.Z, 1);
 
@@ -90,11 +64,8 @@ public class DiffractedBearingTests
         Assert.Equal(Diffraction.MaxInsertionLossDb, Diffraction.InsertionLossDb(delta, Diffraction.MidBandHz), 1);
     }
 
-    /// <summary>
-    /// The doorway case, from maps/default.json: the west leaf of the wood room's front wall, with the
-    /// opening at x 6..8. Stand square in front of the leaf and the shortest way past it is round the
-    /// jamb — so that is where the megaphone inside is heard from.
-    /// </summary>
+    /// <summary>The doorway in maps/default.json (the wood room's front wall, opening at x 6..8): square in
+    /// front of the leaf, the megaphone inside is heard from the jamb.</summary>
     [Fact]
     public void ASourceThroughADoorwayIsHeardFromTheJamb()
     {
@@ -106,22 +77,13 @@ public class DiffractedBearingTests
         Assert.True(Diffraction.PathDifferenceAroundBox(centre, size, Quaternion.Identity,
                                                         source, listener, out _, out Vector3 edge));
 
-        // A jamb of the opening, not the top and not the far end. The source is midway between the
-        // two jambs, so either is right; the east one was only ever chosen because the search went
-        // round one way. The route round a jamb is under a metre.
+        // A jamb, not the top or the far end; the source is midway between the two, so either is right.
         Assert.True(MathF.Abs(edge.X - 6f) < 0.1f || MathF.Abs(edge.X - 2f) < 0.1f, $"edge {edge}");
 
         Assert.True(BearingShiftDegrees(listener, source, edge) > 20f,
             "standing in front of a wall with a door beside it, the sound comes from the door");
     }
 
-    /// <summary>
-    /// The crossing reported is the one the LAST leg leaves from.
-    ///
-    /// For a thin screen the two crossings coincide and nothing distinguishes them. For anything with
-    /// depth — a stand, a building — the route climbs one edge, runs across the face and drops off the
-    /// far one, and reporting the entry crossing would place the sound at the corner it went in by.
-    /// </summary>
     /// <summary>The way round is the way back: swapping source and listener cannot change the detour.</summary>
     [Theory]
     [InlineData(0f, 6f, 0f, 40f, 12f, 16f, 0f, 0.6f, -30f, 0f, 1.7f, 30f)]
@@ -146,6 +108,8 @@ public class DiffractedBearingTests
         Assert.True(over < 1f, $"detour {over:F2} m over a 3 m wall");
     }
 
+    /// <summary>The crossing reported is the one the last leg leaves from: over a deep box the route
+    /// climbs one edge and drops off the far one, and the entry corner would be the wrong place.</summary>
     [Fact]
     public void TheEdgeReportedIsTheOneNearestTheEar()
     {
@@ -161,8 +125,7 @@ public class DiffractedBearingTests
             $"the crossing at z={edge.Z:F1} is on the source's side of the box; the ear is at z=+30");
     }
 
-    /// <summary>The overload without the edge still answers exactly as it did — the level model is
-    /// unchanged by any of this, and the knee-high-wall fix it carries must not have moved.</summary>
+    /// <summary>The overload without the edge gives the same detour, so the knee-high-wall level fix holds.</summary>
     [Fact]
     public void TheLevelAnswerIsUnchanged()
     {
@@ -176,12 +139,9 @@ public class DiffractedBearingTests
         Assert.Equal(a, b, 6);
     }
     /// <summary>
-    /// Every way round a box, not only the shortest. A storey-high wall beside a doorway, the ear in the
-    /// flat and a walker in the corridor: the shortest way past the wall is over its top, which in a
-    /// building runs into the slab above, and round the jamb is a few centimetres longer. The search
-    /// only ever gave the first, so an open door let nothing round its corner (2026-09-30). The jamb
-    /// must be among the routes, with its crossings, so the caller can check the legs against a leaf
-    /// hung in the doorway.
+    /// Every way round a box, not only the shortest: past a storey-high wall the top route runs into the
+    /// slab above, and the jamb, a few centimetres longer, was never offered, so an open door let nothing
+    /// round its corner (2026-09-30). The jamb comes with its crossings, to check against a hung leaf.
     /// </summary>
     [Fact]
     public void A_storey_wall_reports_the_jamb_as_well_as_the_top()
@@ -200,8 +160,7 @@ public class DiffractedBearingTests
         foreach (var r in jamb) if (r.D < best.D) best = r;
         Assert.True(best.D < 1.0f, $"round the jamb {best.D:F2} m");
         Assert.True(best.D >= shortest);
-        // On the wall's end, where the doorway is: the corridor corner, which is what the last leg
-        // leaves from across the doorway (the leg a shut leaf stands in).
+        // The corridor corner at the wall's end, which the last leg leaves from across the doorway.
         Assert.True(MathF.Abs(best.SourceSide.Z + 84.36f) < 0.02f && MathF.Abs(best.Edge.Z + 84.36f) < 0.02f,
                     $"crossings {best.SourceSide} then {best.Edge}");
     }

@@ -1,14 +1,13 @@
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A wall's copy of a recorded loop arrives as much under the loop as the wall sends back: the arrival's gain against
-/// the direct sound, once. It came out some 40 dB under that, placed with no reference distance, its spreading counted
-/// at the image as well as in its gain, and its middle band in both its volume and its EQ.
+/// A wall's copy of a recorded loop arrives under the loop by what the wall sends back, counted once. It came
+/// out some 40 dB lower: placed with no reference distance, its spreading counted at the image and in its
+/// gain, and its middle band in both its volume and its EQ.
 /// </summary>
 public class LoopEchoLevelTests
 {

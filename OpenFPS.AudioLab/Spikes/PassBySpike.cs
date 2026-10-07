@@ -1,22 +1,12 @@
-using System;
-using System.IO;
-
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// Spike: white noise driven past a standing listener through Steam Audio's binaural effect, the
-/// way the game does it — one direction per mixer block — and the same pass rendered with the
-/// direction updated every 64 samples, as the reference for what a smoothly moving source is.
-///
-/// "Anything that passes close sounds inside out; a little further away it is fine." What changes
-/// with distance is how fast the direction turns: at 2 m and 15 m/s the bearing swings about 25
-/// degrees in one 1024-sample block. The measures, per block round the closest approach:
-///   iacc   — the peak of the normalised left/right cross-correlation within +-1 ms. A real source
-///            at one place is highly coherent between the ears; "inside out" is the ears disagreeing.
-///   ripple — the spread (dB) of the block's spectrum against the reference's, 1-10 kHz: a comb
-///            from two delayed copies being cross-faded shows as notches the reference lacks.
-///
-/// --pass-by [out=DIR]   writes pass_{d}m_{block}.wav for listening.
+/// --pass-by [out=DIR]: white noise driven past a listener through Steam Audio's binaural effect with one
+/// direction per mixer block, as the game does, against a direction every 64 samples as the reference.
+/// For "anything that passes close sounds inside out": at 2 m and 15 m/s the bearing swings about 25
+/// degrees in one 1024-sample block. Per block: iacc (peak left/right cross-correlation within 1 ms; low
+/// is the ears disagreeing) and ripple (1-10 kHz spread against the reference: a cross-faded comb).
+/// Writes pass_{d}m_{block}.wav.
 /// </summary>
 public static class PassBySpike
 {

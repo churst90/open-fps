@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Client.AudioEngine.Core;
@@ -10,7 +7,6 @@ using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -58,10 +54,8 @@ public class BeaconTests
         _o.WriteLine(aids.Command(Array.Empty<string>()));
     }
 
-    /// <summary>
-    /// Standing beside a real door on the city, its blip reaches the mixer — through the real facade
-    /// and voice manager, which is where the driving cues were silently dropped once.
-    /// </summary>
+    /// <summary>Beside a real city door its blip reaches the mixer through the real facade and voice
+    /// manager, where the driving cues were once silently dropped.</summary>
     [Fact]
     public void ADoorNearYouBlips()
     {
@@ -105,13 +99,8 @@ public class BeaconTests
         Assert.DoesNotContain(provider.PlayedSounds, s => s.Contains("beacon_door"));
     }
 
-    /// <summary>
-    /// A door you can see is a door you are told about. Standing where the door's face is in plain
-    /// view — a few metres out and off to one side, wherever the street or corridor leaves room — the
-    /// path model still calls many of them half blocked, because a door set into a wall is partly
-    /// hidden by its own jamb at an angle. On that figure alone doors fell silent as you approached
-    /// them: "I don't hear the beacons for doors now where I heard them before".
-    /// </summary>
+    /// <summary>A door whose face is in plain view blips, though the path model calls many half blocked
+    /// by their own jamb at an angle ("I don't hear the beacons for doors now where I heard them before").</summary>
     [Fact]
     public void ADoorInViewBlipsFromAnAngle()
     {
@@ -144,8 +133,7 @@ public class BeaconTests
                 foreach (var ear in new[] { face + normal * 3f + side * 1.5f + Vector3.UnitY * 0.5f,
                                             face + normal * 1.5f + side * 1.5f + Vector3.UnitY * 0.5f })
                 {
-                    // Only where the door is really in view: nothing between its face and the ear,
-                    // and nothing between the ear and a point straight out from the face.
+                    // Really in view: clear from the face to the ear, and from the ear to a point straight out.
                     var dir = ear - face; float len = dir.Length();
                     if (acoustics.Spatial.RaycastSingle(snap, face, dir / len, len, out _, out _)) continue;
                     tried++;
@@ -160,10 +148,8 @@ public class BeaconTests
         Assert.Equal(0, silent);
     }
 
-    /// <summary>
-    /// A door on the far side of a wall is somebody else's room: it does not blip through the brick.
-    /// Standing against the side of 24 Birch Street, both of its doors are round the corner.
-    /// </summary>
+    /// <summary>A door on the far side of a wall does not blip through the brick: against the side of
+    /// 24 Birch Street, both its doors are round the corner.</summary>
     [Fact]
     public void ADoorBehindAWallDoesNotBlip()
     {
@@ -192,10 +178,8 @@ public class BeaconTests
         Assert.DoesNotContain(provider.PlayedSounds, s => s.Contains("beacon_door"));
     }
 
-    /// <summary>
-    /// Nobody placed a beacon on the city, and it is full of them: every door is a door beacon, and
-    /// every parked car a vehicle beacon. Checked on the definitions the client is actually sent.
-    /// </summary>
+    /// <summary>Every city door is a door beacon and every parked car a vehicle beacon, though nobody placed
+    /// one; checked on the definitions the client is sent.</summary>
     [Fact]
     public void DoorsAndParkedCarsAreBeaconsWithoutBeingPlaced()
     {
@@ -244,12 +228,9 @@ public class BeaconTests
         return (client.GetSnapshot(), cars);
     }
 
-    /// <summary>
-    /// A parked car's beacon is heard from wherever round it you stand. It used to sound from where
-    /// the car rests - the middle of its footprint at road level, inside its own floor and doors - so
-    /// every path out of it read 0.95 blocked and no vehicle beacon was ever played (Cody, 2026-10-05:
-    /// "I'm not sure I hear vehicle beacons"). Now it hangs just off the body on your side.
-    /// </summary>
+    /// <summary>A parked car's beacon hangs just off the body on your side, heard from all round; from the
+    /// footprint's middle every path read 0.95 blocked (Cody, 2026-10-05: "I'm not sure I hear vehicle
+    /// beacons").</summary>
     [Fact]
     public void AParkedCarBlipsFromWhereverYouStand()
     {
@@ -288,10 +269,8 @@ public class BeaconTests
         Assert.Equal(0, silent);
     }
 
-    /// <summary>
-    /// Standing among the parked cars, the nearest blip on their own beats; and the car you are
-    /// sitting in is not one of them - the next one along takes its place.
-    /// </summary>
+    /// <summary>Among parked cars the nearest blip on their own beats, and the car you sit in is not one of
+    /// them: the next one along takes its place.</summary>
     [Fact]
     public void TheNearestParkedCarsBlipButNotTheOneYouAreIn()
     {
@@ -322,8 +301,7 @@ public class BeaconTests
         _o.WriteLine($"beside: {beside.Count} blips");
         Assert.Contains(beside, e => From(e, first));
 
-        // Sitting in it, with nothing asked about paths: the car's own panels shut out the others, as
-        // they should, and that is not what this is about.
+        // No paths: the car's own panels would shut out the others, which is not under test here.
         var inside = Listen(first.Transform.Position + new Vector3(0f, 1.1f, 0f), paths: false);
         _o.WriteLine($"inside: {inside.Count} blips, from {string.Join(", ", inside.Select(e => e.Position))}");
         Assert.DoesNotContain(inside, e => From(e, first));

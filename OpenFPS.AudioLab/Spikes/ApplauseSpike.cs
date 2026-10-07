@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Linq;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
@@ -11,9 +8,8 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 ///   --applause [people=400] [intensity=0.7] [sec=3] [out=DIR]
 ///   --applause compare=DIR          one synthesised clap against a folder of recorded ones
 ///
-/// With no arguments it writes a sweep of them — a handful of people barely bothering, a stand
-/// reacting, and a full ovation — because the interesting thing about this model is that those are
-/// one sound at three arrival rates rather than three recordings.
+/// With no arguments, a sweep: a handful barely bothering, a stand reacting, a full ovation, one model
+/// at three arrival rates.
 /// </summary>
 public static class ApplauseSpike
 {
@@ -56,16 +52,10 @@ public static class ApplauseSpike
     }
 
     /// <summary>
-    /// The model's single clap held up against real ones, the way a footstep is: SHAPE per band,
-    /// normalised to each side's own total, and how fast each one is gone.
-    ///
-    /// Point it at a folder of single-clap WAVs — `tools/split_footsteps.py` cuts them out of a
-    /// recording of somebody clapping slowly, since a clap and a footstep are both one transient
-    /// with a gap after it. A recording carries whatever room it was made in, so the tail it reports
-    /// is an upper bound on the clap's own; the bands above 500 Hz are barely touched by that, the
-    /// ones below are where a room adds most.
-    ///
-    ///   --applause compare=DIR
+    /// The model's single clap against recorded ones: shape per band, normalised to each side's total,
+    /// and how fast each is gone. The folder holds single-clap WAVs (`tools/split_footsteps.py` cuts a
+    /// slow-clap recording). A recording's tail is an upper bound on the clap's own; its room adds most
+    /// below 500 Hz.
     /// </summary>
     private static int Compare(string dir)
     {

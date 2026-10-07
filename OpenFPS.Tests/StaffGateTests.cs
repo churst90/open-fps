@@ -12,17 +12,10 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Every command that needs a role, run by somebody without one.
-///
-/// The 2026-10-01 mutation run found that the role check could be deleted from eighteen of these and
-/// the suite still passed: only /tp and /spawn were ever tried as a Player. Each case here is run
-/// twice on a fresh world set up so the command has something to do: once as a Player, who must be
-/// refused with nothing anywhere changed and nothing sent to anybody, and once as staff, who must
-/// change something. The second half is what makes the first worth anything — a refusal of a command
-/// that would have done nothing anyway proves nothing.
-///
-/// The list is the switch in <see cref="CommandHandler"/>. <see cref="EveryGatedCommandIsListedHere"/>
-/// reads the source and fails if a gated case is added there and not here.
+/// Every command that needs a role, run on a fresh world as a Player (refused, nothing changed or sent)
+/// and as staff (something changes, so the refusal proves something). The 2026-10-01 mutation run could
+/// delete eighteen role checks unnoticed. <see cref="EveryGatedCommandIsListedHere"/> keeps the list
+/// in step with <see cref="CommandHandler"/>.
 /// </summary>
 public class StaffGateTests : IDisposable
 {
@@ -112,8 +105,7 @@ public class StaffGateTests : IDisposable
         string said = rig.Run(command, args);
 
         Assert.NotEqual(Denied, said);
-        // Something happened: the world, the build cursor, a file, a role, or a message to somebody.
-        // The read-only admin commands change nothing, so for them the answer itself is the effect.
+        // For the read-only admin commands the answer itself is the effect.
         Assert.True(rig.Sent.Count > 0 || rig.Fingerprint() != before || ReadOnly(command),
                     $"/{command} as {needs} changed nothing, so its refusal to a Player proves nothing. It said: {said}");
     }
@@ -169,10 +161,8 @@ public class StaffGateTests : IDisposable
         Assert.Equal(Denied, rig.Run("move", "150", "150", "6"));
     }
 
-    /// <summary>
-    /// An administrator makes a role of their own and gives it to somebody: they are told who made them
-    /// what and what they can now do, and they can do exactly that.
-    /// </summary>
+    /// <summary>A role an administrator makes and gives is announced to its holder (who, what, and what
+    /// they can do), and grants exactly that.</summary>
     [Fact]
     public void ACustomRoleIsAnnouncedAndAllowsItsCommandsOnly()
     {
@@ -231,19 +221,14 @@ public class StaffGateTests : IDisposable
     [Fact]
     public void StaffNamingAWeaponFiresIt()
     {
-        // The other half: the name is honoured for staff, so the refusal above is the gate and not
-        // a weapon that never fires.
+        // Staff can, so the refusal above is the gate.
         var rig = new Rig(_dir, UserRole.Dev, "fire");
         rig.Run("fire", "akm");
         Assert.Contains(rig.Sent, m => m is WorldAudioEvent);
     }
 
-    /// <summary>
-    /// Every gated permission that is a command is listed here, and everything listed here is gated:
-    /// a permission added to the table without a case here fails, and so does a case here that the
-    /// table does not gate. The powers that are part of a command (fire-any, join-private, edit-any,
-    /// move-player, give-premium, tp-free and the rest of Permissions.Powers) have tests of their own.
-    /// </summary>
+    /// <summary>The gated commands and this list are the same set. Powers within a command
+    /// (Permissions.Powers: fire-any, join-private and the rest) have tests of their own.</summary>
     [Fact]
     public void EveryGatedCommandIsListedHere()
     {
@@ -263,19 +248,15 @@ public class StaffGateTests : IDisposable
             string candidate = Path.Combine(new[] { dir.FullName }.Concat(parts).ToArray());
             if (File.Exists(candidate)) return candidate;
         }
-        // The build output lives outside the repository (--artifacts-path); fall back on the source
-        // tree this file was compiled from.
+        // The build output is outside the repository (--artifacts-path): use this file's source tree.
         string here = Path.GetDirectoryName(ThisFile())!;
         return Path.Combine(new[] { here, ".." }.Concat(parts).ToArray());
     }
 
     private static string ThisFile([System.Runtime.CompilerServices.CallerFilePath] string path = "") => path;
 
-    /// <summary>
-    /// A small real world: the default map copied to a temporary folder (so /savemap writes there),
-    /// the real command handler, and a player standing in an empty corner, with whatever the command
-    /// under test needs set out in front of them.
-    /// </summary>
+    /// <summary>The default map in a temporary folder (so /savemap writes there), the real command handler,
+    /// and a player in an empty corner with what the command needs set out.</summary>
     private sealed class Rig
     {
         public readonly List<IMessage> Sent = new();
@@ -437,11 +418,8 @@ public class StaffGateTests : IDisposable
             return string.Join(" | ", replies);
         }
 
-        /// <summary>
-        /// Everything a command could change, as one string: every component of every entity on the
-        /// map, the builder's cursor, the files the world is saved in, the message of the day, every
-        /// online player's role, and every account's role.
-        /// </summary>
+        /// <summary>Everything a command could change, as one string: every entity's components, the build
+        /// cursor, the saved files, the message of the day, and every player's and account's role.</summary>
         public string Fingerprint()
         {
             var text = new StringBuilder();

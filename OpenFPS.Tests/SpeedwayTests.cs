@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Server.Repositories;
@@ -8,35 +5,17 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for the speedway: the racing line a car is given, and the walls that answer it.
-///
-/// Both are things that fail QUIETLY. A racing line with one bad node still drives — the car just
-/// crawls, and "the cars sound slow" is a long way from "one triple of points in turn three fitted a
-/// four-metre radius". A wall segment rotated wrongly still reflects — it just reflects in a
-/// direction the wall does not face, and on a curve every segment is rotated differently so there is
-/// no single value to eyeball. These assert the two numbers that would otherwise only show up as a
-/// sound somebody has to describe.
+/// The speedway's racing line and the walls that answer it, both of which fail quietly: a bad node makes
+/// a car crawl, and a wrongly turned wall segment reflects where the wall does not face.
 /// </summary>
 public class SpeedwayTests
 {
     private const float R = 150f, SX = 164.5f;
 
     /// <summary>
-    /// A car goes round the lap at the speed it is doing, everywhere, on every lane.
-    ///
-    /// Reported 2026-09-18 from the front straight: "the F1 will stop in front of me, the Doppler
-    /// change in place, and then the car keeps going... other cars are stopping for a second then
-    /// continuing." Nothing in the audio was wrong. <c>RaceLine.Sample</c> wrapped the distance on the
-    /// line's TRUE perimeter and then found the node by dividing by the centreline's NOMINAL spacing,
-    /// and those are not the same number: smoothing shortens the loop where it curves, and the lateral
-    /// offset onto a lane lengthens the turns for an outside line and shortens them for an inside one.
-    /// On the St Louis egg an outside lane is about forty metres longer than nominal, so for forty
-    /// metres of every lap the node index hit the clamp and the car sat motionless on the first node
-    /// of its own line — the best part of a second for a stock car, half of one for a formula car, at
-    /// the same point on the track every lap. An inside lane teleported the same distance forward.
-    ///
-    /// Walking the lap in equal steps of arc length has to move the car equally far each time. That is
-    /// the whole of it, and it is what the clamp could not do.
+    /// A car goes round the lap at the speed it is doing, everywhere, on every lane: equal steps of arc move
+    /// it equally far. Reported 2026-09-18 as cars stopping for a second on the front straight: the node
+    /// index clamped for the forty metres an outside lane is longer than nominal (docs/COMMON_NOTES.md).
     /// </summary>
     [Theory]
     [InlineData(-8f)]
@@ -60,21 +39,15 @@ public class SpeedwayTests
             prev = p;
         }
 
-        // A metre of arc moves the car a metre. The tolerance is chord-versus-arc on the tightest
-        // corner, which is parts per million here, not the centimetres this allows.
+        // A metre of arc moves the car a metre; chord against arc on the tightest corner is parts per million.
         Assert.True(shortest > 0.97f * step,
             $"lane {lane:+0.0;-0.0} m: a metre of lap moved the car {shortest:F3} m at its worst — it stalls");
         Assert.True(longest < 1.03f * step,
             $"lane {lane:+0.0;-0.0} m: a metre of lap moved the car {longest:F3} m at its worst — it jumps");
     }
 
-    /// <summary>
-    /// The lap the line reports is the lap the line IS.
-    ///
-    /// The stall was only visible at all because these two disagreed. An outside lane really is longer
-    /// than the centreline it was offset from — that is geometry, not a fault — so the check is that
-    /// <see cref="RaceLine.Length"/> matches the nodes rather than that it matches the nominal.
-    /// </summary>
+    /// <summary>The lap the line reports is the lap the line is: <see cref="RaceLine.Length"/> matches its
+    /// nodes, not the nominal centreline (an outside lane really is longer).</summary>
     [Theory]
     [InlineData(-8f)]
     [InlineData(0f)]
@@ -83,8 +56,7 @@ public class SpeedwayTests
     {
         var line = new RaceLine(Oval(), lane, 90f, 2.9f, 8f);
 
-        // Sum the line by walking it in very small steps: the total distance covered over one lap of
-        // arc length must be the lap itself.
+        // Walked in small steps, one lap of arc length covers the lap itself.
         const float step = 0.25f;
         float walked = 0f;
         line.Sample(0f, out Vector3 prev, out _, out _);
@@ -97,8 +69,8 @@ public class SpeedwayTests
         Assert.Equal(line.Length, walked, 0);
     }
 
-    /// <summary>An outside lane is longer than an inside one, and both are still driven end to end.
-    /// This is the property that made the fault lane-dependent, so it is worth saying out loud.</summary>
+    /// <summary>An outside lane is longer than an inside one, and both are driven end to end: the property
+    /// that made the fault lane-dependent.</summary>
     [Fact]
     public void AnOutsideLaneIsLongerThanAnInsideOne()
     {
@@ -109,8 +81,7 @@ public class SpeedwayTests
         Assert.Equal(inner.NodeCount, outer.NodeCount);
     }
 
-    /// <summary>The oval's centreline, drawn the way a map draws one: as a modest number of
-    /// waypoints with straight chords between them.</summary>
+    /// <summary>The oval's centreline as a map draws one: a modest number of waypoints joined by chords.</summary>
     private static List<Vector3> Oval(int perTurn = 32, int perStraight = 11)
     {
         var pts = new List<Vector3>();
@@ -139,10 +110,9 @@ public class SpeedwayTests
     }
 
     /// <summary>
-    /// The one that matters. A turn of radius 150 taken at 2.9 lateral g allows about 235 km/h, and
-    /// nothing anywhere on the lap may be slower than that — a track made of chords has a corner at
-    /// every waypoint join, and measuring the radius across adjacent nodes finds those corners
-    /// instead of the turn. When this regressed, the field lapped at 113 km/h.
+    /// A turn of radius 150 at 2.9 lateral g allows about 235 km/h, and nothing on the lap is slower: measuring
+    /// the radius across adjacent nodes finds the chords' corners instead of the turn. When this regressed
+    /// the field lapped at 113 km/h.
     /// </summary>
     [Fact]
     public void CornerSpeedComesFromTheTurnAndNotFromTheWaypointJoins()
@@ -175,10 +145,8 @@ public class SpeedwayTests
         Assert.InRange(fast.MinSpeed / slow.MinSpeed, 1.85f, 2.15f);
     }
 
-    /// <summary>
-    /// The brakes have to be applied BEFORE the corner. Sampling the lap from the end of the
-    /// straight back toward the start/finish line must find the limit already coming down.
-    /// </summary>
+    /// <summary>The brakes go on before the corner: the limit is already coming down at the end of the
+    /// straight.</summary>
     [Fact]
     public void BrakingBeginsBeforeTheCornerRatherThanAtIt()
     {
@@ -200,11 +168,8 @@ public class SpeedwayTests
             $"inside {inside.Length:F0} m, outside {outside.Length:F0} m");
     }
 
-    /// <summary>
-    /// A wall segment turned to follow a curve must present a face that looks at the track. Taking
-    /// the axis-aligned box instead points every face along X or Z, and the reflections then come
-    /// back off directions the wall does not face.
-    /// </summary>
+    /// <summary>A wall segment turned to follow a curve presents a face that looks at the track; an
+    /// axis-aligned box points every face along X or Z.</summary>
     [Fact]
     public void ARotatedWallFacesTheWayItWasTurned()
     {
@@ -220,23 +185,19 @@ public class SpeedwayTests
         int n = ImageSource.FacesOfBox(centre, new Vector3(20f, 3.5f, 0.6f), rot, 0.02f, 1, faces);
         Assert.Equal(6, n);
 
-        // The face pointing at the middle of the turn is the one that reflects a car back at the
-        // stands. Its normal must point from the wall toward the turn's centre.
+        // The face toward the turn's centre reflects a car back at the stands; its normal points there.
         var toCentre = Vector3.Normalize(new Vector3(SX, 1.75f, 0f) - centre);
         float best = -2f;
         for (int i = 0; i < n; i++) best = MathF.Max(best, Vector3.Dot(faces[i].Normal, toCentre));
         Assert.True(best > 0.99f, $"no face looks at the track; best alignment {best:F3}");
     }
 
-    /// <summary>
-    /// The map on disk is the thing that ships. Check it parses, claims the login slot, carries no
-    /// ambience, and gives every car a track that exists.
-    /// </summary>
+    /// <summary>The shipped map parses, claims the login slot, carries no ambience, and gives every car a
+    /// track that exists.</summary>
     [Fact]
     public void TheShippedMapIsCoherent()
     {
-        // maps/ is copied next to the test assembly from the real server data (see the csproj), so
-        // this reads the file that actually ships rather than a fixture that can drift from it.
+        // maps/ is the real server data copied beside the test assembly (see the csproj), not a fixture.
         string path = System.IO.Path.Combine(AppContext.BaseDirectory, "maps", "speedway.json");
         Assert.True(System.IO.File.Exists(path), $"speedway.json was not copied to {path}");
         var map = MapRepository.LoadFromFile(path);
@@ -256,21 +217,16 @@ public class SpeedwayTests
             Assert.True(track != null, $"{v.Name} names track '{v.Track}', which the map does not have");
             Assert.True(track!.Waypoints.Count >= 3);
 
-            // And the line it produces has to be driveable — with the BANKING the track declares,
-            // because without it the corner speed is worked out for a flat surface and every car
-            // lifts for corners it could take flat.
+            // Driveable with the track's banking: without it every car lifts for corners it could take flat.
             var line = new RaceLine(track.Waypoints, v.LaneOffsetMetres, v.TopSpeedKmh / 3.6f,
                                     v.CorneringG, v.BrakingMps2, track.BankingDegrees);
             Assert.True(line.MinSpeed > 15f, $"{v.Name} is limited to {line.MinSpeed * 3.6f:F0} km/h somewhere");
-            // A 1.25-mile oval, which is what the generator builds. Generous either side so a
-            // dimension can be tuned without the test having to be edited in the same commit.
+            // A 1.25-mile oval, as the generator builds it, with room to tune a dimension.
             Assert.InRange(line.Length, 1900f, 2150f);
         }
 
-        // The listener stands in the INFIELD, which is the only place on a track that is surrounded:
-        // cars pass on every side over a lap and the near wall is different in each direction. From
-        // the grandstand every car is in front of you and every reflection comes off the one wall
-        // behind your head — an easier problem and a much worse demonstration.
+        // The listener stands in the infield, the one place cars pass on every side and the near wall differs
+        // in each direction.
         Assert.True(map.SpawnPoint.Position.Y < 3f, "the listener should be down in the infield");
         float fromCentre = new System.Numerics.Vector2(map.SpawnPoint.Position.X, map.SpawnPoint.Position.Z).Length();
         Assert.True(fromCentre < 60f, $"the spawn is {fromCentre:F0} m from the middle of the oval");

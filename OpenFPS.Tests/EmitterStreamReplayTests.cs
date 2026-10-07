@@ -1,10 +1,6 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Text;
@@ -21,31 +17,19 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The emitter-stream replay (docs/SOUND_LIBRARY_BOUNDARY.md, stage 0).
+/// The emitter-stream replay (docs/SOUND_LIBRARY_BOUNDARY.md, stage 0). A whole ClientAudioSystem is driven
+/// through scripted worlds (a walk past cars and walls, a drive with a horn, traffic in the rain) and every
+/// call it makes on the mixer is written down and compared with the stream stored in
+/// OpenFPS.Tests/LibraryBoundary/streams: a refactor that changes nothing changes no line of it.
 ///
-/// A whole ClientAudioSystem is driven through a scripted sequence of worlds (a walk past cars and
-/// walls, a drive with a horn, traffic in the rain), and every call it makes on the mixer is written
-/// down: each voice started, placed and stopped with every field of its emitter, each acoustic path,
-/// the listener, the reverb, the ambience. That stream is compared with the one stored in
-/// OpenFPS.Tests/LibraryBoundary/streams. It is what makes splitting ClientAudioSystem (stage 7) and
-/// moving the acoustics behind a world input (stage 6) checkable without listening: a refactor that
-/// changes nothing changes no line of it.
+/// Everything left to threads, the clock or chance is pinned (the acoustic worker answers on the test's
+/// thread, without Steam Audio; the geometry and rain survey are built in place; birds, near drops and
+/// footsteps are seeded), and each scenario must agree with itself twice before the comparison. Where the
+/// maths library matches the machine the streams were made on (RenderFingerprintTests.MathsProbe) the stream
+/// must match to the character; elsewhere the same calls, every number within a part in a thousand.
 ///
-/// For the stream to be the same on every run, everything the game leaves to threads, the clock or
-/// chance is pinned: the acoustic worker answers between one update and the next on the test's thread
-/// (and without Steam Audio, which the tests never load), the geometry and the rain survey are built in
-/// place, the audio clock is the test's, and birds, near drops and footsteps are seeded. Each scenario
-/// is run twice per test and must agree with itself before it is compared with the stored stream.
-///
-/// The numbers come from the platform's maths library as well as the code. Where the maths match the
-/// machine the streams were made on (RenderFingerprintTests.MathsProbe), the stream must match to the
-/// character; where they do not, the calls must be the same calls and every number within a part in a
-/// thousand.
-///
-/// An intended change to what the audio system does changes the stream. Regenerate in the same commit
-/// as the change, and say why in the commit message: OPENFPS_REPLAY_WRITE=1 dotnet test --filter
-/// EmitterStreamReplayTests. OPENFPS_REPLAY_DUMP=dir writes each run's stream there as text, to diff two
-/// commits.
+/// An intended change regenerates the stream in the same commit, saying why: OPENFPS_REPLAY_WRITE=1 dotnet
+/// test --filter EmitterStreamReplayTests. OPENFPS_REPLAY_DUMP=dir writes each run's stream as text.
 /// </summary>
 public class EmitterStreamReplayTests
 {
@@ -85,9 +69,8 @@ public class EmitterStreamReplayTests
             return;
         }
 
-        // Another maths library: the same calls, every number within a part in a thousand. Compared
-        // whole (each voice's every field), since a value that rounds the same on one machine between two
-        // frames may not on another, and the stream writes only what changed.
+        // Compared whole (every field of each voice): a value that rounds the same between two frames on one
+        // machine may not on another, and the stream writes only what changed.
         _o.WriteLine($"{scenario}: the maths differ from the machine the stream was made on; numbers compared within 1e-3");
         Assert.Equal(stored.Count, first.Count);
         var a = Expand(stored);
@@ -297,9 +280,8 @@ internal sealed class Replay
     public static List<string> Run(string scenario)
     {
         AcousticRegistry.Initialize();
-        // The settings and world state the audio system reads from statics, at the game's defaults and
-        // the same whatever ran before or the environment says (docs/SOUND_LIBRARY_BOUNDARY.md, 4.1: these
-        // become instances in stage 5), and put back after.
+        // The statics the audio system reads, at the game's defaults whatever ran before, and put back after
+        // (docs/SOUND_LIBRARY_BOUNDARY.md, 4.1).
         var saved = (Loudness.DynamicRangeCompression, OpenFPS.Common.Hearing.EarModel.Enabled,
                      OpenFPS.Common.Hearing.EarModel.ListeningLevelDb, AudioPhysics.CurrentSpeedOfSound,
                      AudioPhysics.CurrentAirCelsius, MixerQuality.MixerRate,
@@ -339,8 +321,8 @@ internal sealed class Replay
         }
     }
 
-    /// <summary>One audio frame: the update, the acoustic worker's answers to it, then the facade's
-    /// audio thread, pumped by hand (twice: a voice the budget plays is queued, then handed over).</summary>
+    /// <summary>One audio frame: the update, the acoustic worker's answers, then the facade's audio thread
+    /// pumped by hand twice (a voice the budget plays is queued, then handed over).</summary>
     private void Tick()
     {
         Frame++;
@@ -598,7 +580,6 @@ internal sealed class StreamMixer : IAudioProvider
     public void SetEarWind(EarWindListener? listener) => Log("EarWind", listener);
     public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes) => Log("Boundaries", probes.ToArray());
     public bool PlayAmbientBed(string id, AmbisonicLayout l, float v, bool loop = true) { Log("PlayBed", id, l, v, loop); return true; }
-    public void SetAmbientBedVolume(string id, float v) => Log("BedVolume", id, v);
     public void StopAmbientBed(string id) => Log("StopBed", id);
     public void SetAcousticMap(AcousticMap map) => Log("AcousticMap");
     public void PlaySpatialSound(SpatialEmitter e) { LogDelta("Play", e.EntityId, e, _emitterFields, whole: true); _latest[e.EntityId] = e; _live.Add(e.EntityId); }
@@ -616,7 +597,6 @@ internal sealed class StreamMixer : IAudioProvider
     public void StopSound(int id) { Log("Stop", id); _live.Remove(id); _emitterFields.Remove(id); _pathFields.Remove(id); }
     public bool IsPlaying(int id) => _live.Contains(id);
     public Vector3 GetSoundPosition(int id) => _latest.TryGetValue(id, out var e) ? e.Position : Vector3.Zero;
-    public float GetPlaybackProgress(int id) => 0f;
     public IEnumerable<int> GetActiveSpatialSoundIds() => _live.OrderBy(i => i).ToList();
     public void Preload(string id) => Log("Preload", id);
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)

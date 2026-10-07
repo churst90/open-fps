@@ -1,20 +1,12 @@
-using System;
-using System.Collections.Generic;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Fmod;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// What a bus does when it actually stops.
-///
-/// Every one of these sounds was already in the model and none of them could ever fire, because
-/// they are read off the vehicle's own speed going to zero and STAYING there, and nothing on a
-/// city map ever stopped — the buses were on racing lines. So this drives the real voice through a
-/// real stop-and-go and listens for them, which is the only way to know the chain works end to
-/// end: the speed history, the air system, the ports, and the beeper.
+/// What a bus does when it stops, driven through the real voice in a stop-and-go so the whole chain is
+/// heard end to end: the speed history, the air system, the ports and the beeper.
 /// </summary>
 public class BusStopTests
 {
@@ -22,11 +14,8 @@ public class BusStopTests
     private readonly ITestOutputHelper _o;
     public BusStopTests(ITestOutputHelper o) => _o = o;
 
-    /// <summary>
-    /// Pulls up, stands for twelve seconds, pulls away — and the standing part is much louder than
-    /// the idling part would be on its own, because the brakes, the kneel and the doors all vent
-    /// into it.
-    /// </summary>
+    /// <summary>A bus pulling up and standing 12 s vents brakes, kneel and doors: arriving is far louder
+    /// than the same bus settled.</summary>
     [Fact]
     public void StoppingMakesTheAirSystemSpeak()
     {
@@ -38,20 +27,15 @@ public class BusStopTests
         _o.WriteLine($"arriving {r.Arriving:F1} dB, settled {r.Settled:F1} dB, rolling {r.Rolling:F1} dB, "
                    + $"chime band {r.ChimeBand:F1} dB, doors opened: {r.DoorsOpened}");
 
-        // Measured as a TRANSIENT against the same bus a few seconds later, not as a level.
-        // "Louder than sixty decibels" is a test an idling bus passes on its own and proves
-        // nothing — which is what the first version of this did.
+        // A transient against the same bus later, not a level: an idling bus alone passes "over 60 dB".
         Assert.True(r.DoorsOpened, "the bus never opened its doors, so nothing pneumatic fired");
         Assert.True(r.Arriving > r.Settled + 3f,
             $"arriving at the stop made {r.Arriving:F1} dB against {r.Settled:F1} settled — "
           + "the brakes, the kneel and the doors did not speak");
     }
 
-    /// <summary>
-    /// And the beeper: there is energy at the piezo's own resonance while the doors are open and
-    /// next to none while the bus is moving. A tone test rather than a level test, because the
-    /// beeper is 80 dB against an engine of 95 and would not move the total.
-    /// </summary>
+    /// <summary>The beeper sounds at the piezo's resonance while the doors are open, not while moving; a
+    /// tone test, since 80 dB against a 95 dB engine would not move the total.</summary>
     [Fact]
     public void TheDoorBeeperSoundsOnlyAtTheStop()
     {
@@ -71,11 +55,8 @@ public class BusStopTests
           + $"({chimeWhileStopped:F1} vs {chimeOnATruck:F1} dB)");
     }
 
-    /// <summary>
-    /// "When I'm on the bus and it stops I should hear the beeping from inside too." The beeper hangs
-    /// over the doorway, inside; it was mixed into the part of the voice the interior path replaces
-    /// with what gets through the body, and a body's mass law takes a 2.7 kHz beep to nothing.
-    /// </summary>
+    /// <summary>The beeper is heard from inside the bus: it hangs inside over the doorway, and mixed
+    /// into the body path the mass law took its 2.7 kHz to nothing.</summary>
     [Fact]
     public void TheDoorBeeperIsHeardFromInsideTheBus()
     {
@@ -88,11 +69,8 @@ public class BusStopTests
         Assert.True(inside.ChimeBand > truck + 6f, "inside the bus the door beeper is no louder than a cab that has none");
     }
 
-    /// <summary>
-    /// At a junction a bus holds its service brake and goes again: no spring brakes, no kneel, no
-    /// doors — those are for a stop that takes passengers — and one short puff as the pedal comes up
-    /// to pull away. Reported: "at an intersection the air brakes are long bursts".
-    /// </summary>
+    /// <summary>At a junction a bus holds its service brake and goes: no spring brakes, kneel or doors,
+    /// one short puff pulling away (reported: "at an intersection the air brakes are long bursts").</summary>
     [Fact]
     public void AtAJunctionABusHoldsItsBrakeAndGoes()
     {
@@ -109,11 +87,8 @@ public class BusStopTests
         Assert.Equal(2, atStop.GetValueOrDefault("door"));          // open, and shut
     }
 
-    /// <summary>
-    /// A release vents what the chambers held, and they held what the braking asked for: a gentle
-    /// stop is a short puff, a hard one a longer, louder one. It used to go by how long the pedal
-    /// was down, so a slow stop dumped the full volume.
-    /// </summary>
+    /// <summary>A release vents what the braking put in the chambers: a gentle stop a short puff, a hard
+    /// one longer and louder, not by how long the pedal was down.</summary>
     [Fact]
     public void AGentleStopsReleaseIsAPuff()
     {
@@ -190,11 +165,8 @@ public class BusStopTests
         return peak;
     }
 
-    /// <summary>
-    /// Drives a voice: rolling, then a deceleration to a dead stop, twelve seconds standing, then
-    /// away again. Returns the level while standing, the level while rolling, and the energy in the
-    /// door beeper's band while standing.
-    /// </summary>
+    /// <summary>A voice rolling, stopping dead, standing twelve seconds and pulling away: levels arriving,
+    /// settled and rolling, and the beeper's band while standing.</summary>
     private readonly record struct Run(float Arriving, float Settled, float Rolling, float ChimeBand, bool DoorsOpened, float PeakChimePa);
 
     private static Run Drive(VehicleProfile v, bool inside = false, bool busStop = true)
@@ -231,14 +203,8 @@ public class BusStopTests
         static float Db(double sum, long n, float sc) =>
             n == 0 ? 0f : 20f * MathF.Log10(MathF.Max(1e-9f, MathF.Sqrt((float)(sum / n)) * sc) / 20e-6f);
 
-        // The piezo's band, in SHORT windows, taking the loudest.
-        //
-        // Not one Goertzel over the whole stop: the beeper is PULSED, so over ten seconds the
-        // carrier is present under half the time and its energy is spread into sidebands two hertz
-        // apart — and a Goertzel run over four hundred thousand samples is numerically soft
-        // besides. Measured that way the beeper read 33 dB while the synthesis was demonstrably
-        // producing its full 0.218 Pa. A tenth of a second lands inside one beep, which is what
-        // there is to measure.
+        // The piezo's band in 0.1 s windows, the loudest taken: the beeper is pulsed, and one Goertzel
+        // over the whole stop read 33 dB while the synthesis made its full 0.218 Pa.
         float chimeDb = 0f;
         float hz = DoorChimeSpec.TransitBus.ToneHz;
         int win = Rate / 10;

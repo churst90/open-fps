@@ -17,12 +17,6 @@ internal static class TestDeadline
         catch (TimeoutException) { throw Late(limit, what); }
     }
 
-    public static async Task<T> Within<T>(this Task<T> task, TimeSpan limit, string what)
-    {
-        try { return await task.WaitAsync(limit); }
-        catch (TimeoutException) { throw Late(limit, what); }
-    }
-
     private static TimeoutException Late(TimeSpan limit, string what) => new(
         $"{what} did not finish in {limit.TotalSeconds:F0} s. Thread pool: {ThreadPool.ThreadCount} threads, "
         + $"{ThreadPool.PendingWorkItemCount} work items waiting.");

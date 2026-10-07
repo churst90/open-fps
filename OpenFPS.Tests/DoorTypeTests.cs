@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -13,7 +8,6 @@ using OpenFPS.Common.Systems;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -63,11 +57,8 @@ public class DoorTypeTests : IDisposable
 
     // ── Motion and aperture ─────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Every kind opens over its own travel time, and the opening it leaves is the fraction it has
-    /// moved: a swinging leaf turns about its hinged edge, a sliding one moves along its own width by
-    /// as much as it is wide and does not turn.
-    /// </summary>
+    /// <summary>Every kind opens over its own travel time, leaving an opening in proportion: a swinging
+    /// leaf turns about its hinged edge, a sliding one moves its own width without turning.</summary>
     [Theory]
     [InlineData("door", DoorKind.Hinged, false)]
     [InlineData("steel_door", DoorKind.PushBar, false)]
@@ -111,10 +102,8 @@ public class DoorTypeTests : IDisposable
 
     // ── Closers ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A closer waits for the doorway to be clear, then shuts the door: slowly through its sweep and
-    /// faster for the last part, to carry the latch. Never while anybody stands in the doorway.
-    /// </summary>
+    /// <summary>A closer waits for a clear doorway, then shuts the door, slow through the sweep and faster
+    /// at the end to carry the latch.</summary>
     [Theory]
     [InlineData("steel_door")]
     [InlineData("glass_front_door")]
@@ -173,10 +162,8 @@ public class DoorTypeTests : IDisposable
 
     // ── Automatic doors ─────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// An automatic door opens for anyone who comes within 2.5 m in front of it, either side — a player
-    /// or a person in the street — stays open while they are there, and closes 2 s after they have gone.
-    /// </summary>
+    /// <summary>An automatic door opens for anyone (player or walker) within 2.5 m either side, stays open
+    /// while they are there, and closes 2 s after they have gone.</summary>
     [Theory]
     [InlineData(true, 1f)]
     [InlineData(true, -1f)]
@@ -254,10 +241,8 @@ public class DoorTypeTests : IDisposable
 
     // ── Events ──────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// One open and one shut of every kind, as the events its hardware makes, in order. The ones a
-    /// door model already renders carry its sounds; the rest are silent until they are synthesised.
-    /// </summary>
+    /// <summary>One open and one shut of every kind, as its hardware's events in order; those without a
+    /// model render are silent until synthesised.</summary>
     [Theory]
     // The knob door's close is a hand shutting it, sent as the leaf arrives.
     // Opened from nowhere in particular is opened from the push side (DoorSidesTests has both sides).
@@ -315,11 +300,8 @@ public class DoorTypeTests : IDisposable
 
     // ── The routes see the leaf where it is ─────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A sliding leaf in a doorway: shut it blocks the opening exactly as a shut swinging leaf does;
-    /// as it slides into the wall the opening passes more, and fully open it passes everything. The
-    /// leaf's pose is the server's, through the real door system.
-    /// </summary>
+    /// <summary>A sliding leaf shut blocks the doorway as a swinging one does, passes more as it slides
+    /// away, and everything fully open; its pose comes from the real door system.</summary>
     [Fact]
     public void TheRoutesSeeASlidingLeafWhereItIs()
     {
@@ -407,11 +389,9 @@ public class DoorTypeTests : IDisposable
     // ── The city ────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The city's doors by kind: knobs on the flats and the houses' fronts, a push bar on the hangar's
-    /// and the terminal's service doors and on the stair housing onto each tower's roof, a keyed glass
-    /// front door on each tower, two pairs of automatic leaves at the terminal's entrances, and a patio
-    /// door onto every back garden. Each front door's
-    /// key side faces the street, away from the stairwell it opens into.
+    /// The city's doors by kind: knobs on flats and house fronts, push bars on the hangar's and
+    /// terminal's service doors and each tower's roof, a keyed glass front door on each tower (key side
+    /// to the street), automatic pairs at the terminal, and a patio door onto every back garden.
     /// </summary>
     [Fact]
     public void TheCitysDoorsByKind()

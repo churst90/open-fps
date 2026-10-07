@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -15,7 +11,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// Thunder measured before anyone listens: ground and cloud flashes at 0.1, 0.5, 1, 3, 8 and 15 km,
 /// heard in an open field and in a city street, each rendered by the same code the client plays.
 ///
-/// --thunder [out=DIR] [seed=N] [city=x,z] [nowav]
+/// --thunder [out=DIR] [seed=N] [city=x,z] [still] [nowav]   (still: no wind, so no turbulence)
 ///
 /// For every case: the peak level at the ear (dB SPL, from the pressure the model computes), how long
 /// it lasts above -20 dB of its loudest (125 ms Fast envelope), the spectral centroid, the 1/3-octave
@@ -314,9 +310,9 @@ public static class ThunderSpike
 
     // ── Binaural ────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>A part at the files' rate, band-limited (MixerQuality.Resample). It was linear
-    /// interpolation, which from 24 kHz left the rumble's images across 12-24 kHz: in round 2's 1 km
-    /// file the 20 kHz third-octave stood 26 dB over the 12.5 kHz one (docs/AUDIO_QUALITY_2026-10-06.md).</summary>
+    /// <summary>A part at the files' rate, band-limited (MixerQuality.Resample): linear interpolation from
+    /// 24 kHz left the rumble's images across 12-24 kHz, the 20 kHz third-octave 26 dB over the 12.5 kHz
+    /// one in round 2's 1 km file (docs/AUDIO_QUALITY_2026-10-06.md).</summary>
     internal static float[] To48k(Thunder.Part p)
         => p.SampleRate == OutRate ? p.Pressure
          : OpenFPS.Client.AudioEngine.Fmod.MixerQuality.Resample(p.Pressure, p.SampleRate, OutRate);
@@ -563,7 +559,7 @@ public static class ThunderSpike
     }
 
     /// <summary>24-bit WAV: a tail 60 dB down in a file normalised to its crack is not left to the last
-    /// bits of sixteen (round 1 was sixteen).</summary>
+    /// bits of sixteen.</summary>
     private static void WriteStereo(string path, float[] l, float[] r, float gain)
     {
         int frames = Math.Min(l.Length, r.Length);

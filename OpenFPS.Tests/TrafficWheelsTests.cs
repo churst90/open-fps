@@ -1,15 +1,9 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Numerics;
-using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

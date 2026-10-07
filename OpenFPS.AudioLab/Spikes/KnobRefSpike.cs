@@ -1,21 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using OpenFPS.Common;
 
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// The knob door rendered as the game names it, in pascals, for measuring against the recordings
-/// (kyles' light wood door, Sudd's lever) with the scratchpad's analysis. The recordings are yardsticks
-/// only: nothing of them is played by the game.
-///
-///   --knob-renders [key=K;K] [out=DIR] [stems=DIR] [events]
-///
-/// Without key= it renders every character opening and shutting (gentle, normal, hard, slam) at the game's
-/// 1.1 and 1.4 m leaves. Each file is 32-bit float at 48 kHz, one unit being KnobDoor.PascalsAtFullScale at a
-/// metre, so a file's level in dBFS plus 120 is dB SPL at a metre. Prints each render's LAFmax and peak.
+/// --knob-renders [key=K;K] [out=DIR] [stems=DIR] [events]: the knob door rendered as the game names it,
+/// in pascals, to measure against the recordings (kyles' light wood door, Sudd's lever), which the game
+/// never plays. Without key=, every character opening and shutting at the 1.1 and 1.4 m leaves. Files are
+/// 32-bit float at 48 kHz, one unit being KnobDoor.PascalsAtFullScale at a metre (dBFS + 120 = dB SPL).
 /// </summary>
 public static class KnobRefSpike
 {

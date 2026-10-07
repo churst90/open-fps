@@ -1,29 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 
 /// <summary>
-/// --heard-levels [d=1.5] [wav=DIR]: what level each everyday world sound actually reaches the listener
-/// at, against what the server declares for it.
-///
-/// Every world sound is placed by <see cref="Loudness.Place"/> from the level the server sends, and that
-/// gain is applied to the buffer the client renders or decodes. The convention (Speech.LevelDb) is that a
-/// sound's level is its buffer's FULL SCALE at one metre. So what reaches the ear is the placement plus
-/// where the buffer's own loudness sits under full scale: a peak-normalised crack sits far further under
-/// it than a loudness-normalised line of speech does. This takes each buffer exactly as the client gets
-/// it (door models through their RenderKey, a car door and a knock through their renders, a footstep take
-/// from its bank with its TakeLevels correction, a pedestrian's line brought to the speech loudness), and
-/// reports its LAFmax (A-weighted, 125 ms) at <c>d</c> metres on the direct path, at the shipped
-/// compression and at 1.0 ("real", where rendered dBFS plus the ceiling is dB SPL).
-///
-/// For the door models it also reports the model's own physical LAFmax at a metre (its pressure, before
-/// RenderKey normalised it): at 1.0 a door should be heard at that, less 20 log d.
-///
-/// With wav=DIR it writes each buffer, as the client would play it at 1.0 and d metres, as a WAV (with a
-/// common gain so the loudest fits), so the files stand to each other as they do in the game.
+/// --heard-levels [d=1.5] [wav=DIR] | survey [only=TEXT]: the level each everyday world sound reaches the
+/// ear at, against what the server declares. A sound's declared level is its buffer's full scale at a metre
+/// (<see cref="Loudness.Place(float)"/>), so what arrives also depends on where the buffer's loudness sits
+/// under full scale (a peak-normalised crack far further than a loudness-normalised line). Each buffer is
+/// taken as the client gets it and its LAFmax reported at d metres on the direct path, at the shipped
+/// compression and at 1.0 ("real": rendered dBFS plus the ceiling is dB SPL); for door models also their
+/// own physical LAFmax at a metre. wav=DIR writes each at 1.0 and d metres, one common gain.
 /// </summary>
 public static class HeardLevelsSpike
 {
@@ -35,10 +21,8 @@ public static class HeardLevelsSpike
     }
 
     /// <summary>
-    /// --heard-levels survey: every door key the game sends (knob doors 1.1 and 1.4 m wide, every
-    /// character and way of shutting; push-bar and sliding doors, every character), rendered in pressure,
-    /// with its LAFmax and its peak at a metre: what the declared full-scale levels are read from.
-    /// only=TEXT keeps the keys that contain it (only=patio).
+    /// --heard-levels survey [only=TEXT]: every door key the game sends, rendered in pressure, with its
+    /// LAFmax and peak at a metre, which the declared full-scale levels are read from. only= filters keys.
     /// </summary>
     public static int Survey(string? only = null)
     {
@@ -99,16 +83,16 @@ public static class HeardLevelsSpike
             for (int v = 0; v < KnobDoor.Variants; v += 3)
             {
                 string key = KnobDoor.Key(true, KnobDoor.Construction.HollowCore, v, 0.9f, how, 0.9f, 2.1f);
-                AddModel(sources, $"knob close {how.ToString().ToLowerInvariant()} v{v}", KnobDoor.CloseLevelDb(how), key, KnobDoor.PascalsAtFullScale, Rate);
+                AddModel(sources, $"knob close {how.ToString().ToLowerInvariant()} v{v}", KnobDoor.CloseLevelDb(how), key);
             }
         }
         for (int v = 0; v < KnobDoor.Variants; v += 3)
             AddModel(sources, $"knob open v{v}", KnobDoor.OpenLevelDb,
-                     KnobDoor.Key(false, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, 0.9f, 2.1f), KnobDoor.PascalsAtFullScale, Rate);
+                     KnobDoor.Key(false, KnobDoor.Construction.HollowCore, v, 0.9f, KnobDoor.Shut.Normal, 0.9f, 2.1f));
         for (int v = 0; v < PushBarDoor.Variants; v++)
         {
-            AddModel(sources, $"push-bar open v{v}", PushBarDoor.OpenLevelDb(v), PushBarDoor.Key(false, v, 1.4f, 1.0f, 2.1f), PushBarDoor.PascalsAtFullScale, Rate);
-            AddModel(sources, $"push-bar close v{v}", PushBarDoor.CloseLevelDb(v), PushBarDoor.Key(true, v, 1.4f, 1.0f, 2.1f), PushBarDoor.PascalsAtFullScale, Rate);
+            AddModel(sources, $"push-bar open v{v}", PushBarDoor.OpenLevelDb(v), PushBarDoor.Key(false, v, 1.4f, 1.0f, 2.1f));
+            AddModel(sources, $"push-bar close v{v}", PushBarDoor.CloseLevelDb(v), PushBarDoor.Key(true, v, 1.4f, 1.0f, 2.1f));
         }
         foreach (var kind in new[] { SlidingDoor.Kind.Patio, SlidingDoor.Kind.Automatic })
             foreach (int v in new[] { 1, 3 })
@@ -116,12 +100,12 @@ public static class HeardLevelsSpike
                 float open = kind == SlidingDoor.Kind.Patio ? 1.4f : SlidingDoor.AutomaticSeconds(1.0f, true);
                 float shut = kind == SlidingDoor.Kind.Patio ? 1.4f : SlidingDoor.AutomaticSeconds(1.0f, false);
                 string k = kind == SlidingDoor.Kind.Patio ? "patio" : "auto";
-                AddModel(sources, $"{k} open v{v}", SlidingDoor.OpenLevelDb(kind, v), SlidingDoor.Key(kind, false, v, open, kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f), SlidingDoor.PascalsAtFullScale, Rate);
-                AddModel(sources, $"{k} close v{v}", SlidingDoor.CloseLevelDb(kind, v), SlidingDoor.Key(kind, true, v, shut, kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f), SlidingDoor.PascalsAtFullScale, Rate);
+                AddModel(sources, $"{k} open v{v}", SlidingDoor.OpenLevelDb(kind, v), SlidingDoor.Key(kind, false, v, open, kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f));
+                AddModel(sources, $"{k} close v{v}", SlidingDoor.CloseLevelDb(kind, v), SlidingDoor.Key(kind, true, v, shut, kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f));
             }
 
         // ── For comparison: other things the game plays ──────────────────────────────────────────────
-        // A car door at the levels the server declared in today's session (DoorAcoustics: 77 open, 88 shut).
+        // A car door at the server's declared levels (DoorAcoustics: 77 open, 88 shut).
         sources.Add(new Source("car door open", 77f, CarDoor.Render(false, Rate, 1), null, null));
         sources.Add(new Source("car door close", 88f, CarDoor.Render(true, Rate, 1), null, null));
         sources.Add(new Source("knock x3 (Shift+E)", DoorKnock.LevelDb, DoorKnock.Render(3, Rate, 1), null, null));
@@ -206,7 +190,7 @@ public static class HeardLevelsSpike
     /// <summary>A door model's key as the client plays it: its render through WorldAudioPlayer.RenderDoorKey,
     /// placed at the level WorldAudioPlayer.AtOwnLevel gives it (the render's own peak), the server's figure
     /// shown beside it. The model's LAFmax at a metre is the buffer's LAFmax over its full scale.</summary>
-    private static void AddModel(List<Source> list, string name, float declared, string key, double pascalsAtFullScale, int rate)
+    private static void AddModel(List<Source> list, string name, float declared, string key)
     {
         var own = new System.Collections.Concurrent.ConcurrentDictionary<string, float>();
         float[] buf = OpenFPS.Client.Core.WorldAudioPlayer.RenderDoorKey(key, own);

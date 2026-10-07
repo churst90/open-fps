@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -29,13 +27,9 @@ public static class ConcreteRow
         var boxes = new List<SteamAudioScene.Box> { Ground() };
         var q = Quaternion.Identity;
 
-        // Blocks down both sides. The gaps matter as much as the blocks — a first-order reflection
-        // needs a FACE at the point where the path bounces, so an opening in the right place removes
-        // a building's answer entirely, and that is the sound of a side street.
-        //
-        // They are one-sided on purpose: a cross street cutting through both rows leaves a source in
-        // the middle of the road with no face to bounce off at all. Real blocks are not symmetrical
-        // either.
+        // The gaps matter as much as the blocks: a reflection needs a face where it bounces, and a
+        // missing answer is the sound of a side street. One-sided on purpose: a cross street through
+        // both rows leaves a source mid-road with no face at all.
         float z = -50f;
         int i = 0;
         while (z < 240f)
@@ -67,14 +61,8 @@ public static class ConcreteRow
         int id = 1;
         foreach (var b in boxes)
         {
-            // 0.25, not the 0.02 a lab measures for a smooth concrete slab.
-            //
-            // A building front is not a slab. It is windows, reveals, sills, downpipes, signage and
-            // texture, and all of that SCATTERS — it sends energy off in directions other than the
-            // specular one, where it becomes part of the diffuse tail instead of a distinct arrival.
-            // Modelled as polished concrete, every facade answered at 98% and the street came back at
-            // you like a hall of mirrors: louder than life and, because the reflections were nearly as
-            // loud as the direct sound, exaggerated rather than convincing.
+            // 0.25, not a smooth slab's 0.02: windows, reveals, sills and signage scatter. At 98 % every
+            // facade answered and the street was a hall of mirrors.
             int n = ImageSource.FacesOfBox(b.Center, b.Size, 0.25f, id, six);
             for (int i = 0; i < n; i++) all.Add(six[i]);
             id += 8;
@@ -83,18 +71,10 @@ public static class ConcreteRow
     }
 
     /// <summary>
-    /// What is immediately around the listener's head, as six head-relative probes.
-    ///
-    /// This answers a different question from the reflections, and the difference is the whole point.
-    /// A reflection is an ARRIVAL — a distinct event you could point at. A surface a metre or two away
-    /// produces no such thing: its return comes back in five or ten milliseconds, far inside the
-    /// window where the ear fuses it with the direct sound, and what you get instead is a change in
-    /// timbre and a strong, immediate sense that something solid is RIGHT THERE. That is how a person
-    /// with their eyes shut knows they are standing in front of a wall before touching it, and it is
-    /// what makes a space feel occupied rather than sterile.
-    ///
-    /// <see cref="BoundaryModel"/> renders it — six probes, each a delayed, damped, lateralized tap at
-    /// 2d/c. It has been in the engine since the near-field work and a scene must feed it.
+    /// What is immediately round the listener's head, as six head-relative probes for
+    /// <see cref="BoundaryModel"/> (a delayed, damped, lateralised tap each at 2d/c). A surface a metre
+    /// or two away returns inside the ear's fusion window: not an arrival but a change of timbre, the
+    /// sense of a wall before touching it.
     /// </summary>
     public static int Probes(Vector3 listener, List<SteamAudioScene.Box> boxes,
                                       BoundaryProbe[] into)
@@ -106,8 +86,7 @@ public static class ConcreteRow
             float nearest = float.MaxValue;
             foreach (var b in boxes)
             {
-                // Distance from the listener to this box along the probe direction, treating the box
-                // as a slab: the standard ray/AABB slab test, minus the parts we do not need.
+                // The ray/AABB slab test along the probe.
                 Vector3 half = b.Size * 0.5f;
                 Vector3 lo = b.Center - half, hi = b.Center + half;
                 Vector3 d = dirs[i];

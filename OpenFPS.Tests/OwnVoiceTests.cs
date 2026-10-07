@@ -1,7 +1,4 @@
-using System;
-using System.Linq;
 using OpenFPS.Client.AudioEngine.Fmod;
-using Xunit;
 
 namespace OpenFPS.Tests;
 

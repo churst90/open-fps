@@ -1,27 +1,13 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A body walking off a kerb does not leave the ground.
-///
-/// <see cref="SharedMovementEngine"/> has always been able to step UP: walk into something no taller
-/// than <see cref="PhysicsConstants.StepHeight"/> and the body is lifted onto it. There was no
-/// matching allowance going DOWN, and that asymmetry was audible rather than visible. A lip of twelve
-/// centimetres — the edge of a pavement, the end of a road surface — put the body in the air for two
-/// ticks and then LANDED it, and a landing is a heavy sound played out of the footstep bank.
-///
-/// Worse where you stop on one. The ground probe samples five points around the feet, so standing on
-/// a lip it straddles the edge, and any jitter in the position — server reconciliation keeps nudging
-/// it after you stop — flips the answer, drops the body, and lands it again. Gated to one landing
-/// every half second, that is a bang every half second for as long as you stand there. Reported from
-/// the chair as "walk a few steps, stop, and for like 10 seconds, periodic bangs".
-///
-/// So the floor may now be a full step BELOW you and still be the floor you are on — but only if you
-/// are not already going up or down, so that walking off a roof is still walking off a roof.
+/// A body walking off a kerb does not leave the ground: the floor may be a full step below and still be the
+/// floor, unless the body is already moving vertically. A 12 cm lip put the body in the air for two ticks and
+/// landed it with a heavy step sound, and standing on one, reconciliation's jitter flipped the five-point
+/// ground probe: "walk a few steps, stop, and for like 10 seconds, periodic bangs".
 /// </summary>
 public class StepDownTests
 {
@@ -43,7 +29,7 @@ public class StepDownTests
             MapMax = new Vector3(500, 100, 500),
         };
 
-    /// <summary>Nothing in the way — these are about the FLOOR, not about walls.</summary>
+    /// <summary>Nothing in the way: these are about the floor, not walls.</summary>
     private static readonly SharedMovementEngine.Collider[] Nothing = Array.Empty<SharedMovementEngine.Collider>();
 
     /// <summary>The one that was reported: a pavement's edge, twelve centimetres.</summary>
@@ -62,10 +48,7 @@ public class StepDownTests
         Assert.Equal(0f, vel.Y, 3);             // ...without falling
     }
 
-    /// <summary>
-    /// And a real drop is still a real drop. Past a step, the body leaves the ground and falls, which
-    /// is what walking off a roof, a platform edge or a garage deck has to do.
-    /// </summary>
+    /// <summary>A real drop is still a real drop: past a step the body falls, as off a roof or a platform.</summary>
     [Theory]
     [InlineData(0.6f)]
     [InlineData(2.5f)]
@@ -80,11 +63,8 @@ public class StepDownTests
         Assert.True(pos.Y > -drop, "it should not have been snapped to the bottom");
     }
 
-    /// <summary>
-    /// A body already moving vertically keeps the old, tight tolerance. A jump must leave the ground
-    /// on the tick it is asked for, and a body in mid-fall must not be caught by a floor it is still
-    /// a step above — the step down is for walking, and only for walking.
-    /// </summary>
+    /// <summary>A body already moving vertically keeps the tight tolerance: a jump leaves the ground on its
+    /// tick, and a fall is not caught by a floor a step below.</summary>
     [Fact]
     public void JumpingAndFallingAreUntouched()
     {
@@ -100,11 +80,8 @@ public class StepDownTests
         Assert.False(fell.IsGrounded, "a falling body was caught by a floor a step below it");
     }
 
-    /// <summary>
-    /// Stepping down is not free height: the body ends up ON the new floor, not hovering over it and
-    /// not below it. Held because "grounded" and "at the ground" are two different claims and only
-    /// the second one keeps the listener's ears where the geometry says they are.
-    /// </summary>
+    /// <summary>Stepping down puts the body on the new floor, not hovering or below it, so the listener's ears
+    /// are where the geometry says.</summary>
     [Fact]
     public void AfterSteppingDownTheBodyIsOnTheFloorItSteppedTo()
     {

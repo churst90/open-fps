@@ -1,34 +1,18 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Picking things up, carrying them, and putting them down.
-///
-/// The claim these hold is that an item you are carrying is the SAME ENTITY as one on the ground —
-/// not a row in a table, not a name in a list. Everything worth having follows from that and from
-/// nothing else: a carried thing has a position, so it comes with you and other people can hear it
-/// go past; it has a mass and a material, so putting it down makes the noise those two make meeting
-/// that floor from the height it actually fell, out of a calculation that already existed and has
-/// never heard of a sword; and nobody can lift it out of your hands because somebody already has it.
-///
-/// The other claim is that TWO HANDS is a real constraint rather than a slot count. A rifle spends
-/// both, so a rifle and a torch is a decision, and a decision made out loud in the moment is worth
-/// more to a player who cannot see their own hands than a list they can scroll. The back is what
-/// makes that liveable, and the back is limited by weight, because weight is what a back is limited
-/// by.
+/// Picking things up, carrying them and putting them down. A carried item is the same entity as one on the
+/// ground, so it goes where you go, makes the noise its mass and material make when it lands, and cannot
+/// be taken from somebody's hands. Two hands are a real constraint, not a slot count: a rifle spends both.
+/// The back is limited by weight.
 /// </summary>
 public class HeldItemTests : IDisposable
 {
@@ -53,8 +37,7 @@ public class HeldItemTests : IDisposable
         Assert.Equal(player.Entity.Id, f.World.Get<HeldComponent>(sword).HolderEntityId);
         Assert.Equal(sword.Id, f.World.Get<HandsComponent>(player.Entity).RightEntityId);
 
-        // And it moves because the holder does — through ParentSystem, which has carried children
-        // with their parent since long before anything could be picked up.
+        // It moves because the holder does, through ParentSystem.
         f.Move(player, new Vector3(40, 0, 20));
         f.Tick(1);
         Assert.True(Vector3.Distance(f.World.Get<Transform>(sword).Position, new Vector3(40, 0, 20)) < 2f);
@@ -68,8 +51,7 @@ public class HeldItemTests : IDisposable
         f.Item("Iron Sword", new Vector3(28, 0, 20));
 
         Assert.False(f.Hands.Take(player, "", out string message));
-        // Refusing says WHERE it is, because a player who cannot see it has no other way to find out
-        // whether "no" meant "not here" or "not yet".
+        // A refusal says where it is: "no" could mean "not here" or "not yet".
         Assert.Contains("metres away", message);
         Assert.Contains("Get closer", message);
     }
@@ -158,7 +140,7 @@ public class HeldItemTests : IDisposable
 
         Assert.False(f.Hands.Take(player, "torch", out string refusal));
         Assert.Contains("Your hands are full", refusal);
-        // And it says what is in them, because "full" without "of what" is a dead end.
+        // It says what is in them: "full" without "of what" is a dead end.
         Assert.Contains("AKM", refusal);
     }
 
@@ -238,8 +220,7 @@ public class HeldItemTests : IDisposable
 
         Assert.NotEmpty(quiet);
         Assert.NotEmpty(loud);
-        // Same material, same floor, same fall. The only difference is the mass, and it is audible —
-        // which is the whole reason items carry one.
+        // Same material, floor and fall; the mass alone is audible, which is why items carry one.
         Assert.True(loud.Max(s => s.LevelDb) > quiet.Max(s => s.LevelDb) + 3f,
                     $"a 20 kg anvil should land louder than a 300 g torch: {loud.Max(s => s.LevelDb):F1} vs {quiet.Max(s => s.LevelDb):F1} dB");
     }
@@ -256,8 +237,7 @@ public class HeldItemTests : IDisposable
         Assert.True(f.Hands.Take(player, "sword", out _));      // left
         Assert.True(f.Hands.Drop(player, "right", out _));      // right is empty again
 
-        // Bare /drop used to look only at the right hand and report holding nothing, while a sword
-        // sat in the left.
+        // Bare /drop looked only at the right hand and said it held nothing while a sword sat in the left.
         Assert.True(f.Hands.Drop(player, "", out string message), message);
         Assert.Contains("Iron Sword", message);
         Assert.False(f.World.Has<HeldComponent>(sword));
@@ -289,7 +269,7 @@ public class HeldItemTests : IDisposable
         Assert.True(f.Hands.Stow(player, "", out string message), message);
         Assert.Contains("onto your back", message);
 
-        // Hands empty, but you still HAVE it: it is on you, at a position, parented to you.
+        // Hands empty, but it is still on you, at a position, parented to you.
         var hands = f.World.Get<HandsComponent>(player.Entity);
         Assert.Equal(-1, hands.RightEntityId);
         Assert.Equal(-1, hands.LeftEntityId);
@@ -359,9 +339,8 @@ public class HeldItemTests : IDisposable
     [Fact]
     public void DrawingAThingYouDoNotCarryIsRefusedAndTakesNothing()
     {
-        // FirstOrDefault on a list of entities answers default(Entity), id 0, when nothing matches,
-        // and Arch's Entity.Null is id -1. A guard against Entity.Null never fired, so a typo put
-        // whatever the map spawned first into the player's hands.
+        // FirstOrDefault answers default(Entity), id 0, when nothing matches, and Entity.Null is id -1: a guard
+        // against Entity.Null never fired, so a typo put whatever the map spawned first into your hands.
         var f = new Fixture(_dir);
         var player = f.Player("cody", new Vector3(20, 0, 20));
         var rifle = f.Item("AKM", new Vector3(20.3f, 0, 20), massKg: 3.3f, hands: 2, weaponId: "akm");
@@ -391,8 +370,7 @@ public class HeldItemTests : IDisposable
         var player = f.Player("cody", new Vector3(20, 0, 20));
         for (int i = 0; i < 4; i++) f.Item($"Anvil {i}", new Vector3(20.2f + i * 0.05f, 0, 20), massKg: 9f, material: "Metal");
 
-        // Two nine-kilo anvils go on. The third is eighteen plus nine against a limit of twenty-five,
-        // and no number of pockets changes that.
+        // Two nine-kilo anvils go on; the third is eighteen plus nine against a limit of twenty-five.
         for (int i = 0; i < 2; i++)
         {
             Assert.True(f.Hands.Take(player, $"Anvil {i}", out string t), t);
@@ -409,7 +387,7 @@ public class HeldItemTests : IDisposable
         Assert.True(f.Hands.Drop(player, "", out _));
         for (int i = 0; i < 6; i++)
         {
-            var torch = f.Item($"Torch {i}", new Vector3(20.2f, 0, 20), massKg: 0.3f);
+            f.Item($"Torch {i}", new Vector3(20.2f, 0, 20), massKg: 0.3f);
             Assert.True(f.Hands.Take(player, $"Torch {i}", out _));
             Assert.True(f.Hands.Stow(player, "", out string s), s);
         }
@@ -462,13 +440,9 @@ public class HeldItemTests : IDisposable
     [Fact]
     public void SomethingTheMapPutThereCanBePickedUpAndReadBack()
     {
-        // The demo map leaves a crowbar on the concrete a few steps from the spawn point. Taking a
-        // thing the MAP spawned is not the same code path as taking one a command spawned, and the
-        // difference used to be fatal in a way nothing noticed: a map entity was registered in the
-        // map's lookup under the id its AUTHOR wrote in the JSON and not under its runtime id, so
-        // the moment anything held a runtime id — which is what every component carries — it
-        // resolved to nothing. /take said "You take the Crowbar"; /inv said your hands were empty;
-        // and the crowbar was gone from the floor, because it really had been picked up.
+        // Taking a thing the map spawned: map entities were registered under the id in the JSON, not the
+        // runtime id, so /take said "You take the Crowbar", /inv said your hands were empty, and the crowbar was
+        // gone from the floor.
         var f = new Fixture(_dir);
         var player = f.Player("cody", new Vector3(1.2f, 0, 2.5f));
 
@@ -550,8 +524,7 @@ public class HeldItemTests : IDisposable
             Assert.True(Maps.TryGetMap(MapId, out World, out _, out Grid, out Lookup));
         }
 
-        /// <summary>Something on the floor: a name, a mass, a material and a position. That is all an
-        /// item is, and all of it matters to something.</summary>
+        /// <summary>Something on the floor: a name, a mass, a material and a position.</summary>
         public Entity Item(string name, Vector3 at, float massKg = 2f, int hands = 1,
                            string weaponId = "", string material = "Metal")
         {

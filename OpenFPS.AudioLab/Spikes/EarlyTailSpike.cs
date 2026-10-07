@@ -1,21 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Common;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// The first 120 ms of the listener's trace, against the room's image sources from the same point.
-///
-///   --early-tail [room=flat|stair|corridor]
-///
-/// Prints the trace's omnidirectional channel as read back, energy per 2 ms in three band groups,
-/// beside the first- and second-order mirror images of the listener in the same geometry
-/// (EarlyReflections, the search the placed copies use): when each arrives and what it carries.
+/// --early-tail [room=flat|stair|corridor] [hrtf]: the first 120 ms of the listener's trace, energy per
+/// 2 ms in three band groups, beside the first- and second-order image sources from the same point
+/// (EarlyReflections, the search the placed copies use). hrtf: where an impulse leaves the binaural effect.
 /// </summary>
 public static class EarlyTailSpike
 {
@@ -87,8 +79,8 @@ public static class EarlyTailSpike
         for (int k = 0; k < bins; k++) { tot += e[k, 1]; totImg += img[k, 1]; }
         Console.WriteLine($"  0-120 ms, mid group: trace {D(tot)} dB, images {D(totImg)} dB");
 
-        // What is played: the published directional part and late field, every direction's energy
-        // summed, against the trace itself, 10 ms at a time; as before 2026-10-03 and now.
+        // What is played (the published directional part and late field, every direction summed)
+        // against the trace itself, 10 ms at a time, both ways round the 2026-10-03 change.
         var played = new Dictionary<bool, double[]>();
         foreach (bool old in new[] { true, false })
         {

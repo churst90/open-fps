@@ -6,7 +6,7 @@ using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Tests;
 
-/// <summary>Tests for extracting Steam Audio scene geometry from a WorldSnapshot (Phase 4b).</summary>
+/// <summary>Which of a WorldSnapshot's bodies become Steam Audio scene geometry.</summary>
 public class SteamAudioSceneTests
 {
     private static void Add(WorldSnapshot w, int id, Vector3 pos, Vector3 size, bool solid,
@@ -65,8 +65,8 @@ public class SteamAudioSceneTests
     [Fact]
     public void BoxesFromWorld_ExcludesSoundEmitters_SoNoSelfOcclusion()
     {
-        // A solid beacon that also emits sound must NOT become occluding geometry — otherwise its own
-        // collider sits at its emission point and occludes itself (the megaphone-goes-silent bug).
+        // A solid beacon that emits sound is not occluding geometry, or its collider at its emission point
+        // occludes itself (the megaphone that went silent).
         var w = new WorldSnapshot();
         Add(w, 1, new Vector3(0, 2, 0), new Vector3(4, 4, 4), solid: true);                         // a wall -> included
         Add(w, 2, new Vector3(7, 1.5f, 15), new Vector3(0.5f, 0.5f, 1f), solid: true, soundId: "BEACONS/megaphone"); // emitter -> excluded

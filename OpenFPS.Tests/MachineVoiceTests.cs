@@ -1,26 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text.Json;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Server.Repositories;
-using Xunit;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Whether a machine that stands still and runs arrives at the mixer at the level it says it is.
-///
-/// A voice carries its level in TWO places and they have to agree. The synthesis renders pascals and
-/// divides by the pressure that maps to full scale; the emitter is then placed on the machine's
-/// declared level (Loudness.Place). If the first of those is wrong the second corrects for a machine
-/// that is not the one being rendered, and the result is a source that is right at one distance and
-/// wrong at every other — which is not heard as "too loud", it is heard as the room being wrong.
-///
-/// This is the machine's version of EngineSynthTests' level check, and it exists because the two
-/// normalisations were written months apart.
+/// A standing machine arrives at the mixer at the level it declares. The level lives in two places that
+/// must agree: the synthesis divides pascals by its full-scale pressure, and the emitter is placed on the
+/// declared level (Loudness.Place); if the first is wrong the source is right at one distance only, heard
+/// as the room being wrong. The machines' counterpart of EngineSynthTests' level check.
 /// </summary>
 public class MachineVoiceTests
 {
@@ -28,23 +17,21 @@ public class MachineVoiceTests
 
     private const float Rate = 44100f;
 
-    /// <summary>Renders a machine's voice and gives back the pressure it put in the ring, in pascals
-    /// — the ring's own units undone, which is what the declared level is measured in.</summary>
+    /// <summary>A machine's voice in pascals (the ring's units undone), as its declared level is
+    /// measured: RMS and peak in dB SPL.</summary>
     private static (float RmsDb, float PeakDb) Measure(string preset, float seconds = 1.5f)
     {
         var spec = SmallMachineSpec.ByName(preset);
         var voice = new MachineVoiceState(spec, Rate, entityId: 4242, seed: 11);
-        // A mower's declared level is the machine WORKING, which is a mower being pushed. 0.95 m/s is
-        // the speed every mower ran at when the levels were measured, back when it was a constant.
+        // A mower's declared level is the mower being pushed, at the 0.95 m/s its levels were measured at.
         if (spec.Cutting != null) voice.TargetGroundSpeed = 0.95f;
         // An air conditioner's is the machine on a hot day, its compressor running (Thermostat).
         if (spec.Compressor != null) voice.AmbientCelsius = 36f;
         int n = (int)(Rate * seconds);
         var buf = new float[n];
 
-        // Half a second thrown away first. A cold machine's waveguides start empty and the first
-        // thing out of them is a cabinet pressurising from silence — the same transient the voice
-        // discards at warm-up, and measuring it would be measuring the start rather than the machine.
+        // Half a second discarded: a cold machine's first output is its cabinet pressurising from
+        // silence, the transient the voice discards at warm-up.
         var warm = new float[(int)(Rate * 0.5f)];
         voice.Render(warm);
         voice.Render(buf);
@@ -62,13 +49,8 @@ public class MachineVoiceTests
                 20f * MathF.Log10(MathF.Max(peak, 1e-9f) / 20e-6f));
     }
 
-    /// <summary>
-    /// Every machine renders within a few decibels of the level it declares.
-    ///
-    /// Six decibels of tolerance either way, because the declared level is the loudest second of a
-    /// machine working hard and this renders it at whatever load its own governor settles on. What
-    /// it catches is the fault that matters: a normalisation out by a factor of ten.
-    /// </summary>
+    /// <summary>Every machine renders within 6 dB of its declared level (the loudest second of hard work,
+    /// rendered here at whatever load its governor settles on): it catches a normalisation out by ten.</summary>
     [Theory]
     [InlineData("mower_push")]
     [InlineData("mower_riding")]
@@ -83,15 +65,9 @@ public class MachineVoiceTests
     }
 
     /// <summary>
-    /// A mower being pushed is working, and one standing at the end of its strip is not.
-    ///
-    /// "The lawnmowers don't move" — they did, on the server, sixteen metres out and back. The voice
-    /// ran a constant ground speed, so pushing, turning and waiting all sounded the same and nothing
-    /// said the thing was going anywhere. Moving puts grass under the deck and the grass takes
-    /// torque. The governor holds the revs to within about one per cent, so the average rpm barely
-    /// moves and is the wrong thing to measure; what it does instead is OPEN THE THROTTLE to carry
-    /// the load, and a single under a wide-open throttle is a harder, louder engine than one idling
-    /// its blade round in air. Standing still, that has to close again.
+    /// A mower being pushed works harder than one standing at the end of its strip (Cody: "the lawnmowers
+    /// don't move"; the voice ran a constant ground speed). Grass under the deck takes torque; the
+    /// governor holds rpm within about 1 %, so the throttle opening is what to measure, not the revs.
     /// </summary>
     [Theory]
     [InlineData("mower_push", 1.1f)]
@@ -118,14 +94,9 @@ public class MachineVoiceTests
             $"{preset}: throttle {standingAgain:F2} stopped again against {moving:F2} moving ({standing:F2} before) — it never let off");
     }
 
-    /// <summary>
-    /// ...and nothing clips on the way there.
-    ///
-    /// The ring runs anything past its reference through a tanh, so a machine whose peaks exceed the
-    /// headroom does not arrive loud, it arrives as a square wave. That is what a field of race cars
-    /// sounded like the first time one was put on a map, and the shared headroom exists so it cannot
-    /// happen twice. A blade striking something is allowed to touch the ceiling; sitting on it is not.
-    /// </summary>
+    /// <summary>No machine clips: the ring runs anything past its reference through a tanh, so peaks over
+    /// the headroom arrive as a square wave (the first race field on a map did). A blade strike may touch
+    /// the ceiling but not sit on it.</summary>
     [Theory]
     [InlineData("mower_push")]
     [InlineData("mower_riding")]
@@ -146,15 +117,8 @@ public class MachineVoiceTests
         Assert.True(buf.Any(v => MathF.Abs(v) > 1e-4f), $"{preset} rendered silence");
     }
 
-    /// <summary>
-    /// A window unit is quieter than a condenser is quieter than a mower, and the ORDER survives
-    /// placement.
-    ///
-    /// Placement is not a volume knob: it compresses (Loudness.DynamicRangeCompression) and it pays
-    /// for extent (Loudness.Widen), and both of those could in principle reorder two sources. They
-    /// must not — a mower has to be the loudest thing in a garden after it has been placed, not
-    /// before — and this is the one assertion that says so at the distance a listener stands at.
-    /// </summary>
+    /// <summary>A window unit is quieter than a condenser, which is quieter than a mower, and placement
+    /// (compression and Loudness.Widen) keeps that order at a listener's distance.</summary>
     [Fact]
     public void PlacementKeepsMachinesInTheOrderTheirLevelsPutThemIn()
     {
@@ -174,14 +138,8 @@ public class MachineVoiceTests
         }
     }
 
-    /// <summary>
-    /// Every synth id a SHIPPED PREFAB names is one this client can build.
-    ///
-    /// The whole of the coupling between a map and the models is a string with a prefix on it, which
-    /// is exactly the kind of thing a typo goes unnoticed in: nothing throws, nothing logs at load,
-    /// and the machine is simply never heard. The city carries sixty-four of them and five aircraft;
-    /// one misspelling is one silent wall of air conditioners.
-    /// </summary>
+    /// <summary>Every synth id a shipped prefab names is one this client can build: a misspelt id throws
+    /// nothing, logs nothing and is never heard.</summary>
     [Fact]
     public void EverySynthIdAShippedPrefabNamesIsAModelThatExists()
     {
@@ -252,20 +210,13 @@ public class MachineVoiceTests
         Assert.NotEmpty(checkedIds);
     }
 
-    /// <summary>
-    /// ...and every aircraft and vehicle a SHIPPED MAP declares is one that can be spawned.
-    ///
-    /// The same fault one level up: VehicleSystem decides whether a preset is an aircraft or a car by
-    /// which library has it, and a name in neither is logged past and never spawned. That log line is
-    /// easy to miss on a map that spawns twenty-seven other things successfully.
-    /// </summary>
+    /// <summary>Every aircraft and vehicle a shipped map declares can be spawned: VehicleSystem picks the
+    /// library by name, and a name in neither is only logged.</summary>
     [Fact]
     public void EveryVehicleAShippedMapDeclaresCanBeBuilt()
     {
-        // Through the repository's OWN loader, not a bare JsonDocument. Maps are hand-edited and
-        // MapRepository.JsonOptions is where the trailing commas, the comments and the spelling of a
-        // Vector3 are agreed; a test that parses them its own way is a test that can pass on a file
-        // the server cannot read, and fail on one it can.
+        // The server's own loader options (trailing commas, comments, Vector3), so the test reads a map
+        // exactly as the server does.
         var repo = new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps"));
         MachineRegistry.EnsureLoaded(Path.Combine(AppContext.BaseDirectory, "machines"));
 
@@ -296,14 +247,8 @@ public class MachineVoiceTests
         Assert.True(seen > 0, "no shipped map declares a vehicle");
     }
 
-    /// <summary>
-    /// Every aircraft renders, at the level it declares, without faulting.
-    ///
-    /// THIS DID NOT EXIST AND SHOULD HAVE. The machines were held by the three tests above from the
-    /// day they were written; the aircraft went onto a map on the same voice path with nothing
-    /// asking them to make a sound first, and the client died three seconds after the first one
-    /// started. A model that has never been rendered in a test is a model nobody has rendered.
-    /// </summary>
+    /// <summary>Every aircraft renders without faulting, at about its declared level. The aircraft went
+    /// onto a map untested and the client died three seconds after the first one started.</summary>
     [Theory]
     [InlineData("airliner")]
     [InlineData("turboprop")]
@@ -311,9 +256,8 @@ public class MachineVoiceTests
     [InlineData("helicopter")]
     public void WhereAnAircraftIsHeardFromChangesItsLevel(string preset)
     {
-        // What the declared level is measured AT is not written down anywhere, and this says what
-        // the difference costs: a propeller is strongly directional and a jet radiates aft, so the
-        // same aeroplane at the same power is a different number depending on where you stand.
+        // A propeller is strongly directional and a jet radiates aft, so the level depends on where
+        // you stand; where the declared level is measured from is not written down.
         var p = AircraftProfile.ByName(preset);
         foreach (var (name, at) in new (string, System.Numerics.Vector3)[]
                  {
@@ -345,9 +289,8 @@ public class MachineVoiceTests
     public void AnAircraftRendersAtTheLevelItDeclares(string preset)
     {
         var p = AircraftProfile.ByName(preset);
-        // Full power, and ALREADY at it — which is what PlaceAtLever is for. Without that a turbofan
-        // is still spooling out of idle a second and a half later and measures forty decibels under
-        // what it declares, which is the fault this line exists to have found.
+        // Placed at full power: spooling from idle, a turbofan measures 40 dB under its declared level
+        // 1.5 s later.
         var voice = new AircraftVoiceState(p, Rate, seed: 5, lever: 1f);
         voice.SetListener(new System.Numerics.Vector3(40f, -180f, -120f));   // below and behind
 
@@ -367,28 +310,16 @@ public class MachineVoiceTests
         }
         float rms = 20f * MathF.Log10(MathF.Max(MathF.Sqrt((float)(sum / buf.Length)), 1e-9f) / 20e-6f);
         Assert.True(buf.Any(v => MathF.Abs(v) > 1e-4f), $"{preset} rendered silence");
-        // WITHIN FOURTEEN DECIBELS, not six, and the difference is a real open question rather than
-        // slack. A propeller is strongly directional and a jet radiates aft, so what an aeroplane
-        // measures depends on where the listener stands — and where the DECLARED level is measured
-        // from is not written down. Against a listener below and behind, the airliner lands on its
-        // number and the turboprop and the helicopter come in ten to thirteen decibels under it.
-        //
-        // That is not a thing to settle by moving a constant: the jet balance was pinned by ear
-        // (-16/-21 dB trims, docs/AIRCRAFT.md) and the levels were approved with it. What this holds
-        // is that nothing is out by an ORDER, which is the fault that would make an aeroplane
-        // inaudible or deafening on a map. WhereAnAircraftIsHeardFromChangesItsLevel above prints
-        // the spread the question is about.
+        // Within 14 dB, not 6: below and behind, the airliner lands on its number and the turboprop and
+        // helicopter come 10-13 dB under. The jet balance is pinned by ear (docs/AIRCRAFT.md), so this
+        // holds only that nothing is out by an order.
+        // TODO: say where an aircraft's declared level is measured from.
         Assert.True(MathF.Abs(rms - p.SourceLevelDb) < 14f,
             $"{preset} declares {p.SourceLevelDb:F0} dB at 1 m and rendered {rms:F1}");
     }
 
-    /// <summary>
-    /// ...and the lever travels rather than stepping, whatever the block size.
-    ///
-    /// It was written per CALL rather than per second and came out at two thirds of full travel
-    /// every eleven milliseconds, which is a step with arithmetic in front of it. A turbine spools
-    /// on its own time constant; the LEVER is a pilot's hand.
-    /// </summary>
+    /// <summary>The power lever travels per second, not per render call, whatever the block size: per
+    /// call it moved two thirds of full travel every 11 ms.</summary>
     [Fact]
     public void ThePowerLeverTravelsRatherThanStepping()
     {
@@ -406,19 +337,10 @@ public class MachineVoiceTests
     }
 
     /// <summary>
-    /// The ring survives being produced, consumed and steered from three threads at once.
-    ///
-    /// WHY THIS EXISTS. The client segfaults on FMOD's mixer thread, and the physical voice path is
-    /// the newest code in the audio engine — a ring buffer written this session, produced by a pool
-    /// of worker threads and consumed by the mixer, with the game thread writing the listener and
-    /// the envelope underneath both. Every index in it is masked and every cross-thread field is
-    /// volatile or interlocked, which is exactly the kind of claim that is easy to make and worth
-    /// testing rather than asserting.
-    ///
-    /// It hammers the real object the real way: several producers racing on Produce() (which is
-    /// guarded by a compare-exchange and must let exactly one through), a consumer taking blocks at
-    /// the mixer's block size, and a third thread moving the listener and the envelope. Anything
-    /// that escapes — an index, a null, a torn read — fails the test instead of killing a session.
+    /// The ring survives being produced, consumed and steered from three threads at once: producers
+    /// racing on Produce() (a compare-exchange must let exactly one through), a consumer at the mixer's
+    /// block size, and the game thread moving the listener and envelope. Written while the client was
+    /// crashing on FMOD's mixer thread (docs/THE_MIXER_THREAD_CRASH.md).
     /// </summary>
     [Fact]
     public void TheRingSurvivesProducersAndAConsumerAtOnce()
@@ -441,7 +363,7 @@ public class MachineVoiceTests
             threads.Add(t); t.Start();
         }
 
-        // ...and the game thread, steering it.
+        // The game thread, steering it.
         var steer = new System.Threading.Thread(() =>
         {
             try
@@ -484,14 +406,9 @@ public class MachineVoiceTests
         Assert.True(faults.IsEmpty, faults.TryDequeue(out var first) ? first.ToString() : "");
     }
 
-    /// <summary>
-    /// Two machines of the same kind do not run in step.
-    ///
-    /// A street of forty window units is forty machines, and forty copies of one waveform is a
-    /// chorus — one machine with a very strange timbre. Everything that could put them in step is
-    /// seeded from the ENTITY ID: the thermostat's phase, its on and off times, and where in the
-    /// load cycle it is. This holds that two ids give two different machines.
-    /// </summary>
+    /// <summary>Two machines of the same kind do not run in step: the thermostat's phase, its on and off
+    /// times and the load cycle are seeded from the entity id, since forty copies of one waveform is a
+    /// chorus.</summary>
     [Fact]
     public void TwoOfTheSameMachineDoNotRunInStep()
     {

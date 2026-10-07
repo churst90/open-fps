@@ -1,14 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -42,8 +37,8 @@ public class RoadNetworkTests
         Assert.True(net.Junctions.Count >= 20);
     }
 
-    /// <summary>Every lane runs on asphalt: the road data and the geometry came from the same call and
-    /// must agree. Sampled every two metres along every lane.</summary>
+    /// <summary>Every lane runs on asphalt, sampled every two metres: the road data and the geometry come
+    /// from the same call.</summary>
     [Fact]
     public void Every_lane_lies_on_the_road_surface()
     {
@@ -127,11 +122,8 @@ public class RoadNetworkTests
         Assert.Equal("Asphalt", RoadNetwork.SurfaceAt(road, 20f));
     }
 
-    /// <summary>
-    /// Anybody can rebuild the city: the generator, run from the repository, writes exactly the map
-    /// that ships, byte for byte. A change to the generator that is not regenerated, or a hand edit to
-    /// city.json that the generator would undo, fails here.
-    /// </summary>
+    /// <summary>The generator writes the shipped city.json byte for byte: an unregenerated generator change
+    /// or a hand edit fails here.</summary>
     [Fact]
     public void The_generator_reproduces_the_shipped_city()
     {
@@ -206,8 +198,7 @@ public class RoadNetworkTests
         var inPath = new List<Vector3> { new(0, 0, 0), new(10, 0, 0) };
         var outPath = new List<Vector3> { new(15, 0, 5), new(15, 0, 15) };
         var pts = LaneRoutes.Connector(inPath, outPath);
-        // The curve bows towards the corner at (15, 0, 0): its middle is 1.8 m from it, where the
-        // straight chord's would be 3.5 m.
+        // The curve bows towards the corner at (15, 0, 0): its middle 1.8 m from it, the chord's 3.5 m.
         var mid = pts[pts.Count / 2];
         Assert.True(Vector3.Distance(mid, new Vector3(15, 0, 0)) < 2.5f, $"middle at {mid}");
     }

@@ -1,21 +1,15 @@
-using System;
-using System.Collections.Generic;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Fmod;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// What reads a live engine in step with it — a reflection of the car, the front of the car as a voice
-/// of its own — must read it continuously, however the mixer takes the car.
-///
-/// FMOD resamples a pitched DSP channel by calling it more or fewer times per mixer block, a whole block
-/// each time (measured in the lab: a car closing at 60 km/h was called 4.9 % more often, every call 1024
-/// samples). So the car's play position moves in whole blocks. A reflection read a fixed distance behind
-/// it skipped 23 ms of the car at every extra call, and the front voice stepped up to ten samples toward
-/// it at nearly every block: 4-8 discontinuities a second on a car going past (--quality echo).
+/// What reads a live engine in step with it (a reflection of the car, the front of the car) reads it
+/// continuously however the mixer takes the car. FMOD resamples a pitched channel by calling it more or
+/// fewer times per mixer block, a whole block each time (a car closing at 60 km/h: 4.9 % more calls of 1024
+/// samples), so the play position moves in whole blocks: a reflection a fixed distance behind it skipped
+/// 23 ms per extra call, and the front voice stepped (4-8 discontinuities a second, --quality echo).
 /// </summary>
 [Collection(nameof(ValveFlowSwitch))]
 public class EngineReadContinuityTests
