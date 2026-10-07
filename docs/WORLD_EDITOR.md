@@ -361,3 +361,5 @@ Selecting is not an operation: it changes nothing and is per player.
    models needs edit-models (developers and admins), because a model is shared by every map.
 4. Undo history is lost on a restart; the edits themselves are kept.
 5. A solid thing placed "at your feet" is put just in front of you, so you are not inside it.
+6. Owners and named editors may place at most 5,000 things on a map with the editor; staff are not
+   limited. Things to carry need the give permission to place, and premium items cannot be placed.

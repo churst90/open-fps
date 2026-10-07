@@ -95,7 +95,9 @@ public sealed class ModelStore
     /// </summary>
     public ModelUpdate Commit(string kind, string id, string specJson, string author, string note)
     {
-        // Checked before anything is kept: a model that will not read back is not a version.
+        // Checked before anything is kept: a model that will not read back is not a version, and an id
+        // that is not a plain name is not a file name.
+        if (!IsSafeId(id) || !IsSafeId(kind)) throw new ArgumentException($"'{kind}:{id}' cannot be kept as a file.");
         ModelLibrary.FromSpecJson(kind, specJson);
         if (!_models.TryGetValue(Key(kind, id), out var h))
         {

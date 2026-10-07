@@ -571,6 +571,7 @@ public sealed partial class WorldEditor
     {
         if (!TryBody(s, reply, out _, out _, out float yaw)) return;
         if (!TrySelected(s, reply, out var world, out var e, out int id)) return;
+        if (Full(s, out string full)) { Say(reply, full); return; }
         var source = Take(s.CurrentMapId, world, e, id);
         var dir = Compass4[Quarter(yaw)];
         var (lo, hi) = Box(world, e);
@@ -610,7 +611,7 @@ public sealed partial class WorldEditor
         if (!TryBody(s, reply, out var world, out var feet, out float yaw)) return;
         string prefab = args[0].ToLowerInvariant();
         if (!_maps.Prefabs.TryGetValue(prefab, out var t)) { Say(reply, $"There is no prefab called {args[0]}. /edit prefabs lists them."); return; }
-        if (!MayPlace(s, t, out string refusal)) { Say(reply, refusal); return; }
+        if (!MayPlace(s, t, out string refusal) || Full(s, out refusal)) { Say(reply, refusal); return; }
         var size = t.ColliderSize ?? Vector3.Zero;
         bool solid = t.ColliderSize.HasValue && (t.IsSolid ?? true);
         var pose = InFront(feet, yaw, size, solid, new Pose(feet, Quaternion.Identity, Vector3.One));
@@ -625,6 +626,18 @@ public sealed partial class WorldEditor
         Say(reply, $"Placed {t.Name} {where}, facing {Compass4Names[Quarter(yaw)]}. It is selected.");
         Notify(s, $"{s.Username} placed {t.Name}.");
         Refresh(s, reply);
+    }
+
+    /// <summary>How many things an owner or a named editor may place on a map with the editor. Staff are not
+    /// held to it: a city is theirs to build.</summary>
+    public const int MaxPlacedByOwners = 5000;
+
+    private bool Full(UserSession s, out string refusal)
+    {
+        refusal = "";
+        if (s.Can(Permissions.Edit) || Overlays.Get(s.CurrentMapId).Added.Count < MaxPlacedByOwners) return false;
+        refusal = $"This map has {MaxPlacedByOwners} things placed with the editor, the most a player's map may have.";
+        return true;
     }
 
     /// <summary>Whether a player may put this prefab on the map: never a premium item, and things to carry

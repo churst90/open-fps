@@ -463,6 +463,8 @@ command line with the start of the command typed for you; type the number and pr
 - Undo and redo are your own. An undo is refused if somebody else has changed the thing since, and
   says who.
 - A solid thing is never placed or moved into a player.
+- On a map of your own you may place up to 5,000 things with the editor. Things to carry need the
+  give permission, and premium items cannot be placed.
 - Other editors on the map hear a few words about each change ("cody moved Fountain.").
 - Edits are kept when the server restarts (see "Map edits" in Part 2). Undo history is not.
 
