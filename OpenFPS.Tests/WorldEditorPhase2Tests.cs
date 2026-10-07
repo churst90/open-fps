@@ -152,7 +152,7 @@ public class WorldEditorPhase2Tests : IDisposable
         Assert.Equal(0, store.UpdatesFor(rig.Overlay("mine").Pins).Single(u => u.Id == id).Version);
         Assert.Equal(2, store.UpdatesFor(rig.Overlay("open").Pins).Single(u => u.Id == id).Version);
 
-        Assert.Contains("versions", rig.Run("edit", "model", "versions", "machine", id).ToLowerInvariant() + " versions");
+        Assert.Contains("Version 0, as built, pinned here.", rig.Run("edit", "model", "versions", "machine", id));
         Assert.StartsWith("Undid: changed", rig.Run("edit", "undo"));
         Assert.StartsWith($"Undid: pinned the machine {id} at version 0", rig.Run("edit", "undo"));
         Assert.Empty(rig.Overlay("mine").Pins);
@@ -466,7 +466,7 @@ public class WorldEditorPhase2Tests : IDisposable
         bare.Entities.Clear();
         Assert.True(rig.Maps.CreateMap(bare, out string error), error);
         rig.Stand(rig.Tester, "bare", new Vector3(0, 0.05f, 0));
-        Assert.Equal("This map's natural ground: grass_floor.", rig.Run("edit", "map", "set", "ground", "grass"));
+        Assert.Equal("This map's natural ground: Grass Area.", rig.Run("edit", "map", "set", "ground", "grass"));
         bool grass = false;
         rig.World("bare").Query(new QueryDescription().WithAll<IdentityComponent>(), (ref IdentityComponent i) => { if (i.Name == "Ground" && i.PrefabId == "grass_floor") grass = true; });
         Assert.True(grass);
