@@ -4,21 +4,13 @@ using Serilog;
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
-/// Puts a loader thread BELOW everything that has to meet a deadline, which on Linux is the only
-/// scheduling lever a game actually has.
+/// Puts a loader thread below everything that has to meet a deadline: on Linux, the only scheduling
+/// lever an unprivileged game has.
 ///
-/// <see cref="Thread.Priority"/> looks like the obvious tool and is a placebo here: CoreCLR on Unix
-/// accepts the assignment and silently does not apply it, because raising a thread's priority needs
-/// CAP_SYS_NICE and an unprivileged process does not have it. So on a map load the acoustic bake,
-/// the Steam Audio scene build, the sample decodes, the JIT's own threads, the engine render pool
-/// and FMOD's mixer thread — which also fails to get real-time scheduling unprivileged — all run at
-/// exactly the same priority, and the scheduler hands the audio no more than its share of a machine
-/// that is briefly oversubscribed. That is what "buffer depth, thread priority and dedicated threads
-/// all helped and none fixed it" was describing.
-///
-/// What IS allowed without privilege is LOWERING your own threads, and it is the same lever seen
-/// from the other end: nice the loader to +10 and the mixer and the engine producers win every
-/// contention against it. The load takes slightly longer and is heard rather than heard through.
+/// <see cref="Thread.Priority"/> is a placebo on Unix: CoreCLR accepts it and silently does not apply
+/// it (raising a priority needs CAP_SYS_NICE), and FMOD's mixer gets no real-time scheduling either.
+/// Lowering your own threads needs no privilege: nice the loader to +10 and the mixer and the engine
+/// producers win every contention against it during a map load.
 /// </summary>
 public static class BackgroundPriority
 {
@@ -28,17 +20,14 @@ public static class BackgroundPriority
     [DllImport("libc", SetLastError = true)] private static extern int gettid();
 
     /// <summary>
-    /// Nices the CALLING thread down. Call it as the first thing a loader thread does — the value is
-    /// per-thread on Linux (setpriority's PRIO_PROCESS acts on a task, not the thread group), so it
-    /// must run on the thread it is meant to slow, not on the one that started it.
+    /// Nices the calling thread down. It must run on the thread it is meant to slow: on Linux
+    /// setpriority's PRIO_PROCESS acts on a task, not the thread group.
     /// </summary>
     public static void LowerThisThread(string what, int nice = 10)
     {
         if (OperatingSystem.IsWindows())
         {
-            // On Windows the managed priority is real and needs no privilege to lower, so the same
-            // lever is one assignment. BelowNormal is the loader at a disadvantage against the mixer
-            // and the engine producers without starving it.
+            // On Windows the managed priority is real. BelowNormal loses to the mixer without starving.
             try { Thread.CurrentThread.Priority = ThreadPriority.BelowNormal; }
             catch (Exception ex) { Log.Debug(ex, "Could not lower {What}; the loader will compete with the mixer.", what); }
             return;
@@ -56,12 +45,9 @@ public static class BackgroundPriority
     }
 
     /// <summary>
-    /// Runs <paramref name="work"/> on a dedicated niced thread rather than the shared pool.
-    ///
-    /// Two separate reasons, and both of them were live bugs. The nice is above. The dedicated thread
-    /// is because the .NET thread pool is where the sample decodes and the scene build already are:
-    /// long blocking work on a pool that grows by a thread or two per second starves everything else
-    /// queued on it, and a bake that takes seconds has no business there.
+    /// Runs <paramref name="work"/> on a dedicated niced thread. Not the thread pool: the sample decodes
+    /// and the scene build are there, and seconds of blocking work on a pool that grows a thread or two
+    /// a second starves them.
     /// </summary>
     public static Thread RunLowered(string name, Action work, int nice = 10)
     {

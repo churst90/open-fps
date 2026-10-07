@@ -23,16 +23,12 @@ public enum BodyShape : byte
 /// from its nearest point, inside it out by its nearest edge; a solid above the middle of a body that can
 /// go down is a ceiling, one below the middle with the axis over it a floor.</para>
 ///
-/// <para><b>The capsule</b> (<see cref="CapsuleOverlap"/>) is stage 2's, as built: a cylinder's foot and trunk
-/// under a rounded head. The design asked for a capsule rounded at both ends (docs/GEOMETRY.md 3.1); that was
-/// built and measured on the four maps against the cylinder (AudioLab --geometry-parity only=capsule), and its
-/// rounded foot changed how a body meets every kerb, step and ledge: a falling body caught ledges the cylinder
-/// fell past and rode up roof edges, the step-up climbed 56 cm where the cylinder stopped, and 3 to 15 walks
-/// in 400 parted by metres. The ground probe and the step rule are a flat foot's, a body's radius wide, so the
-/// foot is flat. The head is round: an edge over the brow (a beam, a lintel, a sloped ceiling, an arch's
-/// curve) is met by the curve, a ceiling straight over a body on the ground is left alone, and a ceiling over
-/// one in the air pushes it down. Slopes too steep to walk are walls to the trunk, pushed off across the
-/// ground; the ground probe stands only on faces within the walkable slope.</para>
+/// <para><b>The capsule</b> (<see cref="CapsuleOverlap(TriangleWorld, SolidRef, Vector3, Capsule, bool)"/>):
+/// the cylinder's flat foot and trunk under a rounded head. The foot stays flat because the ground probe and
+/// the step rule are a flat foot's; a rounded foot was measured and rejected (docs/GEOMETRY.md, stage 2). An
+/// edge over the brow is met by the curve, a ceiling straight over a body on the ground is left alone, and a
+/// ceiling over one in the air pushes it down. Slopes too steep to walk are walls to the trunk; the ground
+/// probe stands only on faces within the walkable slope.</para>
 ///
 /// <para>A solid that is not convex (stairs, an arch) is met piece by piece: its convex pieces, the
 /// deepest contact of them. Allocation-free up to <see cref="StackTriangles"/> triangles a piece.</para>
@@ -119,14 +115,11 @@ public static class SolidContact
             minZ = MathF.Min(minZ, p.Z); maxZ = MathF.Max(maxZ, p.Z);
         }
 
-        // 1. Over the body's height at all.
         if (maxY < y0 || minY > y1) return result;
-        // A quick no: its bounds are a radius or more away.
         float bx = MathF.Max(0f, MathF.Max(minX, -maxX)), bz = MathF.Max(0f, MathF.Max(minZ, -maxZ));
         if (bx * bx + bz * bz >= radius * radius) return result;
 
-        // 2. The cross-section: each triangle cut to the slab and seen from above. The nearest point of it
-        //    to the axis, and every corner and edge direction, for the way out from inside.
+        // The cross-section: each triangle cut to the slab and seen from above.
         Span<Vector2> corners = tc <= StackTriangles ? stackalloc Vector2[5 * StackTriangles] : new Vector2[5 * tc];
         // Where each cut polygon's corners start in the list, and one past the last.
         Span<int> starts = tc <= StackTriangles ? stackalloc int[StackTriangles + 1] : new int[tc + 1];
@@ -169,11 +162,9 @@ public static class SolidContact
         }
         else
         {
-            // Over it: out by the nearest edge, the whole radius past it. The support of the cut corners
-            // along each edge direction is how far the section reaches that way; the least of them is the
-            // nearest edge of a convex section.
-            // Every edge of every cut polygon is tried, both ways round: a direction that is not an edge
-            // of the section (a diagonal) reaches at least as far as the boundary, so it never wins wrongly.
+            // Over it: out by the nearest edge, the whole radius past it. The least support of the cut
+            // corners over every edge direction, both ways round, is that edge; a diagonal that is not an
+            // edge of the section reaches at least as far, so it never wins wrongly.
             float best = float.MaxValue;
             Vector2 way = Vector2.UnitX;
             for (int p = 0; p < polys; p++)
@@ -219,9 +210,8 @@ public static class SolidContact
     // ═══ The capsule ═════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// A capsule body standing with its feet at <paramref name="feet"/>: from <paramref name="bottom"/>
-    /// above them to <paramref name="top"/> above them, <paramref name="radius"/> round, its axis the
-    /// segment between the centres of its two ends.
+    /// A capsule body, measured up from its feet: from <paramref name="Bottom"/> to <paramref name="Top"/>,
+    /// <paramref name="Radius"/> round.
     /// </summary>
     public readonly record struct Capsule(float Radius, float Bottom, float Top)
     {
@@ -346,9 +336,9 @@ public static class SolidContact
     /// <summary>
     /// The head's dome, the half sphere of <paramref name="r"/> over (0, <paramref name="centreY"/>, 0),
     /// against one convex piece: its nearest point above the dome's rim. Over a body in the air, a ceiling
-    /// pushes it down until the top of the head clears it; straight over a body on the ground it is left
-    /// alone (standing on a sofa under a low ceiling: the cylinder took the slab's nearest end as the way
-    /// out, a metre and a half in a step); anything else pushes across the ground until it clears the curve.
+    /// pushes it down until the head clears it; straight over a body on the ground it is left alone (on a
+    /// sofa under a low ceiling the cylinder's way out was a metre and a half in a step); anything else
+    /// pushes across the ground until it clears the curve.
     /// </summary>
     private static GeometryUtils.CollisionResult Dome(ReadOnlySpan<Vector3> v, ReadOnlySpan<Vector4> planes, float r, float centreY,
                                                      bool airborne, out float depth)

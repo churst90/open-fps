@@ -3,14 +3,9 @@ using OpenFPS.Client.Core.Platform;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Maps WinForms virtual key codes to the neutral <see cref="GameKey"/>. This is the Windows side of
-/// the input boundary; the Linux head maps GDK keyvals to the same enum. Only the keys the game
-/// actually binds are mapped — everything else becomes <see cref="GameKey.None"/> and is dropped by
-/// the input buffer.
-///
-/// The modifier bits are stripped first: a hook reports <c>Keys.W | Keys.Shift</c> for shift-W, and
-/// the game binds the physical key, not the chord. Left/right modifiers are reported by their own
-/// virtual key codes (LShiftKey / RShiftKey / ...), so they survive the strip and reach the enum.
+/// Maps WinForms virtual key codes to <see cref="GameKey"/>; keys the game does not bind become
+/// <see cref="GameKey.None"/>. Modifier bits are stripped first (the game binds the key, not the
+/// chord); left and right modifiers have their own codes and survive the strip.
 /// </summary>
 public static class WinFormsKeyMap
 {

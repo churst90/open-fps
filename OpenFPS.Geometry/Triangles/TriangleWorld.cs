@@ -631,8 +631,7 @@ public sealed class TriangleWorld
     /// The same, and the floor's outward normal. A floor is a face no steeper than the walkable slope
     /// (<see cref="SolidContact.WalkableCos"/>, 45 degrees): a steeper one is a wall, and a probe that
     /// meets it goes on down past it to whatever is under it, so a body cannot stand on a bank too steep
-    /// to walk and slides down it instead (docs/GEOMETRY.md 3.2). A box's top is level, so on a map of
-    /// boxes this is the probe stage 1 had.
+    /// to walk and slides down it instead (docs/GEOMETRY.md 3.2).
     /// </summary>
     public float Ground<F>(Vector3 pos, float radius, float step, GeometryLayers layers, ref F filter, out SolidRef solid, out int owner,
                            out Vector3 normal) where F : IGeometryFilter

@@ -4,14 +4,10 @@ using OpenFPS.Client.Services;
 namespace OpenFPS.Client.UI;
 
 /// <summary>
-/// The main menu and its windows — Connect, Saved Servers, Settings — over the same
-/// <see cref="ClientSettings"/> file the Linux head uses, so a friend's saved servers and devices
-/// behave the same on both.
-///
-/// Every control is a native Win32 control with an accessible name, so NVDA announces each one as it
-/// takes focus. The game adds only the interface cue — a tick on focus, a rise on select, a fall on
-/// Escape — and speaks names itself only when no screen reader is running, since speaking over NVDA
-/// cuts it off (and NVDA's own focus announcement cuts the game off).
+/// The main menu and its windows (Connect, Saved Servers, Settings), over the same
+/// <see cref="ClientSettings"/> file the Linux head uses. Native controls with accessible names, so
+/// NVDA announces each; the game adds the interface cues, and speaks names only with no screen reader
+/// running, since each would cut the other off.
 /// </summary>
 public sealed class MenuWindow : Form
 {
@@ -19,8 +15,8 @@ public sealed class MenuWindow : Form
     private readonly ClientSettings _settings;
     private readonly MenuServices _services;
 
-    // The connect form stays up until the server has answered. Closing it on submit dropped focus back
-    // onto the menu, and that announcement cut off the rejection — a wrong password sounded like silence.
+    // The connect form stays up until the server has answered: closed on submit, the menu's focus
+    // announcement cut off the spoken rejection of a wrong password.
     private Form? _loginForm;
     private TextBox? _loginStatus;
     private TextBox? _loginUser;

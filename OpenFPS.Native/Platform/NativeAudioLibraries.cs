@@ -3,13 +3,9 @@ using System.Runtime.InteropServices;
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
-/// The native libraries the audio stack resolves at runtime, and what is actually lost when one of them
-/// is absent. Both heads share this so a missing library produces the same, specific, spoken diagnosis
-/// instead of silence or a vague "audio disabled".
-///
-/// This is the whole point of the check: an audio-first game that quietly starts without HRTF is worse
-/// than one that refuses to start, because the player has no way to tell the difference from inside the
-/// game — the world just sounds flat.
+/// The native libraries the audio stack resolves at runtime, and what is lost when one is absent, said
+/// the same way by both heads. A game that quietly starts without HRTF is worse than one that refuses:
+/// from inside, the world just sounds flat.
 /// </summary>
 public static class NativeAudioLibraries
 {
@@ -25,12 +21,7 @@ public static class NativeAudioLibraries
     /// <summary>Platform file name of the FMOD core library.</summary>
     public static string FmodFileName => IsWindows ? "fmod.dll" : "libfmod.so";
 
-    /// <summary>
-    /// Every native library the audio stack expects next to the executable, in the order they are
-    /// reported. FMOD core and Steam Audio are both <see cref="NativeLib.Required"/>: without FMOD there
-    /// is no sound at all, and without phonon there is no HRTF binaural — which for this game is the
-    /// difference between "playable" and "a stereo pan toy".
-    /// </summary>
+    /// <summary>Every native library the audio stack expects next to the executable, in report order.</summary>
     public static IReadOnlyList<NativeLib> Expected { get; } = IsWindows
         ?
         [
@@ -62,10 +53,8 @@ public static class NativeAudioLibraries
     /// <summary>True when the given library file is present next to the executable.</summary>
     public static bool IsPresent(string fileName) => File.Exists(Path.Combine(BaseDirectory, fileName));
 
-    /// <summary>
-    /// A single sentence naming each missing library and exactly what it costs — the text that gets both
-    /// logged and spoken. Returns an empty string when nothing is missing.
-    /// </summary>
+    /// <summary>One sentence, logged and spoken, naming each missing library and what it costs; empty when
+    /// none is missing.</summary>
     public static string DescribeMissing(IReadOnlyList<NativeLib> missing)
     {
         if (missing.Count == 0) return string.Empty;

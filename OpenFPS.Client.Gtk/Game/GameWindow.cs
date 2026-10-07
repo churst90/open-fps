@@ -82,15 +82,8 @@ internal sealed class GameWindow
                                                          out uint keyval, out int effectiveGroup, out int level, out uint consumed);
 
     /// <summary>
-    /// Brings the in-game window up, building it the first time and only the first time.
-    ///
-    /// The shell keeps ONE GameWindow for the life of the session, but that was only half of it:
-    /// this method built a fresh <see cref="ApplicationWindow"/> on every call and dropped the old
-    /// one into the field, so the previous toplevel stayed mapped and stayed owned by the
-    /// Application — a window per spawn, and the server answers every <c>/tp</c> with one. Found by
-    /// alt-tab: a stack of "OpenFPS — In Game" windows behind the live one.
-    ///
-    /// Made once; afterwards Present only raises it and puts the focus back on the label.
+    /// Brings the in-game window up, building it the first time only. Built on every call, it left a
+    /// window behind per spawn, and the server answers every <c>/tp</c> with a spawn.
     /// </summary>
     public void Present(Application app)
     {
@@ -117,8 +110,7 @@ internal sealed class GameWindow
         _focusTarget = label;
 
         var keys = EventControllerKey.New();
-        // Capture phase: receive key events at the window level regardless of which (if any) child
-        // widget has focus.
+        // Capture phase: key events at the window, whichever child has focus.
         keys.SetPropagationPhase(PropagationPhase.Capture);
         keys.OnKeyPressed += (_, e) =>
         {
@@ -139,12 +131,9 @@ internal sealed class GameWindow
         focus.OnEnter += (_, _) => { IsActive = true; _input.Clear(); _focusTarget?.GrabFocus(); };
         _window.AddController(focus);
 
-        // EventControllerFocus only tracks focus moving WITHIN the app; alt-tab is a window-manager
-        // activation that GTK reports via the window's state flags (BACKDROP clears when active).
-        // On reactivation: CLEAR the held-key buffer and re-grab focus. The clear is critical — the
-        // Alt of an Alt+Tab chord registers key-down while focused but its key-up arrives while the
-        // window is unfocused, leaving Alt stuck "held". Movement is suppressed whenever a modifier is
-        // held, so without this only the non-movement tap keys would respond.
+        // Alt-tab is reported by the window's state flags (BACKDROP), not EventControllerFocus. On
+        // reactivation the held keys must be cleared: Alt+Tab's Alt goes up while the window is away,
+        // leaves Alt held, and a held modifier stops all movement.
         _window.OnStateFlagsChanged += (_, _) =>
         {
             IsActive = !window.GetStateFlags().HasFlag(StateFlags.Backdrop);
@@ -155,10 +144,8 @@ internal sealed class GameWindow
             }
         };
 
-        // Closing the in-game window quits the whole app (the menu window is only hidden, so it
-        // would otherwise keep the process — and its audio thread — alive).
-        // Logged, because a window closing is the one thing that ends the process without a crash,
-        // and nothing said when it happened. "It stopped" needs to distinguish this from a signal.
+        // Closing it quits the app (the hidden menu window would keep the process alive), and says so in
+        // the log, so a closed window can be told from a killed process.
         _window.OnCloseRequest += (_, _) =>
         {
             Serilog.Log.Information("Game window received a close request.");

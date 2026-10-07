@@ -6,10 +6,9 @@ namespace OpenFPS.Client.Services;
 /// Owns the Forms — main menu, loading screen, game window — and moves between them. Safe to call
 /// from any thread: every change is marshalled onto the UI thread first.
 ///
-/// The marshal is a hidden control's BeginInvoke, which posts a window message and so wakes the UI
-/// thread. The queue it replaces was drained on Application.Idle, which only fires after some OTHER
-/// message has been handled — so a loading line or a login outcome posted from the game thread could
-/// sit unseen until the player happened to press a key.
+/// The marshal is a hidden control's BeginInvoke, which posts a window message and wakes the UI
+/// thread. Not Application.Idle: that fires only after some other message, so a login outcome could
+/// wait for a key press.
 /// </summary>
 public sealed class ClientNavigationService : ApplicationContext
 {
@@ -80,9 +79,8 @@ public sealed class ClientNavigationService : ApplicationContext
     });
 
     /// <summary>
-    /// Brings the game window up. ONE window for the life of the session: the server answers every
-    /// spawn with a PlayerSpawned, the first and every /tp after it, and a window per call leaves a
-    /// stack of them behind the live one.
+    /// Brings the game window up: one window for the session, since every spawn, every /tp included,
+    /// calls this.
     /// </summary>
     public void EnterGame(Action<MainWindow> setup) => EnqueueUIAction(() =>
     {

@@ -51,7 +51,7 @@ public enum SurfaceFlags : ushort
 }
 
 /// <summary>
-/// What <see cref="WallTransmission"/> needs and a triangle does not carry: the panel the sound goes
+/// What WallTransmission (OpenFPS.Common) needs and a triangle does not carry: the panel the sound goes
 /// through (today the box's own size: its smallest side is its thickness, the other two its face) and how
 /// it is built (the prefab's leaves and studs), and for a hollow shell how thick the shell is.
 /// </summary>
@@ -121,7 +121,7 @@ public sealed class MeshAsset
 
 /// <summary>
 /// Shapes generated from a few numbers by the same code on server and client (docs/GEOMETRY.md 2.6), so
-/// a map sends the numbers and never the triangles. Stage 1 has the one every entity is today: the box.
+/// a map sends the numbers and never the triangles. The box is here; the other shapes are in <see cref="Shapes"/>.
 /// </summary>
 public static class ShapeLibrary
 {
@@ -171,12 +171,11 @@ public static class ShapeLibrary
     }
 
     /// <summary>
-    /// A turn as the matrix every corner is placed with: the quaternion made unit length first (a map
-    /// writes six digits, and 0.707082/0.707131 is not quite unit), then the classical matrix. For a turn
-    /// about the vertical alone its middle row and column are exactly (0, 1, 0), so a box's top is exactly
-    /// its centre plus half its height, as every box test reads it: Vector3.Transform with a quaternion
-    /// that is not unit length scales the height by its length squared, and a gravel strip's top came out
-    /// a float's last bit low, which was enough to step a body up onto a kerb the box path did not.
+    /// A turn as the matrix every corner is placed with, the quaternion made unit length first (a map
+    /// writes six digits, and 0.707082/0.707131 is not quite unit). For a turn about the vertical the
+    /// middle row and column are then exactly (0, 1, 0), so a box's top is exactly centre plus half
+    /// height; a quaternion not of unit length put a gravel strip's top a float's last bit low, enough to
+    /// step a body up onto a kerb.
     /// </summary>
     public static Matrix4x4 RotationMatrix(Quaternion rotation)
     {

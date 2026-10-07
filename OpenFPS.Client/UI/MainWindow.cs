@@ -10,10 +10,8 @@ namespace OpenFPS.Client.UI;
 /// The in-game window. It draws nothing — the game is heard — and exists to hold keyboard focus and
 /// hand key transitions to the shared <see cref="InputStateBuffer"/>.
 ///
-/// Keys come from this window's own messages, not a system-wide hook. The hook this replaced saw every
-/// key pressed anywhere on the machine, including the screen reader's, and nothing cleared a key whose
-/// release happened in another window — the stuck-Alt of an Alt+Tab. The GTK head reads keys the same
-/// way, and clears held keys on every focus change for the same reason.
+/// Keys come from this window's own messages, not a system-wide hook: a hook saw the screen reader's
+/// keys too, and a key released in another window (Alt+Tab's Alt) stayed held.
 /// </summary>
 public sealed class MainWindow : Form
 {

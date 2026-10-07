@@ -12,10 +12,8 @@ namespace OpenFPS.Client.Core;
 
 /// <summary>
 /// The Windows head: speech, the WinForms windows behind <see cref="IClientShell"/>, microphone
-/// capture, the virtual-key map, and the game thread. Everything else — netcode, prediction,
-/// acoustics, bindings, every spoken announcement — is <see cref="ClientGameSession"/> in
-/// OpenFPS.Client.Core, shared verbatim with the GTK head. This file is the GTK head's Program.cs
-/// said in WinForms, and the two should be kept saying the same thing.
+/// capture, the key map and the game thread. Everything else is <see cref="ClientGameSession"/>,
+/// shared with the GTK head; keep this in step with the GTK head's Program.cs.
 /// </summary>
 public class ClientRunner
 {
@@ -122,7 +120,6 @@ public class ClientRunner
             _speech.Speak($"The saved output device, {_settings.OutputDevice}, is not connected. Using the default.", false);
     }
 
-    // ── Game / network loop (background thread) ─────────────────────────────────
 
     private void GameLoop()
     {
@@ -182,8 +179,7 @@ public class ClientRunner
             }
             catch (Exception ex)
             {
-                // A handler or simulation exception must never silently kill the loop that pumps the
-                // network: that would freeze the world-load handshake with no diagnostic at all.
+                // The loop pumps the network: one exception must not end it.
                 Serilog.Log.Error(ex, "GameLoop iteration failed.");
             }
 
@@ -192,9 +188,8 @@ public class ClientRunner
     }
 
     /// <summary>
-    /// Notices a HANG — everything stops and the log ends mid-stream, which from the chair is the same
-    /// as a crash. Writes a dump of this process (every thread's stack) next to the log and keeps
-    /// running. Armed only once the loop has ticked: it does not tick at the menu.
+    /// Notices a hang and writes a dump of every thread next to the log, then keeps running. Armed only
+    /// once the loop has ticked: it does not tick at the menu.
     /// </summary>
     private void Watchdog()
     {

@@ -8,14 +8,9 @@ namespace OpenFPS.Common;
 /// returns is in the order the boxes were added, so code that reads them in order reads them exactly as a
 /// scan of the whole list would, and gets the same answer.
 ///
-/// For the passes that ask every room about every wall: a city is thousands of each, a town tens of
-/// thousands, and a scan per room grows with the square of the map (a 3 km map of a real place took
-/// 18 s in the server's survey and 16 s in the client's openings before boxes were filed at all).
-///
-/// A tree over the boxes' extents (the triangle world's BVH builder, geometry stage 2), built once, the
-/// first time it is asked: every box whose extent meets the one asked about, no more. It was a grid of
-/// ground-plane columns, which handed back every box in every column touched, at every height, and kept
-/// the ground under a map on a list every question included.
+/// For the passes that ask every room about every wall: a scan per room grows with the square of the map
+/// (a 3 km map of a real place took 18 s in the server's survey and 16 s in the client's openings). A BVH
+/// over the extents, built on the first query.
 /// </summary>
 public sealed class BoxColumns
 {

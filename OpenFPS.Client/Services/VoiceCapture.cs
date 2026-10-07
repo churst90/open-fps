@@ -50,8 +50,7 @@ public sealed class VoiceCapture : IMicrophoneCapture
     }
 
     /// <summary>
-    /// Raised on the NAudio capture thread each time a complete 20ms Opus packet is ready.
-    /// The callback must be thread-safe.
+    /// Raised on the NAudio capture thread for each 20 ms Opus packet: the handler must be thread-safe.
     /// </summary>
     public event Action<byte[]>? PacketReady;
     public event Action<float[]>? SamplesCaptured;
@@ -75,8 +74,8 @@ public sealed class VoiceCapture : IMicrophoneCapture
     {
         if (_capturing || !IsAvailable) return;
 
-        // A device that exists can still refuse to open (in use, driver fault). Failing loudly here
-        // matters more than most: the player would otherwise believe they were transmitting.
+        // A device can refuse to open (in use, driver fault): say so, or the player believes they are
+        // transmitting.
         try
         {
             _encoder = new VoiceFrameEncoder();

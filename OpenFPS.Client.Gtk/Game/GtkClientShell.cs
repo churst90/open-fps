@@ -9,10 +9,8 @@ namespace OpenFPS.Client.Gtk.Game;
 /// The Linux half of <see cref="IClientShell"/>: GTK windows for the loading screen, the in-game
 /// focus target, the command console, and the game menu.
 ///
-/// The shared session calls every one of these from the game-loop thread, so each one marshals onto
-/// the GTK main thread through the captured <see cref="SynchronizationContext"/> before touching a
-/// widget. GTK windows expose themselves to Orca over AT-SPI, which is why the console and the quit
-/// dialog are real windows rather than spoken prompts.
+/// The session calls these from the game-loop thread, so each marshals onto the GTK main thread before
+/// touching a widget. The console and the quit dialog are real windows so Orca can read them.
 /// </summary>
 internal sealed class GtkClientShell : IClientShell
 {
@@ -20,9 +18,8 @@ internal sealed class GtkClientShell : IClientShell
     private readonly Action _onQuit;
     private readonly Action<UiCue> _cue;
 
-    // The session creates the input buffer and needs the shell to construct, so the buffer arrives a
-    // moment later via SetInput. The shell only ever uses it to clear held keys around modal dialogs,
-    // which cannot happen before the player is in the world.
+    // Set by SetInput just after the session is built; used only to clear held keys around modal
+    // dialogs, which cannot open before then.
     private InputStateBuffer _input = new();
 
     private Application? _app;
@@ -111,13 +108,8 @@ internal sealed class GtkClientShell : IClientShell
     {
         if (_app == null) return;
 
-        // Hide (don't close) the menu: closing it disrupts the new window's keyboard focus so the game
-        // window stops receiving key events. The game window quits the whole app on close, so the
-        // hidden menu won't keep the process alive.
-        // ONE game window for the life of the session. The server answers every spawn with a
-        // PlayerSpawned — the first one and every /tp after it — and the session calls this for
-        // each. Building a window per call left a stack of "OpenFPS — In Game" windows behind the
-        // live one, one per teleport, found by alt-tab. It is made once and brought forward after.
+        // Hide, not close, the menu: closing it took keyboard focus from the game window. One game
+        // window for the session: this is called on every spawn, every /tp included.
         if (_gameWindow == null) _gameWindow = new GameWindow(_input, _onQuit);
         _gameWindow.Present(_app);
 

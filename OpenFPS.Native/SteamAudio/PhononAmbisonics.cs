@@ -3,18 +3,9 @@ using System.Runtime.InteropServices;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// Ambisonics bindings for the Steam Audio (phonon) C API — the decode effect, which is what turns a
-/// recorded soundfield into a pair of ears.
-///
-/// This is the half of Steam Audio that makes an ambience bed work in a game at all. A binaural
-/// RECORDING is head-locked: the spatial image is baked to the orientation of the head that recorded
-/// it, so the bird on your left stays on your left after you turn around. A first-order ambisonic
-/// recording instead describes sound arriving from every direction as a field, and
-/// <c>iplAmbisonicsDecodeEffectApply</c> rotates that field by the listener's orientation BEFORE
-/// decoding it to binaural — so the world stays put while the player turns in it.
-///
-/// See <see cref="Phonon"/> for the coordinate convention (+x right, +y up, -z FORWARD; the game uses
-/// +z forward, so every direction handed to this API is converted on the way in).
+/// Ambisonics bindings for the Steam Audio (phonon) C API: encode, and the decode effect that turns a
+/// soundfield into a pair of ears, rotated by the listener's orientation first so the world stays put
+/// while the player turns. Steam Audio is -z forward; see <see cref="World"/>.
 /// </summary>
 internal static partial class Phonon
 {
@@ -34,9 +25,8 @@ internal static partial class Phonon
     public const int IPL_AUDIOEFFECTSTATE_TAILREMAINING = 0;
     public const int IPL_AUDIOEFFECTSTATE_TAILCOMPLETE = 1;
 
-    // IPLCoordinateSpace3 (right, up, ahead, origin) is already declared in PhononSim.cs and its field
-    // order matches phonon.h. That order is load-bearing: get it wrong and the soundfield rotates the
-    // wrong way with nothing to tell you so.
+    // IPLCoordinateSpace3 is declared in PhononSim.cs. Its field order (right, up, ahead, origin) must
+    // match phonon.h: wrong, and the soundfield rotates the wrong way with nothing to tell you so.
 
     [StructLayout(LayoutKind.Sequential)]
     public struct IPLSpeakerLayout
@@ -92,10 +82,9 @@ internal static partial class Phonon
         public int order;
     }
 
-    /// <summary>Encodes a mono signal into a soundfield from a given direction. Not needed to PLAY a
-    /// recorded bed — but it is how a mono point source joins an ambisonic bus later, and it is how the
-    /// decode path is verified: generating the test field with Steam Audio's own encoder tests the
-    /// round trip rather than testing a guess at its spherical-harmonic convention.</summary>
+    /// <summary>Encodes a mono signal into a soundfield from a direction. The decode path is tested with
+    /// fields from this encoder, so the test checks the round trip, not a guess at the spherical-harmonic
+    /// convention.</summary>
     [DllImport(Lib, CallingConvention = CC)]
     public static extern int iplAmbisonicsEncodeEffectCreate(
         IntPtr context, ref IPLAudioSettings audioSettings,
@@ -121,19 +110,12 @@ internal static partial class Phonon
     };
 
     /// <summary>
-    /// A point or direction of the game's world in Steam Audio's world: the same x and y, and z the
-    /// other way. The game's frame is +x right, +y up, +z forward (north); Steam Audio's is +x right,
-    /// +y up, -z forward. Every world coordinate handed to Steam Audio goes through here — the scene's
-    /// vertices, each trace's source and listener, the probe volume — so that its world is a true
-    /// image of the game's and ListenerFrame, which flips z the same way, reads it correctly.
-    ///
-    /// Until 2026-09-29 the scene and the sources were handed over unflipped while ListenerFrame was
-    /// flipped, so a traced response was decoded with the listener facing the wrong way along z: the
-    /// facade ahead of you answered from behind. Nothing else noticed — occlusion, transmission and
-    /// pathing do not care which way is forward — which is why it went unheard until a room's traced
-    /// tail was listened to for where it came from.
+    /// A point or direction of the game's world in Steam Audio's: z the other way (the game is +z
+    /// forward, Steam Audio -z). Every world coordinate handed to Steam Audio goes through here, or a
+    /// traced response is decoded facing backwards while occlusion and pathing still look right
+    /// (changes.md, 2026-09-29).
     /// </summary>
-    /// <remarks>SA_MIRROR=0 restores the old unflipped world, for the lab's <c>--sa-frame</c> check
+    /// <remarks>SA_MIRROR=0 hands the world over unflipped, for the lab's <c>--sa-frame</c> check
     /// and nothing else.</remarks>
     public static IPLVector3 World(System.Numerics.Vector3 v) => new IPLVector3 { x = v.X, y = v.Y, z = MirrorZ ? -v.Z : v.Z };
     /// <summary>The z component of a Steam Audio world direction, in the game's world.</summary>
@@ -141,17 +123,11 @@ internal static partial class Phonon
     internal static readonly bool MirrorZ = Environment.GetEnvironmentVariable("SA_MIRROR") != "0";
 
     /// <summary>
-    /// The listener's frame of reference in the SOUNDFIELD's coordinates, built from the game's
-    /// listener rotation.
-    ///
-    /// Steam Audio's documentation is explicit about which way round this goes: to keep the soundfield
-    /// fixed in world space while the listener looks around, you pass the listener's own axes as world
-    /// -space direction vectors. The effect works out the rotation from that.
+    /// The listener's own axes as world-space directions, z flipped: what Steam Audio asks for to keep
+    /// the soundfield fixed in the world while the listener turns.
     /// </summary>
     public static IPLCoordinateSpace3 ListenerFrame(System.Numerics.Quaternion listenerRotation)
     {
-        // Game frame: +x right, +y up, +z forward. Steam Audio: +x right, +y up, -z forward.
-        // Flipping the z component of each axis is the whole of the conversion.
         var right = System.Numerics.Vector3.Transform(System.Numerics.Vector3.UnitX, listenerRotation);
         var up = System.Numerics.Vector3.Transform(System.Numerics.Vector3.UnitY, listenerRotation);
         var ahead = System.Numerics.Vector3.Transform(System.Numerics.Vector3.UnitZ, listenerRotation);
