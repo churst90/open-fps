@@ -2860,9 +2860,11 @@ public class ClientAudioSystem
             if (_audio.IsPlaying(snap.Id)) return;    // still saying the last one
         }
 
-        // The road under a machine hands its sound back a moment later; see GroundReflection.
+        // The road under a machine hands its sound back a moment later; see GroundReflection. Engines and
+        // physical models only: a sustained recording (a PA's speech) gets none, as speech flanged with
+        // one (docs/CLIENT_NOTES.md, "Speech has no ground reflection").
         long groundAt = System.Diagnostics.Stopwatch.GetTimestamp();
-        if (engineKey.Length > 0 || physicalKey != null) ApplyGround(ref emitter, world);
+        if (engineKey.Length > 0 || physicalKey.Length > 0) ApplyGround(ref emitter, world);
         _partMs[1] += Ms(groundAt);
         Spreading? spreading = extentLayout != null ? SpreadOf(snap, extentLayout, ref emitter, eyePos, engineDt, now) : null;
         _placed[snap.Id] = (emitter.Volume, emitter.MinDistance);

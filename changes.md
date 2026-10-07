@@ -29,6 +29,11 @@ Recent work, newest first. `git log` has the rest.
     7 to 10 dB over the walk banks' medians. Your own landing still has no bone-conduction lift (your
     steps have 8 dB), so at your own feet a landing comes out about as loud as a step. Unheard; renders in
     inbox/probable-bugs-2026-10-07/3-landing.
+  - A sustained recording gets no ground reflection: only engines and physical models do, inside their
+    voices. The test was `physicalKey != null` of a string that starts empty, so every looping recording
+    had one: the speedway's four PA speakers played their speech over the asphalt's bounce, the comb that
+    flanged when speech had one (docs/CLIENT_NOTES.md, "Speech has no ground reflection"). One-off sounds
+    are unchanged (impulses keep theirs). Unheard; renders in inbox/probable-bugs-2026-10-07/2-ground.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream
