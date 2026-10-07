@@ -229,7 +229,16 @@ public static class ModelLibrary
     public static bool Knows(string kind, string id)
         => !string.IsNullOrEmpty(id)
            && (_authored.ContainsKey(Key(kind, id))
-               || (BuiltIn.TryGetValue(kind, out var lib) && lib.ContainsKey(id)));
+               || (BuiltIn.TryGetValue(kind, out var lib) && lib.ContainsKey(id))
+               || IsPartsList(kind, id));
+
+    /// <summary>
+    /// A vehicle written as a parts list in machines/ (MachineRegistry.Authored): a vehicle model as it
+    /// ships, like a built-in one, whose version 0 is its parts assembled. Asked of MachineRegistry each
+    /// time, since its folder is loaded after this library is made.
+    /// </summary>
+    private static bool IsPartsList(string kind, string id)
+        => string.Equals(kind, Kinds.Vehicle, StringComparison.OrdinalIgnoreCase) && MachineRegistry.Authored.ContainsKey(id);
 
     /// <summary>Whether a model of this kind and name has been put in from data (a file, a map, the world
     /// editor) rather than being only the built-in.</summary>
@@ -237,12 +246,15 @@ public static class ModelLibrary
 
     /// <summary>The built-in model of this kind and name, as it ships (never an authored one), or null.</summary>
     public static object? BuiltInModel(string kind, string id)
-        => BuiltIn.TryGetValue(kind, out var lib) && lib.TryGetValue(id, out var make) ? make() : null;
+        => BuiltIn.TryGetValue(kind, out var lib) && lib.TryGetValue(id, out var make) ? make()
+         : IsPartsList(kind, id) ? VehicleSpec.Of(id) : null;
 
     /// <summary>Every model of a kind, authored and built in.</summary>
     public static IEnumerable<string> Ids(string kind)
     {
         var built = BuiltIn.TryGetValue(kind, out var lib) ? lib.Keys : Enumerable.Empty<string>();
+        if (string.Equals(kind, Kinds.Vehicle, StringComparison.OrdinalIgnoreCase))
+            built = built.Concat(MachineRegistry.Authored.Keys.Where(k => !lib!.ContainsKey(k))).ToList();
         string prefix = kind + ":";
         var authored = _authored.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                                      .Select(k => k[prefix.Length..]);
@@ -291,6 +303,7 @@ public static class ModelLibrary
     {
         if (_authored.TryGetValue(Key(kind, id), out var authored) && authored is T typed) return typed;
         if (BuiltIn.TryGetValue(kind, out var lib) && lib.TryGetValue(id, out var make) && make() is T built) return built;
+        if (IsPartsList(kind, id) && VehicleSpec.Of(id) is T parts) return parts;
         throw new ArgumentException(
             $"No {kind} called '{id}'. Known: {string.Join(", ", Ids(kind))}");
     }
