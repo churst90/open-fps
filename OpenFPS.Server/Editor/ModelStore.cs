@@ -59,7 +59,7 @@ public sealed class ModelStore
     private static string Key(string kind, string id) => kind + ":" + id;
 
     /// <summary>Model ids are file names here, so nothing that could leave the folder.</summary>
-    public static bool IsSafeId(string s) => Regex.IsMatch(s, "^[A-Za-z0-9_-]{1,64}$");
+    public static bool IsSafeId(string s) => OpenFPS.Server.Core.SafeText.IsFileName(s);
 
     /// <summary>Reads every saved model and puts each one's current version in use.</summary>
     public int LoadAll()

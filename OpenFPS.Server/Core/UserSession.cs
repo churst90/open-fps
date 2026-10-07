@@ -115,6 +115,9 @@ public class UserSession
     /// </summary>
     public float InputBudget { get; set; }
 
+    /// <summary>A manifest has been sent and its map data not yet asked for. One asking per manifest.</summary>
+    public bool AwaitingMapData { get; set; }
+
     /// <summary>Inputs discarded because the queue was full — flood diagnostics.</summary>
     public long DroppedInputs { get; set; }
 

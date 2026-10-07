@@ -204,6 +204,11 @@ internal class FmodResourceManager : IDisposable
         }
 
         string path = FmodAudioProvider.SoundFilePath(soundId);
+        if (path.Length == 0)
+        {
+            ReportMissing(soundId, "not a path under ASSETS");
+            return SoundLoadState.Missing;
+        }
 
         if (!File.Exists(path))
         {
@@ -2050,12 +2055,28 @@ public partial class FmodAudioProvider : IAudioProvider
         return $"Echoes {mode}, {TailDb:F0} dB against physical (the tail level). {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
     }
 
-    /// <summary>Where a sound id's file is: the path the loader opens.</summary>
+    /// <summary>Where a sound id's file is: the path the loader opens; empty if it would leave ASSETS.</summary>
+    // Sound ids come from the server and a map's owner sets them: a network share here would hand
+    // Windows' login hash to whoever runs it.
     internal static string SoundFilePath(string soundId)
     {
-        if (soundId.Contains("ASSETS", StringComparison.OrdinalIgnoreCase)) return soundId;
+        if (string.IsNullOrEmpty(soundId)) return "";
+        string baseDir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
+        if (soundId.Contains("ASSETS", StringComparison.OrdinalIgnoreCase))
+            return Inside(soundId, baseDir, Path.IsPathFullyQualified(soundId) ? soundId : Path.Combine(baseDir, soundId));
         string normId = soundId.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ASSETS", "SOUNDS", normId);
+        string sounds = Path.Combine(baseDir, "ASSETS", "SOUNDS");
+        return Inside(soundId, sounds, Path.Combine(sounds, normId));
+    }
+
+    /// <summary>The path, if it is inside the folder and names no network share; empty if not.</summary>
+    private static string Inside(string id, string folder, string path)
+    {
+        if (id.StartsWith(@"\\", StringComparison.Ordinal) || id.StartsWith("//", StringComparison.Ordinal)) return "";
+        string full;
+        try { full = Path.GetFullPath(path); } catch (Exception) { return ""; }
+        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)) + Path.DirectorySeparatorChar;
+        return full.StartsWith(root, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) ? full : "";
     }
 
     /// <summary>A recorded take's correction to its bank's median level (TakeLevels); 1 for anything
@@ -2064,6 +2085,7 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         if (emitter.IsSynth || emitter.IsGranular || string.IsNullOrEmpty(emitter.SoundId)) return 1f;
         string path = SoundFilePath(emitter.SoundId);
+        if (path.Length == 0) return 1f;
         if (!File.Exists(path))
             foreach (var ext in new[] { ".wav", ".ogg", ".mp3" })
                 if (File.Exists(path + ext)) { path += ext; break; }

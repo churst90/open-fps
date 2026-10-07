@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenFPS.Common.Networking;
 using Serilog;
 
@@ -21,6 +22,25 @@ public class MessageDispatcher : IMessageDispatcher
     /// handler has to remember to check.
     /// </summary>
     public Func<int, bool>? IsAuthenticated { get; set; }
+
+    /// <summary>How often each account may do each thing (docs/SERVER_SECURITY.md). Tests give it a clock.</summary>
+    public MessageLimits Limits { get; set; } = new();
+
+    /// <summary>What a connection's limits are counted under: its account once logged in, so that
+    /// reconnecting does not refill them. Null, or a null answer, counts by connection.</summary>
+    public Func<int, string?>? KeyOf { get; set; }
+
+    /// <summary>
+    /// Every message a client sends. Anything else arriving from the network is one of the server's own
+    /// messages sent back at it, and is dropped before it is read (NetworkService.IsClientMessage).
+    /// </summary>
+    public static readonly IReadOnlyList<Type> SentByClients = new[]
+    {
+        typeof(ClientInputUpdate), typeof(ChatMessage), typeof(LoginRequest), typeof(TextCommand),
+        typeof(InteractRequest), typeof(VoiceData), typeof(RegisterRequest), typeof(LogoutRequest),
+        typeof(MapDataRequest), typeof(PlayerListRequest), typeof(FriendListRequest), typeof(MapListRequest),
+        typeof(ScopedShot), typeof(InventoryRequest),
+    };
 
     /// <summary>What a connection may send before it has logged in.</summary>
     public static readonly IReadOnlySet<Type> AllowedBeforeLogin = new HashSet<Type>
@@ -83,6 +103,8 @@ public class MessageDispatcher : IMessageDispatcher
             return;
         }
 
+        if (!Admit(connectionId, message, replyAction)) return;
+
         if (_handlers.TryGetValue(type, out var handler))
         {
             try
@@ -100,6 +122,64 @@ public class MessageDispatcher : IMessageDispatcher
             // write a line to the log for every one.
             Log.Warning("No handler registered for message type {Type}", type.Name);
         }
+    }
+
+    /// <summary>The limits and the text rules (docs/SERVER_SECURITY.md); false drops the message, said if a person typed it.</summary>
+    private bool Admit(int connectionId, IMessage message, Action<IMessage> reply)
+    {
+        string key = KeyOf?.Invoke(connectionId) ?? $"conn:{connectionId}";
+        bool Refuse(RateLimiter limiter, string kind, string? say, double cost = 1)
+        {
+            if (limiter.TryConsume(key, cost)) return false;
+            Limits.Abuse.Note(key, kind, $"over the {kind} limit");
+            if (say != null) reply(new TextEvent { Text = say });
+            return true;
+        }
+
+        switch (message)
+        {
+            case ChatMessage chat:
+                chat.Text = SafeText.Words(chat.Text);
+                return !Refuse(Limits.Chat, "chat", MessageLimits.ChatTooFast);
+            case TextCommand command:
+            {
+                if (!CleanCommand(command)) { reply(new TextEvent { Text = MessageLimits.CommandTooLong }); return false; }
+                if (Refuse(Limits.Commands, "command", MessageLimits.CommandsTooFast)) return false;
+                string name = command.Command.TrimStart('/').ToLowerInvariant();
+                if (name is "all" or "pm" or "t" or "say" && Refuse(Limits.Chat, "chat", MessageLimits.ChatTooFast)) return false;
+                if (name == "join" && Refuse(Limits.Travel, "travel", MessageLimits.TravelTooFast)) return false;
+                if (name == "edit" && OpenFPS.Server.Editor.WorldEditor.EditCost(command.Args) is double cost and > 0
+                    && Refuse(Limits.Edits, "edit", MessageLimits.EditsTooFast, cost)) return false;
+                return true;
+            }
+            case VoiceData:
+                return !Refuse(Limits.Voice, "voice", null);
+            case InteractRequest or ScopedShot or PlayerListRequest or FriendListRequest or MapListRequest or InventoryRequest:
+                return !Refuse(Limits.Requests, "request", null);
+            default:
+                return true;
+        }
+    }
+
+    /// <summary>A command's words without control characters; false if it is too long to be anything typed.</summary>
+    private static bool CleanCommand(TextCommand command)
+    {
+        command.Command ??= "";
+        command.Args ??= Array.Empty<string>();
+        if (command.Command.Length > SafeText.MaxCommandNameChars || command.Args.Length > SafeText.MaxCommandWords) return false;
+        int total = command.Command.Length;
+        foreach (var a in command.Args) total += (a?.Length ?? 0) + 1;
+        if (total > SafeText.MaxCommandChars) return false;
+        command.Command = Strip(command.Command);
+        for (int i = 0; i < command.Args.Length; i++) command.Args[i] = Strip(command.Args[i] ?? "");
+        return true;
+    }
+
+    private static string Strip(string word)
+    {
+        foreach (char c in word)
+            if (SafeText.IsUnsafeChar(c)) return string.Concat(word.Where(ch => !SafeText.IsUnsafeChar(ch)));
+        return word;
     }
 
     private static bool IsFinite(System.Numerics.Vector3 v)

@@ -281,8 +281,8 @@ public class MudGateway
     public static string Redact(string line)
     {
         var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length >= 3 && parts[0].Equals("login", StringComparison.OrdinalIgnoreCase))
-            return $"login {AuthService.ForLog(parts[1])} [password]";
+        if (parts.Length >= 3 && (parts[0].Equals("login", StringComparison.OrdinalIgnoreCase) || parts[0].Equals("register", StringComparison.OrdinalIgnoreCase)))
+            return $"{parts[0].ToLowerInvariant()} {AuthService.ForLog(parts[1])} [password]";
         return AuthService.ForLog(line);
     }
 

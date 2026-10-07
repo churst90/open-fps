@@ -84,6 +84,8 @@ public class GameServer
         _auth = new AuthService(userRepo);
         // Nothing but a login or a registration is heard from a connection that has not logged in.
         _dispatcher.IsAuthenticated = id => _sessions.TryGetSession(id, out _);
+        // Limits follow the account, so reconnecting does not refill them.
+        _dispatcher.KeyOf = id => _sessions.TryGetSession(id, out var s) ? s.Username : null;
     }
 
     /// <summary>The login rules and their state, for the admin's commands.</summary>
@@ -668,8 +670,7 @@ public class GameServer
             if (s.InputQueue.Count >= MaxQueuedInputs)
             {
                 s.DroppedInputs++;
-                if (s.DroppedInputs % 120 == 1)
-                    Log.Warning("Input queue full for {User}; dropping inputs ({Count} so far).", s.Username, s.DroppedInputs);
+                _dispatcher.Limits.Abuse.Note(s.Username, "input", $"input queue full; dropping inputs ({s.DroppedInputs} so far)");
                 return;
             }
             s.InputQueue.Enqueue(req);
@@ -1210,6 +1211,7 @@ public class GameServer
             Log.Warning("Login for {User}: no authored data for map '{Map}'; sending defaults.", session.Username, mapId);
         }
 
+        session.AwaitingMapData = true;
         SendToSession(session, manifest);
         Log.Information("Manifest sent to {User}. Waiting for data request or ready.", session.Username);
     }
@@ -1217,6 +1219,19 @@ public class GameServer
     private void HandleMapDataRequest(NetPeer peer, MapDataRequest request)
     {
         if (!_sessions.TryGetSession(peer.Id, out var session)) return;
+        MapDataAsked(session, request);
+    }
+
+    /// <summary>A client asking for the map's data, as it does once after each manifest.</summary>
+    internal void MapDataAsked(UserSession session, MapDataRequest request)
+    {
+        // Each asking sends the whole map; a client asks once per manifest.
+        if (!session.AwaitingMapData)
+        {
+            _dispatcher.Limits.Abuse.Note(session.Username, "mapdata", "asked for map data with no manifest outstanding");
+            return;
+        }
+        session.AwaitingMapData = false;
         SendMapData(session, request);
     }
 

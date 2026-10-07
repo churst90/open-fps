@@ -394,6 +394,8 @@ public sealed partial class WorldEditor
         bool everywhere = words.Count > 1 && words[1].Equals("everywhere", StringComparison.OrdinalIgnoreCase);
         if (everywhere && !s.Can(Permissions.EditModels)) { Say(reply, "Replacing a model on every map needs edit-models. /edit model replace KIND ID with OTHER here does this map."); return; }
         var maps = everywhere ? _maps.GetAllMaps().Select(m => m.Key).ToList() : new List<string> { s.CurrentMapId };
+        if (kind.Kind == PrefabKind.KindId && _maps.Prefabs.TryGetValue(other.ToLowerInvariant(), out var into) && !MayPlace(s, into, out string refusal))
+        { Say(reply, refusal); return; }
 
         var ops = new List<EditOp>();
         int count = 0, refused = 0;
@@ -406,6 +408,9 @@ public sealed partial class WorldEditor
                 if (kind.Kind == PrefabKind.KindId)
                 {
                     if (!id.Equals(PrefabOf(world, e), StringComparison.OrdinalIgnoreCase)) continue;
+                    // A map-file thing made again is an addition: it counts against the cap.
+                    if (Overlays.Get(mapId).AdditionFor(thingId) == null && mapId.Equals(s.CurrentMapId, StringComparison.OrdinalIgnoreCase)
+                        && Full(s, 1, out _)) { refused++; continue; }
                     if (SwapPrefab(mapId, world, e, thingId, other, out var swap)) { ops.AddRange(swap); count++; }
                     else refused++;
                     continue;
@@ -424,7 +429,7 @@ public sealed partial class WorldEditor
         if (count == 0) { Say(reply, $"Nothing {(everywhere ? "on a loaded map" : "on this map")} uses the {kind.Spoken} {id}{(refused > 0 ? $"; {refused} could not be changed" : "")}."); return; }
         Push(s, new BatchOp(s.CurrentMapId, ops, $"replaced the {kind.Spoken} {id} with {other}"));
         Say(reply, $"Replaced the {kind.Spoken} {id} with {other} on {Plural(count, "thing")}{(everywhere ? " on every loaded map" : " on this map")}."
-                 + (refused > 0 ? $" {refused} could not be changed: somebody is standing where the new one would be." : "") + " One undo puts them all back.");
+                 + (refused > 0 ? $" {refused} could not be changed: somebody is standing where the new one would be, or the map is full." : "") + " One undo puts them all back.");
         Notify(s, $"{s.Username} replaced the {kind.Spoken} {id} with {other}.");
         Refresh(s, reply);
     }
