@@ -255,12 +255,13 @@ against them. People in the street use doors the same way.
 | F6 | Maps |
 | Shift+F6 | Your maps |
 | F8 | Friends |
+| F12 | The world editor, on a map you may edit (see "The world editor") |
 | I | Your inventory |
 
 Inside a list:
 - Up and Down move. Enter or Right chooses. Escape, Left or Backspace goes back.
 - A letter jumps to the next item starting with that letter.
-- You stand still while a list is open. F5, F6 and F8 switch straight to another list.
+- You stand still while a list is open. F5, F6, F8 and F12 switch straight to another list.
 - Choosing a **player** or **friend** gives: Private message, View profile, and Add or Remove
   friend. Staff also get Where is.
 - Choosing a **map** takes you there. A map is read as its name, how many players are on it,
@@ -423,6 +424,66 @@ A team holds up to 16 players. Your team's player beacons sound on a different i
 
 Choose a map in the F6 list, or type `/join` and the map name. The client says "Travelling to" the
 map, loads it and puts you in. You stay logged in.
+
+## The world editor
+
+F12 opens the world editor. It changes the map you are on, while you play: there is no build mode,
+you walk and collide as usual. Close it with Escape to move, and press F12 to carry on. The design is
+in docs/WORLD_EDITOR.md.
+
+Who may use it:
+- Developers and the administrator, on any map.
+- A map's owner, on that map.
+- People the owner names with `/map editor add NAME` (and `/map editor remove NAME`), on that map.
+  `/map editor` lists them. Naming an editor also invites them in.
+- Anyone else hears "The world editor is for this map's owner, the people they ask to edit it, and
+  developers."
+
+The menu works like the other lists. Items that change something you may want again (a nudge, a step
+up or down) keep the menu open, so Enter can be pressed again. Items that need a number open the
+command line with the start of the command typed for you; type the number and press Enter.
+
+| Menu | What is in it |
+|---|---|
+| Map | Name, owner, size, tiles, how many things, the spawn point; Set spawn here; the editors |
+| Place | The prefabs by category (walls, floors, doors, machines, water, fire, trees, sounds, places, things to carry). Choosing one places it: a solid thing just in front of you, anything else at your feet |
+| Select | Nearest things; things within 5, 10 or 20 metres; by name; by number. Choosing one selects it and opens its menu |
+| Selected | What it is and where; move by numbers (east, north, up); nudge by the step (north, south, east, west, up, down, forward, back, left, right); turn 15 or 90 degrees or face a direction; bring to you; duplicate; delete; settings; its model |
+| Library | Every kind of model (machines, water features, fire, trees, horns, bells, trains, ...) and each model's values |
+| Test tools | What is around me; map information |
+| Undo, Redo | Say what they would undo or redo |
+
+- Settings of a placed thing: name, width, height, depth, and for a thing that makes a sound its
+  volume, range and minimum distance. A value outside the sensible range is refused and the range is
+  said.
+- A model's values are listed with their units. Values that are described can be changed: typed, or
+  a step up or down. Changing a model changes it on every map and needs the `edit-models`
+  permission (developers and the administrator). Each change is a new version; Versions lists them.
+  Everyone hears the change at once.
+- Undo and redo are your own. An undo is refused if somebody else has changed the thing since, and
+  says who.
+- A solid thing is never placed or moved into a player.
+- Other editors on the map hear a few words about each change ("cody moved Fountain.").
+- Edits are kept when the server restarts (see "Map edits" in Part 2). Undo history is not.
+
+The same commands can be typed, and a text (MUD) player gets each menu as numbered lines with the
+command for each:
+
+| Command | What it does |
+|---|---|
+| `/edit` | The menu |
+| `/edit select nearest`, `/edit select NAME`, `/edit select #ID`, `/edit select within METRES` | Select |
+| `/edit selected`, `/edit settings` | What is selected, and its settings |
+| `/edit move EAST NORTH UP` | Move by metres; negative goes west, south, down |
+| `/edit nudge DIRECTION [METRES]`, `/edit step METRES` | Move by the step (0.5 m to start with) |
+| `/edit turn DEGREES`, `/edit face DIRECTION` | Turn clockwise (negative: anticlockwise), or to a compass direction |
+| `/edit bring`, `/edit duplicate`, `/edit delete` | Bring to you, copy, delete |
+| `/edit set FIELD VALUE`, `/edit up FIELD`, `/edit down FIELD` | A setting: Name, Width, Height, Depth, Volume, Range, MinDistance |
+| `/edit place PREFAB`, `/edit prefabs [CATEGORY]` | Place a prefab; list them |
+| `/edit spawn here`, `/edit info` | Move the map's spawn point to you; map information |
+| `/edit model show KIND ID`, `/edit model versions KIND ID` | A model and its versions |
+| `/edit model set KIND ID FIELD VALUE`, `/edit model up KIND ID FIELD`, `/edit model down KIND ID FIELD` | Change a model: `/edit model set machine ac_condenser Compressor.HumDb 66` |
+| `/edit undo`, `/edit redo` | Undo and redo |
 
 ## Stairs
 
@@ -721,6 +782,20 @@ file byte for byte (a test checks this):
     python3 tools/gen_city.py --out=city.json  # somewhere else
 
 Change the generator, not `city.json`: a hand edit is undone the next time the city is generated.
+
+### Map edits
+
+What the world editor changes is kept in `OpenFPS.Server/maps/overlays/MAP.json`, one file per map,
+and laid over the map file when the server starts. The editor never writes a map file, so a
+generated map stays what its generator wrote.
+
+- Each entry names the thing by its number in the map file, its prefab and where the file had it. If
+  the map is generated again and the numbers change, the thing is found by its prefab and place; if
+  it is gone, the entry is skipped and the log says so.
+- Things the editor places are numbered from 900,000,000.
+- Models changed in the editor are kept in `OpenFPS.Server/model_versions/KIND.ID.json`, every
+  version, and loaded at start.
+- To undo every edit on a map, stop the server and delete its overlay file.
 
 ### What a map file contains
 

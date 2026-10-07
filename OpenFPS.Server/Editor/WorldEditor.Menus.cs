@@ -296,7 +296,11 @@ public sealed partial class WorldEditor
 
     private static EditorMenu LibraryMenu()
         => Menu("Library", ModelLibrary.AllKinds.OrderBy(k => ModelKinds.Spoken(k))
-            .Select(k => Opens($"{Capital(ModelKinds.Spoken(k))}, {ModelLibrary.Ids(k).Count()} models", $"kind:{k}")));
+            .Select(k =>
+            {
+                int n = ModelLibrary.Ids(k).Count();
+                return Opens($"{Capital(ModelKinds.Spoken(k))}, {n} model{(n == 1 ? "" : "s")}", $"kind:{k}");
+            }));
 
     private EditorMenu? KindMenu(string kind)
     {
@@ -389,7 +393,7 @@ public sealed partial class WorldEditor
         var items = new List<EditorMenuItem>();
         if (h != null)
             foreach (var v in h.Versions.OrderByDescending(v => v.Version))
-                items.Add(Info($"Version {v.Version}{(v.Version == h.Current ? ", in use" : "")}: {v.Note}, by {v.Author}, {v.SavedUtc:d MMMM HH:mm}"));
+                items.Add(Info($"Version {v.Version}{(v.Version == h.Current ? ", in use" : "")}: {v.Note}, by {v.Author}, {v.SavedUtc.ToLocalTime():d MMMM HH:mm}"));
         items.Add(Info($"Version 0, as built{((h?.Current ?? 0) == 0 ? ", in use" : "")}"));
         return Menu("Versions", items);
     }

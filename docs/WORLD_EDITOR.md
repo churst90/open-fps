@@ -79,7 +79,9 @@ Items marked (2) or (3) are later phases; phase 1 shows only what works.
 - **People** (3): characters such as Alex, walker density.
 - **Roads and routes** (3).
 - **Places and rooms** (2): named places, regions, what a room is made of.
-- **Test tools**: what is around me (`/scan`); listen here (2).
+- **Test tools**: what is around me (`/scan`), map information; listen here (2).
+- Delete asks first ("Delete Fountain?": Yes, or Escape). Yes closes the editor, since what it was
+  showing has gone; undo puts it back.
 - **Undo** and **Redo**, each saying what it would undo or redo.
 
 ## 4. Models and how a kind describes itself
@@ -274,8 +276,9 @@ Selecting is not an operation: it changes nothing and is per player.
   "Spawn": { "Position": { "X": 60, "Y": 0.15, "Z": 122 }, "Rotation": { "X": 0, "Y": 0, "Z": 0, "W": 1 } },
   "Changed": [
     { "Id": 1002, "Prefab": "asphalt_road", "Was": { "X": -130, "Y": 0.025, "Z": 66 },
-      "Position": { ... }, "Rotation": { ... }, "Scale": { ... }, "Name": null,
-      "Settings": { "Volume": "0.8" } }
+      "WasRotation": { ... }, "WasScale": { ... },
+      "Position": { ... }, "Rotation": { ... }, "Scale": { ... },
+      "Settings": { "Volume": "0.8", "Name": "Wharf Avenue" } }
   ],
   "Removed": [ { "Id": 1003, "Prefab": "concrete_floor", "Was": { ... } } ],
   "Added": [ { "Entity": { "EntityId": 900000001, "PrefabId": "ac_condenser", "Position": { ... } },
@@ -293,6 +296,8 @@ Selecting is not an operation: it changes nothing and is per player.
   and the log says so by name and place. So regenerating city.json after a street is added does not
   move the wrong wall.
 - Every operation and every undo writes the file at once (a temporary file, then a rename).
+- A change entry that is undone back to where, how turned and how big the map file has the thing, with
+  no settings, is dropped, so the file holds only real differences.
 - Laying the overlay twice changes nothing (positions and settings are absolute, an addition whose id is
   already there is skipped), so a map that has been /savemap'd with its edits in it loads the same.
 - /savemap still writes the map file as it was in memory. On a generated map that is the existing

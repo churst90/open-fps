@@ -186,6 +186,22 @@ public class WorldEditorTests : IDisposable
     }
 
     [Fact]
+    public void AMapFileThingUndoneBackToTheFileLeavesNothingInTheOverlay()
+    {
+        var rig = new Rig(_dir, UserRole.Player);
+        rig.On("mine");
+        rig.Run("edit", "select", "#1");
+        rig.Run("edit", "nudge", "east");
+        var change = Assert.Single(rig.Overlay("mine").Changed);
+        Assert.Equal(Vector3.Zero, change.Was);
+        rig.Run("edit", "undo");
+        Assert.Empty(rig.Overlay("mine").Changed);
+        // A setting keeps it, even where the file has it.
+        rig.Run("edit", "set", "name", "Slab");
+        Assert.Equal("Slab", Assert.Single(rig.Overlay("mine").Changed).Settings!["Name"]);
+    }
+
+    [Fact]
     public void SettingsChangeTheThingAndUndo()
     {
         var rig = new Rig(_dir, UserRole.Player);

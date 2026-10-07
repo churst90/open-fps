@@ -32,6 +32,10 @@ public sealed class OverlayChange
     public Vector3 Scale { get; set; } = Vector3.One;
     /// <summary>Its own settings (EntitySettings), by field path, as stored ("0.8", "Fountain").</summary>
     public Dictionary<string, string>? Settings { get; set; }
+    /// <summary>How the map file has it turned and scaled, so an entry that has been undone back to the
+    /// file can be dropped.</summary>
+    public Quaternion? WasRotation { get; set; }
+    public Vector3? WasScale { get; set; }
 }
 
 /// <summary>A thing from the map file that the editor removed.</summary>

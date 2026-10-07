@@ -4,6 +4,30 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-06
 
+- World editor, phase 1 (docs/WORLD_EDITOR.md; unheard). F12 opens it on a map you may edit:
+  developers and the administrator anywhere, a map's owner on that map, and the people the owner names
+  with `/map editor add NAME`. Others are told who it is for. You edit while you play; there is no
+  build mode.
+  - Menus: Map (information, set spawn here, editors), Place (prefabs by category, placed at your feet
+    or just in front of you if solid), Select (nearest, within 5, 10 or 20 metres, by name, by number),
+    the selected thing (move by numbers, nudge, turn, face, bring, duplicate, delete, settings, its
+    model), Library (every kind of model and its values), Test tools, Undo and Redo.
+  - The server builds every menu and the client only shows it, on the same lists as F5, F6 and F8.
+    Every item sends an `/edit` command, so the command line and the MUD do the same things; a text
+    player gets the menus as numbered lines.
+  - Kinds of model describe themselves: a `Tunable` attribute gives each value its spoken name, unit,
+    range, step, help and source, and the menus are made from it. Small machines (the condenser and
+    window AC units, the mowers) are described in full; the other kinds list their values read only
+    until described. A placed thing's own settings: name, width, height, depth, and a sound's volume,
+    range and minimum distance. Values outside the range are refused with the range said.
+  - Changing a model (needs `edit-models`) makes a new version in `model_versions/`, puts it in use on
+    every map, and sends it to every client, which restarts that model's voices.
+  - Undo and redo per editor; an undo is refused if somebody else has changed the thing since. A solid
+    thing is never placed or moved into a player. Other editors on the map are told of each change.
+  - Edits are kept in `maps/overlays/MAP.json` and laid over the map file at load. The map file is
+    never written, so city.json stays byte for byte what gen_city.py writes; an entry finds its thing
+    again by prefab and place if the generator renumbers.
+  - New messages EditorMenu (40) and ModelUpdate (41): the server and clients must be rebuilt together.
 - Inside a vehicle, its sound comes from where it gets in (unheard). Cody: "the inside of the cab of
   the cars sounds mono". It was one voice from one point ahead of you and below; the ears matched 0.97
   to 1.00 from 125 Hz to 1 kHz at a cruise. The interior model is now split into its paths, each played

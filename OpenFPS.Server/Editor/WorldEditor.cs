@@ -207,8 +207,8 @@ public sealed partial class WorldEditor
         var (lo, hi) = Box(world, e);
         var closest = Vector3.Clamp(feet, lo, hi);
         var flat = new Vector3(closest.X - feet.X, 0f, closest.Z - feet.Z);
-        bool insideXz = feet.X >= lo.X && feet.X <= hi.X && feet.Z >= lo.Z && feet.Z <= hi.Z;
-        bool contains = insideXz && feet.Y >= lo.Y - 0.25f && feet.Y <= hi.Y + 0.25f;
+        // Over or under it, or inside it: the ground you stand on, the room you are in, the roof above.
+        bool contains = feet.X >= lo.X && feet.X <= hi.X && feet.Z >= lo.Z && feet.Z <= hi.Z;
         var centre = world.Get<Transform>(e).Position;
         var toward = flat.LengthSquared() > 1e-6f ? flat : new Vector3(centre.X - feet.X, 0f, centre.Z - feet.Z);
         return (flat.Length(), toward, contains);
@@ -220,18 +220,19 @@ public sealed partial class WorldEditor
         if (contains)
         {
             var (lo, hi) = Box(world, e);
-            return hi.Y <= feet.Y + 0.3f ? "under you" : "around you";
+            return hi.Y <= feet.Y + 0.3f ? "under you" : lo.Y >= feet.Y + PhysicsConstants.PlayerHeight ? "above you" : "around you";
         }
         string dir = toward.LengthSquared() > 1e-6f ? DirectionWords.Relative(yaw, toward) : "here";
-        return $"{Metres(d)} {dir}";
+        return d < 0.05f ? $"beside you, {dir}" : $"{Metres(d)} {dir}";
     }
 
     private string Summary(UserSession s, World world, Entity e, int id)
     {
         if (!TryBody(s, _ => { }, out _, out var feet, out float yaw)) return NameOf(world, e);
         var t = world.Get<Transform>(e);
-        string size = world.Has<ColliderComponent>(e)
-            ? $", {FieldDescriptor.Format(world.Get<ColliderComponent>(e).Size.X)} by {FieldDescriptor.Format(world.Get<ColliderComponent>(e).Size.Z)} by {FieldDescriptor.Format(world.Get<ColliderComponent>(e).Size.Y)} metres high"
+        var z = world.Has<ColliderComponent>(e) ? world.Get<ColliderComponent>(e).Size : Vector3.Zero;
+        string size = z != Vector3.Zero
+            ? $", {FieldDescriptor.Format(z.X)} metres wide, {FieldDescriptor.Format(z.Z)} deep and {FieldDescriptor.Format(z.Y)} high"
             : "";
         string model = world.Has<SoundEmitterComponent>(e) && ModelKinds.TryModelOfSound(world.Get<SoundEmitterComponent>(e).SoundId, out var kind, out var mid)
             ? $", a {ModelKinds.Spoken(kind)}, model {mid}" : "";

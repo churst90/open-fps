@@ -318,14 +318,12 @@ public sealed partial class WorldEditor
         }
         else
         {
-            var c = o.ChangeFor(id);
-            if (c == null)
-            {
-                data.TryGetValue(id, out var was);
-                c = new OverlayChange { Id = id, Prefab = was?.PrefabId ?? PrefabOf(world, e), Was = was?.Position ?? pose.Position };
-                o.Changed.Add(c);
-            }
+            var c = ChangeEntry(o, mapId, id, world, e);
             c.Position = pose.Position; c.Rotation = pose.Rotation; c.Scale = pose.Scale;
+            // Back where the map file has it, with nothing else changed: nothing to keep.
+            if ((c.Settings == null || c.Settings.Count == 0) && c.WasRotation.HasValue && c.WasScale.HasValue
+                && pose.Near(new Pose(c.Was, c.WasRotation.Value, c.WasScale.Value)))
+                o.Changed.Remove(c);
         }
         if (data.TryGetValue(id, out var entry))
         {
@@ -334,18 +332,30 @@ public sealed partial class WorldEditor
         Overlays.Save(mapId);
     }
 
+    /// <summary>A map-file thing's change entry, made from how the map's data has it now if there is none.</summary>
+    private OverlayChange ChangeEntry(MapOverlay o, string mapId, int id, World world, Entity e)
+    {
+        var c = o.ChangeFor(id);
+        if (c != null) return c;
+        DataOf(mapId).TryGetValue(id, out var was);
+        var pose = PoseOf(world, e);
+        c = new OverlayChange
+        {
+            Id = id, Prefab = was?.PrefabId ?? PrefabOf(world, e), Was = was?.Position ?? pose.Position,
+            WasRotation = was?.Rotation, WasScale = was?.Scale,
+            Position = pose.Position, Rotation = pose.Rotation, Scale = pose.Scale,
+        };
+        o.Changed.Add(c);
+        return c;
+    }
+
     /// <summary>Keeps one setting of a thing in its overlay entry.</summary>
     private void KeepSetting(string mapId, int id, World world, Entity e, string path, string value)
     {
         var o = Overlays.Get(mapId);
         Dictionary<string, string> settings;
         if (o.AdditionFor(id) is { } a) settings = a.Settings ??= new Dictionary<string, string>();
-        else
-        {
-            if (o.ChangeFor(id) == null) Record(mapId, id, world, e);
-            var c = o.ChangeFor(id)!;
-            settings = c.Settings ??= new Dictionary<string, string>();
-        }
+        else settings = ChangeEntry(o, mapId, id, world, e).Settings ??= new Dictionary<string, string>();
         settings[EntitySettings.Named(path)?.Field.Path ?? path] = value;
         if (path.Equals("Name", StringComparison.OrdinalIgnoreCase) && DataOf(mapId).TryGetValue(id, out var entry)) entry.Name = value;
         Overlays.Save(mapId);
@@ -369,6 +379,7 @@ public sealed partial class WorldEditor
                                 Id = change.Id, Prefab = change.Prefab, Was = change.Was, Position = change.Position,
                                 Rotation = change.Rotation, Scale = change.Scale,
                                 Settings = change.Settings == null ? null : new Dictionary<string, string>(change.Settings),
+                                WasRotation = change.WasRotation, WasScale = change.WasScale,
                             },
                             change?.Was ?? entry?.Position ?? pose.Position);
     }

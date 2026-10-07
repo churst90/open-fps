@@ -92,7 +92,7 @@ public sealed partial class WorldEditor
                 var h = Models.History(kind, id);
                 if (h == null || h.Versions.Count == 0) { Say(reply, $"The {ModelKinds.Spoken(kind)} {id} has not been changed: version 0, as built."); return; }
                 Say(reply, string.Join(" ", h.Versions.OrderByDescending(v => v.Version).Select(v =>
-                    $"Version {v.Version} by {v.Author}, {v.SavedUtc:d MMMM HH:mm}: {v.Note}{(v.Version == h.Current ? ", in use" : "")}."))
+                    $"Version {v.Version} by {v.Author}, {v.SavedUtc.ToLocalTime():d MMMM HH:mm}: {v.Note}{(v.Version == h.Current ? ", in use" : "")}."))
                     + (h.Current == 0 ? " Version 0, as built, is in use." : ""));
                 return;
             }
