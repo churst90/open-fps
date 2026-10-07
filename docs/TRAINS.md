@@ -251,9 +251,17 @@ one chain per kind of bogie and one per kind of body: the wheel, rail and sleepe
 bogies through one chain are exactly forty through their own (measured +15.9 dB against the +16.0 of
 forty independent sources), each bogie's roughness being independent noise (one noise at the root of
 the sum of their squared weights) and each bogie's blows arriving at its own moment and weight from
-its own axle schedule. The freight's rolling stock costs 16 % of a core on one voice; through 154
-separate bogies it cost 104 %. A voice whose lane has not caught up renders nothing that pass; it never
-waits on a lock.
+its own axle schedule, worked out once per 256-sample block. In a debug build the freight's rolling
+stock costs 4 % of a core on one voice, and through 154 separate bogies it cost 104 %. In a release
+build the whole model with every bogie on its own (`--rail-cost`) is 70 % of a core, half of it its
+two diesels; the freight scene by the crossing kept the render pool's twelve workers 11 % busy. A
+voice never waits on a lock. When a lane is behind, the voice waits only while it has half its lead in
+hand. After that it renders without the late source, which fades out over 64 samples and back in when
+its lane catches up.
+
+A voice left with nothing in it plays silence for four seconds before it is let go, and a new group
+takes it first. As a train rounds a curve its groups merge and split, and this keeps that from
+starting and stopping voices: on a 150 m curve, 6 starts in 25 s.
 
 Everything is timed by one clock, the train's own timeline (256-sample blocks of speed, notch, head
 position and signals), so a source handed between voices is the same source at the same moment in

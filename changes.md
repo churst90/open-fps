@@ -21,14 +21,17 @@ Recent work, newest first. `git log` has the rest.
     without HRTF, no starves.
   - Every bogie of a train shared one track's filters, stepped once per bogie per sample, and a bogie
     radiated its roll and each blow separately: the rail's modes ran at many times their rate and folded
-    back as hiss (the freight's static: its 2-8 kHz octaves 6 to 13 dB over what they are now, against
-    the rest of its spectrum, in a capture of the session against a render from the same spot). Each
+    back as hiss (the freight's static: its 2, 4 and 8 kHz octaves 5, 8 and 2 dB over what they are now,
+    against the rest of its spectrum, in a capture of the session against a render from the same spot;
+    4.0 discontinuities a second in the capture, 0.4 to 0.7 in the render). Each
     bogie has its own track and radiates once a sample. The rolling anchor had been raised 12 dB to make
     up for the loss and is back at 92 dB (the six-coach train passes at 82 dB at 7.5 m at 80 km/h again);
     at 12 m the freight is as loud as before, the six-coach train 1 dB louder, the light rail 3 dB
     quieter. A bogie's declared level now carries the track's roughness, as its synth does.
   - A train first heard is already running: its diesels used to crank and catch each time it came into
-    earshot.
+    earshot. A train's voice left empty is held four seconds before it is let go (no voices coming and
+    going round a curve), and a voice whose diesel lane is late plays on without that engine for the
+    moment instead of starving whole.
   - A voice let go is released once its fade has been played, not when it was rendered up to 0.7 s
     earlier: every machine and car the budget gave up was cut at full level (the fountain, the gong).
   - The budgets take back what they give up: a voice comes back when the mixer has stayed 8 points
