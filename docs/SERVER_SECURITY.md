@@ -146,6 +146,28 @@ Game port (UDP 33288):
 - 4 connections per address, 200 in all.
 - New connections: 10 at once per address, then one every 2 seconds.
 - A message over 16 KB is dropped. A voice packet over 4,000 bytes is dropped.
+- A message in more than 64 fragments is dropped, and one sender may have at most 8 messages half
+  arrived (FragmentGuard, before LiteNetLib holds any of it).
+- 600 messages at once per connection, then 400 a second; the excess is dropped.
+- Only the messages a client sends are read. Each is checked against its own layout first
+  (WireCheck): a string that says it is longer than the message is refused.
+
+Per account (per connection before login), so reconnecting does not refill them
+(`MessageLimits`; see "Hardening, 2026-10-07" below):
+
+- Chat (plain typing, `/all`, `/pm`, `/t`): 6 lines at once, then one every 2 seconds. "You are
+  chatting too fast."
+- Commands, including every world editor menu choice: 20 at once, then 5 a second.
+- World editor changes: 20 at once, then 4 a second. Looking costs nothing (menus, select, find,
+  settings); a change costs 1; a row 1 plus a tenth of its length; placing a group or replacing a model
+  on one map 5; replacing everywhere 10. "Too many edits at once."
+- `/join`: 3 at once, then one every 10 seconds.
+- Voice: 100 packets at once, then 60 a second. Dropped without a word.
+- Lists (F5, F6, F8, I), the interact key and scoped shots: 10 at once, then 4 a second. Dropped.
+- The map's data is sent once per manifest.
+- Chat is at most 512 characters; a command at most 1,024 characters and 64 words. Both lose control
+  characters and the marks that reverse reading order.
+- Each limit that refuses something is logged once a minute per account, with how many times since.
 - A connection that has not logged in within 2 minutes is closed.
 - Voice is sent on as coming from the sender's own body, whatever the packet says.
 - Map data is sent only for the map the player is on.
@@ -228,6 +250,106 @@ Nothing else is needed. Delete the copy once the server is running normally.
 - No command to change a password; `OPENFPS_ADMIN_PASSWORD` resets only `admin`.
 - No ban. `/kick` disconnects, but the player can log straight back in.
 - The MUD port has no encryption.
-- LiteNetLib puts a fragmented message back together before the 16 KB check sees it, so one
-  connection can still make the server hold a large message for a moment. The per-address
-  connection limit bounds how many.
+- LiteNetLib still holds the fragments of a message until it is whole: at most 8 messages of 64
+  fragments per sender, about 700 KB, until the connection closes.
+- Clients read the server's messages with the same MemoryPack, unchecked: a hostile server could crash
+  a client. The server is trusted.
+- Chat typed on the MUD (`say`) is handled on the gateway's thread, not the tick thread.
+- model_versions/ keeps every version of every model in full and rewrites a model's file on each
+  change, on the tick thread. Only edit-models can add versions. See decision 3 below.
+
+## Hardening, 2026-10-07
+
+An audit of what a modified client could do now that players change the live world, and the fixes.
+Every fix has a test in `OpenFPS.Tests/ServerHardeningTests.cs` that failed before it (41 of the first
+57 failed; the crash took the test host down). Also checked live through the MUD on a scratch server.
+
+### Findings, worst first
+
+Critical:
+
+1. **One packet crashed the server, before login.** MemoryPack 1.21.4 reads a UTF-8 string by asking
+   for `~header + 4` bytes. A header of `int.MinValue` to `int.MinValue + 3` overflows that to a
+   negative size, its bounds check passes, and it reads 2 GB past the buffer: an
+   AccessViolationException, which no `catch` stops. Five bytes in a LoginRequest ended the process.
+   Not fixed upstream. Fixed: `WireCheck` walks every string of a client message before MemoryPack
+   reads it, from the message types' own fields.
+2. **`/saveas NAME` wrote anywhere.** The name was the file name as typed. Any player, on a map of their
+   own, could write `composites/../roles.json`, `../map_access.json`, a map, a prefab, or any absolute
+   path the server could write, as long as it ended `.json`. Fixed: a design's name is letters, digits,
+   `_` and `-`, checked in the command, in CompositeService and in CompositeRepository.
+3. **LiteNetLib held fragments without limit.** For each new fragment id it allocates an array of the
+   claimed part count (up to 65,535) and keeps it until the message is whole or the connection closes:
+   512 KB held per 1.4 KB packet, 65,536 ids per peer, for anybody connected. Fixed: `FragmentGuard`, a
+   LiteNetLib packet layer, drops a fragment claiming more than 64 parts, a sender's ninth half-arrived
+   message, and a merged packet whose parts run past the datagram.
+
+High:
+
+4. **A map's owner could point visitors' clients at any file.** `/set_sound`, `/play_folder` and
+   `/start_state` (everybody's on their own map) took any text, and every client on the map opens a
+   sound id as a file. `\\host\share\ASSETS\x` makes a Windows client connect to that host and send its
+   login hash; `../` and absolute paths read outside the game. Volumes of NaN and 1e30 went to every
+   visitor's mixer. Fixed: a sound id is a relative name under the sounds folder or a model id; a volume
+   is 0 to 4. The client also refuses any sound path outside ASSETS.
+5. **Premium items and things to carry could be made with the editor.** Only Place checked them.
+   Duplicate, Row, placing a group and replacing a prefab did not: a teleporter or a rifle on an owner's
+   map could be copied 5,000 times, and walls could be replaced with teleporters. Fixed.
+6. **No limits on what a logged-in client sends.** Chat (to everybody, read aloud), commands, editor
+   operations, voice (relayed to everybody on the map), list requests and the interact key could be sent
+   as fast as the network allowed, each costing the tick thread. Fixed: the limits above, per account.
+7. **Asking for the map's data again sent the whole map again.** A 20-byte request, repeated, made the
+   server send the city's tiles over and over. Fixed: once per manifest.
+8. **Editor batches were slow on the tick thread.** A row of 50 wrote the overlay file 50 times; a
+   replacement on a full map, thousands of times; undoing a row refiled the map 50 times (the live check
+   dropped 5 ticks). Fixed: one write and one refile per `/edit`.
+
+Medium:
+
+9. **The 5,000 cap could be got round.** Undoing a deletion and redoing a placing were not counted: with
+   a second editor placing in between, an owner's map grew without end. Replacing map-file things made
+   additions uncounted too. Fixed.
+10. **Chat and commands had no length or character rules over UDP.** An ANSI escape in chat reached
+    telnet players' terminals; a newline forged a line in the chat log. Fixed.
+11. **The server read its own message types if a client sent them.** ServerStateUpdate unpacks its bytes
+    as it is read. Fixed: only the 14 types a client sends are read, by their union tag.
+12. **No cap on messages per connection.** The incoming queue had no bound. Fixed.
+13. **Things could be moved anywhere.** 1,000 m per move, repeated without end; the held list and a
+    group's parts had no limit. Fixed: 20 km from the map's middle; 500 held, 500 parts.
+14. **Logs per packet.** The scoped-aim warning was one line per shot; a MUD registration that failed to
+    parse was logged with its password. Fixed: once a minute per player; the password is not logged.
+
+Low:
+
+15. Model and group ids accepted a trailing newline (`$` matches before one). Fixed (`\z`).
+
+### Checked and sound
+
+- Every `/edit`, typed or from the menu, goes through one permission check on the tick thread
+  (`edit`: the role, the owner, or a named editor). Model changes check `edit-models` in the command
+  and again in undo and redo. Pins need `edit` on that map; replacing everywhere and making groups need
+  `edit-models`. Model, group and map ids from players are looked up, never used as paths, except new
+  model ids, which are file names (checked).
+- Field values are checked against their `[Tunable]` ranges on the server; text fields have a length and
+  no control characters.
+- Input is finite, clamped and queue-bounded. Interact targets and boarding are on your own map and
+  within reach. Voice is sent on as the sender's own. Map data is only for your own map.
+- bcrypt at cost 12, constant time, a dummy hash for unknown names; logins off the tick thread, 8 at
+  once; per-address and per-name limits as above. Passwords are not logged. One session per account.
+
+### Wire
+
+No change: no new message, no field added. A client from before talks to a server from after. The
+client's sound path check is in the client only.
+
+### Decisions for Cody
+
+1. **The limits in play.** Chat 6 then one every 2 s; commands 20 then 5 a second; editor changes 20
+   then 4 a second; `/join` 3 then one every 10 s. Recommendation: keep, and raise any one he or a
+   friend runs into while playing honestly.
+2. **Line lengths.** Chat 512 characters, a command 1,024. Recommendation: keep (the MUD's line is 512).
+3. **model_versions.** Every change keeps the whole model again and rewrites the model's file on the tick
+   thread; a long tuning session on one engine is hundreds of versions and a file of megabytes.
+   Recommendation: no limit now (only developers can add versions); if a file passes 1,000 versions,
+   write model files off the tick thread and cap versions per model then.
+

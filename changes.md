@@ -4,6 +4,26 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- Server hardening against modified clients (docs/SERVER_SECURITY.md, "Hardening, 2026-10-07"; tests in
+  ServerHardeningTests). No wire change.
+  - One malformed string in any message, a LoginRequest before login included, crashed the server
+    (MemoryPack reads 2 GB past the buffer on an overflowing length). Every client message's strings are
+    now checked before it is read (WireCheck).
+  - `/saveas NAME` wrote NAME.json wherever NAME pointed (`../roles`, an absolute path), for any player on
+    their own map. Design names are now letters, digits, `_` and `-`.
+  - LiteNetLib held up to 512 KB per 1.4 KB packet for unfinished fragmented messages, for anybody
+    connected. A message is now at most 64 fragments and a sender has at most 8 half arrived.
+  - Sound ids players set (`/set_sound`, `/play_folder`, `/start_state`) are names under the sounds
+    folder: a network share made Windows visitors' clients send their login hash to it. Volumes are 0 to
+    4. The client opens no sound file outside ASSETS.
+  - Duplicate, row, groups and replace no longer make premium items or things to carry; undo and replace
+    count against the 5,000 cap; nothing goes more than 20 km out.
+  - Limits per account: chat 6 then one every 2 s, commands 20 then 5/s, editor changes 20 then 4/s by
+    size, `/join` 3 then one every 10 s, voice 100 then 60/s, lists and E 10 then 4/s; 600 then 400
+    messages a second per connection. Chat is 512 characters and commands 1,024, without control
+    characters. Map data is sent once per manifest. Abuse is logged once a minute.
+  - An `/edit` writes its overlay and refiles the map once, not once per thing (a row of 50 was 50 file
+    writes; undoing it dropped 5 ticks).
 - Voices are ranked by how loud they are to the ear (Cody's decision on finding 1 of
   docs/COVERAGE_2026-10-06.md). The voice budget and the machine budget used to rank on the gain the
   law plays a voice at, which includes the extra gain the law gives a sound the ear hears less of: a
