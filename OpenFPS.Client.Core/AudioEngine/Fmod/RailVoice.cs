@@ -430,7 +430,13 @@ public sealed class TrainSlotState : PhysicalVoiceState
     }
     private readonly List<Chain> _chains = new();
     private readonly Dictionary<object, int> _chainOf = new();
-    private readonly float[] _impacts = new float[AxleSchedule.MaxPerSample];
+
+    /// <summary>This block's blows, in the order they fall: the sample within the block, the chain, the
+    /// impact speed times the bogie's weight. Worked out once a block (AxleSchedule.AdvanceBlock).</summary>
+    private readonly List<(int At, int Chain, float Impact, float Weight)> _blows = new();
+    private readonly int[] _blowAt = new int[16];
+    private readonly float[] _blowImpact = new float[16];
+    private int _nextBlow;
 
     private TrainVoiceState.ClockBlock _block;
     private long _blockIndex = -1;
@@ -585,7 +591,23 @@ public sealed class TrainSlotState : PhysicalVoiceState
             _order.Remove(m);
             if (m.Ring != null && Shared.Train.Sources[i].Kind == TrainLayout.Kind.Horn) _carriesHorn = false;
         }
+
+        // Every carried bogie's blows in this block, at the sample each falls on. The block runs from the
+        // cursor to the end of the clock's block (the speed is steady across it).
+        _blows.Clear();
+        _nextBlow = 0;
+        int count = (int)(TrainVoiceState.BlockSamples - _cursor % TrainVoiceState.BlockSamples);
+        foreach (var m in _order)
+        {
+            if (m.Axles == null) continue;
+            int n = m.Axles.AdvanceBlock(_block.Speed, _dt, count, _blowAt, _blowImpact);
+            for (int j = 0; j < n; j++) _blows.Add((_blowAt[j], m.Chain, _blowImpact[j], m.Weight));
+        }
+        if (_blows.Count > 1) _blows.Sort(static (a, b) => a.At.CompareTo(b.At));
+        _blockStart = _cursor;
     }
+
+    private long _blockStart;
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     protected override float StepSynth()
@@ -598,10 +620,13 @@ public sealed class TrainSlotState : PhysicalVoiceState
         for (int k = 0; k < order.Count; k++)
         {
             var m = order[k];
-            if (m.Ring != null) { y += m.Weight * m.Ring[(int)(at & TrainVoiceState.RingMask)]; continue; }
-            if (m.Axles == null) continue;
-            int n = m.Axles.Advance(v, _dt, _impacts);
-            for (int j = 0; j < n; j++) _chains[m.Chain].Bogie!.Inject(_impacts[j], m.Weight);
+            if (m.Ring != null) y += m.Weight * m.Ring[(int)(at & TrainVoiceState.RingMask)];
+        }
+        int here = (int)(at - _blockStart);
+        while (_nextBlow < _blows.Count && _blows[_nextBlow].At <= here)
+        {
+            var b = _blows[_nextBlow++];
+            _chains[b.Chain].Bogie!.Inject(b.Impact, b.Weight);
         }
         for (int c = 0; c < _chains.Count; c++)
         {

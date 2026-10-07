@@ -285,6 +285,39 @@ and going choppy for the first seconds in a map. A real-time producer cannot sha
 background work, so the pool owns dedicated threads for its life. A quarter of the machine capped at
 six was the size when an engine cost a twentieth of a core.
 
+The workers share one sweep down the list (nearest first) instead of a fixed share each (2026-10-07).
+With fixed shares a worker held by one slow voice starved every voice in its share while the others
+had time: a fifty-wagon freight's 160 taps all took one train's lock, and each worker that reached
+one waited, so every car on that worker starved too (up to 3,224 starved blocks a second). A train
+renders without a lock now (docs/TRAINS.md, "Voicing a train"), and a slow voice holds up only itself.
+
+A voice let go fades on its envelope, and is released only once the mixer has played the fade. The
+fade is rendered with the rest of the ring, up to 0.7 s ahead; released when it was rendered, as it was
+until 2026-10-07, the voice was stopped at full level and the fade never heard. That was the fountain
+and the crossing bell "cutting out" each time the budget gave them up.
+
+## The budgets: giving voices up and taking them back
+
+The engine, machine, place and reflection budgets (ClientAudioSystem.ChooseLiveEngines) give a voice
+up when the mixer stays over 70 % for 0.75 s, when the render pool starves, and when fewer than six
+binaural voices are free; they take one back when the mixer has stayed 8 points under its ceiling for
+3 s, one step at a time. A voice costs the mixer about 0.3 % (Cody's city: 60 voices at 60 %, 200 at
+100 %). Most of the mixer is not voices: in `--train-scene cars=24` (31 voices, the mixer at about
+30 %) the six traced-echo rigs took 12 points, the binaural stages of all 31 voices 5, FMOD's own units
+and mixing 6. The "Mixer time" line (MixerProfile) says it for every second of a session.
+
+Until 2026-10-07 a voice was taken back only under 45 %, which the city's mixer never reached, so
+whatever was given up in the first thirty seconds after the map loaded (while its bake and decodes
+held the mixer at 74-108 %) stayed given up: the machines went from ten to one, the fountain, the
+crossing bell, the trees and every train shared that one voice for the hour, and sixteen cars stayed
+out of budget. Now the budget is held thirty seconds after a load, and one voice taken back and given
+up again within 15 s makes the next restore wait twice as long, up to four minutes, so the budget
+settles rather than churning at the ceiling. The machine budget counts voices (24), not things: a
+fountain is five voices and a train up to six.
+
+A voice the binaural pool has no stage for is not started (FmodAudioProvider.PlaySpatialSound),
+rather than played flat in the middle of the head; the budgets see it not playing and give voices up.
+
 ## Why an echo is smeared
 
 A reflection read straight out of the source's ring is the source's own waveform, sample for sample,

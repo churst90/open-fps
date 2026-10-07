@@ -428,4 +428,41 @@ internal sealed class AxleSchedule
         }
         return n;
     }
+
+    /// <summary>
+    /// Moves on <paramref name="count"/> samples at a steady <paramref name="v"/> m/s and writes the
+    /// sample within them and the impact speed of every axle that met something: the same moments
+    /// <see cref="Advance"/> finds sample by sample, worked out once for the block. Returns how many. A
+    /// voice carrying a hundred bogies asked each one every sample whether it had reached a joint.
+    /// </summary>
+    public int AdvanceBlock(float v, float dt, int count, Span<int> at, Span<float> impact)
+    {
+        double step = v * (double)dt;
+        double start = _distance;
+        _distance += step * count;
+        int n = 0;
+        if (step <= 0.0) return 0;
+        for (int i = 0; i < _axleOffset.Length; i++)
+        {
+            // Sample k (0-based) leaves the bogie at start + step·(k+1): the first k at which an axle is
+            // at or past the joint is the sample it strikes, as in Advance.
+            while (true)
+            {
+                double k = Math.Ceiling((_nextJoint[i] - _axleOffset[i] - start) / step) - 1.0;
+                if (k >= count || n >= at.Length) break;
+                _nextJoint[i] += _period;
+                at[n] = Math.Max(0, (int)k);
+                impact[n++] = _t.JointDipRadians * v * (0.8f + 0.4f * (float)_rng.NextDouble());
+            }
+            while (true)
+            {
+                double k = Math.Ceiling((_nextFlat[i] - _axleOffset[i] - start) / step) - 1.0;
+                if (k >= count || n >= at.Length) break;
+                _nextFlat[i] += _circ;
+                at[n] = Math.Max(0, (int)k);
+                impact[n++] = v * _w.FlatLengthMetres / MathF.Max(0.1f, _w.DiameterMetres);
+            }
+        }
+        return n;
+    }
 }
