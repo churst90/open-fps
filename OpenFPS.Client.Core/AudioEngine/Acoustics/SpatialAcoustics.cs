@@ -48,7 +48,6 @@ public class SpatialAcoustics
             {
                 IsReflection = true,
                 ReflectionId = a.SurfaceId,
-                ReflectionIndex = i,
                 ApparentPosition = a.ImagePosition,
                 EffectiveDistance = a.PathLength,
                 ReflectionDelayMs = a.ExtraDelaySeconds * 1000f,

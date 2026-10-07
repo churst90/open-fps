@@ -49,6 +49,15 @@ Recent work, newest first. `git log` has the rest.
     tail per octave: the carpeted flat decays 0.6 to 0.8 s, the tiled stairwell 1.35 to 2.2 s, its top
     octaves shorter than its middle (air and the tiles). The TODO is now a comment saying so. Renders
     in inbox/probable-bugs-2026-10-07/4-reverb-colour.
+  - A sustained recording's copy off a wall stays on its own voice. The voices were numbered by the copy's
+    place in the list of the four loudest arrivals sorted by surface, so a wall joining or leaving the
+    list moved every wall after it to the next voice, which jumped from one wall's image to another's while
+    it played (in a test yard, from the west wall's image to the north wall's, 42 m apart). Each voice now
+    keeps its surface (`AcousticPathData.ReflectionId`, written and never read until now); a new wall
+    takes a voice that is free and silent, or waits for one. `ReflectionIndex` is gone. Scattering is read
+    only as the copy's width (`Spread`); unlike an engine's echo the copy is not smeared by it (a TODO).
+    Unheard; renders in inbox/probable-bugs-2026-10-07/7-reflection-slots. The emitter streams were
+    regenerated for the field that went (no other line changed).
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream

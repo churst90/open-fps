@@ -19,17 +19,18 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --probable-bugs scene=pa|landing|bell|rooms [out=DIR] [room=flat|stair]: the sounds the probable bugs
+/// --probable-bugs scene=pa|landing|bell|yard|rooms [out=DIR] [room=flat|stair]: the sounds the probable bugs
 /// of 2026-10-07 change, rendered through the game's own mixer for a before and an after.
 ///
 ///   pa       a public-address speaker (a recording of speech) on a 4 m pole, from 10 and 30 m, over
 ///            asphalt: whether a sustained recording gets the ground reflection.
 ///   landing  your own jump landings on concrete and on wood, with a few steps on each for scale.
 ///   bell     the crossing gong, the tram gong and the locomotive bell ringing, 5 m off.
+///   yard     the PA in a yard walled in concrete, walked round at 1.4 m/s: the walls' copies of it.
 ///   rooms    four claps in a carpeted flat or a tiled stairwell (room=), the listener's traced tail
 ///            and the placed copies, as --clap-room does: whether the room's colour reaches the tail.
 ///
-/// The first three are the whole client path (a ClientAudioSystem over the facade over the
+/// All but rooms are the whole client path (a ClientAudioSystem over the facade over the
 /// FmodAudioProvider, as --game-levels): the loudness law at the default /levels, the master and the
 /// HRTF. Output: DIR/capture.wav and DIR/segments.csv for tools/game_levels.py. The rooms scene drives
 /// the provider directly (there is no map) and writes DIR/capture-ROOM.wav.
@@ -184,6 +185,53 @@ public static class ProbableBugsSpike
                     Remove(id);
                     Pump(3.0);
                 }
+            }
+            else if (scene == "yard")
+            {
+                // A yard walled in concrete, 30 m square, the PA in it, and you walking round it at 1.4 m/s:
+                // each wall's copy of the speech, and whether it stays on its wall.
+                int wall = 2;
+                void Solid(Vector3 centre, Vector3 size) => world.RegisterDefinition(new EntityDefinition
+                {
+                    EntityId = wall++, Type = EntityType.StaticObject,
+                    Transform = new Transform { Position = centre, Rotation = Quaternion.Identity, Scale = Vector3.One },
+                    Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = size, IsSolid = true },
+                    Material = new MaterialComponent { Material = "Concrete" },
+                });
+                Solid(new Vector3(15.25f, 3f, 0f), new Vector3(0.5f, 6f, 31f));
+                Solid(new Vector3(-15.25f, 3f, 0f), new Vector3(0.5f, 6f, 31f));
+                Solid(new Vector3(0f, 3f, 15.25f), new Vector3(31f, 6f, 0.5f));
+                Solid(new Vector3(0f, 3f, -15.25f), new Vector3(31f, 6f, 0.5f));
+                var speaker = new Vector3(3f, 2f, 4f);
+                const float Radius = 11f, Speed = 1.4f;
+                double t0 = clock.Elapsed.TotalSeconds;
+                Vector3 At(double t) { float a = (float)((t - t0) * Speed / Radius); return new Vector3(Radius * MathF.Cos(a), 0f, Radius * MathF.Sin(a)); }
+                Stand(At(t0), speaker);
+                int id = AddEmitter("ANNOUNCE/st_louis_welcome", false, speaker, 400f, 12f);
+                // The walls' copies play under ClientAudioSystem.ReflectionVoiceId's ids: say how many, and
+                // count the times one of them moved more than a metre while it played (handed to another wall).
+                var lastAt = new Dictionary<int, Vector3>();
+                int jumps = 0; double nextSay = t0 + 5.0;
+                perFrame = t =>
+                {
+                    Stand(At(t), speaker);
+                    int playing = 0;
+                    for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
+                    {
+                        int voice = -30000 - id * (EarlyReflections.MaxArrivals + 1) - slot;
+                        if (!facade.IsPlaying(voice)) { lastAt.Remove(voice); continue; }
+                        playing++;
+                        var p = provider.GetSoundPosition(voice);
+                        if (lastAt.TryGetValue(voice, out var was) && Vector3.Distance(was, p) > 1f) jumps++;
+                        lastAt[voice] = p;
+                    }
+                    if (t >= nextSay) { nextSay += 5.0; Console.WriteLine($"    {t - t0,5:F1} s: {playing} wall copies playing, {jumps} jump(s) so far"); }
+                };
+                Pump(2.0);
+                Record("yard walk round the pa", 40.0);
+                perFrame = null;
+                Remove(id);
+                Pump(1.5);
             }
             else { Console.WriteLine($"No scene '{scene}'."); return 1; }
             Record("silence end", 1.0);

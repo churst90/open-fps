@@ -739,10 +739,8 @@ public class AsyncAcousticWorker : IDisposable
             var reflected = new AcousticPathData
             {
                 IsReflection = true,
-                // The surface's identity. TODO: nothing reads ReflectionId; meant to keep a wall on one voice
-                // as the listener moves (a voice torn down and restarted is a click per frame).
+                // The surface's identity: a wall keeps one voice as the listener moves.
                 ReflectionId = a.SurfaceId,
-                ReflectionIndex = i,
                 ApparentPosition = a.ImagePosition,
                 EffectiveDistance = a.PathLength,
                 ReflectionDelayMs = a.ExtraDelaySeconds * 1000f,

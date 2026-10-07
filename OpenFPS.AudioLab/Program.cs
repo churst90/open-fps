@@ -69,7 +69,7 @@ string[] usage =
     "  --car-fronts [preset ...] [out= tag= ambient=] the whole voice from in front, behind, and passing at 10 km/h",
     "  --binaural-input                              a mono voice through the binaural stage in FMOD against the HRTF alone",
     "  --game-levels [out=DIR] [set=measure|render|compare|all|faults] [cars=a,b]  one thing at a time through the real mixer, captured",
-    "  --probable-bugs scene=pa|landing|bell|rooms [out=DIR] [room=flat|stair]  the 2026-10-07 probable bugs through the real mixer, captured",
+    "  --probable-bugs scene=pa|landing|bell|yard|rooms [out=DIR] [room=flat|stair]  the 2026-10-07 probable bugs through the real mixer, captured",
     "  --wide-sources [out=DIR] [set=measure|render|level|all] [wide=on|off] [sec=]  a tree, the fountain, the fire and rain through the game path, for interaural coherence",
     "  --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]  texture statistics and game-level texture files",
     "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
