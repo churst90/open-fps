@@ -52,7 +52,8 @@ public static class ExtendedSources
     public static int TreePlaces = int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_WIDE_TREE_PLACES"), out int t) && t >= 1
         ? Math.Min(t, FoliageSynth.Boughs) : FoliageSynth.Boughs;
 
-    /// <summary>How many places a fire's bed is heard from round its flames.</summary>
+    /// <summary>How many places a fire pit's bed is heard from round its flames; a bigger fire says its own
+    /// (FireSpec.Places, FireSynth.Layout).</summary>
     public const int FirePlaces = 3;
 
     /// <summary>How many places each tap of a water feature is heard from round its middle.</summary>
@@ -148,8 +149,9 @@ public static class ExtendedSources
                 if (key.StartsWith("fire:", StringComparison.OrdinalIgnoreCase))
                 {
                     var spec = FireSpec.ByName(key[5..]);
-                    var places = new Vector3[1 + FirePlaces];
-                    for (int j = 0; j < FirePlaces; j++) places[1 + j] = FireSynth.PlaceOffset(spec, j, FirePlaces) * LayoutScale;
+                    var places = FireSynth.Layout(spec);
+                    if (places.Length <= 1) return null;
+                    for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
                     return places;
                 }
             }

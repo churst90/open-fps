@@ -514,6 +514,13 @@ if (args.Contains("--nature"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.NatureSpike.Run(args));
 }
 
+if (args.Contains("--fire"))
+{
+    // --fire [levels|render out=DIR|game out=DIR set=] [preset ...] [sec= wind= age= heard= parts=]:
+    // fires from a campfire to a crown fire from their model (docs/FIRE.md).
+    Environment.Exit(OpenFPS.AudioLab.Spikes.FireSpike.Run(args));
+}
+
 if (args.Contains("--waves"))
 {
     // --waves [levels|sea|render out=DIR|game out=DIR set=] [preset ...] [sec= wind= fetch= parts=]:
