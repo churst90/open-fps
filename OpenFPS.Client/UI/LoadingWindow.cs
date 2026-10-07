@@ -39,13 +39,14 @@ public sealed class LoadingWindow : Form
         Shown += (_, _) => _status.Focus();
     }
 
-    /// <summary>A new stage of the load: shown, and spoken once.</summary>
-    public void ShowStatus(string text)
+    /// <summary>A new stage of the load: shown, and spoken once unless <paramref name="speak"/> is false
+    /// (a login: "Reconnected." or the arrival line says it, and this would cut either off).</summary>
+    public void ShowStatus(string text, bool speak = true)
     {
         _status.Text = text;
         _progress.Value = 0;
         // NVDA reads the field as it takes focus; SAPI has nobody reading it, so it is spoken.
-        if (!_speech.ScreenReaderRunning) _speech.Speak(text, interrupt: true);
+        if (speak && !_speech.ScreenReaderRunning) _speech.Speak(text, interrupt: true);
     }
 
     public void UpdateStatus(string text, int percent)

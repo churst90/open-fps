@@ -52,7 +52,8 @@ public class PresenceTests : IDisposable
 
     private async Task<UserSession> LogIn(int connection, string name)
     {
-        await _server.Login(connection, new LoginRequest { Username = name, Password = "correct horse" }, _ => { });
+        await _server.Login(connection, new LoginRequest { Username = name, Password = "correct horse" }, _ => { })
+            .Within(TestDeadline.Login, $"{name}'s login");
         _server.DrainCommandBuffer();
         Assert.True(_sessions.TryGetSession(connection, out var session));
         return session;

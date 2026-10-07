@@ -64,10 +64,10 @@ public sealed class ClientNavigationService : ApplicationContext
         SwitchTo(_menu);
     });
 
-    public void ShowLoading(string status) => EnqueueUIAction(() =>
+    public void ShowLoading(string status, bool speak = true) => EnqueueUIAction(() =>
     {
         if (_loading == null || _loading.IsDisposed) _loading = _loadingFactory();
-        _loading.ShowStatus(status);
+        _loading.ShowStatus(status, speak);
         // Over the menu, not instead of it: a login that fails after this goes back to the connect form.
         if (!_loading.Visible) _loading.Show(Menu);
         _loading.Activate();

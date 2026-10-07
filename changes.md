@@ -4,6 +4,28 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- The CI hang (run 37576816453, shard 2: `PresenceTests.ALoginIsAnnouncedToEveryoneElseOnTheAllChannel`
+  silent for 30 minutes). Not SQLite: every `ClientGameSession` a test built, sound or not, queued the
+  whole door prewarm (164 renders) on the thread pool, and a pool thread that finished one took the next
+  from its own queue before anything else. After WorldEditorClientTests' five sessions a work item
+  waited 71 s on twelve cores; on a 4-core runner the login's password check (a `Task.Run`) waited past
+  the hang timeout. The prewarm now runs on four threads of its own, so the pool stays free in the game
+  too (the rain survey, route builds, a first-heard sound waited behind it), and a session without
+  sound renders nothing. Tests that wait on a login or registration fail after 60 s with the pool's
+  state (`TestDeadline`) instead of hanging. The `SqliteConnection.ClearAllPools()` calls in seven
+  classes cannot race another class's connections: the assembly runs one test at a time.
+- Windows client against the GTK client. The world editor, the new messages, the driving keys,
+  /editorkeys, the settings' driving switches and the game menu's cues are all in the shared session
+  or already there; what differed was in the head:
+  - Every spoken line is logged as `[SAY]`, as on Linux; the log is the only record from the Windows
+    player. A change between NVDA and SAPI is logged and silences SAPI, a line NVDA refuses goes to SAPI,
+    and SAPI is called under one lock.
+  - The loading screen honours the session's "do not speak this" ("Logging in..." cut off
+    "Reconnected." through SAPI).
+  - The keypad with Num Lock off reached the game: Windows reports keypad 8 as Up and keypad period as
+    Delete, told apart from the arrows only by the extended-key flag. Dropped, as GTK does.
+  - The key help in the game window names the driving keys.
+
 - Housekeeping (docs/HOUSEKEEPING.md) of the server, Geometry, Native and both client heads. No
   behaviour, sound or wire change: the render fingerprints, the emitter stream replay and the library
   boundary pass unregenerated.

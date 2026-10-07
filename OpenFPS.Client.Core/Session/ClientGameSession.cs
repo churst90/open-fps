@@ -55,6 +55,7 @@ public sealed partial class ClientGameSession : IDisposable
     private readonly AudioEngineFacade _audioEngine;
     private readonly SoundMappingService _sounds;
     private readonly ClientAudioSystem _audioSystem;
+    internal ClientAudioSystem AudioSystemForTest => _audioSystem;
     private readonly PredictionReconciler _reconciler;
     private readonly ChatManager _chat;
 
@@ -160,7 +161,9 @@ public sealed partial class ClientGameSession : IDisposable
         _controller = new LocalPlayerController(_state);
         _others = new OtherBodies();
         _sounds = new SoundMappingService(_state);
-        _audioSystem = new ClientAudioSystem(_audioEngine, _sounds, _state);
+        // Without sound (the tests) no doors are rendered: each session's renders took minutes of every
+        // core, and the next test's login waited behind them.
+        _audioSystem = new ClientAudioSystem(_audioEngine, _sounds, _state, prewarm: enableAudio);
         _chat = new ChatManager(_speech);
         Ui = new UiSounds(audioEngine);
         _menus = new MenuStack(_speech, Ui);
@@ -473,6 +476,8 @@ public sealed partial class ClientGameSession : IDisposable
         "N turns the narration of what is ahead, as you turn and move and as things pass, on or off.",
         "G take, Q drop, Shift+R draw, T clap or ignition.",
         "R: with a gun, reload; in a vehicle, the window; otherwise put what you hold on your back.",
+        "Driving: T engine on, Shift T off, H held the horn, U siren, Shift U its tone, J and L indicators, K lane assist,",
+        "Shift K all driving sounds, Z the road, Shift H your health.",
         "Scope, on the keypad with Num Lock on: star raises it, 8 2 4 6 aim, 5 what is on the crosshair, 7 and 9 the targets in view,",
         "plus and minus zoom, 1 and 3 the turret, period the rangefinder, 0 held to hold your breath, slash or Enter to fire.",
         "V voice, F5 players, F6 maps, F8 friends, F12 the world editor, brackets to read chat, slash for the command console.",

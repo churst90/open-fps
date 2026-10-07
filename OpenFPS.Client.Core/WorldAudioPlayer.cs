@@ -233,19 +233,31 @@ public sealed class WorldAudioPlayer
     /// </summary>
     private void PrewarmDoors()
     {
-        var gate = new System.Threading.SemaphoreSlim(4);
+        var keys = new System.Collections.Concurrent.ConcurrentQueue<string>();
         foreach (string key in PrewarmKeys())
-        {
-            string id = $"synth:{key}";
-            if (!_rendering.Add(id)) continue;
-            System.Threading.Tasks.Task.Run(async () =>
+            if (_rendering.Add($"synth:{key}")) keys.Enqueue(key);
+
+        // Threads of their own, never the pool: a pool thread that finished a render took the next from
+        // its own queue first, so every other Task.Run (rain survey, route build, a first-heard sound)
+        // waited for the doors. 71 s on twelve cores; a CI login past a 30-minute timeout (2026-10-07).
+        for (int t = 0; t < PrewarmThreads; t++)
+            new System.Threading.Thread(() =>
             {
-                await gate.WaitAsync();
-                try { _rendered.Enqueue(AtMixerRate(id, RenderDoorKey(key, _fullScaleDb))); }
-                finally { gate.Release(); }
-            });
-        }
+                while (keys.TryDequeue(out var key))
+                {
+                    string id = $"synth:{key}";
+                    try { _rendered.Enqueue(AtMixerRate(id, RenderDoorKey(key, _fullScaleDb))); }
+                    // An exception here would end the process; a door that will not render is silent.
+                    catch (Exception ex) { Serilog.Log.Warning(ex, "[DOOR] prewarm of {Key} failed", key); }
+                }
+            }) { IsBackground = true, Name = "Door prewarm" }.Start();
     }
+
+    /// <summary>Door renders made at once while prewarming.</summary>
+    private const int PrewarmThreads = 4;
+
+    /// <summary>Sounds asked for and not yet handed to the mixer: the prewarm, until the first update.</summary>
+    internal int RendersOutstanding => _rendering.Count;
 
     /// <summary>
     /// Every door model render the city's doors and the cars' windows ask for, the commonest first: a knob

@@ -34,6 +34,10 @@ public sealed class NvdaSpeechOutput : ISpeechOutput
     private bool _nvda;
     private long _checkedAt;
     private SpeechSynthesizer? _sapi;
+    // Lines come from the game loop, the UI thread and the audio thread at once, and SAPI's
+    // synthesiser is not safe to call from two of them.
+    private readonly object _speaking = new();
+    private bool _lastWasNvda;
 
     public string BackendName => ScreenReaderRunning ? "NVDA" : "SAPI 5";
 
@@ -67,6 +71,7 @@ public sealed class NvdaSpeechOutput : ISpeechOutput
     public bool Initialize()
     {
         bool nvda = ScreenReaderRunning;
+        _lastWasNvda = nvda;
         Serilog.Log.Information("Speech output: {Backend}", nvda ? "NVDA" : "SAPI 5 (NVDA is not running)");
         return nvda || Sapi() != null;
     }
@@ -87,25 +92,50 @@ public sealed class NvdaSpeechOutput : ISpeechOutput
         return _sapi;
     }
 
+    /// <summary>
+    /// Whether this line goes to NVDA. On a change the backend being left is silenced once and the
+    /// change is logged, as on Linux: neither backend knows the other is talking.
+    /// </summary>
+    private bool UseNvda()
+    {
+        bool nvda = ScreenReaderRunning;
+        if (nvda == _lastWasNvda) return nvda;
+        if (nvda) _sapi?.SpeakAsyncCancelAll();
+        _lastWasNvda = nvda;
+        Serilog.Log.Information("Speech now goes through {Backend}.", nvda ? "NVDA" : "SAPI 5");
+        return nvda;
+    }
+
     public void Speak(string text, bool interrupt = true)
     {
         if (string.IsNullOrEmpty(text)) return;
-        if (ScreenReaderRunning)
+        // Every spoken line in the log, as on Linux: the player's log is the only record of what the
+        // game said to them on Windows.
+        Serilog.Log.Information("[SAY] {Text}", text);
+        lock (_speaking)
         {
-            if (interrupt) NvdaNative.nvdaController_cancelSpeech();
-            NvdaNative.nvdaController_speakText(text);
-            return;
+            if (UseNvda())
+            {
+                if (interrupt) NvdaNative.nvdaController_cancelSpeech();
+                if (NvdaNative.nvdaController_speakText(text) == 0) return;
+                // NVDA went away inside the two seconds its answer is kept: this line goes to SAPI.
+                lock (_gate) _checkedAt = 0;
+                if (UseNvda()) return;
+            }
+            var sapi = Sapi();
+            if (sapi == null) return;
+            if (interrupt) sapi.SpeakAsyncCancelAll();
+            sapi.SpeakAsync(text);
         }
-        var sapi = Sapi();
-        if (sapi == null) return;
-        if (interrupt) sapi.SpeakAsyncCancelAll();
-        sapi.SpeakAsync(text);
     }
 
     public void Interrupt()
     {
-        if (ScreenReaderRunning) NvdaNative.nvdaController_cancelSpeech();
-        else _sapi?.SpeakAsyncCancelAll();
+        lock (_speaking)
+        {
+            if (UseNvda()) NvdaNative.nvdaController_cancelSpeech();
+            else _sapi?.SpeakAsyncCancelAll();
+        }
     }
 
     public void Dispose() => _sapi?.Dispose();

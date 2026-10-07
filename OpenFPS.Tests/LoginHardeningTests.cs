@@ -436,7 +436,8 @@ public class LoginHardeningTests : IDisposable
     private static async Task<List<IMessage>> LogIn(GameServer server, int connection, string user, string password)
     {
         var replies = new List<IMessage>();
-        await server.Login(connection, new LoginRequest { Username = user, Password = password }, replies.Add);
+        await server.Login(connection, new LoginRequest { Username = user, Password = password }, replies.Add)
+            .Within(TestDeadline.Login, $"{user}'s login");
         server.DrainCommandBuffer();
         return replies;
     }
@@ -514,7 +515,8 @@ public class LoginHardeningTests : IDisposable
         async Task<RegisterResponse> Register(string user, string password)
         {
             var replies = new List<IMessage>();
-            await server.Register(10001, new RegisterRequest { Username = user, Password = password }, replies.Add);
+            await server.Register(10001, new RegisterRequest { Username = user, Password = password }, replies.Add)
+                .Within(TestDeadline.Login, $"{user}'s registration");
             server.DrainCommandBuffer();
             return Assert.IsType<RegisterResponse>(Assert.Single(replies));
         }

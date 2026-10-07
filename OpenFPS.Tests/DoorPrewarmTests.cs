@@ -6,6 +6,8 @@ using Arch.Core;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core;
+using OpenFPS.Client.Core.Platform;
+using OpenFPS.Client.Core.Session;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
@@ -107,5 +109,39 @@ public class DoorPrewarmTests
             DoorRenderCache.Folder = was;
             try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
         }
+    }
+
+    /// <summary>A session with no sound (every test that builds one) renders no doors. Each one rendered the
+    /// whole list on the thread pool, minutes of every core, and on a 4-core CI runner the next test's
+    /// password check waited behind them past the 30-minute hang timeout (2026-10-07).</summary>
+    [Fact]
+    public void ASessionWithoutSoundRendersNoDoors()
+    {
+        var session = new ClientGameSession(new ClientNetworkService(), new Silent(), new NoShell(), new AudioEngineFacade(),
+            microphone: new NullMicrophoneCapture("none"), enableAudio: false);
+        Assert.Equal(0, session.AudioSystemForTest.WorldAudio.RendersOutstanding);
+    }
+
+    private sealed class Silent : ISpeechOutput
+    {
+        public string BackendName => "test";
+        public bool Initialize() => true;
+        public void Speak(string text, bool interrupt = true) { }
+        public void Interrupt() { }
+        public void Dispose() { }
+    }
+
+    private sealed class NoShell : IClientShell
+    {
+        public bool IsGameInputActive { get; set; } = true;
+        public event Action<string>? CommandEntered { add { } remove { } }
+        public void ShowLoading(string status, bool speak = true) { }
+        public void UpdateLoadingStatus(string text, int percent) { }
+        public void EnterGame() { }
+        public void OpenCommandConsole() { }
+        public void OpenCommandConsole(string initialText) { }
+        public void ShowGameMenu(Action<GameMenuChoice> chosen) { }
+        public void ReturnToMenu() { }
+        public void Quit() { }
     }
 }
