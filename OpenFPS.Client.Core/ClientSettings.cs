@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text.Json;
 
 namespace OpenFPS.Client.Core;
@@ -42,18 +38,17 @@ public sealed class ClientSettings
     public List<SavedServer> Servers { get; set; } = new();
 
     /// <summary>
-    /// How much of the real difference in loudness between sounds reaches the mix: 1 is real life,
-    /// lower squeezes loud and quiet together (see Loudness.DynamicRangeCompression). Set with
-    /// `/levels` in game. The live value is the truth: <see cref="Save"/> records it.
+    /// How much of the real difference in loudness reaches the mix: 1 is real life, lower squeezes loud
+    /// and quiet together (Loudness.DynamicRangeCompression, `/levels`). <see cref="Save"/> records the
+    /// live value.
     /// </summary>
     public float LevelCompression { get; set; } = OpenFPS.Common.Loudness.DefaultCompression;
 
     /// <summary>
-    /// How loud your headphones play the game: the level, dB SPL at your ears, of a normal voice at arm's
-    /// length as the game plays it. 62.35 (the default) is that voice as loud as life, conversational.
-    /// Set by ear with `/listening`, or `/listening 58`. It changes no level in the
-    /// mix, only how much of a sound's tone the ear model gives back at the level it plays at
-    /// (docs/EAR_MODEL.md). The live value is the truth: <see cref="Save"/> records it.
+    /// How loud the headphones play: dB SPL at the ears of a normal voice at arm's length as the game
+    /// plays it; 62.35, the default, is as loud as life. Set by ear with `/listening`. It changes no level
+    /// in the mix, only how much tone the ear model gives back (docs/EAR_MODEL.md). <see cref="Save"/>
+    /// records the live value.
     /// </summary>
     public float ListeningLevelDb { get; set; } = OpenFPS.Common.Hearing.EarModel.DefaultListeningLevelDb;
 
@@ -188,10 +183,9 @@ public sealed class ClientSettings
 }
 
 /// <summary>
-/// The live switches for the two navigation aids, which the game reads and a key or a command flips.
-/// Static, like Loudness.DynamicRangeCompression and for the same reason: a head holds its own copy of
-/// <see cref="ClientSettings"/> for the life of the run, and the live value is what
-/// <see cref="ClientSettings.Save"/> must write, whoever saves.
+/// The live switches for the navigation aids, which a key or a command flips. Static, like
+/// Loudness.DynamicRangeCompression: a head keeps its own copy of <see cref="ClientSettings"/> for the
+/// run, and the live value is what <see cref="ClientSettings.Save"/> must write, whoever saves.
 /// </summary>
 public static class NavigationAids
 {

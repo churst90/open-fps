@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
@@ -10,23 +7,15 @@ using OpenFPS.Client.AudioEngine.Core.Signals;
 namespace OpenFPS.Client.AudioEngine.Core.Rail;
 
 /// <summary>
-/// A whole train, as a line of sources strung out along the track.
+/// A whole train, as a line of sources strung out along the track (docs/TRAINS.md).
 ///
-/// THIS IS THE POINT OF THE WHOLE FILE: a train is not a thing at a place. A six-coach Amtrak is a
-/// hundred and seventy metres long and a fifty-wagon freight is nearly a kilometre, and the
-/// difference between a train going past and a lorry going past is not timbre, it is that the train
-/// ARRIVES FOR A MINUTE. Every bogie is its own source with its own distance, its own Doppler and
-/// its own arrival time, and everything people recognise falls out of that and out of nothing else:
-/// the level that rises and then sits on a plateau instead of peaking (a line source falls off by
-/// three decibels a doubling, not six, until you are further away than it is long); the clatter
-/// sweeping down the train past you; the way the far end of a long freight is a different, duller
-/// sound than the near end because the air has taken the top off it.
-///
-/// So <see cref="Sources"/> is the deliverable. Each one knows how far behind the head of the train
-/// it sits and what it is emitting in pascals at a metre; where they are heard is the renderer's or
-/// the mixer's business. A bogie is one source because the axles of a bogie share a rail and a
-/// sleeper bay; two bogies of the same coach are two sources because they are eighteen metres apart
-/// and the ear can hear that.
+/// A six-coach train is 170 m long and a fifty-wagon freight nearly a kilometre: a train arrives for
+/// a minute. Every bogie is its own source with its own distance, Doppler and arrival time, and the
+/// plateau of level (a line source falls three decibels a doubling until you are further than it is
+/// long), the clatter sweeping past and the duller far end all fall out of that.
+/// <see cref="Sources"/> is the deliverable: each knows how far behind the head it sits and what it
+/// emits in pascals at a metre. A bogie's axles share a rail and are one source; two bogies eighteen
+/// metres apart are two.
 /// </summary>
 public sealed class TrainSynth
 {
@@ -38,8 +27,8 @@ public sealed class TrainSynth
         public required float AlongMetres { get; init; }
         /// <summary>Metres above the railhead.</summary>
         public float HeightMetres { get; init; } = 0.5f;
-        /// <summary>The size of the thing, metres — a bogie is small, a locomotive body is not.
-        /// The renderer uses it to stop the inverse square from running away at close range.</summary>
+        /// <summary>The size of the thing, metres: what keeps the inverse square from running away
+        /// at close range.</summary>
         public float ExtentMetres { get; init; } = 1.5f;
         /// <summary>Pascals at one metre, valid after Step().</summary>
         public float Out { get; internal set; }
@@ -71,8 +60,6 @@ public sealed class TrainSynth
     public bool HornBlowing { get => _horn?.Blowing ?? false; set { if (_horn != null) _horn.Blowing = value; } }
     public bool WhistleBlowing { get => _whistle?.Blowing ?? false; set { if (_whistle != null) _whistle.Blowing = value; } }
     public bool BellRinging { get => _bell?.Ringing ?? false; set { if (_bell != null) _bell.Ringing = value; } }
-    public SteamFrontEnd? Steam => _steam;
-    public EngineSynth? Diesel => _diesel;
     /// <summary>Every prime mover in the consist, lead unit first.</summary>
     public IReadOnlyList<EngineSynth> Diesels => _diesels;
 
@@ -103,9 +90,7 @@ public sealed class TrainSynth
         for (int b = 0; b < v.Bogies; b++)
         {
             float at = v.Bogies == 1 ? mid : mid + (b - (v.Bogies - 1) * 0.5f) * v.BogieCentresMetres;
-            // On a curve a rigid wheelset cannot point where it is going: the creep angle it is
-            // forced into is about half the bogie's wheelbase over the radius. Below a few
-            // milliradians nothing happens; past it, the wheel sings.
+            // On a curve the creep angle is about half the bogie's wheelbase over the radius.
             float creep = Profile.Track.CurveRadiusMetres > 1f
                 ? 0.5f * v.BogieWheelbaseMetres / Profile.Track.CurveRadiusMetres
                 : 0f;
@@ -162,8 +147,7 @@ public sealed class TrainSynth
             }
             case RailTraction.Electric when tr.Drive != null:
             {
-                // The motors are ON the bogies, not in the middle of the car — which is why an
-                // electric train's whine sweeps past you twice.
+                // The motors are on the bogies: an electric train's whine sweeps past twice.
                 for (int b = 0; b < v.Bogies; b++)
                 {
                     float at = v.Bogies == 1 ? mid : mid + (b - (v.Bogies - 1) * 0.5f) * v.BogieCentresMetres;
@@ -193,7 +177,6 @@ public sealed class TrainSynth
             }
         }
 
-        // Whatever it warns people with.
         string? hornKey = tr.HornKey;
         if (hornKey != null && _horn == null)
         {
@@ -263,10 +246,8 @@ public sealed class TrainSynth
     {
         if (_diesel != null && _notches.Length > 0)
         {
-            // A diesel-electric has no throttle, it has notches, and a governor that holds the
-            // notch by moving the fuel rack. So the sound steps rather than sweeps, and the engine
-            // takes a couple of seconds to get there because it weighs what it weighs. The governor
-            // is the engine's own, with its speed set by the notch; the pedal stays up.
+            // A diesel-electric has notches, not a throttle: the engine's own governor holds the
+            // notch's speed with the pedal up, so the sound steps, and takes a couple of seconds.
             int n = Math.Clamp((int)MathF.Round(Notch), 0, _notches.Length - 1);
             float want = _notches[n], idle = _notches[0];
             float frac = n / MathF.Max(1f, _notches.Length - 1f);
@@ -276,10 +257,9 @@ public sealed class TrainSynth
                 eng.Starter = rpm < 100f;
                 eng.Throttle = 0f;
                 eng.GovernedRpm = want;
-                // The alternator is the load, and it takes what the traction motors are asking for.
-                // It is not excited until the engine is turning on its own: nothing while cranking,
-                // all of it from idle up. Its voltage, and so its torque into the same motors, goes
-                // with its speed, which is what lets a bogged engine pull back up instead of stalling.
+                // The alternator is the load: not excited while cranking, all of it from idle up, and
+                // its torque goes with speed, which lets a bogged engine pull back up instead of
+                // stalling.
                 float excited = Math.Clamp((rpm - eng.Profile.CrankingRpm) / MathF.Max(1f, idle - eng.Profile.CrankingRpm), 0f, 1f);
                 float atNotch = eng.Profile.PeakTorqueNm * (0.06f + 0.84f * MathF.Pow(frac, 1.3f));
                 eng.LoadTorque = excited * atNotch * rpm / want;
@@ -329,10 +309,9 @@ public sealed class TrainSynth
 }
 
 /// <summary>
-/// A vehicle body as a drum. An empty steel wagon is a box of thin panels hung off the bogies, and
-/// everything the bogies do goes into it: it booms at the panels' own low modes, and it stops when
-/// the wagon is loaded because the load damps it. It is why an empty freight train is louder than a
-/// full one and sounds completely different.
+/// A vehicle body as a drum: an empty steel wagon's thin panels boom at their low modes with
+/// everything the bogies do, and a load damps them. Why an empty freight train is louder than a full
+/// one.
 /// </summary>
 internal sealed class BodyDrum
 {
@@ -361,9 +340,8 @@ internal sealed class BodyDrum
 }
 
 /// <summary>
-/// A locomotive's radiator fans: a metre and a half across, ten or twelve blades, and on all the
-/// time. At idle on a summer night they are most of what you hear of a standing locomotive — more
-/// than the engine — and they are the reason a diesel in a yard is a roar and not a rumble.
+/// A locomotive's radiator fans: a metre and a half across, ten or twelve blades, on all the time.
+/// At idle they are most of what a standing locomotive is heard as: a roar, not a rumble.
 /// </summary>
 internal sealed class FanNoise
 {
@@ -382,8 +360,7 @@ internal sealed class FanNoise
 
     public float Step(float duty)
     {
-        // Broadband, because a fan is mostly turbulence; plus the blade-passing tone and its octave,
-        // because it is also a row of blades going past.
+        // Turbulence, plus the blade-passing tone and its octave.
         float n = (float)(_rng.NextDouble() * 2 - 1);
         float a = OnePole.AlphaFor(700f * (0.6f + 0.4f * duty), _rate);
         _lp1 += a * (n - _lp1); _lp2 += a * (_lp1 - _lp2);

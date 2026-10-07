@@ -1,9 +1,8 @@
 file	name	count
-OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	OpenFPS.Common.Components.RegionComponent	1
 OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	OpenFPS.Common.Components.Transform	3
 OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	OpenFPS.Common.EntitySnapshot	10
 OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	OpenFPS.Common.Networking.EntityDefinition	1
-OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	OpenFPS.Common.WorldSnapshot	37
+OpenFPS.Client.Core/AudioEngine/Acoustics/AsyncAcousticWorker.cs	OpenFPS.Common.WorldSnapshot	34
 OpenFPS.Client.Core/AudioEngine/Acoustics/CabinWalls.cs	OpenFPS.Common.Components.SoundEmitterComponent	2
 OpenFPS.Client.Core/AudioEngine/Acoustics/CabinWalls.cs	OpenFPS.Common.Components.Transform	2
 OpenFPS.Client.Core/AudioEngine/Acoustics/CabinWalls.cs	OpenFPS.Common.EntitySnapshot	12

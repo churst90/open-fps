@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Client.Core.Input;
 using OpenFPS.Client.Core.Platform;

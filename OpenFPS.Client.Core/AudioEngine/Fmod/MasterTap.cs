@@ -1,31 +1,20 @@
-using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using FMOD;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// Writes everything the mixer produces to a WAV file WHILE IT STILL PLAYS.
-///
-/// FMOD's own WAVWRITER output does this by replacing the sound card, which is fine for a rig and
-/// useless for a person: reproducing an artefact usually means playing normally until you hear it.
-/// This is a pass-through DSP at the head of the master chain instead — the samples go to the
-/// speakers exactly as before and a copy goes to disk.
-///
-/// It exists because "it crackles" cannot be diagnosed from a description or a CPU percentage. The
-/// difference between a clipped waveform, a starved buffer, a stepped voice and an aliasing
-/// synthesis is obvious in thirty seconds of samples and invisible from the listening chair, and
-/// every one of them is fixed somewhere different.
+/// Writes what the mixer makes to a WAV file while it still plays: a pass-through DSP on the master,
+/// where FMOD's WAVWRITER would replace the sound card. A clipped waveform, a starved buffer, a stepped
+/// voice and aliasing all sound like "it crackles" and look different in thirty seconds of samples.
 /// </summary>
 public sealed class MasterTap : IDisposable
 {
     private readonly FileStream _file;
     private readonly BinaryWriter _writer;
     private readonly int _rate;
-    /// <summary>IEEE float samples rather than sixteen bits, unclamped: what the mixer made, including
-    /// anything over full scale, and quiet detail below the sixteenth bit (OPENFPS_AUDIO_CAPTURE_FLOAT=1,
-    /// and the lab's measurements).</summary>
+    /// <summary>IEEE float, unclamped: over full scale and below the sixteenth bit as the mixer made
+    /// it (OPENFPS_AUDIO_CAPTURE_FLOAT, and the lab's measurements).</summary>
     private readonly bool _float;
     private int _channels;
     private long _frames;
@@ -43,16 +32,15 @@ public sealed class MasterTap : IDisposable
         _float = asFloat;
         _file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
         _writer = new BinaryWriter(_file);
-        // Header is written now with placeholder sizes and rewritten on close.
+        // The header's sizes are filled in on close.
         _writer.Write(new byte[44]);
     }
 
     /// <summary>
-    /// Attaches a tap to the master channel group. Returns null when no capture was asked for or the
-    /// DSP could not be made — never throws, because a diagnostic must not be able to break playback.
+    /// Attaches a tap to the master group at <paramref name="index"/> (the head, what leaves the mixer,
+    /// by default; a number puts it there, e.g. just before the limiter). Null if the DSP could not be
+    /// made; never throws, because a diagnostic must not be able to break playback.
     /// </summary>
-    /// <param name="index">Where in the group's chain: the HEAD (last, what leaves the mixer) by
-    /// default; a number puts it at that position, e.g. just before the master limiter.</param>
     public static MasterTap? Attach(FMOD.System system, ChannelGroup master, string path, int rate,
                                     int index = CHANNELCONTROL_DSP_INDEX.HEAD, bool asFloat = false)
     {
@@ -78,12 +66,9 @@ public sealed class MasterTap : IDisposable
     }
 
     /// <summary>
-    /// The guard, and the reason it is a separate method: a managed DSP callback MUST NOT THROW.
-    ///
-    /// FMOD calls this from its own native mixer thread, and an exception that unwinds across that
-    /// boundary does not fault a voice — it takes the whole process down. The client was killed
-    /// exactly that way by an index slip in the boundary DSP, which had no guard either. Everything
-    /// below stays as it was; a fault now costs one silent block and one line in the log.
+    /// A managed DSP callback must not throw: FMOD calls it on its native mixer thread, and an exception
+    /// unwinding across that boundary kills the process (it did, from an index slip in the boundary DSP).
+    /// A fault costs one silent block and one line in the log.
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
@@ -110,7 +95,7 @@ public sealed class MasterTap : IDisposable
         int n = (int)length, ch = inchannels;
         if (outchannels == 0) outchannels = ch;
 
-        // Pass through FIRST and unconditionally: the capture must never be able to silence the game.
+        // Pass through first and unconditionally: the capture must never be able to silence the game.
         unsafe
         {
             float* src = (float*)inbuffer, dst = (float*)outbuffer;
@@ -134,7 +119,6 @@ public sealed class MasterTap : IDisposable
             else
                 for (int i = 0; i < total; i++)
                 {
-                    // 16-bit is plenty to see a discontinuity and keeps the file small enough to pass around.
                     float v = src[i];
                     if (v > 1f) v = 1f; else if (v < -1f) v = -1f;
                     _writer.Write((short)(v * 32767f));
@@ -151,9 +135,8 @@ public sealed class MasterTap : IDisposable
             _closed = true;
             try
             {
-                // OFF THE GROUP FIRST. FMOD refuses to release an attached unit and says so in its
-                // logging build — `Failed to release because unit is still attached` — so a release
-                // here freed nothing and left the tap in the master chain for the rest of the run.
+                // Off the group first: FMOD will not release an attached unit ("Failed to release
+                // because unit is still attached"), and the tap stayed in the chain for the run.
                 if (_dsp.hasHandle() && _group.hasHandle()) _group.removeDSP(_dsp);
                 if (_dsp.hasHandle()) { _dsp.release(); }
                 if (_handle.IsAllocated) _handle.Free();

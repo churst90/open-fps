@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 
@@ -8,19 +7,14 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// The intake tract, valve to open air: a runner per cylinder into a plenum, the throttle plate,
 /// the airbox, and the snorkel that radiates.
 ///
-/// The runners are waveguides, the same as the exhaust's pipes. The plenum is a LUMPED volume: a
-/// mass of air at a pressure, filled through the throttle and emptied by whatever the runners draw.
-/// Manifold pressure is therefore not a formula in here — it is the balance between what the
-/// throttle passes and what the engine breathes, so a shut plate pulls a deep vacuum at speed, a big
-/// cam that cannot pull a vacuum does not, a turbo that raises the airbox pressure raises the
-/// manifold with it, and a single cylinder on a tiny plenum makes the whole intake pulse because
-/// there is nothing there to smooth it. All of that is mass conservation, and the earlier version,
-/// which wrote the manifold pressure by hand and let an acoustic network breathe under it, could be
-/// pumped by its own resonance into charges no throttle could have passed.
+/// The runners are waveguides like the exhaust's pipes; the plenum is a lumped volume filled through
+/// the throttle and emptied by the runners. Manifold pressure is that mass balance, not a formula: a
+/// shut plate pulls a deep vacuum at speed, a turbo raises the manifold with the airbox, a single on a
+/// tiny plenum pulses. A hand-written manifold pressure could be pumped by the network's own resonance
+/// into charges no throttle could pass.
 ///
-/// What crosses the throttle is a flow, and its fluctuation is the sound that reaches the airbox
-/// and the snorkel — small at idle because the plate is almost shut, the full induction roar at
-/// wide open, without anyone writing that rule down.
+/// The throttle flow's fluctuation is the sound that reaches the airbox and the snorkel: small at idle,
+/// the full induction roar at wide open.
 /// </summary>
 internal sealed class IntakeNetwork
 {
@@ -51,27 +45,11 @@ internal sealed class IntakeNetwork
     private float _tnLp1, _tnLp2;
 
     /// <summary>
-    /// How much of the engine's own pulsation gets past the COMPRESSOR to the airbox and out.
-    ///
-    /// On a turbocharged or blown engine there is a wheel in the way. Everything the cylinders do —
-    /// the runner's quarter-wave, the plenum's breathing, the plate's turbulence — has to cross a
-    /// bladed rotor spinning at a hundred thousand rpm before it can reach the snorkel, and a rotor
-    /// is a wall to a plane wave: it reflects and scatters most of it. That is why a turbo engine's
-    /// intake is a WHOOSH and a whistle rather than the induction honk of a naturally aspirated one,
-    /// and the whistle is the compressor's own noise, generated downstream of the barrier.
-    ///
-    /// Leaving it out was audible and diesel-specific. The leak term below is scaled by the OPEN
-    /// AREA of the plate, so on a petrol engine at part throttle almost nothing crosses — but a
-    /// diesel has no plate at all and runs wide open for ever, so the runners' fixed 386 Hz
-    /// quarter-wave went straight out of the airbox. A listener heard it as a note, worst on the
-    /// overrun where no combustion covers it, and it survived silencing the exhaust, the valvetrain,
-    /// the turbo whistle, the knock, the alternator and the throttle turbulence one at a time —
-    /// because it was none of those, it was the engine breathing out through a hole that should
-    /// have had a compressor in it.
-    ///
-    /// Twenty decibels, which is the order of a centrifugal stage's insertion loss for plane waves
-    /// well below blade-passing. The MEAN flow is untouched: a compressor passes air, it is only
-    /// pulsation it stops.
+    /// How much of the engine's own pulsation gets past the compressor to the airbox: a bladed rotor
+    /// reflects most of a plane wave, which is why a turbo intake is a whoosh and a whistle, not an
+    /// induction honk. Without it a diesel (no plate, always wide open) sent the runners' 386 Hz
+    /// quarter-wave straight out of the airbox as a note, worst on the overrun. Twenty decibels, the
+    /// order of a centrifugal stage's plane-wave insertion loss; the mean flow is untouched.
     /// </summary>
     private readonly float _compressorBarrier;
 
@@ -98,11 +76,10 @@ internal sealed class IntakeNetwork
         _snorkel = new Pipe(s.SnorkelLengthMetres, Circle(s.SnorkelDiameterMm), rate, 2f, 0f);
         _end = new OpenEnd(rate);
         // The mean follows the throttle within about 15 ms, so a snapped pedal moves the mean flow
-        // rather than arriving as one enormous gulp; what is left is the pulsation.
+        // rather than arriving as one gulp; what is left is the pulsation.
         _meanAlpha = OnePole.AlphaFor(12f, rate);
         _dcAlpha = OnePole.AlphaFor(2f, rate);
-        // Both kinds of forced induction put a rotor in the INTAKE path — a turbo's compressor and a
-        // blower's rotors alike — so both get the barrier. Only the exhaust side distinguishes them.
+        // A turbo's compressor and a blower's rotors are both in the intake path: both get the barrier.
         _compressorBarrier = e.Induction == Induction.NaturallyAspirated ? 1f : 0.1f;
         SetThrottle(0f);
         UpdateGas(305f, Gas.Atmosphere);
@@ -118,8 +95,6 @@ internal sealed class IntakeNetwork
 
     /// <summary>Manifold pressure, pascals absolute: the state of the plenum.</summary>
     public float PlenumPressure => _plenumMass * Gas.R * _plenumK / _plenumVolume;
-    /// <summary>Mass flow through the throttle, kg/s, smoothed.</summary>
-    public float ThrottleFlow => _throttleFlowMean;
 
     /// <summary>Open fraction of the throttle plate, 0..1. A plate never quite shuts: about one per
     /// cent of the bore leaks past it, which is why an engine can idle at all with the pedal up.</summary>
@@ -129,6 +104,7 @@ internal sealed class IntakeNetwork
     public void SetThrottle(float open, float bypass = 0f)
         => _throttleOpen = 0.0025f + Math.Clamp(bypass, 0f, 0.06f) + 0.9975f * MathF.Pow(Math.Clamp(open, 0f, 1f), 1.6f);
 
+    /// <summary>Retunes the tract for the intake air.</summary>
     /// <param name="kelvin">Intake air temperature.</param>
     /// <param name="airboxPressure">Pressure upstream of the throttle, pascals — atmospheric, or
     /// more with a turbo or blower on it.</param>
@@ -162,9 +138,8 @@ internal sealed class IntakeNetwork
     public void Step()
     {
         // ── The plenum end of every runner ───────────────────────────────────────────────────
-        // The plenum is large compared with a runner and its pressure is the reference the runner's
-        // waves ride on, so the mouth is a pressure release: what arrives comes back inverted, and
-        // the flow that crosses the mouth is what the plenum gains or loses.
+        // The mouth is a pressure release (the plenum is the waves' reference): what arrives comes
+        // back inverted, and the flow across it is what the plenum gains or loses.
         float rho = Gas.Density(PlenumPressure, _plenumK);
         float massIn = 0f;
         for (int c = 0; c < _n; c++)
@@ -175,12 +150,10 @@ internal sealed class IntakeNetwork
             float u = 2f * a / r.Impedance;             // volume flow into the plenum
             massIn += rho * u * _dt;
         }
-        // The waves carry the pulsation, but not the mean: the runners' losses and the 0.94 at the
-        // mouth take the steady part of a flow down with everything else, so a plenum charged only
-        // by the waves lost a fraction of what the cylinders drew. With the throttle shut the
-        // cylinders were still breathing 18 times what came past the plate, and every engine made
-        // torque on the overrun. So the mean crossing the mouths is held to the mean through the
-        // valves, which is conservation of mass, and the waves keep everything above it.
+        // The waves carry the pulsation, not the mean: the runners' losses take the steady flow down
+        // too, and charged by the waves alone the cylinders breathed 18 times what passed a shut
+        // plate (torque on the overrun). So the mean across the mouths is held to the mean through the
+        // valves, which is conservation of mass; the waves keep everything above it.
         _mouthFlowMean += _dcAlpha * (massIn / _dt - _mouthFlowMean);
         _valveFlowMean += _dcAlpha * (_valveFlow - _valveFlowMean);
         massIn += (_valveFlowMean - _mouthFlowMean) * _dt;
@@ -198,10 +171,8 @@ internal sealed class IntakeNetwork
         _throttleFlowMean += _meanAlpha * (flow - _throttleFlowMean);
 
         // ── What gets past the plate is what the airbox hears ────────────────────────────────
-        // The fluctuating part of the throttle flow, drawn from the airbox, sent down the snorkel.
-        // Plus the plenum's pulsation leaking acoustically through whatever gap the plate leaves —
-        // the choked mean flow at idle carries no fluctuation of its own, but the pressure behind
-        // the plate does, and some of that gets through.
+        // The throttle flow's fluctuation, plus the plenum's pulsation leaking through the plate's
+        // gap: at idle the choked flow carries none of its own, but the pressure behind the plate does.
         _plenumMean += _meanAlpha * (pPlenum - _plenumMean);
         float acoustic = (pPlenum - _plenumMean) * area / (Gas.Density(_airboxPressure, _plenumK) * 340f) * 0.5f;
         float uAb = ((flow - _throttleFlowMean) / Gas.Density(_airboxPressure, _plenumK) + acoustic
@@ -222,17 +193,10 @@ internal sealed class IntakeNetwork
     /// <summary>
     /// The broadband the plate makes, as a fluctuating volume flow into the airbox.
     ///
-    /// A sharp-edged orifice in a duct is a dipole: the jet through it beats on the plate, and the
-    /// plate pushes back on the air. Below the duct's cut-on frequency there is only the plane wave
-    /// to radiate into, and none of the inefficiency a dipole suffers in free air — so the power goes
-    /// as the fourth power of the velocity through the gap rather than the sixth (Nelson and Morfey,
-    /// 1981), which is the second power in pressure, and that is the one Mach number in the term
-    /// below. Getting this wrong by a power of U does not change a level, it changes whether a car is
-    /// loudest under your foot or off it.
-    ///
-    /// The BAND is the Strouhal number of the gap: turbulence peaks where the velocity divided by the
-    /// size of the hole puts it, so the same source is fifty hertz through an open plate and ten
-    /// kilohertz through a shut one. Nothing here knows what kind of engine it is on.
+    /// A sharp-edged orifice in a duct is a dipole radiating into the plane wave only, so its power goes
+    /// as U^4, not U^6 (Nelson and Morfey, 1981): the one Mach number in the term below. A power of U
+    /// wrong decides whether a car is loudest under your foot or off it. The band is the gap's Strouhal
+    /// number: fifty hertz through an open plate, ten kilohertz through a shut one.
     /// </summary>
     /// <param name="massFlow">Mass through the plate now, kg/s.</param>
     /// <param name="area">Open area of the plate now, m^2.</param>
@@ -242,20 +206,11 @@ internal sealed class IntakeNetwork
         float level = _spec.FlowNoiseLevel;
         if (level <= 0f || area <= 1e-9f) return 0f;
 
-        // A PLATE THAT IS NOT IN THE WAY IS NOT AN ORIFICE.
-        //
-        // This whole term is the dipole of a separated jet beating on a sharp edge, and a jet only
-        // exists where there is a pressure drop to drive one. Scaling it by the duct velocity alone
-        // was wrong in a way that shows up hardest on the engine that has no plate at all: a diesel
-        // is pedal-is-fuel and runs its intake WIDE OPEN for ever, so it was being given the
-        // turbulence of a throttle it does not have — and fed to a tract with modes at 300-460 Hz,
-        // broadband comes back out as a NOTE. A listener heard it as "a frequency, like a phone
-        // interfering with a speaker", loudest on the overrun where no combustion masks it.
-        //
-        // The drop across the plate is the honest measure of how much of an orifice it is: about
-        // 0.6 of the upstream pressure on a petrol engine at idle, a few per cent at wide open, and
-        // essentially nothing on a diesel at any time. It is also why induction HISS is a
-        // part-throttle sound — at full throttle what you hear is the pulsation, not the plate.
+        // A plate that is not in the way is not an orifice: the jet needs a pressure drop. Scaled by
+        // duct velocity alone, a diesel (always wide open) got the turbulence of a throttle it does
+        // not have, and its tract's 300-460 Hz modes turned it into a note ("a frequency, like a phone
+        // interfering with a speaker"). The drop is about 0.6 of upstream at petrol idle, a few per
+        // cent wide open, nothing on a diesel: induction hiss is a part-throttle sound.
         float pUp = MathF.Max(1e3f, _airboxPressure);
         float restriction = Math.Clamp((pUp - PlenumPressure) / pUp, 0f, 1f);
         if (restriction < 0.02f) return 0f;
@@ -273,8 +228,8 @@ internal sealed class IntakeNetwork
         _tnLp2 += a * (_tnLp1 - _tnLp2);
         float band = _tnLp1 - _tnLp2;
 
-        // Turbulence intensity at a sharp orifice is ten per cent or so of the mean; the Mach number
-        // is what makes it a SOUND rather than a fluctuation, and it is what carries the U^4 law.
+        // Turbulence intensity at a sharp orifice is about ten per cent of the mean; the Mach number
+        // carries the U^4 law.
         const float intensity = 0.10f;
         float mach = u / MathF.Max(1f, _airbox.SoundSpeed);
         return intensity * area * u * mach * band * level * 8f * restriction;

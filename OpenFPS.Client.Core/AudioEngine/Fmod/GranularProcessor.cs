@@ -1,12 +1,9 @@
-using System;
 using System.Runtime.InteropServices;
 using FMOD;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
-/// <summary>
-/// Responsibility: Holds the internal state for a single Granular Synthesis voice.
-/// </summary>
+/// <summary>One granular voice: its source PCM, its parameters (from the SpatialEmitter) and its grains.</summary>
 public class GranularVoiceState : IGuardedUnit
 {
     /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
@@ -16,15 +13,13 @@ public class GranularVoiceState : IGuardedUnit
     public int Channels;
     public int SampleRate;
 
-    // Parameters from SpatialEmitter
-    public float Position; // 0.0 to 1.0
+    public float Position; // 0..1 through the source
     public float GrainSizeMs; // 10 to 200 ms
-    public float Density; // Grains per second
-    public float Pitch; // Base playback speed
-    public float PositionJitter; // 0.0 to 1.0 randomness
-    public float PitchJitter; // Randomness in pitch
+    public float Density; // grains per second
+    public float Pitch; // playback speed
+    public float PositionJitter; // 0..1
+    public float PitchJitter;
 
-    // Internal execution state
     public float SamplesSinceLastGrain;
     public Random Rnd = new Random();
 
@@ -37,7 +32,7 @@ public class GranularVoiceState : IGuardedUnit
         public bool IsActive;
     }
 
-    public Grain[] Grains = new Grain[128]; // Max 128 overlapping grains to prevent CPU overload
+    public Grain[] Grains = new Grain[128]; // at most 128 overlapping, to bound the mixer's cost
     
     /// <summary>Forgets the previous sound's grains, for a pooled voice about to play another. The
     /// DSP is out of the graph when this is called, so the mixer is not reading it.</summary>
@@ -56,8 +51,7 @@ public class GranularVoiceState : IGuardedUnit
 }
 
 /// <summary>
-/// Responsibility: The FMOD Custom DSP that implements Granular Synthesis math.
-/// Converts continuous audio buffers into clouds of overlapping windowed grains.
+/// The FMOD DSP for a granular voice: a cloud of overlapping Hann-windowed grains read from a sound.
 /// </summary>
 public static class GranularProcessor
 {
@@ -66,20 +60,13 @@ public static class GranularProcessor
 
     private static readonly FMOD.DSP_READ_CALLBACK _readCallback = ReadCallback;
 
-    /// <summary>
-    /// Creates a custom FMOD DSP configured for granular synthesis.
-    /// </summary>
     public static RESULT CreateDSP(FMOD.System system, GranularVoiceState state, out FMOD.DSP dsp, out GCHandle handle)
     {
         FMOD.DSP_DESCRIPTION desc = new FMOD.DSP_DESCRIPTION();
         desc.pluginsdkversion = FMOD.VERSION.number;
-        desc.numinputbuffers = 0; // We generate audio, no input needed
+        desc.numinputbuffers = 0;
         desc.numoutputbuffers = 1;
         desc.read = _readCallback;
-
-        // Note: In C#, struct strings need careful marshalling. 
-        // We leave name blank or basic to avoid marshalling complex strings manually.
-        // The wrapper will handle it if we leave it default.
 
         RESULT res = system.createDSP(ref desc, out dsp);
         if (res == RESULT.OK)
@@ -96,12 +83,9 @@ public static class GranularProcessor
     }
 
     /// <summary>
-    /// The guard, and the reason it is a separate method: a managed DSP callback MUST NOT THROW.
-    ///
-    /// FMOD calls this from its own native mixer thread, and an exception that unwinds across that
-    /// boundary does not fault a voice — it takes the whole process down. The client was killed
-    /// exactly that way by an index slip in the boundary DSP, which had no guard either. Everything
-    /// below stays as it was; a fault now costs one silent block and one line in the log.
+    /// A managed DSP callback must not throw: FMOD calls it on its native mixer thread, and an exception
+    /// unwinding across that boundary kills the process (an index slip in the boundary DSP did). A
+    /// fault here costs one silent block and one log line.
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
@@ -128,14 +112,12 @@ public static class GranularProcessor
 
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        // Get the state from the DSP user data
         IntPtr userData;
         unsafe
         {
-            // The FMOD wrapper doesn't provide direct access to getUserData from DSP_STATE easily,
-            // Through the CALLBACK'S OWN function table — see DspCallback.UserData. Building an
-            // FMOD.DSP from dsp_state.instance and calling the general API re-enters FMOD from
-            // inside its own mix, which is the thing the documentation forbids.
+            // Through the callback's own function table (DspCallback.UserData): calling the general
+            // API on an FMOD.DSP built from dsp_state.instance re-enters FMOD inside its own mix,
+            // which its documentation forbids.
             userData = DspCallback.UserData(ref dsp_state);
         }
 
@@ -156,7 +138,6 @@ public static class GranularProcessor
         {
             float* outBuf = (float*)outbuffer;
 
-            // Clear output buffer first
             for (uint i = 0; i < length * outCh; i++)
             {
                 outBuf[i] = 0.0f;
@@ -168,7 +149,6 @@ public static class GranularProcessor
 
             for (uint frame = 0; frame < length; frame++)
             {
-                // 1. Spawn new grains
                 state.SamplesSinceLastGrain++;
                 if (state.SamplesSinceLastGrain >= samplesBetweenGrains)
                 {
@@ -176,7 +156,6 @@ public static class GranularProcessor
                     SpawnGrain(state, totalFrames, samplesPerGrain);
                 }
 
-                // 2. Process active grains
                 for (int i = 0; i < state.Grains.Length; i++)
                 {
                     ref var grain = ref state.Grains[i];
@@ -191,7 +170,6 @@ public static class GranularProcessor
 
                     float window = 0.5f * (1.0f - MathF.Cos(2.0f * MathF.PI * progress));
 
-                    // Read sample with basic linear interpolation
                     float readPos = grain.StartSample + grain.CurrentSample;
                     // Clamped like idx1: a grain started near the end read past it, threw, and the
                     // guard silenced the whole block.
@@ -199,7 +177,6 @@ public static class GranularProcessor
                     int idx1 = Math.Min(idx0 + 1, totalFrames - 1);
                     float frac = readPos - idx0;
 
-                    // Mix into output
                     for (int c = 0; c < outCh; c++)
                     {
                         int srcChannel = c % inCh; 
@@ -210,11 +187,10 @@ public static class GranularProcessor
                         outBuf[frame * outCh + c] += sample * window;
                     }
 
-                    // Advance grain
                     grain.CurrentSample += grain.Pitch * ((float)state.SampleRate / sampleRateOut);
                 }
                 
-                // 3. Safety Limiter/Normalization
+                // Overlapping grains sum: scaled and clamped.
                 for (int c = 0; c < outCh; c++)
                 {
                     outBuf[frame * outCh + c] = Math.Clamp(outBuf[frame * outCh + c] * 0.7f, -1.0f, 1.0f);
@@ -227,14 +203,12 @@ public static class GranularProcessor
 
     private static void SpawnGrain(GranularVoiceState state, int totalFrames, float lengthSamples)
     {
-        // Find free grain slot
         for (int i = 0; i < state.Grains.Length; i++)
         {
             if (!state.Grains[i].IsActive)
             {
                 float basePos = state.Position;
-                // Add jitter
-                float jitter = ((float)state.Rnd.NextDouble() * 2.0f - 1.0f) * state.PositionJitter; // -jitter to +jitter
+                float jitter = ((float)state.Rnd.NextDouble() * 2.0f - 1.0f) * state.PositionJitter;
                 float finalPos = Math.Clamp(basePos + jitter, 0.0f, 0.99f);
 
                 float pitchJitter = ((float)state.Rnd.NextDouble() * 2.0f - 1.0f) * state.PitchJitter;

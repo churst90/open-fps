@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Core.Input;
@@ -26,13 +24,9 @@ public enum KeyModifiers
 }
 
 /// <summary>
-/// Maps a key press to an action, per context, with rebinding as a first-class operation.
-/// Keyed on the neutral <see cref="GameKey"/>, so one binding table serves both heads.
-///
-/// A binding may name modifiers, and one that does is tried FIRST. A binding that does not name any
-/// then runs whatever is held — which is what keeps a key that reads its own modifiers working (the
-/// chat brackets decide between stepping messages and stepping buffers by asking about shift
-/// themselves) while still letting shift-F5 mean something different from F5.
+/// Key to action, per context, on the neutral <see cref="GameKey"/> so both heads share one table. A
+/// binding that names modifiers is tried first; one that names none runs whatever is held, so a key
+/// that reads its own modifiers (the chat brackets ask about Shift) still works.
 /// </summary>
 public sealed class InputCommandMapper
 {
@@ -44,45 +38,30 @@ public sealed class InputCommandMapper
             _keyMap[ctx] = new Dictionary<(GameKey, KeyModifiers), Action>();
     }
 
-    /// <summary>Binds a key to an action within a context, replacing any existing binding. The
-    /// binding runs whatever modifiers are held unless a more specific one exists.</summary>
+    /// <summary>Replaces any binding of the key. It runs whatever modifiers are held unless a binding
+    /// with those modifiers exists.</summary>
     public void Bind(InputContext context, GameKey key, Action action) => _keyMap[context][(key, KeyModifiers.None)] = action;
 
-    /// <summary>Binds a key HELD WITH modifiers, which takes precedence over the same key alone.</summary>
+    /// <summary>Binds a key held with modifiers, which wins over the same key alone.</summary>
     public void Bind(InputContext context, GameKey key, KeyModifiers modifiers, Action action) =>
         _keyMap[context][(key, modifiers)] = action;
 
-    /// <summary>Binds a key in the Global context.</summary>
     public void Bind(GameKey key, Action action) => Bind(InputContext.Global, key, action);
 
-    /// <summary>Binds a key with modifiers in the Global context.</summary>
     public void Bind(GameKey key, KeyModifiers modifiers, Action action) => Bind(InputContext.Global, key, modifiers, action);
 
-    /// <summary>Removes a binding.</summary>
-    public void Unbind(InputContext context, GameKey key) => _keyMap[context].Remove((key, KeyModifiers.None));
-
-    /// <summary>Removes a modified binding.</summary>
-    public void Unbind(InputContext context, GameKey key, KeyModifiers modifiers) => _keyMap[context].Remove((key, modifiers));
-
-    /// <summary>True when the key is bound in the given context or globally.</summary>
+    /// <summary>True when the key is bound in the context or globally.</summary>
     public bool IsBound(InputContext context, GameKey key) => IsBound(context, key, KeyModifiers.None);
 
     /// <summary>True when the key, with those modifiers, resolves to anything at all.</summary>
     public bool IsBound(InputContext context, GameKey key, KeyModifiers modifiers) =>
         Resolve(context, key, modifiers) != null;
 
-    /// <summary>
-    /// Runs the action bound to <paramref name="key"/> in <paramref name="context"/>, falling back to
-    /// the Global context. Returns whether anything ran.
-    /// </summary>
+    /// <summary>Runs the key's action in the context, else the Global one. Returns whether anything ran.</summary>
     public bool Execute(InputContext context, GameKey key) => Execute(context, key, KeyModifiers.None);
 
-    /// <summary>
-    /// Runs the action bound to <paramref name="key"/> held with <paramref name="modifiers"/>.
-    ///
-    /// Order is most specific first: this context with those modifiers, then Global with those
-    /// modifiers, then this context unmodified, then Global unmodified.
-    /// </summary>
+    /// <summary>Runs the key's action, most specific first: this context with the modifiers, Global with
+    /// them, this context bare, Global bare.</summary>
     public bool Execute(InputContext context, GameKey key, KeyModifiers modifiers)
     {
         var action = Resolve(context, key, modifiers);

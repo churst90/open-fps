@@ -1,16 +1,14 @@
-using System;
 using System.Runtime.InteropServices;
-using System.Threading;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// One outdoor reverb bus's traced stage: what the bus's sends carry, played through the place's
-/// measured impulse response (TracedReverb) and rendered round the listener's head. It sits just
-/// after the bus's SFXREVERB, which in traced mode passes its input through dry; in room mode this
-/// stage is bypassed and the SFXREVERB is the tail.
+/// One reverb bus's traced stage: what the bus's sends carry, played through the place's measured
+/// impulse response (TracedReverb) and rendered round the listener's head. It sits just after the
+/// bus's SFXREVERB, which in traced mode passes its input through dry; in room mode this stage is
+/// bypassed and the SFXREVERB is the tail.
 /// </summary>
 internal sealed class TracedReverbState
 {
@@ -21,7 +19,7 @@ internal sealed class TracedReverbState
     public IntPtr WorkerContext;          // the tracer's context: the effect must be of the IR's context
     public IntPtr Effect;                 // IPLReflectionEffect (convolution: the whole traced response)
     /// <summary>Play the tail only: the room the listener is in, where the early part is placed
-    /// reflections (WorldAudioPlayer.QueueRoomEchoes). Game thread writes.</summary>
+    /// copies (WorldAudioPlayer.QueueEarlyEchoes). Game thread writes.</summary>
     public volatile bool TailOnly;
     /// <summary>The tail: the trace's own late part (LateTailIr), convolved here.</summary>
     public LateTailConvolver? LateConv;
@@ -83,8 +81,6 @@ internal sealed class TracedReverbState
     }
     private readonly int _sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
 
-    // Diagnostics: what goes in and what comes out, for the /reverb line.
-    public volatile float InRms, OutRms;
     /// <summary>Running totals of the energy in (mono) and out (per ear), for the lab.</summary>
     public double InEnergy, OutEnergy, ChannelEnergy;
     public int Channels;
@@ -98,32 +94,17 @@ internal sealed class TracedReverbState
 }
 
 /// <summary>
-/// The late tail of the room you are in, rendered as the diffuse field it is.
+/// The late tail of the room you are in, rendered as the diffuse field it is: energy from every
+/// direction at once, each direction a different signal through its own head response, turned into
+/// the head's frame every block. One channel in both ears sits inside the head however it is
+/// decorrelated.
 ///
-/// The traced late part is one channel: W, the omnidirectional one. The same signal in both ears is
-/// heard inside the head, or straight ahead, and it stays there when the head turns. Splitting it
-/// into two ears with different all-pass chains (EarDecorrelator) lowers the correlation but not the
-/// place. A real late tail is energy arriving from every direction at once, each direction's share a
-/// different signal with the same statistics.
-///
-/// So the tail goes through twenty velvet-noise branches (DiffuseBranch), one per direction of a
-/// dodecahedron tilted off the game's axes, and each branch goes straight through its own head
-/// response for that direction (RenderBinaural), turned into the head's frame every block. Each ear
-/// then hears twenty independent signals through different responses, which is where a diffuse
-/// field's interaural correlation comes from in life, and when the head turns the tail's fine
-/// structure turns with it while its level and colour do not. Above <see cref="EarSplitHz"/> each
-/// ear's share is made its own as well.
-///
-/// The low end, below <see cref="SplitHz"/>, goes to both ears as it is: that is what a diffuse
-/// field is at those frequencies on a head (interaural correlation near 1, level equal to the
-/// field's).
-///
-/// The directional part of the tail (SdmTailIr) is added from the walls it came off
+/// The late part normally arrives as twenty independent signals (DiffuseLate) and goes through
+/// <see cref="RenderLate"/>. A trace without directions, and the lab's A/B, take one channel through
+/// twenty velvet branches (DiffuseBranch) instead (<see cref="RenderBinaural"/>), with the low end
+/// below <see cref="SplitHz"/> to both ears as it is and each ear made its own above
+/// <see cref="EarSplitHz"/>. The directional part (SdmTailIr) is added from the walls it came off
 /// (<see cref="AddDirectional"/>).
-///
-/// Since 2026-10-03 the late part normally arrives already as twenty independent signals
-/// (DiffuseLate) and goes through <see cref="RenderLate"/>: no velvet, no splits. The velvet way
-/// above is kept for a trace without directions and for the lab's A/B.
 /// </summary>
 internal sealed class DiffuseTail
 {
@@ -156,7 +137,7 @@ internal sealed class DiffuseTail
     /// </summary>
     public volatile float[]? LateShares;
 
-    private void UpdateBranchGains(int sub)
+    private void UpdateBranchGains()
     {
         var bias = new System.Numerics.Vector3(Volatile.Read(ref _biasX), Volatile.Read(ref _biasY), Volatile.Read(ref _biasZ));
         var shares = LateShares;
@@ -176,10 +157,9 @@ internal sealed class DiffuseTail
         }
     }
 
-    /// <summary>Below this the tail goes straight to both ears; see the class note. Set where the
-    /// branches stop being distinct signals (their all-passes are 89-431 samples, so about
-    /// 100 Hz), not at the ear decorrelator's 300: a step on carpet is nearly all below 300 Hz, and
-    /// a tail that is the same in both ears there sits in the head however diffuse the rest is.</summary>
+    /// <summary>Below this the one-channel tail goes straight to both ears (a diffuse field on a head is
+    /// nearly alike there). Not the ear decorrelator's 300 Hz: a step on carpet is nearly all below
+    /// 300 Hz, and a tail alike in both ears there sits in the head however diffuse the rest is.</summary>
     public const float SplitHz = 120f;
     private readonly float _lpA;
     private float _a1, _a2, _b1;
@@ -188,13 +168,10 @@ internal sealed class DiffuseTail
 
     // ── Straight to the ears ─────────────────────────────────────────────────────────────────
     //
-    // Not encoded into a second-order soundfield and decoded through the HRTF like every other
-    // field. At second order that decode cannot make two ears independent at high frequencies:
-    // measured, the tail's interaural coherence was 0.60 at 2 kHz and 0.34 at 4 kHz where a head in
-    // a diffuse field gets under about 0.15 (Zaunschirm et al. 2018, the order-limited binaural
-    // decode). Coherent ears put a sound in the middle of the head, over everything. So each
-    // direction goes through its own binaural effect, the head-related response of exactly that
-    // direction, turned into the head's frame every block.
+    // Not a second-order soundfield decoded through the HRTF: that decode cannot make the ears
+    // independent at high frequencies (the tail's interaural coherence measured 0.60 at 2 kHz and 0.34
+    // at 4 kHz, where a diffuse field gives under about 0.15; Zaunschirm et al. 2018), and coherent ears
+    // put the tail in the middle of the head. Each direction has its own binaural effect.
     public readonly IntPtr[] Ears = new IntPtr[DiffuseBranch.Count];
     public Phonon.IPLAudioBuffer EarBuf;
     public IntPtr EarContext, EarHrtf;
@@ -208,16 +185,11 @@ internal sealed class DiffuseTail
     private float _rx, _ry, _rz, _rw = 1f;
 
     /// <summary>
-    /// Above this each ear's share of the tail is made its own (<see cref="_earL"/>, <see cref="_earR"/>).
-    ///
-    /// Twenty independent directions leave the two ears about 1/sqrt(20) alike at high frequencies:
-    /// measured 0.2-0.3 from 1 to 4 kHz, where two hundred directions through the same head response
-    /// read 0.03 (--tail-iacc) — a real diffuse field is simply different at the two ears
-    /// up there. Two hundred head responses a block is too dear, so above the frequency where this
-    /// head's diffuse field stops being alike at both ears (0.70 at 250 Hz, 0.10 at 500) each ear's
-    /// half goes through a velvet filter of its own: independent fine structure, the same energy, so
-    /// the level difference that carries the tail's lean survives. Below it the twenty directions keep
-    /// the coherence they have, which is already the head's.
+    /// Above this each ear's share of the one-channel tail is made its own (<see cref="_earL"/>,
+    /// <see cref="_earR"/>). Twenty directions leave the ears about 1/sqrt(20) alike up there (0.2-0.3
+    /// from 1 to 4 kHz, where two hundred read 0.03, --tail-iacc); above where this head's diffuse
+    /// field stops being alike (0.70 at 250 Hz, 0.10 at 500) each ear goes through a velvet filter of
+    /// its own, the same energy, so the level difference that carries the tail's lean survives.
     /// </summary>
     public const float EarSplitHz = 400f;
     // A fourth-order Linkwitz-Riley split (two Butterworth sections each side): steep, so the
@@ -278,7 +250,7 @@ internal sealed class DiffuseTail
             W[k] = h1 - _b1;
         }
         Array.Clear(Stereo, 0, sub * 2);
-        UpdateBranchGains(sub);
+        UpdateBranchGains();
         var rot = new System.Numerics.Quaternion(Volatile.Read(ref _rx), Volatile.Read(ref _ry), Volatile.Read(ref _rz), Volatile.Read(ref _rw));
         var toHead = System.Numerics.Quaternion.Conjugate(rot);
         float baseGain = BinauralTrim / MathF.Sqrt(DiffuseBranch.Count);
@@ -312,17 +284,12 @@ internal sealed class DiffuseTail
 
     // ── The late part as a field (DiffuseLate) ─────────────────────────────────────────────────
     //
-    // Each direction's own independent late signal (DiffuseLateConvolver), so no velvet branch and
-    // no ear velvet: three random spectra multiplied were the ring. Twenty independent directions
-    // leave the ears as unlike as the velvet did (--tail-iacc, noise, four headings: 0.11 0.07 0.17
-    // 0.13 from 500 Hz to 4 kHz, against 0.25 0.16 0.16 0.12), so nothing more is done to them; an
-    // all-pass chain per ear (24 sections from 700 Hz) was tried and changed nothing measurable.
-    // And no split at SplitHz either:
-    // the directions are distinct signals all the way down, so the head alone makes the low end
-    // alike at the two ears, as alike as a head in a diffuse field hears it (0.91 at 125 Hz with this
-    // HRTF, --tail-iacc), not identical. Split as the one-channel tail is, the low part (two one-pole
-    // low-passes) and the rest (two one-pole high-passes) of the SAME signal met in phase opposition
-    // at 120 Hz: a notch, 1.3-2.5 dB out of the 125 Hz octave and its decay shortened.
+    // Each direction's own independent late signal (DiffuseLateConvolver), with no velvet branch and no
+    // ear velvet: three random spectra multiplied were the ring. The ears come out as unlike as with
+    // the velvet (--tail-iacc, 500 Hz-4 kHz: 0.11 0.07 0.17 0.13 against 0.25 0.16 0.16 0.12); an
+    // all-pass chain per ear changed nothing measurable. No split at SplitHz: the head alone makes the
+    // low end alike (0.91 at 125 Hz), and split, the two halves met in phase opposition at 120 Hz, a
+    // notch of 1.3-2.5 dB in the 125 Hz octave.
 
     /// <summary>One block per direction: the late field's signals, filled by DiffuseLateConvolver.</summary>
     public float[][] LateIn = Array.Empty<float[]>();
@@ -338,7 +305,7 @@ internal sealed class DiffuseTail
     {
         Array.Clear(Stereo, 0, sub * 2);
         Array.Clear(Low, 0, sub);
-        UpdateBranchGains(sub);
+        UpdateBranchGains();
         var rot = new System.Numerics.Quaternion(Volatile.Read(ref _rx), Volatile.Read(ref _ry), Volatile.Read(ref _rz), Volatile.Read(ref _rw));
         var toHead = System.Numerics.Quaternion.Conjugate(rot);
         float baseGain = BinauralTrim / MathF.Sqrt(DiffuseBranch.Count);
@@ -390,10 +357,9 @@ internal sealed class DiffuseTail
                 eEar += (l * l + r * r) / 2;
             }
         }
-        // Measured, and NOT applied. It is the head's diffuse-field gain — what the pinna does to sound
-        // from everywhere, a few decibels above 2 kHz — and the direct sounds keep theirs, so the tail
-        // keeps its: only the 1/sqrt(N) split between directions. Trimming it away (white noise, so the
-        // top end ruled) put the tail 2.5 dB under the voices it belongs to.
+        // Measured, and not applied: it is the head's diffuse-field gain, which the direct sounds keep
+        // too, so only the 1/sqrt(N) split is trimmed. Trimming it away put the tail 2.5 dB under the
+        // voices it belongs to.
         if (eEar > 0 && eIn > 0) DiffuseFieldGainDb = (float)(10 * Math.Log10(eEar / eIn));
         BinauralTrim = 1f;
         foreach (var e in Ears) if (e != IntPtr.Zero) Phonon.iplBinauralEffectReset(e);
@@ -405,10 +371,9 @@ internal sealed class DiffuseTail
 
     // ── The directional part (SdmTailIr) ──────────────────────────────────────────────────────
     //
-    // Each direction's own response, through that direction's own head response, turned with the head
-    // every block — and NOT through the ear decorrelation, which would scramble the very timing
-    // between the ears that says where it comes from. Its own twenty binaural effects: a binaural
-    // effect carries state, and the diffuse branches use theirs.
+    // Each direction's own response through that direction's head response, turned with the head every
+    // block, and not through the ear decorrelation, which would scramble the interaural timing that
+    // says where it comes from. Its own twenty binaural effects: an effect carries state.
     public readonly IntPtr[] SdmEars = new IntPtr[DiffuseBranch.Count];
     public float[][] SdmOut = Array.Empty<float[]>();
     public bool SdmReady;
@@ -450,11 +415,9 @@ internal sealed class DiffuseTail
     }
 
     /// <summary>
-    /// The directions the tail arrives from: the twenty vertices of a regular dodecahedron round the
-    /// head, in the game's world — as even a spread over the sphere as twenty points get. Not fewer:
-    /// N independent directions summed at two ears leave a coherence of about 1/sqrt(N) at high
-    /// frequencies, and eight (a cube's corners) measured 0.4-0.6 above 1.2 kHz where a head in a real
-    /// diffuse field is far lower.
+    /// The directions the tail arrives from: the twenty vertices of a regular dodecahedron, game world.
+    /// Not fewer: N directions leave the ears about 1/sqrt(N) coherent at high frequencies, and eight
+    /// (a cube's corners) measured 0.4-0.6 above 1.2 kHz.
     /// </summary>
     public static System.Numerics.Vector3 Direction(int i) => Dodecahedron[i % Dodecahedron.Length];
 
@@ -471,11 +434,9 @@ internal sealed class DiffuseTail
             v.Add(new(a * inv, b * phi, 0));
             v.Add(new(a * phi, 0, b * inv));
         }
-        // Tilted off every axis the game lines a head up with. As generated, four vertices lie exactly in
-        // the plane between the ears when you face north, and your turns snap to 45-degree steps, so the
-        // head sat on that alignment often: sound from the median plane is the same at both ears, and a
-        // fifth of the tail arriving from it held the ears' coherence up. 17 degrees about the vertical
-        // and 11 about east-west line nothing up with anything.
+        // Tilted off every axis the game lines a head up with: as generated, four vertices lie in the
+        // median plane when you face north (turns snap to 45 degrees), and a fifth of the tail arriving
+        // from there held the ears' coherence up.
         var tilt = System.Numerics.Quaternion.CreateFromYawPitchRoll(17f * MathF.PI / 180f, 11f * MathF.PI / 180f, 0f);
         for (int i = 0; i < v.Count; i++) v[i] = System.Numerics.Vector3.Normalize(System.Numerics.Vector3.Transform(v[i], tilt));
         return v.ToArray();
@@ -564,14 +525,10 @@ internal static class TracedReverbDsp
 
     // ── Lining the room up with the voices ─────────────────────────────────────────────────────
     //
-    // Steam Audio's binaural effect delays what it renders by an amount that depends on its frame:
-    // an impulse straight ahead comes out 289 samples later at the voices' 1,024 and 97 at the traced
-    // stage's 256 (--early-tail hrtf; the same within 15 samples for every direction tried). A voice
-    // and its send leave the channel together (the send tap is the first thing the signal meets), so
-    // the room came out 192 samples, 4.4 ms, BEFORE the sound it answers: measured with a click 30 ms
-    // into the traced response, it landed 25.5 ms after the dry click (--clap-room probe=30). While
-    // the response started at 50 ms nobody could hear that. Started at the first reflection, a room
-    // whose nearest surface answers in 6 ms would have answered in 1.5. So the stage's input waits the
+    // Steam Audio's binaural effect delays by its frame: an impulse ahead comes out 289 samples late at
+    // the voices' 1,024 and 97 at the traced stage's 256 (--early-tail hrtf). A voice and its send leave
+    // the channel together, so the room came 192 samples (4.4 ms) before the sound it answers (a click
+    // 30 ms into the response landed at 25.5 ms, --clap-room probe=30). The stage's input waits the
     // difference.
 
     /// <summary>Where an impulse straight ahead first comes out of a binaural effect of this HRTF and
@@ -796,8 +753,6 @@ internal static class TracedReverbDsp
             }
         }
         s.InEnergy += inSum; s.OutEnergy += outSum / 2; s.ChannelEnergy += chSum / inCh; s.Channels = inCh;
-        s.InRms = (float)Math.Sqrt(inSum / n);
-        s.OutRms = (float)Math.Sqrt(outSum / (2 * n));
         return RESULT.OK;
     }
 }

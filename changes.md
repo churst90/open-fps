@@ -4,6 +4,31 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
+  optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
+  FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream
+  replay pass unregenerated, and every comment edit was checked to leave the code's tokens as they were.
+  - Comments: 17,546 lines to 11,872. Narration and history cut; every thread rule, measured figure,
+    source, Cody decision and regression fact kept in a sentence; doc comments that sat on the wrong
+    member put back on their own (about forty); some sixty comments corrected to what the code does (the
+    engine voice is rendered by the pool, not in the callback; a siren's oscillator is rectangular; the
+    turbine scatters above 2.5 kHz; the solver is regula falsi; BogieVoice is a whole bogie; the reverb
+    bus's HRTF stage is blended, never bypassed). The build's doc warnings in these files are gone.
+    Reasoning that was in no doc moved: the new docs/CLIENT_NOTES.md (stair cues, breathing, riding,
+    turn keys, taps, footsteps and the smoothed position, one-off echoes, the rain click, the bearing,
+    the render pool, echo smearing, impacts, breath, air absorption, the near boundary, gain staging,
+    traced reverb, the reflections trim), docs/COMMON_NOTES.md ("Footfalls" under Walking),
+    docs/ENGINE_SYNTHESIS.md (the turbocharger, the starter) and docs/THE_MIXER_THREAD_CRASH.md (a
+    callback does no I/O; userdata through the callback's own table).
+  - Dead code, 752 code lines: members with no caller anywhere (the ambient bed's volume and
+    diagnostics, GetPlaybackProgress, HasCategory, SteamAudioSimulator.GetPathing, ClientAudioSystem's
+    OnBreath and TyreDemand, SpatialService.RaycastAll, EngineSynth.Reset, the reverb bus meter, the
+    provider's unused send constants, InputCommandMapper.Unbind, ClientGameSession.Bind, about fifty
+    diagnostic getters); TolkSpeechOutput (no head uses it); write-only state (LocalPlayerState's room,
+    map and weather copies, the Steam Audio stages' diagnostic RMS, voice states' spec copies, the
+    boundary processor's per-sample loudest tally); parameters no body read (EarWindSynth.Control's dt,
+    its AudioLab and test callers updated); 296 unused usings. LibraryBoundary's file list and one
+    allowance follow.
 - The CI hang (run 37576816453, shard 2: `PresenceTests.ALoginIsAnnouncedToEveryoneElseOnTheAllChannel`
   silent for 30 minutes). Not SQLite: every `ClientGameSession` a test built, sound or not, queued the
   whole door prewarm (164 renders) on the thread pool, and a pool thread that finished one took the next

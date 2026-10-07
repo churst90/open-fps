@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Engine;
@@ -8,28 +7,13 @@ namespace OpenFPS.Client.AudioEngine.Core.Signals;
 /// <summary>
 /// A steam whistle: a cup with a lid, and an annular sheet of steam blown across the gap under it.
 ///
-/// It is a flue pipe and not a reed, and it is CLOSED at the top, so it sounds c/4L and the odd
-/// harmonics — half the frequency of an air horn of the same length, and hollow where the horn is
-/// brassy. The sheet of steam flaps in and out of the lip at the pipe's own rate and keeps it going.
-///
-/// The thing that makes it a steam whistle rather than an organ pipe is the gas. Sound travels at
-/// about 510 m/s in steam at 170 C against 343 in room air, so a whistle stands a fifth sharp of a
-/// pipe of the same length — and it is why a whistle WAILS UP as it starts. The bell begins full of
-/// cold air; the steam displaces it and heats the walls over the best part of a second, the sound
-/// speed inside climbs with the square root of temperature, and the note rises two or three
-/// semitones to settle. Nothing bends the pitch: the gas in the pipe changes.
-///
-/// Two more things it does on its own. A chime whistle's bells are deliberately NOT a clean chord,
-/// so the close ones beat against each other a few times a second — the "hollow" in a big whistle,
-/// which no single bell has. And a great deal of what you hear is not the note at all but the jet
-/// tearing itself apart at the lip: the breathiness, which rises with supply pressure and is why a
-/// whistle sounds like weather as much as like an instrument.
-///
-/// The one idealisation, marked because it is one: the jet's transit from gap to lip is taken as the
-/// phase the pipe wants (a third of a period) rather than computed from the gap and the jet speed.
-/// Doing that properly needs the jet's growth rate, which this model does not carry; what it costs
-/// is that the whistle will not overblow to its third harmonic when it is blown too hard, the way a
-/// real one does.
+/// A stopped flue pipe: c/4L and the odd harmonics, half an air horn's note for the length and
+/// hollow where the horn is brassy. Sound runs at about 510 m/s in steam at 170 °C against 343 in
+/// air, and the bell starts cooler, so the note wails up two or three semitones as the steam fills
+/// and heats it.
+/// A chime whistle's bells are deliberately not a clean chord and beat against each other; and much of
+/// what is heard is the jet's breath, rising with the supply. The jet is locked to the pipe (see
+/// Bell), so it will not overblow to its third harmonic as a real one blown too hard does.
 /// </summary>
 public sealed class SteamWhistle
 {
@@ -43,10 +27,9 @@ public sealed class SteamWhistle
     private readonly float _wobbleStep;   // 0.0009 a sample at 44.1 kHz: 6.3 Hz
 
     /// <summary>
-    /// What the bell sits at between blasts. NOT ambient: a whistle lives on top of a boiler with
-    /// live steam in the pipe under its valve, and the casting is hot to the touch. Starting it cold
-    /// made it wail up through seven semitones, which is three times what a real one does — the
-    /// first version did exactly that and it sounded like a slide whistle.
+    /// What the bell sits at between blasts: not ambient, since it sits on a boiler with live steam
+    /// under its valve. Started cold it wailed up seven semitones, three times a real one, like a
+    /// slide whistle.
     /// </summary>
     private const float IdleKelvin = 372f;
 
@@ -54,8 +37,6 @@ public sealed class SteamWhistle
     public bool Blowing { get; set; }
     /// <summary>Output, pascals at one metre, valid after Step().</summary>
     public float Out { get; private set; }
-    /// <summary>The gas temperature in the bells now — the thing the pitch is riding on.</summary>
-    public float GasKelvin => _kelvin;
     public float SoundSpeed => MathF.Sqrt(1.33f * 461.5f * MathF.Max(280f, _kelvin));
 
     public SteamWhistle(WhistleSpec spec, float rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, int seed = 23)
@@ -73,16 +54,14 @@ public sealed class SteamWhistle
     public void Step()
     {
         float target = Blowing ? 1f : 0f;
-        // The valve is a lever on a pipe: it opens fast and the steam arrives behind it.
         _valve += (target - _valve) * MathF.Min(1f, 1f / MathF.Max(1f, 0.035f * _rate));
 
-        // The bell fills with steam and warms. Cold air on the way in, cold metal taking heat out
-        // of it; both are one time constant and both are the wail.
+        // Filling with steam and warming the metal are one time constant, and both are the wail.
         float want = _valve > 0.05f ? MathHelper.Lerp(IdleKelvin, _spec.SteamKelvin, _valve) : IdleKelvin;
         _kelvin += (want - _kelvin) * MathF.Min(1f, 1f / MathF.Max(1f, _spec.WarmSeconds * _rate));
 
-        // Water carried over with the steam, and the boiler breathing: a slow roughness on both the
-        // level and the pitch, a few hertz, which is most of what separates steam from a siren.
+        // Water carried over and the boiler breathing: a roughness of a few hertz on level and
+        // pitch, most of what separates steam from a siren.
         float n = (float)(_rng.NextDouble() * 2 - 1);
         _wobbleLp += _wobbleStep * (n - _wobbleLp);
         _wobble = _wobbleLp * 26f;
@@ -104,19 +83,10 @@ public sealed class SteamWhistle
     }
 
     /// <summary>
-    /// One stopped bell and the sheet of steam under it.
-    ///
-    /// The jet is locked to the pipe rather than left to find it, for the same reason and with the
-    /// same honesty as the horn's reed: a flue pipe entrains within a couple of cycles and the
-    /// finding is not audible, while a jet model that fails to start is extremely audible. What that
-    /// costs is the overblow — a real whistle blown far too hard jumps to its third harmonic and
-    /// this one will not.
-    ///
-    /// The waveform is a flue's and not a reed's: the sheet of steam swings smoothly across the lip
-    /// and saturates at the ends of its travel, so it makes a rounded wave with the ODD harmonics of
-    /// a stopped pipe and nothing like a horn's pulse. On top of it is the jet tearing itself apart,
-    /// which in a whistle is not a detail — it is a third of what you hear, and it is why a whistle
-    /// sounds like weather.
+    /// One stopped bell and the sheet of steam under it. The jet is locked to the pipe, as the air
+    /// horn's reed is: a flue entrains within a couple of cycles, inaudibly, and a jet model that fails
+    /// to start is very audible. The sheet swings across the lip and saturates, a rounded wave, with
+    /// the jet's breath on top: a third of what is heard.
     /// </summary>
     internal sealed class Bell
     {
@@ -149,13 +119,11 @@ public sealed class SteamWhistle
             _hp = _noiseLp1 = _noiseLp2 = 0f; _phase = 0;
         }
 
-        /// <summary>A stopped pipe: only the odd harmonics exist in it, and the high ones lose more
-        /// at the walls, so it is a rounded wave and not a square one.</summary>
+        /// <summary>A stopped pipe: odd harmonics only, the high ones losing more at the walls.</summary>
         private void Build(float c)
         {
             float f1 = c / (4f * MathF.Max(0.02f, _b.EffectiveLengthMetres));
-            // Sized for the COLDEST the bell gets, so the count never changes and a mode is never
-            // created or destroyed under a sounding note.
+            // Sized for the coldest the bell gets, so no mode is created or destroyed under a note.
             if (_modes == null)
             {
                 float fCold = MathF.Sqrt(1.33f * 461.5f * IdleKelvin) / (4f * MathF.Max(0.02f, _b.EffectiveLengthMetres));
@@ -174,29 +142,21 @@ public sealed class SteamWhistle
         public float Step(float valve, float c, float breathMod)
         {
             if (valve < 1e-3f) return 0f;
-            // The pitch rides the gas. Rebuild the modes when the sound speed has moved enough to
-            // matter, which is a few dozen times over the wail and never again after it.
+            // Retuned when the sound speed has moved enough to matter: a few dozen times a wail.
             if (MathF.Abs(c - _lastC) > 0.0004f * _lastC) Build(c);
 
             float f1 = c / (4f * MathF.Max(0.02f, _b.EffectiveLengthMetres));
-            // Water carried over, and the jet wandering on the lip: a real whistle is never quite
-            // steady, and a steady one sounds like a synthesiser.
-            // A real whistle wanders, but only slightly: the first version wobbled six per cent,
-            // which is most of a semitone, continuously — and a note that is never in one place is
-            // not a note. ("Not like solid notes.")
+            // A real whistle wanders, but slightly: steady sounds like a synthesiser, and six per cent
+            // was "not like solid notes".
             _jitter += _jitterStep * ((float)_rng.NextDouble() * 2f - 1f - _jitter);
             _phase += f1 * (1f + 0.7f * _jitter) * _dt;
             if (_phase >= 1.0) _phase -= 1.0;
 
-            // The sheet of steam swinging across the lip, saturating at the ends of its travel.
             float jet = MathF.Tanh(2.9f * MathF.Sin(MathF.Tau * (float)_phase)) * valve;
 
-            // The steam tearing itself apart at the lip. It is a JET, and a jet's noise is set by
-            // the gap it comes through and how fast it is going — a three millimetre slot at four
-            // hundred metres a second peaks far above hearing — so it is broadband and BRIGHT, and
-            // it has nothing to do with the note. Banding it around the note instead (which is what
-            // this did first) takes all the air out of a whistle and leaves it sounding, in the
-            // owner's words, "like under water".
+            // The jet's noise is set by its gap and speed (a 3 mm slot at 400 m/s peaks far above
+            // hearing): broadband and bright, nothing to do with the note. Banded round the note it
+            // sounded, in Cody's words, "like under water".
             float nz = (float)(_rng.NextDouble() * 2 - 1);
             _noiseLp1 += OnePole.AlphaFor(7000f, _rate) * (nz - _noiseLp1);
             _noiseLp2 += OnePole.AlphaFor(320f, _rate) * (_noiseLp1 - _noiseLp2);

@@ -1,22 +1,15 @@
-using System;
-
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
-/// Microphone capture for voice chat, as Opus-encoded 20 ms frames (48 kHz mono).
-///
-/// Windows implements this over NAudio today; Linux has no implementation yet, which is exactly why
-/// the seam exists — <see cref="NullMicrophoneCapture"/> reports itself unavailable so the session
-/// can SAY so when the player presses the transmit key, rather than appearing to transmit into
-/// nothing. The intended convergence is FMOD's own
-/// <c>recordStart</c>, which is cross-platform and would let both heads share one implementation.
+/// Microphone capture for voice chat as Opus 20 ms frames, 48 kHz mono: NAudio in the Windows head,
+/// <see cref="FmodMicrophoneCapture"/> on Linux. Without a device <see cref="NullMicrophoneCapture"/>
+/// lets the session say so when the transmit key is pressed, rather than seem to transmit.
 /// </summary>
 public interface IMicrophoneCapture : IDisposable
 {
     /// <summary>False when this platform has no capture backend; the session explains that aloud.</summary>
     bool IsAvailable { get; }
 
-    /// <summary>True between a successful <see cref="Start"/> and <see cref="Stop"/>.</summary>
     bool IsCapturing { get; }
 
     /// <summary>Raised on the capture thread with one encoded Opus packet. Handlers must be thread-safe.</summary>

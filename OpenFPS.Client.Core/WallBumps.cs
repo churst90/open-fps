@@ -1,32 +1,18 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
 
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Walking into something: once per contact, a body-against-it knock from where you touched it, and
-/// its name.
-///
-/// "When you run into walls, we need a bump sound and I need to hear what I ran into" (Cody,
-/// 2026-10-04). Stopping dead at a wall in silence feels like the keys stopped working, and the wall's
-/// name is the one fact that says where you are against the building.
-///
-/// ONCE PER CONTACT is the whole of the rule set:
-///   * A bump needs INTENT — the attempted motion aimed at the surface by at least
-///     <see cref="MinIntent"/> of its speed (thirty degrees off the face or steeper). Sliding along a
-///     wall you are brushing is not running into it.
-///   * Then it is a contact until you have moved <see cref="RearmMetres"/> clear of where you last
-///     touched anything. Pressing on, letting go and pressing again, or sliding along the wall —
-///     across however many panels it was built from — is the same contact.
-///   * Inside one contact, only something genuinely ELSE bumps again: a different entity whose face
-///     turns more than <see cref="NewFaceDegrees"/> from every face already touched. Walking into a
-///     corner is two walls; a long wall built of two-metre panels is one.
-///
-/// The ground is never bumped (see <see cref="Sightline.IsGround"/>), and neither is a ceiling or a
-/// floor edge: only faces that stand up.
+/// Walking into something: once per contact, a knock from where you touched it, and its name (Cody,
+/// 2026-10-04: "we need a bump sound and I need to hear what I ran into"). Once per contact means:
+///   * a bump needs intent, the attempted motion aimed at the surface by at least
+///     <see cref="MinIntent"/> of its speed; brushing along a wall is not running into it.
+///   * it is one contact until you are <see cref="RearmMetres"/> clear of where you last touched, so
+///     pressing again or sliding along a wall of many panels is the same contact.
+///   * within it, only a different entity whose face turns more than <see cref="NewFaceDegrees"/> from
+///     every face touched bumps again: a corner is two walls, a wall of panels one.
+/// Only faces that stand up: never the ground (<see cref="Sightline.IsGround"/>), a ceiling or a step.
 /// </summary>
 public sealed class WallBumps
 {

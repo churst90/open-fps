@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -9,29 +7,19 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// <summary>
 /// The ways a vehicle's own sound gets into its cabin, and where each one comes in.
 ///
-/// WHY. Sitting in a car, the interior model (EngineVoiceState, "Sitting in it") worked out the
-/// pressure at the ear as ONE signal and played it from one point a little ahead of the head and
-/// below. Both ears then heard the same thing: interaural correlation about 1.0 in every band, which
-/// is heard as mono, in the head (Cody, 2026-10-06: "the inside of the cab of the cars sounds mono").
-/// A real cabin is nothing like that. The engine comes through the firewall and the dash in front of
-/// you, each tyre through its own wheel arch and the floor at its corner, the exhaust along the floor
-/// behind, the wind at the A-pillars and the mirrors either side of the windscreen. Each of those is
-/// its own mechanism with its own noise, so the two ears get different mixes of them: a real cabin is
-/// fairly diffuse above about 500 Hz, with the engine's low orders from the front.
+/// The interior model is split into paths (<see cref="Kind"/>), each rendered from its own sources
+/// through its own panels and played from where it comes in. Played as one signal from one point,
+/// both ears matched (correlation 0.97 to 1.00) and the cab sounded mono (Cody, 2026-10-06; see
+/// changes.md). No path is a copy of another: a noise per wheel, the tread tone once from under the
+/// floor, a wind noise per side. The paths' powers add to what the single signal had, so the level at
+/// the ear is the model's; only where it comes from changes.
 ///
-/// WHAT. The same model, split into those paths (<see cref="Kind"/>), each rendered from its own
-/// sources through its own panels (the mass law and the seals of the interior model, per path), and
-/// played from where it comes in. Nothing is a copy of anything else: the tyres are a noise per
-/// wheel (their tread tone, one tone on every wheel, once, from under the floor), the wind a noise per
-/// side. The paths' powers add to what the single signal had, so the
-/// level at the ear is the model's; only where it comes from changes.
+/// Positions are in the vehicle's own frame (x right, y up from the road, z forward from the middle of
+/// the body), from the cabin's measured box (<see cref="VehicleCabin"/>) and the wheel layout
+/// (<see cref="WheelDynamics"/>); nothing is authored per vehicle. A vehicle with no cabin (a
+/// motorcycle, a formula car) has no layout and keeps the one interior voice.
 ///
-/// WHERE. In the vehicle's own frame (x right, y up from the road, z forward from the middle of the
-/// body), from the cabin's measured box (<see cref="VehicleCabin"/>) and the running gear's wheel
-/// layout (<see cref="WheelDynamics"/>). Nothing here is authored per vehicle. A vehicle with no
-/// cabin (a motorcycle, a formula car) has no layout and keeps the one interior voice.
-///
-/// OPENFPS_CABIN_PATHS=0 plays the interior from one point, as before 2026-10-06.
+/// OPENFPS_CABIN_PATHS=0 plays the interior from one point.
 /// </summary>
 public static class CabinPaths
 {
@@ -48,8 +36,8 @@ public static class CabinPaths
         Wheel,
         /// <summary>The tread tone: one tone, in phase on every tyre of a size (the blocks of each meet the
         /// road at the same rate, from the same start), so one source, under the floor between the axles.
-        /// Shared out over the wheels it was four copies of one tone from four places, which beat against
-        /// each other at the ears and lost a decibel in the tone's octave.</summary>
+        /// Shared out over the wheels it was four copies of one tone, which beat at the ears and lost a
+        /// decibel in the tone's octave.</summary>
         Tread,
         /// <summary>The wind over the body at the A-pillar and the mirror on one side, and whatever
         /// comes in through that side's open windows.</summary>
@@ -85,10 +73,9 @@ public static class CabinPaths
         public int Count => Paths.Length;
     }
 
-    /// <summary>How far from the head every path is played, metres: where the one interior voice was
-    /// (0.4 below and 0.6 ahead, 0.72 m). The HRTF takes only a direction; the distance sets the gain,
-    /// the ear model's shelves and the room send, and the interior model has already worked out the
-    /// pressure at the ear, so every path is placed where the single voice was and only turned.</summary>
+    /// <summary>How far from the head every path is played, metres: the one interior voice's distance
+    /// (0.4 below and 0.6 ahead). The interior model already gives the pressure at the ear and the
+    /// distance sets gain, ear shelves and room send, so each path is only turned, never moved.</summary>
     public const float PlacedMetres = 0.72f;
 
     /// <summary>Where the one interior voice was played from, against the head in the vehicle's frame.</summary>
@@ -192,8 +179,7 @@ public static class CabinPaths
 
     /// <summary>
     /// Where path <paramref name="path"/> is played from, relative to the head, in the vehicle's frame:
-    /// the direction from the ear to where it comes in, at <see cref="PlacedMetres"/>. A path straight
-    /// through the head (it cannot be: the head is never on a panel) is placed ahead.
+    /// the direction from the ear to where it comes in, at <see cref="PlacedMetres"/>.
     /// </summary>
     public static Vector3 Offset(Layout layout, int path, Vector3 ear)
     {

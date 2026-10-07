@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
 
 /// <summary>
@@ -342,19 +338,16 @@ public static class TextureStatistics
         }
     }
 
-    // ── The references ───────────────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// The summary features of the reference recordings, each cut into 20 s pieces (the length a test
-    /// renders; a recording under 20 s is one piece) and each piece measured with tools/texture_stats.py,
-    /// so a range is the recordings' own spread including how far one recording wanders from one 20 s
-    /// to the next (one 30 s window of a fountain moved its octave correlation from 0.16 to 0.24). The
-    /// files are in
-    /// ~/openfps-scratch-archive/{nature,rain}-2026-10-05/refs, listed with their sources in
-    /// SOURCES.txt). Recordings are a yardstick and are never played in the game; their numbers are
-    /// written here so the tests can hold a model inside their spread without them. "fountain", "leaves"
-    /// (wind in broadleaf trees), "fire", "rain" (streets, gardens, woods, a car roof, a tiled roof, a
-    /// window; not the two whose originals stop at 4 and 8 kHz). Running water (2026-10-06,
+    /// renders) and measured with tools/texture_stats.py, so a range includes how far one recording
+    /// wanders from one 20 s to the next (one 30 s window of a fountain moved its octave correlation
+    /// from 0.16 to 0.24). The files and their sources (SOURCES.txt) are in
+    /// ~/openfps-scratch-archive/{nature,rain}-2026-10-05/refs; they are yardsticks, never played, so
+    /// their numbers are written here for the tests. "fountain", "leaves" (wind in broadleaf trees),
+    /// "fire", "rain" (streets, gardens, woods, a car roof, a tiled roof, a window; not the two whose
+    /// originals stop at 4 and 8 kHz). Running water (2026-10-06,
     /// ~/openfps-scratch-archive/running-water-2026-10-06/refs): "stream" (six brooks and creeks, two river
     /// riffles), "drain" (storm drains and a trough's overflow drain), "downpipe" (five downpipes and
     /// spouts) and "overflow" (a pond overflow, a tiny dam, a small weir, a fountain's overflow).

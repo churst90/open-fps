@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using OpenFPS.Common.Networking;
 using OpenFPS.Client.Core.Platform;
 
@@ -20,12 +18,9 @@ public enum ChatBufferType
 }
 
 /// <summary>
-/// The player's message history as four rings, navigable by keyboard — the accessible equivalent of
-/// a scrollback pane. [ and ] walk the messages in the ring you are in; Shift+[ and Shift+] change
-/// ring. Speaks through <see cref="ISpeechOutput"/>, so it is shared by every client head.
-///
-/// Each message carries its channel; the ring and the wording come from that, never from the
-/// sender's name. Nothing from the server is prefixed: its lines have their own sound.
+/// The message history as four rings, the keyboard's scrollback: [ and ] walk the ring you are in,
+/// Shift+[ and Shift+] change ring. The ring and the wording come from a message's channel, never
+/// from the sender's name; the server's lines have no prefix, they have their own sound.
 /// </summary>
 public class ChatManager
 {
@@ -94,9 +89,8 @@ public class ChatManager
     }
 
     /// <summary>
-    /// Private messages and the server's answers are spoken whichever ring you are in. Ambient chat
-    /// is not: turning away from it is what a ring is for. The answer to a command you just typed is
-    /// always spoken, or a refused command would sound exactly like one that worked.
+    /// Private messages and the server's answers are spoken whichever ring you are in; ambient chat is
+    /// not. A refused command must never sound like one that worked.
     /// </summary>
     private static bool IsAddressedToYou(ChatBufferType ring) => ring is ChatBufferType.Private or ChatBufferType.Server;
 

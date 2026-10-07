@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Common;
@@ -7,13 +6,10 @@ using OpenFPS.Client.AudioEngine.Core.Nature;
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// The wind at the listener's ears, as a voice: one generator, two channels, played flat (2D) on the
-/// master with no reverb send and no binaural placement, because it is not a sound arriving from
-/// anywhere; it is made at the ears (see <see cref="EarWind"/>).
-///
-/// The game thread hands it where the listener is, how they are moving, which way they face and how
-/// exposed the place is (<see cref="Listener"/>). The mixer reads the wind field itself once a block,
-/// so the gusts keep moving at the ears even while the game thread is busy.
+/// The wind at the listener's ears: one stereo generator played flat on the master, with no reverb
+/// send and no binaural placement, because it is made at the ears rather than arriving from anywhere
+/// (<see cref="EarWind"/>). The game thread sets the listener (<see cref="SetListener"/>); the mixer
+/// reads the wind field itself once a block, so the gusts keep moving while the game thread is busy.
 /// </summary>
 public sealed class EarWindState : IGuardedUnit
 {
@@ -21,8 +17,8 @@ public sealed class EarWindState : IGuardedUnit
 
     public readonly EarWindSynth Synth;
 
-    /// <summary>Where the listener is, or null for nobody (no world loaded). Game thread writes, mixer
-    /// reads; the box is swapped whole so the mixer never reads half of one frame's listener.</summary>
+    /// <summary>The listener, or null with no world loaded. Game thread writes, mixer reads; the box is
+    /// swapped whole so the mixer never reads half of one frame's listener.</summary>
     public void SetListener(EarWindListener? listener)
         => System.Threading.Volatile.Write(ref _listener, listener is { } l ? new Box(l) : null);
     private Box? _listener;
@@ -31,8 +27,7 @@ public sealed class EarWindState : IGuardedUnit
     /// <summary>Off with OPENFPS_EAR_WIND=0: a lever for listening without it, not a setting.</summary>
     public volatile bool Enabled = true;
 
-    /// <summary>The exposure the ears are at, glided over 0.4 s so a doorway fades the wind rather than
-    /// cutting it.</summary>
+    /// <summary>Glided over 0.4 s so a doorway fades the wind rather than cutting it.</summary>
     private float _exposure = -1f;
     private const float ExposureSeconds = 0.4f;
 
@@ -50,7 +45,7 @@ public sealed class EarWindState : IGuardedUnit
         var box = System.Threading.Volatile.Read(ref _listener);
         if (!Enabled || box == null)
         {
-            Synth.Control(default, dt);
+            Synth.Control(default);
             return;
         }
         var listener = box.L;
@@ -58,7 +53,7 @@ public sealed class EarWindState : IGuardedUnit
         if (_exposure < 0f) _exposure = target;
         _exposure += (target - _exposure) * (1f - MathF.Exp(-dt / ExposureSeconds));
         var ears = EarWind.Hear(WindField.Weather, listener with { Exposure = _exposure }, WindField.Now());
-        Synth.Control(ears, dt);
+        Synth.Control(ears);
     }
 }
 
@@ -88,7 +83,7 @@ internal static class EarWindProcessor
         return res;
     }
 
-    /// <summary>A managed DSP callback must not throw: a fault is one silent block, and a line in the
+    /// <summary>A managed DSP callback must not throw: a fault is one silent block and a line in the
     /// log from the game thread (DspFault).</summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)

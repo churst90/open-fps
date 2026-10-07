@@ -2,13 +2,12 @@ using System.Numerics;
 
 namespace OpenFPS.Client.AudioEngine.Data;
 
+/// <summary>What the path from a source to the listener does to it, as the acoustic worker answered.</summary>
 public struct AcousticPathData
 {
     public float Occlusion;
-    /// <summary>Where the SOURCE was when this was computed. A result is answered for a place, and a
-    /// voice id that has since been reused for a sound somewhere else must not inherit it — see
-    /// ClientAudioSystem, where a one-shot's pooled id used to be handed the previous occupant's
-    /// occlusion and apparent position for its first frames.</summary>
+    /// <summary>Where the source was when this was computed: a pooled voice id reused elsewhere must not
+    /// inherit the previous occupant's occlusion and apparent position (ClientAudioSystem).</summary>
     public Vector3 SourcePosition;
     public Vector3 ApparentPosition;
     public float EffectiveDistance;
@@ -26,11 +25,12 @@ public struct AcousticPathData
     public float EqHigh;
 
     public bool IsReflection;
+    // TODO: ReflectionId and Scattering are written (AsyncAcousticWorker, SpatialAcoustics) and read nowhere.
     public int ReflectionId;
     public float ReflectionDelayMs;
     public int ReflectionIndex;
     public float Scattering;
-    public float Spread; // (0-360) Volumetric width of the sound
+    public float Spread; // degrees, 0-360: the sound's width
 
     public AcousticPathData(float occlusion, Vector3 apparentPos, float effectiveDist, float materialAbsorption = 0.0f, float aperture = 1.0f, float bleed = 0.1f, int regionId = -1, float eqL = 1.0f, float eqM = 1.0f, float eqH = 1.0f)
     {

@@ -1,23 +1,15 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Parts of a room with names of their own: a flight of stairs, a landing (prefabs/named_place.json).
-///
-/// "The stairs themselves need a zone, then the landings need a zone" (Cody, 2026-10-04). A region
-/// would not do: a region is a name and a room for sound at once, and a stairwell cut into a region
-/// a flight would have been cut into rooms a flight long — its reverberation measured from a box
-/// 1.6 m wide, and sound from the rest of the shaft reaching the stairs through walls that are not
-/// there. A named place is only a name. Where you stand in one, it is what you are told you are in;
-/// the room you hear is the region round it, as before.
-///
-/// Each is a fixed box that is not solid, so the client keeps them with the markers
-/// (<see cref="WorldSnapshot.MarkerEntityIds"/>), which is a short list rather than the whole map.
+/// Parts of a room with names of their own: a flight of stairs, a landing (prefabs/named_place.json;
+/// Cody, 2026-10-04: "the stairs themselves need a zone, then the landings"). Only a name, never a room
+/// for sound: a stairwell cut into regions a flight long would be reverberated as 1.6 m boxes, with the
+/// rest of the shaft heard through walls that are not there (docs/AUTHORING.md, "Named places"). Not
+/// solid, so the client keeps them with the markers (<see cref="WorldSnapshot.MarkerEntityIds"/>).
 /// </summary>
 public static class NamedPlaces
 {

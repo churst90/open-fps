@@ -1,23 +1,15 @@
-using System;
 using System.Runtime.InteropServices;
-using System.Threading;
 using FMOD;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// The player's own voice, as the room they are standing in answers it.
-///
-/// You never hear your own voice dry through the game: you already hear it, through the air and your
-/// skull, and a second copy a few tens of milliseconds late would be a slap-back. What you hear is the
-/// room: the surfaces round you sending it back, each from its own direction and after its own extra
-/// path, and the room's reverberation. That is how a speaker knows a tiled bathroom from a field, and
-/// what tells a player on voice chat that the microphone is live.
-///
-/// The microphone writes here as it captures (48 kHz mono, before encoding; nothing goes through the
-/// server), and each voice of the room reads back from it at its own delay. The capture runs in 20 ms
-/// frames on its own thread, so a reader keeps <see cref="Margin"/> behind the newest sample and is
-/// never left without one.
+/// The player's own voice as their room answers it, and the ring a talker's voice is played from. Your
+/// own voice is never played dry (you hear it already; a late copy is a slap-back), only the surfaces
+/// sending it back and the room's reverberation: how a speaker tells a bathroom from a field, and how a
+/// player knows the microphone is live. The microphone writes here as it captures (48 kHz mono, before
+/// encoding, never through the server) in 20 ms frames on its own thread, so a reader keeps
+/// <see cref="Margin"/> behind the newest sample.
 /// </summary>
 public sealed class OwnVoiceRing
 {
@@ -34,8 +26,8 @@ public sealed class OwnVoiceRing
 
     /// <summary>
     /// How far behind the newest sample a reader stays, seconds: <see cref="Margin"/> for the microphone,
-    /// and for a voice arriving over the network, what its jitter needs (TalkerStream). Writer sets it;
-    /// a reader moves toward a new one at its pull rate rather than jumping.
+    /// what the jitter needs for a network voice (TalkerStream). The writer sets it; a reader moves toward
+    /// a new one at its pull rate, never jumps.
     /// </summary>
     public double MarginSeconds
     {
@@ -45,9 +37,9 @@ public sealed class OwnVoiceRing
     private double _margin = Margin;
 
     /// <summary>
-    /// Bumped each time somebody starts talking again after a pause (TalkerStream). A reader that sees it
-    /// change starts from <see cref="SpurtStart"/> once a margin's worth has arrived, instead of from a
-    /// margin behind the newest sample, which on the first packet would be the end of what they said last.
+    /// Bumped each time somebody talks again after a pause (TalkerStream). A reader that sees it change
+    /// starts from <see cref="SpurtStart"/> once a margin's worth has arrived: a margin behind the newest
+    /// sample would, on the first packet, be the end of what they said last.
     /// </summary>
     public int Spurt => Volatile.Read(ref _spurt);
     private int _spurt;
@@ -76,11 +68,10 @@ public sealed class OwnVoiceRing
     private long _lastWrite;
 
     /// <summary>
-    /// How loud this player talks into this microphone, dBFS RMS: a slow average of the level while they
-    /// are speaking (above a -50 dBFS gate), starting from a typical -26. Their usual voice is taken to
-    /// be normal conversation (Speech.NormalDb at a metre), as a recorded line's level is; a shout is
-    /// then louder than that, and fills the room more. Without it the room's answer would follow the
-    /// microphone's gain, not the voice.
+    /// How loud this player talks into this microphone, dBFS RMS: a slow average while speaking (above a
+    /// -50 dBFS gate), from a typical -26. Their usual voice is taken as normal conversation
+    /// (Speech.NormalDb at a metre), so a shout fills the room more and the answer follows the voice,
+    /// not the microphone's gain.
     /// </summary>
     public float SpeechRmsDbfs => Volatile.Read(ref _speechDb);
     private float _speechDb = -26f;
@@ -116,11 +107,10 @@ public sealed class OwnVoiceRing
 }
 
 /// <summary>
-/// One voice of the room answering: the ring read back at a delay, at the mixer's rate. The read keeps
-/// its own clock and is pulled toward where it should be by at most 1 % of its rate, averaged over a
-/// couple of seconds: the capture arrives in 10-20 ms bursts, and chasing each one would wobble the
-/// pitch. A delay that changes as the listener moves arrives the same way, which is the small pitch
-/// shift a reflection really has while you walk toward its wall; it is never stepped (a click).
+/// One voice reading the ring at a delay, at the mixer's rate. The read keeps its own clock, pulled
+/// toward its target by at most its pull rate, averaged over a couple of seconds: the capture arrives in
+/// 10-20 ms bursts and chasing each would wobble the pitch. A delay that changes as you walk arrives the
+/// same way (the small pitch shift a reflection really has), never stepped (a click).
 /// </summary>
 public sealed class OwnVoiceTap : IGuardedUnit
 {
@@ -140,12 +130,13 @@ public sealed class OwnVoiceTap : IGuardedUnit
     private int _spurt;
     private bool _priming, _starved;
 
-    /// <param name="maxPull">The most the read rate may be pulled off true to follow its target, as a
-    /// fraction: 1 % for the room answering you, whose delays change as you walk (that change is the small
-    /// pitch shift a reflection really has); far less for somebody talking (TalkerStream.MaxPull).</param>
-    /// <param name="measures">Whether catching up with the newest sample is reported to the ring as a
-    /// margin too short (TalkerStream lengthens it). The voice itself does; a surface answering it reads
-    /// behind it, so running dry is the voice's to report, and counted twice would lengthen the margin twice.</param>
+    /// <param name="ring">The ring to read.</param>
+    /// <param name="delaySeconds">The delay to start at, behind the ring's margin.</param>
+    /// <param name="mixerRate">The rate the mixer asks for samples at.</param>
+    /// <param name="maxPull">The most the read rate may be pulled off true, as a fraction: 1 % for the room
+    /// answering you; far less for somebody talking (TalkerStream.MaxPull).</param>
+    /// <param name="measures">Whether running dry is reported to the ring as a margin too short. The voice
+    /// does; a surface answering it reads behind it, and reporting twice would lengthen the margin twice.</param>
     public OwnVoiceTap(OwnVoiceRing ring, float delaySeconds, int mixerRate, double maxPull = 0.01, bool measures = true)
     {
         Ring = ring;
@@ -195,8 +186,7 @@ public sealed class OwnVoiceTap : IGuardedUnit
         {
             if (_position + 1 >= written)
             {
-                // Caught up with the newest sample. Wait here for the rest rather than run on past it:
-                // what has not arrived yet is still to be said, and running on would skip it. The last
+                // Caught up: wait here rather than run on and skip what is still to arrive. The last
                 // sample dies away instead of stopping dead.
                 if (live && !_starved) { if (_measures) Ring.Starved(); _starved = true; }
                 _last *= _starveDecay;
@@ -237,7 +227,7 @@ public static class OwnVoiceProcessor
         return res;
     }
 
-    /// <summary>NOTHING MAY ESCAPE A DSP CALLBACK (see MachineProcessor).</summary>
+    /// <summary>Nothing may escape a DSP callback (see MachineProcessor).</summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {

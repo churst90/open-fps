@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
@@ -8,40 +6,31 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
-using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Client.Core;
 
 /// <summary>
 /// Where the rain is heard from: the surfaces round the listener, sampled from the sky down.
 ///
-/// Rain is not a sound at a point; it is every surface in the open being struck at once, and what
-/// you hear is that field — loud and separate close by, a hiss further off, each part coloured by
-/// what it lands on. So the survey drops a column out of the sky over a polar grid round the
-/// listener (rings out to <see cref="RingEdges"/>'s last edge, eight sectors each) and asks what each
-/// column meets first: the road, the grass, a car's roof, a tree's crown, a building's roof. That
-/// answer, with the column's share of the ground and its distance from the ear, is all the rain
-/// voices need (RainSynth renders the drops on it; RainPlate rings what is thin).
+/// <para>Rain is every surface in the open struck at once. The survey drops a column out of the sky
+/// over a polar grid round the listener (rings to <see cref="RingEdges"/>'s last edge, eight sectors
+/// each) and asks what each column meets first; that, with its share of the ground and its distance,
+/// is all the rain voices need (RainSynth renders the drops; RainPlate rings what is thin).</para>
 ///
-/// The columns are gathered into a few PATCHES, each one voice: a near and a far patch in each of
-/// the four compass directions, and the roof overhead if there is one. A patch is placed where its
-/// surfaces are, weighted as they are heard (area over distance squared), so the car beside you,
-/// the street ahead and the park behind come from where they are, and one heard from indoors comes
-/// through the walls and the windows like anything else outside.
+/// <para>The columns are gathered into patches, one voice each: near and far in each compass quarter,
+/// and the roof overhead. A patch is placed where its surfaces are, weighted as heard (area over
+/// distance squared), so one heard from indoors comes through the walls and windows like anything
+/// outside.</para>
 ///
-/// THE ROOF OVERHEAD is its own voice. When the first thing straight up from the ear is the same
-/// thing the rain lands on, you are under that roof, and what you hear of the rain on it is the
-/// sheet itself ringing (RainPlate, heard from below): a bus shelter's steel drums, a car's roof
-/// drums, a concrete slab is silent. When something else is in between — a suspended ceiling, a
-/// floor — that is a wall between you and the roof, and takes what a wall takes
-/// (WallTransmission.BandGains). Under a tree you are not under a roof: the crown is rain on leaves
-/// and drips round you.
+/// <para>The roof overhead: when the first thing straight up from the ear is what the rain lands on,
+/// you hear the sheet ringing from below (a shelter's steel drums, a concrete slab is silent). Anything
+/// between (a suspended ceiling, a floor) takes what a wall takes (WallTransmission.BandGains). A tree's
+/// crown is not a roof.</para>
 ///
-/// Nothing here is per map: the kinds of surface come from the materials (RainSurfaces), the sizes
-/// from the geometry, a car's panels from its own body (VehicleBody), a tree's crown from its own
-/// spec (FoliageSpec). Not yet: rain driven onto walls and windows by the wind (the drops fall
-/// straight down here, so a vertical pane takes none), gutters and downpipes, and run-off.
+/// <para>Nothing is per map: surface kinds from the materials (RainSurfaces), sizes from the geometry,
+/// a car's panels from its body (VehicleBody), a crown from its FoliageSpec.</para>
 /// </summary>
+// TODO: wind-driven rain on walls and windows (drops fall straight down), gutters, downpipes, run-off.
 public sealed class RainSurvey
 {
     /// <summary>The survey's rings, m from the listener. The last edge is how far rain is heard
@@ -74,8 +63,8 @@ public sealed class RainSurvey
     {
         public readonly RainPatch?[] Patches = new RainPatch?[RainFeeds.Slots];
         public readonly Vector3[] Centres = new Vector3[RainFeeds.Slots];
-        /// <summary>The patch is heard in plain view (or round an edge, already paid for in its
-        /// areas): it takes no path but the air. A patch wholly behind something takes the path to it.</summary>
+        /// <summary>The patch is heard in plain view (or round an edge, already paid for in its areas) and
+        /// takes no path but the air; one wholly behind something takes the path to it.</summary>
         public readonly bool[] Direct = new bool[RainFeeds.Slots];
         /// <summary>What the voice of the roof overhead is filtered by, per band (amplitude).</summary>
         public (float Low, float Mid, float High) OverheadEq = (1f, 1f, 1f);
@@ -135,7 +124,6 @@ public sealed class RainSurvey
         public bool Vehicle;
         public VehicleBody? Body;
         public bool Solid;
-        public float SizeThickness;
         public Vector3 Size;
         public WallBuild Build;
     }
@@ -162,18 +150,18 @@ public sealed class RainSurvey
         return d;
     }
 
-    /// <summary>Surveys the rain round <paramref name="ear"/>. <paramref name="ownEntityId"/> is
-    /// never a roof (it is the listener's own body); <paramref name="ridingEntityId"/> is, if the
-    /// listener is sitting in it.</summary>
     /// <summary>Keep a line per column in the result, for the lab.</summary>
     public bool TraceColumns;
 
+    /// <summary>Surveys the rain round <paramref name="ear"/>. <paramref name="ownEntityId"/> is never a
+    /// roof (it is the listener's own body). <paramref name="ridingEntityId"/> is not read: the vehicle
+    /// you sit in is a roof like any other thing.</summary>
     public Result Run(WorldSnapshot world, Vector3 ear, int ownEntityId, int ridingEntityId)
     {
         long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
         var result = new Result();
         float reach = RingEdges[^1];
-        Gather(world, ear, reach + 2f, ownEntityId, ridingEntityId);
+        Gather(world, ear, reach + 2f, ownEntityId);
         result.Candidates = _things.Count;
         foreach (var m in _layers) m.Clear();
         Array.Clear(_seenAny);
@@ -253,17 +241,15 @@ public sealed class RainSurvey
                 if (seen) _seenAny[slot] = true;
             }
         }
-        // A patch is heard from the part of it the listener can see, or hear round the edge of
-        // something, if there is any: the street round the end of a shelter's glass, at what the
-        // edge costs it. Only a patch that is wholly behind something — everything outside, to a
-        // listener indoors — is heard through it, by the path to it (the walls, the windows, the
-        // openings).
+        // A patch is heard from the part of it in view or round an edge (the street past a shelter's
+        // glass). Only a patch wholly behind something (outside, to a listener indoors) is heard by the
+        // path to it.
         foreach (var c in _columns)
         {
             if (c.Slot != OverheadSlot && _seenAny[c.Slot] && !c.Seen) continue;
             _underTop = c.UnderTop;
-            // Near enough, and heard straight (or the roof over the ear): its big drops are played one
-            // by one where they land (NearDrops), and the patch keeps the rest.
+            // Near and heard straight (or the roof over the ear): its big drops are played one by one
+            // (NearDrops), and the patch keeps the rest.
             bool near = c.Ring < NearDrops.NearRings && (c.FromBelow || c.Plain);
             _near = near ? result : null;
             _nearAngle = c.Angle;
@@ -380,8 +366,7 @@ public sealed class RainSurvey
                     layer.UnderStretch = RainSurfaces.ContactStretch(AcousticRegistry.GetProperties(Known(below.Material)));
                     float bottom = thing.Sphere ? thing.Centre.Y - thing.Radius : thing.Centre.Y - thing.Half.Y;
                     layer.DripFallMetres = MathF.Max(0.5f, MathF.Round(2f * (bottom - _underTop)) / 2f);
-                    // The leaves face every way; what the bin's aim is for is the drips and the
-                    // rain coming through, which land on the ground under the crown.
+                    // Leaves face every way: the aim is the drips', on the ground under the crown.
                     var ground = new Vector3(at.X, _underTop, at.Z);
                     aim = (ear.Y - _underTop) / MathF.Max(0.5f, Vector3.Distance(ground, ear));
                 }
@@ -534,13 +519,11 @@ public sealed class RainSurvey
     public const float MaxEdgeLossDb = 20f;
 
     /// <summary>
-    /// What reaches the ear from a point, as a share of its energy: 1 in plain view. Behind ONE thing
-    /// standing across the line — a shelter's glass end, a parked van, a garden wall — round its
-    /// edge: over its top or past either end, whichever way is clear on both legs (ear to edge, edge to
-    /// point), at Maekawa's barrier loss for that detour at 1 kHz, 10 log10(3 + 20 N) − 4.77 dB with
-    /// N = 2δ/λ (the law VehicleShadow puts moving bodies in the way with). 0 when no way round is
-    /// clear, when more than one thing is in the way, or when the way round costs more than
-    /// <see cref="MaxEdgeLossDb"/>: a room's walls, a building, a pane set in a wall.
+    /// What reaches the ear from a point, as a share of its energy: 1 in plain view. Behind one thing
+    /// standing across the line (a shelter's glass end, a van, a garden wall), round its top or either
+    /// end, whichever is clear on both legs, at Maekawa's loss for the detour at 1 kHz,
+    /// 10 log10(3 + 20 N) − 4.77 dB with N = 2δ/λ (VehicleShadow's law). 0 when no way round is clear,
+    /// more than one thing is in the way, or the way round costs more than <see cref="MaxEdgeLossDb"/>.
     /// </summary>
     private float Through(Vector3 ear, Vector3 to, int except)
     {
@@ -556,8 +539,7 @@ public sealed class RainSurvey
         }
         if (blocker < 0) return 1f;
         var t = _things[blocker];
-        // Only something standing across the line, which the line goes through side to side, has an
-        // edge to get round: a line down through a floor or a roof is through it, not past it.
+        // Only a line through it side to side has an edge to get round; one down through a roof does not.
         if (MathF.Abs(entry.Y) >= t.Half.Y * 0.999f || MathF.Abs(exit.Y) >= t.Half.Y * 0.999f) return 0f;
         var rotation = Quaternion.Inverse(t.ToLocal);
         var mid = 0.5f * (entry + exit);
@@ -625,7 +607,7 @@ public sealed class RainSurvey
 
     // ── What there is to meet ───────────────────────────────────────────────────────────────────
 
-    private void Gather(WorldSnapshot world, Vector3 ear, float radius, int ownEntityId, int ridingEntityId)
+    private void Gather(WorldSnapshot world, Vector3 ear, float radius, int ownEntityId)
     {
         _things.Clear();
         if (world.StaticGrid != null)
@@ -655,7 +637,7 @@ public sealed class RainSurvey
         }
         foreach (var e in _foliage)
             if (Vector3.DistanceSquared(e.Transform.Position, ear) < (radius + 15f) * (radius + 15f)) AddFoliage(e);
-        // Vehicles: what is parked or driving near.
+        // Vehicles, parked or driving, the one you ride in included.
         foreach (var e in world.DynamicEntities)
         {
             if (e.Id == ownEntityId) continue;
@@ -690,7 +672,6 @@ public sealed class RainSurvey
             BayB = MathF.Min(RainSurfaces.BuiltBayMetres, mid),
             Solid = true,
             Size = size,
-            SizeThickness = thickness,
             Build = new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres),
         });
     }
@@ -782,7 +763,8 @@ public sealed class RainField
     /// <summary>The last survey, for the log and the lab.</summary>
     public RainSurvey.Result? LastSurvey => _last;
 
-    /// <param name="seed">Seeds the near drops (NearDrops). Null: from the clock, as in the game.</param>
+    /// <summary>The rain voices on <paramref name="audio"/>, with paths through <paramref name="acoustics"/>
+    /// when given; <paramref name="seed"/> seeds the near drops, from the clock when null (the game).</summary>
     public RainField(AudioEngineFacade audio, SpatialAcoustics? acoustics, int? seed = null)
     {
         _audio = audio;
@@ -814,10 +796,8 @@ public sealed class RainField
         }
         _dryFrom = double.NaN;
 
-        // The survey runs off the game thread: on the city there are fifteen hundred boxes within
-        // reach and it takes tens of milliseconds, which on this thread is every sound in the world
-        // standing still for that long (the-empty-grid-answer). The snapshot it reads is not changed
-        // after it is made — the acoustic worker reads snapshots off this thread the same way.
+        // The survey runs off the game thread: on the city (1,500 boxes in reach) it takes tens of
+        // milliseconds, every sound in the world standing still. Safe because a snapshot never changes.
         if (_pending is { IsCompleted: true } done)
         {
             _pending = null;
@@ -902,10 +882,9 @@ public sealed class RainField
     private readonly Vector3[] _partAt = new Vector3[8];
     private readonly float[] _partShares = new float[8];
 
-    /// <summary>How far round the point over the ear the roof's parts are placed, m: a third of the side
-    /// of the roof heard (the patch's area), so each part sits over its own quarter of it; at least
-    /// 0.3 m (a car's roof is a metre or two across) and at most 2.5 (beyond, the rain on a big roof is
-    /// far enough off to be the ring patches' business, not the roof's).</summary>
+    /// <summary>How far round the point over the ear the roof's parts are placed, m: about a third of the
+    /// side of the roof heard, so each part sits over its own quarter; 0.3 m at least (a car's roof) and
+    /// 2.5 at most (beyond, a big roof's rain is the ring patches').</summary>
     public static float RoofReach(RainPatch patch)
     {
         float area = 0f;
@@ -922,9 +901,8 @@ public sealed class RainField
     }
 
     /// <summary>Where part <paramref name="part"/> of <paramref name="parts"/> of a near quarter is: the
-    /// patch's middle turned about the ear to the middle of that part's share of the quarter, so a
-    /// quarter of two parts is heard from 22.5° either side of its middle (and none of it from straight
-    /// ahead or behind, where both ears hear the same).</summary>
+    /// patch's middle turned about the ear to the middle of that part's share, so two parts are heard
+    /// 22.5° either side (none from straight ahead or behind, where both ears hear the same).</summary>
     public static Vector3 QuarterPartAt(Vector3 ear, Vector3 middle, int part, int parts)
     {
         float turn = (MathF.PI / 2f) * ((part + 0.5f) / Math.Max(1, parts) - 0.5f);
@@ -934,11 +912,10 @@ public sealed class RainField
     }
 
     /// <summary>
-    /// A patch as RainFeeds.PartsFor(slot) voices, each rendering its share of the patch's area with its
-    /// own drops (RainVoiceState) from its own part of it: the roof over the ear round the point over the
-    /// ear, a near quarter across its quarter. All are placed by the whole patch's level, with the one gain
-    /// that keeps them together as loud as the patch from its middle (ExtendedSources.Balance; one for a
-    /// quarter, whose parts are as far away as its middle).
+    /// A patch as RainFeeds.PartsFor(slot) voices, each rendering its share of the area with its own drops
+    /// (RainVoiceState) from its own part: the roof round the point over the ear, a near quarter across
+    /// its quarter. All are placed by the whole patch's level, with the gain that keeps them together as
+    /// loud as the patch from its middle (ExtendedSources.Balance).
     /// </summary>
     private void PlayParts(int slot, SpatialEmitter whole, RainPatch patch, Vector3 ear)
     {
@@ -976,18 +953,15 @@ public sealed class RainField
     /// <summary>Where the ear was when the survey in use was asked for.</summary>
     private Vector3 _lastAt;
 
-    /// <summary>
-    /// The roof of the vehicle you are sitting in rides with your head. The survey places the roof's
-    /// parts in the world round the point over the ear where it last looked, and a survey is only
-    /// asked for every metre and a half: at 100 km/h the roof was left behind between surveys, a metre
-    /// or two back, and with no velocity of its own it was Doppler-shifted against a listener doing
-    /// 28 m/s, about eight per cent flat. Riding, each part is kept where it was against the head at
-    /// the survey (the roof is fixed to the car, and so is the head) and moves with the vehicle.
-    /// OPENFPS_CABIN_PATHS=0 leaves it in the world, as before 2026-10-06.
-    /// </summary>
     /// <summary>For the lab: false leaves the roof in the world, to tell what riding with the head does.</summary>
     internal static bool RoofRidesWithHead = true;
 
+    /// <summary>
+    /// The roof of the vehicle you ride in rides with your head: each part is kept where it was against
+    /// the head at the survey, and moves with the vehicle. Left in the world, at 100 km/h the roof fell a
+    /// metre or two behind between surveys and was Doppler-shifted about eight per cent flat.
+    /// OPENFPS_CABIN_PATHS=0 leaves it in the world, as before 2026-10-06.
+    /// </summary>
     private void OnYourRoof(ref SpatialEmitter e, Vector3 at)
     {
         if (!OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled || !RoofRidesWithHead

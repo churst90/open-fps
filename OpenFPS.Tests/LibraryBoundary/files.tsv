@@ -142,7 +142,6 @@ OpenFPS.Client.Core/Platform/ISpeechOutput.cs	host
 OpenFPS.Client.Core/Platform/SpeechDispatcherOutput.cs	host		
 OpenFPS.Client.Core/Platform/SpeechLog.cs	host		
 OpenFPS.Client.Core/Platform/TimerResolution.cs	host		
-OpenFPS.Client.Core/Platform/TolkSpeechOutput.cs	host		
 OpenFPS.Client.Core/Platform/VoiceCodec.cs	host		
 OpenFPS.Client.Core/PredictionReconciler.cs	host		
 OpenFPS.Client.Core/ProcessLifeLog.cs	host		

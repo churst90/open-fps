@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Concurrent;
 using OpenFPS.Common;
 
@@ -7,18 +6,14 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// <summary>
 /// The wind in your ears, rendered: one noise per ear, shaped as <see cref="EarWind"/> says.
 ///
-/// THE MECHANISM. Air flowing over the head separates off the edges of the pinna and rolls past the
-/// ear canal as eddies; what the ear hears is the pressure under them. Each ear's eddies are its own
-/// (turbulent pressure decorrelates within a centimetre), so each ear gets its own noise from its own
-/// generator. That pressure is flat in level below a knee set by the speed over the ear's size and
-/// falls steeply above it (EarWind: −26 dB an octave measured; here a fourth-order fall, −24).
+/// Air separating off the pinna rolls past the ear canal as eddies, and the ear hears the pressure
+/// under them. Turbulent pressure decorrelates within a centimetre, so each ear has its own noise. It
+/// is flat below a knee set by the speed over the ear's size and falls steeply above it (EarWind:
+/// −26 dB an octave measured; here a fourth-order fall, −24).
 ///
-/// It does not hold still. The eddies arriving are a range of sizes, and the ones a head or two
-/// across swell and drop the noise over tenths of a second: the buffeting that makes wind on a
-/// microphone, or on an ear, unmistakable. That is a lognormal envelope whose rate is the speed over
-/// about half a metre and whose depth is ±4 dB; the bigger of those eddies cover the whole head, so
-/// half of it is shared by the two ears and half each ear's own. Slower still, the gusts of the
-/// field itself (WindField) move the speed, and with it the level and the knee.
+/// Eddies a head or two across buffet it over tenths of a second: a lognormal envelope at the speed
+/// over half a metre, ±4 dB deep, half shared by the two ears and half each ear's own. The field's
+/// gusts (WindField) move the speed, and with it the level and the knee.
 /// </summary>
 public sealed class EarWindSynth
 {
@@ -26,8 +21,6 @@ public sealed class EarWindSynth
     public const float BuffetDepth = 0.5f;
     /// <summary>The size of the eddies that buffet, m: about a head and shoulders.</summary>
     public const float BuffetEddyMetres = 0.5f;
-    /// <summary>How much of the buffeting the two ears share.</summary>
-    public const float BuffetShared = 0.5f;
     /// <summary>Below this, nobody hears the pressure and it costs headroom, Hz.</summary>
     public const float HighPassHz = 20f;
 
@@ -43,13 +36,12 @@ public sealed class EarWindSynth
     private float _gainL, _gainR, _targetL, _targetR, _gainStep;
 
     /// <summary>
-    /// The highest the ears' wind may peak, before the master, full scale: −11 dBFS, which the master's
-    /// trim and makeup (+9 dB) bring to its limiter's −2 dB ceiling exactly. Wind buffets stand some
-    /// twenty decibels over their own mean; left alone, a jog or a gale would drive the master limiter
-    /// on every one and the whole world would duck with each gust. So the wind rides its own gain
-    /// down for its loudest buffets instead: a peak follower 6 ms ahead of the signal (so it is down
-    /// before the buffet arrives, and nothing is clipped), released over 200 ms, the same gain on both
-    /// ears so their difference stands. Below the ceiling it does nothing at all.
+    /// The highest the ears' wind may peak before the master, full scale: −11 dBFS, which the master's
+    /// trim and makeup (+9 dB) bring to its limiter's −2 dB ceiling exactly. Buffets stand some 20 dB
+    /// over their mean, and left alone a jog or a gale ducked the whole world on every gust. So the
+    /// wind rides its own gain: a peak follower one look-ahead (about 6 ms) ahead of the signal,
+    /// released over 200 ms, the same gain on both ears so their difference stands. Below the ceiling
+    /// it does nothing.
     /// </summary>
     public const float PeakCeiling = 0.2818f;
     private const int LookAhead = 256;
@@ -61,7 +53,7 @@ public sealed class EarWindSynth
     // Buffeting: three lowpassed noises (shared, left, right), each two one-poles in cascade.
     private float _mA, _mS1, _mS2, _mL1, _mL2, _mR1, _mR2, _mNorm = 1f;
 
-    /// <summary>What the ears were last placed at, dBFS RMS; and how loud the wind is at each, dB SPL.</summary>
+    /// <summary>What the ears were last placed at, dBFS RMS.</summary>
     public float RenderedLeftDb { get; private set; } = -120f;
     public float RenderedRightDb { get; private set; } = -120f;
     public EarWindAtEars Last { get; private set; }
@@ -80,25 +72,21 @@ public sealed class EarWindSynth
     }
 
     /// <summary>
-    /// Takes what the ears hear now (<see cref="EarWind.Hear"/>) and how long since the last call:
-    /// once a block. Levels glide over 50 ms and the knee over 100 ms, so a block boundary is never a
-    /// step.
+    /// Takes what the ears hear now (<see cref="EarWind.Hear"/>), once a block. Levels glide over
+    /// 50 ms and the knee over 100 ms, so a block boundary is never a step.
     /// </summary>
-    public void Control(in EarWindAtEars ears, float dt)
+    public void Control(in EarWindAtEars ears)
     {
         Last = ears;
         float l = EarWind.RenderedDb(ears.DeclaredDb, ears.LeftDb);
         float r = EarWind.RenderedDb(ears.DeclaredDb, ears.RightDb);
-        // Air that is not moving makes nothing.
         if (ears.Speed < EarWind.StillAir || !float.IsFinite(l) || !float.IsFinite(r)) { l = -150f; r = -150f; }
         RenderedLeftDb = l; RenderedRightDb = r;
         _targetL = MathF.Pow(10f, l / 20f);
         _targetR = MathF.Pow(10f, r / 20f);
 
-        // Targets only: Render glides the knee and the buffeting rate to them every few samples. Set
-        // here once a block, the knee moved a fifth of the way at a time, its filters and their
-        // level with it — a 43 Hz staircase in the colour and level of the wind whenever it changed,
-        // as on every turn of the head.
+        // Targets only: Render glides to them every few samples. Set here once a block, the knee
+        // stepped at 43 Hz, a staircase in the wind's colour and level on every turn of the head.
         if (float.IsFinite(ears.KneeHz)) _kneeTarget = ears.KneeHz;
         _buffetTarget = Math.Clamp(ears.Speed / BuffetEddyMetres, 0.5f, 30f);
     }
@@ -134,7 +122,7 @@ public sealed class EarWindSynth
     /// <summary>Whether there is anything to hear: lets a caller skip a silent block.</summary>
     public bool Silent => _gainL < 1e-6f && _gainR < 1e-6f && _targetL < 1e-6f && _targetR < 1e-6f;
 
-    /// <summary>Renders a block into two channels (or interleaved stereo with a stride of 2).</summary>
+    /// <summary>Renders a block into two channels.</summary>
     public void Render(Span<float> left, Span<float> right)
     {
         int n = Math.Min(left.Length, right.Length);
@@ -149,18 +137,16 @@ public sealed class EarWindSynth
     /// <summary>One sample of each ear.</summary>
     public void Next(out float left, out float right)
     {
-        // Carriers: one noise per ear.
         Gaussian2(out float nl, out float nr);
         float cl = _lp2L.Low(_lp1L.Low(_hpL.High(nl)));
         float cr = _lp2R.Low(_lp1R.Low(_hpR.High(nr)));
 
-        // Buffeting: a shared and an own part, both slow.
         Gaussian2(out float bs, out float bl);
         Gaussian2(out float br, out _);
         _mS1 += _mA * (bs - _mS1); _mS2 += _mA * (_mS1 - _mS2);
         _mL1 += _mA * (bl - _mL1); _mL2 += _mA * (_mL1 - _mL2);
         _mR1 += _mA * (br - _mR1); _mR2 += _mA * (_mR1 - _mR2);
-        const float shared = 0.70710678f; // sqrt(BuffetShared), so the sum keeps unit variance
+        const float shared = 0.70710678f; // half shared, half each ear's own; √0.5 keeps unit variance
         float ml = (shared * _mS2 + shared * _mL2) * _mNorm;
         float mr = (shared * _mS2 + shared * _mR2) * _mNorm;
         // Lognormal with unit mean square: exp(s m - s^2).
@@ -172,9 +158,8 @@ public sealed class EarWindSynth
         float l = cl * _norm * el * _gainL;
         float r = cr * _norm * er * _gainR;
 
-        // The governor: follow the peak of what is about to play, and play it LookAhead later.
-        // A peak is held for the look-ahead, so the follower has the whole of it to rise to, not
-        // just the moment it passes; the follower then rises to it fast and lets go slowly.
+        // The governor (PeakCeiling): a peak is held for the look-ahead, so the follower has all of
+        // it to rise to before it plays.
         float peak = MathF.Max(MathF.Abs(l), MathF.Abs(r));
         if (peak >= _held) { _held = peak; _holdLeft = LookAhead; }
         else if (_holdLeft > 0) _holdLeft--;
@@ -187,9 +172,6 @@ public sealed class EarWindSynth
         _delayL[at] = l; _delayR[at] = r;
         _delayAt = at + 1 == LookAhead ? 0 : at + 1;
     }
-
-    /// <summary>How far the governor has the ears down now, dB (0 when it is doing nothing).</summary>
-    public float GovernorDb => _peakEnv > PeakCeiling ? 20f * MathF.Log10(PeakCeiling / _peakEnv) : 0f;
 
     private void SetKnee(float hz)
     {
@@ -211,13 +193,12 @@ public sealed class EarWindSynth
         _mNorm = (float)(1.0 / Math.Sqrt(Math.Max(1e-12, v)));
     }
 
-    // ── The carrier's level, so the noise is unit RMS whatever the knee ────────────────────────
 
     private static readonly ConcurrentDictionary<int, float[]> NoiseTables = new();
     private const int TableSize = 48;
 
-    /// <summary>The RMS that unit white noise has after the carrier's filters, for a knee: measured
-    /// once from the filters' own impulse response over a table of knees, and read off it.</summary>
+    /// <summary>The RMS of unit white noise through the carrier's filters at a knee, from a table of
+    /// the filters' impulse responses, so the carrier is unit RMS whatever the knee.</summary>
     internal static float NoiseRms(float kneeHz, float sampleRate)
     {
         var table = NoiseTables.GetOrAdd((int)sampleRate, r => BuildTable(r));
@@ -249,7 +230,6 @@ public sealed class EarWindSynth
         return t;
     }
 
-    // ── Noise ──────────────────────────────────────────────────────────────────────────────────
 
     private ulong NextBits()
     {

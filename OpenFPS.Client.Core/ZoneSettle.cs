@@ -3,17 +3,11 @@ using System.Numerics;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Whether the zone you are in has been where you are long enough to say. A zone is announced as you
-/// cross into it, and a crossing is something a body does: it walks over a line and stays on the far
-/// side. A zone that changes back within a fraction of a second, or changes while the body is being
-/// thrown about faster than anybody walks, is not a crossing, and saying it makes the names flip.
-///
-/// Cody, 2026-10-04, after a /tp to 100 m over Brandt Court: landing on the roof, his position
-/// bounced for three seconds between the roof and seven to thirteen metres over it, and the zone with
-/// it — "Brandt Court roof" and, in the air above the roof's box where only the concrete under him
-/// named the place, "sidewalk" — eighteen lines in three seconds. Held for <see cref="SettleSeconds"/>
-/// with no jump of more than <see cref="JumpMetres"/> between updates, the roof was said once, when
-/// he stopped bouncing.
+/// Whether the zone you are in has held long enough to say: a crossing is walking over a line and
+/// staying on the far side, not a flicker or a body thrown about. Cody, 2026-10-04, after a /tp over
+/// Brandt Court: bouncing for three seconds between the roof and 7 to 13 m above it gave "Brandt Court
+/// roof" and "sidewalk" eighteen times; held for <see cref="SettleSeconds"/> with no jump over
+/// <see cref="JumpMetres"/>, the roof was said once.
 /// </summary>
 public sealed class ZoneSettle
 {

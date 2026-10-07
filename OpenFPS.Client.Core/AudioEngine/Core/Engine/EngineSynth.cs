@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
@@ -11,28 +10,13 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// pistons; the pipes on both sides are waveguides. The sound is whatever leaves the tailpipes,
 /// the snorkel and the block.
 ///
-/// What this buys over drawing pulses and pushing them into a filter:
-///
-///   * The exhaust pulse has the shape the valve and the cylinder give it. Blowdown is choked
-///     orifice flow from a cylinder at four or five bar through a curtain area that follows the cam;
-///     the cylinder empties, the flow unchokes, and the piston then sweeps the rest out. Its
-///     duration is cylinder volume over valve area, so a big slow cylinder blows down longer than a
-///     small quick one and the whole spectral envelope moves with the geometry.
-///   * Load is not a volume knob. Manifold pressure sets the charge, the charge sets the pressure at
-///     exhaust valve opening, that pressure sets the pulse — ten times the amplitude at full throttle
-///     as at idle, and that amplitude then decides how hard the wave fronts steepen in the primaries.
-///     Which is why a worked engine barks and an idling one burbles.
-///   * The valve is a real boundary. An open valve looks into a cylinder, which absorbs or feeds the
-///     wave depending on the pressures either side; a shut valve is a wall. Waves returning from the
-///     collector during overlap push exhaust back INTO the cylinder — reversion — and the burnt gas
-///     that stays dilutes the next charge. That dilution is what makes a big cam lope: it does not
-///     have to be modelled as a pattern, because it happens.
-///   * The crank speeds up on every power stroke and slows on every compression, by the amount the
-///     gas torque and the inertia say, so firings are uneven in time at idle and even at speed, the
-///     engine hunts when combustion is unstable, and a free rev climbs at the rate the flywheel allows.
-///
-/// Nothing here is a tone control. The cost is a few hundred operations per sample per cylinder,
-/// which at 44.1 kHz is a few per cent of a core for a V8.
+/// So the blowdown pulse has the shape the valve and cylinder give it (choked orifice flow through a
+/// curtain that follows the cam, its length cylinder volume over valve area); load sets the pulse's
+/// amplitude (ten times idle at full throttle) and so how hard the fronts steepen; reversion through
+/// an open valve dilutes the next charge, which is what makes a big cam lope; and the crank speeds and
+/// slows on every stroke, so idle firings are uneven and an unstable engine hunts. Nothing here is a
+/// tone control. A few hundred operations per sample per cylinder: a few per cent of a core for a V8
+/// at 44.1 kHz. Design and history: docs/ENGINE_SYNTHESIS.md.
 /// </summary>
 public sealed class EngineSynth
 {
@@ -68,7 +52,7 @@ public sealed class EngineSynth
     /// the pipe, pascals at one metre. Diagnostic.</summary>
     public float ExhaustShell { get; private set; }
 
-    /// <summary>...and the part that came out of the pipes. Diagnostic.</summary>
+    /// <summary>The part of <see cref="Exhaust"/> that came out of the pipes. Diagnostic.</summary>
     public float ExhaustPipe { get; private set; }
     /// <summary>Pressure at one metre from the intake mouth, pascals.</summary>
     public float Intake { get; private set; }
@@ -81,10 +65,7 @@ public sealed class EngineSynth
     /// hear what of a start is the starter.</summary>
     public float StarterMix = 1f;
 
-    /// <summary>
-    /// The block's absolute-level anchor, as a gain: +7.5 dB. See where Block is assembled for how it was
-    /// measured and why it is one number rather than one per engine.
-    /// </summary>
+    /// <summary>The block's absolute-level anchor, +7.5 dB as a gain. See where Block is assembled.</summary>
     private const float BlockRadiationGain = 2.371f;   // 10^(7.5/20)
     /// <summary>The speed the block's anchor was measured at (a car's rated speed); above it a petrol
     /// engine's block grows by Anderton's 40 log N more than the mechanisms give.</summary>
@@ -112,20 +93,14 @@ public sealed class EngineSynth
     public float CrankDegrees => (float)(_theta % Profile.CycleDegrees);
 
     /// <summary>
-    /// Sets the crank turning at a given speed without having driven it there.
-    ///
-    /// For placing a voice, not for driving one. A car that comes into earshot already doing three
-    /// hundred kilometres an hour has an engine at nine thousand rpm, and starting that engine from
-    /// rest and letting the driver chase the speed means a full spin-up — throttle wide, clutch
-    /// slipping, the whole rev range — crammed into the eighty milliseconds it takes the speed
-    /// filter to catch up. That is a loud swoop every time a car enters the mix, and it is heard as
-    /// a pop.
+    /// Sets the crank turning at a given speed without having driven it there: for placing a voice.
+    /// Started from rest, a car entering earshot at speed spun up through its whole range in the
+    /// speed filter's 80 ms, heard as a pop.
     /// </summary>
     public void SpinTo(float rpm)
     {
         _omega = MathF.Max(0f, rpm) * 2f * MathF.PI / 60f;
-        // Placed already turning: already synchronised, so a car heard for the first time at speed
-        // does not go quiet for three revolutions.
+        // Already synchronised, or a car first heard at speed goes quiet for three revolutions.
         _syncDegrees = rpm > 0f ? float.PositiveInfinity : 0f;
         _rpmSlow = Rpm;
         _rpmFast = Rpm;
@@ -135,8 +110,6 @@ public sealed class EngineSynth
     /// <summary>Net torque from the gas on the crank this sample, Nm, scaled so full throttle at
     /// the torque peak gives the profile's peak torque.</summary>
     public float Torque { get; private set; }
-    /// <summary>Mean exhaust mass flow, kg/s, smoothed over a few cycles.</summary>
-    public float MassFlow => _massFlowLp;
     /// <summary>Manifold pressure, bar absolute.</summary>
     public float ManifoldBar => _map / Gas.Atmosphere;
     /// <summary>Whether combustion is happening — for the caller's log, not the physics.</summary>
@@ -152,8 +125,6 @@ public sealed class EngineSynth
     /// <summary>What the idle governor is adding: bypass area as a fraction of the bore on a petrol
     /// engine (0..0.04), fuel on a diesel (0..1).</summary>
     public float IdleAir => _idleAir;
-    /// <summary>The torque calibration applied, so the console can say what the model made.</summary>
-    public float TorqueScale => _torqueScale;
     public float EvoPressureCalibratedBar { get; private set; }
 
     public readonly EngineProfile Profile;
@@ -188,7 +159,7 @@ public sealed class EngineSynth
     private const float MeanFlowRate = 1.5f;
     private readonly float _runnerVolume, _runnerArea, _primaryArea;
 
-    // Combustion instability shared by the engine: see Weakness().
+    // Combustion instability shared by the engine: see DecideCharge.
     private float _mixtureWalk;
 
     // Block noise
@@ -196,13 +167,10 @@ public sealed class EngineSynth
     private float _structLpK1, _structLpK2, _structLpV1, _structLpV2, _valveLp;
     private readonly float _structLpA, _valveLpA;
     /// <summary>
-    /// Calibration of the structure's ringing (--tap-balance knock). The knock is held to its anchor
-    /// at FULL LOAD — a heavy diesel's block at rated power, the declared levels that
-    /// DeclaredSourceLevelMatchesTheLiveVoice holds every preset to. A slow full-load pressure rise
-    /// puts more of itself on the block's modes than a light-load one does, so at idle and at a
-    /// cruise the knock comes out lower, about five decibels under a gas-mode-only model. The valves
-    /// sit under the combustion knock at idle, as a diesel's valvetrain sits under its combustion
-    /// noise.
+    /// Calibration of the structure's ringing (--tap-balance knock): the knock is held to its anchor at
+    /// full load, the declared levels DeclaredSourceLevelMatchesTheLiveVoice holds every preset to. At
+    /// idle and cruise it comes out about 5 dB under a gas-mode-only model; the valves sit under the
+    /// combustion knock at idle, as a diesel's valvetrain does.
     /// </summary>
     private const float StructureKnockGain = 0.50f, StructureValveGain = 5.5f;
 
@@ -271,7 +239,7 @@ public sealed class EngineSynth
         public float ExhaustUMean, IntakeUMean; // slow mean volume velocity through each valve, m^3/s
         public float PortE, PortI, FlowE, FlowI; // diagnostics: port acoustic pressure, valve mass flow
         // This cycle's combustion, decided at intake valve closing.
-        public float HeatTotal, SparkDeg, BurnDeg, BurnPrev, Quality, Dilution;
+        public float HeatTotal, SparkDeg, BurnDeg, BurnPrev, Quality;
         public float Premix;                   // diesel: fraction of the charge that burns premixed
         public bool Burning, ChargeDecided, Misfired;
         public float PopAmp; public int PopLeft, PopLength;
@@ -304,54 +272,32 @@ public sealed class EngineSynth
         _cv = Gas.R / (_gammaCyl - 1f);
         _cp = _cv + Gas.R;
 
-        // THE MODES OF THE GAS IN THE CYLINDER, which is a cavity and not a tuned pipe.
-        //
-        // A combustion chamber at TDC is a shallow disc of gas, and a shallow disc has a whole family
-        // of transverse modes, not one. Draper's numbers are the roots of the Bessel derivative:
-        // the first circumferential at 1.841, the second at 3.054, the first radial at 3.832, each
-        // times c/(pi D). Knock sensors are tuned to the first because it is the strongest, which is
-        // what makes it tempting to model only that — and modelling only that is WRONG in a way a
-        // listener catches immediately. One high-Q pole struck at the firing rate is not a knock, it
-        // is a NOTE: the same pitch, over and over, at 120 hits a second. Three modes at
-        // incommensurate ratios beat against each other and never settle on a pitch, which is what a
-        // knock is.
-        //
-        // The frequency still falls out of the bore and nothing else, so a 102 mm Cummins knocks at
-        // 5.2 kHz and a 116 mm bus at 4.5, and no preset says so.
+        // The gas in the cylinder at TDC is a shallow disc with a family of transverse modes (Draper:
+        // 1.841, 3.054 and 3.832 times c/(pi D)). One mode struck at the firing rate is a note, not a
+        // knock; three at incommensurate ratios never settle on a pitch. The frequency falls out of the
+        // bore alone: a 102 mm Cummins knocks at 5.2 kHz, a 116 mm bus at 4.5.
         _knockBore = MathF.Max(0.04f, bore);
         float baseHz = 900f / (MathF.PI * _knockBore);
         bool ci = e.Fuel == FuelType.Diesel;
         _knockModes = new Mode[3];
-        // Damped hard: a bore of gas against wet metal, full of turbulence. These die in about a
-        // millisecond, which is a knock; leave them ringing for five and they are a chime.
+        // Damped hard: they die in about a millisecond; ringing for five they are a chime.
         _knockModes[0].Set(1.841f * baseHz, ci ? 6f : 5f, rate, 1.00f);
         _knockModes[1].Set(3.054f * baseHz, ci ? 5f : 4f, rate, 0.55f);
         _knockModes[2].Set(3.832f * baseHz, ci ? 4.5f : 3.5f, rate, 0.40f);
 
-        // THE STRUCTURE THE KNOCK HAS TO GET OUT THROUGH.
-        //
-        // Without it the knock peaks at 2-4 kHz and is only six to thirteen decibels down at 8 kHz,
-        // and the valve clicks are one ring at 3.1-4.4 kHz louder than the knock: zippy, harsh and
-        // fake. A diesel's clatter is neither. The
-        // premixed burn's pressure rise is an impulse, and what the air hears is that impulse
-        // RINGING THE BLOCK AND HEAD — panel and casting modes between about 0.6 and 3 kHz, each dying
-        // in a few milliseconds (a measured heavy engine: peaks at 1.03, 1.29 and 2.72 kHz). The
-        // block is a filter on the way out, the "structure attenuation" of Austen and Priede, and it
-        // passes least loss near 2 kHz and loses 5 dB by 4 kHz, 17 by 6 and 27 by 8. The gas
-        // ringing across the bore at 4-5 kHz is real, but through the metal it is a faint zing: it
-        // adds half a decibel to the level even in hard knock (Sandia, OSTI 1123537).
-        //
-        // So the knock and the valves both drive these modes. A valve landing on its seat is an
-        // impact on the same head. The modes are placed for a 125 mm bore and move up gently on a
-        // smaller engine, whose castings are smaller and stiffer; 6 ms of decay each, which is cast
-        // iron's damping at these frequencies. The lowest is where that heavy engine's radiation
-        // started to rise.
+        // The structure the knock gets out through. A premixed burn's pressure rise is an impulse, and
+        // the air hears it ringing the block and head: modes between about 0.6 and 3 kHz dying in a few
+        // milliseconds (a measured heavy engine peaked at 1.03, 1.29 and 2.72 kHz). The block's
+        // "structure attenuation" (Austen and Priede) loses least near 2 kHz, 5 dB by 4 kHz, 17 by 6 and
+        // 27 by 8; the gas ringing at 4-5 kHz adds half a decibel through the metal even in hard knock
+        // (Sandia, OSTI 1123537). Without it the knock and the 3.1-4.4 kHz valve rings were zippy and
+        // fake. Knock and valve seats both drive these modes: placed for a 125 mm bore, up gently on a
+        // smaller engine, 6 ms decay each (cast iron's damping).
         float sizeScale = MathF.Sqrt(0.125f / MathF.Max(0.05f, bore));
         _structLpA = OnePole.AlphaFor(5500f, rate);
         _valveLpA = OnePole.AlphaFor(2000f, rate);
-        // And one at 3.6 kHz: the head and the valve covers are small, stiff panels, and without them
-        // the clatter measures 24-28 dB down at 4 kHz where the research puts it at 18, and a diesel
-        // sounds choked.
+        // The 3.6 kHz mode is the head and valve covers: without it the clatter measured 24-28 dB down
+        // at 4 kHz where the research puts it at 18, and a diesel sounded choked.
         float[] structHz = { 620f, 800f, 1300f, 1800f, 2700f, 3600f };
         float[] structWeight = { 0.70f, 1.00f, 0.95f, 0.95f, 0.95f, 0.70f };
         _structKnock = new Mode[structHz.Length];
@@ -435,36 +381,24 @@ public sealed class EngineSynth
         return _crankRadius * s + _crankRadius * _crankRadius * s * c / root;
     }
 
-    /// <summary>Effective flow area of a valve set at a lift: the curtain, capped by the port.</summary>
     /// <summary>Switch for <see cref="BlowdownJet"/>: the lab's A/B, and /valveflow in game.
     /// Volatile because the engines render on the pool's threads.</summary>
     internal static volatile bool ValveJetNoise = true;
 
     /// <summary>
-    /// The rush of gas through the exhaust valve's gap, as broadband noise in the port.
+    /// The rush of gas through the exhaust valve's gap, as broadband noise in the port: sonic flow
+    /// through a fraction of a millimetre at several atmospheres. Without it a diesel's tailpipe was
+    /// 40-50 dB down at 1 kHz from its firing octave ("like it's got its lips tightly shut").
     ///
-    /// When the exhaust valve cracks open the cylinder is at several atmospheres and the gap is a
-    /// fraction of a millimetre, so the gas goes through it at the speed of sound and slams into the
-    /// seat, the valve's back and the port wall. It was the one thing the gas path did not make.
-    /// Without it the blowdown pulse is a smooth pressure bump, and a diesel — slow, with a long
-    /// gentle cam ramp — put out a tailpipe 40-50 dB down at 1 kHz from its firing octave before it
-    /// reached a muffler: "like it's being choked ... like it's got its lips tightly shut".
-    ///
-    /// Measured, the top of a diesel's exhaust is exactly this. The DOT's Noise Control Handbook for
-    /// Diesel-Powered Vehicles (Damkevala 1974, s. 4.2): flow over the exhaust valve "may be the
-    /// dominant source of high frequency exhaust noise" — a continuous hump flat per proportional
-    /// band from about 400 Hz to 3 kHz, 13-18 dB under the firing line in tenth-octaves, which puts
-    /// every octave from 1 to 4 kHz 8-15 dB under the peak octave of an unmuffled diesel.
-    ///
-    /// Flow past an obstruction in a duct is a dipole, not a free jet (Gordon, NASA 1969): power
-    /// K rho U^6 A / c^3, against Lighthill's U^8 for the tailpipe. Here U is the throat velocity
-    /// (choked, so no more than sonic), rho the throat density, A the curtain area, c the port gas's;
-    /// half the power travels down the primary as a plane wave. The one constant,
-    /// <see cref="ValveFlowNoiseK"/>, is set against the handbook's unmuffled NA Cummins (Fig 4.3);
-    /// the pipes and the muffler then do to it what they do to everything else, which is what gives
-    /// a muffled truck its flat, lower top (Donaldson US 6,082,487).
+    /// The DOT's Noise Control Handbook for Diesel-Powered Vehicles (Damkevala 1974, s. 4.2): valve
+    /// flow "may be the dominant source of high frequency exhaust noise", a hump flat per proportional
+    /// band from about 400 Hz to 3 kHz, 13-18 dB under the firing line in tenth-octaves. Flow past an
+    /// obstruction in a duct is a dipole (Gordon, NASA 1969): power K rho U^6 A / c^3 at the throat,
+    /// half of it down the primary as a plane wave. <see cref="ValveFlowNoiseK"/> is set against the
+    /// handbook's unmuffled NA Cummins (Fig 4.3); the pipes and muffler then give a muffled truck its
+    /// flat, lower top (Donaldson US 6,082,487).
     /// </summary>
-    private float BlowdownJet(ref Cylinder cy, float mdot, float area, float lift, float valveD, int c)
+    private float BlowdownJet(ref Cylinder cy, float mdot, float area)
     {
         float rhoT = 0.63f * MathF.Max(1e-3f, cy.Mass / MathF.Max(1e-7f, cy.Volume));
         float cCyl = Gas.SoundSpeed(cy.Temp, Gas.GammaExhaust);
@@ -501,8 +435,7 @@ public sealed class EngineSynth
         _noiseHpA = MathF.Exp(-MathF.Tau * 250f / _rate);
         _noiseLpA = 1f - MathF.Exp(-MathF.Tau * 7000f / _rate);
         _pinkLpA = OnePole.AlphaFor(5000f, _rate);
-        // Normalise by measurement: two seconds of it, whatever the sample rate, on its own noise so
-        // the engine's random stream is untouched.
+        // Normalised by measuring two seconds, on its own generator so the engine's stream is untouched.
         var probe = new Cylinder();
         var rng = new Random(1);
         _pinkNorm = 1f;
@@ -515,6 +448,8 @@ public sealed class EngineSynth
         _pinkNorm = 1f / MathF.Sqrt((float)(e / (n - skip)));
     }
 
+    /// <summary>Effective flow area of a valve set at a lift: the curtain, capped at a quarter of the
+    /// diameter's lift.</summary>
     private static float ValveArea(ValveSpec v, float lift)
     {
         float d = v.DiameterMm * 1e-3f;
@@ -619,29 +554,15 @@ public sealed class EngineSynth
     }
 
     /// <summary>
-    /// How long a diesel waits between the injector opening and the charge lighting, in CRANK
-    /// DEGREES — and, through that, how much of it clatters.
-    ///
-    /// This is the parameter a diesel is built around. Fuel sprayed into the cylinder does not burn
-    /// on contact: it has to break up, evaporate, mix and reach its autoignition temperature, and
-    /// that takes a time set by how hot and how dense the air it lands in is. Everything injected
-    /// during that wait is sitting there premixed when the first of it finally lights, so it all goes
-    /// off together — and THAT is the pressure spike the block radiates as clatter. Whatever is
-    /// injected afterwards burns as fast as it can mix, which is slow and smooth and quiet.
-    ///
-    /// So the split is not a constant, and making it one is what stopped the model sounding like a
-    /// diesel. At idle the injector is open for a few degrees and the delay is longer than that, so
-    /// nearly the whole charge is premixed and the engine clatters. Under load the injector is open
-    /// for forty or fifty degrees while the delay is shorter still — hotter, denser, boosted air —
-    /// so most of the fuel arrives into an already-burning cylinder and never joins the spike. That
-    /// is the whole reason a diesel rattles at a standstill and goes smooth and hard when it pulls,
-    /// and none of it has to be written down anywhere: it falls out of the two timescales.
-    ///
-    /// The delay in milliseconds is the usual Arrhenius form — it goes as the inverse of pressure and
-    /// exponentially with the reciprocal of temperature — and crank degrees are milliseconds times
-    /// the crank speed, which is why the delay in DEGREES grows as an engine revs even though the
-    /// delay in time shrinks.
+    /// How long a diesel waits between the injector opening and the charge lighting, in crank degrees,
+    /// and so how much of it clatters. Everything injected during the wait burns at once when it
+    /// lights (the premixed spike the block radiates); what comes after burns as fast as it mixes,
+    /// smoothly. At idle the delay outlasts the injection and nearly all of it is premixed; under load
+    /// the injection outlasts a shorter delay. So a diesel rattles standing and goes smooth pulling,
+    /// from the two timescales alone; a constant split stopped it sounding like a diesel. The delay is
+    /// Arrhenius in milliseconds, so in degrees it grows as the engine revs.
     /// </summary>
+    /// <param name="rpm">Crank speed.</param>
     /// <param name="pressureBar">Cylinder pressure at injection, bar absolute.</param>
     /// <param name="kelvin">Charge temperature at injection.</param>
     private static float IgnitionDelayDegrees(float rpm, float pressureBar, float kelvin)
@@ -659,17 +580,14 @@ public sealed class EngineSynth
     }
 
     /// <summary>Burnt mass fraction at an angle after ignition: Wiebe, a=5, m=2. A diesel burns in
-    /// two parts and <paramref name="premix"/> is the split between them — see
-    /// <see cref="IgnitionDelayDegrees"/> for where that number comes from and why it is not a
-    /// constant.</summary>
+    /// two parts split by <paramref name="premix"/> (see <see cref="IgnitionDelayDegrees"/>).</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private static float Wiebe(float degAfterSpark, float duration, FuelType fuel, float premix)
     {
         if (degAfterSpark <= 0f) return 0f;
         if (fuel == FuelType.Diesel)
         {
-            // The premixed burn is what accumulated during the delay going off nearly at once, so it
-            // is quick however much of it there is: a few degrees, not a fraction of the duration.
+            // The premixed burn goes off nearly at once: a few degrees, not a fraction of the duration.
             float pre = 1f - MathF.Exp(-5f * MathF.Pow(Math.Clamp(degAfterSpark / 7f, 0f, 1f), 2.5f));
             float dif = 1f - MathF.Exp(-5f * MathF.Pow(Math.Clamp(degAfterSpark / duration, 0f, 1f), 1.6f));
             return premix * pre + (1f - premix) * dif;
@@ -682,19 +600,10 @@ public sealed class EngineSynth
 
     /// <summary>One sample of engine.</summary>
     /// <remarks>
-    /// AggressiveOptimization, here and on the rest of the per-sample path, because of what a MAP
-    /// LOAD does to the JIT. .NET starts every method at unoptimized tier-0 and promotes it after
-    /// thirty calls PLUS a hundred-millisecond quiet period that RESTARTS whenever other methods are
-    /// being jitted — and a map load jits continuously for seconds. So the engine loop stays at
-    /// tier-0 for exactly as long as the load lasts. Measured on nascar_v8 with the cost spike:
-    /// 7.8x realtime settled, 4.0x with tier-0 pinned (DOTNET_TC_CallCountingDelayMs=100000), which
-    /// is 12.8% of a core per voice against 25%. Half the machine's engine capacity, during the one
-    /// second it is most needed.
-    ///
-    /// Targeted rather than TieredCompilation=false for the whole client: turning tiering off would
-    /// also make the JIT do MORE work during the load, which is the thing competing for the cores.
-    /// Small helpers do not need their own attribute — an optimized caller inlines them. The ones
-    /// that are too big to inline and run per sample carry it themselves.
+    /// AggressiveOptimization here and on every per-sample method too big to inline: during a map load
+    /// the JIT keeps this at tier-0, which measured 4.0x realtime against 7.8x settled on nascar_v8
+    /// (docs/AUDIO_LOAD_DROPOUTS.md, section 2). Targeted rather than tiering off for the whole client,
+    /// which would make the JIT do more work during the load.
     /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public void Step()
@@ -707,11 +616,9 @@ public sealed class EngineSynth
         _gasTick = _gasTick + 1 == GasEvery ? 0 : _gasTick + 1;
 
         // ── Crank ────────────────────────────────────────────────────────────────────────────
-        double before = _theta;
         _theta += _omega * (180.0 / Math.PI) * _dt;
         if (_theta >= _cycleDeg) _theta -= _cycleDeg;
-        // The engine computer's count since the key was turned. Lost with the ignition, and with the
-        // crank stopping: a stalled engine has to find itself again.
+        // The engine computer's count, lost with the ignition or a stopped crank: a stall resynchronises.
         if (!Ignition || _omega < 0.5f) _syncDegrees = 0f;
         else if (_syncDegrees < float.PositiveInfinity) _syncDegrees += _omega * (180f / MathF.PI) * _dt;
 
@@ -812,7 +719,7 @@ public sealed class EngineSynth
                     cy.BurntMass += entering;
                 }
                 portPeak = MathF.Max(portPeak, MathF.Abs(aE + bE));
-                if (ValveJetNoise && mdot > 0f) bE += BlowdownJet(ref cy, mdot, area, liftE, e.ExhaustValve.DiameterMm * 1e-3f, c);
+                if (ValveJetNoise && mdot > 0f) bE += BlowdownJet(ref cy, mdot, area);
             }
             else
             {
@@ -820,9 +727,8 @@ public sealed class EngineSynth
                 cy.ExhaustB = aE;
                 cy.ExhaustUMean -= cy.ExhaustUMean * _dt * MeanFlowRate;
             }
-            // Overrun pops: unburnt charge from a misfire or a closed-throttle high-rpm cycle lighting
-            // off in the hot pipe. Enters at the port because that is where it happens — as a pulse a
-            // couple of milliseconds long, since a single-sample step was a click, not a bang.
+            // Overrun pops: unburnt charge lighting off in the hot pipe, entered at the port as a pulse
+            // a couple of milliseconds long (a single-sample step was a click, not a bang).
             if (cy.Misfired && liftE > 1e-4f && cy.PopLeft <= 0 && _rng.NextDouble() < 0.6 * _dt * 40.0 * e.Exhaust.OverrunPopRate / 6f)
             {
                 cy.PopAmp = (0.12f + 0.2f * (float)_rng.NextDouble()) * 1e5f;
@@ -844,7 +750,6 @@ public sealed class EngineSynth
             {
                 float area = ValveArea(e.IntakeValve, liftI);
                 float Z = _intake.RunnerImpedance(c);
-                // The runner sits at manifold pressure; the wave rides on top of that.
                 float capI = 0.3f * 350f * _runnerArea;
                 bI = SolveValve(aI, cy.IntakeB, Z, area, cy.Pressure, cy.Temp, intakeK, Gas.GammaAir, cy.Mass, _dt, 0f, capI, _map, out float mdotOut);
                 cy.IntakeB = bI;
@@ -852,11 +757,9 @@ public sealed class EngineSynth
                 cy.PortI = aI + bI; cy.FlowI = mdotOut;
                 intakeFlow += mdotOut;
                 float dm = mdotOut * _dt;                  // positive = cylinder to runner
-                // The runner is a mixed reservoir of fixed mass: what the cylinder pushes into it
-                // raises its burnt fraction and displaces the same mass on toward the plenum; what
-                // the cylinder draws from it carries that fraction and is replaced from the plenum
-                // with clean air. That is the reversion that dilutes a big cam's idle, bounded the
-                // way a real runner bounds it — a plug model marked whole charges as burnt.
+                // The runner is a mixed reservoir of fixed mass: reversion raises its burnt fraction,
+                // and a draw carries that fraction and is replaced with clean air. That bounds the
+                // dilution of a big cam's idle; a plug model marked whole charges as burnt.
                 float runnerMass = MathF.Max(1e-6f, _runnerVolume * Gas.Density(_map, intakeK));
                 if (dm < 0f)
                 {
@@ -900,14 +803,13 @@ public sealed class EngineSynth
             gasTorque += (cy.Pressure - Gas.Atmosphere) * _pistonArea * Lever(phase);
 
             // ── What the block radiates ──────────────────────────────────────────────────
-            // Combustion through the metal: the rate of pressure rise, which for a petrol engine
-            // is modest and for a diesel is the sound.
+            // Combustion through the metal: the rate of pressure rise, modest for petrol, for a
+            // diesel the sound.
             if (cy.Burning)
             {
                 float dp = (cy.Pressure - cy.PressurePrev) * _rate;
                 knock += dp;
-                // The modes are the gas's, so they move with the gas. Weighted by how hard this
-                // cylinder is driving them, because that is whose temperature is being heard.
+                // The modes move with the gas temperature, weighted by how hard each cylinder drives them.
                 float wgt = MathF.Abs(dp);
                 knockTempAcc += cy.Temp * wgt;
                 knockTempWgt += wgt;
@@ -916,8 +818,8 @@ public sealed class EngineSynth
 
             // Valvetrain: a tick as each valve leaves its seat and a louder one as it lands.
             bool eOpen = liftE > 1e-5f;
-            if (eOpen != cy.EOpenWas) _click.Trigger(eOpen ? 0.5f : 1f, 3600f + 400f * (c % 3));
-            if (intakeOpen != cy.IOpenWas) _click.Trigger(intakeOpen ? 0.45f : 0.9f, 3100f + 300f * (c % 4));
+            if (eOpen != cy.EOpenWas) _click.Trigger(eOpen ? 0.5f : 1f);
+            if (intakeOpen != cy.IOpenWas) _click.Trigger(intakeOpen ? 0.45f : 0.9f);
             cy.EOpenWas = eOpen; cy.IOpenWas = intakeOpen;
         }
 
@@ -938,54 +840,28 @@ public sealed class EngineSynth
         _exhaust.Step();
         _intake.SetValveFlow(intakeFlow);
         _intake.Step();
-        // The turbine's tone leaves by the tailpipe (see Turbo); last sample's, the turbo being
-        // worked out after the pipes.
+        // The turbine's tone leaves by the tailpipe (see Turbo): last sample's, the turbo being worked
+        // out after the pipes.
         Exhaust = _exhaust.Radiated + _turbineTone;
         ExhaustShell = _exhaust.ShellRadiated;
         ExhaustPipe = _exhaust.PipeRadiated;
-        // ── The intake's silencer ──────────────────────────────────────────────────────────────
-        //
-        // Level is an ESCAPE FRACTION — how much of what the orifice makes gets out of the car —
-        // and it cannot also do the job of being a silencer: no preset sets it low enough, and on
-        // its own every car with a silenced EXHAUST radiates more from its airbox than from its
-        // tailpipe, which is what a race car with velocity stacks does and not what a road car does. The airbox is
-        // an expansion chamber and silences like one; see IntakeSpec.AirboxLossDb, which reads it
-        // off the box and the snorkel and gives an economy four thirteen decibels where it gives a
-        // big-block with an open element four.
+        // The intake's silencer. Level is an escape fraction and cannot also be the silencer: alone,
+        // every road car radiated more from its airbox than its tailpipe. The airbox silences as an
+        // expansion chamber (IntakeSpec.AirboxLossDb): 13 dB on an economy four, 4 on an open big-block.
         Intake = _intake.Radiated * e.Intake.Level * _airboxLoss;
 
         // ── The block ────────────────────────────────────────────────────────────────────────
-        // Knock: the pressure-rise rate, RUNG THROUGH THE GAS, and then through the metal.
-        //
-        // A combustion knock is not a broadband thump that happens to be high-pitched. The sudden
-        // pressure rise excites a standing wave ACROSS THE BORE — the first radial mode of the gas
-        // in a shallow cylinder, at 1.841c/(pi D) — and what the block radiates is that ringing. It
-        // is why knock sensors are tuned filters and why the band they listen in is quoted per
-        // engine: the frequency is the bore and the gas temperature and nothing else.
-        //
-        // That makes it fall out rather than be declared. Hot burnt gas runs about 900 m/s, so a
-        // 130 mm truck bore rings near 4 kHz and an 80 mm car bore near 6.6 — the big engine knocks
-        // DEEPER, which is most of what tells them apart by ear, and no preset has to say so. A plain
-        // high-pass has no frequency of its own and would give every engine the same colour of knock.
-        //
-        // What DRIVES the modes is the sharp part of the pressure rise, not the smooth part. The
-        // smooth rise is the thud that goes through the mounts and is handled below; feeding it to
-        // the resonators as well just pumps them with a slow ramp. So it is high-passed first.
+        // Knock: the pressure-rise rate rung through the gas (modes across the bore, so a 130 mm truck
+        // bore knocks near 4 kHz and an 80 mm car's near 6.6, deeper for the big engine), then
+        // through the metal. Only the sharp part of the rise drives the modes; the smooth part is the
+        // thud below, and fed to the resonators it only pumps them.
         float kh = OnePole.AlphaFor(700f, _rate);
         _knockHp += kh * (knock - _knockHp);
         float knockDrive = knock - _knockHp;
 
-        // AND THE MODES MOVE WHILE THEY RING, which is the difference between a knock and a note.
-        //
-        // The frequency is c/(pi D) times a Bessel root, and c is sqrt(gamma R T) in gas that is
-        // cooling as fast as the piston can pull it down — 2,500 K at the peak to 1,200 a few degrees
-        // later. That is a 30 per cent fall in the speed of sound, so every knock CHIRPS DOWNWARD
-        // through a third of its frequency while it decays. A fixed-frequency resonator struck a
-        // hundred times a second gives the same pitch every time and the ear hears a tone; one that
-        // slides gives a knock. A model with the frequency right and held still is heard as a note.
-        //
-        // Retuned every 32 samples, which is 0.7 ms: fast enough to follow the chirp, and 1/32 of
-        // the cost of doing it per sample on the most expensive voice in the mixer.
+        // The modes move while they ring: the gas cools from 2,500 K to 1,200 within a few degrees, so
+        // every knock chirps down by about a third. Held still, the right frequency is heard as a note.
+        // Retuned every 32 samples (0.7 ms), 1/32 of the per-sample cost.
         float knockRing;
         if (DebugLegacyDiesel) { knockRing = knockDrive; goto knockDone; }   // Stryker disable once all : lab A/B switch
         if (knockTempWgt > 1e-6f) _knockTemp = knockTempAcc / knockTempWgt;
@@ -1003,13 +879,12 @@ public sealed class EngineSynth
         for (int i = 0; i < _knockModes.Length; i++) gasRing += _knockModes[i].Step(knockDrive);
         float structRing = 0f;
         for (int i = 0; i < _structKnock.Length; i++) structRing += _structKnock[i].Step(knockDrive);
-        // Above its modes the block falls away fast — 17 dB down by 6 kHz, 27 by 8 on the AVL curve —
-        // which a resonator's own skirt (6 dB an octave) does not do: two poles at 5.5 kHz, above the
-        // highest mode, so the steep top is the AVL curve's and not a lid on the head's own ringing.
+        // Above its modes the block falls 17 dB by 6 kHz and 27 by 8 (the AVL curve), steeper than a
+        // resonator's skirt: two poles at 5.5 kHz, above the highest mode.
         _structLpK1 += _structLpA * (structRing - _structLpK1);
         _structLpK2 += _structLpA * (_structLpK1 - _structLpK2);
-        // The block's ringing, and the gas's a twentieth of it in pressure, the zing: well under the
-        // twenty decibels below the peak it is measured at.
+        // Plus the gas's ring at a twentieth in pressure, the zing, well under the 20 dB below the peak
+        // it is measured at.
         knockRing = _structLpK2 * StructureKnockGain + gasRing * 0.05f;
         knockDone:
         // Scaled so a truck diesel under load radiates about 95 dB of knock at a metre and a petrol
@@ -1017,19 +892,10 @@ public sealed class EngineSynth
         float knockRaw = knockRing * e.Mechanical.CombustionKnock * 4.0e-9f;
         float knockOut = 2f * MathF.Tanh(knockRaw * 0.5f);
 
-        // The low thud of the cylinders reaching the air through the block and the mounts. It must
-        // not be most of what a block radiates, or the diesels come out backwards.
-        //
-        // A truck six's block with the thud weighted up measures 94 per cent below 200 Hz and 1.7 per
-        // cent between 800 Hz and 2.5 kHz. That is not what a big diesel sounds like: injector knock
-        // and valvetrain clatter live between about 500 Hz and 4 kHz and they are the whole of what
-        // makes one recognisable AS a diesel. Without them it is a formless low roar.
-        //
-        // The two paths are not alike and are not scaled alike. The thud is
-        // STRUCTURE-BORNE: cylinder pressure into the block, through rubber mounts, into a chassis,
-        // and every one of those junctions is a mismatch that reflects most of the energy back. The
-        // knock and the clatter radiate straight off the block's own surfaces into the air. Weighting
-        // the indirect path above the direct one buries the engine.
+        // The low thud of the cylinders through the block and the mounts: structure-borne, through
+        // junctions that reflect most of it, so it must not outweigh the knock and clatter that radiate
+        // straight off the block. Weighted up, a truck six's block was 94 % below 200 Hz and 1.7 %
+        // between 800 Hz and 2.5 kHz, where a diesel's identity lives: a formless low roar.
         float bl = OnePole.AlphaFor(180f, _rate);
         _blockLp += bl * (blockLow - _blockLp);
         float thud = _blockLp * 5.0e-8f;
@@ -1059,84 +925,31 @@ public sealed class EngineSynth
             whine += (float)(Math.Sin(_blowerPhase * 2 * Math.PI) + 0.5 * Math.Sin(_blowerPhase * 4 * Math.PI))
                    * m.BlowerWhineLevel * 0.12f * (0.3f + 0.7f * load);
         }
-        // ── The block's anchor ─────────────────────────────────────────────────────────────────
-        //
-        // Everything above is a MECHANISM with a shape: knock rings the bore at its own modes, the
-        // thud is cylinder pressure through the mounts, the clatter is one event per valve, the
-        // whine is an accessory order. None of them carries an absolute level. Every other source in
-        // this engine has one — the tyres declare SquealDb, a blade row ReferenceDb, a jet its
-        // Lighthill trim — so the block gets one too: BlockRadiationGain.
-        //
-        // Without it, measured with `--voice-levels parts`, the block lands about seven and a half
-        // decibels low, and by the same amount at both ends of the range: a 13 litre truck six at
-        // 90.6 dB at a metre where published engine-surface figures for heavy-duty diesels at rated
-        // power are 97-100, and a 1.6 litre petrol four at 76.1 where a small four is 82-86. The
-        // DISPLACEMENT scaling between them is right (+3.7 dB over 4.6x the swept volume, against the
-        // +4.4 a two-thirds-power surface law gives), which says this is one anchor for everybody
-        // rather than a preset needing a number.
-        //
-        // It is worth nothing on a petrol car — a muscle car's block is thirty decibels under its
-        // exhaust either way — and it is most of a bus, whose block is the loudest thing on it.
-        //
-        // And the anchor holds at the speeds it was measured at, rated speed for a car or a truck —
-        // six thousand and under. Past that a petrol engine's radiated noise keeps climbing: Anderton's
-        // law for spark-ignition engines is 50 log N + 30 log B, where the mechanisms above grow by
-        // about 10 log N (one more event per revolution, each as hard as the last). The difference,
-        // 40 log N, is the valves seating harder, the pistons slapping, the gears and the chain, and
-        // it is what an engine sounds like at eleven thousand: a litre bike's block at a metre is as
-        // loud as its stock exhaust (engine 49 % of a motorcycle's noise at 5,000 rpm, exhaust 43 %;
-        // Lu & Jen, Inter-noise 2014); without this term it would be thirty decibels under it and the
-        // bike all pipe. Nothing at or below six thousand changes.
+        // The block's anchor. The mechanisms above have shapes but no absolute level; BlockRadiationGain
+        // is one anchor for every engine. Without it (`--voice-levels parts`) the block was 7.5 dB low
+        // at both ends: a 13 litre truck six 90.6 dB at a metre against published 97-100, a 1.6 litre
+        // four 76.1 against 82-86, with the displacement scaling right (+3.7 dB over 4.6x, against +4.4
+        // for a surface law). Worth nothing on a petrol car, most of a bus.
+        // Past 6,000 rpm a petrol block keeps climbing: Anderton's 50 log N + 30 log B against the
+        // mechanisms' 10 log N, the 40 log N being valves, piston slap, gears and chain. A litre bike's
+        // block is as loud as its stock exhaust (49 % against 43 % at 5,000 rpm; Lu & Jen, Inter-noise
+        // 2014); without this the bike was all pipe. Nothing at or below 6,000 changes.
         float overRated = e.Fuel == FuelType.Diesel ? 1f : MathF.Max(1f, rpm / BlockLawReferenceRpm);
         Block = (knockOut + thud + mech + whine) * BlockRadiationGain * overRated * overRated
               + (StarterOut = StarterSound() * StarterMix) + Turbo();
     }
 
     // ── The turbocharger ──────────────────────────────────────────────────────────────────────
-    //
-    // A whistle set as a hand-set fraction of the block and sent out through the bay vanishes
-    // exactly when it should scream: floored, a straight-piped compound Cummins is 112 dB at its
-    // tailpipe. So the turbo is three sources, each at its measured level, each out of the place it
-    // leaves by:
-    //
-    //   the COMPRESSOR's blade-pass tone: main blades x shaft speed, 81 dB at 60,000 rpm on a
-    //   heavy-duty diesel's compressor (7+7 blades, open inlet), rising as the fourth power of the
-    //   shaft speed (Sustainability 15, 11300, 2023). Its outlet is 30-35 dB louder than its inlet
-    //   in the duct (Tiikoja, KTH), so it leaves by the boost pipes: through the bay.
-    //
-    //   the WHOOSH: a diesel's is broadband at 1.5-3.5 kHz (Evans & Ward, SAE 2005-01-2485),
-    //   85-90 dB(A) at 10 cm from the boost duct near full speed (SAE 2009-01-2048): 68 at a metre.
-    //   Also the bay.
-    //
-    //   the TURBINE's blade-pass tone, out of the tailpipe: ten to twelve blades, so 4 kHz at an
-    //   idling shaft and past hearing at full boost. No measured level exists; owners of straight-
-    //   piped diesels report it "increased massively". It is put in the duct 10 dB under the
-    //   compressor outlet's and radiated from the pipe's mouth, which at these frequencies is large
-    //   against the wavelength: at a metre, the duct pressure times radius / sqrt 2. It does NOT go
-    //   through the waveguide: the pipes' losses above 5 kHz took a 150 dB tone to nothing, and
-    //   changing them would change every engine. A muffler takes 15 dB off it (industrial and
-    //   truck mufflers at 4-8 kHz: Lilly; Donaldson US 6,082,487).
-    //
-    // The shaft runs about 22,000 rpm with a truck idling and 110-120,000 pulling (engine-sensor
-    // readings), and it follows the spool. TurboWhistleLevel stays as the declared multiplier: one
-    // is a single turbo breathing through an open inlet, as the measurement was made.
-    //
-    // PITCH. Two measured facts set it, and together they put it an octave under the plain
-    // blade-passing tone of a 22,000 rpm idle:
-    //
-    //   what a compressor sings at part speed is not its blade-passing tone but TIP-CLEARANCE noise,
-    //   a narrow hump at about half of it: over "a large range of rotor speeds with subsonic flow,
-    //   radial compressor noise is dominated by tip clearance noise" (Raitor and Neise, JSV 314,
-    //   2008); an automotive wheel at design speed shows it at 0.53 x BPF under a BPF that has only
-    //   then become the strongest (Broatch et al. 2018). The blade-passing tone is kept, under the
-    //   hump at part speed and over it as the tips go supersonic near full boost — how much under and
-    //   over is not published, so the +-6 dB crossing is a setting.
-    //
-    //   and the shaft idles at 12-15,000 rpm on a truck turbo (logged speed sensors: HE351VE,
-    //   Power Stroke), cruises at 40-50,000 and makes 120-130,000 at full boost. 22,000 is where
-    //   a light throttle starts to walk it up, not the idle.
-    //
-    // A cruise comes out at 2.3-2.9 kHz.
+    // Three sources, each at its measured level, each out of the place it leaves by: the compressor's
+    // tone (81 dB at a metre at 60,000 rpm, as the fourth power of shaft speed; through the bay), the
+    // whoosh (1.5-3.5 kHz, 68 dB at a metre near full speed; the bay) and the turbine's blade-pass tone
+    // out of the tailpipe (in the duct 10 dB under the compressor outlet, radiated from the pipe's
+    // mouth past the waveguide, whose losses above 5 kHz take it to nothing; 15 dB off with a muffler).
+    // At part speed a compressor sings tip-clearance noise, a narrow hump at half its blade-passing
+    // frequency; the shaft idles at 12-15,000 rpm and makes 120-130,000 at full boost. A cruise comes
+    // out at 2.3-2.9 kHz. Sources and reasoning: docs/ENGINE_SYNTHESIS.md, "The turbocharger's three
+    // sources". A hand-set whistle through the bay vanished floored, where a straight-piped compound
+    // Cummins is 112 dB at its tailpipe.
     private const float TurboShaftIdleRpm = 12000f, TurboShaftFullRpm = 125000f;
     private const int CompressorBlades = 7, TurbineBlades = 11;
     /// <summary>Tip-clearance noise sits at this share of the blade-passing frequency.</summary>
@@ -1149,9 +962,8 @@ public sealed class EngineSynth
     /// it at full boost, crossing between these shaft speeds.</summary>
     private const float BpfUnderDb = -6f, BpfOverDb = 6f, BpfCrossLowRpm = 60000f, BpfCrossHighRpm = 120000f;
     private const float WhooshDb = 68f, WhooshAtRpm = 110000f;                // at a metre
-    /// <summary>In the duct. Ten decibels under the compressor outlet: nothing measured shows a truck's
-    /// turbine tone getting out of the tailpipe past its aftertreatment and can (Tiikoja and Abom:
-    /// the turbine is an attenuator, significant only at very high blade-passing frequencies).</summary>
+    /// <summary>In the duct, ten decibels under the compressor outlet (Tiikoja and Abom: the turbine
+    /// is an attenuator, significant only at very high blade-passing frequencies).</summary>
     private const float TurbineDuctDb = 100f, TurbineAtRpm = 110000f;
 
     private static float Pa(float db) => 20e-6f * MathF.Pow(10f, db / 20f);
@@ -1172,10 +984,8 @@ public sealed class EngineSynth
             _turbineTone = 0f;
             return 0f;
         }
-        // Shaft speed from the spool: the model's boost goes as the square of the spool, and a
-        // compressor's pressure ratio as the square of its speed, so the speed follows the spool —
-        // but a spool idling at 0.35 (a big turbo freewheeling) is a shaft at 12-25,000, not 44,000,
-        // so it rises as the square from the idle speed: 26,000 at 0.35, 40,000 at 0.5, 125,000 flat out.
+        // Shaft speed rises as the square of the spool from the idle speed (a freewheeling spool at
+        // 0.35 is a shaft at 26,000, not 44,000): 40,000 at 0.5, 125,000 flat out.
         float sp = Math.Clamp(_spool, 0f, 1f);
         float shaft = TurboShaftIdleRpm + (TurboShaftFullRpm - TurboShaftIdleRpm) * sp * sp;
         float rev = shaft / 60f;
@@ -1187,11 +997,8 @@ public sealed class EngineSynth
         float comp = 0f, turb = 0f;
         float fc = CompressorBlades * rev;
         float compPa = 1.41421356f * Pa(CompressorToneDb) * Scale(CompressorAtRpm) * lvl;
-        // The hump: tip-clearance noise at half the blade-passing frequency, a narrow BAND rather than
-        // a line — the rotating instability that makes it is noise, and a hump is what the spectra
-        // show (Raitor and Neise). A sine, even with a wandering pitch, is a line and sounds thin. So
-        // it is white noise through a band HumpWidth of its centre wide, held at the power a sine of
-        // the same amplitude would have.
+        // The tip-clearance hump: noise through a band HumpWidth wide (a sine sounds thin), at the power
+        // a sine of the same amplitude would have.
         _tcnDrift += (((float)_rng.NextDouble() * 2f - 1f) - _tcnDrift) * (40f / _rate);
         float ft0 = TipClearanceShare * fc * (1f + 0.015f * _tcnDrift);
         if (ft0 < nyq)
@@ -1255,24 +1062,12 @@ public sealed class EngineSynth
     }
 
     // ── The starter motor ─────────────────────────────────────────────────────────────────────
-    //
-    // The engine turning over on the starter was always here — the compression pulses coming round
-    // with nothing lighting them is the chug of cranking, and it falls out of the cylinders. The
-    // starter is the rest: a solenoid slamming the pinion into the ring gear, then a small DC motor
-    // pushing through a planetary reduction and the pinion.
-    //
-    // It is modelled as a machine, not a tone. Six recordings of real starts (Freesound: a V8 van, a
-    // Volvo 245, an Aston V8, a Beetle, a Mazda 6 from the cabin, a diesel) are broadband from 500 Hz
-    // to 4 kHz, flat within a few decibels per octave, with weak, nearly steady gear lines under the
-    // noise and a swell and a clack on every compression. The noise is the brushes and the gears
-    // sliding (US10895239); the clack is the one-way clutch: the motor's own inertia, reflected
-    // through the whole reduction, cannot follow the crank as it springs off each compression, so
-    // the clutch lets go and picks it up again a moment later (US5086657). When the engine catches it
-    // runs away from the motor for good: the clutch overruns, the gears unload and go quiet, and the
-    // motor winds DOWN once the pinion is thrown out. Nothing in a starter climbs in pitch.
-    //
-    // Gearing: a 130-tooth ring against a 10-tooth pinion, and a 4.5:1 planetary set inside a
-    // permanent-magnet gear-reduction starter (Bosch quotes 13-16:1 at the ring, 4.4:1 inside).
+    // The chug of cranking falls out of the cylinders; this is the starter itself, as a machine: a
+    // solenoid, a DC motor, a 4.5:1 planetary set and a 10-tooth pinion on a 130-tooth ring. Brush and
+    // gear noise (broadband 500 Hz-4 kHz in six recorded starts), weak gear lines, and a clack each
+    // time the one-way clutch picks the crank up after a compression. When the engine catches the
+    // clutch overruns and the motor winds down: nothing in a starter climbs in pitch. Recordings and
+    // sources: docs/ENGINE_SYNTHESIS.md, "The starter motor".
     private const int RingTeeth = 130, PinionTeeth = 10, CommutatorBars = 24, ArmatureSlots = 11;
     private const float PlanetaryRatio = 4.5f;
     private const float StarterReduction = (float)RingTeeth / PinionTeeth * PlanetaryRatio;
@@ -1286,9 +1081,8 @@ public sealed class EngineSynth
     /// an idle one's valvetrain.</summary>
     private const float StarterDbAtOneMetre = 82f;
     /// <summary>The displacement <see cref="StarterDbAtOneMetre"/> is for, litres. A starter is sized to
-    /// the engine it turns — about a kilowatt for a small four, two for a big V8, six or more for a
-    /// bus diesel — and its noise and its armature go with its power, so with the swept volume it
-    /// has to push over compression.</summary>
+    /// its engine (about 1 kW for a small four, 2 for a big V8, 6 or more for a bus diesel), so its noise
+    /// and armature go with the swept volume.</summary>
     private const float StarterReferenceLitres = 1.6f;
     private float StarterSize => MathF.Max(0.25f, Profile.DisplacementLitres / StarterReferenceLitres);
     /// <summary>The armature's speed as the crank would see it through the reduction, rad/s.</summary>
@@ -1296,8 +1090,7 @@ public sealed class EngineSynth
     private bool _clutchLocked, _starterWas;
     /// <summary>What the starter is pushing with this sample, as a fraction of its stall torque.</summary>
     private float _starterLoad, _starterLoadLp;
-    /// <summary>For instruments: the starter's load now, 0..1, and its sound this sample before the
-    /// mix knob, Pa.</summary>
+    /// <summary>For instruments: the starter's load now, 0..1.</summary>
     internal float StarterLoadNow => _starterLoadLp;
     private float _meshPhase, _armPhase, _slotPhase, _meshDrift;
     /// <summary>The starter's whine lines against its noise, a gain — normally one. Writable so an
@@ -1308,19 +1101,15 @@ public sealed class EngineSynth
     private float _clackKick, _engageKick, _clunkKick, _clunkDelay;
     private float _clack1, _clack1b, _clack2, _clack2b, _clack3, _clack3b, _clunk, _clunkB;
 
-    /// <summary>The engine speed at which the starter has no torque left, rad/s: a DC motor's free
-    /// speed on a battery sagging under it, through the reduction.
-    ///
-    /// A DC motor's torque falls in a straight line from stall to free speed, and it settles where
-    /// that line meets what it is turning: the engine's friction (compression gives back most of
-    /// what it takes). The declared cranking speed is that meeting point, so the free speed is
-    /// placed to put it there.</summary>
+    /// <summary>The engine speed at which the starter has no torque left, rad/s, through the reduction.
+    /// A DC motor's torque falls linearly to its free speed and settles where it meets the engine's
+    /// friction; the free speed is placed to make that the declared cranking speed.</summary>
     private float StarterFreeOmega
         => Profile.CrankingRpm * MathF.Tau / 60f / MathF.Max(0.2f, 1f - Friction(Profile.CrankingRpm) / StarterTorque());
 
     /// <summary>
-    /// One sample of the crank while the starter is in: the motor and the crank locked together
-    /// through the one-way clutch, or apart while the crank runs ahead. Returns the crank's new speed.
+    /// One sample of the crank while the starter is in: motor and crank locked through the one-way
+    /// clutch, or apart while the crank runs ahead. Returns the crank's new speed.
     /// </summary>
     private float CrankWithStarter(float engineNet, float J)
     {
@@ -1328,8 +1117,8 @@ public sealed class EngineSynth
         float ja = ArmatureKgM2 * StarterSize * StarterReduction * StarterReduction;
         if (!_starterWas)
         {
-            // The pinion goes in against a standing (or coasting) motor: the clutch takes up as soon
-            // as the motor catches the crank.
+            // The pinion goes in against a standing or coasting motor; the clutch takes up when it
+            // catches the crank.
             _clutchLocked = false;
             _engageKick = 1f;
             _clunkDelay = 0.02f;
@@ -1373,18 +1162,15 @@ public sealed class EngineSynth
         float spin = MathF.Min(1f, _armOmega / free);
         if (spin < 1e-3f && _engageKick == 0f && _clunkKick == 0f && _clackKick == 0f && MathF.Abs(_clunk) < 1e-6f) return 0f;
 
-        // RMS pressure at a metre while it cranks steadily: everything below is scaled to come to
-        // about one there.
+        // RMS pressure at a metre while it cranks steadily; everything below comes to about one there.
         float amp = 20e-6f * MathF.Pow(10f, StarterDbAtOneMetre / 20f) * MathF.Sqrt(StarterSize);
         _starterLoadLp += (_starterLoad - _starterLoadLp) * MathF.Min(1f, _dt * 200f);
-        // How hard it is pushing against how hard it pushes on average (the friction it settles
-        // against): one while it cranks steadily, more coming up on a compression, nothing while
-        // the clutch is overrunning.
+        // Load against the steady cranking load: one cranking, more coming up on a compression,
+        // nothing while the clutch overruns.
         float load = engaged ? MathF.Min(3f, _starterLoadLp * StarterTorque() / MathF.Max(1f, Friction(Profile.CrankingRpm))) : 0f;
 
-        // The brushes and the sliding teeth: broadband, as loud as the current (the load) makes it,
-        // rippling a little at the commutator. Pink, 250 Hz to about 6 kHz: flat per octave and
-        // falling above, like the recordings.
+        // Brushes and sliding teeth: pink from 250 Hz to about 6 kHz, as loud as the load makes it,
+        // rippling at the commutator.
         float w = (float)(_rng.NextDouble() * 2 - 1);
         _pink0 = _kp0 * _pink0 + w * 0.0990460f;
         _pink1 = _kp1 * _pink1 + w * 0.2965164f;
@@ -1399,19 +1185,16 @@ public sealed class EngineSynth
         // Thrown out, no current flows: what is left is the armature's bearings and windage.
         float noise = _noiseLp2 * ripple * (0.55f * spin * (engaged ? 1f : 0.3f) + 0.45f * load);
 
-        // The ring gear meshing with the pinion, and the armature: weak lines under the noise, louder
-        // under load, never quite steady (the teeth are not perfect, the speed wanders).
-        // The recordings put these lines 8-14 dB over the noise around them in a 5 Hz bin: the ring
-        // mesh (380-830 Hz) and, on a geared starter, the armature's slots passing the magnets near
-        // 2-2.5 kHz (a Volvo 245, an Aston V8, a diesel). They are what makes it a whine and not a hiss.
+        // The ring mesh (380-830 Hz) and the armature's slots (near 2-2.5 kHz on a geared starter):
+        // 8-14 dB over the noise in a 5 Hz bin in the recordings, louder under load, never quite steady.
+        // They make it a whine and not a hiss.
         _meshDrift += ((float)(_rng.NextDouble() * 2 - 1) * 0.006f - _meshDrift) * _dt * 30f;
         float meshHz = engaged ? _omega / MathF.Tau * RingTeeth * (1f + _meshDrift) : 0f;
         _meshPhase += meshHz * _dt; _meshPhase -= MathF.Floor(_meshPhase);
         float mesh = (MathF.Sin(MathF.Tau * _meshPhase) + 0.3f * MathF.Sin(MathF.Tau * 2f * _meshPhase))
                    * 1.6f * MathF.Min(2f, 0.4f + 0.6f * load) * StarterToneMix;
         _slotPhase += armHz * ArmatureSlots * (1f + _meshDrift) * _dt; _slotPhase -= MathF.Floor(_slotPhase);
-        // The slot whine is magnetic: it rides on the speed, and on the current while it pushes, and
-        // goes on as the armature winds down after it is thrown out.
+        // The slot whine is magnetic: it rides on speed and current, and goes on as the armature winds down.
         float slot = (MathF.Sin(MathF.Tau * _slotPhase) + 0.35f * MathF.Sin(MathF.Tau * 2f * _slotPhase))
                    * 0.8f * spin * (engaged ? MathF.Min(2f, 0.5f + 0.5f * load) : 0.5f) * StarterToneMix;
         float whine = (MathF.Sin(MathF.Tau * _armPhase) + 0.25f * MathF.Sin(MathF.Tau * 2f * _armPhase)) * 0.12f * spin * spin + slot;
@@ -1444,9 +1227,8 @@ public sealed class EngineSynth
 
     private float StarterTorque()
     {
-        // Sized to the engine, as a starter is: it has to push a cylinder over compression from a
-        // standstill, so it is rated above the peak static compression torque — the slow-cranking
-        // compression pressure on the piston times the crank lever near its worst — with margin.
+        // Rated above the peak static compression torque (slow-cranking compression pressure on the
+        // piston times the crank lever near its worst), with margin: it must push a cylinder over.
         float e = Profile.CompressionRatio;
         float pComp = Gas.Atmosphere * MathF.Pow(e, 1.2f);
         float peakStatic = pComp * _pistonArea * 0.6f * _crankRadius;
@@ -1458,28 +1240,24 @@ public sealed class EngineSynth
 
     /// <summary>
     /// The state of the engine that changes slowly: gas temperature, manifold pressure, boost, and
-    /// the idle governor. A few hundred times a second is plenty.
+    /// the idle governor. Every <see cref="GasEvery"/> samples.
     /// </summary>
     private void UpdateSlow(float rpm)
     {
         var e = Profile;
         float dtSlow = _dt * GasEvery;
 
-        // Mean exhaust mass flow, over a few cycles.
         float flowNow = _massFlowAcc / dtSlow;
         _massFlowAcc = 0f;
         _massFlowLp += (flowNow - _massFlowLp) * MathF.Min(1f, dtSlow * 8f);
 
-        // Governor. On a petrol engine it is an idle bypass — a small hole beside the plate, one to
-        // three per cent of the bore — opened and closed slowly to hold the idle speed; on a diesel it
-        // is fuel. It is slow on purpose: the plenum takes a fifth of a second to fill and combustion
-        // two cycles to answer, and a loop quicker than that hunts by hundreds of rpm, which a badly
-        // set-up idle does — but the profile should decide that through its gain, not the arithmetic.
+        // Governor: an idle bypass beside the plate on petrol (1-3 % of the bore), fuel on a diesel.
+        // Slow on purpose: the plenum takes a fifth of a second to fill, and a quicker loop hunts by
+        // hundreds of rpm; whether an idle hunts is the profile's gain to decide.
         bool pedalUp = Throttle < 0.04f;
         bool diesel = e.Fuel == FuelType.Diesel;
-        // Authority is sized from what THIS engine needs to idle: a 1.6 needs half a per cent of its
-        // throttle bore, a 7-litre one per cent. Gains are fractions of that, so the same profile
-        // gain means the same thing on both.
+        // Authority is sized from what this engine needs to idle (half a per cent of the bore for a
+        // 1.6, one per cent for a 7-litre), so a profile gain means the same on both.
         float unit = diesel ? 0.3f : _idleAreaFrac;
         float idleCap = diesel ? 1f : 3f * unit;
         float kp = 0.5f * unit, ki = 0.7f * unit, kd = 1.4f * unit;
@@ -1492,15 +1270,11 @@ public sealed class EngineSynth
             float rising = (_rpmFast - _rpmSlow) / e.IdleRpm;         // where it is heading
             _idleIntegral = Math.Clamp(_idleIntegral + err * e.IdleGovernorGain * ki * dtSlow, 0f, idleCap);
             _idleAir = Math.Clamp(_idleIntegral + e.IdleGovernorGain * (err * kp - rising * kd), 0f, idleCap);
-            // The fast half of idle control is the spark: an ECU pulls timing when the idle runs
-            // high and adds it when it sags, which changes torque within a cycle where air takes a
-            // fifth of a second to arrive. It is what stops the plenum's lag turning the idle into a
-            // slow surge. A carburetted engine has none of it, and its low gain says so.
-            // Twelve degrees of retard is enough to steady an idle, and no more: a big cam's lope is
-            // the idle swinging a fifth either side of its speed, and more authority flattens it.
-            // A start flare is twice the idle speed, and there the ECU pulls the timing to about
-            // top dead centre — at 2,500 rpm the base advance is 30 degrees, and a 12-degree limit
-            // left the flare burning efficiently for seconds.
+            // The fast half of idle control is the spark, which changes torque within a cycle and stops
+            // the plenum's lag making a slow surge (a carburetted engine has none; its low gain says so).
+            // Twelve degrees of retard steadies an idle without flattening a big cam's lope; in a start
+            // flare (over 1.5x idle) the ECU pulls timing to about TDC, as a 12-degree limit left the
+            // flare burning efficiently for seconds.
             float retardLimit = _rpmSlow > 1.5f * e.IdleRpm ? -30f : -12f;
             _idleSparkTrim = diesel ? 0f : Math.Clamp(e.IdleGovernorGain * (err * 18f - rising * 36f), retardLimit, 8f);
         }
@@ -1513,17 +1287,14 @@ public sealed class EngineSynth
         _pedal += (pedalRaw - _pedal) * MathF.Min(1f, dtSlow / 0.04f);
         float pedal = _pedal;
 
-        // Boost follows load with the lag of the turbine, or the crank for a blower, and raises the
-        // pressure upstream of the throttle; the plenum then decides what the manifold sees.
+        // Boost follows load with the turbine's lag (the crank's for a blower) and raises the pressure
+        // upstream of the throttle; the plenum decides what the manifold sees.
         float wantSpool = e.Induction switch
         {
-            // The exhaust spins the turbine even at idle: a big turbo freewheels there
-            // (MechanicalSpec.TurboIdleSpool), and the throttle takes it from there — ON TOP of that,
-            // not instead of it. It was the larger of the two, and the throttle's share only passed
-            // the freewheel at 1,300-1,700 rpm, so a compound truck pulling away gently held its
-            // whistle flat until then: "when it hits the gas the turbo doesn't spin up right away".
-            // With no freewheel declared this is the throttle's share alone, as it always was.
-            // An engine on an all-speed governor has its pedal up, so there the fuel drives it.
+            // The throttle's share is on top of the idle freewheel (MechanicalSpec.TurboIdleSpool), not
+            // the larger of the two: as the larger, a compound truck pulling away gently held its
+            // whistle flat to 1,300-1,700 rpm ("the turbo doesn't spin up right away"). On an all-speed
+            // governor the pedal is up, so the fuel drives it.
             Induction.Turbocharged => TurboTarget(GovernedRpm > 0f ? pedal : Throttle, rpm, e),
             Induction.Supercharged => Math.Clamp(rpm / e.RedlineRpm, 0f, 1f) * (0.3f + 0.7f * Throttle),
             _ => 0f,
@@ -1536,8 +1307,7 @@ public sealed class EngineSynth
         _intake.UpdateGas(_intakeK, airbox);
         float open = Math.Clamp((_map / Gas.Atmosphere - 0.3f) / 0.7f, 0f, 1f);
 
-        // Gas temperature follows the work, with the thermal inertia of steel: quick to heat,
-        // slow to cool.
+        // Gas temperature follows the work: quick to heat, slow to cool.
         float work = Math.Clamp(0.3f * rpm / e.RedlineRpm + 0.7f * (e.Fuel == FuelType.Diesel ? pedal : open), 0f, 1f);
         float wantK = (Ignition && _omega > 10f)
             ? MathHelper.Lerp(e.Exhaust.GasCelsiusIdle, e.Exhaust.GasCelsiusFull, work) + 273.15f
@@ -1548,22 +1318,13 @@ public sealed class EngineSynth
     }
 
     /// <summary>
-    /// Decides how this cycle will burn, at intake valve closing when the charge is what it is.
-    ///
-    /// The mass and the burnt fraction are real: they came through the valves. What is added here is
-    /// what the model cannot integrate — the turbulence and mixing luck that make two identical
-    /// charges burn differently — and it is added the way it is measured, as a coefficient of
-    /// variation of the work per cycle. A healthy engine at load measures 2-4%; at idle with a lot of
-    /// residual it climbs past 10%, which is where combustion becomes bimodal: the charge lights, or
-    /// it barely does, or it does not. Above about 25% burnt fraction the flame slows badly and past
-    /// 35% it fails, and a failed cycle sends its charge into the exhaust to pop later.
-    ///
-    /// The randomness is CORRELATED between consecutive firings, whichever cylinder they are in,
-    /// through a walk the whole engine shares. This came from a measured failure: independent
-    /// per-cylinder randomness averages smooth and a fixed pattern repeats like a tremolo, while what
-    /// a lopey engine does is stagger — runs of weak cycles and runs of strong ones that never line
-    /// up with the crank. Conditions the whole engine sees at once (manifold depression, residual in
-    /// the plenum, the crank surging) are the physical reason.
+    /// Decides how this cycle will burn, at intake valve closing. The mass and burnt fraction came
+    /// through the valves; added here is the mixing luck the model cannot integrate, as a coefficient of
+    /// variation of the work per cycle: 2-4 % at load, past 10 % at a diluted idle, where combustion
+    /// turns bimodal. The flame slows badly past about 25 % burnt fraction and fails past 35-40 %, and a
+    /// failed charge pops in the exhaust later. The randomness is correlated between consecutive
+    /// firings through a walk the whole engine shares: independent per-cylinder luck averaged smooth and
+    /// a fixed pattern was a tremolo, where a lopey engine staggers in runs.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private void DecideCharge(ref Cylinder cy, float rpm, float load, bool firing)
@@ -1571,7 +1332,6 @@ public sealed class EngineSynth
         var e = Profile;
         float fresh = MathF.Max(0f, cy.Mass - cy.BurntMass);
         float dilution = cy.Mass > 1e-9f ? cy.BurntMass / cy.Mass : 1f;
-        cy.Dilution = dilution;
 
         if (!firing) { cy.ChargeDecided = false; cy.HeatTotal = 0f; return; }
         if (rpm > e.RedlineRpm + 120f) { cy.ChargeDecided = false; cy.HeatTotal = 0f; return; } // limiter
@@ -1610,11 +1370,10 @@ public sealed class EngineSynth
             float pBar = MathF.Max(1f, cy.Pressure / 1e5f);
             float delay = IgnitionDelayDegrees(rpm, pBar, cy.Temp);
             cy.SparkDeg = inject + delay;
-            // How long the injector stays open: the fuel quantity is the pedal, and it is metered
-            // over crank degrees. A few degrees at idle, most of the burn under full load.
+            // The injector's open time in crank degrees: a few at idle, most of the burn at full load.
             float injectDeg = 3f + 45f * fuelFrac;
-            // What is already in the cylinder when it lights is what burns premixed. Real engines
-            // run roughly half at idle and under a tenth at full load, which is what this gives.
+            // What is in the cylinder when it lights burns premixed: roughly half at idle and under a
+            // tenth at full load, as real engines run.
             cy.Premix = Math.Clamp(delay / MathF.Max(1e-3f, delay + injectDeg), 0.04f, 0.6f);
         }
         else
@@ -1654,36 +1413,27 @@ public sealed class EngineSynth
     /// Solves the valve as a boundary between the cylinder and a waveguide.
     ///
     /// The pipe end sees an incoming wave a and returns b; its pressure is p0 + a + b and its volume
-    /// velocity into the pipe is (b - a)/Z. The valve passes a mass flow that depends on the pressure
-    /// ratio across it, and that flow divided by the gas density at the port must equal the volume
-    /// velocity. One nonlinear equation in b, monotone, solved by Newton from last sample's answer.
-    /// Returns b; mdot is positive OUT of the cylinder.
+    /// velocity into the pipe (b - a)/Z, which must equal the valve's orifice flow over the port
+    /// density. One monotone nonlinear equation in b, bracketed and solved by regula falsi from last
+    /// sample's answer. Returns b; mdot is positive out of the cylinder.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     internal static float SolveValve(float a, float bStart, float Z, float area, float pCyl, float tCyl,
                                     float pipeK, float gamma, float cylMass, float dt, float uMean, float uCap, float pMean, out float mdot)
     {
         if (DebugRigidValves) { mdot = 0f; return a; }   // Stryker disable once all : lab switch
-        // uMean is kept at zero: subtracting a running mean of the flow at the valve was tried to keep
-        // the mean breathing out of the pipes, and it injects a spurious compression whenever the
-        // instantaneous flow is below the mean — a false ram effect worth a quarter of the charge on
-        // a big single. The pipes bleed their own DC instead (plenum stub, open ends).
-        // uCap: the pipe cannot supply or accept more than about Mach 0.3 of quasi-steady flow. A
-        // choked valve into an empty cylinder asks a linear pipe for more than that, the pipe's
-        // pressure goes to nothing, and the equation has no root; the cap keeps it physical.
-        // Only the FLUCTUATING flow is a wave. The mean flow through the valve — the engine's
-        // breathing — is carried by the pipe at no acoustic pressure, its pressure drop being what
-        // the manifold-pressure model already accounts for. Left in, it piled up as a standing DC
-        // suction of nearly half a bar in the intake runners and starved every cylinder.
-        // The most the cylinder can exchange in one sample is what brings it to the port pressure.
-        // Without this cap a small cylinder at TDC with a wide-open valve overshoots the port
-        // pressure every sample and rings the pipe up from nothing: an explicit step on a stiff
-        // coupling. Inside the residual so the pipe and the cylinder always see the same flow.
+        // uMean is kept at zero: subtracting a running mean of the valve flow injected a false ram
+        // effect worth a quarter of the charge on a big single. The pipes bleed their own DC.
+        // uCap: a pipe passes about Mach 0.3 of quasi-steady flow at most; past it a choked valve into an
+        // empty cylinder leaves the equation without a root.
+        // Only the fluctuating flow is a wave: the mean breathing, left in, piled up as nearly half a bar
+        // of DC suction in the intake runners and starved every cylinder.
+        // The most the cylinder can exchange in a sample brings it to the port pressure: otherwise a
+        // small cylinder at TDC overshoots every sample and rings the pipe up from nothing. Inside the
+        // residual so the pipe and the cylinder see the same flow.
         float equalise = 0.5f * cylMass / dt;
-        // The residual is monotone increasing in b, so bracket it by the largest volume velocity
-        // the valve could possibly pass in either direction and close in with regula falsi. Newton
-        // was tried first and could not be trusted near p_port = p_cyl, where the orifice law has an
-        // infinite slope and a bad step throws energy into the pipe.
+        // Bracketed by the largest volume velocity either way, then regula falsi. Newton could not be
+        // trusted near p_port = p_cyl, where the orifice law's slope is infinite.
         float uMax = uCap * 1.05f;
         float lo = a - Z * uMax, hi = a + Z * uMax;
         float gLo = Residual(lo, out _), gHi = Residual(hi, out _);
@@ -1706,10 +1456,8 @@ public sealed class EngineSynth
 
         float Residual(float bb, out float m)
         {
-            // Floored so the density stays positive — at a share of the pressure the port sits at,
-            // not of the atmosphere. Against an atmospheric floor, a manifold pulled below 0.05 bar
-            // by a shut throttle at high revs still offered the cylinders air at 0.05 bar, from
-            // nowhere, and every engine made torque on the overrun.
+            // Floored at a share of the port's mean pressure, not the atmosphere: against an atmospheric
+            // floor a manifold below 0.05 bar still offered air from nowhere (torque on the overrun).
             float pPort = MathF.Max(0.05f * MathF.Max(pMean, 100f), pMean + a + bb);
             float rhoPort = Gas.Density(pPort, pipeK);
             if (pCyl >= pPort)
@@ -1743,8 +1491,8 @@ public sealed class EngineSynth
     public static int DebugSoloTailpipe = -1;
 
     /// <summary>Where the listener stands, in the machine's frame (x across, y up, z forward, origin
-    /// at the exhaust part), so each tailpipe can radiate from its own position. Optional: an engine
-    /// nobody has told sums its pipes at one point. See <see cref="ExhaustNetwork.SetListener"/>.</summary>
+    /// at the exhaust part), so each tailpipe radiates from its own place; untold, the pipes sum at one
+    /// point. See <see cref="ExhaustNetwork.SetListener"/>.</summary>
     public void SetListener(Vector3 machineFrame) => _exhaust.SetListener(machineFrame);
 
     // Stryker disable all : diagnostic text for the lab, nothing audible depends on it
@@ -1760,14 +1508,6 @@ public sealed class EngineSynth
     }
     // Stryker restore all
 
-    /// <summary>Resets the engine to cold and still.</summary>
-    public void Reset()
-    {
-        _armOmega = 0f; _clutchLocked = false;
-        _omega = 0f; _theta = 0; _idleAir = 0f; _spool = 0f; _massFlowLp = 0f; _syncDegrees = 0f;
-        _turbineTone = 0f; _wb1 = _wb2 = _wx1 = _wx2 = 0f;
-    }
-
     /// <summary>Console lines about the built engine.</summary>
     public System.Collections.Generic.IEnumerable<string> Describe()
     {
@@ -1778,25 +1518,20 @@ public sealed class EngineSynth
         foreach (var line in _exhaust.Describe()) yield return line;
     }
 
-    /// <summary>A short mechanical tick: a two-pole ring plus a puff of noise.</summary>
+    /// <summary>A short mechanical tick: a puff of noise, rung by the head's structure.</summary>
     private sealed class ClickVoice
     {
-        private readonly float _rate;
         private readonly Random _rng;
-        private float _env, _freq = 3500f;
+        private float _env;
         private readonly float _decay;   // 0.9 a sample at 44.1 kHz: 0.2 ms
-        public ClickVoice(float rate, int seed) { _rate = rate; _rng = new Random(seed); _decay = At44k.Decay(0.9f, rate); }
-        public void Trigger(float amp, float freq)
-        {
-            _env = MathF.Min(1.5f, _env + amp * (0.7f + 0.6f * (float)_rng.NextDouble()));
-            _freq = freq;
-        }
+        public ClickVoice(float rate, int seed) { _rng = new Random(seed); _decay = At44k.Decay(0.9f, rate); }
+        public void Trigger(float amp)
+            => _env = MathF.Min(1.5f, _env + amp * (0.7f + 0.6f * (float)_rng.NextDouble()));
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public float Process()
         {
-            // The impact alone: the seat's contact is a short burst of force, and what it RINGS is the
-            // head's structure (EngineSynth._structValves), not a resonance of its own. A pole of its
-            // own at 3.1-4.4 kHz makes the valvetrain sound zippy.
+            // The impact alone: the head's structure (_structValves) does the ringing. A pole of its own
+            // at 3.1-4.4 kHz made the valvetrain zippy.
             if (_env < 1e-5f) return 0f;
             float x = _env * ((float)_rng.NextDouble() * 2f - 1f);
             _env *= _decay;

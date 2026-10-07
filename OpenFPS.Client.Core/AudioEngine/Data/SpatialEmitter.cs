@@ -6,12 +6,16 @@ namespace OpenFPS.Client.AudioEngine.Data;
 public enum EmitterType { EntityAttached, WorldLocked, Atmospheric, UI }
 public enum SynthWaveType { Sine, Square, Triangle, Saw, Noise }
 
+/// <summary>
+/// Everything the mixer needs to place and play one voice. EmitterStreamReplayTests logs every field
+/// in declaration order: adding, removing or reordering one changes the stored stream.
+/// </summary>
 public struct SpatialEmitter
 {
-    public int EntityId; 
-    public string SoundId; 
-    public string StartSoundId; // Triggered when emitter becomes active
-    public string StopSoundId;  // Triggered when emitter is deactivated
+    public int EntityId;
+    public string SoundId;
+    public string StartSoundId; // played when the emitter becomes active
+    public string StopSoundId;  // played when it is stopped
     public PlaybackMode Mode; 
     public Vector3 Position; 
     public Vector3 ApparentPosition; 
@@ -23,31 +27,18 @@ public struct SpatialEmitter
     public EmitterType Type;
 
     /// <summary>
-    /// Pinned above the physics because a player needs it, whatever the arithmetic says.
-    ///
-    /// A SHORT, explicit list on purpose — speech, the player's own footsteps, a warning tone — and
-    /// not a knob on every object. Ranking KINDS of thing rather than what can be heard would let a
-    /// clap two hundred metres away outrank a car at five metres, and the car that loses is not faded
-    /// but STOPPED and rebuilt the next frame. For a synthesized engine that means a fresh ring,
-    /// priming silence and an envelope fade: a vehicle that stops sounding as it goes past.
-    ///
-    /// Everything else is ranked on <see cref="OpenFPS.Common.Loudness.RenderedGain"/> times what the
-    /// path lets through: the level this voice will actually deliver to the ear. See VoiceManager.
+    /// Pinned above the physics because a player needs it: a short explicit list (speech, your own
+    /// footsteps, a warning tone), not a knob on every object. Ranking kinds rather than audibility
+    /// would let a clap 200 m away outrank a car at 5 m. Everything else ranks on what reaches the ear
+    /// (VoiceManager.Audibility).
     /// </summary>
     public bool Essential;
 
     /// <summary>
-    /// How big the source is, metres. Zero means a point.
-    ///
-    /// A car is three and a half metres of machine, a grandstand is eighty metres of people, a
-    /// fountain is three metres of falling water — and inside a source's own size the inverse law
-    /// does not hold, because stepping a metre nearer one part of it steps you a metre further from
-    /// another. <see cref="OpenFPS.Common.Loudness.Place(float, float)"/> is what does the arithmetic:
-    /// the reference distance widens to the source's radius and the gain is paid down to match, so
-    /// the FAR FIELD IS UNCHANGED and only the near field flattens.
-    ///
-    /// Widening a vehicle's reference without paying the gain back (a bare `MathF.Max(reference, 3f)`)
-    /// would make every quiet vehicle up to eight decibels louder than its own level says it is.
+    /// How big the source is, metres; zero is a point. Inside its own size the inverse law does not
+    /// hold, so <see cref="OpenFPS.Common.Loudness.Place(float, float)"/> widens the reference distance
+    /// and pays the gain down: the far field is unchanged. Widened without paying back, a quiet vehicle
+    /// came out up to 8 dB over its own level.
     /// </summary>
     public float ExtentMetres;
 
@@ -56,24 +47,20 @@ public struct SpatialEmitter
     /// <see cref="ListenerOffset"/> from the listener's head every tick, whatever Position says.</summary>
     public bool FollowsListener;
 
-    /// <summary>
-    /// Made by the vehicle the listener is sitting in — its own door, its own latch — and so not
-    /// heard through that vehicle's glass. Everything else outside the car is.
-    /// </summary>
+    /// <summary>Made by the vehicle the listener sits in (its own door, its latch), so not heard through
+    /// its glass.</summary>
     public bool InsideListenersVehicle;
 
     /// <summary>
-    /// This emitter's band gains, air loss and room are its path, and a re-submission while it plays
-    /// updates them. Set by a caller that works the path out itself and moves the voice, such as a
-    /// person talking as they walk. Everything else gets its path from the acoustic worker, and its
-    /// re-submissions leave the tone alone.
+    /// The band gains, air loss and room here are the path, and a re-submission while playing updates
+    /// them: for a caller that works out the path itself (a person talking as they walk). Otherwise the
+    /// acoustic worker owns the path and re-submissions leave the tone alone.
     /// </summary>
     public bool CarriesPath;
     public Vector3 ListenerOffset;
-    public float DelayMs; 
-    /// <summary>For a reflection: the entity whose sound this is a copy of. The provider starts the copy
-    /// at that voice's own playback position, so an echo of a sustained sound lags it by exactly the
-    /// path's extra delay instead of being the same file started again from the top.</summary>
+    public float DelayMs;
+    /// <summary>For a reflection: the entity it copies. The copy starts at that voice's own playback
+    /// position, so an echo of a sustained sound lags it by the path's extra delay.</summary>
     public int ReflectionOf;
     public long SequenceId; 
     public float ConeInside; 
@@ -83,22 +70,11 @@ public struct SpatialEmitter
     public int TargetRegionId;
     public Vector3 Velocity;
     /// <summary>
-    /// When <see cref="Position"/> was TRUE, seconds on <see cref="OpenFPS.Common.AudioClock"/>.
-    /// Zero means "nobody knows", and the provider then treats it as now.
-    ///
-    /// The distinction between when a position was sampled and when it was handed over is the whole
-    /// of why a close, fast car stopped mid-pass. Remote entities are interpolated once per 33 ms
-    /// simulation step; the audio update submits at about 45 Hz, so half its submissions carry a
-    /// position that has not changed; and the 250 Hz attribute loop then re-applies whatever it was
-    /// last given. Stamped on SUBMISSION, every one of those looked freshly sampled, dead reckoning
-    /// saw an age of four milliseconds, and the loop wrote the same pitch and the same bearing eight
-    /// times over before jumping — a 30 Hz staircase, which at three metres and 235 km/h is two and a
-    /// third semitones and sixty degrees a step. Freeze, jump, freeze, jump is what "it stops for a
-    /// second and then continues" sounds like.
-    ///
-    /// Stamped at SAMPLE time, the same value can be re-applied as often as anything likes and the
-    /// age keeps growing, which is what makes the reckoning carry the car between updates instead of
-    /// being reset by its own re-submission. It is the same rule for a car, a drone and a running NPC.
+    /// When <see cref="Position"/> was true, seconds on <see cref="OpenFPS.Common.AudioClock"/>; zero
+    /// is unknown, taken as now. Stamped at sample time, never at submission: stamped on submission,
+    /// dead reckoning was reset by every re-submission and a close fast car moved in a 30 Hz staircase
+    /// (2.3 semitones and 60 degrees a step at 3 m and 235 km/h), heard as "it stops for a second and
+    /// then continues". See docs/AUDIO_GHOSTS_AND_STUTTERS.md, rule 5.
     /// </summary>
     public double PositionSampledAt;
     public Vector3 Direction;
@@ -110,18 +86,16 @@ public struct SpatialEmitter
     public float LevelDb;
 
     /// <summary>
-    /// For the ear model (docs/EAR_MODEL.md): the declared level at a metre, dB SPL, of the source this
-    /// voice is, the level its placement came from; 0 when it has none, and then the ear model leaves
-    /// the voice alone. A copy (a reflection) carries its SOURCE's level here, because it keeps its
-    /// source's placement, and how far under the source it is in <see cref="EarCopyDb"/>.
+    /// For the ear model (docs/EAR_MODEL.md): the source's declared level at a metre, dB SPL, or 0 to
+    /// leave the voice alone. A reflection carries its source's level here, and how far under it it is
+    /// in <see cref="EarCopyDb"/>.
     /// </summary>
     public float EarLevelDb;
     /// <summary>A copy's level under its source, dB (20 log10 of what the surface and the path kept); 0
     /// for a direct sound.</summary>
     public float EarCopyDb;
-    public float ReflectionSpread; // (0-360) How wide the reflection feels in 3D space.
+    public float ReflectionSpread; // degrees, 0-360: how wide the reflection feels
 
-    // Granular Synthesis Parameters
     public bool IsGranular;
     public float GranularPosition; // 0.0 to 1.0, position in the source file
     public float GranularGrainSizeMs; // Length of each grain (e.g. 10 to 200 ms)
@@ -130,50 +104,31 @@ public struct SpatialEmitter
     public float GranularPositionJitter; // Randomness in position (0.0 to 1.0)
     public float GranularPitchJitter; // Randomness in pitch
 
-    // Synthesizer Parameters
     public bool IsSynth;
     /// <summary>A vehicle engine preset (see VehicleProfile.Presets) run live in the mixer. Set when
     /// the entity's SoundId is "engine:&lt;preset&gt;".</summary>
     public string EngineKey;
     /// <summary>
-    /// A physical model other than a vehicle engine, run live in the mixer, as the WHOLE prefixed id
-    /// the entity carries: "machine:ac_window", "aircraft:airliner".
-    ///
-    /// The prefix is kept rather than stripped because it is the only thing that says which library
-    /// to look the name up in, and there is more than one — a governed single-cylinder machine and a
-    /// turbofan are different models with different inputs. One field with the prefix left on means
-    /// one place decides what a name means (FmodAudioProvider), rather than every reader carrying a
-    /// flag for which kind it was handed.
-    ///
-    /// Separate from <see cref="EngineKey"/>, which buys a whole VEHICLE — driveline, gearbox,
-    /// tyres, a driver following a road speed — and is the one model with two outlets, echoes and
-    /// borrowed voices hanging off it.
+    /// A physical model other than a vehicle engine, run live in the mixer, as the whole prefixed id
+    /// ("machine:ac_window", "aircraft:airliner"): the prefix says which library the name is in, and
+    /// FmodAudioProvider is the one place that reads it. <see cref="EngineKey"/> is a whole vehicle
+    /// (driveline, tyres, a driver), with outlets, echoes and borrowed voices.
     /// </summary>
     public string PhysicalKey = "";
 
     /// <summary>Whether the listener is sitting in this vehicle, so its engine voice renders what
     /// gets through the body rather than what radiates from it. See EngineVoiceState.Interior.</summary>
     public bool Interior;
-    /// <summary>
-    /// The power lever of anything that has one, 0..1 — an aircraft.
-    ///
-    /// Read off the CLIMB ANGLE rather than scripted (ClientAudioSystem.PowerLeverFor): an aeroplane
-    /// going up is at or near full power, one holding height is at cruise, one coming down is at
-    /// idle with the drag doing the work. That is why the same aeroplane overhead and on approach
-    /// are completely different sounds with nothing about the aeroplane changed, and doing it this
-    /// way means the sound falls out of the flight path instead of being painted onto it.
-    /// </summary>
+    /// <summary>An aircraft's power lever, 0..1, read off its climb angle (ClientAudioSystem.PowerLeverFor):
+    /// climbing near full, level at cruise, descending at idle.</summary>
     public float PowerLever;
 
-    /// <summary>How hard a rotor is meeting its own wake, 0..1 — a helicopter descending or in fast
-    /// forward flight slaps, one in a hover does not. Ignored by anything without a rotor.</summary>
+    /// <summary>How hard a rotor is meeting its own wake, 0..1: a helicopter descending or in fast
+    /// forward flight slaps, one in a hover does not.</summary>
     public float RotorWake;
 
-    /// <summary>
-    /// An aeroplane's wheels are on the ground. Read off the flight path like the power lever is:
-    /// an aeroplane at runway height that has stopped going down has landed, and nothing scripts
-    /// it. The transition into it is the touchdown; see AircraftVoiceState.
-    /// </summary>
+    /// <summary>An aeroplane's wheels are on the ground, read off the flight path (at runway height and
+    /// no longer descending); the change is the touchdown (AircraftVoiceState).</summary>
     public bool OnGround;
 
     /// <summary>Road speed the engine follows, m/s.</summary>
@@ -192,22 +147,19 @@ public struct SpatialEmitter
     /// <summary>How rough the surface an echo came off is, 0..1 — how much the renderer smears it.
     /// See EngineEchoState.Scattering.</summary>
     public float EchoScattering;
-    /// <summary>The ground between this source and the listener (see GroundReflection): the extra
-    /// path in seconds, and the pressure it hands back below and above a kilohertz, spreading
-    /// included. All zero: no ground reflection.</summary>
-    /// <summary>The height of the surface the ground reflection bounces off, world metres: where its
-    /// image is. Meaningful only when the ground gains are above zero.</summary>
+    /// <summary>The height of the surface the ground reflection bounces off, world metres (where its
+    /// image is); meaningful only when the ground gains are above zero.</summary>
     public float GroundHeight;
+    /// <summary>The ground between source and listener (GroundReflection): the extra path, seconds, and
+    /// the pressure handed back below and above a kilohertz, spreading included. All zero: none.</summary>
     public float GroundDelaySeconds;
     public float GroundLowGain;
     public float GroundHighGain;
     /// <summary>
-    /// When non-zero, this voice is the FRONT OUTLET of that entity's live engine — what the machine
-    /// breathes through, and the block behind it — placed at its own point on the machine.
-    ///
-    /// Not a second engine: the same integration writes both taps, so this costs a buffer read and a
-    /// voice. The two sum to exactly what the single voice was, so a machine does not change level
-    /// when it gains or loses its second outlet. See EngineTapState.
+    /// When non-zero, this voice is the front outlet (intake and block) of that entity's live engine,
+    /// at its own point on the machine. The same integration writes both taps, and they sum to exactly
+    /// the single voice, so a machine keeps its level when it gains or loses the outlet. See
+    /// EngineTapState.
     /// </summary>
     public int IntakeOfEntity;
     /// <summary>
@@ -233,14 +185,9 @@ public struct SpatialEmitter
     /// <summary>For a wood heard as one (WoodChorus): how many of its trees its synth stands for now.
     /// Read only for a wood's voice.</summary>
     public float Trees;
-    /// <summary>
-    /// How hard the road is working this vehicle's tyres, as a fraction of the grip they have.
-    ///
-    /// Zero is rolling; one is the limit, where a tyre squeals; above that it is sliding. Computed
-    /// from the entity's OWN motion rather than from anything knowing what a corner is — see
-    /// ClientAudioSystem.TyreDemand — so a car, a bus, a runaway trolley and a player-driven vehicle
-    /// all get it on the same terms.
-    /// </summary>
+    /// <summary>How hard the road is working this vehicle's tyres, as a fraction of their grip: zero
+    /// rolling, one the limit where a tyre squeals, above it sliding. From the server's
+    /// <see cref="OpenFPS.Common.Networking.EntityState.TyreDemand"/>.</summary>
     public float TyreSlip;
     /// <summary>Each wheel as the server sent it, front axle first, or null. The tyre voices take
     /// each axle's share of <see cref="TyreSlip"/> from it.</summary>
@@ -251,15 +198,15 @@ public struct SpatialEmitter
     /// <summary>The road's water under a vehicle whose wheels are not sent, mm (WorldSnapshot.RoadWaterMm).</summary>
     public float RoadWaterMm;
     public SynthWaveType SynthWave;
-    public float SynthFrequency; // Base frequency (e.g. 440.0f)
-    public float SynthLfoRate; // Lfo speed in Hz
-    public float SynthLfoDepth; // Amount of modulation (0.0 to 1.0)
-    public float SynthFilterCutoff; // Filter cutoff (0.0 to 1.0)
-    public float SynthFilterResonance; // Filter resonance (0.0 to 1.0)
-    public float SynthPulseWidth; // For Square/Pulse waves
+    public float SynthFrequency; // Hz
+    public float SynthLfoRate; // Hz
+    public float SynthLfoDepth; // 0..1
+    public float SynthFilterCutoff; // 0..1
+    public float SynthFilterResonance; // 0..1
+    public float SynthPulseWidth; // square and pulse waves
 
-    // 3-Band EQ Multipliers (1.0 = unity gain, 0.0 = mute): the WHOLE of what the path does to each
-    // band — occlusion, transmission, diffraction — applied once by the mixer.
+    // Band gains, 1 unity: the whole of what the path does to each band (occlusion, transmission,
+    // diffraction), applied once by the mixer.
     public float EqLow;
     public float EqMid;
     public float EqHigh;
@@ -299,8 +246,7 @@ public struct SpatialEmitter
         ApertureFactor = 1.0f;
         TransmissionBleed = 1.0f;
         IsEvent = false;
-        
-        // Ensure audio is audible by default
+
         EqLow = 1.0f;
         EqMid = 1.0f;
         EqHigh = 1.0f;

@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -7,56 +6,39 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// <summary>
 /// The wind in a tree, from the tree.
 ///
-/// LEAVES. A leaf on a stalk in moving air flutters, at a rate of the order of the wind speed over its
-/// own length, and fluttering leaves touch their neighbours. Each touch is a strike on a light,
-/// heavily damped membrane: a click with a short scratch after it, in the low kilohertz. A crown
-/// holds tens of thousands of leaves, so the strikes run to thousands a second and merge into the
-/// rustle — but they are still separate strikes, which is what makes a rustle a rustle and not a hiss.
-/// How many touch, and how hard, both grow with the wind, and below a breath of air none do.
+/// Leaves flutter at about the wind speed over their length and strike their neighbours: each a click
+/// and a short scratch on a light, damped membrane, in the low kilohertz. Thousands a second merge
+/// into the rustle, but stay separate strikes, which is what makes it a rustle and not a hiss. Below a
+/// breath of air none touch.
 ///
-/// BRANCHES. The leaves ride on branches, and branches swing on their own frequencies, the crown at
-/// a fraction of a hertz and the outer boughs at a few. A branch swinging into the wind carries its
-/// leaves through the air faster, so the rustle comes in surges from one part of the crown and then
-/// another, never as a steady wash.
+/// Boughs swing on their own frequencies (the crown at a fraction of a hertz, the outer boughs at a
+/// few) and carry their leaves faster into the wind, so the rustle surges from one part of the crown
+/// and then another. The rustle comes at the scale of the twig, a dozen or two leaves: an eddy hits a
+/// twig, its leaves clatter for a tenth to a fifth of a second, and it settles; those patches over a
+/// sparse scatter of single ticks. A steady rain of strikes sounds like a hiss.
 ///
-/// TWIGS. Between the bough and the leaf is the twig, a cluster of a dozen or two leaves, and that is
-/// the scale the rustle actually comes in: an eddy a few tens of centimetres across hits a twig, its
-/// leaves clatter against each other for a tenth or a fifth of a second, and it settles. A recording
-/// of leaves in wind is made of those patches, each a little higher or lower than the last for the
-/// size of its leaves, over a sparse scatter of single ticks — not of a steady rain of strikes, which
-/// was the first version of this and sounded like a hiss.
+/// The air itself sheds vortices at f = St U / d, St ≈ 0.2: a couple of hundred hertz over twigs, the
+/// whoosh under a rustle; near a kilohertz over pine needles, nearly all a conifer makes (the sough).
+/// Leaves and twigs fold as the wind rises (Vogel 1984: drag as U^(2+V), V −0.5 to −1.2), so the sound
+/// grows far more slowly than a rigid cylinder's U³, and the crown keeps to the 30-36 dB a decade
+/// Fégeant measured.
 ///
-/// THE AIR ITSELF. Flow past anything round sheds vortices at f = St U / d, St ≈ 0.2. Over twigs a
-/// few millimetres thick at a few metres a second that is a couple of hundred hertz: the low whoosh
-/// under a rustle. Over pine needles a millimetre and a half thick it is near a kilohertz, and with
-/// no leaves to flutter it is nearly all a conifer makes: the sough. Over a rigid cylinder that is a
-/// dipole whose pressure goes as the cube of the speed; a crown is not rigid. Leaves and twigs fold
-/// and streamline as the wind rises (Vogel 1984: the drag on a plant goes as U^(2+V), V −0.5 to −1.2),
-/// so the force on them — and the sound of it, and the push on the boughs — grows far more slowly,
-/// and the whole crown keeps to the 30-36 dB a decade Fégeant measured.
+/// Fitted (2026-10-04): one leaf strike's level and the shedding's, at 5 m/s, so a broadleaf crown of
+/// 400 m³ in a 4 m/s breeze makes about 50 dB(A) close to it; Fégeant's model (tabled by Heutschi,
+/// Pieren and Müller 2014) puts an oak's 100 m³ at 44 dB(A) from 5 m in 5 m/s. The counts and the laws
+/// come from the tree and the wind. Measured levels: docs/COMMON_NOTES.md, "The park tree".
 ///
-/// WHAT IS FITTED: how loud one leaf strike is, and how loud the shedding is, both at 5 m/s, set on
-/// 2026-10-04 so a broadleaf crown of 400 m³ in a 4 m/s breeze makes about 50 dB(A) close to it —
-/// Fégeant's model (as tabled by Heutschi, Pieren and Müller 2014) puts an oak's 100 m³ at 44 dB(A)
-/// from 5 m in 5 m/s. The counts and the laws come from the tree and the wind.
-///
-/// PLACES (2026-10-06). A crown is eight metres of leaves, and each ear hears its own mix of them. With
-/// more than one place (ExtendedSources), each bough's strikes and twig episodes are written to the
-/// place that stands for that bough's part of the crown, or to the middle by the middle's share, and the
-/// shedding has its own noise at each place, its power split by the places' shares. So the places are
-/// independent streams that add up to the tree, not copies of it. One place is the tree as it was.
+/// With more than one place (ExtendedSources, 2026-10-06), each bough's strikes and twig episodes go to
+/// the place for its side of the crown, or to the middle by the middle's share, and each place has its
+/// own shedding noise: independent streams that add up to the tree.
 /// </summary>
 public sealed class FoliageSynth
 {
-    // ── The fitted constants ─────────────────────────────────────────────────────────────────────
-
     /// <summary>One leaf strike's peak, Pa at a metre from the crown, for a 40 cm² leaf in a 5 m/s wind.</summary>
     public const float LeafStrikePascals = 0.00075f;
 
     /// <summary>The shedding noise, rms Pa at a metre, for a crown of 50 m² of leaf at 5 m/s.</summary>
     public const float SheddingPascals = 0.00225f;
-
-    // ── The tree's laws ──────────────────────────────────────────────────────────────────────────
 
     /// <summary>Strouhal number of a cylinder in cross-flow.</summary>
     private const float Strouhal = 0.2f;
@@ -95,7 +77,7 @@ public sealed class FoliageSynth
     private readonly float _rate;
     private readonly EventSum _sum;
     /// <summary>Each place's events; place 0 (the middle) is <see cref="_sum"/>, which also draws every
-    /// random number the scheduling needs, so a tree of one place renders exactly as before places.</summary>
+    /// random number the scheduling needs, so a tree of one place renders as it did without places.</summary>
     private readonly EventSum[] _sums;
     private readonly float _leaves;          // how many leaves on the tree
     private readonly float _leafLength;      // m
@@ -111,13 +93,10 @@ public sealed class FoliageSynth
         set { for (int b = 0; b < Boughs; b++) _boughWindIn[b] = value; }
     }
 
-    /// <summary>Reads the wind field at each bough's own place, for a tree whose crown's middle is at
-    /// (x, z) on the map. A crown is metres across, and a gust crosses it in a second or two (its
-    /// diameter over the wind speed), so the boughs on its upwind side take the gust up before the
-    /// ones on the far side and the crown as a whole takes it up over that crossing — not in the
-    /// fifth of a second one leaf does. Reading the wind at the crown's middle for all of them made
-    /// every gust arrive everywhere at once, and its swell was heard as a change of setting rather
-    /// than as air moving through a tree.</summary>
+    /// <summary>Reads the wind field at each bough's own place, for a crown whose middle is at (x, z).
+    /// A gust crosses a crown in a second or two, upwind boughs first. Read at the middle for all of
+    /// them, every gust arrived everywhere at once and was heard as a change of setting rather than as
+    /// air moving through a tree.</summary>
     public void ReadWind(float x, float z, double seconds)
     {
         for (int b = 0; b < Boughs; b++)
@@ -143,11 +122,9 @@ public sealed class FoliageSynth
 
     /// <summary>
     /// How many trees this synth is: 1 for a tree; for a wood heard as one source (WoodChorus), how many
-    /// of its trees it stands for now. N independent trees are N independent streams of strikes and N
-    /// independent shedding noises, so their sum is one stream at N times the rate and N times the
-    /// power: up to <see cref="MaxDensityTrees"/> that is what is rendered (the strikes and the twig
-    /// episodes come N times as often, the shedding's power is N times), and past it the rendered
-    /// trees' sum is scaled in amplitude to N trees' power. Under one, a share of a tree.
+    /// of its trees it stands for now. N independent trees sum to one stream at N times the rate and
+    /// power: rendered so up to <see cref="MaxDensityTrees"/>, and past it scaled in amplitude to N
+    /// trees' power. Under one, a share of a tree.
     /// </summary>
     public float Trees = 1f;
 
@@ -163,11 +140,9 @@ public sealed class FoliageSynth
 
     /// <summary>
     /// Where bough <paramref name="b"/> is in the crown, m from its middle (x east, y up, z north): round
-    /// the crown at two-thirds of its radius, the mean distance from the middle of a disc's area, every
-    /// sixty degrees, alternately a quarter of the radius above and below the middle. The wind is read
-    /// there (<see cref="ReadWind"/>), so a gust crosses the crown from its upwind boughs to its downwind
-    /// ones; and the bough's strikes are heard from there (ExtendedSources). Until 2026-10-06 the boughs
-    /// were a line along the wind, read but not placed.
+    /// the crown at two-thirds of its radius (the mean distance from the middle of a disc), every sixty
+    /// degrees, alternately a quarter of the radius above and below. The wind is read there
+    /// (<see cref="ReadWind"/>) and the bough's strikes are heard from there (ExtendedSources).
     /// </summary>
     public static Vector3 BoughOffset(FoliageSpec spec, int b)
     {
@@ -181,9 +156,6 @@ public sealed class FoliageSynth
     /// neighbouring boughs together, so each place is one side of the crown.</summary>
     public static int PlaceOfBough(int b, int places) => places <= 0 ? 0 : Math.Clamp(b * places / Boughs, 0, places - 1);
 
-    /// <summary>How many places the tree is heard from: one, the middle, unless made with more.</summary>
-    public int Places => _sums.Length;
-
     /// <summary>How much of the tree its outer places carry, 0 (all from the middle) to 1 (an equal share
     /// each): ExtendedSources.Shares. Set between control calls; the shedding glides to it.</summary>
     public float Spread;
@@ -194,7 +166,7 @@ public sealed class FoliageSynth
     private readonly float[] _boughWindIn = new float[Boughs];
     private readonly float[] _wind = new float[Boughs];
 
-    // A bough: a damped oscillator driven by the wind's buffeting.
+    // Each bough: a damped oscillator driven by the wind's buffeting.
     private readonly float[] _x = new float[Boughs], _v = new float[Boughs], _hz = new float[Boughs];
     private readonly float[] _push = new float[Boughs], _pushTarget = new float[Boughs], _pushClock = new float[Boughs];
     private readonly float[] _agitation = new float[Boughs];
@@ -223,8 +195,8 @@ public sealed class FoliageSynth
         _placeOut = new float[places];
         _placeGain[0] = _placeGainTarget[0] = 1f;
         Vogel = Math.Clamp(spec.VogelExponent, -1.5f, 0f);
-        // The increments carry the same mean energy as the fit of LeafStrikePascals was made with: a
-        // strike's goes as (u e)^(2 · 1.2), an episode's scale as the old 0.4 + 1.2 u's (mean square 1.12).
+        // Normalised to the mean energy LeafStrikePascals was fitted with: a strike's goes as
+        // (u e)^(2 · 1.2), an episode's scale as the earlier 0.4 + 1.2 u (mean square 1.12).
         _incrementOrder = IncrementOrder;
         _incrementNorm = MathF.Sqrt(GammaMoment(_incrementOrder, 2 * StrikeSpeedPower));
         _episodeOrder = EpisodeOrder;
@@ -250,16 +222,13 @@ public sealed class FoliageSynth
     }
 
     /// <summary>
-    /// How hard the air through the crown hits one leaf, or one twig, against the mean: a velocity
-    /// increment across a few centimetres of turbulent air, mean one. Small-scale velocity increments
-    /// in turbulence are not Gaussian: their distribution has exponential tails, fatter the smaller the
-    /// scale (Kailasnath, Sreenivasan and Stolovitzky 1992, Phys. Rev. Lett. 68, 2766; Frisch 1995,
-    /// "Turbulence", ch. 8: intermittency). So most strikes are glancing touches in a slack moment and a
-    /// few are hard knocks in a sharp one, the knocks a recording of leaves has standing out of the
-    /// rustle. A gamma law of order <see cref="IncrementOrder"/>, 1 the exponential. Texture round 1
-    /// (2026-10-06): every strike and episode had been driven by the mean wind alone, so the rustle's
-    /// band envelopes were as steady as noise between gusts (spread 0.075 at 6-12 kHz in a steady wind,
-    /// skew below zero; recordings 0.08-0.20 and 0.35-1.4).
+    /// How hard the air hits one leaf, or one twig, against the mean: a velocity increment across a
+    /// few centimetres of turbulent air, mean one, from a gamma law of order <paramref name="order"/>
+    /// (1 the exponential). Small-scale increments have exponential tails, fatter the smaller the scale
+    /// (Kailasnath, Sreenivasan and Stolovitzky 1992, Phys. Rev. Lett. 68, 2766; Frisch 1995,
+    /// "Turbulence", ch. 8), so most strikes are glancing and a few are the hard knocks a recording has.
+    /// Driven by the mean wind alone (texture round 1, 2026-10-06) the band envelopes were as steady as
+    /// noise: spread 0.075 at 6-12 kHz and skew below zero, against recordings' 0.08-0.20 and 0.35-1.4.
     /// </summary>
     private float Increment(int order)
     {
@@ -318,8 +287,8 @@ public sealed class FoliageSynth
 
     public void Control(float dt)
     {
-        // The boughs. The wind pushes each with a drag that goes as the speed squared, and the
-        // buffeting — the gusts inside the gust — is a force that changes every fraction of a second.
+        // The wind pushes each bough with its drag, and the buffeting (the gusts inside the gust)
+        // changes that force every fraction of a second.
         for (int b = 0; b < Boughs; b++)
         {
             // A bough's leaves take up a gust fast and let it go slowly: Heutschi, Pieren and Müller
@@ -350,12 +319,11 @@ public sealed class FoliageSynth
             _agitation[b] = MathF.Max(0f, _wind[b] + 1.5f * MathF.Abs(_v[b]));
         }
 
-        // The shedding follows the mean of the crown's motion through the air.
+        // The shedding follows the crown's mean motion through the air.
         float mean = 0f;
         for (int b = 0; b < Boughs; b++) mean += _agitation[b];
         mean /= Boughs;
-        // It glides to the note the crown's speed sets, retuned every call: the resonators had been
-        // retuned in jumps of 3 % at a time, each a small step in the colour of the hiss.
+        // Glides and is retuned every call: retuned in 3 % jumps, each was a step in the hiss's colour.
         _shedTargetHz = Math.Clamp(Strouhal * mean / (Spec.ShedDiameterMm * 1e-3f), 20f, 6000f);
         _shedHz += (_shedTargetHz - _shedHz) * MathF.Min(1f, dt / 0.25f);
         _shed.Tune(_shedHz, 0.7f, _rate);
@@ -396,7 +364,7 @@ public sealed class FoliageSynth
             Schedule(Block / _rate);
         }
         _samples++;
-        // The level is set once a control call; glide to it over a few milliseconds so it never steps.
+        // Set once a control call; glided over a few milliseconds so it never steps.
         _shedGain += (_shedLevel - _shedGain) * _shedGlide;
         _amp += (_ampTarget - _amp) * _shedGlide;
         float n = _sum.Signed() * 1.7320508f;
@@ -404,8 +372,8 @@ public sealed class FoliageSynth
         return (shed * ShedPart + _sum.Next()) * _amp;
     }
 
-    /// <summary>The next sample at each place, pascals at a metre from it: <paramref name="places"/>
-    /// holds <see cref="Places"/> of them. Their sum is the tree.</summary>
+    /// <summary>The next sample at each place, pascals at a metre from it, one per place in
+    /// <paramref name="places"/>. Their sum is the tree.</summary>
     public void NextPlaces(Span<float> places)
     {
         if (--_untilBlock <= 0)
@@ -448,11 +416,10 @@ public sealed class FoliageSynth
             // The closing speed of two fluttering leaves is a fraction of the wind through them.
             float closing = MathF.Pow(MathF.Max(0f, speed) / 5f, StrikeSpeedPower);
 
-            // Twigs set going. While an eddy holds a twig, each of its leaves touches a neighbour
-            // once each way every flutter cycle, so an episode strikes at the twig's leaves times
-            // twice the flutter rate — about 160 a second in a breeze, some thirty-five strikes in
-            // all. It had been 400 strikes an episode, ten times what a twig's leaves can make, so
-            // the rustle came as a few loud patches a second that could each be heard arriving.
+            // Twigs set going. While an eddy holds a twig each leaf touches a neighbour once each way
+            // a flutter cycle: about 160 strikes a second in a breeze, some thirty-five an episode.
+            // At 400 an episode (ten times what a twig can make) the rustle came as a few loud
+            // patches a second, each heard arriving.
             float episodeRate = LeavesPerTwig * TouchesPerFlutter * Flutter(speed);
             int starts = episodeRate > 0f ? _sum.Poisson(strikes * EpisodeShare / (episodeRate * MeanEpisodeSeconds) * dt) : 0;
             for (int k = 0; k < starts; k++)
@@ -465,8 +432,7 @@ public sealed class FoliageSynth
                     {
                         Left = length,
                         Rate = episodeRate,
-                        // How hard this eddy hit — a velocity increment across the twig, heavy-tailed
-                        // as the next strike's (see Increment) — and how big this twig's leaves are.
+                        // How hard this eddy hit (Increment), and how big this twig's leaves are.
                         Scale = closing * MathF.Pow(Increment(_episodeOrder), EpisodePower) / _episodeNorm,
                         Tone = 0.6f + 1.0f * _sum.Uniform(),
                         Bough = b,
@@ -475,14 +441,13 @@ public sealed class FoliageSynth
                 }
             }
 
-            // And the single ticks between.
+            // The single ticks between.
             Strikes(strikes * (1f - EpisodeShare) * dt, closing, 1f, b);
         }
         for (int e = 0; e < _episodes.Length; e++)
         {
             ref var ep = ref _episodes[e];
             if (ep.Left <= 0f) continue;
-            // An episode rises and dies away over its length.
             Strikes(ep.Rate * dt, ep.Scale, ep.Tone, ep.Bough);
             ep.Left -= dt;
         }
@@ -498,13 +463,9 @@ public sealed class FoliageSynth
         {
             int at = (int)(_sum.Uniform() * Block);
             var place = PlaceFor(bough);
-            // Most touches are glancing and a few are square. Two leaves meet at any angle, and for
-            // directions spread evenly over a sphere the cosine of the angle to the normal is
-            // uniform, so the closing speed's normal part is the speed times a uniform number, and
-            // the strike goes as that to StrikeSpeedPower. It had been 0.15 + 3u³, a skew nothing
-            // physical set, whose loudest strikes were twenty times the faintest and poked out of
-            // the rustle as scratches; this has the same mean energy (0.15 + 3u³ squared averages
-            // 1.53, and so does 2.28 u^1.2).
+            // Two leaves meet at any angle, and over a sphere the cosine to the normal is uniform, so
+            // the closing speed's normal part is the speed times a uniform number. The earlier
+            // 0.15 + 3u³ poked out of the rustle as scratches; this has its mean energy (1.53).
             float u = _sum.Uniform() * Increment(_incrementOrder);
             float p = LeafStrikePascals * _leafScale * scale * weight * StrikeAngleScale * MathF.Pow(u, StrikeSpeedPower) * LeafPart / _incrementNorm;
             // The tap: a light plate stopped over a few tenths of a millisecond...

@@ -1,29 +1,17 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Rail;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// A train, rendered once, heard from many places.
-///
-/// Every other physical model is one pressure at one point and has <see cref="PhysicalVoiceState"/>:
-/// a synth, a ring, a DSP. A train is a line of bogies, drives and a body drum spread over fifty
-/// metres of consist, and the rule that must not be undone (docs/TRAINS.md) is that they share ONE
-/// rail: splitting them into independent synths gives each bogie its own track, and the clatter
-/// sweep, the level plateau and the far end being duller than the near end all go.
-///
-/// So the server places one entity per source (<see cref="TrainLayout"/>, sampling the track at
-/// <c>head − along</c>, which is right round curves), and the client gives each of them a
-/// <see cref="TrainTapState"/> — an ordinary physical voice as far as the provider, the render pool
-/// and FMOD are concerned — that reads source <c>i</c> of a single <see cref="TrainSynth"/> held here.
-/// Whichever tap asks for a sample the synth has not made yet steps the synth, under a lock, and
-/// writes every source's output into that source's ring; taps then read their own ring at their
-/// own pace. The rings are long enough that taps rendered on different worker threads, each a few
-/// hundred milliseconds ahead of the mixer, stay inside the window.
+/// A train, rendered once, heard from many places. Its bogies, drives and body share one rail and so
+/// one <see cref="TrainSynth"/> (docs/TRAINS.md): separate synths give each bogie its own track and
+/// lose the clatter sweep, the level plateau and the duller far end. The server places one entity per
+/// source (<see cref="TrainLayout"/>) and each gets a <see cref="TrainTapState"/>, an ordinary physical
+/// voice reading source i. Whichever tap asks for a sample not yet made steps the synth under a lock and
+/// writes every source's ring; the rings are long enough for taps on different render workers, each a
+/// few hundred milliseconds ahead of the mixer, to stay inside them.
 /// </summary>
 public sealed class TrainVoiceState
 {
@@ -46,8 +34,7 @@ public sealed class TrainVoiceState
     public int Taps;                                       // how many entities currently read it
 
     /// <summary>What the train is sounding (TrainSignal): the horn's rhythm and the bell's length, from a
-    /// sample of the synth's own timeline. Swapped whole by the game thread; read by whichever worker
-    /// renders the train.</summary>
+    /// sample of the synth's own timeline. Swapped whole by the game thread; read by the rendering worker.</summary>
     private sealed record Signalling(float[] Warning, float BellSeconds, long StartSample);
     private Signalling? _signal;
     private readonly float _rate;
@@ -70,10 +57,9 @@ public sealed class TrainVoiceState
     public long Newest => Volatile.Read(ref _rendered);
 
     /// <summary>
-    /// The train sounds its horn (or whistle) in this rhythm and rings its bell for this long, begun
-    /// <paramref name="secondsAgo"/> before now. Played by the train's own outlets, where they are on
-    /// it (TrainSynth's horn, whistle and bell sources), from the newest sample the synth has made: a
-    /// voice renders a few hundred milliseconds ahead, and that is all the rhythm can be late by.
+    /// Sounds the horn (or whistle) in this rhythm and the bell for this long, begun
+    /// <paramref name="secondsAgo"/> before now, from the train's own outlets. Timed from the newest
+    /// sample made, so the rhythm is at most the render lead (a few hundred milliseconds) late.
     /// </summary>
     public void Signal(float[] warning, float bellSeconds, double secondsAgo)
         => Volatile.Write(ref _signal, new Signalling(warning, MathF.Max(0f, bellSeconds),
@@ -93,7 +79,7 @@ public sealed class TrainVoiceState
                 long have = _rendered;
                 if (at >= have)
                 {
-                    // Render in a block, not one sample per lock: 512 is what the pool asks for.
+                    // A block per lock, not a sample: 512 is what the pool asks for.
                     long upto = at + 512;
                     for (long s = have; s < upto; s++) StepOnce(dt);
                     Volatile.Write(ref _rendered, upto);
@@ -105,7 +91,7 @@ public sealed class TrainVoiceState
 
     private void StepOnce(float dt)
     {
-        // Speed and notch slew: a train's speed cannot step, and neither can its effort.
+        // A train's speed cannot step, and neither can its effort.
         _speed += (TargetSpeed - _speed) * MathF.Min(1f, dt * 1.5f);
         _notch += (TargetNotch - _notch) * MathF.Min(1f, dt * 0.8f);
         Train.Speed = Running ? MathF.Max(0f, _speed) : 0f;
@@ -118,7 +104,7 @@ public sealed class TrainVoiceState
             Train.HornBlowing = warn;
             Train.WhistleBlowing = warn;
             Train.BellRinging = t >= 0f && t < sig.BellSeconds;
-            // Done: let it go, unless the game thread has already put a new one in its place.
+            // Over: cleared, unless the game thread has already put a new one in its place.
             if (t > TrainSignal.Duration(sig.Warning, sig.BellSeconds)) Interlocked.CompareExchange(ref _signal, null, sig);
         }
         Train.Step();

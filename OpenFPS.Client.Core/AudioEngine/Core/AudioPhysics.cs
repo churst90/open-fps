@@ -1,20 +1,16 @@
-using System;
 using System.Numerics;
-using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core;
 
-/// <summary>
-/// Pure audio-physics helpers (no FMOD/Steam Audio state) so they can be unit-tested in isolation.
-/// </summary>
+/// <summary>Audio physics with no FMOD or Steam Audio state: the speed of sound, Doppler, air
+/// absorption.</summary>
 public static class AudioPhysics
 {
     /// <summary>Default speed of sound in air, m/s (~20 °C).</summary>
     public const float SpeedOfSound = 343f;
 
-    /// <summary>The speed of sound in the air the world has now (<see cref="SpeedOfSoundAt"/> of its
-    /// temperature), m/s. One figure for Doppler, echo delays, the ground reflection and flight time:
-    /// the echoes ran at a fixed 343 while Doppler followed the temperature.</summary>
+    /// <summary>The speed of sound in the world's air now, m/s: one figure for Doppler, echo delays, the
+    /// ground reflection and flight time (echoes once ran at 343 while Doppler followed the weather).</summary>
     public static float CurrentSpeedOfSound
     {
         get => System.Threading.Volatile.Read(ref _current);
@@ -22,9 +18,8 @@ public static class AudioPhysics
     }
     private static float _current = SpeedOfSound;
 
-    /// <summary>The air temperature the world has now, degrees C, as the server's weather sends it.
-    /// What a vehicle's cooling system runs against: on a warm day a car's air conditioning is on and
-    /// its radiator fan runs whenever it is standing or crawling.</summary>
+    /// <summary>The world's air temperature now, °C, from the server's weather: what a vehicle's cooling
+    /// system runs against.</summary>
     public static float CurrentAirCelsius
     {
         get => System.Threading.Volatile.Read(ref _currentCelsius);
@@ -32,14 +27,8 @@ public static class AudioPhysics
     }
     private static float _currentCelsius = 20f;
 
-    /// <summary>
-    /// Speed of sound in dry air at a given temperature, m/s: c = 331.3 + 0.606·T(°C).
-    ///
-    /// This is what makes the simulated temperature audible rather than decorative. It is a ~4%
-    /// swing across a playable range (−20 °C to +40 °C), which is small on its own but shifts every
-    /// Doppler factor in the world in the same direction — a siren on a winter night is measurably
-    /// flatter than the same siren in high summer.
-    /// </summary>
+    /// <summary>Speed of sound in dry air, m/s: c = 331.3 + 0.606·T(°C). About 4 % across −20 to
+    /// +40 °C, shifting every Doppler factor the same way.</summary>
     /// <param name="celsius">Air temperature. Clamped to a range the linear fit still holds over.</param>
     public static float SpeedOfSoundAt(float celsius)
     {
@@ -48,20 +37,25 @@ public static class AudioPhysics
     }
 
     /// <summary>
-    /// Doppler pitch multiplier for a source heard by a listener, from their positions and velocities.
-    /// &gt;1 = pitched up (closing), &lt;1 = pitched down (receding). Steam Audio voices are rendered on a 2D
-    /// FMOD channel (so FMOD's own Doppler is bypassed); the provider applies this factor to the channel
-    /// pitch instead. Native-3D fallback voices keep FMOD's Doppler and must NOT use this.
-    /// f' = f · (c − v_listener·û) / (c − v_source·û), with û the unit vector source→listener.
+    /// Doppler pitch multiplier, f' = f · (c − v_listener·û) / (c − v_source·û), û from source to
+    /// listener; above 1 closing. For Steam Audio voices, whose 2D channels bypass FMOD's Doppler; a
+    /// native-3D fallback voice keeps FMOD's and must not use this too.
     /// </summary>
+    /// <param name="listenerPos">Listener position.</param>
+    /// <param name="listenerVel">Listener velocity, m/s.</param>
+    /// <param name="sourcePos">Source position.</param>
+    /// <param name="sourceVel">Source velocity, m/s.</param>
     /// <param name="scale">Exaggeration factor (1 = physically correct, matches FMOD's dopplerscale).</param>
+    /// <param name="speedOfSound">m/s.</param>
+    /// <param name="min">Lowest factor returned.</param>
+    /// <param name="max">Highest factor returned.</param>
     public static float DopplerFactor(
         Vector3 listenerPos, Vector3 listenerVel,
         Vector3 sourcePos, Vector3 sourceVel,
         float scale = 1f, float speedOfSound = SpeedOfSound,
         float min = 0.5f, float max = 2.0f)
     {
-        Vector3 d = listenerPos - sourcePos; // source -> listener
+        Vector3 d = listenerPos - sourcePos;
         float dist = d.Length();
         if (dist < 1e-4f || speedOfSound <= 1e-3f) return 1f;
         Vector3 u = d / dist;
@@ -69,7 +63,7 @@ public static class AudioPhysics
         float vL = Vector3.Dot(listenerVel, u);
         float vS = Vector3.Dot(sourceVel, u);
 
-        // Clamp closing speeds below the speed of sound so the factor can't blow up / go negative.
+        // Below the speed of sound, so the factor cannot blow up or go negative.
         float lim = speedOfSound * 0.95f;
         vL = Math.Clamp(vL, -lim, lim);
         vS = Math.Clamp(vS, -lim, lim);
@@ -79,21 +73,11 @@ public static class AudioPhysics
         return Math.Clamp(factor, min, max);
     }
 
-    // ── Atmospheric absorption: ISO 9613-1 ──────────────────────────────────────────────────────
-    //
-    // Air takes the top end off a sound by molecular relaxation of oxygen and nitrogen, and how much
-    // depends on the frequency, the temperature and — above all — the water in the air. ISO 9613-1
-    // gives it in closed form, and that is what this is: no fixed coefficients and no fudge.
-    //
-    // It replaced a straight-line "muffle" that reached its limit at about 135 m and took 32 dB off
-    // the high band and 16 off the mid there, where the standard says about 14 and under 1 — six
-    // times too much — so a hot rod a block away arrived as a dull rumble with its crackle gone. It
-    // also replaced a fixed-coefficient version that added an "urban excess" of up to 9 dB per
-    // 100 m for obstacles the game already models on their own (walls, vehicles, diffraction), and
-    // that halved the loss indoors. Air is air indoors too.
-
     /// <summary>
-    /// Absorption of sound in air, dB per metre, by ISO 9613-1 (the pure-tone formula).
+    /// Absorption of sound in air, dB per metre, by ISO 9613-1 (the pure-tone formula): molecular
+    /// relaxation of oxygen and nitrogen, above all set by the water in the air. Indoors too. No excess
+    /// for obstacles, which are modelled on their own. See docs/CLIENT_NOTES.md, "Air absorption: what
+    /// ISO 9613-1 replaced".
     /// </summary>
     /// <param name="frequency">Hz.</param>
     /// <param name="temperatureC">Air temperature, °C.</param>
@@ -107,7 +91,7 @@ public static class AudioPhysics
         const double t0 = 293.15, t01 = 273.16, pr = 101.325;
         double pa = Math.Clamp(pressureMillibars, 500f, 1100f) / 10.0;          // kPa
         double hr = Math.Clamp(relativeHumidity, 0.001f, 1f) * 100.0;           // percent
-        // Molar concentration of water vapour, from the saturation pressure over ice/water.
+        // Molar concentration of water vapour, from the saturation pressure.
         double c = -6.8346 * Math.Pow(t01 / t, 1.261) + 4.6151;
         double h = hr * Math.Pow(10.0, c) * (pr / pa);
         // Relaxation frequencies of oxygen and nitrogen.
@@ -120,11 +104,14 @@ public static class AudioPhysics
     }
 
     /// <summary>
-    /// What the air takes off a sound over <paramref name="distance"/> metres, in dB (positive), in the
-    /// game's three bands — the same band centres the diffraction model uses
-    /// (<see cref="OpenFPS.Common.Diffraction.LowBandHz"/> and its siblings), so the whole pipeline
-    /// agrees on what "the high band" is.
+    /// What the air takes off a sound over <paramref name="distance"/> metres, dB (positive), in the
+    /// diffraction model's three bands (<see cref="OpenFPS.Common.Diffraction.LowBandHz"/> and its
+    /// siblings), so the pipeline agrees on what "the high band" is.
     /// </summary>
+    /// <param name="distance">Metres.</param>
+    /// <param name="humidity">Relative humidity, 0..1.</param>
+    /// <param name="temperatureC">Air temperature, °C.</param>
+    /// <param name="airPressureMillibars">Ambient pressure, mbar; unset (0) means standard.</param>
     /// <param name="multiplier">The map's AirAbsorptionMultiplier: 1 is the standard atmosphere; an
     /// unset (zero) field means 1, not "none".</param>
     public static (float Low, float Mid, float High) AirLossDb(float distance, float humidity, float temperatureC,

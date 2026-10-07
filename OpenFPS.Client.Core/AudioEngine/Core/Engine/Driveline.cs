@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 
@@ -6,14 +5,11 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 
 /// <summary>
 /// The car behind the engine: gearbox, clutch, mass, drag, brakes. One degree of freedom when the
-/// clutch is up — the crank and the wheels are the same shaft through the ratio — and two when it
-/// is down.
+/// clutch is up (crank and wheels one shaft through the ratio), two when it is down.
 ///
-/// The engine integrates its own speed from torque against inertia, so the driveline's job is to
-/// tell it what inertia it is dragging and what torque is resisting, and to read the road speed
-/// back off the crank. That is why an upshift drops the revs by exactly the ratio step, why a heavy
-/// car makes a free rev sound different from a launch, and why lifting off at speed spins the engine
-/// DOWN through the gearing rather than letting it fall to idle.
+/// The engine integrates its own speed; the driveline tells it the inertia it drags and the torque
+/// resisting, and reads road speed back off the crank. So an upshift drops the revs by the ratio
+/// step, and lifting off at speed spins the engine down through the gearing, not to idle.
 /// </summary>
 public sealed class Driveline
 {
@@ -51,9 +47,7 @@ public sealed class Driveline
     public float GearRpm(int gear) => _gb.RpmFor(Speed, gear);
     public float Ratio(int gear) => gear >= 1 && gear <= _gb.TopGear ? _gb.Ratios[gear - 1] * _gb.FinalDrive : 0f;
 
-    /// <summary>
-    /// One sample: couples the engine to the road, steps the engine, and moves the car.
-    /// </summary>
+    /// <summary>One sample: couples the engine to the road, steps the engine, and moves the car.</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public void Step(EngineSynth engine, float dt)
     {
@@ -242,32 +236,20 @@ public sealed class Driver
                 float release = order.Seconds * 0.62f;
                 if (phase < release)
                 {
-                    // Governed on where the crank is HEADING, not where it is.
-                    //
-                    // An unloaded engine is the fastest thing on the car: the F1's ten pistons weigh
-                    // nothing and turn in 0.035 kg m^2, so it gains rpm at five figures a second. A
-                    // governor that waits until the needle is within a fixed band of the target has
-                    // already lost — by the time the plate moves, the plenum empties and the next
-                    // charge burns, the crank has gone thousands of rpm past, and every blip lands
-                    // within a whisker of the limiter whatever it was asked for.
-                    //
-                    // So the error is taken against the PREDICTED speed: where the crank will be when
-                    // the throttle's answer actually arrives. That delay has two parts and the
-                    // SMALLER one is the obvious one: two crank revolutions to stop drawing and stop
-                    // burning, 30 ms at a 4,000 rpm idle and 8 ms at 15,500. The larger is the PLATE,
-                    // which does not teleport — EngineSynth runs the pedal through a 40 ms lag, and a
-                    // light engine gains four thousand rpm while the plate is still travelling.
-                    // Anticipating only the combustion and not the linkage was worth almost nothing,
-                    // which is the useful part of this: the delay a governor must lead is the whole
-                    // chain to torque, and the slowest link in it sets the answer.
+                    // Governed on where the crank is heading, not where it is. An unloaded F1 engine
+                    // (0.035 kg m^2) gains rpm at five figures a second, so a governor on the needle
+                    // put every blip at the limiter. The lead is the whole chain to torque: two
+                    // revolutions of combustion (30 ms at 4,000 rpm, 8 ms at 15,500) plus the plate's
+                    // 40 ms lag (PedalLagSeconds), the larger part; leading the combustion alone was
+                    // worth almost nothing.
                     float rate = (_engine.Rpm - _revPrevRpm) / MathF.Max(dt, 1e-6f);
                     _revPrevRpm = _engine.Rpm;
                     _revRate += (rate - _revRate) * MathF.Min(1f, dt * 200f);
                     float lead = PedalLagSeconds + 2f * 60f / MathF.Max(400f, _engine.Rpm);
                     float predicted = _engine.Rpm + _revRate * lead;
 
-                    // The band is the engine's own scale rather than a fixed number of rpm: 900 is a
-                    // sixth of a diesel's whole range and a seventeenth of this one's.
+                    // The band is on the engine's own scale: 900 rpm is a sixth of a diesel's range
+                    // and a seventeenth of an F1's.
                     float err = (target - predicted) / MathF.Max(150f, 0.06f * e.RedlineRpm);
                     _revIntegral = Math.Clamp(_revIntegral + err * 1.5f * dt, -0.3f, 0.6f);
                     float t = Math.Clamp(err + _revIntegral, 0f, 1f);
@@ -352,10 +334,9 @@ public sealed class Driver
 }
 
 /// <summary>
-/// A driver who is told where the car IS rather than what to do: follows a target road speed with
-/// throttle, brake and gears. This is how a vehicle whose position comes over the network gets an
-/// engine — the throttle is whatever it takes to match the speed the server reports, so a car that
-/// is accelerating hard sounds like it and one that is slowing down comes off the throttle and pops.
+/// A driver told where the car is rather than what to do: follows a target road speed with throttle,
+/// brake and gears. This is how a networked vehicle gets an engine: the throttle is whatever matches
+/// the speed the server reports.
 /// </summary>
 public sealed class VirtualDriver
 {
@@ -378,9 +359,8 @@ public sealed class VirtualDriver
         _dl = dl;
         _engine = engine;
         _gb = dl.Vehicle.Gearbox;
-        // The least the clutch is held at while pulling away: the bite that pushes the vehicle at
-        // about one metre a second squared. Eight per cent was that for a car, and three for a bike —
-        // a light machine through a low first gear, where eight per cent drove it on at three.
+        // The least the clutch is held at while pulling away: the bite that pushes the vehicle at about
+        // 1 m/s^2. That is eight per cent for a car and three for a bike (eight drove a bike at 3 m/s^2).
         _launchBite = Math.Clamp(dl.Vehicle.MassKg * 1f * _gb.WheelRadiusMetres
                                  / MathF.Max(1f, dl.Ratio(1) * dl.ClutchCapacityNm), 0.02f, 0.08f);
         _launchRpm = _gb.LaunchRpm ?? MathF.Max(engine.Profile.IdleRpm * 2f, engine.Profile.PeakTorqueRpm * 0.4f);
@@ -402,11 +382,9 @@ public sealed class VirtualDriver
             return;
         }
         _engine.Ignition = true;
-        // The key is held until it catches: until it fires and pulls away from the starter's speed,
-        // which is where an engine computer cuts the starter (about 300 rpm). Released on speed
-        // alone, the crank passed 1.5 times its cranking speed before the engine computer had
-        // synchronised, and the start was a starter blip and a silent coast. Held longer, the
-        // starter's clutch only overruns: the engine has already left it.
+        // The key is held until it fires and pulls away from the starter's speed, where an engine
+        // computer cuts the starter (about 300 rpm). Released on speed alone, the crank passed 1.5
+        // times cranking speed before the computer had synchronised: a starter blip and a silent coast.
         _engine.Starter = !_engine.Firing || _engine.Rpm < e.CrankingRpm * 1.5f;
 
         // Estimate the target's acceleration, so the throttle can lead rather than lag.
@@ -417,18 +395,15 @@ public sealed class VirtualDriver
         if (_shiftTimer > 0f)
         {
             _shiftTimer -= dt;
-            // Going up, the revs fall on their own toward the next gear's speed, which is what the
-            // pause is for. Going DOWN they have to rise to it, and with the throttle shut they fell
-            // to idle instead — then the clutch yanked them from 780 to 1,600 in one go, the hard
-            // step heard on the tunnel truck coming down from 54. A driver blips the throttle to
-            // match the revs, and so does an automated box; so does this.
+            // Going down, the revs must rise to the lower gear: a blip matches them. With the throttle
+            // shut they fell to idle and the clutch yanked them from 780 to 1,600 at once (the tunnel
+            // truck's hard step coming down from 54).
             float match = _shiftTo >= 1 ? _dl.GearRpm(_shiftTo) : 0f;
             _engine.Throttle = match > _engine.Rpm ? Math.Clamp((match - _engine.Rpm) / 400f, 0f, 0.7f) : 0f;
             _dl.Clutch = 0f;
-            // A change up ends with the clutch in, as it always did. A change down ends with it in
-            // only if the blip landed the revs on the gear; otherwise it is let in like any other
-            // (below). A light bike's engine overshot the blip, and closing on it at once shoved the
-            // bike forward three km/h under braking.
+            // A change up ends with the clutch in; a change down only if the blip landed the revs on
+            // the gear, otherwise it is let in below. A light bike overshot the blip, and closing at
+            // once shoved it forward 3 km/h under braking.
             if (_shiftTimer <= 0f)
             {
                 float gr = _dl.GearRpm(_shiftTo);
@@ -456,9 +431,8 @@ public sealed class VirtualDriver
         float need = wantAccel * mass + 0.5f * 1.225f * _dl.Vehicle.DragArea * _dl.Speed * _dl.Speed
                    + _dl.Vehicle.RollingResistance * mass * 9.81f;
         float available = MathF.Max(50f, e.PeakTorqueNm * 0.85f * _dl.Ratio(_dl.Gear) / _gb.WheelRadiusMetres);
-        // The integral only while it can do something: in gear with the clutch in, and not pushing
-        // further past a throttle that is already shut or wide open. Overshooting a pull-away it
-        // wound to -0.3 and then held the throttle shut with the bike ten km/h slow for two seconds.
+        // The integral only while it can act: locked in gear, and not pushing past a throttle already
+        // shut or wide open. Wound to -0.3 on a pull-away overshoot, it held a bike 10 km/h slow for 2 s.
         float unclamped = need / available + _integral;
         if (_dl.Locked && !(unclamped <= 0f && err < 0f) && !(unclamped >= 1f && err > 0f))
             _integral = Math.Clamp(_integral + err * 0.08f * dt, -0.3f, 0.5f);
@@ -468,8 +442,8 @@ public sealed class VirtualDriver
         _dl.Brake = brake;
 
         float gearRpm = _dl.GearRpm(_dl.Gear);
-        // Slowing to below what the gear does at idle: clutch in, or the idle drives the vehicle on.
-        // A bike asked to stop crept along at 12 km/h — first gear at 1,300 rpm — and never stopped.
+        // Slowing below what the gear does at idle: clutch in, or the idle drives it on (a bike asked
+        // to stop crept at 12 km/h, first gear at 1,300 rpm).
         bool stopping = throttle < 0.05f && wantAccel < -0.3f && (_accelEstimate < -0.1f || TargetSpeed < 0.3f)
                         && _gb.RpmFor(TargetSpeed, _dl.Gear) < e.IdleRpm * 1.1f;
         float clutchWas = _dl.Clutch;
@@ -477,29 +451,23 @@ public sealed class VirtualDriver
         {
             _dl.Clutch = 0f;
         }
-        // Pulling away, the clutch is let in by slipping — whatever the throttle asks. Only a
-        // clutch that is already in stays in. If a light throttle took the other branch it would
-        // hold the clutch OUT while the engine revved free (a bike to 7,000 rpm on five per cent),
-        // and then the plain `else` would close it in one step at a 5,000 rpm mismatch: the flywheel
-        // dumps into the wheels and the bike jumps ten km/h in a tenth of a second.
+        // Pulling away, the clutch is let in by slipping whatever the throttle asks; only a clutch
+        // already in stays in. Otherwise a light throttle held it out while a bike revved free to
+        // 7,000 rpm, and the plain `else` closed it at a 5,000 rpm mismatch: ten km/h in a tenth of a second.
         else if (_dl.Gear == 1 && gearRpm < _launchRpm * 0.95f && (throttle > 0.05f || !_dl.Locked))
         {
-            // The clutch holds the revs at the launch speed and the throttle holds them there —
-            // unless the vehicle is already ahead of where it should be, when the foot comes off
-            // too. And no floor under it: a fifth of the throttle held open whatever the revs takes a
-            // 200 kg bike to its limiter pulling away, the clutch unable to pass it without
-            // outrunning the target.
+            // Clutch and throttle hold the revs at the launch speed. No throttle floor: a fifth held
+            // open whatever the revs took a 200 kg bike to its limiter pulling away.
             float over = (_engine.Rpm - _launchRpm) / _launchRpm;
-            // Ahead of where it should be, the hand eases the clutch back toward the bite and the
-            // foot comes off with it — gradually, over a metre a second of lead. As a switch it
-            // hunts: a bike's revs swing 3,100 to 4,700 and back every eight tenths of a second.
+            // Ahead of pace, clutch back toward the bite and foot off, gradually over 1 m/s of lead.
+            // As a switch it hunted: a bike's revs swung 3,100 to 4,700 every 0.8 s.
             float onPace = Math.Clamp(1f + err * 1f, 0f, 1f);
             float hold = Math.Clamp(0.25f + over * 3f, _launchBite, 1f);
             _dl.Clutch = MathHelper.Lerp(_launchBite, hold, onPace);
             float toLaunch = Math.Clamp(0.4f + (_launchRpm - _engine.Rpm) / 1500f, 0f, 0.9f);
             throttle = MathHelper.Lerp(MathF.Min(toLaunch, throttle), toLaunch, onPace);
-            // And rolled on, not snapped open: nine tenths of the throttle in the first instant of a
-            // pull-away flares a bike to 4,300 rpm and the clutch that catches it jolts it forward.
+            // Rolled on, not snapped: nine tenths at once flared a bike to 4,300 rpm and the clutch
+            // that caught it jolted it forward.
             throttle = MathF.Min(throttle, _engine.Throttle + dt * LaunchRollOnPerSecond);
         }
         else if (gearRpm < e.IdleRpm * 0.9f && throttle < 0.05f)
@@ -507,27 +475,20 @@ public sealed class VirtualDriver
             _dl.Clutch = 0f;
         }
         else _dl.Clutch = 1f;
-        // A clutch is let in, not dropped. Closing it on an engine turning far from the gear's speed
-        // dumps the flywheel into the wheels: from the launch slip at 4,000 rpm with the gear at
-        // 1,400 a bike leaps eight km/h at once, overshoots, and the speed loop spends the next
-        // seconds winding itself back, which is heard as a lurch. Half a second from open to shut unless the two sides already turn together.
+        // A clutch is let in, not dropped: half a second from open to shut unless both sides already
+        // turn together. Closed at 4,000 rpm on a gear at 1,400, a bike leapt 8 km/h and the speed
+        // loop's recovery was heard as a lurch.
         float mismatch = MathF.Abs(_engine.Rpm - gearRpm);
         if (_dl.Clutch > clutchWas && mismatch > 150f + 0.1f * gearRpm)
             _dl.Clutch = MathF.Min(_dl.Clutch, clutchWas + dt * ClutchLetInPerSecond);
         _engine.Throttle = throttle;
 
-        // Automatic shifting: up near the shift point under throttle, up early when cruising, down
-        // when the revs sag — and down when floored and the gear below has room to rev (kickdown).
-        // Without the kickdown a bike asked for everything at 3,300 rpm in third stayed there,
-        // lugging, and never reached the band its power is in. The lower gear must land under 90%
-        // of the upshift point, so the change up that follows does not immediately undo it.
-        //
-        // And a change up must LAND above the point the change down is taken at. On the 13 litre
-        // truck the light-throttle shift point (85 % of a 1,200 rpm torque peak, 1,020) sat under
-        // its 1,100 rpm change down: up at 1,050, landing at 750, straight back down, and round
-        // again — eight tenths of a second in neutral each time, so the truck spent most of a
-        // steady cruise between gears and its pitch stepped every couple of seconds ("the pitch
-        // steps hard, not smooth"). The same guard the kickdown has, the other way.
+        // Up near the shift point under throttle, early when cruising; down when the revs sag, and
+        // down when floored if the lower gear lands under 90 % of the upshift point (kickdown: without
+        // it a bike floored at 3,300 rpm in third lugged there).
+        // A change up must land above the change-down point: the 13 litre truck's light-throttle
+        // shift (1,020) sat under its 1,100 change down, and it hunted between gears every couple of
+        // seconds ("the pitch steps hard, not smooth").
         float upAt = MathHelper.Lerp(_gb.CruiseUpshiftRpm ?? e.PeakTorqueRpm * 0.85f, _gb.UpshiftRpm, throttle);
         float downAt = MathF.Max(_gb.DownshiftRpm, e.IdleRpm * 1.5f);
         bool floored = need > available && err > 0.5f;

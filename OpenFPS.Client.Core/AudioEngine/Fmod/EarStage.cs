@@ -1,55 +1,44 @@
-using System;
 using System.Runtime.InteropServices;
-using System.Threading;
 using FMOD;
 using OpenFPS.Common.Hearing;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// One world voice's ear stage (docs/EAR_MODEL.md): the loudness compensation, two shelves whose
-/// gains the audio update sets from the ISO 226:2023 contour difference between the level the voice
-/// really has at the ear and the level it plays at; and, for a live voice, a tap of its signal for
-/// its spectrum.
-///
-/// First in the voice's chain, so the direct sound and its reverb send are both corrected: a room
-/// answers a source with the source's real tone too.
-///
-/// Pooled with its DSP and never freed while the mixer runs (see THE_MIXER_THREAD_CRASH.md): a pooled
-/// state is <see cref="Reset"/> while it is out of the graph.
+/// One world voice's ear stage (docs/EAR_MODEL.md): two shelves set from the ISO 226:2023 contour
+/// difference between the voice's real level at the ear and the level it plays at, and, for a live
+/// voice, a tap of its signal for its spectrum. First in the voice's chain, so the reverb send is
+/// corrected too. Pooled with its DSP and never freed while the mixer runs
+/// (docs/THE_MIXER_THREAD_CRASH.md); <see cref="Reset"/> only out of the graph.
 /// </summary>
 public sealed class EarVoiceState : IGuardedUnit
 {
     public NonFiniteUnit Guard { get; } = new();
 
-    /// <summary>Largest channel count a voice brings here (a stereo recording is two).</summary>
+    /// <summary>Largest channel count a voice brings here.</summary>
     public const int MaxChannels = 8;
 
-    /// <summary>How fast the shelves may move, dB a second: no step, and slower than anything a
-    /// listener tracks as a change of tone.</summary>
+    /// <summary>dB a second: no step, and slower than a listener tracks as a change of tone.</summary>
     public const float SlewDbPerSecond = 6f;
 
     public float SampleRate = 48000f;
 
     private float _targetLow, _targetHigh;
 
-    /// <summary>The shelves to move toward, dB. Audio update thread.</summary>
+    /// <summary>Audio update thread.</summary>
     public void SetTarget(float lowDb, float highDb)
     {
         Volatile.Write(ref _targetLow, float.IsFinite(lowDb) ? lowDb : 0f);
         Volatile.Write(ref _targetHigh, float.IsFinite(highDb) ? highDb : 0f);
     }
 
-    /// <summary>Starts the shelves where they should be, for a voice that has not played yet.</summary>
+    /// <summary>For a voice that has not played yet: start the shelves where they should be.</summary>
     public void Snap(float lowDb, float highDb)
     {
         SetTarget(lowDb, highDb);
         Volatile.Write(ref _snap, 1);
     }
     private int _snap;
-
-    public float TargetLowDb => Volatile.Read(ref _targetLow);
-    public float TargetHighDb => Volatile.Read(ref _targetHigh);
 
     // ── Mixer thread ─────────────────────────────────────────────────────────────────────────
     internal float LowDb, HighDb;
@@ -152,8 +141,8 @@ public static class EarProcessor
         return res;
     }
 
-    /// <summary>A managed DSP callback must not throw (DspFault): everything, the handle resolution
-    /// included, is inside the guard, and a fault passes the voice through untouched.</summary>
+    /// <summary>A managed DSP callback must not throw (DspFault): everything is inside the guard, and a
+    /// fault passes the voice through untouched.</summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {

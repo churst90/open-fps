@@ -1,19 +1,15 @@
-using System;
 using System.Runtime.InteropServices;
 using FMOD;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
-/// <summary>
-/// Responsibility: Holds the internal state for a single Synthesizer voice.
-/// Tracks phase, LFO position, and filter coefficients.
-/// </summary>
+/// <summary>One synthesizer voice: its parameters (from the SpatialEmitter) and its oscillator, LFO,
+/// envelope and filter state.</summary>
 public class SynthVoiceState : IGuardedUnit
 {
     /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
     public NonFiniteUnit Guard { get; } = new();
 
-    // Parameters from SpatialEmitter
     public OpenFPS.Client.AudioEngine.Data.SynthWaveType WaveType;
     public float Frequency; 
     public float LfoRate; 
@@ -22,13 +18,11 @@ public class SynthVoiceState : IGuardedUnit
     public float FilterResonance; 
     public float PulseWidth = 0.5f;
 
-    // Internal execution state
     public float Phase;
     public float LfoPhase;
     public float EnvValue = 1.0f;
     public Random Rnd = new Random();
 
-    // Filter state
     public float Filter_v0;
     public float Filter_v1;
 
@@ -46,9 +40,8 @@ public class SynthVoiceState : IGuardedUnit
 }
 
 /// <summary>
-/// Responsibility: The FMOD Custom DSP that implements Real-Time Synthesis math.
-/// Generates Sine, Square, Triangle, Saw, and Noise waves with resonant filtering.
-/// Upgraded: Now supports Percussive Envelopes triggered by LFO.
+/// The FMOD DSP that synthesizes a voice: sine, square, triangle, saw or noise through a resonant
+/// low-pass, with a decaying envelope the LFO re-triggers on each cycle (percussive mode).
 /// </summary>
 public static class SynthProcessor
 {
@@ -80,12 +73,9 @@ public static class SynthProcessor
     }
 
     /// <summary>
-    /// The guard, and the reason it is a separate method: a managed DSP callback MUST NOT THROW.
-    ///
-    /// FMOD calls this from its own native mixer thread, and an exception that unwinds across that
-    /// boundary does not fault a voice — it takes the whole process down. The client was killed
-    /// exactly that way by an index slip in the boundary DSP, which had no guard either. Everything
-    /// below stays as it was; a fault now costs one silent block and one line in the log.
+    /// A managed DSP callback must not throw: FMOD calls it on its native mixer thread, and an exception
+    /// unwinding across that boundary kills the process (an index slip in the boundary DSP did). A
+    /// fault here costs one silent block and one log line.
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
@@ -131,30 +121,24 @@ public static class SynthProcessor
 
             for (uint frame = 0; frame < length; frame++)
             {
-                // 1. Process LFO / Trigger
-                float prevLfo = state.LfoPhase;
                 state.LfoPhase += state.LfoRate / sampleRate;
-                if (state.LfoPhase >= 1.0f) 
+                if (state.LfoPhase >= 1.0f)
                 {
                     state.LfoPhase -= 1.0f;
-                    // RE-TRIGGER ENVELOPE if LFO wraps (Percussive Mode)
                     if (state.LfoRate > 0.01f) state.EnvValue = 1.0f;
                 }
 
-                // 2. Decay Envelope (Simple exponential decay)
-                // Use PulseWidth as Decay Factor: 0.1 = fast, 0.9 = slow
+                // PulseWidth is the envelope's decay: 0.1 fast, 0.9 slow.
                 float decayCoeff = 1.0f - (1.0f / (sampleRate * Math.Max(0.01f, state.PulseWidth * 2.0f)));
                 state.EnvValue *= decayCoeff;
 
                 float lfoVal = MathF.Sin(state.LfoPhase * 2.0f * MathF.PI) * state.LfoDepth;
 
-                // 3. Calculate current frequency with LFO modulation
                 float modFreq = state.Frequency * (1.0f + lfoVal); 
                 float phaseInc = modFreq / sampleRate;
                 state.Phase += phaseInc;
                 if (state.Phase >= 1.0f) state.Phase -= 1.0f;
 
-                // 4. Generate Oscillator signal
                 float rawSignal = 0.0f;
                 switch (state.WaveType)
                 {
@@ -175,10 +159,9 @@ public static class SynthProcessor
                         break;
                 }
 
-                // 5. Apply Envelope to signal
                 float envSignal = rawSignal * state.EnvValue;
 
-                // 6. Apply Resonant Low-Pass Filter
+                // A trapezoidal state-variable low-pass; FilterCutoff 0..1 maps to 40 Hz-12 kHz.
                 float cutoffHz = Math.Clamp(state.FilterCutoff * 12000.0f, 40.0f, 18000.0f);
                 float g = MathF.Tan(MathF.PI * cutoffHz / sampleRate);
                 float k = 2.0f - (2.0f * state.FilterResonance); 

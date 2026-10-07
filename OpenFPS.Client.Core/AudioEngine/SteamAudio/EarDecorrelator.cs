@@ -1,21 +1,12 @@
-using System;
-
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// One direction's share of a diffuse field: the late tail through a sparse random filter of its own
-/// (velvet noise), so that the branches fed the same tail are different signals with the same
-/// spectrum and envelope, as the field arriving from each direction of a real room is.
+/// One direction's share of a diffuse field: the tail through a velvet-noise filter of its own (taps
+/// at random places, random signs, a falling weight, energy one), so branches fed the same tail are
+/// different signals with the same spectrum and envelope, decorrelated at every lag.
 ///
-/// Not a chain of short all-passes. With first delays a few samples apart (79, 83, 89), each branch
-/// is mostly the same input a few samples later, so the branches correlate at small lags, and a head
-/// measures its two ears' correlation over lags of up to a millisecond: the tail's interaural
-/// coherence measured 0.35-0.55 above 1.2 kHz, where a head in a real diffuse field gets far less.
-///
-/// Velvet noise is independent in fine structure by construction: thirty-two taps at random places
-/// across 30 ms, random signs, a gently falling weight, energy one. Two branches share nothing but
-/// chance, so they are decorrelated at every lag and every frequency the tail has. The 30 ms smear is
-/// nothing on a tail that begins 50 ms after the sound and is already noise.
+/// Not short all-passes: with first delays a few samples apart the branches correlated at small lags,
+/// and the tail's interaural coherence measured 0.35-0.55 above 1.2 kHz, far over a real diffuse field.
 /// </summary>
 internal sealed class DiffuseBranch
 {
@@ -30,9 +21,11 @@ internal sealed class DiffuseBranch
     /// given in samples at this rate and laid out at <c>rate</c>, so the filter lasts as long at any.</summary>
     public const int DesignRate = 44100;
 
-    /// <param name="taps">How many taps; <paramref name="span"/> the samples they spread over, counted at
-    /// <see cref="DesignRate"/> (30 ms, 32 taps for a direction's share). More taps closer together leave
-    /// two filters fed alike signals less alike: the ear decorrelation uses 128 over 40 ms.</param>
+    /// <param name="index">Seeds the taps: each index is its own filter.</param>
+    /// <param name="taps">How many taps (32 over 30 ms for a direction's share). More taps closer
+    /// together leave two filters fed alike signals less alike; <see cref="EarPair"/> uses 96 over
+    /// 40 ms.</param>
+    /// <param name="span">The samples the taps spread over, counted at <see cref="DesignRate"/>.</param>
     /// <param name="rate">The rate the filter runs at.</param>
     public DiffuseBranch(int index, int taps = 32, int span = 1323, int rate = DesignRate)
     {
@@ -58,20 +51,12 @@ internal sealed class DiffuseBranch
 
     /// <summary>
     /// A pair of ear filters: two independent velvet sequences, each tap anywhere in its own slot.
-    ///
-    /// Not interleaved. Forcing the ears' taps into alternate 2.7 ms slots, each tap in the first
-    /// 0.7 ms of its slot, makes each ear's filter a near-regular pulse train 5.4 ms apart: a comb, a
-    /// pitch near 180 Hz (the left ear measured repeating itself at 5.5-5.7 ms, 0.32, on a click),
-    /// heard as a metallic reverb. Taps free across their slots do not ring; the ears are a little
-    /// less unlike for it.
+    /// Not interleaved: forcing the ears' taps into alternate 2.7 ms slots made each a pulse train
+    /// 5.4 ms apart, a comb near 180 Hz heard as a metallic reverb (measured on a click: the left ear
+    /// repeating itself at 5.5-5.7 ms, 0.32).
     /// </summary>
     public static (DiffuseBranch Left, DiffuseBranch Right) EarPair(int seed, int span = 1764, int taps = 96, int rate = DesignRate)
         => (new DiffuseBranch(seed, taps, span, rate), new DiffuseBranch(seed + 977, taps, span, rate));
-
-    private DiffuseBranch(int taps, int span)
-    {
-        Taps = taps; _pos = new int[taps]; _gain = new float[taps]; _line = new float[span + 1];
-    }
 
     public float Process(float x)
     {
@@ -91,21 +76,13 @@ internal sealed class DiffuseBranch
 }
 
 /// <summary>
-/// Makes one ear's copy of a room's tail its own.
+/// Makes one ear's copy of a room's tail its own: a chain of all-passes per ear (mutually prime delays,
+/// a different set each), which changes every component's phase and not its level.
 ///
-/// The traced reverb is rebuilt from an energy field round the listener, and in a diffuse room the
-/// energy comes equally from every way — so every directional channel cancels and what is left is the
-/// omnidirectional one. Decoded round the head, that is the SAME signal in both ears: the room in the
-/// middle of the head, mono, with the floor-and-ceiling flutter of a low room sitting on top of it.
-/// Measured from a capture in a city flat without this: 0.8-0.99 interaural correlation in the tail
-/// where a real room is 0.1-0.5; the traced IR's first-order channels 18-26 dB under the omni one where
-/// a diffuse field puts them 5 dB under. It is heard as flutter in the middle of the head, with no
-/// sense of the room.
-///
-/// A real tail differs at the two ears because every reflection reaches each by its own path. This
-/// gives each ear its own chain of all-passes — mutually prime delays, a different set per ear — which
-/// changes the phase of every component and not its level, so the spectrum and the decay are the
-/// trace's and the two ears no longer carry one signal. Mixer-thread object, allocated once.
+/// In a diffuse room the traced field's directional channels cancel and only the omni is left, the
+/// same signal in both ears: measured in a city flat, 0.8-0.99 interaural correlation in the tail where
+/// a real room is 0.1-0.5, heard as flutter in the middle of the head. Mixer-thread object, allocated
+/// once.
 /// </summary>
 internal sealed class EarDecorrelator
 {
@@ -119,15 +96,12 @@ internal sealed class EarDecorrelator
     /// totals kept equal.</param>
     public EarDecorrelator(int ear, int rate = DiffuseBranch.DesignRate)
     {
-        // Samples at 44.1 kHz, 0.16 to 2.2 ms. Keep them short: six all-passes running to 13 ms at a
-        // feedback of 0.6 are a reverberator, turning a click into 100 ms of build-up peaking 20-45 ms
-        // late, a hall laid over every room. These hand 90 % of a click back inside 9 ms and still take
-        // the ears to 0.2-0.3 above 1 kHz.
+        // Samples at 44.1 kHz, 0.16 to 2.0 ms. Keep them short: six all-passes to 13 ms at a feedback of
+        // 0.6 were a reverberator (a click became 100 ms of build-up, a hall over every room, Cody's
+        // "stadium"). These hand 90 % of a click back inside 9 ms and take the ears to 0.2-0.3 above 1 kHz.
         //
-        // And the SAME total in each ear. A chain of all-passes delays a signal, on average, by the sum
-        // of its delays. A 32-sample difference (0.7 ms) is as large as the head ever makes between the
-        // ears, and the ear puts the whole room on the early side whichever way you face. Both sets
-        // sum to 260.
+        // The same total in each ear (260): a chain delays a signal by the sum of its delays, and a
+        // 32-sample difference put the whole room on one side whichever way you faced.
         int[] delays = ear == 0 ? new[] { 7, 19, 31, 47, 67, 89 } : new[] { 13, 17, 41, 43, 71, 75 };
         if (rate > 0 && rate != DiffuseBranch.DesignRate)
         {
@@ -142,20 +116,18 @@ internal sealed class EarDecorrelator
         for (int k = 0; k < delays.Length; k++) _lines[k] = new float[delays[k]];
     }
 
-    // Below a few hundred hertz the two ears of a real diffuse field hear nearly the same thing — the
-    // wavelength is longer than the head — so the bottom is left shared and only the rest is pulled
-    // apart. Pulled apart all the way down, a room's bass goes wide and hollow in headphones.
+    // Below a few hundred hertz both ears of a real diffuse field hear nearly the same thing, so the
+    // bottom is left shared; pulled apart all the way down, a room's bass goes wide and hollow.
     private const float SplitHz = 300f;
     private readonly float _lpA;
     private float _a1, _a2, _b1;
 
     public float Process(float x)
     {
-        // A second-order Linkwitz-Riley split from first-order sections: the bottom is LP x LP, the
-        // rest HP x HP, and LP^2 - HP^2 is an all-pass — the two halves add back to the level they
-        // came from, with the bottom 25 dB clear of the scattered half by 100 Hz. (Subtracting a
-        // steep low-pass from the input is not a high-pass: it left three quarters of 100 Hz in the
-        // half that was being pulled apart.)
+        // A second-order Linkwitz-Riley split from first-order sections: LP^2 - HP^2 is an all-pass, so
+        // the halves add back to the level they came from, the bottom 25 dB clear of the scattered half
+        // by 100 Hz. Input minus a steep low-pass is not a high-pass: it left three quarters of 100 Hz in
+        // the scattered half.
         _a1 += _lpA * (x - _a1);                 // low, once
         _a2 += _lpA * (_a1 - _a2);               // low, twice
         float h1 = x - _a1;                       // high, once (a one-pole's complement is exact)

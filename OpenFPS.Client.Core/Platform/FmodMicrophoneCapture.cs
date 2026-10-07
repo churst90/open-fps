@@ -1,14 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
 
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
-/// Microphone capture through FMOD's own recording, for heads that have no other capture library
-/// (Linux). Sends what the Windows head's NAudio capture sends (VoiceCodec): 48 kHz mono, 20 ms Opus
-/// frames. The device records at its own rate; anything else is resampled to 48 kHz (SincResampler).
+/// Microphone capture through FMOD's recording, for the Linux head. Sends what the Windows head's
+/// NAudio capture sends (VoiceCodec), resampled to 48 kHz from the device's own rate (SincResampler).
 /// </summary>
 public sealed class FmodMicrophoneCapture : IMicrophoneCapture
 {
@@ -38,8 +34,7 @@ public sealed class FmodMicrophoneCapture : IMicrophoneCapture
     public void Start()
     {
         if (_capturing || !IsAvailable) return;
-        // A device that exists can still refuse to open; failing loudly matters, or the player
-        // would believe they were transmitting.
+        // A device can still refuse to open: log it, or the player believes they are transmitting.
         if (!_audio.StartRecording(_preferredDevice(), out int rate) || rate <= 0)
         {
             Serilog.Log.Error("Microphone capture failed to start.");

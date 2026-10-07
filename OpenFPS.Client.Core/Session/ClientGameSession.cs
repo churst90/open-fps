@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Threading;
-using System.Threading.Tasks;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -15,26 +10,13 @@ using OpenFPS.Client.Services;
 namespace OpenFPS.Client.Core.Session;
 
 /// <summary>
-/// The client's game logic — the whole of it, for every head.
+/// The client's game logic, once for every head. What differs by platform is behind
+/// <see cref="ISpeechOutput"/>, <see cref="IClientShell"/>, <see cref="IMicrophoneCapture"/> and each
+/// head's key map feeding <see cref="Input"/>.
 ///
-/// This class is the answer to the question the two heads used to answer separately: the Windows
-/// <c>ClientSimulationSystem</c> and the GTK <c>GameSession</c> were two implementations of one job,
-/// and they had already drifted. The Linux client had no chat buffers, no interactable proximity
-/// announcements, no voice key and no loading progress; the Windows client had no look-ahead binding
-/// in the same place, spoke different sentences on spawn, and reached the world through a Win32
-/// global keyboard hook. Every difference between them was an accident of which file was edited, not
-/// a decision about the platform.
-///
-/// What is genuinely platform-specific is now behind four interfaces, and only those:
-/// <see cref="ISpeechOutput"/> (what the game says), <see cref="IClientShell"/> (windows and the
-/// command console), <see cref="IMicrophoneCapture"/> (voice), and each head's key map feeding
-/// <see cref="Input"/>. Everything else — netcode, prediction, reconciliation, acoustics, shelter,
-/// bindings, the announcements themselves — lives here once.
-///
-/// Threading: <see cref="HandleMessage"/>, <see cref="SimStep"/> and <see cref="ContinuousUpdate"/>
-/// are all called from the single game-loop thread that also pumps the network, so player state needs
-/// no extra locking. A head's UI thread only ever touches <see cref="Input"/> (thread-safe) and the
-/// shell it implements itself.
+/// Threading: <see cref="HandleMessage"/>, <see cref="SimStep"/> and <see cref="ContinuousUpdate"/> run
+/// on the one game-loop thread that also pumps the network, so player state needs no locking. A head's
+/// UI thread touches only <see cref="Input"/> (thread-safe) and its own shell.
 /// </summary>
 public sealed partial class ClientGameSession : IDisposable
 {
@@ -59,8 +41,8 @@ public sealed partial class ClientGameSession : IDisposable
     private readonly PredictionReconciler _reconciler;
     private readonly ChatManager _chat;
 
-    /// <summary>The interface's sounds — menus, chat, arriving in the world. Shared with the head's
-    /// menus so there is one switch for all of them.</summary>
+    /// <summary>The interface's sounds (menus, chat, arriving), shared with the head's menus so one
+    /// switch covers them all.</summary>
     public UiSounds Ui { get; }
 
     /// <summary>The lists behind F5, F6 and F8: players, maps, friends, and what to do with each.</summary>
@@ -81,7 +63,7 @@ public sealed partial class ClientGameSession : IDisposable
     private int _expectedEntityCount;
     private readonly bool _enableAudio;
 
-    // Map metadata captured from the manifest, needed when acoustics are generated later.
+    // From the manifest, for when the acoustics are generated.
     private float _voxelResolution = AcousticConstants.DefaultVoxelResolution;
     private float _occlusionFloor = 0.2f;
     private Vector3 _mapMin;
@@ -89,7 +71,7 @@ public sealed partial class ClientGameSession : IDisposable
     /// definition batch from now on is a tile arriving.</summary>
     private bool _streamed, _mapLoaded;
 
-    // Interactable proximity tracking — announce a named object once, on entering its radius.
+    // A named object is announced once, on coming within its radius.
     private const float InteractionRadius = 3.0f;
     private readonly HashSet<int> _announcedNearby = new();
     private readonly HashSet<int> _currentNearby = new();
@@ -98,35 +80,27 @@ public sealed partial class ClientGameSession : IDisposable
     /// <summary>Keyboard state for the in-game window. Each head's key map writes into this.</summary>
     public InputStateBuffer Input { get; } = new();
 
-    /// <summary>The local player's entity id, or -1 before spawn.</summary>
+    /// <summary>-1 before spawn.</summary>
     public int OwnEntityId => _ownEntityId;
 
-    /// <summary>True once the local player has spawned into the world.</summary>
     public bool IsInGame => _ownEntityId != -1;
 
-    /// <summary>True once the audio engine has finished initializing.</summary>
-    public bool AudioReady => _audioEngine.IsInitialized;
-
-    /// <summary>The shared world state, for heads that want to inspect it (diagnostics).</summary>
+    /// <summary>For a head's diagnostics.</summary>
     public ClientWorldState World => _world;
 
-    /// <summary>The local player's state, for heads that want to inspect it (diagnostics).</summary>
+    /// <summary>For a head's diagnostics.</summary>
     public LocalPlayerState PlayerState => _state;
 
     /// <summary>Raised on the game-loop thread once the local player has spawned.</summary>
     public event Action? GameJoined;
 
-    /// <summary>Raised on the game-loop thread when the server ACCEPTS a login; the argument is the
-    /// username it accepted. A head uses it to dismiss its connect form.</summary>
+    /// <summary>Raised on the game-loop thread with the username the server accepted; a head closes
+    /// its connect form on it.</summary>
     public event Action<string>? LoginSucceeded;
 
-    /// <summary>Raised on the game-loop thread when the server REJECTS a login; the argument is the
-    /// server's reason, already spoken by the session.
-    ///
-    /// The head needs to know because the outcome is a UI event as much as a spoken one: a connect form
-    /// that closes the moment the button is pressed drops the player back on the menu, and the focus
-    /// change there speaks over the rejection with interrupt — which is why a wrong password read as
-    /// total silence. Keep the form open, and put focus back where the player can fix it.</summary>
+    /// <summary>Raised on the game-loop thread with the server's reason, already spoken. The head keeps
+    /// its connect form open and puts focus back to fix it: a form that closed on Connect moved focus to
+    /// the menu, whose speech interrupted the rejection, and a wrong password read as silence.</summary>
     public event Action<string>? LoginFailed;
 
     public ClientGameSession(
@@ -145,12 +119,10 @@ public sealed partial class ClientGameSession : IDisposable
         _microphone = microphone ?? new NullMicrophoneCapture();
         _enableAudio = enableAudio;
 
-        // Initialize the material registry FIRST — before the audio system starts its acoustic worker
-        // thread (which reads the registry). Initialize() is thread-safe, but doing it up front keeps
-        // ordering deterministic and avoids redundant concurrent rebuilds.
+        // Before the audio system starts its acoustic worker, which reads the registry: Initialize is
+        // thread-safe, but up front the order is fixed and nothing rebuilds it twice.
         AcousticRegistry.Initialize();
-        // ...and the machines, for the same reason: the client assembles a car's engine itself from
-        // the name the server sends, so it has to know the same names the server does.
+        // The client assembles a car's engine from the name the server sends, so it needs the same names.
         MachineRegistry.EnsureLoaded();
         ModelLibrary.EnsureLoaded();
 
@@ -194,21 +166,9 @@ public sealed partial class ClientGameSession : IDisposable
         _others.OnStepTriggered += _audioSystem.OnPlayerFootstep;
         _others.OnLandTriggered += _audioSystem.OnPlayerLand;
 
-        // Breathing, which is the only sound a body still makes once it has stopped moving — and
-        // therefore the only way to find somebody who has stopped to listen for you.
-        // ── BREATHING IS NOT PLAYED ─────────────────────────────────────────────────────────────
-        //
-        // Judged by ear and rejected: "I don't like the breathing, remove it." Not a bug — the model
-        // and the synthesis were both repaired first (see BreathTests and --breath), and what was
-        // left was a breath that sounded like a breath and was still not wanted. A sound nobody wants
-        // to hear is not information, however correct it is.
-        //
-        // The MODEL stays and keeps running: Breathing drives the exertion readout ("Breathing hard",
-        // "Winded") that the player asks for on a key, and that readout is the useful half. Only the
-        // voice is gone, and bringing it back is these two lines.
-        //
-        //   _controller.OnBreath += (pos, breath) => _audioSystem.OnBreath(_ownEntityId, pos, breath);
-        //   _others.OnBreath += _audioSystem.OnBreath;
+        // Breathing is not played: judged by ear and rejected by Cody ("I don't like the breathing,
+        // remove it") after the model and the synthesis were repaired. The model still drives the
+        // exertion readout on B. See docs/CLIENT_NOTES.md, "Breathing is not played".
 
         _shell.CommandEntered += HandleCommandEntered;
         _microphone.PacketReady += OnVoicePacketReady;
@@ -220,12 +180,9 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// Starts audio-engine initialization and asset preloading on a dedicated background thread.
-    ///
-    /// It must NOT run inline: the session is constructed on the network/game-loop thread, and a
-    /// synchronous audio init would stop that thread pumping the messages the world-load handshake is
-    /// made of. Audio is only used after spawn, by which time this has completed; until then the
-    /// provider's calls no-op.
+    /// Starts the audio engine and its preloading on a thread of its own. Never inline: the session
+    /// lives on the game-loop thread, which must keep pumping the world-load handshake. The provider's
+    /// calls do nothing until it is ready, which is before spawn.
     /// </summary>
     /// <param name="onReady">Invoked on the audio thread once initialization has finished (or failed,
     /// or been skipped). A head that gates its main menu on the sound library uses this.</param>
@@ -258,11 +215,10 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     // ── Bindings ────────────────────────────────────────────────────────────────
-    // One table, both heads. A head that wants a different layout rebinds; it does not reimplement.
 
     private void RegisterBindings()
     {
-        // Accessibility readouts — the game's HUD, spoken.
+        // The readouts: the game's HUD, spoken.
         _bindings.Bind(InputContext.Gameplay, GameKey.C,
             () => Say(OpenFPS.Common.PlayerCoordinates.Format(_state.Position)));
         _bindings.Bind(InputContext.Gameplay, GameKey.F, () => Say(_state.GetCompassDirection()));
@@ -274,8 +230,7 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.Z, () =>
             Say(_state.RidingControls && _audioSystem.Driving.Readout is { } road ? road : _state.CurrentRegion));
         _bindings.Bind(InputContext.Gameplay, GameKey.B, () => Say(ExertionReadout()));
-        // N: the narration as you turn, on or off, and remembered. Not a screen reader's key, and
-        // nothing else in gameplay had it.
+        // N: the narration as you turn, on or off, and saved.
         _bindings.Bind(InputContext.Gameplay, GameKey.N, ToggleTurnNarration);
 
         // Interaction.
@@ -284,10 +239,8 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.E, KeyModifiers.Shift,
             () => _network.Send(new TextCommand { Command = "knock" }));
 
-        // P is "what am I looking at", answered HERE rather than by the server. It used to send
-        // `scan`, which is a different question — the five nearest things in any direction, most of
-        // them the floor — and it had to cross the network to answer a question the client can answer
-        // instantly from geometry it already has. `scan` is still a command for when you want it.
+        // P is "what am I looking at", answered here from the geometry the client has. Shift+P is the
+        // server's scan, a different question: the five nearest things in any direction.
         _bindings.Bind(InputContext.Gameplay, GameKey.P, LookAhead);
         _bindings.Bind(InputContext.Gameplay, GameKey.P, KeyModifiers.Shift,
             () => _network.Send(new TextCommand { Command = "scan" }));
@@ -295,15 +248,11 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.I, () => _network.Send(new InventoryRequest()));
         _bindings.Bind(InputContext.Gameplay, GameKey.I, KeyModifiers.Shift, () => _network.Send(new TextCommand { Command = "inv" }));
 
-        // Carrying things. G takes whatever is within reach, Q puts down what is in your hand, and
-        // R (with no gun in hand) swaps a hand for your back — the three verbs you use while moving, on keys you can find
-        // without letting go of the movement ones. Naming a particular thing is what the console is
-        // for; these are the ones you want under a finger.
+        // Carrying: G takes what is within reach, Q puts down what is in your hand, R (no gun) slings
+        // it on your back, all reachable without letting go of the movement keys.
         _bindings.Bind(InputContext.Gameplay, GameKey.G, () => _network.Send(new TextCommand { Command = "take" }));
-        // T starts the engine; Shift+T switches it off. Two keys, not one toggle: a toggle pressed by
-        // somebody who cannot tell whether the engine is already running switches it OFF half the
-        // time — which is exactly what happened on the first drive with a key.
-        // T: the key in a vehicle; on foot, clap your hands.
+        // T starts the engine and Shift+T stops it; on foot T claps. Two keys, not a toggle: somebody
+        // who cannot tell whether the engine runs switches it off half the time, as on the first drive.
         _bindings.Bind(InputContext.Gameplay, GameKey.T, () => _network.Send(_state.IsRiding
             ? new TextCommand { Command = "ignition", Args = new[] { "on" } }
             : new TextCommand { Command = "clap" }));
@@ -325,9 +274,8 @@ public sealed partial class ClientGameSession : IDisposable
             SaveSettings();
             Say(DrivingCues.Enabled ? "Driving sounds on." : "Driving sounds off.");
         });
-        // J and L: the left and right indicator in the driver's seat (they turn you on foot, which is
-        // read as a held key and does nothing in a seat). Which way you mean to turn is what the
-        // guide and the brake cue plan the junction ahead by.
+        // J and L: the indicators in the driver's seat (on foot they turn you, read as held keys). The
+        // guide and the brake cue plan the junction ahead by them.
         _bindings.Bind(InputContext.Gameplay, GameKey.J, () => { if (_state.RidingControls) Say(_audioSystem.Driving.ToggleIndicator(-1)); });
         _bindings.Bind(InputContext.Gameplay, GameKey.L, () => { if (_state.RidingControls) Say(_audioSystem.Driving.ToggleIndicator(+1)); });
         // U: the siren on or off, on a vehicle that has one; Shift+U its next tone (wail, yelp,
@@ -341,29 +289,18 @@ public sealed partial class ClientGameSession : IDisposable
             if (_state.RidingControls) _network.Send(new TextCommand { Command = "siren", Args = new[] { "next" } });
         });
         _bindings.Bind(InputContext.Gameplay, GameKey.Q, () => _network.Send(new TextCommand { Command = "drop" }));
-        // R does what the moment calls for: in a seat it winds the window, with a gun in your hands it
-        // reloads it, and otherwise it slings what you hold onto your back. One key for the three,
-        // because they never apply at once, and a player should not have to remember which mode
-        // they are in to find the one that does.
+        // R: the window in a seat, reload with a gun, otherwise sling what you hold. One key, since the
+        // three never apply at once.
         _bindings.Bind(InputContext.Gameplay, GameKey.R, () => _network.Send(new TextCommand { Command = RKeyCommand(_state) }));
         // Shift+R: the reverse, the first thing on your back into your hand. Without a name the server
         // takes whatever was slung first.
         _bindings.Bind(InputContext.Gameplay, GameKey.R, KeyModifiers.Shift, () => _network.Send(new TextCommand { Command = "draw" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.V, ToggleVoiceTransmission);
 
-        // ── Firing, on ENTER, and NEVER on a screen reader's key ────────────────────────────────
-        //
-        // Not on control. CONTROL IS HOW A SCREEN READER USER SILENCES SPEECH: every reader there is
-        // (NVDA, JAWS, Orca, VoiceOver) stops talking when you press it, so a blind player presses it
-        // constantly, reflexively, without thinking of it as input. Bound to firing, it fires a rifle
-        // every time they hush the reader, and the shots sound like random banging from nowhere.
-        //
-        // Enter, because a blind player finds it by touch without counting keys from a landmark, it
-        // is under the right hand that is already on J K L O for turning, and no reader claims it in
-        // a focused game window. See ScreenReaderKeys: nothing in gameplay may be bound to one.
-        //
-        // Only with a gun in your hands. Without one, Enter is the interact key it always was: a
-        // player reaching for a door with empty hands must not be told they have nothing to fire.
+        // Firing is on Enter, never on Control: every screen reader silences speech on Control, so a
+        // blind player presses it constantly, and bound to firing it shot a rifle each time (heard as
+        // random banging). Enter is found by touch, sits by J K L O, and no
+        // reader claims it in a game window. See ScreenReaderKeys. With empty hands Enter interacts.
         _bindings.Bind(InputContext.Gameplay, GameKey.Enter, () => { if (EnterFires(_state)) Fire(); else Interact(); });
 
         // X: the fire selector, a detent on; Shift+X back. The server holds where it sits and says it.
@@ -373,8 +310,7 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.Y, () => CalibreKey(1));
         _bindings.Bind(InputContext.Gameplay, GameKey.Y, KeyModifiers.Shift, () => CalibreKey(-1));
 
-        // Social / discovery. The plain key is the wider question and shift narrows it to here —
-        // the same relationship on both, so there is one thing to remember rather than two.
+        // The plain key asks about the server, Shift narrows it to here (or to yours).
         _bindings.Bind(GameKey.F5, () => _network.Send(new PlayerListRequest { Scope = PlayerListScope.Server }));
         _bindings.Bind(GameKey.F5, KeyModifiers.Shift, () => _network.Send(new PlayerListRequest { Scope = PlayerListScope.Map }));
         _bindings.Bind(GameKey.F6, () => _network.Send(new MapListRequest { Scope = MapListScope.Server }));
@@ -400,20 +336,13 @@ public sealed partial class ClientGameSession : IDisposable
 
         RegisterScopeBindings();
         // Comma and period: the doors, entrances, stairs, items, people, vehicles or places near you.
-        // Comma was a second look-ahead key; P is that.
         RegisterTrackerBindings();
     }
 
     /// <summary>
-    /// Keys a screen reader owns, which nothing in gameplay may ever be bound to.
-    ///
-    /// CONTROL silences speech in every screen reader there is. ALT is the window manager's and opens
-    /// menus. Both are pressed by a blind player dozens of times a minute as punctuation, not as
-    /// input — so a game action on either is not a key that is hard to use, it is a key that fires by
-    /// itself.
-    ///
-    /// Modified bindings are a different thing and are fine: shift-F5 is a chord somebody chose to
-    /// press. What is forbidden is a screen reader's key AS the action.
+    /// Keys nothing in gameplay may be bound to. Control silences every screen reader and Alt is the
+    /// window manager's; a blind player presses both dozens of times a minute, so an action on either
+    /// fires by itself. A chord with a modifier (Shift+F5) is fine: the key itself may not be the action.
     /// </summary>
     public static readonly GameKey[] ScreenReaderKeys =
         { GameKey.ControlLeft, GameKey.ControlRight, GameKey.AltLeft, GameKey.AltRight };
@@ -483,10 +412,6 @@ public sealed partial class ClientGameSession : IDisposable
         "V voice, F5 players, F6 maps, F8 friends, F12 the world editor, brackets to read chat, slash for the command console.",
         "Escape for the game menu: keep playing, main menu, or quit.");
 
-    /// <summary>Rebinds a key. Exposed so a head (or a future settings screen) can re-map without
-    /// touching the session.</summary>
-    public void Bind(InputContext context, GameKey key, Action action) => _bindings.Bind(context, key, action);
-
     /// <summary>Whether anything is bound to a key in a context. For a settings screen, and for the
     /// test that keeps a screen reader's keys free of game actions (see <see cref="ScreenReaderKeys"/>).</summary>
     public bool IsBound(InputContext context, GameKey key) => _bindings.IsBound(context, key);
@@ -500,7 +425,7 @@ public sealed partial class ClientGameSession : IDisposable
     internal static string ReverbCommand(string[] args)
     {
         if (args.Length > 0) return "Traced everywhere now; there is no room mode. /reflections sets the level.";
-        return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus(null);
+        return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus();
     }
 
     /// <summary>
@@ -523,11 +448,9 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// /levels, /levels default, /levels 0.7 (or 70): how much of the real difference in loudness
-    /// between sounds reaches the mix. Everything is placed by it — how far a thing carries, how much
-    /// louder a hot rod is than a hatchback, how much a car rises when it is floored.
-    /// There is no "real" any more (Cody, 2026-10-05): 100 percent is literal source levels, which on
-    /// headphones made a parked car's idle inaudible and footsteps vanish; the word invited it.
+    /// /levels, /levels default, /levels 0.7 (or 70): how much of the real loudness differences reach
+    /// the mix. No "real" setting (Cody, 2026-10-05): 100 percent is literal source levels, which on
+    /// headphones made a parked car's idle inaudible and footsteps vanish, and the word invited it.
     /// </summary>
     internal static string LevelsCommand(string[] args, Action? save = null)
     {
@@ -570,8 +493,7 @@ public sealed partial class ClientGameSession : IDisposable
         _shiftHeldThisStep = InputStateBuffer.HasShift(held);
         var modifiers = InputStateBuffer.ModifiersIn(held);
 
-        // Bindings run in the context the shell reports: with a modal console open, gameplay bindings
-        // must not fire, but the global ones (chat navigation, quit) still should.
+        // With the console open gameplay bindings must not fire; the global ones (chat, quit) still do.
         bool gameplayActive = _shell.IsGameInputActive;
         var context = gameplayActive ? InputContext.Gameplay : InputContext.UI;
         // An open list has the keyboard, except the F keys, which swap one list for another.
@@ -603,11 +525,8 @@ public sealed partial class ClientGameSession : IDisposable
             input.LookDelta = Vector2.Zero;
         }
 
-        // Remote interpolation FIRST, then everything that reads the world reads one snapshot.
-        // Interpolation is the only step in the tick that mutates the world, and it touches only remote
-        // entities (it skips the local player, whose position prediction owns). Advancing it before the
-        // readers rather than between two of them means prediction, the shelter raycast, the proximity
-        // scan and the audio system all share a single snapshot build instead of forcing a second one.
+        // Interpolation first: it is the only step that changes the world (remote entities only), so
+        // everything after it shares one snapshot build.
         _world.UpdateInterpolation(dt, _ownEntityId);
         var snapshot = _world.GetSnapshot();
 
@@ -620,9 +539,9 @@ public sealed partial class ClientGameSession : IDisposable
         // Localize atmospheric effects: a roof over your head is most of what stops the rain.
         _state.PrecipitationIntensity = _world.CurrentPrecipitation * (1.0f - _state.ShelterFactor);
 
-        // Bleed the reconciliation visual offset toward zero so server snaps don't pop.
+        // The correction's visual offset bleeds away over about 0.2 s.
         if (_state.VisualOffset.LengthSquared() > 0.0001f)
-            _state.VisualOffset = Vector3.Lerp(_state.VisualOffset, Vector3.Zero, 5.0f * dt); // ~0.2 s
+            _state.VisualOffset = Vector3.Lerp(_state.VisualOffset, Vector3.Zero, 5.0f * dt);
         else
             _state.VisualOffset = Vector3.Zero;
 
@@ -633,12 +552,8 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// Getting in and out, as the server reports it.
-    ///
-    /// The transition is what matters, not the state: sitting down and standing up are both teleports
-    /// as far as prediction is concerned, so the unacknowledged input history is meaningless across
-    /// either and the stride accumulator is holding distance walked by somebody who is now sitting in
-    /// a car. Both are thrown away, exactly as they are on a spawn.
+    /// Getting in and out, as the server reports it. Either is a teleport to prediction: the input
+    /// history and the stride are thrown away, as on a spawn.
     /// </summary>
     private void NoteRiding(int ridingEntityId)
     {
@@ -658,17 +573,9 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// Sitting in something, you face the way it faces.
-    ///
-    /// Reported: "when the bus turns, the bus turns around my head, which is wrong. My head should
-    /// stay facing the direction of the bus, and when I press F it should tell me the correct
-    /// direction." A first attempt carried your own heading round with the vehicle's turns and let
-    /// the server's copy of it correct yours; but the server's copy arrives a network trip late, so
-    /// half way through every corner the two disagreed by more than the correction threshold and your
-    /// head was snapped back to where the bus had been — the bus swinging round you. Now, while you
-    /// ride, your heading IS the vehicle's, set every frame from the vehicle itself and never
-    /// corrected (PredictionReconciler skips the look while Riding). The ears, the compass on F and
-    /// the way you face when you step off all read the same number.
+    /// Riding, your heading is the vehicle's, set every frame and never corrected (PredictionReconciler
+    /// skips the look while Riding): the server's copy is a network trip late, and correcting toward it
+    /// swung the bus round your head on every corner. See docs/CLIENT_NOTES.md, "Facing while riding".
     /// </summary>
     private void FollowRide(WorldSnapshot snapshot)
     {
@@ -678,52 +585,35 @@ public sealed partial class ClientGameSession : IDisposable
         _state.Rotation = Quaternion.CreateFromYawPitchRoll(_state.Yaw, _state.Pitch, 0f);
     }
 
-
-    /// <summary>Render-rate update: footstep generation + spatial audio listener/emitters.</summary>
+    /// <summary>Render rate: footsteps, the listener and the emitters, then the announcements.</summary>
     public void ContinuousUpdate()
     {
         if (!IsInGame) return;
-        // A passenger travels without walking. Feeding the vehicle's motion to the stride generator
-        // would produce a footstep every stride-length of ROAD — at sixty miles an hour, a machine gun.
+        // A passenger does not walk: the road would be a footstep every stride, a machine gun at speed.
         if (_state.IsRiding) _controller.Teleported();
-        // ── Where the body IS, not where the camera is being eased to ───────────────────────────
-        //
-        // VisualOffset is a rendering term: when the server corrects the prediction, the listener is
-        // slid to the new position over about two tenths of a second instead of being snapped, so the
-        // world does not jump. Feeding it to the stride generator made that slide into WALKING. A
-        // correction of a few metres decays at up to twenty-five metres a second, in steps small
-        // enough to look plausible, and if the player's own velocity is over the walking threshold at
-        // the time — which it is, if they were moving when it landed — every one of those steps banks
-        // distance. Heard, and reported, as "when I /tp myself or land in the map, I hear a few
-        // footsteps before it settles".
-        //
-        // The accumulator's own rule is that a stride is something a body DID. The smoothing is
-        // something done to the camera, so it has no business here at all.
+        // Where the body is, never the smoothed position: the slide that hides a correction was heard
+        // as footsteps after a /tp. See docs/CLIENT_NOTES.md, "Footsteps and the smoothed position".
         else _controller.Update(_state.Position, _state.Velocity);
 
         var snapshot = _world.GetSnapshot();
         FollowRide(snapshot);
 
-        // ...and everybody else, off the same snapshot. A passenger needs the same exemption as the
-        // local player above, and has it there: a seated body carries its vehicle's velocity, and the
-        // definition says it is seated (OtherBodies).
+        // Everybody else, off the same snapshot; a seated body makes no steps there either (OtherBodies).
         _others.Update(snapshot, _ownEntityId);
 
-        // Internally capped to 60 Hz; the loop this hangs off spins far faster to keep the socket
-        // serviced. See ClientAudioSystem.UpdateHz.
+        // Capped to 60 Hz inside (ClientAudioSystem.UpdateHz); this loop spins faster for the socket.
         _audioSystem.Update(snapshot);
         UpdateGuidance();
 
-        // ...and only then, because the region the audio system just worked out is the one to say.
+        // After the audio update: the region it just worked out is the one to say.
         AnnounceStairs(snapshot);
         AnnounceZoneChanges(snapshot);
         AnnounceMapEdge();
     }
 
     /// <summary>
-    /// Says so when you walk into the edge of the map. The edge is not a wall — nothing is there to
-    /// hear or touch — so stopping at it silently felt like the keys had stopped working. Said once
-    /// on arriving, and again only after you have stepped a metre back from it.
+    /// The edge of the map, said: nothing there to hear or touch, so stopping at it silently felt like
+    /// the keys had stopped. Again only after a metre back from it.
     /// </summary>
     private void AnnounceMapEdge()
     {
@@ -744,27 +634,10 @@ public sealed partial class ClientGameSession : IDisposable
 
     // ── Turning ─────────────────────────────────────────────────────────────────────────────────
     //
-    // Which way each key turns you, as a sign on the values the physics applies:
-    //   Yaw   -= LookDelta.X * RotationSpeed * dt      (and forward = (sin yaw, 0, cos yaw), so
-    //                                                   INCREASING yaw swings forward toward +X,
-    //                                                   which is right — therefore a POSITIVE
-    //                                                   LookDelta.X decreases yaw and turns LEFT)
-    //   Pitch += LookDelta.Y * RotationSpeed * dt      (and Rotation is built by
-    //                                                   Quaternion.CreateFromYawPitchRoll(yaw, pitch, 0),
-    //                                                   whose pitch is a RIGHT-HANDED rotation about
-    //                                                   +X — which takes forward (+Z) toward -Y.
-    //                                                   Therefore INCREASING pitch looks DOWN.)
-    //
-    // J and L were the wrong way round, and the derivation above is why: J emitted a NEGATIVE X,
-    // which increases yaw, which turns right. Reported as "turning left seems to turn me right", and
-    // it is only findable by following the sign all the way to the forward vector, because every
-    // step of it is individually plausible.
-    //
-    // K and O were wrong for the same reason and the comment here was part of it: it asserted that a
-    // positive pitch looks up, which is the intuitive reading of the word and the opposite of what
-    // CreateFromYawPitchRoll does. So K, written to look down, emitted a negative Y, which decreased
-    // pitch, which looked UP. Reported as "k and o seem to be swapped". The sign now comes from the
-    // rotation, not from the word, and TurnKeyTests holds it there.
+    // The signs, from the physics: Yaw -= LookDelta.X (forward is (sin yaw, 0, cos yaw), so a positive
+    // X turns left) and Pitch += LookDelta.Y (CreateFromYawPitchRoll's pitch takes +Z toward -Y, so
+    // increasing pitch looks down). J/L and K/O were each the wrong way round once, every step of the
+    // reasoning plausible; TurnKeyTests holds them. See docs/CLIENT_NOTES.md, "Turn key signs".
     private static readonly (GameKey Key, float X, float Y)[] TurnKeys =
     {
         (GameKey.J, +1f,  0f),   // left
@@ -773,9 +646,9 @@ public sealed partial class ClientGameSession : IDisposable
         (GameKey.O,  0f, -1f),   // up
     };
 
-    /// <summary>A tap turns this far. A quarter turn: four presses face you the other way.</summary>
+    /// <summary>A tap turns this far: four face you the other way.</summary>
     private const float TurnStepDegrees = 45f;
-    /// <summary>...and with shift, this far, for lining something up by ear.</summary>
+    /// <summary>With Shift, for lining something up by ear.</summary>
     private const float TurnFineDegrees = 1f;
     /// <summary>How long a key must be down before a tap becomes a sweep.</summary>
     private const double TurnHoldBeforeSweep = 0.35;
@@ -786,12 +659,9 @@ public sealed partial class ClientGameSession : IDisposable
     private double _simTime;
 
     /// <summary>
-    /// How far to the next forty-five degree mark in the direction a turn key was pressed.
-    ///
-    /// Sign conventions, because they are the whole of it and each one is individually plausible:
-    /// the physics applies <c>Yaw -= LookDelta.X * ...</c>, so a POSITIVE x (J) DECREASES yaw, and
-    /// <c>Pitch += LookDelta.Y * ...</c>, so a positive y (K) increases pitch. The step returned
-    /// here is always a positive magnitude; the key's own axis sign carries the direction.
+    /// Degrees to the next forty-five degree mark in the direction a turn key was pressed, as a
+    /// magnitude: the key's axis sign carries the direction (a positive x, J, decreases yaw; a positive
+    /// y, K, increases pitch).
     /// </summary>
     private float SnapDegrees(float ax, float ay)
     {
@@ -801,35 +671,23 @@ public sealed partial class ClientGameSession : IDisposable
         else { currentDeg = _state.Pitch * (180f / MathF.PI); dir = MathF.Sign(ay); }
 
         float step = TurnStepDegrees;
-        // Where the grid line is, in the direction of travel. A heading already ON the grid gets a
-        // whole step — otherwise the key would do nothing at all, which is worse than overshooting.
+        // A heading already on the grid gets a whole step, or the key would do nothing.
         float grid = dir > 0f ? MathF.Ceiling(currentDeg / step) * step
                               : MathF.Floor(currentDeg / step) * step;
         float delta = MathF.Abs(grid - currentDeg);
-        // A tolerance, because a float yaw is never exactly on a mark after a few turns and a
-        // hundredth of a degree of "snap" is a key that did nothing.
+        // A float yaw is never exactly on a mark after a few turns.
         const float OnGrid = 0.25f;
         return delta < OnGrid ? step : delta;
     }
 
     /// <summary>
-    /// Turns the four look keys into a LookDelta, as DISCRETE steps rather than a continuous push.
-    ///
-    /// A key that turns for as long as it is down cannot be aimed: at the old rate a press held for
-    /// a tenth of a second swung you twenty-six degrees, so listening to something and then asking
-    /// which way you were facing gave a different answer every time — "it seems jumpy when I turn and
-    /// then press f, it's like sometimes I overshoot". A tap is now exactly forty-five degrees,
-    /// whatever the frame rate and however fast the key was released, so four of them face you the
-    /// other way and eight bring you back. Holding still sweeps, for when you want to scan.
-    ///
-    /// The step is converted into the units the physics expects for ONE tick, so the client's
-    /// prediction and the server's authoritative copy apply exactly the same arithmetic and agree.
+    /// The look keys as discrete steps: a tap is one snap whatever the frame rate, and holding sweeps.
+    /// A key that turned while down could not be aimed (a tenth of a second was twenty-six degrees;
+    /// "sometimes I overshoot"). The step is in one tick's units, so prediction and the server agree.
     /// </summary>
     private Vector2 GatherLook(HashSet<GameKey> held, IReadOnlyCollection<GameKey> justPressed, bool fine, float dt)
     {
-        // In the driver's seat your head faces where the car points, and stays there. Every cue —
-        // the guide ahead, the centre line on your left — is placed relative to the car, and a head
-        // turned away with J or L would put them all somewhere else. A and D steer the car.
+        // Riding, the head faces where the vehicle points: every driving cue is placed relative to it.
         if (_state.IsRiding) { _turnDownAt.Clear(); return Vector2.Zero; }
         // Through a scope every look key is a fine one, scaled by the power.
         if (_scope.Raised) return GatherScopeLook(held, justPressed, dt);
@@ -844,19 +702,9 @@ public sealed partial class ClientGameSession : IDisposable
             if (justPressed.Contains(key))
             {
                 _turnDownAt[key] = _simTime;
-                // A coarse tap SNAPS TO THE GRID rather than adding to wherever you happen to be.
-                //
-                // Adding forty-five degrees to an off-angle heading keeps it off-angle for ever.
-                // Once a fine nudge or a sweep has left you at, say, 47 degrees, every coarse tap
-                // after it lands on 92, 137, 182 — and walking "straight" then changes BOTH
-                // coordinates, which is the whole complaint: "if I press j or l to go facing north
-                // and I walk straight, both the x and the y change when they shouldn't."
-                //
-                // Heading north, east, south or west and having exactly one coordinate move is the
-                // thing this key is for. So a coarse tap goes to the next multiple of forty-five in
-                // the direction pressed — which is a full step when you are already on the grid,
-                // and less than one when you are not. Shift is unchanged: one degree, off-grid on
-                // purpose, for lining something up by ear.
+                // A coarse tap snaps to the next multiple of forty-five: added to an off-grid heading
+                // it stayed off-grid, and walking "north" moved both coordinates. Shift stays one
+                // degree, off the grid on purpose.
                 degrees = fine ? TurnFineDegrees : SnapDegrees(ax, ay);
             }
             else if (_simTime - _turnDownAt.GetValueOrDefault(key, _simTime) >= TurnHoldBeforeSweep)
@@ -876,60 +724,40 @@ public sealed partial class ClientGameSession : IDisposable
     {
         var input = new ClientInputUpdate { SequenceId = ++_sequenceId, DeltaTime = dt };
 
-        // Shift is a TURN modifier now, not just a suppressor, so it has to be told apart from the
-        // window-manager and screen-reader chords that must never move the player.
+        // Shift modifies the key it is pressed with: a one-degree turn, a run on a movement key.
         bool fine = InputStateBuffer.HasShift(held);
-        // Alt still suppresses everything — it is the window manager's and the screen reader's. Control
-        // no longer does, because control is the trigger now, and a player must be able to fire while
-        // they are moving.
+        // Alt (and the console keys) suppress everything: it is the window manager's and the screen
+        // reader's. Control does not: readers silence speech on it while the player keeps moving.
         bool chord = InputStateBuffer.HasAlt(held)
                    || held.Contains(GameKey.Slash) || held.Contains(GameKey.NumpadDivide);
         if (chord) return input;
 
-        // Shift modifies the key it is pressed WITH, rather than suppressing everything.
-        //
-        // It used to stop movement dead, so that a shift chord could never walk the player somewhere.
-        // That also made shift+W unusable, and shift+W is where a run belongs — it is the key every
-        // other game puts it on and the one a hand finds without looking. The two meanings do not
-        // collide, because they are on different keys: shift with a turn key is still a one-degree
-        // nudge, shift with a movement key is a run, and holding both does both.
-        // A key that went down AND back up between two drains still moved the player.
-        //
-        // Held state is sampled once per fixed tick, 33 ms apart, and a quick tap is shorter than
-        // that: pressed and released inside one interval, the key was never in `held` when the tick
-        // looked, so the press did nothing at all — no movement, no footstep, no packet. A press is a
-        // player asking to move, and the smallest amount of movement this simulation can express is
-        // one tick of it, so that is what a press that is already over is worth. The just-pressed set
-        // is consumed by the same drain, so it is paid exactly once however the two rates line up.
+        // A key that went down and up between two ticks (33 ms) was never in `held` and did nothing:
+        // such a press is worth one tick of movement, paid once since the drain consumes it. See
+        // docs/CLIENT_NOTES.md, "Shift, Control and taps in GatherInput".
         bool Pressed(GameKey k) => held.Contains(k) || justPressed.Contains(k);
 
-        // The arrow keys are the same four, for anyone whose hand goes there first — which is most
-        // people the moment they are behind a wheel. Held together with WASD they do not add up to a
-        // double step: each direction counts once.
+        // The arrows are the same four; held with WASD each direction still counts once.
         Vector3 move = Vector3.Zero;
         if (Pressed(GameKey.W) || Pressed(GameKey.Up)) move.Z += 1;
         if (Pressed(GameKey.S) || Pressed(GameKey.Down)) move.Z -= 1;
         if (Pressed(GameKey.A) || Pressed(GameKey.Left)) move.X -= 1;
         if (Pressed(GameKey.D) || Pressed(GameKey.Right)) move.X += 1;
-        // Lane assist, when you are driving and not steering yourself: the car holds the middle of
-        // the lane. Your own A or D always wins — the moment you steer, it lets go.
+        // Lane assist holds the middle of the lane until you steer: your A or D always wins.
         if (_state.RidingControls && move.X == 0f && _audioSystem.Driving.AssistSteer is { } assist)
             move.X = assist;
-        // Normalised on foot, so diagonal walking is not faster. Not while driving: there the two
-        // axes are throttle and steering, and shrinking one because the other is held would halve
-        // the throttle every time lane assist leaned on the wheel.
+        // Normalised on foot so a diagonal is not faster. Not driving: the axes are throttle and
+        // steering, and lane assist leaning on the wheel would halve the throttle.
         if (move != Vector3.Zero)
             input.MoveDirection = _state.RidingControls
                 ? new Vector3(Math.Clamp(move.X, -1f, 1f), 0f, Math.Clamp(move.Z, -1f, 1f))
                 : Vector3.Normalize(move);
 
         if (held.Contains(GameKey.Space)) input.Jump = true;
-        // The horn, for as long as H is down, in the driver's seat. Every packet says so; the server
-        // lets go of it a few ticks after they stop saying it.
+        // The horn while H is down in the driver's seat; the server lets go a few ticks after.
         input.Horn = _state.RidingControls && !fine && Pressed(GameKey.H);
 
-        // Running is a claim about a key, not about a speed: the speed is the server's to apply, and
-        // prediction reads the same flag so a stride does not mispredict.
+        // A claim about a key, not a speed: the server applies it, and prediction reads the same flag.
         input.Sprint = fine && move != Vector3.Zero;
 
         input.LookDelta = GatherLook(held, justPressed, fine, dt);
@@ -969,9 +797,8 @@ public sealed partial class ClientGameSession : IDisposable
                 _mapName = manifest.MapName;
                 _arrived = false;                  // the next spawn is an arrival, said out loud
                 _lastAnnouncedRegion = null;
-                // A second manifest is a journey to another map (/join, or a map chosen from F6). Everything
-                // the last map was making a sound for goes before the new one arrives, and the body goes
-                // too: until the server spawns us again there is nobody here to move.
+                // A second manifest is travel to another map: the old map's sounds and the body go
+                // before the new one arrives.
                 if (IsInGame)
                 {
                     _menus.Close();
@@ -993,13 +820,10 @@ public sealed partial class ClientGameSession : IDisposable
                 _lastAnnouncedRegionId = int.MinValue;
                 _zoneSettle.Reset();
                 _others.Clear();
-                // The map's authored atmosphere applies immediately: the world-state broadcast only
-                // arrives once a second, and until it does the acoustics would otherwise be computed for
-                // the previous map's air.
+                // At once: the world-state broadcast is once a second, and until then the acoustics
+                // would use the previous map's air.
                 _world.ApplyManifestAtmosphere(manifest);
-                // The map's outdoor soundfield. It plays for as long as the map is loaded and is
-                // ducked by shelter rather than switched off, so a doorway is a change in the world
-                // rather than a boundary the world stops at.
+                // Ducked by shelter, never switched off: a doorway is a change in the world, not its end.
                 _audioSystem.SetMapAmbience(manifest.AmbienceId);
                 _audioSystem.Beacons.SetMapPolicy(manifest.BeaconPolicy);
                 // A new map's roads come with its data; until then there are none.
@@ -1022,7 +846,6 @@ public sealed partial class ClientGameSession : IDisposable
                 _state.Rotation = manifest.SpawnPoint.Rotation;
                 _state.MapMin = manifest.PlayMin;
                 _state.MapMax = manifest.PlayMax;
-                _state.MapSize = manifest.WorldSize;
 
                 // With how far round us a streamed map should be sent: the world detail setting.
                 var radii = WorldDetail.Radii;
@@ -1091,46 +914,43 @@ public sealed partial class ClientGameSession : IDisposable
                 foreach (int gone in _world.RefreshWoods()) _audioSystem.ForgetEntity(gone);
                 Serilog.Log.Information("MapLoadComplete: {Count} entity definitions received.", _world.EntityCount);
                 LoadProgress("Geometry ready. Finalizing acoustics...", 80);
-                // Niced, and off the shared pool. The voxel bake is seconds of solid CPU that lands
-                // at the exact moment thirty engine voices are being created and primed; at equal
-                // priority on a pool that is also decoding samples, it takes its cores from the
-                // audio. See BackgroundPriority for why lowering this is the only lever that works.
+                // Niced and off the shared pool: the bake is seconds of CPU while thirty engine voices
+                // are primed, and at equal priority it takes their cores (see BackgroundPriority).
                 _audioSystem.NoteSceneLoading();
                 BackgroundPriority.RunLowered("AcousticBake", GenerateAcoustics);
                 break;
 
             case PlayerSpawned spawn:
-                // The other half of the budget hold: the bake is over, but the cars only start
-                // sounding now, and their first seconds are the expensive ones.
+                // The budget hold again: the cars start now, and their first seconds cost the most.
                 _audioSystem.NoteSceneLoading();
                 _ownEntityId = spawn.EntityId;
                 _physics.OwnEntityId = spawn.EntityId;
-                _physics.Spatial.OwnEntityId = spawn.EntityId; // ignore self in prediction/raycasts
+                _physics.Spatial.OwnEntityId = spawn.EntityId;
                 _audioSystem.OwnEntityId = spawn.EntityId;
 
                 _state.Position = spawn.SpawnTransform.Position;
                 _state.Rotation = spawn.SpawnTransform.Rotation;
                 _state.Velocity = Vector3.Zero;
-                _reconciler.Reset(); // CRITICAL: reset the prediction buffer on teleport/spawn
-                _controller.Teleported(); // ...and the stride accumulator, or the spawn walks for you
-                _stairs.Reset();          // ...and which stairs you were at: landing beside some is not walking up to them
-                _bumps.Reset();           // ...and the wall you were last against
+                // A spawn is a teleport: no replay, no stride (the spawn would walk for you), no stairs
+                // you were at, no wall you were against.
+                _reconciler.Reset();
+                _controller.Teleported();
+                _stairs.Reset();
+                _bumps.Reset();
                 _sight.Reset();
 
                 Serilog.Log.Information("PlayerSpawned: entity {Id} at {Pos}.", spawn.EntityId, spawn.SpawnTransform.Position);
-                // A spawn after arriving is a teleport (/tp): the server says where to, and the zone is
-                // announced as you land in it. Only arriving on a map is an entry into the world.
+                // A spawn after arriving is a /tp, and its zone is announced as you land in it.
                 if (_arrived) break;
                 _arrived = true;
                 LoadProgress("Entering World...", 100);
                 _shell.EnterGame();
                 GameJoined?.Invoke();
                 Ui.Play(UiCue.EnterWorld);
-                // The world comes up over a second rather than starting mid-sentence; the chord above
-                // is an interface sound and is not faded.
+                // The world fades up over a second; the chord is an interface sound and is not faded.
                 FadeWorldIn();
-                // What a player needs on arriving, and nothing else: where they are. Said once the body
-                // is placed in a zone (AnnounceZoneChanges), so the map and the zone are one sentence.
+                // Arriving, a player is told where: once the body is placed in a zone, so the map and the
+                // zone are one sentence (AnnounceZoneChanges).
                 _arrivalPendingSince = DateTime.UtcNow;
                 break;
 
@@ -1149,9 +969,8 @@ public sealed partial class ClientGameSession : IDisposable
                 break;
 
             case WorldAudioEvent audioEvent:
-                // Something happened somewhere and made a noise. Rendered on arrival and queued for
-                // its own moment, because the parts of one event do not all happen at once: a latch
-                // precedes its own impact, and a pane's glass lands a second and a half after it broke.
+                // Rendered on arrival, each part queued for its own moment: a latch precedes its impact,
+                // and a pane's glass lands a second and a half after it broke.
                 _audioSystem.WorldAudio.Receive(audioEvent, OpenFPS.Common.AudioClock.Now);
                 break;
 
@@ -1162,22 +981,18 @@ public sealed partial class ClientGameSession : IDisposable
                 break;
 
             case HitConfirm confirm:
-                // Your shot landed. A chime and no words: the chime is the information, and a word
-                // on every hit would talk over the fight. A kill has its own.
+                // A chime and no words: a word on every hit would talk over the fight.
                 Ui.Play(confirm.Killed ? UiCue.Kill : UiCue.Hit);
                 break;
 
             case StatsUpdate stats:
                 _state.Health = stats.Health;
                 _state.HeldWeaponId = stats.HeldWeaponId ?? "";
-                _state.HeldRounds = stats.HeldRounds;
                 _state.HeldScopeId = stats.HeldScopeId ?? "";
                 _state.SpeedLimit = stats.SpeedLimit;
                 _state.CurrentMaterial = stats.CurrentMaterial;
                 _state.CurrentVariant = stats.CurrentVariant;
-                // CurrentMaterial feeds the reverb bus material calculation via LocalPlayerState: when a
-                // region's floor material (index 0) was not explicitly authored, this is the runtime
-                // override for the underfoot surface absorption.
+                // The floor underfoot, kept current for the region's material.
                 _audioSystem.NotifyMaterialChange(stats.CurrentMaterial);
                 break;
 
@@ -1247,9 +1062,8 @@ public sealed partial class ClientGameSession : IDisposable
             _speech.Speak("Acoustic generation failed.", interrupt: false);
         }
 
-        // Tell the server we're done loading; it responds by spawning us (-> PlayerSpawned). This MUST
-        // be sent here, not in the PlayerSpawned handler — the spawn is the server's reply to "ready",
-        // so sending it later would deadlock the handshake.
+        // "ready" must be sent here: the spawn is the server's answer to it, so waiting for the spawn
+        // to send it would deadlock the handshake.
         Serilog.Log.Information("Acoustics done; sending ready.");
         _network.Send(new TextCommand { Command = "ready" });
         // The saved aim assistance, which the server keeps per session and starts on.
@@ -1276,15 +1090,8 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// What you are looking at, answered here and now.
-    ///
-    /// Three facts in the order a player wants them: what it is, what it is made of, and how far. The
-    /// material is worth saying because it is what the thing will SOUND like when anything happens to
-    /// it, so it is the difference between "a wall" and a wall you now expect to ring.
-    ///
-    /// With nothing in front of you the answer is where you are, because "nothing directly ahead" is
-    /// a non-answer to a player who pressed a key to find out where they were pointing. The zone is
-    /// the fact underneath that question.
+    /// P: what is ahead, what it is made of (what it will sound like) and how far. With nothing ahead,
+    /// where you are and which way you face.
     /// </summary>
     private void LookAhead()
     {
@@ -1315,13 +1122,9 @@ public sealed partial class ClientGameSession : IDisposable
     private int _bumpSeed;
 
     /// <summary>
-    /// After each fresh movement step: if the body pressed into something it had not already met, a
-    /// knock from where it touched and the thing's name. See <see cref="WallBumps"/> for what counts.
-    ///
-    /// Local only: heard by you, through the ordinary world-sound path (placed, occluded, in the
-    /// room), but not sent to the server, so nobody else hears you meet a wall. The prediction that
-    /// finds the contact is the client's; making it a world sound for others would mean the server
-    /// finding the same contact in its own step and sending it out, which is a feature of its own.
+    /// After a fresh step: pressing into something not already met gives a knock where it touched and
+    /// the thing's name (<see cref="WallBumps"/>). Local only: others would need the server to find the
+    /// contact itself.
     /// </summary>
     private void UpdateWallBump(WorldSnapshot snapshot, ClientInputUpdate input)
     {
@@ -1359,18 +1162,16 @@ public sealed partial class ClientGameSession : IDisposable
     private double _sightCostLoggedAt;
 
     /// <summary>
-    /// After each step: what your eyes would tell you. Once your own turning or looking has settled,
-    /// what is in front of you; as you walk or strafe, what has come in front of you; and anything
-    /// crossing in front. See <see cref="SightWatch"/> for when and what, and <see cref="Sightline"/>
-    /// for the ground never being named.
+    /// After each step, what your eyes would tell you: what is ahead once a turn settles, what comes in
+    /// front as you move, and what crosses in front. See <see cref="SightWatch"/>.
     /// </summary>
     private void UpdateTurnNarration(WorldSnapshot snapshot, ClientInputUpdate input, bool gameplayActive)
     {
         // Not riding (the vehicle faces for you), not through a scope (it has its own readout), not
         // while a list or the console has the keyboard.
         if (_state.IsRiding || _scope.Raised || !gameplayActive || !NavigationAids.TurnNarration) { _sight.Reset(); return; }
-        // A look key still held counts as looking: between a tap's step and the sweep that follows
-        // when it is held, no look arrives for a third of a second, which is longer than the settle.
+        // A held look key counts as looking: between a tap and its sweep no look arrives for a third
+        // of a second, longer than the settle.
         bool looking = input.LookDelta != Vector2.Zero
                     || _turnDownAt.ContainsKey(GameKey.J) || _turnDownAt.ContainsKey(GameKey.L)
                     || _turnDownAt.ContainsKey(GameKey.K) || _turnDownAt.ContainsKey(GameKey.O);
@@ -1510,12 +1311,7 @@ public sealed partial class ClientGameSession : IDisposable
             : (now ? "Bumps on: walking into something knocks and names it." : "Bumps off.");
     }
 
-    /// <summary>
-    /// Firing what is in your hands, on a key rather than a typed command.
-    ///
-    /// Still a text command on the wire: the server spends the round, finds what it hit and takes the
-    /// health, and says back a HitConfirm when it was somebody.
-    /// </summary>
+    /// <summary>A text command on the wire: the server spends the round and answers a hit with HitConfirm.</summary>
     private void Fire()
     {
         // Through a scope the shot carries its own aim and is flown; see FireScoped.
@@ -1544,20 +1340,13 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// Says the zone as you cross into it, without being asked.
-    ///
-    /// Keyed on the region ID and not on its name: two rooms may share a name, and the outdoor
-    /// fallback name flips between "Outside" and "Under Shelter" on a continuous shelter value, which
-    /// would announce itself every time a bridge passed overhead. The id changes exactly when you
-    /// cross a boundary, which is exactly when a player wants to be told.
-    ///
-    /// Spoken WITHOUT interrupting, because crossing a doorway must not cut off whatever you were
-    /// already being told — very often the thing that made you walk through it.
+    /// Says the zone as you cross into it. Keyed on the region id, not the name (two rooms may share
+    /// one, and the outdoor name flips with shelter), and spoken without interrupting: a doorway must
+    /// not cut off what you were being told.
     /// </summary>
     private void AnnounceZoneChanges(WorldSnapshot snapshot)
     {
-        // Whether the zone you are in has held long enough, with the body moving as a body moves, to
-        // be a place you have walked into rather than a flicker or a bounce. See ZoneSettle.
+        // Held long enough, the body moving as a body moves, to be walked into (ZoneSettle).
         double now = (DateTime.UtcNow - DateTime.UnixEpoch).TotalSeconds;
         bool settled = _zoneSettle.Update(_state.CurrentRegionId, _state.Position, now);
 
@@ -1565,8 +1354,7 @@ public sealed partial class ClientGameSession : IDisposable
         {
             string here = _state.CurrentRegion;
             var waited = DateTime.UtcNow - since;
-            // The zone is placed by the audio update a few frames after the spawn, and until then the
-            // name is the previous map's or the default. Past a second and a half it is not coming.
+            // The audio update places the zone a few frames after the spawn; past 1.5 s it is not coming.
             bool placed = waited > TimeSpan.FromSeconds(0.25) && here != LocalPlayerState.UnknownArea;
             if (!placed && waited < TimeSpan.FromSeconds(1.5)) return;
             // "at outside" and "at under shelter" name no place: the map alone is said.
@@ -1583,11 +1371,8 @@ public sealed partial class ClientGameSession : IDisposable
         int region = _state.CurrentRegionId;
         bool part = NamedPlaces.NameOf(snapshot, region) != null;
 
-        // Not a room's name while you are on the stairs. Where the map has not named its flights, a
-        // storey's zone ends at its ceiling and the next begins at its floor, so at eye height the next
-        // floor's name comes halfway up the flight — "floor 3" with five steps still to climb, and on
-        // the way down "floor 2" two treads from the top. Held until your feet are off the treads, it
-        // is said on the landing, which is where you arrive. A named flight is the stairs' own name.
+        // On an unnamed flight a room's name waits for the landing: at eye height the next storey's
+        // zone begins halfway up ("floor 3" with five steps to climb).
         if (_stairs.OnFlight && !part) return;
 
         if (region == _lastAnnouncedRegionId) return;
@@ -1598,27 +1383,16 @@ public sealed partial class ClientGameSession : IDisposable
         _lastAnnouncedRegionId = region;
         Serilog.Log.Information("[ZONE] {Id} '{Name}' at {Pos}", region, _state.CurrentRegion, _state.Position);
 
-        // ...and the NAME has to have changed too, which is the other half of it.
-        //
-        // A place worth naming is rarely one box. A banked turn is a curve and a straight is four
-        // hundred metres, so either is tiled out of several region volumes that are all the same
-        // PLACE — and keying on the id alone announced "Turn one and two" four times while you
-        // walked through it. Requiring the name to change as well makes crossing between two boxes
-        // of one region silent, which is what a player means by not having moved.
+        // ...and the name must change too: a place is often several boxes ("Turn one and two" was
+        // announced four times walking through it).
         string name = _state.CurrentRegion;
         if (string.IsNullOrWhiteSpace(name) || name == _lastAnnouncedRegion) return;
-        // A doorway is roofed and in no zone, so stepping from a flat into its corridor passed through
-        // "Under Shelter" on the way. Where you are is the zone on either side of it; the where-am-I
-        // key still says it.
+        // A doorway is roofed and in no zone: passing through it is not "Under Shelter".
         if (name == ClientAudioSystem.UnderShelter || name.StartsWith(ClientAudioSystem.DoorwayPrefix)) return;
 
         _lastAnnouncedRegion = name;
-        // The stair cue speaks for a flight or a landing it has just told you about: walking up to a
-        // flight facing it, "Stairs up, 17 steps, to floor 3" is said half a metre short of the first
-        // riser, and the landing you are on and the flight you step onto a moment later would each say
-        // their names straight after it. The cue says more — which way, how many, to where — and comes
-        // first. Their names are said when it did not speak: onto the stairs from the side or
-        // backwards, or off a flight onto a landing. See StairCues.CoversZone.
+        // A stair cue just said ("Stairs up, 17 steps, to floor 3") speaks for the landing and flight
+        // after it; their names are said when it did not speak. See StairCues.CoversZone.
         if (part && StairCues.CoversZone(_stairs.FlightAnnounced, _stairCueAt, _zoneSettle.HeldSince))
         {
             Serilog.Log.Information("[ZONE] '{Name}' not said: the stair cue spoke for it", name);
@@ -1631,16 +1405,14 @@ public sealed partial class ClientGameSession : IDisposable
     private double _stairCueAt = double.NegativeInfinity;
 
     /// <summary>
-    /// The foot or the top of a flight, said once as you reach it facing along it: "Stairs up, 17 steps,
-    /// to floor 3". Without interrupting, like a zone: it is where you are, not an alarm. Not while you
-    /// ride anything, which carries you past stairs rather than up them. The zone is passed so that
-    /// leaving the stairwell and coming back is a new arrival and walking about inside it is not.
+    /// The foot or top of a flight, said once as you reach it facing along it, without interrupting.
+    /// Not while riding.
     /// </summary>
     private void AnnounceStairs(WorldSnapshot snapshot)
     {
         if (_state.IsRiding) { _stairs.Reset(); return; }
-        // The ROOM, not a flight's or a landing's name: stepping off a landing onto the floor beside it
-        // and back is not having been somewhere else, and must not say the flight again.
+        // The room, not a flight's or landing's name: stepping off a landing and back must not say the
+        // flight again.
         string? line = _stairs.Update(snapshot, _state.Position, _state.Rotation, _state.CurrentRoomId);
         if (line == null) return;
         Serilog.Log.Information("[STAIRS] '{Line}' at {Pos}", line, _state.Position);
@@ -1661,12 +1433,6 @@ public sealed partial class ClientGameSession : IDisposable
     private bool _arrived;
     private string? _lastAnnouncedRegion;
 
-    /// <summary>
-    /// The map list, as a sentence rather than a grid.
-    ///
-    /// Ordered by how many people are on each, because that is the fact a player is actually asking
-    /// for: a list of names tells you what exists, and the population tells you where the game is.
-    /// </summary>
     // ── The lists behind F5, F6 and F8 ──────────────────────────────────────────────────────────
 
     private ListMenu PlayersMenu(PlayerListResponse list)
@@ -1719,9 +1485,8 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// What you can do with a person: all of it is a command the server answers aloud. "Where is" is
-    /// for moderators and the administrator (the server refuses /where to anyone else, developers
-    /// included since the roles of 2026-10-05), so nobody else is offered it.
+    /// What you can do with a person, each a command the server answers. "Where is" is offered only to
+    /// moderators and the administrator, whom the server allows /where (roles of 2026-10-05).
     /// </summary>
     private ListMenu PersonMenu(string name, bool isFriend)
     {
@@ -1784,8 +1549,8 @@ public sealed partial class ClientGameSession : IDisposable
     /// <summary>The frames sent so far, wrapping; never zero on the wire, which means "not numbered".</summary>
     private int _voiceSequence;
 
-    /// <summary>Capture thread. Unreliable and unordered on purpose: a frame resent late is a frame the
-    /// listener has already had to do without, and waiting for it would hold up every frame behind it.</summary>
+    /// <summary>Capture thread. Unreliable on purpose: a resent frame arrives after the listener has
+    /// done without it, and waiting for it would hold up every frame behind.</summary>
     private void OnVoicePacketReady(byte[] opusData)
     {
         ushort sequence = (ushort)System.Threading.Interlocked.Increment(ref _voiceSequence);
@@ -1795,9 +1560,7 @@ public sealed partial class ClientGameSession : IDisposable
         _network.Flush();
     }
 
-    /// <summary>
-    /// Turns a line typed into the command console into either a slash command or public chat.
-    /// </summary>
+    /// <summary>A line from the command console: a slash command (some answered here) or map chat.</summary>
     public void HandleCommandEntered(string text)
     {
         string input = text.Trim();
@@ -1827,7 +1590,7 @@ public sealed partial class ClientGameSession : IDisposable
                 Say(_audioSystem.Beacons.Command(parts.Skip(1).ToArray()));
                 return;
             }
-            // Which tail the open air has — traced through the map's geometry, or the room algorithm.
+            // How the traced tail is doing.
             if (parts[0].Equals("reverb", StringComparison.OrdinalIgnoreCase))
             {
                 Say(ReverbCommand(parts.Skip(1).ToArray()));
@@ -1956,8 +1719,8 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// Announces named interactables as the player walks into range, at roughly 1 Hz so the screen
-    /// reader is not flooded. Reads the snapshot the tick already built rather than forcing another.
+    /// Named things as the player comes within range, once a second so the screen reader is not
+    /// flooded, off the tick's snapshot.
     /// </summary>
     private void CheckInteractableProximity(WorldSnapshot snap)
     {
@@ -1969,11 +1732,8 @@ public sealed partial class ClientGameSession : IDisposable
             if (entity.Id == _ownEntityId) continue;
             if (entity.Definition.Type == EntityType.Player) continue;
 
-            // Only things that earn an announcement. Every entity carries a name — the walls, the floor,
-            // the auto-injected foundation, the acoustic region volumes and the portals all have one so
-            // that authors and logs can refer to them. Announcing all of them meant that stepping through
-            // a doorway read the portal prefab's authoring notes aloud. The server decides (prefab
-            // `Announce`); the client just obeys.
+            // Only what the prefab says to announce: every wall, floor and portal has a name, and a
+            // doorway once read the portal's authoring notes aloud.
             if (!entity.Definition.Identity.Announce) continue;
 
             string name = entity.Definition.Identity.Name;
@@ -1992,8 +1752,8 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// Calculates the ShelterFactor (0 to 1) from regional data and vertical raycasting. Shelter
-    /// reduces precipitation, damps environmental ambience, and stills the wind.
+    /// ShelterFactor, 0 to 1: an indoor region, else the share of 16 upward rays that hit something,
+    /// slewed. Shelter keeps the rain off and ducks the map's ambience.
     /// </summary>
     private void UpdateShelterFactor(float dt, WorldSnapshot snap)
     {
@@ -2002,7 +1762,6 @@ public sealed partial class ClientGameSession : IDisposable
         // Same eye position as the audio system uses for the listener, so the two agree.
         Vector3 visualEyePos = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
 
-        // 1. Regional check: are we in an explicitly marked "indoor" region?
         if (snap.AcousticMap != null)
         {
             int regionId = _physics.Spatial.GetRegionAt(snap, visualEyePos);
@@ -2012,7 +1771,7 @@ public sealed partial class ClientGameSession : IDisposable
 
         float targetShelter = isSheltered ? 1.0f : 0.0f;
 
-        // 2. Volumetric sky-visibility check: a 16-ray Fibonacci hemisphere cast upward.
+        // A Fibonacci spread over the upper hemisphere.
         if (!isSheltered)
         {
             const int rays = 16;
@@ -2022,7 +1781,7 @@ public sealed partial class ClientGameSession : IDisposable
             for (int i = 0; i < rays; i++)
             {
                 float theta = 2 * MathF.PI * i / goldenRatio;
-                float phi = MathF.Acos(1 - (float)i / rays); // upper hemisphere only
+                float phi = MathF.Acos(1 - (float)i / rays);
 
                 var dir = new Vector3(
                     MathF.Cos(theta) * MathF.Sin(phi),
@@ -2036,7 +1795,7 @@ public sealed partial class ClientGameSession : IDisposable
             targetShelter = (float)hits / rays;
         }
 
-        // 3. Smooth the transition so the audio does not pop at a threshold.
+        // Slewed, so the audio does not pop at a threshold.
         _state.ShelterFactor += (targetShelter - _state.ShelterFactor)
             * Math.Clamp(AcousticConstants.ShelterFadeSpeed * dt, 0f, 1f);
     }

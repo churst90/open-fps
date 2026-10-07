@@ -1,35 +1,23 @@
-using System;
-
 namespace OpenFPS.Client.AudioEngine.Core;
 
 /// <summary>How a multi-channel ambisonic file lays out its channels and scales them.</summary>
 public enum AmbisonicLayout
 {
-    /// <summary>ACN channel order, SN3D normalization. What "AmbiX" means, what almost every modern
-    /// ambisonic recording and every ambisonic microphone's output uses, and the sane default.</summary>
+    /// <summary>ACN order, SN3D normalization: almost every modern recording and microphone, and the
+    /// default.</summary>
     AmbiX,
 
-    /// <summary>ACN channel order, N3D (fully orthonormal) normalization. Steam Audio's own native
-    /// format, so this needs no conversion at all.</summary>
+    /// <summary>ACN order, N3D (orthonormal): Steam Audio's own format, no conversion.</summary>
     N3D,
 
-    /// <summary>Furse-Malham: WXYZ channel order with W attenuated by 1/√2. What "B-format" usually
-    /// meant before AmbiX existed, so older free recordings are often this — and feeding FuMa to a
-    /// decoder expecting AmbiX does not fail, it just puts everything in the wrong place.</summary>
+    /// <summary>Furse-Malham: WXYZ order with W 1/√2 down, the old "B-format" of many free recordings.</summary>
     FuMa
 }
 
 /// <summary>
-/// Converts a block of ambisonic audio into the format Steam Audio's decode effect actually wants.
-///
-/// Steam Audio's native format is N3D — ACN channel order, orthonormal spherical harmonics — and the
-/// decode effect assumes it. Recordings in the wild are almost never N3D: they are AmbiX (ACN/SN3D) or,
-/// if they are older, FuMa. Neither mismatch produces an error. AmbiX fed to an N3D decoder renders with
-/// the directional components 1.7x too quiet, which reads as a vague, over-wide, badly localized field.
-/// FuMa fed to an ACN decoder swaps the axes outright: front becomes up.
-///
-/// So this is not a nicety. It is the difference between a soundfield that points the right way and one
-/// that sounds broken in a way that is very hard to diagnose by ear.
+/// Converts ambisonic audio to N3D/ACN, which Steam Audio's decode effect assumes. Neither mismatch is an
+/// error: AmbiX decoded as N3D has its directional components 1.7x too quiet (a vague, over-wide field),
+/// and FuMa decoded as ACN swaps the axes (front becomes up).
 /// </summary>
 public static class AmbisonicFormat
 {
@@ -52,14 +40,10 @@ public static class AmbisonicFormat
     /// <summary>SN3D → N3D gain for one ACN channel: √(2n + 1) for order n.</summary>
     public static float Sn3dToN3dGain(int acn) => MathF.Sqrt(2f * OrderOfAcnChannel(acn) + 1f);
 
-    /// <summary>
-    /// Rewrites one interleaved block in place into N3D/ACN.
-    ///
-    /// Interleaved rather than planar because that is how a decoded audio file arrives and how FMOD
-    /// hands buffers around; the caller de-interleaves once, afterwards, into Steam Audio's planar
-    /// buffer. Allocates nothing.
-    /// </summary>
+    /// <summary>Rewrites one interleaved block in place into N3D/ACN. Allocates nothing.</summary>
     /// <param name="samples">Interleaved frames of <paramref name="channels"/> channels.</param>
+    /// <param name="channels">Channels per frame.</param>
+    /// <param name="layout">The layout the block is in.</param>
     public static void ConvertToN3d(Span<float> samples, int channels, AmbisonicLayout layout)
     {
         if (channels <= 0 || samples.Length < channels) return;
@@ -68,10 +52,9 @@ public static class AmbisonicFormat
         switch (layout)
         {
             case AmbisonicLayout.N3D:
-                return; // already what the decoder wants
+                return;
 
             case AmbisonicLayout.AmbiX:
-                // Channel order already matches; only the normalization differs.
                 for (int c = 0; c < channels; c++)
                 {
                     float gain = Sn3dToN3dGain(c);
@@ -81,8 +64,7 @@ public static class AmbisonicFormat
                 return;
 
             case AmbisonicLayout.FuMa:
-                // FuMa is first order only in any file worth worrying about, and it differs in BOTH
-                // ways: the channels are W X Y Z where ACN wants W Y Z X, and W is recorded 1/√2 down.
+                // First order only: W X Y Z where ACN wants W Y Z X, and W 1/√2 down.
                 if (channels < 4) return;
                 float w = MathF.Sqrt(2f);
                 float dir = Sn3dToN3dGain(1); // the three first-order channels share one gain
@@ -99,11 +81,7 @@ public static class AmbisonicFormat
         }
     }
 
-    /// <summary>
-    /// Guesses the layout of a file from its name, so an author can drop a download straight in.
-    /// A filename is a hint and nothing more — the bed spec can always say outright — but the naming
-    /// conventions in the wild are consistent enough to be worth reading.
-    /// </summary>
+    /// <summary>Guesses a file's layout from its name; the bed spec can always say outright.</summary>
     public static AmbisonicLayout GuessLayout(string fileName)
     {
         if (string.IsNullOrEmpty(fileName)) return AmbisonicLayout.AmbiX;
@@ -111,9 +89,7 @@ public static class AmbisonicFormat
 
         if (n.Contains("fuma") || n.Contains("_fma") || n.Contains("-fma")) return AmbisonicLayout.FuMa;
 
-        // ORDER MATTERS: "sn3d" contains "n3d". Checking for N3D first reads every file labelled
-        // SN3D — which is to say most AmbiX files, since SN3D is what AmbiX normalization is called —
-        // as N3D, and then skips the conversion they needed.
+        // Order matters: "sn3d" contains "n3d", and most AmbiX files are labelled SN3D.
         if (n.Contains("sn3d") || n.Contains("ambix") || n.Contains("acn")) return AmbisonicLayout.AmbiX;
         if (n.Contains("n3d")) return AmbisonicLayout.N3D;
 

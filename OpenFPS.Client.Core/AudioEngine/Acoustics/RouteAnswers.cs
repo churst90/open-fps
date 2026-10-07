@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -7,14 +6,13 @@ namespace OpenFPS.Client.AudioEngine.Acoustics;
 /// <summary>
 /// Each voice's last answer from the routes through openings (AsyncAcousticWorker.AskRoutes), kept while
 /// neither end has moved enough to change it.
-///
-/// An answer is only good for the graph it was asked of, and it remembers which by holding the graph.
-/// The graph holds its scene, and the scene every tile's triangles. A voice that stopped kept its answer,
-/// so it kept the graph of its day alive, with every tile of that graph; with streaming a new graph is
-/// built at every tile change, and the heap grew some 400 MB a kilometre driven (found by the Resonance
-/// team, 2026-10-06). So a new graph lets every answer about an old one go, and a voice the worker
-/// forgets takes its answer with it.
 /// </summary>
+/// <remarks>
+/// An answer holds the graph it was asked of, and the graph its scene's every tile: a stopped voice's
+/// answer kept an old graph alive, and with a new graph at every streamed tile change the heap grew
+/// some 400 MB a kilometre driven (the Resonance team, 2026-10-06). So a new graph drops every answer
+/// about an old one, and a forgotten voice takes its answer with it.
+/// </remarks>
 public sealed class RouteAnswers
 {
     public readonly record struct Held(OpeningRoutes Model, Vector3 Source, Vector3 Listener, OpeningRoutes.Answer? Answer, long At);
@@ -22,8 +20,8 @@ public sealed class RouteAnswers
     private readonly Dictionary<int, Held> _held = new();
     private OpeningRoutes? _current;
 
-    /// <summary>For the lab's before-and-after only (AudioLab --stream-walk keep=old): answers kept as they
-    /// were before 2026-10-06, about any graph, and a forgotten voice's left behind.</summary>
+    /// <summary>For the lab's before-and-after only (AudioLab --stream-walk keep=old): answers kept as
+    /// before 2026-10-06, about any graph, and a forgotten voice's left behind.</summary>
     public static bool RetainSuperseded { get; set; }
 
     public int Count => _held.Count;
@@ -32,7 +30,7 @@ public sealed class RouteAnswers
     public bool TryGet(int id, OpeningRoutes model, out Held held)
         => _held.TryGetValue(id, out held) && ReferenceEquals(held.Model, model);
 
-    /// <summary>Keeps a voice's answer. One asked of a graph that is no longer the current one is not kept.</summary>
+    /// <summary>An answer asked of a graph that is no longer current is not kept.</summary>
     public void Put(int id, Held held)
     {
         if (RetainSuperseded) { _held[id] = held; return; }

@@ -1,26 +1,19 @@
-using System;
 using System.Runtime.InteropServices;
 using FMOD;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// Triangular dither, one 16-bit step tall, on the very last thing the mixer does.
-///
-/// The mix is float to the end, and then FMOD hands it to the sound server as SIXTEEN BITS: on Linux
-/// its PulseAudio stream is s16le at 44.1 kHz (read off `pactl list sink-inputs` while the lab ran),
-/// and the conversion has no dither. A 1 kHz tone two steps tall came out as three values with its
-/// third harmonic 16 dB under it (the lab's --quality lsb). That is fine for anything loud. It is not
-/// fine for this game's mix, which sits low by design (a median of -28 LUFS in play, a quiet park
-/// -48 dBFS RMS) and is listened to turned up: a distant sound, a decaying tail, a reverb return, light
-/// rain at -60 to -70 dBFS is only 25-40 dB over the last bit, and undithered, what is left of it is
-/// not a little hiss but the sound itself turned into steps — grain that follows the sound.
-///
-/// Dither turns that error into a steady, signal-independent hiss at about -101 dBFS RMS, under any
-/// sound card's own floor, and leaves nothing that follows the signal. Where the output is float
-/// already (WASAPI in shared mode usually is) it costs a hiss nobody can hear. See Enabled for when it
-/// is left out.
+/// Triangular dither, one 16-bit step tall, the last thing the mixer does.
 /// </summary>
+/// <remarks>
+/// FMOD hands the float mix to the sound server as s16le without dither (on Linux, read off `pactl list
+/// sink-inputs`): a tone two steps tall came out as three values with its third harmonic 16 dB under it
+/// (the lab's --quality lsb). This mix sits low by design (a median of -28 LUFS in play) and is played
+/// turned up, so light rain at -60 to -70 dBFS, a tail or a distant sound is only 25-40 dB over the last
+/// bit, and undithered it turns to grain that follows the sound. Dither leaves a steady hiss about
+/// -101 dBFS RMS instead. docs/AUDIO_QUALITY_2026-10-06.md, finding 7.
+/// </remarks>
 public sealed class MasterDither : IDisposable
 {
     /// <summary>One sixteen-bit step, full scale being 1.</summary>
@@ -33,9 +26,8 @@ public sealed class MasterDither : IDisposable
     private uint _a = 0x9E3779B9u, _b = 0x85EBCA6Bu;
 
     /// <summary>
-    /// On for a sound card, off for the WAV writer (OPENFPS_FMOD_WAV): the lab's instruments read that
-    /// file for exact silence and two-millisecond holes, which a step of dither would fill.
-    /// OPENFPS_DITHER=1 or 0 decides either way.
+    /// On for a sound card, off for the WAV writer (OPENFPS_FMOD_WAV): the lab reads that file for exact
+    /// silence and two-millisecond holes, which dither would fill. OPENFPS_DITHER=1 or 0 overrides.
     /// </summary>
     public static bool Enabled => Environment.GetEnvironmentVariable("OPENFPS_DITHER") switch
     {

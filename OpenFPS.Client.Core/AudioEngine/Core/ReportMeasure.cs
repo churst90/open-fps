@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -7,18 +6,19 @@ namespace OpenFPS.Client.AudioEngine.Core;
 /// <summary>What one shot measured: the numbers docs/GUNFIRE.md compares.</summary>
 /// <param name="PositivePhaseMs">From the onset to the waveform's first crossing back through zero.</param>
 /// <param name="Down10Ms">From the loudest 0.25 ms window to the first one 10 dB under it.</param>
+/// <param name="Down20Ms">The same, 20 dB under.</param>
+/// <param name="Down30Ms">The same, 30 dB under.</param>
 /// <param name="BandsDb">Octave bands 125 Hz to 16 kHz over the event, dB re the loudest band.</param>
+/// <param name="CentroidHz">The spectral centroid below 20 kHz over the event.</param>
 /// <param name="NegativeRatio">The deepest point of the negative phase against the positive peak.</param>
 public sealed record ReportMeasurement(float PositivePhaseMs, float Down10Ms, float Down20Ms, float Down30Ms,
                                        float[] BandsDb, float CentroidHz, float NegativeRatio = 0f);
 
 /// <summary>
-/// Measures a gunshot the way the NIJ recordings were measured (inbox/gunfire-357-2026-10-02/nij.py),
-/// so a render and a recording are read by the same ruler.
-///
-/// The band window is flat-topped, from a millisecond before the onset to 20 ms after, with 0.5 ms
-/// tapers. A Hann window starting at the onset is nearly zero over the first 3 ms, where almost all
-/// of a shot is, and once measured its tail instead (docs/GUNFIRE.md).
+/// Measures a gunshot as the NIJ recordings were measured (inbox/gunfire-357-2026-10-02/nij.py), so a
+/// render and a recording are read by the same ruler. The band window is flat-topped, 1 ms before the
+/// onset to 20 ms after: a Hann window from the onset is nearly zero over the first 3 ms, where almost
+/// all of a shot is, and once measured its tail instead (docs/GUNFIRE.md).
 /// </summary>
 public static class ReportMeasure
 {

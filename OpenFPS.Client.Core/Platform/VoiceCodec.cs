@@ -1,24 +1,14 @@
-using System;
-using System.Collections.Generic;
 using Concentus;
 using Concentus.Enums;
 
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
-/// Voice chat on the wire: Opus, 48 kHz mono, one 20 ms frame per packet, and the settings both heads
-/// encode with, so a Windows player and a Linux player send the same thing.
-///
-/// 64 kbit/s, full band (to 20 kHz), at the codec's highest complexity. That is the rate at which Opus
-/// is transparent for speech: the whole voice, sibilants and breath included, not the telephone band
-/// the old 24 kbit/s VOIP setting gave. It is 8 kB a second per person talking, which no connection
-/// that can carry the world state will notice.
-///
-/// The AUDIO application, not VOIP: VOIP shapes the signal for intelligibility over a narrow channel
-/// (a high-pass and an emphasis on the formants), and here the voice is placed in a world that does its
-/// own shaping, by distance and by the walls in between. In-band forward error correction is on, so a
-/// lost packet can be rebuilt from the one after it when the codec is carrying any of it in its speech
-/// layer; whatever it cannot rebuild the decoder conceals (TalkerStream).
+/// Voice chat on the wire, the same from both heads: Opus, 48 kHz mono, one 20 ms frame per packet.
+/// 64 kbit/s full band is transparent for speech, sibilants and breath included (24 kbit/s VOIP gave a
+/// telephone band), at 8 kB/s per talker. The AUDIO application, not VOIP: VOIP's high-pass and formant
+/// emphasis would come on top of the world's own shaping by distance and walls. In-band FEC rebuilds a
+/// lost packet when it can; the decoder conceals the rest (TalkerStream).
 /// </summary>
 public static class VoiceCodec
 {

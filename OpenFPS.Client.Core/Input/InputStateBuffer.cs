@@ -1,20 +1,11 @@
-using System.Collections.Generic;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Core.Input;
 
 /// <summary>
-/// Thread-safe keyboard state for the focused game window, keyed on the neutral
-/// <see cref="GameKey"/>.
-///
-/// Each head's UI thread writes transitions through <see cref="SetKey"/> from its native key events
-/// (WinForms <c>Keys</c> / GDK keyvals, both mapped at the boundary); the game-loop thread drains a
-/// snapshot per fixed step through <see cref="GetSnapshot"/>. Held keys persist across the drain;
-/// just-pressed keys are consumed by it, so a tap is acted on exactly once no matter how the two
-/// thread rates line up.
-///
-/// This replaces the two near-identical buffers the heads used to keep — one typed on
-/// <c>System.Windows.Forms.Keys</c>, one on <c>GameKey</c>.
+/// Keyboard state for the game window, shared between threads. The head's UI thread writes through
+/// <see cref="SetKey"/>; the game loop takes a snapshot per fixed step through <see cref="GetSnapshot"/>,
+/// which consumes the just-pressed keys, so a tap is acted on exactly once whatever the two rates.
 /// </summary>
 public sealed class InputStateBuffer
 {
@@ -39,10 +30,8 @@ public sealed class InputStateBuffer
     }
 
     /// <summary>
-    /// Drops all held state. Called on focus loss and on window re-activation: the Alt of an Alt+Tab
-    /// registers its key-down while focused and its key-up while not, which would otherwise leave Alt
-    /// stuck "held" — and a held modifier suppresses movement, so the player would come back to a
-    /// character that only responds to tap keys.
+    /// Drops all held state, on focus loss and re-activation: Alt+Tab's Alt goes down while focused and
+    /// up while not, and a stuck modifier suppresses movement.
     /// </summary>
     public void Clear()
     {
@@ -67,14 +56,13 @@ public sealed class InputStateBuffer
         lock (_lock) return new HashSet<GameKey>(_held);
     }
 
-    /// <summary>True when any modifier is currently held. Movement is suppressed while one is, so
-    /// window-manager and screen-reader chords never walk the player across the map.</summary>
+    /// <summary>Any modifier held. Movement is suppressed while one is, so window-manager and
+    /// screen-reader chords never walk the player.</summary>
     public static bool HasModifier(HashSet<GameKey> held) =>
         held.Contains(GameKey.ShiftLeft) || held.Contains(GameKey.ShiftRight) ||
         held.Contains(GameKey.ControlLeft) || held.Contains(GameKey.ControlRight) ||
         held.Contains(GameKey.AltLeft) || held.Contains(GameKey.AltRight);
 
-    /// <summary>True when either shift is held — the chat bindings' modifier.</summary>
     public static bool HasShift(HashSet<GameKey> held) =>
         held.Contains(GameKey.ShiftLeft) || held.Contains(GameKey.ShiftRight);
 

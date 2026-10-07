@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
@@ -12,15 +10,10 @@ namespace OpenFPS.Client.AudioEngine.Core.Yard;
 /// <summary>
 /// A machine that stands in one place and runs: a lawn mower, an air-conditioning condenser.
 ///
-/// Assembled from parts that already existed, which is the point of it. The engine is
-/// <see cref="EngineSynth"/> — the same solver that runs a V8 — with a governor on the throttle
-/// instead of a driver. The blade and the fan are <see cref="BladeRow"/>, the aircraft's propeller,
-/// because a mower blade and a condenser fan and a propeller are one mechanism at three sizes. The
-/// deck and the cabinet are resonances taken from their own dimensions. Nothing here is a sample and
-/// nothing here is an equaliser curve.
-///
-/// Outputs are pascals at one metre in the machine's frame, exactly like an engine's or an
-/// aircraft's, so distance, Doppler, occlusion and the room are somebody else's business.
+/// Assembled from existing parts: the engine is <see cref="EngineSynth"/> with a governor on the
+/// throttle instead of a driver; the blade and the fan are <see cref="BladeRow"/>, the aircraft's
+/// propeller (one mechanism at three sizes); the deck and the cabinet are resonances from their own
+/// dimensions. Outputs are pascals at one metre in the machine's frame.
 /// </summary>
 public sealed class SmallMachineSynth
 {
@@ -42,9 +35,8 @@ public sealed class SmallMachineSynth
     /// blade keeps turning for a while on its own inertia — and drops an air conditioner to its fan.</summary>
     public bool Running { get; set; } = true;
 
-    /// <summary>Whether the compressor is being called for. An air conditioner's fan runs on while
-    /// the thermostat is satisfied and the compressor is not, which is a sound everybody knows and
-    /// nobody could name.</summary>
+    /// <summary>Whether the compressor is being called for. The fan runs on while the compressor
+    /// rests.</summary>
     public bool CompressorOn { get; set; } = true;
 
     /// <summary>How hard the compressor is pumping against its rating (1): the lift the weather sets
@@ -112,10 +104,8 @@ public sealed class SmallMachineSynth
         {
             int rows = Math.Max(1, spec.BladeRows);
             _blades = new BladeRow[rows];
-            // A blade row's axis is vertical: a mower's blade lies flat and a condenser fan blows
-            // straight up, so the listener standing beside either of them is IN the disc plane,
-            // where the thickness noise is loudest. That is not a detail — it is why you hear a
-            // mower's roar from across a garden and an aircraft's propeller mostly as it turns.
+            // The axis is vertical, so a listener beside a mower or a condenser is in the disc plane,
+            // where thickness noise is loudest: why a mower roars across a garden.
             for (int i = 0; i < rows; i++) _blades[i] = new BladeRow(b, rate, Vector3.UnitY, seed + 10 + i * 7);
             _bladeRpm = b.RpmIdle;
         }
@@ -186,11 +176,8 @@ public sealed class SmallMachineSynth
         {
             float rpm = _engine.Rpm;
             // ── The governor, and nothing else, moves this throttle ──────────────────────────────
-            //
-            // A proportional controller with a droop: see GovernorSpec. Its output is slewed at its
-            // own response rate, because a pair of flyweights and a spring have mass, and the lag
-            // between the load arriving and the throttle answering is the *bog* — the half second a
-            // mower spends sounding like it is about to stall before it picks up again.
+            // Proportional with a droop (GovernorSpec), slewed at its response rate: flyweights have
+            // mass, and that lag is the bog, the half second a mower sounds about to stall.
             var gov = Spec.Governor;
             float want = gov != null && Running ? gov.Throttle(rpm) : (Running ? 0.3f : 0f);
             float a = gov != null ? MathF.Min(1f, _dt * SlowEvery * MathF.Tau * gov.ResponseHz) : 1f;
@@ -199,10 +186,8 @@ public sealed class SmallMachineSynth
             _engine.Ignition = Running;
             _engine.Starter = Running && rpm < 400f;
 
-            // What the crank is dragging. A blade in air is a fan law — torque with the square of
-            // speed — and the grass on top of it is proportional to how much grass arrives, which is
-            // ground speed times swath. The two are different shapes, which is why a mower bogs when
-            // you push it into long grass and not when you rev it in the driveway.
+            // A blade in air is a fan law (torque with speed squared); the grass adds torque with how
+            // much arrives: why a mower bogs in long grass and not revved in the driveway.
             float rated = _engine.Profile.PeakTorqueNm;
             float fan = 0.55f * rated / (Spec.Governor?.SettingRpm ?? 3000f) / (Spec.Governor?.SettingRpm ?? 3000f);
             float torque = fan * rpm * rpm;
@@ -216,22 +201,20 @@ public sealed class SmallMachineSynth
         }
         else if (Spec.Blade is { } fanSpec)
         {
-            // An electric fan: it is either on at its one speed (its own motor's) or spinning down.
+            // An electric fan: on at its motor's one speed, or spinning down.
             float want = Running ? fanSpec.RpmMax * Math.Clamp(FanSpeedFraction, 0.5f, 1.2f) : 0f;
             _bladeRpm += (want - _bladeRpm) * MathF.Min(1f, _dt * SlowEvery / 2.5f);
             Rpm = 0f;
         }
 
         BladeRpm = _bladeRpm;
-        // How hard the blades are working. A mower's blade is loaded by the grass it is cutting; a
-        // fan's loading is whatever the coil in front of it makes it, and that does not change.
+        // A mower's blade is loaded by the grass; a fan's by its coil, which does not change.
         float blading = Spec.Cutting != null
             ? Math.Clamp(0.3f + 0.7f * load * Math.Clamp(GroundSpeed / 1.2f, 0f, 1.3f), 0f, 1.2f)
             : 0.8f;
         for (int i = 0; i < _blades.Length; i++)
         {
-            // Two blades on one deck are not synchronised; a few per cent between them is what makes
-            // a wide deck beat slowly instead of ringing on one note.
+            // A few per cent between two blades on one deck makes it beat slowly, not ring one note.
             float trim = _blades.Length == 1 ? 1f : 1f + (i - (_blades.Length - 1) * 0.5f) * 0.03f;
             _blades[i].SetSpeed(_bladeRpm * trim, blading, dir);
         }
@@ -261,26 +244,17 @@ public sealed class SmallMachineSynth
         for (int i = 0; i < _blades.Length; i++) blades += _blades[i].Step();
 
         // ── The deck ────────────────────────────────────────────────────────────────────────────
-        //
-        // Some of the blade's noise leaves straight out of the open bottom and is heard as it is;
-        // the rest goes round inside a shallow steel pan and is heard through the pan's two
-        // resonances, the quarter wave over its depth and the half wave across it.
+        // The blade's noise leaves the open bottom, and the pan adds some back at its two resonances
+        // (a quarter wave over its depth, a half wave across).
         if (Spec.Deck != null)
         {
-            // The pan ADDS. Sound made under a deck leaves through the open bottom whatever happens,
-            // and what the pan does is send some of it round again and give it back at the cavity's
-            // own two frequencies. Modelling that as a blend — part direct, part filtered — made the
-            // deck a LOSS of five decibels, which is the opposite of what a resonator does and the
-            // opposite of why mower decks are loud.
+            // The pan adds: as a blend of direct and filtered the deck was a five decibel loss.
             blades += _deckWet * (_deckDepth.Process(blades) + 0.7f * _deckWidth.Process(blades)) * 2.4f;
         }
 
         // ── The grass ───────────────────────────────────────────────────────────────────────────
-        //
-        // A rate of stalks, not a texture: stalks per square metre times the swath times how fast the
-        // machine is walking. Nothing is cut while a tip is not in standing grass, so the whole train
-        // is gated by the blade passing — and a mower standing still cuts nothing at all, which is
-        // the difference you hear when somebody stops to turn round.
+        // A rate of stalks (per square metre, times the swath, times the walking speed), gated by
+        // the blade passing: a mower standing still cuts nothing.
         if (Spec.Cutting is { } cut && _bladeRpm > 100f)
         {
             float perSecond = cut.StalksPerSquareMetre * _swathMetres * MathF.Max(0f, GroundSpeed)
@@ -294,8 +268,8 @@ public sealed class SmallMachineSynth
                 if (_gate > 1e7) _gate = 0;
 
                 float expected = perSecond * _dt * gate * 2.9f;   // 2.9 = 1/mean(gate)
-                // Poisson: at these rates it is many per sample, so the count is the rate and the
-                // randomness is in the amplitude. Below one per sample it is a Bernoulli trial.
+                // Many per sample: the count is the rate and the randomness the amplitude. Below one
+                // per sample, a Bernoulli trial.
                 float hit;
                 if (expected >= 1f) hit = expected + MathF.Sqrt(expected) * (float)(_rng.NextDouble() * 2 - 1);
                 else hit = _rng.NextDouble() < expected ? 1f : 0f;
@@ -307,15 +281,14 @@ public sealed class SmallMachineSynth
         if (Spec.Compressor is { } comp && _compressorUp > 1e-3f)
         {
             float up = _compressorUp;
-            // The hum is the MAINS: twice the line frequency, and it does not move with anything.
+            // The hum is the mains: twice the line frequency, fixed.
             _humPhase += comp.HumHz / _rate;
             if (_humPhase > 1.0) _humPhase -= 1.0;
             double h = _humPhase * Math.Tau;
             float hum = (float)(Math.Sin(h) + 0.42 * Math.Sin(2 * h) + 0.20 * Math.Sin(3 * h)) * _humAmp * up;
 
-            // The pump is the SHAFT, which is a few per cent slower than synchronous under load and
-            // slower still while it is coming up to speed. The two series beat, and that beat is the
-            // whole difference between a compressor and a mains transformer.
+            // The pump is the shaft, a few per cent under synchronous with load and more while coming
+            // up: the beat against the hum is what makes it a compressor and not a transformer.
             float pumpHz = comp.PulsationHzAt(CompressorLoad) * (0.55f + 0.45f * up);
             CompressorHz = pumpHz;
             _pulsePhase += pumpHz / _rate;
@@ -330,10 +303,8 @@ public sealed class SmallMachineSynth
             _flowLp2 += a * (_flowLp1 - _flowLp2);
             float flow = (_flowLp1 - _flowLp2) * _flowAmp * up * 8f;
 
-            // ...and all of it is inside a steel can. At 120 Hz the can is far smaller than a
-            // wavelength and stiff, so it passes the hum essentially untouched; what it adds is its
-            // own ring where it rings. A can that ATTENUATED what is inside it would be a silencer,
-            // and a compressor is not quiet.
+            // The steel can, small and stiff against 120 Hz, passes the hum and adds its own ring;
+            // it does not attenuate.
             float inside = hum + pump + flow;
             compressor = inside + 0.5f * _shell.Process(inside) * 2.2f;
             _casingDrive = compressor;

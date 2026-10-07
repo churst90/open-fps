@@ -1,33 +1,25 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using Concentus;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// Another player's voice as it comes off the network: decoded frame by frame, in order, into a ring that
-/// one voice in the world reads continuously (an <see cref="OwnVoiceTap"/> placed at their mouth), the
-/// way your own microphone feeds your room.
-///
-/// Packets do not arrive the way they were sent. They come in bursts, out of order, some late and now
-/// and then one not at all. So:
+/// Another player's voice off the network, decoded in order into a ring that one voice in the world
+/// reads (an <see cref="OwnVoiceTap"/> at their mouth). Packets come in bursts, out of order, late or
+/// not at all, so:
 /// <list type="bullet">
-/// <item>Frames are held by their number and decoded in order. A frame that comes before the one it
-/// follows waits for it, but only as long as the buffer allows: then the missing one is rebuilt from the
-/// forward error correction the codec carries in the next (when it has any) or concealed by the decoder,
-/// its extrapolation of the voice. One that turns up after that is dropped. Past five frames missing it
-/// is a gap, not a loss, and nothing is made up.</item>
-/// <item>The reader stays a margin behind the newest decoded sample: the jitter buffer. The margin is what
-/// this connection needs, measured: the spread in how late frames have been against their place in the
-/// stream over the last few seconds, plus room for one lost frame. At least 70 ms, at most half a
-/// second, and longer for a while each time the reader still ran dry.</item>
-/// <item>A pause in talking starts a new run: the reader waits for a margin of the new run and plays it
-/// from its first word.</item>
+/// <item>Frames are held by number and decoded in order. One that comes early waits for the missing
+/// one as long as the buffer allows; then the missing one is rebuilt from the next frame's forward error
+/// correction or concealed by the decoder, and if it turns up later it is dropped. Past five missing it
+/// is a gap and nothing is made up.</item>
+/// <item>The reader stays a margin (the jitter buffer) behind the newest sample: the spread in how late
+/// frames have been over the last few seconds plus room for one lost frame, 70 ms to half a second, and
+/// longer for a while each time the reader still ran dry.</item>
+/// <item>A pause in talking starts a new run, played from its first word once a margin of it is in.</item>
 /// </list>
-/// Packets come in on the thread that handles network messages, <see cref="Pump"/> runs on the game
-/// thread, the ring is read on the mixer thread.
+/// Packets arrive on the network thread, <see cref="Pump"/> runs on the game thread, the ring is read on
+/// the mixer thread.
 /// </summary>
 public sealed class TalkerStream
 {
@@ -40,11 +32,9 @@ public sealed class TalkerStream
     public const double WindowSeconds = 8;
     public const int MaxConcealedFrames = 5;
     /// <summary>
-    /// The most a talker's voice is sped up or slowed to keep to the margin: 0.2 %, three cents, below
-    /// what an ear hears in a voice. It only has to follow the drift between two machines' clocks and let
-    /// a margin that is no longer needed shrink. A margin that has to GROW does so by the reader waiting
-    /// for what has not arrived (a pause, not a pitch change), and a new run of talking starts at the
-    /// full margin.
+    /// The most a voice is sped up or slowed to keep to the margin: 0.2 %, three cents, below what an ear
+    /// hears in a voice. Enough to follow two clocks' drift and let an unneeded margin shrink; a margin
+    /// grows by the reader waiting (a pause, not a pitch change).
     /// </summary>
     public const double MaxPull = 0.002;
     private const double FrameSeconds = (double)VoiceCodec.FrameSamples / VoiceCodec.Rate;
@@ -65,9 +55,8 @@ public sealed class TalkerStream
     private double _floor;
     private int _seenUnderruns;
 
-    /// <summary>Counts for the log. <see cref="RanDry"/> counts the reader catching up with the newest
-    /// sample while the same run of talking went on: the margin was too short. The ring's own count also
-    /// has the end of every sentence in it, which is the reader playing out what was said.</summary>
+    /// <summary>Counts for the log. <see cref="RanDry"/> is the reader catching up mid-run (the margin
+    /// was too short); the ring's own underrun count also has the end of every sentence in it.</summary>
     public int Received, Lost, Rebuilt, Late, Corrupt, RanDry;
 
     /// <summary>When the last packet came, seconds on the clock <see cref="Receive"/> was given.</summary>
@@ -76,6 +65,7 @@ public sealed class TalkerStream
     public TalkerStream(int senderId) => SenderId = senderId;
 
     /// <param name="sequence">The sender's frame number; zero for a sender that does not number them.</param>
+    /// <param name="packet">One Opus frame.</param>
     /// <param name="now">Seconds on any steady clock; the same one <see cref="Pump"/> is given.</param>
     public void Receive(ushort sequence, byte[] packet, double now)
     {
@@ -233,10 +223,9 @@ public static class Talkers
     }
 
     /// <summary>
-    /// The emitter key of one surface answering a talker: <c>talkercopy:42</c>. Their voice read back at
-    /// the copy's extra delay, as your room answers your own (OwnVoiceCopyKey). Not a <see cref="Key"/>:
-    /// a copy is not the voice, and it does not measure the connection (it reads behind the voice, so
-    /// running dry is the voice's to report).
+    /// The emitter key of one surface answering a talker, <c>talkercopy:42</c>: their voice read back at
+    /// the copy's extra delay, as your room answers your own (FmodAudioProvider.OwnVoiceCopyKey). Not a
+    /// <see cref="Key"/>: a copy reads behind the voice, so running dry is the voice's to report.
     /// </summary>
     public const string CopyKeyPrefix = "talkercopy:";
 

@@ -1,20 +1,11 @@
-using System;
-
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// The scope's own sounds: the guidance tone and a held breath. Synthesised, quiet, in both ears and
-/// not in the world, like the interface sounds.
-///
-/// The guidance tone is two loops. The first is one PULSE and the silence after it; played faster it
-/// rises in pitch and pulses faster together, because both are the same loop played at a higher rate.
-/// That is the whole of "pitch and pulse rate rise as the crosshair nears a target": one number, the
-/// playback rate, from 1 far off to 2 almost on. The second is the same note held, which the pulses
-/// settle into when the crosshair is on a body: it is the pulse's own top pitch, so arriving on target
-/// sounds like the pulses running together rather than like a different sound starting.
-///
-/// The timbre is a soft reed: a fundamental with a little second and third harmonic, so it is not the
-/// pure sine of the beacons and not the bell of the interface chimes.
+/// The scope's own sounds, quiet and in the head like the interface sounds: the guidance tone and a
+/// held breath. The tone is two loops. One pulse and its silence, played at a rate from 1 far off to 2
+/// almost on, so pitch and pulse rate rise together from one number; and the same note held, at the
+/// pulse's top pitch, for the crosshair on target, so arriving sounds like the pulses running together.
+/// A soft reed (a little second and third harmonic): not the beacons' sine, not the interface's bell.
 /// </summary>
 public static class ScopeSounds
 {
@@ -22,8 +13,8 @@ public static class ScopeSounds
     /// resampler.</summary>
     public static int SampleRate => OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
 
-    /// <summary>The held note, Hz. About E5. It was thirty cycles in two thousand samples at 44.1 kHz,
-    /// and stays that note at any rate: the loop is made of whole cycles instead (<see cref="SteadyLoopSamples"/>).</summary>
+    /// <summary>The held note, Hz, about E5: thirty cycles in 2000 samples at 44.1 kHz, kept at any rate by
+    /// a loop of whole cycles (<see cref="SteadyLoopSamples"/>).</summary>
     public const float SteadyHz = 661.5f;
     /// <summary>The pulse's note at the slowest rate, an octave under the held note.</summary>
     public const float PulseHz = SteadyHz / 2f;
@@ -81,11 +72,9 @@ public static class ScopeSounds
     public static float PulseRate(float closeness) => MathF.Pow(2f, Math.Clamp(closeness, 0f, 1f));
 
     /// <summary>
-    /// A breath for holding still: drawn in (higher, narrower) when the hold starts and let out (lower,
-    /// longer) when it ends. Air, not a note: broad noise around a centre, swelling and fading on a
-    /// raised cosine so there is no onset to hear as a knock. Quiet, -26 dBFS at its peak before the
-    /// interface volume and about -35 as played, because it is the shooter's own and is only there to
-    /// be felt.
+    /// A breath for holding still: drawn in (higher, shorter) when the hold starts, let out (lower,
+    /// longer) when it ends. Band noise on a raised cosine, so no onset knocks; -26 dBFS peak before the
+    /// interface volume, about -35 as played: the shooter's own, only there to be felt.
     /// </summary>
     public static float[] RenderBreath(bool inhale, int seed = 1)
     {

@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.IO;
 using System.Runtime.InteropServices;
 using FMOD;
 using Serilog;
@@ -8,14 +6,13 @@ using Serilog;
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// Responsibility: Loads audio files directly into raw PCM memory (float arrays) 
-/// so the granular synthesis DSP can read them rapidly without locking FMOD's core channels.
+/// Sound files decoded to interleaved float PCM in memory, for DSPs that read samples themselves
+/// (the granular voice, spoken lines played as world sounds).
 /// </summary>
 public class GranularBank : IDisposable
 {
     private readonly FMOD.System _system;
-    
-    // Maps SoundId -> Interleaved float PCM data
+
     private readonly ConcurrentDictionary<string, float[]> _pcmCache = new();
     private readonly ConcurrentDictionary<string, int> _channelsCache = new();
     private readonly ConcurrentDictionary<string, int> _sampleRateCache = new();
@@ -25,9 +22,7 @@ public class GranularBank : IDisposable
         _system = system;
     }
 
-    /// <summary>
-    /// Gets or loads the raw PCM data for a given sound ID.
-    /// </summary>
+    /// <summary>A sound's PCM, decoded on first use and kept.</summary>
     public bool TryGetPcmData(string soundId, out float[] data, out int channels, out int sampleRate)
     {
         if (_pcmCache.TryGetValue(soundId, out data!) && 
@@ -60,14 +55,9 @@ public class GranularBank : IDisposable
         string path = ResolvePath(soundId);
         if (string.IsNullOrEmpty(path)) return false;
 
-        // CREATESAMPLE decodes the whole file into memory, which is what `lock` then hands back.
-        //
-        // OPENONLY used to be in here too, and it is the opposite of what was wanted: it tells FMOD to
-        // open the file and parse its header but NOT to read or decode any sample data, leaving you to
-        // pull it yourself with readData. `lock` on a sound like that returns a buffer of exactly the
-        // right size containing nothing at all — so every load reported the correct channel count,
-        // sample rate and length, logged a confident success, and produced silence. Nothing caught it
-        // because the only consumer was the granular engine, which has never had a caller.
+        // CREATESAMPLE decodes the whole file, which is what `lock` hands back. Never add OPENONLY: it
+        // parses only the header, and `lock` then returns a buffer of the right size holding silence,
+        // with the right channels, rate and length logged as a success.
         MODE mode = MODE.CREATESAMPLE | MODE.ACCURATETIME;
         RESULT res = _system.createSound(path, mode, out FMOD.Sound sound);
         if (res != RESULT.OK)
@@ -83,11 +73,8 @@ public class GranularBank : IDisposable
             sampleRate = (int)freq;
 
             sound.getLength(out uint lengthBytes, TIMEUNIT.PCMBYTES);
-            
-            // Read data
+
             byte[] rawBytes = new byte[lengthBytes];
-            IntPtr ptr = Marshal.AllocHGlobal((int)lengthBytes);
-            
             res = sound.@lock(0, lengthBytes, out IntPtr ptr1, out IntPtr ptr2, out uint len1, out uint len2);
             if (res == RESULT.OK)
             {
@@ -100,13 +87,10 @@ public class GranularBank : IDisposable
             }
             else
             {
-                Marshal.FreeHGlobal(ptr);
                 return false;
             }
-            Marshal.FreeHGlobal(ptr);
 
-            // Convert to float array based on format
-            data = ConvertToFloatArray(rawBytes, format);
+            data =ConvertToFloatArray(rawBytes, format);
             return channels > 0;
         }
         finally
@@ -140,7 +124,7 @@ public class GranularBank : IDisposable
             SOUND_FORMAT.PCM24 => 3,
             SOUND_FORMAT.PCM32 => 4,
             SOUND_FORMAT.PCMFLOAT => 4,
-            _ => 2 // Default to 16-bit
+            _ => 2
         };
 
         int totalSamples = rawBytes.Length / bytesPerSample;

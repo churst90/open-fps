@@ -1,27 +1,20 @@
-using System;
 using System.Numerics;
-using System.Threading;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
 /// How much late sound each source raises where the listener stands, and from which way it comes:
-/// traced from where each source really is, energy only.
+/// traced from where each source really is, energy only, against a source at the listener's own
+/// position in the same simulation (so the ratio needs no other calibration).
 ///
-/// Why it exists. The tail of the place you stand in is ONE response, traced from your own position
-/// (TracedReverb, LateTailIr), and every source is played through it. In a room that is nearly right:
-/// a room's late field barely depends on where the sound started (its late energy arrives from
-/// everywhere, |I|/E 0.07 in flat 01F). In a tunnel or a street it is wrong. There the late energy
-/// falls along the length and comes mostly from the source's side (|I|/E 0.4-0.85), and the send's
-/// stand-in for it, the distance raised to the measured enclosure, made a car 45 m down the tunnel
-/// ring nearly as loud as one at 5 m (1.8 dB apart where the trace says 7), from all round the head
-/// (2026-09-29). Here each source is traced: its late energy against a source at the listener's own
-/// position in the same simulation (so the ratio needs nothing else to be calibrated), and the
-/// direction that energy arrives from.
+/// The tail is one response traced from the listener (TracedReverb). In a room that is nearly right
+/// (late energy from everywhere, |I|/E 0.07 in flat 01F); in a tunnel or street the late energy falls
+/// along the length and comes from the source's side (|I|/E 0.4-0.85), and without this a car 45 m
+/// down the tunnel rang 1.8 dB under one at 5 m where the trace says 7, from all round the head
+/// (2026-09-29).
 ///
-/// The rays are shot once from the listener and serve every source (as in TracedEchoes), so sixteen
-/// sources cost little more than one. Each IR is read back through a private convolution, like the
-/// listener's (TracedReverb.ExtractLate).
+/// The rays are shot once from the listener and serve every source (as in TracedEchoes); each IR is
+/// read back through a private convolution (as TracedReverb.ExtractLate).
 /// </summary>
 internal sealed class LateField : IDisposable
 {
@@ -66,7 +59,8 @@ internal sealed class LateField : IDisposable
     public int Runs;
     public double LastRunMs;
 
-    /// <param name="sampleRate">0: the mixer's (MixerQuality.MixerRate).</param>
+    /// <summary>A simulator of its own on <paramref name="context"/>, at <paramref name="sampleRate"/>
+    /// (0: MixerQuality.MixerRate).</summary>
     public LateField(IntPtr context, int sampleRate = 0)
     {
         if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;

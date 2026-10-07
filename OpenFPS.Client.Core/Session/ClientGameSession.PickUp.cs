@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace OpenFPS.Client.Core.Session;
 
 /// <summary>E and the things on the ground: which one it picks up. See <see cref="PickUp"/>.</summary>

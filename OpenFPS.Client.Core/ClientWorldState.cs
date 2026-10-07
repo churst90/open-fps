@@ -1,27 +1,22 @@
 using System.Numerics;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common;
-using System.Linq;
-using System;
-using System.Threading;
 
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Responsibility: Single source of truth for the client's world data.
-/// Manages the transition from network messages to physical simulation.
+/// The client's copy of the world: definitions, interpolated transforms, weather and the acoustic map,
+/// from the network messages, served as immutable snapshots.
 /// </summary>
 public class ClientWorldState
 {
     private readonly ConcurrentDictionary<int, EntityDefinition> _definitions = new();
     private readonly ConcurrentDictionary<int, Transform> _serverTransforms = new();
 
-    /// <summary>The interpolated transform of one entity, if the client has one. Diagnostic and test
-    /// access: the snapshot only carries entities whose definition has arrived, and whether the
-    /// INTERPOLATOR is still moving things is a separate question from that.</summary>
+    /// <summary>The interpolated transform of one entity, whether or not its definition has arrived.
+    /// Diagnostic and test access.</summary>
     public bool TryGetInterpolatedTransform(int entityId, out Transform transform)
         => _serverTransforms.TryGetValue(entityId, out transform);
     private readonly ConcurrentDictionary<int, Vector3> _serverVelocities = new();
@@ -38,32 +33,19 @@ public class ClientWorldState
     /// <summary>Fixed beacons that are not solid, such as stair markers, and named places. See IsMarker.</summary>
     private readonly ConcurrentDictionary<int, byte> _markerEntityIds = new();
 
-    // --- Snapshot Interpolation ---
     private readonly List<ServerStateUpdate> _snapshotBuffer = new();
-    private const double InterpolationDelay = 0.1; // 100ms buffer
+    private const double InterpolationDelay = 0.1;
 
     /// <summary>
-    /// How many server snapshots of history to keep.
-    ///
-    /// Ten was 333 ms at the 30 Hz tick, and playback sits 100 ms behind the newest — so there were
-    /// 233 ms of margin before the snapshot the interpolator is reading FROM got pruned out from
-    /// under it. When that happens no bracketing pair exists and every entity in the world simply
-    /// holds its position until one does, with no correction and nothing in the log. Heard from the
-    /// grandstand as some of the cars stopping in front of you for about a second and then carrying
-    /// on — "some" because a frozen car straight in front changes bearing enormously and a frozen
-    /// one on the far side of the track does not.
-    ///
-    /// Thirty is a full second of history. It is a list of references; the cost is nothing.
+    /// Server snapshots of history kept: a second at the 30 Hz tick. Ten (333 ms) left 233 ms before
+    /// the snapshot being read from was pruned, and then every entity held its place until a bracketing
+    /// pair returned, silently: heard from the grandstand as cars stopping for a second and carrying on.
     /// </summary>
     private const int SnapshotHistory = 30;
 
     /// <summary>Past this far out of step, the playback clock is snapped rather than eased — the
     /// stream stopped and restarted, and one jump beats seconds of a world that does not move.</summary>
     private const double MaxDriftBeforeSnap = 0.5;
-
-    /// <summary>Times the playback clock has run outside the buffer. Diagnostic — it should be 0.</summary>
-    public int InterpolationStalls => _interpolationStalls;
-    private int _interpolationStalls;
 
     /// <summary>When the interpolated transforms were last advanced, seconds on
     /// <see cref="OpenFPS.Common.AudioClock"/>. Copied into every snapshot built from them.</summary>
@@ -83,20 +65,12 @@ public class ClientWorldState
     public AcousticMap? AcousticMap { get; private set; }
     public Vector3 CurrentMapSize { get; private set; } = new Vector3(200, 100, 200);
 
-    // Atmospheric State
     private readonly object _envLock = new();
     private WorldEnvironmentComponent _env = new();
 
-    // --- Snapshot cache -------------------------------------------------------------------------------
-    // A snapshot is a full copy of the world: every definition, every transform, a dictionary and two lists.
-    // A frame used to build between three and six of them — the predictor asked for one, the shelter check
-    // asked for another, the proximity scan a third, the audio system a fourth — all describing the same
-    // instant. They are read-only once built, so there is no reason for more than one to exist per version
-    // of the world.
-    //
-    // Every mutation bumps _version. GetSnapshot hands back the cached copy while the version it was built
-    // at still stands, and builds a new one when it does not. The pair is stored as a single immutable
-    // object so a reader can never see a new version stamped on an old copy.
+    // A snapshot is a full copy of the world and read-only once built, so one is built per version of the
+    // world (every mutation bumps _version) and shared by everything that asks in a frame. Version and copy
+    // are one immutable object, so a reader never sees a new version stamped on an old copy.
     private sealed record CachedSnapshot(long Version, WorldSnapshot Snapshot);
     private readonly Dictionary<int, EntityState> _interpolationFrom = new();
 
@@ -124,9 +98,8 @@ public class ClientWorldState
     public long Version => Interlocked.Read(ref _version);
 
     /// <summary>
-    /// How many entities the client knows about, without building a snapshot to count them. Map load
-    /// reports progress on every definition that arrives, and asking for a snapshot to do it made the
-    /// load quadratic: a full copy of the world, per entity of the world.
+    /// How many entities the client knows about, without building a snapshot: map load reports progress
+    /// per definition, and a snapshot per definition made the load quadratic.
     /// </summary>
     public int EntityCount => _definitions.Count;
 
@@ -138,18 +111,11 @@ public class ClientWorldState
     public float CurrentRainRate { get { lock(_envLock) return _rainRate; } }
     private float _rainRate;
     private Precipitation _precipitation = Precipitation.None;
-    /// <summary>The water on this map's roads as the server last sent it (RoadWater): the texture, the
-    /// sheet and the puddles. Dry until a server sends one.</summary>
+    /// <summary>The water on this map's roads as the server last sent it: dry until one is sent.</summary>
     private readonly RoadWater _roadWater = new();
+    /// <summary>The water in a wheel path of an asphalt road (2.5 m from the crown, no kerb, no puddle),
+    /// mm: for a vehicle whose wheels the server does not send.</summary>
     private float _roadWaterMm;
-    /// <summary>The water in a wheel path of an asphalt road now, mm (RoadWater.WaterMm 2.5 m from the
-    /// crown, no kerb, no puddle): for a vehicle whose wheels the server does not send.</summary>
-    public float CurrentRoadWaterMm { get { lock (_envLock) return _roadWaterMm; } }
-    /// <summary>The road water state, for an instrument. Read under no lock: a copy is not kept.</summary>
-    public RoadWater RoadWater => _roadWater;
-    public float CurrentTemperature { get { lock(_envLock) return _env.Temperature; } }
-    public float CurrentWindGustiness { get { lock(_envLock) return _env.WindGustiness; } }
-    public Vector3 CurrentWindVelocity { get { lock(_envLock) return _env.WindVelocity; } }
 
     public void UpdateAtmosphere(WorldStateUpdate update)
     {
@@ -168,10 +134,8 @@ public class ClientWorldState
             _precipitation = new Precipitation((PrecipitationKind)Math.Clamp(update.PrecipitationKind, 0, 4),
                                                update.RainRateMmPerHour, update.RainMedianDropMm, update.HailDiameterMm);
         }
-        // The wind every tree, fire and ear on the map reads: this broadcast, reached from the last one
-        // over a second so it never lands as a step (WindWeather). The session hands it to WindField;
-        // kept here rather than written there, so a world built in a test does not blow on every
-        // other test's trees.
+        // Reached from the last broadcast over a second, never a step (WindWeather). The session hands it
+        // to WindField: kept here, so a world built in a test does not blow on every other test's trees.
         var air = WindAir.FromBroadcast(update.WindVelocity, update.WindGustiness,
                                         update.WindClock, update.WindTravelEast, update.WindTravelNorth);
         Wind = Wind.Following(air, WindField.Now());
@@ -187,12 +151,8 @@ public class ClientWorldState
     private WindWeather _wind = WindWeather.Default;
 
     /// <summary>
-    /// Applies the map's authored atmosphere the moment the manifest lands.
-    ///
-    /// The world state broadcast arrives once a second, so without this the first second in a new map
-    /// is heard through whatever the previous map's air was — or, on the first map, through the
-    /// defaults. Everything here is overwritten by the next <see cref="UpdateAtmosphere"/>; it exists
-    /// so the gap is authored rather than arbitrary.
+    /// Applies the map's authored atmosphere the moment the manifest lands, so the first second (before
+    /// the next <see cref="UpdateAtmosphere"/>) is not heard through the previous map's air.
     /// </summary>
     public void ApplyManifestAtmosphere(MapManifest manifest)
     {
@@ -206,9 +166,8 @@ public class ClientWorldState
         Touch();
     }
 
-    // A server that sends nonsense (an old build, a map authored in atmospheres, an unassigned field)
-    // must not be able to switch the acoustics off from a distance. Both guards substitute the neutral
-    // value rather than letting a zero propagate into a divisor.
+    // Nonsense from a server (an old build, a map in atmospheres, an unset field) gets the neutral value,
+    // not a zero in a divisor that switches the acoustics off.
     private static float SanePressure(float mb) => mb is > 300f and < 1100f ? mb : 1013.25f;
     private static float SaneAbsorptionMultiplier(float m) => m > 0.01f ? m : 1.0f;
 
@@ -228,8 +187,7 @@ public class ClientWorldState
         lock (_metaLock)
         {
             CurrentMapSize = size;
-            // A refresh still running for the last map is not this one's: it is thrown away when it
-            // finishes (RefreshAcousticsNow checks this).
+            // A refresh still running for the last map is thrown away when it finishes (RefreshAcousticsNow).
             _mapEpoch++;
         }
         _tiles.Clear();
@@ -258,12 +216,12 @@ public class ClientWorldState
         Touch();
     }
 
-    /// <param name="deferAcoustics">
-    /// A tile of a streamed map arriving: its rooms and doorways wait for the tile's acoustic rebuild
-    /// (<see cref="RequestAcousticRefresh"/>) instead of going on the acoustic map one at a time. One at a
-    /// time, each room copied every region table and surveyed its walls against every definition held,
-    /// on the game thread, and a room that came before its walls was found open on every side.
-    /// </param>
+    /// <summary>
+    /// A definition arrived or changed. With <paramref name="deferAcoustics"/> (a tile of a streamed map)
+    /// its rooms and doorways wait for the tile's acoustic rebuild (<see cref="RequestAcousticRefresh"/>):
+    /// one at a time, each room copied every region table and surveyed its walls on the game thread, and a
+    /// room that came before its walls was found open on every side.
+    /// </summary>
     public void RegisterDefinition(EntityDefinition def, bool deferAcoustics = false)
     {
         _definitions.TryGetValue(def.EntityId, out var before);
@@ -271,10 +229,8 @@ public class ClientWorldState
         _serverTransforms[def.EntityId] = def.Transform;
         Geometry.Note(before, def);
 
-        // A room that turned up after the map was baked — a building somebody put down while we were
-        // standing here, or the inside of a car, which is never in the bake at all because it moves.
-        // Without this the acoustic map never hears of it and stepping inside sounds like stepping
-        // nowhere.
+        // A room that arrived after the map was baked: a building put down in play, or a car's inside,
+        // never in the bake because it moves.
         if (def.Region.RoomSize.X > 0f)
         {
             if (!deferAcoustics) TrackRegion(def);
@@ -282,10 +238,8 @@ public class ClientWorldState
             _regionEntityIds[def.EntityId] = 0;
         }
 
-        // A door's aperture is not a fixed property of it, it is how far the leaf has swung. The
-        // server re-sends the definition as it moves, and this is what turns that into the opening
-        // the acoustics actually use — without it a door swings silently and nothing sounds different
-        // on the other side of it, which is the entire point of a door.
+        // A door's aperture is how far its leaf has swung; the server re-sends the definition as it moves,
+        // and this turns it into the opening the acoustics use.
         if (def.Portal.RegionAId != def.Portal.RegionBId)
         {
             if (!deferAcoustics) TrackPortal(def);
@@ -294,9 +248,8 @@ public class ClientWorldState
             else if (Holds(def.Portal.RegionAId) && Holds(def.Portal.RegionBId)) _tablesDirty = true;
         }
 
-        // Anything that makes sound on its own is processed every frame. See RunsOnItsOwn: this used
-        // to be a list of two playback modes rather than a rule, and everything outside the list was
-        // silently absent from the audio system entirely.
+        // Anything that makes sound on its own is processed every frame (RunsOnItsOwn is the rule; a list
+        // of two playback modes once left everything else silent).
         if (def.SoundEmitter.RunsOnItsOwn())
             _audioEntityIds[def.EntityId] = 0;
 
@@ -322,15 +275,12 @@ public class ClientWorldState
     /// <summary>
     /// Puts a runtime region on the acoustic map, or updates one already there.
     ///
-    /// Build-then-swap rather than mutating in place, because the region tables are read without a
-    /// lock from the audio worker and the FMOD thread while this runs on the network one, and adding
-    /// a key to a dictionary somebody else is enumerating throws. The tables are small and this
-    /// happens when a building arrives, not per frame, so a copy costs nothing worth having.
+    /// <para>Build-then-swap: the region tables are read without a lock by the audio worker and the FMOD
+    /// thread while this runs on the network thread, and adding a key to a dictionary being enumerated
+    /// throws.</para>
     ///
-    /// Deliberately NOT voxelized. The voxel grid is the fallback for entities the client cannot see
-    /// in its snapshot, and a composite's room is an entity it can always see; the exact
-    /// point-in-box test against the live transform is both cheaper and right, and it is the only one
-    /// that can be right for a room that moves.
+    /// <para>Not voxelized: the voxel grid is for regions with no entity in the snapshot, and the exact
+    /// point-in-box test is cheaper and the only one right for a room that moves.</para>
     /// </summary>
     private void TrackRegion(EntityDefinition def)
     {
@@ -343,22 +293,16 @@ public class ClientWorldState
             map.RegionPositions = new Dictionary<int, Vector3>(map.RegionPositions) { [def.EntityId] = def.Transform.Position };
             map.RegionRotations = new Dictionary<int, Quaternion>(map.RegionRotations) { [def.EntityId] = def.Transform.Rotation };
 
-            // Its open sides are openings to whatever is beyond them, as a map room's are (the bake does
-            // the same for every room it was given). Not for a room that moves: an opening is a fixed
-            // place on the map, and the inside of a car would leave its windows behind at the kerb.
+            // Its open sides are openings, as the bake makes a map room's. Not for a room that moves: an
+            // opening is a fixed place, and a car would leave its windows behind at the kerb.
             if (!def.Moves)
                 OpenFPS.Common.Systems.AcousticVolumeGenerator.AddFaceOpenings(map, _definitions.Values, new[] { def.EntityId });
         }
     }
 
     /// <summary>
-    /// Puts a portal on the acoustic map, or moves the one already there.
-    ///
-    /// A shut door has no aperture and is therefore not an opening at all, so it comes straight back
-    /// off — which is right, and is the same thing the map bake does with an aperture of zero.
-    ///
-    /// Build-then-swap for the same reason as the regions: these tables are walked without a lock
-    /// from the audio worker while this runs on the network thread.
+    /// Puts a portal on the acoustic map, or moves the one already there. A shut door (aperture zero) is
+    /// not an opening and comes off, as in the map bake. Build-then-swap, as for the regions.
     /// </summary>
     private void TrackPortal(EntityDefinition def)
     {
@@ -440,11 +384,9 @@ public class ClientWorldState
     }
 
     /// <summary>
-    /// Purges entities the server says are gone (destroyed, or out of our area of interest).
-    /// Everything else about an entity is additive — a definition arrives and stays — so without this
-    /// a disconnected player's body remains forever: still colliding, still announced by scans, still
-    /// emitting whatever sound it carried. Returns the ids that were actually being tracked, so the
-    /// caller can stop their voices.
+    /// Purges entities the server says are gone (destroyed, or out of the area of interest); without it a
+    /// definition stays for ever, colliding and sounding. Returns the ids that were tracked, so the caller
+    /// can stop their voices.
     /// </summary>
     public List<int> RemoveEntities(IEnumerable<int> entityIds)
     {
@@ -480,18 +422,11 @@ public class ClientWorldState
     }
 
     /// <summary>
-    /// Takes one world-state packet into the interpolation buffer, MERGING it with any packet
-    /// already held for the same tick.
-    ///
-    /// A tick's world state is not always one packet. LiteNetLib will not fragment an unreliable
-    /// send, so past the peer's limit the server splits a tick across several packets that all carry
-    /// the same Tick — see NetworkService.SendStateUpdate. Filing those as separate snapshots would
-    /// be worse than the problem it solves: the interpolator brackets the playback time between two
-    /// buffered snapshots and divides by the time between them, so two entries with the SAME tick is
-    /// a zero denominator, and each of them holds only half the world anyway.
-    ///
-    /// Merging by entity id rather than appending, so a retransmitted or duplicated state replaces
-    /// rather than doubling.
+    /// Takes one world-state packet into the interpolation buffer, merged by entity id with any packet
+    /// held for the same tick. LiteNetLib will not fragment an unreliable send, so the server splits a
+    /// big tick across packets with one Tick (NetworkService.SendStateUpdate); two entries for one tick
+    /// would be a zero denominator in the interpolation, each holding half the world. By id, so a
+    /// duplicated state replaces rather than doubles.
     /// </summary>
     public void SyncState(ServerStateUpdate update)
     {
@@ -514,14 +449,14 @@ public class ClientWorldState
             }
 
             _snapshotBuffer.Add(update);
-            while (_snapshotBuffer.Count > SnapshotHistory) _snapshotBuffer.RemoveAt(0); // Prune old history
+            while (_snapshotBuffer.Count > SnapshotHistory) _snapshotBuffer.RemoveAt(0);
             _snapshotBuffer.Sort((a, b) => a.Tick.CompareTo(b.Tick));
         }
     }
 
     /// <summary>
-    /// Smooths remote entities by lerping between buffered server snapshots.
-    /// Called once per game loop.
+    /// Moves remote entities between the buffered server snapshots, <see cref="InterpolationDelay"/>
+    /// behind the newest. Once per game loop.
     /// </summary>
     public void UpdateInterpolation(float dt, int localPlayerId)
     {
@@ -530,31 +465,19 @@ public class ClientWorldState
         bool moved = false;
         lock (_snapshotBuffer)
         {
-            // 1. Determine the 'Playback Time' (current server tick we want to show)
-            // We lag behind the latest received tick by InterpolationDelay seconds.
             double latestServerTime = _snapshotBuffer.Last().Tick * PhysicsConstants.FixedDeltaTime;
             double oldestServerTime = _snapshotBuffer[0].Tick * PhysicsConstants.FixedDeltaTime;
             double target = latestServerTime - InterpolationDelay;
             if (_clientInterpolationTime == 0) _clientInterpolationTime = target;
 
-            // ── Keep the playback clock ON the server's clock ────────────────────────────────
-            //
-            // It used to be set once and then advanced by the CLIENT's own dt for ever, which makes
-            // it an independent clock: two crystals, two frame-rate regimes, no correction anywhere.
-            // They drift, and when the drift exceeds the buffer the bracket search below finds no
-            // pair, every entity freezes where it stands, and nothing says so. Minutes in, that is
-            // what "some of the cars stop in front of me, then keep going" was.
-            //
-            // Corrected by RATE, not by jumping: playback runs up to 10 % fast or slow to close the
-            // gap. Setting the time directly would move every entity in the world at once, which is
-            // the very artefact this is here to avoid. A gap too big for that to fix in reasonable
-            // time is not drift, it is a stall — a stream that stopped and restarted — and there one
-            // jump now beats several seconds of a frozen world.
+            // The playback clock follows the server's. Advanced by the client's dt alone it drifted, and
+            // past the buffer every entity froze, silently ("some of the cars stop in front of me, then
+            // keep going"). Corrected by rate, up to 10 % either way: a jump moves the whole world at
+            // once. Only a gap past MaxDriftBeforeSnap, a stalled stream, is jumped.
             double error = target - _clientInterpolationTime;
             if (Math.Abs(error) > MaxDriftBeforeSnap)
             {
                 _clientInterpolationTime = target;
-                _interpolationStalls++;
                 Serilog.Log.Debug("Interpolation clock resynchronised: {Error:F2} s out, {Count} snapshot(s) buffered.",
                                   error, _snapshotBuffer.Count);
             }
@@ -563,11 +486,10 @@ public class ClientWorldState
                 _clientInterpolationTime += dt * Math.Clamp(1.0 + error * 2.0, 0.9, 1.1);
             }
 
-            // And never outside what the buffer can actually serve, whatever the arithmetic above did.
+            // Never outside what the buffer can serve.
             if (_clientInterpolationTime > latestServerTime) _clientInterpolationTime = latestServerTime;
             if (_clientInterpolationTime < oldestServerTime) _clientInterpolationTime = oldestServerTime;
 
-            // 2. Find the two snapshots that bracket our playback time
             ServerStateUpdate? from = null;
             ServerStateUpdate? to = null;
 
@@ -590,34 +512,28 @@ public class ClientWorldState
                 double t1 = to.Tick * PhysicsConstants.FixedDeltaTime;
                 float alpha = (float)((_clientInterpolationTime - t0) / (t1 - t0));
 
-                // Index the 'from' states once. The inner FirstOrDefault this replaces made the whole
-                // interpolation quadratic in the entity count and allocated a lambda closure per entity,
-                // every frame, for a lookup a dictionary answers in one step.
+                // Indexed once: a search per entity was quadratic in the entity count, every frame.
                 _interpolationFrom.Clear();
                 foreach (var stateFrom in from.States) _interpolationFrom[stateFrom.EntityId] = stateFrom;
 
                 if (from.Tick != _heldThrough) moved |= HoldThrough(from, to, localPlayerId);
 
-                // 3. Perform Linear Interpolation for all dynamic entities
                 foreach (var stateTo in to.States)
                 {
-                    if (stateTo.EntityId == localPlayerId) continue; // Skip ourselves (handled by CSP)
+                    if (stateTo.EntityId == localPlayerId) continue; // predicted, not interpolated
                     moved = true;
 
-                    // Where it was at 'from'. Not in that snapshot is not the same as unknown: the server
-                    // leaves out anything that has not moved (RestingStates), so a car pulling away from
-                    // the kerb is in 'to' and was last mentioned some ticks ago, resting where it still
-                    // was at 'from'. Snapping it to 'to' would move it a tick early, every time anything
-                    // set off.
+                    // Missing from 'from' is not unknown: the server leaves out what has not moved
+                    // (RestingStates), so a car pulling away was resting where it was held. Snapping it
+                    // to 'to' would move it a tick early every time anything set off.
                     double fromTime = t0;
                     bool haveFrom = _interpolationFrom.TryGetValue(stateTo.EntityId, out var stateFrom) && stateFrom.EntityId != 0;
                     if (!haveFrom && _held.TryGetValue(stateTo.EntityId, out var held))
                     {
                         stateFrom = held.State;
                         haveFrom = true;
-                        // Something that was moving when it was last heard of, though, is missing from
-                        // 'from' because that packet was lost, not because it stopped: it has been
-                        // travelling since, so it goes from where it was then.
+                        // One moving when last heard of is missing because a packet was lost: it goes from
+                        // where and when it was then.
                         if (held.State.LinearVelocity.LengthSquared() > RestingSpeedSquared)
                             fromTime = held.Tick * PhysicsConstants.FixedDeltaTime;
                     }
@@ -652,13 +568,8 @@ public class ClientWorldState
             }
         }
 
-        // Only a frame that actually moved something invalidates the snapshot. A frame that found no
-        // bracketing pair changed nothing, and rebuilding a copy of an unchanged world is the exact cost
-        // this cache exists to remove.
-        //
-        // The stamp goes on at the same moment, and only when something moved, because it is an answer
-        // to "how old is this position" and a frame that produced no new position did not make the old
-        // one any younger. Everything downstream — dead reckoning most of all — measures from here.
+        // Only a frame that moved something invalidates the snapshot and stamps the positions: the stamp
+        // says how old a position is, and dead reckoning downstream measures from it.
         if (moved)
         {
             _positionsSampledAt = OpenFPS.Common.AudioClock.Now;
@@ -667,15 +578,13 @@ public class ClientWorldState
     }
 
     /// <summary>
-    /// Brings the held states up to the 'from' snapshot, and puts down exactly where it rests anything
-    /// that is not in 'to'. Run once each time playback moves into a new pair of snapshots.
+    /// Brings the held states up to the 'from' snapshot, and puts anything not in 'to' exactly where it
+    /// rests. Once each time playback moves into a new pair.
     ///
-    /// The server sends a moving thing every tick and a resting one hardly at all: a few repeats as it
-    /// stops, then once a second (RestingStates). So a snapshot no longer lists the whole world, and
-    /// what a snapshot does not mention has to stay where it was last put — not freeze wherever the
-    /// interpolation happened to have got to between two ticks, a few centimetres short of where it
-    /// stopped. Every snapshot played through is folded in, including any a slow frame skipped over, so
-    /// a resting state is never missed because the frame that would have read it never came.
+    /// <para>The server sends a resting thing only a few times as it stops, then once a second
+    /// (RestingStates), so what a snapshot leaves out stays where it was last put, not a few centimetres
+    /// short where the interpolation had got to. Every snapshot played through is folded in, including
+    /// any a slow frame skipped.</para>
     /// </summary>
     private bool HoldThrough(ServerStateUpdate from, ServerStateUpdate to, int localPlayerId)
     {
@@ -730,12 +639,8 @@ public class ClientWorldState
     }
 
     /// <summary>
-    /// The world as the simulation and audio threads read it: one immutable copy per version of the world.
-    ///
-    /// Everything that consumes a snapshot within a frame — prediction, the shelter raycast, the proximity
-    /// scan, the audio system, the acoustic worker — now shares the same object rather than each paying to
-    /// rebuild it. The copy is never mutated after it is built, which is what makes sharing it across
-    /// threads safe; a change to the world produces a NEW copy, it never edits the one already handed out.
+    /// The world as the simulation and audio threads read it: one immutable copy per version, shared by
+    /// everything in a frame. Never mutated once built, which is what makes sharing it across threads safe.
     /// </summary>
     public WorldSnapshot GetSnapshot()
     {
@@ -752,8 +657,8 @@ public class ClientWorldState
             if (cached != null && cached.Version == version) return cached.Snapshot;
 
             var built = BuildSnapshot();
-            // Stamped with the version read BEFORE the build. A mutation that lands mid-build leaves
-            // _version ahead of the stamp, so the next caller rebuilds — stale data is never labelled fresh.
+            // Stamped with the version read before the build: a mutation mid-build leaves _version ahead,
+            // so stale data is never labelled fresh.
             _cached = new CachedSnapshot(version, built);
             Interlocked.Increment(ref _snapshotBuilds);
             PerfProbe.Count("client.snapshot.build");
@@ -837,18 +742,17 @@ public class ClientWorldState
             yield return (kv.Value, _serverTransforms.GetValueOrDefault(kv.Key, kv.Value.Transform));
     }
 
-    /// <summary>A fixed thing nothing can bump into, in neither the static grid nor the moving things,
-    /// that something looks for near you: a beacon such as a stair marker, or a named place such as a
-    /// flight or a landing (<see cref="NamedPlaces"/>). Each consumer takes its own kind from the list.</summary>
+    /// <summary>A fixed thing nothing can bump into (so in neither the static grid nor the moving things)
+    /// that something looks for near you: a beacon such as a stair marker, or a named place
+    /// (<see cref="NamedPlaces"/>).</summary>
     internal static bool IsMarker(EntityDefinition def)
         => def.Type == EntityType.StaticObject && !def.Moves && !def.Collider.IsSolid
            && (!string.IsNullOrEmpty(def.Identity.BeaconCategory) || NamedPlaces.Is(def));
 
     /// <summary>
-    /// The static collision grid, made again from the definitions, into a NEW grid that replaces the old.
-    /// It used to be cleared and refilled in place, and the grid is the one every snapshot hands out: the
-    /// acoustic worker and the audio thread, walking the snapshot they hold, could find it half empty.
-    /// On a streamed map that happens each time a tile arrives or leaves, not once per map.
+    /// The static collision grid, made again into a new grid that replaces the old. Never refill it in
+    /// place: every snapshot hands it out, and the acoustic worker and the audio thread found it half
+    /// empty (on a streamed map, at every tile).
     /// </summary>
     private void RebuildGrid()
     {
@@ -873,15 +777,12 @@ public class ClientWorldState
     /// <summary>Times the static grid has been made again. Diagnostic.</summary>
     public int GridRebuilds { get; private set; }
 
-    // ── A map streamed in tiles ─────────────────────────────────────────────────────────────────────
+    // ── A map streamed in tiles (docs/WORLD_STREAMING.md) ───────────────────────────────────────────
     //
-    // The server sends the tiles near the player and takes away the ones left behind (TileStreamer;
-    // docs/WORLD_STREAMING.md). Each arrival or departure is said by a TileStreamUpdate after its
-    // definitions or removals, and the acoustic map is then made again from what is held, on a niced
-    // thread, and its tables swapped into the map object in use. The object itself is kept: the mixer
-    // drops every reverb bus when the map object changes (FmodAudioProvider.SetAcousticMap), and region
-    // ids are entity ids, so a room that stays loaded keeps its id and its bus. The swap bumps
-    // GeometryVersion, which tells the acoustic worker to rebuild its Steam Audio scene in the background.
+    // After each TileStreamUpdate the acoustic map is made again from what is held, on a niced thread,
+    // and its tables swapped into the map object in use. Keep the object: the mixer drops every reverb
+    // bus when it changes (FmodAudioProvider.SetAcousticMap), while a room that stays loaded keeps its id
+    // and bus. The swap bumps GeometryVersion, and the acoustic worker rebuilds its Steam Audio scene.
 
     private readonly ConcurrentDictionary<TileKey, TileDetail> _tiles = new();
     private Vector3 _acousticMin;
@@ -890,9 +791,8 @@ public class ClientWorldState
     private long _geometryVersion;
     private int _refreshRunning;
     private volatile bool _refreshAgain;
-    /// <summary>A room or a doorway arrived with a tile, or a room left: the acoustic tables need making
-    /// again. A tile of only walls and roads (the coarse ring, as the player moves) changes the Steam Audio
-    /// scene and nothing else, and is answered by a new GeometryVersion alone.</summary>
+    /// <summary>A room or a doorway arrived, or a room left: the acoustic tables need making again. A tile
+    /// of only walls and roads changes the Steam Audio scene alone: a new GeometryVersion answers it.</summary>
     private volatile bool _tablesDirty;
 
     /// <summary>The side of the tiles this map streams in, metres; 0 for a map sent whole.</summary>
@@ -904,10 +804,11 @@ public class ClientWorldState
     /// <summary>Bumped each time a refresh swaps new tables into the acoustic map. See WorldSnapshot.GeometryVersion.</summary>
     public long GeometryVersion => Interlocked.Read(ref _geometryVersion);
 
-    /// <summary>Refreshes finished, and how long the last one took, milliseconds. Diagnostic.</summary>
+    /// <summary>Refreshes finished. Diagnostic.</summary>
     public int AcousticRefreshes { get; private set; }
     /// <summary>Tile changes that moved only walls and roads: a new GeometryVersion, no rebuild.</summary>
     public int GeometryOnlyChanges { get; private set; }
+    /// <summary>How long the last refresh took, milliseconds.</summary>
     public double LastAcousticRefreshMs { get; private set; }
 
     /// <summary>Runs a refresh off the calling thread. The game uses a niced thread of its own
@@ -937,9 +838,8 @@ public class ClientWorldState
     }
 
     /// <summary>
-    /// The acoustic map for a set of definitions. On a streamed map, doorways into rooms that are not
-    /// held (a door on the edge of what is loaded, whose room is in the next tile) are left out: there is
-    /// nothing on the far side of them to hear into.
+    /// The acoustic map for a set of definitions. On a streamed map, doorways into rooms not held (the
+    /// room is in the next tile) are left out: there is nothing on the far side to hear into.
     /// </summary>
     public static AcousticMap BuildAcousticMap(IEnumerable<EntityDefinition> definitions, Vector3 mapSize, Vector3 min,
                                                float voxelResolution, float occlusionFloor, bool streamed, bool report)
@@ -974,8 +874,7 @@ public class ClientWorldState
     {
         if (!_tablesDirty && !AcousticRefreshPending)
         {
-            // Walls and roads only: the scene follows (the worker rebuilds it in the background), the
-            // rooms and openings are as they were.
+            // Walls and roads only: the worker rebuilds the scene; rooms and openings are unchanged.
             Interlocked.Increment(ref _geometryVersion);
             GeometryOnlyChanges++;
             Touch();
@@ -1034,8 +933,7 @@ public class ClientWorldState
         {
             if (!ReferenceEquals(AcousticMap, live) || epoch != _mapEpoch) return false;
             Reconcile(built);
-            // The voxel grid and the tables, each replaced whole: everything reading them takes the
-            // dictionary it found and walks that, as with TrackRegion's build-then-swap.
+            // Each replaced whole: readers walk the dictionary they found (TrackRegion's build-then-swap).
             live.VoxelGrid = built.VoxelGrid;
             live.Regions = built.Regions;
             live.RegionPositions = built.RegionPositions;
@@ -1090,12 +988,10 @@ public class ClientWorldState
         }
     }
 
-
     // ── Woods heard as one ──────────────────────────────────────────────────────────────────────
     //
-    // A wood's trees past the hand-over distance are one source (WoodChorus). Each wood is an entity of
-    // the client's own, never the server's: a definition with a synthetic id below WoodChorus.FirstId,
-    // made from the crowns held, so the audio system ranks, places and voices it as it does a tree.
+    // A wood's trees past the hand-over distance are one source (WoodChorus): an entity of the client's
+    // own, with a synthetic id below WoodChorus.FirstId, so the audio system voices it as it does a tree.
 
     private WoodChorus? _woods;
     /// <summary>The tree crowns held, and whether they changed since the woods were last made.</summary>
@@ -1150,7 +1046,7 @@ public class ClientWorldState
             };
             def.Identity.Name = "Woods";
             def.Material.Material = "Foliage";
-            // The trees' own emitter, as the wood's: the same mode and running state, its own key and reach.
+            // The trees' emitter, with the wood's own key and reach.
             var em = sample!.SoundEmitter;
             em.SoundId = w.Key;
             em.Range = w.RangeMetres;
@@ -1170,6 +1066,7 @@ public class ClientWorldState
         return gone;
     }
 
+    /// <summary>The nearest entity within 3 m that is not a player or a wood.</summary>
     public int? GetClosestEntityId(Vector3 pos)
     {
         int? bestId = null;

@@ -1,28 +1,18 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// The place you are standing in, measured: an impulse response traced through the map's real
-/// geometry from the listener's own position, a few times a second, for everything outdoors to be
-/// played through (TracedReverbDsp). Steam Audio's "listener-centric reverb".
+/// The place you are standing in, measured: an impulse response traced through the map's geometry and
+/// materials from the listener's own position a few times a second, played through TracedReverbDsp
+/// (Steam Audio's "listener-centric reverb"). A street's tail is flutter between facades, scatter and
+/// energy lost to the sky, not an algorithmic room's smooth tail; this stands for the copies of copies
+/// nobody can voice one by one.
 ///
-/// Why it exists. An algorithmic room reverb with its decay set from a ray survey is a statistical
-/// ROOM tail, dense and smooth from the first milliseconds. A street is not that: its tail is the
-/// flutter between two facades, scatter off windows and cars, and most of the energy leaving through
-/// the open sky. Reverb should fall out of the physics; what is needed is not an algorithm but
-/// something to stand for the thousands of copies of copies nobody can voice one by one. This is
-/// that, measured: rays from the listener, bouncing off the scene's own materials
-/// (absorption and scattering per band), collected back into a two-second first-order ambisonic IR.
-///
-/// One simulation for everything, because the tracing is the cost. The approximation is Steam
-/// Audio's own: every sound is reverberated as if it were where the listener is. The late field of a
-/// place barely depends on where in it the source stands; the early echoes do, and those are voiced
-/// separately and exactly (EngineReflections, EarlyReflections' flutter).
+/// One simulation for everything, because tracing is the cost: every sound is reverberated as if it
+/// were where the listener is. The late field barely depends on where the source stands; the early
+/// echoes do, and are voiced separately (EngineReflections, EarlyReflections, TracedEchoes).
 /// </summary>
 internal sealed class TracedReverb : IDisposable
 {
@@ -30,12 +20,10 @@ internal sealed class TracedReverb : IDisposable
     public static volatile TracedReverb? Current;
 
     /// <summary>
-    /// The block the traced response is convolved in, samples. The convolution answers one block
-    /// late, so this IS the room's pre-delay: at the mixer's 1,024 the first reflection of every room,
-    /// a hatchback's cabin included, comes 20-23 ms after the sound, and a room answers as a separate
-    /// space off to one side instead of the one you stand in, the reflections not centred on you.
-    /// At 256 it is 5-6 ms. The mixer's block is run
-    /// through in pieces of this size (TracedReverbDsp).
+    /// The block the traced response is convolved in, samples. The convolution answers one block late,
+    /// so this is the room's pre-delay: at the mixer's 1,024 every room's first reflection, a cabin's
+    /// included, came 20-23 ms late and the room sounded like a separate space to one side; at 256 it is
+    /// 5-6 ms. The mixer's block is run through in pieces of this size (TracedReverbDsp).
     /// </summary>
     public const int TracedFrame = 256;
 
@@ -63,11 +51,9 @@ internal sealed class TracedReverb : IDisposable
     private IntPtr _simulator, _source;
     /// <summary>
     /// One source per stage that plays this trace, all at the same point. A Steam Audio IR update is
-    /// taken by the FIRST effect that reads it after the trace (measured, --traced-echoes: a second
-    /// effect on the same IR stayed silent), and every outdoor bus played the listener's trace through
-    /// its own effect — so one bus had the street and the others a stale IR or none, and a car's
-    /// reverberation came and went as it crossed from one region's bus to another's: the reflections
-    /// "cutting out". Each reader has its own source, and its own copy of every trace.
+    /// taken by the first effect that reads it after the trace (--traced-echoes: a second effect stayed
+    /// silent), so with one source a car's reverberation came and went as it crossed from one region's
+    /// bus to another's, the reflections "cutting out".
     /// </summary>
     public const int MaxReaders = 24;
     private readonly IntPtr[] _readers = new IntPtr[MaxReaders];
@@ -83,12 +69,10 @@ internal sealed class TracedReverb : IDisposable
     public double LastRunMs;
 
     /// <summary>
-    /// Read the traced IR back after every trace and publish its late part (<see cref="Late"/>) for
-    /// the tail of the place you stand in: measured as energy, averaged over traces and played through
-    /// fixed noise (SmoothTail). The SDK keeps the IR opaque, so an impulse is
-    /// pushed through a private convolution on this thread, on a reader of its own
-    /// (<see cref="ExtractReader"/>): a trace update goes to the first effect that reads it, and the
-    /// mixer's stages must not lose theirs. Set before <see cref="SetScene"/>.
+    /// Read the traced IR back after every trace and publish the tail of the place you stand in
+    /// (<see cref="Late"/>, through SmoothTail). The SDK keeps the IR opaque, so an impulse is pushed
+    /// through a private convolution on this thread, on a reader of its own (<see cref="ExtractReader"/>)
+    /// so the mixer's stages do not lose their update. Set before <see cref="SetScene"/>.
     /// </summary>
     public bool ExtractLate;
     /// <summary>The late part to play, time zero at the direct sound, from the traces' averaged energy
@@ -96,8 +80,9 @@ internal sealed class TracedReverb : IDisposable
     public volatile LateTailIr? Late;
     /// <summary>The last trace's omnidirectional channel as read back, whole and unwindowed: for the lab.</summary>
     public volatile float[]? LastReadBack;
-    /// <summary>The tail's directional part (SdmTailIr), from the fade-in to ~0.3 s; <see cref="Late"/>
-    /// is then only the diffuse remainder after it. Until the axes are known, Late is all of it.</summary>
+    /// <summary>The tail's directional part (SdmTailIr), from the first reflection to 0.25-0.35 s;
+    /// <see cref="Late"/> is then only the remainder after it. Until the axes are known, Late is all of
+    /// it.</summary>
     public volatile SdmTailIr? LateSdm;
     /// <summary>The late part after the directional one as a field, one independent noise per
     /// direction (DiffuseLate), from the traces' averaged energy. Null without directions or with
@@ -106,11 +91,8 @@ internal sealed class TracedReverb : IDisposable
     private System.Numerics.Vector3 _ax1, _ax2, _ax3;
     private bool _axesKnown;
 
-    /// <summary>
-    /// The trace's tail as energy, averaged over traces and played through fixed noise (SmoothTail).
-    /// Played as each trace's own samples, the tail's directions were re-split four times a second
-    /// from a noisy estimate: a wavy, stepping tail. Made on the first read-back.
-    /// </summary>
+    /// <summary>The trace's tail as energy, averaged over traces (SmoothTail). Made on the first
+    /// read-back.</summary>
     private SmoothTail? _smooth;
     /// <summary>The lab's A/B: play each trace's own samples, as before SmoothTail. Never set in the game.</summary>
     public static bool RawTail;
@@ -149,15 +131,12 @@ internal sealed class TracedReverb : IDisposable
 
     // ── Where the remainder arrives from ─────────────────────────────────────────────────────────
     //
-    // Averaged over a stretch of the trace, W times each channel is the coefficient of the ENERGY
-    // arriving from each direction, expanded in the same spherical harmonics (for arrivals that do not
-    // interfere, the cross terms average out). At first order that is the intensity, and from the
-    // middle of a corridor the two ends cancel in it; at second order they add. So the remainder's
-    // distribution is rebuilt from all nine: f(u) = 1 + sum_c (<W ch_c> / <W W>) g_c(u) / <g_c^2>,
-    // with g_c(u) each channel's gain for a sound from u and <g_c^2> its mean over the sphere, both
-    // measured through Steam Audio's own encoder. Tried first, and wrong: a direction per sample, as
-    // the early part uses — in a 60 m corridor it put 25 % of the late energy along the axis, less
-    // than an even spread, because opposed arrivals cancel in it.
+    // Averaged over a stretch of the trace, W times each channel is the coefficient of the energy
+    // arriving from each direction in the same spherical harmonics. At first order (the intensity) a
+    // corridor's two ends cancel; at second order they add. So the remainder is rebuilt from all nine:
+    // f(u) = 1 + sum_c (<W ch_c> / <W W>) g_c(u) / <g_c^2>, g_c(u) each channel's gain from u and <g_c^2>
+    // its mean over the sphere, both measured through Steam Audio's encoder. A direction per sample, as
+    // the early part uses, put 25 % of a 60 m corridor's late energy along its axis, less than even.
     private readonly double[] _lateCov = new double[Channels];
     private float[,]? _dirGains;          // [direction, channel]
     private float[]? _chanPower;          // mean g_c^2 over the sphere
@@ -230,9 +209,11 @@ internal sealed class TracedReverb : IDisposable
     private Phonon.IPLAudioBuffer _extractIn, _extractOut;
     private float[] _extractMono = Array.Empty<float>(), _extractInter = Array.Empty<float>();
 
+    /// <param name="context">The Steam Audio context; the tracer makes a simulator of its own.</param>
+    /// <param name="sampleRate">0: the mixer's (MixerQuality.MixerRate).</param>
+    /// <param name="frameSize">The convolution's block (<see cref="TracedFrame"/>).</param>
     /// <param name="refreshMs">How often the trace is redone: a quarter second for the listener,
     /// who walks; a second for a room traced from its middle, which does not move.</param>
-    /// <param name="sampleRate">0: the mixer's (MixerQuality.MixerRate).</param>
     public TracedReverb(IntPtr context, int sampleRate = 0, int frameSize = TracedFrame, int refreshMs = DefaultRefreshMs)
     {
         if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
@@ -314,13 +295,9 @@ internal sealed class TracedReverb : IDisposable
         }
     }
 
-    /// <summary>Where the listener is. Game or worker thread.
-    ///
-    /// Under its OWN lock, never the tracer's: the trace holds that one for the whole run, and in a
-    /// big hard hall a run takes hundreds of milliseconds. The game thread calls this every frame,
-    /// so it would wait out each trace — in the airport terminal every sound would stand still for
-    /// 680 ms at a time, the game loop run at 8 Hz, footsteps and claps come late or not at all and
-    /// the reverb step.</summary>
+    /// <summary>Where the listener is. Game or worker thread, under its own lock, never the tracer's:
+    /// a trace holds that for hundreds of milliseconds in a hard hall, and every frame waiting on it
+    /// stalled every sound 680 ms at a time in the airport terminal.</summary>
     public void SetListener(Vector3 at) { lock (_listenerGate) _listener = at; }
 
     /// <summary>Where the listener is and the region they are in. A new region starts the averaged
@@ -378,7 +355,7 @@ internal sealed class TracedReverb : IDisposable
                         _sceneChanged = false;
                         if (RawTail || KeepRaw)
                         {
-                            // Each trace's own samples, as they were played before SmoothTail.
+                            // Each trace's own samples (the lab's raw tail).
                             SdmTailIr? rawSdm = null;
                             LateTailIr rawLate;
                             if (dirs != null)
@@ -537,26 +514,23 @@ internal static class TracedReverbSet
     /// <summary>At most this many rooms traced besides the listener's; the mixer only ever hears four.</summary>
     private const int MaxRooms = 6;
 
-    /// <summary>The worker, once its scene is built (and again after every rebuild).</summary>
-    /// <param name="listenerScene">The scene the listener's own trace uses: the same geometry without
-    /// its open ground (SteamAudioScene.WithoutOpenGround). Null uses <paramref name="scene"/>.</param>
+    /// <summary>The worker hands over its <paramref name="context"/> and <paramref name="scene"/> once
+    /// built and after every rebuild. <paramref name="listenerScene"/> is the same geometry without its
+    /// open ground (SteamAudioScene.WithoutOpenGround), for the listener's trace; null uses
+    /// <paramref name="scene"/>.</summary>
     public static void Configure(IntPtr context, SteamAudioScene scene, SteamAudioScene? listenerScene = null)
     {
-        // The tracers are handed the scene OUTSIDE the gate: each one's SetScene waits for its own
-        // trace to finish, and a late-field run holds that for hundreds of milliseconds. Under the
-        // gate, the game thread and the mixer — which take it for Listener, Echoes, LateField and
-        // Cabin every frame — waited with it: a door swinging within 50 m froze every sound for up to
-        // a second at a time (477 rebuilds in one session on 2026-09-30).
+        // The tracers are handed the scene outside the gate: each SetScene waits for its own trace, and
+        // under the gate the game thread and the mixer (Listener, Echoes, LateField, Cabin every frame)
+        // waited too: a door swinging within 50 m froze every sound for up to a second (2026-09-30).
         TracedReverb listener; TracedEchoes echoes; LateField late; List<TracedReverb> rooms;
         lock (Gate)
         {
             _context = context; _scene = scene;
             listener = _listener ??= new TracedReverb(context) { ExtractLate = true };
-            // The few sources traced from where they are (TracedEchoes), on the scene WITHOUT its open
-            // ground, as the listener's trace is. Every voice already carries its own ground bounce
-            // (GroundReflection); traced over the ground as well, a car at 30 m has that bounce twice,
-            // the second at about the direct level and under a millisecond late — a comb that takes
-            // twenty decibels of trim to hide.
+            // On the scene without its open ground too: every voice carries its own ground bounce
+            // (GroundReflection), and traced again a car at 30 m had it twice, a comb under a millisecond
+            // late at about the direct level.
             echoes = _echoes ??= new TracedEchoes(context);
             // Each source's own late energy and its direction, on the listener's scene (LateField).
             late = _late ??= new LateField(context);
@@ -619,11 +593,10 @@ internal static class TracedReverbSet
 
     // ── The vehicle you are riding in ────────────────────────────────────────────────────────
     //
-    // Inside a vehicle the room is its cabin, heard by reflections like any other room. A vehicle moves, so it is not in the map's traced scene — traced from a bus seat, the world
-    // scene answers with the street outside. But from inside, the cabin does not move relative to
-    // you: it is traced as a scene of its own, in the vehicle's frame, from the same geometry the
-    // server builds the shell from (VehicleCabin) — its floor, its steel below the waist and glass
-    // above, its length.
+    // Inside a vehicle the room is its cabin. A vehicle moves, so it is not in the map's traced scene
+    // (from a bus seat the world scene answers with the street), but it does not move relative to you:
+    // it is traced as a scene of its own in the vehicle's frame, from the shell the server builds
+    // (VehicleCabin).
     private static string? _cabinPreset;
     private static SteamAudioScene? _cabinScene;
     private static TracedReverb? _cabin;

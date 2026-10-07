@@ -1,51 +1,17 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// What the client says about stairs: "Stairs up, 17 steps, to floor 3" when you reach the foot of a
-/// flight facing up it, and whether you are on a flight at all.
-///
-/// Everything it knows comes from the map. Each end of a flight is a stair marker the map put on the
-/// landing (prefabs/stair_marker.json): standing <see cref="MarkerHeightMetres"/> above the floor a
-/// step back from the end riser, turned to face the way you walk to take the flight from there, and
-/// named with the line to say. Nothing here works out where a flight is from the geometry.
-///
-/// <b>Said once per arrival, and never about the flight you came by.</b> Reaching a marker facing
-/// along it says its line, once. It is not said again while you stay on that landing — standing,
-/// turning about, stepping sideways to the flight beside it and back, walking off across the floor
-/// and returning — only once you have been somewhere else: another place (zone), another floor, or
-/// well away across a big one (<see cref="LeaveMetres"/>). And while your feet are on a flight both
-/// its ends go quiet, so stepping off at the top or the bottom says nothing about the flight you have
-/// just walked: you know where it goes.
-///
-/// That replaced a rule of reach and leave radii a metre and a half apart (Cody, 2026-10-04: "I hear
-/// indicators repeating several times"). On a landing the top of one flight and the foot of the next
-/// stand side by side facing the same way, so a sidestep from one lane to the other left the one and
-/// reached the other, and "Stairs up, Stairs down, Stairs up" came out of shuffling on one spot; any
-/// two-metre walk away and back said it again, nine times in three minutes; and arriving off a flight
-/// walking backwards — facing up it — announced the flight just walked down.
-///
-/// <b>On a flight.</b> Where the map names its flights and landings (NamedPlaces) the flight is a zone
-/// of its own, "Marlow Tower stairs, floor 2 to 3", and the landing at its end another. Where it does
-/// not, a storey's zone stops at its ceiling and the next one starts at its floor, so at eye height
-/// the name would change about halfway up the stairs; the zone announcer holds a ROOM's name while
-/// <see cref="OnFlight"/> is true and says where you are when you step off.
-///
-/// <b>The cue speaks for the stairs.</b> Walking up to a flight facing it, the cue is said half a
-/// metre before the first riser, and stepping onto the flight a moment later is stepping into its
-/// zone; the landing you crossed to reach it is a zone too. Both lines would come together, and the
-/// cue says more — which way, how many steps, to where — so a flight's or a landing's name is not
-/// said when the cue has just been, or when the flight is one whose end the cue told you about
-/// (<see cref="CoversZone"/>, <see cref="FlightAnnounced"/>). The zone is said when the cue was not:
-/// stepping onto the stairs from the side, or backwards, or arriving on a landing off a flight.
-///
-/// <b>One beacon a floor.</b> The stairs beacon blips from the foot of every floor's flight up and,
-/// on the roof, from the top of the flight down (<see cref="FloorBeacons"/>): each floor's stairs can
-/// be found by ear, and a landing where two flights meet blips once, not twice.
+/// What the client says about stairs ("Stairs up, 17 steps, to floor 3" at the foot of a flight, facing
+/// up it) and whether you are on a flight, all from the map's stair markers (prefabs/stair_marker.json).
+/// A line is said once per arrival and never about the flight you came by: a marker stays quiet until
+/// you have been to another zone, another floor or <see cref="LeaveMetres"/> away, and both ends of
+/// the flight under your feet are quiet (Cody, 2026-10-04: "I hear indicators repeating several
+/// times"). The cue speaks for a flight's and a landing's zone names (<see cref="CoversZone"/>), and
+/// the zone announcer holds a room's name while <see cref="OnFlight"/>.
+/// See docs/CLIENT_NOTES.md, "Stair cues".
 /// </summary>
 public sealed class StairCues
 {
@@ -112,10 +78,8 @@ public sealed class StairCues
     private int _lastSaid = -1;
 
     /// <summary>
-    /// One update. Returns the line to say, or null. <paramref name="feet"/> is the body's position
-    /// (its feet); <paramref name="facing"/> its rotation, of which only the heading counts;
-    /// <paramref name="place"/> the zone you are in, if the map has zones — leaving it for another is
-    /// leaving the landing.
+    /// One update: the line to say, or null. Only the heading of <paramref name="facing"/> counts;
+    /// <paramref name="place"/> is the zone you are in, and leaving it is leaving the landing.
     /// </summary>
     public string? Update(WorldSnapshot world, Vector3 feet, Quaternion facing, int place = int.MinValue)
     {
@@ -200,11 +164,8 @@ public sealed class StairCues
         return along != Vector3.Zero && line.Length > 0;
     }
 
-    /// <summary>
-    /// Whether a stair marker is one end of the whole stair: the only flight's end on its landing. The
-    /// foot of the ground floor's flight and the top of the flight onto the roof are; every landing in
-    /// between has the top of the flight below and the foot of the flight above, side by side.
-    /// </summary>
+    /// <summary>Whether a stair marker is one end of the whole stair: the only marker on its landing.
+    /// Every landing in between has the top of one flight and the foot of the next side by side.</summary>
     public static bool IsStairwellEnd(WorldSnapshot world, int id)
     {
         if (!TryMarker(world, id, out var at, out _, out _)) return false;
@@ -219,21 +180,10 @@ public sealed class StairCues
     }
 
     /// <summary>
-    /// The markers the stairs beacon blips from: one a floor. The foot of every flight up, and the top
-    /// of the whole stair — on the city's towers, the top of the flight onto the roof.
-    ///
-    /// Cody, 2026-10-04: a beacon only at the bottom and the top leaves "the levels in between" to be
-    /// found without seeing where the stairs are. Every floor has a flight up but the top one, so the
-    /// beacon on each floor is where you step onto the stairs to go up from it, and where two flights
-    /// meet on a landing, only the one going up blips.
-    ///
-    /// Which end of a flight a marker is comes from the markers alone, paired from the bottom up. A
-    /// marker's position and facing do not say it: in a dog-leg every other flight is in the same lane,
-    /// so the top of one flight faces, along the same line, both its own foot a storey down and the
-    /// foot of the flight two up a storey up. But the lowest marker of a stair can only be a foot, and
-    /// it pairs with the nearest marker above facing back down its line, which is that flight's top;
-    /// taken in order of height, every marker not already the top of a flight from below is the foot
-    /// of the flight above it, or the top of the whole stair if nothing above faces back down to it.
+    /// The markers the stairs beacon blips from, one a floor (Cody, 2026-10-04): the foot of every
+    /// flight up, and the top of the whole stair (on the city's towers, onto the roof). Which end a
+    /// marker is comes from pairing the markers from the bottom up, since in a dog-leg position and
+    /// facing do not say it. See docs/CLIENT_NOTES.md, "Stair cues".
     /// </summary>
     public static HashSet<int> FloorBeacons(WorldSnapshot world)
     {
@@ -275,15 +225,11 @@ public sealed class StairCues
     }
 
     /// <summary>
-    /// Whether the feet are on the flight that starts at this marker: past it along the way it faces,
-    /// short of the marker at the other end, within a lane's width of the line between them, and
-    /// between the two floors. <paramref name="otherEnd"/> is that other marker.
-    ///
-    /// The other end is the marker facing back the opposite way along the same line, on the side of
-    /// this one the feet are: above it if they are above its floor, below if below. That side has to be
-    /// asked, because stairwells stack. A dog-leg puts every other flight in the same lane, so straight
-    /// ahead of the foot of one flight are both its own top, a storey up, and the top of the flight two
-    /// below it, a storey down, at the same distance along.
+    /// Whether the feet are on the flight that starts at this marker: past it, short of
+    /// <paramref name="otherEnd"/>, within a lane of the line between them and between the two floors.
+    /// The other end is the marker facing back along the same line on the side the feet are (above or
+    /// below): stairwells stack, and straight ahead of a dog-leg's foot are both its own top a storey up
+    /// and another flight's top a storey down.
     /// </summary>
     private static bool OnTreads(WorldSnapshot world, int id, Vector3 at, Vector3 along, Vector3 feet, out int otherEnd)
     {

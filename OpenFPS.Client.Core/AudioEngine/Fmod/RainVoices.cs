@@ -1,6 +1,4 @@
-using System;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Core.Nature;
 using OpenFPS.Common;
 
@@ -18,7 +16,7 @@ public sealed class RainFeed
 
     private float _rate, _median, _hail;
     private int _kind;
-    /// <summary>The rain rate, mm/h (the water-equivalent rate of whatever falls).</summary>
+    /// <summary>mm/h, the water-equivalent rate of whatever falls.</summary>
     public float Rate { get => Volatile.Read(ref _rate); set => Volatile.Write(ref _rate, value); }
 
     /// <summary>What falls: its kind, rate and sizes. Written field by field; a block that reads it
@@ -68,16 +66,12 @@ public static class RainFeeds
     /// How many voices a slot's patch is heard from (RainVoiceState, RainField.PlayParts); one each with
     /// ExtendedSources off.
     ///
-    /// The roof over the ear, four. A roof over your head is rain landing all over it and a sheet ringing
-    /// all over it, not a point: played as one voice straight overhead, both ears heard the same thing
-    /// (interaural correlation 1.00 in a car and under a steel attic roof, 0.74-0.80 under the bus shelter,
-    /// rain round 2, 2026-10-06). Each part renders a quarter of the roof's area from round the point over
-    /// the ear.
-    ///
-    /// Each near quarter, two. A quarter played from its middle puts the whole of the north and south
-    /// quarters straight ahead and behind, where both ears hear the same: half the near rain was mono, and
-    /// the street measured 0.53 at 2 kHz (AudioLab --wide-sources). Two parts 22.5° either side of each
-    /// quarter's middle. The far ring stays one a quarter: it is quieter, and further off the angles matter less.
+    /// The roof over the ear, four, each a quarter of its area round the point over the ear: as one voice
+    /// overhead both ears heard the same (interaural correlation 1.00 in a car and under a steel attic
+    /// roof, 0.74-0.80 under the bus shelter; rain round 2, 2026-10-06). Each near quarter, two, 22.5°
+    /// either side of its middle: from its middle, the north and south quarters were straight ahead and
+    /// behind, half the near rain mono (the street 0.53 at 2 kHz, AudioLab --wide-sources). The far ring
+    /// stays one a quarter: quieter, and further off the angles matter less.
     /// </summary>
     public static int PartsFor(int slot)
     {
@@ -109,42 +103,33 @@ public static class RainFeeds
 }
 
 /// <summary>
-/// One patch of rain as a voice. See <see cref="RainSynth"/> for the sound and RainField for where
-/// the patches come from.
+/// One patch of rain as a voice (<see cref="RainSynth"/>; the patches come from RainField).
 ///
-/// ITS LEVEL. Rain is not a source of one declared level: a patch is as loud as the rain is hard and
-/// the surfaces in it are ringing, and both change. So the voice MEASURES what it renders — the mean
-/// square of its own output over <see cref="LevelSeconds"/> — renders it at a fixed reference so it
-/// sits in the mixer's full scale like every other physical voice, and publishes the measured level.
-/// The survey places it by that level through Loudness.Place, the law every source in the game is
-/// placed by, so light rain and a cloudburst stand in the same relation to a car going past as they
-/// would in the street, compressed as everything is. A change faster than the measurement — a gust
-/// of heavier drops, a near drop — goes straight through: only the slow level is handed to the law.
+/// Rain has no one declared level, so the voice measures its own output over
+/// <see cref="LevelSeconds"/>, renders at a fixed reference to sit in full scale like every physical
+/// voice, and publishes the measured level; the survey places it by that level through Loudness.Place,
+/// the law every source is placed by. A change faster than the measurement (a gust of heavier drops, a
+/// near drop) goes straight through.
 ///
-/// A PART of a patch (the roof over the ear, or a near quarter, heard from several places, RainFeeds.PartsFor) renders
-/// its share of every surface's area with its own drops, and is rendered against the WHOLE patch's
-/// level: its own measured level times the number of parts, the parts being alike. So each part plays
-/// its share, the parts together play the patch, and all of them are placed by the patch's level.
-/// Only part 0 publishes the level.
+/// A part of a patch (RainFeeds.PartsFor) renders its share of every surface's area with its own drops
+/// against the whole patch's level (its own level times the number of parts), so the parts together
+/// play the patch. Only part 0 publishes the level.
 /// </summary>
 public sealed class RainVoiceState : PhysicalVoiceState
 {
-    /// <summary>What the voice renders its measured level at, dB at a metre.</summary>
+    /// <summary>dB at a metre: what the measured level is rendered at.</summary>
     public const float ReferenceDb = 60f;
 
-    /// <summary>The room its peaks need over the measured level, dB. MEASURED with --rain levels:
-    /// the 99.9th percentile of the 10 ms peaks over the Leq across the lab's scenes and kinds. Rain
-    /// needs 15-30 dB; hail, whose stones are single blows on a quiet bed, up to 43 (golf balls on the
-    /// street), and the patches render it too.</summary>
+    /// <summary>The room its peaks need over the measured level, dB: the 99.9th percentile of the 10 ms
+    /// peaks over the Leq across the lab's scenes (--rain levels). Rain needs 15-30 dB, hail up to 43
+    /// (golf balls on the street).</summary>
     public const float HeadroomDb = 45f;
 
-    /// <summary>How long the level is measured over, s.</summary>
     public const float LevelSeconds = 1.5f;
 
     private const float ReferencePascals = 20e-6f * 1000f;            // 60 dB
-    /// <summary>The quietest level the voice measures itself at, as a mean square (30 dB). Under it
-    /// the voice is simply rendered quieter than its reference rather than lifted: a few drops after a
-    /// dry spell are a few quiet drops, not a few drops at full scale.</summary>
+    /// <summary>30 dB as a mean square: under it the voice plays quieter than its reference rather than
+    /// being lifted, so a few drops after a dry spell stay a few quiet drops.</summary>
     private const float FloorMeanSquare = 20e-6f * 20e-6f * 1000f;
 
     private readonly RainFeed _feed;

@@ -125,11 +125,11 @@ public static class WeatherWindSpike
         var l = new float[n]; var r = new float[n];
         // A second of settling (the gain and knee glide in) that is not kept.
         var warmL = new float[Block]; var warmR = new float[Block];
-        for (int i = 0; i < Rate; i += Block) { s.Control(ears, Block / (float)Rate); s.Render(warmL, warmR); }
+        for (int i = 0; i < Rate; i += Block) { s.Control(ears); s.Render(warmL, warmR); }
         for (int i = 0; i < n; i += Block)
         {
             int m = Math.Min(Block, n - i);
-            s.Control(ears, m / (float)Rate);
+            s.Control(ears);
             s.Render(l.AsSpan(i, m), r.AsSpan(i, m));
         }
         return (l, r);
@@ -153,7 +153,7 @@ public static class WeatherWindSpike
                 int m = Math.Min(Block, n - i);
                 float facing = 360f * i / n;
                 var ears = EarWind.Ears(speed, moving, facing);
-                s.Control(ears, m / (float)Rate);
+                s.Control(ears);
                 s.Render(l.AsSpan(i, m), r.AsSpan(i, m));
             }
             Console.WriteLine("   facing   wind from   L dBFS  R dBFS   law L  law R   (2 s windows)");
@@ -321,7 +321,7 @@ public static class WeatherWindSpike
                     var listener = new EarWindListener(at, 1.7f, vel, facing, exposure);
                     last = EarWind.Hear(sim.Weather, listener, t);
                     meanSpeed += last.MeanSpeed; meanL += last.LeftDb; meanR += last.RightDb; blocks++;
-                    synth.Control(last, m / (float)Rate);
+                    synth.Control(last);
                     synth.Render(l.AsSpan(i, m), r.AsSpan(i, m));
                 }
                 var sec1 = new List<double>();

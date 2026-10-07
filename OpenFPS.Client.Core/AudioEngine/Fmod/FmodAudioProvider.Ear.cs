@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Concurrent;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -258,12 +257,9 @@ public partial class FmodAudioProvider
         }
     }
 
-    // ── The wind at the ears ──────────────────────────────────────────────────────────────────
-    //
-    // Not a world voice: it is made at the ears and placed by the same law straight from its declared
-    // ear level (EarWind.PlacedDb). It gets the same two things as every other voice, from its own
-    // measured spectrum: the law's correction (a gain on its channel) and the compensation (the
-    // shelves). Its real level at the ear is its declared level.
+    // The wind at the ears: not a world voice, placed by the law straight from its declared ear level
+    // (EarWind.PlacedDb), and given the same correction and shelves as every voice from its own
+    // measured spectrum. Its real level at the ear is its declared level.
     private EarVoiceState? _windEar;
     private FMOD.DSP _windEarDsp;
     private GCHandle _windEarHandle;
@@ -271,9 +267,6 @@ public partial class FmodAudioProvider
     private float _windGainDb, _windCorrectionDb;
     private double _windEarAt;
     private bool _windEarStarted;
-
-    /// <summary>The wind's ear stage, for the log and the lab: its correction, dB.</summary>
-    public float EarWindCorrectionDb => _windGainDb;
 
     private void AttachEarToWind()
     {
@@ -322,10 +315,8 @@ public partial class FmodAudioProvider
         _earWindChannel.setVolume(MathF.Pow(10f, _windGainDb / 20f));
     }
 
-    /// <summary>
-    /// One line every ten seconds: the listening level and the loudest few voices as the ear model
-    /// sees them. "[EAR]" in the log.
-    /// </summary>
+    /// <summary>An [EAR] line every ten seconds: the listening level and the loudest few voices as the
+    /// ear model sees them. Steps the ear wind first.</summary>
     private void ReportEar()
     {
         UpdateEarWind(_attributeDt);

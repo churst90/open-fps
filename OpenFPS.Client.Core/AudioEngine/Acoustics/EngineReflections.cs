@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -9,116 +7,71 @@ using OpenFPS.Client.AudioEngine.Data;
 namespace OpenFPS.Client.AudioEngine.Acoustics;
 
 /// <summary>
-/// The walls answering a live engine.
-///
-/// A vehicle's engine is synthesized in the mixer, so there is no file to play a delayed copy of and
-/// the ordinary reflection paths in ClientAudioSystem — which all work by re-triggering the same
-/// sound id — have nothing to work with. What it does have is a ring buffer: EngineVoiceState keeps
-/// a few seconds of everything it has rendered, and an echo voice is that buffer read back at the
-/// delay the mirrored path implies, placed at the image source. The pitch of the echo then glides on
-/// its own as the car moves and the path length changes, because the read position is slewed rather
-/// than stepped — which is the Doppler of the reflection, and the reason the echo voice carries no
-/// velocity of its own.
-///
-/// This existed only in the lab. The piece that was missing in the game was the geometry: which faces
-/// of which walls are worth bouncing off, kept between frames so a reflection holds one voice instead
-/// of retriggering as a click every time the world is rescanned.
-///
-/// The surfaces are built once per distinct world geometry and reused. A face that is small in both
-/// directions is dropped before it ever reaches the image-source pass: the Fresnel test inside
-/// ImageSource would return almost nothing for it anyway, and on a track made of two hundred wall
-/// segments the pruning is the difference between a scan that costs nothing and one that shows.
+/// The walls answering a live engine. An engine is synthesized in the mixer, so there is no file to
+/// replay; an echo voice reads the engine's ring buffer (EngineVoiceState) back at the mirrored path's
+/// delay, placed at the image source. The read position is slewed, which is the reflection's Doppler,
+/// so the echo voice carries no velocity of its own. The faces worth bouncing off are kept between
+/// frames so a reflection holds one voice instead of clicking at every rescan.
 /// </summary>
 public sealed class EngineReflections
 {
-    /// <summary>A face smaller than this in BOTH in-plane directions is not a mirror at engine
-    /// frequencies; it is something sound goes round. Dropping it costs nothing and saves the scan.</summary>
+    /// <summary>A face smaller than this both ways is something sound goes round at engine frequencies,
+    /// not a mirror (ImageSource's Fresnel test would give it almost nothing); dropped before the scan.</summary>
     private const float MinFaceHalfExtent = 1.5f;
 
-    /// <summary>How many walls may answer one car. Two is enough for a track: the retaining wall in
-    /// front and whatever big flat thing is behind you.</summary>
+    /// <summary>Two: the retaining wall in front and whatever big flat thing is behind you.</summary>
     public const int MaxEchoesPerEngine = 2;
 
     /// <summary>
-    /// How many are actually rendered right now — the first thing given up when the mixer runs short.
-    ///
-    /// A reflection voice is cheap to GENERATE (a delayed read of a ring buffer the engine has
-    /// already filled) and expensive to PLACE: it carries the same HRTF convolution and filtering as
-    /// any other source. Eight of them alongside four engines is most of a mixer.
-    ///
-    /// Shedding them before shedding cars is the right order, and the wrong order is audible: with
-    /// the budget taking engines away first, cars entering the mix push out cars that have not
-    /// finished passing, so the field sounds like voices swapping rather than like traffic.
-    /// A listener notices a car vanishing. Nobody notices its second reflection.
+    /// How many are rendered now: the first thing given up when the mixer runs short. A reflection is
+    /// cheap to generate and as dear to place as any source (HRTF, filters); eight with four engines is
+    /// most of a mixer. Shed before cars: a listener notices a car vanishing, not its second reflection.
     /// </summary>
     public int EchoesPerEngine { get; set; } = MaxEchoesPerEngine;
 
     /// <summary>
-    /// How many reflection voices may sound AT ONCE, across every source on the map.
-    ///
-    /// A voice budget, which is a real resource — a reflection is cheap to generate and expensive to
-    /// PLACE, carrying the same HRTF convolution and filtering as any other source — and not a rule
-    /// about racetracks. What it explicitly is NOT is a limit on how many CARS may be answered: that
-    /// would make "loud things reflect more" a property of a special case rather than of the physics,
-    /// right on one map and silently wrong on the next.
-    ///
-    /// The budget is spent on the reflections that are actually AUDIBLE, wherever they come from —
-    /// see the audibility floor below. A single loud car beside a concrete wall can legitimately take
-    /// several of these; thirty distant ones off a soft surface take none, because nobody can hear
-    /// them, not because they were counted.
+    /// Reflection voices at once across the map: a voice budget, not a limit on how many cars may be
+    /// answered. It goes to the most audible reflections wherever they come from (<see cref="AudibilityFloor"/>):
+    /// one loud car by a concrete wall may take several, thirty distant ones off a soft surface none.
     /// </summary>
     public int MaxReflectionVoices { get; set; } = 16;
 
     /// <summary>
-    /// The level a reflection has to reach to be worth a voice, set each frame so that about
-    /// <see cref="MaxReflectionVoices"/> of them clear it.
-    ///
-    /// One budget for the whole map, not a cap per car. Every candidate reflection on the
-    /// map reports what it would actually deliver to the ear — the source's own level, times what the
-    /// surface kept, spread over the path it took — and the budget goes to the loudest, whichever
-    /// source they belong to. Nothing here knows what a car is, or that this map is a racetrack.
-    ///
-    /// Sorted rather than servo'd: a control loop that nudged a threshold up and down would hunt, and
-    /// hunting is a reflection fading in and out. Taking the Nth value outright settles in one frame
-    /// and cannot oscillate. It is one frame stale, which at sixty a second is not a thing anybody
-    /// can hear.
+    /// The level a reflection must deliver to the ear to be worth a voice, set each frame so that about
+    /// <see cref="MaxReflectionVoices"/> clear it. The Nth value taken outright, not servoed: a control
+    /// loop would hunt, and hunting is a reflection fading in and out. One frame stale.
     /// </summary>
     public float AudibilityFloor => _audibilityFloor;
     private float _audibilityFloor;
     private readonly List<float> _audibilities = new();
 
-    /// <summary>
-    /// Closes the frame: works out the level the next one will demand of a reflection.
-    ///
-    /// Call once per audio update, after every source has been offered to <see cref="Update"/>.
-    /// </summary>
+    /// <summary>Works out the next frame's floor. Once per audio update, after every source has been
+    /// offered to <see cref="Update"/>.</summary>
     public void EndFrame()
     {
         if (_audibilities.Count <= MaxReflectionVoices)
         {
-            // Everything that wants a voice can have one; the only floor is the one the image-source
-            // search already applies for being inaudible in absolute terms.
+            // Everything can have a voice; the image-source search has its own absolute floor.
             _audibilityFloor = 0f;
         }
         else
         {
-            _audibilities.Sort();                                  // ascending
+            _audibilities.Sort();
             _audibilityFloor = _audibilities[_audibilities.Count - MaxReflectionVoices];
         }
         _audibilities.Clear();
     }
 
-    /// <summary>Beyond this from the listener a surface is not worth testing. A reflection off
-    /// something further away than this has a path long enough to belong in the reverb tail.</summary>
+    /// <summary>Metres from the path's middle: a reflection off anything further belongs in the reverb tail.</summary>
     private const float SurfaceSearchRadius = 260f;
 
-    /// <summary>An echo that stops being found fades for this long before its voice is let go, so a
-    /// car passing behind a gap in the wall does not click on the way out.</summary>
+    /// <summary>An echo no longer found fades this long before its voice goes, so a car passing a gap in
+    /// the wall does not click.</summary>
     private const float ReleaseSeconds = 0.8f;
 
     private readonly List<ReflectingSurface> _surfaces = new();
-    /// <summary>The solid boxes the surfaces came from, kept so a mirrored path can be asked whether
-    /// anything is standing in it. Same list, so the mirror and the obstruction can never disagree.</summary>
+    /// <summary>The boxes the surfaces came from, for the obstruction test: one list, so the mirror and the
+    /// obstruction cannot disagree.</summary>
     private List<OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box> _boxes = new();
     private int _builtFrom = -1;
     private int _lastEntityCount = -1;
@@ -128,8 +81,7 @@ public sealed class EngineReflections
         public int VoiceId;
         public float Silent;
         public bool Seen;
-        /// <summary>The last reflection this wall gave, so the release can fade that path out rather
-        /// than inventing a new one or moving it while it dies.</summary>
+        /// <summary>What the release fades out: a dying echo is not moved.</summary>
         public Reflection Last;
         public float Gain;
     }
@@ -138,30 +90,24 @@ public sealed class EngineReflections
     private readonly Dictionary<int, Dictionary<int, Echo>> _voices = new();
     private int _nextVoiceId = EchoVoiceIdBase;
 
-    /// <summary>Echo voices live in their own band of negative ids so nothing else collides with
-    /// them and ClientAudioSystem can recognise one on sight.</summary>
+    /// <summary>Echo voices have their own band of negative ids, so nothing collides with them and
+    /// ClientAudioSystem knows one on sight.</summary>
     public const int EchoVoiceIdBase = -600000;
 
     /// <summary>
-    /// Rebuilds the reflecting surfaces if the world's static geometry has changed.
-    ///
-    /// "Changed" is judged by the number of solid boxes, which is cheap and right for a map whose
-    /// walls do not move. A map with moving walls would want the checksum instead; nothing in this
-    /// game has one yet, and rebuilding two hundred surfaces every frame to catch a case that does
-    /// not exist would be the more expensive mistake.
+    /// Rebuilds the reflecting surfaces if the static geometry changed, judged by the entity count and then
+    /// the number of solid boxes: right while no map has walls that move without changing the count.
     /// </summary>
     public void SyncGeometry(WorldSnapshot world) => SyncGeometry(world, null);
 
     /// <summary>
-    /// The same, with the scene's acoustic triangle world when there is one (SpatialAcoustics.ReflectionWorldFor):
-    /// a leg of a mirrored path is then asked of its tree (geometry stage 2) instead of being tested
-    /// against every solid box on the map.
+    /// With the scene's acoustic triangle world when there is one (SpatialAcoustics.ReflectionWorldFor): a
+    /// leg of a mirrored path is then asked of its tree instead of every solid box.
     /// </summary>
     public void SyncGeometry(WorldSnapshot world, OpenFPS.Common.Geometry.TriangleWorld? acoustic)
     {
         _world = acoustic;
-        // Cheap test FIRST. BoxesFromWorld walks every entity and allocates a list; doing that sixty
-        // times a second to discover nothing had changed is pure garbage on the game thread.
+        // The cheap test first: BoxesFromWorld walks every entity and allocates, sixty times a second.
         if (world.Entities.Count == _lastEntityCount) return;
         _lastEntityCount = world.Entities.Count;
 
@@ -183,16 +129,9 @@ public sealed class EngineReflections
             {
                 var f = six[i];
                 if (f.HalfU.Length() < MinFaceHalfExtent && f.HalfV.Length() < MinFaceHalfExtent) continue;
-                // Identify the face by the PLANE it lies in, not by which box it came from.
-                //
-                // A long wall is authored as a row of blocks — the speedway's grandstand is twelve —
-                // and a car going past sweeps the bounce point along it at the speed of the car. Keyed
-                // per box, that means the reflection is a DIFFERENT surface every time the bounce
-                // crosses a seam: the voice answering for it is torn down and a new one started
-                // several times a second per car, each one re-entering the Steam Audio pool with its
-                // own DSPs while the old one is still fading. Keyed by the plane, the twelve blocks
-                // are one wall, the bounce slides along it, and one voice follows it the whole way —
-                // which is both what is physically happening and a great deal less work.
+                // Keyed by the plane, not the box: a long wall is a row of blocks (the speedway's
+                // grandstand is twelve), and keyed per box the bounce crossing a seam tore the voice
+                // down and started another several times a second per car.
                 _surfaces.Add(f with { SurfaceId = PlaneId(f) });
             }
         }
@@ -201,10 +140,8 @@ public sealed class EngineReflections
 
     // ── The faces in a tree ─────────────────────────────────────────────────────────────────────
     //
-    // A search mirrors through the faces near the path: within SurfaceSearchRadius of its middle. Every
-    // face on the map was measured for that, six a box (130,000 on Magnolia), for every one-off sound and
-    // every engine's echo: a tree over their extents hands back the ones whose extents come within the
-    // radius, and only those are measured (geometry stage 2).
+    // A search mirrors through the faces within SurfaceSearchRadius of the path's middle. The tree hands
+    // back only those to measure, rather than every face on the map (six a box, 130,000 on Magnolia).
     private OpenFPS.Common.Geometry.BvhNode[]? _faceNodes;
     private int[] _faceOrder = Array.Empty<int>();
     private readonly List<int> _faceHits = new();
@@ -222,8 +159,7 @@ public sealed class EngineReflections
         _faceNodes = OpenFPS.Common.Geometry.BvhBuilder.Build(lo, hi, _surfaces.Count, 4, out _faceOrder);
     }
 
-    /// <summary>The faces whose extents come within <paramref name="radius"/> of <paramref name="at"/>, in
-    /// the order the list holds them.</summary>
+    /// <summary>In the order the list holds them.</summary>
     private void FacesNear(Vector3 at, float radius, List<int> into)
     {
         into.Clear();
@@ -253,8 +189,8 @@ public sealed class EngineReflections
     /// </summary>
     private static int PlaneId(in ReflectingSurface f)
     {
-        // A tenth of a unit on the normal and a tenth of a metre on the offset: far finer than any
-        // wall is crooked, far coarser than floating-point noise between two boxes built the same way.
+        // A tenth on the normal and a tenth of a metre on the offset: finer than any wall is crooked,
+        // coarser than floating-point noise between two boxes built the same way.
         int nx = (int)MathF.Round(f.Normal.X * 10f);
         int ny = (int)MathF.Round(f.Normal.Y * 10f);
         int nz = (int)MathF.Round(f.Normal.Z * 10f);
@@ -267,21 +203,18 @@ public sealed class EngineReflections
         }
     }
 
-    /// <summary>How many reflection voices are alive right now, across every car. Diagnostic.</summary>
+    /// <summary>Reflection voices alive now, across every car. Diagnostic.</summary>
     public int VoiceCount { get { int n = 0; foreach (var m in _voices.Values) n += m.Count; return n; } }
 
-    /// <summary>How many reflecting faces the current geometry offers. Diagnostic.</summary>
+    /// <summary>Reflecting faces in the current geometry. Diagnostic.</summary>
     public int SurfaceCount => _surfaces.Count;
 
-
     /// <summary>
-    /// Brings one engine's echo voices up to date. <paramref name="direct"/> is the emitter that was
-    /// just submitted for the engine itself; the echoes copy its placement so they attenuate with
-    /// distance the same way, and carry only the surface's own share in their volume.
+    /// Brings one engine's echo voices up to date. They copy <paramref name="direct"/>, the engine's own
+    /// emitter, so they attenuate the same way, with only the surface's share in their volume. With
+    /// <paramref name="traced"/> (FmodAudioProvider.HasTracedEchoes) the mirror images fade out: the trace
+    /// has them and every order past them.
     /// </summary>
-    /// <param name="traced">The source's echoes are traced from where it is (FmodAudioProvider
-    /// .HasTracedEchoes): its mirror images fade out, since the trace has them and every order past
-    /// them.</param>
     public void Update(int entityId, in SpatialEmitter direct, in AcousticPathData directPath,
                        Vector3 listener, float speedOfSound, float dt, AudioEngineFacade audio, bool traced = false)
     {
@@ -300,20 +233,13 @@ public sealed class EngineReflections
         for (int i = 0; i < n; i++)
         {
             var r = found[i];
-            // FMOD attenuates the mirrored position itself, so the voice's own volume must carry
-            // only what the SURFACE did — the extra spreading is already in the placement. Undoing
-            // the distance term here and letting the emitter reapply it is what keeps an echo off a
-            // far wall quiet without making one off a near wall louder than the car.
+            // FMOD attenuates the mirrored position, so the volume carries only what the surface did:
+            // the distance term is undone here and reapplied by the placement.
             float gain = Math.Clamp(r.Gain * r.PathLength / directDist, 0f, 1f);
             if (gain < ImageSource.MinGain) continue;
 
-            // ── Is this reflection loud enough to be worth a voice? ──────────────────────────
-            //
-            // Asked of the REFLECTION, not of the car. What arrives at the ear is the source's own
-            // level, times what the surface kept, spread over the path it took — so a loud car off a
-            // hard wall nearby wins, a quiet one off a soft wall far away loses, and neither of those
-            // outcomes is written down anywhere. It falls out of the materials and the geometry, which is
-            // the only way it stays true on a map nobody has authored yet.
+            // Asked of the reflection, not the car: the source's level, times what the surface kept, over
+            // the path it took. It falls out of the materials and the geometry, on any map.
             float audibility = direct.Volume * gain * MathF.Max(0.1f, direct.MinDistance) / MathF.Max(1f, r.PathLength);
             _audibilities.Add(audibility);
             if (audibility < _audibilityFloor) continue;
@@ -323,10 +249,8 @@ public sealed class EngineReflections
                 echo = new Echo { VoiceId = _nextVoiceId-- };
                 mine[r.SurfaceId] = echo;
             }
-            // Starting the voice can fail on the frame the car first comes into earshot, because the
-            // echo reads the ENGINE's ring buffer and the engine's own voice is created later in the
-            // same tick. Asking whether it is playing rather than remembering that we asked for it
-            // is what makes the next frame try again instead of leaving a silent wall.
+            // Asked whether it plays, not remembered: on the car's first frame the engine's voice (whose
+            // ring the echo reads) is made later in the tick, the start fails, and the next frame retries.
             var e = Make(echo.VoiceId, entityId, direct, r, gain);
             if (audio.IsPlaying(echo.VoiceId)) audio.UpdateSpatialAttributes(e);
             else audio.PlayPhysicalSoundDirect(e);
@@ -337,11 +261,8 @@ public sealed class EngineReflections
             echo.Gain = gain;
         }
 
-        // Walls that have stopped answering fade out and are let go.
-        //
-        // FADE, not "wait and then cut". Stopping a voice that is still at its last gain ends it on
-        // a step: a click every time a car passes the end of a wall, several a lap on an oval. The
-        // gain is ramped to zero across the release, and the voice is only stopped once it is silent.
+        // Walls that stopped answering fade to zero and only then stop: cut at their last gain, they
+        // clicked every time a car passed the end of a wall.
         List<int>? drop = null;
         foreach (var kv in mine)
         {
@@ -354,8 +275,7 @@ public sealed class EngineReflections
                 (drop ??= new List<int>()).Add(kv.Key);
                 continue;
             }
-            // Hold the last path — only the level goes. Moving a dying echo would Doppler it as it
-            // faded, which is a whistle rather than a wall going quiet.
+            // Only the level goes: moving a dying echo would Doppler it into a whistle.
             float fade = 1f - echo.Silent / ReleaseSeconds;
             audio.UpdateSpatialAttributes(Make(echo.VoiceId, entityId, direct, echo.Last, echo.Gain * fade));
             ApplyPath(audio, echo.VoiceId, directPath, echo.Last, listener, directDist);
@@ -364,11 +284,8 @@ public sealed class EngineReflections
     }
 
     /// <summary>
-    /// Everything this engine's echoes were using is released. Call when the car goes.
-    ///
-    /// These CAN be cut rather than faded: an echo is a delayed copy of the engine, so when the
-    /// engine itself is fading out the echo is already following it down a fraction of a second
-    /// later. Stopping them together is what keeps the tail from outliving the car.
+    /// Stops this engine's echoes, when the car goes. Cut, not faded: an echo follows its engine's own
+    /// fade a fraction of a second later, and stopping them together keeps the tail from outliving the car.
     /// </summary>
     public void Forget(int entityId, AudioEngineFacade audio)
     {
@@ -377,29 +294,21 @@ public sealed class EngineReflections
         _voices.Remove(entityId);
     }
 
-    /// <summary>True if this id is one of ours.</summary>
     public static bool IsEchoVoice(int id) => id <= EchoVoiceIdBase;
 
     /// <summary>
-    /// The reflections the world offers a sound at this point, obstruction-tested.
-    ///
-    /// Public because a wall does not care what made the sound. The crowd in the grandstand, a door
-    /// slamming and a rifle going off need exactly this search, and the two things that make it right
-    /// — only mirroring through faces near the path, and testing both legs for something standing in
-    /// the way — are the two things a caller doing it itself forgets. The transient path DID forget
-    /// the second one, and reproduced the fault this class was written to fix: an echo that is never
-    /// obstruction-tested keeps sounding off a wall the source can no longer see, so where the direct
-    /// sound is blocked the echo is all that is left.
+    /// The reflections the world offers a sound at this point, obstruction-tested, for any source (the
+    /// grandstand crowd, a door, a rifle). Use this rather than a search of one's own: the transient path
+    /// once skipped the leg test, and its echoes kept sounding off walls the source could not see.
     /// </summary>
     public int FindReflections(Vector3 source, Vector3 listener, float speedOfSound, Span<Reflection> into,
                                int diffuseTaps = 0)
         => FirstOrderNear(source, listener, speedOfSound, into, diffuseTaps, nearestPart: true);
 
     /// <summary>
-    /// How far a point is from the nearest part of a face, squared. Not from its centre: the city's
-    /// ground is one box a kilometre across whose centre is the middle of the city, so measured from
-    /// the centre the ground under anyone more than 260 m out was never considered at all, and
-    /// neither was the far half of any long facade.
+    /// Squared, to the face's nearest part, not its centre: the city's ground is one box a kilometre
+    /// across, and from its centre the ground under anyone 260 m out was never considered, nor the far
+    /// half of any long facade.
     /// </summary>
     internal static float DistanceSquaredToFace(in ReflectingSurface s, Vector3 p)
     {
@@ -411,15 +320,16 @@ public sealed class EngineReflections
         return Vector3.DistanceSquared(nearest, p);
     }
 
-    /// <param name="nearestPart">Find faces by their nearest part (one-off sounds: the ground and long
-    /// facades count wherever you are) or by their centre (engines). Engines keep the centre until
-    /// their echoes stop phasing: counted along their whole length, long facades gave every passing
-    /// car a set of coherent echoes, heard as cars passing "inside out" where they had not been.</param>
+    /// <summary>
+    /// The first-order reflections through the faces near the path: found by their nearest part with
+    /// <paramref name="nearestPart"/> (one-off sounds), by their centre otherwise (engines). Engines keep
+    /// the centre until their echoes stop phasing: counted along their whole length, long facades gave
+    /// every passing car coherent echoes, heard as cars passing "inside out".
+    /// </summary>
     private int FirstOrderNear(Vector3 source, Vector3 listener, float speedOfSound, Span<Reflection> into,
                                int diffuseTaps = 0, bool nearestPart = true)
     {
-        // Only the faces near the path are worth mirroring through. Judged from the midpoint, which
-        // is where a specular bounce off anything between the two has to land.
+        // Judged from the midpoint, near where a specular bounce between the two has to land.
         Vector3 mid = (source + listener) * 0.5f;
         float r2 = SurfaceSearchRadius * SurfaceSearchRadius;
         _near.Clear();
@@ -435,11 +345,11 @@ public sealed class EngineReflections
 
     private readonly List<ReflectingSurface> _near = new();
 
-    /// <summary>The scene's acoustic triangle world, when there is one: legs are asked of it.</summary>
+    /// <summary>Legs are asked of it when there is one.</summary>
     private OpenFPS.Common.Geometry.TriangleWorld? _world;
 
-    /// <summary>Whether a leg starts inside a solid (the box test counted a segment wholly inside a box as
-    /// crossing it).</summary>
+    /// <summary>Whether a leg starts inside a solid, as the box test counted a segment wholly inside a box
+    /// as crossing it.</summary>
     private static bool Inside(OpenFPS.Common.Geometry.TriangleWorld world, Vector3 p)
     {
         var inside = _inside ??= new List<OpenFPS.Common.Geometry.SolidRef>(4);
@@ -452,16 +362,9 @@ public sealed class EngineReflections
     [ThreadStatic] private static List<OpenFPS.Common.Geometry.SolidRef>? _inside;
 
     /// <summary>
-    /// Is there anything standing in this leg of the mirrored path?
-    ///
-    /// ImageSource has always offered this test and nothing ever passed it, which is most of what "the
-    /// cars disappear and I hear the ghost of their reflections" was. A reflection that is never
-    /// obstruction-tested keeps sounding at full level off a wall the car can no longer see, so the
-    /// moment the direct sound is taken away the echo is all that is left — thirty silenced cars and
-    /// twenty bright copies of them.
-    ///
-    /// Both legs are pulled in slightly before the test, because a bounce point lies exactly ON a
-    /// surface and a leg that correctly ends there would otherwise report itself blocked by it.
+    /// Whether anything stands in this leg of a mirrored path. Untested, a reflection sounds off a wall
+    /// the car can no longer see ("the cars disappear and I hear the ghost of their reflections"). The
+    /// ends are pulled in: a bounce point lies on a surface and would block its own leg.
     /// </summary>
     private bool Blocked(Vector3 a, Vector3 b)
     {
@@ -471,10 +374,9 @@ public sealed class EngineReflections
         float len = d.Length();
         if (len < 1e-3f) return false;
         Vector3 unit = d / len;
-        const float Skin = 0.05f;   // stand clear of the surfaces at either end
+        const float Skin = 0.05f;
         if (_world is { } world)
         {
-            // The same boxes as triangles (the acoustic scene), asked of the tree.
             if (len <= 2f * Skin) return false;
             var all = new OpenFPS.Common.Geometry.AcceptAll();
             return world.Any(a + unit * Skin, unit, len - 2f * Skin, OpenFPS.Common.Geometry.GeometryLayers.Acoustics,
@@ -491,18 +393,10 @@ public sealed class EngineReflections
     }
 
     /// <summary>
-    /// Gives an echo the acoustics of the source it is an echo OF.
-    ///
-    /// A reflection is the same sound taking a longer route, so whatever is muffling the car muffles
-    /// its reflections too. Without this the echoes were the one thing on the map exempt from the
-    /// acoustic model — never sent to the worker (their ids are below the threshold step 5 scans),
-    /// never given a path, permanently unoccluded and full-bandwidth.
-    ///
-    /// Distance, delay and the AIR are the echo's OWN: it has travelled further, so it is placed at
-    /// the mirrored source, carries the length of the path it actually took, and has lost as much of
-    /// its top as that path costs. With the car's own air absorption instead, an echo that has come
-    /// 120 m round a facade is as bright as a car 40 m away, often brighter than the car, and
-    /// brightness is how the ear judges nearness: the car would be heard on the far side of the street.
+    /// Gives an echo an acoustic path: the worker never sees echo ids, so without one they were
+    /// unoccluded and full-bandwidth. Distance, delay and air are the echo's own: with the car's air, an
+    /// echo 120 m round a facade was brighter than the car 40 m away, and brightness is how the ear
+    /// judges nearness.
     /// </summary>
     private static void ApplyPath(AudioEngineFacade audio, int voiceId, in AcousticPathData directPath,
                                   in Reflection r, Vector3 listener, float directDist)
@@ -511,9 +405,8 @@ public sealed class EngineReflections
         p.ApparentPosition = r.ApparentPosition;
         p.EffectiveDistance = MathF.Max(r.PathLength, Vector3.Distance(listener, r.ApparentPosition));
         (p.AirLowDb, p.AirMidDb, p.AirHighDb) = EchoAir(directPath, directDist, r.PathLength);
-        // NOT the direct path's blocking. An echo exists only because both of its legs were found
-        // clear of every solid, so the wall or the bus that is muffling the car is not on
-        // its route (the legs are tested in Blocked); copying the direct path's occlusion and band gains muffled it a second time.
+        // Not the direct path's blocking: both legs were found clear (Blocked), and copying the direct
+        // path's occlusion muffled the echo a second time.
         p.Occlusion = 0f;
         p.EqLow = p.EqMid = p.EqHigh = 1f;
         p.TransmissionBleed = 0f;
@@ -522,9 +415,8 @@ public sealed class EngineReflections
     }
 
     /// <summary>
-    /// What the air takes over the echo's path, per band. The ISO 9613-1 loss is proportional to
-    /// distance, so it is the direct path's per metre times the echo's length. A direct path too short
-    /// to give a rate uses the standard atmosphere.
+    /// The air over the echo's path, per band: ISO 9613-1 is proportional to distance, so the direct
+    /// path's per metre times the echo's length; the standard atmosphere when the direct path is too short.
     /// </summary>
     internal static (float Low, float Mid, float High) EchoAir(in AcousticPathData direct, float directDist, float pathLength)
     {

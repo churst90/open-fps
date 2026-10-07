@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common.Networking;
 
@@ -22,14 +20,10 @@ public enum UiCue
 }
 
 /// <summary>
-/// The sounds the interface makes: short, soft, in both ears and not in the world.
-///
-/// Synthesised rather than recorded, and deliberately plain — a menu tick is a sine blip with a bell's
-/// decay, a chat is two or three notes — because they are heard constantly and must never compete with
-/// the world or with speech. Each cue is a distinct shape (a tick, a rise, a fall, a chord) rather than
-/// just a different pitch, since shape is what survives being heard a hundred times.
-///
-/// Shared by every client head; the head only decides WHEN. Silenced by one setting.
+/// The sounds the interface makes: short, soft, synthesised, in both ears and not in the world, plain so
+/// they never compete with the world or speech. Each cue is a distinct shape (a tick, a rise, a fall, a
+/// chord), not just a pitch, since shape survives being heard a hundred times. Shared by every head;
+/// the head decides when.
 /// </summary>
 public sealed class UiSounds
 {
@@ -58,12 +52,10 @@ public sealed class UiSounds
     }
 
     /// <summary>
-    /// The sound a line of chat is heard with, or none. The channel decides it, whoever is talking:
-    /// an admin's map chat is still map chat (with the admin cue in its place, an admin was heard the
-    /// same on every channel). The admin cue is for server announcements by staff. A reply to a
-    /// command (no sender) is only spoken; a chat sound on "/tp" said a message came. A presence
-    /// notice has its own sound, or none when those are turned off, and never the chat sound
-    /// instead: nobody said anything.
+    /// The sound a line of chat is heard with, or none. The channel decides, whoever talks: an admin's
+    /// map chat is map chat, and the admin cue is for staff's server announcements. A reply to a command
+    /// (no sender) is only spoken. A presence notice has its own sound or none, never the chat sound:
+    /// nobody said anything.
     /// </summary>
     public static UiCue? CueFor(ChatMessage msg, bool presenceSounds)
     {
@@ -115,7 +107,8 @@ public sealed class UiSounds
     public static float[] RenderProgress(int step)
         => Notes(SampleRate, 0.3f, (440f * MathF.Pow(2f, Math.Clamp(step, 0, ProgressSteps) / (float)ProgressSteps), 0f, 0.09f));
 
-    /// <summary>The waveform of a cue, peak about 0.8. Public so a test can measure it.</summary>
+    /// <summary>The waveform of a cue: peak 1.28 times its gain, at most 0.95. Public so a test can
+    /// measure it.</summary>
     public static float[] Render(UiCue cue) => Render(cue, SampleRate);
 
     /// <summary>A cue at any sample rate, for writing it out to be listened to.</summary>
@@ -149,12 +142,10 @@ public sealed class UiSounds
         UiCue.VoiceOff => Notes(rate, 0.5f, (880f, 0f, 0.06f), (659.3f, 0.07f, 0.08f)),
         // Trying the server again: a quiet low tick, every few seconds until it answers.
         UiCue.Reconnecting => Notes(rate, 0.25f, (587.3f, 0f, 0.04f)),
-        // Presence: somebody came, went, or stepped away. Chords, not single notes (Cody, 2026-10-03:
-        // "make the online/offline sound chordal and use the triangle or another waveform that sounds
-        // unique"), on a triangle wave, which nothing else in the interface or the beacons uses: hollow
-        // and soft, and recognisably its own instrument. Longer than a chat line, so they are heard as
-        // somebody arriving or leaving rather than somebody talking. Each pair is one figure turned round.
-        // Online: C major, C5 E5 G5 C6, rolled upward so it is heard to rise, all four left ringing.
+        // Presence: chords on a triangle wave, which nothing else here uses (Cody, 2026-10-03: "make the
+        // online/offline sound chordal and use the triangle or another waveform that sounds unique"),
+        // longer than a chat line so they are heard as arriving or leaving, not talking. Each pair is
+        // one figure turned round. Online: C major, C5 E5 G5 C6, rolled upward, all left ringing.
         UiCue.PresenceOnline => TriangleChord(rate, 0.45f, 0.055f, 0.75f, 523.25f, 659.25f, 783.99f, 1046.5f),
         // Logged out: the same chord rolled downward, from the top. Gone, on purpose.
         UiCue.PresenceLoggedOut => TriangleChord(rate, 0.45f, 0.055f, 0.75f, 1046.5f, 783.99f, 659.25f, 523.25f),
@@ -177,9 +168,8 @@ public sealed class UiSounds
         // Your team said something: the same two notes as a private message's first two, then back
         // down to the first — a call among friends rather than one aimed at you alone.
         UiCue.ChatTeam => Notes(rate, 0.5f, (1046.5f, 0f, 0.09f), (1318.5f, 0.08f, 0.09f), (1046.5f, 0.16f, 0.16f)),
-        // Your shot landed: a high A and the E above it struck together, short and bright. Higher
-        // than anything in the menus and over before the shot's own echoes, so it never sounds like
-        // part of the world.
+        // Your shot landed: A6 and E7 together, higher than the menus and over before the shot's own
+        // echoes, so it never sounds like part of the world.
         UiCue.Hit => Notes(rate, 0.6f, (1760f, 0f, 0.07f), (2637f, 0f, 0.07f)),
         // A kill: the same A, then up a fourth and up a fifth, quick, the last one left to ring.
         // A leap and not the chat's steps, so it cannot be taken for a message.
@@ -207,30 +197,6 @@ public sealed class UiSounds
                 float release = MathF.Min(1f, (len - i) / (0.01f * rate));
                 float w = MathF.Sin(MathF.Tau * n.Hz * t) + 0.25f * MathF.Sin(MathF.Tau * 2f * n.Hz * t);
                 buf[start + i] += w * attack * decay * release;
-            }
-        }
-        return Scale(buf, gain);
-    }
-
-    /// <summary>
-    /// Notes that swell in and out rather than strike: (hertz, start seconds, length seconds), each a
-    /// raised cosine with the beacon swell's slow, slight vibrato. For cues that should arrive gently.
-    /// </summary>
-    private static float[] Swells(int rate, float gain, params (float Hz, float At, float Seconds)[] notes)
-    {
-        float end = 0f;
-        foreach (var n in notes) end = MathF.Max(end, n.At + n.Seconds);
-        var buf = new float[(int)((end + 0.02f) * rate)];
-        foreach (var n in notes)
-        {
-            int start = (int)(n.At * rate), len = (int)(n.Seconds * rate);
-            double ph = 0;
-            for (int i = 0; i < len && start + i < buf.Length; i++)
-            {
-                float t = i / (float)rate;
-                float env = 0.5f - 0.5f * MathF.Cos(MathF.Tau * t / n.Seconds);
-                ph += MathF.Tau * n.Hz * (1f + 0.004f * MathF.Sin(MathF.Tau * 5f * t)) / rate;
-                buf[start + i] += env * (float)(Math.Sin(ph) + 0.25 * Math.Sin(2 * ph));
             }
         }
         return Scale(buf, gain);

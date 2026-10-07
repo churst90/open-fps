@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -6,16 +5,14 @@ using OpenFPS.Common.Components;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// What is in front of you, and what is merely the ground. One answer for the three things that ask:
-/// P (look ahead), the narration as you turn, and the bump when you walk into something.
+/// What is in front of you, and what is merely the ground: one answer for P (look ahead), the turn
+/// narration and the bump when you walk into something.
 ///
-/// THE GROUND IS NEVER NAMED. Z says where you stand; hearing "Concrete Floor" or "Brandt Court roof"
-/// whenever you look down, turn, or brush a kerb tells you nothing Z did not, and it buries the one
-/// name that matters. Ground is decided from GEOMETRY, not from names, because names are an author's
-/// and the generator's to change: a box is ground when it is a slab (no taller than it is wide either
-/// way) and either its top is within a step of your feet — the floor, a kerb, the road, the roof you
-/// are on — or it is thin and its top is below your eyes, which is a floor or a tread you are looking
-/// down at. A wall is taller than it is thick; a car, a sofa and a parapet stand above a step.
+/// <para>The ground is never named: Z says where you stand, and "Concrete Floor" on every look down
+/// buries the name that matters. Ground is decided from geometry, not names (those are the author's and
+/// the generator's to change): a slab no taller than it is wide whose top is within a step of your feet,
+/// or a thin one whose top is below your eyes. A wall is taller than it is thick; a car, a sofa and a
+/// parapet stand above a step.</para>
 /// </summary>
 public static class Sightline
 {
@@ -44,11 +41,8 @@ public static class Sightline
         return (c - ext, c + ext);
     }
 
-    /// <summary>
-    /// Whether this is ground to a body whose feet are at <paramref name="feetY"/> and eyes at
-    /// <paramref name="eyeY"/>: something you could stand on, at or below your feet, or a floor you
-    /// are looking down at. See the class summary.
-    /// </summary>
+    /// <summary>Whether this is ground to a body with feet at <paramref name="feetY"/> and eyes at
+    /// <paramref name="eyeY"/>. See the class summary.</summary>
     public static bool IsGround(in EntitySnapshot e, float feetY, float eyeY)
     {
         var (min, max) = WorldBounds(e);
@@ -65,12 +59,11 @@ public static class Sightline
     public const float NoseMetres = 0.25f;
 
     /// <summary>
-    /// Whether a ray that met this box at <paramref name="hitY"/> met GROUND: the box is ground
-    /// (<see cref="IsGround"/>), or the ray only clipped the nose of a top you could stand on — a
-    /// stair tread a few steps up, which a level look at knee, chest or eye height meets just under
-    /// its top. A flight of stairs is built of columns, each as tall as its tread is high, and those
-    /// are walls to <see cref="IsGround"/>; this is what keeps them from being named as you turn.
-    /// A wall is too thin on top to stand on, so a ray grazing its top is still a ray meeting a wall.
+    /// Whether a ray that met this box at <paramref name="hitY"/> met ground: the box is ground
+    /// (<see cref="IsGround"/>), or the ray clipped the nose of a top you could stand on. A flight of
+    /// stairs is built of columns, walls to <see cref="IsGround"/>, and a level look meets a tread a few
+    /// steps up just under its top; this keeps them from being named as you turn. A wall's top is too
+    /// thin to stand on, so grazing it is still meeting a wall.
     /// </summary>
     public static bool IsGroundAt(in EntitySnapshot e, float hitY, float feetY, float eyeY)
     {
@@ -80,15 +73,13 @@ public static class Sightline
         return standable && max.Y - hitY <= NoseMetres && max.Y <= eyeY + NoseMetres;
     }
 
-    /// <summary>What a thing is called: its name, and only if it has none, what it is made of. A
-    /// vehicle or a passer-by is called by what it is (<see cref="KindOf"/>): "Hatchback", not
-    /// "Hatchback 1"; "Pedestrian", not "Pedestrian, Main Street, west side 14".</summary>
+    /// <summary>What a thing is called: its name, or failing that what it is made of. A named NPC (a
+    /// vehicle, a passer-by) is called by what it is (<see cref="KindOf"/>).</summary>
     public static string NameOf(in EntitySnapshot e)
     {
         string name = e.Definition.Identity.Name;
         if (e.Definition.Type == EntityType.NPC && !string.IsNullOrWhiteSpace(name)) return KindOf(e);
         if (!string.IsNullOrWhiteSpace(name)) return name.Trim();
-        // A person nobody has named is somebody, not "something" or what they are made of.
         if (IsPerson(e)) return "someone";
         string material = e.Definition.Material.Material;
         if (!string.IsNullOrEmpty(material) && material is not ("Generic" or "None"))
@@ -101,9 +92,9 @@ public static class Sightline
         => e.Definition.Type == EntityType.Player || ScopeView.Classify(e) == SightKind.Person;
 
     /// <summary>
-    /// What a moving thing is, for saying it passed: a player by their name; anything else by its name
-    /// up to the first comma, without the number the map counts them by — "Hatchback 1" is a
-    /// hatchback, "Pedestrian, Main Street, west side 14" a pedestrian, "Light rail 2" light rail.
+    /// What a moving thing is: a player by their name; anything else by its name up to the first comma,
+    /// without the map's number ("Hatchback 1" a hatchback, "Pedestrian, Main Street, west side 14" a
+    /// pedestrian).
     /// </summary>
     public static string KindOf(in EntitySnapshot e)
     {
@@ -118,9 +109,9 @@ public static class Sightline
         return name.Length == 0 ? "something" : name;
     }
 
-    /// <summary>A person or a vehicle on the move, faster than <see cref="MovingMetresPerSecond"/>.
-    /// The sight line looks through these, because they do not stay where they were seen: one
-    /// crossing in front is said as passing (<see cref="PassingWatch"/>), not as what is ahead.</summary>
+    /// <summary>A person or a vehicle faster than <see cref="MovingMetresPerSecond"/>. The sight line
+    /// can look through these: one crossing in front is said as passing (<see cref="PassingWatch"/>),
+    /// not as what is ahead.</summary>
     public static bool IsOnTheMove(in EntitySnapshot e)
         => e.Definition.Type is EntityType.NPC or EntityType.Player
            && e.Velocity.X * e.Velocity.X + e.Velocity.Z * e.Velocity.Z > MovingMetresPerSecond * MovingMetresPerSecond;
@@ -135,9 +126,9 @@ public static class Sightline
         => e.Id != ownEntityId && (e.Definition.Collider.IsSolid || e.Definition.Identity.Announce);
 
     /// <summary>
-    /// The first thing along each ray that is not the ground, the nearest of them; null when the rays
-    /// meet nothing within <paramref name="range"/>, or meet the ground first — a floor you are looking
-    /// at hides whatever is under it, and is not itself an answer.
+    /// The nearest first non-ground hit along the rays; null when they meet nothing within
+    /// <paramref name="range"/> or meet the ground first (a floor hides what is under it and is not
+    /// itself an answer).
     /// </summary>
     public static Sighting? Ahead(SpatialService spatial, WorldSnapshot world, ReadOnlySpan<Vector3> origins, Vector3 dir,
                                   float range, float feetY, float eyeY, int ownEntityId, bool throughMoving = false)
@@ -157,10 +148,8 @@ public static class Sightline
         return best;
     }
 
-    /// <summary>
-    /// What the turn narration looks along: level, the way you face, at your knees, chest and eyes —
-    /// so a car, a bench or a low wall is found as well as a wall at head height.
-    /// </summary>
+    /// <summary>What the turn narration looks along: level, the way you face, at knee, chest and eye
+    /// height, so a bench or a low wall is found as well as a wall at head height.</summary>
     public static Sighting? AheadLevel(SpatialService spatial, WorldSnapshot world, Vector3 feet, float yaw, float eyeHeight, int ownEntityId,
                                        bool throughMoving = false)
     {

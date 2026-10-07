@@ -1,7 +1,5 @@
-using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using System.Threading;
 using Thread = System.Threading.Thread;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
@@ -9,36 +7,21 @@ using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// The echoes of a few sources, traced from where each one actually is.
+/// The echoes of a few sources, traced from where each one actually is: one simulator with a source per
+/// traced sound, the rays from the listener collecting every order of reflection back to each source,
+/// refreshed several times a second. A traced source's reverberation is all its own: its send to the
+/// shared tail is cut and no mirror-image echoes are made (the provider's UpdateTracedEchoes).
 ///
-/// The listener's trace (TracedReverb) plays everything as if it stood at the listener: right for the
-/// late field, which barely depends on where in a place a source is, and wrong for the early part,
-/// which is all about where it is. Those were voiced as a handful of first-order mirror images per
-/// engine, each its own voice — and as a train or a police car moved, the images jumped from one
-/// facade to the next: "I hear the reflections bounce around from one building to another as the
-/// source of sound moves, but in reality the train's sound is reflecting and those reflections are
-/// reflecting as well". A real one is a dense field of copies of copies that slides as the source
-/// moves.
+/// The listener's trace (TracedReverb) is wrong for the early part, which is all about where a source
+/// is; mirror images per engine jumped from facade to facade as a train moved ("I hear the reflections
+/// bounce around from one building to another"). Only the loudest few sustained sources at the ear are
+/// traced, as many as the mixer's headroom allows.
 ///
-/// That is what this is: one Steam Audio simulator with a source per traced sound, the rays from the
-/// listener collecting every order of reflection back to each source's real position, refreshed
-/// several times a second, and each IR crossfaded inside its effect. A traced source's whole
-/// reverberation is its own: its send to the shared tail is cut and its mirror-image echoes are not
-/// made (see the provider's UpdateTracedEchoes and ClientAudioSystem).
-///
-/// Only a few: the loudest sustained sources at the ear, ranked by the level they render at, with the
-/// number following the mixer's headroom. Everything else keeps the cheap paths.
-///
-/// TWO banks of sources, traced in turn. A trace is a Monte Carlo estimate: a source that has not moved
-/// comes back with the same energy (within a few tenths of a decibel) and a different fine pattern
-/// of echoes every time, and the effect swapped one pattern for the next inside a single 23 ms
-/// block — heard as the reflections "jumping and cutting out a little bit ... they aren't a smooth
-/// transition". With two, each IR is replaced only while the mix has faded it out, and what is heard
-/// is a crossfade from the older trace to the newer across the whole refresh.
-///
-/// Both banks are sources in ONE simulator: a second simulator on the same scene traced nothing
-/// (--traced-echoes: its IRs came back silent). A trace asks for reflections only from the bank
-/// being refreshed; the other bank's sources are given no simulation flags and keep what they had.
+/// Two banks of sources, traced in turn: a trace is a Monte Carlo estimate, a different fine pattern
+/// each time, and swapped inside one 23 ms block it was heard as the reflections "jumping and cutting
+/// out a little bit". Each IR is replaced only while the mix has it faded out. Both banks are in one
+/// simulator: a second simulator on the same scene traced nothing (--traced-echoes). The bank not
+/// being refreshed gets no simulation flags and keeps its IR.
 /// </summary>
 internal sealed class TracedEchoes : IDisposable
 {
@@ -69,10 +52,9 @@ internal sealed class TracedEchoes : IDisposable
     /// <summary>The bank traced most recently: the mix crossfades towards it. -1 before the first.</summary>
     public volatile int NewestBank = -1;
     /// <summary>
-    /// How many times each bank has been traced. A Steam Audio IR update goes to the first effect that
-    /// reads it after the trace — measured: a second effect on the same IR never saw one — so an
-    /// effect newly given a slot has nothing from a bank until that bank is traced again. A rig
-    /// notes these when it is attached and fades to a bank only once it has moved on.
+    /// How many times each bank has been traced. A Steam Audio IR update goes only to the first effect
+    /// that reads it after the trace (measured), so a rig notes these when attached and fades to a bank
+    /// only once it has moved on.
     /// </summary>
     public readonly int[] BankGeneration = new int[Banks];
     /// <summary>How long the mix takes to cross from one bank to the other, seconds: just under the
@@ -81,11 +63,9 @@ internal sealed class TracedEchoes : IDisposable
     private readonly bool[] _inUse = new bool[MaxSources];
     private readonly Vector3[] _at = new Vector3[MaxSources];
     /// <summary>
-    /// Two locks, and the game thread only ever takes the first. <c>_gate</c> guards the requests —
-    /// which slots are in use, where each source and the listener are, which sources are waiting to
-    /// be added — and is held for microseconds. <c>_simGate</c> guards the simulator, and a trace holds
-    /// it for its whole run. With one lock, every per-frame SetSource and SetListener waited out the
-    /// trace in progress (see TracedReverb.SetListener: 680 ms stalls in the airport terminal).
+    /// Two locks, and the game thread only takes the first: <c>_gate</c> guards the requests and is held
+    /// for microseconds; <c>_simGate</c> guards the simulator for a whole trace. With one lock every
+    /// per-frame SetSource waited out the trace (TracedReverb.SetListener: 680 ms stalls).
     /// </summary>
     private readonly object _gate = new();
     private readonly object _simGate = new();
@@ -101,7 +81,8 @@ internal sealed class TracedEchoes : IDisposable
     public int Runs;
     public double LastRunMs;
 
-    /// <param name="sampleRate">0: the mixer's (MixerQuality.MixerRate).</param>
+    /// <summary>A simulator of its own on <paramref name="context"/>, at <paramref name="sampleRate"/>
+    /// (0: MixerQuality.MixerRate) in blocks of <paramref name="frameSize"/>.</summary>
     public TracedEchoes(IntPtr context, int sampleRate = 0, int frameSize = 1024)
     {
         if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.MixerRate;
@@ -165,9 +146,8 @@ internal sealed class TracedEchoes : IDisposable
         }
     }
 
-    /// <summary>Gives a slot back. Its source stays in the simulator — adding and removing sources
-    /// needs a commit, and an idle source is only a few visibility checks — but it is parked far
-    /// below the map, where nothing reaches it.</summary>
+    /// <summary>Gives a slot back. Its source stays in the simulator (adding and removing needs a
+    /// commit) and is parked far below the map, where nothing reaches it.</summary>
     public void Release(int slot)
     {
         if (slot < 0 || slot >= MaxSources) return;
@@ -300,12 +280,11 @@ internal sealed class TracedEchoes : IDisposable
 }
 
 /// <summary>
-/// One traced source's two stages on its own channel, made once and moved from voice to voice:
-/// a CAPTURE at the head of the chain, which passes the voice through and keeps a copy of this block
-/// at the source's own level, and a MIX at the tail, after the HRTF, which plays that copy through the
-/// source's traced IR, decodes it round the head and adds it. Both run inside the one channel's chain
-/// in the same block, head first, so the echoes are not a block late — the reason the mirror-image
-/// echoes read their source two blocks behind (EngineEchoState.MinDelayBlocks) does not arise.
+/// One traced source's two stages on its own channel, made once and moved from voice to voice: a capture
+/// at the head of the chain, which passes the voice through and keeps this block at the source's level,
+/// and a mix at the tail, after the HRTF, which plays it through the source's traced IR, decodes it round
+/// the head and adds it. Both run in the same block, head first, so the echoes are not late (the
+/// mirror-image echoes read their source two blocks behind: EngineEchoState.MinDelayBlocks).
 /// </summary>
 internal sealed class TracedEchoRig : IGuardedUnit
 {
@@ -317,7 +296,7 @@ internal sealed class TracedEchoRig : IGuardedUnit
     public IntPtr WorkerContext, ProviderContext;
     public IntPtr Effect, EffectB, Decode, Hrtf;
     public Phonon.IPLAudioBuffer Mono, Ambi, AmbiB, Stereo;
-    public float[] Capture = Array.Empty<float>(), MonoScratch = Array.Empty<float>(), StereoScratch = Array.Empty<float>();
+    public float[] Capture = Array.Empty<float>(), StereoScratch = Array.Empty<float>();
     public float[] AmbiScratchA = Array.Empty<float>(), AmbiScratchB = Array.Empty<float>();
     /// <summary>Where the crossfade stands: 0 all bank A, 1 all bank B. Mixer thread only.</summary>
     public float Blend = -1f;
@@ -341,8 +320,6 @@ internal sealed class TracedEchoRig : IGuardedUnit
     /// <summary>The effect's convolution tail belongs to the last voice; the mix resets it on its
     /// first block with a new one.</summary>
     public volatile bool NeedsReset;
-    /// <summary>Which voice (entity id) it is on, for the readout.</summary>
-    public int Owner;
     public volatile float InRms, OutRms;
 }
 
@@ -396,8 +373,8 @@ internal static class TracedEchoDsp
             for (int k = 0; k < n * ch; k++) o[k] = i[k];
             var rig = RigOf(ref dsp_state);
             if (rig == null || rig.Slot < 0 || n != rig.FrameSize) return RESULT.OK;
-            // Ramped across the block from the last block's gain: the gain carries the voice's fade and
-            // its distance, set once a game frame, and held per block it stepped every 23 ms.
+            // Ramped across the block from the last block's gain: set once a game frame and held per
+            // block, it stepped every 23 ms.
             float g = rig.InputGain;
             float g0 = rig.LastInputGain < 0f ? g : rig.LastInputGain;
             rig.LastInputGain = g;
@@ -466,9 +443,8 @@ internal static class TracedEchoDsp
             float step = 1f / MathF.Max(1f, TracedEchoes.CrossfadeSeconds * rig.SampleRate);
             float b0 = rig.Blend;
             bool moving = MathF.Abs(target - b0) > 1e-6f;
-            // BOTH banks run every block, faded out or not: a convolution is its input's history, and
-            // one left idle while faded out would come back without the last second and a half of
-            // tail — a dip in the reverberation at every crossfade.
+            // Both banks run every block, faded out or not: a convolution left idle would come back
+            // without its last second and a half of tail, a dip at every crossfade.
             float bEnd = moving ? (target > b0 ? MathF.Min(target, b0 + step * n) : MathF.Max(target, b0 - step * n)) : b0;
             bool needA = haveA, needB = haveB;
             if (needA) Phonon.iplReflectionEffectApply(rig.Effect, ref pa, ref rig.Mono, ref rig.Ambi, IntPtr.Zero);

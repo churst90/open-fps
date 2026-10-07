@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
@@ -9,28 +7,19 @@ using Serilog;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// What a driver who cannot see the road needs to hear, and nothing else.
+/// What a driver who cannot see the road needs to hear, each cue a different kind of sound so none is
+/// mistaken for another (docs/DRIVING_AIDS.md):
 ///
-/// Three sounds and a voice. Each one means one thing, and each is a different kind of sound so
-/// that none of them can be mistaken for another:
+///   * the guide: a soft high beep on the middle of your lane (or the planned line) ahead; steer
+///     toward it. Its rate is your speed.
+///   * the centre line and the kerb: parking-sensor beeps from that side within 1.5 m, faster as you
+///     close; over the line, the wheels on Botts' dots or a rumble strip (a steady tone when stopped).
+///   * a click every 15 degrees of turn and a chime when in line with the road; the brake cue; the
+///     indicator relay; the over-speed notes.
+///   * the voice: the road's name, junctions ahead and their exits, "road ends", "off the road".
 ///
-///   * THE GUIDE — a soft high beep placed on the middle of your lane a little way ahead. Steer
-///     towards it: when it is straight in front of you, you are in the middle of your lane and
-///     pointing down it. It beeps faster the faster you go, so its rate is your speed.
-///   * THE CENTRE LINE — a mid-pitched beep from the side the centre line is on, like a parking
-///     sensor: silent until the car is within a metre and a half of it, faster as you close, and a
-///     steady tone once you are over it — into the oncoming lane.
-///   * THE KERB — the same, low and buzzy, from the kerb side.
-///   * THE VOICE — the name of the road when you turn onto one, "junction ahead" with its distance
-///     and which ways lead off it, "road ends" before a dead end, and "off the road" when the wheels
-///     leave the asphalt.
-///
-/// All of it comes from the carriageway boxes the map is built of: a named box is a road, and an
-/// unnamed square one is a junction. When roads become data the same questions will be asked of
-/// the road graph instead.
-///
-/// The first version of this was a noise tick for every painted dash that went by. It was heard as
-/// "popping", told nobody anything, and is gone.
+/// Lanes come from the carriageway boxes the map is built of (a named box is a road, an unnamed square
+/// one a junction); the line ahead comes from the map's roads where it has them (DrivingCuePlanner).
 /// </summary>
 public sealed class DrivingAids
 {
@@ -56,10 +45,9 @@ public sealed class DrivingAids
     private const float GuideVolume = 0.28f, SensorVolume = 0.32f, OverToneVolume = 0.16f;
 
     /// <summary>
-    /// Where the listener's head is. Every cue follows the head, but it still needs a real position
-    /// in the world: the voice manager drops anything more than one and a half times its range from
-    /// the listener, and a cue left at the default position (the middle of the map) was dropped
-    /// everywhere more than 120 m from it — which is most of Main Street. None of them ever played.
+    /// Where the listener's head is. Every cue follows the head but still needs a real position: the
+    /// voice manager drops anything beyond 1.5 times its range, and cues left at the map's middle were
+    /// never heard more than 120 m from it.
     /// </summary>
     private Vector3 _ear;
     private double _now, _nextGuide, _nextCentre, _nextKerb, _nextTrace;
@@ -72,11 +60,8 @@ public sealed class DrivingAids
 
     // ── How far you have turned ──────────────────────────────────────────────────────────────
     //
-    // "It's hard to know how far I'm turning, and I overshoot the lane." A driver who can see
-    // watches the road swing round the windscreen; nothing here said how far the car had turned
-    // until it was pointing somewhere else. So: a soft click for every fifteen degrees the car
-    // turns — count them, six is a right angle — and a rising chime when it comes into line with
-    // the road, which is the moment to straighten the wheel.
+    // Cody: "It's hard to know how far I'm turning, and I overshoot the lane." A click every 15
+    // degrees (six is a right angle) and a rising chime when in line with the road: straighten now.
     private const float TurnClickDegrees = 15f, AlignedDegrees = 4f, UnalignedDegrees = 8f;
     private const int TurnBaseId = -965000, AlignId = -966001;
     private const string TurnSound = "SYNTH/drive_turn", AlignSound = "SYNTH/drive_aligned";
@@ -84,10 +69,9 @@ public sealed class DrivingAids
     private bool _aligned;
 
     /// <summary>
-    /// Lane assist: while you are roughly in line with the road and not steering, the car steers
-    /// itself to the middle of your lane — pure pursuit of the same point the guide beep sits on.
-    /// Null when it has nothing to say (off the road, in a junction, turning hard, stopped). K
-    /// switches it off and on; it starts on.
+    /// Lane assist's steering, -1..1 of full lock: pure pursuit of the middle of your lane while you are
+    /// roughly in line with the road. Null off the road, in a junction, turning hard or stopped. K
+    /// switches it; it starts on.
     /// </summary>
     public float? AssistSteer { get; private set; }
     public bool AssistEnabled { get; set; } = true;
@@ -98,11 +82,9 @@ public sealed class DrivingAids
     public DrivingAids(AudioEngineFacade audio) => _audio = audio;
 
     // ── The road ahead (docs/DRIVING_AIDS.md) ────────────────────────────────────────────────
-    //
-    // From the map's roads as the server sent them (MapRoads): the line ahead through the next
-    // junction, the speed limit, the give-way line, a closed level crossing, the end of the road, and
-    // how hard the car will have to brake for whichever of them comes first. Null on a map without roads,
-    // where the asphalt boxes answer what they can, as before.
+
+    /// <summary>Plans from the map's roads: the line through the next junction, the limit, give-way,
+    /// a closed crossing, the road's end, and the braking needed. Null on a map without roads.</summary>
     private DrivingCuePlanner? _planner;
 
     /// <summary>The last plan, for the readout and the tests. Null when there is none.</summary>
@@ -118,11 +100,9 @@ public sealed class DrivingAids
 
     // ── Indicators ───────────────────────────────────────────────────────────────────────────
     //
-    // J and L in the driver's seat. Which way you are going to turn is the one thing about the line
-    // ahead the road cannot say, so the planner takes it from the indicator: the guide leads into that
-    // turn, and the brake cue is for it. The flasher relay ticks in the dash, on and off at 1.5 Hz (SAE
-    // J590: 60 to 120 flashes a minute), and it cancels itself once the car has turned through 45 degrees
-    // and straightened, the way a steering column's cam throws it off.
+    // J and L. The planner takes the turn you mean from the indicator, so the guide and the brake cue
+    // lead into it. The relay ticks at 1.5 Hz (SAE J590: 60 to 120 flashes a minute) and cancels once
+    // the car has turned through 45 degrees and straightened, as a steering column's cam does.
     private int _indicator;
     private double _nextFlash;
     private bool _flashOn;
@@ -134,9 +114,6 @@ public sealed class DrivingAids
     private const float CancelAfterDegrees = 45f;
     private const int RelayId = -966010;
     private const string TickSound = "SYNTH/drive_relay_on", TockSound = "SYNTH/drive_relay_off";
-
-    /// <summary>-1 left, +1 right, 0 off.</summary>
-    public int Indicator => _indicator;
 
     /// <summary>J (-1) or L (+1): that side's indicator on, or off if it already was. What to say.</summary>
     public string ToggleIndicator(int side)
@@ -153,11 +130,9 @@ public sealed class DrivingAids
 
     // ── How hard to brake ────────────────────────────────────────────────────────────────────
     //
-    // A falling note — "come down" — toward whatever the braking is for. Silent while nothing ahead
-    // needs more than coasting; then the notes come faster and higher as the braking needed grows
-    // toward what the tyres can give (DrivingCueBands): lift, brake, brake hard, and at the limit a
-    // run of them so close together they are one sound. On a wet road the tyres give less, so the
-    // same corner calls for it sooner.
+    // A falling note toward whatever the braking is for, silent while coasting will do, faster and
+    // higher as the braking needed nears what the tyres can give (DrivingCueBands: lift, brake, hard,
+    // limit). A wet road gives less, so the same corner calls for it sooner.
     private double _nextBrake;
     private int _brakeIdx;
     private const int BrakeBaseId = -967100;
@@ -179,10 +154,9 @@ public sealed class DrivingAids
 
     // ── A wheel on a line ────────────────────────────────────────────────────────────────────
     //
-    // What a real road does to a car that strays: the tyres run over the raised markers on a centre
-    // line, and over the milled rumble strip at the edge. Each is a loop of strikes, played from that
-    // side at the front wheel, at a rate that is the speed over the spacing — Botts' dots every 1.2 m,
-    // a rumble strip's grooves every 0.3 m. It replaces the steady "over the line" tone.
+    // The tyres on the centre line's raised markers (Botts' dots every 1.2 m) or the edge's milled
+    // rumble strip (grooves every 0.3 m): a loop of strikes from that side's front wheel at speed over
+    // spacing.
     private const int CentreRumbleId = -964003, KerbRumbleId = -964004;
     private const string DotsSound = "SYNTH/drive_dots", StripSound = "SYNTH/drive_strip";
     private const float DotSpacing = 1.2f, GrooveSpacing = 0.3f;
@@ -204,8 +178,7 @@ public sealed class DrivingAids
         {
             Silence();
             Readout = null;
-            // Getting in is a fresh start: say nothing about where the car was parked until it
-            // reaches a road, and then say which one.
+            // Getting in is a fresh start: nothing is said until the car reaches a road.
             _wasOnRoad = false; _roadName = ""; _offRoadSince = -1;
             _announcedJunction = int.MinValue; _announcedDeadEnd = false;
             _lastClickSector = int.MinValue; _aligned = false; AssistSteer = null;
@@ -231,8 +204,7 @@ public sealed class DrivingAids
 
         float heading = MathF.Atan2(forward.X, forward.Z);
         Indicators(heading, speed);
-        // How fast the car is turning, smoothed over a few updates: with the speed, what the turn it is
-        // in already asks of its tyres.
+        // The yaw rate, smoothed over 0.15 s: with the speed, what the turn already asks of the tyres.
         double since = _now - _lastPlanAt;
         if (!float.IsNaN(_lastHeading) && since > 1e-3 && since < 0.5)
         {
@@ -254,8 +226,8 @@ public sealed class DrivingAids
         AssistSteer = null;
 
         bool onRoad = TryRoadAt(world, at, forward, out var road, out string name, out bool junction, out int roadId);
-        // Looking ahead goes DOWN THE ROAD, not along the bonnet: a car a few degrees off the line
-        // would otherwise probe out through the kerb and hear "road ends" on a straight road.
+        // Look down the road, not along the bonnet: a few degrees off, the probe left through the kerb
+        // and said "road ends" on a straight road.
         var ahead = forward;
         if (onRoad && !junction)
         {
@@ -266,10 +238,8 @@ public sealed class DrivingAids
 
         if (!onRoad)
         {
-            // Off the asphalt, the guide leads BACK to it: it sits on the nearest road, a couple of
-            // metres in from its edge, and the voice says which road and which way. Silence here is
-            // how a whole drive was spent crossing open ground at seventy with no idea where any
-            // road was.
+            // Off the asphalt the guide leads back to the nearest road and the voice says which and
+            // where: silent here, a whole drive was spent on open ground with no idea where a road was.
             StopTones();
             StopRumble();
             string where = "no road nearby";
@@ -291,8 +261,7 @@ public sealed class DrivingAids
 
         if (junction)
         {
-            // In the middle of a junction there are no lanes: the guide points the way you are
-            // going, and the sensors are quiet until you are on a road again.
+            // A junction has no lanes: the guide points the way on and the sensors are quiet.
             StopTones();
             StopRumble();
             Guide(PlanAim(at) ?? forward * GuideDistance(speed), speed);
@@ -306,18 +275,17 @@ public sealed class DrivingAids
         var dirAlong = along * p.Facing;
         var driverRight = across * p.Facing;
 
-        // Which lane you should be in: the one you are in, if it is on your side of the road; the
-        // nearest one on your side if you have strayed over the centre.
+        // Your lane, or the nearest on your side if you have strayed over the centre.
         float laneWidth = p.Width / p.Lanes;
         float mySide = p.TwoWay ? p.Facing : 0f;             // + is the road's right-hand half
         float target = LaneCentreFor(p, laneWidth, mySide);
         float lookAhead = GuideDistance(speed);
         var aim = dirAlong * lookAhead + driverRight * ((target - p.Across) * p.Facing);
-        // The guide on the planned line when there is one: it follows the road's bends and leads into
-        // the turn the indicator asks for. Lane assist keeps to the lane (below).
+        // The guide on the planned line when there is one (bends, the indicated turn); lane assist
+        // keeps to the lane.
         Guide(PlanAim(at) ?? aim, speed);
 
-        // In line with the road? Signed: positive is pointing to the right of it.
+        // Positive is pointing to the right of the road.
         float offRoadLine = SignedDegrees(dirAlong, forward);
         if (!_aligned && MathF.Abs(offRoadLine) < AlignedDegrees)
         {
@@ -326,12 +294,10 @@ public sealed class DrivingAids
         }
         else if (_aligned && MathF.Abs(offRoadLine) > UnalignedDegrees) _aligned = false;
 
-        // Lane assist: pure pursuit of the aim point. Steering angle atan(2 L sin(alpha) / ld),
-        // as a fraction of full lock — the same law a driver's hands follow toward a point ahead.
+        // Pure pursuit of the aim point: steer = atan(2 L sin(alpha) / ld), as a fraction of full lock.
         if (AssistEnabled && speed > 1.5f && MathF.Abs(offRoadLine) < AssistWithinDegrees)
         {
-            // The car's own wheelbase and lock, from its preset's chassis; a car the client cannot
-            // name is driven as the default chassis would have it.
+            // The preset's wheelbase and lock; an unknown car gets the default chassis.
             var chassis = car.Definition.SoundEmitter.SoundId is { } s2 && s2.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
                           && MachineRegistry.Knows(s2[7..])
                 ? MachineRegistry.VehicleFor(s2[7..]).Running
@@ -394,8 +360,7 @@ public sealed class DrivingAids
             _announcedDeadEnd = false;
         }
 
-        // Looking ahead down the road: a junction, or the end of the road. Checked every few metres
-        // out to a distance that grows with speed, so there is always three or four seconds' warning.
+        // A junction or the road's end ahead, probed every 3 m out to four seconds at this speed.
         if (junction) return;
         float reach = MathF.Max(35f, speed * 4f);
         for (float d = 6f; d <= reach; d += 3f)
@@ -447,10 +412,8 @@ public sealed class DrivingAids
         Announce?.Invoke(text);
     }
 
-    /// <summary>
-    /// The nearest point of road within sixty metres: which road, how far, and where. Junctions
-    /// count — they are road — and are named after a road that meets them.
-    /// </summary>
+    /// <summary>The nearest point of road within 60 m, two metres in from its edge: which road, how far,
+    /// and where. A junction counts, and is called "a junction".</summary>
     private static bool NearestRoad(WorldSnapshot world, Vector3 at, out Vector3 point, out string name, out float distance)
     {
         point = at; name = ""; distance = float.MaxValue;
@@ -460,8 +423,6 @@ public sealed class DrivingAids
             if (!world.Entities.TryGetValue(eid, out var e)) continue;
             var def = e.Definition;
             if (!string.Equals(def.Material.Material, "Asphalt", StringComparison.OrdinalIgnoreCase)) continue;
-            // The nearest point of the box's footprint, then two metres in from its edge so the beep
-            // is ON the road rather than at the kerb.
             var inv = Quaternion.Inverse(e.Transform.Rotation);
             var local = Vector3.Transform(at - e.Transform.Position, inv);
             var half = def.Collider.Size * 0.5f;
@@ -484,8 +445,7 @@ public sealed class DrivingAids
         to.Y = 0f;
         if (to.LengthSquared() < 1e-4f) return "here";
         float angle = MathF.Atan2(Vector3.Cross(forward, Vector3.Normalize(to)).Y, Vector3.Dot(forward, Vector3.Normalize(to))) * 180f / MathF.PI;
-        // In this world +X is east and +Z north, so facing north, east (on your right) gives
-        // Cross(forward, to).Y = +1. Positive is RIGHT. (Increasing-pitch-looks-down has a sibling.)
+        // +X east, +Z north: facing north, east gives Cross(forward, to).Y = +1, so positive is right.
         float a = MathF.Abs(angle);
         string side = angle > 0 ? "right" : "left";
         return a < 20f ? "ahead" : a < 70f ? $"ahead to your {side}" : a < 110f ? $"to your {side}" : a < 160f ? $"behind you to the {side}" : "behind you";
@@ -543,13 +503,12 @@ public sealed class DrivingAids
 
         if (side.Gap <= 0f)
         {
-            // Over it: the wheels on the markers, from that side at the front wheel — or, standing
-            // still where there is nothing to roll over, the steady tone no beep can be mistaken for.
+            // Over it: the wheels on the markers, or standing still the steady tone.
             float rate = speed / (centre ? DotSpacing : GrooveSpacing);
             if (speed > 0.5f)
             {
                 if (_audio.IsPlaying(toneId)) _audio.StopSound(toneId);
-                // The front wheel on that side: a front overhang of about 0.9 m behind the nose.
+                // The front wheel on that side, about 0.9 m behind the nose.
                 float frontAxle = MathF.Max(0.5f, (profile?.LengthMetres ?? 4.4f) * 0.5f - 0.9f);
                 var wheelSide = driverRight * (MathF.Sign(side.Offset) * (profile?.WidthMetres ?? 1.8f) * 0.5f);
                 Rumble(rumbleId, centre ? DotsSound : StripSound, wheelSide + ForwardOf(driverRight) * frontAxle,

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
 
 /// <summary>

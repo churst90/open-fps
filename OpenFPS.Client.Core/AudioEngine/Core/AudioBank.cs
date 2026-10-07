@@ -1,10 +1,6 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Collections.Generic;
-
 namespace OpenFPS.Client.AudioEngine.Core;
 
+/// <summary>The recorded sounds under ASSETS/SOUNDS, by folder and by their own id.</summary>
 public class AudioBank
 {
     private readonly Dictionary<string, List<string>> _sounds = new(StringComparer.OrdinalIgnoreCase);
@@ -55,7 +51,6 @@ public class AudioBank
 
     public IEnumerable<string> GetAllSoundIds()
     {
-        // Return all unique sound paths that point to actual files
         return _sounds.Values.SelectMany(x => x).Distinct();
     }
 }

@@ -1,10 +1,6 @@
 namespace OpenFPS.Client.Core.Platform;
 
-/// <summary>
-/// Platform-neutral key identifiers. Replaces <c>System.Windows.Forms.Keys</c> leaking into game
-/// logic — each head maps its native key codes (WinForms <c>Keys</c> / GTK keyvals) to/from these
-/// at the OS boundary, so the input/command layer stays portable.
-/// </summary>
+/// <summary>Keys as the game knows them; each head maps its native key codes to these.</summary>
 public enum GameKey
 {
     None = 0,
@@ -34,15 +30,13 @@ public enum GameKey
     // Chat buffer navigation
     BracketLeft, BracketRight,
 
-    /// <summary>The numeric keypad's divide key — a second binding for the command console, so the
-    /// console is reachable without a modifier on layouts where slash needs one. With the scope up it
-    /// is a trigger.</summary>
+    /// <summary>The keypad's divide: the command console without a modifier on layouts where slash
+    /// needs one. With the scope up it is a trigger.</summary>
     NumpadDivide,
 
-    // The rest of the numeric keypad, as it reports with Num Lock ON: the scope's keys. With Num Lock
-    // off the keypad is NVDA's and Orca's review keys and reports as navigation keys instead, which
-    // are left unmapped so the game never acts on a screen reader's command. The keypad's Enter is
-    // reported as Enter by both heads.
+    // The keypad with Num Lock on: the scope's keys. With Num Lock off it is NVDA's and Orca's review
+    // keys, reported as navigation keys, and those stay unmapped so the game never acts on a screen
+    // reader's command. The keypad's Enter is Enter in both heads.
     Numpad0, Numpad1, Numpad2, Numpad3, Numpad4, Numpad5, Numpad6, Numpad7, Numpad8, Numpad9,
     NumpadMultiply, NumpadAdd, NumpadSubtract, NumpadDecimal,
 }

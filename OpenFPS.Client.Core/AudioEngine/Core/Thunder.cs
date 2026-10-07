@@ -1,30 +1,22 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core;
 
 /// <summary>
-/// Thunder, worked out for one listener from the lightning channel that made it.
+/// Thunder for one listener from the lightning channel that made it: the tortuous-channel model (Few,
+/// J. Geophys. Res. 74, 1969; Ribner and Roy, J. Acoust. Soc. Am. 72, 1982; Lacroix, Coulouvrat,
+/// Marchiano, Farges and Ripoll, Geophys. Res. Lett. 46, 2019).
 ///
-/// The model is the tortuous-channel one (Few, J. Geophys. Res. 74, 1969; Ribner and Roy, J. Acoust.
-/// Soc. Am. 72, 1982; Lacroix, Coulouvrat, Marchiano, Farges and Ripoll, Geophys. Res. Lett. 46,
-/// 2019). Every bit of the channel is heated at once and sends out the same weak shock, an N-wave;
-/// each arrives at the listener after its own distance over the speed of sound. So the thunder is
-/// the channel's shape read out in time: the nearest bit is the crack, and the rest, kilometres of
-/// it at every distance, is the rumble. A straight piece of channel adds up loudly only where its
-/// pieces arrive together, broadside on (Ribner and Roy's "pip"); seen end on its pieces arrive one
-/// after another and almost cancel, so the corners carry much of the sound.
+/// Every bit of channel sends the same weak shock, an N-wave, at once, so thunder is the channel's
+/// shape read out in time: the nearest bit is the crack, the rest the rumble. A straight piece is loud
+/// only broadside on (Ribner and Roy's "pip"); end on its arrivals almost cancel, so the corners carry
+/// much of the sound. On the way the N-wave lengthens (weak-shock theory, Few 1969), the air takes its
+/// top (ISO 9613-1, Bass 1980), the ground adds a second arrival, and a high, far source is refracted
+/// over the listener (Fleagle, J. Meteorol. 6, 1949): thunder is rarely heard past about 25 km.
 ///
-/// What happens on the way is per distance: the N-wave lengthens a little as its shock outruns its
-/// tail (weak-shock theory, Few 1969), the air takes the top off it (ISO 9613-1, Bass 1980), the
-/// ground under the listener adds a second arrival, and a source high up and far away is refracted
-/// over the listener's head by the temperature falling with height (Fleagle, J. Meteorol. 6, 1949),
-/// which is why thunder is rarely heard past about 25 km.
-///
-/// The level is anchored to the channel simulation Lacroix et al. (2019) matched to thunder measured
-/// from 100 m to 25 km: 650 Pa, 2 m from the channel, for a wave whose spectrum peaks at 148 Hz.
+/// The level is anchored to Lacroix et al.'s (2019) simulation matched to thunder measured from 100 m
+/// to 25 km: 650 Pa, 2 m from the channel, spectrum peaking at 148 Hz.
 /// </summary>
 public static class Thunder
 {
@@ -121,17 +113,13 @@ public static class Thunder
 
     // ── Turbulence ───────────────────────────────────────────────────────────────────────────────
     //
-    // The air between the channel and the ear is not still: eddies of wind and warmth move the sound
-    // speed about by a few parts in a thousand. Over kilometres that scatters a weak shock: the
-    // coherent N-wave loses its high frequencies (its rise is rounded; sonic booms heard through
-    // turbulence are "rounded" or "peaked" at random: Pierce and Maglieri, J. Acoust. Soc. Am. 51,
-    // 1972), and what it loses arrives as an incoherent field, spread in time behind it. For thunder
-    // that is the difference between a train of separate N-waves with silence between them and a
-    // rumble: every piece of channel's arrival is followed by its own scattered tail, longer the
-    // further it came. Chernov's small-angle theory for a Gaussian medium (Ostashev and Wilson,
-    // "Acoustics in Moving Inhomogeneous Media", 2nd ed. 2015, ch. 7) gives both laws used here: the
-    // coherent intensity falls as exp(-sqrt(pi) mu^2 k^2 L r), and the mean square scattering angle
-    // grows as sqrt(pi) mu^2 r / L, which delays the scattered sound by about r <theta^2> / 4c.
+    // Eddies move the sound speed by a few parts in a thousand; over kilometres that rounds the
+    // N-wave's rise (Pierce and Maglieri, J. Acoust. Soc. Am. 51, 1972) and what it loses trails it as
+    // an incoherent tail. That tail is the difference between separate N-waves with silence between
+    // and a rumble. Chernov's small-angle theory (Ostashev and Wilson, "Acoustics in Moving
+    // Inhomogeneous Media", 2nd ed. 2015, ch. 7): coherent intensity falls as
+    // exp(-sqrt(pi) mu^2 k^2 L r), and the mean square scattering angle sqrt(pi) mu^2 r / L delays the
+    // scattered sound by about r <theta^2> / 4c.
 
     /// <summary>Turbulence's scale along the path, metres (the Gaussian model's correlation length).
     /// Near the ground it is about the height; along a path from kilometres up it is larger. A
@@ -171,11 +159,9 @@ public static class Thunder
         => Math.Clamp(MathF.Sqrt(MathF.PI) * mu2 * distance * distance / (4f * c * TurbulenceScaleMetres), 0f, MaxScatterSeconds);
 
     /// <summary>
-    /// The share of a wave at <paramref name="f"/> Hz, come <paramref name="distance"/> metres, that is
-    /// heard as scattered sound: what turbulence took from the coherent wave, as far as it is spread by
-    /// more than a period. Scattered sound that arrives within a fraction of a period of the coherent
-    /// wave is that wave with its phase disturbed, and a crack 100 m off, scattered by 0.02 ms, is still
-    /// a crack; from kilometres, spread by tens of milliseconds, it is a rumble. The weighting,
+    /// The share of a wave at <paramref name="f"/> Hz, come <paramref name="distance"/> metres, heard
+    /// as scattered sound: what turbulence took, as far as it is spread by more than a period. A crack
+    /// 100 m off, scattered by 0.02 ms, is still a crack; from kilometres it is a rumble. The weighting,
     /// spread / (spread + period), is a judgement.
     /// </summary>
     public static float ScatteredShare(float f, float distance, float mu2, float c)
@@ -205,11 +191,9 @@ public static class Thunder
         float groundY = listener.Y - options.EarAboveGround;
 
         // ── The pieces, each a straight bit of channel with the energy it took ─────────────────
-        // The energy varies along the channel: Bestard, Farges and Coulouvrat (J. Geophys. Res. 130,
-        // 2025) find the sound power within one flash "highly heterogeneous". Each 8 m step takes the
-        // flash's energy per metre times a log-normal draw from the strike's seed, so every client
-        // draws the same. It also keeps every piece from sending the identical N-wave, whose
-        // spectrum has regularly spaced zeros: summed identical, the thunder has a comb in it.
+        // Sound power within one flash is "highly heterogeneous" (Bestard, Farges and Coulouvrat,
+        // J. Geophys. Res. 130, 2025): each 8 m step takes a log-normal draw from the strike's seed, so
+        // every client draws the same. Identical N-waves summed would put a comb in the thunder.
         var pieces = new List<Piece>(4096);
         var draw = new Random(strike.Seed ^ 0x2C1B3C6D);
         for (int p = 0; p < channel.Paths.Count; p++)
@@ -221,10 +205,9 @@ public static class Thunder
                 float spread = MathF.Exp(EnergySpreadSigma * LightningPhysics.Gaussian(draw));
                 float e = strike.EnergyPerMetre * share * (options.Plain ? 1f : spread);
                 if (options.Plain) { pieces.Add(new Piece(path[i - 1], path[i], 1f, p == 0, e)); continue; }
-                // Each step's fine structure from its own seed (not HashCode, which is salted per
-                // process), so a listener a few metres away, who follows a different set of steps
-                // down, still hears the same channel.
-                FineStructure(pieces, path[i - 1], path[i], listener, e, p == 0, unchecked(strike.Seed * 73856093 ^ (p + 1) * 19349663 ^ i * 83492791));
+                // Each step's own seed (not HashCode, which is salted per process), so every listener
+                // hears the same channel.
+                FineStructure(pieces, path[i - 1], path[i], e, p == 0, unchecked(strike.Seed * 73856093 ^ (p + 1) * 19349663 ^ i * 83492791));
             }
         }
         if (pieces.Count == 0) return new List<Part>();
@@ -246,7 +229,6 @@ public static class Thunder
                 fine.Add(pc with { A = Vector3.Lerp(pc.A, pc.B, k / (float)n), B = Vector3.Lerp(pc.A, pc.B, (k + 1) / (float)n) });
         }
 
-        // ── Which direction each piece comes from, grouped ───────────────────────────────────
         var dirs = new Vector3[fine.Count];
         var weights = new float[fine.Count];
         for (int i = 0; i < fine.Count; i++)
@@ -261,13 +243,11 @@ public static class Thunder
         }
         var (centres, member) = Cluster(dirs, weights, Math.Max(1, options.MaxParts), options.MergeDegrees);
 
-        // ── The kernels: one element's wave, for its energy, as it arrives from each distance ──
         var kernels = new KernelBank(fs, c, air, strike.EnergyPerMetre * MathF.Exp(3f * EnergySpreadSigma), options.Turbulence ? TurbulenceVariance(air, c) : 0f);
 
         var parts = new List<Part>();
         for (int g = 0; g < centres.Count; g++)
         {
-            // How long this part runs.
             double tFirst = double.MaxValue, tLast = 0;
             for (int i = 0; i < fine.Count; i++)
             {
@@ -284,13 +264,12 @@ public static class Thunder
             int pre = kernels.Pre;
             double start = tFirst - pre / (double)fs - 0.005;
             int length = (int)((tLast - start + strokeSpan) * fs) + kernels.MaxLength + pre + 16;
-            // Room after the last arrival for its scattered tail.
             length += (int)(4f * ScatterSpreadSeconds((float)(tLast * c), kernels.Mu2, c) * fs);
             if (length > fs * 240) length = fs * 240;   // four minutes is more thunder than there is
             var mine = new List<int>();
             for (int i = 0; i < fine.Count; i++) if (member[i] == g) mine.Add(i);
-            // Split across a few cores, each into a buffer of its own, interleaved so each gets near and
-            // far pieces alike: a strike 100 m away is heard a third of a second after the flash.
+            // A few cores, a buffer each, near and far pieces interleaved: a strike 100 m away is heard
+            // a third of a second after the flash.
             int threads = options.Threads > 0 ? options.Threads : Math.Clamp(Environment.ProcessorCount / 2, 1, 4);
             var buffers = new float[threads][];
             System.Threading.Tasks.Parallel.For(0, threads, t =>
@@ -321,9 +300,9 @@ public static class Thunder
         return parts;
     }
 
-    /// <summary>The spread (natural log) of the energy each 8 m of channel takes about the flash's
-    /// figure. A judgement standing for Bestard et al.'s heterogeneity; it is what keeps the summed
-    /// N-waves' spectral zeros from lining up.</summary>
+    /// <summary>The spread (natural log) of each 8 m step's energy about the flash's figure. A
+    /// judgement standing for Bestard et al.'s heterogeneity; it keeps the summed N-waves' spectral
+    /// zeros from lining up.</summary>
     public const float EnergySpreadSigma = 0.35f;
 
     /// <summary>Every part summed into one mono buffer, from the flash: for measuring.</summary>
@@ -356,22 +335,18 @@ public static class Thunder
         => MathF.Sqrt(MathF.Max(1f, energyPerMetre) / (MathF.PI * LightningPhysics.AmbientPressurePa));
 
     /// <summary>
-    /// One 8 m step of channel as the pieces it is made of. Hill's 16 degrees is measured at the 8 m
-    /// scale and the walk is built to it; below that, the step is taken to be as tortuous again, step
-    /// for step, down to the relaxation radius: the same random turn about the same random axis, pulled
-    /// to the step's far end so the 8 m geometry is kept. That a lightning channel is tortuous at every
-    /// scale photographs resolve is an assumption here (a self-similar channel), and it is what decides
-    /// how much of the thunder above a few hundred hertz there is: a straight 8 m piece seen obliquely
-    /// sends almost nothing above 1/W (W its arrival spread), and the kinks inside it do. It is done
-    /// at every distance: a straight 8 m piece seen end on is heard only at its two ends, with silence
-    /// between, and a rumble made of those breaks up (Cody, round 1: "crackly and breaks up").
+    /// One 8 m step as the pieces it is made of: as tortuous again below Hill's 16 degrees (measured at
+    /// 8 m), down to the relaxation radius, pulled to the step's far end so the 8 m geometry is kept.
+    /// The self-similar channel is an assumption, and it decides how much thunder there is above a few
+    /// hundred hertz: a straight piece sends almost nothing above 1/W (W its arrival spread). Done at
+    /// every distance: straight pieces end on are heard only at their ends, and a rumble of those
+    /// breaks up (Cody, round 1: "crackly and breaks up").
     /// </summary>
-    private static void FineStructure(List<Piece> into, Vector3 a, Vector3 b, Vector3 listener, float energy, bool main, int seed)
+    private static void FineStructure(List<Piece> into, Vector3 a, Vector3 b, float energy, bool main, int seed)
     {
         float len = Vector3.Distance(a, b);
         float r0 = RelaxationRadius(energy);
         int n = (int)MathF.Floor(len / MathF.Max(0.25f, r0));
-        float d = Vector3.Distance((a + b) * 0.5f, listener);
         if (n < 2 || len <= 0f)
         {
             into.Add(new Piece(a, b, 1f, main, energy));
@@ -393,7 +368,7 @@ public static class Thunder
                 var u = MathF.Abs(dir.Y) < 0.9f ? Vector3.Normalize(Vector3.Cross(dir, Vector3.UnitY)) : Vector3.Normalize(Vector3.Cross(dir, Vector3.UnitX));
                 var v = Vector3.Cross(dir, u);
                 var turned = dir * MathF.Cos(theta) + (u * MathF.Cos(phi) + v * MathF.Sin(phi)) * MathF.Sin(theta);
-                // Pulled to the step's far end, harder as fewer sub-steps are left to get there.
+                // Pulled to the step's far end, harder as fewer sub-steps are left.
                 var home = b - p;
                 float left = home.Length();
                 if (left > 1e-4f) turned += home / left * (LightningPhysics.HomingShare * n / MathF.Max(1, n - k));
@@ -408,12 +383,10 @@ public static class Thunder
     private static Vector3 Mirror(Vector3 p, float groundY) => new(p.X, 2f * groundY - p.Y, p.Z);
 
     /// <summary>
-    /// One straight piece of channel, every stroke, added to the buffer. In its own far field the
-    /// piece's elements arrive spread evenly over W = |d2 - d1| / c, so what it adds is the element's
-    /// wave averaged over that spread: (K(t - t1) - K(t - t1 - W)) / W, K the wave's running integral
-    /// (Ribner and Roy 1982). Broadside on, W is nothing and it is the wave itself, as loud as the
-    /// piece is long. Each stroke heats the channel again with its own energy (the main channel only:
-    /// subsequent strokes do not light the branches), so each has its own wave.
+    /// One straight piece of channel, every stroke, added to the buffer. In its far field the elements
+    /// arrive spread over W = |d2 - d1| / c, so it adds (K(t - t1) - K(t - t1 - W)) / W, K the wave's
+    /// running integral (Ribner and Roy 1982); broadside on it is the wave itself. Subsequent strokes
+    /// relight the main channel only, each with its own energy and wave.
     /// </summary>
     private static void Add(float[] buf, double start, int fs, Vector3 a, Vector3 b, Vector3 listener, float weight, float energy,
                             bool main, LightningChannel channel, KernelBank kernels, float c, Air air, float groundY,
@@ -447,14 +420,10 @@ public static class Thunder
     }
 
     /// <summary>
-    /// The thunder as turbulence leaves it. Everything arriving at time t has come c t metres, so the
-    /// share each frequency keeps coherent, exp(-alpha(f) c t), is a function of time alone, and the
-    /// coherent sound is filtered by it frame by frame (short-time Fourier, overlapping sine windows,
-    /// so the gain glides). What it loses, octave by octave, is the scattered field: noise in that
-    /// octave whose intensity follows the energy lost, each frame's let out over the spread its
-    /// distance gives it (<see cref="ScatterSpreadSeconds"/>). Close by the spread is a fraction of a
-    /// millisecond and the scattered crack is still a crack; from kilometres off each arrival trails a
-    /// tail tens to hundreds of milliseconds long, and the gaps between arrivals fill.
+    /// The thunder as turbulence leaves it. What arrives at time t has come c t metres, so the share
+    /// kept coherent, exp(-alpha(f) c t), is a function of time alone and is applied frame by frame
+    /// (short-time Fourier, overlapping sine windows). What is lost becomes, octave by octave, noise
+    /// whose intensity follows the energy lost, let out over <see cref="ScatterSpreadSeconds"/>.
     /// </summary>
     private static float[] Scatter(float[] coherent, double start, int fs, float c, float mu2, int seed)
     {
@@ -467,9 +436,8 @@ public static class Thunder
         int bands = 0;
         while (bands < ScatterBands.Length && ScatterBands[bands] * 1.414f < 0.5f * fs) bands++;
         var lostEnergy = new double[bands][];
-        // Each octave by three band-passes in a row (RBJ, Q = sqrt 2): skirts of 18 dB an octave, so
-        // the rumble's strong low octaves do not leak into the top ones (with two, the 500 Hz octave's
-        // noise put a top on thunder 8 km away that the air had taken off).
+        // Three RBJ band-passes per octave (Q = sqrt 2), 18 dB an octave: with two, the 500 Hz octave's
+        // noise put back a top on thunder 8 km away that the air had taken off.
         var filters = new (double B0, double B2, double A1, double A2)[bands];
         for (int b = 0; b < bands; b++)
         {
@@ -543,9 +511,8 @@ public static class Thunder
         {
             var e = lostEnergy[b];
             var intensity = new float[frames];
-            // Each frame's lost energy let out over its spread as two lags of half the spread each: a
-            // delay that rises from nothing and falls away, as sound scattered many times over arrives
-            // (a single lag would start every tail at full strength, a step).
+            // Two lags of half the spread each, so a tail rises from nothing and falls away; a single
+            // lag would start every tail at full strength, a step.
             double first = 0, level = 0, any = 0;
             for (int f = 0; f < frames; f++)
             {
@@ -558,7 +525,7 @@ public static class Thunder
             }
             if (any <= 0) return;
             var bp = new BandPass(filters[b]);
-            // White noise from a fixed generator (xorshift), seeded by the strike: every client the same.
+            // xorshift seeded by the strike: every client the same.
             uint state = unchecked((uint)(seed * 131 + b * 7919)) | 1u;
             var noise = new float[n];
             double power = 0;
@@ -573,7 +540,6 @@ public static class Thunder
             double perFrame = dt * fs;
             for (int i = 0; i < n; i++)
             {
-                // The intensity at the middle of each frame, joined straight between them.
                 double f = i / perFrame - 0.5;
                 int lo = Math.Clamp((int)Math.Floor(f), 0, frames - 1), hi = Math.Min(lo + 1, frames - 1);
                 double frac = Math.Clamp(f - lo, 0.0, 1.0);
@@ -625,13 +591,11 @@ public static class Thunder
     // ── Refraction: the acoustic shadow ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// What refraction leaves of a piece at <paramref name="at"/>, as a gain. With the temperature
-    /// falling with height the sound speed falls too, a ray curves upward with a radius of
-    /// 1/a, a = lapse / (2 T), and the lowest ray from a source h up reaches the ground no further than
-    /// x = sqrt(2 h / a), plus the same for the listener's own height (Fleagle 1949; a 4 km source,
-    /// about 26 km). A wind blowing toward the listener bends sound down and pushes that edge out;
-    /// blowing away, it pulls it in. In a storm the air near the ground is often cooled by the rain,
-    /// which weakens or inverts the lapse and carries thunder further; the standard lapse is used.
+    /// What refraction leaves of a piece at <paramref name="at"/>, as a gain. Rays curve up with radius
+    /// 1/a, a = lapse / (2 T), so the lowest ray from h up reaches the ground no further than
+    /// sqrt(2 h / a), plus the same for the listener's height (Fleagle 1949; a 4 km source, about 26 km).
+    /// Wind toward the listener pushes that edge out, away pulls it in. Rain-cooled air can weaken the
+    /// lapse in a storm; the standard lapse is used.
     /// </summary>
     public static float ShadowGain(Vector3 at, Vector3 listener, float groundY, Air air, float c)
     {
@@ -723,7 +687,7 @@ public static class Thunder
         /// per metre of channel that gives that amplitude.</summary>
         public sealed class Class
         {
-            public int Index; public float T0; public float A2; public float Strength;
+            public float T0; public float A2; public float Strength;
             public readonly System.Collections.Concurrent.ConcurrentDictionary<int, Kernel> Bins = new();
         }
 
@@ -757,7 +721,7 @@ public static class Thunder
             float e = MathF.Pow(2f, index / (float)PerDoubling);
             float t0 = LightningPhysics.NWaveSeconds(e, _c);
             float a2 = AmplitudeAt2m(e, _c);
-            return _classes.GetOrAdd(index, new Class { Index = index, T0 = t0, A2 = a2, Strength = a2 / LineResponseCached(t0, _c) });
+            return _classes.GetOrAdd(index, new Class { T0 = t0, A2 = a2, Strength = a2 / LineResponseCached(t0, _c) });
         }
 
         public Kernel For(Class cls, float distance)

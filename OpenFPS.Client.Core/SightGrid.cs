@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Common;
@@ -9,22 +7,18 @@ namespace OpenFPS.Client.Core;
 /// <summary>
 /// Sight rays, cheaply enough to look ten times a second while walking.
 ///
-/// The client's collision grid has ten-metre cells and is asked by radius, so one twenty-metre ray
-/// asks about a fifty-metre square — every floor of every tower standing in it, each stair column and
-/// railing — and a look of four or five rays cost a millisecond and a half in the city. This keeps its
-/// own index of the fixed solid things: <see cref="CellMetres"/> cells walked in order along the ray,
-/// stopping at the first cell that holds the nearest hit, with each thing's box tested before its
-/// shape. Floors, roofs and roads, which would fill hundreds of cells each, are kept apart as slabs
-/// and tested whole. Door leaves swing and the things that move go where they like, so those two are
-/// gathered fresh for each look (<see cref="Prepare"/>) from the ones within reach.
+/// <para>The collision grid's ten-metre cells are asked by radius, so a twenty-metre ray asked about a
+/// fifty-metre square and a look of four or five rays cost 1.5 ms in the city. This keeps its own index
+/// of the fixed things, <see cref="CellMetres"/> cells walked in order along the ray, box before shape.
+/// Floors, roofs and roads are kept apart as slabs and tested whole; door leaves and moving things are
+/// gathered fresh for each look (<see cref="Prepare"/>).</para>
 ///
-/// The answers are <see cref="SpatialService.RaycastSingle"/>'s, to the same thing at the same
-/// distance; only the cost differs.
+/// <para>The answers are <see cref="SpatialService.RaycastSingle(WorldSnapshot, Vector3, Vector3, float, Func{EntitySnapshot, bool}, out EntitySnapshot, out float)"/>'s,
+/// same thing at the same distance; only the cost differs.</para>
 ///
-/// <para>With a triangle world (geometry stage 2) the fixed boxes are its: the solid ones in its physical
-/// layers, the ones said by name but not solid in its sight-only layer (GeometryLayers.Announced), and a
-/// look asks its tree. The index keeps only what the triangles do not hold: a fixed thing that is not a
-/// box, and anything whose solid changed since the last build.</para>
+/// <para>With a triangle world the fixed boxes are its (physical layers for solids, GeometryLayers.Announced
+/// for things named but not solid) and a look asks its tree. The index then keeps only what the
+/// triangles do not hold: a fixed thing that is not a box, and anything changed since the last build.</para>
 /// </summary>
 public sealed class SightGrid
 {
@@ -64,15 +58,14 @@ public sealed class SightGrid
     private static bool InTriangles(in EntitySnapshot e)
         => EntityGeometry.RoleOf(e.Definition) is GeometryRole.Static or GeometryRole.SightOnly or GeometryRole.Mover;
 
-    /// <summary>Whether this index holds a thing: one a look can find that the triangles do not hold, or
-    /// every one of them when there are no triangles.</summary>
+    /// <summary>Whether this index holds a thing: one a look can find that the triangles do not hold.</summary>
     private bool Indexed(in EntitySnapshot e) => Seen(e) && !(_triangles && InTriangles(e));
 
     /// <summary>Whether the index was built for a world with triangles.</summary>
     private bool _triangles;
 
-    /// <summary>Rebuilds the index if the world's fixed things have changed. Counted at most every
-    /// <see cref="CheckSeconds"/>, and only when the number of things in the world has changed.</summary>
+    /// <summary>Rebuilds the index if the world's fixed things have changed: checked when the number of
+    /// things in the world changes, at most every <see cref="CheckSeconds"/>.</summary>
     public void Refresh(WorldSnapshot world, double now)
     {
         bool triangles = SpatialService.UsesTriangles(world);
@@ -157,8 +150,7 @@ public sealed class SightGrid
 
     /// <summary>
     /// The nearest thing along the ray that <paramref name="accept"/> admits, within
-    /// <paramref name="range"/>: <see cref="SpatialService.RaycastSingle"/> over what <see cref="Prepare"/>
-    /// gathered and the index.
+    /// <paramref name="range"/>, over what <see cref="Prepare"/> gathered and the index.
     /// </summary>
     public bool Cast(WorldSnapshot world, Vector3 origin, Vector3 dir, float range, Func<EntitySnapshot, bool> accept,
                      out EntitySnapshot hit, out float distance)
@@ -168,8 +160,8 @@ public sealed class SightGrid
         bool found = false;
         if (++_stampNow == int.MaxValue) { Array.Clear(_stamp); _stampNow = 1; }
 
-        // The fixed boxes, from the triangle world: where the ray enters the first one the look stops at, or
-        // at once if it starts inside one, as the box test had it.
+        // From the triangle world: where the ray enters the first box the look stops at, or at once if it
+        // starts inside one, as the box test does.
         if (_triangles && world.Geometry is { } geo)
         {
             var look = new Looks { World = world, Stops = accept, Stale = world.GeometryStale };
@@ -255,7 +247,7 @@ public sealed class SightGrid
         return true;
     }
 
-    /// <summary>The shape test, as <see cref="SpatialService.RaycastSingle"/> makes it.</summary>
+    /// <summary>The shape test, as SpatialService.RaycastSingle makes it.</summary>
     private static bool Shape(in EntitySnapshot e, Vector3 origin, Vector3 dir, float range, out float distance)
     {
         var def = e.Definition;

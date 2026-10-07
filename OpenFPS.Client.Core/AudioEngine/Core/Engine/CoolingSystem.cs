@@ -1,4 +1,3 @@
-using System;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core.Engine;
@@ -6,28 +5,22 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// <summary>
 /// The coolant's temperature, and the fan clutch that answers it (<see cref="VehicleProfile.FanClutch"/>).
 ///
-/// A heat balance with one lump of metal and water in it. Heat goes in from the engine, in proportion
-/// to the power it is making plus what it loses to its own friction: coolant heat is a fixed share of
-/// the fuel burned, and the fuel follows the power. Heat goes out through the radiator in proportion
-/// to how far the coolant is above the air, how open the thermostat is, and how much air is going
-/// through the core, which is the road's ram air and the fan's together.
+/// A heat balance with one lump of metal and water in it. Heat goes in in proportion to the engine's
+/// power plus its friction (coolant heat is a fixed share of the fuel burned), and out through the
+/// radiator in proportion to the coolant's rise over the air, the thermostat's opening, and the air
+/// through the core (ram air and fan together).
 ///
-/// Everything is in units of the engine's DESIGN heat: what it rejects at rated power. The radiator
-/// is sized the way a real one is, to carry that at 100 C with the fan locked up and the vehicle
-/// standing still, the worst case it is specified for. That leaves no free constants per vehicle:
-/// the rated power comes from the engine's own peak torque and redline, the thermal mass from its
-/// displacement.
+/// Everything is in units of the engine's design heat, what it rejects at rated power, and the
+/// radiator is sized as a real one is: to carry that at 100 C with the fan locked and the vehicle
+/// standing. So there are no constants per vehicle: rated power from peak torque and redline, thermal
+/// mass from displacement.
 ///
-/// What it gives, as a result rather than as a rule: at a cruise the ram air carries the heat and
-/// the thermostat is part closed, so the fan stays disengaged; pulling a load up to speed from a
-/// stop, the heat outruns a radiator with no air through it and, after twenty or thirty seconds of
-/// it, the clutch goes in.
+/// As a result, not a rule: at a cruise the ram air carries the heat and the fan stays out; pulling a
+/// load up from a stop, the clutch goes in after twenty or thirty seconds.
 ///
-/// A car's fan is the other kind (<see cref="ElectricFanSpec"/>): a motor on a relay, its speed
-/// nothing to do with the crank's. The same heat balance switches it, in two stages, and so does the
-/// air conditioning: the condenser sits in front of the radiator and the fan has to pull air through
-/// it whenever the compressor runs and the road is not doing it, so on a warm day an idling or
-/// crawling car runs its fan whatever the coolant is doing.
+/// A car's fan is the other kind (<see cref="ElectricFanSpec"/>): a motor on a relay, switched by the
+/// same balance in two stages, and by the air conditioning: the condenser is in front of the radiator,
+/// so on a warm day an idling or crawling car runs its fan whatever the coolant is doing.
 /// </summary>
 public sealed class CoolingSystem
 {

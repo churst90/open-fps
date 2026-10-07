@@ -1,26 +1,18 @@
 using System.Numerics;
-using System.Collections.Generic;
-using OpenFPS.Common.Components;
-using System;
 
 namespace OpenFPS.Client.Core;
 
-/// <summary>
-/// Responsibility: Track the current player's stats and position for immediate TTS feedback.
-/// Includes support for visual smoothing during server reconciliation.
-/// </summary>
+/// <summary>The local player's position, look, stats and surroundings, as the client knows them now.</summary>
 public class LocalPlayerState
 {
-    // Authoritative logical position (used for physics and networking)
+    /// <summary>The predicted position, for physics and the network.</summary>
     public Vector3 Position = Vector3.Zero;
-    
-    // Smoothing offset: Added to Position to get the "Visual" location.
-    // This bleeds to zero over time to hide server snaps.
+
+    /// <summary>Added to <see cref="Position"/> for where the listener is; bleeds to zero to hide a
+    /// server correction.</summary>
     public Vector3 VisualOffset = Vector3.Zero;
 
-    /// <summary>
-    /// Returns the smoothed position used for Audio Listener and UI rendering.
-    /// </summary>
+    /// <summary>The smoothed position: the listener's.</summary>
     public Vector3 VisualPosition => Position + VisualOffset;
 
     public Vector3 Velocity = Vector3.Zero;
@@ -30,34 +22,25 @@ public class LocalPlayerState
     public bool IsGrounded { get; set; } = true;
 
     /// <summary>
-    /// The composite this player is riding in, or -1 when they are on their own two feet.
-    ///
-    /// While it is set, the client does not predict its own position: there is nothing of its own to
-    /// predict. A passenger's position belongs to a seat, the seat belongs to something the client
-    /// cannot simulate, and guessing would earn a correction every single tick. It also stops
-    /// footsteps, which somebody sitting down does not make.
+    /// The composite this player rides in, or -1 on foot. While set, the position is not predicted (it
+    /// is a seat's, see PredictionReconciler.Riding) and there are no footsteps.
     /// </summary>
     public int RidingEntityId { get; set; } = -1;
 
     public bool IsRiding => RidingEntityId >= 0;
-    /// <summary>Whether the seat being ridden in is the one that drives.</summary>
+    /// <summary>The seat ridden in is the one that drives.</summary>
     public bool RidingControls { get; set; }
 
     /// <summary>
-    /// How high the ears are above where the body is, metres: standing, or sitting down.
-    ///
-    /// It was 1.7 everywhere, sitting or not — and a seat's position is its floor. A hatchback's roof
-    /// is 1.15 m above its floor, so a driver's ears were half a metre ABOVE THE ROOF: outside the
-    /// cabin's room, in the open air over the car, which is why the inside of a car did not sound
-    /// like the inside of anything. Seated, the eyes are about a metre up.
+    /// How high the ears are above the body's position, metres. A seat's position is its floor, and a
+    /// hatchback's roof is 1.15 m above it: at the standing 1.7 a driver's ears were over the roof, out
+    /// of the cabin's room. Seated, they are about a metre up.
     /// </summary>
     public float EyeHeight => IsRiding ? 1.0f : 1.7f;
     public int Health { get; set; } = 100;
     /// <summary>The gun in your hands (a weapon id), or empty: what decides whether Enter fires and R
     /// reloads. From the server's StatsUpdate.</summary>
     public string HeldWeaponId { get; set; } = "";
-    /// <summary>Rounds in it, or -1 with none.</summary>
-    public int HeldRounds { get; set; } = -1;
     /// <summary>The scope on it (a ScopeRegistry id), or empty: what numpad star raises.</summary>
     public string HeldScopeId { get; set; } = "";
     /// <summary>The fastest you may move on foot, m/s, or 0 for none: set while you carry a body. From the
@@ -68,41 +51,20 @@ public class LocalPlayerState
     public const string UnknownArea = "Unknown Area";
     public string CurrentRegion { get; set; } = UnknownArea;
 
-    /// <summary>Which acoustic region the listener is in, or a negative id for none.
-    ///
-    /// The ID rather than the NAME is what a crossing is: two rooms can share a name, and the outdoor
-    /// fallback name flips between "Outside" and "Under Shelter" on a continuous shelter value, which
-    /// would announce itself every time a cloud of geometry passed overhead.</summary>
+    /// <summary>The acoustic region the listener is in, or negative for none. A crossing is a change of
+    /// id, not of name: two rooms can share a name, and the outdoor name flips between "Outside" and
+    /// "Under Shelter" on a continuous shelter value.</summary>
     public int CurrentRegionId { get; set; } = int.MinValue;
 
-    /// <summary>The ROOM the listener is in: <see cref="CurrentRegionId"/> without the named parts of
-    /// rooms (a flight, a landing; see NamedPlaces). Walking from a landing onto the floor beside it is
-    /// a new name but not a new room, and what the stair cues count as having gone somewhere else is a
-    /// new room.</summary>
+    /// <summary>The room the listener is in: <see cref="CurrentRegionId"/> without the named parts of
+    /// rooms (a flight, a landing; see NamedPlaces). The stair cues count a new room, not a new name.</summary>
     public int CurrentRoomId { get; set; } = int.MinValue;
     public bool IsIndoor { get; set; }
-    public Vector3 RoomSize { get; set; }
-    public Vector3 RoomCenter { get; set; }
     public Vector3 MapMin { get; set; } = new Vector3(-50, 0, -50);
     public Vector3 MapMax { get; set; } = new Vector3(50, 10, 50);
-    public Vector3 MapSize { get; set; } = new Vector3(100, 100, 100);
     public float ShelterFactor { get; set; } = 0.0f;
 
     public float Temperature { get; set; } = 20.0f;
-    public float Humidity { get; set; } = 0.5f;
-    public float AirPressure { get; set; } = 1013.25f;
-
-    /// <summary>The sustained wind the server broadcasts, m/s. Weather, not what you feel.</summary>
-    public Vector3 WindVelocity { get; set; } = Vector3.Zero;
-
-    /// <summary>How hard the sustained wind gusts, 0..1. The amplitude of the swell the client
-    /// synthesizes locally; see <see cref="OpenFPS.Common.WindModel"/>.</summary>
-    public float WindGustiness { get; set; } = 0.0f;
-
-    /// <summary>The air moving past the listener's head this frame, m/s (x east, z north): the
-    /// weather's wind where the head is (WindField, gusts and all, less what the place shelters),
-    /// minus the head's own movement. What the ears hear (EarWind).</summary>
-    public Vector3 FeltWind { get; set; } = Vector3.Zero;
 
     public float PrecipitationIntensity { get; set; } = 0.0f;
 
@@ -144,14 +106,9 @@ public class LocalPlayerState
             _ => "North West"
         };
         
-        // INCREASING PITCH LOOKS DOWN, and this readout had it the other way round.
-        //
-        // Rotation is built by Quaternion.CreateFromYawPitchRoll(yaw, pitch, 0), whose pitch is a
-        // right-handed rotation about +X — which takes forward (+Z) toward -Y. So a positive pitch
-        // aims at the ground. The same trap caught the K and O keys themselves once: the word
-        // "pitch" reads as "up" and the arithmetic does the opposite, and every step of it is
-        // individually plausible. Reported as "when I press O and I'm looking up, pressing f says
-        // looking down".
+        // Increasing pitch looks down: CreateFromYawPitchRoll's pitch turns forward (+Z) toward -Y.
+        // This readout had it backwards once ("pressing f says looking down" while looking up), and
+        // the K and O keys fell into the same trap.
         float pitchDeg = Pitch * (180.0f / MathF.PI);
         string pitchStr = pitchDeg switch
         {

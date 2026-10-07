@@ -1,24 +1,5 @@
-using System;
-using System.Threading;
-
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
-/// <summary>
-/// The guard on every custom DSP that writes into the mix: a block with a sample that is not a
-/// number (NaN or infinite) is zeroed before it leaves the unit, and the unit is named once in the
-/// log ([NONFINITE]).
-///
-/// Why. One NaN reaching a bus is summed into everything after it: the master limiter's state goes
-/// NaN and stays there, and the whole game is silent until it is restarted, with nothing in the log
-/// (Cody, 2026-10-03: "a pop while inside one of the buildings and the audio just cut out"; the
-/// loudness meter on the master read NaN from then on). A unit with a recursive state (a filter, a
-/// convolution's input ring) that once holds a NaN puts it out on every block after, so the unit
-/// also forgets its state where it can.
-///
-/// Mixer thread: nothing here allocates, locks or throws. A report is two strings the unit already
-/// holds (what kind of unit, which one), put into a fixed ring; the game thread logs it
-/// (<see cref="Drain"/>).
-/// </summary>
 /// <summary>A DSP's state the non-finite guard can name and reset (NonFinite.After).</summary>
 public interface IGuardedUnit
 {
@@ -34,10 +15,21 @@ public sealed class NonFiniteUnit
     public int Reported;
     public volatile string? Name;
     public int Region = int.MinValue;
-    /// <summary>Handed to another sound: may be reported again, under its name.</summary>
-    public void Rearm(string? name, int region = int.MinValue) { Name = name; Region = region; Reported = 0; }
 }
 
+/// <summary>
+/// The guard on every custom DSP that writes into the mix: a block with a NaN or an infinity is zeroed
+/// before it leaves the unit, the unit is reset, and it is named once in the log ([NONFINITE]).
+/// </summary>
+/// <remarks>
+/// One NaN reaching a bus is summed into everything after it: the master limiter's state stays NaN
+/// and the game is silent until restarted, with nothing in the log (Cody, 2026-10-03: "a pop while
+/// inside one of the buildings and the audio just cut out"). A unit with recursive state holds a NaN
+/// for ever, hence the reset.
+///
+/// Mixer thread: nothing here allocates, locks or throws. A report is two strings the unit already
+/// holds, put into a fixed ring that the game thread logs (<see cref="Drain"/>).
+/// </remarks>
 internal static class NonFinite
 {
     private const int Slots = 64;
@@ -48,7 +40,6 @@ internal static class NonFinite
     /// <summary>Blocks zeroed so far, every unit.</summary>
     public static int Blocks;
 
-    /// <summary>Is every one of the <paramref name="count"/> samples finite?</summary>
     public static unsafe bool AllFinite(float* buffer, int count)
     {
         for (int i = 0; i < count; i++) if (!float.IsFinite(buffer[i])) return false;
@@ -74,7 +65,7 @@ internal static class NonFinite
         return true;
     }
 
-    /// <summary>As the pointer form, for a managed buffer.</summary>
+    /// <summary>As the pointer form of Scrub, for a managed buffer.</summary>
     public static bool Scrub(Span<float> buffer, ref int reported, string kind, string? name = null, int region = int.MinValue)
     {
         if (AllFinite(buffer)) return false;
@@ -131,7 +122,6 @@ internal static class NonFinite
         try { unit.ResetAfterFault(); } catch { }
     }
 
-    /// <summary>The [NONFINITE] line for one report.</summary>
     public static string Line(string kind, string? name, int region)
         => $"[NONFINITE] {kind}{(name != null ? " " + name : "")}{(region != int.MinValue ? $", region {region}" : "")}: "
          + "a block with NaN or infinity was zeroed before the mix and the unit reset. Once per unit.";

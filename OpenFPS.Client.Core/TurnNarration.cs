@@ -1,19 +1,11 @@
-using System;
-
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// When to say what is in front of you as you turn: once the heading has held still for
-/// <see cref="SettleSeconds"/> after a turn of your own, and never in the middle of one.
-///
-/// "Maybe an auto narration so as I turn my head I know what is in front of me" (Cody, 2026-10-04).
-/// Saying it on every tick of a sweep would be a flood; saying it on every tap of a quick run of taps
-/// would be four lines for one turn. Waiting for the head to settle says it once, about where you
-/// ended up. A line still being spoken when you start turning again is about a heading you have left,
-/// so it is cut off then (<see cref="Step.Interrupt"/>) rather than left to talk over the next.
-///
-/// Only YOUR turns count. The server correcting your heading, a vehicle carrying you round, a spawn
-/// or a teleport changes where you face without you asking, and is not narrated.
+/// When to say what is in front of you as you turn (Cody, 2026-10-04): once the heading has held for
+/// <see cref="SettleSeconds"/> after a turn of your own, so a run of taps is one line about where you
+/// ended up. A line still being spoken when you turn again is about a heading you have left, and is
+/// cut off (<see cref="Step.Interrupt"/>). Only your own turns count: a correction, a vehicle carrying
+/// you round, a spawn or a teleport is not narrated.
 /// </summary>
 public sealed class TurnNarration
 {
@@ -78,9 +70,6 @@ public sealed class TurnNarration
 
     /// <summary>True from a turn until the narration after it: the head is still moving or settling.</summary>
     public bool Pending => _pending;
-
-    /// <summary>The last line accepted, for telling whether it is still the last thing said.</summary>
-    public string? LastLine => _spoken;
 
     /// <summary>Forget any turn in progress (a spawn, a teleport, getting into a seat).</summary>
     public void Reset()

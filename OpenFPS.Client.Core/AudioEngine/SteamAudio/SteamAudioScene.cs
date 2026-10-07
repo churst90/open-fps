@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using OpenFPS.Common;
@@ -9,10 +7,9 @@ using PV = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// Builds and owns a Steam Audio <c>IPLScene</c> from the game's solid box colliders, so the simulator
-/// can ray-trace occlusion / transmission / reflections / pathing against real world geometry. Each box
-/// becomes 8 vertices + 12 triangles with an acoustic material derived from <see cref="AcousticRegistry"/>.
-/// Rebuild on map load; the scene is reused across simulation frames.
+/// Builds and owns a Steam Audio <c>IPLScene</c> from the game's solid box colliders, for occlusion,
+/// transmission, reflections and pathing: each box 8 vertices and 12 triangles with a material from
+/// <see cref="AcousticRegistry"/>.
 /// </summary>
 public sealed class SteamAudioScene : IDisposable
 {
@@ -31,11 +28,9 @@ public sealed class SteamAudioScene : IDisposable
 
     // ── Which ray tracer a context's scenes use ─────────────────────────────────────────────────
     //
-    // Embree where it starts (docs/GEOMETRY.md 2.4 and 6.4: builds in a quarter of the time, traces
-    // faster, and is the only tracer that handles a scene made of instanced tile sub-scenes), the default
-    // where it does not. Per context, so a lab instrument with a context of its own keeps the default. A
-    // simulator must be made for the type of the scenes it will be given (SteamAudioSimulator,
-    // TracedReverb, TracedEchoes, LateField ask TypeFor).
+    // Embree where it starts (docs/GEOMETRY.md 2.4 and 6.4: a quarter of the build time, faster traces,
+    // and the only tracer that handles instanced tile sub-scenes), the default where it does not. Per
+    // context. A simulator must be made for the type of the scenes it will be given (TypeFor).
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<IntPtr, IntPtr> EmbreeDevices = new();
 
     /// <summary>Makes this context's scenes Embree scenes. False, and the default tracer stays, if Embree
@@ -111,11 +106,9 @@ public sealed class SteamAudioScene : IDisposable
     public SteamAudioScene(IntPtr context) => _context = context;
 
     /// <summary>
-    /// Extracts the solid box colliders from a <see cref="WorldSnapshot"/> as scene geometry — each solid
-    /// box entity becomes one <see cref="Box"/> at its live transform, with the acoustic material taken
-    /// from its <c>MaterialComponent</c>. Phase 4b uses boxes only (the simulator scene is built from
-    /// boxes); non-box solids are skipped. Pure/static so the acoustic worker and the headless spikes
-    /// share one definition of "what counts as audio geometry".
+    /// The solid box colliders of a <see cref="WorldSnapshot"/> as scene geometry, one <see cref="Box"/>
+    /// each at its live transform with its <c>MaterialComponent</c>'s material; non-box solids are
+    /// skipped. The one definition of what counts as audio geometry, for the worker and the lab.
     /// </summary>
     public static List<Box> BoxesFromWorld(WorldSnapshot world)
     {
@@ -125,13 +118,11 @@ public sealed class SteamAudioScene : IDisposable
         {
             var def = snap.Definition;
             if (def == null || !def.Collider.IsSolid || def.Collider.Shape != ColliderShape.Box) continue;
-            // A sound SOURCE must not be part of the occluding geometry, or its own collider sits at its
-            // emission point and occludes itself (a solid beacon goes permanently silent). Beacons/NPCs/
-            // machines that emit sound are excluded from the acoustic mesh; they are small relative to
-            // walls, so losing their occlusion of OTHER sources is negligible.
+            // A sound source is not occluding geometry: its own collider sits at its emission point and
+            // occludes itself (a solid beacon went permanently silent). They are small next to walls.
             if (!string.IsNullOrEmpty(def.SoundEmitter.SoundId)) continue;
-            // Nor anything that MOVES. The scene is built once, so a car's panels would stay where
-            // the car was parked — a ghost of glass and steel in the bay — after it drove away.
+            // Nor anything that moves: the scene is built once, and a car's panels would stay in the bay
+            // after it drove away.
             if (def.Moves) continue;
             var size = def.Collider.Size;
             if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) continue;
@@ -142,20 +133,13 @@ public sealed class SteamAudioScene : IDisposable
     }
 
     /// <summary>
-    /// The scene without its open ground: every thin, flat slab at ground level with open sky over
-    /// it — road, pavement, lawn, a plaza, the ground itself. Floors with a ceiling over them stay,
-    /// and so does everything higher up (a roof is a ceiling); they are part of a room.
+    /// The scene without its open ground: every thin, flat slab at ground level with open sky over it
+    /// (road, pavement, lawn, the ground itself). Floors under a ceiling and everything higher stay.
     ///
-    /// For the trace taken from the LISTENER's position (TracedReverb). That trace plays every sound
-    /// as if it came from where the listener stands, so its ground bounce is the one from their own
-    /// head to the floor and back — ten milliseconds, at a level set by nothing about the source —
-    /// plus the convolution's own block of delay. Every voice came back a moment later off the ground
-    /// under your feet, and a clean voice close by with a copy of itself 10-15 ms behind is a small
-    /// room: "they sound like they're in a room when they aren't" (measured from the capture,
-    /// 2026-09-27: -2 to -7 dB at 9-15 ms behind the direct voice). A source's own ground reflection,
-    /// at its own geometry's delay, is modelled with the source (engines' GroundReflection, the ground
-    /// wash after a shot); the ground's share of a place's tail is small, and the facades carry the
-    /// street's.
+    /// For the trace from the listener's position (TracedReverb), which plays every sound as if from
+    /// where the listener stands: its ground bounce, head to floor and back, put a copy of every voice
+    /// 9-15 ms behind it at -2 to -7 dB, a small room ("they sound like they're in a room when they
+    /// aren't", capture of 2026-09-27). A source's own ground reflection is modelled with the source.
     /// </summary>
     public static List<Box> WithoutOpenGround(IReadOnlyList<Box> boxes)
     {
@@ -242,7 +226,7 @@ public sealed class SteamAudioScene : IDisposable
             if (b.Size.X > 0 && b.Size.Y > 0 && b.Size.Z > 0) solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
         Solids = solids;
 
-        _mesh = AddMesh(_context, _scene, boxes, out var bmin, out var bmax);
+        _mesh = AddMesh(_scene, boxes, out var bmin, out var bmax);
         if (_mesh != IntPtr.Zero) { BoundsMin = bmin; BoundsMax = bmax; }
         Phonon.iplSceneCommit(_scene);
     }
@@ -251,7 +235,7 @@ public sealed class SteamAudioScene : IDisposable
     /// The boxes as one static mesh, added to <paramref name="scene"/> (not committed); zero if there are
     /// none. Vertices in Steam Audio's frame. The bounds are in the game's.
     /// </summary>
-    internal static IntPtr AddMesh(IntPtr context, IntPtr scene, IReadOnlyList<Box> boxes, out Vector3 boundsMin, out Vector3 boundsMax)
+    internal static IntPtr AddMesh(IntPtr scene, IReadOnlyList<Box> boxes, out Vector3 boundsMin, out Vector3 boundsMax)
     {
         boundsMin = boundsMax = Vector3.Zero;
         IntPtr mesh = IntPtr.Zero;
@@ -268,7 +252,6 @@ public sealed class SteamAudioScene : IDisposable
             AppendBox(b, verts, tris, triMat, mi);
         }
         if (tris.Count == 0) return IntPtr.Zero;
-
 
         var vArr = verts.ToArray();
         var tArr = tris.ToArray();
@@ -367,28 +350,25 @@ public sealed class SteamAudioScene : IDisposable
         finally { hV.Free(); hT.Free(); hMI.Free(); hM.Free(); }
     }
 
-    /// <summary>Steam Audio's three band centres (phonon.h, IPLMaterial): what its ABSORPTION figures
-    /// mean. Its transmission figures are the mixer's bands instead; see <see cref="MaterialIndex"/>.</summary>
+    /// <summary>Steam Audio's three band centres (phonon.h, IPLMaterial): what its absorption figures
+    /// mean. Its transmission figures are the mixer's bands instead; see MaterialIndex.</summary>
     public static readonly (float Low, float Mid, float High) SteamAudioBandsHz = (400f, 2500f, 15000f);
 
     /// <summary>
-    /// A material per (name, what the box lets through): what a wall lets through depends on how heavy
-    /// and stiff it is and how it is built, not only on what it is made of
-    /// (<see cref="WallTransmission.BandGains(string, Vector3, WallBuild)"/>, the model the hand-rolled
-    /// tracer uses too).
+    /// A material per (name, what the box lets through): what a wall lets through depends on its mass,
+    /// stiffness and build, not only its material
+    /// (<see cref="WallTransmission.BandGains(string, Vector3, WallBuild)"/>, as the hand-rolled tracer).
     ///
-    /// The transmission triple is the MIXER's three bands (<see cref="AcousticBands"/>), not Steam
-    /// Audio's: the direct simulation only multiplies these figures along its rays, and the engine
-    /// applies the products in the mixer's three-band EQ. Absorption is read by the reflection
-    /// simulation at Steam Audio's own centres.
+    /// The transmission triple is the mixer's three bands (<see cref="AcousticBands"/>), not Steam
+    /// Audio's: the direct simulation only multiplies these along its rays, and the engine applies the
+    /// products in the mixer's EQ. Absorption is read by the reflection simulation at Steam Audio's
+    /// centres.
     ///
-    /// Per FACE, and that is the power 2/3. Steam Audio's direct simulator casts its transmission
-    /// rays alternately from the listener and the source, multiplies the transmission of every face
-    /// they hit, and takes the square root of the product when there is more than one hit
-    /// (core/src/core/direct_simulator.cpp). The loop stops when either ray finds nothing, so a
-    /// single box is three hits, not four, and each face carries the box's transmission to the 2/3:
-    /// one wall then loses exactly its own figure, in every band. n boxes in a row are 2n + 1 hits and
-    /// lose (2n + 1)/3 of one each: two walls 5/3 of one (measured), not 2. (open-fps-patches 5.)
+    /// Per face, hence the power 2/3: Steam Audio's direct simulator casts transmission rays alternately
+    /// from listener and source, multiplies every face's transmission and takes the square root of the
+    /// product (core/src/core/direct_simulator.cpp), so a single box is three hits and one wall loses
+    /// exactly its own figure. n boxes in a row lose (2n + 1)/3 of one each: two walls 5/3 (measured),
+    /// not 2. (open-fps-patches 5.)
     /// </summary>
     private static int MaterialIndex(in Box b, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
         => MaterialIndex(b.Material, b.Size, b.Build, materials, byName);
@@ -415,7 +395,7 @@ public sealed class SteamAudioScene : IDisposable
         return idx;
     }
 
-    // Box corner offsets (half-extents), then the 12 triangles (outward winding; occlusion ignores winding).
+    // Box corner offsets (half-extents), then the 12 triangles, wound outward in Steam Audio's frame.
     private static readonly Vector3[] _corner =
     {
         new(-1,-1,-1), new(1,-1,-1), new(1,1,-1), new(-1,1,-1),
@@ -458,8 +438,4 @@ public sealed class SteamAudioScene : IDisposable
 
     public void Dispose() => Release();
 
-    private static class Defaults
-    {
-        public static Phonon.IPLSceneSettings SceneSettings = new() { type = Phonon.IPL_SCENETYPE_DEFAULT };
-    }
 }

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using FMOD;
 using Serilog;
@@ -17,18 +13,11 @@ using OpenFPS.Client.AudioEngine.Core.Nature;
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// How distance attenuates a voice: FMOD's INVERSE rolloff, on every 3D channel and bus.
-///
-/// <see cref="OpenFPS.Common.Loudness"/>'s <c>RenderedGain</c> is an inverse law with an edge fade,
-/// and every balance in the game is set against it: the widening, the ranges, the level compression.
-/// The mixer has to apply the same law or none of those numbers mean what they say.
-///
-/// Linear rolloff in particular must not come back. It barely attenuates until the listener is near
-/// the range limit, so near and far sources sit at nearly the same level and distance stops carrying
-/// information. And it undoes <c>Widen</c>: a source with a size gets a reference distance equal to
-/// its body and pays its gain down by the same ratio, so gain x reference (the far field under an
-/// inverse law) is held. Under a linear law that product means nothing, so long vehicles would pay
-/// the gain and get nothing back, in proportion to their length.
+/// How distance attenuates a voice: FMOD's inverse rolloff, on every 3D channel and bus, the same law
+/// as <see cref="OpenFPS.Common.Loudness"/>'s <c>RenderedGain</c>, which every balance is set against.
+/// Linear rolloff must not come back: near and far sources sit at nearly one level, and it undoes
+/// <c>Widen</c> (a wide source pays its gain down for a reference distance that only an inverse law
+/// gives back), so long vehicles were quiet in proportion to their length.
 /// </summary>
 internal static class Rolloff
 {
@@ -43,15 +32,13 @@ internal static class FmodHelpers
     public static FMOD.VECTOR ToFmodVec(Vector3 v) => new FMOD.VECTOR { x = v.X, y = v.Y, z = v.Z };
 }
 
-/// <summary>Outcome of asking the resource manager for a sound. The distinction between "still loading"
-/// and "will never exist" is the whole point: a <see cref="Loading"/> sound must be retried, a
-/// <see cref="Missing"/> one must be reported. Collapsing the two silently loses the first play of
+/// <summary>Outcome of asking the resource manager for a sound. A <see cref="Loading"/> sound must be
+/// retried and a <see cref="Missing"/> one reported: treating the two alike loses the first play of
 /// every sound.</summary>
 internal enum SoundLoadState
 {
-    /// <summary>Decoded and playable right now.</summary>
     Ready,
-    /// <summary>Load started (or still in flight). Ask again shortly.</summary>
+    /// <summary>Load started or still in flight. Ask again shortly.</summary>
     Loading,
     /// <summary>No such asset on disk, or FMOD refused it. Retrying will not help.</summary>
     Missing,
@@ -65,24 +52,6 @@ internal class FmodResourceManager : IDisposable
 
     public FmodResourceManager(FMOD.System system) => _system = system;
 
-    /// <summary>
-    /// Resolves a sound, kicking off its NONBLOCKING load on first request.
-    ///
-    /// Sounds are created with <see cref="MODE.NONBLOCKING"/>, so the very first request for an
-    /// un-preloaded asset can only ever answer "loading" — the decode has not finished yet. Reporting
-    /// that honestly (rather than handing back a not-yet-ready handle that <c>playSound</c> rejects with
-    /// ERR_NOTREADY) is what lets the caller retry instead of dropping the play.
-    /// </summary>
-    /// <summary>
-    /// Puts a buffer the game SYNTHESISED into the cache under an id, so that everything downstream
-    /// can treat it as an ordinary sound.
-    ///
-    /// This is the whole bridge between physical modelling and the rest of the audio engine, and it
-    /// is deliberately one method. Every path that plays a sound — placement, occlusion, reverb, the
-    /// region, the acoustic path, the voice budget — works from a sound id, so a rendered door latch
-    /// registered here is heard through a wall exactly as a recorded one would be, with none of those
-    /// paths knowing that nobody recorded it.
-    /// </summary>
     /// <summary>Releases a registered synthesised buffer. Stops anything still playing it.</summary>
     public bool ReleasePcm(string soundId)
     {
@@ -92,7 +61,8 @@ internal class FmodResourceManager : IDisposable
         return true;
     }
 
-    /// <summary>The same, from 32-bit float samples: kept as float, so a quiet tail is not cut to the last bit.</summary>
+    /// <summary><see cref="RegisterPcm"/> from 32-bit float samples, kept as float so a quiet tail is
+    /// not cut to the last bit.</summary>
     public bool RegisterPcmFloat(string soundId, float[] pcm, int sampleRate)
     {
         if (string.IsNullOrEmpty(soundId) || pcm.Length == 0) return false;
@@ -125,6 +95,11 @@ internal class FmodResourceManager : IDisposable
     private readonly HashSet<string> _registeredPcm = new();
     public bool IsRegisteredPcm(string soundId) => _registeredPcm.Contains(soundId);
 
+    /// <summary>
+    /// Puts a synthesised buffer into the cache under an id. Every path that plays a sound (placement,
+    /// occlusion, reverb, the voice budget) works from an id, so a rendered door latch is heard through
+    /// a wall exactly as a recorded one would be.
+    /// </summary>
     public bool RegisterPcm(string soundId, byte[] pcm16Mono, int sampleRate)
     {
         if (string.IsNullOrEmpty(soundId) || pcm16Mono.Length == 0) return false;
@@ -139,8 +114,7 @@ internal class FmodResourceManager : IDisposable
             format = SOUND_FORMAT.PCM16,
         };
 
-        // OPENRAW because there is no file header on a buffer we made ourselves; without it FMOD
-        // tries to parse one and refuses the sound silently.
+        // OPENRAW: without it FMOD looks for a file header and silently refuses the sound.
         RESULT res = _system.createSound(pcm16Mono,
             MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | Rolloff.Mode | MODE.LOOP_OFF,
             ref info, out FMOD.Sound sound);
@@ -153,10 +127,8 @@ internal class FmodResourceManager : IDisposable
         return true;
     }
 
-    /// <summary>
-    /// What FMOD reports about a sound that has not loaded — its open state, how much is buffered, and
-    /// where the file was looked for. Diagnostic only; never changes what is cached.
-    /// </summary>
+    /// <summary>What FMOD reports about a sound that has not loaded: its open state and how much is
+    /// buffered. Diagnostic only.</summary>
     public void DescribeLoad(string soundId, bool loop, out string detail)
     {
         string cacheKey = soundId + (loop ? "_L" : "");
@@ -171,6 +143,11 @@ internal class FmodResourceManager : IDisposable
             : $"(getOpenState failed: {r} — the sound handle is not usable)";
     }
 
+    /// <summary>
+    /// Resolves a sound, starting its nonblocking load on the first request. That first request can
+    /// only answer <see cref="SoundLoadState.Loading"/>: a not-yet-ready handle would be refused by
+    /// <c>playSound</c> with ERR_NOTREADY, and saying so lets the caller retry instead of dropping the play.
+    /// </summary>
     public SoundLoadState TryGetSound(string soundId, out FMOD.Sound sound, bool loop = false)
     {
         sound = default;
@@ -180,19 +157,11 @@ internal class FmodResourceManager : IDisposable
         if (loop && _registeredPcm.Contains(soundId)) cacheKey = soundId;
         if (_cache.TryGetValue(cacheKey, out sound))
         {
-            // NONBLOCKING loads complete asynchronously — verify the sound is ready before use.
             sound.getOpenState(out OPENSTATE openState, out _, out _, out _);
 
-            // ── A sound that is already playing is loaded ───────────────────────────────────────
-            //
-            // PLAYING counts as loaded, not only READY. FMOD reports PLAYING for a sound that has a
-            // channel on it, so once a LOOPING sample starts, every further request for it — a second
-            // emitter, a reflection of it, a re-play after it went out of earshot — would otherwise
-            // be told "still loading" and parked for ever. The "still not decoded" warning prints the
-            // open state so a case like this shows itself.
-            //
-            // A CREATESAMPLE sound is decoded PCM in memory and any number of channels may play it at
-            // once, so PLAYING carries exactly the same guarantee READY does: the data is there.
+            // PLAYING counts as loaded: FMOD reports it for a sound with a channel on it, and taken as
+            // "still loading" every further request for a playing loop (a second emitter, a reflection)
+            // was parked for ever. A CREATESAMPLE sound is decoded PCM, so PLAYING guarantees what READY does.
             if (openState == OPENSTATE.READY || openState == OPENSTATE.PLAYING) return SoundLoadState.Ready;
             sound = default;
             if (openState == OPENSTATE.ERROR)
@@ -235,16 +204,13 @@ internal class FmodResourceManager : IDisposable
 
         _cache[cacheKey] = sound;
 
-        // The load has only just been queued; it is never ready on this call. Say so, so the caller can
-        // defer the play rather than lose it.
         sound.getOpenState(out OPENSTATE state, out _, out _, out _);
         if (state == OPENSTATE.READY || state == OPENSTATE.PLAYING) return SoundLoadState.Ready;
         sound = default;
         return SoundLoadState.Loading;
     }
 
-    /// <summary>Logs an unresolvable sound once per id — a missing asset is a content bug and must be
-    /// visible, but it must not spam the log every frame the emitter is in range.</summary>
+    /// <summary>Logs an unresolvable sound once per id, not every frame its emitter is in range.</summary>
     private void ReportMissing(string soundId, string reason)
     {
         if (!_reportedMissing.Add(soundId)) return;
@@ -261,16 +227,13 @@ public partial class FmodAudioProvider : IAudioProvider
     private GranularBank _granularBank = null!;
     private bool _isInitialized = false;
 
-    /// <summary>How many voices have had to play without an HRTF voice because the pool was empty.
-    /// Worth watching: those voices are panned by FMOD rather than placed by Steam Audio, and until
-    /// today they were also attenuated by a different law.</summary>
+    /// <summary>Voices that played without an HRTF stage because the pool was empty: panned by FMOD,
+    /// not placed by Steam Audio.</summary>
     private int _saPoolMisses, _lastSaPoolMisses;
-    // Pooled DSPs that could not be detached from their channel, and so were thrown away
-    // instead of re-used. This should stay at zero; see Detach for why it is not fatal.
+    // Pooled DSPs that could not be detached and were thrown away. Should stay zero; see Detach.
     private int _failedDetaches, _lastFailedDetaches;
-    // Pooled DSPs whose channel had already been recycled, so they had to be cut loose from the DSP
-    // side instead. This is the ORDINARY path for any voice that ended on its own, so it is expected
-    // to be non-zero; it is reported to show the cleanup is happening, not to flag a problem.
+    // Pooled DSPs cut loose from the DSP side because their channel was already recycled: the ordinary
+    // path for a voice that ended on its own, so non-zero is expected.
     private int _lateDetaches, _lastLateDetaches;
 
     private readonly System.Collections.Concurrent.ConcurrentStack<FMOD.DSP> _threeEqPool = new();
@@ -278,12 +241,11 @@ public partial class FmodAudioProvider : IAudioProvider
     private readonly System.Collections.Concurrent.ConcurrentStack<FMOD.DSP> _sendTapPool = new();
 
     /// <summary>
-    /// A pass-through at the INPUT end of a voice's chain, ahead of the route EQ, the diffraction and
-    /// the HRTF: what the source radiates, before anything between it and the listener. A sound
-    /// rings its own room whatever stands between it and you, so its own room's reverb is fed from
-    /// here; the cross-send into the listener's room stays at the fader, since that room is rung by
-    /// what arrives. Fed from the fader, a street sound reached the street's reverb already through
-    /// the lobby wall, and the doorway then turned that reverb down a second time.
+    /// A pass-through at the input end of a voice's chain, ahead of the route EQ, the diffraction and
+    /// the HRTF. A sound rings its own room whatever stands between it and you, so its own room's
+    /// reverb is fed from here; the send into the listener's room stays at the fader, since that room
+    /// is rung by what arrives. Fed from the fader, a street sound reached the street's reverb through
+    /// the lobby wall and the doorway turned it down a second time.
     /// </summary>
     private FMOD.DSP GetSendTapDsp()
     {
@@ -292,8 +254,8 @@ public partial class FmodAudioProvider : IAudioProvider
         return dsp;
     }
 
-    /// <summary>Off the channel, then every connection it still has — the sends hang off it, and a
-    /// pooled tap that kept one would feed a room from the next voice it is given to.</summary>
+    /// <summary>Off the channel, then every connection it still has: a pooled tap that kept a send
+    /// would feed a room from the next voice it is given to.</summary>
     private void ReleaseSendTapDsp(ActiveSound active)
     {
         var dsp = active.SendTap;
@@ -324,8 +286,7 @@ public partial class FmodAudioProvider : IAudioProvider
         // reset(): the filters keep the previous voice's history, heard as its tail on the new one.
         if (_threeEqPool.TryPop(out var dsp)) { dsp.reset(); dsp.setBypass(false); return dsp; }
         _system.createDSPByType(DSP_TYPE.THREE_EQ, out dsp);
-        // The bands every path gain is computed for (OpenFPS.Common.AcousticBands), said here rather
-        // than left to FMOD's defaults, so the two cannot come apart.
+        // The bands every path gain is computed for, set rather than left to FMOD's defaults.
         dsp.setParameterFloat((int)DSP_THREE_EQ.LOWCROSSOVER, OpenFPS.Common.AcousticBands.LowCrossoverHz);
         dsp.setParameterFloat((int)DSP_THREE_EQ.HIGHCROSSOVER, OpenFPS.Common.AcousticBands.HighCrossoverHz);
         return dsp;
@@ -359,29 +320,10 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
-    /// Takes a POOLED DSP off the channel it is on, and says whether it is safe to re-use.
-    ///
-    /// A pooled DSP is about to be addDSP'd onto a DIFFERENT channel. While it is attached to two,
-    /// tearing either one down leaves the other holding a link to something that has gone, and FMOD
-    /// crashes following it: it reads the DSP's owner at +0x78, that owner's next link at +0x10, and
-    /// tests a flag byte at +0x7c. With the middle link null, the flag test reads address 0x7c. Bypassing a DSP does not detach it; only this does.
-    ///
-    /// If the detach FAILS the DSP is NOT pooled — it is dropped, and a fresh one is made next time.
-    /// Losing a pooled object costs a few hundred bytes. Re-using an attached one costs the process.
-    /// </summary>
-    /// <summary>
-    /// Takes every room's reverberation unit off its bus and frees both, IN THAT ORDER.
-    ///
-    /// Releasing the DSPs and then the buses is not enough. FMOD REFUSES to release a unit that is
-    /// still attached, and says so only in its logging build:
-    ///
-    ///     DSPI::release WARNING.  Failed to release because unit is still attached.
-    ///
-    /// followed at shutdown by `closeInternal assertion: connectionsRemaining == 0 failed`. The unit
-    /// stays in the graph, attached to a ChannelGroup that is then released out from under it.
-    ///
-    /// A ChannelGroup is not a Channel and has no `stop()` that would do this implicitly. The unit
-    /// has to be removed by hand.
+    /// Takes every room's reverberation unit off its bus and frees both, in that order. FMOD refuses
+    /// to release a unit still attached (said only in its logging build: "Failed to release because
+    /// unit is still attached", then `connectionsRemaining == 0 failed` at shutdown), and a ChannelGroup
+    /// has no <c>stop()</c> that would detach it, so the unit is removed by hand.
     /// </summary>
     private void ReleaseReverbUnits()
     {
@@ -397,31 +339,27 @@ public partial class FmodAudioProvider : IAudioProvider
         foreach (var bus in _reverbBuses.Values) if (bus.hasHandle()) bus.release();
     }
 
+    /// <summary>
+    /// Takes a pooled DSP off its channel and says whether it is safe to re-use. A DSP attached to two
+    /// channels crashes FMOD when either is torn down (it follows the owner link at +0x78, then +0x10,
+    /// and reads address 0x7c). Bypassing does not detach. A DSP that will not detach is dropped, not
+    /// pooled: a few hundred bytes lost against the process.
+    /// </summary>
     private bool Detach(FMOD.Channel channel, FMOD.DSP dsp, string what)
     {
         if (!dsp.hasHandle()) return false;
         RESULT r = channel.hasHandle() ? channel.removeDSP(dsp) : RESULT.ERR_INVALID_HANDLE;
         if (r == RESULT.OK) return true;
 
-        // ERR_INVALID_HANDLE here is NOT an edge case, it is the ordinary case.
-        //
-        // The reaper's trigger is `isPlaying == false`. For a sample voice that has simply finished
-        // — a footstep, a door, any one-shot — FMOD retired and RECYCLED that channel before we ever
-        // looked. The handle is stale by construction, so removeDSP can never work, and every pooled
-        // DSP on a naturally-ended voice takes this path.
-        //
-        // Dropping them is not enough either. A dropped DSP is still wherever it was: sitting in the
-        // chain of a channel that has since been handed to a different sound. So go at it from the
-        // DSP's own side. disconnectAll works on the DSP OBJECT and does not need a live channel; it
-        // cuts every connection the unit still has, which is precisely the owner link FMOD was
-        // following when it read address 0x7c.
+        // The ordinary case: a one-shot that finished had its channel recycled by FMOD before the
+        // reaper looked, so the handle is stale. The DSP still sits in that channel's chain, now another
+        // sound's; disconnectAll works from the DSP's side and cuts the owner link FMOD crashed on.
         if (dsp.disconnectAll(true, true) == RESULT.OK)
         {
             _lateDetaches++;
             return true;
         }
 
-        // Only if even that fails is the unit unsafe to hand out again.
         _failedDetaches++;
         if (_failedDetaches == 1)
             Log.Warning("A {What} DSP would neither come off its channel ({Result}) nor disconnect "
@@ -466,16 +404,14 @@ public partial class FmodAudioProvider : IAudioProvider
 
     private void ReleaseGranularDsp(FMOD.DSP dsp, System.Runtime.InteropServices.GCHandle handle, GranularVoiceState? state)
     {
-        // Out of the graph before it is handed to anyone else: a pooled DSP that is
-        // still connected is the same dangling pointer as a released one.
+        // Out of the graph before it is pooled: a still-connected DSP dangles like a released one.
         if (dsp.hasHandle()) dsp.disconnectAll(true, true);
         if (dsp.hasHandle() && state != null) { _granularPool.Push(new PooledGranularDsp(dsp, handle, state)); }
     }
 
     private void ReleaseSynthDsp(FMOD.DSP dsp, System.Runtime.InteropServices.GCHandle handle, SynthVoiceState? state)
     {
-        // Out of the graph before it is handed to anyone else: a pooled DSP that is
-        // still connected is the same dangling pointer as a released one.
+        // Out of the graph before it is pooled: a still-connected DSP dangles like a released one.
         if (dsp.hasHandle()) dsp.disconnectAll(true, true);
         if (dsp.hasHandle() && state != null) { _synthPool.Push(new PooledSynthDsp(dsp, handle, state)); }
     }
@@ -510,39 +446,24 @@ public partial class FmodAudioProvider : IAudioProvider
         /// <summary>One outlet of a machine whose engine belongs to another voice.</summary>
         public EngineTapState? TapState;
 
-        /// <summary>A machine that stands still and runs — a window air conditioner, a mower. It
-        /// shares <see cref="EngineDsp"/> and <see cref="EngineHandle"/> with an engine because a
-        /// voice is one or the other and never both, and one release path is one release path.</summary>
+        /// <summary>A machine that stands and runs (an air conditioner, a mower). Shares
+        /// <see cref="EngineDsp"/> and <see cref="EngineHandle"/> with an engine: a voice is never both,
+        /// and there is one release path.</summary>
         public PhysicalVoiceState? MachineState;
         /// <summary>A voice of the player's own room answering their microphone (OwnVoiceTap).</summary>
         public OwnVoiceTap? OwnVoice;
 
-        /// <summary>When this voice's position was last TRUE, seconds on <see cref="OpenFPS.Common.AudioClock"/>
-        /// — the sample time carried by the emitter, not the moment it was handed over.
-        /// A voice keeps PLAYING whether or not anything repositions it, so a voice nobody updates is
-        /// a sound sitting still in the air while the thing making it drives away.</summary>
+        /// <summary>When this voice's position was last true, seconds on <see cref="OpenFPS.Common.AudioClock"/>:
+        /// the emitter's sample time, not when it was handed over. A voice nobody updates keeps playing
+        /// where it was while the thing making it drives away.</summary>
         public double LastAttributeAt;
 
-        /// <summary>
-        /// The oldest this voice's position has been at the moment it was placed, this report interval.
-        ///
-        /// The figure that matters, and the one nothing measured. Sampling staleness at the instant of
-        /// the five-second report can only see a hold that is still going on when the report fires; a
-        /// hold that started and ended between two reports — which is every one of them, at 30 Hz —
-        /// was invisible. Kept as a MAXIMUM over the interval and reset when it is read, so a single
-        /// bad pass cannot hide behind four good seconds.
-        /// </summary>
+        /// <summary>The oldest this voice's position has been when placed, this report interval. A
+        /// maximum, reset when read: sampled at the report, a hold between two reports was invisible.</summary>
         public double WorstPositionAge;
 
-        /// <summary>
-        /// The budget's own gain on this voice, and where it is heading — 1 while it holds a slot,
-        /// 0 once it has lost one.
-        ///
-        /// Slewed rather than switched, in the same per-update pass that applies distance and
-        /// occlusion, so letting a voice go is a fade and taking it back is a fade the other way. It
-        /// is a plain multiplier on top of everything else the voice is doing, which is what lets it
-        /// work identically for a sample, a loop and a synthesized engine.
-        /// </summary>
+        /// <summary>The budget's gain on this voice and its target (1 holding a slot, 0 having lost
+        /// one), slewed in the distance pass so losing or regaining a slot is a fade, for any kind of voice.</summary>
         public float FadeGain = 1f;
         public float FadeTarget = 1f;
 
@@ -605,22 +526,14 @@ public partial class FmodAudioProvider : IAudioProvider
         public FMOD.DSPConnection SourceReverbConnection;
         /// <summary>The pass-through the own-room send is taken from. See GetSendTapDsp.</summary>
         public FMOD.DSP SendTap;
-        // The unit each live send actually feeds, kept BESIDE the connection. The bus a send fades
-        // out of must be this unit and no other; looking it up again from a region id can find a
-        // different unit. See DropSend for what FMOD does with the wrong unit.
+        // The unit each live send feeds, kept beside the connection: a send must fade out of this unit,
+        // and looking it up again by region id can find another. See DropSend.
         public FMOD.DSP ReverbBus;
         public FMOD.DSP SourceReverbBus;
 
-        // ── A send is a signal path, and one cannot simply appear ───────────────────────────────
-        //
-        // Disconnecting a voice's reverb send from the old room's unit and connecting a new one at
-        // full mix, in one frame, on a running signal, is two step discontinuities, and a region
-        // crossing does it to EVERY playing voice at once. The boundary of a room is its wall, so
-        // walking along a wall crosses it repeatedly and the reverb pops and clicks.
-        //
-        // The old connection is therefore kept alive and faded out while the new one fades in, and
-        // only dropped once it is carrying nothing. Two connections for a few tens of milliseconds
-        // costs an input slot on a bus; a click costs the illusion that the room is a place.
+        // A send moved to a new room in one frame is two steps on a running signal, on every voice at
+        // once, and walking along a wall crosses rooms repeatedly: the reverb clicked. The old
+        // connection fades out while the new one fades in, and is dropped once it carries nothing.
         public float ReverbMix;                     // 0..1 of the target mix, ramping in
         public float SourceReverbMix;
         public FMOD.DSPConnection FadingReverbConnection;
@@ -631,7 +544,7 @@ public partial class FmodAudioProvider : IAudioProvider
         public float FadingSourceMix;
         public float RoomGain = 1.0f;
 
-        // Steam Audio per-voice binaural effect (null when SA disabled / falling back to FMOD pan).
+        // Null when Steam Audio is off and FMOD pans the voice.
         public SteamAudioVoiceState? SaState;
         /// <summary>The ear model on this voice (FmodAudioProvider.Ear.cs), or null.</summary>
         public EarVoice? Ear;
@@ -650,38 +563,32 @@ public partial class FmodAudioProvider : IAudioProvider
 
     private readonly List<ActiveSound> _activeSounds = new();
 
-    // The same voices, indexed by the entity that owns them. The per-frame queries (IsPlaying,
-    // GetSoundPosition, the lookup at the head of PlaySpatialSound and UpdateSpatialAttributes) run
-    // once per active voice, so a linear scan of the list would make a frame cost the SQUARE of the
-    // number of things making noise. ForgetEntity probes a hundred reflection ids, each a lookup.
-    // An entity can own more than one voice (a sound and its reflections), hence a list per id.
+    // The same voices by owning entity (a sound and its reflections, hence a list). The per-frame
+    // queries run once per voice, so a scan of the list made a frame cost the square of the voices.
     private readonly Dictionary<int, List<ActiveSound>> _activeById = new();
     private readonly object _lock = new();
     private AcousticMap? _acousticMap;
     private Dictionary<int, FMOD.ChannelGroup> _reverbBuses = new();
     private Dictionary<int, FMOD.DSP> _reverbDsps = new();
     private Dictionary<int, float> _reverbVolumes = new();
-    /// <summary>Buses built with their wet level muted because the region they belong to is not a closed
-    /// boundary and so has no Sabine estimate behind it. These are the ones the ray-traced RT60 governs:
-    /// it caps their decay and opens their wet level in proportion to what the rays actually found.</summary>
-    // Per-bus Steam Audio voice (HRTF) used to localize a room's reverb to its doorway when the listener
-    // is OUTSIDE. Bus-lifetime (no churn); borrowed from the voice pool, returned on bus teardown.
+    // Per bus, the HRTF voice that places a room's reverb at its doorway when the listener is outside.
+    // Borrowed from the voice pool for the bus's life, returned on teardown.
     private readonly Dictionary<int, SaVoice> _reverbSaVoices = new();
     private HashSet<int> _activeRegionIds = new();
 
     private FMOD.ChannelGroup _reflectionGroup;
     /// <summary>
-    /// The player's own voice feeding their room's reverberation: a group at zero, so nothing of the voice
-    /// itself is heard, while the channel's sends to the room (which leave from its own fader, not the
-    /// group's) carry it. You already hear your own voice; a copy of it late would be a slap-back.
+    /// The player's own voice into their room's reverberation: a group at zero, so the voice itself is
+    /// not heard (a late copy of it would be a slap-back) while the channel's sends, which leave from
+    /// its own fader, carry it.
     /// </summary>
     private FMOD.ChannelGroup _ownVoiceRoomGroup;
 
     /// <summary>The physical keys of the player's own voice: the room's reverberation fed from their mouth,
     /// and a copy off one surface round them (ClientAudioSystem.UpdateOwnVoice).</summary>
     public const string OwnVoiceRoomKey = "ownvoice:room", OwnVoiceCopyKey = "ownvoice:copy";
-    /// <summary>One playing ambisonic ambience bed. Several can be live at once so one region's
-    /// ambience can cross-fade into another's rather than cutting.</summary>
+
+    /// <summary>One playing ambisonic ambience bed. Several can be live, so beds can cross-fade.</summary>
     private sealed class AmbientBed
     {
         public required AmbisonicBedState State;
@@ -715,20 +622,10 @@ public partial class FmodAudioProvider : IAudioProvider
     private readonly List<(float Distance, IRenderedVoice Voice)> _engineOrder = new();
 
     /// <summary>
-    /// Every live voice the pool renders ahead — engines and standing machines alike — NEAREST
-    /// FIRST. Copied under the lock so the pool never walks a list the mixer is changing.
-    ///
-    /// The two kinds share one list and one ordering on purpose. A street with a bus going past it
-    /// and forty air conditioners on the wall above has to decide what gets rendered when the
-    /// machine cannot render everything, and the answer is the same answer for both: what is
-    /// nearest. Two lists would have meant two budgets, and a budget per kind is how a distant
-    /// condenser ends up rendered ahead of the truck beside you.
-    ///
-    /// The order is not cosmetic. When the machine cannot render every ring ahead of the mixer — the
-    /// first seconds in a map, on a track with a full field — some voice is going to come up short,
-    /// and in _activeSounds order which one it is comes down to when the car happened to be added.
-    /// Priming the nearest first means the shortfall lands on the car at the far end of the back
-    /// straight, which is a whisper, rather than on the one going past your seat.
+    /// Every voice the pool renders ahead, engines and standing machines in one list, nearest first;
+    /// copied under the lock so the pool never walks a list the mixer is changing. One list, so a
+    /// distant condenser is never rendered ahead of the truck beside you; nearest first, so when the
+    /// machine cannot keep every ring ahead (a map's first seconds) the shortfall lands on a whisper.
     /// </summary>
     private List<IRenderedVoice> SnapshotEngineVoices()
     {
@@ -746,26 +643,17 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
-    /// Makeup gain on the master, dB: how loud the game plays for a given volume setting, decided in
-    /// this one place. See the gain-staging note in Initialize.
+    /// Makeup gain on the master, dB: how loud the game plays, decided in this one place (see the
+    /// gain-staging note in Initialize). It moves no balance: every voice plays where Loudness.Place
+    /// puts it for 0 dBFS = 100.8 dB SPL (Loudness.DesignFullScaleDb), a voice at a metre about -38
+    /// dBFS RMS; a player who calibrates sets their volume 6 dB lower, 0 dBFS out = 94.8 dB SPL.
     ///
-    /// It moves no balance and no level the law decides. Under it every voice plays where
-    /// Loudness.Place puts it for the playback the law is designed for (Loudness.DesignFullScaleDb):
-    /// 0 dBFS is 100.8 dB SPL at the ear, so a normal voice a metre away (62.35 dB) comes out at about
-    /// -38 dBFS RMS. The listening calibration and the ear model work in those units, and their
-    /// reference voice plays through this gain like everything else, so a player who calibrates sets
-    /// their volume 6 dB lower and 0 dBFS at the output is 94.8 dB SPL.
-    ///
-    /// Six: the loudness chosen by meter and by ear in September (ten for the speedway at -19 to -23
-    /// LUFS short-term; then three back for the ground's energy and a two-decibel trim for the street),
-    /// less the 3.01 dB the binaural stage was losing on every voice and no longer does (SteamAudioDsp).
-    /// So every voice through the HRTF plays as loud as it did. The wind at the ears and the interface,
-    /// which never passed through it, play 3 dB quieter, level with the voices again.
-    ///
-    /// Measured with --quality: four cars passing on a street, -35 LUFS integrated and no limiting;
-    /// shots from 1.5 to 30 m, -26.6 LUFS and -0.9 dBTP with the limiter taking 2.9 dB on average. Read
-    /// the "Mix loudness" line before changing it: once the limiter is working, more makeup buys
-    /// compression, not loudness. Override with OPENFPS_MASTER_MAKEUP_DB.
+    /// Six: September's level by meter and ear (ten for the speedway at -19 to -23 LUFS short-term,
+    /// three back for the ground, two for the street), less the 3.01 dB the binaural stage no longer
+    /// loses (SteamAudioDsp). Measured with --quality: four cars on a street -35 LUFS, no limiting;
+    /// shots at 1.5 to 30 m -26.6 LUFS, -0.9 dBTP, the limiter taking 2.9 dB on average. Read the "Mix
+    /// loudness" line first: once the limiter works, more makeup buys compression, not loudness.
+    /// Override with OPENFPS_MASTER_MAKEUP_DB.
     /// </summary>
     public static readonly float MasterMakeupDb =
         float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MASTER_MAKEUP_DB"), out float mk)
@@ -787,18 +675,15 @@ public partial class FmodAudioProvider : IAudioProvider
     // Geometry-driven reverb decay (ms) from the Steam Audio reflection sim; 0 = keep the Sabine estimate.
     private float _simReverbDecayMs;
 
-    // Opt-in spatialization tracing (OPENFPS_AUDIO_DEBUG=1): logs each spatial source's
-    // listener-relative HRTF direction + listener yaw ~once/sec to diagnose panning.
+    // OPENFPS_AUDIO_DEBUG=1 logs each source's HRTF direction and the listener's yaw about once a second.
     private static readonly bool _audioDebug = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
     private int _dbgFrame;
 
-    // Steam Audio (phonon) HRTF state — shared context + HRTF.
     private IntPtr _saContext;
     private IntPtr _saHrtf;
-    /// <summary>The HRTF the traced reverb decodes through, made for ITS block (TracedReverb.TracedFrame).
-    /// Not <see cref="_saHrtf"/>, which is made for the mixer's 1024: an HRTF built for one frame size
-    /// and run at another comes out 2 dB hot and is not the head it was meant to be (measured with
-    /// --traced-reverb and SA_HRTF_FRAME).</summary>
+    /// <summary>The HRTF the traced reverb decodes through, made for its own block
+    /// (TracedReverb.TracedFrame): one built for the mixer's 1024 and run at another size comes out 2 dB
+    /// hot and is not the same head (measured with --traced-reverb and SA_HRTF_FRAME).</summary>
     private IntPtr _saHrtfTraced;
     private int _saHrtfTracedFrame;
     /// <summary>How long a traced stage's input waits, samples (TracedReverbDsp.StagePreDelay); -1 until measured.</summary>
@@ -806,12 +691,10 @@ public partial class FmodAudioProvider : IAudioProvider
     private int _saFrameSize = 1024;
     private bool _steamAudioEnabled;
 
-    // Pre-allocated pool of Steam Audio voices (binaural effect + Phonon buffers + FMOD DSP). Created
-    // ONCE at init and reused — never iplBinauralEffectCreate/iplAudioBufferAllocate/free at runtime.
-    // Freeing Phonon resources while the FMOD mixer thread is mid-callback on them caused native heap
-    // corruption / segfaults under the voice churn from footsteps + wall reflections (reproduced by
-    // ProviderOrbit.RunChurn). Pooling removes the runtime alloc/free entirely, so there is nothing
-    // to free out from under a live callback.
+    // Steam Audio voices (binaural effect, Phonon buffers, FMOD DSP), made once at init and reused,
+    // never created or freed at runtime: freeing Phonon resources while the mixer thread was in a
+    // callback on them corrupted the native heap under footstep and reflection churn
+    // (ProviderOrbit.RunChurn reproduces it).
     private sealed class SaVoice
     {
         public SteamAudioVoiceState State = null!;
@@ -821,45 +704,30 @@ public partial class FmodAudioProvider : IAudioProvider
     private readonly Stack<SaVoice> _saPool = new();
 
     /// <summary>
-    /// GCHandles for DSPs that have been released, kept alive until Dispose.
-    ///
-    /// They are not freed when the voice is, because FMOD may call that DSP's read callback once
-    /// more after release, and the first thing the callback does is resolve this handle. Freeing it
-    /// is a use-after-free inside the runtime on the mixer thread — the crash that reads as
-    /// "libfmod called libcoreclr and libcoreclr aborted", with no exception and no log line. The
-    /// Steam Audio voices have never freed theirs for exactly this reason; the engine voices did,
-    /// and on a map that makes and drops voices continuously it finally caught up with them.
-    ///
-    /// Sixteen bytes per retired voice, for the life of the session. Freed in Dispose, after the
-    /// system is closed and no callback can be in flight.
+    /// GCHandles of released DSPs, kept until Dispose. FMOD may call a DSP's read callback once more
+    /// after release, and the callback first resolves this handle: freed with the voice, it was a
+    /// use-after-free on the mixer thread ("libfmod called libcoreclr and libcoreclr aborted", no
+    /// exception, no log line). Sixteen bytes per retired voice; freed once the system is closed.
     /// </summary>
     private readonly List<System.Runtime.InteropServices.GCHandle> _retiredHandles = new();
     private readonly List<SaVoice> _saAllVoices = new();
     /// <summary>
-    /// How many binaural voices exist. Idle ones cost memory only; the HRTF runs for a voice that
-    /// is playing. At 96 the city ran the pool dry — every region's reverb return holds one for the
-    /// life of its bus, and every echo takes one — and whatever started after that was placed by
-    /// FMOD's amplitude panner: level between the ears but no time difference, heard beside HRTF
-    /// voices as a sound inside the head or above it. The newest arrival is the car coming past you,
-    /// so it was always the CLOSE ones: "anything that passes close to me is inverted".
+    /// How many binaural voices exist; idle ones cost only memory. At 96 the city ran the pool dry
+    /// (each region's reverb return holds one, each echo takes one) and the newest voices, the cars
+    /// passing close, fell to FMOD's panner with no interaural time difference: "anything that passes
+    /// close to me is inverted".
     /// </summary>
     private const int SaPoolSize = 160;
 
-    /// <summary>
-    /// Binaural voices only a direct sound may take. An echo or a reverb return that finds the pool
-    /// this low goes without: a wash placed a little less precisely is not heard as wrong, and a car
-    /// going past you with no interaural time difference is.
-    /// </summary>
+    /// <summary>Binaural voices only a direct sound may take: an echo or reverb return without HRTF is
+    /// not heard as wrong, a passing car is.</summary>
     private const int SaDirectReserve = 24;
 
     /// <summary>What is left of the binaural pool. See IAudioProvider.SpatialVoicesFree.</summary>
     public int SpatialVoicesFree { get { lock (_saPool) return _saPool.Count; } }
 
-    /// <summary>
-    /// Logs and returns false when an FMOD call fails. FMOD result codes were previously
-    /// discarded everywhere, so failures (missing DLL, bad format, etc.) produced silence
-    /// with no explanation. Route significant calls through this to make failures visible.
-    /// </summary>
+    /// <summary>Logs and returns false when an FMOD call fails: a discarded result code is silence with
+    /// no explanation.</summary>
     private static bool FmodCheck(RESULT result, string operation)
     {
         if (result != RESULT.OK)
@@ -874,45 +742,22 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         try
         {
-            // ── The garbage collector is in the audio path, whether or not that was intended ───
-            //
-            // Every custom DSP in this engine is a managed callback entered from FMOD's NATIVE mixer
-            // thread — engine voices, echoes, the synth, the granular bank, boundary reflections,
-            // Steam Audio's binaural pass, the ambisonic bed, the master tap. A native thread
-            // entering managed code while a GC suspension is in progress does not run: it waits for
-            // the collection. Workstation GC suspends every managed thread for gen0 and gen1 and for
-            // the compacting phases of gen2, and a map load — the entity snapshot, the JSON, the
-            // voxel acoustics — grows the heap fast enough to trigger a run of them. The ring
-            // buffers being full is no help at all when the consumer is stopped.
-            //
-            // SustainedLowLatency keeps gen2 in the background and off the foreground path. The
-            // short suspensions remain; the hundreds-of-milliseconds one does not. It is set here
-            // rather than in either head's Program because it is a property of having managed DSPs
-            // at all, and both heads have them. The Mixer load line reports gen2 count and total
-            // pause time so this can be checked rather than assumed.
+            // Every custom DSP is a managed callback entered from FMOD's native mixer thread, and that
+            // thread waits out any GC suspension; a map load triggers a run of them. SustainedLowLatency
+            // keeps gen2 in the background (the hundreds-of-milliseconds pause). Set here because it is a
+            // property of having managed DSPs, which both heads do. See docs/AUDIO_LOAD_DROPOUTS.md.
             System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.SustainedLowLatency;
 
             if (!FmodCheck(Factory.System_Create(out _system), "System_Create")) return false;
 
-            // Coordinate convention: the listener uses forward = +Z, up = +Y, right = +X
-            // (strafe-right is Transform(UnitX, yaw)). That is exactly FMOD's DEFAULT LEFT-handed
-            // convention (+X right, +Y up, +Z forward), so NO handedness flag is needed.
-            // Empirically: setting INITFLAGS._3D_RIGHTHANDED inverts left/right (a +X source is
-            // heard on the LEFT). Verified by ear 2026-06 — leave FMOD in its default left-handed mode.
-            // The mixer's rate: 48 kHz (MixerQuality.RequestedRate; OPENFPS_MIXER_RATE overrides). It was
-            // 44.1, under a sound server and devices that run at 48 and renders made at 48, so every
-            // one-shot went through a resampler on its way in and the whole mix through another on its
-            // way out. Everything that cares reads the rate back (MixerQuality.MixerRate), never a constant.
+            // The listener's frame (+X right, +Y up, +Z forward) is FMOD's default left-handed one.
+            // _3D_RIGHTHANDED puts a +X source on the left (verified by ear 2026-06): leave it unset.
+            // The mixer runs at 48 kHz (MixerQuality.RequestedRate; OPENFPS_MIXER_RATE overrides), the
+            // devices' and the renders' rate. Read it back (MixerQuality.MixerRate), never a constant.
             FmodCheck(_system.setSoftwareFormat(MixerQuality.RequestedRate, SPEAKERMODE.STEREO, 0), "setSoftwareFormat");
 
-            // OPENFPS_FMOD_WAV=<path> captures exactly what the mixer produced to a file, instead of
-            // (or as well as) the speakers. Worth having permanently: "it crackles" is not something
-            // that can be reasoned about from a CPU percentage, and the difference between a clipped
-            // waveform, a starved buffer and a stepped voice is obvious in thirty seconds of samples
-            // and invisible from the listening chair.
-            // OPENFPS_FMOD_WAV replaces the sound card with a file writer: exact, and silent, which
-            // suits a rig. OPENFPS_AUDIO_CAPTURE taps the master instead and keeps playing, which
-            // suits a person trying to reproduce something they can only find by ear.
+            // OPENFPS_FMOD_WAV=<path> replaces the sound card with a file writer: exact and silent, for
+            // a rig. OPENFPS_AUDIO_CAPTURE taps the master and keeps playing, for finding something by ear.
             string? wavPath = Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV");
             IntPtr extra = IntPtr.Zero;
             if (string.IsNullOrEmpty(wavPath)) MixerQuality.ApplyOutput(_system);
@@ -924,67 +769,22 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             FmodCheck(_system.set3DSettings(1.0f, 1.0f, 1.0f), "set3DSettings"); // 1 unit = 1 metre
 
-            // ── How much of a stall the mixer can absorb ──────────────────────────────────────
-            //
-            // FMOD's default on Linux is four buffers of 1024 samples: 93 ms between the callback
-            // running and the sound card wanting the result. That is the whole tolerance for
-            // anything that stops the mixer thread — a GC suspension, the scheduler giving its core
-            // to a bake — and it was never set. Eight buffers doubles it to about 185 ms for 93 ms
-            // more output latency, which on a first-person game is under the threshold where a
-            // gunshot stops feeling like it came from the trigger.
-            //
-            // It is insurance and not a fix: a stall longer than the buffer is still a dropout, and
-            // the reason the stalls exist is dealt with elsewhere. But a load spike does not have to
-            // be heard just because it happened.
+            // Eight buffers of 1024 (FMOD's Linux default is four, 93 ms): about 185 ms of stall the
+            // mixer can absorb, for 93 ms more latency. Insurance, not a fix. docs/AUDIO_LOAD_DROPOUTS.md.
             FmodCheck(_system.setDSPBufferSize(1024, 8), "setDSPBufferSize");
 
-            // ── Real voices, which is not the number passed to init ───────────────────────────
-            //
-            // BEFORE init, and that is not a style point — FMOD refuses this afterwards with
-            // ERR_INITIALIZED. The error is logged and nothing else happens, so the limit silently
-            // stays at the default 64 and the symptom arrives minutes later, once there are enough
-            // voices (on the speedway, thirty cars and their reflections) to climb past it.
-            //
-            // The 512 passed to init is the VIRTUAL channel count. How many are actually MIXED is
-            // this, and past it FMOD picks the quietest playing voices and stops rendering them —
-            // correctly, silently, and with no error anywhere. On a racetrack the quietest voices
-            // are the cars furthest away, so the set being virtualised changes continuously as cars
-            // approach and recede: every car crossing in front pushes another one out and is itself
-            // pushed out on the way past. For a sampled voice that is inaudible. For a SYNTHESIZED
-            // one it is not — the DSP callback simply stops being called and later starts again, and
-            // the ring it reads from has moved on, so the voice resumes somewhere else in its own
-            // waveform. Heard as extreme pitch jumpiness on every pass-by, from the moment the voice
-            // count crosses the limit.
-            //
-            // Thirty cars is thirty engines plus up to sixty reflections; measured at 91 playing
-            // with 64 real. 256 leaves room for footsteps, weapons and ambience on top of a full
-            // field, and costs nothing until the voices exist.
+            // Real (mixed) voices, before init: afterwards FMOD refuses with ERR_INITIALIZED and the
+            // limit silently stays at 64. Past it FMOD stops rendering the quietest voices, and a
+            // synthesised voice resumed later jumps in pitch: every pass-by on the speedway (91 playing
+            // with 64 real). 256 leaves room for footsteps, weapons and ambience over a full field.
             FmodCheck(_system.setSoftwareChannels(256), "setSoftwareChannels");
 
-            // ── FMOD does not get to decide which voices are real ────────────────────────────
-            //
-            // VOL0_BECOMES_VIRTUAL is NOT set. It is a reasonable optimisation for a mixer playing
-            // back samples: a channel whose volume reaches zero stops costing anything
-            // and is revived when it is audible again. It is the wrong flag for THIS mixer, because
-            // almost nothing here is a plain sample. A voice carries a Steam Audio binaural stage, a
-            // three-band EQ, a diffraction low-pass, and for a vehicle a physically integrated engine
-            // — all of them filters with state. Virtualising a channel stops its DSP chain; reviving
-            // it resumes those filters where they left off, against a signal that has moved on. The
-            // engine note is the audible half of it (a synthesized voice jumps in pitch when revived,
-            // which is already written down as a rule), and the convolution is the rest.
-            //
-            // And the trigger is volume reaching zero, which on this engine is not a rare event: it is
-            // what occlusion does when you step behind a wall, and what a reflection does as it fades.
-            // So walking along a wall virtualised and revived voices continuously. Measured in a
-            // captured mix while walking the inside of a room: five discontinuities and six two-
-            // millisecond holes in forty-six seconds, with the mixer reporting 2 real of 5 playing at
-            // the moment of the first. Reported as "lots of popping and clicking from the reverb as I
-            // walk near the walls" — the reverb was innocent.
-            //
-            // There are 256 real channels above and the engine does its own rationing by measured
-            // audibility, which is the decision this flag was quietly overruling.
-            // How every voice whose rate is not the mixer's is resampled — a 48 kHz render, a 24 kHz
-            // thunder, and every moving voice, whose Doppler is a channel pitch. See MixerQuality.
+            // VOL0_BECOMES_VIRTUAL must stay unset: virtualising a voice at zero volume (occlusion behind
+            // a wall, a fading reflection) stops its stateful DSP chain and resumes it against a signal
+            // that moved on. It was the "popping from the reverb as I walk near the walls" (five
+            // discontinuities in 46 s of a captured walk). The engine rations voices by audibility
+            // itself. See docs/REPEATS_AND_POPS.md.
+            // The resampler for every voice not at the mixer's rate, Doppler included. See MixerQuality.
             MixerQuality.ApplyResampler(_system);
 
             if (!FmodCheck(_system.init(512, INITFLAGS.NORMAL, extra), "init"))
@@ -993,8 +793,7 @@ public partial class FmodAudioProvider : IAudioProvider
             _system.getSoftwareFormat(out int mixRate, out _, out _);
             MixerQuality.MixerRate = mixRate;
 
-            // Say what was actually granted. A limit that silently stayed at its default is exactly
-            // the failure this whole line of investigation was.
+            // What was granted: a limit that silently stayed at its default was the speedway's bug.
             _system.getSoftwareChannels(out int realChannels);
             Log.Information("FMOD software channels: {Real} real voices (512 virtual).", realChannels);
 
@@ -1024,9 +823,8 @@ public partial class FmodAudioProvider : IAudioProvider
             _system.createChannelGroup("Interface", out _uiGroup);
             master.addGroup(_uiGroup);
 
-            // A trim for a run (MasterTrimDb), none by default: how loud the game plays is the makeup's
-            // (MasterMakeupDb), and the balance between sources is the law's. Not per source: nudging
-            // presets for overall loudness would undo the work that made them agree.
+            // How loud the game plays is the makeup's and the balance is the law's; this is a trim for
+            // a run. Never per source: nudging presets for loudness undoes what made them agree.
             float masterDb = MasterTrimDb;
             _masterTrim = MathF.Pow(10f, masterDb / 20f);
             if (MathF.Abs(masterDb) > 0.01f)
@@ -1035,51 +833,25 @@ public partial class FmodAudioProvider : IAudioProvider
                 Log.Information("Master trim: {Db:F1} dB (OPENFPS_MASTER_DB).", masterDb);
             }
 
-            // Near-field boundary reflections, at the TAIL so every world sound passes through them —
-            // a wall reflects the whole room back at you, not one voice.
-            //
-            // TAIL is where the signal ENTERS: FMOD runs a DSP chain tail -> head -> output, so a
-            // unit added at the tail is processed FIRST and one added at the head is processed LAST.
-            // The limiter below is therefore added at the HEAD. At the tail it would sit before these
-            // reflections rather than after them, and could not catch the one thing it exists to
-            // prevent: a reflection pushing the master past the ceiling.
-            // The MIXER's rate, which is the rate this unit runs at. It was the sound card's (driver 0),
-            // which on a 48 kHz device put every boundary delay 9 % long.
+            // Near-field boundary reflections, at the tail so every world sound passes through them.
+            // FMOD runs a chain tail -> head -> output: the tail is processed first, so the limiter goes
+            // at the head, after these, where it can catch a reflection pushing past the ceiling.
+            // The mixer's rate, not the sound card's: that put every boundary delay 9 % long at 48 kHz.
             _boundaryState = new BoundaryVoiceState(MixerQuality.MixerRate);
             if (BoundaryProximityProcessor.CreateDSP(_system, _boundaryState, out _boundaryDsp, out _boundaryHandle) == RESULT.OK)
                 master.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, _boundaryDsp);
             else
                 Log.Warning("Boundary proximity DSP could not be created; walls will not colour the mix.");
 
-            // ── Gain staging, and where the headroom is paid back ────────────────────────────────
-            //
-            // Every source in this game is rendered at its TRUE level relative to every other one:
-            // Loudness.Place turns a source's dB SPL at a metre into a gain and a reference distance,
-            // and the engine then attenuates literally with 1/r. That is the part that must not be
-            // fiddled with per sound, because it is the whole reason a listener can tell a rifle at
-            // two hundred metres from a pistol at twenty.
-            //
-            // The cost of getting that right is that the mix sits LOW, and by design: the law plays a
-            // sound as loud as it is at a playback where 0 dBFS is 100.8 dB SPL (Loudness.DesignFullScaleDb),
-            // so a normal voice a metre away is about -38 dBFS RMS and an outdoor scene spends another 30 dB
-            // on distance. Nothing is lost on the way. A synthesized voice's 16 dB of headroom over its RMS
-            // is given back by the law in loudness units (Timbre.DigitalRmsDb), the HRTF is level over the
-            // sphere (+-0.4 dB; 1.4 dB down straight ahead and up at the sides, as a head is), and the
-            // binaural stage takes each voice at its own level (SteamAudioDsp). There is simply a lot of
-            // unused range above the music.
-            //
-            // That range is taken back HERE, once, for everything — not by making individual sounds
-            // louder, which would destroy the relative levels the game is built on, and not by
-            // guessing per map, which cannot work when nobody knows what sources a map will carry.
-            // The makeup raises the whole mix into the top of the range and the brick wall catches
-            // whatever that pushes over, so adding a hundred more sound sources changes what you hear
-            // and never how loud the master is.
-            //
-            // The brick wall is a look-ahead true-peak limiter (MasterLimiter): FMOD's own has no
-            // look-ahead, so it clipped the leading edge of every shot and thunder crack flat at its
-            // ceiling (975 flat-topped runs in a 16-minute capture). It delays the mix by
-            // MasterLimiter latency (2 ms) and takes the same makeup. OPENFPS_LIMITER=fmod puts FMOD's
-            // back for an A/B.
+            // Gain staging. Every source plays at its true level against every other (Loudness.Place,
+            // then 1/r), never fiddled per sound: it is how a rifle at 200 m is told from a pistol at 20.
+            // So the mix sits low by design (a voice at a metre about -38 dBFS RMS, an outdoor scene
+            // another 30 dB down for distance), and the headroom is taken back here, once, for
+            // everything: the makeup lifts the whole mix and the brick wall catches what goes over, so
+            // more sources change what you hear, never how loud the master is.
+            // The brick wall is a look-ahead true-peak limiter (MasterLimiter, 2 ms): FMOD's has no
+            // look-ahead and flat-topped every shot's leading edge (975 runs in a 16-minute capture).
+            // OPENFPS_LIMITER=fmod puts FMOD's back for an A/B.
             if (!MasterLimiter.UseFmodLimiter
                 && (_trueLimiter = MasterLimiter.Create(_system, MixerQuality.MixerRate, MasterMakeupDb)) != null)
             {
@@ -1091,21 +863,15 @@ public partial class FmodAudioProvider : IAudioProvider
             {
                 _system.createDSPByType(DSP_TYPE.LIMITER, out _masterLimiter);
                 _masterLimiter.setParameterFloat(0, 50.0f);            // release time (ms)
-                // Two decibels under full scale, not one: FMOD's limiter does not look ahead, so a sharp
-                // transient gets through for a moment before it reacts; the meter caught +1.6 dBFS
-                // leaving the mixer with the ceiling at -1.
+                // -2, not -1: without look-ahead a transient got through at +1.6 dBFS with the ceiling at -1.
                 _masterLimiter.setParameterFloat(1, -2.0f);            // ceiling (dBFS)
                 _masterLimiter.setParameterFloat(2, MasterMakeupDb);   // maximizer gain (dB)
                 Log.Information("Master limiter: FMOD's (OPENFPS_LIMITER=fmod), no look-ahead, ceiling -2.0 dBFS.");
             }
             master.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, _masterLimiter);
 
-            // And the meter that says whether the number above is right. Integrated loudness on the
-            // master, in LUFS — the only honest answer to "is the mix too quiet", and the thing to
-            // read before changing any level anywhere. Added at the HEAD *after* the limiter, so it
-            // ends up nearer the output and measures what actually leaves the mixer; metering ahead
-            // of the limiter reports the makeup gain as having done nothing, which is how the
-            // ordering above came to be noticed.
+            // Integrated loudness (LUFS) of what leaves the mixer: read it before changing any level.
+            // At the head after the limiter; ahead of it, the meter showed the makeup doing nothing.
             if (_system.createDSPByType(DSP_TYPE.LOUDNESS_METER, out _loudnessMeter) == RESULT.OK)
             {
                 master.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, _loudnessMeter);
@@ -1121,8 +887,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 if (_masterTap != null) Log.Information("Capturing the mix to {Path} (playback continues).", capturePath);
                 else Log.Warning("Could not attach the capture tap; playback is unaffected.");
             }
-            // The mix as it reaches the master limiter, beside what leaves it: the difference is what
-            // the limiter did (OPENFPS_AUDIO_CAPTURE_PRE; the lab's --quality limiter).
+            // The mix as it reaches the limiter, to compare with what leaves it (the lab's --quality limiter).
             string? prePath = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_PRE");
             if (!string.IsNullOrEmpty(prePath) && master.getDSPIndex(_masterLimiter, out int limiterAt) == RESULT.OK)
             {
@@ -1130,8 +895,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 _preLimiterTap = MasterTap.Attach(_system, master, prePath, preRate > 0 ? preRate : MixerQuality.MixerRate,
                                                   index: limiterAt + 1, asFloat: MixerQuality.CaptureFloat);
             }
-            // Last of all, after the meter and the capture: dither for the sixteen bits the output is
-            // handed (MasterDither).
+            // Last, after the meter and the capture: dither for the sixteen-bit output.
             _dither = MasterDither.Attach(_system, master);
             if (_dither != null) Log.Information("Master dither: triangular, one 16-bit step (OPENFPS_DITHER=0 leaves it out).");
 
@@ -1185,8 +949,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>Where the listener is, for the wind at their ears; null when nobody is in a world.</summary>
     public void SetEarWind(OpenFPS.Common.EarWindListener? listener) => _earWind?.SetListener(listener);
 
-    /// <summary>The wind at the ears on or off: for the lab, which measures one source at a time and would
-    /// otherwise measure the wind's own noise at each ear as part of it.</summary>
+    /// <summary>The wind at the ears on or off, for the lab, which measures one source at a time.</summary>
     public bool EarWindEnabled
     {
         get => _earWind?.Enabled ?? false;
@@ -1197,18 +960,11 @@ public partial class FmodAudioProvider : IAudioProvider
     public (float LeftDbfs, float RightDbfs, OpenFPS.Common.EarWindAtEars Ears) EarWindLevels
         => _earWind is { } w ? (w.Synth.RenderedLeftDb, w.Synth.RenderedRightDb, w.Synth.Last) : (-150f, -150f, default);
 
-    // --- Steam Audio (phonon) HRTF binaural spatialization. Falls back to FMOD panning if unavailable. ---
-
+    /// <summary>Steam Audio's HRTF stage and its voice pool. Without it, FMOD pans.</summary>
     private void TryInitSteamAudio()
     {
-        // OPENFPS_HRTF=0 leaves the binaural stage out entirely — FMOD's own panning instead.
-        //
-        // A bisect lever, not a setting. The binaural DSP is the largest native surface inside the
-        // mixer callback: one Phonon effect per voice, applied on every block, with buffers and
-        // effects handed round a pool of ninety-six. When a crash lands on an FMOD thread and every
-        // managed suspect has been cleared, being able to take that out in one run is the difference
-        // between knowing and guessing. It costs the HRTF — everything goes flat and stereo — which
-        // is why it is a lever rather than an option.
+        // OPENFPS_HRTF=0 leaves the binaural stage out: a bisect lever for a crash on an FMOD thread
+        // (the stage is the largest native surface in the mixer callback), not a setting.
         if (Environment.GetEnvironmentVariable("OPENFPS_HRTF") == "0")
         {
             Log.Warning("OPENFPS_HRTF=0 — the Steam Audio binaural stage is OFF. Spatial cues are FMOD "
@@ -1246,14 +1002,14 @@ public partial class FmodAudioProvider : IAudioProvider
         catch (Exception ex) { Log.Warning(ex, "Steam Audio init failed; DEGRADED to FMOD panning — no HRTF binaural."); }
     }
 
-    /// <summary>The mixer's rate, which is the rate the binaural stage's input runs at.</summary>
+    /// <summary>The mixer's rate, which the binaural stage's input runs at.</summary>
     private float SaGroundRate()
     {
         _system.getSoftwareFormat(out int rate, out _, out _);
         return rate > 0 ? rate : MixerQuality.MixerRate;
     }
 
-    /// <summary>Allocates one pooled voice (effect + Phonon buffers + DSP). Called only at init.</summary>
+    /// <summary>One pooled voice (effect, Phonon buffers, DSP). Init only.</summary>
     private bool CreatePooledVoice(out SaVoice voice)
     {
         voice = null!;
@@ -1303,8 +1059,8 @@ public partial class FmodAudioProvider : IAudioProvider
         s.GroundEffect = IntPtr.Zero;
     }
 
-    /// <summary>Borrows a voice from the pool (no allocation). Returns false when the pool is empty —
-    /// that sound then plays without HRTF rather than crashing.</summary>
+    /// <summary>Borrows a voice from the pool, leaving <paramref name="leave"/> in it. False when there
+    /// are none: the sound then plays without HRTF.</summary>
     private bool TryCreateSteamAudioVoice(out SteamAudioVoiceState? state, out FMOD.DSP dsp, out System.Runtime.InteropServices.GCHandle handle,
                                           int leave = 0)
     {
@@ -1315,23 +1071,19 @@ public partial class FmodAudioProvider : IAudioProvider
             if (_saPool.Count <= leave) return false;
             v = _saPool.Pop();
         }
-        // Reset transient state. Crucially, clear the binaural effect's internal overlap-add buffers:
-        // pooled voices are reused rapidly (footsteps), and reusing an effect that still holds the tail of
-        // the previous sound produces an audible click/pop on the first frame. The DSP is detached from any
-        // channel at this point (ReleaseSteamAudioVoice removed it), so resetting here is safe.
+        // An effect still holding the last sound's overlap-add tail clicks on the first frame. Safe to
+        // reset: ReleaseSteamAudioVoice detached the DSP.
         Phonon.iplBinauralEffectReset(v.State.Effect);
         if (v.State.GroundEffect != IntPtr.Zero) Phonon.iplBinauralEffectReset(v.State.GroundEffect);
         v.State.Ground?.Reset();
         v.State.GroundDirX = 0f; v.State.GroundDirY = -1f; v.State.GroundDirZ = 0f;
         v.State.DirX = 0f; v.State.DirY = 0f; v.State.DirZ = -1f;
-        // Fully placed. A room's reverb bus holds its stage at blend 0 (its stereo passed through) and
-        // gives it back that way when a map is unloaded; a point source that borrowed it next played
-        // the same signal in both ears. After a /join, half the voices on the new map were mono.
+        // Fully placed: a reverb bus gives its stage back at blend 0, and after a /join half the voices
+        // that borrowed one played mono.
         v.State.SpatialBlend = 1f;
         v.State.PreEq = null;
         Array.Clear(v.State.PreEqState);
-        v.State.LastRms = v.State.LastRmsL = v.State.LastRmsR = 0f;
-        v.State.ProducedAudio = false;
+        v.State.LastRmsL = v.State.LastRmsR = 0f;
         v.State.GuardName = null; v.State.NonFiniteReported = 0; v.State.NonFiniteInputReported = 0;
         state = v.State; dsp = v.Dsp; handle = v.Handle;
         return true;
@@ -1340,14 +1092,8 @@ public partial class FmodAudioProvider : IAudioProvider
     private void ReleaseSteamAudioVoice(ActiveSound a)
     {
         if (a.SaState == null) return;
-        // Detach the DSP from its channel so the mixer stops calling it (removeDSP blocks until any
-        // in-flight callback completes), then return the voice to the pool for reuse. We never free
-        // the Phonon effect/buffers or the GCHandle here — that is exactly what raced the mixer
-        // callback and corrupted the heap. The resources live until Dispose.
-        // The detach has to SUCCEED before this voice may be handed to anyone else — see Detach.
-        // A voice that would not come off its channel is simply not pooled again; _saAllVoices still
-        // holds it, so Dispose frees its Phonon effect and buffers as it always did, and the only
-        // cost is one pool miss.
+        // removeDSP waits out a callback in flight. Nothing is freed here (freeing raced the mixer and
+        // corrupted the heap); Dispose frees it. A voice that will not detach is not pooled again.
         bool reusable = !a.SaDsp.hasHandle() || Detach(a.Channel, a.SaDsp, "binaural");
         if (reusable)
         {
@@ -1357,41 +1103,18 @@ public partial class FmodAudioProvider : IAudioProvider
         a.SaState = null; a.SaDsp = default; a.SaHandle = default;
     }
 
-    // A short history of simulated decays, median-filtered. See SetSimulatedReverbDecay.
+    // The last five simulated decays, for the median. See SetSimulatedReverbDecay.
     private readonly float[] _simReverbHistory = new float[5];
     private int _simReverbCount;
 
+    // TODO: hfDecayRatio and lfDecayRatio are passed in and not used here.
     /// <summary>
-    /// The geometry-derived reverberation time for the listener's surroundings, from the ray tracer.
-    ///
-    /// Median-filtered over the last five readings, and that is not smoothing for its own sake. The
-    /// measurement is stochastic — successive runs over the SAME street canyon returned 1729, 2725 and
-    /// 2800 ms — and every so often a run finds nothing at all and reports zero. Used raw, the good
-    /// readings make the reverb time wander audibly, and a single empty one collapses the street to
-    /// open air for a frame, which is a far worse artefact than being slightly wrong about the decay.
-    ///
-    /// A median rejects the dropout outright (one bad sample in five cannot move it) while tracking a
-    /// genuine change — walking out of the canyon into a field moves three readings and the median
-    /// follows. A mean would let every dropout drag the value down, and a floor-check could not tell
-    /// a failed trace from an actual open field, because both report the same number.
+    /// The ray tracer's reverberation time for the listener's surroundings, median-filtered over the
+    /// last five readings. The measurement is stochastic (one street canyon gave 1729, 2725 and 2800 ms)
+    /// and now and then a run finds nothing and reports zero: a median rejects that dropout, where a mean
+    /// would be dragged down by it and a floor could not tell it from a real open field. The enclosure
+    /// is the target the listener's room walks toward (AdvanceListenerRoom).
     /// </summary>
-    /// <summary>A send may amplify (FMOD allows a mix above 1), and in a sealed hard room the law asks
-    /// it to; this is the ceiling, 20 dB, past which the diffuse field of a whisper next to your ear
-    /// is not a thing anyone needs.</summary>
-    private const float MaxReverbSend = 10f;
-
-    /// <summary>How much of a reflection's energy is scattered rather than mirrored, and so belongs in
-    /// the diffuse field rather than in the arrival. The rest is already counted by its source's own
-    /// send — see the note in ApplyAcousticFilters.</summary>
-    private const float ReflectionScatteredShare = 0.25f;
-
-    /// <summary>The largest reverb send any voice was given since the last report, and how far away
-    /// that voice was. Reported rather than the constant, because the send has not been a constant
-    /// since it became the room equation.</summary>
-
-    /// <summary>Lab overrides for the reverb unit's early-reflection share (%) and late delay (ms);
-    /// NaN means the constants. The AudioLab's room walk sets these to measure them.</summary>
-
     public void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio)
     {
         _enclosureTarget = enclosure;
@@ -1407,29 +1130,18 @@ public partial class FmodAudioProvider : IAudioProvider
         _simReverbDecayMs = sorted[_simReverbCount / 2];
     }
 
-    /// <summary>The median-filtered decay currently driving the reverb, for the spikes and profiler.</summary>
+    /// <summary>The median-filtered decay, for the spikes and the profiler.</summary>
     public float SimulatedReverbDecayMs => _simReverbDecayMs;
 
-    /// <summary>How enclosed the listener's surroundings are, 0..1 — the value in USE, slewed toward
-    /// the measurement. See OpenFPS.Common.Enclosure and <see cref="AdvanceListenerRoom"/>.</summary>
+    /// <summary>How enclosed the listener's surroundings are, 0..1: the value in use, slewed toward
+    /// <see cref="_enclosureTarget"/> by <see cref="AdvanceListenerRoom"/>. See OpenFPS.Common.Enclosure.</summary>
     private float _listenerEnclosure = -1f;
 
-    /// <summary>The room's surface area as the rays measured it, m² — the term the room equation used
-    /// to assume was a cube's. See Enclosure.ReverberantToDirectPower.</summary>
-
-    /// <summary>The last measurement of each, which the live values above walk toward.</summary>
+    /// <summary>The last measured enclosure, which <see cref="_listenerEnclosure"/> walks toward.</summary>
     private float _enclosureTarget;
     private double _roomAdvancedAt;
 
-    /// <summary>How the listener's room colours its tail, as ratios of the mid band's decay. This is
-    /// what a material sounds like: carpet's top dies four times faster than its middle, concrete's
-    /// barely tilts.</summary>
-
-    /// <summary>What the enclosure measure currently reads, for the spikes and the report line.</summary>
-    public float ListenerEnclosure => _listenerEnclosure;
-
-    // Speed of sound, m/s, derived from the world's air temperature. Defaults to the 20 °C value so a
-    // provider that is never told the weather behaves exactly as it did before.
+    // From the world's air temperature; 20 °C until the weather says otherwise.
     private float _speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound;
     public void SetAirTemperature(float celsius)
     {
@@ -1438,40 +1150,13 @@ public partial class FmodAudioProvider : IAudioProvider
         OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentAirCelsius = celsius;
     }
 
-    /// <summary>The wet level of the bus for the room the listener is in, dB, moved toward its target
-    /// rather than snapped to it. -80 is silence, which is where open ground sits.</summary>
-
-    /// <summary>Overrides the listener-region reverb DSP decay with the simulated RT60-derived value when
-    /// available, replacing the Sabine estimate for the room the listener is in. No-op when 0 (sim off).
-    ///
-    /// Outdoors is included, and used not to be. The outdoor bus is built muted because the Sabine
-    /// estimate for it treats the entire map as one room and produces an omnipresent wash — but that
-    /// is an argument against THAT ESTIMATE, not against outdoor reverberation, and the early return on
-    /// the global region id was quietly turning down the one model that gets it right. A ray-traced
-    /// RT60 is computed from the geometry actually standing around the listener: nearly nothing in an
-    /// open field, and a real decay in a street with tall buildings down both sides. So outdoors the
-    /// simulated decay sets the time AND opens the wet level in proportion to it, which leaves open
-    /// ground exactly as dry as it is today and gives a concrete canyon the slapback it should have.
-    /// </summary>
     /// <summary>
-    /// Walks the room the listener is IN toward the room the rays just measured.
-    ///
-    /// The measurement is a step function: the probe runs every few ticks, and crossing the mouth of a
-    /// car park moves it from 40 % enclosed to 89 % between one sample and the next. The send is built
-    /// from that (Enclosure.ReverberantToDirectPower), so applied directly the reverberation of every
-    /// voice would jump SEVENTEEN AND A HALF DECIBELS in one two-metre step (measured with
-    /// `--enclosure map=city walk=-4,30:-30,30`), heard as a click stepping into range of a building's
-    /// reflections and a pop stepping out.
-    ///
-    /// A reverberant field cannot do that. It is energy stored in a room, and energy takes as long to
-    /// build up or die away as the room's own tail: walking through a doorway, what you hear is the
-    /// old room fading and the new one filling, both over about an RT60. So the live values walk
-    /// toward the measured ones with the room's own time constant, and the walk is what a listener
-    /// hears instead of a step.
-    ///
-    /// This is not a smoothing filter hiding a bad measurement. The measurement is right — a car park
-    /// really is that much more enclosed than the street outside it — and what was missing is that it
-    /// takes a moment to get there.
+    /// Walks the listener's enclosure toward what the rays just measured, with the room's own time
+    /// constant. The measurement steps (a car park's mouth: 40 % to 89 % enclosed between two samples)
+    /// and applied directly every voice's reverberation jumped 17.5 dB in one two-metre step (measured
+    /// with `--enclosure map=city walk=-4,30:-30,30`), a click in and a pop out. A reverberant field
+    /// builds and dies over its own decay, so the walk is what a doorway sounds like, not a smoothing
+    /// of a bad measurement.
     /// </summary>
     private void AdvanceListenerRoom()
     {
@@ -1480,17 +1165,14 @@ public partial class FmodAudioProvider : IAudioProvider
         _roomAdvancedAt = now;
         if (dt <= 0f || dt > 0.5f) return;   // a stall is not a walk across a room
 
-        // A room's field settles over its own decay. Floored so a dead room still takes a moment, and
-        // capped so a cathedral does not lag a listener who has walked out of it.
+        // Floored so a dead room still takes a moment, capped so a cathedral does not lag a listener
+        // who has walked out of it.
         float tau = Math.Clamp(_simReverbDecayMs * 0.001f * 0.5f, 0.12f, 0.6f);
         float a = 1f - MathF.Exp(-dt / tau);
         _listenerEnclosure += (_enclosureTarget - _listenerEnclosure) * a;
     }
 
-    /// <summary>The listener's measured enclosure, eased toward the survey's reading at the pace of
-    /// the room's own decay (AdvanceListenerRoom). It scales what the listener's own room hears of a
-    /// sound at a distance (the send).</summary>
-    private void ApplySimulatedReverb(int listenerRegionId) => AdvanceListenerRoom();
+    private void ApplySimulatedReverb() => AdvanceListenerRoom();
 
     public void SetAcousticMap(AcousticMap map)
     {
@@ -1507,8 +1189,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 active.SourceReverbConnection = default;
                 active.ReverbBus = default;
                 active.SourceReverbBus = default;
-                // The buses these pointed into have just been released, so a fading send has nothing
-                // left to disconnect from; forgetting it is the whole of the cleanup.
+                // Their buses are released: forgetting a fading send is the whole of its cleanup.
                 active.FadingReverbConnection = default;
                 active.FadingSourceConnection = default;
                 active.FadingReverbBus = default;
@@ -1521,10 +1202,9 @@ public partial class FmodAudioProvider : IAudioProvider
 
     private void ClearReverbBuses()
     {
-        ReturnReverbVoices(); // detach HRTF voices while the buses still exist, return them to the pool
+        ReturnReverbVoices(); // while the buses still exist
         // Each traced stage off its bus while the bus exists: removeDSP waits out a callback in flight,
-        // so once it returns nothing reads the stage's native effects and buffers. A unit still
-        // attached cannot be released, and releasing its bus first left it in the graph.
+        // so after it nothing reads the stage's native memory. An attached unit cannot be released.
         foreach (var (regionId, (_, dsp, _)) in _traced)
         {
             if (!dsp.hasHandle()) continue;
@@ -1557,7 +1237,6 @@ public partial class FmodAudioProvider : IAudioProvider
         foreach (var kvp in _acousticMap.Regions)
         {
             int regionId = kvp.Key;
-            // Global Environment is always active
             if (regionId == _acousticMap.GlobalEnvironmentId) { activeIds.Add(regionId); continue; }
             
             if (_acousticMap.RegionPositions.TryGetValue(regionId, out var regPos))
@@ -1568,7 +1247,7 @@ public partial class FmodAudioProvider : IAudioProvider
         }
         if (_listenerRegionId != AcousticConstants.GlobalRegionId && _listenerRegionId != -1) activeIds.Add(_listenerRegionId);
 
-        // Add adjacent regions through portals
+        // The listener's neighbours through portals.
         foreach (var pKvp in _acousticMap.Portals.Values)
         {
             if (pKvp.Portal.RegionAId == _listenerRegionId || pKvp.Portal.RegionBId == _listenerRegionId || _listenerRegionId == _acousticMap.GlobalEnvironmentId)
@@ -1593,54 +1272,16 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
-    /// How many region reverb buses may EXIST at once. Four of them are ever audible
-    /// (<see cref="MaxActiveReverbBuses"/>); this is the headroom above that.
-    ///
-    /// A bus is an FMOD channel group with a live SFXREVERB unit in its chain, and one was created
-    /// for every region any source had ever sent to — which on a city block was a couple of dozen
-    /// and on a city is a hundred and eighty-five, every one of them carrying a reverb unit through
-    /// the mix and taking a setVolume call on every audio update, to be silent. Nothing about that
-    /// is bounded by the map; it is bounded by how far a player has walked.
-    ///
-    /// Twenty-four is six times what can be heard, which is enough that the set never churns while
+    /// How many region reverb buses may exist at once; four are ever audible
+    /// (<see cref="MaxActiveReverbBuses"/>). Unbounded, one was made for every region any source had
+    /// sent to (185 on the city), each a reverb unit in the mix to be silent. Twenty-four never churns
     /// walking down a street with rooms either side.
     /// </summary>
     private const int MaxReverbBuses = 24;
 
-    /// <summary>
-    /// NOTHING IS TORN DOWN WHILE THE MIXER IS RUNNING. This is a cap, not a recycler.
-    ///
-    /// Releasing the furthest silent buses (the channel group, its SFXREVERB unit, and its HRTF voice
-    /// back to the shared pool) is the mistake ReleaseSteamAudioVoice warns about: FMOD objects
-    /// destroyed on the game thread while the mix is in flight. It would also drain the pool the
-    /// spatial voices share, heard as everything going MONO, because a voice that cannot get a
-    /// binaural effect plays without one.
-    ///
-    /// So a bus that exists is kept for the life of the map. What is bounded is how many get MADE:
-    /// past the cap the far ones are simply not built, they stay dry, and since only four are ever
-    /// audible at once that costs nothing anybody can hear. Walking back towards a room that was
-    /// refused builds it then, because by then it is near.
-    /// </summary>
-    // ── Traced reverb, everywhere ─────────────────────────────────────────────────────────
-    //
-    // Reverb is not an effect added on top: it falls out of the geometry. Every reverb bus gets a traced stage
-    // right after its SFXREVERB. In traced mode the SFXREVERB passes its input through dry and the
-    // stage convolves it with a traced impulse response (SteamAudio.TracedReverb): the listener's own,
-    // traced from where they stand, for the room they are in; each other audible room's own, traced
-    // from its middle, so a sound through a doorway rings with the room it is in. The materials of
-    // every surface are in the trace, so carpet and concrete and tile tell themselves apart, and the
-    // reverb is simply the late part of what comes back. There is no parametric room algorithm (no
-    // SFXREVERB tail, Sabine or enclosure estimate, wet-level loop or room-equation send). The
-    // SFXREVERB unit on each bus is kept only as the point the traced stage is inserted at; it passes
-    // its input through dry.
-    //
-    // One rule for every place: a one-off sound's first 80 ms are placed voices
-    // mirrored through the surfaces round it (WorldAudioPlayer.QueueEarlyEchoes and the steps'
-    // SubmitRoomStepEchoes), the listener's traced stage plays only the late tail (TailOnly, as a
-    // diffuse field), and every reflected path — placed copies, tails, traced echoes — sits at one
-    // trim against the direct sound (TailDb and CopiesDb). Nothing decides by "indoors" except
-    // where physics does: past the window a room's copies are dense and are the tail; a street's are
-    // sparse and stay separate events (QueueHigherOrderEchoes).
+    // Traced reverb, on every bus: the SFXREVERB unit passes its input through dry and only marks
+    // where the traced stage (SteamAudio.TracedReverb) is inserted. No parametric room algorithm.
+    // See docs/CLIENT_NOTES.md, "Traced reverb everywhere".
 
     private readonly Dictionary<int, (TracedReverbState State, FMOD.DSP Dsp, System.Runtime.InteropServices.GCHandle Handle)> _traced = new();
     /// <summary>Which traced stages are running (not bypassed) right now.</summary>
@@ -1649,24 +1290,17 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>Whether there is a trace to play yet (the scene is built after the map loads).</summary>
     internal static bool TracedActive => TracedReverbSet.Listener != null;
 
-    // ── Traced echoes: a few sources traced from where they are ──────────────────────────────
-    //
-    // Mirror-image echoes of a moving source jump from facade to facade as it passes. The loudest
-    // few sustained sources at the ear are traced from their own positions instead (TracedEchoes):
-    // every order of reflection, crossfaded as they move. They are chosen by the level they render
-    // at, which a passing car reaches as it comes close and loses as it goes, so only sources loud
-    // enough to be heard reflecting pay for a trace.
-    //
-    // Each one's rig (TracedEchoRig) is two units on its own channel: a capture at the input end,
-    // before the HRTF, and a mix at the output end, after the fader (index 0 is the output end:
-    // --dsp-order). The echoes therefore carry none of the direct path's distance law, occlusion or
-    // EQ — the trace has its own — and are added in the same block as the voice, not a block late.
+    // Traced echoes: the loudest few sustained sources are traced from where they are (TracedEchoes),
+    // because mirror images of a moving source jump from facade to facade. Each rig is a capture at
+    // the channel's input end (before the HRTF) and a mix at its output end (after the fader; index 0
+    // is the output end, --dsp-order), so the echoes carry their own path, not the direct one's, in
+    // the same block as the voice.
 
     /// <summary>/echoes on | off | a trim in dB. On by default, for far sources only, at
     /// <see cref="TailDb"/>; OPENFPS_ECHOES=off starts with them off.</summary>
     public static volatile bool TracedEchoesOn = !string.Equals(Environment.GetEnvironmentVariable("OPENFPS_ECHOES"), "off", StringComparison.OrdinalIgnoreCase);
-    /// <summary>Entities whose echoes are traced this frame, for the game side to stop making their
-    /// mirror images. Written by the audio update; read by ClientAudioSystem.</summary>
+    /// <summary>Entities whose echoes are traced this frame, so the game side stops making their mirror
+    /// images. Written by the audio update, read by ClientAudioSystem.</summary>
     private static volatile int[] _tracedEchoIds = Array.Empty<int>();
     public static bool HasTracedEchoes(int entityId)
     {
@@ -1678,55 +1312,35 @@ public partial class FmodAudioProvider : IAudioProvider
     private readonly List<TracedEchoRig> _echoRigs = new();
     private bool _echoRigsTried;
     private readonly List<(ActiveSound A, float Score)> _echoCandidates = new();
-    /// <summary>A candidate must render within this much of the loudest voice to be worth a trace:
-    /// under it, its echoes are under everything else's.</summary>
+    /// <summary>A candidate must render within this much of the loudest voice: under it, its echoes are
+    /// under everything else's.</summary>
     private const float EchoWithinDb = 30f;
-    /// <summary>Held once chosen until it falls this far behind the one that would replace it, so a
-    /// pair of cars at the edge do not swap every frame.</summary>
+    /// <summary>A chosen source is held until this far behind its replacement, so two cars at the edge
+    /// do not swap every frame.</summary>
     private const float EchoHoldDb = 4f;
     private const int MaxEchoTapsPerTrain = 2;
     /// <summary>
-    /// Only FAR sources. Close to, a voice already has its direct sound, its ground bounce and the
-    /// near walls, all exactly; a traced response on top of that stacked a second set of strong early
-    /// reflections a few milliseconds behind the direct sound, and a copy that close is a comb (boxy,
-    /// flanged). In from this distance, out again inside the hold.
+    /// Far sources only: close to, a traced response stacked a second set of strong early reflections
+    /// a few milliseconds behind the direct sound, a comb (boxy, flanged). In from this distance, out
+    /// again inside the hold.
     /// </summary>
     private const float EchoEnterMetres = 30f, EchoHoldMetres = 22f;
-    /// <summary>How long the hand-over between the ordinary paths and the traced ones takes.</summary>
+    /// <summary>The hand-over between the ordinary paths and the traced ones.</summary>
     private const float EchoFadeSeconds = 0.6f;
     private long _echoTickAt;
     /// <summary>
-    /// Every reflected sound against the direct sound, dB: the placed early copies of a one-off sound
-    /// (WorldAudioPlayer.QueueEarlyEchoes and its facade and flutter echoes, the steps'
-    /// SubmitRoomStepEchoes), every room's and every street's traced tail (the traced stages), and the
-    /// far sources' traced echoes (the rigs). The same indoors and out. Zero is the traced and image-source level, which is physical to
-    /// within a couple of decibels wherever it has been measured (--clap-room, --traced-reverb).
-    ///
-    /// Why a trim at all: every trimmed path is a copy of the source arriving a few tens of
-    /// milliseconds late. What the ear does with those in life (fuse them, suppress them) it does less
-    /// of through a generic HRTF in headphones, where a copy at its physical level is heard as an
-    /// event. The room's identity — its decay, its colour, where its walls are — survives the trim;
-    /// only its weight against the direct sound is set for the listener.
-    ///
-    /// There are two numbers, because the two kinds are heard differently:
-    ///   TailDb   — everything TRACED: the listener's and other rooms' stages, far sources' traced
-    ///              echoes. Convolved through the traced response, so already reflections, not copies.
-    ///              `/tail <dB>`, OPENFPS_TAIL_DB.
-    ///   CopiesDb — everything PLACED as a copy of the source: early echoes, facade and higher-order
-    ///              echoes, your own steps' echoes, the master-bus boundary copies.
-    ///              `/copies <dB>`, OPENFPS_COPIES_DB.
-    /// `/reflections <dB>` sets both.
-    ///
-    /// Both are -6, set by ear in a flat, a tunnel and a street. A trim further down was hiding
-    /// faults, not setting a level: with the tail parametric it was 14-20 dB too loud in the tunnel;
-    /// with the tail spread evenly it was "centralised"; with sample-identical copies the ear heard
-    /// separate events. If the tail sounds like a wash at a level near 0, look for something
-    /// non-physical before trimming. One is known: the trace rings as long at 4 kHz as at 250 Hz
-    /// (0.79 s, where Sabine from the same materials says 0.52), so the top hangs on.
+    /// Every traced reflection against the direct sound, dB: the rooms' and streets' traced tails and
+    /// the far sources' traced echoes (`/tail`, OPENFPS_TAIL_DB; `/reflections` sets this and
+    /// <see cref="CopiesDb"/>). Zero is physical to within a couple of decibels where measured
+    /// (--clap-room, --traced-reverb). -6 for both, set by ear in a flat, a tunnel and a street; the
+    /// trace rings as long at 4 kHz as at 250 Hz (0.79 s, Sabine 0.52), so the top hangs on. See
+    /// docs/CLIENT_NOTES.md, "The reflections trim".
     /// </summary>
     public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? -6f;
-    /// <summary>See <see cref="TailDb"/>. The copies carry only the mirror share, with the scattered
-    /// share as the wall's wash, at energy-correct levels, and at most four second-order copies.</summary>
+    /// <summary>Every reflection placed as a copy of the source against the direct sound, dB: early,
+    /// facade and higher-order echoes, your own steps' echoes, the boundary copies (`/copies`,
+    /// OPENFPS_COPIES_DB). The copies carry only the mirror share, with the scattered share as the
+    /// wall's wash, and at most four second-order copies. See <see cref="TailDb"/>.</summary>
     public static volatile float CopiesDb = EnvDb("OPENFPS_COPIES_DB") ?? -6f;
     public static float TailTrim => MathF.Pow(10f, TailDb / 20f);
     public static float CopiesTrim => MathF.Pow(10f, CopiesDb / 20f);
@@ -1736,10 +1350,10 @@ public partial class FmodAudioProvider : IAudioProvider
                        System.Globalization.CultureInfo.InvariantCulture, out float db) ? Math.Clamp(db, -80f, 6f) : null;
 
     /// <summary>The cabin's traced response against its physical level, dB: 0 is the traced level.
-    /// `/cabin <dB>` sets it, for judging a ride by ear; the reflections trim does not touch it.</summary>
+    /// `/cabin` with a level in dB sets it, for judging a ride by ear; the reflections trim does not touch it.</summary>
     public static volatile float CabinDb = 0f;
 
-    /// <summary>Once chosen, a source keeps its trace at least this long: no flicker as it passes
+    /// <summary>A chosen source keeps its trace at least this long, so it does not flicker passing
     /// behind something.</summary>
     private const float EchoMinHoldSeconds = 3f;
     private double _echoLogAt;
@@ -1748,7 +1362,7 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         _echoRigsTried = true;
         if (_saContext == IntPtr.Zero || _saHrtf == IntPtr.Zero) return;
-        // As for a traced stage: echoes traced for another rate would play every delay time-scaled.
+        // Echoes traced for another rate would play every delay time-scaled.
         if (echoes.SampleRate != MixerQuality.MixerRate)
         {
             Log.Warning("Traced echoes: traced at {Trace} Hz, the mixer is at {Mixer} Hz; no traced echoes.", echoes.SampleRate, MixerQuality.MixerRate);
@@ -1769,7 +1383,7 @@ public partial class FmodAudioProvider : IAudioProvider
             {
                 FrameSize = _saFrameSize, WorkerContext = echoes.Context, ProviderContext = _saContext,
                 Effect = effect, EffectB = effectB, Decode = decode, Hrtf = _saHrtf,
-                Capture = new float[_saFrameSize], MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
+                Capture = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
                 AmbiScratchA = new float[_saFrameSize * TracedEchoes.Channels], AmbiScratchB = new float[_saFrameSize * TracedEchoes.Channels],
                 Orientation = Phonon.ListenerFrame(_listenerRot), SampleRate = echoes.SampleRate,
             };
@@ -1796,7 +1410,6 @@ public partial class FmodAudioProvider : IAudioProvider
             echoes.Release(slot);
             return;
         }
-        rig.Owner = a.EntityId;
         rig.AttachGeneration[0] = System.Threading.Volatile.Read(ref echoes.BankGeneration[0]);
         rig.AttachGeneration[1] = System.Threading.Volatile.Read(ref echoes.BankGeneration[1]);
         a.EchoWeight = 0f;
@@ -1809,8 +1422,8 @@ public partial class FmodAudioProvider : IAudioProvider
         a.EchoRig = rig;
     }
 
-    /// <summary>Takes a voice's rig off it — removeDSP blocks until a callback in flight returns —
-    /// and hands the rig back to the pool. The rig itself is never freed.</summary>
+    /// <summary>Takes a voice's rig off it (removeDSP waits out a callback in flight) and frees its
+    /// slot. The rig itself is never freed.</summary>
     private void DetachEchoRig(ActiveSound a)
     {
         var rig = a.EchoRig;
@@ -1824,10 +1437,9 @@ public partial class FmodAudioProvider : IAudioProvider
             a.Channel.removeDSP(rig.CaptureDsp);
         }
         TracedReverbSet.Echoes?.Release(slot);
-        rig.Owner = 0;
     }
 
-    // ── Each source's own late sound (LateField) ─────────────────────────────────────────────────
+    // Each source's own late sound (LateField).
     private readonly List<(ActiveSound A, float Level)> _lateCandidates = new();
     private readonly int[] _lateIds = new int[LateField.MaxSources];
     private readonly Vector3[] _lateAt = new Vector3[LateField.MaxSources];
@@ -1841,9 +1453,9 @@ public partial class FmodAudioProvider : IAudioProvider
     private const double LateAnswerSeconds = 3.0;
 
     /// <summary>
-    /// The loudest sources in the place you stand in, handed to the tracer that measures each one's own
-    /// late energy and direction; its answers turned into the place's distance law (for everything
-    /// it did not trace, the one-off sounds above all) and the way the tail leans.
+    /// Hands the loudest sources in the listener's place to the tracer that measures each one's late
+    /// energy and direction, and turns its answers into the place's distance law (for everything it did
+    /// not trace) and the way the tail leans.
     /// </summary>
     private void UpdateLateField()
     {
@@ -1854,9 +1466,8 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             if (a.IsReflection || a.FadeTarget <= 0f || a.TargetRegionId != _listenerRegionId) continue;
             if (!a.SourceReverbConnection.hasHandle()) continue;
-            // The paths into the cabin you sit in send at the interior voice's own send, so they need no
-            // trace of their own; given slots, they pushed the rain on the roof out of them (+2 dB, the
-            // rain falling back on the stand-in law).
+            // Cabin paths send at the interior voice's send; given slots, they pushed the rain on the
+            // roof out of them (+2 dB, the rain falling back on the stand-in law).
             if (a.TapState is { CabinPath: > 0 }) continue;
             float dist = Vector3.Distance(_listenerPos, a.Position);
             _lateCandidates.Add((a, a.BaseVolume * Loudness.RenderedGain(1f, a.MinDistance, a.Range, dist)));
@@ -1912,11 +1523,10 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
-    /// How much of the listener's traced tail a source in the same place raises, against its own
-    /// direct sound as the send already carries it: distance × sqrt(its late energy against a source at
-    /// the listener). From its own trace if it had one, else from the place's fitted law, else the
-    /// old stand-in (distance raised to the enclosure) — which made a car 45 m down the tunnel ring
-    /// nearly as loud as one at 5 m.
+    /// How much of the listener's traced tail a source in the same place raises, against its direct
+    /// sound as the send carries it: distance × sqrt(its late energy against a source at the listener).
+    /// From its own trace, else the place's fitted law, else the stand-in (distance raised to the
+    /// enclosure), which made a car 45 m down the tunnel ring nearly as loud as one at 5 m.
     /// </summary>
     private float LateSend(ActiveSound a, float d)
     {
@@ -1953,9 +1563,9 @@ public partial class FmodAudioProvider : IAudioProvider
             if (a.FadeTarget <= 0f || a.LastVolume <= 0f) continue;
             float dist = Vector3.Distance(_listenerPos, a.CurrentApparentPosition);
             if (dist < (a.EchoRig != null && !a.EchoLeaving ? EchoHoldMetres : EchoEnterMetres)) continue;
-            // Ranked by what it radiates at this distance, not by what gets through: LastVolume carries
-            // occlusion and the cone, which swing as a siren passes behind a building, and ranking on
-            // them flickered the trace in and out — "reflect, cut out, cut in, cut out".
+            // Ranked by what it radiates here, not what gets through: occlusion and the cone swing as a
+            // siren passes behind a building, and ranking on them flickered the trace ("reflect, cut
+            // out, cut in, cut out").
             float level = a.BaseVolume * Loudness.RenderedGain(1.0f, a.MinDistance, a.Range, dist);
             bool held = a.EchoRig != null && !a.EchoLeaving;
             float score = level * (held ? MathF.Pow(10f, EchoHoldDb / 20f) : 1f);
@@ -1993,8 +1603,8 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             if (a.EchoRig == null) continue;
             bool wanted = keep.Contains(a);
-            // A source not wanted any more still keeps its trace out the minimum hold, unless it
-            // has come close — close is where the trace does harm.
+            // An unwanted source keeps its trace out the minimum hold, unless it has come close, where
+            // the trace does harm.
             bool close = Vector3.Distance(_listenerPos, a.CurrentApparentPosition) < EchoHoldMetres;
             if (!wanted && !close && nowS - a.EchoSince < EchoMinHoldSeconds) { keep.Add(a); wanted = true; }
             a.EchoLeaving = !wanted;
@@ -2008,8 +1618,7 @@ public partial class FmodAudioProvider : IAudioProvider
             AttachEchoRig(a, free, echoes);
         }
 
-        // Each frame: where each one is, and its level at a metre with the same loudness law the
-        // direct sound gets, so the echoes stand to the direct sound as they would in the air.
+        // The same loudness law as the direct sound, so the echoes stand to it as they would in the air.
         long tick = System.Diagnostics.Stopwatch.GetTimestamp();
         float dt = _echoTickAt == 0 ? 0f : Math.Clamp((tick - _echoTickAt) / (float)System.Diagnostics.Stopwatch.Frequency, 0f, 0.25f);
         _echoTickAt = tick;
@@ -2055,9 +1664,9 @@ public partial class FmodAudioProvider : IAudioProvider
         return $"Echoes {mode}, {TailDb:F0} dB against physical (the tail level). {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
     }
 
-    /// <summary>Where a sound id's file is: the path the loader opens; empty if it would leave ASSETS.</summary>
-    // Sound ids come from the server and a map's owner sets them: a network share here would hand
-    // Windows' login hash to whoever runs it.
+    /// <summary>The path the loader opens for a sound id; empty if it would leave ASSETS. Ids come from
+    /// the server and a map's owner sets them: a network share would hand Windows' login hash to whoever
+    /// runs it.</summary>
     internal static string SoundFilePath(string soundId)
     {
         if (string.IsNullOrEmpty(soundId)) return "";
@@ -2092,27 +1701,19 @@ public partial class FmodAudioProvider : IAudioProvider
         return TakeLevels.GainFor(path);
     }
 
-    /// <summary>For the /reverb readout: mode, and how the tracing is doing.</summary>
-    public static string TracedReverbStatus(FmodAudioProvider? p)
+    /// <summary>For the /reverb readout: how the tracing is doing and the two trims.</summary>
+    public static string TracedReverbStatus()
     {
         if (TracedReverbSet.Listener == null) return "No trace yet — the scene is still being built.";
         var (rooms, runs, ms) = TracedReverbSet.Stats();
         return $"Traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms. Tail {TailDb:F0} dB, copies {CopiesDb:F0} dB. {LateFieldStatus()}";
     }
 
-    /// <summary>Adds a traced stage to every bus that lacks one, points each at the place it should be
-    /// played through, and puts every bus in the mode asked for. Audio update thread.</summary>
-    // ── The ear, overloaded ─────────────────────────────────────────────────────────────────
-    //
-    // The loudness law puts everything above about 112 dB at the ear at full scale (Loudness), so a
-    // pistol 1 m away and one 30 m away came out the same, and a shot beside you was "just a click":
-    // 1-2 ms of energy at the same peak a hand clap reaches. What does not fit under the ceiling has
-    // to show somewhere, and the ear shows where: a sound that loud sets off its protective reflex and
-    // leaves the world dulled for a moment after. So the excess is taken out of everything ELSE, by
-    // the same law that compresses the rest (the excess at the ear times the compression), and comes
-    // back over a few hundred milliseconds, longer the harder it was hit. The shot itself, its echoes
-    // and the room's reverb are left alone: what you hear in that moment is the shot and its room.
-    // About 20 dB for a pistol at a metre, 6 at 40 m, nothing from a jackhammer.
+    // The ear, overloaded. The loudness law puts everything above about 112 dB at the ear at full scale,
+    // so a shot beside you was "just a click", level with one at 30 m. The excess is taken out of
+    // everything else instead, as the ear's protective reflex does, by the law that compresses the rest,
+    // and comes back over a few hundred milliseconds, longer the harder it was hit; the shot, its echoes
+    // and its room are left alone. About 20 dB for a pistol at a metre, 6 at 40 m, none from a jackhammer.
 
     /// <summary>Most the world gives way by, dB.</summary>
     private const float OverloadMaxDb = 24f;
@@ -2147,9 +1748,8 @@ public partial class FmodAudioProvider : IAudioProvider
                 _overloadPending.RemoveAt(i);
                 if (db <= _overloadDb) continue;
                 _overloadDb = db;
-                // The reflex holds while the sound is still in the ear, and the world comes back the
-                // slower the harder it was hit: about a quarter of a second after a distant shot, most
-                // of a second after one beside you.
+                // Held while the sound is in the ear; back in about a quarter of a second after a
+                // distant shot, most of a second after one beside you.
                 _overloadHoldUntil = now + 0.05;
                 _overloadTau = 0.15 + 0.03 * db;
             }
@@ -2159,9 +1759,8 @@ public partial class FmodAudioProvider : IAudioProvider
         _overloadGain = MathF.Pow(10f, -_overloadDb / 20f);
     }
 
-    /// <summary>For the readouts and tests: how far the world is giving way right now, dB.</summary>
-    public float OverloadNowDb => _overloadDb;
-
+    /// <summary>Adds a traced stage to every bus that lacks one, points each at the place it is heard
+    /// as, and runs only the audible ones. Audio update thread.</summary>
     private void UpdateTracedStages()
     {
         var listenerTrace = TracedReverbSet.Listener;
@@ -2173,47 +1772,42 @@ public partial class FmodAudioProvider : IAudioProvider
             AddTracedStage(kv.Key, bus, kv.Value, listenerTrace);
         }
 
-        // Which place each bus is heard as. The room you are in: yours. Any other ROOM: its own,
-        // from its middle. Open ground elsewhere: yours too — the open air has no middle to trace.
+        // The room you are in: yours (the cabin's, riding in one). Any other room: its own, from its
+        // middle. Open ground elsewhere: yours too, the open air having no middle to trace.
         var cabin = TracedReverbSet.Cabin;
         foreach (var kv in _traced)
         {
-            // Riding in something with a cabin, your room is the cabin, traced as itself.
             TracedReverb? trace = kv.Key == _listenerRegionId && cabin != null ? cabin : listenerTrace;
             if (kv.Key != _listenerRegionId && IsEnclosure(kv.Key) && _acousticMap != null
                 && _acousticMap.RegionPositions.TryGetValue(kv.Key, out var centre)
                 && _reverbVolumes.TryGetValue(kv.Key, out float vol) && vol > 0.001f)
                 trace = TracedReverbSet.ForRoom(kv.Key, centre) ?? listenerTrace;
-            // Open ground heard from INDOORS: from just outside the opening it comes in by. Traced at
-            // the listener it was the street's sound with the lobby's echoes in it.
+            // Open ground heard from indoors: traced from just outside the opening it comes in by.
+            // Traced at the listener it was the street with the lobby's echoes in it.
             else if (kv.Key != _listenerRegionId && !IsEnclosure(kv.Key) && IsEnclosure(_listenerRegionId)
                      && _fieldHere.TryGetValue(kv.Key, out var field) && field.Region == _listenerRegionId && field.Gain > 0f
                      && _reverbVolumes.TryGetValue(kv.Key, out float openVol) && openVol > 0.001f)
                 trace = TracedReverbSet.ForRoom(kv.Key, field.InField) ?? listenerTrace;
             kv.Value.State.Trace = trace;
-            // Your own place's stage: the late tail alone, the early part being placed copies
+            // Your own place plays the late tail alone, its early part being placed copies
             // (WorldAudioPlayer.QueueEarlyEchoes). A cabin keeps its whole response: nothing is placed
             // inside a vehicle.
             bool tailOnly = kv.Key == _listenerRegionId && !ReferenceEquals(trace, cabin);
-            // The late field's convolver, made here and not on the mixer thread, and only for a stage
-            // that plays the room you are in: it holds a ring of half a second per direction.
+            // Made here, not on the mixer thread, and only for your own room's stage: it holds half a
+            // second per direction.
             if (tailOnly && kv.Value.State.DiffuseLateConv == null && trace != null && kv.Value.State.SubFrame > 0
                 && DiffuseLateNoise.Block % kv.Value.State.SubFrame == 0)
                 kv.Value.State.DiffuseLateConv = trace.NewDiffuseLateConvolver(kv.Value.State.SubFrame);
             kv.Value.State.TailOnly = tailOnly;
-            // The trim is for reflections heard beside their direct sound. A cabin's response is not
-            // that: nothing is placed inside a vehicle, so it is the whole of the room you sit in,
-            // and it plays at its traced level. Trimmed with the rest, a bus ride is muffled, with the
-            // doors and the street gone and no way to tell the bus is stopping.
+            // A cabin's response is the whole of the room you sit in, not reflections beside a direct
+            // sound, so it plays at its traced level: trimmed, a bus ride was muffled, the doors and
+            // the street gone and no way to tell the bus was stopping.
             kv.Value.State.Gain = ReferenceEquals(trace, cabin) ? MathF.Pow(10f, CabinDb / 20f) : TailTrim;
         }
 
-        // ONLY WHERE IT CAN BE HEARD. A traced stage convolves and then decodes round the head, about
-        // half a millisecond a block, and FMOD runs a bus's chain whatever its volume. Twenty-four
-        // buses carrying one each take the mixer from 40 % to 77 %; the voice budget then sheds the
-        // city down to two engines, heard as "bit crushed" cars and a train that cuts in and out.
-        // Only four buses are ever audible (MaxActiveReverbBuses), so a
-        // silent bus's stage is bypassed and costs nothing.
+        // Only where it can be heard: a stage costs about half a millisecond a block whatever its bus's
+        // volume, and twenty-four running took the mixer from 40 % to 77 % ("bit crushed" cars, a train
+        // cutting in and out as the budget shed voices). A silent bus's stage is bypassed.
         foreach (var kv in _traced)
         {
             bool audible = _reverbVolumes.TryGetValue(kv.Key, out float v) && v > 0.001f;
@@ -2227,13 +1821,12 @@ public partial class FmodAudioProvider : IAudioProvider
 
     private void AddTracedStage(int regionId, FMOD.ChannelGroup bus, FMOD.DSP sfx, TracedReverb tr)
     {
-        // In pieces of TracedReverb.TracedFrame: the convolution answers a block late, and the block
-        // it answers late by is ITS block, not the mixer's.
+        // In pieces of TracedReverb.TracedFrame: the convolution answers a block late, and that is its
+        // own block, not the mixer's.
         int sub = tr.FrameSize;
         if (_saFrameSize % sub != 0) { Log.Warning("Traced reverb: mixer block {Block} is not a multiple of {Sub}.", _saFrameSize, sub); return; }
-        // A trace made for another rate than the mixer's would play every delay and the whole tail
-        // time-scaled (8 % between 44.1 and 48 kHz). Traces take the mixer's rate when they are made, so
-        // this only happens if one was made before the mixer was: say so rather than play it wrong.
+        // A trace at another rate would play every delay time-scaled (8 % between 44.1 and 48 kHz).
+        // Only a trace made before the mixer can be; say so rather than play it wrong.
         if (tr.SampleRate != MixerQuality.MixerRate)
         {
             Log.Warning("Traced reverb: the trace runs at {Trace} Hz and the mixer at {Mixer} Hz; region {Id} plays without it.",
@@ -2255,9 +1848,9 @@ public partial class FmodAudioProvider : IAudioProvider
             { _saHrtfTraced = IntPtr.Zero; Phonon.iplReflectionEffectRelease(ref effect); return; }
             _saHrtfTracedFrame = sub;
         }
-        // The voices' binaural rendering delays a sound more than the stage's own does (its frame is
-        // four times as long): the stage's input waits the difference, so the room answers after the
-        // sound and not 4 ms before it (TracedReverbDsp.StagePreDelay). Measured once.
+        // The voices' binaural stage (a frame four times as long) delays a sound more than this one, so
+        // its input waits the difference and the room answers after the sound, not 4 ms before it
+        // (TracedReverbDsp.StagePreDelay). Measured once.
         if (_tracedPreDelay < 0)
         {
             int voice = TracedReverbDsp.BinauralOnset(_saContext, _saHrtf, _saFrameSize);
@@ -2276,8 +1869,8 @@ public partial class FmodAudioProvider : IAudioProvider
             MonoScratch = new float[sub], StereoScratch = new float[sub * 2],
             AmbiScratch = new float[sub * TracedReverb.Channels],
             Orientation = Phonon.ListenerFrame(_listenerRot),
-            // Its own reader in every trace it will play: see TracedReverb.MaxReaders.
-            // Never the last: that one is the tracer's own, for reading the late tail back.
+            // Its own reader in every trace it plays (TracedReverb.MaxReaders); never the last, which
+            // is the tracer's own for reading the late tail back.
             Reader = Math.Min(_traced.Count, TracedReverb.ExtractReader - 1),
             LateConv = new LateTailConvolver(sub, tr.MaxLatePartitions),
             SdmConv = new SharedInputConvolver(sub, SdmTailIr.PartitionsFor(tr.SampleRate, sub), DiffuseBranch.Count),
@@ -2291,8 +1884,8 @@ public partial class FmodAudioProvider : IAudioProvider
         Phonon.iplAudioBufferAllocate(tr.Context, TracedReverb.Channels, sub, ref st.Ambi);
         Phonon.iplAudioBufferAllocate(_saContext, 2, sub, ref st.Stereo);
         if (TracedReverbDsp.Create(_system, st, out var dsp, out var handle) != RESULT.OK) return;
-        // Just downstream of the SFXREVERB: FMOD's index 0 is the output end, so inserting AT the
-        // reverb's index pushes the reverb one further from the output and puts this after it.
+        // Just downstream of the SFXREVERB: index 0 is the output end, so inserting at the reverb's
+        // index puts this after it.
         int at = -1;
         bus.getNumDSPs(out int count);
         for (int i = 0; i < count; i++)
@@ -2302,6 +1895,11 @@ public partial class FmodAudioProvider : IAudioProvider
         _traced[regionId] = (st, dsp, handle);
     }
 
+    /// <summary>
+    /// A cap, not a recycler: nothing is torn down while the mixer runs. Releasing silent buses would
+    /// destroy FMOD objects mid-mix (see ReleaseSteamAudioVoice) and drain the HRTF pool (everything
+    /// mono). Past the cap far rooms are not built and stay dry; walking back builds them, being near.
+    /// </summary>
     private bool CanAffordAnotherReverbBus(int regionId)
     {
         if (_reverbBuses.Count < MaxReverbBuses) return true;
@@ -2310,11 +1908,9 @@ public partial class FmodAudioProvider : IAudioProvider
         return false;
     }
 
-    /// <summary>Is the listener — or a sound — inside a CLOSED boundary?
-    ///
-    /// Not "is this the global region id", which answers a different question: whether the map has
-    /// bothered to name the place. RoomAcoustics answers this
-    /// one from the region's own faces, so naming the infield does not put a roof over it.</summary>
+    /// <summary>Whether a region is a closed boundary, from its own faces (RoomAcoustics): not whether
+    /// it is the global region id, which only says whether the map named the place. Naming the infield
+    /// does not put a roof over it.</summary>
     private bool IsEnclosure(int regionId)
         => _acousticMap != null && _acousticMap.Regions.TryGetValue(regionId, out var r)
            && RoomAcoustics.IsEnclosure(r);
@@ -2324,13 +1920,8 @@ public partial class FmodAudioProvider : IAudioProvider
         if (_acousticMap == null) return;
         if (!_acousticMap.Regions.TryGetValue(regionId, out var region)) return;
 
-        // THE RESULT IS CHECKED, and it was not.
-        //
-        // FMOD refusing to make another channel group or another DSP is a thing that happens — it has
-        // finite pools — and the next line used the handle anyway. That is not a failed reverb, it is
-        // a null dereference inside the native library, with no managed exception and no log line: the
-        // process simply stops. Which is exactly what "it crashes when I walk around" looks like on a
-        // map where walking is what makes more buses.
+        // Checked: FMOD's pools are finite, and using a handle it refused is a null dereference in the
+        // native library, no exception and no log line ("it crashes when I walk around").
         string busName = (region.FriendlyName ?? "Unknown") + "_Reverb";
         if (_system.createChannelGroup(busName, out var bus) != RESULT.OK || !bus.hasHandle())
         {
@@ -2338,12 +1929,9 @@ public partial class FmodAudioProvider : IAudioProvider
                       + "That room will be dry.", regionId, region.FriendlyName, _reverbBuses.Count);
             return;
         }
-        // Make the reverb bus positionable in 3D so UpdateReverbBuses can place a room's reverb AT its
-        // doorway when the listener is outside (set3DLevel 1 + set3DAttributes(portal)). Without a 3D
-        // mode those calls are no-ops and the reverb is heard omnidirectionally everywhere it is sent.
-        // We gate the LEVEL manually (per-portal aperture/distance), so keep FMOD's own distance
-        // rolloff out of the way with a huge max distance. When the listener is inside the room we set
-        // 3D level back to 0 so the reverb fills the space non-directionally.
+        // 3D, so UpdateReverbBuses can place a room's reverb at its doorway for a listener outside
+        // (without a 3D mode those calls do nothing). The level is gated by hand per portal, so FMOD's
+        // own rolloff is kept out of the way with a huge max distance.
         bus.setMode(MODE._3D | Rolloff.Mode);
         bus.set3DMinMaxDistance(2.0f, 10000.0f);
         if (_system.createDSPByType(DSP_TYPE.SFXREVERB, out var reverbDsp) != RESULT.OK || !reverbDsp.hasHandle())
@@ -2354,18 +1942,14 @@ public partial class FmodAudioProvider : IAudioProvider
             return;
         }
         
-        // The unit makes no tail of its own and passes its input through dry: the traced stage
-        // inserted at its index (AddTracedStage) is the room's answer, and a bus is an AUX SEND —
-        // the only thing that leaves it is that answer.
+        // No tail of its own, input passed through dry: the traced stage inserted at its index
+        // (AddTracedStage) is the room's answer, and the only thing that leaves the bus.
         reverbDsp.setParameterFloat(11, -80.0f);
         reverbDsp.setParameterFloat(12, 0.0f);
 
-        // ORDER MATTERS, and it is the opposite of what it reads like. FMOD's chain runs TAIL (input) ->
-        // HEAD (output), so the reverb must go at the TAIL for the fader — and the binaural stage added
-        // at the HEAD below — to sit DOWNSTREAM of it. With the reverb at the HEAD the sends inject
-        // past both: the per-portal volume gating does nothing and the doorway HRTF localizes
-        // silence, so a room's reverb is heard at full level, from all directions, from anywhere on
-        // the map.
+        // At the tail (the input end), so the fader and the binaural stage at the head are downstream.
+        // At the head the sends injected past both: a room's reverb at full level, from all
+        // directions, from anywhere on the map.
         bus.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, reverbDsp);
         
         float initialVol = (regionId == _listenerRegionId) ? 1.0f : 0.0f;
@@ -2376,30 +1960,25 @@ public partial class FmodAudioProvider : IAudioProvider
         _system.getMasterChannelGroup(out var master);
         master.addGroup(bus);
 
-        // Steam Audio directional reverb: route this room's reverb output through an HRTF voice so that,
-        // when the listener is OUTSIDE, the reverberation localizes to the doorway (like the direct sound)
-        // instead of washing from all sides. The voice's binaural DSP sits at the bus HEAD — the OUTPUT
-        // end, so it binauralizes the finished reverb tail rather than the dry input — and is bypassed
-        // while inside the room (reverb then fills the space as 2D stereo). The bus is switched to 2D so
-        // FMOD doesn't also collapse the binaural pair. Voice is held for the bus lifetime.
+        // An HRTF voice at the bus's head (its output end, so it places the finished tail): for a
+        // listener outside, the room's reverberation comes from its doorway; inside, it passes the
+        // stereo through. The bus goes 2D so FMOD does not collapse the binaural pair. Held for the
+        // bus's life.
         if (_steamAudioEnabled && TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle, SaDirectReserve))
         {
             rvState!.GuardName = "(a reverb bus's head)";
             bus.getMode(out MODE bm);
             bus.setMode((bm & ~(MODE._3D | Rolloff.Either)) | MODE._2D);
             bus.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, rvDsp);
-            // Never bypassed. The stage crossfades between the reverb's own stereo and its binaural
-            // placement inside the callback (SpatialBlend), so there is no switch to click and no
-            // "inside"/"outside" to decide — see SetReverbDirection.
+            // Never bypassed: the stage crossfades between the reverb's own stereo and its placement
+            // (SpatialBlend), so there is no switch to click. See SetReverbDirection.
             rvState!.SpatialBlend = 0f;
             _reverbSaVoices[regionId] = new SaVoice { State = rvState!, Dsp = rvDsp, Handle = rvHandle };
         }
     }
 
-    // ── Trains: one synth per consist, a tap per entity ─────────────────────────────────────────
-    //
-    // See RailVoice.cs. The server names every source of a train "rail:<preset>/<train>/<i>", and the
-    // shared synth for <preset>/<train> is made on the first tap and kept while any tap is alive.
+    // Trains: one synth per consist, a tap per entity (RailVoice.cs). The server names every source of
+    // a train "rail:<preset>/<train>/<i>"; the synth for <preset>/<train> is made on the first tap.
     private readonly Dictionary<string, TrainVoiceState> _trains = new();
 
     /// <summary>The last signal each train was given, and when, for a synth made after it arrived.</summary>
@@ -2486,8 +2065,8 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>How many voices a rain slot is played as (RainFeeds.PartsFor).</summary>
     private static int RainParts(int slot) => RainFeeds.PartsFor(slot);
 
-    // See NatureVoices.cs. A map names each tap of a water feature "water:<preset>/<feature>/<tap>"; the
-    // one synth for <preset>/<feature> is made on the first tap, at the mixer's own rate.
+    // A map names each tap of a water feature "water:<preset>/<feature>/<tap>"; the one synth for
+    // <preset>/<feature> is made on the first tap, at the mixer's rate. See NatureVoices.cs.
     private readonly Dictionary<string, WaterFeatureVoice> _waterFeatures = new();
 
     private PhysicalVoiceState? Water(string key, int rate, int entityId, System.Numerics.Vector3 position, in SpatialEmitter emitter)
@@ -2520,36 +2099,20 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    /// <summary>The DSP a source's reverb SEND must feed: the region bus's own SFXREVERB unit, which sits
-    /// at the TAIL (input end) of the bus chain. Addressing it by identity rather than by
-    /// <c>getDSP(HEAD)</c> is the point — the head is the binaural output stage, and sending into it
-    /// bypassed both the bus fader (the per-portal distance/aperture gating) and the reverb itself.</summary>
+    /// <summary>The DSP a reverb send must feed: the bus's SFXREVERB unit at its input end, by identity.
+    /// <c>getDSP(HEAD)</c> is the binaural output stage, and a send into it bypassed the bus fader and
+    /// the reverb.</summary>
     private bool TryGetReverbInput(int regionId, out FMOD.DSP dsp)
         => _reverbDsps.TryGetValue(regionId, out dsp) && dsp.hasHandle();
 
-    /// <summary>Removes a send connection outright instead of leaving it muted. A muted-but-attached
-    /// connection is re-created every time the region flips back, and FMOD caps inputs per DSP.
-    ///
-    /// ── THE UNIT ASKED TO DISCONNECT MUST BE THE UNIT THE CONNECTION FEEDS ─────────────────────
-    ///
-    /// This was the city crash: SIGSEGV at 0x7c on FMOD's mixer thread, or a hang, eighteen seconds
-    /// into a walk, deterministic on /tp. FMOD's <c>DSP::disconnectFrom(target, connection)</c> is
-    /// queued to the mixer as (this, target, connection) and the executor checks ONE thing — that
-    /// the connection's source is <c>target</c>. It then unlinks the connection's node from
-    /// whichever input list holds it, and decrements the input COUNT on <c>this</c>. Given the wrong
-    /// unit, the real owner's list is one shorter than its count from then on, silently; the wrong
-    /// unit's count is one too low. The next honest disconnect on the owner takes its count to 1
-    /// with an empty list, and the executor's final step — "if I have exactly one input, cache its
-    /// source" — reads the list head's null data pointer: <c>testb $0x4,0x7c(%rax)</c>. Three dumps,
-    /// three <c>FMOD Reverb</c> units in that state, each being asked to drop its last send.
-    ///
-    /// Not a race and not a stale handle: a valid call with the wrong <c>this</c>. FMOD's logging
-    /// build says nothing about it. <c>AudioLab --foreign-disconnect</c> does it once, on purpose,
-    /// and dies in a second; <c>--send-churn ownroom</c> reaches it through the provider.
-    ///
-    /// The callers now pass the unit the connection was created on. This guard asks the connection
-    /// itself which unit it feeds and counts any disagreement, so a future regression is a number in
-    /// the health line and not a core file.</summary>
+    /// <summary>
+    /// Removes a send outright rather than muting it: a muted one is re-created each time the region
+    /// flips back, and FMOD caps inputs per DSP. The unit asked to disconnect must be the unit the
+    /// connection feeds: FMOD checks only the source, then unlinks from the owner and decrements the
+    /// count on the unit it was told, and the owner later crashed the mixer thread at 0x7c (the city
+    /// crash; docs/THE_MIXER_THREAD_CRASH.md, AudioLab --foreign-disconnect). The connection is asked
+    /// for its owner and any disagreement is counted for the health line.
+    /// </summary>
     private static void DropSend(ref FMOD.DSPConnection conn, FMOD.DSP target, FMOD.DSP source)
     {
         if (!conn.hasHandle()) return;
@@ -2565,28 +2128,20 @@ public partial class FmodAudioProvider : IAudioProvider
         conn = default;
     }
 
-    /// <summary>How many times a send was about to be disconnected through a unit that did not own
-    /// it. Must stay 0; anything else is the city crash waiting to happen (see DropSend).</summary>
+    /// <summary>Sends about to be disconnected through a unit that did not own them. Must stay 0: anything
+    /// else is the city crash waiting to happen (see DropSend).</summary>
     private static int _sendDropsOnWrongBus;
-    public static int SendDropsOnWrongBus => _sendDropsOnWrongBus;
 
-    /// <summary>Localizes a room's reverb to its doorway (HRTF) when the listener is outside, or makes it
-    /// fill the room (binaural bypassed) when inside. Falls back to FMOD 3D positioning if Steam Audio is
-    /// unavailable for this bus.</summary>
+    /// <summary>Places a room's reverb at its doorway (HRTF) when the listener is outside, or passes its
+    /// stereo through when inside. Without Steam Audio for the bus, FMOD's 3D positioning.</summary>
     private void SetReverbDirection(int regionId, FMOD.ChannelGroup bus, Vector3 doorwayPos, bool outside, Vector3 lPos)
     {
         if (_reverbSaVoices.TryGetValue(regionId, out var v) && v.Dsp.hasHandle())
         {
-            // ── One rule for where a reverberant field comes from ──────────────────────────────
-            //
-            // Another room's field arrives through its opening, so it is placed AT the opening
-            // (blend 1). The listener's own room passes its stereo through (blend 0): see below.
-            //
-            // The stage is never bypassed and nothing flips at a region's edge; only the direction
-            // and the weight change, both smoothed (the stage crossfades its own stereo through, see
-            // SteamAudioDsp). Toggling a bypass as the listener crosses a region edge re-engages a
-            // stage on a stale tail and swings the field to the opening, heard as a whoosh from the
-            // join, like a door opening and closing, on every crossing between two halves of a hall.
+            // Another room's field arrives through its opening (blend 1); your own room's passes its
+            // stereo through (blend 0). Only direction and weight change, both smoothed: toggling a
+            // bypass at a region's edge re-engaged a stale tail, a whoosh like a door on every crossing
+            // between two halves of a hall.
             Vector3 worldDir; float targetBlend;
             if (outside)
             {
@@ -2595,11 +2150,8 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             else
             {
-                // The room you are in: its field is already round the head — its early part as
-                // placed reflections and its tail as a diffuse field (DiffuseTail) — and a mono copy
-                // of the whole bus placed at one point on top of that would be a second, one-point
-                // room, heard as the reverb "consolidating" in one direction. The stage passes its
-                // stereo through.
+                // Your own room is already round the head (placed reflections, DiffuseTail); placed at
+                // one point as well it was a second room, the reverb "consolidating" in one direction.
                 worldDir = Vector3.Zero;
                 targetBlend = 0f;
             }
@@ -2626,32 +2178,11 @@ public partial class FmodAudioProvider : IAudioProvider
         else bus.set3DLevel(0.0f);
     }
 
-    /// <summary>
-    /// Peak level actually flowing through a region's reverb DSP, metered by FMOD itself.
-    ///
-    /// Reading the bus's binaural stage cannot answer this: that stage is BYPASSED whenever the
-    /// listener is inside the region — and outdoors the listener is always inside region -1. This
-    /// meters the reverb DSP's own input and output and is true regardless of what is bypassed
-    /// downstream.
-    /// </summary>
-    internal bool TryMeterReverbBus(int regionId, out float inputPeak, out float outputPeak)
-    {
-        inputPeak = 0f; outputPeak = 0f;
-        if (!_reverbDsps.TryGetValue(regionId, out var dsp) || !dsp.hasHandle()) return false;
-        dsp.setMeteringEnabled(true, true);
-        if (dsp.getMeteringInfo(out var inInfo, out var outInfo) != RESULT.OK) return false;
-        for (int i = 0; i < inInfo.numchannels && i < 32; i++)
-            inputPeak = Math.Max(inputPeak, inInfo.peaklevel[i]);
-        for (int i = 0; i < outInfo.numchannels && i < 32; i++)
-            outputPeak = Math.Max(outputPeak, outInfo.peaklevel[i]);
-        return true;
-    }
-
-    /// <summary>Lab only: a voice's binaural stage as it last ran — each ear's level and how placed it
-    /// is (1 = fully by the HRTF). False when the voice has no stage.</summary>
     internal int ReverbBusCountForLab => _reverbBuses.Count;
     internal string ReverbBlendsForLab => string.Join(" ", _reverbSaVoices.Values.Select(v => v.State.SpatialBlend.ToString("F2")));
 
+    /// <summary>Lab only: a voice's binaural stage as it last ran, each ear's level and how placed it
+    /// is (1 = fully by the HRTF). False when the voice has no stage.</summary>
     internal bool TryGetBinauralLevels(int entityId, out float rmsL, out float rmsR, out float blend)
     {
         rmsL = rmsR = 0f; blend = 0f;
@@ -2717,8 +2248,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
         bus.getVolume(out float vol);
         float tracked = _reverbVolumes.TryGetValue(regionId, out float tv) ? tv : float.NaN;
-        // How many voices are actually PLUGGED IN, and at what mix. A computed send that was never
-        // connected reads as a healthy percentage in every log line and moves no air whatever.
+        // Sends actually plugged in: a computed send never connected reads healthy in every log line.
         dsp.getNumInputs(out int inputs);
         float loudestMix = 0f;
         for (int i = 0; i < inputs; i++)
@@ -2731,15 +2261,14 @@ public partial class FmodAudioProvider : IAudioProvider
         static float Db(float peak) => peak <= 1e-6f ? -120f : 20f * MathF.Log10(peak);
     }
 
-    /// <summary>Detaches and returns all per-bus reverb HRTF voices to the pool (before the buses are
-    /// released). Safe to call repeatedly.</summary>
+    /// <summary>Detaches every bus's HRTF voice and returns it to the pool, before the buses are
+    /// released. Safe to call repeatedly.</summary>
     private void ReturnReverbVoices()
     {
         foreach (var kvp in _reverbSaVoices)
         {
             var v = kvp.Value;
-            // Pooled only once it is off its bus, as Detach insists for a channel: a stage still in
-            // one graph and handed to another is the crash Detach describes.
+            // Pooled only once off its bus: a stage in two graphs is the crash Detach describes.
             bool off = !v.Dsp.hasHandle()
                     || (_reverbBuses.TryGetValue(kvp.Key, out var b) && b.hasHandle() && b.removeDSP(v.Dsp) == RESULT.OK)
                     || v.Dsp.disconnectAll(true, true) == RESULT.OK;
@@ -2817,9 +2346,8 @@ public partial class FmodAudioProvider : IAudioProvider
         }
         else if (emitter.IsSynth && emitter.IntakeOfEntity != 0)
         {
-            // The front outlet of a machine that already has a voice. It reads that engine's front
-            // tap; if the engine is not there — the car lost its slot in the same frame — there is
-            // nothing to be the other half OF, and the voice is simply not created.
+            // The front outlet of a machine that already has a voice, reading that engine's front tap.
+            // No engine this frame (it lost its slot), no voice.
             if (!_isInitialized) return;
             EngineVoiceState? src;
             lock (_lock) { src = FindActive(emitter.IntakeOfEntity)?.EngineState; }
@@ -2835,14 +2363,12 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             channel.setMode(MODE._3D | Rolloff.Mode);
             tapState = tap;
-            // ...and the voice it came from stops carrying the front of the machine. Slewed, not
-            // switched: see EngineVoiceState.SplitVoices.
+            // The engine's own voice stops carrying the front, slewed (EngineVoiceState.SplitVoices).
             src.SplitVoices = true;
         }
         else if (emitter.IsSynth && emitter.CabinOfEntity != 0)
         {
-            // A path into the cabin of the vehicle the listener sits in (CabinPaths): it reads that
-            // engine's ring for the path. No engine this frame, nothing to be a path of.
+            // A path into the cabin the listener sits in (CabinPaths), read from the engine's ring.
             if (!_isInitialized) return;
             EngineVoiceState? src;
             lock (_lock) { src = FindActive(emitter.CabinOfEntity)?.EngineState; }
@@ -2858,7 +2384,7 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             channel.setMode(MODE._3D | Rolloff.Mode);
             tapState = tap;
-            // ...and the engine's own voice stops carrying the path, slewed as the tap fades in.
+            // The engine's own voice stops carrying the path, slewed as the tap fades in.
             src.SetCabinTapLive(emitter.CabinPath, true);
         }
         else if (emitter.IsSynth && emitter.EchoOfEntity != 0)
@@ -2867,9 +2393,8 @@ public partial class FmodAudioProvider : IAudioProvider
             EngineVoiceState? src;
             lock (_lock) { src = FindActive(emitter.EchoOfEntity)?.EngineState; }
             if (src == null) return;
-            // A BORROWED voice keeps its own read cursor; a REFLECTION follows the source's, because an
-            // echo of a car is that car's sound arriving late and the source's Doppler belongs in it.
-            // Told apart by what the emitter is: a reflection is marked as one.
+            // A borrowed voice keeps its own read cursor; a reflection follows the source's, since an
+            // echo of a car is that car's sound arriving late, Doppler and all.
             var echo = new EngineEchoState(src)
             {
                 TargetDelaySeconds = emitter.EchoDelaySeconds,
@@ -2893,11 +2418,9 @@ public partial class FmodAudioProvider : IAudioProvider
                                      || emitter.PhysicalKey.StartsWith(Talkers.KeyPrefix, StringComparison.Ordinal)
                                      || emitter.PhysicalKey.StartsWith(Talkers.CopyKeyPrefix, StringComparison.Ordinal)))
         {
-            // The player's own microphone, read back at a delay: their room answering them. The room
-            // feed plays into a group at zero, so only its sends to the room are heard.
-            // Or somebody else talking, read from what has arrived of their voice (TalkerStream): a
-            // world voice like any other, heard from where they stand. Or a surface answering them: their
-            // voice read back at the copy's extra delay, as your room answers yours.
+            // The player's own microphone read back at a delay, their room answering them (the room
+            // feed plays into a group at zero, so only its sends are heard); somebody else talking, from
+            // what has arrived of their voice (TalkerStream); or a surface answering them, at the copy's delay.
             if (!_isInitialized) return;
             OwnVoiceRing ring = OwnVoiceRing.Shared;
             double maxPull = 0.01;
@@ -2930,13 +2453,8 @@ public partial class FmodAudioProvider : IAudioProvider
         }
         else if (emitter.IsSynth && !string.IsNullOrEmpty(emitter.PhysicalKey))
         {
-            // A physical model that is not a vehicle: a machine standing still and running, or an
-            // aircraft going over. Everything an engine voice does about threading, priming and
-            // fading applies to both unchanged; what they do not have is a road speed, a gearbox or
-            // a second outlet. See PhysicalVoiceState.
-            //
-            // This is the ONE place that turns a name into a model, which is why the emitter carries
-            // the prefix rather than a stripped key and a flag.
+            // A physical model that is not a vehicle (PhysicalVoiceState). The one place a name turns
+            // into a model, which is why the emitter carries the prefix rather than a key and a flag.
             if (!_isInitialized) return;
             _system.getSoftwareFormat(out int mrate, out _, out _);
             int colon = emitter.PhysicalKey.IndexOf(':');
@@ -2952,30 +2470,25 @@ public partial class FmodAudioProvider : IAudioProvider
                                                          mrate, emitter.EntityId * 17 + 3,
                                                          lever: emitter.PowerLever),
                     "rail" => RailTap(emitter.PhysicalKey, mrate),
-                    // A siren head, on the car that carries it. Its own voice because it is 35 dB
-                    // over the car's exhaust and the two cannot share one full-scale reference —
-                    // see SirenVoiceState.
+                    // Its own voice: 35 dB over the car's exhaust, the two cannot share one full-scale
+                    // reference (SirenVoiceState).
                     "siren" => new SirenVoiceState(OpenFPS.Common.SirenSpec.ByName(preset), mrate),
-                    // A crossing bell. Its Running flag is the server's, not the client's — see
-                    // BellVoiceState for why this one cannot be worked out locally.
+                    // Running is the server's word, not worked out locally (BellVoiceState).
                     "bell" => new BellVoiceState(OpenFPS.Common.ModelLibrary.Bell(preset),
                                                  mrate, emitter.EntityId * 13 + 5),
-                    // A level crossing's gate: the arm follows the crossing's closed signal (the
-                    // emitter's Running, the server's word), so it starts where the crossing is.
+                    // The arm follows the crossing's closed signal (Running, the server's word).
                     "gate" => new GateVoiceState(OpenFPS.Common.CrossingGateSpec.ByName(preset), mrate, closed: emitter.EngineRunning),
-                    // Water, fire and wind in leaves read the wind where they stand, so they are
-                    // given their place. See NatureVoiceState.
+                    // Given their place: they read the wind where they stand (NatureVoiceState).
                     "water" => Water(emitter.PhysicalKey, mrate, emitter.EntityId, emitter.Position, emitter),
-                    // A tree or a fire is heard from places across it (ExtendedSources): its own
-                    // voice is the middle, and the others read the same synth.
+                    // Heard from places across it (ExtendedSources), all reading the middle's synth.
                     "fire" or "foliage" or "flow" or "shore" or "wood" => NaturePlace(kind.ToLowerInvariant(), preset, emitter, mrate),
-                    // A patch of rain round the listener, fed by the rain survey. See RainVoiceState.
-                    // The roof over the ear and the near quarters are several, each a part (RainFeeds.PartsFor).
+                    // Rain round the listener, fed by the rain survey (RainVoiceState); the roof over
+                    // the ear and the near quarters are several parts each (RainFeeds.PartsFor).
                     "rain" => RainFeeds.TryParse(emitter.PhysicalKey, out int rainSlot, out int rainPart)
                                 && rainPart < RainParts(rainSlot)
                         ? new RainVoiceState(RainFeeds.Feed[rainSlot], mrate, rainSlot * 53 + 23 + rainPart * 7919, rainPart, RainParts(rainSlot))
                         : null,
-                    // A vehicle's horn, with the rhythm of the hand on it in the key. See Honk.
+                    // The rhythm of the hand on the horn is in the key (Honk).
                     "horn" => OpenFPS.Common.Honk.TryParse(emitter.PhysicalKey, out var hornKey, out var rhythm)
                         ? new HornVoiceState(hornKey, rhythm, mrate, emitter.EntityId * 29 + 1)
                         : null,
@@ -2990,8 +2503,7 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             if (machineState == null)
             {
-                // An outer place whose source has no voice this frame: there is nothing for it to be a
-                // place OF. The client asks again next frame.
+                // An outer place whose source has no voice this frame; asked again next frame.
                 if (emitter.PlaceOfEntity != 0) return;
                 Log.Warning("Physical voice: '{Key}' names no model this client knows.", emitter.PhysicalKey);
                 return;
@@ -3024,12 +2536,10 @@ public partial class FmodAudioProvider : IAudioProvider
                 Interior = emitter.Interior,
                 CabinEarX = emitter.CabinEarX,
                 RoadWaterMm = emitter.RoadWaterMm,
-                // Live: the loudness law applies to what the engine is doing now, not just to its
-                // declared level. See EngineVoiceState.CompensateLevel.
+                // The loudness law on what the engine is doing now, not only its declared level.
                 CompensateLevel = true,
             };
-            // The car is already doing this speed; start the engine in that state rather than
-            // spinning it up from rest inside the first eighty milliseconds.
+            // Start the engine at the car's speed, not spinning up from rest in the first 80 ms.
             engineState.PlaceAtSpeed(emitter.EngineSpeed);
             if (emitter.WheelStrikes != null) engineState.QueueStrikes(emitter.WheelStrikes);
             if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var localListener))
@@ -3079,9 +2589,8 @@ public partial class FmodAudioProvider : IAudioProvider
                 if (_audioDebug && emitter.Mode == PlaybackMode.LoopOne)
                     Log.Information("[BEACON] e{Id} '{Sound}' not playing yet — {State}", emitter.EntityId, emitter.SoundId, loadState);
 
-                // A NONBLOCKING load that has not finished is NOT a reason to lose the play: park the
-                // emitter and retry it on subsequent Update() ticks (see DrainDeferredPlays). Only a
-                // genuinely Missing asset is dropped, and that has already been logged once by name.
+                // A load in flight parks the play for retry (DrainDeferredPlays); only a missing asset,
+                // already logged by name, is dropped.
                 if (loadState == SoundLoadState.Loading) DeferPlay(emitter);
                 return;
             }
@@ -3115,13 +2624,8 @@ public partial class FmodAudioProvider : IAudioProvider
             threeEqDsp = GetThreeEqDsp();
             channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, threeEqDsp);
 
-            // A reflection does not get a diffraction filter.
-            //
-            // It is already a modelled path — the image-source pass decided which surface it came off
-            // and how far it travelled — so bending it round an obstacle as well counts the geometry
-            // twice. It is also the cheapest voice in the mix to generate and one of the dearest to
-            // place, and on a track where every car has a reflection against every wall, one fewer
-            // DSP per echo is the difference between the mixer having room for another car and not.
+            // No diffraction filter on a reflection: it is already a modelled path, bending it as well
+            // counts the geometry twice, and on a track one DSP fewer per echo is room for another car.
             if (!emitter.IsReflection)
             {
                 diffractionDsp = GetDiffractionDsp();
@@ -3131,48 +2635,26 @@ public partial class FmodAudioProvider : IAudioProvider
                                                                emitter.IsReflection ? SaDirectReserve : 0))
             {
                 saState!.GuardName = emitter.SoundId;
-                // Steam Audio binaural sits last in the chain (after occlusion EQ + diffraction),
-                // turning the filtered mono into an HRTF stereo pair.
                 channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, saDsp);
 
-                // CRITICAL: a 3D channel treats the signal as a mono point source and downmixes the
-                // DSP's binaural stereo back to mono on the way to the master bus — set3DLevel(0) does
-                // NOT prevent this (measured: 3D collapses L≈R,
-                // switching the channel to 2D restores full L/R separation). Swap the 3D flags for 2D
-                // while preserving loop/other flags. Distance falloff is applied manually below in
-                // ApplyAcousticFilters (distAtten), so we lose nothing by leaving FMOD's 3D path.
+                // 2D, keeping the other flags: a 3D channel downmixes the binaural pair to mono, even
+                // at set3DLevel(0) (measured L≈R). Distance is applied by hand in ApplyAcousticFilters.
                 channel.getMode(out MODE chMode);
                 channel.setMode((chMode & ~(MODE._3D | Rolloff.Either)) | MODE._2D);
             }
             else
             {
-                // NO HRTF VOICE TO BE HAD — and it still has to obey the same distance law.
-                //
-                // FMOD's LINEAR rolloff is not that law. It ramps straight from the reference distance
-                // to the range, so over a three-kilometre range a source two hundred metres away comes
-                // out at ninety-three per cent of full scale: a clap from across the track arriving
-                // essentially undimmed, which is heard as a sound suddenly in your face and which gets
-                // worse the more honest the range is. The HRTF path applies min/distance by hand in
-                // ApplyAcousticFilters; INVERSE is that same law, so the two agree and a voice that
-                // misses the pool is quieter and further away rather than louder and nearer.
-                // Counted for DIRECT sounds only: an echo refused by the reserve is the policy working.
+                // No HRTF voice: FMOD's inverse rolloff is the law the HRTF path applies by hand, so a
+                // voice that misses the pool is not louder and nearer (linear left a clap 200 m across a
+                // 3 km range at 93 % of full scale). Counted for direct sounds only: an echo refused by
+                // the reserve is the policy working.
                 if (!emitter.IsReflection) _saPoolMisses++;
                 channel.getMode(out MODE fallbackMode);
                 channel.setMode((fallbackMode & ~Rolloff.Either) | MODE._3D | MODE._3D_INVERSEROLLOFF);
                 channel.set3DLevel(1.0f);
             }
-            // ── NOT ON A CHANNEL WE JUST MADE 2D ────────────────────────────────────────────────
-            //
-            // The branch above switches an HRTF voice to 2D on purpose, and then this asked FMOD for
-            // a 3D minimum/maximum distance and a 3D cone on it anyway. FMOD refuses with
-            // ERR_NEEDS3D — "tried to call a command on a 2d sound when the command was meant for 3d
-            // sound" — and its logging build counted the result: **113,228 refused calls in a
-            // twenty-five second run, 91% of everything FMOD had to say**, about four and a half
-            // thousand a second, every one of them taking FMOD's lock on the GAME thread against a
-            // mixer that wants the same lock.
-            //
-            // None of it ever did anything: the HRTF path applies min/distance and the cone by hand
-            // in ApplyAcousticFilters, which is the whole reason the channel is 2D.
+            // Never 3D calls on a channel made 2D: FMOD refuses with ERR_NEEDS3D, 113,228 times in a
+            // 25 s run (91 % of its log), each taking FMOD's lock on the game thread against the mixer.
             if (saState == null)
             {
                 channel.set3DMinMaxDistance(emitter.MinDistance, emitter.Range);
@@ -3186,10 +2668,8 @@ public partial class FmodAudioProvider : IAudioProvider
         }
         else
         {
-            // IN THE HEAD: a cue for the player (the driving aids), not a sound in the world. Panned
-            // by its direction from the listener and nothing else — no HRTF to put it out on the road,
-            // no distance, no room, no reverb, no echo. Head-relative, so it stays put as the head turns
-            // and is re-aimed only when its own direction changes.
+            // In the head: a cue for the player (the driving aids), panned by its direction and nothing
+            // else, no HRTF, distance, room or echo. Head-relative, so it stays put as the head turns.
             channel.getMode(out MODE headMode);
             channel.setMode((headMode & ~Rolloff.Either) | MODE._3D | MODE._3D_HEADRELATIVE);
             channel.set3DMinMaxDistance(1000f, 10000f);
@@ -3200,15 +2680,9 @@ public partial class FmodAudioProvider : IAudioProvider
         channel.setVolume(emitter.Volume);
         channel.setPitch(emitter.IsGranular || emitter.IsSynth ? 1.0f : emitter.Pitch); 
 
-        // ── A reflection is the SAME sound arriving later, so it starts where its source IS ──────
-        //
-        // A voice is an independent read of the file. Started from sample zero while the source is
-        // halfway through, a reflection of a sustained sound is not a delayed copy of what is being
-        // heard — it is the announcement again, from the top, offset by however long the source has
-        // been playing, and the two drift past each other for as long as both loop. Reported exactly
-        // so: "I hear like 2 copies, one latent like it is echoing off something way far away".
-        // Starting the copy at the source's own playback position, and scheduling it the path's extra
-        // delay later, makes it lag by exactly that delay — which is what a reflection is.
+        // A reflection starts at its source's playback position, then waits the path's extra delay.
+        // From sample zero it was the announcement again from the top ("I hear like 2 copies, one
+        // latent like it is echoing off something way far away").
         if (emitter.IsReflection && emitter.ReflectionOf != 0 && !emitter.IsSynth && !emitter.IsGranular)
         {
             lock (_lock)
@@ -3223,19 +2697,11 @@ public partial class FmodAudioProvider : IAudioProvider
             }
         }
 
-        // When the voice actually begins, on the DSP clock: now, or the path's extra delay from now.
-        // Kept for the onset ramp below, which has to start when the sound does, not when it was asked for.
-        //
-        // The PARENT's clock, and that is the whole of a fault that was invisible for as long as it
-        // existed. setDelay and addFadePoint both take "the DSP clock of the parent ChannelGroup";
-        // this read the channel's OWN clock, which for a channel that has not started is nowhere near
-        // it, so every start time and every fade point was in the past and FMOD honoured none of
-        // them. Measured (AudioLab --room-walk clock): a one-shot asked for with 300 ms of delay
-        // began 24 ms after the ask, exactly like one asked for with none; a reflection scheduled
-        // 200 ms late began at once. So no reflection in the engine had ever been delayed — each was
-        // a copy in exact sync with its source, which is a comb filter, heard as a metallic ring —
-        // and no one-shot had ever had its onset ramp.
-        channel.getDSPClock(out _, out ulong voiceStartClock);
+        // When the voice begins, on the parent's DSP clock (setDelay and addFadePoint take the parent
+        // ChannelGroup's): the channel's own clock put every start and fade point in the past, so no
+        // reflection was ever delayed (a comb, a metallic ring) and no one-shot ever had its onset
+        // ramp (AudioLab --room-walk clock). Kept for the onset ramp below.
+        channel.getDSPClock(out _, out ulong voiceStartClock);   // (dspclock, parentclock)
         if (emitter.DelayMs > 0)
         {
             _system.getSoftwareFormat(out int rate, out _, out _);
@@ -3291,16 +2757,13 @@ public partial class FmodAudioProvider : IAudioProvider
                 activeSound.GroundHeight = HasGround(emitter) ? emitter.GroundHeight : null;
             }
 
-            if (_acousticMap != null && !activeSound.IsReflection && emitter.Type != EmitterType.UI) // Reflections should not feed back into reverb
+            if (_acousticMap != null && !activeSound.IsReflection && emitter.Type != EmitterType.UI) // a reflection does not feed the reverb
             {
                 int sourceRegionId = activeSound.TargetRegionId;
-                // NOT "sourceRegionId != -1". Outdoors IS region -1, so that test — written to mean
-                // "this source has no region" — excluded every sound in the open world from every
-                // reverb bus. The outdoor bus could be built, unmuted and correctly timed, and still
-                // receive nothing: a street that measured a two-second reverberation time and sounded
-                // completely dead. TryGetReverbInput already returns false for a region with no bus,
-                // which is the test that was actually wanted.
-                // Last onto the TAIL, so it is the first thing the signal meets.
+                // Not "sourceRegionId != -1": outdoors is region -1, and that test kept every outdoor
+                // sound off every bus (a street measuring two seconds sounded dead). TryGetReverbInput
+                // is the test wanted.
+                // The send tap goes last onto the tail, so it is the first thing the signal meets.
                 {
                     var tap = GetSendTapDsp();
                     if (activeSound.Channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, tap) == RESULT.OK) activeSound.SendTap = tap;
@@ -3331,15 +2794,9 @@ public partial class FmodAudioProvider : IAudioProvider
             AddActive(activeSound);
         }
 
-        // Short fade-in on one-shot event voices (footsteps, impacts). These recycle pooled HRTF voices
-        // rapidly; an abrupt onset (or a hard cut when the pool reuses a still-playing voice) clicks. A
-        // ~6 ms ramp from silence removes the onset pop. Fade points multiply with setVolume, so the
-        // per-frame distance/cone volume still applies on top.
-        //
-        // A reflection voice gets the same ramp: it starts mid-file, at its source's playback position,
-        // and a sustained sound joined at an arbitrary sample is a step from silence — a click each time
-        // a wall starts answering. The ramp begins when the voice does, which for a reflection is its
-        // scheduled start, not the moment it was asked for.
+        // A 6 ms fade-in on one-shots (an abrupt onset on a recycled HRTF voice clicks) and on
+        // reflections (joined mid-file, a step from silence each time a wall starts answering). It
+        // begins at the voice's scheduled start; fade points multiply with setVolume.
         if ((emitter.IsEvent || emitter.IsReflection) && channel.hasHandle())
         {
             _system.getSoftwareFormat(out int sr, out _, out _);
@@ -3358,15 +2815,9 @@ public partial class FmodAudioProvider : IAudioProvider
             var active = FindActive(emitter.EntityId); 
             if (active != null) 
             { 
-                // WHEN THE POSITION WAS TRUE, not when it turned up.
-                //
-                // An emitter that knows its own sample time keeps it, however many times the same
-                // emitter is re-applied — and it is re-applied constantly: the voice manager hands
-                // every playing voice back to this method on each of its 250 Hz ticks. Stamping "now"
-                // here would reset the age of a position that had not changed, so dead reckoning would
-                // never see an age over one tick and the 30 Hz staircase it exists to smooth would come
-                // through untouched. An emitter with no sample time (an event, a UI sound, a reflection
-                // placed this instant) is as fresh as this call.
+                // When the position was true, not when it arrived: the voice manager re-applies every
+                // voice at 250 Hz, and stamping "now" hid the 30 Hz staircase from dead reckoning. An
+                // emitter with no sample time is as fresh as this call.
                 active.LastAttributeAt = emitter.PositionSampledAt > 0
                     ? emitter.PositionSampledAt
                     : OpenFPS.Common.AudioClock.Now;
@@ -3381,8 +2832,7 @@ public partial class FmodAudioProvider : IAudioProvider
                     active.TargetLow = emitter.EqLow; active.TargetMid = emitter.EqMid; active.TargetHigh = emitter.EqHigh;
                     active.AirLowDb = emitter.AirLowDb; active.AirMidDb = emitter.AirMidDb; active.AirHighDb = emitter.AirHighDb;
                     active.TargetRegionId = emitter.TargetRegionId;
-                    // Whether it is inside the vehicle you are sitting in is part of its path: a person
-                    // talking gets into your car, or you into theirs, while they are talking.
+                    // Part of the path: a talker can get into your car mid-sentence, or you into theirs.
                     active.InsideListenersVehicle = emitter.InsideListenersVehicle;
                 }
                 if (emitter.IsGranular && active.GranularState != null)
@@ -3402,22 +2852,17 @@ public partial class FmodAudioProvider : IAudioProvider
                 else if (emitter.IsSynth && active.MachineState != null)
                 {
                     active.MachineState.Running = emitter.EngineRunning;
-                    // The power lever, for anything that has one. It comes from the flight path
-                    // rather than from a script: see ClientAudioSystem, where it is read off the
-                    // climb angle.
+                    // The power lever slot, read off the climb angle in ClientAudioSystem for an aircraft.
                     if (active.MachineState is SirenVoiceState sirenv)
                     {
-                        // The lever slot carries the mode. A siren has no continuous control, so
-                        // there is nothing to slew and nothing to interpolate: it is a switch on a
-                        // dashboard and the head changes sound between one sweep and the next.
+                        // For a siren it carries the mode: a dashboard switch, nothing to slew.
                         sirenv.TargetMode = (int)MathF.Round(emitter.PowerLever);
                     }
                     else if (active.MachineState is AircraftVoiceState airv)
                     {
                         airv.TargetLever = emitter.PowerLever;
                         airv.TargetDescending = emitter.RotorWake;
-                        // The wheels. Speed over the ground is the aeroplane's own speed; it is what
-                        // the runway is doing to a wheel that is not yet turning.
+                        // The runway against a wheel not yet turning: the aeroplane's own speed.
                         airv.TargetGroundSpeed = emitter.Velocity.Length();
                         airv.TargetOnGround = emitter.OnGround;
                     }
@@ -3427,21 +2872,20 @@ public partial class FmodAudioProvider : IAudioProvider
                     }
                     else if (active.MachineState is TrainTapState tap)
                     {
-                        // Any tap may set it; they all read the one train. The lever is the notch
-                        // as a fraction of eight and the wake slot carries the speed.
+                        // Any tap may set it, all reading one train: the lever is the notch over
+                        // eight, the wake slot the speed.
                         tap.Shared.TargetSpeed = emitter.RotorWake;
                         tap.Shared.TargetNotch = emitter.PowerLever * 8f;
                     }
                     else if (active.MachineState is NaturePlaceState { Place: 0 } middle)
                     {
-                        // The middle of a tree or a fire carries how much of it its other places play.
+                        // The middle carries how much its other places play, and a wood's how many
+                        // trees it stands for now (WoodChorus).
                         middle.Shared.TargetSpread = emitter.Spread;
-                        // ...and a wood, how many of its trees it stands for now (WoodChorus).
                         if (middle.Shared.WindPlaces != null) middle.Shared.TargetTrees = emitter.Trees;
                     }
                     else if (active.MachineState is WaterTapState { Place: 0 } tapMiddle)
                     {
-                        // ...and the middle of a fountain's tap, of that tap.
                         tapMiddle.Shared.SetSpread(tapMiddle.Tap, emitter.Spread);
                     }
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var mlocal))
@@ -3486,20 +2930,17 @@ public partial class FmodAudioProvider : IAudioProvider
                     active.Pitch = emitter.Pitch;
                     active.Channel.setPitch(active.Pitch);
                 }
-                // The ground between it and the listener, for every live physical voice.
                 var ground = active.EngineState?.Ground ?? active.TapState?.Ground ?? active.MachineState?.Ground;
                 ground?.Set(emitter.GroundDelaySeconds, emitter.GroundLowGain, emitter.GroundHighGain);
-                // A recorded sound's, in its binaural stage. Never both: a synthesised voice that also
-                // ran through one would be answered by the ground twice.
+                // A recorded sound's ground is in its binaural stage. Never both, or the ground answers twice.
                 if (ground == null && !active.IsReflection)
                 {
                     active.SaState?.Ground?.Set(emitter.GroundDelaySeconds, emitter.GroundLowGain, emitter.GroundHighGain);
                     active.GroundHeight = HasGround(emitter) ? emitter.GroundHeight : null;
                 }
                 active.MinDistance = emitter.MinDistance;
-                // Same again, and this one ran EVERY FRAME for EVERY voice — which is where the
-                // 113,228 came from. A voice with a binaural stage is 2D by design; see the note at
-                // the creation site.
+                // No 3D calls on a 2D (binaural) voice: run every frame, this was most of the 113,228
+                // refused calls (see PlaySpatialSound).
                 if (active.SaState == null)
                 {
                     active.Channel.set3DMinMaxDistance(active.MinDistance, emitter.Range);
@@ -3521,14 +2962,11 @@ public partial class FmodAudioProvider : IAudioProvider
     { 
         lock (_lock) 
         { 
-            // Once per active voice per audio frame, so the scan this replaces was the squared term in the
-            // frame's cost all by itself. Every voice the entity owns still gets the path.
             if (!_activeById.TryGetValue(entityId, out var voices)) return;
             foreach (var active in voices) 
             {
-                // The car you are sitting in: its voice already rendered what gets through the body,
-                // and a path traced from outside to your ear through that same body would take it
-                // away a second time. It keeps the listener's own room, which is the cabin.
+                // The car you sit in already rendered what gets through its body; a path traced through
+                // the same body would take it away twice.
                 if (active.EngineState is { Interior: true }) continue;
                 active.TargetOcclusion = path.Occlusion;
                 active.ApparentPosition = path.ApparentPosition;
@@ -3545,10 +2983,8 @@ public partial class FmodAudioProvider : IAudioProvider
         } 
     }
 
-    // --- Deferred plays: NONBLOCKING loads that were not ready when the emitter asked to be heard ------
-    // Without this, the FIRST play of any un-preloaded sound is silently lost — createSound returns
-    // immediately, the decode is still in flight, and playSound answers ERR_NOTREADY. Parking the emitter
-    // and retrying costs nothing and makes the sound arrive a few milliseconds late instead of never.
+    // Deferred plays: without them the first play of any sound not preloaded is lost (the decode is in
+    // flight and playSound answers ERR_NOTREADY). Parked and retried, it arrives a few ms late instead.
     private sealed class DeferredPlay
     {
         public SpatialEmitter Emitter;
@@ -3556,8 +2992,7 @@ public partial class FmodAudioProvider : IAudioProvider
         public DeferredPlay(SpatialEmitter emitter, long deadlineTicks) { Emitter = emitter; DeadlineTicks = deadlineTicks; }
     }
 
-    // How long a queued play waits for its decode before we give up and say so. Generous: a cold ogg
-    // decode on a slow disk is still well inside this, and a one-off late sound beats a missing one.
+    // Generous: a cold ogg decode on a slow disk is well inside it, and a late sound beats a missing one.
     private const int DeferredPlayTimeoutMs = 3000;
     private readonly List<DeferredPlay> _deferredPlays = new();
     private readonly object _deferredLock = new();
@@ -3572,8 +3007,7 @@ public partial class FmodAudioProvider : IAudioProvider
             for (int i = 0; i < _deferredPlays.Count; i++)
             {
                 if (_deferredPlays[i].Emitter.EntityId != emitter.EntityId) continue;
-                // Keep the ORIGINAL deadline: re-requesting a still-loading sound every frame must not
-                // extend the wait forever, or a genuinely broken asset would never be reported.
+                // The original deadline stands, or a broken asset re-asked every frame is never reported.
                 _deferredPlays[i].Emitter = emitter;
                 return;
             }
@@ -3581,9 +3015,8 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    /// <summary>Retries parked plays whose sound has since finished decoding, and reports the ones that
-    /// ran out of time. Called at the top of <see cref="Update"/>, OUTSIDE the active-sound lock, because
-    /// a successful retry re-enters PlaySpatialSound and mutates the active list.</summary>
+    /// <summary>Retries parked plays whose sound has decoded and reports those out of time. Called at
+    /// the top of <see cref="Update"/>, outside the active-sound lock: a retry re-enters PlaySpatialSound.</summary>
     private void DrainDeferredPlays()
     {
         List<DeferredPlay>? due = null;
@@ -3612,9 +3045,8 @@ public partial class FmodAudioProvider : IAudioProvider
 
             if (now >= d.DeadlineTicks)
             {
-                // What FMOD actually says, not just that we gave up. Without it a NONBLOCKING load
-                // that never reaches READY is indistinguishable from a slow one. The open state and the buffered percentage separate a decode still in progress from one
-                // that is wedged, and naming the file separates either from a path problem.
+                // What FMOD says: the open state and the buffered percentage tell a slow decode from a
+                // wedged one.
                 _resources.DescribeLoad(d.Emitter.SoundId, loopNative, out string detail);
                 Log.Warning("Audio asset '{SoundId}' still not decoded after {Timeout} ms; entity {Id} stayed silent. {Detail}",
                     d.Emitter.SoundId, DeferredPlayTimeoutMs, d.Emitter.EntityId, detail);
@@ -3625,54 +3057,38 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    /// <summary>
-    /// Reports the mixer's own CPU load every few seconds.
-    ///
-    /// Worth having permanently, because the two ways this engine breaks sound alike and are fixed
-    /// in opposite directions. A voice whose level reference is wrong CLIPS — a continuous rasp that
-    /// gets worse the louder the source is. A mixer that misses its deadline STARVES — the same
-    /// audio, torn and stuttering. Both get described as "crackling and breaking up", and the dsp
-    /// figure below tells them apart in one line: past about 60% the callback is running out of
-    /// time; under it, whatever is wrong is not the budget.
-    ///
-    /// A live engine is by far the most expensive voice in the mix (`--engine-cost`), so this is the
-    /// number to look at before raising OPENFPS_ENGINE_VOICES.
-    /// </summary>
-    /// <summary>
-    /// The mixer's DSP load, 0..1+, as of the last sample. 1 means the callback is using its whole
-    /// deadline; past that it is late, and late is not slow, it is torn audio.
-    /// </summary>
+    /// <summary>The mixer's DSP load, 0..1+, as of the last sample. Past 1 the callback is late, and
+    /// late is torn audio.</summary>
     public float MixerLoad => _mixerLoad;
     private volatile float _mixerLoad;
-    /// <summary>
-    /// Interval timer for the load SAMPLE, and nothing else.
-    ///
-    /// It is restarted every quarter second, which is fine for an interval timer and catastrophic for
-    /// a timebase. Never stamp positions with it: a position stamped at 0.24 s compared against a
-    /// "now" of 0.01 s after a restart has a negative age, and the dead reckoning returns it
-    /// unchanged. Timestamps come from <see cref="OpenFPS.Common.AudioClock"/>, which nothing restarts.
-    /// </summary>
+    /// <summary>The load sample's interval timer, restarted every quarter second: never a timebase for
+    /// positions (a restart gives a negative age). Timestamps come from <see cref="OpenFPS.Common.AudioClock"/>.</summary>
     private readonly System.Diagnostics.Stopwatch _loadSampleClock = System.Diagnostics.Stopwatch.StartNew();
 
     /// <summary>FMOD's own DSP load, per cent of the mixer's deadline, now. The lab's cost figures.</summary>
     internal float DspCpuPercent() => _isInitialized && _system.getCPUUsage(out var u) == RESULT.OK ? u.dsp : float.NaN;
 
+    /// <summary>
+    /// Samples the mixer's load for <see cref="MixerLoad"/> and logs the mixer's health. Clipping (a
+    /// wrong level reference) and starving (a missed deadline) are both called "crackling"; the dsp
+    /// figure tells them apart: past about 60 % the callback is running out of time. A live engine is
+    /// the dearest voice (`--engine-cost`): read this before raising OPENFPS_ENGINE_VOICES.
+    /// </summary>
     private void ReportMixerLoad()
     {
-        // Sampled far more often than it is logged, because something has to steer on it.
+        // Sampled far more often than logged: something steers on it.
         if (_loadSampleClock.Elapsed.TotalSeconds >= 0.25)
         {
             _loadSampleClock.Restart();
             if (_system.getCPUUsage(out var now) == RESULT.OK)
             {
-                // A slow average: the control loop above this must not chase a single busy block.
+                // A slow average: the control loop must not chase a single busy block.
                 float f = now.dsp * 0.01f;
                 _mixerLoad += (f - _mixerLoad) * 0.35f;
             }
         }
 
-        // Five seconds when nothing is wrong, one second when something is — a starve or a gen2
-        // collection in the last second is exactly when a five-second average stops being useful.
+        // Every five seconds, or every second after a starve or a gen2 collection.
         double since = _cpuClock.Elapsed.TotalSeconds;
         bool trouble = EngineVoiceState.GlobalStarves != _lastStarves || GC.CollectionCount(2) != _lastGen2;
         if (since < 5.0 && !(trouble && since >= 1.0)) return;
@@ -3681,31 +3097,12 @@ public partial class FmodAudioProvider : IAudioProvider
         int voices = 0;
         lock (_lock) foreach (var a in _activeSounds) if (a.EngineState != null || a.EchoState != null) voices++;
 
-        // ── What a dropout actually needs you to know ────────────────────────────────────────
-        //
-        // A dsp percentage cannot tell the difference between a mixer that is working hard and a
-        // mixer that was FROZEN — and every remaining suspect freezes it rather than loads it. So
-        // the line carries the three things that distinguish them, as deltas over the last five
-        // seconds, because a running total tells you nothing about now:
-        //
-        //   starves   blocks the engine producers had not rendered in time. Producer-side.
-        //   gc        gen2 collections and the total time every managed thread spent suspended.
-        //             A managed DSP callback is entered from FMOD's native mixer thread, and a
-        //             native thread entering managed code during a GC suspension WAITS for the GC.
-        //             The ring being full does not help; the consumer is the thing that stopped.
-        //             If this jumps when the audio cuts, that is the cause, and it is the one
-        //             suspect that no amount of buffer depth can absorb.
-        //   real      FMOD's REAL channels against its limit. 512 at init is the VIRTUAL count;
-        //             the software limit is 64 by default, and past it the quietest voices go
-        //             silent — which on a track with engines, echoes, wall reflections, samples
-        //             and ambience is reached without anything appearing to be wrong.
-        // ── The worst any ONE voice went unrepositioned ──────────────────────────────────────
-        //
-        // Separate from the audio system's own figure ON PURPOSE. That one measures whether the
-        // placement pass ran at all; this one measures whether it reached every voice. They come
-        // apart exactly where "some of the cars stop, not all of them" lives: a pass that runs on
-        // time but skips a voice leaves that one car's engine hanging in the air while the rest of
-        // the field carries on, and a global timer cannot see it.
+        // A dsp percentage cannot tell a busy mixer from a frozen one, so the line carries deltas of
+        // what freezes it: starves (blocks the producers had not rendered), gen2 collections and GC
+        // pause (a native mixer thread entering managed code waits the GC out, which no buffer can
+        // absorb), and real channels against the limit (past it the quietest voices go silent).
+        // The worst any one voice went unplaced, apart from the audio system's figure on purpose: that
+        // says the placement pass ran, this that it reached every voice ("some of the cars stop").
         double nowSec = OpenFPS.Common.AudioClock.Now;
         double worstStale = 0; int worstId = 0;
         lock (_lock)
@@ -3713,13 +3110,11 @@ public partial class FmodAudioProvider : IAudioProvider
             foreach (var a in _activeSounds)
             {
                 if (a.LastAttributeAt <= 0) continue;
-                // A voice pinned to the listener is placed under their head every frame and has no
-                // attribute update to be waiting for, so the age of the last one says nothing about
-                // it. Counting it made every footstep in the game report itself as a sound left
-                // behind by its owner, which buried the one voice that really had been.
+                // A voice pinned to the listener waits for no update; counted, every footstep buried the
+                // one voice really left behind.
                 if (a.FollowsListener) { a.WorstPositionAge = 0; continue; }
-                // The worst it reached DURING the interval, and the worst it is right now — a voice
-                // that has been abandoned since the last report has no placement to have recorded it.
+                // The worst during the interval, or now: a voice abandoned since the last report has no
+                // placement to have recorded it.
                 double stale = Math.Max(a.WorstPositionAge, nowSec - a.LastAttributeAt);
                 a.WorstPositionAge = 0;
                 if (stale > worstStale) { worstStale = stale; worstId = a.EntityId; }
@@ -3747,32 +3142,18 @@ public partial class FmodAudioProvider : IAudioProvider
         _lastLateDetaches = _lateDetaches;
         _lastStarves = starves; _lastGen2 = gen2; _lastPauseMs = pauseMs;
 
-        // What the room is doing to everything, which is the one thing the load line never said.
-        //
-        // "Everything sounds like it is in a room when I am outdoors" has two completely different
-        // causes and they are fixed in different places, so guessing between them is worthless. Either
-        // the listener's bus is OPEN — a long decay at an audible wet level, which outdoors can only
-        // come from the ray-traced RT60 finding geometry around the listener — or the bus is shut and
-        // the wetness is coming from how much of each voice is SENT to it, which is a fixed fraction
-        // and therefore the same proportion at one metre as at a hundred.
-        //
-        // Both numbers, every report, so the next person to hear it can tell which.
-        // Anything a DSP callback recorded since the last report. It cannot log from in there — see
-        // DspFault — so this is where a faulting unit gets to say so, on a thread that may block.
+        // A DSP callback cannot log (DspFault): a faulting unit says so here, on a thread that may block.
         if (DspFault.TryDrain(out int dspFaults, out string? dspFirst))
             Log.Error("A DSP callback faulted {Count} time(s) since the last report; the block(s) were "
                     + "silenced rather than taking the process down. First: {First}", dspFaults, dspFirst);
 
-        // The SEND a voice actually got (Enclosure.ReverberantToDirectPower), not a constant. An
-        // instrument that states a constant as if it were a measurement is worse than one that says
-        // nothing.
+        // What the room is doing to everything, every report. Measurements only: a constant stated as
+        // one is worse than nothing.
         Log.Information("Room: listener in region {Region}; ray-traced RT60 {Sim:F0} ms; enclosure {Enc:P0}; "
                       + "reflections {Refl:F0} dB",
                         _listenerRegionId, _simReverbDecayMs, _listenerEnclosure, TailDb);
 
-        // One simulation step plus a comfortable margin. Below that a voice is being placed at a
-        // position from the last step, which is exactly what the interpolation clock delivers and what
-        // dead reckoning carries forward; above it, something is holding a source still.
+        // One simulation step and a margin: older than that, something is holding a source still.
         const double AcceptablePositionAgeSeconds = 0.06;
         if (worstStale > AcceptablePositionAgeSeconds)
             Log.Warning("Voice {Id} was placed at a position {Stale:F0} ms old (worst this interval) — its sound "
@@ -3781,9 +3162,8 @@ public partial class FmodAudioProvider : IAudioProvider
 
 
 
-        // What the mix actually measures, after the makeup gain and the brick wall. Momentary is
-        // "right now", short-term is the last three seconds; -18 to -23 LUFS is where a game mix
-        // belongs, and a long way under that means the master makeup is too low for this content.
+        // The mix after the makeup and the brick wall; short-term is the last three seconds. -18 to -23
+        // LUFS is where a game mix belongs; far under it, the makeup is too low for this content.
         if (!_loudnessMeter.hasHandle()) return;
         if (_loudnessMeter.getParameterData(2, out IntPtr data, out uint _) != RESULT.OK) return;
         var info = System.Runtime.InteropServices.Marshal.PtrToStructure<DSP_LOUDNESS_METER_INFO_TYPE>(data);
@@ -3791,9 +3171,8 @@ public partial class FmodAudioProvider : IAudioProvider
             Log.Information("Mix loudness: {Short:F1} LUFS short-term, {Momentary:F1} momentary, "
                           + "{Peak:F1} dBFS peak (makeup {Makeup:F0} dB)",
                             info.shorttermloudness, info.momentaryloudness, info.maxtruepeak, MasterMakeupDb);
-        // The peak is FMOD's maximum since metering began, so without this every line after the first
-        // full-scale moment of a session read -0.0 dBFS (320 of 391 lines on 10-06) and looked like a
-        // master living at its ceiling. Reset, it is the peak of the interval since the last line.
+        // FMOD's peak is the maximum since metering began (320 of 391 lines on 10-06 read -0.0 dBFS):
+        // reset, it is the interval's.
         _loudnessMeter.setParameterInt(0, (int)DSP_LOUDNESS_METER_STATE_TYPE.RESET_MAXPEAK);
         _loudnessMeter.setParameterInt(0, (int)DSP_LOUDNESS_METER_STATE_TYPE.ANALYZING);
         // What the brick wall did in the interval: nothing, most of the time.
@@ -3808,25 +3187,15 @@ public partial class FmodAudioProvider : IAudioProvider
     private int _lastStarves, _lastGen2;
     private double _lastPauseMs;
 
-    /// <summary>
-    /// How long this method is taking, and how often it is being called — the two numbers that say
-    /// whether a pass-by glides or steps.
-    ///
-    /// The audio thread runs at 250 Hz on purpose (see AudioEngineFacade): Doppler is applied as a
-    /// channel pitch, a channel pitch changes the instant it is set, so the loop period IS the
-    /// resolution of every pass-by. At 250 Hz a car going past steps by 0.65 %, under the threshold
-    /// where a pitch change is heard as a step; at 60 Hz it steps by 2.7 % and is heard as a
-    /// staircase. But the loop's period is `max(1 ms, 4 ms - however long the tick took)`, so the
-    /// rate is not a setting, it is an OUTCOME — and the tick walks every active voice. Going from
-    /// eight cars to thirty multiplies that walk by three or four, and nothing anywhere said so.
-    /// </summary>
+    // How long Update takes and how often it runs: whether a pass-by glides or steps. Doppler is a
+    // channel pitch, so the 250 Hz loop's period is every pass-by's resolution (0.65 % steps; 60 Hz is
+    // 2.7 %, a staircase), and the period is an outcome of the tick, which walks every voice.
     private double _updateMsSum, _updateMsMax;
     private int _updateCount;
     private readonly System.Diagnostics.Stopwatch _updateTimer = new();
 
-    /// <summary>Mean and worst time one attribute pass took since this was last read, and how many
-    /// voices it walked. Reading it resets the window. The caller owns the cadence, so the caller is
-    /// the one that can say whether it is fast enough.</summary>
+    /// <summary>Mean and worst time one attribute pass took since the last read, and the voices it
+    /// walked. Reading resets the window; the caller owns the cadence.</summary>
     public (double MeanMs, double MaxMs, int Calls, int Voices) TakeUpdateCost()
     {
         var r = (_updateCount > 0 ? _updateMsSum / _updateCount : 0.0, _updateMsMax, _updateCount, _activeSounds.Count);
@@ -3849,7 +3218,6 @@ public partial class FmodAudioProvider : IAudioProvider
         _updateTimer.Restart();
         ReportMixerLoad();
 
-        // Before anything else: retry plays that were waiting on a NONBLOCKING decode.
         DrainDeferredPlays();
 
         try
@@ -3864,7 +3232,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 UpdateTracedStages();
                 UpdateTracedEchoes();
                 UpdateLateField();
-                ApplySimulatedReverb(listenerRegionId);
+                ApplySimulatedReverb();
 
                 for (int i = _activeSounds.Count - 1; i >= 0; i--)
                 {
@@ -3904,90 +3272,40 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
-    /// Takes one voice apart. THE CHANNEL IS STOPPED FIRST, and it was not.
-    ///
-    /// Every crash on the city map was a SIGSEGV at the SAME faulting address — `0x7c`, a null
-    /// dereference at field offset 124 — inside libfmod, on an FMOD mixer thread, with none of our
-    /// managed code on the stack. Seven dumps, identical. That is FMOD walking its own graph and
-    /// finding a hole in it.
-    ///
-    /// The hole was made here. One of the three callers is the voice REAPER, which does:
-    ///
-    ///     active.Channel.isPlaying(out bool isPlaying);
-    ///     if (!isPlaying) { ReleaseActiveSoundResources(active); ... }
-    ///
-    /// — and never stops the channel. For an ordinary sample voice that is harmless: "not playing"
-    /// means FMOD has finished with it. For a voice created with `playDSP` — every engine, every
-    /// machine, every echo, every tap — the DSP is still WIRED INTO the channel group, and
-    /// `isPlaying` can read false while the mixer is still holding it. Releasing it there leaves a
-    /// dangling DSP in the graph, and the next block walks into it.
-    ///
-    /// It is probabilistic in WHEN and exact in WHERE, and its rate is the number of DSP voices
-    /// being reaped — which is what the bisection actually measured. Turning off machines, or
-    /// reflections, or the binaural stage, or the simulator each removed SOME of those voices and
-    /// none of them all, so every single-lever run still crashed in under twenty seconds; turning
-    /// off all four at once left so few that a run lasted 131 seconds and exited cleanly.
-    ///
-    /// So: stop the channel, disconnect the DSP from the graph, and only then release it. That is
-    /// the order FMOD documents and the order the other two callers already had by accident.
+    /// Takes one voice apart: every DSP off the live channel, then the channel stopped, then the
+    /// voice's own DSP disconnected and released. The reaper releases on <c>isPlaying == false</c>,
+    /// which for a <c>playDSP</c> voice (engine, machine, echo, tap) can read false while the mixer
+    /// still holds the DSP: released without the channel stopped, it was the city's SIGSEGV at 0x7c on
+    /// FMOD's mixer thread. See docs/THE_MIXER_THREAD_CRASH.md.
     /// </summary>
     private void ReleaseActiveSoundResources(ActiveSound active)
     {
-        // ORDER MATTERS, and it is DETACH-THEN-STOP, not the other way round.
-        //
-        // A stopped Channel is recycled immediately and its handle goes stale, so removeDSP on it
-        // returns ERR_INVALID_HANDLE and the DSP stays attached to a channel that no longer exists.
-        // Every POOLED DSP has to come off while the channel is still alive. removeDSP is also the
-        // call that blocks until an in-flight callback returns, which is the safety we actually want
-        // here — so it has to be the first thing that happens, not something done to a corpse.
+        // Detach, then stop: a stopped channel is recycled at once and removeDSP on it fails, leaving
+        // the DSP attached. removeDSP also waits out a callback in flight, so it comes first.
         DetachEchoRig(active);
         ReleaseSteamAudioVoice(active);
         ReleaseThreeEqDsp(active.Channel, active.ThreeEqDsp);
         ReleaseDiffractionDsp(active.Channel, active.DiffractionDsp);
         ReleaseSendTapDsp(active);
         ReleaseEar(active);
-        // The OWNED units come off the same way, and for the same reason. FMOD's logging build says
-        // this in one line where a core file does not:
-        //
-        //     DSPI::release WARNING. Failed to release because unit is still attached.
-        //                            Use removeDSP function first.
-        //
-        // and then, at shutdown, `closeInternal assertion: connectionsRemaining == 0 failed`. A
-        // refused release is not a no-op — the unit stays in the graph, and the ATTACHMENT to a
-        // ChannelControl is a different thing from the CONNECTIONS to other DSPs, so disconnectAll
-        // does not satisfy it. Only removeDSP, or stopping the channel, does.
+        // The owned units too: FMOD refuses to release an attached unit ("Failed to release because
+        // unit is still attached", logging build only) and it stays in the graph. Attachment is not a
+        // connection, so disconnectAll does not undo it; only removeDSP or stopping the channel does.
         Detach(active.Channel, active.GranularDsp, "granular");
         Detach(active.Channel, active.SynthDsp, "synth");
         Detach(active.Channel, active.EngineDsp, "engine/machine");
-        // Only once nothing at all is left on it does the channel stop...
         if (active.Channel.hasHandle()) active.Channel.stop();
         if (active.OwnedSound.hasHandle()) { active.OwnedSound.release(); active.OwnedSound = default; }
         ReleaseGranularDsp(active.GranularDsp, active.GranularHandle, active.GranularState);
         ReleaseSynthDsp(active.SynthDsp, active.SynthHandle, active.SynthState);
         if (active.EngineDsp.hasHandle())
         {
-            // Not pooled: an engine is a whole vehicle's worth of state, and the next one is a
-            // different car.
-            //
-            // THE GCHANDLE IS NOT FREED HERE, and that is the whole of a crash that took three
-            // sessions to catch. Every DSP read callback in this file begins by resolving the
-            // userdata pointer back to its state object — `GCHandle.FromIntPtr(userData).Target` —
-            // and that call on a handle which has just been freed does not throw, it dereferences a
-            // slot that no longer belongs to it. On FMOD's mixer thread that is a fatal error in the
-            // runtime, which is exactly what the crash dump showed: libfmod calling into libcoreclr,
-            // and libcoreclr going straight to abort. No managed exception, no log line, signal 11.
-            //
-            // ReleaseSteamAudioVoice a few hundred lines up already says this in so many words —
-            // "we never free the Phonon effect/buffers or the GCHandle here, that is exactly what
-            // raced the mixer callback and corrupted the heap" — and the engine path never learned
-            // it, because on a racetrack the voices are made once and kept. A city makes and drops
-            // them continuously as you walk, and the race is then a matter of time.
-            //
-            // The userdata is cleared first so a callback that arrives anyway finds zero and leaves,
-            // and the handle is parked until Dispose. It is sixteen bytes per retired voice.
+            // Not pooled: the next engine is a different car. The GCHandle is not freed: a callback
+            // arriving after release resolves it first, and a freed one aborted the runtime on the
+            // mixer thread (no exception, signal 11). Userdata cleared so a late callback leaves; the
+            // handle parked until Dispose (_retiredHandles).
             active.EngineDsp.setUserData(IntPtr.Zero);
-            // OUT OF THE GRAPH BEFORE IT IS FREED. release() on a DSP that is still connected is
-            // what left FMOD dereferencing null at 0x7c inside its mix.
+            // Out of the graph before release: a connected DSP released was the null at 0x7c.
             active.EngineDsp.disconnectAll(true, true);
             active.EngineDsp.release();
             if (active.EngineHandle.IsAllocated) _retiredHandles.Add(active.EngineHandle);
@@ -3996,19 +3314,16 @@ public partial class FmodAudioProvider : IAudioProvider
             active.MachineState = null;
             active.OwnVoice = null;
             active.EchoState = null;
-            // A machine whose second outlet has gone is a machine heard through one voice again, and
-            // the front tap slews back into it. Without this the intake would simply disappear — the
-            // car would lose a third of its sound for being far enough away to be heard as one thing.
+            // A second outlet gone: its share slews back into the engine's voice, or the car lost a
+            // third of its sound for being far enough away to be one voice.
             active.TapState?.HandBack();
             active.TapState = null;
         }
-        // ...and only now is nothing left pointing at it.
         active.Channel.clearHandle();
     }
 
-    /// <summary>How much of a send's crossfade happens per audio update. At the update rate this is a
-    /// few tens of milliseconds, which is the same order as the engine voice's own fade and well under
-    /// anything a listener hears as a change of place.</summary>
+    /// <summary>How much of a send's crossfade happens per audio update: a few tens of milliseconds at
+    /// the update rate, under anything heard as a change of place.</summary>
     private const float ReverbSendFadeStep = 0.12f;
 
     private void UpdateReverbRouting(ActiveSound active, int listenerRegionId)
@@ -4016,17 +3331,15 @@ public partial class FmodAudioProvider : IAudioProvider
         if (_acousticMap == null) return;
         int sourceRegionId = active.TargetRegionId;
 
-        // A sound in the listener's OWN room needs no cross-send: the cross-send exists so that a
-        // sound in the NEXT room reverberates a little here as well as there, and a source that is
-        // already here would simply be sent to the same bus twice.
+        // The cross-send lets a sound in the next room ring a little here too; a sound already in the
+        // listener's room would be sent to the same bus twice.
         int crossRegionId = sourceRegionId == listenerRegionId
             ? AcousticConstants.GlobalRegionId : listenerRegionId;
 
         bool sourceChanged = sourceRegionId != active.CurrentSourceRegionId || !active.SourceReverbConnection.hasHandle();
         bool listenerChanged = crossRegionId != active.CurrentRegionId || !active.ReverbConnection.hasHandle();
 
-        // Not the steady state any more: a crossfade still running has to be advanced even when
-        // nothing changed this frame, which is most frames of one.
+        // A crossfade still running is advanced even when nothing changed this frame.
         bool fading = active.FadingReverbConnection.hasHandle() || active.FadingSourceConnection.hasHandle()
                    || active.ReverbMix < 1f || active.SourceReverbMix < 1f;
         if (!sourceChanged && !listenerChanged && !fading) return;
@@ -4034,16 +3347,13 @@ public partial class FmodAudioProvider : IAudioProvider
         active.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var sourceFader);
         var sourceTap = SourceSendDsp(active);
 
-        // Update Source Reverb Send (the room the sound is in)
+        // The send into the room the sound is in.
         if (sourceChanged)
         {
-            // Whatever was already fading out has had its turn; a second change before the first
-            // finished drops it outright rather than leaving connections to accumulate.
+            // A second change before the first fade finished drops the old one outright.
             DropSend(ref active.FadingSourceConnection, active.FadingSourceBus, sourceTap);
-            // The bus it fades out of is the unit the send was made into — the handle stored with
-            // the connection — NOT a fresh lookup by region id. The id recorded in CurrentRegionId
-            // is a change detector and can legitimately differ from the bus (see crossRegionId);
-            // when it did, the lookup handed DropSend another room's unit, and FMOD does not check.
+            // It fades out of the unit stored with the connection, never one looked up by region id:
+            // the recorded id is a change detector and can differ from the bus (see DropSend).
             if (active.SourceReverbConnection.hasHandle() && active.SourceReverbBus.hasHandle())
             {
                 active.FadingSourceConnection = active.SourceReverbConnection;
@@ -4063,15 +3373,13 @@ public partial class FmodAudioProvider : IAudioProvider
             active.CurrentSourceRegionId = sourceRegionId;
         }
 
-        // Update Listener Reverb Send (the room the listener is in)
+        // The send into the room the listener is in.
         if (listenerChanged)
         {
             DropSend(ref active.FadingReverbConnection, active.FadingReverbBus, sourceFader);
-            // THIS is where the city crashed. CurrentRegionId holds crossRegionId, which is the
-            // GLOBAL id whenever the source is in the listener's own room, while the send itself
-            // was made into listenerRegionId's unit. A city names its outdoors, so the global id
-            // resolved to the outdoor bus, and the room's send was handed to the outdoor unit to
-            // disconnect. The stored handle is the unit that owns the connection, by construction.
+            // Where the city crashed: CurrentRegionId holds the global id for a source in the
+            // listener's own room, which on the city is the outdoor bus, while the send went into the
+            // room's unit. The stored handle owns the connection by construction.
             if (active.ReverbConnection.hasHandle() && active.ReverbBus.hasHandle())
             {
                 active.FadingReverbConnection = active.ReverbConnection;
@@ -4094,16 +3402,15 @@ public partial class FmodAudioProvider : IAudioProvider
         AdvanceSendFade(active, sourceFader, sourceTap);
     }
 
-    /// <summary>Moves both sends one step along their crossfade and releases a connection that has
-    /// finished fading out. The mixes here are FRACTIONS of each send's own target level, which
-    /// <see cref="UpdateReverbRouting"/>'s callers may scale further.</summary>
+    /// <summary>Moves both sends one step along their crossfade and drops a connection that has faded
+    /// out. The mixes are fractions of each send's own target level.</summary>
     private void AdvanceSendFade(ActiveSound active, FMOD.DSP sourceFader, FMOD.DSP sourceTap)
     {
         float listenerTarget = AcousticConstants.ReverbSendMix * AcousticConstants.ReverbCrossSendScale;
         float sourceTarget = AcousticConstants.ReverbSendMix;
 
-        // The live sends' fractions only — their mix is written in one place, by the per-source pass
-        // that also knows what a reflection's send should be. Two writers is how the ramp was lost.
+        // The live sends' fractions only: their mix has one writer, the per-source pass. Two writers
+        // lost the ramp.
         if (active.SourceReverbConnection.hasHandle() && active.SourceReverbMix < 1f)
             active.SourceReverbMix = MathF.Min(1f, active.SourceReverbMix + ReverbSendFadeStep);
         if (active.ReverbConnection.hasHandle() && active.ReverbMix < 1f)
@@ -4124,50 +3431,23 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
-    /// Longest a voice's position may be carried forward on its own velocity, seconds.
-    ///
-    /// Sized from how the position is actually SAMPLED, now that the stamp says so honestly. A remote
-    /// entity is interpolated once per simulation step (33 ms) and the audio update re-offers it about
-    /// every 22 ms, so a position legitimately reaches the far side of fifty milliseconds old before
-    /// a newer one exists anywhere in the process. A cap under that is not caution, it is a hold: the
-    /// reckoning stops, the source freezes for the remainder of the step, and the freeze is exactly
-    /// the artefact this mechanism exists to remove.
-    ///
-    /// This is NOT permission to stretch the cap until a fault goes quiet. It is short enough that a
-    /// source which stops dead — a car that crashes, a stream that drops — cannot be flung more than a
-    /// couple of metres before the truth arrives, and anything older than this is a stall, which the
-    /// worst-position-age instrument reports rather than papers over.
+    /// Longest a voice's position may be carried forward on its own velocity, seconds. A position is
+    /// legitimately over 50 ms old before a newer one exists (a 33 ms step, re-offered every 22 ms), and
+    /// a shorter cap is a freeze. Not to be stretched until a fault goes quiet: a source that stops dead
+    /// is flung at most a couple of metres, and anything older is a stall the worst-age line reports.
     /// </summary>
     private const double MaxDeadReckonSeconds = 0.08;
 
-    /// <summary>
-    /// Where a source IS NOW, rather than where the game thread last said it was.
-    ///
-    /// Without it a close pass sounds "auto-tuned". Doppler is computed from the unit vector between
-    /// listener and source, recomputed 250 times a second, but the position only changes when the
-    /// game thread resubmits the emitter — measured at 22 ms, so about 45 Hz. The loop would write
-    /// the same pitch five times over and then jump.
-    ///
-    /// The size of the jump goes as v^2/d, so it is entirely a NEAR-FIELD problem. A car at fifty metres and 280 km/h swings its radial speed by 2.7 m/s
-    /// between updates — 0.8 %, a glide. The same car at FIVE metres swings it by 27 m/s — 7.6 %,
-    /// well over a semitone, forty-five times a second. That is not a Doppler shift, it is a pitch
-    /// quantiser, and it sounds like one.
-    ///
-    /// Carrying the source forward on its own velocity makes the vector vary continuously at the
-    /// rate this loop actually runs at, which is what the loop was for.
-    /// </summary>
     /// <summary>Degrees a second the direction of a sound heard round an obstacle may turn.</summary>
     private const float BlockedTurnDegPerSecond = 120f;
     /// <summary>...and of one in the clear, which only has to keep up with a car passing close.</summary>
     private const float ClearTurnDegPerSecond = 1500f;
 
     /// <summary>
-    /// Moves where a voice is heard from toward where it should be, as a DIRECTION and a DISTANCE, not
-    /// in a straight line. A sound heard round a building can have its route switch from one side of it
-    /// to the other between two updates; eased in a straight line, the point it is heard from swept
-    /// through the listener's head, so it swapped ears and its level lumped by 5-10 dB two to five
-    /// times a second (heard as siren and horn "flutter"). Turning at a limited rate, a
-    /// switch is a short turn, and one that switches back before it gets there hardly moves at all.
+    /// Moves where a voice is heard from toward where it should be as a direction and a distance, not
+    /// in a straight line. A route round a building can switch sides between two updates; eased in a
+    /// line, the heard point swept through the head, swapping ears with 5-10 dB lumps two to five times
+    /// a second (siren and horn "flutter"). At a limited turn rate a switch back hardly moves it.
     /// </summary>
     private static Vector3 TurnToward(ActiveSound active, Vector3 listener, Vector3 target, double now)
     {
@@ -4193,6 +3473,12 @@ public partial class FmodAudioProvider : IAudioProvider
         return listener + Vector3.Normalize(dir) * d;
     }
 
+    /// <summary>
+    /// Where a source is now, carried forward on its velocity from where the game thread last said.
+    /// Doppler is recomputed at 250 Hz from a position that changes at about 45 Hz, so a close pass
+    /// sounded "auto-tuned": the jump goes as v²/d, 0.8 % at 50 m and 280 km/h but 7.6 % at 5 m, a
+    /// pitch quantiser. See docs/AUDIO_LOAD_DROPOUTS.md.
+    /// </summary>
     private Vector3 DeadReckon(ActiveSound active, Vector3 position, double nowSec)
     {
         if (active.LastAttributeAt <= 0 || active.Velocity == Vector3.Zero) return position;
@@ -4203,16 +3489,9 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
-    /// One voice, traced at the full attribute rate. Set OPENFPS_AUDIO_TRACE to an entity id.
-    ///
-    /// The instrument that was missing when a close pass "stopped for a second and then carried on".
-    /// Everything that existed averaged or sampled: the census every five seconds, [ADBG] one frame in
-    /// sixty. A hold that starts and ends inside 33 milliseconds is invisible to all of it, and a hold
-    /// that size is precisely what a 30 Hz position on a 250 Hz loop produces.
-    ///
-    /// What comes out is a CSV of one pass — time, placed position, bearing, distance, pitch, and the
-    /// age of the position each of those was computed from. A staircase is visible in it at a glance:
-    /// eight identical rows and a jump, thirty times a second. A glide is not.
+    /// OPENFPS_AUDIO_TRACE=entity id: that voice traced at the full attribute rate, as [ATRACE] CSV
+    /// (time, placed position, bearing, distance, Doppler, position age, occlusion). A hold under 33 ms
+    /// is invisible to every sampled instrument; here a staircase is eight identical rows and a jump.
     /// </summary>
     private static readonly int _traceEntity =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_AUDIO_TRACE"), out int t) ? t : int.MinValue;
@@ -4220,17 +3499,13 @@ public partial class FmodAudioProvider : IAudioProvider
     private void UpdateSpatialPositioning(ActiveSound active, Vector3 lPosVec)
     {
         double now = OpenFPS.Common.AudioClock.Now;
-        // A voice pinned to the listener has no position to go stale: it is placed under the head
-        // every frame a few lines below, whatever it was last TOLD. Counting the age of an attribute
-        // update nobody sends it would make every footstep report itself as a stale position and
-        // drown the warning that matters.
+        // A voice pinned to the listener has no position to go stale (see ReportMixerLoad).
         double positionAge = active.FollowsListener || active.LastAttributeAt <= 0
             ? 0 : now - active.LastAttributeAt;
         if (positionAge > active.WorstPositionAge) active.WorstPositionAge = positionAge;
 
         Vector3 targetPos = (active.ApparentPosition != Vector3.Zero) ? active.ApparentPosition : active.Position;
-        // Placed where it is now, not where it was last told. A reflection carries no velocity of its
-        // own (deliberately — see EngineEchoState), so this is a no-op for one.
+        // A reflection carries no velocity (EngineEchoState), so this leaves it where it is.
         targetPos = DeadReckon(active, targetPos, now);
         if (active.ApparentPosition != Vector3.Zero && active.ApparentPosition != active.Position)
         {
@@ -4238,8 +3513,7 @@ public partial class FmodAudioProvider : IAudioProvider
             targetPos = Vector3.Lerp(active.ApparentPosition, active.Position, bias);
         }
 
-        // Part of the listener: under their head, this tick, exactly. Not where they were when the
-        // step fell, and not eased toward it — the ease is for sounds that move through the world.
+        // Part of the listener: under their head this tick, not eased (the ease is for sounds in the world).
         if (active.FollowsListener)
         {
             targetPos = lPosVec + active.ListenerOffset;
@@ -4261,11 +3535,8 @@ public partial class FmodAudioProvider : IAudioProvider
 
         if (active.SaState != null)
         {
-            // Steam Audio path: the channel is 2D (see PlaySpatialSound) so FMOD does not collapse the
-            // binaural stereo. The HRTF owns directional panning and distance is applied manually in
-            // ApplyAcousticFilters — so we skip FMOD's 3D positioning calls entirely (they would be
-            // no-ops on a 2D channel). Feed the listener-relative direction, converting from the game
-            // frame (+Z forward) to Steam Audio's (-Z forward).
+            // The HRTF places it (the channel is 2D; distance is applied in ApplyAcousticFilters).
+            // Listener-relative, from the game's +Z forward to Steam Audio's -Z.
             Vector3 local = Vector3.Transform(active.CurrentApparentPosition - lPosVec, Quaternion.Conjugate(_listenerRot));
             float len = local.Length();
             if (len > 1e-4f)
@@ -4304,8 +3575,7 @@ public partial class FmodAudioProvider : IAudioProvider
             return;
         }
 
-        // FMOD native 3D fallback (Steam Audio unavailable): position the mono point source and let
-        // FMOD pan + roll off by distance.
+        // No Steam Audio: FMOD pans and rolls off the mono point source.
         FMOD.VECTOR fpos = FmodHelpers.ToFmodVec(active.CurrentApparentPosition), fvel = FmodHelpers.ToFmodVec(active.Velocity);
         active.Channel.set3DAttributes(ref fpos, ref fvel);
         active.Channel.set3DMinMaxDistance(active.MinDistance, active.Range);
@@ -4315,7 +3585,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
         if (isIndirect)
         {
-            // Indirect paths (diffraction) fill the room based on aperture size.
+            // A diffracted path spreads with the aperture.
             float roomFillSpread = Math.Clamp((distToSound * AcousticConstants.SpreadGrowthFactor), 0.0f, AcousticConstants.VolumetricSpreadMax);
             float baseSpread = (active.CurrentAperture * 90.0f) / Math.Max(0.5f, distToSound);
             active.Channel.set3DSpread(Math.Min(baseSpread, roomFillSpread));
@@ -4331,10 +3601,8 @@ public partial class FmodAudioProvider : IAudioProvider
         active.Channel.set3DLevel(1.0f);
     }
 
-    /// <summary>
-    /// The EQ a path asks for, dB per band: each band's gain as a level, less what the air took. The
-    /// gains are linear and are the WHOLE of the path's blocking; see ApplyAcousticFilters.
-    /// </summary>
+    /// <summary>The EQ a path asks for, dB per band: each linear band gain (the whole of the path's
+    /// blocking) as a level, less what the air took. See ApplyAcousticFilters.</summary>
     internal static (float Low, float Mid, float High) PathEqDb(float gainLow, float gainMid, float gainHigh,
                                                                float airLowDb, float airMidDb, float airHighDb)
     {
@@ -4358,50 +3626,33 @@ public partial class FmodAudioProvider : IAudioProvider
         active.CurrentMid = MathHelper.Lerp(active.CurrentMid, active.TargetMid, lerpFactor);
         active.CurrentHigh = MathHelper.Lerp(active.CurrentHigh, active.TargetHigh, lerpFactor);
 
-        // ── What the path does, applied ONCE ────────────────────────────────────────────────────
-        //
-        // The band gains (CurrentLow/Mid/High) are the whole of what occlusion, transmission and
-        // diffraction do to each band — linear gains, from Steam Audio's visibility and transmission
-        // with the edge's diffraction merged in, or from the fallback tracer joined the same way — and
-        // they are applied as exactly that, 20 log10 of each, in the EQ below. Nothing else here
-        // blocks. It used to be three times over: a broadband (1 - occlusion) on the volume, the band
-        // gains read as interpolation weights in dB space (a gain of 0.2, -14 dB, came out at -32 in
-        // the high band), and an extra 40 dB high / 20 dB mid scaled by occlusion-plus-air. A bleed
-        // floor and a +10 dB bass lift then added back transmission the band gains already carry.
-        // The air is its own per-band loss, from the standard, subtracted there too.
+        // The path is applied once: the band gains are the whole of what occlusion, transmission and
+        // diffraction do, as 20 log10 each in the EQ below, with the air's per-band loss. Applied
+        // three times over (a broadband 1 - occlusion, the gains read as dB weights, an extra
+        // occlusion cut) a gain of 0.2 came out at -32 dB in the high band.
         float finalVolFactor = 1.0f;
-        
-        // --- Shelter Damping ---
-        // Atmospheric sounds (Wind, Rain) are aggressively dampened when sheltered.
-        // Physical world sounds (Megaphones, NPCs) are NOT double-dampened here as they rely on Occlusion/Diffraction.
+
+        // Atmospheric sounds (wind, rain) are damped under shelter, keeping 5 % for "interior rain";
+        // world sounds are left to occlusion and the geometry.
         if (active.Type == EmitterType.Atmospheric)
         {
-            finalVolFactor *= (1.0f - (_shelterFactor * 0.95f)); // Keep 5% for "interior rain" sense
+            finalVolFactor *= (1.0f - (_shelterFactor * 0.95f));
         }
-        // Sounds are not damped here any more: the walls and the doors, where they are, do it in the geometry.
 
         float roomGainBonus = MathHelper.Lerp(1.0f, active.RoomGain, 0.5f);
 
-        // Distance attenuation: when Steam Audio drives panning (set3DLevel 0), FMOD does NOT apply its
-        // 3D rolloff, so we apply it ourselves. Use a NATURAL inverse-distance rolloff (≈1/dist) rather
-        // than a gentle linear ramp, so a source is loud/present right up close and falls off quickly as
-        // you move away — then a smooth fade over the last stretch brings it fully to zero at Range.
+        // A 2D binaural channel gets no rolloff from FMOD, so the law is applied here.
         float distAtten = 1.0f;
         if (active.SaState != null)
         {
-            // One law, in Loudness, so a test can ask what this will do to two sources without a sound
-            // card — which is the only way the balance between a crowd and a car can be checked at all.
-            // From where the source IS, not where it is heard from: round a building the heard point
-            // is only a direction, and its distance changes with the route (the obstruction's own loss
-            // is the occlusion's business).
+            // One law, in Loudness, so a test can check a balance without a sound card. From where the
+            // source is, not where it is heard from: round a building the heard point is a direction.
             distAtten = Loudness.RenderedGain(1.0f, active.MinDistance, active.Range,
                                               Vector3.Distance(lPosVec, active.Position));
         }
 
-        // Directional cone: Steam Audio channels are 2D, so FMOD's set3DConeSettings no longer fires.
-        // Reproduce it manually from the angle between the source's facing (Direction) and the
-        // source->listener vector: full volume inside the inner cone, ConeOutsideVolume beyond the
-        // outer cone, smooth between. (Native-3D fallback channels still use FMOD's own cone.)
+        // The cone by hand on a 2D binaural channel (a 3D fallback channel uses FMOD's): full inside
+        // the inner cone, ConeOutsideVolume past the outer, smooth between.
         float coneAtten = 1.0f;
         float coneOffAxis = 0.0f; // 0 = on-axis, 1 = fully outside the cone (drives the off-axis timbre)
         if (active.SaState != null && active.ConeInside < 360f && active.Direction != Vector3.Zero)
@@ -4421,9 +3672,8 @@ public partial class FmodAudioProvider : IAudioProvider
             }
         }
 
-        // The budget's fade, slewed here because this is the pass that already owns the voice's gain.
-        // About eighty milliseconds either way: long enough that no step survives it, short enough
-        // that a voice which has genuinely gone does not linger.
+        // The budget's fade, here because this pass owns the voice's gain: long enough that no step
+        // survives it, short enough that a voice gone does not linger.
         float fadeStep = dt / VoiceFadeSeconds;
         active.FadeGain += Math.Clamp(active.FadeTarget - active.FadeGain, -fadeStep, fadeStep);
 
@@ -4432,43 +3682,29 @@ public partial class FmodAudioProvider : IAudioProvider
                             * EarGain(active, lPosVec, dt);   // the law in loudness units (FmodAudioProvider.Ear.cs)
         active.Channel.setVolume(active.LastVolume);
 
-        // Doppler: Steam Audio voices play on a 2D channel, so FMOD's own Doppler is bypassed — apply it
-        // manually to the channel pitch from the real (not apparent) source/listener motion. Native-3D
-        // fallback voices already get FMOD Doppler, so skip them here.
+        // Doppler by hand on a 2D binaural channel (a 3D fallback voice gets FMOD's), from the real
+        // source position carried forward to now (DeadReckon), not the apparent one.
         if (active.SaState != null)
         {
-            // The real (not apparent) source position, carried forward to NOW. See DeadReckon: this
-            // is what turns a 45 Hz pitch staircase back into the glide the 250 Hz loop exists for.
             Vector3 sourceNow = DeadReckon(active, active.Position, OpenFPS.Common.AudioClock.Now);
             float doppler = OpenFPS.Client.AudioEngine.Core.AudioPhysics.DopplerFactor(
                 lPosVec, _listenerVel, sourceNow, active.Velocity, speedOfSound: _speedOfSound);
             float basePitch = (active.GranularState != null || active.SynthState != null || active.EngineState != null || active.EchoState != null) ? 1.0f : active.Pitch;
 
-            // ── A reflection already has its Doppler, and must not be given it twice ────────
-            //
-            // A reflection voice is a read of the source engine's ring buffer at the extra delay its
-            // longer path implies. The position it reads from is the source's PLAY cursor, which is
-            // the emission time whose direct sound is arriving right now — so the read rate already
-            // carries the direct leg's Doppler, and the delay slewing on top of it adds the rest of
-            // the mirrored path's. That sum is the reflection's whole Doppler, correctly.
-            //
-            // Applying a channel pitch as well counted the listener's own motion a second time: real
-            // while it lasted, wrong in size, and worse the faster the listener moved. What a
-            // reflection must not inherit is a Doppler that is not its own; what it must not be given
-            // is one it already has.
-            // The vehicle you sit in and the paths into its cabin ride with you: no Doppler at all, not
-            // the near-one a smoothed listener velocity against the vehicle's makes while it speeds up.
-            // A pitched channel is called an extra block now and then, and the cabin's taps, which play
-            // the samples the vehicle's own voice plays at the same moment, would lose it by a block.
+            // An engine reflection reads the source's ring behind its play cursor, so the read rate and
+            // the slewing delay already carry its whole Doppler; a channel pitch as well counted the
+            // listener's motion twice. The vehicle you sit in and its cabin paths ride with you: no
+            // Doppler at all (a pitched channel is called an extra block now and then, and the cabin
+            // taps would fall a block out of step with the voice).
             if (active.EngineState is { Interior: true } || active.TapState is { CabinPath: > 0 }) doppler = 1f;
             if (active.EchoState != null && active.IsReflection) active.Channel.setPitch(1.0f);
             else active.Channel.setPitch(basePitch * doppler);
-            // ...and what reads this voice in step with it is told the rate it is being taken at,
-            // because its play position moves in whole blocks (EngineVoiceState.ConsumeRate).
+            // What reads this voice in step is told its rate: its play position moves in whole blocks
+            // (EngineVoiceState.ConsumeRate).
             if (active.EngineState != null) active.EngineState.ConsumeRate = basePitch * doppler;
             if (active.TapState != null) active.TapState.ChannelRate = basePitch * doppler;
-            // Where this channel's own clock sits on its parent's, once it has started: what puts the
-            // vehicle you sit in and the taps of its cabin on one time line (EngineVoiceState.BlockAt).
+            // The channel's clock against its parent's, once started: puts the vehicle you sit in and
+            // its cabin taps on one time line (EngineVoiceState.BlockAt).
             if ((active.EngineState is { CabinLayout: not null, Interior: true } || active.TapState is { CabinPath: > 0 })
                 && active.Channel.getDSPClock(out ulong own, out ulong parent) == RESULT.OK && own > 0)
             {
@@ -4480,30 +3716,18 @@ public partial class FmodAudioProvider : IAudioProvider
 
         if (active.ThreeEqDsp.hasHandle())
         {
-            Vector3 toSound = Vector3.Normalize(active.CurrentApparentPosition - lPosVec);
-            Vector3 forward = Vector3.Transform(Vector3.UnitZ, _listenerRot);
-            Vector3 right = Vector3.Transform(Vector3.UnitX, _listenerRot);
-
             var (lowDb, midDb, highDb) = PathEqDb(active.CurrentLow, active.CurrentMid, active.CurrentHigh,
                                                   active.AirLowDb, active.AirMidDb, active.AirHighDb);
 
-            // Extra muffle for environmental sounds when sheltered. "Environmental" means a sound that
-            // belongs to the open air, which is a property of its region's boundary and not of the
-            // region's id — a named patch of open ground is still the open air.
-            // (The blanket muffle on outdoor sounds inside an enclosure is retired; see where _shelterFactor is set.)
-
-
-            // Sitting in a car: everything OUTSIDE it comes through the glass and the doors. Not the
-            // car's own engine, whose voice already rendered its way through the same body, and not
-            // anything riding on the listener's head (the lane cues).
+            // Sitting in a car, everything outside it comes through the glass and the doors: not the
+            // car's own engine (its voice rendered the body already), not the cues on your head.
             if (!active.FollowsListener && !active.InsideListenersVehicle && active.EngineState is not { Interior: true })
             {
                 lowDb += _enclosureLowDb; midDb += _enclosureMidDb; highDb += _enclosureHighDb;
             }
 
-            // Directional-source timbre: off-axis, a projecting source (e.g. a megaphone) loses its highs
-            // first, then mids — so to the sides it sounds DULL, not just quieter. Combined with the cone
-            // volume attenuation above, this gives it a real "beamed" character (bright/present in front).
+            // Off-axis a projecting source (a megaphone) loses its highs, then its mids: dull to the
+            // sides, not only quieter.
             if (coneOffAxis > 0f)
             {
                 highDb -= coneOffAxis * 36.0f;
@@ -4518,32 +3742,20 @@ public partial class FmodAudioProvider : IAudioProvider
 
         WatchForPops(active, lPosVec);
 
-        // The wet send must NOT grow with distance: then distant sounds drown in reverb and the room
-        // seems to follow the listener. The dry path already rolls off with distance, so the
-        // wet-to-dry ratio rises with distance on its own.
-        // ── The send IS the room equation, per source ─────────────────────────────────────────
-        //
-        // What a source contributes to the diffuse field, relative to what the ear gets of it
-        // directly, is a fact about the room and about how far away the source is:
-        // Enclosure.ReverberantToDirectPower — measured enclosure, measured mean free path, this
-        // distance. The send hangs off the fader, so it already carries the direct level at this
-        // distance; the square root of that ratio, applied here, makes the bus receive exactly the
-        // reverberant field this source should raise.
         float sourceDist = Vector3.Distance(lPosVec, active.Position);
+        // A room rings with what the source radiates, not what its cone lets through to you.
         float radiated = 1f / MathF.Max(coneAtten, 0.05f);
         // The sends carry the source to its room's traced stage at unity: the trace is the room's
-        // answer to a source at a metre, at its level. In the listener's own room the send is scaled
-        // by the distance the direct sound has already fallen over, so a sound across the room feeds
-        // the room what a source across the room would; through a doorway the other room's stage is
-        // fed as it is. A copy sends nothing: it is already the room answering. Nothing is sent until
-        // a stage exists to receive it.
+        // answer to a source at a metre. In the listener's own room the send is scaled by the distance
+        // the direct sound has already fallen over (LateSend); through a doorway the other room's stage
+        // is fed as it is. A copy sends nothing, being the room answering already, and nothing is sent
+        // until a stage exists.
         float d = MathF.Max(0.1f, sourceDist);
         bool here = active.TargetRegionId == _listenerRegionId;
         float atDistance = here ? LateSend(active, d)
                                 : MathF.Min(d, 1f) * MathF.Pow(MathF.Max(d, 1f), Math.Clamp(_listenerEnclosure, 0f, 1f));
-        // The paths into the cabin you sit in feed your room as the one interior voice did: the voice's
-        // own send, every path alike. Each traced for itself, they came out a decibel apart, and the
-        // cabin's boom with them.
+        // The cabin paths feed your room at the interior voice's own send, all alike: each traced for
+        // itself, they came out a decibel apart, and the cabin's boom with them.
         if (here && active.EngineState is { Interior: true, CabinLayout: not null } inside) inside.CabinRoomSend = atDistance;
         else if (here && active.TapState is { CabinPath: > 0 } cabinTap && cabinTap.Source.CabinRoomSend is float shared && shared >= 0f)
             atDistance = shared;
@@ -4585,7 +3797,7 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         if (_acousticMap == null) return;
         
-        // 1. Identify candidate regions for reverb (Top N nearest)
+        // The listener's room first, then the nearest; every other bus fades out.
         var candidates = _activeRegionIds
             .Select(id => new { 
                 Id = id, 
@@ -4597,8 +3809,6 @@ public partial class FmodAudioProvider : IAudioProvider
             .Take(MaxActiveReverbBuses)
             .ToList();
 
-        // 2. Manage bus volumes directly instead of slots for now to fix the handles
-        // We will fade out any bus that isn't a candidate
         HashSet<int> candidateIds = candidates.Select(c => c.Id).ToHashSet();
 
         foreach (var kvp in _reverbBuses)
@@ -4612,7 +3822,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 if (regionId == listenerRegionId)
                 {
                     targetVol = 1.0f;
-                    SetReverbDirection(regionId, bus, default, outside: false, lPosVec); // fill the room
+                    SetReverbDirection(regionId, bus, default, outside: false, lPosVec);
                 }
                 else if (_routesSource?.Invoke() is { } routes
                          && routes.NodeOf(regionId) != routes.NodeOf(listenerRegionId))
@@ -4625,8 +3835,8 @@ public partial class FmodAudioProvider : IAudioProvider
                 }
                 else
                 {
-                    // Leakage through portals: the old one-room rule, for a map with no openings yet and
-                    // for two outdoor places, which share the one unbounded node.
+                    // Leakage through portals, for a map with no openings yet and for two outdoor places,
+                    // which share the one unbounded node.
                     var portals = _acousticMap.Portals.Values.Where(p =>
                         (p.Portal.RegionAId == regionId && p.Portal.RegionBId == listenerRegionId) ||
                         (p.Portal.RegionAId == listenerRegionId && p.Portal.RegionBId == regionId) ||
@@ -4638,17 +3848,14 @@ public partial class FmodAudioProvider : IAudioProvider
                     {
                         float dist = Vector3.Distance(lPosVec, nearest.Position);
                         targetVol = Math.Clamp((nearest.Portal.ApertureSize / 2.0f) / Math.Max(1.0f, dist), 0.0f, 1.0f);
-                        // Localize the room's reverb to the doorway (HRTF), so from outside the reverb
-                        // arrives from the opening — not spread around the listener.
                         SetReverbDirection(regionId, bus, nearest.Position, outside: true, lPosVec);
                     }
                 }
             }
 
-            // In seconds, not per pass. A fixed 0.15 a pass is a 25 ms fade at the loop's 4 ms, which
-            // cuts a room's ring off dead as you walk out of it. What is already ringing in a room goes on dying at the room's own rate after
-            // you leave it: a falling bus follows that room's decay (-60 dB over its RT60, measured while
-            // you were in it), and a rising one takes a tenth of a second.
+            // In seconds, not per pass (0.15 a pass was 25 ms, cutting a room's ring off as you left).
+            // A falling bus follows that room's own decay (-60 dB over the RT60 measured while you were
+            // in it); a rising one takes a tenth of a second.
             if (regionId == listenerRegionId && _simReverbDecayMs > 0f)
                 _regionDecaySeconds[regionId] = _simReverbDecayMs / 1000f;
             float current = _reverbVolumes[regionId];
@@ -4672,13 +3879,7 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
-    /// <summary>
-    /// The listener as a machine sees it: in the frame the machine's parts are placed in (x across,
-    /// y up, z forward), with the origin at the emitter. The machine's forward is the emitter's
-    /// Direction — which for an engine is the entity's own heading — or, failing that, the way it is
-    /// moving. A machine standing still with no heading has nothing to say, and says so.
-    /// </summary>
-    // ── The cabin's paths, equalised for their directions (CabinPaths, HrtfBands) ──────────────────
+    // The cabin's paths, equalised for their directions (CabinPaths, HrtfBands).
 
     /// <summary>The ears' mean power per band in each direction asked about, by direction to a degree
     /// or so, and in the one interior voice's direction.</summary>
@@ -4686,9 +3887,8 @@ public partial class FmodAudioProvider : IAudioProvider
     private float[]? _hrtfOnePlace;
 
     /// <summary>The ears' mean power per band from <paramref name="dir"/>, measured once a direction. A
-    /// measurement is a millisecond or two of the game thread, so at most one is made every
-    /// <see cref="HrtfMeasureSeconds"/>: getting into a car asks for nine at once. False when this one
-    /// has to wait its turn.</summary>
+    /// measurement is a millisecond or two of the game thread and getting into a car asks for nine, so
+    /// at most one every <see cref="HrtfMeasureSeconds"/>; false when this one must wait its turn.</summary>
     private bool HrtfBandsAt(Vector3 dir, out float[]? db)
     {
         var key = ((int)MathF.Round(dir.X * 50f), (int)MathF.Round(dir.Y * 50f), (int)MathF.Round(dir.Z * 50f));
@@ -4706,9 +3906,9 @@ public partial class FmodAudioProvider : IAudioProvider
     private const double HrtfMeasureSeconds = 0.01;
 
     /// <summary>
-    /// Works out, when the direction it is played from has moved by more than a couple of degrees, the
-    /// equaliser that takes a cabin path's HRTF colouring back to the one interior voice's (a little
-    /// ahead and below, CabinPaths.OnePlace), and puts it on the path's binaural stage.
+    /// The equaliser that takes a cabin path's HRTF colouring back to the one interior voice's (a little
+    /// ahead and below, CabinPaths.OnePlace), on the path's binaural stage; redone when the path's
+    /// direction moves more than two degrees.
     /// </summary>
     private void CabinTrim(ActiveSound active, Vector3 dir)
     {
@@ -4721,12 +3921,16 @@ public partial class FmodAudioProvider : IAudioProvider
         if (_hrtfOnePlace == null || here == null) return;
         Span<float> trim = stackalloc float[here.Length];
         for (int k = 0; k < trim.Length; k++) trim[k] = Math.Clamp(_hrtfOnePlace[k] - here[k], -12f, 12f);
-        // On the binaural stage, after the room's send: the HRTF colours only what reaches the ears
-        // directly, and the cabin's response is fed what the path really is. Put on the path itself, it
-        // took the low end's correction off the send too, and the cabin's boom fell 1-2 dB.
+        // On the binaural stage, after the room's send: on the path itself it took the correction off
+        // the send too, and the cabin's boom fell 1-2 dB.
         if (active.SaState != null) active.SaState.PreEq = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.Design(trim, MixerQuality.MixerRate);
     }
 
+    /// <summary>
+    /// The listener in the frame a machine's parts are placed in (x across, y up, z forward, origin at
+    /// the emitter). Forward is the emitter's Direction (an engine's heading), else the way it moves;
+    /// false for a machine standing still with no heading.
+    /// </summary>
     private bool ListenerInMachineFrame(Vector3 position, Vector3 direction, Vector3 velocity, out Vector3 local)
     {
         Vector3 fwd = direction;
@@ -4734,8 +3938,7 @@ public partial class FmodAudioProvider : IAudioProvider
         fwd.Y = 0f;
         if (fwd.LengthSquared() < 1e-4f) { local = default; return false; }
         fwd = Vector3.Normalize(fwd);
-        // A proper rotation carries cross products, so the machine's local +x is up cross forward —
-        // the same axis Vector3.Transform(slot, rotation) puts a part's x on.
+        // +x is up × forward, the axis Vector3.Transform(slot, rotation) puts a part's x on.
         Vector3 right = Vector3.Cross(Vector3.UnitY, fwd);
         Vector3 d = _listenerPos - position;
         local = new Vector3(Vector3.Dot(d, right), d.Y, Vector3.Dot(d, fwd));
@@ -4826,9 +4029,8 @@ public partial class FmodAudioProvider : IAudioProvider
         if (!_isInitialized) return;
         _listenerPos = position; _listenerRot = rotation; _listenerVel = velocity; _listenerRegionId = regionId;
 
-        // Every ambisonic bed is rotated by this on the mixer thread. It is the whole reason the beds
-        // are ambisonic rather than binaural recordings: the field stays fixed in the world and the
-        // listener's frame of reference turns underneath it.
+        // Every ambisonic bed is rotated by this on the mixer thread: the field stays fixed in the
+        // world while the listener turns, which is why the beds are ambisonic.
         if (_ambientBeds.Count > 0)
         {
             var frame = Phonon.ListenerFrame(rotation);
@@ -4848,13 +4050,11 @@ public partial class FmodAudioProvider : IAudioProvider
 
     public void UpdateShelter(float shelterFactor) => _shelterFactor = shelterFactor;
 
-    // The blanket muffle on outdoor sounds inside an enclosure (InsulationFactor, shelter x 40 dB off
-    // the top) is retired, 2026-09-30: it did not know about doors — "I open the door but I don't hear
-    // the outside world flow inside" — and it counted the walls twice on top of Steam Audio's
-    // transmission. Door leaves are geometry where they are now (AsyncAcousticWorker
-    // .RebuildSceneIfNeeded) and walls lose their full mass-law figure (SteamAudioScene.MaterialIndex).
-    // Rain and wind keep the sky-ray shelter, which is what it measures.
+    // No blanket muffle on outdoor sounds inside an enclosure (retired 2026-09-30: it ignored doors,
+    // "I open the door but I don't hear the outside world flow inside", and counted the walls twice).
+    // Door leaves and walls are in the geometry; only rain and wind keep the sky-ray shelter.
 
+    /// <summary>The listener's vehicle body against everything outside it, dB per band.</summary>
     private float _enclosureLowDb, _enclosureMidDb, _enclosureHighDb;
     public void SetListenerEnclosure(float lowDb, float midDb, float highDb)
     {
@@ -4862,13 +4062,8 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
-    /// Hands the mixer what the space immediately around the listener's head looks like: one probe per
-    /// direction, each with the distance to whatever is there and what it is made of.
-    ///
-    /// This replaced a single "distance to the nearest wall" scalar, which could only ever produce one
-    /// undifferentiated colouration — a ceiling a metre up and a wall thirty centimetres to the left
-    /// sounded the same, and turning your head changed nothing. Each probe now becomes its own
-    /// reflection, with its own delay, its own damping and its own place between the ears.
+    /// Hands the mixer the space round the listener's head: one probe per direction, each its own
+    /// reflection with its own delay, damping and place between the ears.
     /// </summary>
     public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes)
     {
@@ -4886,16 +4081,13 @@ public partial class FmodAudioProvider : IAudioProvider
             if (live[i]) total += Math.Max(Math.Abs(taps[i].GainL), Math.Abs(taps[i].GainR));
         }
 
-        // A tight hard-walled space can put a surface in every direction at once. Each reflection is
-        // individually right, but six of them summed onto the master would swamp the direct sound and
-        // ride the limiter. Scale the set back together rather than clipping it — the RATIOS between
-        // the surfaces are the cue, and they survive.
+        // A tight hard space puts a surface in every direction, and six summed swamp the direct sound:
+        // the set is scaled back together, keeping the ratios between surfaces, which are the cue.
         float trim = total > AcousticConstants.MaxBoundaryReflectionSum
             ? AcousticConstants.MaxBoundaryReflectionSum / total
             : 1f;
-        // These are reflections too — the nearest walls and the ceiling, copies of the WHOLE mix — on
-        // top of the walls QueueEarlyEchoes already places (in flat 01F, a -9 dB copy of every sound
-        // off the ceiling 6 ms late). The copies level governs them like every other copy.
+        // Copies of the whole mix, on top of QueueEarlyEchoes' walls (in flat 01F, a -9 dB copy of
+        // every sound off the ceiling 6 ms late): the copies trim governs them too.
         trim *= CopiesTrim;
 
         for (int i = 0; i < BoundaryVoiceState.MaxTaps; i++)
@@ -4910,28 +4102,23 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             else
             {
-                // Silence it rather than detaching it: the mixer glides the gain down, so a surface
-                // leaving probe range fades out instead of being cut off.
+                // Silenced, not detached: the mixer glides it out.
                 s.TargetGainL[i] = 0f;
                 s.TargetGainR[i] = 0f;
             }
         }
     }
 
-    /// <summary>Diagnostics (AudioLab): the loudest boundary reflection currently being rendered.</summary>
-    internal float BoundaryReflectionLevel => _boundaryState?.LoudestGain ?? 0f;
-
     /// <summary>
-    /// Starts an ambisonic ambience bed, or re-aims an already-playing one at a new level.
-    ///
-    /// The file must be a full-sphere ambisonic recording — 4 channels for first order, 9 for second,
-    /// 16 for third. A stereo file is not ambisonics and is refused rather than played as if it were,
-    /// because the failure would otherwise be a soundfield pointing in an arbitrary direction with
-    /// nothing to say so.
+    /// Starts an ambisonic ambience bed, or re-aims a playing one at a new level. Only a full-sphere
+    /// recording (4, 9 or 16 channels) is taken: anything else would play as a soundfield pointing
+    /// anywhere, with nothing to say so.
     /// </summary>
-    /// <param name="soundId">Path under ASSETS/SOUNDS, as everywhere else.</param>
-    /// <param name="layout">The file's channel layout. AmbiX unless you know otherwise; see
+    /// <param name="soundId">Path under ASSETS/SOUNDS.</param>
+    /// <param name="layout">The file's channel layout, AmbiX unless known otherwise; see
     /// <see cref="AmbisonicFormat"/> for why guessing wrong is silently awful.</param>
+    /// <param name="volume">The level the bed glides to.</param>
+    /// <param name="loop">Whether it loops.</param>
     public bool PlayAmbientBed(string soundId, AmbisonicLayout layout, float volume, bool loop = true)
     {
         if (!_isInitialized) return false;
@@ -4964,7 +4151,7 @@ public partial class FmodAudioProvider : IAudioProvider
             return false;
         }
 
-        // Convert ONCE, on the copy this bed will play, rather than per block on the mixer thread.
+        // Converted once, on the bed's own copy, not per block on the mixer thread.
         var converted = new float[pcm.Length];
         Array.Copy(pcm, converted, pcm.Length);
         AmbisonicFormat.ConvertToN3d(converted, channels, layout);
@@ -5025,8 +4212,7 @@ public partial class FmodAudioProvider : IAudioProvider
         return true;
     }
 
-    /// <summary>Fades a bed out and frees it. Fading rather than cutting, because an ambience that
-    /// stops dead is the one thing more noticeable than one that never started.</summary>
+    /// <summary>Stops a bed and frees it, at once: there is no fade here.</summary>
     public void StopAmbientBed(string soundId)
     {
         if (!_ambientBeds.TryGetValue(soundId, out var bed)) return;
@@ -5037,40 +4223,6 @@ public partial class FmodAudioProvider : IAudioProvider
         ReleaseBedResources(bed.State, bed.Handle);
     }
 
-    /// <summary>Sets the level a bed glides toward. Two beds and two levels is a cross-fade.</summary>
-    public void SetAmbientBedVolume(string soundId, float volume)
-    {
-        if (_ambientBeds.TryGetValue(soundId, out var bed)) bed.State.TargetVolume = volume;
-    }
-
-    /// <summary>Diagnostics (AudioLab): the ear levels a bed most recently decoded to.</summary>
-    internal bool TryGetAmbientBedLevels(string soundId, out float rmsL, out float rmsR)
-    {
-        rmsL = 0f; rmsR = 0f;
-        if (!_ambientBeds.TryGetValue(soundId, out var bed)) return false;
-        rmsL = bed.State.LastRmsL;
-        rmsR = bed.State.LastRmsR;
-        return true;
-    }
-
-    /// <summary>Diagnostics (AudioLab): why a bed is silent, which is otherwise unknowable from outside
-    /// the mixer thread.</summary>
-    internal string DescribeAmbientBed(string soundId)
-    {
-        if (!_ambientBeds.TryGetValue(soundId, out var bed)) return "no such bed";
-        var s = bed.State;
-        string bail = s.Bailed switch
-        {
-            0 => "none",
-            1 => $"BLOCK LENGTH {s.LastBlockLength} != effect frame size {s.FrameSize}",
-            2 => "decode effect is null",
-            _ => "no PCM"
-        };
-        return $"callbacks={s.CallbackCount} inputRms={s.InputRms:F5} block={s.LastBlockLength} outCh={s.LastOutChannels} " +
-               $"frames={(s.Channels > 0 ? s.Pcm.Length / s.Channels : 0)} pos={s.Position:F0} " +
-               $"produced={s.ProducedAudio} bail={bail}";
-    }
-
     private void ReleaseBedResources(AmbisonicBedState state, System.Runtime.InteropServices.GCHandle handle)
     {
         if (state.Effect != IntPtr.Zero) Phonon.iplAmbisonicsDecodeEffectRelease(ref state.Effect);
@@ -5079,8 +4231,8 @@ public partial class FmodAudioProvider : IAudioProvider
         if (handle.IsAllocated) handle.Free();
     }
 
-    // --- Active-voice bookkeeping. Every mutation of _activeSounds goes through these so the index and the
-    // list cannot drift apart. All of them assume _lock is already held.
+    // Every change to _activeSounds goes through these, so the index and the list cannot drift apart.
+    // All assume _lock is held.
     private void AddActive(ActiveSound sound)
     {
         _activeSounds.Add(sound);
@@ -5103,19 +4255,12 @@ public partial class FmodAudioProvider : IAudioProvider
         DeindexActive(sound);
     }
 
-    /// <summary>The voice an entity's per-frame update should drive, or null. O(1).</summary>
+    /// <summary>The voice an entity's per-frame update drives, or null.</summary>
     private ActiveSound? FindActive(int entityId) =>
         _activeById.TryGetValue(entityId, out var voices) && voices.Count > 0 ? voices[0] : null;
 
-    /// <summary>
-    /// Asks a live engine voice to fade out, and reports whether it has finished.
-    ///
-    /// Returns true when the voice is silent and safe to stop — or when there is no such voice, so a
-    /// caller can treat "gone" and "never existed" the same way. A synthesized engine has no
-    /// zero-crossing to be stopped on, so stopping one without this is a step in the waveform.
-    /// </summary>
-    /// <summary>Restarts the loudness meter's integration, so a measurement can be taken per
-    /// condition rather than averaged across a whole session.</summary>
+    /// <summary>Restarts the loudness meter's integration, to measure per condition rather than per
+    /// session.</summary>
     public void ResetLoudnessMeter()
     {
         if (!_loudnessMeter.hasHandle()) return;
@@ -5123,7 +4268,7 @@ public partial class FmodAudioProvider : IAudioProvider
         _loudnessMeter.setParameterInt(0, 1);
     }
 
-    /// <summary>Brings a live engine voice back to full after a fade-out was started. Idempotent.</summary>
+    /// <summary>Whether an engine voice's vehicle has its doors open.</summary>
     public bool EngineDoorsOpen(int entityId)
     {
         lock (_lock) return FindActive(entityId)?.EngineState?.DoorsOpen ?? false;
@@ -5159,15 +4304,13 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
+    /// <summary>Brings an engine or machine voice back to full after a fade-out was started. Idempotent.</summary>
     public void ReviveEngine(int entityId)
     {
         lock (_lock)
         {
             var active = FindActive(entityId);
-            // A standing machine fades and revives by exactly the same rules, and for exactly the
-            // same reason: there is no zero-crossing to stop a running synthesiser at. Answering
-            // both here rather than adding a parallel pair of calls keeps "this voice is wanted
-            // again" one question with one answer.
+            // A standing machine fades and revives by the same rules: one question, one answer.
             active?.EngineState?.Revive();
             active?.MachineState?.Revive();
         }
@@ -5196,20 +4339,22 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
+    /// <summary>
+    /// Asks a live engine, machine or tap voice to fade out; true once it is silent and safe to stop,
+    /// or when there is no such voice. A synthesised voice has no zero-crossing to stop on, so stopping
+    /// one without this is a step in the waveform.
+    /// </summary>
     public bool FadeOutEngine(int entityId)
     {
         lock (_lock)
         {
             var active = FindActive(entityId);
-            // A machine's second outlet retires by the same call, because it is the same question:
-            // this voice is no longer wanted, fade it and tell me when it is safe to stop.
             var tap = active?.TapState;
             if (tap != null)
             {
                 tap.TargetGain = 0f;
-                // Handed back at the moment the fade STARTS, so the two crossfade rather than
-                // leaving a hole: the voice that stays gains the front tap (or the cabin path) over
-                // the same sixty milliseconds this one loses it.
+                // Handed back as the fade starts, so the voice that stays gains the share over the
+                // same sixty milliseconds this one loses it.
                 tap.HandBack();
                 return tap.FadedOut;
             }
@@ -5239,17 +4384,6 @@ public partial class FmodAudioProvider : IAudioProvider
     }
     
     public bool IsPlaying(int entityId) { lock (_lock) return _activeById.ContainsKey(entityId); }
-    public float GetPlaybackProgress(int entityId) { 
-        lock (_lock) { 
-            var sound = FindActive(entityId); 
-            if (sound == null) return 0f; 
-            sound.Channel.getCurrentSound(out var fmodSound); 
-            if (!fmodSound.hasHandle()) return 0f; 
-            fmodSound.getLength(out uint len, TIMEUNIT.MS); 
-            sound.Channel.getPosition(out uint pos, TIMEUNIT.MS); 
-            return (len == 0) ? 0f : (float)pos / len; 
-        } 
-    }
     public IEnumerable<int> GetActiveSpatialSoundIds() { lock(_lock) return new List<int>(_activeById.Keys); }
     public Vector3 GetSoundPosition(int entityId) { lock(_lock) return FindActive(entityId)?.Position ?? Vector3.Zero; }
 
@@ -5263,18 +4397,14 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         if (!_isInitialized) return;
 
-        // Try preloading as a granular sound first
         _granularBank.TryGetPcmData(soundId, out _, out _, out _);
 
-        // Also preload as a standard FMOD sound. This is exactly what makes the deferred-play path rare:
-        // the NONBLOCKING decode is started here, long before anything asks to hear it.
+        // The nonblocking decode starts here, long before anything asks to hear it: why deferred plays are rare.
         _resources.TryGetSound(soundId, out _, false);
     }
 
-    /// <summary>
-    /// Registers a synthesised buffer under an id, so an ordinary emitter naming that id plays it
-    /// with the full acoustic treatment. Returns false if the audio engine is not up.
-    /// </summary>
+    /// <summary>Registers a synthesised buffer under an id, for an ordinary emitter to play with the full
+    /// acoustic treatment. False if the audio engine is not up.</summary>
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
         => _isInitialized && _resources.RegisterPcm(soundId, pcm16Mono, sampleRate);
 
@@ -5284,9 +4414,8 @@ public partial class FmodAudioProvider : IAudioProvider
     public bool RegisterSynthesisedSoundFloat(string soundId, float[] pcm, int sampleRate)
         => _isInitialized && _resources.RegisterPcmFloat(soundId, pcm, sampleRate);
 
-    /// <summary>Interface sounds, made once and kept. Releasing an FMOD sound stops every channel
-    /// playing it, so a sound created, played and released at once is cut off almost before it
-    /// starts. These are never released until shutdown.</summary>
+    /// <summary>Interface sounds, made once and kept until shutdown: releasing an FMOD sound stops every
+    /// channel playing it.</summary>
     private readonly Dictionary<string, FMOD.Sound> _uiSounds = new();
 
     /// <summary>The group interface sounds play in, under the master.</summary>
@@ -5299,12 +4428,8 @@ public partial class FmodAudioProvider : IAudioProvider
     /// the inverse, and that has to stay finite.</summary>
     public const float WorldFadeFloor = 1e-3f;
 
-    /// <summary>
-    /// Fades everything heard in the world — voices, rooms, echoes — and not the interface sounds.
-    ///
-    /// Every group ends at the master, so the fade is the master's level. The interface group is
-    /// lifted by the inverse so a menu tick or the arrival chord plays at its own level throughout.
-    /// </summary>
+    /// <summary>Fades everything heard in the world, not the interface: the fade is the master's level,
+    /// and the interface group is lifted by the inverse.</summary>
     public void SetWorldFade(float gain)
     {
         if (!_isInitialized) return;
@@ -5314,10 +4439,8 @@ public partial class FmodAudioProvider : IAudioProvider
         if (_uiGroup.hasHandle()) _uiGroup.setVolume(1f / g);
     }
 
-    /// <summary>
-    /// The voices reaching the listener loudest, by the volume last applied times the strongest band
-    /// the EQ lets through. Diagnostic: "why can I still hear that" needs the route and the numbers.
-    /// </summary>
+    /// <summary>The voices reaching the listener loudest, by the volume last applied and the strongest
+    /// band the EQ lets through. Diagnostic: "why can I still hear that".</summary>
     public IReadOnlyList<VoiceLevel> LoudestVoices(int count)
     {
         var all = new List<VoiceLevel>();
@@ -5327,8 +4450,7 @@ public partial class FmodAudioProvider : IAudioProvider
             {
                 if (!a.Channel.hasHandle() || a.LastVolume <= 0f) continue;
                 float dist = Vector3.Distance(_listenerPos, a.CurrentApparentPosition);
-                // A voice without a Steam Audio state is panned by FMOD, which applies the distance
-                // law itself; LastVolume holds it only for the Steam Audio voices.
+                // FMOD applies the law to a voice it pans; LastVolume holds it only for binaural ones.
                 float law = a.SaState != null ? 1f : Loudness.RenderedGain(1f, a.MinDistance, a.Range, dist);
                 float db = 20f * MathF.Log10(MathF.Max(1e-9f, a.LastVolume * law));
                 var eq = a.LastEqDb;
@@ -5360,11 +4482,8 @@ public partial class FmodAudioProvider : IAudioProvider
         return names;
     }
 
-    // ── The microphone ───────────────────────────────────────────────────────────────────────
-    //
-    // FMOD records as well as plays, on every platform it runs on, and Settings already lists the
-    // input devices by FMOD's names — so the Linux head's voice chat comes from here rather than
-    // from a second audio library. One second of looping buffer, read as the record cursor moves.
+    // The microphone, for the Linux head's voice chat: FMOD records too, and Settings lists its device
+    // names. One second of looping buffer, read as the record cursor moves.
 
     private readonly object _recLock = new();
     private FMOD.Sound _recSound;
@@ -5530,8 +4649,8 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>The interface loops playing now, by slot: the channel and the loop it is playing.</summary>
     private readonly Dictionary<string, (FMOD.Channel Channel, string Id)> _uiLoops = new();
 
-    /// <summary>How long an interface loop takes to fade in or out, seconds: long enough not to click,
-    /// short enough that the guidance tone answers the aim at once.</summary>
+    /// <summary>An interface loop's fade in or out, seconds: no click, and the guidance tone still
+    /// answers the aim at once.</summary>
     private const float UiLoopFadeSeconds = 0.02f;
 
     public void SetUiLoop(string slot, string id, Func<float[]> render, int sampleRate, float volume, float pitch)
@@ -5571,8 +4690,7 @@ public partial class FmodAudioProvider : IAudioProvider
             channel.setLoopCount(-1);
             channel.setVolume(volume);
             channel.setPitch(pitch);
-            // Faded in on the parent's clock (the channel's own is not running yet; see the voice
-            // start above for what reading the wrong clock did).
+            // On the parent's clock: the channel's own is not running yet (see PlaySpatialSound).
             channel.getDSPClock(out _, out ulong start);
             _system.getSoftwareFormat(out int rate, out _, out _);
             channel.addFadePoint(start, 0f);
@@ -5603,9 +4721,8 @@ public partial class FmodAudioProvider : IAudioProvider
         channel.setDelay(0, end, true);
     }
 
-    // --- Step 1a diagnostic: a single isolated mono source for verifying HRTF / panning. ---
-    // Deliberately bypasses the VoiceManager and the whole acoustics layer so we test ONLY
-    // the renderer + listener path. Driven by AudioDiagnostics (`--audio-test`).
+    // One isolated mono source for checking HRTF and panning by ear, bypassing the voice manager and
+    // the acoustics. Driven by AudioDiagnostics (`--audio-test`).
     private FMOD.Channel _diagChannel;
     private FMOD.Sound _diagSound;
     private byte[]? _diagPcm;
@@ -5615,8 +4732,7 @@ public partial class FmodAudioProvider : IAudioProvider
         if (!_isInitialized) return;
         StopDiagnosticSound();
 
-        // 1 second mono loop, at the mixer's rate, of short broadband noise bursts. Broadband transients
-        // localize far better than pure tones, so HRTF / panning cues are unmistakable.
+        // A one-second loop of broadband noise bursts: transients localise far better than tones.
         int sampleRate = MixerQuality.MixerRate;
         int numSamples = sampleRate;
         _diagPcm = new byte[numSamples * 2];
@@ -5642,16 +4758,14 @@ public partial class FmodAudioProvider : IAudioProvider
             format = SOUND_FORMAT.PCM16
         };
 
-        // OPENRAW is required for headerless PCM in memory; OPENMEMORY alone would make FMOD
-        // try to parse a (non-existent) file header. (The existing voice/beep paths omit OPENRAW
-        // and are likely silently broken — out of scope here, flagged for the cleanup pass.)
+        // OPENRAW: headerless PCM in memory.
         if (!FmodCheck(_system.createSound(_diagPcm, MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | Rolloff.Mode | MODE.LOOP_NORMAL, ref info, out _diagSound), "createSound(diagnostic)"))
             return;
         if (!FmodCheck(_system.playSound(_diagSound, default, true, out _diagChannel), "playSound(diagnostic)"))
             return;
 
         _diagChannel.setMode(MODE._3D | Rolloff.Mode | MODE.LOOP_NORMAL);
-        _diagChannel.set3DLevel(1.0f); // fully spatialized, no 2D blend
+        _diagChannel.set3DLevel(1.0f);
         _diagChannel.set3DMinMaxDistance(1.0f, 100.0f);
         _diagChannel.setVolume(1.0f);
         var origin = new FMOD.VECTOR { x = 0, y = 0, z = 3 };
@@ -5689,9 +4803,7 @@ public partial class FmodAudioProvider : IAudioProvider
             foreach (var id in new List<string>(_ambientBeds.Keys)) StopAmbientBed(id);
             if (_earWindChannel.hasHandle()) _earWindChannel.stop();
             if (_earWindDsp.hasHandle()) _earWindDsp.release();
-            // The three units on the MASTER GROUP come off it before they are freed, for the same
-            // reason the reverb units do: FMOD refuses to release an attached unit, so releasing
-            // them where they stood freed none of them and left the assertion at close.
+            // The master's units come off before they are freed: FMOD refuses to release an attached unit.
             _system.getMasterChannelGroup(out var masterOut);
             if (masterOut.hasHandle())
             {
@@ -5709,10 +4821,9 @@ public partial class FmodAudioProvider : IAudioProvider
         } 
         StopDiagnosticSound();
 
-        // The FMOD side first, then close, then what the callbacks read. A released DSP can still be
-        // mid-callback until the mixer next syncs, and Steam Audio's buffers and effects are native:
-        // freeing one under a running callback is a crash no guard catches. close() stops the mixer
-        // thread, so after it nothing can be in flight.
+        // The FMOD side, then close, then what the callbacks read: a released DSP can be mid-callback
+        // until the mixer syncs, and native memory freed under it is a crash no guard catches.
+        // close() stops the mixer thread.
         if (_steamAudioEnabled)
             foreach (var v in _saAllVoices)
                 if (v.Dsp.hasHandle()) v.Dsp.release();

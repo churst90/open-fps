@@ -1,27 +1,14 @@
-using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
-/// Turns on FMOD'S OWN logging, which is a drop-in library away and was not used for three sessions.
-///
-/// `libfmodL.so` ships next to `libfmod.so` in the SDK. It validates every call and NAMES what is
-/// wrong — the handle that was stale, the object that was still connected, the thread it happened
-/// on — where the ordinary build simply faults and leaves a core file to be read by hand.
-///
-/// Two things about it are easy to get wrong and both cost a run:
-///
-/// 1. **It must be armed BEFORE System::create.** After that it does nothing at all. So this is
-///    called from a program's entry point, not from the audio provider.
-/// 2. **FMOD's own FILE mode BUFFERS.** The first attempt at this produced a zero-byte log from a
-///    run that ended in SIGSEGV, which is indistinguishable from FMOD having found nothing wrong.
-///    Every line goes through the callback below and is flushed to disk immediately instead.
-///
-/// `RESULT.OK` back from Initialize means the logging build is loaded. `ERR_UNSUPPORTED` means the
-/// ordinary one is, and nothing will be written — that is how to tell the swap worked.
+/// FMOD's own logging, from its validating build (`libfmodL.so`), which names the stale handle or the
+/// still-connected unit where the ordinary build only faults. Armed before System::create or it does
+/// nothing, so from a program's entry point; written through the callback, flushed per line, because
+/// FMOD's file mode buffers and left a zero-byte log from a run that ended in SIGSEGV. See
+/// docs/THE_MIXER_THREAD_CRASH.md, "FMOD ships a validating build".
 /// </summary>
 public static class FmodDebugLog
 {
@@ -30,9 +17,9 @@ public static class FmodDebugLog
     private static readonly object _gate = new();
 
     /// <summary>
-    /// Arms FMOD debug logging if OPENFPS_FMOD_DEBUG is set. Returns a line describing what happened,
-    /// or null if the variable was not set. "all" adds FMOD's own trace, which is enormous —
-    /// eleven thousand lines in a forty-second run — and is what you want when a crash is seconds away.
+    /// Arms FMOD debug logging if OPENFPS_FMOD_DEBUG is set, and says what happened (null if not set).
+    /// "all" adds FMOD's trace: eleven thousand lines in a forty-second run, for a crash seconds away.
+    /// RESULT.OK means the logging build is loaded; ERR_UNSUPPORTED means the ordinary one is.
     /// </summary>
     public static string? ArmFromEnvironment()
     {
@@ -53,10 +40,8 @@ public static class FmodDebugLog
     }
 
     /// <summary>
-    /// A diagnostic that marshals strings and flushes a file from inside an FMOD thread — possibly
-    /// the mixer thread — which is precisely what the rest of this codebase forbids. It is acceptable
-    /// in this one place because the alternative is another session spent reading page-fault
-    /// addresses out of core files, and because nothing arms it unless someone asked for it.
+    /// Marshals strings and flushes a file on an FMOD thread, possibly the mixer's, which everything
+    /// else here forbids: accepted for a diagnostic that nothing arms unless asked.
     /// </summary>
     private static FMOD.RESULT Write(FMOD.DEBUG_FLAGS flags, IntPtr file, int line, IntPtr func, IntPtr message)
     {

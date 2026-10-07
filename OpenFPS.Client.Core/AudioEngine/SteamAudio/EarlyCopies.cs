@@ -1,39 +1,21 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// The early energy of the place you stand in that the placed copies already carry, worked out from
-/// where the listener is, so the traced response can play the rest of it from the first reflection
-/// on without counting any of it twice.
+/// The early energy of the place you stand in that the placed copies already carry, so the traced
+/// response can play the rest from the first reflection on without counting any of it twice. Starting
+/// the trace at 50 ms left a gap after the copies (Cody, 2026-10-03: "a delay between when I clap and
+/// when I hear the reflections"); see changes.md, "The room answers from its first reflection".
 ///
-/// Why. The traced response used to start at 50 ms, faded in to 100, with the first 80 ms left to the
-/// placed copies (WorldAudioPlayer.QueueEarlyEchoes). Those are a few discrete reflections: the walls
-/// and the ceiling once, four second orders. Everything else that arrives in a room's first 50 ms
-/// was missing: a clap in flat 01F was the clap, a few clicks, then nothing from 26 to 46 ms, then the
-/// reverb building to a plateau at 70 ms (Cody, 2026-10-03: "a delay between when I clap and when I
-/// hear the reflections").
-///
-/// How. Steam Audio's trace cannot be split into its specular and its scattered paths, and it has no
-/// discrete peaks to gate: it is noise under an energy histogram of 10 ms bins (--early-tail: a lone
-/// floor 6 m down answers from exactly 30 ms for a 35 ms arrival, and a lone floor's answer spreads
-/// over 0-28 ms for a 10 ms one). So the copies are taken out as ENERGY: each copy's energy, band by
-/// band, from the frames the trace put it in, from the start of its bin for <see cref="ReachSeconds"/>,
-/// the same share of each, never more than the trace has there. The trace keeps the rest. This is what the hybrid room models do (image sources for the low-order specular paths,
-/// rays for the rest, with those paths left out of the rays), done after the fact because the rays
-/// are not ours. A copy and the trace then never both carry the same energy: where the trace has
-/// less than the copies (it does in flat 01F's first 20 ms, by about 0.4 dB), it plays nothing there.
-///
-/// What a copy carries is what the room plan places (WorldAudioPlayer.PlanRoomEchoes) for a sound
-/// at the listener, which is what the trace stands for: a first-order surface all it returns (its
-/// mirror share as the copy, its scattered share as the wash beside it), the floor all it returns
-/// (the voice's own ground reflection), a second order its mirror share. And nothing arrives before
-/// the nearest surface's reflection: what the trace's first bin holds before then is moved to it.
+/// Steam Audio's trace is noise under an energy histogram of 10 ms bins, with no specular peaks to
+/// gate, so the copies come out as energy: each copy's, band by band, the same share of every frame
+/// within <see cref="ReachSeconds"/> of its bin's start, never more than the trace has there (the
+/// hybrid room models' split, done after the fact). What a copy carries is what
+/// WorldAudioPlayer.PlanRoomEchoes places for a sound at the listener. Nothing arrives before the
+/// nearest surface's reflection: the trace's energy before it is moved to it.
 /// </summary>
 internal sealed class EarlyCopies
 {
@@ -68,7 +50,7 @@ internal sealed class EarlyCopies
     {
         if (solids.Count == 0) return null;
         float c = AudioPhysics.CurrentSpeedOfSound;
-        // A sound AT the listener: the search wants the two a little apart.
+        // A sound at the listener: the search wants the two a little apart.
         var src = listener + new Vector3(0f, 0f, 0.01f);
         float direct = Vector3.Distance(src, listener);
         var found = new List<EarlyReflections.Arrival>();
@@ -173,8 +155,7 @@ internal sealed class EarlyCopies
             int f0 = Math.Min(frames - 1, from / frame), f1 = Math.Min(frames - 1, (from + reach) / frame);
             for (int b = 0; b < bands; b++)
             {
-                // The same share of every frame in reach: the trace's own envelope there is its best
-                // guess of when the energy arrives, so it keeps its shape, only less of it. Taken from
+                // The same share of every frame in reach, so the trace keeps its envelope: taken from
                 // the first frames on, the copies dug a hole where they ran out of reach.
                 double have = 0;
                 for (int f = f0; f <= f1; f++) have += e[b * frames + f];

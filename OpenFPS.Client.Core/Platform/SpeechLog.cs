@@ -1,9 +1,8 @@
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
-/// The session's speech, passed straight through, remembering the last line it was given. The turn
-/// narration uses it to cut off only ITS OWN line when you turn again: if anything else has been said
-/// since, that is what is talking, and it is left alone.
+/// The session's speech, passed through, remembering the last line. The turn narration cuts off only
+/// its own line when you turn again; anything said since is left alone.
 /// </summary>
 public sealed class SpeechLog : ISpeechOutput
 {

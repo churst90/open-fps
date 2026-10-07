@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Engine;
@@ -8,33 +6,17 @@ using OpenFPS.Client.AudioEngine.Core.Signals;
 namespace OpenFPS.Client.AudioEngine.Core.Rail;
 
 /// <summary>
-/// The front end of a steam locomotive: what happens between the cylinders and the top of the
-/// chimney, plus everything else the machine leaks and clanks.
+/// The front end of a steam locomotive: from the cylinders to the top of the chimney, and what the
+/// machine leaks and clanks.
 ///
-/// THE CHUFF IS A JET, not a drum. When the piston reaches the end of its stroke the exhaust valve
-/// opens on a cylinder still holding a couple of bar, and that cylinder empties up the blast pipe
-/// and out of a nozzle about a hand's breadth across, at the speed of sound in steam. So it is
-/// Lighthill's eighth power like any other jet — which is exactly why an engine working hard is a
-/// cannon and the same engine drifting is nearly silent, and why the difference is not a volume
-/// control but the exhaust pressure. Each burst decays as the cylinder empties, and how fast that is
-/// is the cylinder's volume divided by the nozzle area times the speed of sound: about thirty
-/// milliseconds for a big engine, which is what makes a chuff a chuff.
-///
-/// THE BARK IS THE CHIMNEY. The burst goes out through a pipe open at both ends, so it is shaped by
-/// the resonances of c/2L of the stack — two hundred hertz for a metre of chimney. A short wide
-/// stack barks; a tall narrow one rings. Nothing else in this file decides the pitch of the exhaust.
-///
-/// THE RATE IS GEOMETRY. Two cylinders, each double-acting, means four beats per turn of the
-/// drivers, and the drivers turn at the road speed over their circumference. A 1.85 m wheel at 25
-/// m/s turns 4.3 times a second, so it barks seventeen times a second — fast enough that the beats
-/// have run together into a roar, which is what a big engine at speed really sounds like and not
-/// what anybody expects. At walking pace the same engine gives you the four separate beats. And
-/// because no valve gear was ever square, the four are not evenly spaced: the limp in the beat is
-/// ValveSettingError and it is the difference between a locomotive and a metronome.
-///
-/// AND IT IS NEVER QUIET. The blower, the glands, the injector overflow and every joint in it hiss
-/// continuously — a steam engine standing still is a loud machine — and the rods, crossheads and
-/// axleboxes all have play in them and clank once a revolution.
+/// The chuff is a jet: a cylinder still at a couple of bar empties up the blast pipe at the speed of
+/// sound in steam, so Lighthill's eighth power makes a working engine a cannon and a drifting one
+/// nearly silent. Each burst decays as the cylinder volume over nozzle area times sound speed, about
+/// thirty milliseconds for a big engine. The chimney, open at both ends, shapes it at c/2L of the
+/// stack (two hundred hertz for a metre): the bark. Two double-acting cylinders beat four times a
+/// turn of the drivers, so a 1.85 m wheel at 25 m/s barks seventeen times a second, run into a roar;
+/// at walking pace the beats are separate, and unevenly spaced (ValveSettingError). The blower,
+/// glands and joints hiss continuously, and the rods clank once a revolution each side.
 /// </summary>
 public sealed class SteamFrontEnd
 {
@@ -68,9 +50,6 @@ public sealed class SteamFrontEnd
     /// with the exhaust.</summary>
     public bool SafetyValve { get; set; }
 
-    public float ChuffHz { get; private set; }
-    public float StackHz => _s.StackHz;
-
     public SteamFrontEnd(SteamLocoSpec s, float rate, int seed)
     {
         _s = s; _rate = rate; _dt = 1f / rate; _rng = new Random(seed); _clankDecay = At44k.Decay(0.988f, rate);
@@ -90,9 +69,8 @@ public sealed class SteamFrontEnd
 
         BuildStack();
 
-        // The cylinder empties through the nozzle at the speed of sound in steam: volume over area
-        // over speed. That is the decay of one beat, and it is why a big engine's exhaust is soft
-        // and a small one's is a crack.
+        // One beat's decay: volume over nozzle area over the sound speed in steam. A big engine's
+        // exhaust is soft and a small one's a crack.
         float cylVol = MathF.PI * 0.25f * s.CylinderBoreMetres * s.CylinderBoreMetres * s.CylinderStrokeMetres;
         float nozzleArea = MathF.PI * 0.25f * s.BlastNozzleMetres * s.BlastNozzleMetres;
         _decayTau = Math.Clamp(cylVol / MathF.Max(1e-4f, nozzleArea * 480f), 0.006f, 0.12f);
@@ -118,7 +96,6 @@ public sealed class SteamFrontEnd
     public float Step(float speedMps)
     {
         float driverHz = MathF.Abs(speedMps) * MathF.Max(0.2f, Slip) / (MathF.PI * MathF.Max(0.3f, _s.DriverDiameterMetres));
-        ChuffHz = driverHz * _beatPhase.Length;
 
         double before = _rev;
         _rev += driverHz * _dt;
@@ -140,9 +117,8 @@ public sealed class SteamFrontEnd
         // The cylinder emptying.
         _env -= _env * _dt / _decayTau;
 
-        // The jet. The exhaust pressure at release is what the engine is being worked at, and the
-        // eighth power does the rest: a drifting engine's blast is forty decibels under a working
-        // one's and that is not a fader, it is the law.
+        // The pressure at release is how hard it is worked; the eighth power puts a drifting engine's
+        // blast forty decibels under a working one's.
         float effort = Math.Clamp(Effort, 0.02f, 1.2f);
         float u = 150f + 330f * effort;
         float jetLevel = JetNoise.LighthillPressure(_s.BlastNozzleMetres, u, 700f);
@@ -152,8 +128,7 @@ public sealed class SteamFrontEnd
         _jetLp1 += a * (n1 - _jetLp1); _jetLp2 += a * (_jetLp1 - _jetLp2);
         float jet = (_jetLp1 - _jetLp2) / JetNoise.BandNormaliser(a) * jetLevel;
 
-        // The draught: between beats the fire is still being pulled through, and the smokebox is
-        // still roaring. It follows the blast but never goes away while the engine is alive.
+        // The draught follows the blast but never stops: the fire is still pulled through between beats.
         _draught += ((0.18f + 0.82f * _env) - _draught) * MathF.Min(1f, 60f * _dt);
 
         float through = jet * _draught;
@@ -161,7 +136,7 @@ public sealed class SteamFrontEnd
         for (int k = 0; k < _stack.Length; k++) stack += _stack[k].Process(through) / (1f + 0.6f * k);
         float y = stack * 2.2f + through * 0.35f;
 
-        // Everything that leaks. A steam locomotive standing at a platform is not a quiet machine.
+        // Everything that leaks.
         float n3 = (float)(_rng.NextDouble() * 2 - 1);
         float la = OnePole.AlphaFor(2600f, _rate);
         _leak1 += la * (n3 - _leak1);
@@ -170,8 +145,7 @@ public sealed class SteamFrontEnd
         if (CocksOpen) leak += (_leak1 - _leak2) * 9f * _leakAmp;
         if (SafetyValve)
         {
-            // A safety valve is a choked jet through a much smaller hole than the blast nozzle, so
-            // it is far higher and far more violent than anything else on the engine.
+            // A choked jet through a much smaller hole than the blast nozzle: higher and more violent.
             float sv = JetNoise.LighthillPressure(0.045f, 480f, 460f);
             leak += (_leak1 - _leak2) * 3.5f * sv;
         }

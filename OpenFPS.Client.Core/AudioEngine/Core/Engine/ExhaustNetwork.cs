@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
@@ -11,18 +9,14 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// <see cref="ExhaustSpec"/>: one primary per cylinder into its collector, the collectors joined
 /// (or not) by the crossover, then each branch runs mid-pipe, muffler and tailpipe to an open end.
 ///
-/// A junction is not a mixer. When a wave arrives at one, part reflects back up the pipe it came from
-/// and the rest divides among the others — including back up the other primaries toward closed
-/// valves, which return it again. That cross-talk is why cylinder 3 is audible in cylinder 5's pipe,
-/// why four pipes of four lengths make a forest of resonances rather than one, and why the same
-/// engine on a cast manifold and on long-tubes is two different sounds.
+/// A junction is not a mixer: part of a wave reflects and the rest divides among the other pipes,
+/// including back up other primaries to closed valves. That cross-talk is why four pipes of four
+/// lengths make a forest of resonances, and why a cast manifold and long-tubes sound different.
 ///
-/// The muffler is not a filter either. A chambered muffler is literally what it says — the pipe
-/// opens into a can several times its area and closes again, and the transmission loss of that is
-/// the textbook expansion chamber, 10 log(1 + (m - 1/m)^2 sin^2(kL) / 4), which this reproduces from
-/// the two area steps and the delay between them. An absorptive muffler is a straight tube with
-/// packing round it, so it is a pipe with heavy frequency-dependent loss. A resonator is a neck into
-/// a closed volume. They are built from the same pipes and junctions as everything else.
+/// The muffler is not a filter either: a chambered can is two area steps and a delay, which gives the
+/// textbook expansion chamber's loss, 10 log(1 + (m - 1/m)^2 sin^2(kL) / 4); an absorptive one is a pipe
+/// with heavy frequency-dependent loss; a resonator is a neck into a closed volume. All are built from
+/// the same pipes and junctions.
 /// </summary>
 internal sealed class ExhaustNetwork
 {
@@ -41,29 +35,14 @@ internal sealed class ExhaustNetwork
     private readonly float[] _scratchA = new float[20], _scratchY = new float[20], _scratchB = new float[20];
     private readonly float _airDensity = 1.2f;
     private float _flowLossFraction;
-    private float _meanMassFlow;
     private float _tailK = 293f;
 
     /// <summary>
-    /// The turbine, sitting where it really sits: between the manifold and the downpipe.
-    ///
-    /// This is the other half of the turbo, and the model had neither half. A turbine is not a pipe
-    /// with a restriction in it — it is a bladed rotor across the whole gas path, and to a pressure
-    /// wave arriving from the cylinders it is three things at once:
-    ///
-    /// IT TAKES ENERGY OUT. That is its job. The pulse energy the exhaust would otherwise radiate is
-    /// what spins the compressor, so a turbo engine is quieter at the tailpipe than the same engine
-    /// with the turbo removed — measurably so, and it is why a "turbo" exhaust note is a RUSH where a
-    /// naturally aspirated one is a set of beats.
-    ///
-    /// IT REFLECTS. What it does not pass and does not absorb goes back up the manifold, which is why
-    /// a turbo manifold has its own strong resonances and why turbo engines are so sensitive to
-    /// manifold volume. Blocking without reflecting would leave the manifold looking like an open
-    /// end, which it is not.
-    ///
-    /// AND IT IS A LOW-PASS. The blade passages are short compared with a long wavelength, so the low
-    /// end leaks through while everything above a few hundred hertz is scattered into the rotor. That
-    /// asymmetry is most of the character: the deep part of the pulse survives and the crack does not.
+    /// The turbine, between the manifold and the downpipe: a bladed rotor across the gas path. It
+    /// takes energy out (the pulse energy spins the compressor, so a turbo note is a rush, not beats),
+    /// reflects what it neither passes nor absorbs back up the manifold (blocking without reflecting
+    /// would make the manifold an open end), and scatters the top: the low end passes, the scattering
+    /// sets in above a couple of kilohertz, where the blade passages stop being short.
     /// </summary>
     private sealed class Turbine
     {
@@ -116,16 +95,12 @@ internal sealed class ExhaustNetwork
         /// <summary>What the shell radiated this sample, pascals at one metre. Diagnostic.</summary>
         public float ShellRadiated;
 
-        /// <summary>Acoustic pressure summed over the chambers this sample — the drive. Diagnostic.</summary>
-        public float ChamberPressure;
 
         /// <summary>Where this pipe leaves the car, machine frame, relative to the exhaust part.</summary>
         public Vector3 Exit;
 
-        /// <summary>
-        /// The extra distance this pipe's sound travels to the listener, against the nearest pipe,
-        /// in samples — and the ring that delays it by that much. See <see cref="SetListener"/>.
-        /// </summary>
+        /// <summary>The ring that delays this pipe by its extra distance to the listener against the
+        /// nearest pipe, in samples. See <see cref="SetListener"/>.</summary>
         public float[] Path = Array.Empty<float>();
         public int PathAt;
         public float PathSamples, PathTarget;
@@ -158,8 +133,7 @@ internal sealed class ExhaustNetwork
                 L = _x.PrimaryLengthsMetres[c];
             else
             {
-                // Position along the bank decides the length: the pipe from the rear cylinder
-                // has further to go to a front collector, and a spread of 0 makes them equal.
+                // Position along the bank decides the length; a spread of 0 makes them equal.
                 int bank = e.Bank[c];
                 int inBank = 0, ofBank = 0;
                 for (int k = 0; k < _n; k++) if (e.Bank[k] == bank) { if (k < c) inBank++; ofBank++; }
@@ -194,17 +168,12 @@ internal sealed class ExhaustNetwork
             {
                 End = new OpenEnd(rate),
                 Jet = new JetNoise(rate, _x.TailpipeDiameterMm * 1e-3f, seed + 17 * b),
-                // A radial turbine takes about six decibels off a wave passing through it, evenly
-                // across the plane-wave range, and only scatters the top — above a couple of
-                // kilohertz, where the blade passages are no longer short against the wavelength
-                // (Tiikoja and Abom's measurements: 5-10 dB of transmission loss, significant only at
-                // very high frequencies). Half of what is stopped comes back up the manifold rather
-                // than becoming work. Not a low-pass: a 260 Hz one passing a third takes everything
-                // above the firing note of a straight-piped diesel pickup off before the pipe, and
-                // leaves the truck all rumble and turbo whine.
-                // TURBOCHARGED ONLY. A blower is belt-driven and has nothing in the exhaust at all —
-                // that is the whole difference between the two kinds of forced induction, and giving
-                // a supercharged V8 a turbine would take 17 dB off it for no reason.
+                // A radial turbine takes about 6 dB off a passing wave across the plane-wave range and
+                // scatters only above a couple of kilohertz (Tiikoja and Abom: 5-10 dB transmission
+                // loss); half of what is stopped comes back up the manifold. A 260 Hz corner passing a
+                // third left a straight-piped diesel pickup all rumble and turbo whine.
+                // Turbocharged only: a blower has nothing in the exhaust, and a turbine would take
+                // 17 dB off a supercharged V8.
                 Turbine = e.Induction == Induction.Turbocharged
                         ? new Turbine(rate, 2500f, 0.5f, 0.5f) : null,
             };
@@ -236,16 +205,14 @@ internal sealed class ExhaustNetwork
 
     private readonly CrossoverKind _crossover;
 
-    /// <summary>True when the profile places its tailpipes apart; false means one point, as before.</summary>
+    /// <summary>True when the profile places its tailpipes apart; false means one point.</summary>
     private readonly bool _hasExits;
     /// <summary>True once anyone has said where the listener is.</summary>
     private bool _listenerKnown;
 
     /// <summary>
-    /// The most a pipe's path delay may move per sample. A delay that changes is a pitch shift of
-    /// that pipe against the other, which is real — the two ends of a car passing you have slightly
-    /// different Dopplers — and on a real pass-by it stays under half a per cent. This is the cap
-    /// that keeps a game-thread jump (a car teleported, a listener respawned) from arriving as a chirp.
+    /// The most a pipe's path delay may move per sample. A real pass-by's differential Doppler stays
+    /// under half a per cent; the cap keeps a game-thread jump (a teleport, a respawn) from a chirp.
     /// </summary>
     private const float MaxPathSlew = 0.005f;
 
@@ -253,18 +220,12 @@ internal sealed class ExhaustNetwork
     /// Tells the network where the listener stands, in the machine's frame (x across, y up, z
     /// forward, origin at the exhaust part), so each tailpipe can radiate from its own place.
     ///
-    /// Not one source. Adding every branch's radiated pressure at a single point is exactly right for
-    /// a listener equidistant from every pipe — dead behind the car — and systematically wrong
-    /// everywhere else, because the components that DIFFER between banks are the ones a coherent sum
-    /// destroys. On an even-firing V10 the banks are anti-phase at the bank firing rate, so a single
-    /// sum cancels the engine's fundamental and leaves the next harmonic alone: a siren. Measured,
-    /// order 2.5 reads 12-19 dB under order 5 on the sum and level with it on one pipe.
-    ///
-    /// Each branch gets the path difference its exit implies — the extra distance to the listener
-    /// against the nearest pipe, as a delay — and the ratio of spherical spreading, which only matters
-    /// up close. In the far field on the centre line this reduces to the single sum exactly; off it the
-    /// two pipes interfere as two sources do, and on a pass-by the balance sweeps with the bearing.
-    /// Called a few hundred times a second at most; the delays slew, never step.
+    /// A single-point sum is right only dead behind the car: on an even-firing V10 the banks are
+    /// anti-phase at the bank firing rate, so the sum cancelled the fundamental and left a siren (order
+    /// 2.5 read 12-19 dB under order 5 on the sum, level with it on one pipe). Each branch gets the
+    /// delay of its extra distance to the listener against the nearest pipe, and the spreading ratio
+    /// up close; on the centre line far off this is the single sum exactly. Called a few hundred times
+    /// a second at most; the delays slew, never step.
     /// </summary>
     public void SetListener(Vector3 machineFrame)
     {
@@ -279,8 +240,7 @@ internal sealed class ExhaustNetwork
         {
             float path = Vector3.Distance(machineFrame, br.Exit);
             br.PathTarget = Math.Clamp((path - nearest) / airC * _rate, 0f, br.Path.Length - 3f);
-            // Inside a metre the pipes are separate sources at separate distances; beyond it the
-            // ratio is within a few per cent of one and not worth a discontinuity at the boundary.
+            // Beyond a metre the spreading ratio is within a few per cent of one.
             br.SpreadTarget = r > 1f ? Math.Clamp(r / MathF.Max(0.1f, path), 0.25f, 4f) : 1f;
         }
         _listenerKnown = true;
@@ -293,12 +253,9 @@ internal sealed class ExhaustNetwork
     }
 
     /// <summary>
-    /// Builds the muffler's internals onto the branch chain.
-    ///
-    /// Every section steepens by the same law as the pipes either side of it, with the profile's own
-    /// <see cref="ExhaustSpec.Steepening"/>. Steepening is a property of the gas and the size of the
-    /// wave, not of the pipe: a chamber steepens less because its wider area has already dropped
-    /// the pressure, which the law sees for itself.
+    /// Builds the muffler's internals onto the branch chain. Every section steepens with the profile's
+    /// <see cref="ExhaustSpec.Steepening"/>: steepening belongs to the gas and the wave, not the pipe,
+    /// and a chamber's wider area has already dropped the pressure.
     /// </summary>
     private void BuildMuffler(Branch br, MufflerSpec m, float pipeArea, float wall, float steep)
     {
@@ -313,15 +270,13 @@ internal sealed class ExhaustNetwork
                 float canArea = pipeArea * MathF.Max(1.5f, m.ExpansionRatio);
                 for (int i = 0; i < m.ChamberLengthsMetres.Length; i++)
                 {
-                    // The chamber: an expansion to the can's area over its length. Baffles and
-                    // deflectors inside take energy off every internal reflection, which broadens
-                    // the chamber's notches — a clean expansion chamber rings, a Flowmaster does not.
+                    // Baffles take energy off every internal reflection and broaden the notches: a
+                    // clean expansion chamber rings, a Flowmaster does not.
                     var chamber = new Pipe(m.ChamberLengthsMetres[i], canArea, _rate, wall, steep);
                     float baffle = Math.Clamp(m.BaffleLoss, 0f, 0.95f);
                     chamber.SetExtraLoss(1f - 0.5f * baffle, OnePole.AlphaFor(MathHelper.Lerp(12000f, 1500f, baffle), _rate));
                     br.Chain.Add(chamber);
-                    // Remember where it is: this is a pipe with the can's steel wrapped round it, so
-                    // its pressure is what shakes the case.
+                    // Its pressure is what shakes the case.
                     br.ChamberIndices.Add(br.Chain.Count - 1);
                     // Between chambers, a short passage through the partition at pipe area.
                     if (i + 1 < m.ChamberLengthsMetres.Length)
@@ -364,8 +319,7 @@ internal sealed class ExhaustNetwork
         float c = Gas.SoundSpeed(273.15f + _x.GasCelsiusIdle * _x.TailCooling + 20f, Gas.GammaExhaust);
         float w = 2f * MathF.PI * MathF.Max(20f, m.ResonatorHz);
         float V = c * c * neckArea / (w * w * neckEff);
-        // Cavity as a wide short pipe closed at the far end; keep it well under a quarter wave at
-        // the frequencies that matter so it behaves as a compliance.
+        // A wide short pipe, closed, well under a quarter wave so it behaves as a compliance.
         float cavArea = pipeArea * 6f;
         float cavL = MathF.Max(0.03f, V / cavArea);
         var neck = new Pipe(neckL, neckArea, _rate, wall * 2f, 0f);
@@ -395,17 +349,13 @@ internal sealed class ExhaustNetwork
     /// <summary>Radiated pressure at one metre from all tailpipes, pascals, this sample.</summary>
     public float Radiated { get; private set; }
 
-    /// <summary>How much of <see cref="Radiated"/> came off the muffler CASE rather than out of the
-    /// pipe. Diagnostic: the only way to answer "how loud is the can" without guessing at it.</summary>
+    /// <summary>How much of <see cref="Radiated"/> came off the muffler case rather than out of the
+    /// pipe. Diagnostic.</summary>
     public float ShellRadiated { get; private set; }
 
-    /// <summary>...and the rest of it, out of the pipes. Kept separately because the obvious way to
-    /// report the can's level — against <see cref="Radiated"/> — compares it against ITSELF plus the
-    /// pipe, so the number saturates at 0 dB however loud the can gets and a six-fold change in it
-    /// reads as three decibels.</summary>
+    /// <summary>The rest of it, out of the pipes. Report the can against this: against
+    /// <see cref="Radiated"/>, which includes the can, a six-fold change in it read as three decibels.</summary>
     public float PipeRadiated { get; private set; }
-    /// <summary>Exit velocity of branch 0 this sample, m/s, for anyone who wants to look.</summary>
-    public float ExitVelocity => _branch[0].ExitVelocity;
 
     /// <summary>
     /// Retunes every pipe for the gas now in the system. Called a few hundred times a second, not
@@ -415,7 +365,6 @@ internal sealed class ExhaustNetwork
     /// <param name="massFlowKgPerS">Mean exhaust mass flow of the whole engine.</param>
     public void UpdateGas(float portKelvin, float massFlowKgPerS)
     {
-        _meanMassFlow = massFlowKgPerS;
         float ambient = 293f;
         float tailK = ambient + (portKelvin - ambient) * _x.TailCooling;
         _tailK = tailK;
@@ -429,8 +378,7 @@ internal sealed class ExhaustNetwork
         {
             float rho = Gas.Density(Gas.Atmosphere, primK);
             float cs = Gas.SoundSpeed(primK, Gas.GammaExhaust);
-            // Each primary carries its cylinder's share, but only while that valve is open; the
-            // Mach number here is the mean, which is what the loss and delay corrections want.
+            // The mean Mach number, which is what the loss and delay corrections want.
             float mach = massFlowKgPerS / _n / (rho * cs * _primary[c].Area);
             _primary[c].SetGas(primK, Gas.GammaExhaust, mach);
         }
@@ -631,17 +579,15 @@ internal sealed class ExhaustNetwork
                 }
                 else
                 {
-                    // Read once: ArriveFar advances the pipe's forward line, so a second read would take
-                    // the NEXT sample and run the pipe at half its delay.
+                    // Read once: ArriveFar advances the line, and a second read runs the pipe at half
+                    // its delay.
                     float atEnd = up.ArriveFar();
                     var (back, on) = Junction.Two(atEnd, down.ArriveNear(), up.Admittance, down.Admittance,
                                                   loss * MathF.Min(up.Admittance, down.Admittance) * 0.25f);
                     up.PushBackward(back);
                     down.PushForward(on);
 
-                    // Pressure at this junction is the sum of the two waves meeting there — the
-                    // arriving one and the one reflected back into it. Where that junction is the end
-                    // of a chamber, that is the pressure pushing on the can.
+                    // The junction's pressure (arriving plus reflected) at a chamber's end pushes on the can.
                     if (br.Shell != null && br.ChamberIndices.Contains(i)) chamberPressure += atEnd + back;
                 }
             }
@@ -656,24 +602,16 @@ internal sealed class ExhaustNetwork
             float jet = br.Jet.Process(br.ExitVelocity + br.MeanVelocity, br.MeanVelocity, _x.JetNoiseLevel, _tailK);
             br.Radiated = direct + jet;
 
-            // ...and the can, which radiates straight into the air rather than out of the pipe.
-            //
-            // CALIBRATION. The drive is the acoustic pressure inside the chambers and the output is
-            // pressure at one metre, and those differ by orders of magnitude: the internal wave is
-            // thousands of pascals where a metre away is tens. ShellLevel carries that whole
-            // conversion — transmission through the steel, the case's radiating area, and the
-            // spreading out to a metre — as one measured ratio rather than three guessed ones. It is
-            // set by rendering with the shell on and reading the level it lands at against the pipe;
-            // see the note on MufflerSpec.ShellLevel.
-            br.ChamberPressure = chamberPressure;
+            // The can radiates straight into the air. ShellLevel is the whole conversion from chamber
+            // pressure (thousands of pascals) to pressure at a metre (tens) as one measured ratio; see
+            // MufflerSpec.ShellLevel.
             if (br.Shell != null)
             {
                 br.ShellRadiated = br.Shell.Process(chamberPressure) * _x.Muffler.ShellLevel;
                 br.Radiated += br.ShellRadiated;
             }
 
-            // Each pipe from its own place, if the profile says where that is and anyone has said
-            // where the listener is. Otherwise the sum at one point, bit for bit as it always was.
+            // Each pipe from its own place once the listener is known; otherwise the sum at one point.
             float heard = br.Radiated;
             if (_listenerKnown)
             {
@@ -701,9 +639,6 @@ internal sealed class ExhaustNetwork
         ShellRadiated = shell;
         PipeRadiated = pipe;
     }
-
-    /// <summary>Mean exhaust flow the network was last told about, kg/s.</summary>
-    public float MeanMassFlow => _meanMassFlow;
 
     /// <summary>Everything the console might want to print about the geometry.</summary>
     public IEnumerable<string> Describe()
