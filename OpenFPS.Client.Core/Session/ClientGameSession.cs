@@ -55,6 +55,7 @@ public sealed partial class ClientGameSession : IDisposable
     private readonly AudioEngineFacade _audioEngine;
     private readonly SoundMappingService _sounds;
     private readonly ClientAudioSystem _audioSystem;
+    internal ClientAudioSystem AudioSystemForTest => _audioSystem;
     private readonly PredictionReconciler _reconciler;
     private readonly ChatManager _chat;
 
@@ -160,7 +161,9 @@ public sealed partial class ClientGameSession : IDisposable
         _controller = new LocalPlayerController(_state);
         _others = new OtherBodies();
         _sounds = new SoundMappingService(_state);
-        _audioSystem = new ClientAudioSystem(_audioEngine, _sounds, _state);
+        // Without sound (the tests) no doors are rendered: each session's renders took minutes of every
+        // core, and the next test's login waited behind them.
+        _audioSystem = new ClientAudioSystem(_audioEngine, _sounds, _state, prewarm: enableAudio);
         _chat = new ChatManager(_speech);
         Ui = new UiSounds(audioEngine);
         _menus = new MenuStack(_speech, Ui);

@@ -355,8 +355,10 @@ public class ClientAudioSystem
     private string _regionAmbienceId = "";
     private int _ambienceRegionId = int.MinValue;
 
-    public ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state)
-        : this(audio, sounds, state, StopwatchClock()) { }
+    /// <param name="prewarm">Render the city's doors in the background at start. A session with no sound
+    /// has nothing to play them on.</param>
+    public ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state, bool prewarm = true)
+        : this(audio, sounds, state, StopwatchClock(), prewarm: prewarm) { }
 
     /// <summary>For tests: the same system on a clock the caller controls.</summary>
     /// <param name="manualAcoustics">The acoustic worker runs no thread: the test steps it between

@@ -22,7 +22,7 @@ public class OwnClapTests
         var provider = new SteelDoorSoundTests.CapturingProvider();
         var facade = new AudioEngineFacade(provider);
         facade.InitializeForTest();
-        var player = new WorldAudioPlayer(facade, new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new SpatialService()));
+        var player = new WorldAudioPlayer(facade, new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new SpatialService()), prewarm: false);
         // The client has you 1.4 m further along than the server did, facing east (+x).
         var feet = new Vector3(11.4f, 0f, 5f);
         var east = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
