@@ -586,6 +586,9 @@ where the length puts them. The low modes are unchanged (the loop's 0.8 below a 
 so is the level: the cavity is still normalised on white noise. The gully pot, the sump and the sinks'
 wastes have the same law with their one open end.
 
-Dry (`--running-water render`, heavy rain): frames with the 32.3 ms peak, gutter outlet 55 % to 1 %,
-downpipe 14 % to 2 %; level within 0.3 dB (the drain 0.8 dB up). Through the game, per ear: see
-`inbox/water-smoothing-2026-10-06/round2/README.txt`.
+Dry (`--running-water render`, heavy rain), frames with the 32.3 ms peak: gutter outlet 64 % to 0,
+downpipe 18 % to 0; level within 0.3 dB (the drain 0.8 dB up). Through the game, per ear, frames with
+a peak over 1 ms (above the HRTF's lags), before and after: gutter outlet heavy 57 / 56 % to 2 / 1 %,
+violent 25 / 29 to 2 / 2; the house's downpipe and outlet in heavy rain 16 / 20 to 1 / 0; the downpipe
+from 1.5 m, heavy 19 / 20 to 6 / 6 (scattered lags, none at 32.3 ms), moderate 13 / 12 to 2 / 3. Every
+running-water scene within 0.5 dB of its level before. `inbox/water-smoothing-2026-10-06/round2/README.txt`.
