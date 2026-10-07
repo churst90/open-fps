@@ -16,6 +16,9 @@ Recent work, newest first. `git log` has the rest.
     (Release, three runs each): steady state unchanged; at tier 0 (tiering pinned) 1-2 % less per
     block (i4_economy 1,202 to 1,175 us, diesel_truck 1,521 to 1,503, v8_muscle 2,176 to 2,161 leaving
     out a 2,752 outlier). The rest of the tier-0 penalty, about 30 %, is in what the loop calls.
+  - Steam Audio pathing stays off. docs/CLIENT_NOTES.md, "Steam Audio pathing is off", says what turning
+    it on would take (a reader, a rule against OpeningRoutes and the barrier search, probes fine enough,
+    doors) and what it cost when it ran, for Cody to decide.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream
