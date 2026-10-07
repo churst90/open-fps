@@ -87,4 +87,30 @@ public class ScreenReaderKeyTests
         Assert.True(session.IsBound(InputContext.Gameplay, GameKey.Enter), "there is no trigger bound");
         Assert.DoesNotContain(GameKey.Enter, ClientGameSession.ScreenReaderKeys);
     }
+
+    /// <summary>
+    /// The keypad with Num Lock off is NVDA's review keys. Windows reports keypad 8 as Up and keypad
+    /// period as Delete; only the extended flag tells them from the arrows and Delete, which are the
+    /// game's. GTK names them apart, and the Windows head now drops them the same way.
+    /// </summary>
+    [Theory]
+    [InlineData(0x26, false, true)]    // keypad 8: Up, not extended
+    [InlineData(0x26, true, false)]    // the Up arrow
+    [InlineData(0x2E, false, true)]    // keypad period: Delete, not extended
+    [InlineData(0x2E, true, false)]    // Delete
+    [InlineData(0x2D, false, true)]    // keypad 0: Insert, NVDA's own key
+    [InlineData(0x0C, false, true)]    // keypad 5: Clear
+    [InlineData(0x68, false, false)]   // keypad 8 with Num Lock on: the scope's
+    [InlineData(0x0D, true, false)]    // the keypad's Enter is Enter
+    [InlineData(0x55, false, false)]   // U
+    public void TheWindowsKeypadWithNumLockOffIsNotTheGames(int virtualKey, bool extended, bool keypad)
+        => Assert.Equal(keypad, OpenFPS.Client.Core.KeypadKeys.IsNumLockOffKeypad(virtualKey, extended));
+
+    [Fact]
+    public void TheExtendedFlagIsBit24OfTheKeyMessage()
+    {
+        Assert.True(OpenFPS.Client.Core.KeypadKeys.IsExtended(0x01480001));    // Up arrow, scan code 0x48, extended
+        Assert.False(OpenFPS.Client.Core.KeypadKeys.IsExtended(0x00480001));   // keypad 8, Num Lock off
+        Assert.True(OpenFPS.Client.Core.KeypadKeys.IsExtended(unchecked((int)0xC1480001)));   // its key-up
+    }
 }

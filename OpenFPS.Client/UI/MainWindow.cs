@@ -88,8 +88,12 @@ public sealed class MainWindow : Form
             SyncModifiers();
             return;
         }
-        _input.SetKey(WinFormsKeyMap.Map(code), down);
+        // The keypad with Num Lock off is the screen reader's, and arrives as Up, Delete and the rest.
+        _input.SetKey(KeypadKeys.IsNumLockOffKeypad((int)code, _extendedKey) ? GameKey.None : WinFormsKeyMap.Map(code), down);
     }
+
+    // The extended-key flag of the key message being handled, which KeyEventArgs does not carry.
+    private bool _extendedKey;
 
     private void SyncModifiers()
     {
@@ -109,6 +113,7 @@ public sealed class MainWindow : Form
 
     private const int WM_SYSCOMMAND = 0x0112;
     private const int SC_KEYMENU = 0xF100;
+    private const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, WM_SYSKEYDOWN = 0x0104, WM_SYSKEYUP = 0x0105;
 
     /// <summary>
     /// Alt pressed and released on its own, or F10, puts a window into menu mode: the next keys go to
@@ -120,6 +125,8 @@ public sealed class MainWindow : Form
     {
         if (m.Msg == WM_SYSCOMMAND && ((int)m.WParam & 0xFFF0) == SC_KEYMENU && m.LParam == IntPtr.Zero)
             return;
+        if (m.Msg is WM_KEYDOWN or WM_KEYUP or WM_SYSKEYDOWN or WM_SYSKEYUP)
+            _extendedKey = KeypadKeys.IsExtended(m.LParam.ToInt64());
         base.WndProc(ref m);
     }
 

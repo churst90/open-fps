@@ -49,6 +49,8 @@
     <!-- The Linux head's key map, which is plain code over GameKey: compiled in here so the keys it
          reports (Shift-comma as comma, not "<") are tested without referencing GTK. -->
     <Compile Include="..\OpenFPS.Client.Gtk\Game\GtkKeyMap.cs" Link="Linked\GtkKeyMap.cs" />
+    <!-- And the Windows head's test for the keypad with Num Lock off, which is plain virtual key codes. -->
+    <Compile Include="..\OpenFPS.Client\Core\KeypadKeys.cs" Link="Linked\KeypadKeys.cs" />
   </ItemGroup>
 
   <ItemGroup>

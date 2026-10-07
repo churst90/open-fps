@@ -18,7 +18,7 @@ public static class WinFormsKeyMap
 
         // Top-row digits 0-9 (Keys.D0..Keys.D9). The keypad's digits are their own keys now, the scope's:
         // Windows reports them as NumPad0..NumPad9 only with Num Lock on. With it off they arrive as
-        // Home, Up, Insert and the rest, which are NVDA's review keys and are left unmapped.
+        // Home, Up, Insert and the rest, which are NVDA's review keys: MainWindow drops them (KeypadKeys).
         if (code >= Keys.D0 && code <= Keys.D9) return GameKey.D0 + (int)(code - Keys.D0);
         if (code >= Keys.NumPad0 && code <= Keys.NumPad9) return GameKey.Numpad0 + (int)(code - Keys.NumPad0);
 
