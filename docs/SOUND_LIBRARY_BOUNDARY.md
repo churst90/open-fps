@@ -1593,3 +1593,6 @@ EarlyReflections._chain, EarlyReflections._flFaces, EarlyReflections._flHits, Ea
 - Resonance takes the library as a git submodule pinned to tagged versions.
 - The other defaults stand: namespaces unchanged during the moves, Serilog kept, a library SourceSpec
   that mirrors SoundEmitterComponent.
+- Why (Cody, 2026-10-07): "we're separating concerns in the code not just for resonance's use, but because
+  it's just good coding practice." The split is judged as open-fps's own architecture: clear boundaries and
+  one-way dependencies between the projects, whatever Resonance ends up consuming.
