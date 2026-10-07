@@ -60,6 +60,12 @@ public static class ModelLibrary
         public const string Flow = "flow";
         /// <summary>Waves at an edge: a beach, a rocky shore, a harbour wall, a river bank, a boat's side.</summary>
         public const string Shore = "shore";
+
+        /// <summary>A road vehicle's engine: EngineProfile. Every vehicle built on it has the change.</summary>
+        public const string Engine = "engine";
+        /// <summary>A road vehicle, as the world editor edits one (VehicleSpec): MachineRegistry's
+        /// vehicles, with the engine, chassis, outlets, tyres, body and gearbox as data.</summary>
+        public const string Vehicle = "vehicle";
     }
 
     private sealed class ModelFile
@@ -76,6 +82,8 @@ public static class ModelLibrary
         AllowTrailingCommas = true,
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        // An engine says "derived" with NaN (RevolutionsBeforeFiring); JSON has no NaN of its own.
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 
     private static volatile Dictionary<string, object> _authored = new(StringComparer.OrdinalIgnoreCase);
@@ -108,6 +116,8 @@ public static class ModelLibrary
         [Kinds.Foliage] = FoliageSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Flow] = RunningWaterSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Shore] = ShoreSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
+        [Kinds.Engine] = EngineProfile.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
+        [Kinds.Vehicle] = VehicleProfile.Presets.Keys.ToDictionary(k => k, k => (Func<object>)(() => VehicleSpec.Of(k)), StringComparer.OrdinalIgnoreCase),
         [Kinds.RailVehicle] = new(StringComparer.OrdinalIgnoreCase)
         {
             ["genesis_p42"] = () => TrainProfile.GenesisP42,
@@ -145,6 +155,8 @@ public static class ModelLibrary
         [Kinds.Foliage] = typeof(FoliageSpec),
         [Kinds.Flow] = typeof(RunningWaterSpec),
         [Kinds.Shore] = typeof(ShoreSpec),
+        [Kinds.Engine] = typeof(EngineProfile),
+        [Kinds.Vehicle] = typeof(VehicleSpec),
     };
 
     // ── Loading ─────────────────────────────────────────────────────────────────────────────────
@@ -232,6 +244,18 @@ public static class ModelLibrary
         => !string.IsNullOrEmpty(id)
            && (_authored.ContainsKey(Key(kind, id))
                || (BuiltIn.TryGetValue(kind, out var lib) && lib.ContainsKey(id)));
+
+    /// <summary>Whether a model of this kind and name has been put in from data (a file, a map, the world
+    /// editor) rather than being only the built-in.</summary>
+    public static bool IsAuthored(string kind, string id) => !string.IsNullOrEmpty(id) && _authored.ContainsKey(Key(kind, id));
+
+    /// <summary>Whether a model of this kind and name ships in C#.</summary>
+    public static bool IsBuiltIn(string kind, string id)
+        => !string.IsNullOrEmpty(id) && BuiltIn.TryGetValue(kind, out var lib) && lib.ContainsKey(id);
+
+    /// <summary>The built-in model of this kind and name, as it ships (never an authored one), or null.</summary>
+    public static object? BuiltInModel(string kind, string id)
+        => BuiltIn.TryGetValue(kind, out var lib) && lib.TryGetValue(id, out var make) ? make() : null;
 
     /// <summary>Every model of a kind, authored and built in.</summary>
     public static IEnumerable<string> Ids(string kind)

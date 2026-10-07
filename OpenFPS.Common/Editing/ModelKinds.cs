@@ -41,7 +41,7 @@ public sealed class FieldNode
 /// </summary>
 public static class ModelKinds
 {
-    private static readonly ConcurrentDictionary<Type, IReadOnlyList<FieldNode>> Cache = new();
+    private static readonly ConcurrentDictionary<Type, (int Generation, IReadOnlyList<FieldNode> Nodes)> Cache = new();
 
     /// <summary>What a kind is called aloud: "small_machine" is "machine", "rail_vehicle" "rail vehicle".</summary>
     public static string Spoken(string kind) => kind switch
@@ -53,8 +53,16 @@ public static class ModelKinds
         _ => kind.Replace('_', ' '),
     };
 
-    /// <summary>The properties of a model type, described.</summary>
-    public static IReadOnlyList<FieldNode> Describe(Type type) => Cache.GetOrAdd(type, Build);
+    /// <summary>The properties of a model type, described. Made again when the library changes, since a
+    /// choice of models (<c>Choices = "models:horn"</c>) lists what the library holds.</summary>
+    public static IReadOnlyList<FieldNode> Describe(Type type)
+    {
+        int generation = ModelLibrary.Generation;
+        if (Cache.TryGetValue(type, out var cached) && cached.Generation == generation) return cached.Nodes;
+        var nodes = Build(type);
+        Cache[type] = (generation, nodes);
+        return nodes;
+    }
 
     private static IReadOnlyList<FieldNode> Build(Type type)
     {
@@ -100,6 +108,8 @@ public static class ModelKinds
                        : FieldType.Number;
         IReadOnlyList<string> choices = t.IsEnum ? Enum.GetNames(t)
             : tunable?.Choices == "materials" ? AcousticRegistry.KnownMaterials()
+            : tunable?.Choices is { } m && m.StartsWith("models:", StringComparison.Ordinal)
+                ? ModelLibrary.Ids(m["models:".Length..]).OrderBy(i => i, StringComparer.OrdinalIgnoreCase).ToArray()
             : tunable?.Choices is { Length: > 0 } c ? c.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             : Array.Empty<string>();
         return new FieldDescriptor
@@ -152,10 +162,14 @@ public static class ModelKinds
     /// <summary>The description of the value at a path in a model of this type, with its full path; null if
     /// the path names no scalar. Names match whatever the case, as the model's JSON does.</summary>
     public static FieldNode? NodeAt(Type type, string path, out FieldDescriptor? field)
+        => NodeAt(Describe(type), path, out field);
+
+    /// <summary>The same, over a description that did not come from a type (a prefab's, from its schema).</summary>
+    public static FieldNode? NodeAt(IReadOnlyList<FieldNode> root, string path, out FieldDescriptor? field)
     {
         field = null;
         if (!TryParsePath(path, out var segments)) return null;
-        IReadOnlyList<FieldNode> level = Describe(type);
+        IReadOnlyList<FieldNode> level = root;
         FieldNode? node = null;
         var canonical = new List<string>();
         for (int i = 0; i < segments.Count; i++)
@@ -290,6 +304,9 @@ public static class ModelKinds
             "foliage" => ModelLibrary.Kinds.Foliage,
             "flow" => ModelLibrary.Kinds.Flow,
             "bell" => ModelLibrary.Kinds.Bell,
+            "shore" => ModelLibrary.Kinds.Shore,
+            // A vehicle's sound is its engine: "engine:school_bus" is the vehicle school_bus.
+            "engine" => ModelLibrary.Kinds.Vehicle,
             _ => "",
         };
         id = key;
@@ -305,6 +322,21 @@ public static class ModelKinds
         ModelLibrary.Kinds.Foliage => "foliage:",
         ModelLibrary.Kinds.Flow => "flow:",
         ModelLibrary.Kinds.Bell => "bell:",
+        ModelLibrary.Kinds.Shore => "shore:",
+        ModelLibrary.Kinds.Vehicle => "engine:",
         _ => null,
     };
+
+    /// <summary>A sound id with the model it names changed to another of the same kind:
+    /// "water:park_fountain/elm_park/0" with "pond_jet" is "water:pond_jet/elm_park/0". Null if the
+    /// sound does not name a model.</summary>
+    public static string? WithModel(string? soundId, string newId)
+    {
+        if (string.IsNullOrEmpty(soundId)) return null;
+        int colon = soundId.IndexOf(':');
+        if (colon <= 0) return null;
+        string rest = soundId[(colon + 1)..];
+        int slash = rest.IndexOf('/');
+        return soundId[..(colon + 1)] + newId + (slash >= 0 ? rest[slash..] : "");
+    }
 }
