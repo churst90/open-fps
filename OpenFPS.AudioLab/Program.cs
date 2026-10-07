@@ -3,31 +3,23 @@ using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using Serilog;
 
-// FMOD'S OWN LOGGING, FIRST THING. It does nothing whatsoever once System::create has run, so it
-// cannot live down among the mode handlers — the first attempt put it beside --reap-churn and every
-// mode above it silently got FMOD's default TTY logging instead.
+// FMOD's own logging is armed before any mode runs: it does nothing once System::create has run, and
+// placed among the handlers it silently missed every mode above it.
 {
     string? armed = OpenFPS.Client.Core.AudioEngine.Fmod.FmodDebugLog.ArmFromEnvironment();
     if (armed != null) Console.Error.WriteLine(armed);
 }
 
-
-// Cross-platform audio test runner. Compiles the platform-neutral OpenFPS audio engine
-// (FMOD + acoustics) into a plain net10.0 console app so it runs on Linux as well as Windows.
+// The audio lab: Cody's instruments, the game's audio engine run headless. --help lists them.
 //
-//   dotnet build OpenFPS.AudioLab --artifacts-path <somewhere off the repo volume>
+//   tools/build-local.sh <artifacts> OpenFPS.AudioLab
 //   dotnet <artifacts>/bin/OpenFPS.AudioLab/debug/OpenFPS.AudioLab.dll --<instrument> ...
-//   --help lists the instruments.
 //
 // Not `dotnet run`: it writes obj/ and bin/ into the repo, and MSBuild hangs on the ntfs3 volume.
-//
-// Requires FMOD's native library next to the binary:
-//   Linux:   libfmod.so   (drop into repo-root lib/)
-//   Windows: fmod.dll      (already in repo-root lib/)
+// FMOD's native library goes next to the binary: libfmod.so in the repo-root lib/ (fmod.dll on Windows).
 
-// A FILE as well as the console, and not as an afterthought. Every diagnosis in this project has
-// come from lining a log up against a capture, and scrollback in a terminal is not a log — least of
-// all for somebody reading it with a screen reader. OPENFPS_LAB_LOG moves it.
+// A log file as well as the console (OPENFPS_LAB_LOG moves it): every diagnosis here has come from
+// lining a log up against a capture, and a terminal's scrollback is no log for a screen reader user.
 string labLog = Environment.GetEnvironmentVariable("OPENFPS_LAB_LOG") ?? "/tmp/openfps-lab.log";
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
@@ -49,64 +41,98 @@ string[] usage =
     "  --voice-levels [preset ...] [sweep] [parts]   the game's whole vehicle voice at 1 m against its declared level",
     "  --engine-levels                               every machine's tailpipe alone, offline: headroom and crest factor",
     "  --engine-orders <preset> [rpm=] [thr=] [wav]  order content, band balance, centroid",
-    "  --engine-trace <preset> [idle|off] [rpm= ...] rpm, manifold pressure and torque each quarter second",
+    "  --engine-trace <preset> [idle|off] [rpm= thr= sec= dumpfrom=] [rigid]",
+    "                                                rpm, manifold pressure and torque each quarter second",
     "  --engine-gallery [preset]                     every preset's orders side by side",
     "  --engine-alias [preset] [rpm=] [rates=]       whether a breakdown at the redline is the engine's or the sample rate's",
     "  --engine-solver                               the intake valve solver on one dumped state",
-    "  --engine-cost [preset ...] [kmh=] [sec=]      what one live voice costs a core",
-    "  --engine-jumps [preset ...] [kmh=] [sec=]     sample-to-sample jumps in the voice alone (crackle)",
+    "  --engine-cost [preset ...] [kmh=] [sec=] [body=off] [rate=]",
+    "                                                what one live voice costs a core",
+    "  --engine-jumps [preset ...] [kmh=] [sec=] [blame]",
+    "                                                sample-to-sample jumps in the voice alone (crackle)",
     "  --engine-live [preset] [kmh=]                 the game's real-time engine path driven past you",
     "  --engine-street [preset ...] [kmh=]           cars down Concrete Row, the buildings answering",
     "  --vehicle[-live] / --vehicle-rev[-live] / --muscle-rev[-live] <preset> [knobs]",
     "                                                a drive in stems, a pass-by, or the stationary rev bench",
     "  --ride [preset] [knobs] out=FILE.wav          the vehicle voice through a stop-go ride at a fixed gain",
     "  --shift-trace [preset] [top=]                 what the game's driver does with the gearbox in town",
-    "  --tap-balance                                 each machine's rear voice against its front voice",
-    "  --car-fronts [preset ...] [out= tag= ambient=] the whole voice from in front, behind, and passing at 10 km/h",
+    "  --tap-balance [preset ...] [parts|front|frontparts|whoosh|pipe|port|turbo|knock|squeal|shifts|cost|nan|audit|placed|seed=N]",
+    "                                                each machine's rear voice against its front voice",
+    "  --car-fronts [preset ...] [tailpipe|fan] [out= raw= tag= ambient= sec= bay=] [level=game|physical] [nowav]",
+    "                                                the whole voice from in front, behind, and passing at 10 km/h",
     "  --binaural-input                              a mono voice through the binaural stage in FMOD against the HRTF alone",
-    "  --game-levels [out=DIR] [set=measure|render|compare|all|faults] [cars=a,b]  one thing at a time through the real mixer, captured",
-    "  --wide-sources [out=DIR] [set=measure|render|level|all] [wide=on|off] [sec=]  a tree, the fountain, the fire and rain through the game path, for interaural coherence",
-    "  --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]  texture statistics and game-level texture files",
+    "  --game-levels [out=DIR] [set=measure|render|compare|all|ear|wind|faults|faults-ac|faults-squeal|faults-landing] [cars=a,b] [ear=on|off] [listening=] [calm=]",
+    "                                                one thing at a time through the real mixer, captured; spectra [preset ...] for an engine's bass",
+    "  --wide-sources [out=DIR] [set=measure|roofs|tree|render|level|all] [wide=on|off] [sec=] [turbulence=] [collapse=on] [spread=] | cost",
+    "                                                a tree, the fountain, the fire and rain through the game path, for interaural coherence; cost: what they cost the mixer",
+    "  --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]",
+    "                                                texture statistics and game-level texture files",
     "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
-    "  --intake-ir [preset ...] [thr=] [sec=] [out=] the intake tract alone, thumped once",
+    "  --intake-ir [preset ...] [thr=] [sec=] [out=]",
+    "                                                the intake tract alone, thumped once",
     "  --wheel-squeal [out=] [axle] [binaural]       each wheel squealing for itself, and four drives",
-    "  --wet-roads [water|levels out=|game out= set=] tyres on wet roads: the water, the grip, the sound",
-    "  --cabin [game out= paths=on|off set=|model out=] sitting in a vehicle: the cabin's paths, through the game",
-    "  --speedway [map] [seconds=] [voices=] [probe] the shipped race heard from its spawn point",
-    "  --earshot [map=city] [at=x,z] [top=]          everything audible from a spot, ranked, under both distance laws",
-    "  --car-horn / --siren [preset] [sec=]          horns and the siren on the bench, measured and written",
+    "  --wet-roads [water|levels out=|game out= set=]",
+    "                                                tyres on wet roads: the water, the grip, the sound",
+    "  --cabin [game out= paths=on|off set=|model out=|hrtf out=]",
+    "                                                sitting in a vehicle: the cabin's paths, through the game",
+    "  --driving out=DIR [set=all|horn|siren|bend|lines|rails|gates|aircraft] [compare]",
+    "                                                the driving controls and aids through the game (docs/DRIVING_AIDS.md)",
+    "  --speedway [map] [seconds=] [voices=] [probe] [walk] [noecho]",
+    "                                                the shipped race heard from its spawn point (the map name comes first)",
+    "  --earshot [map=city] [at=x,z] [law=inverse|linear|both] [top=]",
+    "                                                everything audible from a spot, ranked, under both distance laws",
+    "  --car-horn [preset ...] [out=] [air=] [bend=] [rise=] [fall=] [tag=]",
+    "                                                horns on the bench, measured and written",
+    "  --siren [preset ...] [sec=20] | drive [map= track=] | voice",
+    "                                                each siren mode measured against its spec: level, the horn band's share, sweep rate",
     "  --car-door [out=] [seed=]                     the car door opening and shutting, for tools/car_door_fit",
     "",
     "Machines, aircraft, rail",
     "  --machines [id] [export=DIR]                  what a machine is made of, as the JSON an author writes",
     "  --machine-levels [id ...] [kmh=]              how loud a machine is at a cruise, and what reaches you",
-    "  --machine-pass [id] [kmh=] [side=]            a machine driving past, as one voice and as two",
-    "  --yard [preset ...] [levels] [pass]           mowers and air conditioners, measured and walked past",
-    "  --nature [levels|render out=DIR] [preset ...] water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
-    "  --weather-wind [out=DIR] [sec=] [ears|trees]  the wind at your ears by speed and heading, a 360 turn, and a tree under /weather",
-    "  --thunder [out=DIR] [seed=] [city=x,z] [nowav] thunder at 0.1-15 km, ground and cloud flashes, open field and a city street",
-    "  --rain [levels|render out=DIR|physics|survey map= ear=] [scene ...] [rate=]  rain on the surfaces round a listener, by rate",
+    "  --machine-pass [id] [kmh=] [side=] [one] [two] [hard]",
+    "                                                a machine driving past, as one voice and as two",
+    "  --yard [preset ...] [levels] [pass] [sec=] [dist=]",
+    "                                                mowers and air conditioners, measured and walked past",
+    "  --nature [levels|render out=DIR] [preset ...]",
+    "                                                water, fire and wind in leaves at a metre; compare=FILE.wav for a recording",
+    "  --fire [levels|render out=DIR [places=1]|game out=DIR set=|hrtf] [preset ...] [sec= wind= age= seed= heard= parts=]",
+    "                                                fires from a campfire to a crown fire, from their model (docs/FIRE.md)",
+    "  --weather-wind [out=DIR] [sec=] [ears|trees] [short] [live]",
+    "                                                the wind at your ears by speed and heading, a 360 turn, and a tree under /weather",
+    "  --thunder [out=DIR] [seed=] [city=x,z] [still] [nowav]",
+    "                                                thunder at 0.1-15 km, ground and cloud flashes, open field and a city street",
+    "  --rain [levels|render out=DIR|live|physics|resolve|survey map= ear=] [scene ...] [rate=|fall=] [near=] [sec=]",
+    "                                                rain on the surfaces round a listener, by rate; compare=FILE.wav for a recording",
     "  --models [export=DIR]                         the model library's ids, or each as JSON",
-    "  --aircraft / --landing / --spool [preset]     flyovers, arrivals, and an engine against its lever",
-    "  --train / --crossing / --airbrake / --signals trains, a level crossing, air brakes, horns and bells",
+    "  --aircraft [steady] / --landing / --spool [preset ...] [alt= speed= offset= sec= lever= descend=]",
+    "                                                flyovers, arrivals, and an engine against its lever",
+    "  --train / --crossing / --airbrake / --signals",
+    "                                                trains, a level crossing, air brakes, horns and bells",
     "",
     "People and things",
-    "  --footsteps [surface ...] [shoe=] [run]       footsteps by surface, measured",
+    "  --footsteps [surface ...] [shoe=] [run] [steps=] [kg=] [table] [compare=DIR]",
+    "                                                footsteps by surface, measured",
     "  --breath [effort=] [seconds=] [out=]          the breathing model laid out at its own times and levels",
-    "  --bumps                                       a person walking into things",
-    "  --applause [people=] [intensity=] [sec=]      a crowd on its own; compare=DIR against recordings",
+    "  --bumps [--speed=1.4] [--out=DIR]             a person walking into things",
+    "  --applause [people=] [intensity=] [sec=] [out=]",
+    "                                                a crowd on its own; compare=DIR against recordings",
     "  --door-knock [out=] [seed=] [knocks=]         knuckles on a wooden door",
     "  --door-opening [out=]                         doors opening and shutting at a metre",
-    "  --knob-door [out=] [seed=] [only=] [stems=]   the physical knob door: opens and shuts, hinges worn and oiled",
-    "  --knob-renders [key=K;K] [out=] [stems=] [events]  knob door keys as the game names them, float WAVs in pascals",
+    "  --knob-door [out=] [seed=] [only=] [stems=] [latch=] [pins]",
+    "                                                the physical knob door: opens and shuts, hinges worn and oiled",
+    "  --knob-renders [key=K;K] [out=] [stems=] [events]",
+    "                                                knob door keys as the game names them, float WAVs in pascals",
     "  --pushbar-door [out=] [only=] [stems=]        the physical push-bar door: each character opening and shutting on its closer",
     "  --sliding-door [out=] [only=] [stems=]        the physical sliding doors: a patio door and an automatic door, each character",
     "  --door-models [out=] [only=] [stems=] [refs]  glass front and pull doors, the lift door, the key in a lock, push openings: every event, measured",
-    "  --prerender-doors out=DIR [threads=N]          every door render the client makes at start, as its disk cache (publish-windows.sh ships it)",
+    "  --prerender-doors out=DIR [threads=N]         every door render the client makes at start, as its disk cache (publish-windows.sh ships it)",
     "  --patio-vs-ref [ref=] [wav=] [only=] [out=]   the patio door measured against the recording of a real one, side by side",
     "  --pushbar-vs-ref [before=] [only=] [out=]     the push-bar door's push, release and slam against recordings, side by side",
-    "  --car-window [out=] [only=]                    a car's power window going down, up and half way, each character",
-    "  --beacon-tones [out=]                         each beacon three times at its real period",
+    "  --car-window [out=] [only=]                   a car's power window going down, up and half way, each character",
+    "  --glass survey [quick] | round1 [out=DIR] | kernels | ringfit [out=FILE]",
+    "                                                the physical glass model: levels and render times, windows shot, contact kernels, shards for ringclick.py",
+    "  --beacon-tones [out=] [rate=]                 each beacon three times at its real 1.6 s period, then the teammate's call",
     "  --presence-sounds [out=]                      the online, logged out, connection lost, away and back cues, measured",
     "  --gun-spec                                    synthesized shots against the NIJ recordings",
     "  --reload-spec [refs=DIR] [only=]              the gun-handling recordings measured: contacts, falls, bands",
@@ -115,43 +141,77 @@ string[] usage =
     "  --admin-gun [out=DIR]                         admin gun reports, its target effects, selectors, teleporter, hand-overs",
     "  --bullet-pass [out=DIR]                       a round's crack or whizz going by a listener, then its report",
     "  --bullet-round2 [out=DIR]                     the whizz before/after, ricochets, and a round striking each material",
-    "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
+    "  --gun-fit [nij=DIR] [out=] [tag=] [only=ID] [wavs] [grid] [z= pp= bd= td= corner= trail= gap= lead=]",
+    "                                                every weapon's report against its own NIJ takes",
     "  --speech-lines                                decodes every shipped voice line as the client does",
     "  --heard-levels [d=1.5] [wav=DIR]              doors, steps, speech: declared vs LAFmax at the ear",
-    "  --ground-voice [--ladder]                     a talker's ground reflection three ways",
+    "  --ground-voice [line.ogg] [--at=3] [--angle=30] [--out=DIR] [--ladder]",
+    "                                                a talker's ground reflection three ways",
+    "  --mic [sec=3] [device=NAME]                   the microphone through FMOD, as voice chat opens it: samples and level; nothing kept",
     "",
     "Rooms, paths and the mixer",
-    "  --clap-room [out=] [claps=]                   a clap in Marlow flat 01F through the whole mixer",
-    "  --room-walk                                   the wood room walked with the megaphone on, captured",
-    "  --walk [map= from= to= via= y= trace sprint]  the real movement and ground probe over a real map",
-    "  --enclosure [map= at= walk=]                  what the room round a listener measures, and its send",
-    "  --path-probe [map=city] ear=x,y,z src=x,y,z   what the occlusion worker hands the mixer (door= open= swings= traced)",
-    "  --siren-route [map= track= at=]               a car's path to a fixed listener, frame by frame",
-    "  --pop-hunt [map=city] ear=x,y,z [sec= cars=]  cars driving the streets; paths that jump and come back",
+    "  --clap-room [out=] [claps=] [sound=click|WEAPON] [dist=] [bed] [tail=raw] [late=velvet] [copies=0] [early=old] [probe=MS]",
+    "                                                a clap in Marlow flat 01F through the whole mixer",
+    "  --room-walk [seconds= speed= out=] [cone|reverb|boundary|steps|megaphone=off] [still] [echo=on] [clock]",
+    "                                                the wood room walked with the megaphone on, captured",
+    "  --walk [map= from= to= via= y= seconds= stand= taps= gap= trace sprint]",
+    "                                                the real movement and ground probe over a real map",
+    "  --stair-walk [scene=shapes|city] [sprint] [trace]",
+    "                                                up and down real treads, every footfall checked (docs/GEOMETRY.md)",
+    "  --enclosure [map= at= walk= step= head= dist=]",
+    "                                                what the room round a listener measures, and its send",
+    "  --path-probe [map=city] ear=x,y,z src=x,y,z [door= open= swings= traced legcost root=]",
+    "                                                what the occlusion worker hands the mixer",
+    "  --siren-route [map=city] [track=downtown] [preset=police_interceptor] [lane=1.8] [at=x,z] [from=] [sec=60] [every=10]",
+    "                                                a car's path to a fixed listener, frame by frame",
+    "  --pop-hunt [map=city] ear=x,y,z [sec= cars= extra= seed=] [verbose] [lines]",
+    "                                                cars driving the streets; paths that jump and come back",
     "  --room-echoes [map=city] ear= src=            the placed reflections a one-off sound gets",
-    "  --shot-echoes [map=city] at=x,z               every echo a shot makes there, and what it came off",
+    "  --shot-echoes [map=city] at=x,z [shot=x,z]    every echo a shot makes there, and what it came off",
     "  --wall-tl                                     the city's constructions' transmission loss per band",
     "  --traced-reverb / --traced-echoes             the traced reverb and per-source echoes, headless",
-    "  --sa-frame                                    which way Steam Audio's traced soundfield faces",
-    "  --tail-bands / --tail-iacc / --late-field     the tail per octave, its ears' coherence, each source's late energy",
-    "  --tail-steady [room=stair|flat|corridor]      does the tail hold still: pulsing, steps, decay, ring, raw vs smooth",
-    "  --tail-cost [t60=2]                           the late tail's cost per mixer piece: one channel against the field",
+    "  --sa-frame                                    which way Steam Audio's traced soundfield faces (SA_MIRROR=0: unflipped)",
+    "  --tail-bands / --tail-iacc / --late-field [place=flat|tunnel|street]",
+    "                                                the tail per octave, its ears' coherence, each source's late energy",
+    "  --tail-steady [room=stair|flat|corridor] [seconds= jitter= skip= late=velvet earvelvet=1 early=old]",
+    "                                                does the tail hold still: pulsing, steps, decay, ring, raw vs smooth",
+    "  --tail-cost [t60=2] [seconds=20]              the late tail's cost per mixer piece: one channel against the field",
+    "  --early-tail [room=flat|stair|corridor] [hrtf]",
+    "                                                the trace's first 120 ms against the room's image sources",
     "  --sim-reverbfield                             the simulator's reverb against enclosure across places",
     "  --scene-cost [map=city]                       what rebuilding the Steam Audio scenes costs",
-    "  --distant-woods [set=sum|walk|all] [out=DIR]   a wood from 300-800 m: the sum of its trees against the wood heard as one; the walk up to it",
-    "  --tile-scenes [map=magnolia_tx]                Steam Audio scene per tile on Embree against one mesh: cost and answers",
-    "  --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [stops=M]  a streamed map walked: tile costs, worker gaps",
-    "  --geometry [map=magnolia_tx] [terrain=5] [sa=1] the world as triangles: BVH and Steam Audio costs (docs/GEOMETRY.md)",
-    "  --geometry-parity [map=city] [n=4000] [only=rays,ground,...] old box path and triangle world side by side, every difference",
+    "  --distant-woods [set=sum|walk|all] [out=DIR] [trees=] [sec=]",
+    "                                                a wood from 300-800 m: the sum of its trees against the wood heard as one; the walk up to it",
+    "  --tile-scenes [map=magnolia_tx] [detail=medium] [sources=48]",
+    "                                                Steam Audio scene per tile on Embree against one mesh: cost and answers",
+    "  --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [heading=] [churn=N] [keep=old] [stops=M]",
+    "                                                a streamed map walked: tile costs, worker gaps",
+    "  --map-travel [from=city] [to=speedway] [voices=40]",
+    "                                                one map's acoustics then another's, as /join does: are sources still placed",
+    "  --nan-mix [from= to= door= seconds=] [atear]  the walk into Marlow flat 00B through the whole mixer; what the non-finite guard caught",
+    "  --nan-walk [map=city] [from=x,y,z] [to=x,y,z] [steps=12] [inside]",
+    "                                                the listener's trace walked over a real map, every response checked for non-finite values",
+    "  --geometry [map=magnolia_tx] [terrain=5] [sa=1]",
+    "                                                the world as triangles: BVH and Steam Audio costs (docs/GEOMETRY.md)",
+    "  --geometry-parity [map=city] [n=4000] [only=rays,ground,...]",
+    "                                                old box path and triangle world side by side, every difference",
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
     "  --ambisonic                                   ambisonic encode and decode come out of the right ear",
     "  --dsp-order                                   where HEAD and TAIL put a unit in a channel's chain",
-    "  --quality resampler|orbit|echo|ceiling|quant|lsb|output|thunderfile|scene=NAME [out=DIR] [tag=]",
+    "  --quality resampler|orbit|echo|ceiling|quant|lsb|output|limiter|thunderfile|scene=NAME [out=DIR] [tag=]",
     "                                                what the mixer does to a sound: resampler, binaural steps, limiter (tools/audio_quality.py)",
     "",
     "The mixer thread (docs/THE_MIXER_THREAD_CRASH.md)",
-    "  --scene-churn / --provider-churn / --physical-churn / --reap-churn / --send-churn",
-    "  --ended-channel / --foreign-disconnect / --send-drift scenario=N / --send-window",
+    "  --scene-churn [sec=]                          engines, machines, aircraft and region reverb buses made and released while the listener walks",
+    "  --provider-churn                              footsteps and reflections created and stopped fast against the Steam Audio callbacks",
+    "  --physical-churn                              every machine and aircraft preset created, moved and released",
+    "  --reap-churn [sec=]                           one-shots that end on their own and are collected by the reaper: a stale channel handle",
+    "  --send-churn [sec=] [noflip] [ownroom]        one-shots with reverb sends ending on their own while the listener's region flips",
+    "  --ended-channel                               whether a DSP stays attached to a channel that ended on its own",
+    "  --foreign-disconnect                          a send disconnected through the wrong reverb unit: the city crash, isolated",
+    "  --send-drift scenario=N                       a sending channel torn down one way, then the wire tripped",
+    "  --send-window [sec=] [mode=client|forget|stop]",
+    "                                                the window between a queued send disconnect and the channel finishing",
 };
 if (args.Contains("--help"))
 {
@@ -267,9 +327,8 @@ if (args.Contains("--traced-reverb"))
 
 if (args.Contains("--sa-frame"))
 {
-    // --sa-frame: which way Steam Audio's traced soundfield faces. A wall to the left and a wall ahead;
-    // the traced response must say left and ahead, and decode that way round the head. SA_MIRROR=0
-    // shows the unflipped world it used to be given (the wall ahead answered from behind).
+    // A wall to the left and a wall ahead: the traced response must say left and ahead, and decode
+    // that way round the head.
     int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSpike.FrameCheck();
     Log.CloseAndFlush();
     Environment.Exit(code);
@@ -294,8 +353,6 @@ if (args.Contains("--engine-solver"))
 }
 if (args.Contains("--engine-street"))
 {
-    // --engine-street [preset ...] [kmh=50,100]: cars driving past you down Concrete Row, with the
-    // buildings answering. Default: the big block, then the truck.
     var keys = args.Where(a => OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a)).ToArray();
     if (keys.Length == 0) keys = new[] { "v8_muscle", "diesel_truck" };
     string? kmhArg = args.FirstOrDefault(a => a.StartsWith("kmh="));
@@ -306,7 +363,6 @@ if (args.Contains("--engine-street"))
 }
 if (args.Contains("--engine-live"))
 {
-    // --engine-live [preset] [kmh=30,60,90]: the game's real-time engine path, driven past you.
     string presetKey = args.FirstOrDefault(a => OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a)) ?? "v8_muscle";
     string? kmh = args.FirstOrDefault(a => a.StartsWith("kmh="));
     float[]? speeds = kmh == null ? null : Array.ConvertAll(kmh[4..].Split(','), float.Parse);
@@ -316,9 +372,7 @@ if (args.Contains("--engine-live"))
 }
 if (args.Contains("--wheel-squeal"))
 {
-    // --wheel-squeal [out=DIR] [axle] [binaural]: each wheel squealing for itself, measured, then four drives
-    // rendered (an ordinary stop, a hard stop, a fast turn, a wheelspin pull-away). `axle` renders
-    // the same drives with the axle voices squealing from the overall demand, as before.
+    // axle: the same drives with the axle voices squealing from the overall demand.
     string? outArg = args.FirstOrDefault(a => a.StartsWith("out="));
     OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.AxleOnly = args.Contains("axle");
     OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.Binaural = args.Contains("binaural");
@@ -328,8 +382,6 @@ if (args.Contains("--wheel-squeal"))
 }
 if (args.Contains("--speedway"))
 {
-    // --speedway [map] [seconds=] [voices=]: the shipped map, its cars on its track, its walls
-    // answering them, heard from its own spawn point.
     int wcode = OpenFPS.Client.Core.AudioEngine.Fmod.SpeedwaySpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(wcode);
@@ -342,52 +394,42 @@ if (args.Contains("--engine-jumps"))
 }
 if (args.Contains("--applause"))
 {
-    // --applause [people=] [intensity=] [sec=] [out=DIR]: a crowd, on its own.
     int acode = OpenFPS.Client.Core.AudioEngine.Fmod.ApplauseSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(acode);
 }
 if (args.Contains("--body-ir"))
 {
-    // --body-ir [preset ...] [out=DIR] [sec=..]: the CAR, with no engine in it — its impulse
-    // response rendered, written to a WAV and measured.
     int bcode = OpenFPS.Client.Core.AudioEngine.Fmod.BodyIrSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(bcode);
 }
 if (args.Contains("--intake-ir"))
 {
-    // --intake-ir [preset ...] [thr=..] [sec=..] [out=DIR]: the INTAKE TRACT alone, thumped once —
-    // what note the airbox and its snorkel make, independently of anything driving them.
     int iicode = OpenFPS.Client.Core.AudioEngine.Fmod.IntakeIrSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(iicode);
 }
 if (args.Contains("--footsteps"))
 {
-    // --footsteps [surface ...] [shoe=..] [run] [kg=..] [steps=..] [table]
     int fscode = OpenFPS.AudioLab.Spikes.FootstepSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(fscode);
 }
 if (args.Contains("--machine-levels"))
 {
-    // --machine-levels [id ...] [kmh=..]: how loud a machine is at a cruise, and what reaches a listener.
     int mlcode = OpenFPS.AudioLab.Spikes.MachineSpike.Levels(args);
     Log.CloseAndFlush();
     Environment.Exit(mlcode);
 }
 if (args.Contains("--machine-pass"))
 {
-    // --machine-pass [id] [kmh=..] [side=..] [one] [two]: a machine drives past, once as one voice
-    // and once as two, so the rig can be judged by ear rather than by argument.
     int mpcode = OpenFPS.AudioLab.Spikes.MachineSpike.Pass(args);
     Log.CloseAndFlush();
     Environment.Exit(mpcode);
 }
 if (args.Contains("--machines"))
 {
-    // --machines [id] [export=DIR]: what a machine is made of, and the JSON an author would write.
     int mcode = OpenFPS.AudioLab.Spikes.MachineSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(mcode);
@@ -405,24 +447,18 @@ if (args.Contains("--engine-levels"))
 }
 if (args.Contains("--shot-echoes"))
 {
-    // --shot-echoes [map=city] at=x,z [shot=x,z]: every echo a shot makes there, and what it came off.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.ShotEchoSpike.Run(args));
 }
 if (args.Contains("--ride"))
 {
-    // --ride [preset] [steep= absorb= mufflen= prim= coll= mid= tail= knock= valve=] out=FILE.wav:
-    // the game's vehicle voice through a stop-go ride, at a fixed gain, for comparing variants by ear.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.RideSpike.Run(args));
 }
 if (args.Contains("--shift-trace"))
 {
-    // --shift-trace [preset] [top=50]: what the game's driver does with the gearbox in town.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.ShiftTraceSpike.Run(args));
 }
 if (args.Contains("--engine-cost"))
 {
-    // --engine-cost [preset ...] [kmh=..] [sec=..]: what one live voice costs a core, so a grid
-    // of cars can be sized before it is authored.
     int ccode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(ccode);
@@ -441,15 +477,12 @@ if (args.Contains("--engine-gallery"))
 }
 if (args.Contains("--engine-alias"))
 {
-    // --engine-alias [preset] [rpm=..] [rates=..]: is the redline the engine's or the sample rate's?
     int eacode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Alias(args);
     Log.CloseAndFlush();
     Environment.Exit(eacode);
 }
 if (args.Contains("--breath"))
 {
-    // --breath [effort= seconds= out=]: the real Breathing model rendered through the real
-    // TransientSynth, laid out at its own times and levels. See BreathSpike.
     int brCode = OpenFPS.Client.Core.AudioEngine.Fmod.BreathSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(brCode);
@@ -457,8 +490,6 @@ if (args.Contains("--breath"))
 
 if (args.Contains("--walk"))
 {
-    // --walk [map= from= to= seconds= stand= sprint]: the REAL movement engine and ground probe over a
-    // real map, reporting every footfall, every landing and every time the ground moved. See WalkSpike.
     int walkCode = OpenFPS.Client.Core.AudioEngine.Fmod.WalkSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(walkCode);
@@ -466,8 +497,6 @@ if (args.Contains("--walk"))
 
 if (args.Contains("--enclosure"))
 {
-    // --enclosure [map= at= walk= step= head= dist=]: what the room round a listener measures at a
-    // place on a real map, and the reverb send that follows from it. See EnclosureSpike.
     int encCode = OpenFPS.Client.Core.AudioEngine.Fmod.EnclosureSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(encCode);
@@ -475,8 +504,6 @@ if (args.Contains("--enclosure"))
 
 if (args.Contains("--yard"))
 {
-    // --yard [preset ...] [levels] [pass] [sec= dist=]: the machinery that stands in a garden and
-    // runs — mowers and air conditioners — measured, scripted and walked past.
     int yardCode = OpenFPS.Client.Core.AudioEngine.Fmod.YardSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(yardCode);
@@ -484,86 +511,61 @@ if (args.Contains("--yard"))
 
 if (args.Contains("--weather-wind"))
 {
-    // --weather-wind [out=DIR] [sec=] [ears|trees]: the weather's wind at the ears and in a tree,
-    // measured against the published figures (WeatherWindSpike).
     Environment.Exit(OpenFPS.AudioLab.Spikes.WeatherWindSpike.Run(args));
 }
 if (args.Contains("--quality"))
 {
-    // --quality resampler|orbit|quant|scene=NAME: known signals and typical scenes through the real
-    // mixer, captured in float before and after the master limiter (QualitySpike).
     int qcode = OpenFPS.AudioLab.Spikes.QualitySpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(qcode);
 }
 if (args.Contains("--thunder"))
 {
-    // --thunder [out=DIR] [seed=N] [city=x,z] [nowav]: the lightning channel's thunder at six
-    // distances, measured, and written binaurally at the game's level and normalised.
     Environment.Exit(OpenFPS.AudioLab.Spikes.ThunderSpike.Run(args));
 }
 
 if (args.Contains("--nature"))
 {
-    // --nature [levels|render out=DIR|compare=FILE.wav] [preset ...] [sec= wind=]: water, fire and
-    // the wind in leaves, rendered from their models and measured against recordings.
     Environment.Exit(OpenFPS.AudioLab.Spikes.NatureSpike.Run(args));
 }
 
 if (args.Contains("--fire"))
 {
-    // --fire [levels|render out=DIR|game out=DIR set=] [preset ...] [sec= wind= age= heard= parts=]:
-    // fires from a campfire to a crown fire from their model (docs/FIRE.md).
     Environment.Exit(OpenFPS.AudioLab.Spikes.FireSpike.Run(args));
 }
 
 if (args.Contains("--waves"))
 {
-    // --waves [levels|sea|render out=DIR|game out=DIR set=] [preset ...] [sec= wind= fetch= parts=]:
-    // lake shores, surf, shingle, a harbour wall, a river bank and a boat's hull from their models.
     Environment.Exit(OpenFPS.AudioLab.Spikes.WavesSpike.Run(args));
 }
 
 if (args.Contains("--wet-roads"))
 {
-    // --wet-roads [water|levels out=DIR|game out=DIR set=]: tyres on wet roads, the road's water,
-    // the grip it leaves, and the sound through the game.
     Environment.Exit(OpenFPS.AudioLab.Spikes.WetRoadSpike.Run(args));
 }
 
 if (args.Contains("--driving"))
 {
-    // --driving out=DIR [set=all|horn|siren|bend|rails|gates|aircraft]: the driving controls and aids
-    // (docs/DRIVING_AIDS.md) through the game: horns, siren, a turn with and without the brake cue, the
-    // rails, the gates, an aeroplane's roll-out.
     Environment.Exit(OpenFPS.AudioLab.Spikes.DrivingSpike.Run(args));
 }
 
 if (args.Contains("--cabin"))
 {
-    // --cabin [game out=DIR paths=on|off set=all|car|bus|police | model out=DIR]: sitting in a vehicle,
-    // the interior heard from where each path comes in (CabinPaths), through the game.
     Environment.Exit(OpenFPS.AudioLab.Spikes.CabinSpike.Run(args));
 }
 
 if (args.Contains("--running-water"))
 {
-    // --running-water [levels|runoff|render out=DIR|game out=DIR set=] [preset ...] [sec= rain= flow=]:
-    // creeks, gutters, drains, downpipes and overflows from their models, measured and played through the game.
     Environment.Exit(OpenFPS.AudioLab.Spikes.RunningWaterSpike.Run(args));
 }
 
 if (args.Contains("--textures"))
 {
-    // --textures stats FILE... | compare REF... -- FILE... | render out=DIR [before=DIR]: the cochlear
-    // envelope statistics a texture is recognised by, and the texture round's game-level files.
     Environment.Exit(OpenFPS.AudioLab.Spikes.TextureSpike.Run(args));
 }
 
 if (args.Contains("--rain"))
 {
-    // --rain [levels|render out=DIR|physics|survey map= ear=|compare=FILE.wav] [scene ...] [rate= sec=]:
-    // rain surveyed and rendered as the game does it, measured at light, moderate, heavy and violent.
     Environment.Exit(OpenFPS.AudioLab.Spikes.RainSpike.Run(args));
 }
 
@@ -668,8 +670,6 @@ if (args.Contains("--pass-by"))
 
 if (args.Contains("--car-door"))
 {
-    // --car-door [out=DIR] [seed=N]: the car door model (OpenFPS.Common.CarDoor) opening and shutting,
-    // one WAV each, to compare with its recording (tools/car_door_fit/cmp.py and tonal.py).
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     int seed = int.TryParse(args.FirstOrDefault(a => a.StartsWith("seed="))?.Substring(5), out int sd) ? sd : 3;
     System.IO.Directory.CreateDirectory(dir);
@@ -690,8 +690,6 @@ if (args.Contains("--car-door"))
 
 if (args.Contains("--beacon-tones"))
 {
-    // --beacon-tones [out=DIR] [rate=HZ]: each beacon three times at its real 1.6 s period, one WAV
-    // each, and the teammate's version of the player's call after them.
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     System.IO.Directory.CreateDirectory(dir);
     int rate = int.TryParse(args.FirstOrDefault(a => a.StartsWith("rate=", StringComparison.Ordinal))?.Substring(5), out int r0) ? r0 : 44100, k = 0;
@@ -714,8 +712,6 @@ if (args.Contains("--beacon-tones"))
 
 if (args.Contains("--presence-sounds"))
 {
-    // --presence-sounds [out=DIR]: each presence cue once, at 48 kHz, one WAV each, with its length
-    // and peak, so the set can be listened to and checked against each other before it is heard in game.
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     System.IO.Directory.CreateDirectory(dir);
     int rate = 48000, k = 0;
@@ -744,113 +740,90 @@ if (args.Contains("--presence-sounds"))
 
 if (args.Contains("--room-echoes"))
 {
-    // --room-echoes [map=city] ear=x,y,z src=x,y,z: the reflections a one-off sound is placed with, each with its box.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RoomEchoesSpike.Run(args));
 }
 if (args.Contains("--wall-tl"))
 {
-    // --wall-tl: the city's walls, floors, doors and glass, transmission loss per third octave and per mixer band.
     Environment.Exit(OpenFPS.AudioLab.Spikes.WallTlSpike.Run());
 }
 if (args.Contains("--pop-hunt"))
 {
-    // --pop-hunt [map=city] ear=x,y,z [sec=60] [cars=40] [extra=30]: answers that jump 15 dB and come back.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PopHuntSpike.Run(args));
 }
 if (args.Contains("--path-probe"))
 {
-    // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.Run(args));
 }
 if (args.Contains("--distant-woods"))
 {
-    // --distant-woods [set=sum|walk|all] [out=DIR] [trees=40] [sec=30]: a wood heard far off, as the sum of its trees and as one.
     Environment.Exit(OpenFPS.AudioLab.Spikes.DistantWoodsSpike.Run(args));
 }
 if (args.Contains("--tile-scenes"))
 {
-    // --tile-scenes [map=magnolia_tx] [detail=medium] [sources=48]: one mesh or a sub-scene per tile, default or Embree: cost and answers.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.TileScenesSpike.Run(args));
 }
 if (args.Contains("--stream-walk"))
 {
-    // --stream-walk [map=magnolia_tx] [speed=15] [seconds=60] [detail=medium] [heading=east]: tiles streamed as you move.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.StreamWalkSpike.Run(args));
 }
 if (args.Contains("--stair-walk"))
 {
-    // --stair-walk [scene=shapes|city] [sprint] [trace]: up and down real treads, every footfall checked (docs/GEOMETRY.md stage 2).
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.StairWalkSpike.Run(args));
 }
 if (args.Contains("--geometry-parity"))
 {
-    // --geometry-parity [map=city] [n=4000] [only=...]: the box path and the triangle world side by side (docs/GEOMETRY.md stage 1).
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GeometryParitySpike.Run(args));
 }
 if (args.Contains("--geometry"))
 {
-    // --geometry [map=magnolia_tx] [terrain=5] [sa=1]: the world as triangles (docs/GEOMETRY.md).
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GeometrySpike.Run(args));
 }
 if (args.Contains("--scene-cost"))
 {
-    // --scene-cost [map=city]: what rebuilding the Steam Audio scenes costs, as a door opening does.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.SceneCostSpike.Run(args));
 }
 if (args.Contains("--tail-bands"))
 {
-    // --tail-bands: the flat's traced tail per octave (T20, late energy) against Sabine and Eyring.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailBandsSpike.Run(args));
 }
 if (args.Contains("--tail-steady"))
 {
-    // --tail-steady [room=stair|flat|corridor] [seconds=10] [jitter=CM] [skip=4]: the tail standing still, each trace's own
-    // samples against SmoothTail's averaged energy through fixed noise.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailSteadySpike.Run(args));
 }
 if (args.Contains("--tail-cost"))
 {
-    // --tail-cost [t60=2] [seconds=20]: the late tail's cost per mixer piece, one channel against the field.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailCostSpike.Run(args));
 }
 if (args.Contains("--tail-iacc"))
 {
-    // --tail-iacc: the tail's spatial rendering alone, the two ears' coherence per octave.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailIaccSpike.Run());
 }
 if (args.Contains("--late-field"))
 {
-    // --late-field [place=flat|tunnel|street]: each source's own late energy and direction, traced.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.LateFieldSpike.Run(args));
 }
 if (args.Contains("--nan-mix"))
 {
-    // --nan-mix [from= to= door= seconds=]: the walk into Marlow flat 00B through the whole mixer; what the non-finite guard caught.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NanMixSpike.Run(args));
 }
 if (args.Contains("--map-travel"))
 {
-    // --map-travel [from=city] [to=speedway] [voices=40]: one map's acoustics then another's, as /join does; are sources still placed?
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.MapTravelSpike.Run(args));
 }
 if (args.Contains("--nan-walk"))
 {
-    // --nan-walk [map=city] [from=x,y,z] [to=x,y,z] [steps=12]: the listener's trace walked over a real map, every response checked for non-finite values.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NanWalkSpike.Run(args));
 }
 if (args.Contains("--early-tail"))
 {
-    // --early-tail [room=flat|stair|corridor]: the trace's first 120 ms against the room's image sources.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EarlyTailSpike.Run(args));
 }
 if (args.Contains("--clap-room"))
 {
-    // --clap-room [out=path] [claps=4]: a clap in Marlow flat 01F through the whole mixer, and the room against it.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.ClapRoomSpike.Run(args));
 }
 if (args.Contains("--door-knock"))
 {
-    // --door-knock [out=DIR] [seed=N] [knocks=N]: knuckles on a wooden door (OpenFPS.Common.DoorKnock).
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     int seed = int.TryParse(args.FirstOrDefault(a => a.StartsWith("seed="))?.Substring(5), out int sd) ? sd : 3;
     int knocks = int.TryParse(args.FirstOrDefault(a => a.StartsWith("knocks="))?.Substring(7), out int kn) ? kn : 3;
@@ -869,8 +842,6 @@ if (args.Contains("--door-knock"))
 
 if (args.Contains("--knob-door"))
 {
-    // --knob-door [out=DIR] [seed=N]: the physical knob door (OpenFPS.Common.KnobDoor). One WAV per
-    // render, all on one scale (KnobDoor.PascalsAtFullScale), with what each contact did.
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     int seed = int.TryParse(args.FirstOrDefault(a => a.StartsWith("seed="))?.Substring(5), out int sd) ? sd : 1;
     System.IO.Directory.CreateDirectory(dir);
@@ -943,8 +914,6 @@ if (args.Contains("--knob-door"))
 
 if (args.Contains("--pushbar-door"))
 {
-    // --pushbar-door [out=DIR] [only=] [stems=DIR]: the physical push-bar door (OpenFPS.Common.PushBarDoor),
-    // each character opening and shutting on its closer, all on one gain.
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
     OpenFPS.Common.PushBarDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
@@ -981,8 +950,6 @@ if (args.Contains("--pushbar-door"))
 
 if (args.Contains("--sliding-door"))
 {
-    // --sliding-door [out=DIR] [only=] [stems=DIR]: the physical sliding doors (OpenFPS.Common.SlidingDoor),
-    // a patio door and an automatic door in each character, opening and shutting, all on one gain.
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
     OpenFPS.Common.SlidingDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
@@ -1021,9 +988,6 @@ if (args.Contains("--sliding-door"))
 
 if (args.Contains("--car-window"))
 {
-    // --car-window [out=DIR] [only=]: the power window model (OpenFPS.Common.CarWindow), each character
-    // going fully down, fully up, half way down and back up from half way, all on one gain, with the
-    // model's own report: travel time, current, rotor speed, and each part's peak.
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4)
                  ?? OpenFPS.AudioLab.LabPaths.InRepo("inbox", "car-window-2026-10-03");
     string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
@@ -1123,9 +1087,6 @@ if (args.Contains("--car-horn"))
 
 if (args.Contains("--mic"))
 {
-    // --mic [sec=3] [device=NAME]: records from the microphone through FMOD, the Linux head's voice
-    // chat path, and says whether the device opened, how many samples came, and how loud they were.
-    // Nothing is kept or sent.
     float micSec = 3f;
     string micDevice = "";
     foreach (var a in args)
@@ -1165,8 +1126,6 @@ if (args.Contains("--spool"))
 
 if (args.Contains("--aircraft"))
 {
-    // --aircraft [preset ...] [alt= speed= offset= sec= lever= descend=]: aircraft flying past a
-    // listener on the ground, one WAV each. See docs/AIRCRAFT.md.
     int aircode = OpenFPS.Client.Core.AudioEngine.Fmod.AircraftSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(aircode);
@@ -1223,8 +1182,6 @@ if (args.Contains("--room-walk"))
 
 if (args.Contains("--scene-churn"))
 {
-    // --scene-churn [sec=]: engines, machines, aircraft and region reverb buses all at once, made
-    // and released while the listener walks — the headless shape of a city. See RunSceneChurn.
     double secs = args.FirstOrDefault(a => a.StartsWith("sec=")) is { } sa && double.TryParse(sa[4..], out double sv) ? sv : 30.0;
     int code = ProviderOrbit.RunSceneChurn(secs);
     Log.CloseAndFlush();
@@ -1233,9 +1190,7 @@ if (args.Contains("--scene-churn"))
 
 if (args.Contains("--physical-churn"))
 {
-    // --physical-churn: every machine and aircraft preset, created, moved and released against a
-    // live mixer. The headless reproduction of "the client dies a few seconds after an aircraft
-    // starts". See ProviderOrbit.RunPhysicalChurn.
+    // The headless reproduction of "the client dies a few seconds after an aircraft starts".
     int code = ProviderOrbit.RunPhysicalChurn(seconds: 12.0);
     Log.CloseAndFlush();
     Environment.Exit(code);
@@ -1243,8 +1198,7 @@ if (args.Contains("--physical-churn"))
 
 if (args.Contains("--ended-channel"))
 {
-    // --ended-channel: asks FMOD directly whether a DSP stays attached to a Channel that ended on
-    // its own. The answer decides whether pooling those DSPs is safe at all.
+    // The answer decides whether pooling those DSPs is safe at all.
     int code = ProviderOrbit.RunEndedChannelProbe();
     Log.CloseAndFlush();
     Environment.Exit(code);
@@ -1252,8 +1206,6 @@ if (args.Contains("--ended-channel"))
 
 if (args.Contains("--send-churn"))
 {
-    // --send-churn [sec=] [noflip] [ownroom]: one-shots WITH reverb sends, ending on their own, while the
-    // listener's region flips every update — the one path no other harness had (see ProviderOrbit).
     double sec = 30.0;
     foreach (var a in args) if (a.StartsWith("sec=")) sec = double.Parse(a[4..]);
     int code = ProviderOrbit.RunSendChurn(sec, flip: !args.Contains("noflip"), ownRoom: args.Contains("ownroom"));
@@ -1263,8 +1215,6 @@ if (args.Contains("--send-churn"))
 
 if (args.Contains("--foreign-disconnect"))
 {
-    // --foreign-disconnect: one send disconnected through the WRONG reverb unit, and what FMOD's
-    // input counts do afterwards. The mechanism of the city crash, isolated.
     int code = ProviderOrbit.RunForeignDisconnectProbe();
     Log.CloseAndFlush();
     Environment.Exit(code);
@@ -1272,7 +1222,6 @@ if (args.Contains("--foreign-disconnect"))
 
 if (args.Contains("--send-drift"))
 {
-    // --send-drift scenario=N: tears a sending channel down one way, then trips the wire.
     int sc = 1; foreach (var a in args) if (a.StartsWith("scenario=")) sc = int.Parse(a[9..]);
     int code = ProviderOrbit.RunSendDriftProbe(sc);
     Log.CloseAndFlush();
@@ -1281,8 +1230,6 @@ if (args.Contains("--send-drift"))
 
 if (args.Contains("--send-window"))
 {
-    // --send-window [sec=] [mode=client|forget|stop]: FMOD alone, forcing the window between a
-    // queued send disconnect and the channel finishing.
     double sec = 20.0; string mode = "client";
     foreach (var a in args) { if (a.StartsWith("sec=")) sec = double.Parse(a[4..]); if (a.StartsWith("mode=")) mode = a[5..]; }
     int code = ProviderOrbit.RunSendWindowProbe(sec, mode);
@@ -1292,9 +1239,8 @@ if (args.Contains("--send-window"))
 
 if (args.Contains("--reap-churn"))
 {
-    // --reap-churn [sec=]: one-shots that END ON THEIR OWN and are collected by the reaper. The only
-    // harness that exercises a STALE channel handle — every other one stops its voices itself, which
-    // is the safe path, and is why none of them reproduced the city crash.
+    // The one harness with a stale channel handle: every other stops its voices itself, the safe path,
+    // which is why none of them reproduced the city crash.
     double sec = 20.0;
     foreach (var a in args) if (a.StartsWith("sec=")) sec = double.Parse(a[4..]);
     int code = ProviderOrbit.RunReapChurn(sec);
