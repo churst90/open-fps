@@ -58,6 +58,13 @@ Recent work, newest first. `git log` has the rest.
     only as the copy's width (`Spread`); unlike an engine's echo the copy is not smeared by it (a TODO).
     Unheard; renders in inbox/probable-bugs-2026-10-07/7-reflection-slots. The emitter streams were
     regenerated for the field that went (no other line changed).
+  - The traced reverb's input is the bus's channels summed at constant power, not averaged (found by the
+    todo audit). A room's bus is stereo in the game (two input channels with only mono claps sending),
+    and FMOD upmixes a mono send to it at -3.01 dB a channel (`--probable-bugs scene=upmix`), so the
+    average took every mono source's tail 3 dB under the -6 dB trim. The trim stays -6, so the tail is
+    3 dB wetter than what was approved by ear on 2026-09-30 (Cody to judge whether -6 still holds). A
+    clap's tail 150-400 ms after it, three renders each: the flat +3.3 dB, a street +1.6 (the facades'
+    placed echoes share that window). Unheard; renders in inbox/probable-bugs-2026-10-07/traced-reverb-input.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream

@@ -19,7 +19,7 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --probable-bugs scene=pa|landing|bell|yard|rooms [out=DIR] [room=flat|stair]: the sounds the probable bugs
+/// --probable-bugs scene=pa|landing|bell|yard|rooms|upmix [out=DIR] [room=flat|stair|street] [stereo=1]: the sounds the probable bugs
 /// of 2026-10-07 change, rendered through the game's own mixer for a before and an after.
 ///
 ///   pa       a public-address speaker (a recording of speech) on a 4 m pole, from 10 and 30 m, over
@@ -27,10 +27,13 @@ namespace OpenFPS.AudioLab.Spikes;
 ///   landing  your own jump landings on concrete and on wood, with a few steps on each for scale.
 ///   bell     the crossing gong, the tram gong and the locomotive bell ringing, 5 m off.
 ///   yard     the PA in a yard walled in concrete, walked round at 1.4 m/s: the walls' copies of it.
-///   rooms    four claps in a carpeted flat or a tiled stairwell (room=), the listener's traced tail
-///            and the placed copies, as --clap-room does: whether the room's colour reaches the tail.
+///   rooms    four claps in a carpeted flat, a tiled stairwell or a street (room=flat|stair|street), the
+///            listener's traced tail and the placed copies, as --clap-room does: whether the room's colour
+///            reaches the tail. stereo=1 puts an inaudible stereo voice in the room as well.
+///   upmix    FMOD alone: what a reverb bus's input carries of a mono send, with and without a stereo
+///            voice on the same bus.
 ///
-/// All but rooms are the whole client path (a ClientAudioSystem over the facade over the
+/// pa, landing, bell and yard are the whole client path (a ClientAudioSystem over the facade over the
 /// FmodAudioProvider, as --game-levels): the loudness law at the default /levels, the master and the
 /// HRTF. Output: DIR/capture.wav and DIR/segments.csv for tools/game_levels.py. The rooms scene drives
 /// the provider directly (there is no map) and writes DIR/capture-ROOM.wav.
@@ -45,7 +48,8 @@ public static class ProbableBugsSpike
         string outDir = Arg(args, "out=") ?? "/tmp/openfps-probable-bugs";
         Directory.CreateDirectory(outDir);
         AcousticRegistry.Initialize();
-        if (scene == "rooms") return Rooms(outDir, Arg(args, "room=") ?? "flat");
+        if (scene == "rooms") return Rooms(outDir, Arg(args, "room=") ?? "flat", Arg(args, "stereo=") is "1" or "on");
+        if (scene == "upmix") return Upmix();
 
         string wav = Path.Combine(outDir, "capture.wav");
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
@@ -248,6 +252,101 @@ public static class ProbableBugsSpike
         return 0;
     }
 
+    // ── What a reverb bus gets from a mono voice ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// FMOD alone, as the provider wires a voice to a room: mono noise on a channel, sent from a mixer
+    /// tap at the channel's input end (the own-room send) and from its fader (the listener's-room send)
+    /// into a bus whose SFXREVERB passes its input through. Prints what each channel of the reverb's
+    /// input carries against the voice's own mono signal: the gain FMOD's upmix gives a mono send, which
+    /// TracedReverbDsp then averages back to one channel.
+    /// </summary>
+    private static int Upmix()
+    {
+        if (FMOD.Factory.System_Create(out FMOD.System sys) != FMOD.RESULT.OK) { Console.WriteLine("FAIL: no FMOD"); return 1; }
+        sys.setOutput(FMOD.OUTPUTTYPE.NOSOUND);
+        sys.setSoftwareFormat(48000, FMOD.SPEAKERMODE.STEREO, 0);
+        sys.init(64, FMOD.INITFLAGS.NORMAL, IntPtr.Zero);
+        sys.getSoftwareFormat(out int rate, out _, out _);
+        int len = rate;
+        var pcm = new byte[len * 2];
+        var rnd = new Random(1);
+        for (int i = 0; i < len; i++)
+        {
+            short v = (short)((rnd.NextDouble() * 2 - 1) * 6000);
+            pcm[i * 2] = (byte)(v & 0xFF); pcm[i * 2 + 1] = (byte)((v >> 8) & 0xFF);
+        }
+        var info = new FMOD.CREATESOUNDEXINFO
+        {
+            cbsize = System.Runtime.InteropServices.Marshal.SizeOf<FMOD.CREATESOUNDEXINFO>(),
+            length = (uint)pcm.Length, numchannels = 1, defaultfrequency = rate, format = FMOD.SOUND_FORMAT.PCM16,
+        };
+        sys.createSound(pcm, FMOD.MODE.OPENMEMORY | FMOD.MODE.OPENRAW | FMOD.MODE.LOOP_NORMAL | FMOD.MODE._2D, ref info, out var snd);
+
+        // A silent stereo voice on the same bus makes its input stereo, as any stereo voice in the room
+        // (a stereo recording, a synth) does in the game: then the mono send is upmixed.
+        var silent = new byte[len * 4];
+        var info2 = info; info2.numchannels = 2; info2.length = (uint)silent.Length;
+        sys.createSound(silent, FMOD.MODE.OPENMEMORY | FMOD.MODE.OPENRAW | FMOD.MODE.LOOP_NORMAL | FMOD.MODE._2D, ref info2, out var quiet);
+
+        foreach (string from in new[] { "tap", "fader", "tap+stereo", "fader+stereo" })
+        {
+            sys.createChannelGroup("room", out var bus);
+            sys.createDSPByType(FMOD.DSP_TYPE.SFXREVERB, out var reverb);
+            reverb.setParameterFloat(11, -80f);   // as the provider: no tail of its own, dry through
+            reverb.setParameterFloat(12, 0f);
+            bus.addDSP(FMOD.CHANNELCONTROL_DSP_INDEX.TAIL, reverb);
+            sys.getMasterChannelGroup(out var master);
+            master.addGroup(bus);
+
+            sys.playSound(snd, default, true, out var ch);
+            ch.setVolume(1f);
+            FMOD.DSP send;
+            if (from.StartsWith("tap"))
+            {
+                sys.createDSPByType(FMOD.DSP_TYPE.MIXER, out send);
+                ch.addDSP(FMOD.CHANNELCONTROL_DSP_INDEX.TAIL, send);
+            }
+            else ch.getDSP(FMOD.CHANNELCONTROL_DSP_INDEX.FADER, out send);
+            reverb.addInput(send, out var conn, FMOD.DSPCONNECTION_TYPE.SEND);
+            conn.setMix(1f);
+            FMOD.Channel other = default;
+            if (from.EndsWith("+stereo"))
+            {
+                sys.playSound(quiet, default, false, out other);
+                other.getDSP(FMOD.CHANNELCONTROL_DSP_INDEX.FADER, out var otherFader);
+                reverb.addInput(otherFader, out _, FMOD.DSPCONNECTION_TYPE.SEND);
+            }
+            send.setMeteringEnabled(false, true);
+            reverb.setMeteringEnabled(true, true);
+            ch.setPaused(false);
+            for (int i = 0; i < 50; i++) { sys.update(); Thread.Sleep(10); }
+            send.getMeteringInfo(IntPtr.Zero, out FMOD.DSP_METERING_INFO sent);
+            reverb.getMeteringInfo(out FMOD.DSP_METERING_INFO got, out FMOD.DSP_METERING_INFO left);
+            double Db(float x) => 20 * Math.Log10(Math.Max(1e-9, x));
+            Console.WriteLine($"  from the {from}: the send carries {sent.numchannels} channel(s), rms {Db(sent.rmslevel[0]):F2} dBFS"
+                            + (sent.numchannels > 1 ? $" / {Db(sent.rmslevel[1]):F2}" : "")
+                            + $"; the reverb's input has {got.numchannels}: "
+                            + string.Join(" / ", Enumerable.Range(0, got.numchannels).Select(c => $"{Db(got.rmslevel[c]):F2}"))
+                            + $" dBFS. Their mean, as TracedReverbDsp takes it, against a mono source at the send: "
+                            + $"{Db(Enumerable.Range(0, got.numchannels).Sum(c => got.rmslevel[c]) / got.numchannels) - Db(sent.rmslevel[0]):F2} dB"
+                            + (got.numchannels > 1 ? $"; their sum over sqrt({got.numchannels}): {Db(Enumerable.Range(0, got.numchannels).Sum(c => got.rmslevel[c]) / MathF.Sqrt(got.numchannels)) - Db(sent.rmslevel[0]):F2} dB" : "")
+                            + $"; the reverb hands on {left.numchannels} channel(s): "
+                            + string.Join(" / ", Enumerable.Range(0, left.numchannels).Select(c => $"{Db(left.rmslevel[c]):F2}")) + " dBFS");
+            if (other.hasHandle()) other.stop();
+            ch.stop();
+            reverb.disconnectAll(true, true);
+            if (from.StartsWith("tap")) send.release();
+            reverb.release();
+            bus.release();
+            sys.update();
+        }
+        snd.release();
+        quiet.release();
+        sys.release();
+        return 0;
+    }
+
     // ── Rooms ──────────────────────────────────────────────────────────────────────────────────────
 
     private const int RoomId = 87;
@@ -258,14 +357,30 @@ public static class ProbableBugsSpike
     /// storeys, tile floor, concrete walls and ceiling). The claps are placed by the loudness law and
     /// get the copies the game plans for them.
     /// </summary>
-    private static int Rooms(string outDir, string room)
+    private static int Rooms(string outDir, string room, bool stereoVoice = false)
     {
         var q = Quaternion.Identity;
         List<SteamAudioScene.Box> boxes;
         Vector3 ear;
         RegionComponent region;
         int I(string m) => AcousticRegistry.GetProperties(m).ResonanceIndex;
-        if (room == "stair")
+        if (room == "street")
+        {
+            // A street 14 m wide between two terraces 12 m high and 80 m long, asphalt between them.
+            boxes = new List<SteamAudioScene.Box>
+            {
+                new(new Vector3(0, -0.25f, 0), new Vector3(120f, 0.5f, 120f), q, "Asphalt"),
+                new(new Vector3(-12f, 6f, 0), new Vector3(10f, 12f, 80f), q, "Brick"),
+                new(new Vector3(12f, 6f, 0), new Vector3(10f, 12f, 80f), q, "Brick"),
+            };
+            ear = new Vector3(2f, 1.7f, 0f);
+            region = new RegionComponent
+            {
+                FriendlyName = "Street", IsIndoor = false, RoomSize = new Vector3(14f, 12f, 80f), ReverbTimeScale = 1f,
+                Materials = new[] { I("Asphalt"), I("Asphalt"), I("Brick"), I("Brick"), I("Brick"), I("Brick") },
+            };
+        }
+        else if (room == "stair")
         {
             const float W = 3f, D = 6f, H = 9f;
             boxes = new List<SteamAudioScene.Box>
@@ -316,7 +431,7 @@ public static class ProbableBugsSpike
         TracedReverbSet.Configure(ctx, saScene);
         TracedReverbSet.SetListener(ear);
 
-        string wav = Path.Combine(outDir, $"capture-{room}.wav");
+        string wav = Path.Combine(outDir, $"capture-{room}{(stereoVoice ? "-stereo" : "")}.wav");
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
         var provider = new FmodAudioProvider();
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
@@ -380,6 +495,20 @@ public static class ProbableBugsSpike
                 }
             }
 
+            // stereo=1: a stereo voice in the room as well (a plain synth, which FMOD makes stereo), 60 dB
+            // under the claps: inaudible, but it makes the room's bus stereo, and every mono send upmixed.
+            if (stereoVoice)
+            {
+                var at = ear + new Vector3(3f, 0f, 0f);
+                provider.PlaySpatialSound(new SpatialEmitter
+                {
+                    EntityId = -60, SoundId = "SYNTH", IsSynth = true, SynthWave = SynthWaveType.Sine, SynthFrequency = 220f,
+                    SynthFilterCutoff = 2000f, Mode = PlaybackMode.LoopOne, Type = EmitterType.WorldLocked,
+                    Position = at, ApparentPosition = at, Volume = placed.Gain * 1e-3f, MinDistance = placed.ReferenceDistance,
+                    Range = 200f, Pitch = 1f, ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,
+                    EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f, IsEvent = true, Essential = true, TargetRegionId = RoomId,
+                });
+            }
             var sw = System.Diagnostics.Stopwatch.StartNew();
             double next = 3.0;
             int played = 0;
@@ -406,6 +535,8 @@ public static class ProbableBugsSpike
                 provider.Update();
                 Thread.Sleep(10);
             }
+            var meter = provider.TracedMeter(RoomId);
+            Console.WriteLine($"  the room's bus carried {meter.Channels} channel(s) into the traced stage");
             Console.WriteLine($"  {region.FriendlyName}: listener trace {(TracedReverbSet.Listener != null ? "ready" : "MISSING")}, "
                             + $"tail {FmodAudioProvider.TailDb:F0} dB, copies {FmodAudioProvider.CopiesDb:F0} dB, {plan.Count} planned copies");
         }

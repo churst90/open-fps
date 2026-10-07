@@ -424,7 +424,10 @@ boundary copies (`/copies <dB>`, OPENFPS_COPIES_DB). `/reflections <dB>` sets bo
 image-source level, physical to within a couple of decibels wherever measured (--clap-room,
 --traced-reverb).
 
-Both are -6, set by ear in a flat, a tunnel and a street (settled 2026-09-30). A trim further down was
+Both are -6, set by ear in a flat, a tunnel and a street (settled 2026-09-30). The tail was then 3 dB
+under that: the traced stage averaged its bus's two channels, and FMOD puts a mono send into a stereo bus
+at -3.01 dB a channel. Summed at constant power since 2026-10-07 (TracedReverbDsp.DownmixGain), so -6
+now means what it says and is 3 dB wetter than what was approved; Cody to judge. A trim further down was
 hiding faults, not setting a level: with the tail parametric it was 14-20 dB too loud in the tunnel; with
 the tail spread evenly it was "centralised"; with sample-identical copies the ear heard separate events.
 If the tail sounds like a wash at a level near 0, look for something non-physical before trimming. One is
