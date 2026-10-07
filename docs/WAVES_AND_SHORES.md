@@ -68,6 +68,15 @@ groups longer. Nothing here makes groups on purpose: the model's surface at each
 spectrum's components (16 for a wind sea, 12 for a swell), and each wave is found where the surface
 crosses zero upward, with its own height and period.
 
+Where the edge takes the waves one by one, the wind sea's and the swell's are found apart, each where
+its own train crosses zero: a wall or a hull throws back every crest that reaches it, and a steep beach
+where the wind sea plunges (an Iribarren number of 0.5 or more) takes each wave at its step. On a gentle
+beach where the wind sea spills, its short waves are spent across a wide surf zone and what reaches the
+edge is the long waves' swash, so there the sum's own up-crossings are the waves [estimate, from
+Battjes's breaker types]. Until 2026-10-06 every edge took the sum: a wind wave riding a swell never
+crossed zero, and the shingle and the harbour wall broke once a swell period and fell silent between
+(section 8.1).
+
 ### 1.4 Swell
 
 The sea's surf is mostly swell from storms far away, which arrives whatever the local wind. A preset
@@ -246,14 +255,21 @@ Found at the zero up-crossing, with its height and period, then by the face (sec
 A surf plume is millions of bubbles; a lake's lap a few. Every population (bubbles by octave of size,
 bursting bubbles, stone clicks, spray) is rendered event by event while there are no more than three to
 a 128-sample block in a band, and as band noise of the same power above that: a crowd too dense to tell
-apart is noise, and its envelope still moves with the waves and their groups. Its rate is uneven from one
-40 ms to the next, log-normally (`Flicker`, fitted), as turbulent intermittency is (Kolmogorov 1962).
+apart is noise, and its envelope still moves with the waves and their groups. Its rate is uneven,
+log-normally (`Flicker`, fitted), as turbulent intermittency is (Kolmogorov 1962), and the unevenness
+glides over about a tenth of a second (`FlickerSeconds`). Until 2026-10-06 it was drawn afresh every
+20-60 ms and held, which made every breaker's hiss step (section 8.1).
 
 ### 5.4 Heard from places along it
 
 A stretch of edge is heard from places along it (`ExtendedSources`), each its own column, so its waves
 arrive at different places at different times; a surf beach also from a row of places on its break
 line. Every event belongs to one place, heard there with the spread, otherwise at the middle.
+
+A swell's crest comes in at an angle, so a column of the beach does not break in one instant: the break
+runs across the column's width over w sin θ / c (0.25-0.3 s for the surf's and the shingle's columns at
+10 degrees), and the column breaks in three pieces over that time, each with its share of the crest.
+A process's rate (the quick rise, then three time constants of fall) comes down to nothing at its end.
 
 ## 6. On the maps
 
@@ -333,13 +349,58 @@ What does not fit:
 - The lakes' lowest two octaves are 15-25 dB under the recordings', which carry wind on the microphone.
 
 Levels at a metre from one stretch, at 5 m/s onshore (`SourceLevelDb`): lake beach 67 dB, rocky edge 64,
-pond bank 51.5, reedy edge 46, river bank 48.5, surf 85, shingle 93.5, harbour wall 64.5, boats 60-61.
+pond bank 51.5, reedy edge 46, river bank 48.5, surf 85, shingle 92.5 (93.5 before section 8.1),
+harbour wall 66 (64.5), boats 60-61.
 The surf heard 15 m back from 150 m of beach measures 62 dB, against 62 dB at 40 m quoted from Bolin and
 Åbom (wave height not read): about right, perhaps a little low.
 
 Cost of one core, one stretch: lake beach 3.2 %, rocky edge 3.3 %, pond 0.9 %, reedy edge 0.8 %, river
 bank 0.9 %, surf 11.1 %, shingle 5.9 %, harbour wall 1.7 %, boats 2.2-2.9 %. A near stretch takes 5 HRTF
-voices (surf 10).
+voices (surf 10). Since section 8.1 the surf costs about half as much again, the shingle about four
+times and the harbour wall about twice (measured side by side with the old model on a busy machine:
+surf 21-27 % to 36 %, shingle 8 % to 32-37 %, harbour wall 4.4 % to 10 %); the rest are unchanged.
+
+### 8.1 Smoothing, 2026-10-06
+
+Cody, hearing `inbox/waves-2026-10-06`: "the sound on the waves crashing is very steppy/jumpy. the white
+noise from the crashing needs to be smoothed out ... waves are a wash, not jumpy events." Besides that
+the model was approved by ear. What made a break exact and separate:
+
+- The crowd's unevenness (`Flicker`, log-normal, 1.3) was drawn afresh every 20-60 ms and held: level
+  steps of 5.6 dB standard deviation in every band, twenty times a second. It now glides: two one-pole
+  stages of Gaussian noise in cascade, unit variance, time constant `FlickerSeconds` = 0.1 s, the same
+  spread. 0.04 s smooth was 13 of 14 for the surf and 0.1 and 0.25 s were 14 of 14 (the earlier
+  stepping was 13, its 4-16 Hz modulation outside).
+- A process's rate fell for three time constants and was cut off at e^-3 of its peak, a 13 dB step at
+  the end of every part of every break. It now falls to nothing: (e^-u − e^-3) / (1 − e^-3).
+- A column broke in one instant. A swell's crest comes in at an angle, so the break runs across a
+  column of width w for w sin θ / c (0.25-0.3 s for the surf and the shingle at 10 degrees); the column
+  now breaks in three pieces over that time, each with a third of the crest. `MaxProcs` 128 to 256
+  (145 seen at once).
+- The waves on shingle and at the harbour wall were found on the sum of the wind sea and the swell
+  (section 1.3).
+
+Measured on the game's path (`inbox/water-smoothing-2026-10-06/README.txt`), the 2-8 kHz level of 10 ms
+windows, the step from one to the next, median / 95th percentile / largest, before and after, and the
+recordings' range:
+
+| scene | before | after | recordings |
+|---|---|---|---|
+| surf 5 m | 1.12 / 3.79 / 10.0 dB | 0.90 / 2.69 / 6.2 | 0.61-1.28 / 1.74-4.16 / 5.3-41 |
+| shingle 3 m | 1.51 / 6.24 / 24.6 | 1.06 / 3.14 / 6.4 | 0.66-1.22 / 2.00-4.37 / 6.0-21 |
+| lake beach 2 m, 8 m/s | 1.28 / 4.15 / 12.2 | 1.04 / 3.31 / 5.8 | 0.87-2.39 / 2.65-9.40 / 8-40 |
+| harbour wall 2 m | 3.23 / 13.98 / 44.8 | 2.50 / 9.01 / 37.0 | |
+
+The envelope's modulation at 4-16 Hz (texture_stats.py): surf 0.274 to 0.080 (recordings 0.054-0.108),
+lake beach 0.303 to 0.148, shingle 0.142 to 0.069. Texture statistics inside the recordings' spread (of
+21, 30 s through the game): shingle 2 to 13, harbour wall 11 to 16, lake beach 17 to 17, surf 17 to 14
+(one take; dry at a metre 13-14 of the fit's 14, against 13). The 2-8 kHz level's standard deviation:
+shingle 11.7 to 6.5 dB (recordings 3.0-5.8), harbour wall 14.8 to 8.0 (1.7-8.9). Remeasured at a
+metre: shingle 92.3 dB, harbour wall 65.8.
+
+Still open: the harbour wall and the boats are slaps with little between them (the boats' 2-8 kHz level
+standard deviation 14 dB against 3.6-11.8 recorded); what fills the time between slaps at a real face is
+not modelled. The shingle is still lumpier than its recordings.
 
 ## 9. Not modelled yet, and what comes next
 

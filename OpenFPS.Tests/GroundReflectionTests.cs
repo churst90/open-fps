@@ -112,4 +112,51 @@ public class GroundReflectionTests
         for (int k = 0; k < 64; k++) last = g.Process(k);
         Assert.InRange(last, 2 * 63 - 0.5f - 0.05f, 2 * 63 - 0.5f + 0.05f);
     }
+
+    // ── A texture's ground: its power, not a copy ────────────────────────────────────────────────
+
+    private static GroundReflection Texture(float delaySeconds, float gain)
+    {
+        var g = new GroundReflection(Sr) { Texture = true };
+        g.Set(delaySeconds, gain, gain);
+        return g;
+    }
+
+    /// <summary>
+    /// "house_downpipe_and_gutter_outlet_heavy.wav has a flanging/very fast repeating sound to it"
+    /// (Cody, 2026-10-06): a gutter outlet 2.8 m up, heard 1.8 m away over paving, was its own stream
+    /// again 8 ms later, a comb every 125 Hz. Running water hands back the ground's power: there are no
+    /// notches, and noise through it has no echo of itself at the delay.
+    /// </summary>
+    [Fact]
+    public void ATextureHasNoComb()
+    {
+        const float delay = 0.008f;
+        float notch = 1f / (2f * delay);
+        // Through a copy: the notches at the odd multiples of 62.5 Hz cut deep.
+        Assert.True(GainDb(Hard(delay), 7f * notch) < -10.0);
+        // Through a texture's ground: within a decibel of each other at a notch and a peak.
+        double atNotch = GainDb(Texture(delay, 0.45f), 7f * notch), atPeak = GainDb(Texture(delay, 0.45f), 8f * notch);
+        Assert.InRange(atNotch - atPeak, -1.0, 1.0);
+
+        var g = Texture(delay, 0.45f);
+        var rng = new Random(5);
+        int n = (int)Sr * 4, lag = (int)MathF.Round(delay * Sr);
+        var y = new float[n];
+        for (int i = 0; i < n; i++) y[i] = g.Process((float)(rng.NextDouble() * 2 - 1));
+        double r0 = 0, r1 = 0;
+        for (int i = (int)Sr; i < n - lag; i++) { r0 += y[i] * (double)y[i]; r1 += y[i] * (double)y[i + lag]; }
+        Assert.InRange(r1 / r0, -0.03, 0.03);
+    }
+
+    /// <summary>...and it is still the ground: above the corner c / 4Δ it adds the reflection's power,
+    /// 1 + g², and below it the bass lifts by the full pressure, (1 + g)², as for any source.</summary>
+    [Fact]
+    public void ATexturesGroundKeepsItsPowerAndItsBass()
+    {
+        const float delay = 0.0007f, gain = 0.9f;       // a downpipe's shoe 0.15 m up, 1.5 m away
+        double high = GainDb(Texture(delay, gain), 6000f), low = GainDb(Texture(delay, gain), 40f);
+        Assert.InRange(high, 10 * Math.Log10(1 + gain * gain) - 0.5, 10 * Math.Log10(1 + gain * gain) + 0.5);
+        Assert.InRange(low, 20 * Math.Log10(1 + gain) - 0.7, 20 * Math.Log10(1 + gain) + 0.3);
+    }
 }

@@ -35,7 +35,7 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// (bubbles by octave of size, bursting bubbles, stone clicks) is rendered event by event while it is
 /// sparse, and as band noise of the same power once there are more than a few to a block in a band:
 /// a crowd too dense to tell apart is noise, and its envelope still moves with the waves and their
-/// groups.
+/// groups, and with the turbulence's own unevenness, which glides and never steps.
 ///
 /// EXTENDED (ExtendedSources). A stretch of edge is heard from places along it, each its own column of
 /// water with its own waves; a surf beach also from a row on its break line. Every event belongs to one
@@ -69,8 +69,9 @@ public sealed class ShoreSynth
     /// bubble, going as its radius. FITTED with the swash's foam.</summary>
     public static readonly float PopPascalsPerMm = Knob("POP", 0.01f);
 
-    /// <summary>How unevenly a crowd of events comes, the standard deviation of the log of its rate
-    /// from one 40 ms to the next: turbulent intermittency is log-normal (Kolmogorov 1962). FITTED.</summary>
+    /// <summary>How unevenly a crowd of events comes, the standard deviation of the log of its rate:
+    /// turbulent intermittency is log-normal (Kolmogorov 1962). It glides, over about
+    /// <see cref="FlickerSeconds"/> (until 2026-10-06 it was drawn afresh every 40 ms and stepped). FITTED.</summary>
     public static readonly float Flicker = Knob("FLICKER", 1.3f);
 
     /// <summary>How much of that unevenness every size of bubble shares (the rest each octave of sizes has
@@ -175,11 +176,15 @@ public sealed class ShoreSynth
 
     private const int Block = 128;
     private const int Bands = 7;                 // octaves 250 Hz .. 16 kHz
-    private const int MaxProcs = 128;
+    private const int MaxProcs = 256;
+    /// <summary>How many pieces a column's break is cut into along its width (see Column.Sweep).</summary>
+    private const int SweepPieces = 3;
     /// <summary>More than this many events of one band in one block (about 1,100 a second) and the band
     /// is a crowd: rendered as noise of the same power.</summary>
     private const float SparseLimit = 3f;
-    private const float FlickerSeconds = 0.04f;
+    /// <summary>How long one swell of a crowd's unevenness lasts, s: the time constant of the smooth
+    /// process its rate follows (see <see cref="FlickerAt"/>).</summary>
+    private static readonly float FlickerSeconds = Knob("FLICKERSECONDS", 0.1f);
 
     public readonly ShoreSpec Spec;
     public readonly ShoreGeometry Geometry;
@@ -191,6 +196,9 @@ public sealed class ShoreSynth
     private readonly Train? _swell;
     private readonly Proc[] _procs = new Proc[MaxProcs];
     private readonly float[,] _bandFlicker = new float[MaxProcs, Bands];
+    // The unevenness of each process, common (index Bands) and per band: two one-pole stages of
+    // Gaussian noise in cascade, so it glides rather than steps.
+    private readonly float[,] _flickA = new float[MaxProcs, Bands + 1], _flickB = new float[MaxProcs, Bands + 1];
     private readonly float[,] _power;            // per place, per band: Pa² this block
     private readonly float[,] _gain;              // per place, per band: the noise's gain now
     private readonly Resonator[,] _band, _band2;
@@ -223,6 +231,10 @@ public sealed class ShoreSynth
         Spec = spec;
         Geometry = geometry ?? spec.DefaultGeometry;
         _rate = sampleRate;
+        _flickPole = MathF.Exp(-Block / sampleRate / MathF.Max(1e-3f, FlickerSeconds));
+        _flickDrive = MathF.Sqrt(1f - _flickPole * _flickPole);
+        float rho2 = _flickPole * _flickPole;
+        _flickA2B = MathF.Sqrt((1f - rho2) * (1f - rho2) * (1f - rho2) / (1f + rho2)) / _flickDrive;
         _along = Math.Max(1, spec.Places);
         _rows = spec.BreakRowMetres > 0f ? 2 : 1;
         _places = new EventSum[_along * _rows];
@@ -266,7 +278,12 @@ public sealed class ShoreSynth
             float hb = WindWaves.BreakerDepth(WindWaves.BreakerHeight(spec.SwellHeightMetres, tp));
             float c = MathF.Sqrt(WindWaves.Gravity * MathF.Max(0.2f, hb));
             float s = MathF.Sin(spec.SwellAngleDegrees * MathF.PI / 180f);
-            foreach (var col in _columns) col.SwellDelay = (col.Along + 0.5f * length) * s / c;
+            foreach (var col in _columns)
+            {
+                col.SwellDelay = (col.Along + 0.5f * length) * s / c;
+                // ...and across its own width the break runs for this long: a column is not a point.
+                col.Sweep = col.Width * MathF.Abs(s) / c;
+            }
         }
         if (spec.Face == ShoreFace.Hull && spec.Hull != null) _hull = new HullPlate(spec.Hull, sampleRate, _places.Length);
     }
@@ -419,7 +436,7 @@ public sealed class ShoreSynth
 
     private sealed class Column
     {
-        public float Width, Along, SwellDelay;
+        public float Width, Along, SwellDelay, Sweep;
         public int Swash, Break;
         public Train Wind = null!;
         public Train? Eddy;
@@ -427,6 +444,8 @@ public sealed class ShoreSynth
         public double LastUp = double.NaN;
         public float EddyPrev, EddyCrest = float.MinValue, EddyTrough = float.MaxValue;
         public double EddyLastUp = double.NaN;
+        public float SwellPrev, SwellCrest = float.MinValue, SwellTrough = float.MaxValue;
+        public double SwellLastUp = double.NaN;
     }
 
     /// <summary>
@@ -548,10 +567,28 @@ public sealed class ShoreSynth
             ? 0.2f * Spec.CurrentMetresPerSecond / MathF.Max(0.05f, Spec.BankFeatureMetres) : 0f;
         // The surface rocked at the bank by an eddy: of the order of its velocity head, U² / 2g.
         float eddyHs = Spec.CurrentMetresPerSecond * Spec.CurrentMetresPerSecond / (2f * WindWaves.Gravity);
+        // Where the edge takes the waves one by one, the wind sea's and the swell's are each found on their
+        // own: a wall or a hull throws back every crest that reaches it, and a steep beach where the wind
+        // sea plunges (an Iribarren number of 0.5 or more, Battjes 1974) takes each wave at its step. On
+        // a gentle beach where it spills, the short waves are spent across a wide surf zone and what
+        // reaches the edge is the long waves' swash: there a wave is the sum's own up-crossing. Found as
+        // one sum on shingle and at the harbour wall, a wind wave riding a swell was never a wave of its
+        // own, so each place broke once a swell period and fell silent between (2026-10-06).
+        bool apart = _swell != null && windHs > 0f
+                     && (Spec.Face != ShoreFace.Beach || WindWaves.Iribarren(MathF.Max(0.005f, Spec.BeachSlope), windHs, 1f / windHz) >= 0.5f);
         foreach (var c in _columns)
         {
             float eta = windHs > 0f ? windHs * c.Wind.Advance(windHz, dt, _rng) : 0f;
-            if (_swell != null) eta += Spec.SwellHeightMetres * _swell.At(swellHz, c.SwellDelay);
+            if (apart)
+            {
+                float sw = Spec.SwellHeightMetres * _swell!.At(swellHz, c.SwellDelay);
+                Find(c, sw, ref c.SwellPrev, ref c.SwellCrest, ref c.SwellTrough, ref c.SwellLastUp, eddy: false);
+            }
+            else if (_swell != null)
+            {
+                eta += Spec.SwellHeightMetres * _swell.At(swellHz, c.SwellDelay);
+                c.SwellLastUp = double.NaN;
+            }
             Find(c, eta, ref c.Prev, ref c.Crest, ref c.Trough, ref c.LastUp, eddy: false);
             if (c.Eddy != null)
             {
@@ -645,26 +682,39 @@ public sealed class ShoreSynth
             // at the edge for the second.
             float crossing = MathF.Max(0.8f * period, breaksAt / MathF.Max(0.3f, MathF.Sqrt(g * WindWaves.BreakerDepth(hb) * 0.5f)));
             float jetShare = plunging ? 0.5f : 0f;
-            if (jetShare > 0f)
-                StartCloud(c.Break, at, 2f * MathF.Sqrt(2f * hb / g) + 0.15f, jetShare * plumeAir, PlumeLargestMm(hb), PlumeHeard(hb) * PlumePart);
             float roller = (1f - jetShare) * plumeAir;
-            StartCloud(c.Break, at, 0.5f * crossing, 0.5f * roller, PlumeLargestMm(hb), PlumeHeard(hb) * PlumePart);
-            StartCloud(c.Swash, at + (int)(0.5f * crossing * _rate), 0.5f * crossing, 0.5f * roller, PlumeLargestMm(0.5f * hb), PlumeHeard(0.5f * hb) * PlumePart);
+            // A swell's crest comes in at an angle, so the break runs along the column's width over its
+            // Sweep: the column breaks a piece at a time, each piece its own share of the crest, rather
+            // than all of it in one instant (Cody, 2026-10-06: "waves are a wash, not jumpy events").
+            int pieces = c.Sweep > 0.05f ? SweepPieces : 1;
+            float piece = 1f / pieces;
+            for (int k = 0; k < pieces; k++)
+            {
+                int from = at + (int)((k + _rng.Uniform()) * piece * c.Sweep * _rate);
+                if (jetShare > 0f)
+                    StartCloud(c.Break, from, 2f * MathF.Sqrt(2f * hb / g) + 0.15f, piece * jetShare * plumeAir, PlumeLargestMm(hb), PlumeHeard(hb) * PlumePart);
+                StartCloud(c.Break, from, 0.5f * crossing, piece * 0.5f * roller, PlumeLargestMm(hb), PlumeHeard(hb) * PlumePart);
+                StartCloud(c.Swash, from + (int)(0.5f * crossing * _rate), 0.5f * crossing, piece * 0.5f * roller, PlumeLargestMm(0.5f * hb), PlumeHeard(0.5f * hb) * PlumePart);
+                if (plunging && CrashPart > 0f)
+                {
+                    // The jet lands: its water (a tenth of Hb² a metre of crest, the lip that is thrown) at
+                    // the speed it fell from the crest, as lumps up to a centimetre across.
+                    float jetSpeed = MathF.Sqrt(2f * g * hb);
+                    float lump = Math.Clamp(0.05f * hb, 0.002f, 0.01f);
+                    float water = 0.1f * hb * hb * w;
+                    float lumps = water / (4f / 3f * MathF.PI * lump * lump * lump);
+                    StartSpray(c.Break, from + (int)(MathF.Sqrt(2f * hb / g) * _rate), 0.12f + 0.3f * hb, piece * lumps, lump, jetSpeed,
+                               FallingWaterSynth.PoolCrownShare, CrashPart);
+                }
+            }
             CloudOscillation(c.Break, at, h0, period, hb, plunging, plumeAir, w);
             if (plunging && CrashPart > 0f)
             {
-                // The jet lands: its water (a tenth of Hb² a metre of crest, the lip that is thrown) at the
-                // speed it fell from the crest, as lumps up to a centimetre across.
-                float jetSpeed = MathF.Sqrt(2f * g * hb);
-                float lump = Math.Clamp(0.05f * hb, 0.002f, 0.01f);
-                float water = 0.1f * hb * hb * w;
-                float lumps = water / (4f / 3f * MathF.PI * lump * lump * lump);
-                StartSpray(c.Break, at + (int)(MathF.Sqrt(2f * hb / g) * _rate), 0.12f + 0.3f * hb, lumps, lump, jetSpeed,
-                           FallingWaterSynth.PoolCrownShare, CrashPart);
                 // The air tube the jet closes on: its pulsation, as a large bubble that breaks up within
-                // a few cycles.
+                // a few cycles, somewhere along the break.
                 float tubeMm = 1000f * 0.08f * hb * (0.6f + 0.8f * _rng.Uniform());
-                Pocket(c.Break, at + (int)((MathF.Sqrt(2f * hb / g) + 0.02f) * _rate), tubeMm, CrashPart * MathF.Sqrt(w), 0.3f);
+                int tubeAt = at + (int)((_rng.Uniform() * c.Sweep + MathF.Sqrt(2f * hb / g) + 0.02f) * _rate);
+                Pocket(c.Break, tubeAt, tubeMm, CrashPart * MathF.Sqrt(w), 0.3f);
             }
         }
 
@@ -862,7 +912,6 @@ public sealed class ShoreSynth
         public float A, B, C, D;          // kind's own
         public float Weight;
         public float Flicker;
-        public double NextFlicker;
         public float BinShare0, BinShare1, BinShare2, BinShare3, BinShare4, BinShare5, BinShare6;
     }
 
@@ -877,8 +926,14 @@ public sealed class ShoreSynth
             p.Place = place;
             p.Start = _time + delaySamples / (double)_rate;
             p.Length = MathF.Max(0.01f, seconds);
-            p.Flicker = 1f;
-            for (int b = 0; b < Bands; b++) _bandFlicker[i, b] = 1f;
+            // Each process starts somewhere in its own unevenness, as a crowd already under way would.
+            for (int b = 0; b <= Bands; b++)
+            {
+                _flickA[i, b] = Gauss();
+                _flickB[i, b] = Gauss();
+            }
+            p.Flicker = FlickerAt(i, Bands, FlickerCommonSigma);
+            for (int b = 0; b < Bands; b++) _bandFlicker[i, b] = FlickerAt(i, b, FlickerBandSigma);
             return ref p;
         }
         return ref _dropped;
@@ -952,14 +1007,22 @@ public sealed class ShoreSynth
     }
 
     /// <summary>The share of a process's events in [t0, t1): a quick rise over the first sixth, then a
-    /// fall of three time constants over the rest.</summary>
+    /// fall of three time constants over the rest that comes down to nothing at its end. (It was cut off
+    /// at the end still at e^-3 of its peak rate, so every break's hiss stopped on the same 13 dB step.)</summary>
     private static float Share(in Proc p, double t0, double t1)
     {
         double a = Math.Max(0, t0 - p.Start), b = Math.Min(p.Length, t1 - p.Start);
         if (b <= a) return 0f;
         double rise = p.Length / 6, tau = (p.Length - rise) / 3;
-        double norm = rise / 2 + tau * (1 - Math.Exp(-3));
-        double Cum(double x) => x <= rise ? x * x / (2 * rise) : rise / 2 + tau * (1 - Math.Exp(-(x - rise) / tau));
+        // The rate after the rise, (e^-u − e^-3) / (1 − e^-3) for u = (x − rise) / tau from 0 to 3.
+        double end = Math.Exp(-3), k = tau / (1 - end);
+        double norm = rise / 2 + k * (1 - end - 3 * end);
+        double Cum(double x)
+        {
+            if (x <= rise) return x * x / (2 * rise);
+            double u = (x - rise) / tau;
+            return rise / 2 + k * (1 - Math.Exp(-u) - u * end);
+        }
         return (float)((Cum(b) - Cum(a)) / norm);
     }
 
@@ -972,15 +1035,17 @@ public sealed class ShoreSynth
             if (p.Kind == Kind.None) continue;
             if (t0 >= p.Start + p.Length) { p.Kind = Kind.None; continue; }
             if (t1 <= p.Start) continue;
-            if (t0 >= p.NextFlicker)
+            // A burst of turbulence makes bubbles of every size at once, and each size also comes and
+            // goes on its own: a common factor and one per band, log-normal, mean one. They glide from
+            // block to block; drawn afresh every 40 ms as steps, a breaker's hiss came and went in
+            // jumps (Cody, 2026-10-06: "very steppy/jumpy ... waves are a wash, not jumpy events").
+            for (int b = 0; b <= Bands; b++)
             {
-                // A burst of turbulence makes bubbles of every size at once, and each size also comes and
-                // goes on its own: a common factor and one per band, log-normal, mean one.
-                float sc = Flicker * MathF.Sqrt(FlickerCommon), sb = Flicker * MathF.Sqrt(1f - FlickerCommon);
-                p.Flicker = MathF.Exp(sc * Gauss() - 0.5f * sc * sc);
-                for (int b = 0; b < Bands; b++) _bandFlicker[i, b] = MathF.Exp(sb * Gauss() - 0.5f * sb * sb);
-                p.NextFlicker = t0 + FlickerSeconds * (0.5 + _rng.Uniform());
+                _flickA[i, b] = _flickPole * _flickA[i, b] + _flickDrive * Gauss();
+                _flickB[i, b] = _flickPole * _flickB[i, b] + _flickA2B * _flickA[i, b];
             }
+            p.Flicker = FlickerAt(i, Bands, FlickerCommonSigma);
+            for (int b = 0; b < Bands; b++) _bandFlicker[i, b] = FlickerAt(i, b, FlickerBandSigma);
             float n = p.Total * Share(p, t0, t1) * p.Flicker;
             if (n <= 0f) continue;
             // Where in the block the process is running.
@@ -1211,6 +1276,21 @@ public sealed class ShoreSynth
 
     private float Gauss()
         => MathF.Sqrt(-2f * MathF.Log(MathF.Max(1e-7f, _rng.Uniform()))) * MathF.Cos(MathF.Tau * _rng.Uniform());
+
+    // ── The unevenness of a crowd ────────────────────────────────────────────────────────────────
+    //
+    // Two one-pole stages in cascade, each with the pole e^(−block / FlickerSeconds), driven by Gaussian
+    // noise: a process with a unit standard deviation whose path is smooth (its slope is finite, where
+    // one stage alone is as rough as a random walk inside its time constant). The first
+    // stage has a unit variance; _flickA2B hands it to the second so that the second's is one too.
+
+    private readonly float _flickPole, _flickDrive, _flickA2B;
+    private static readonly float FlickerCommonSigma = Flicker * MathF.Sqrt(FlickerCommon);
+    private static readonly float FlickerBandSigma = Flicker * MathF.Sqrt(1f - FlickerCommon);
+
+    /// <summary>A process's unevenness now: log-normal, mean one, the log's standard deviation
+    /// <paramref name="sigma"/>.</summary>
+    private float FlickerAt(int slot, int band, float sigma) => MathF.Exp(sigma * _flickB[slot, band] - 0.5f * sigma * sigma);
 
     // ── The hull ─────────────────────────────────────────────────────────────────────────────────
 

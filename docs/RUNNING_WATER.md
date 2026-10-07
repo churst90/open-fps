@@ -526,3 +526,37 @@ At a metre (AudioLab `--running-water cycle` and `levels`):
 - US EPA WaterSense specifications (faucets, showerheads).
 - Wyly, Eaton 1961. NBS Monograph 31.
 - Zhu, Oguz, Prosperetti 2000. J. Fluid Mech.; Phys. Fluids 12.
+
+## 11. The ground under running water, 2026-10-06
+
+Cody, hearing round 2: "house_downpipe_and_gutter_outlet_heavy.wav has a flanging/very fast repeating
+sound to it ... there are other samples like it." Besides that the model was approved by ear.
+
+The comb was the ground. Every synthesised voice carries its own ground reflection
+(`GroundReflection`): its output again one path difference later, off the surface between the source
+and the listener. Heard through the game, running water was one stream heard twice:
+
+| scene | source height | listener | extra path | autocorrelation before |
+|---|---|---|---|---|
+| gutter outlet | 2.8 m | 1.8 m away | 8.1 ms (a comb every 125 Hz) | 0.34 at 8.08 ms |
+| downpipe's shoe | 0.15 m | 1.5 m away | 0.69 ms | 0.26-0.33 |
+| downpipe, from the house scene's garden | 0.15 m | 2.2 m away | 0.54 ms | 0.21-0.29 |
+| basin overflow | 0.3 m | 1.5 m away | 0.92 ms | 0.36 |
+| kitchen sink, washbasin | 0.9 m over the floor | 0.6 m away | 4.8-5.0 ms | 0.16-0.27 |
+
+A texture of thousands of independent events spread over moving water is not one signal heard twice:
+where on the water an event happens, the water's own movement and the listener's head all move the
+reflection's phase. `GroundReflection.Texture` (set by running water's voices): below c / 4Δ, where the
+two paths are within a quarter period wherever the event is, the ground lifts the bass by its full
+pressure as before; above it the reflection adds its power, √(1 + g²) per band, with no delay. That is
+Nord2000's incoherent term, |p_d + F p_r|² + (1 − F²)|p_r|², with the coherence F at zero. The
+corner is under 30 Hz for the outlet and 360 Hz for the downpipe's shoe. Engines, machines, recorded
+impulses and the shores keep the copy.
+
+After (the game's path, `inbox/water-smoothing-2026-10-06/README.txt`): the gutter outlet's 8 ms peak
+is gone (largest left 0.20 at 2.2 ms, its gurgle's own pitch, cepstral z 9.0 to 3.4); the downpipes
+0.03-0.05; the house scene 0.07-0.08; the overflow 0.16 at 2.1 ms; the washbasin's 4.8 ms cepstral peak
+gone. The creek, the kerb gutter and the drain had no comb (their water is at the ground); the kerb
+gutter's 0.41 at 0.67 ms and the drain's 0.21 at 0.46 ms are each one broad spectral peak, the bubbles
+of shallow water, and are unchanged. Filling the comb's notch makes the downpipes 1-3 dB louder, the
+house scene 0.7-1.2 dB and the shower 1.9 dB; the others are within a decibel.
