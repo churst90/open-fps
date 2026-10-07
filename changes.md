@@ -24,6 +24,11 @@ Recent work, newest first. `git log` has the rest.
   - A map entry's own form (a ramp laid as stairs, `Form` over the prefab's) is kept when the world editor
     makes the thing again (a new prefab version), copies it, puts a deletion back, and when the overlay
     copies the entry. Each of them made the prefab's form, or a box. Server only.
+  - A jump's landing plays a take from the LANDING bank: it asked for an impact of force 0, a footstep,
+    so every landing was a step take. Placed at a step's level as before; the landing takes are recorded
+    7 to 10 dB over the walk banks' medians. Your own landing still has no bone-conduction lift (your
+    steps have 8 dB), so at your own feet a landing comes out about as loud as a step. Unheard; renders in
+    inbox/probable-bugs-2026-10-07/3-landing.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream

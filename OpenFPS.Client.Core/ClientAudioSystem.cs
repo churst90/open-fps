@@ -3766,13 +3766,12 @@ public class ClientAudioSystem
 
     private void SubmitLanding(Vector3 nudgePos, string mat, bool follows, Vector3 offset)
     {
-        string impactSound = _sounds.GetImpactSoundId(mat, 0f);
-        string resolved = _sounds.ResolvePath(impactSound);
-        
+        string resolved = _sounds.ResolvePath(_sounds.GetLandingSoundId(mat));
+
         if (!string.IsNullOrEmpty(resolved))
         {
-            // Placed like a step (SubmitFootstep), at a step's level.
-            // TODO: force 0 picks the FOOTSTEPS bank, so a landing plays a step take, never LANDING.
+            // Placed like a step (SubmitFootstep), at a step's level; the landing takes are recorded 7 to
+            // 10 dB over the walk banks' medians, and that difference is kept.
             var (landGain, landReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb);
             var landEmitter = new SpatialEmitter
             {

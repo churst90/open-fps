@@ -57,13 +57,19 @@ public class SoundMappingService
     private static string NearestRecorded(string material)
         => RecordedStandIn.TryGetValue(material, out var folder) ? folder : material;
 
-    /// <summary>A footstep's file (a landing's above 5 of force) on a material, the weather and the
-    /// player's variant taken into account.</summary>
+    /// <summary>Above this force an impact is a landing, from the LANDING bank.</summary>
+    private const float LandingForce = 5.0f;
+
+    /// <summary>A landing's file on a material: <see cref="GetImpactSoundId"/> past the landing force.</summary>
+    public string GetLandingSoundId(string material) => GetImpactSoundId(material, LandingForce + 1f);
+
+    /// <summary>A footstep's file (a landing's above <see cref="LandingForce"/>) on a material, the
+    /// weather and the player's variant taken into account.</summary>
     public string GetImpactSoundId(string material, float force)
     {
         if (!_initialized) Initialize();
-        
-        string action = (force > 5.0f) ? "LANDING" : "FOOTSTEPS"; 
+
+        string action = (force > LandingForce) ? "LANDING" : "FOOTSTEPS";
         
         string materialName = string.IsNullOrEmpty(material) || material == "None" || material == "Generic" ? "Generic" : material;
         
