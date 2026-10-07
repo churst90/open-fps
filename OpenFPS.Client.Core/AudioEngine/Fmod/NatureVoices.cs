@@ -223,6 +223,9 @@ public sealed class FireVoiceState : NatureVoiceState
     public readonly FireSpec Spec;
     public readonly FireSynth Fire;
 
+    /// <summary>When it was lit on the shared clock (FireSpec.KeyFor), or null for one always burning.</summary>
+    public double? LitAt;
+
     public FireVoiceState(FireSpec spec, float sampleRate, int seed, Vector3 position)
         : base(spec.SourceLevelDb, spec.PeakHeadroomDb, sampleRate, position, spec.FlameHeightMetres)
     {
@@ -234,6 +237,7 @@ public sealed class FireVoiceState : NatureVoiceState
     {
         Fire.Lit = Running;
         Fire.Wind = WindHere();
+        if (LitAt is double lit) Fire.Age = WindField.Now() - lit;
         Fire.Control(dt);
     }
 
@@ -315,7 +319,13 @@ public sealed class PlacedNatureVoice
 
     public PlacedNatureVoice(string key, FireSpec spec, int places, float sampleRate, int seed, Vector3 position)
         : this(key, places, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, spec.FlameHeightMetres)
-        => Fire = new FireSynth(spec, sampleRate, seed, places);
+    {
+        Fire = new FireSynth(spec, sampleRate, seed, places);
+        FireSpec.ParseKey(key, out _, out _litAt);
+    }
+
+    /// <summary>When a fire was lit on the shared clock (its key), or null for one always burning.</summary>
+    private readonly double? _litAt;
 
     public PlacedNatureVoice(string key, RunningWaterSpec spec, float sampleRate, int seed, Vector3 position)
         : this(key, Math.Max(1, spec.Places), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f)
@@ -398,7 +408,9 @@ public sealed class PlacedNatureVoice
         {
             Fire.Spread = spread;
             Fire.Lit = Running;
-            Fire.Wind = WindField.SpeedAt(Position.X, WindHeight, Position.Z, now);
+            // The wind at each of its places: a gust crosses a big fire as it crosses a wood.
+            Fire.ReadWind(Position.X, Position.Z, now);
+            if (_litAt is double lit) Fire.Age = now - lit;
             Fire.Control(dt);
         }
         else if (Flow != null)

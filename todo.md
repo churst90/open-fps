@@ -261,10 +261,15 @@ fetched in the workflow; FMOD's licence does not allow publishing its SDK, so te
 either skip in CI or get the library from a private store.
 
 ### Fire at any size
-The fire model scales (a wider fire is lower and slower; more heat, a louder roar and more crackles)
-but is one point source with a capped crackle stream. A blaze needs sources over the burning area,
-the turbulent roar of a large flame driven by the wind, trees flaring up, and falling branches.
-Medium.
+Built 2026-10-06 (docs/FIRE.md, inbox/fire-2026-10-06, unheard): bodies of fire over the burning area,
+heard from nine places spread as the burning area is; the roar as dQ/dt's turbulent tail; crowds of crackles; torching, falls,
+windows, collapses, a car's bursts; a life from lighting to smoulder; seven presets from a campfire to a
+crown fire; /spawn fire. Open:
+- the crown fire against a real crown-fire recording (none found);
+- the car against more than two recordings;
+- smoke explosions in a closed building;
+- spotting ahead of a crown fire;
+- fire spreading from one thing on a map to the next.
 
 ### Water bodies
 Lakes and ponds lapping at a shore, creeks running, surf. The importer brings them in as zones; none
