@@ -868,20 +868,18 @@ public class MapManager
     public void RefreshGrid(string mapId)
     {
         if (!_maps.TryGetValue(mapId, out var data)) return;
-        data.grid.ClearAll();
-        int gridCount = 0;
-        
-        data.world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) =>
+        // Only what changed, once the map's fixed things have been filed whole (ServerGeometry.Refresh).
+        if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled && OpenFPS.Common.Geometry.TriangleGeometry.Incremental
+            && _geometry.TryGetValue(mapId, out var known) && known.Primed)
         {
-            // Only geometry that stays put. The same test IndexEntity uses, and it has to be the same
-            // one: anything that moves is rebuilt into the dynamic half every tick, so a static entry
-            // for it is a permanent ghost of wherever it happened to be when this ran. That was
-            // harmless while nothing but players and traffic moved — both spawned after the last
-            // refresh — and stops being harmless the moment a building can drive away.
-            if (data.world.Has<Velocity>(e) || data.world.Has<PlayerComponent>(e)) return;
-            data.grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, isStatic: true);
-            gridCount++;
-        });
+            known.Refresh(data.world, data.grid, g => FileStatics(data.world, g));
+            if (known.LastChanged > 0)
+                Log.Information("MapManager: '{Id}': {Changed} fixed thing(s) changed, filed again in {Ms:F1} ms ({Built} tile(s) built).",
+                                mapId, known.LastChanged, known.LastRefreshMs, known.LastBuilt);
+            return;
+        }
+        data.grid.ClearAll();
+        int gridCount = FileStatics(data.world, data.grid);
 
         // The same static geometry as triangles: only the tiles whose solids changed are built again.
         if (OpenFPS.Common.Geometry.TriangleGeometry.Enabled)
@@ -902,6 +900,24 @@ public class MapManager
         {
             Log.Information("MapManager: Refreshed static spatial grid for '{Id}'. Entities indexed: {Count}", mapId, gridCount);
         }
+    }
+
+    /// <summary>Every fixed thing of a world into a grid's static half; how many.</summary>
+    internal static int FileStatics(World world, SpatialGrid<Entity> grid)
+    {
+        int gridCount = 0;
+        world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) =>
+        {
+            // Only geometry that stays put. The same test IndexEntity uses, and it has to be the same
+            // one: anything that moves is rebuilt into the dynamic half every tick, so a static entry
+            // for it is a permanent ghost of wherever it happened to be when this ran. That was
+            // harmless while nothing but players and traffic moved — both spawned after the last
+            // refresh — and stops being harmless the moment a building can drive away.
+            if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e)) return;
+            grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, isStatic: true);
+            gridCount++;
+        });
+        return gridCount;
     }
 
     public bool TryGetMap(string id, out World world, out Vector3 size, out SpatialGrid<Entity> grid, out Dictionary<int, Entity> lookup)

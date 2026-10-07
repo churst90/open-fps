@@ -124,6 +124,8 @@ public static class GeometryParitySpike
             if (some != Entity.Null)
             {
                 ref var tt = ref ecs.Get<Transform>(some);
+                // Filed again whole (stage 1, and OPENFPS_INCREMENTAL_REFRESH=0).
+                OpenFPS.Common.Geometry.TriangleGeometry.Incremental = false;
                 tt.Position += new Vector3(0.2f, 0, 0);
                 refresh.Restart();
                 maps.RefreshGrid(mapId);
@@ -131,14 +133,29 @@ public static class GeometryParitySpike
                 int oneBuilt = serverGeometry.LastBuilt; double oneCollect = serverGeometry.LastCollectMs, oneTiles = serverGeometry.LastBuildMs;
                 tt.Position -= new Vector3(0.2f, 0, 0);
                 maps.RefreshGrid(mapId);
+                // Only what changed (stage 2).
+                OpenFPS.Common.Geometry.TriangleGeometry.Incremental = true;
+                refresh.Restart();
+                maps.RefreshGrid(mapId);
+                double sameInc = refresh.Elapsed.TotalMilliseconds;
+                tt.Position += new Vector3(0.2f, 0, 0);
+                refresh.Restart();
+                maps.RefreshGrid(mapId);
+                double oneInc = refresh.Elapsed.TotalMilliseconds;
+                int incBuilt = serverGeometry.LastBuilt; double incTiles = serverGeometry.LastBuildMs;
+                tt.Position -= new Vector3(0.2f, 0, 0);
+                maps.RefreshGrid(mapId);
                 OpenFPS.Common.Geometry.TriangleGeometry.Enabled = false;
                 refresh.Restart();
                 maps.RefreshGrid(mapId);
                 double gridOnly = refresh.Elapsed.TotalMilliseconds;
                 OpenFPS.Common.Geometry.TriangleGeometry.Enabled = true;
+                OpenFPS.Common.Geometry.TriangleGeometry.Incremental = false;
                 maps.RefreshGrid(mapId);
+                OpenFPS.Common.Geometry.TriangleGeometry.Incremental = true;
                 serverWorld = serverGeometry.World;
-                Console.WriteLine($"  server RefreshGrid: {gridOnly:F0} ms the grid alone; with the triangles {same:F0} ms when nothing changed, {one:F0} ms with one box moved ({oneBuilt} tile built; reading the solids {oneCollect:F0} ms, the tiles {oneTiles:F0} ms)");
+                Console.WriteLine($"  server RefreshGrid: {gridOnly:F0} ms the grid alone; filed again whole with the triangles {same:F0} ms when nothing changed, {one:F0} ms with one box moved ({oneBuilt} tile built; reading the solids {oneCollect:F0} ms, the tiles {oneTiles:F0} ms)");
+                Console.WriteLine($"  server RefreshGrid, only what changed: {sameInc:F1} ms when nothing changed, {oneInc:F1} ms with one box moved ({incBuilt} tile built in {incTiles:F1} ms)");
             }
         }
 

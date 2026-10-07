@@ -15,6 +15,10 @@ public class SpatialGrid<T>
     private readonly Dictionary<(int, int), List<T>> _staticGrid = new();
     private readonly Dictionary<(int, int), List<T>> _dynamicGrid = new();
 
+    /// <summary>Where each static item was filed: the cells (x0, z0) to (x1, z1), or the oversize list, so
+    /// one can be taken out again without rebuilding the grid (<see cref="RemoveStatic"/>).</summary>
+    private readonly Dictionary<T, (int X0, int Z0, int X1, int Z1, bool Oversize)> _staticSpans = new();
+
     /// <summary>
     /// Bumped every time the STATIC half of the grid changes (a static add, or a full clear). The dynamic
     /// half is torn down and rebuilt every tick, so a version that counted it would change every tick and
@@ -72,7 +76,7 @@ public class SpatialGrid<T>
             grid[cell] = list;
         }
         list.Add(item);
-        if (isStatic) StaticVersion++;
+        if (isStatic) { _staticSpans[item] = (cell.Item1, cell.Item2, cell.Item1, cell.Item2, false); StaticVersion++; }
     }
 
     /// <summary>
@@ -121,6 +125,7 @@ public class SpatialGrid<T>
         if (isStatic && _oversizeCells > 0 && (long)(maxX - minX + 1) * (maxZ - minZ + 1) > _oversizeCells)
         {
             _oversize.Add(item);
+            _staticSpans[item] = (0, 0, -1, -1, true);
             StaticVersion++;
             return;
         }
@@ -139,7 +144,27 @@ public class SpatialGrid<T>
             }
         }
 
-        if (isStatic) StaticVersion++;
+        if (isStatic) { _staticSpans[item] = (minX, minZ, maxX, maxZ, false); StaticVersion++; }
+    }
+
+    /// <summary>
+    /// Takes a static item out of the cells it was filed in (or the oversize list). False if it was not
+    /// filed. The order of what is left in each cell is kept.
+    /// </summary>
+    public bool RemoveStatic(T item)
+    {
+        if (!_staticSpans.Remove(item, out var span)) return false;
+        if (span.Oversize) _oversize.Remove(item);
+        else
+            for (int x = span.X0; x <= span.X1; x++)
+                for (int z = span.Z0; z <= span.Z1; z++)
+                    if (_staticGrid.TryGetValue((x, z), out var list))
+                    {
+                        list.Remove(item);
+                        if (list.Count == 0) _staticGrid.Remove((x, z));
+                    }
+        StaticVersion++;
+        return true;
     }
 
     /// <summary>
@@ -229,6 +254,7 @@ public class SpatialGrid<T>
         _dynamicGrid.Clear();
         _oversize.Clear();
         _unindexed.Clear();
+        _staticSpans.Clear();
         StaticVersion++;
     }
 

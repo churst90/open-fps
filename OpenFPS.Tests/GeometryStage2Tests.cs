@@ -85,6 +85,54 @@ public class GeometryStage2Tests : IDisposable
         Assert.Equal("Ground", world.Get<IdentityComponent>(ground).Name);
     }
 
+    /// <summary>
+    /// An incremental refresh files again only what changed, and leaves the grid and the triangles as a
+    /// full refresh would: a wall moved, one taken away, one put up, a form given to another, on the city.
+    /// </summary>
+    [Fact]
+    public void AnIncrementalRefreshIsAFullOne()
+    {
+        var maps = Load("city");
+        Assert.True(maps.TryGetMap("city", out var world, out _, out var grid, out var lookup));
+        Assert.True(maps.TryGetGeometry("city", out var geometry));
+        Assert.True(geometry.Primed);
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+
+        var walls = lookup.Values.Where(e => world.Has<IdentityComponent>(e) && world.Get<IdentityComponent>(e).PrefabId == "concrete_wall").Take(3).ToList();
+        Assert.Equal(3, walls.Count);
+        world.Get<Transform>(walls[0]).Position += new Vector3(0.5f, 0f, 0f);
+        maps.DestroyEntity("city", walls[1]);
+        ref var c2 = ref world.Get<ColliderComponent>(walls[2]);
+        c2.Form = new ShapeSpec { Kind = ShapeKind.Wedge };
+        var added = prefabs.Spawn(world, "concrete_stairs", new Vector3(40f, 1.4f, 40f), Quaternion.Identity);
+        maps.IndexEntity("city", added);
+        maps.RefreshGrid("city");
+        Assert.Equal(2, geometry.LastChanged);   // the form and the stairs: the move and the removal went with the destroy's own refresh
+
+        // A full refresh of the same world, into a grid and triangles of its own.
+        var fullGrid = new SpatialGrid<Entity>(10f);
+        MapManager.FileStatics(world, fullGrid);
+        var full = new ServerGeometry(250f);
+        full.Rebuild(world, fullGrid);
+        var a = geometry.World; var b = full.World;
+        Assert.Equal(b.InstanceCount, a.InstanceCount);
+        Assert.Equal(b.TriangleCount, a.TriangleCount);
+        var sigA = Enumerable.Range(0, a.InstanceCount).Select(i => a.Instance(i)).Where(i => i.Owner < 0).Select(i => (i.Piece.Key, i.Piece.Signature)).OrderBy(x => x.Key.X).ThenBy(x => x.Key.Z).ToList();
+        var sigB = Enumerable.Range(0, b.InstanceCount).Select(i => b.Instance(i)).Where(i => i.Owner < 0).Select(i => (i.Piece.Key, i.Piece.Signature)).OrderBy(x => x.Key.X).ThenBy(x => x.Key.Z).ToList();
+        Assert.Equal(sigB, sigA);
+        // The grid's static half holds the same things round every point (in its own order in a cell).
+        var rng = new Random(5);
+        var got = new List<Entity>(); var want = new List<Entity>(); var s1 = new HashSet<Entity>(); var s2 = new HashSet<Entity>();
+        for (int i = 0; i < 300; i++)
+        {
+            var at = new Vector3((float)(rng.NextDouble() * 1000 - 500), 0f, (float)(rng.NextDouble() * 900 - 350));
+            grid.Clear(); fullGrid.Clear();
+            grid.CollectInRadius(at, 15f, got, s1);
+            fullGrid.CollectInRadius(at, 15f, want, s2);
+            Assert.Equal(want.Select(e => e.Id).OrderBy(x => x), got.Select(e => e.Id).OrderBy(x => x));
+        }
+    }
+
     // ═══ Shapes ══════════════════════════════════════════════════════════════════════════════════
 
     private static Surface Concrete(Vector3 size) => EntityGeometry.SurfaceOf("Concrete", size, 0, 0, false, 0, 0, false, false, false, null);
