@@ -9,7 +9,7 @@ namespace OpenFPS.AudioLab.Spikes;
 /// as WheelStrikes renders it, alone: pascals at a metre, 4 kN on the wheel. Prints, for each, the peak,
 /// how long it rings (to -20 and -40 dB of its peak envelope), the octave bands, and how tonal it is (the
 /// strongest line over the median of the spectrum, 100 Hz-8 kHz). Writes strike_KMH.wav (a strike a
-/// second, five of them, scaled so 2 Pa is full scale) when out= is given.
+/// second, five of them, scaled so 3 Pa is full scale) when out= is given.
 /// </summary>
 public static class WheelStrikeSpike
 {
@@ -46,11 +46,11 @@ public static class WheelStrikeSpike
             Console.WriteLine("        bands: " + string.Join("  ", bands.Select((d, i) => $"{Spectrum.BandEdges[i]:F0}:{d:F0}")));
             if (dir != null)
             {
-                var wav = pcm.Select(x => x / 2f).ToArray();
+                var wav = pcm.Select(x => x / 3f).ToArray();
                 File.WriteAllBytes(Path.Combine(dir, $"strike_{kmh:F0}kmh.wav"), WeaponSynth.ToWav16(wav, Rate));
             }
         }
-        if (dir != null) Console.WriteLine($"\n  wrote {dir}/strike_*.wav (2 Pa = full scale)");
+        if (dir != null) Console.WriteLine($"\n  wrote {dir}/strike_*.wav (3 Pa = full scale)");
         return 0;
     }
 

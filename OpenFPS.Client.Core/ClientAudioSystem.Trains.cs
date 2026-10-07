@@ -23,6 +23,11 @@ public partial class ClientAudioSystem
     /// <summary>How often a train's sources are regrouped, seconds. The weights follow every frame.</summary>
     private const double TrainRegroupSeconds = 0.5;
 
+    /// <summary>How long a train's voice is kept with nothing in it before it is let go, seconds.</summary>
+    private const double TrainVoiceHoldSeconds = 4.0;
+
+    private static readonly TrainSlotPlan EmptyTrainPlan = new(Array.Empty<int>(), Array.Empty<float>());
+
     /// <summary>Trains the machine budget admitted this frame, by "preset/train", and their entities.</summary>
     private readonly HashSet<string> _liveTrains = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _wantedTrains = new(StringComparer.OrdinalIgnoreCase);
@@ -46,6 +51,8 @@ public partial class ClientAudioSystem
         /// (TrainSlotState.FadeSeconds): where the voice is placed follows what it is playing.</summary>
         public readonly Dictionary<int, float>[] Shown = Enumerable.Range(0, TrainVoicing.Slots).Select(_ => new Dictionary<int, float>()).ToArray();
         public readonly bool[] Playing = new bool[TrainVoicing.Slots];
+        /// <summary>Since when a playing voice has carried nothing, or -1.</summary>
+        public readonly double[] IdleSince = Enumerable.Repeat(-1.0, TrainVoicing.Slots).ToArray();
         public double LastSeen;
         public readonly Dictionary<float, float> Correction = new();
     }
@@ -157,7 +164,7 @@ public partial class ClientAudioSystem
         {
             v.RegroupedAt = now;
             var groups = TrainVoicing.Group(_trainSources, eyePos, TrainVoicing.MaxFieldVoices, v.Groups);
-            var slots = TrainVoicing.AssignSlots(groups, v.SlotOf);
+            var slots = TrainVoicing.AssignSlots(groups, v.SlotOf, v.Playing);
             v.SlotOf.Clear();
             for (int g = 0; g < groups.Count; g++)
                 if (slots[g] >= 0) foreach (int i in groups[g]) v.SlotOf[i] = slots[g];
@@ -195,9 +202,18 @@ public partial class ClientAudioSystem
             bool wanted = v.SlotOf.ContainsValue(slot);
             if (power <= 0f || !wanted && shown.Count == 0)
             {
-                StopTrainVoice(v, slot);
+                // Kept a few seconds with nothing in it before it is let go: as a train rounds a curve the
+                // groups merge and split again, and a voice stopped and started for that is a voice
+                // coming and going. A held voice is the first a new group takes (AssignSlots).
+                if (v.Playing[slot])
+                {
+                    if (v.IdleSince[slot] < 0) v.IdleSince[slot] = now;
+                    _audio.PlanTrainSlot(v.Preset, v.Name, slot, EmptyTrainPlan);
+                    if (now - v.IdleSince[slot] > TrainVoiceHoldSeconds) StopTrainVoice(v, slot);
+                }
                 continue;
             }
+            v.IdleSince[slot] = -1;
             Vector3 centre = sum / power;
             foreach (var (i, _) in shown)
                 if (_trainSourceAt.TryGetValue(i, out var src))

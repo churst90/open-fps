@@ -4,6 +4,50 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-07
 
+- Trains, the budgets and the city after Cody's session (14:44-15:40: "sounds are cutting out
+  especially with the trains and even the fountain", "the freight sounds a little staticy", "the road
+  bumps texturing is too tonal like hollow", "where I'm standing I should hear the train horn", "the
+  city is more dead"). Renders and what to listen for in inbox/trains-and-city-2026-10-07.
+  - A train is a handful of voices (docs/TRAINS.md, "Voicing a train"). Each source of a train was a
+    voice of its own, all stepping one synth under one lock: the fifty-wagon freight held 130 voices,
+    emptied the binaural pool (60-84 voices played without HRTF: "the sound went mono"), took the mixer
+    over 100 %, and every render worker that reached one of its taps waited on the lock, so the cars on
+    those workers starved (up to 3,224 starves a second). Its voices were started 913 times in nine
+    minutes. Now at most four voices for the rolling stock and engines, grouped by what the ear can tell
+    apart from where you stand, plus the horn and the bell while they sound; engines, fans, drives, horn
+    and bell render once each on lanes in the render pool; the rolling stock renders in the voice
+    through one chain per kind of bogie (linear: forty bogies through one chain measure +15.9 dB against
+    +16.0 for forty sources). In the lab scene by the Main Street crossing: 6 train voices at most, none
+    without HRTF, no starves.
+  - Every bogie of a train shared one track's filters, stepped once per bogie per sample, and a bogie
+    radiated its roll and each blow separately: the rail's modes ran at many times their rate and folded
+    back as hiss (the freight's static: its 2-8 kHz octaves 6 to 13 dB over what they are now, against
+    the rest of its spectrum, in a capture of the session against a render from the same spot). Each
+    bogie has its own track and radiates once a sample. The rolling anchor had been raised 12 dB to make
+    up for the loss and is back at 92 dB (the six-coach train passes at 82 dB at 7.5 m at 80 km/h again);
+    at 12 m the freight is as loud as before, the six-coach train 1 dB louder, the light rail 3 dB
+    quieter. A bogie's declared level now carries the track's roughness, as its synth does.
+  - A train first heard is already running: its diesels used to crank and catch each time it came into
+    earshot.
+  - A voice let go is released once its fade has been played, not when it was rendered up to 0.7 s
+    earlier: every machine and car the budget gave up was cut at full level (the fountain, the gong).
+  - The budgets take back what they give up: a voice comes back when the mixer has stayed 8 points
+    under its ceiling for 3 s (it was 45 %, under what the city costs with little playing, so in the
+    session the machines went from ten to one in the first 30 s and stayed there, sixteen cars out of
+    budget for the hour). Held 30 s after a map load; a restore given up again within 15 s doubles the
+    wait. The machine budget counts voices (24), a nearly empty binaural pool gives voices up, and a
+    voice with no binaural stage is not started rather than played flat.
+  - The render pool's workers share one sweep down the voices; the mixer load line says how busy the
+    pool is, and a new "Mixer time" line where the mixer's time goes (MixerProfile). In the lab with
+    31 voices: the six traced-echo rigs 12 points, the binaural stages 5, FMOD's own 6.
+  - A tyre over a crossing's rail clacks: band-passed slap round 1.4 kHz, the rail's ring, a thump a
+    fifth of the peak. It was the tyre's 90 and 200 Hz modes alone, 62 dB of one line over the rest.
+  - /spawn train out [NAME] takes off a train put on with /spawn train.
+  - Lab: --train-scene (a train on the city's loop through the whole client, with a census), --rail-cost
+    [law], --wheel-strike. Tests: TrainVoicingTests, TrainVoicesInTheMixTests, AdaptiveBudgetTests,
+    EngineRenderPoolTests, WheelStrikeClackTests, RailAndSignalTests.ABogieInATrainIsAsLoudAsItIsDeclared,
+    RolesScopeTests.ASpawnedTrainComesOffAndTheMapsOwnStays. The light rail fingerprint is regenerated
+    (twice: the track fix, then the anchor).
 - todo.md audited: every item checked against the code, `git log`, this file and Cody's approvals.
   Done items (19, and the finished halves of 22 more) went to the new docs/DONE_2026-10.md, one line
   each with the commit or approval that closes them; partly done items say only what is left. New: a

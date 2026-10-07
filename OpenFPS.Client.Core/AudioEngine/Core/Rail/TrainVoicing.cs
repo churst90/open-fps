@@ -80,10 +80,12 @@ public static class TrainVoicing
 
     /// <summary>
     /// Which voice each group goes to: the one already carrying most of its sources, so a group drifting
-    /// along the train keeps its voice; a group with no voice takes a free one, one that was idle before
-    /// it over one being handed on. <paramref name="previousSlotOf"/> is each source's voice last time.
+    /// along the train keeps its voice; a group with no voice takes a free one: one still playing with
+    /// nothing in it (<paramref name="held"/>) first, then one idle before it, over one being handed on.
+    /// <paramref name="previousSlotOf"/> is each source's voice last time.
     /// </summary>
-    public static int[] AssignSlots(IReadOnlyList<IReadOnlyList<int>> groups, IReadOnlyDictionary<int, int> previousSlotOf)
+    public static int[] AssignSlots(IReadOnlyList<IReadOnlyList<int>> groups, IReadOnlyDictionary<int, int> previousSlotOf,
+                                    IReadOnlyList<bool>? held = null)
     {
         var slotOf = new int[groups.Count];
         Array.Fill(slotOf, -1);
@@ -110,6 +112,7 @@ public static class TrainVoicing
         {
             if (slotOf[g] >= 0) continue;
             int pick = -1;
+            for (int s = 0; s < MaxFieldVoices && pick < 0; s++) if (!taken[s] && !used[s] && held != null && s < held.Count && held[s]) pick = s;
             for (int s = 0; s < MaxFieldVoices && pick < 0; s++) if (!taken[s] && !used[s]) pick = s;
             for (int s = 0; s < MaxFieldVoices && pick < 0; s++) if (!taken[s]) pick = s;
             if (pick < 0) continue;     // more groups than voices: Group never makes that many

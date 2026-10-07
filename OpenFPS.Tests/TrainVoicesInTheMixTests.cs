@@ -20,26 +20,44 @@ public class TrainVoicesInTheMixTests
 
     private static bool IsTrainVoice(int id) => id <= ClientAudioSystem.TrainVoiceBase && id > ClientAudioSystem.TrainVoiceBase - 10_000;
 
-    [Fact]
-    public void A_fifty_wagon_freight_passing_is_a_handful_of_voices_and_none_comes_and_goes()
+    /// <summary>Where a point <paramref name="s"/> metres along the track is: a straight line down x, or a
+    /// circle of 150 m round the origin (the listener 12 m inside it), which makes the groups merge and
+    /// split as the train goes round.</summary>
+    private static (Vector3 At, Vector3 Velocity) Track(bool curved, float s, float height, float speed)
+    {
+        if (!curved) return (new Vector3(s, height, 0f), new Vector3(speed, 0f, 0f));
+        float a = s / 150f;
+        return (new Vector3(150f * MathF.Sin(a), height, 150f - 150f * MathF.Cos(a)),
+                new Vector3(MathF.Cos(a), 0f, MathF.Sin(a)) * speed);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_fifty_wagon_freight_passing_is_a_handful_of_voices_and_none_comes_and_goes(bool curved)
     {
         var layout = TrainLayout.Sources(TrainProfile.ByName("freight"));
         const string train = "freight_test";
-        var velocity = new Vector3(18f, 0f, 0f);
+        const float speed = 18f;
         var ear = new Vector3(0f, 0f, 12f);
-        double seconds = 15.0;
+        double seconds = curved ? 25.0 : 15.0;
         var r = Replay.RunScript(r =>
         {
             float head = 120f;
             for (int i = 0; i < layout.Count; i++)
-                r.RailSource(FirstEntity + i, $"rail:freight/{train}/{i}", layout[i].LevelDb,
-                             new Vector3(head - layout[i].AlongMetres, layout[i].HeightMetres, 0f), velocity);
+            {
+                var (at, v) = Track(curved, head - layout[i].AlongMetres, layout[i].HeightMetres, speed);
+                r.RailSource(FirstEntity + i, $"rail:freight/{train}/{i}", layout[i].LevelDb, at, v);
+            }
             int frames = (int)(seconds * ClientAudioSystem.UpdateHz);
             for (int f = 0; f < frames; f++)
             {
-                head += velocity.X / (float)ClientAudioSystem.UpdateHz;
+                head += speed / (float)ClientAudioSystem.UpdateHz;
                 for (int i = 0; i < layout.Count; i++)
-                    r.Move(FirstEntity + i, new Vector3(head - layout[i].AlongMetres, layout[i].HeightMetres, 0f), velocity);
+                {
+                    var (at, v) = Track(curved, head - layout[i].AlongMetres, layout[i].HeightMetres, speed);
+                    r.Move(FirstEntity + i, at, v);
+                }
                 // Half way through, the horn and bell for a crossing.
                 if (f == frames / 2) r.Audio.WorldAudio.TrainSignalReceived!("freight/" + train, new[] { 3f, 1f, 3f, 1f, 1f, 1f, 8f }, 18f);
                 r.Listener(ear, Vector3.Zero, 0f);
@@ -70,7 +88,7 @@ public class TrainVoicesInTheMixTests
         Assert.Equal(0, sourceVoices);
         Assert.True(most <= TrainVoicing.Slots, $"{most} voices for one train");
         Assert.True(most >= 2, "the freight beside you is more than one voice");
-        Assert.True(trainStarts <= TrainVoicing.Slots + 4, $"{trainStarts} starts in {seconds:F0} s: voices are coming and going");
+        Assert.True(trainStarts <= TrainVoicing.Slots + 3, $"{trainStarts} starts in {seconds:F0} s: voices are coming and going");
         Assert.Equal(1, signalSeen);
     }
 }
