@@ -16,6 +16,13 @@ Recent work, newest first. `git log` has the rest.
     level raised by the friction work, outside the tyre's soft limiter. At a metre the airliner
     screeches at 126 dB for 280 ms (line 520 Hz, flatness 0.019), the light single at 102 dB for 60 ms
     (1630 Hz); round 2 renders in inbox/fault-fixes-2026-10-06/round2.
+  - Round 3 (Cody: the airliner "sounds like gravel ... kind of like the cars, they need to squeal";
+    the light single's touchdown could not be heard). Every tyre's squeal, cars and aircraft, is now a
+    stick-slip note with harmonics whose pitch wanders, over the noise it used to be (a tenth of the
+    power), at the same level; it was a band of noise whose level jumped every few milliseconds. A
+    piston aeroplane is at idle in the flare and on the runway (it had gone to cruise power at
+    touchdown), and the light single's tyre squeal level follows the load law the airliner's does
+    (94 dB, not 88; the turboprop 103). Renders in inbox/fault-fixes-2026-10-06/round3.
   - Trains sound their own horn, whistle and bell. The signal sources are placed on the train now;
     a crossing is sounded with a TrainSignal key (long, long, short, long held to the crossing, the
     bell until it is reached) that the train's one synth plays on its own outlets, instead of the road
