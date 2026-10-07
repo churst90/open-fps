@@ -64,9 +64,42 @@ public class AmbienceAndWeatherTests
     {
         // The manifest is the only thing the client sees before the world arrives, so an outdoor bed
         // that is not on it cannot start until something else happens to mention it.
-        var manifest = new MapManifest { AmbienceId = "AMBIENCE/woods_mid_day" };
-        Assert.Equal("AMBIENCE/woods_mid_day", manifest.AmbienceId);
-        Assert.Equal("", new MapManifest().AmbienceId);
+        string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "openfps-amb-" + Guid.NewGuid().ToString("N"));
+        string mapDir = System.IO.Path.Combine(dir, "maps");
+        System.IO.Directory.CreateDirectory(mapDir);
+        try
+        {
+            var maps = new MapManager(new MapRepository(mapDir), new PrefabRepository(System.IO.Path.Combine(AppContext.BaseDirectory, "prefabs")));
+            maps.Initialize();
+            var woods = MapTemplates.Flat("woods", "tester");
+            woods.AmbienceId = "AMBIENCE/woods_mid_day";
+            Assert.True(maps.CreateMap(woods, out string e1), e1);
+            Assert.True(maps.CreateMap(MapTemplates.Flat("bare", "tester"), out string e2), e2);
+
+            var sessions = new SessionManager();
+            var server = new OpenFPS.Server.GameServer(new NoUsers());
+            server.Attach(maps, sessions, new OccupancyService(maps), new HandsService(maps));
+            var sent = new List<IMessage>();
+            server.Sent = (_, m) => sent.Add(m);
+
+            MapManifest ManifestFor(string mapId)
+            {
+                sent.Clear();
+                server.SendManifest(new UserSession { ConnectionId = 1, Username = "tester", CurrentMapId = mapId });
+                return Assert.Single(sent.OfType<MapManifest>());
+            }
+
+            Assert.Equal("AMBIENCE/woods_mid_day", ManifestFor("woods").AmbienceId);
+            Assert.Equal("", ManifestFor("bare").AmbienceId);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    private sealed class NoUsers : IUserRepository
+    {
+        public UserData? GetUser(string username) => null;
+        public bool AddUser(string username, string password, UserRole role) => false;
+        public bool VerifyPassword(string username, string password) => false;
     }
 
     [Fact]
