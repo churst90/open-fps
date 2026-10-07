@@ -6,53 +6,34 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
 /// The Steam Audio geometry as a tile owns it (docs/WORLD_STREAMING.md, docs/GEOMETRY.md 2.4): each tile
-/// is a sub-scene built once and kept while its solids stay the same, and the scenes the simulators trace
-/// are top scenes of instances of them. Needs Embree: Steam Audio's default tracer walks instances one
-/// by one and traces them twenty times slower (docs/GEOMETRY.md 6.4); without Embree the worker builds
-/// whole scenes as before.
+/// is a sub-scene kept while its solids stay the same, and the simulators trace top scenes of instances
+/// of them. Needs Embree: the default tracer traces instances twenty times slower (docs/GEOMETRY.md 6.4),
+/// and without Embree the worker builds whole scenes.
 ///
-/// <para>The triangles come from the acoustic triangle store (<see cref="AcousticGeometry"/>, geometry
-/// stage 1): a tile's piece is its sub-scenes' source, in the tile's own frame, and the instance places
-/// it at the tile's corner. The same store is what the enclosure survey casts its rays against, so the
-/// two can never disagree about what stands where. A box wider than a tile (the ground under a whole map)
-/// is a piece of its own at the world's origin.</para>
+/// <para>The triangles come from the acoustic store (<see cref="AcousticGeometry"/>), which the enclosure
+/// survey also casts against, so the two never disagree. Per tile two sub-scenes, open ground and the
+/// rest; the listener's scene instances only the rest (SteamAudioScene.WithoutOpenGround). A door leaf
+/// stays in its tile, so a swinging door rebuilds one tile.</para>
 ///
-/// <para>Per tile, two sub-scenes: its open ground (thin slabs at ground level with the sky over them)
-/// and everything else. The full scene instances both; the listener's scene, which must not hear the
-/// ground under its own feet (SteamAudioScene.WithoutOpenGround), instances only the second. A door leaf
-/// stays in its tile's sub-scene, so a door that swings rebuilds that one tile.</para>
+/// <para>Two pairs of top scenes, used in turn: a change (<see cref="Update"/>, <see cref="Assemble"/>)
+/// goes into the idle pair, which is committed and handed over; Steam Audio forbids committing a scene
+/// being traced. Instances are made when their sub-scene is new: making one of a sub-scene being traced
+/// waits for the trace (up to two thirds of a second).</para>
 ///
-/// <para>Two pairs of top scenes, used in turn. While the simulators trace one pair, the other is idle:
-/// a change (<see cref="Update"/>, then <see cref="Assemble"/>) adds the instances of the tiles that came
-/// or were rebuilt to the idle pair, takes out those of the tiles that went, commits it, and it is handed
-/// to the simulators as a rebuilt scene always was (AsyncAcousticWorker). A scene is never committed while
-/// anything traces it, which Steam Audio forbids. Every instance is made when its sub-scene is new, before
-/// anything traces it: making an instance of a sub-scene that is being traced can wait for the trace,
-/// measured at up to two thirds of a second.</para>
-///
-/// <para>Two things about Steam Audio's Embree scenes (4.8, read from its source) shape the rest, and
-/// each, missed, made a top scene trace as if it were empty or a tile go missing (2026-10-06):</para>
+/// <para>Steam Audio 4.8's Embree scenes (read from its source, 2026-10-06; docs/WORLD_STREAMING.md):</para>
 /// <list type="bullet">
-/// <item>An instance goes into its top scene's Embree scene the moment it is made, enabled, and is only
-/// committed (rtcCommitGeometry) by a commit of that top scene that finds it in the scene's list, which
-/// <c>iplInstancedMeshAdd</c> puts it on. Embree refuses to commit a scene holding an enabled geometry
-/// that was never committed ("geometry not committed"), and the scene stays as it was: never built, or
-/// the last build. The instances made for the pair in use, or for a pair a tile then leaves before it is
-/// ever added, were exactly that, so the first door that swung handed over a pair that traced empty. Each
-/// instance is therefore disabled the moment it is made (added and taken out again), and is only ever
-/// enabled by being added for a commit.</item>
-/// <item>Releasing an instance gives its geometry id back to the top scene but never detaches the
-/// geometry from the Embree scene, so the next instance handed that id cannot be attached and is
-/// silently not in the scene: the third swing of a door lost the tile it stood in. So an instance stays
-/// alive (disabled) as long as its top scene, and a replaced tile's sub-scenes with it. A pair whose
-/// replaced tiles have grown past <see cref="RecycleShare"/> of what it traces is made afresh when it
-/// is next idle: new top scenes, the instances of the tiles in use made into them, and the old pair,
-/// with everything it held, let go.</item>
+/// <item>An instance is in its top scene's Embree scene, enabled, from the moment it is made, and Embree
+/// will not build a scene holding an enabled geometry never committed, silently (the first door that
+/// swung handed over a pair that traced empty). So each instance is disabled at once (added and taken
+/// out again) and enabled only by being added for a commit.</item>
+/// <item>Releasing an instance never detaches its Embree geometry, so the next instance given its id is
+/// silently missing (the third swing of a door lost its tile). So instances live, disabled, as long as
+/// their top scene; a pair holding more than <see cref="RecycleShare"/> of replaced geometry is made
+/// afresh when next idle.</item>
 /// </list>
 ///
-/// <para>Not thread-safe: one Update and Assemble at a time, which the worker's one background build at
-/// a time gives it. The caller must only Assemble once the pair it last handed over is the only one in
-/// use (AsyncAcousticWorker waits for TracedReverbSet.Reconfiguring to clear).</para>
+/// <para>Not thread-safe: one Update and Assemble at a time. Assemble only once the pair last handed over
+/// is the only one in use (AsyncAcousticWorker waits for TracedReverbSet.Reconfiguring to clear).</para>
 /// </summary>
 internal sealed class TileSceneSet : IDisposable
 {
@@ -67,9 +48,8 @@ internal sealed class TileSceneSet : IDisposable
 
     /// <summary>
     /// How much replaced geometry a pair may hold, as a share of the triangles it traces, before it is
-    /// made afresh. Replaced tiles cost only memory while they are held (their instances are disabled),
-    /// and making a pair afresh makes an instance of every tile in use, which can wait on the other
-    /// pair's traces. 0 makes it afresh whenever it holds anything replaced (the lab and the tests).
+    /// made afresh. Held tiles cost only memory; making a pair afresh can wait on the other pair's traces.
+    /// 0 makes it afresh whenever it holds anything replaced (the lab and the tests).
     /// </summary>
     internal static double RecycleShare { get; set; } = 1.0;
 
@@ -216,12 +196,10 @@ internal sealed class TileSceneSet : IDisposable
     }
 
     /// <summary>
-    /// Pair <paramref name="b"/> (idle) made afresh: everything out of the old pair and committed, so Steam
-    /// Audio's lists let go of the instances; the instances released while their top scenes still live (an
-    /// instance released after its scene keeps its Embree geometry, and the sub-scene, for good); the old
-    /// top scenes released, taking every geometry they still held with them; new ones made, with an
-    /// instance of every tile in use, enabled by the adding that follows. Replaced tiles that neither pair
-    /// holds any more are let go.
+    /// Idle pair <paramref name="b"/> made afresh: everything taken out and committed, the instances
+    /// released while their top scenes still live (released after, an instance keeps its Embree geometry
+    /// and the sub-scene for good), the old top scenes released, and new ones made with an instance of
+    /// every tile in use. Replaced tiles neither pair holds any more are let go.
     /// </summary>
     private void Recycle(int b)
     {

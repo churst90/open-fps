@@ -3,29 +3,21 @@ using System.Numerics;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// The tail of the place you stand in, played as what a late field is: noise under the room's
-/// energy envelope (Polack), arriving from where the room sends it. Measured from each trace as
-/// ENERGY, averaged over traces, and played through noise that never changes.
+/// The tail of the place you stand in, played as a late field is: noise under the room's energy
+/// envelope (Polack), arriving from where the room sends it. Measured from each trace as energy,
+/// averaged over traces, and played through noise that never changes.
 ///
-/// Why. The listener's trace is redone four times a second. Its omnidirectional channel is steady
-/// from one trace to the next (measured: correlation 1.000 at a standing point, --tail-steady), but
-/// its first-order channels are not: the directions are a Monte Carlo estimate from 8,192 rays,
-/// and from one trace to the next a direction's share of the 50-350 ms part swung from 0 to 5 %
-/// and back. The directional part (SdmTailIr.Build) sent every sample the way its own trace said,
-/// so the tail's directions were shuffled four times a second. At the ears a steady hum's harmonics
-/// swung 2.4-3.8 dB from one 54 ms window to the next above 500 Hz, where a held trace gives 0: the
-/// reflections "bouncing around", a wavy tail instead of one wash.
+/// The trace is redone four times a second and its first-order channels are a Monte Carlo estimate
+/// (8,192 rays): split sample by sample (SdmTailIr.Build), the tail's directions were shuffled each
+/// trace and a steady hum's harmonics swung 2.4-3.9 dB from one 54 ms window to the next, the
+/// reflections "bouncing around". The omnidirectional channel is steady (correlation 1.000 standing,
+/// --tail-steady).
 ///
-/// Three steps, each trace:
-///   1. Measure: the omnidirectional channel split into octave bands, energy per band per frame of
-///      <see cref="Frame"/> samples. For the directional part, where the energy comes from: each
-///      sample sent the way its intensity points (the SDM rule), its energy summed per direction
-///      over a few wide cells of time and frequency (<see cref="SegmentEdges"/>, two band groups),
-///      so one trace's estimate is made from thousands of samples, not one.
-///   2. Average in energy (<see cref="Add"/>): a long average while you stand, a short one while you
-///      walk, a fresh start in a new room.
-///   3. Play: per band and per direction its own fixed noise, made once, scaled by the square root of
-///      the averaged energy. Two traces that measure the same give the same response.
+/// Each trace: (1) measure the omni channel's energy per octave band per <see cref="Frame"/>, and for
+/// the directional part each sample's energy to the direction its intensity points, summed over a few
+/// wide cells of time and frequency (<see cref="SegmentEdges"/>, two band groups); (2) average in
+/// energy (<see cref="Add"/>): long while you stand, short while you walk, a fresh start in a new
+/// room; (3) play fixed noise per band and direction under the square root of the average.
 /// </summary>
 internal sealed class SmoothTail
 {
@@ -33,33 +25,27 @@ internal sealed class SmoothTail
     public const int Frame = 256;
 
     /// <summary>
-    /// Band edges, Hz: octaves, centred on 63 Hz to 16 kHz. Measured, not chosen by taste: Steam
-    /// Audio traces in three bands, but what it hands back is not flat inside them (a dip of about
-    /// 5 dB round 1 kHz, where its 800 Hz crossover is). Five bands (250, 800, 2,500, 8,000) put the
-    /// tail up to 4.4 dB off the trace's own spectrum in third octaves (--tail-steady). Octaves
-    /// follow it to 1-2 dB above 200 Hz, about what two noise realisations differ by anyway.
+    /// Band edges, Hz: octaves, centred on 63 Hz to 16 kHz. Steam Audio traces in three bands but is
+    /// not flat inside them (about 5 dB down round its 800 Hz crossover): five bands put the tail up to
+    /// 4.4 dB off the trace's own spectrum in third octaves (--tail-steady), octaves 1-2 dB above 200 Hz.
     /// </summary>
     public static readonly float[] EdgesHz = { 88f, 177f, 355f, 710f, 1420f, 2840f, 5680f, 11360f };
     public static int Bands => EdgesHz.Length + 1;
 
     /// <summary>
-    /// The first band whose directional part follows the trace's directions (355 Hz up). Below it
-    /// the directional part arrives evenly from all the directions, and that never changes. Measured
-    /// both other ways: split by the trace, the low end's split moved and a 110 Hz hum's low
-    /// harmonics swung 3 dB; played instead through the diffuse late path from 50 ms, the tail lost
-    /// 5 dB at 250 Hz in its first 250 ms (that path's low split is not energy-flat) and its early
-    /// decay at 250 Hz went from 0.76 to 0.98 s. A head tells little of where a late sound under
-    /// about 350 Hz comes from.
+    /// The first band whose directional part follows the trace's directions (355 Hz up); below it the
+    /// directional part arrives evenly from all directions. Split by the trace, a 110 Hz hum's low
+    /// harmonics swung 3 dB; played through the diffuse late path instead, the tail lost 5 dB at 250 Hz
+    /// in its first 250 ms. A head tells little of where a late sound under about 350 Hz comes from.
     /// </summary>
     public const int DirFromBand = 3;
     /// <summary>The directional part's two band groups: 355 Hz-2.8 kHz and 2.8 kHz up.</summary>
     public const int DirHighBand = 6;
     public const int Groups = 2;
     /// <summary>
-    /// The time cells the directions are estimated over, seconds: shorter early, where separate
-    /// reflections come from separate walls, longer later, where the trace's directions are mostly
-    /// noise. Each holds 1,100-5,100 samples. From the sound itself: the directional part starts at
-    /// the first reflection (EarlyCopies), no longer at 50 ms.
+    /// The time cells the directions are estimated over, seconds from the sound: shorter early, where
+    /// separate reflections come from separate walls, longer later, where the trace's directions are
+    /// mostly noise. Each holds 1,100-5,100 samples.
     /// </summary>
     public static readonly float[] SegmentEdges = { 0f, 0.025f, 0.05f, 0.075f, 0.1f, 0.133f, 0.175f, 0.233f, 0.35f };
     public static int Segments => SegmentEdges.Length - 1;
@@ -115,6 +101,7 @@ internal sealed class SmoothTail
     private readonly int[] _doa;
     private readonly double[] _mOmni, _mShare;
 
+    /// <param name="sampleRate">The trace's rate.</param>
     /// <param name="length">Samples per trace (TracedReverb.IrSize).</param>
     /// <param name="directions">How many directions the directional part is split into; 0 for none.</param>
     /// <param name="seed">Fixes the carriers. One per tracer, made once.</param>
@@ -142,10 +129,9 @@ internal sealed class SmoothTail
 
     // ── The band filters ─────────────────────────────────────────────────────────────────────
     //
-    // A tree of fourth-order Butterworth splits: low-pass at each edge gives a band, the high-pass
-    // goes on to the next edge. A Butterworth low-pass and high-pass of the same order at the same
-    // frequency are power complementary (|L|^2 + |H|^2 = 1), so the bands' energies add up to the
-    // whole, and independent noise shaped by the same filters adds back to a flat spectrum.
+    // A tree of fourth-order Butterworth splits: the low-pass at each edge gives a band, the high-pass
+    // goes on to the next edge. The two are power complementary (|L|^2 + |H|^2 = 1), so the bands'
+    // energies add up to the whole and independent noise through the same filters adds back to flat.
 
     private struct Biquad
     {
@@ -214,8 +200,8 @@ internal sealed class SmoothTail
     }
 
     /// <summary>Unit-variance Gaussian noise in band <paramref name="band"/>, through the same filters
-    /// as the measurement (the high-passes of the edges below it, the low-pass of the edge above).
-    /// Run in from 0.2 s before, so the filters have settled.</summary>
+    /// as the measurement (the high-passes of the edges below it, the low-pass of the edge above), run
+    /// in for 8,192 samples first so the filters have settled.</summary>
     private static float[] Carrier(Random rng, int band, int n, int rate)
     {
         const int pre = 8192;
@@ -255,9 +241,8 @@ internal sealed class SmoothTail
                     Vector3[]? directions, double[]? cov, Vector3 at, int place, bool sceneChanged,
                     EarlyCopies? copies = null)
     {
-        // A trace with a NaN or an infinity in it is not added. The average is recursive: added, it
-        // would hold the NaN until the next fresh start (a new room, a metre on), and the tail built
-        // from it would put NaN into the mix on every block, which silences the whole game.
+        // A trace with a NaN or an infinity is not added: the average is recursive, it would hold the
+        // NaN until the next fresh start, and every tail built from it would silence the whole mix.
         if (!Finite(w) || (directions != null && (!Finite(c1) || !Finite(c2) || !Finite(c3))) || (cov != null && !Finite(cov)))
         {
             Rejected++;
@@ -395,10 +380,9 @@ internal sealed class SmoothTail
     // ── 3: the responses to play ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// How many frames a band's energy is smoothed over before it is played: about four periods of
-    /// the band's width. A band 90 Hz wide cannot say what its energy is in less than about 45 ms;
-    /// measured in 5.8 ms frames it is noise, and that noise imposed on the carrier would be a
-    /// granular low end. Odd, centred; one frame from 355 Hz up.
+    /// How many frames a band's energy is smoothed over before it is played: about four periods of the
+    /// band's width. A band 90 Hz wide cannot say its energy in under about 45 ms; per 5.8 ms frame it
+    /// is noise, which on the carrier is a granular low end. Odd, centred; one frame from 355 Hz up.
     /// </summary>
     public static int SmoothFrames(int band, int sampleRate)
     {
@@ -423,10 +407,9 @@ internal sealed class SmoothTail
 
     /// <summary>
     /// The late tail to convolve, windowed. Without a directional part (<paramref name="afterDirectional"/>
-    /// false) it is the whole response, from the first reflection (<see cref="Start"/>) on, with the
-    /// placed copies' energy already out of it. With one, it takes over from it over SdmTailIr's end
-    /// fade, in energy: the two are independent noise, so their windows' squares add to one, where the
-    /// old windows (the same samples) added in amplitude.
+    /// false) it is the whole response from the first reflection (<see cref="Start"/>) on, the placed
+    /// copies' energy already out of it. With one, it takes over across SdmTailIr's end fade in energy:
+    /// the two are independent noise, so their windows' squares add to one.
     /// </summary>
     public float[] LateWindowed(bool afterDirectional)
     {

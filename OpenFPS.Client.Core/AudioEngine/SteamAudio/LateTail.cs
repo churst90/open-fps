@@ -4,21 +4,17 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
 /// The late part of a traced impulse response, ready to convolve: the trace's own omnidirectional
-/// channel from where the placed early reflections end, faded in, in the frequency domain.
+/// channel, faded in, partitioned in the frequency domain.
 ///
-/// Why it exists. Steam Audio's PARAMETRIC reverb is a feedback delay network that takes three decay
-/// times from the trace and nothing else — not its level, not its envelope. Measured against traces
-/// from where the sources really are, it is 14-20 dB too loud in the tunnel, 8-11 in a street, 0-3 in
-/// flat 01F, silent until 60 ms and then a step onto a plateau to 150 ms, decaying slower than the
-/// room: an echo over the room that masks where the reflections come from. The trace itself is none of that:
-/// it is dense, its energy falls from the first reflection on, and its level is the room's. The SDK
-/// keeps the traced IR opaque, so the tracer pushes an impulse through a private convolution to read
-/// it back (TracedReverb.ExtractLate), and this plays it.
+/// Not Steam Audio's parametric reverb: that takes three decay times from the trace and not its level
+/// or envelope, and measured 14-20 dB too loud in the tunnel, 8-11 in a street, 0-3 in flat 01F, silent
+/// to 60 ms and then a plateau. The SDK keeps the traced IR opaque, so it is read back through a
+/// private convolution (TracedReverb.ExtractLate) and played here.
 /// </summary>
 internal sealed class LateTailIr
 {
-    /// <summary>Where the placed early reflections end and the tail begins (WorldAudioPlayer's
-    /// window is 80 ms): a raised-cosine fade-in across this span, so the two meet with no step.</summary>
+    /// <summary>The raised-cosine fade-in of a tail that starts after the placed copies
+    /// (WorldAudioPlayer's 80 ms window), so the two meet with no step.</summary>
     public const float FadeInStartSeconds = 0.05f, FadeInEndSeconds = 0.10f;
 
     public readonly int Block, Bins, Partitions;
@@ -81,9 +77,9 @@ internal sealed class LateTailIr
 
 /// <summary>
 /// Uniformly partitioned overlap-save convolution of one channel through a <see cref="LateTailIr"/>,
-/// one block at a time, on the mixer thread. Nothing here allocates after construction and nothing
-/// throws. A new IR takes over across one block: that block is convolved through both and crossfaded,
-/// so a new trace is never a click.
+/// one block at a time, on the mixer thread: nothing allocates after construction and nothing throws.
+/// A new IR takes over across one block, convolved through both and crossfaded, so a new trace is
+/// never a click.
 /// </summary>
 internal sealed class LateTailConvolver
 {
@@ -282,23 +278,18 @@ internal sealed class Fft
 
 /// <summary>
 /// The directional part of the tail, by the Spatial Decomposition Method (Tervo et al. 2013): the
-/// traced response split, sample by sample, by the direction its sound arrives from, snapped to the
-/// nearest of the tail's directions (DiffuseTail.Direction). Each direction then has its own
-/// response — only the samples that came from that way — and they sum back to the trace exactly.
+/// traced response split sample by sample by the direction its sound arrives from, snapped to the
+/// nearest of the tail's directions (DiffuseTail.Direction). The parts sum back to the trace exactly.
 ///
-/// Why. One channel spread over twenty directions by random filters is a field that is the same
-/// whichever way you face, so turning your head tells you nothing and it sits in front of you as a
-/// mass of reverb, which is where a generic head response puts anything without a direction. The
-/// trace knows better for its first few hundred milliseconds: the second and third
-/// bounces arrive off particular walls. From here they come from those walls, fixed in the room, and
-/// move round the head as it turns. Past <see cref="EndFadeStart"/>..<see cref="EndFadeEnd"/> the trace
-/// itself says the sound arrives from everywhere, and the diffuse rendering takes over; the two
-/// windows are complementary, so the parts add back to the trace.
+/// One channel spread over twenty directions is the same whichever way you face and sits in front of
+/// you as a mass of reverb; the trace's second and third bounces come off particular walls, so they
+/// are played from those walls and move round the head as it turns. Past
+/// <see cref="EndFadeStart"/>..<see cref="EndFadeEnd"/> the trace arrives from everywhere and the
+/// diffuse rendering takes over, with complementary windows.
 ///
-/// Direction per sample: the intensity W x (first-order channels) summed over <see cref="DoaWindow"/>
-/// samples (about 0.7 ms), turned into the game's world through the measured channel axes
-/// (AmbiAxes). Snapping to a fixed set of directions is the published refinement that keeps each
-/// direction's response from being a comb of lone samples (Amengual Garí et al., BinauralSDM).
+/// Direction per sample: the intensity W x (first-order channels) over <see cref="DoaWindow"/>
+/// samples (about 0.7 ms), through the measured channel axes (AmbiAxes). Snapping to fixed directions
+/// keeps each response from being a comb of lone samples (Amengual Garí et al., BinauralSDM).
 /// </summary>
 internal sealed class SdmTailIr
 {
@@ -324,9 +315,10 @@ internal sealed class SdmTailIr
 
     public static int PartitionsFor(int sampleRate, int block) => (int)(EndFadeEnd * sampleRate) / block + 2;
 
-    /// <param name="w">The omnidirectional channel; <paramref name="c1"/>..<paramref name="c3"/> the
-    /// first-order ones, whose world axes (Steam Audio's) are <paramref name="a1"/>..<paramref name="a3"/>.</param>
-    /// <param name="directions">The directions to snap to, in the game's world.</param>
+    /// <summary>Splits the trace <paramref name="w"/> (omnidirectional) and <paramref name="c1"/>..
+    /// <paramref name="c3"/> (first order, whose axes in Steam Audio's world are <paramref name="a1"/>..
+    /// <paramref name="a3"/>) over <paramref name="directions"/> (the game's world), in partitions of
+    /// <paramref name="block"/> samples at <paramref name="sampleRate"/>.</summary>
     public static SdmTailIr Build(float[] w, float[] c1, float[] c2, float[] c3,
                                   System.Numerics.Vector3 a1, System.Numerics.Vector3 a2, System.Numerics.Vector3 a3,
                                   System.Numerics.Vector3[] directions, int sampleRate, int block)

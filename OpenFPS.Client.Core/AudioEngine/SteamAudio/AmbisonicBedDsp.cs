@@ -13,9 +13,8 @@ internal sealed class AmbisonicBedState : IGuardedUnit
     /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
     public NonFiniteUnit Guard { get; } = new();
 
-    /// <summary>Interleaved N3D/ACN sample data for the whole bed. Converted once at load, never
-    /// per block — a 60-second first-order bed is four channels of float and perfectly affordable,
-    /// and doing the normalization per block would be pure waste.</summary>
+    /// <summary>Interleaved N3D/ACN samples of the whole bed, normalised once at load (a 60 s
+    /// first-order bed is four channels of float).</summary>
     public float[] Pcm = Array.Empty<float>();
     public int Channels;
     public int Order;
@@ -37,9 +36,8 @@ internal sealed class AmbisonicBedState : IGuardedUnit
     public float[] Scratch = Array.Empty<float>();
     public float[] StereoScratch = Array.Empty<float>();
 
-    /// <summary>The listener's frame of reference, written by the game thread every audio update and
-    /// read by the mixer. This is the whole point of the exercise: the bed is fixed in the world and
-    /// this is what turns underneath it.</summary>
+    /// <summary>The listener's frame of reference: written by the game thread every audio update, read
+    /// by the mixer. The bed is fixed in the world and this turns underneath it.</summary>
     public Phonon.IPLCoordinateSpace3 Orientation;
 
     /// <summary>Target and current level, glided per block so starting, stopping and crossfading a bed
@@ -55,15 +53,10 @@ internal sealed class AmbisonicBedState : IGuardedUnit
 /// <summary>
 /// An FMOD custom DSP that plays an ambisonic ambience bed through Steam Audio's decode effect.
 ///
-/// It is a GENERATOR (no input buffers), reading its own PCM rather than sitting on an FMOD channel.
-/// That is deliberate: FMOD would downmix a four-channel sound to the output speaker mode long before
-/// any DSP saw it, destroying the soundfield on the way past. Owning the PCM sidesteps the channel
-/// format question entirely and makes looping exact.
-///
-/// Per block: read (order+1)² channels from the bed, hand them to
-/// <c>iplAmbisonicsDecodeEffectApply</c> with the listener's current frame of reference, and take back
-/// a binaural stereo pair. The rotation happens inside the decode, which is why the world stays still
-/// while the player turns — the thing a binaural RECORDING can never do.
+/// A generator (no input buffers) reading its own PCM: on an FMOD channel the four-channel sound would
+/// be downmixed to the speaker mode before any DSP saw it, and the soundfield lost. Per block the
+/// (order+1)² channels are decoded binaurally with the listener's current frame, so the rotation
+/// happens in the decode and the world stays still while the player turns.
 /// </summary>
 internal static class AmbisonicBedDsp
 {
@@ -94,12 +87,9 @@ internal static class AmbisonicBedDsp
     }
 
     /// <summary>
-    /// The guard, and the reason it is a separate method: a managed DSP callback MUST NOT THROW.
-    ///
-    /// FMOD calls this from its own native mixer thread, and an exception that unwinds across that
-    /// boundary does not fault a voice — it takes the whole process down. The client was killed
-    /// exactly that way by an index slip in the boundary DSP, which had no guard either. Everything
-    /// below stays as it was; a fault now costs one silent block and one line in the log.
+    /// The guard: a managed DSP callback must not throw. FMOD calls it on its native mixer thread, and
+    /// an exception unwinding across that boundary takes the whole process down (an index slip in the
+    /// boundary DSP killed the client that way). A fault costs one silent block and a line in the log.
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
@@ -135,9 +125,9 @@ internal static class AmbisonicBedDsp
         int outCh = outchannels;
         int n = (int)length;
 
-        // Steam Audio's effects are built for exactly the frame size they were created with.
         Interlocked.Increment(ref s.CallbackCount);
 
+        // Steam Audio's effects are built for exactly the frame size they were created with.
         if (n != s.FrameSize || s.Effect == IntPtr.Zero || s.Pcm.Length == 0)
         {
             s.Bailed = n != s.FrameSize ? 1 : (s.Effect == IntPtr.Zero ? 2 : 3);

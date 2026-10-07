@@ -6,46 +6,43 @@ using PV = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// Owns an <c>IPLSimulator</c> (DIRECT stage) plus a <see cref="SteamAudioScene"/> reference and a fixed
-/// pool of <c>IPLSource</c> handles. This is the runtime engine that Phase 4 wires into the acoustic
-/// worker thread to replace the hand-rolled occlusion/transmission computation: build/replace the scene
-/// on map load, acquire one source per active voice, then each tick set every active source's position,
-/// set the listener, <see cref="Run"/> the simulator ONCE (the direct stage batches all sources), and
-/// read each source's occlusion/transmission via <see cref="GetResult"/>.
+/// An <c>IPLSimulator</c> and a fixed pool of <c>IPLSource</c> handles, for the acoustic worker: set the
+/// scene on map load, acquire a source per voice, then each tick stage every source and the listener,
+/// <see cref="Run"/> once (the direct stage batches all sources) and read each with
+/// <see cref="GetResult"/>.
 ///
-/// Lifetime model mirrors the voice-pool lesson: all <c>IPLSource</c> handles are created and added to
-/// the simulator up front (adding/removing a source requires an <c>iplSimulatorCommit</c>), so per-frame
-/// work never allocates or mutates the simulator graph. Acquire/Release only toggle logical ownership —
-/// a released source stays added but simply isn't fed inputs or read.
-///
-/// This type is NOT thread-safe; drive it from a single worker thread. It does NOT own the IPLContext
-/// or the scene — the caller creates and disposes those.
-/// Coordinates: occlusion/transmission are position-only, so source/listener orientation is identity
-/// (Steam Audio's +x right / +y up / -z forward); positions are passed through verbatim in world space.
+/// Every source is created and added up front (adding or removing one needs an
+/// <c>iplSimulatorCommit</c>), so per-frame work never allocates or changes the simulator; Acquire and
+/// Release only move ownership. Not thread-safe: one worker thread drives it. The caller owns the
+/// context and the scene. Orientation is identity (+x right, +y up, -z ahead); positions go through
+/// Phonon.World, which mirrors z.
 /// </summary>
 public sealed class SteamAudioSimulator : IDisposable
 {
-    /// <summary>Direct-stage result for one source. <see cref="Visibility"/> is a gain factor: 1 = fully
-    /// clear line of sight, 0 = fully blocked (this is Steam Audio's "occlusion" field — see the Phase 1
-    /// note). Transmission is the per-band gain of sound passing THROUGH the occluder (low/mid/high).</summary>
+    /// <summary>Direct-stage result for one source. <see cref="Visibility"/> is a gain, 1 a clear line of
+    /// sight and 0 fully blocked (Steam Audio's "occlusion" field). Transmission is the per-band gain of
+    /// sound passing through the occluder.</summary>
     public readonly record struct DirectResult(float Visibility, float TransLow, float TransMid, float TransHigh)
     {
-        /// <summary>Result to assume when no source/scene is available (unoccluded, full transmission).</summary>
+        /// <summary>Result to assume with no source or scene: unoccluded.</summary>
         public static readonly DirectResult Clear = new(1f, 1f, 1f, 1f);
     }
 
-    /// <summary>Pathing arrival result for one source: the direction (world space) the sound comes FROM
-    /// after routing through openings, and <see cref="Energy"/> (the SH omni term — 0 means no path found,
-    /// so the caller should keep using the direct line to the source).</summary>
-    /// <param name="EqLow">What the route through the scene takes per band (Steam Audio's pathing eq):
-    /// the level of a sound that has to find its way round, where the direct stage only knows it is
-    /// blocked.</param>
+    /// <summary>Pathing arrival result for one source.</summary>
+    /// <param name="Found">Whether a path was found.</param>
+    /// <param name="WorldDirection">The game-world direction the sound comes from after routing through
+    /// openings.</param>
+    /// <param name="Energy">The SH omni term: 0 is no path, and the caller keeps the direct line.</param>
+    /// <param name="EqLow">What the route takes per band (Steam Audio's pathing eq): the level of a sound
+    /// that has to find its way round, where the direct stage only knows it is blocked.</param>
+    /// <param name="EqMid">As <paramref name="EqLow"/>, mid band.</param>
+    /// <param name="EqHigh">As <paramref name="EqLow"/>, high band.</param>
     public readonly record struct PathResult(bool Found, Vector3 WorldDirection, float Energy,
                                              float EqLow = 0f, float EqMid = 0f, float EqHigh = 0f);
 
-    /// <summary>The direct result mapped to the engine's per-band acoustic parameters: <see cref="Occlusion"/>
-    /// is "fraction blocked" (0=clear) and EqLow/Mid/High are per-band clarity (1=clear). Pure mapping,
-    /// unit-tested. The caller still clamps occlusion to its own cap.</summary>
+    /// <summary>The direct result as the engine's acoustic parameters: <see cref="Occlusion"/> the
+    /// fraction blocked (0 clear), EqLow/Mid/High per-band clarity (1 clear). The caller still clamps
+    /// occlusion to its own cap.</summary>
     public readonly record struct AcousticParams(float Occlusion, float EqLow, float EqMid, float EqHigh, float Bleed);
 
     /// <summary>Maps a <see cref="DirectResult"/> (SA visibility gain + per-band transmission) to engine
@@ -63,17 +60,10 @@ public sealed class SteamAudioSimulator : IDisposable
     }
 
     /// <summary>
-    /// Reflection result for a source/probe: per-band RT60 reverb decay in seconds.
-    ///
-    /// The decay TIME, and only that. The reflections output also carries an <c>eq</c> triple that
-    /// looks like the missing half — how much energy the tail actually has — and it was bound and
-    /// measured here on exactly that hope. On the PARAMETRIC path it comes back zero in every band, in
-    /// an open field and inside a sealed room alike, because Steam Audio only fills it for the hybrid
-    /// reflection effect. It is not carried, rather than carried as a permanent zero that the next
-    /// person would have to disprove again.
-    ///
-    /// Whether there is a reverberant field here at all is therefore not answered from this struct.
-    /// It is measured from the geometry — see OpenFPS.Common.Enclosure.
+    /// Reflection result for a source: per-band RT60, seconds, and only that. The reflections output's
+    /// <c>eq</c> triple comes back zero in every band on the parametric path (Steam Audio fills it only
+    /// for the hybrid effect), so how much reverberant field there is comes from the geometry
+    /// (OpenFPS.Common.Enclosure).
     /// </summary>
     public readonly record struct ReverbResult(float Rt60Low, float Rt60Mid, float Rt60High)
     {
@@ -81,8 +71,7 @@ public sealed class SteamAudioSimulator : IDisposable
         public float Max => MathF.Max(Rt60Low, MathF.Max(Rt60Mid, Rt60High));
     }
 
-    /// <summary>Maps a simulated RT60 (seconds, per band) to an FMOD SFXREVERB decay time in ms, using the
-    /// longest band and clamping to a sane range. Pure, unit-tested.</summary>
+    /// <summary>A simulated RT60 as an FMOD SFXREVERB decay time, ms: the longest band, clamped.</summary>
     public static float ReverbDecayMs(ReverbResult r, float minMs = 100f, float maxMs = 20000f)
         => Math.Clamp(r.Max * 1000f, minMs, maxMs);
 
@@ -102,14 +91,14 @@ public sealed class SteamAudioSimulator : IDisposable
     private readonly List<IntPtr> _allSources = new();
     private Vector3 _listener;
 
-    // Pathing probe state (only when _pathing). Built once on the first SetScene; re-baked on map change.
+    // Pathing probe state (only when _pathing): made by the first bake (BeginProbeBake), re-baked on map change.
     private IntPtr _probeArray;
     private IntPtr _probeBatch;
     private Phonon.IPLBakedDataIdentifier _pathId;
 
-    /// <summary>Converts Steam Audio's order-1 pathing SH (ACN: w, m=-1, m=0, m=+1) to a unit WORLD
-    /// arrival direction (where the sound comes FROM). Convention measured from the simulator, held by SteamAudioMappingTests:
-    /// worldDir = normalize(-sh[1], sh[2], -sh[3]) (world X = -ACN(m=-1), Z = -ACN(m=+1), Y = ACN(m=0)).</summary>
+    /// <summary>Steam Audio's order-1 pathing SH (ACN: w, m=-1, m=0, m=+1) as a unit game-world arrival
+    /// direction: normalize(-sh[1], sh[2], +sh[3]) in the mirrored world, measured from the simulator and
+    /// held by SteamAudioMappingTests. <paramref name="w"/> is not needed for the direction.</summary>
     public static Vector3 PathingWorldDirection(float w, float shYm1, float shZm0, float shXp1)
     {
         // Ambisonic X is Steam Audio's ahead, which is its -z; the game's z runs the other way
@@ -156,19 +145,16 @@ public sealed class SteamAudioSimulator : IDisposable
             _simulator = IntPtr.Zero;
     }
 
-    /// <summary>Points the simulator at a (built) scene and commits. The source pool is created lazily on
-    /// the first call — sources must be added AFTER the scene is set (mirrors the working spike ordering) —
-    /// and reused across later scene rebuilds. Safe to call again on map change.</summary>
+    /// <summary>Points the simulator at a built scene and commits. The source pool is made on the first
+    /// call (sources must be added after the scene is set) and kept across rebuilds.</summary>
     public void SetScene(SteamAudioScene scene)
     {
         if (!IsValid || scene is null || !scene.IsBuilt) return;
         Phonon.iplSimulatorSetScene(_simulator, scene.Handle);
 
-        // The pathing bake does NOT happen here any more. See BeginProbeBake: it used to, it took a
-        // hundred seconds on a large map, and for that whole time this method had not returned — so
-        // the worker produced no occlusion for anything, every source in the world was rendered
-        // unoccluded, and then the entire model arrived in one frame a minute and a half into the
-        // session. Nothing that takes longer than a frame may gate the direct stage.
+        // No pathing bake here (BeginProbeBake): inline it took a hundred seconds on a large map, during
+        // which every source played unoccluded. Nothing that takes longer than a frame may gate the
+        // direct stage.
         Phonon.iplSimulatorCommit(_simulator);
 
         if (_allSources.Count == 0)
@@ -185,24 +171,11 @@ public sealed class SteamAudioSimulator : IDisposable
         }
     }
 
-    /// <summary>Generates floor probes over the scene bounds and bakes the probe-to-probe visibility graph
-    /// (pathing finds nothing without the bake). Built once; re-baked against the new scene on map change
-    /// (probe positions are not relocated — pathing is tuned for single-map sessions). Requires the scene
-    /// to contain floor geometry wound normal-up, or UNIFORMFLOOR places no probes (pathing then silently
-    /// no-ops and the caller falls back to the direct line).</summary>
     /// <summary>
-    /// Starts the pathing bake on a thread of its own, and returns immediately.
-    ///
-    /// Baking is map-sized work — probes over the whole floor, then a visibility graph between them —
-    /// and the caller is a real-time audio worker. Run inline it was a hundred-second hole in the
-    /// direct stage on the speedway; run here it is a background cost that finishes whenever it
-    /// finishes, and until it does <see cref="PathingReady"/> stays false, pathing is simply not part
-    /// of the simulation, and every source is served its direct result from the first tick.
-    ///
-    /// The baked batch is handed to the simulator by <see cref="CommitPendingProbes"/>, which the
-    /// OWNING thread calls between runs — the simulator itself is single-threaded by contract, so the
-    /// background thread never touches it. What the background thread does touch is the scene and the
-    /// probe batch, both of which the baker only reads.
+    /// Starts the pathing bake on a thread of its own and returns at once: it is map-sized work, and
+    /// until it is done <see cref="PathingReady"/> is false and every source gets its direct result.
+    /// The batch is handed over by <see cref="CommitPendingProbes"/> on the owning thread: the simulator
+    /// is single-threaded, and the bake thread only reads the scene.
     /// </summary>
     public void BeginProbeBake(SteamAudioScene scene)
     {
@@ -216,8 +189,7 @@ public sealed class SteamAudioSimulator : IDisposable
         {
             IsBackground = true,
             Name = "SaPathingBake",
-            // Below everything that has a deadline. A map load is the busiest moment the client has,
-            // and this is the one piece of work at that moment which nobody is waiting for.
+            // Below everything with a deadline: at a map load nobody is waiting for this.
             Priority = ThreadPriority.Lowest,
         };
         _bakeThread.Start();
@@ -244,17 +216,17 @@ public sealed class SteamAudioSimulator : IDisposable
     }
 
     /// <summary>
-    /// Probes to generate at most, whatever the map's size.
-    ///
-    /// The bake's cost grows worse than linearly in the probe count and the probe count grows with the
-    /// map's AREA, so a fixed 2 m spacing is a promise that gets more expensive the bigger anyone
-    /// builds — 720 x 420 m of ground is seventy-five thousand probes. A budget with the spacing
-    /// derived from it means a big map gets coarser pathing rather than an unbounded bake, which is
-    /// the trade a listener would choose: coarse direction hints beat waiting for exact ones.
+    /// Probes to generate at most, whatever the map's size: the bake grows worse than linearly in the
+    /// probe count, and 720 x 420 m at a fixed 2 m is seventy-five thousand. A big map gets coarser
+    /// spacing instead of an unbounded bake.
     /// </summary>
     private const int MaxProbes = 8192;
     private const float MinProbeSpacing = 2.0f;
 
+    /// <summary>Generates floor probes over the scene bounds and bakes the visibility graph between them
+    /// (pathing finds nothing without it). Built once; re-baked against the new scene on map change
+    /// without moving the probes. UNIFORMFLOOR needs floors wound normal-up, or it places no probes and
+    /// pathing quietly does nothing.</summary>
     private void BuildOrRebakeProbes(SteamAudioScene scene)
     {
         _pathId = new Phonon.IPLBakedDataIdentifier
@@ -304,9 +276,8 @@ public sealed class SteamAudioSimulator : IDisposable
         Console.WriteLine($"[SteamAudio] Pathing bake finished: {probes} probe(s) at {spacing:F1} m spacing in {seconds:F1} s. "
                         + "Occlusion was live from the first tick; only the direction hint for an occluded source was waiting on this.");
 
-        // Published, not attached. The simulator belongs to whichever thread runs it and only that
-        // thread may add to one, so a batch that was built here waits for CommitPendingProbes. A
-        // RE-bake of a batch the simulator already holds has nothing to hand over.
+        // Published, not attached: only the simulator's own thread may add to it (CommitPendingProbes).
+        // A re-bake of a batch it already holds has nothing to hand over.
         if (isNewBatch) Interlocked.Exchange(ref _bakedBatchPending, batch);
     }
 
@@ -341,14 +312,9 @@ public sealed class SteamAudioSimulator : IDisposable
     public void SetSourceInputs(IntPtr source, Vector3 worldPos, float occlusionRadius = 0.5f)
     {
         if (source == IntPtr.Zero) return;
-        // ── A source only claims the pathing stage once it HAS probes ─────────────────────────
-        //
-        // The flags on a source persist until it is staged again, and the pathing run walks every
-        // source that claims the stage and dereferences the probe batch it was given. A source staged
-        // before the bake finished claims pathing with a null batch — and it keeps claiming it, for as
-        // long as it goes un-restaged, which for a distant source throttled to one update in ten
-        // frames is a third of a second after the bake lands. Leaving the bit off until the probes
-        // exist means no source can ever be in that state, whatever order anything is called in.
+        // A source claims the pathing stage only once there are probes: a source's flags persist until
+        // it is staged again, and the pathing run dereferences the batch of every source that claims it.
+        // Staged before the bake finished, a source would claim it with a null batch.
         int flags = PathingReady ? _flags : _flags & ~Phonon.IPL_SIMULATIONFLAGS_PATHING;
         var inputs = new Phonon.IPLSimulationInputs
         {
@@ -356,9 +322,8 @@ public sealed class SteamAudioSimulator : IDisposable
             directFlags = _direct ? (Phonon.IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | Phonon.IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION) : 0,
             source = Coord(worldPos),
             occlusionType = Phonon.IPL_OCCLUSIONTYPE_VOLUMETRIC,
-            // Per source, because the right size depends on how much room the emitter has above
-            // whatever it is sitting on. A fixed half metre put half of every ground-level emitter's
-            // probe sphere inside the ground it was standing on. See AudioEmission.OcclusionRadiusFor.
+            // Per source (AudioEmission.OcclusionRadiusFor): a fixed half metre put half of every
+            // ground-level emitter's probe sphere inside the ground.
             occlusionRadius = MathF.Max(0.01f, occlusionRadius),
             numOcclusionSamples = 16,
             // Every surface up to eight, not the nearest one: a box's loss is split across its two
@@ -384,10 +349,8 @@ public sealed class SteamAudioSimulator : IDisposable
     }
 
     // --- Ray budget ------------------------------------------------------------------------------------
-    // The simulation is the most expensive thing the client does per audio frame and its cost is a
-    // configuration choice — rays x bounces — not an emergent one. These make that choice legible: what was
-    // asked for, and what it actually cost on this machine's CPU. Measured unconditionally (a timestamp
-    // either side of a millisecond-scale ray trace is free) so the numbers exist the moment anyone asks.
+    // The simulation is the most expensive thing the client does per audio frame: what was asked for
+    // (rays x bounces) and what it cost here, always measured.
 
     /// <summary>Rays cast per <see cref="Run"/>, as configured.</summary>
     public int RaysPerRun => _reflections ? 8192 : 4096;
@@ -418,8 +381,8 @@ public sealed class SteamAudioSimulator : IDisposable
         MaxRunMs = 0.0;
     }
 
-    /// <summary>Runs the direct (and, when enabled, pathing) stage once for ALL staged sources against the
-    /// current listener. Expensive (ray-traced) — call on a worker thread, never the mixer/game thread.</summary>
+    /// <summary>Runs the enabled stages once for all staged sources. Ray-traced: a worker thread, never
+    /// the mixer or game thread.</summary>
     public void Run()
     {
         if (!IsValid) return;
@@ -435,10 +398,8 @@ public sealed class SteamAudioSimulator : IDisposable
         long start = System.Diagnostics.Stopwatch.GetTimestamp();
         Phonon.iplSimulatorSetSharedInputs(_simulator, _flags, ref shared);
         if (_direct) Phonon.iplSimulatorRunDirect(_simulator);
-        // Only over sources that were actually STAGED with a probe batch. Running the pathing stage
-        // over sources that were not is a null dereference inside Steam Audio, which is a dead
-        // process rather than an exception — and the window for it opens the instant a background
-        // bake completes. Caller ordering should keep the two in step; this makes it structural.
+        // Only when a source was staged with a probe batch: otherwise the pathing run is a null
+        // dereference inside Steam Audio, a dead process rather than an exception.
         if (PathingReady && _pathingStaged) Phonon.iplSimulatorRunPathing(_simulator);
         if (_reflections) Phonon.iplSimulatorRunReflections(_simulator);
         _pathingStaged = false;
@@ -492,10 +453,9 @@ public sealed class SteamAudioSimulator : IDisposable
 
     public void Dispose()
     {
-        // The bake reads the scene and writes a probe batch. Releasing either underneath it is a
-        // use-after-free in native code, so wait for it — it is the one thing here that can be
-        // running on another thread. Bounded, because a shutdown that hangs on a bake is its own bug;
-        // past the wait we abandon the batch rather than free something still being written.
+        // The bake reads the scene and writes a probe batch: releasing either under it is a native
+        // use-after-free, so wait for it, bounded, and past the wait abandon the batch rather than free
+        // something still being written.
         var bake = _bakeThread;
         if (bake is { IsAlive: true } && !bake.Join(TimeSpan.FromSeconds(5)))
         {

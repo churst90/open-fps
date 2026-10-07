@@ -5,10 +5,10 @@ using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// Per-voice state for the Steam Audio binaural FMOD DSP. Holds the phonon handles + scratch
-/// buffers (all pre-allocated; nothing is allocated in the audio callback) and the current
-/// listener-&gt;source direction, written by the game thread and read by FMOD's mixer thread.
-/// Direction is in Steam Audio coordinates (+x right, +y up, -z forward).
+/// Per-voice state for the Steam Audio binaural FMOD DSP: the Phonon handles and scratch buffers, all
+/// allocated up front (nothing allocates in the callback), and the listener-to-source direction,
+/// written by the game thread and read by FMOD's mixer thread, in Steam Audio's frame (+x right,
+/// +y up, -z forward).
 /// </summary>
 internal sealed class SteamAudioVoiceState
 {
@@ -24,10 +24,8 @@ internal sealed class SteamAudioVoiceState
     // Live direction (torn reads are inaudible for a single frame).
     public volatile float DirX, DirY = 0f, DirZ = -1f; // default: straight ahead
 
-    /// <summary>How spatialized this voice is: 1 = fully HRTF'd toward <c>Dir</c>, 0 = passed through
-    /// unspatialized. The continuous form of "is this voice being localized", and the reason it exists:
-    /// switching a binaural stage on or off between one block and the next is a step change in the
-    /// signal, and it clicks. Ramping this instead lets a listener cross a threshold silently.</summary>
+    /// <summary>How spatialized this voice is: 1 fully placed toward the direction, 0 passed through.
+    /// Switching a binaural stage on or off between blocks clicks; ramping this does not.</summary>
     public volatile float SpatialBlend = 1f;
 
     /// <summary>The blend the last block ended on, mixer thread only; below zero before the first.
@@ -43,12 +41,10 @@ internal sealed class SteamAudioVoiceState
     public OpenFPS.Client.AudioEngine.Acoustics.GroundReflection? Ground;
 
     /// <summary>
-    /// The ground's answer is placed where it comes from: the source's mirror image below the surface,
-    /// through an HRTF of its own. A voice three metres off arrives from nearly level and its bounce
-    /// from forty-odd degrees below, and two arrivals from two directions are heard as a sound and its
-    /// setting; summed into ONE direction they are a comb in both ears at once, which is flanging
-    /// (heard 2026-09-27). The ear's decolouration of a reflection depends on it arriving from
-    /// somewhere else (Salomons 1995, Brueggen 2001).
+    /// The ground's answer, placed at the source's mirror image below the surface through an HRTF of its
+    /// own. Summed into the source's direction it is a comb in both ears at once, flanging (heard
+    /// 2026-09-27): the ear decolours a reflection only when it arrives from somewhere else (Salomons
+    /// 1995, Brueggen 2001).
     /// </summary>
     public IntPtr GroundEffect;
     public Phonon.IPLAudioBuffer GroundInBuf;   // 1 channel, FrameSize
@@ -59,11 +55,9 @@ internal sealed class SteamAudioVoiceState
     public volatile float GroundDirX, GroundDirY = -1f, GroundDirZ;
 
     /// <summary>
-    /// An equaliser on what this stage places, ahead of the HRTF and after the room's send (which leaves
-    /// the channel before any of its stages): what the HRTF does to the level at the ears in this
-    /// direction, taken back to another direction's. For the paths into a cabin (CabinPaths), which
-    /// keep the one interior voice's level and change only where they come from; see HrtfBands.
-    /// Null for every other voice. Swapped in whole from the game thread; its state is the stage's.
+    /// For the paths into a cabin (CabinPaths) only: an equaliser ahead of the HRTF (and after the room's
+    /// send) that takes this direction's HRTF level at the ears back to the one interior voice's; see
+    /// HrtfBands. Swapped in whole from the game thread; its state is the stage's.
     /// </summary>
     public volatile OpenFPS.Client.AudioEngine.Core.Engine.BandEq? PreEq;
     public readonly float[] PreEqState = OpenFPS.Client.AudioEngine.Core.Engine.BandEq.State();
@@ -88,10 +82,9 @@ internal sealed class SteamAudioVoiceState
 }
 
 /// <summary>
-/// A custom FMOD DSP that spatializes a mono input into binaural stereo using Steam Audio's HRTF,
-/// replacing FMOD's amplitude panner. Created via System.createDSP, state passed through
-/// GCHandle/UserData, work done in the process callback on FMOD's mixer thread. Attach to a 2D
-/// channel (so FMOD does not also pan).
+/// A custom FMOD DSP that places a mono input binaurally with Steam Audio's HRTF, in place of FMOD's
+/// panner; state through GCHandle/UserData, work on FMOD's mixer thread. Attach to a 2D channel, so
+/// FMOD does not also pan.
 /// </summary>
 internal static class SteamAudioDsp
 {
@@ -101,14 +94,9 @@ internal static class SteamAudioDsp
     internal const int OutputChannels = 2;
 
     /// <summary>
-    /// The stage as FMOD is told about it: a process callback, not a read callback, because only a
-    /// process callback can say it puts out two channels while taking one in.
-    ///
-    /// A read callback puts out what it is given, so the stage used to have its input made stereo
-    /// (setChannelFormat), and FMOD did that by panning the mono voice to the middle, 3.01 dB down on
-    /// each side. The stage averaged the two back to one, so every voice reached the HRTF 3.01 dB
-    /// under the level the law placed it at, and the recorded sounds' ground, which waits for a
-    /// one-channel input, never played. Measured with --binaural-input.
+    /// A process callback, not a read callback: only a process callback can put out two channels while
+    /// taking one in. With a read callback the input was made stereo by FMOD's centre pan, so every voice
+    /// reached the HRTF 3.01 dB low and the recorded sounds' ground never played (--binaural-input).
     /// </summary>
     internal static FMOD.DSP_DESCRIPTION Description() => new()
     {
@@ -135,9 +123,8 @@ internal static class SteamAudioDsp
     }
 
     /// <summary>
-    /// FMOD asks first what the stage puts out (the query) and then has it do it. The answer is a
-    /// stereo pair, and the input is left as it comes: a point source arrives as its own one channel,
-    /// at its own level; a reverb bus as its stereo.
+    /// FMOD first queries what the stage puts out (a stereo pair), then runs it. The input is left as it
+    /// comes: a point source as its one channel, a reverb bus as its stereo.
     /// </summary>
     internal static RESULT ProcessCallback(ref DSP_STATE dsp_state, uint length, ref DSP_BUFFER_ARRAY inbufferarray,
                                            ref DSP_BUFFER_ARRAY outbufferarray, bool inputsidle, DSP_PROCESS_OPERATION op)
@@ -170,12 +157,9 @@ internal static class SteamAudioDsp
     }
 
     /// <summary>
-    /// The guard, and the reason it is a separate method: a managed DSP callback MUST NOT THROW.
-    ///
-    /// FMOD calls this from its own native mixer thread, and an exception that unwinds across that
-    /// boundary does not fault a voice — it takes the whole process down. The client was killed
-    /// exactly that way by an index slip in the boundary DSP, which had no guard either. Everything
-    /// below stays as it was; a fault now costs one silent block and one line in the log.
+    /// The guard: a managed DSP callback must not throw. FMOD calls it on its native mixer thread, and
+    /// an exception unwinding across that boundary takes the whole process down (an index slip in the
+    /// boundary DSP killed the client that way). A fault costs one silent block and a line in the log.
     /// </summary>
     private static RESULT Render(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                  uint length, int inchannels, ref int outchannels)
@@ -231,15 +215,13 @@ internal static class SteamAudioDsp
         int outCh = outchannels;
         int n = (int)length;
 
-        // Steam Audio requires buffers of exactly the configured frame size. If FMOD ever hands us
-        // a different block length, output silence for that block rather than misuse the effect.
+        // Steam Audio requires buffers of exactly the configured frame size: any other block is silence.
         if (n != state.FrameSize)
         {
             unsafe { float* o = (float*)outbuffer; for (int i = 0; i < n * outCh; i++) o[i] = 0f; }
             return RESULT.OK;
         }
 
-        // 1. Downmix FMOD's input to the mono scratch buffer.
         unsafe
         {
             float* inp = (float*)inbuffer;
@@ -260,17 +242,16 @@ internal static class SteamAudioDsp
             }
         }
 
-        // 1a. A cabin path's direction's HRTF colouring taken back to the one interior voice's.
+        // A cabin path's direction's HRTF colouring taken back to the one interior voice's.
         if (inchannels == 1 && state.PreEq is { } pre)
         {
             float[] mono = state.MonoScratch, z = state.PreEqState;
             for (int i = 0; i < n; i++) mono[i] = pre.Process(mono[i], z);
         }
 
-        // 1b. The ground's answer, on a point source only (a stereo input is a bus, not a place): the
-        // reflected part alone, to be placed at the image below.
-        // The line is fed even while there is no ground, so a ground that comes back does not replay
-        // what it held when it went.
+        // The ground's answer, on a point source only (a stereo input is a bus, not a place): the
+        // reflected part alone, placed at the image below. Fed even while inactive, so a ground that
+        // comes back does not replay what it held when it went.
         var ground = state.Ground;
         bool grounded = false;
         if (ground != null && inchannels == 1 && state.GroundEffect != IntPtr.Zero)
@@ -280,30 +261,24 @@ internal static class SteamAudioDsp
             grounded = ground.Active;
         }
 
-        // 2. mono -> IPL input buffer
         Phonon.iplAudioBufferDeinterleave(state.Context, state.MonoScratch, ref state.InBuf);
 
-        // 3. Spatialize with the current direction.
         var prm = new Phonon.IPLBinauralEffectParams
         {
             // Never a zero or a NaN direction: Steam Audio answers those with NaN (Phonon.SafeDirection).
             direction = Dir(Phonon.SafeDirection(new System.Numerics.Vector3(state.DirX, state.DirY, state.DirZ))),
             interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR,
-            // Always fully placed here; the blend is applied below, against the stage's OWN input
-            // rather than against Steam Audio's mono. For a point source the input is mono and the
-            // blend is 1, so nothing changes. For a stereo reverb bus, blend 0 is the reverb's own
-            // stereo passing straight through — which used to need the stage BYPASSED, a switch
-            // that clicked every time a listener crossed a doorway. A crossfade has no switch.
+            // Always fully placed here; the blend is applied below against the stage's own input, so a
+            // reverb bus at blend 0 passes its stereo through. Bypassing the stage instead clicked at
+            // every doorway.
             spatialBlend = 1f,
             hrtf = state.Hrtf,
             peakDelays = IntPtr.Zero
         };
         Phonon.iplBinauralEffectApply(state.Effect, ref prm, ref state.InBuf, ref state.OutBuf);
 
-        // 4. IPL stereo (deinterleaved) -> interleaved scratch
         Phonon.iplAudioBufferInterleave(state.Context, ref state.OutBuf, state.StereoScratch);
 
-        // 4b. The ground's answer from below, added to the placed sound.
         if (grounded)
         {
             Phonon.iplAudioBufferDeinterleave(state.Context, state.GroundMono, ref state.GroundInBuf);
@@ -321,9 +296,8 @@ internal static class SteamAudioDsp
             for (int i = 0; i < n * 2; i++) st[i] += gs[i];
         }
 
-        // 5. Write to FMOD's (interleaved) output buffer — the placed signal blended with the input.
-        // Ramped across the block from where the last one ended: the game moves the blend once a frame,
-        // and held for a block and stepped at the next it was a 43 Hz staircase while it moved.
+        // Out, the placed signal blended with the input. The blend is ramped across the block from where
+        // the last one ended: stepped per block it was a 43 Hz staircase while it moved.
         float blend = Math.Clamp(state.SpatialBlend, 0f, 1f);
         float fromBlend = state.LastBlend < 0f ? blend : state.LastBlend;
         state.LastBlend = blend;

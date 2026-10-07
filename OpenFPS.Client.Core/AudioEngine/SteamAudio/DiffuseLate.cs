@@ -3,33 +3,21 @@ using System.Numerics;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// The late tail of the room you stand in as a field: from every one of the tail's directions
-/// (DiffuseTail.Direction) its own independent noise under the room's averaged energy (SmoothTail),
-/// each through its own head response. Independent, as the directional part's twenty directions
-/// already are (SmoothTail.DirectionalWindowed).
+/// The late tail of the room you stand in as a field: each of the tail's directions
+/// (DiffuseTail.Direction) has its own independent noise under the room's averaged energy
+/// (SmoothTail), each through its own head response.
 ///
-/// Why. The late part used to be ONE noise texture (the omnidirectional channel), spread over the
-/// twenty directions by twenty velvet filters, and each ear's sum then through a velvet filter of
-/// its own. Every one of those is a random spectrum, and the ear heard their product: measured
-/// with --tail-steady, 400-900 ms at the ear, 10-11 % of bins 10 dB over their local median and a
-/// spectral flatness of 0.18, where noise has 0.1 % and 0.56. That is the "metallic ringing tail"
-/// (Cody, 2026-10-02). The directional part, independent noise per direction through the same
-/// head responses, measured 0.1-0.2 %.
+/// Independent noise per direction is what ended the "metallic ringing tail" (Cody, 2026-10-02): one
+/// noise spread by velvet filters multiplied three random spectra, 10-11 % of bins 10 dB over their
+/// local median at 400-900 ms (--tail-steady), where noise has 0.1 %. See changes.md, "The late tail
+/// no longer rings".
 ///
-/// Cost, and how it is paid. Twenty full-length convolutions (to 2 s) in the traced reverb's
-/// 256-sample blocks would be twenty times the late convolution that was there. But the late part
-/// starts 250 ms after the sound (SdmTailIr.EndFadeStart), and a response that starts late can be
-/// convolved in long blocks: with blocks of <see cref="Block"/> samples, a block of input's answer
-/// is not due until two blocks later, so its work is spread over the next block's 16 mixer pieces
-/// and the outputs wait in a ring until they are due. Twenty directions in 4,096-sample blocks cost
-/// about what one direction in 256-sample blocks did.
-///
-/// And the response is not rebuilt each trace. Within a block of the response each direction's
-/// noise is fixed, made once (<see cref="DiffuseLateNoise"/>, two spectra per block: the noise faded
-/// out across the block and faded in), and each trace only gives the envelope: per block of the
-/// response and per frequency bin, its amplitude at the block's start and at its end
-/// (<see cref="DiffuseLateIr"/>, built by SmoothTail.BuildDiffuseLate). The convolver multiplies them in
-/// as it goes.
+/// The late part starts 250 ms in (SdmTailIr.EndFadeStart), so it is convolved in blocks of
+/// <see cref="Block"/> samples: a block's answer is due two blocks later, its work is spread over the
+/// next block's mixer pieces, and twenty directions cost about what one did in 256-sample blocks. The
+/// noise is made once (<see cref="DiffuseLateNoise"/>, faded out and faded in across each block); a
+/// trace gives only the envelope per block and bin (<see cref="DiffuseLateIr"/>, from
+/// SmoothTail.BuildDiffuseLate).
 /// </summary>
 internal sealed class DiffuseLateNoise
 {
@@ -194,12 +182,11 @@ internal sealed class DiffuseLateIr
 
 /// <summary>
 /// Convolves one channel through a <see cref="DiffuseLateIr"/> into one signal per direction, in
-/// blocks of <see cref="DiffuseLateNoise.Block"/> fed and read in the mixer's pieces. A block of input
-/// is transformed when it is complete; its answer, due two blocks later, is worked out a pair of
-/// directions at a time over the next block's pieces and parked in a ring per direction. A new trace
-/// takes over across one block: that block is worked out through both and crossfaded (the first
-/// starts as it is, there being nothing to fade from). Mixer thread;
-/// nothing allocates after construction and nothing throws.
+/// blocks of <see cref="DiffuseLateNoise.Block"/> fed and read in the mixer's pieces. A complete
+/// block's answer, due two blocks later, is worked out a pair of directions at a time over the next
+/// block's pieces and parked in a ring per direction. A new trace takes over across one block, worked
+/// out through both and crossfaded. Mixer thread: nothing allocates after construction and nothing
+/// throws.
 /// </summary>
 internal sealed class DiffuseLateConvolver
 {
