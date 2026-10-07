@@ -1296,7 +1296,8 @@ public class GameServer
     internal MapRoads RoadsFor(string mapId)
     {
         _maps.TryGetMapData(mapId, out var map);
-        var data = MapRoadsBuilder.Build(map, _crossings.Rails(mapId));
+        // A server built without its systems (the tests' rig) has no crossings: the roads go without them.
+        var data = MapRoadsBuilder.Build(map, _crossings?.Rails(mapId) ?? Array.Empty<CrossingRails>());
         return new MapRoads { MapName = mapId, Json = data.IsEmpty ? "" : data.ToJson() };
     }
 
