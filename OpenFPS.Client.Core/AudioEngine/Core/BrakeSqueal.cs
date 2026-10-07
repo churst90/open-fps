@@ -1,22 +1,12 @@
 namespace OpenFPS.Client.AudioEngine.Core;
 
 /// <summary>
-/// Brake squeal: a friction-excited instability, not a sample.
-///
-/// A pad dragged over a rotor is a sliding contact whose friction falls as the sliding speed rises,
-/// and at LOW speed, with the pad pressed moderately, that negative slope feeds energy into one of
-/// the rotor's bending modes faster than the rotor's own damping takes it out. The mode grows until
-/// something nonlinear limits it, and it dies away again when the wheel stops, the driver presses
-/// harder or lets go. So squeal is heard in the last few metres of an ordinary stop and not at speed,
-/// and not in an emergency stop; it is a single tone that wanders a little with the speed and the
-/// temperature; and whether a given car's brakes do it at all is a property of that car — its pads,
-/// its rotors, their wear — not of the moment.
-///
-/// Modelled as the envelope of that instability, the Stuart–Landau equation
+/// Brake squeal as a friction-excited instability. At low speed on a moderate pedal, friction falling
+/// with sliding speed feeds a rotor bending mode faster than its damping takes it out: heard in the last
+/// metres of an ordinary stop, not at speed or in an emergency stop, and whether a car's brakes do it at
+/// all is the car's. The envelope is the Stuart-Landau equation
 ///     da/dt = (g - d) a - (g / A^2) a^3
-/// where g is the friction's gain (nought outside the squeal window), d the mode's damping and A
-/// the level it saturates at. It grows from a trace of noise, levels off at A, and rings down at
-/// d when the conditions go. The tone is the mode, pulled slightly by the sliding speed.
+/// g the friction's gain (nought outside the window), d the mode's damping, A the level it saturates at.
 /// </summary>
 public sealed class BrakeSqueal
 {
@@ -31,27 +21,25 @@ public sealed class BrakeSqueal
     /// <summary>The rotor mode it squeals at, Hz.</summary>
     public float Hz => _f0;
 
+    /// <param name="sampleRate">The voice's rate, Hz.</param>
     /// <param name="drums">Heavy vehicles: drum brakes, a lower and heavier mode.</param>
     /// <param name="seed">Per vehicle: whether it squeals, and at what, is the vehicle's.</param>
     public BrakeSqueal(float sampleRate, bool drums, int seed)
     {
         _rate = sampleRate;
-        // Hashed first. The seed is the vehicle's entity id, and neighbouring ids are consecutive
-        // integers; System.Random's first draws from nearby seeds are nearly the same, so a street's
-        // cars came out singing at 6567, 6568 and 6578 Hz — one set of brakes copied down the road.
+        // Hashed: the seed is the entity id, and System.Random's first draws from consecutive seeds
+        // are nearly the same (a street's cars sang at 6567, 6568 and 6578 Hz).
         _rng = new Random(Mix(seed));
-        // About a quarter of cars on a street have brakes that sing. Drum brakes on heavy vehicles
-        // are notorious for it: most city buses squeal coming in to a stop.
+        // About a quarter of cars; most city buses, on drums, squeal coming in to a stop.
         Squeals = _rng.NextDouble() < (drums ? 0.6 : 0.25);
         _f0 = drums ? 900f + 1300f * (float)_rng.NextDouble()       // drum: 0.9-2.2 kHz
                     : 2500f + 4500f * (float)_rng.NextDouble();     // disc: 2.5-7 kHz
         // A squeal is loud for its size; "nothing exaggerated" is the low end of what one measures.
         float db = drums ? 76f : 70f + 4f * (float)_rng.NextDouble();
         _peakPa = 20e-6f * MathF.Pow(10f, db / 20f);
-        // It grows only where the friction's gain beats the mode's damping; the difference is how fast.
         _gain = 60f;                     // 1/s: net growth 40/s, a trace to full in about a quarter second
         _damping = 20f;                  // 1/s: rings down to a tenth in about 0.1 s
-        // ...and it settles where the cubic term balances the net gain, sqrt((g - d) / g) of full.
+        // Where the cubic term balances the net gain.
         _settle = MathF.Sqrt((_gain - _damping) / _gain);
     }
 
@@ -65,18 +53,15 @@ public sealed class BrakeSqueal
         return (int)(h & 0x7FFFFFFF);
     }
 
-    /// <summary>
-    /// One sample, pascals at one metre.
-    /// </summary>
+    /// <summary>One sample, pascals at one metre.</summary>
     /// <param name="speed">Road speed, m/s.</param>
     /// <param name="decel">How hard it is braking, m/s², positive.</param>
     public float Step(float speed, float decel)
     {
         if (!Squeals) return 0f;
         float dt = 1f / _rate;
-        // The window: rolling slowly, on a moderate pedal. At speed the sliding velocity is too high
-        // for the friction's slope to matter; at a standstill nothing slides; hard braking clamps
-        // the pad and kills the mode.
+        // Rolling slowly on a moderate pedal: at speed the friction's slope does not matter, and hard
+        // braking clamps the pad and kills the mode.
         bool window = speed > 0.15f && speed < 4.5f && decel > 0.4f && decel < 3.5f;
         float g = window ? _gain : 0f;
         float a = _a + dt * ((g - _damping) * _a - g * _a * _a * _a);
@@ -85,7 +70,7 @@ public sealed class BrakeSqueal
         _a = Math.Clamp(a, 0f, 1.2f);
         if (_a < 1e-5f) return 0f;
 
-        // The mode, pulled up slightly as the rotor slows and it cools, and wandering.
+        // Pulled up slightly as the rotor slows, and wandering.
         _wander += dt * 0.7;
         float f = _f0 * (1f + 0.012f * (1f - Math.Clamp(speed / 4.5f, 0f, 1f)) + 0.003f * (float)Math.Sin(_wander * 2 * Math.PI));
         _phase += f * dt;

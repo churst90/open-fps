@@ -5,26 +5,19 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.AudioEngine.Core;
 
 /// <summary>
-/// The door models' renders kept on disk. A door, a key in a lock or a car window is a simulation that
-/// takes seconds of a core (a glass door up to forty), and a first hearing waits only
-/// <see cref="OpenFPS.Client.WorldAudioPlayer.MaxRenderLateness"/> for its buffer: a sound not rendered
-/// in time is dropped. Cody, 2026-10-05: "if I walk up to a door and try and open it, it doesn't play a
-/// sound for the first few times I open it, then it works". Every session began with nothing rendered.
+/// The door models' renders kept on disk. A door, a lock or a car window takes seconds of a core to
+/// render (a glass door up to forty), and a first hearing waits only
+/// <see cref="OpenFPS.Client.Core.WorldAudioPlayer.MaxRenderLateness"/> before it is dropped (Cody,
+/// 2026-10-05: "it doesn't play a sound for the first few times I open it, then it works").
 ///
-/// A render is the same every time for the same key and the same models, so it is kept: first in the
-/// folder shipped with the client (ASSETS/rendercache/BUILD, filled when a build is published), then in
-/// the player's own cache, which fills as they play. Both are named by <see cref="Name"/>: the hash of the
-/// door models' own sources (<see cref="DoorModelFingerprint"/>, made by OpenFPS.Common.csproj) and
-/// <c>Version</c>, so a changed model is never played from an old render, and a change anywhere else in
-/// OpenFPS.Common keeps them (they used to be named by WireContract.Hash, and every change to the
-/// project rendered them all again at the next launch). The player's folders for other models are removed.
+/// Read first from the folder shipped with the client (ASSETS/rendercache/BUILD), then from the player's
+/// own cache. Both are named by <see cref="Name"/>, the hash of the door models' sources
+/// (<see cref="DoorModelFingerprint"/>) and <c>Version</c>, so a changed model is never played from an
+/// old render and other changes to OpenFPS.Common keep them. Glass breaking is not kept: every break has
+/// a key of its own.
 ///
-/// Glass breaking is not kept: every pane and every break has a key of its own.
-///
-/// A render is kept at the rate it is made, <see cref="TransientSynth.SampleRate"/> (48 kHz), not the
-/// mixer's: it is brought to the mixer's rate when it is registered (WorldAudioPlayer.AtMixerRate), so
-/// a mixer at another rate (OPENFPS_MIXER_RATE) plays a kept render at its right pitch, and the files
-/// need no rate of their own. If TransientSynth's rate ever changes, bump <c>Version</c>.
+/// Kept at <see cref="TransientSynth.SampleRate"/> and brought to the mixer's rate on registration
+/// (WorldAudioPlayer.AtMixerRate). If TransientSynth's rate ever changes, bump <c>Version</c>.
 /// </summary>
 public static class DoorRenderCache
 {
@@ -34,9 +27,8 @@ public static class DoorRenderCache
     /// <summary>The folder name for this build's door models: their sources' hash and the file version.</summary>
     public static string Name => DoorModelFingerprint.Hash + "-v" + Version;
 
-    // Stored as 16-bit, as the engine is given them (TransientSynth.ToPcm16), scaled by the render's own
-    // peak so a render over full scale (a car window) is not clipped: half the size of floats, and the
-    // shipped folder is in every Windows zip.
+    // Stored as 16-bit scaled by the render's own peak, so a render over full scale (a car window) is
+    // not clipped: half the size of floats, and the shipped folder is in every Windows zip.
 
     /// <summary>Where renders are written, and read after the shipped folder. Null turns the cache off.
     /// OPENFPS_RENDER_CACHE overrides it; the lab's prerender points it at the folder it is filling.</summary>
@@ -95,7 +87,7 @@ public static class DoorRenderCache
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or EndOfStreamException)
             {
-                // A file half-written by a client that was closed, or a folder that cannot be read: render.
+                // A half-written file or an unreadable folder: render.
             }
         }
         return false;

@@ -1,13 +1,10 @@
 namespace OpenFPS.Client.AudioEngine.Core;
 
 /// <summary>
-/// Per-sample coefficients that were chosen, by ear or by measurement, while the mixer ran at 44.1 kHz,
-/// carried to the rate a voice actually runs at so that each still means the same time constant or the
-/// same corner. `ring *= 0.9955f` is a decay of 5.0 ms at 44.1 kHz and of 4.6 ms at 48; through
-/// <see cref="Decay"/> it stays 5.0 ms. The synthesis is unchanged: only how the rate reaches it.
-///
-/// At 44.1 kHz every one of these returns its argument exactly, so nothing tuned at that rate moves.
-/// Work them out once (a constructor, or once a block), not per sample: each is a power.
+/// Per-sample coefficients chosen at 44.1 kHz, carried to a voice's own rate so each keeps its time
+/// constant: `ring *= 0.9955f` is 5.0 ms at 44.1 kHz and 4.6 ms at 48, and through <see cref="Decay"/>
+/// stays 5.0 ms. At 44.1 kHz each returns its argument exactly. Work them out once, not per sample:
+/// each is a power.
 /// </summary>
 public static class At44k
 {

@@ -7,9 +7,8 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.AudioEngine.Core;
 
 /// <summary>
-/// Responsibility: The primary "Public API" for the Audio Engine.
-/// It wraps the FMOD provider, the Voice Manager, and the Audio Bank into a single clean interface.
-/// Now uses lock-free queues and zero-allocation state passing.
+/// The audio engine's public face: the provider, the voice budget and the bank behind one interface.
+/// The game thread queues; the engine's own thread (AudioLoop) applies.
 /// </summary>
 public class AudioEngineFacade : IDisposable, IVoiceSink
 {
@@ -19,32 +18,30 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
 
     /// <summary>However short the mixer runs, this many voices are still placed.</summary>
     private const int MinBudgetVoices = 8;
-    /// <summary>And no more than this, whatever the pool says — an upper bound on the sort, not a
-    /// statement about the hardware.</summary>
+    /// <summary>An upper bound on the sort, not a statement about the hardware.</summary>
     private const int MaxBudgetVoices = 256;
     private readonly AudioBank _bank = new();
 
-    // Lock-free command queues (Game Thread -> Audio Thread)
+    // Game thread to audio thread.
     private readonly ConcurrentQueue<SpatialEmitter> _submissionQueue = new();
     private readonly ConcurrentQueue<int> _stopRequests = new();
     private readonly ConcurrentQueue<KeyValuePair<int, AcousticPathData>> _acousticPaths = new();
     private readonly ConcurrentQueue<SpatialEmitter> _directPlayQueue = new();
     private readonly ConcurrentQueue<SpatialEmitter> _updateAttributesQueue = new();
 
-    // Thread-safe scalar state
+    // Under _stateLock.
     private Vector3 _listenerPos;
     private Quaternion _listenerRot = Quaternion.Identity;
     private Vector3 _listenerVel;
     private int _listenerRegionId = -1;
-    // The surfaces around the listener's head, double-buffered: the game thread fills one while the
-    // audio thread reads the other, so the per-frame probe never allocates and never tears.
+    // The surfaces round the listener's head, double-buffered so the per-frame probe never allocates
+    // and never tears.
     private readonly BoundaryProbe[] _boundariesIn = new BoundaryProbe[BoundaryVoiceState.MaxTaps];
     private readonly BoundaryProbe[] _boundariesOut = new BoundaryProbe[BoundaryVoiceState.MaxTaps];
     private int _boundaryCount;
 
-    /// <summary>Ambience bed commands from the game thread, applied on the audio thread with everything
-    /// else. Starting a bed decodes a file and creates a Steam Audio effect — not work to do on the
-    /// thread that is trying to simulate the world.</summary>
+    /// <summary>Ambience bed commands, applied on the audio thread: starting a bed decodes a file and
+    /// creates a Steam Audio effect, not work for the game thread.</summary>
     private readonly ConcurrentQueue<(string Id, AmbisonicLayout Layout, float Volume, bool Loop, bool Stop)> _ambientBedCommands = new();
     private float _listenerShelter = 0.0f;
     private AcousticMap? _acousticMap;
@@ -63,9 +60,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         _provider = provider;
     }
 
-    /// <summary>
-    /// Bootstraps the engine and loads the sound assets.
-    /// </summary>
+    /// <summary>Brings up the provider, loads the bank and starts the audio thread.</summary>
     public void Initialize()
     {
         if (_provider.Initialize())
@@ -101,19 +96,10 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
                 Serilog.Log.Error(ex, "AudioEngine: Error in audio loop.");
             }
 
-            // Throttle. Faster than a display frame ON PURPOSE.
-            //
-            // Doppler is applied as a channel pitch, and a channel pitch changes the instant it is
-            // set — FMOD ramps volume, not rate. So the update period is the resolution of every
-            // pass-by in the game. A car at 280 km/h going past eleven metres away swings its radial
-            // speed at about v^2/d = 550 m/s^2, which at 60 Hz is a 2.7% pitch step sixty times a
-            // second: not a swoop but a staircase, and clearly audible as one on anything with a
-            // high, pure note, such as a V10.
-            //
-            // At 250 Hz the same pass steps by 0.65%, which is under the threshold where a pitch
-            // change is heard as a step rather than a glide. The loop itself is cheap — it updates
-            // voice attributes, it does not mix — so this costs a few per cent of one thread and buys
-            // the single most audible cue in the game.
+            // 250 Hz, faster than a display frame on purpose. Doppler is a channel pitch and FMOD does
+            // not ramp rate, so this period is every pass-by's resolution: a car at 280 km/h passing
+            // 11 m away steps 2.7 % at 60 Hz (a staircase on a V10's note), 0.65 % at 250 Hz, under the
+            // threshold where a pitch change is heard as a step.
             const int PeriodMs = 4;
             int elapsed = (int)(DateTime.Now - start).TotalMilliseconds;
             int sleep = Math.Max(1, PeriodMs - elapsed);
@@ -126,13 +112,8 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     private int _ticks;
 
     /// <summary>
-    /// Says out loud whether the 250 Hz above is actually being achieved.
-    ///
-    /// It is not a setting, it is an OUTCOME: the period is `max(1 ms, 4 ms - however long the tick
-    /// took)`, and the tick walks every active voice. Eight cars is seventeen voices; thirty cars is
-    /// sixty. Nobody would notice the rate sagging, because the symptom is not a dropout or a warning
-    /// — it is that pass-bys go back to sounding like a staircase, which is the exact thing the
-    /// 250 Hz was chosen to prevent. So it is measured, and it complains.
+    /// Logs whether the 250 Hz is achieved: it is an outcome, not a setting (the tick walks every voice,
+    /// thirty cars is sixty), and a sagging rate is heard only as pass-bys turning back into staircases.
     /// </summary>
     private void ReportTickRate()
     {
@@ -143,8 +124,6 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         double hz = _ticks / since;
         _ticks = 0;
         var cost = _provider.TakeUpdateCost();
-        // The pitch step a pass-by gets at this rate. 0.65% at 250 Hz is the design point — under the
-        // threshold where a change in pitch is heard as a step rather than a glide.
         double stepPct = 0.65 * (250.0 / Math.Max(1.0, hz));
         if (hz < 200)
             Serilog.Log.Warning("Audio thread: {Hz:F0} Hz of 250 — pass-bys step by {Step:F1}% (0.65% is the target). "
@@ -155,15 +134,11 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
                                     hz, cost.MeanMs, cost.MaxMs, cost.Voices);
     }
 
-    /// <summary>
-    /// Synchronous "Pulse" that processes the audio frame.
-    /// Called internally by the AudioThread.
-    /// </summary>
+    /// <summary>One audio frame, on the audio thread.</summary>
     private void Tick()
     {
         if (!_isInitialized) return;
 
-        // 1. Snapshot scalar state
         Vector3 lPos, lVel;
         Quaternion lRot;
         int lRegion;
@@ -183,21 +158,17 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
             aMap = _acousticMap;
         }
 
-        // 2. Synchronize listener
         _provider.UpdateListener(lPos, lRot, lVel, lRegion);
         _provider.UpdateShelter(lShelter);
         _provider.UpdateBoundaries(new ReadOnlySpan<BoundaryProbe>(_boundariesOut, 0, lBoundaries));
         _provider.SetSimulatedReverbDecay(_simReverbMs, _simEnclosure, _simHf, _simLf);
         _provider.SetAirTemperature(_airTemperatureC);
-        
-        // 3. Synchronize acoustic map
+
         if (aMap != null) _provider.SetAcousticMap(aMap);
 
-        // 4. Process incoming commands from Game Thread
         while (_stopRequests.TryDequeue(out int id))
         {
-            // A voice the manager does not own — anything started through PlayPhysicalSoundDirect —
-            // has to be stopped at the provider, or it never stops at all.
+            // A voice the manager does not own (started directly) is stopped at the provider, or never.
             bool owned = _voiceManager?.RequestStop(id) ?? false;
             if (!owned) _provider.StopSound(id);
         }
@@ -228,34 +199,23 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
             _provider.UpdateSpatialAttributes(emitter);
         }
 
-        // 5. Score and manage active voices
-        // The budget is what the mixer HAS, asked every frame rather than declared once. See
-        // VoiceManager.MaxVoices: the floor keeps a handful of voices alive while the pool is
-        // recovering, and the ceiling is only there so the list does not grow without bound.
+        // The budget is what the mixer has, asked every frame (VoiceManager.MaxVoices).
         if (_voiceManager != null)
             _voiceManager.MaxVoices = Math.Clamp(
                 _voiceManager.PlayingCount + _provider.SpatialVoicesFree, MinBudgetVoices, MaxBudgetVoices);
         _voiceManager?.Process(lPos);
-        
-        // 6. Tick the low-level provider
+
         _provider.Update();
     }
 
-    /// <summary>
-    /// Public entry point for the Game Thread to signal it has finished submitting state.
-    /// In the threaded model, this is mostly a heartbeat or no-op as the background thread pulls state.
-    /// </summary>
+    /// <summary>Does nothing: the audio thread pulls state on its own.</summary>
     public void Update()
     {
-        // No-op in asynchronous mode, but kept for interface compatibility.
     }
 
     /// <summary>
-    /// Brings the facade up WITHOUT its audio thread, and pumps it by hand.
-    ///
-    /// For tests only. The voice lifecycle is queue-driven, so asserting on it means draining the
-    /// queues deterministically; with the real thread running as well, the test and the engine race
-    /// each other through the same state and the result is noise rather than a verdict.
+    /// Brings the facade up without its audio thread, to be pumped by hand. Tests only: with the real
+    /// thread running too, the test and the engine race through the same queues.
     /// </summary>
     internal void InitializeForTest(string? soundsPath = null)
     {
@@ -338,8 +298,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         }
     }
 
-    // Geometry-driven reverb decay (ms) for the listener's room, supplied by the acoustic worker's
-    // reflection sim. Volatile scalar — read once per flush; 0 means "no override".
+    // The traced reverb decay for the listener's room, ms, from the acoustic worker; 0 is none.
     private volatile float _simReverbMs;
     public void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio)
     { _simReverbMs = decayMs; _simEnclosure = enclosure; _simHf = hfDecayRatio; _simLf = lfDecayRatio; }
@@ -348,20 +307,15 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     private float _simHf = 1f;
     private float _simLf = 1f;
 
-    // The world's air temperature (°C), supplied by the client audio system from the server's weather.
-    // Volatile scalar, read once per flush, like the reverb decay above.
+    // The world's air temperature, °C, from the server's weather.
     private volatile float _airTemperatureC = 20.0f;
     public void SetAirTemperature(float celsius) => _airTemperatureC = celsius;
 
-    /// <summary>
-    /// Submits a spatial emitter for playback. 
-    /// The VoiceManager will decide if it's audible enough to deserve a physical FMOD channel.
-    /// </summary>
+    /// <summary>Submits an emitter to the voice budget, with its flight time added to its delay.</summary>
     public void Submit(SpatialEmitter emitter)
     {
         if (!_isInitialized) return;
-        
-        // Apply Speed of Sound delay (Wavefront delay), at the air's own speed of sound.
+
         Vector3 lPos;
         lock (_stateLock) { lPos = _listenerPos; }
         
@@ -375,10 +329,8 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         _submissionQueue.Enqueue(emitter);
     }
 
-    /// <summary>
-    /// Bypasses the VoiceManager scoring logic and forces immediate playback.
-    /// Used for critical sounds or transient events like echoes.
-    /// </summary>
+    /// <summary>Plays outside the voice budget (echoes and the like); such a voice must be stopped by
+    /// its caller (VoiceManager.RequestStop).</summary>
     public void PlayPhysicalSoundDirect(SpatialEmitter emitter)
     {
         if (!_isInitialized) return;
@@ -392,9 +344,6 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         }
     }
 
-    /// <summary>
-    /// Updates the attributes of an existing physical sound channel.
-    /// </summary>
     public void UpdateSpatialAttributes(SpatialEmitter emitter)
     {
         if (!_isInitialized) return;
@@ -408,10 +357,6 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         }
     }
 
-    /// <summary>
-    /// Requests a sound to stop. This may trigger a sequential "Shutdown" sound
-    /// if the emitter is configured as a machine.
-    /// </summary>
     /// <summary>The mixer's DSP load, 0..1+. See IAudioProvider.MixerLoad.</summary>
     public float MixerLoad => _isInitialized ? _provider.MixerLoad : 0f;
 
@@ -422,37 +367,33 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// Called from the game thread, and it only writes a float the mixer reads.</summary>
     public bool FadeOutEngine(int entityId) => !_isInitialized || _provider.FadeOutEngine(entityId);
 
-    /// <summary>See IAudioProvider.TryGetEngineTelemetry — the four numbers that tell apart the four
-    /// different reasons a field of cars can sound like it is slowing down.</summary>
     /// <summary>See IAudioProvider.EngineVoiceDetail.</summary>
     public string EngineVoiceDetail(int entityId) => _isInitialized ? _provider.EngineVoiceDetail(entityId) : "";
 
+    /// <summary>See IAudioProvider.TryGetEngineTelemetry: the four numbers that tell apart the four
+    /// reasons a field of cars can sound like it is slowing down.</summary>
     public bool TryGetEngineTelemetry(int entityId, out float toldSpeed, out float ownSpeed, out float rpm, out int gear)
     {
         toldSpeed = ownSpeed = rpm = 0f; gear = 0;
         return _isInitialized && _provider.TryGetEngineTelemetry(entityId, out toldSpeed, out ownSpeed, out rpm, out gear);
     }
 
-    public void StopSound(int entityId) 
+    /// <summary>Asks a sound to stop, on the audio thread; a machine with a stop sound plays it first.</summary>
+    public void StopSound(int entityId)
     {
         _stopRequests.Enqueue(entityId);
     }
-    
-    /// <summary>
-    /// Immediate, hard cutoff of a sound channel.
-    /// </summary>
+
+    /// <summary>A hard cut, on the calling thread.</summary>
     public void StopSoundImmediate(int entityId) => _provider.StopSound(entityId);
 
-    /// <summary>Takes a voice down to silence; true once it is there. The budget's way of letting go
-    /// of a CONTINUOUS source, which is still there and still making a noise. See IVoiceSink.</summary>
+    /// <summary>See <see cref="IVoiceSink.FadeOut"/>.</summary>
     public bool FadeOut(int entityId) => !_isInitialized || _provider.FadeOutVoice(entityId);
 
-    /// <summary>...and the other half, for one that won its slot back.</summary>
+    /// <summary>See <see cref="IVoiceSink.CancelFade"/>.</summary>
     public void CancelFade(int entityId) { if (_isInitialized) _provider.CancelVoiceFade(entityId); }
 
-    /// <summary>
-    /// Sets the real-time physical path data (occlusion, bleed) for an entity.
-    /// </summary>
+    /// <summary>An entity's path (occlusion, bleed), applied on the audio thread.</summary>
     public void SetAcousticPath(int entityId, AcousticPathData path)
     {
         _acousticPaths.Enqueue(new KeyValuePair<int, AcousticPathData>(entityId, path));
@@ -460,18 +401,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
 
     public bool IsPlaying(int entityId) => _isInitialized && _provider.IsPlaying(entityId);
 
-    /// <summary>How many submissions the budget is holding. A number that climbs and does not come
-    /// back down is one-shots being kept after their moment — see VoiceManager.Process. It is heard
-    /// as reflections piling up where nothing is happening.</summary>
+    /// <summary>Submissions the budget is holding: a number that climbs and stays is one-shots kept
+    /// after their moment (VoiceManager.Process).</summary>
     public int PendingSubmissions => _voiceManager?.SubmissionCount ?? 0;
 
-    /// <summary>
-    /// Makes a buffer the game synthesised available under a sound id.
-    ///
-    /// The bridge between physical modelling and the rest of the engine. After this call the id is an
-    /// ordinary sound: placed, attenuated, occluded, reverberated and voice-budgeted by exactly the
-    /// paths that handle recordings, none of which needs to know that nobody recorded it.
-    /// </summary>
+    /// <summary>Makes a synthesised buffer an ordinary sound id, handled by the same paths as a
+    /// recording.</summary>
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
         => _isInitialized && _provider.RegisterSynthesisedSound(soundId, pcm16Mono, sampleRate);
     /// <summary>Lets go of a one-off synthesised buffer once it has played (IAudioProvider.ReleaseSynthesisedSound).</summary>
@@ -485,10 +420,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         => _isInitialized ? _bank.Members(category) : Array.Empty<string>();
     public IEnumerable<int> GetActiveSpatialSoundIds() => _isInitialized ? _provider.GetActiveSpatialSoundIds() : Array.Empty<int>();
 
-    /// <summary>
-    /// A recorded sound from the bank as mono float PCM, decoded on the calling thread and not cached.
-    /// Several channels are averaged down.
-    /// </summary>
+    /// <summary>A recorded sound as mono float PCM, decoded on the calling thread and not cached.</summary>
     public bool TryDecodeMono(string soundId, out float[] mono, out int sampleRate)
     {
         mono = Array.Empty<float>(); sampleRate = 0;
@@ -505,9 +437,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         return true;
     }
 
-    /// <summary>
-    /// Pre-decodes a sound into the granular buffer cache.
-    /// </summary>
+    /// <summary>Pre-decodes a sound into the granular buffer cache.</summary>
     public void Preload(string soundId)
     {
         if (!_isInitialized) return;
@@ -523,11 +453,9 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     {
         if (!_isInitialized) return;
         
-        // Not the spoken lines: they are decoded when somebody says one (WorldAudioPlayer.SpokenLine).
-        // Preloaded, fourteen hundred of them sat decoded in memory for the whole session, some 350 MB.
-        // Nor the footstep bank's per-shoe and per-gait folders (FOOTSTEPS/<material>/<shoe>/<gait>/...):
-        // eleven thousand takes, some 800 MB decoded. The folders the game plays from today, a material's
-        // own walk and landing straight under it, are preloaded; the rest decode on first use.
+        // Not the spoken lines (1,400 of them, some 350 MB decoded; WorldAudioPlayer.SpokenLine decodes
+        // one when said), nor the footstep bank's per-shoe and per-gait folders (11,000 takes, some
+        // 800 MB): those decode on first use.
         var allIds = _bank.GetAllSoundIds()
             .Where(id => !id.StartsWith("VOICES/", StringComparison.OrdinalIgnoreCase))
             .Where(id => !IsFootstepVariant(id))
@@ -582,7 +510,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         foreach (int id in _provider.GetActiveSpatialSoundIds().ToList()) _provider.StopSound(id);
     }
 
-    // --- Step 1a diagnostics: drive an isolated mono source (see AudioDiagnostics). ---
+    // An isolated mono source for AudioDiagnostics.
     public void StartDiagnosticSound() { if (_isInitialized) _provider.StartDiagnosticSound(); }
     public void SetDiagnosticPosition(Vector3 position) { if (_isInitialized) _provider.SetDiagnosticPosition(position); }
     public void StopDiagnosticSound() { if (_isInitialized) _provider.StopDiagnosticSound(); }

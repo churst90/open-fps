@@ -10,20 +10,14 @@ namespace OpenFPS.Client.AudioEngine.Core;
 public readonly record struct WheelStrike(int Wheel, double At, float Pascals, float ContactSeconds);
 
 /// <summary>
-/// A tyre struck by a step, wheel by wheel, inside a vehicle's voice.
+/// A tyre struck by a step, wheel by wheel, inside a vehicle's voice. The force lasts as long as the
+/// patch takes to roll on (15 ms at 36 km/h) and rings the tread band's first radial mode (about
+/// 90 Hz on a car, heavily damped), the air cavity's (c / pi D, about 200 Hz, lightly damped: the
+/// "thunk" with a note in it) and a couple of milliseconds of tread slap.
 ///
-/// The strike is a force on the tread for as long as the contact patch takes to roll onto the step
-/// (patch length over speed: 15 ms at 36 km/h). What it rings is the tyre: the tread band's first
-/// radial mode (about 90 Hz on a car, lower on a big tyre, heavily damped), the air cavity's mode
-/// (c / pi D, about 200 Hz on a car, lightly damped — the "thunk" with a note in it) and a couple of
-/// milliseconds of tread slap. A slow tyre rolls on gently and the onset is soft; a fast one meets the
-/// step all at once.
-///
-/// The client schedules strikes ahead with the time they happen; the render thread places each at the
-/// sample that will be PLAYED at that time, so the rhythm of a car's wheels over two rails — a gauge
-/// apart, then a wheelbase later the back wheels — comes out as it happened however far ahead the
-/// voice is rendered. Nothing here allocates once built: the queue's dequeue does not, and the pending
-/// list is a fixed array.
+/// Strikes are queued ahead with their time; the render thread places each at the sample that will be
+/// played then, so the rhythm over two rails comes out as it happened however far ahead the voice is
+/// rendered. No allocation once built.
 /// </summary>
 public sealed class WheelStrikes
 {
@@ -49,6 +43,7 @@ public sealed class WheelStrikes
     private const float StrikeSeconds = 0.25f;
 
     /// <param name="radius">Each wheel's rolling radius, metres, in the order the wire sends the wheels.</param>
+    /// <param name="sampleRate">The voice's rate, Hz.</param>
     public WheelStrikes(IReadOnlyList<float> radius, float sampleRate)
     {
         int n = radius.Count;
@@ -58,11 +53,10 @@ public sealed class WheelStrikes
         {
             _t[i] = -1f;
             float r = MathF.Max(0.15f, radius[i]);
-            // The tread band's first radial mode falls as the tyre grows (a ring's stiffness over its
-            // mass): about 90 Hz on a 0.33 m car tyre, 60 on a truck's.
+            // The tread band's mode falls as the tyre grows: about 90 Hz on a 0.33 m car tyre, 60 on a
+            // truck's.
             _f1[i] = 90f * MathF.Sqrt(0.33f / r);
-            // The air in the torus: one wavelength round its mean circumference, a little inside the
-            // rolling radius (the tyre's section is about 30 % of it): c / (pi D).
+            // One wavelength round the torus's mean circumference, a little inside the rolling radius.
             _f2[i] = 343f / (MathF.PI * 2f * r * 0.85f);
         }
         _peaks = new float[n][];
@@ -74,8 +68,7 @@ public sealed class WheelStrikes
         }
     }
 
-    /// <summary>The largest value the strike's tonal part reaches (noise aside), worked out once by
-    /// stepping it: the onset ramp and the two modes' phases decide it.</summary>
+    /// <summary>The largest value the strike's tonal part reaches (noise aside), found by stepping it.</summary>
     private static float ShapePeak(float f1, float f2, float onset, float rate)
     {
         float peak = 0f;

@@ -5,30 +5,14 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.AudioEngine.Core;
 
 /// <summary>
-/// What the water on a road does to the sound of a vehicle's tyres (docs/WET_ROADS.md, "The sound").
+/// What the water on a road does to the sound of a vehicle's tyres: the ejection hiss (power the
+/// kinetic energy of the water thrown, so with the water and the cube of speed, pulsing as the grooves
+/// empty), drops striking the arch and body, the bow wave of a film, and the splash entering a
+/// puddle. See docs/WET_ROADS.md, "The sound".
 ///
-/// A tyre rolling on a wet road has to move the water out of its way: every second it sweeps a strip
-/// its own width and its speed long, and all the water in that strip (the texture's and any film's,
-/// RoadWater) is squeezed out of the contact patch through the tread's grooves and thrown off the
-/// tread as it leaves the road. That water is the sound, in four parts:
-///
-///   * EJECTION: the water leaving the grooves at the back of the contact patch at about the road
-///     speed, breaking up into sheets, ligaments and drops (the spray). A dense, broadband hiss above a
-///     kilohertz: the wet-road increase is in the 2-10 kHz bands (Sandberg and Ejsmont 2002, ch. 18;
-///     Descornet 2000). Its power is the kinetic energy of the water thrown, ½ ρ q u² with q = ρ w u W
-///     the mass of water swept, so it grows with the water W and as the cube of the speed, and it comes
-///     out in pulses as each groove of the tread empties.
-///   * IMPACTS: the larger drops of that spray striking the wheel arch, the underbody and the road
-///     beside the tyre — the crackle in the hiss, and the part heard through the floor inside.
-///   * THE BOW: a film standing above the texture is pushed ahead of the tyre and out to its sides;
-///     its turbulence is lower in pitch, a swish that grows with the film's depth.
-///   * THE SPLASH: entering a puddle the tyre throws a sheet of water up and out, which falls back
-///     over half a second as drops striking the water (EventSum bubbles and impacts).
-///
-/// One instance per vehicle voice. <see cref="Block"/> is told each wheel's water and gain once a
-/// block (the water from the server, WheelState.Water); <see cref="Step"/> is called once a sample on
-/// the producer and leaves the front and rear taps' pressure (pascals at a metre) and what reaches
-/// the cabin through the arches and the floor. No allocation after construction.
+/// One per vehicle voice. <see cref="Block"/> once a block with each wheel's water (WheelState.Water)
+/// and gain; <see cref="Step"/> once a sample on the producer, leaving the front and rear taps and the
+/// cabin, Pa at a metre. No allocation after construction.
 /// </summary>
 public sealed class WetTyres
 {
@@ -42,14 +26,14 @@ public sealed class WetTyres
 
     /// <summary>One tyre's ejection hiss at the reference, dB SPL at a metre, broadband.</summary>
     public static float EjectionDb = 83f;
-    /// <summary>How its power grows with the water: p² ∝ W^this. One is the water swept, all of it thrown.</summary>
+    /// <summary>p² ∝ W^this: one is all the water swept, thrown.</summary>
     public static float WaterExponent = 1f;
-    /// <summary>How its power grows with speed: p² ∝ u^this. Three is the kinetic energy of the water thrown.</summary>
+    /// <summary>p² ∝ u^this: three is the kinetic energy of the water thrown.</summary>
     public static float SpeedExponent = 3f;
-    /// <summary>The hiss's band: a two-pole high-pass at this, Hz.</summary>
+    /// <summary>The hiss's two-pole high-pass, Hz.</summary>
     public static float EjectionLowHz = 900f;
-    /// <summary>And a two-pole low-pass at this times (u / reference)^<see cref="BrightnessExponent"/>, Hz:
-    /// the recorded wet pass-bys fall 5-10 dB an octave above 4 kHz (docs/WET_ROADS.md, "Fitting").</summary>
+    /// <summary>Its low-pass, Hz, times (u / reference)^<see cref="BrightnessExponent"/>: recorded wet
+    /// pass-bys fall 5-10 dB an octave above 4 kHz (docs/WET_ROADS.md, "Fitting").</summary>
     public static float EjectionHighHz = 3500f;
     public static float BrightnessExponent = 0.5f;
     /// <summary>How deep the groove pulses modulate the hiss, 0..1.</summary>
@@ -102,12 +86,9 @@ public sealed class WetTyres
     /// <summary>This sample's pressure at the front tap, the rear tap, and in the cabin, Pa at a metre.</summary>
     public float Front, Rear, Cabin;
 
-    // ── Each wheel into the cabin on its own (CabinPaths) ──────────────────────────────────────────
-    //
-    // Sitting in the vehicle, each wheel's spray comes in through its own arch, so the cabin's share is
-    // kept per wheel: each wheel's drops go into an event sum of its own, and each wheel's hiss through a
-    // low-pass of its own. The sum over the wheels is exactly the one Cabin signal (the low-pass is
-    // linear), and the front and rear taps are unchanged. Made the first time anyone sits in it.
+    // Each wheel into the cabin through its own arch (CabinPaths): its own event sum and low-pass. The
+    // sum over the wheels is exactly the one Cabin signal (the low-pass is linear). Made the first time
+    // anyone sits in the vehicle.
     private sealed class Corners
     {
         public readonly EventSum[] Events;
@@ -120,8 +101,7 @@ public sealed class WetTyres
         }
     }
     private Corners? _corners;
-    /// <summary>The corners as this block uses them: latched in <see cref="Block"/>, so a block never
-    /// changes its mind half way.</summary>
+    /// <summary>The corners latched in <see cref="Block"/>, so a block never changes its mind half way.</summary>
     private Corners? _cornersNow;
     private readonly int _seed;
 
@@ -144,6 +124,8 @@ public sealed class WetTyres
     /// <param name="v">The vehicle: its running gear lays out the wheels as the server's model does.</param>
     /// <param name="wheelFront">Per wheel, in the server's order (WheelDynamics), whether it is in the front group.</param>
     /// <param name="wheelAxle">Per wheel, its axle's index in the chassis.</param>
+    /// <param name="sampleRate">The producer's rate, Hz.</param>
+    /// <param name="seed">Seeds the noise and the event sums.</param>
     public WetTyres(VehicleProfile v, bool[] wheelFront, int[] wheelAxle, float sampleRate, int seed)
     {
         _rate = sampleRate;
@@ -161,7 +143,7 @@ public sealed class WetTyres
             // Duals throw twice the water from one place.
             _widthShare[i] = axle.Tyre.WidthMm / 1000f / ReferenceWidth * Math.Max(1, axle.TyresPerWheel);
             _radius[i] = MathF.Max(0.1f, axle.Tyre.RollingRadiusMetres);
-            // The grooves across the tread empty once per block pitch: the tread's own count.
+            // The grooves empty once per tread block.
             _grooves[i] = Math.Max(0, v.Tyres.TreadBlocks);
             _gain[i] = 1f;
             _cabinShare[i] = 1f;
@@ -181,9 +163,8 @@ public sealed class WetTyres
     private static float Pa(float db) => 20e-6f * MathF.Pow(10f, db / 20f);
 
     /// <summary>
-    /// The water under each wheel (mm, RoadWater), each wheel's gain against the tap it goes out through,
-    /// the road speed, and the surface's texture depth; and this block's drops and splashes, placed in
-    /// the next <paramref name="count"/> samples.
+    /// Each wheel's water (mm, RoadWater), gain against its tap and texture depth, and the road speed;
+    /// places this block's drops and splashes in the next <paramref name="count"/> samples.
     /// </summary>
     public void Block(ReadOnlySpan<float> waterMm, ReadOnlySpan<float> gain, ReadOnlySpan<float> textureMm, float speed, int count)
     {
@@ -193,8 +174,7 @@ public sealed class WetTyres
         float u = _speed / ReferenceSpeed;
         float hiHz = MathF.Min(0.45f * _rate, EjectionHighHz * MathF.Pow(MathF.Max(0.2f, u), BrightnessExponent));
         _lpA = 1f - MathF.Exp(-2f * MathF.PI * hiHz / _rate);
-        // The band's own gain on unit-variance noise: two high-pass poles and one low-pass, worked out
-        // as a noise bandwidth so the rms comes out as declared.
+        // The band's noise bandwidth, so the rms comes out as declared.
         float band = MathF.Max(1e-4f, (hiHz * MathF.PI / 4f - EjectionLowHz * 0.5f) / (0.5f * _rate));
         float bowBand = MathF.Max(1e-4f, (BowHighHz * MathF.PI / 2f - BowLowHz) / (0.5f * _rate));
         float eRef = Pa(EjectionDb), bRef = Pa(BowDb);
@@ -215,15 +195,13 @@ public sealed class WetTyres
             _ampE[i] = eRef * MathF.Sqrt(power * (1f - impactShare) / band) * 1.7320508f;
             _ampB[i] = _film[i] > 0f ? bRef * MathF.Sqrt(_widthShare[i] * _film[i] * u * u * u / bowBand) * 1.7320508f : 0f;
 
-            // The drops: a Poisson count this block, each a struck surface (EventSum.Impact). Their
-            // number follows the water swept; each one's size the speed it was thrown at.
+            // A Poisson count of drops: their number follows the water swept, each one's size the speed.
             var sum = _cornersNow != null ? _cornersNow.Events[i] : _front[i] ? _frontEvents : _rearEvents;
             float rate = ImpactsPerSecond * _widthShare[i] * (w / ReferenceWaterMm) * u;
             int drops = sum.Poisson(rate * count / _rate);
             if (drops > 0)
             {
-                // Mean square of the pulses to match their share: a pulse of peak P, rise s and tail t
-                // carries about P² (s √π + t / 2) of energy; spread over the second at this rate.
+                // A pulse of peak P, rise s and tail t carries about P² (s √π + t / 2).
                 float energyEach = ImpactRiseSeconds * 1.7724539f + 0.5f * ImpactTailSeconds;
                 float meanSq = eRef * eRef * power * impactShare;
                 float peak = MathF.Sqrt(meanSq / MathF.Max(1f, rate) / energyEach) * _gain[i];
@@ -246,8 +224,8 @@ public sealed class WetTyres
                 float pa = Pa(SplashDb) * MathF.Sqrt(_widthShare[i] * k) * MathF.Pow(u, 1.5f) * _gain[i];
                 int at = (int)(sum.Uniform() * count);
                 sum.Burst(at, 0.004f, 0.05f + 0.02f * MathF.Min(3f, k), pa, 250f, 7000f);
-                // The sheet falls back as drops onto the water for as long as it flies: up at about the
-                // road speed's tenth, so 2 v sin / g, a few tenths of a second.
+                // The sheet falls back as drops for as long as it flies (2 v sin / g, thrown up at about
+                // a tenth of the road speed): a few tenths of a second.
                 float flight = MathF.Min(0.6f, 2f * 0.12f * _speed / 9.81f + 0.1f);
                 int n = sum.Poisson(FallbackDrops * MathF.Min(3f, k) * MathF.Min(1.5f, u));
                 for (int d = 0; d < n; d++)
@@ -284,7 +262,6 @@ public sealed class WetTyres
         float cabinIn = front + rear;
         if (corners != null)
         {
-            // Each wheel's drops from its own sum, into its own share of the cabin.
             for (int i = 0; i < _n; i++)
             {
                 float e = corners.Events[i].Next();
@@ -296,12 +273,11 @@ public sealed class WetTyres
         {
             if (_ampE[i] <= 0f && _ampB[i] <= 0f) continue;
             float x = Signed();
-            // Two high-pass poles, one low-pass: the spray's band.
             _hp1[i] = _hpA * (_hp1[i] + x - _hpIn1[i]); _hpIn1[i] = x;
             _hp2[i] = _hpA * (_hp2[i] + _hp1[i] - _hpIn2[i]); _hpIn2[i] = _hp1[i];
             _lp1[i] += _lpA * (_hp2[i] - _lp1[i]);
             _lp2[i] += _lpA * (_lp1[i] - _lp2[i]);
-            // The grooves empty in turn: the hiss pulses at the tread's pitch rate.
+            // The hiss pulses at the tread's pitch rate as the grooves empty.
             float mod = 1f;
             if (_grooves[i] > 0)
             {
@@ -330,8 +306,7 @@ public sealed class WetTyres
             Cabin = _cabinLp * _cabinGain;
             return;
         }
-        // Kept apart: each wheel through a low-pass of its own, and the two old sums' last drops on
-        // their own. Together, exactly the one Cabin signal.
+        // Each wheel through its own low-pass, plus the two old sums' last drops: together exactly Cabin.
         float sum = 0f;
         for (int i = 0; i < _n; i++)
         {

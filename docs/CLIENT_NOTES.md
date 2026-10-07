@@ -268,3 +268,56 @@ The borrowed voice keeps its own read cursor for a related reason: it is placed 
 pitched by its own Doppler, so reading relative to the source's play position (which moves at the
 source's Doppler) gave it two Dopplers belonging to two cars going different ways: a car at the redline
 that sounded like it was cruising, worse the more of the field was borrowing.
+
+## An impact is not one resonance
+
+TransientSynth.RenderKnock. A single pole struck by an impulse is a cork coming out of a bottle, and
+that is what listeners called it, twice, about two different sounds: a door shutting and a car hitting
+a wall. Both were one resonance. A struck object answers on many modes at once, inharmonically spaced
+(a plate or a panel or a car wing is not a string), and the high ones die first because they radiate
+faster. That spread is the difference between "something was struck" and "a note was played", and no
+moving of the one note produces it.
+
+The contact burst under the modes is what says two things touched. Unfiltered it is flat to 20 kHz,
+and a 1,500 kg car meeting a wall came out with a third of its energy above 4 kHz: a tiny hard tap laid
+over a low crunch. Its cutoff is tied to the sound's own pitch (six times it), so a latch stays bright
+and a crash is low and gravelly.
+
+## A breath is turbulence
+
+TransientSynth.RenderHiss was noise through one resonator at Q 0.9 with an attack a twelfth of its
+length. Measured, an exhale peaked at 250-1000 Hz with 2-4 kHz 23 dB down and 4-8 kHz 32 dB down, and the
+top is where a breath lives. A sharp attack on a 300 ms noise burst is a transient, the difference
+between a breath and a soft bang. Cody reported it over six sessions: "random banging... it is 2
+different bangs so it makes me think it's breathing in and out... I don't hear the breathing either".
+
+Turbulence through a narrow opening radiates over decades, rolling off gently either side of a centre
+set by the aperture and the flow. So the noise is shaped by a wide band (two poles down at the top, one
+up at the bottom) around `hz` rather than resonated at it, which keeps the 2-6 kHz that carries the
+character. An inhale is drawn through a narrower opening, so its `hz` is higher and the band moves up.
+And it swells: a third of its length rising on a raised cosine, no corner for the ear to hear as an
+onset. That change alone is most of the difference between air and a knock.
+
+## Air absorption: what ISO 9613-1 replaced
+
+AudioPhysics.AirAttenuationDbPerMetre is ISO 9613-1 in closed form, with no fixed coefficients. It
+replaced a straight-line "muffle" that reached its limit at about 135 m and took 32 dB off the high band
+and 16 off the mid there, where the standard says about 14 and under 1: six times too much, so a hot rod a
+block away arrived as a dull rumble with its crackle gone. It also replaced a fixed-coefficient version
+that added an "urban excess" of up to 9 dB per 100 m for obstacles the game already models on their own
+(walls, vehicles, diffraction), and that halved the loss indoors. Air is air indoors too.
+
+## The near-boundary reflection
+
+BoundaryModel turns "a wall half a metre to my left" into the reflection that makes it audible. A
+nearby surface returns a delayed copy of everything you hear, and direct plus delayed is a comb filter:
+the extra path is twice the distance, so the delay is 2d/c and the notches sit at odd multiples of
+c/4d. Half a metre away that is a first notch near 170 Hz and peaks every 340 Hz, the "boxy" colour of
+walking along a corridor wall. Closer, the pattern slides up; further, it slides down and fades. The
+sliding is the cue that tells a player how far they are from a wall, which is why this cannot be a
+fixed-delay effect.
+
+It replaced a fixed-ish 0.1-1.2 ms FMOD echo with 45 % feedback: the wrong delay (2d/c at 1.5 m is
+8.7 ms, seven times longer), the wrong topology (feedback makes a resonator ringing on one pitch, not a
+single reflection tracking the geometry), and every direction collapsed into one scalar, so a ceiling
+and a wall behind you sounded the same.

@@ -2,10 +2,8 @@ using OpenFPS.Common;
 
 namespace OpenFPS.Client.AudioEngine.Core;
 
-/// <summary>
-/// What a weapon sounds like, as numbers. Change these and you have a different gun; nothing else in
-/// the synthesis is weapon-specific, which is the point — one profile per weapon, not one renderer.
-/// </summary>
+/// <summary>What a weapon's report sounds like, as numbers; nothing else in the synthesis is
+/// weapon-specific.</summary>
 public readonly record struct WeaponProfile(
     string Name,
     float MuzzleVelocity,        // m/s
@@ -35,60 +33,28 @@ public readonly record struct WeaponProfile(
 }
 
 /// <summary>
-/// Synthesizes the sounds of a shot, as dry mono one-shots for the engine to place.
-///
-/// Dry and mono is not a compromise, it is the requirement. Every gunshot recording you can find is a
-/// few milliseconds of muzzle blast followed by a second of the field it was recorded in, and this
-/// engine generates its own field — region reverb, boundary reflections, occlusion, Steam Audio. Feed it
-/// a recording with a tail and you hear two rooms at once. Synthesis sidesteps that entirely: what comes
-/// out of here has no room in it, so the room it ends up in is the one the player is standing in.
-///
-/// The report is the one sound here, and it happens at the weapon. A supersonic round's crack happens
-/// somewhere else (where its Mach cone meets the listener, see <see cref="Ballistics"/>) and is not
-/// built yet; see docs/GUNFIRE.md.
-///
-/// Deterministic given a seed, so the same shot renders identically on every machine and the tests can
-/// assert on the waveform rather than on a description of it.
+/// The report of a shot, as a dry mono one-shot: the engine makes the room, and a recording's own
+/// tail would be a second room. A supersonic round's crack is elsewhere (<see cref="Ballistics"/>).
+/// Deterministic given a seed, so tests can assert on the waveform. See docs/GUNFIRE.md.
 /// </summary>
 public static class WeaponSynth
 {
-    /// <summary>The rate the engine plays a rendered one-shot at (<see cref="TransientSynth.SampleRate"/>).
-    /// This was 44.1 kHz while the engine registered the buffer at 48: every shot played 9 per cent
-    /// fast, its positive phase 0.39 ms where 0.42 was written and its spectrum an eighth of an octave
-    /// high.</summary>
+    /// <summary>The rate the engine plays a rendered one-shot at. Rendered at 44.1 kHz and played at
+    /// 48, every shot was 9 per cent fast and an eighth of an octave high.</summary>
     public const int SampleRate = TransientSynth.SampleRate;
 
     /// <summary>
-    /// The report, synthesized to the spec measured from real ones (docs/GUNFIRE.md).
+    /// The report, synthesized to the spec measured from the NIJ recordings (docs/GUNFIRE.md, "The
+    /// bubble model"): at 20-40 m a pulse with a 0.2-0.5 ms positive phase, down 10 dB within about
+    /// a millisecond, peaking at 1 kHz, with a negative phase 0.4-1.0 of the peak.
     ///
-    /// At 20-40 m every rifle and pistol in the NIJ recordings is a pulse with a positive phase of
-    /// 0.2-0.5 ms, down 10 dB within about a millisecond, 20 dB within 1.5-3 and 30 dB within 4-6.
-    /// Its spectrum peaks at 1 kHz (1-2 kHz for the AK) and falls about 5-6 dB an octave either side
-    /// of the peak, and its negative phase is 0.4-1.0 of the positive peak.
-    ///
-    /// The model, and why each part is there:
-    ///  - The far field of a puff of gas is the rate of change of the gas leaving the muzzle, so it
-    ///    has no DC: it goes up, through zero and back. As a filter that is a second-order band-pass,
-    ///    and critically damped its impulse response is exactly the Friedlander pulse,
-    ///    p(t) = (1 - t/T) e^(-t/T). The band-pass's note comes from the positive phase: the first
-    ///    zero crossing falls at T = acos(z) / (w0 sqrt(1 - z^2)) for a damping ratio z.
-    ///  - The damping is below critical: the gas overshoots ambient and comes back, which is the
-    ///    recordings' deep negative phase (a Friedlander's is 0.135 of the peak). It is also the
-    ///    peak at 1 kHz, which one pole on pink noise could not make.
-    ///  - The turbulent burst behind the shock is the same outflow and radiates through the same
-    ///    band-pass. It used to be pink noise straight out, which put as much energy at 125-250 Hz as
-    ///    at 1 kHz: 6-12 dB too much low end against the NIJ Glock. The band-pass's lower skirt is
-    ///    what the separate high-pass (80 Hz in the game, 250 in the lab's fit) was standing in for.
-    ///  - The trail is the gas that leaves after the bubble has rung out: mixing noise from the grown
-    ///    plume, broadband, and what holds up the recordings' 125 Hz band (the rifles' above all).
-    ///  - Two corners. The gas's turbulence cannot move faster than its eddies (the weapon's corner,
-    ///    1.5-4 kHz); the shock front rises in microseconds (<see cref="ShockCornerHz"/>). With one
-    ///    corner for both, 8 kHz came out 6-10 dB light.
-    ///  - A revolver also blasts at its cylinder gap, earlier and smaller, through the same model.
-    /// Nothing after that: what a shot sounds like after its first few milliseconds is the place it
-    /// is heard in, and the engine makes that itself.
-    ///
-    /// Normalised to <see cref="ReportEnergyDb"/>, not to a peak: see there.
+    /// The gas outflow through a second-order band-pass (critically damped, the Friedlander pulse
+    /// p(t) = (1 - t/T) e^(-t/T); the first zero crossing at T = acos(z) / (w0 sqrt(1 - z^2))). Damped
+    /// below critical for the deep negative phase and the 1 kHz peak. The turbulent burst goes through
+    /// the same band-pass (pink noise straight out was 6-12 dB too heavy at 125-250 Hz against the
+    /// Glock); the trail does not. Two corners, the eddies' and the shock's rise: with one, 8 kHz came
+    /// out 6-10 dB light. A revolver also blasts at its cylinder gap. Normalised to
+    /// <see cref="ReportEnergyDb"/>, not to a peak.
     /// </summary>
     public static float[] MuzzleBlast(WeaponProfile w, int seed = 1)
     {
@@ -101,11 +67,11 @@ public static class WeaponSynth
         Blast(buf, (int)MathF.Round(lead * SampleRate), w.PositivePhaseMs, w.Damping, w.BurstDecayMs,
               w.TrailDecayMs, w.TrailLevel, w.CornerHz, 1f, rng);
         if (lead > 0f)
-            // The gap: a small share of the charge's gas, so a shorter and brighter pulse (a blast's
-            // duration goes as the cube root of its energy), when the bullet leaves the cylinder.
+            // The gap: a small share of the gas, so a shorter, brighter pulse (duration goes as the
+            // cube root of energy).
             Blast(buf, 0, w.PositivePhaseMs * GapPulseScale, w.Damping, w.BurstDecayMs * GapPulseScale,
                   w.TrailDecayMs * GapPulseScale, w.TrailLevel, w.CornerHz / GapPulseScale, w.GapLevel, rng);
-        // A short fade over the last tenth, so a buffer that ends on a sample above zero is not a click.
+        // A fade over the last tenth: a buffer ending above zero is a click.
         int fade = n / 10;
         for (int i = 0; i < fade; i++) buf[n - 1 - i] *= i / (float)fade;
         Finish(buf);
@@ -125,7 +91,7 @@ public static class WeaponSynth
         float wd = critical ? 0f : w0 * MathF.Sqrt(1f - z * z);
         float k = critical ? 0f : z / MathF.Sqrt(1f - z * z);
 
-        // The bubble's band-pass for the burst, as a biquad (RBJ's, unity at its centre).
+        // The bubble's band-pass for the burst (RBJ, unity at its centre).
         float wn = w0 / SampleRate, q = 1f / (2f * z);
         float alpha = MathF.Sin(wn) / (2f * q), a0 = 1f + alpha;
         float b0 = alpha / a0, b2 = -alpha / a0, a1 = -2f * MathF.Cos(wn) / a0, a2 = (1f - alpha) / a0;
@@ -166,39 +132,29 @@ public static class WeaponSynth
     /// share. Fitted with the weapons' values against the NIJ takes (`--gun-fit grid`).</summary>
     public const float ReportBurstLevel = 4f;
     /// <summary>A cylinder gap's pulse against the muzzle's, in duration: the cube root of its share
-    /// of the gas, about a tenth.</summary>
+    /// of the gas (about a tenth).</summary>
     public const float GapPulseScale = 0.46f;
     /// <summary>The shock front's rise, as a corner, Hz: a weak shock tens of metres out rises in
     /// 10-20 microseconds.</summary>
     public const float ShockCornerHz = 12000f;
 
     /// <summary>
-    /// Finishes a rendered layer: removes DC and fades the end to silence.
-    ///
-    /// Neither is cosmetic. Resonators and one-pole filters settle at an offset rather than at zero —
-    /// the raw N-wave came out sitting 0.12 above the line, which is twelve per cent of the headroom
-    /// spent on something inaudible and a step in the waveform the moment a voice starts or stops. And
-    /// a one-shot whose buffer ends while it is still decaying ends on a step too, which is a click at
-    /// the end of every shot.
+    /// Removes DC and fades the end to silence. Filters settle at an offset (the raw N-wave once sat
+    /// 0.12 above the line: headroom spent on nothing, and a step when a voice starts or stops), and a
+    /// buffer that ends while still decaying clicks.
     /// </summary>
     private static void Finish(float[] buf)
     {
         if (buf.Length == 0) return;
 
-        // Subtract the actual mean first. A one-pole high-pass alone is not enough now that the blast
-        // has a real sub-bass layer in it: a Friedlander wave integrates to zero over all time, but
-        // driving one through tanh does not — saturation squashes the big positive lobe harder than
-        // the shallow negative one and leaves an offset behind that an 18 Hz corner barely touches.
-        // Removing the measured mean is exact and, unlike a steeper filter, costs none of the weight
-        // the layer was added for.
+        // The measured mean first: exact, where an 18 Hz corner barely touches an offset.
         float mean = 0f;
         foreach (var v in buf) mean += v;
         mean /= buf.Length;
         if (MathF.Abs(mean) > 1e-6f)
             for (int i = 0; i < buf.Length; i++) buf[i] -= mean;
 
-        // DC block: a one-pole high-pass at about 18 Hz. Below anything a muzzle blast really contains,
-        // above the offset the filters leave behind.
+        // DC block at about 18 Hz, below anything a muzzle blast contains.
         float r = 1f - 2f * MathF.PI * 18f / SampleRate;
         float lastIn = 0f, lastOut = 0f;
         for (int i = 0; i < buf.Length; i++)
@@ -210,7 +166,6 @@ public static class WeaponSynth
             buf[i] = y;
         }
 
-        // Fade the last few milliseconds to zero so the buffer ends where silence begins.
         int fade = Math.Min(buf.Length, (int)(SampleRate * 0.008f));
         for (int i = 0; i < fade; i++)
         {
@@ -221,25 +176,17 @@ public static class WeaponSynth
     }
 
     /// <summary>
-    /// What every report carries into the engine: its energy, as the sum of its squared samples over
-    /// the sample rate, in dB (re one second at full scale).
-    ///
-    /// By ENERGY, not by peak, because that is what a short sound's loudness follows (the ear
-    /// integrates over about 100 ms) and what <see cref="Applause"/> normalises a clap by. Scaled to
-    /// a peak, a report's level depended on its crest factor: an 18 ms buffer whose energy sits in
-    /// 1-2 ms carried 12 dB less than a clap at the same peak, and a brighter or shorter gun came out
-    /// quieter than a darker one at the same declared level. Normalised like this every weapon carries
-    /// the same energy, and what separates them is their cartridge level (<see cref="Loudness"/>).
-    ///
-    /// The value is the most the weapons can carry inside full scale: the engine registers a one-shot
-    /// as 16-bit PCM, so a sample past 1.0 is clipped there, and the sharpest report here must still
-    /// fit (<see cref="ReportPeakCeiling"/>). That is why a shot still carries less than a clap does:
-    /// a clap is limited (Applause soft-clips above 0.9) and a report is not.
+    /// The energy every report carries, dB re one second at full scale. By energy, not peak, as a
+    /// short sound's loudness follows it (the ear integrates about 100 ms) and as
+    /// <see cref="Applause"/> normalises a clap: scaled to a peak, a report's level followed its crest
+    /// factor (12 dB under a clap at the same peak), and the cartridge level (<see cref="Loudness"/>)
+    /// is what separates weapons. The most the sharpest report can carry inside full scale (16-bit PCM;
+    /// <see cref="ReportPeakCeiling"/>); a clap carries more because Applause soft-clips and this does not.
     /// </summary>
     public const float ReportEnergyDb = -39f;
 
-    /// <summary>The highest a report may peak. A report whose energy would take it past this is held
-    /// here instead (and comes out quieter); the tests require that no weapon is.</summary>
+    /// <summary>The highest a report may peak; one whose energy would pass it is held here, quieter.
+    /// The tests require that no weapon is.</summary>
     public const float ReportPeakCeiling = 0.98f;
 
     private static float[] ToEnergy(float[] buf, float energyDb)
@@ -254,9 +201,8 @@ public static class WeaponSynth
         return buf;
     }
 
-    /// <summary>Reads a 16-bit mono WAV back to floats. Enough to re-load what the ingest wrote; it
-    /// is not a general decoder and says so by returning empty rather than guessing at a format it
-    /// does not recognise.</summary>
+    /// <summary>Reads a 16-bit WAV back to mono floats; empty for any other format. Not a general
+    /// decoder.</summary>
     public static float[] ReadWav16Mono(byte[] wav)
     {
         if (wav == null || wav.Length < 44) return Array.Empty<float>();
@@ -282,7 +228,6 @@ public static class WeaponSynth
                 var outp = new float[frames];
                 for (int i = 0; i < frames; i++)
                 {
-                    // Mono-sum anything wider, so a stereo take does not come back at half length.
                     int acc = 0;
                     for (int ch = 0; ch < channels; ch++)
                         acc += BitConverter.ToInt16(wav, pos + 8 + (i * channels + ch) * 2);
