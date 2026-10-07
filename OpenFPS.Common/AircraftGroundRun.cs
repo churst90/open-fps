@@ -3,26 +3,18 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// An aeroplane from touchdown to lift-off on one runway: the landing roll, the turn round, the hold
-/// and the take-off roll back the way it came, climbing out up the line it came down.
+/// An aeroplane from touchdown to lift-off on one runway, as kinematics from the type's own figures
+/// (GroundRunSpec):
 ///
-/// Before this an approach braked IN THE AIR to a stop at the runway point, spun round where it stood
-/// and flew back: the wheels touched and there was no landing at all. Now everything is kinematics from
-/// the type's own figures (GroundRunSpec):
+///   1. the landing roll, touchdown speed to taxi speed at a steady deceleration;
+///   2. taxiing on to the turn, far enough that the take-off roll back lifts off where the wheels
+///      touched, so the climb-out is the approach reversed;
+///   3. a 180-degree turn at a tenth of a g, swinging out to one side and back, as a runway backtrack
+///      is flown;
+///   4. back to the hold point if the turn was further out than the take-off needs, and a stop;
+///   5. the hold, then the take-off roll at the type's mean acceleration.
 ///
-///   1. the landing roll, from touchdown speed to taxi speed at a steady deceleration (v^2 / 2s of the
-///      published ground roll);
-///   2. taxiing on to wherever the turn has to be: far enough down the runway that the take-off roll
-///      back lifts off where the wheels touched, so the climb-out is the approach reversed;
-///   3. a 180-degree turn at turning speed (a tenth of a g), swinging out to one side of the centreline
-///      and back across it, as a runway backtrack is flown;
-///   4. back down the runway to the hold point if the turn was further out than the take-off needs,
-///      and a stop;
-///   5. the hold, then the take-off roll at the type's mean acceleration (v^2 / 2s of its take-off
-///      ground roll), lifting off at rotation speed at the touchdown point.
-///
-/// The ground is the touchdown point's height; the line is the runway's direction as the approach
-/// arrived along it.
+/// The ground is the touchdown point's height; the line is the approach's direction.
 /// </summary>
 public sealed class AircraftGroundRun
 {
@@ -70,7 +62,7 @@ public sealed class AircraftGroundRun
 
         // 1-2: straight down the runway to the turn.
         AddLine(touchdown, dir, turnAt);
-        // 3: out to the right by a radius over three, round to the left, and back to the centreline.
+        // 3: out to the right by a radius over three radii of runway, round to the left, and back.
         float blend = 3f * r;
         _turnFrom = Length;
         var start = touchdown + dir * turnAt;
@@ -158,8 +150,7 @@ public sealed class AircraftGroundRun
     private void Place()
     {
         Position = PointAt(_s);
-        // The way it points: the chord across half a metre of path either side, so the heading turns
-        // smoothly through a bend rather than in steps at each point of it.
+        // The chord across half a metre either side, so the heading turns smoothly through a bend.
         var d = PointAt(MathF.Min(_end, _s + 0.5f)) - PointAt(MathF.Max(0f, _s - 0.5f));
         d.Y = 0f;
         if (d.LengthSquared() > 1e-8f)

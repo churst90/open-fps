@@ -68,3 +68,29 @@ gravel and the STK presets; they are tuned by measurement and by ear.
 4. Measure before listening: band balance against dry reference steps (the first 30-60 ms), grain
    rate by Cook's 5.5-11 kHz peak count.
 5. Listen to sequences of six or more steps, A/B against recordings at matched loudness.
+
+## Session 10
+
+The physical footstep model (OpenFPS.Common/Footsteps.cs) was played to Cody in session 10: "none of
+them pass" and "gravel sounds like walking on broken glass". A band analysis of the renders:
+
+    concrete, trainer        30-60 Hz  -24 dB  ...  8-16 kHz   -3 dB
+    concrete, dress shoe     30-60 Hz  -19 dB  ...  8-16 kHz   -2 dB
+    gravel, boot             30-60 Hz  -18 dB  ...  8-16 kHz   -3 dB
+
+Every one rises to 16 kHz and peaks there. A real footstep has most of its energy between about 100 and
+600 Hz and rolls off hard above one or two kilohertz, so these were tilted about 20 dB the wrong way.
+Two faults, both in the renderers and not in the model:
+
+1. One-pole filters are 6 dB per octave and were asked to define bands. Scuff's band is the difference
+   of two one-poles, still only about 18 dB down three octaves above the corner, so a band of grit near
+   3 kHz is bright noise to Nyquist. Bands need a biquad or several poles.
+2. Crunch injected raw white noise with no filter, so every stone gave full-band hiss to 22 kHz; giving
+   each grain a sine resonance (a few kilohertz, a 20 ms decay) made a heap of little bells, the "broken
+   glass". A stone is a small, heavily damped, irregular lump: it clicks. Crunch now renders each piece
+   as a couple of milliseconds of noise round its size's frequency.
+
+The mechanisms (contact time from the softer material, the grain two decades smaller than the heel, the
+floor as a panel, the heap as many small events) measured sensibly and are worth keeping. The model is
+not wired into the game: the client plays the footstep bank, and the model is reachable only from
+AudioLab --footsteps.
