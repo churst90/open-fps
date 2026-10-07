@@ -453,8 +453,8 @@ command line with the start of the command typed for you; type the number and pr
 | Map | Name, owner, size, tiles, how many things, the spawn point; Set spawn here; Settings (weather, time of day, natural ground); Beacon rules; the models this map pins; the editors |
 | Place | What choosing a prefab does (place it at your feet, at the build cursor, or play a preview to you); Search; Again; the prefabs by category (walls, floors, doors, machines, water, fire, trees, sounds, places, things to carry); Groups |
 | Select | Nearest things; things within 5, 10 or 20 metres; doors near you; places and rooms; by name; by number; hold one as well (for a group). Choosing one selects it and opens its menu |
-| Selected | What it is and where; move by numbers (east, north, up); nudge by the step (north, south, east, west, up, down, forward, back, left, right); turn 15 or 90 degrees or face a direction; bring to you; duplicate; a row of copies; delete; settings; its model; its prefab |
-| Held | The things you hold together; group them; let go |
+| Selected | What it is and where; move by numbers (east, north, up); nudge by the step (north, south, east, west, up, down, forward, back, left, right); turn 15 or 90 degrees or face a direction; bring to you; duplicate; a row of copies; delete; settings; its model; its prefab; for a part of a placed group, hold its whole group |
+| Held | The things you hold together; move them together by numbers, nudge them together, turn them together about their middle; group them; let go |
 | Places and rooms | The rooms and named places on the map, nearest first, to select and set |
 | Library | Every kind of model (machines, water features, fire, trees, shores, running water, horns, whistles, bells, air systems, trains, rail vehicles, track, engines, vehicles, prefabs, groups): each model's values, its versions, where it is used, replace it, copy it, retire it, and new models from a template |
 | Test tools | What is around me; map information |
@@ -481,9 +481,19 @@ command line with the start of the command typed for you; type the number and pr
 - Retire: a retired model is no longer offered for new things; things that use it keep it.
 - Engines and vehicles are models too. Changing an engine changes every vehicle, machine and train that
   has it. A vehicle's mass, drag, axles, size, tyres, body, gearbox and where its exhaust and intake are
-  can be changed; the rest (its siren, its air system) comes from the vehicle it is built on.
+  can be changed; the rest (its siren, its air system) comes from the vehicle it is built on. Vehicles
+  written as parts lists in `machines/` are in the Library with the built-in ones: version 0 is the parts
+  list as written, and they have versions and pins like any other.
 - Prefabs are models. Their fields come from prefab-schema.json, with its ranges; a new version makes
   every thing made from that prefab again, where it stands.
+- A prefab's lists (the faces it leaves out, a room's six materials) are listed item by item. Each item
+  can be changed or taken out; Add puts more on the end (one or more values: a room's six materials go in
+  together, Floor, Ceiling, North, South, East, West). A list of parts, such as a fountain's falls or a
+  group's parts, adds a copy of its last part to change after. The prefab is checked whole each time, so
+  a room with five materials is refused and says why.
+- A thing made again, by a new version of its prefab or a new model for its sound, carries on as it
+  was: an open door stays open and keeps its lock, a fire keeps the moment it was lit and so how far it
+  has grown, a machine or a tap that was off stays off.
 - Search finds prefabs whose name has every word you type. Preview plays a prefab's sound two metres in
   front of you for six seconds, to you alone; nothing is placed. Again places the last prefab again
   where you stand. A row makes copies of the selected thing in a line the way you face.
@@ -491,11 +501,16 @@ command line with the start of the command typed for you; type the number and pr
   cursor, choosing a prefab puts it there, for places you cannot walk to (a roof).
 - Groups: hold some things (Select, hold one as well), then Group them and give the group a name. The
   group is a model; Place, Groups puts its things down in front of you, turned the way you face. A
-  placed group is its things, each its own. A group's parts can be moved or taken out in the Library.
+  placed group is its things, each its own, and they are held as it is placed. Later, select any one of
+  them and choose "Hold its whole group" (`/edit select group`): Held then moves, nudges or turns them
+  all together, turning about their middle, and one undo puts them all back. A group's parts can be
+  moved, added or taken out in the Library; that changes the next placing, not the ones already down.
 - Map settings: the weather (the server's, or always clear, rain, snow or storm), the time of day (the
   server's clock, or an hour the map keeps), the natural ground laid where the map has none of its
   own, and the beacon rules (each kind of beacon on unless a player turns it off, off unless turned
-  on, always, or never). The players on the map hear the change at once.
+  on, always, or never). The players on the map hear the change at once. A map that holds a weather
+  has its own lightning: a held storm flashes over it whatever the server's sky is doing, and a held
+  clear sky has none while the server storms.
 - Undo and redo are your own. An undo is refused if somebody else has changed the thing since, and
   says who.
 - A solid thing is never placed or moved into a player.
@@ -521,6 +536,8 @@ command for each:
 | `/edit find WORDS`, `/edit preview PREFAB`, `/edit again` | Search; hear a prefab; place the last one again |
 | `/edit row COUNT [SPACING]` | Copies of the selected thing in a line the way you face |
 | `/edit select add nearest\|NAME\|#ID`, `/edit select clear` | Hold things together; let go |
+| `/edit select group` | Hold every part of the placed group the selected thing belongs to |
+| `/edit held move EAST NORTH UP`, `/edit held nudge DIRECTION [METRES]`, `/edit held turn DEGREES` | Move or turn everything held together, one undo; turning is about their middle |
 | `/edit group NAME`, `/edit place group NAME` | Make a group of what you hold; place one |
 | `/edit map settings`, `/edit map set weather server\|clear\|rain\|snow\|storm`, `/edit map set time server\|HOUR`, `/edit map set ground PREFAB`, `/edit map set beacon CATEGORY on\|off\|always\|never` | The map's own settings |
 | `/edit spawn here`, `/edit info` | Move the map's spawn point to you; map information |
@@ -532,6 +549,8 @@ command for each:
 | `/edit model replace KIND ID with OTHER [here\|everywhere]` | Every thing using one model uses another |
 | `/edit model retire KIND ID`, `/edit model restore KIND ID` | Offer a model no longer for new things, or again |
 | `/edit model remove KIND ID LIST[N]` | Take an item out of a model's list: `/edit model remove group yard Parts[1]` |
+| `/edit model add KIND ID LIST [VALUES]` | Put values on the end of a list (`/edit model add prefab my_room MissingFaces North`), or add a copy of the last part of a list of parts (`/edit model add water my_fountain Falls`) |
+| `/edit model set KIND ID LIST[N] VALUE` | Change one item of a list of values: `/edit model set prefab my_room RoomMaterials[2] Brick` |
 | `/edit undo`, `/edit redo` | Undo and redo |
 
 Direct keys (off unless you turn them on with `/editorkeys on`; they are new and have not been tried
