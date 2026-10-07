@@ -94,17 +94,19 @@ public sealed class EngineRenderPool : IDisposable
         while (_running)
         {
             var voices = _voices;
-            long start = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
                 for (int i = Interlocked.Increment(ref _next) - 1; i < voices.Length; i = Interlocked.Increment(ref _next) - 1)
+                {
+                    long start = System.Diagnostics.Stopwatch.GetTimestamp();
                     voices[i].Produce();
+                    Interlocked.Add(ref _busyTicks, System.Diagnostics.Stopwatch.GetTimestamp() - start);
+                }
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "EngineRenderPool: error while rendering ahead.");
             }
-            Interlocked.Add(ref _busyTicks, System.Diagnostics.Stopwatch.GetTimestamp() - start);
             // The sweep is done: the next starts from the top. Two workers may both start it; a voice
             // already being rendered is passed over (Produce's own guard).
             if (Volatile.Read(ref _next) >= voices.Length) Interlocked.Exchange(ref _next, 0);
@@ -113,14 +115,18 @@ public sealed class EngineRenderPool : IDisposable
         }
     }
 
-    /// <summary>The share of the workers' time spent rendering since the last call, 0 to 1. For the log.</summary>
+    /// <summary>The share of the workers' time spent rendering since the last call, 0 to 1, smoothed over
+    /// a few calls: a long render is counted when it ends, all in one interval. For the log.</summary>
     public float TakeBusy()
     {
         long now = System.Diagnostics.Stopwatch.GetTimestamp();
         long busy = Interlocked.Exchange(ref _busyTicks, 0);
         long span = now - Interlocked.Exchange(ref _busySince, now);
-        return span > 0 ? (float)busy / (span * (float)_workers.Length) : 0f;
+        float share = span > 0 ? (float)busy / (span * (float)_workers.Length) : 0f;
+        _busySmoothed += (share - _busySmoothed) * 0.3f;
+        return _busySmoothed;
     }
+    private float _busySmoothed;
 
     public void Dispose()
     {
