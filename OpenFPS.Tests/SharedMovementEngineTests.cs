@@ -157,10 +157,19 @@ public class SharedMovementEngineTests
             Material = "Concrete"
         };
 
-        var (newPos, _, _) = Step(ctx, new[] { wall });
+        // Two seconds of walking at the wall, 9 m of intent against 0.45 m of room: the body must stop
+        // with its side on the face (x = 0.75), neither inside it nor short of it.
+        var colliders = new[] { wall };
+        for (int i = 0; i < 40; i++)
+        {
+            var (pos, vel, _) = Step(ctx, colliders);
+            ctx = ctx with { Position = pos, Velocity = vel };
+        }
 
-        // Not past the wall's middle (its face is at x = 0.75).
-        Assert.True(newPos.X < 1.0f, $"Player penetrated the wall: X={newPos.X}");
+        float face = wall.Position.X - wall.Size.X / 2f;
+        float side = ctx.Position.X + ctx.PlayerRadius;
+        Assert.True(side <= face + 1e-4f, $"Player penetrated the wall: side at x={side}, face at {face}");
+        Assert.True(side >= face - 0.01f, $"Player stopped short of the wall: side at x={side}, face at {face}");
     }
 
     // ─── Determinism ─────────────────────────────────────────────────────────────
