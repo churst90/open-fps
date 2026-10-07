@@ -195,14 +195,20 @@ public sealed class ShoreSynth
     private readonly Column[] _columns;
     private readonly Train? _swell;
     private readonly Proc[] _procs = new Proc[MaxProcs];
-    private readonly float[,] _bandFlicker = new float[MaxProcs, Bands];
     // The unevenness of each process, common (index Bands) and per band: two one-pole stages of
     // Gaussian noise in cascade, so it glides rather than steps.
     private readonly float[,] _flickA = new float[MaxProcs, Bands + 1], _flickB = new float[MaxProcs, Bands + 1];
-    private readonly float[,] _power;            // per place, per band: Pa² this block
-    private readonly float[,] _gain;              // per place, per band: the noise's gain now
-    private readonly Resonator[,] _band, _band2;
+    // Per band, per place (b * _stride + k): Pa² this block, then the noise's gain; the noise's gain last block.
+    private readonly float[] _power, _gain;
+    /// <summary>The places, padded to a whole number of vectors: the band noise runs every place at once.</summary>
+    private readonly int _stride;
+    // Each band is two resonators in cascade, the same at every place; their state per band, per place.
+    private readonly float[] _bandB0 = new float[Bands], _bandA1 = new float[Bands], _bandA2 = new float[Bands];
+    private readonly float[] _x1, _x2, _y1, _y2, _u1, _u2, _z1, _z2;
     private readonly float[] _bandNorm = new float[Bands];
+    // This block: the white noise that drives each place's bands and their sum (s * _stride + k), and each
+    // place's samples and its hull's (k * Block + s).
+    private readonly float[] _white, _noise, _out, _hullOut;
     private readonly HullPlate? _hull;
     private int _untilBlock;
     private double _time;
@@ -240,17 +246,23 @@ public sealed class ShoreSynth
         _places = new EventSum[_along * _rows];
         for (int k = 0; k < _places.Length; k++) _places[k] = new EventSum(sampleRate, seed * 7919 + 5 + k * 15485863);
         _rng = new EventSum(sampleRate, seed * 31 + 77);
-        _power = new float[_places.Length, Bands];
-        _gain = new float[_places.Length, Bands];
-        _band = new Resonator[_places.Length, Bands];
-        _band2 = new Resonator[_places.Length, Bands];
+        _stride = (_places.Length + Vector<float>.Count - 1) / Vector<float>.Count * Vector<float>.Count;
+        _power = new float[Bands * _stride];
+        _gain = new float[Bands * _stride];
+        _x1 = new float[Bands * _stride]; _x2 = new float[Bands * _stride]; _y1 = new float[Bands * _stride]; _y2 = new float[Bands * _stride];
+        _u1 = new float[Bands * _stride]; _u2 = new float[Bands * _stride]; _z1 = new float[Bands * _stride]; _z2 = new float[Bands * _stride];
+        _white = new float[Block * _stride];
+        _noise = new float[Block * _stride];
+        _out = new float[_places.Length * Block];
         for (int b = 0; b < Bands; b++)
         {
             float hz = BandHz(b);
             // Two resonators in cascade: an octave's band falling 12 dB an octave outside it, so a crowd of
             // bubbles of one size lights its own octave and not the ones three away (a single two-pole
             // band leaks 6 dB an octave, which made a plume of big bubbles as bright as a fizz).
-            for (int k = 0; k < _places.Length; k++) { _band[k, b].Tune(hz, BandQ, sampleRate); _band2[k, b].Tune(hz, BandQ, sampleRate); }
+            Resonator band = default;
+            band.Tune(hz, BandQ, sampleRate);
+            (_bandB0[b], _bandA1[b], _bandA2[b]) = band.Coefficients;
             _bandNorm[b] = 1f / CascadeGain(hz, sampleRate);
         }
 
@@ -286,6 +298,7 @@ public sealed class ShoreSynth
             }
         }
         if (spec.Face == ShoreFace.Hull && spec.Hull != null) _hull = new HullPlate(spec.Hull, sampleRate, _places.Length);
+        _hullOut = new float[_hull != null ? _places.Length * Block : 0];
     }
 
     /// <summary>Where place <paramref name="k"/> of <paramref name="places"/> sits along a line source
@@ -371,8 +384,8 @@ public sealed class ShoreSynth
         Step();
         for (int k = 0; k < _places.Length; k++)
         {
-            float y = _places[k].Next() + Noise(k);
-            if (_hull != null) y += _hull.Next(k) * HullPart;
+            float y = _out[k * Block + _blockAt];
+            if (_hull != null) y += _hullOut[k * Block + _blockAt] * HullPart;
             if (k < places.Length) places[k] = y;
         }
         _blockAt++;
@@ -385,8 +398,8 @@ public sealed class ShoreSynth
         float y = 0f;
         for (int k = 0; k < _places.Length; k++)
         {
-            y += _places[k].Next() + Noise(k);
-            if (_hull != null) y += _hull.Next(k) * HullPart;
+            y += _out[k * Block + _blockAt];
+            if (_hull != null) y += _hullOut[k * Block + _blockAt] * HullPart;
         }
         _blockAt++;
         return y;
@@ -394,33 +407,14 @@ public sealed class ShoreSynth
 
     private int _blockAt;
 
-    private float Noise(int k)
-    {
-        float y = 0f;
-        float x = 1.7320508f * _rng.Signed();
-        float t = _blockAt / (float)Block;
-        for (int b = 0; b < Bands; b++)
-        {
-            float g0 = _gain[k, b], g1 = _power[k, b];
-            if (g0 <= 0f && g1 <= 0f) continue;
-            float g = g0 + (g1 - g0) * t;
-            y += _band2[k, b].Process(_band[k, b].Process(x)) * _bandNorm[b] * g;
-        }
-        return y;
-    }
-
     private void Step()
     {
         if (--_untilBlock > 0) return;
         _untilBlock = Block;
         if (!_underWay) SeaUnderWay();
         // The noise gains glide from last block's to this block's over the block.
-        for (int k = 0; k < _places.Length; k++)
-            for (int b = 0; b < Bands; b++)
-            {
-                _gain[k, b] = _power[k, b];
-                _power[k, b] = 0f;
-            }
+        Array.Copy(_power, _gain, _power.Length);
+        Array.Clear(_power);
         _blockAt = 0;
         float dt = Block / _rate;
         _time += dt;
@@ -428,9 +422,72 @@ public sealed class ShoreSynth
         Seas(dt);
         RunProcs(dt);
         // Power to amplitude: what the noise is driven with this block.
-        for (int k = 0; k < _places.Length; k++)
-            for (int b = 0; b < Bands; b++)
-                _power[k, b] = _power[k, b] > 0f ? MathF.Sqrt(_power[k, b]) : 0f;
+        for (int i = 0; i < _power.Length; i++)
+            _power[i] = _power[i] > 0f ? MathF.Sqrt(_power[i]) : 0f;
+        RenderBlock();
+    }
+
+    /// <summary>
+    /// The block's samples, every place at once: each place's events, and its bands of crowd noise, each
+    /// band's gain gliding from last block's to this block's. Nothing a block's samples depend on changes
+    /// inside the block (events are placed and powers summed in <see cref="Step"/>), so it is the same, to
+    /// the bit, as working each sample as it is asked for: the white noise is drawn in the same order, and
+    /// each place's bands are summed in the same order.
+    /// </summary>
+    private void RenderBlock()
+    {
+        int places = _places.Length, lanes = Vector<float>.Count;
+        for (int s = 0; s < Block; s++)
+            for (int k = 0; k < places; k++)
+                _white[s * _stride + k] = 1.7320508f * _rng.Signed();
+        Array.Clear(_noise);
+        for (int b = 0; b < Bands; b++)
+        {
+            var b0 = new Vector<float>(_bandB0[b]);
+            var a1 = new Vector<float>(_bandA1[b]);
+            var a2 = new Vector<float>(_bandA2[b]);
+            var norm = new Vector<float>(_bandNorm[b]);
+            for (int g = 0; g < _stride; g += lanes)
+            {
+                int at = b * _stride + g;
+                var g0 = new Vector<float>(_gain, at);
+                var g1 = new Vector<float>(_power, at);
+                // A band with no power, last block or this, is silent and its resonators stand still. They are
+                // run with the rest and put back, and a gain of exactly 0 adds nothing to the place's sum.
+                var on = Vector.GreaterThan(g0, Vector<float>.Zero) | Vector.GreaterThan(g1, Vector<float>.Zero);
+                if (Vector.EqualsAll(on, Vector<int>.Zero)) continue;
+                Vector<float> x1 = new(_x1, at), x2 = new(_x2, at), y1 = new(_y1, at), y2 = new(_y2, at);
+                Vector<float> u1 = new(_u1, at), u2 = new(_u2, at), z1 = new(_z1, at), z2 = new(_z2, at);
+                Vector<float> x10 = x1, x20 = x2, y10 = y1, y20 = y2, u10 = u1, u20 = u2, z10 = z1, z20 = z2;
+                var dg = g1 - g0;
+                for (int s = 0; s < Block; s++)
+                {
+                    // Resonator.Process twice, written out: the same operations in the same order.
+                    var x = new Vector<float>(_white, s * _stride + g);
+                    var y = b0 * (x - x2) - a1 * y1 - a2 * y2;
+                    x2 = x1; x1 = x; y2 = y1; y1 = y;
+                    var z = b0 * (y - u2) - a1 * z1 - a2 * z2;
+                    u2 = u1; u1 = y; z2 = z1; z1 = z;
+                    var gain = g0 + dg * new Vector<float>(s / (float)Block);
+                    (new Vector<float>(_noise, s * _stride + g) + z * norm * gain).CopyTo(_noise, s * _stride + g);
+                }
+                Vector.ConditionalSelect(on, x1, x10).CopyTo(_x1, at);
+                Vector.ConditionalSelect(on, x2, x20).CopyTo(_x2, at);
+                Vector.ConditionalSelect(on, y1, y10).CopyTo(_y1, at);
+                Vector.ConditionalSelect(on, y2, y20).CopyTo(_y2, at);
+                Vector.ConditionalSelect(on, u1, u10).CopyTo(_u1, at);
+                Vector.ConditionalSelect(on, u2, u20).CopyTo(_u2, at);
+                Vector.ConditionalSelect(on, z1, z10).CopyTo(_z1, at);
+                Vector.ConditionalSelect(on, z2, z20).CopyTo(_z2, at);
+            }
+        }
+        for (int k = 0; k < places; k++)
+        {
+            var events = _out.AsSpan(k * Block, Block);
+            _places[k].Take(events);
+            for (int s = 0; s < Block; s++) events[s] += _noise[s * _stride + k];
+            _hull?.Render(k, _hullOut.AsSpan(k * Block, Block));
+        }
     }
 
     // ── Starting mid-sea ─────────────────────────────────────────────────────────────────────────
@@ -983,7 +1040,6 @@ public sealed class ShoreSynth
                 _flickB[i, b] = Gauss();
             }
             p.Flicker = FlickerAt(i, Bands, FlickerCommonSigma);
-            for (int b = 0; b < Bands; b++) _bandFlicker[i, b] = FlickerAt(i, b, FlickerBandSigma);
             return ref p;
         }
         return ref _dropped;
@@ -1095,7 +1151,6 @@ public sealed class ShoreSynth
                 _flickB[i, b] = _flickPole * _flickB[i, b] + _flickA2B * _flickA[i, b];
             }
             p.Flicker = FlickerAt(i, Bands, FlickerCommonSigma);
-            for (int b = 0; b < Bands; b++) _bandFlicker[i, b] = FlickerAt(i, b, FlickerBandSigma);
             float n = p.Total * Share(p, t0, t1) * p.Flicker;
             if (n <= 0f) continue;
             // Where in the block the process is running.
@@ -1126,8 +1181,8 @@ public sealed class ShoreSynth
     {
         if (pa2 <= 0f || band < 0 || band >= Bands) return;
         // Each band of a crowd comes and goes on its own as well as with the rest (Flicker).
-        if (slot >= 0) pa2 *= _bandFlicker[slot, band];
-        _power[HomePlace(place), band] += pa2;
+        if (slot >= 0) pa2 *= FlickerAt(slot, band, FlickerBandSigma);
+        _power[band * _stride + HomePlace(place)] += pa2;
     }
 
     private float BlockSeconds => Block / _rate;
@@ -1137,10 +1192,12 @@ public sealed class ShoreSynth
         Span<float> share = stackalloc float[Bands] { p.BinShare0, p.BinShare1, p.BinShare2, p.BinShare3, p.BinShare4, p.BinShare5, p.BinShare6 };
         for (int b = 0; b < Bands; b++)
         {
-            float count = n * share[b] * p.Weight * _bandFlicker[slot, b];
-            if (count <= 0f) continue;
+            // A band's unevenness is worked out only where it is needed: an exp a band a block.
+            if (share[b] <= 0f) continue;
             float mm = FallingWaterSynth.MinnaertHzMetres / BandHz(b) * 1e3f;
             if (mm > p.A * 1.42f) continue;
+            float count = n * share[b] * p.Weight * FlickerAt(slot, b, FlickerBandSigma);
+            if (count <= 0f) continue;
             if (count > SparseLimit)
                 AddPower(p.Place, b, count * BubbleEnergy(mm) / BlockSeconds);
             else
@@ -1358,10 +1415,11 @@ public sealed class ShoreSynth
         private readonly float[] _hz = new float[MaxModes], _gain = new float[MaxModes], _shape = new float[MaxModes];
         private readonly float[] _cw = new float[MaxModes], _sw = new float[MaxModes], _decay = new float[MaxModes];
         private readonly float[] _mass = new float[MaxModes];
+        /// <summary>The modal mass times the sample rate: a force over it is a sample's kick to the velocity.</summary>
+        private readonly float[] _kick = new float[MaxModes];
         private readonly float[,] _re, _im;
         private readonly float[,] _force;
         private readonly float _rate;
-        private int _at;
         // Pending pocket drives: place, start offset, note, decay, amplitude (N).
         private const int MaxDrives = 32;
         private readonly int[] _dPlace = new int[MaxDrives];
@@ -1398,6 +1456,7 @@ public sealed class ShoreSynth
                 _cw[i] = MathF.Cos(w); _sw[i] = MathF.Sin(w);
                 _decay[i] = MathF.Exp(-MathF.PI * _hz[i] * plate.Loss(_hz[i]) / rate);
                 _gain[i] = 413f * MathF.Sqrt(plate.RadiationEfficiency(_hz[i]) * s / (8f * MathF.PI));
+                _kick[i] = _mass[i] * rate;
             }
             _re = new float[places, MaxModes];
             _im = new float[places, MaxModes];
@@ -1406,7 +1465,6 @@ public sealed class ShoreSynth
 
         public void BeginBlock()
         {
-            _at = 0;
             Array.Clear(_force);
             // The pockets' pressure as force, sample by sample, into this block.
             for (int d = 0; d < _drives; d++)
@@ -1448,23 +1506,29 @@ public sealed class ShoreSynth
             _dWait[d] = Math.Max(0, at);
         }
 
-        /// <summary>The bay's sound at this place, Pa at a metre; called once per place per sample.</summary>
-        public float Next(int place)
+        /// <summary>The bay's sound at this place over the block, Pa at a metre.</summary>
+        public void Render(int place, Span<float> into)
         {
-            float f = _force[place, Math.Min(_at, Block - 1)];
-            if (place == _re.GetLength(0) - 1) _at++;
-            float y = 0f;
-            for (int i = 0; i < _modes; i++)
+            int modes = _modes;
+            Span<float> re = stackalloc float[MaxModes], im = stackalloc float[MaxModes];
+            for (int i = 0; i < modes; i++) { re[i] = _re[place, i]; im[i] = _im[place, i]; }
+            ReadOnlySpan<float> shape = _shape, gain = _gain, cw = _cw, sw = _sw, decay = _decay, kick = _kick;
+            for (int s = 0; s < into.Length; s++)
             {
-                // Velocity of the mode: a damped rotation, kicked by the force over its modal mass.
-                float re = _re[place, i] + f * _shape[i] / (_mass[i] * _rate);
-                float im = _im[place, i];
-                y += _gain[i] * re;
-                float nr = (re * _cw[i] - im * _sw[i]) * _decay[i];
-                _im[place, i] = (re * _sw[i] + im * _cw[i]) * _decay[i];
-                _re[place, i] = nr;
+                float f = _force[place, s];
+                float y = 0f;
+                for (int i = 0; i < modes; i++)
+                {
+                    // Velocity of the mode: a damped rotation, kicked by the force over its modal mass.
+                    float r = re[i] + f * shape[i] / kick[i];
+                    float m = im[i];
+                    y += gain[i] * r;
+                    re[i] = (r * cw[i] - m * sw[i]) * decay[i];
+                    im[i] = (r * sw[i] + m * cw[i]) * decay[i];
+                }
+                into[s] = y;
             }
-            return y;
+            for (int i = 0; i < modes; i++) { _re[place, i] = re[i]; _im[place, i] = im[i]; }
         }
     }
 }

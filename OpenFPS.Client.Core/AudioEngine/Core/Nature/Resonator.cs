@@ -22,6 +22,10 @@ public struct Resonator
         _a2 = (1f - alpha) / a0;
     }
 
+    /// <summary>The coefficients <see cref="Process"/> uses (b1 is 0 and b2 is −b0), for a filter that runs
+    /// many of these side by side.</summary>
+    public readonly (float B0, float A1, float A2) Coefficients => (_b0, _a1, _a2);
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Process(float x)
     {
