@@ -247,8 +247,9 @@ public class MachineVoiceTests
         Assert.True(seen > 0, "no shipped map declares a vehicle");
     }
 
-    /// <summary>Every aircraft renders without faulting, at about its declared level. The aircraft went
-    /// onto a map untested and the client died three seconds after the first one started.</summary>
+    /// <summary>Every aircraft renders without faulting from every side, and louder from some sides than
+    /// others. The aircraft went onto a map untested and the client died three seconds after the first
+    /// one started.</summary>
     [Theory]
     [InlineData("airliner")]
     [InlineData("turboprop")]
@@ -256,9 +257,10 @@ public class MachineVoiceTests
     [InlineData("helicopter")]
     public void WhereAnAircraftIsHeardFromChangesItsLevel(string preset)
     {
-        // A propeller is strongly directional and a jet radiates aft, so the level depends on where
-        // you stand; where the declared level is measured from is not written down.
+        // Where the declared level is measured from is not written down. The listener sets a direction
+        // only (no distance law), so every difference below is the source's directivity.
         var p = AircraftProfile.ByName(preset);
+        var levels = new Dictionary<string, float>();
         foreach (var (name, at) in new (string, System.Numerics.Vector3)[]
                  {
                      ("in the disc plane", new System.Numerics.Vector3(120f, 0f, 0f)),
@@ -278,7 +280,21 @@ public class MachineVoiceTests
             foreach (float x in b) { float pa = x * v.PascalsAtFullScale; sum += (double)pa * pa; }
             float db = 20f * MathF.Log10(MathF.Max(MathF.Sqrt((float)(sum / b.Length)), 1e-9f) / 20e-6f);
             Assert.True(db > 60f, $"{preset} {name}: {db:F1} dB — nothing is there");
+            levels[name] = db;
         }
+
+        // Measured 2026-10-07: airliner 9.7 dB between its quietest and loudest direction, helicopter
+        // 3.2, turboprop 2.8, piston single 0.9.
+        string all = string.Join(", ", levels.Select(kv => $"{kv.Key} {kv.Value:F1}"));
+        Assert.True(levels.Values.Max() - levels.Values.Min() > 0.5f,
+            $"{preset}: the same level from every direction ({all}); the listener's direction reaches nothing");
+        // A jet's mixing noise peaks aft of the exhaust axis (JetStream.Directivity).
+        if (p.Power == AircraftPower.Turbofan)
+            Assert.True(levels["dead astern"] > levels["dead ahead"] + 3f, $"{preset}: the jet does not radiate aft ({all})");
+        // A propeller's thickness noise is loudest in its disc's plane and falls on its axis.
+        if (p.Power is AircraftPower.Piston or AircraftPower.Turboprop)
+            Assert.True(levels["in the disc plane"] > levels["dead ahead"] && levels["in the disc plane"] > levels["dead astern"],
+                $"{preset}: the propeller's disc plane is not its loudest side ({all})");
     }
 
     [Theory]
