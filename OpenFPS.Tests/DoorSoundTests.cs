@@ -147,7 +147,7 @@ public class DoorSoundTests
     /// as "just a thump" while every test passed.
     /// </summary>
     [Fact]
-    public void TheLatchComesFirstAndTheRingComesLast()
+    public void TheLeafSeatsFirstTheLatchAfterAndTheRingOutlastsTheBlow()
     {
         var sounds = DoorAcoustics.Closing(Of("Metal"), Vector3.Zero, Vector3.Zero,
                                            0.9f, 2.1f, 0.04f, 30f, 2f, hasSeal: false);
