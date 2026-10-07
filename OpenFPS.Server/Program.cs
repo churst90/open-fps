@@ -1269,7 +1269,16 @@ public class GameServer
         }
         else Log.Information("Join of {Map} for {User}: {Count} entities, {KB:F0} KB, {Ms} ms.",
                              session.CurrentMapId, session.Username, staticEntities.Count, bytes / 1024.0, started.ElapsedMilliseconds);
+        bytes += SendCounted(session, RoadsFor(session.CurrentMapId));
         SendToSession(session, new MapLoadComplete());
+    }
+
+    /// <summary>The map's roads, junctions, level crossings and drivable tracks, for a driver's cues.</summary>
+    internal MapRoads RoadsFor(string mapId)
+    {
+        _maps.TryGetMapData(mapId, out var map);
+        var data = MapRoadsBuilder.Build(map, _crossings.Rails(mapId));
+        return new MapRoads { MapName = mapId, Json = data.IsEmpty ? "" : data.ToJson() };
     }
 
     /// <summary>

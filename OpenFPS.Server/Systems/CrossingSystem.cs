@@ -254,4 +254,42 @@ public sealed class CrossingSystem
     }
 
     public int Count => _crossings.Count;
+
+    /// <summary>
+    /// This map's crossings as the rails lie across the road: the middle of the track at each, from the
+    /// rail line itself rather than the declared point, and the direction the rails run there. What a
+    /// client needs to put a tyre's thump on each rail and a crossing in a driver's path.
+    /// </summary>
+    public IEnumerable<CrossingRails> Rails(string mapId)
+    {
+        foreach (var c in _crossings)
+        {
+            if (c.MapId != mapId) continue;
+            var (track, at) = c.OnRail[0];
+            foreach (var (t, line) in _rail.Lines(mapId))
+            {
+                if (!string.Equals(t, track, StringComparison.OrdinalIgnoreCase)) continue;
+                line.Sample(at, out var centre, out float heading, out _);
+                // Nearest the declared point to a few centimetres: the line is sampled every 2 m.
+                for (float step = 1f; step > 0.02f; step *= 0.5f)
+                {
+                    foreach (float d in new[] { at - step, at + step })
+                    {
+                        line.Sample(d, out var q, out float h, out _);
+                        if (Flat(q - c.Position) < Flat(centre - c.Position)) { centre = q; heading = h; at = d; }
+                    }
+                }
+                yield return new CrossingRails
+                {
+                    Name = c.Name,
+                    Centre = centre,
+                    // A line's heading runs from +z toward +x: (sin h, cos h) on the ground.
+                    Along = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)),
+                };
+                break;
+            }
+        }
+    }
+
+    private static float Flat(Vector3 v) => MathF.Sqrt(v.X * v.X + v.Z * v.Z);
 }

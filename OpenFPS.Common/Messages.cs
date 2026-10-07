@@ -44,6 +44,8 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(37, typeof(InventoryList))]
 [MemoryPackUnion(38, typeof(TileStreamUpdate))]
 [MemoryPackUnion(39, typeof(EntityDefinitionPack))]
+// 40-43 are left for other work in progress; 44 is the driving aids'.
+[MemoryPackUnion(44, typeof(MapRoads))]
 public partial interface IMessage { }
 
 public enum PlayerListScope
@@ -179,6 +181,19 @@ public partial class MapManifest : IMessage
     public float TileMetres;
 
     public MapManifest() { }
+}
+
+/// <summary>
+/// The map's roads, junctions, level crossings and drivable tracks (<see cref="OpenFPS.Common.RoadMapData"/>
+/// as JSON), sent with the map's data before MapLoadComplete. A driver's client plans its cues from them:
+/// the lane ahead, the turn, the give-way line, the speed limit, the rails. Empty for a map without.
+/// </summary>
+[MemoryPackable]
+public partial class MapRoads : IMessage
+{
+    public string MapName = "";
+    public string Json = "";
+    public MapRoads() { }
 }
 
 [MemoryPackable]

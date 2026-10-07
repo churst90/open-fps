@@ -2366,7 +2366,7 @@ public class ClientAudioSystem
     /// </summary>
     private void UpdateHorns(WorldSnapshot world, Vector3 eyePos, double now)
     {
-        UpdateHeldHorns(world, eyePos, now);
+        UpdateHeldHorns(world, eyePos, _now());
         if (_horns.Count == 0) return;
         _hornsDone.Clear();
         foreach (var (id, horn) in _horns)
@@ -2426,6 +2426,111 @@ public class ClientAudioSystem
             _horns.Remove(id);
             _audio.StopSound(HornVoiceBase - Math.Abs(id));
         }
+    }
+
+    // ── Tyres over the rails ────────────────────────────────────────────────────────────────
+    //
+    // A level crossing's rails, from the map's roads (MapRoads). Every vehicle with a voice of its own
+    // that is about to roll a wheel over one has the strike scheduled in its voice, at the moment the
+    // wheel reaches the rail (WheelStrikes): front wheels, a rail-gauge later the second rail, a
+    // wheelbase later the back wheels. Scheduled once a wheel is under a second from a rail, which is
+    // longer than any voice renders ahead; let go once it is well past, so the next pass strikes again.
+
+    private IReadOnlyList<OpenFPS.Common.CrossingRails> _crossings = Array.Empty<OpenFPS.Common.CrossingRails>();
+    private readonly Dictionary<(int Id, int Wheel, int Rail), double> _struck = new();
+    private readonly Dictionary<string, (Vector3[] At, float[] Load, float[] Radius)> _wheelLayouts = new();
+    private readonly List<OpenFPS.Client.AudioEngine.Core.WheelStrike> _strikeBatch = new();
+    private readonly List<(int, int, int)> _unstruck = new();
+
+    /// <summary>The map's level crossings, as the rails lie (null on a map without).</summary>
+    public void SetCrossings(IReadOnlyList<OpenFPS.Common.CrossingRails>? crossings)
+    {
+        _crossings = crossings ?? Array.Empty<OpenFPS.Common.CrossingRails>();
+        _struck.Clear();
+    }
+
+    /// <summary>How far ahead of a rail a wheel's strike is scheduled, seconds: more than a voice ever
+    /// renders ahead (PhysicalVoiceState.MaxLeadSeconds 0.7).</summary>
+    private const double StrikeWithinSeconds = 0.9;
+
+    /// <summary>A preset's wheels where the server's model puts them (WheelDynamics), from the entity's middle.</summary>
+    private (Vector3[] At, float[] Load, float[] Radius) WheelLayout(string preset)
+    {
+        if (_wheelLayouts.TryGetValue(preset, out var l)) return l;
+        var v = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
+        var body = new OpenFPS.Common.WheelDynamics(v);
+        float cog = v.Running.CentreOfGravityZ;
+        int n = body.Wheels.Length;
+        l = (new Vector3[n], new float[n], new float[n]);
+        for (int i = 0; i < n; i++)
+        {
+            l.At[i] = new Vector3(body.Wheels[i].Y, 0f, body.Wheels[i].X + cog);
+            l.Load[i] = body.Wheels[i].StaticLoad;
+            l.Radius[i] = body.Wheels[i].Radius;
+        }
+        _wheelLayouts[preset] = l;
+        return l;
+    }
+
+    /// <summary>The strikes to hand this vehicle's voice this frame, or null for none new.</summary>
+    internal OpenFPS.Client.AudioEngine.Core.WheelStrike[]? RailStrikes(EntitySnapshot snap, string preset, double sampledAt)
+    {
+        if (_crossings.Count == 0) return null;
+        var vel = new Vector3(snap.Velocity.X, 0f, snap.Velocity.Z);
+        float speed = vel.Length();
+        var pos = snap.Transform.Position;
+        _strikeBatch.Clear();
+        _unstruck.Clear();
+        (Vector3[] At, float[] Load, float[] Radius)? layout = null;
+        for (int ci = 0; ci < _crossings.Count; ci++)
+        {
+            var c = _crossings[ci];
+            var off = new Vector3(pos.X - c.Centre.X, 0f, pos.Z - c.Centre.Z);
+            if (off.LengthSquared() > 40f * 40f) continue;
+            layout ??= WheelLayout(preset);
+            var across = new Vector3(c.Along.Z, 0f, -c.Along.X);
+            float u = Vector3.Dot(vel, across);
+            var (left, right) = c.RailPoints();
+            for (int r = 0; r < 2; r++)
+            {
+                var rail = r == 0 ? left : right;
+                for (int i = 0; i < layout.Value.At.Length; i++)
+                {
+                    var p = pos + Vector3.Transform(layout.Value.At[i], snap.Transform.Rotation);
+                    var d = new Vector3(p.X - rail.X, 0f, p.Z - rail.Z);
+                    float s = Vector3.Dot(d, across);
+                    var key = (snap.Id, i, ci * 2 + r);
+                    bool known = _struck.ContainsKey(key);
+                    if (MathF.Abs(Vector3.Dot(new Vector3(p.X - c.Centre.X, 0f, p.Z - c.Centre.Z), c.Along)) > c.HalfLengthMetres + 1f)
+                    {
+                        if (known) _unstruck.Add(key);
+                        continue;
+                    }
+                    if (speed < 0.3f || MathF.Abs(u) < 0.2f)
+                    {
+                        if (known && MathF.Abs(s) > 2f) _unstruck.Add(key);
+                        continue;
+                    }
+                    double t = -s / u;
+                    if (t < 0)
+                    {
+                        // Past it: forget it once well clear, so the next pass strikes again.
+                        if (known && MathF.Abs(s) > 2f) _unstruck.Add(key);
+                        continue;
+                    }
+                    if (known || t > StrikeWithinSeconds) continue;
+                    double at = sampledAt + t;
+                    _struck[key] = at;
+                    float radius = layout.Value.Radius[i];
+                    _strikeBatch.Add(new OpenFPS.Client.AudioEngine.Core.WheelStrike(
+                        i, at,
+                        OpenFPS.Client.AudioEngine.Core.WheelStrikes.PeakPascals(speed, layout.Value.Load[i], OpenFPS.Client.AudioEngine.Core.WheelStrikes.CrossingStepMetres),
+                        OpenFPS.Client.AudioEngine.Core.WheelStrikes.ContactSeconds(speed, radius)));
+                }
+            }
+        }
+        foreach (var k in _unstruck) _struck.Remove(k);
+        return _strikeBatch.Count == 0 ? null : _strikeBatch.ToArray();
     }
 
     /// <summary>Voice ids for a horn a driver is holding down, one per vehicle.</summary>
@@ -3057,6 +3162,7 @@ public class ClientAudioSystem
             // corner would render pure broadband skid, a white-noise tail travelling with the field.
             TyreSlip = snap.TyreDemand,
             Wheels = snap.Wheels,
+            WheelStrikes = engineKey.Length > 0 ? RailStrikes(snap, engineKey, world.PositionsSampledAt) : null,
             RoadWaterMm = _roadWaterMm,
 
             // Synthesis mapping

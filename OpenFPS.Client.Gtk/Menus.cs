@@ -298,6 +298,22 @@ internal static partial class GtkClientProgram
         assist.OnToggled += (_, _) => _speech.Speak(assist.GetActive() ? "On" : "Off", true);
         box.Append(assist);
 
+        // The driving sounds, one each (docs/DRIVING_AIDS.md). Shift+K switches all of them in a car.
+        var driveChecks = new List<(string Name, CheckButton Box)>();
+        foreach (var (name, label) in new[]
+                 {
+                     ("all", "Driving sounds"), ("guide", "Driving: guide beep"), ("lines", "Driving: line beeps and rumble"),
+                     ("clicks", "Driving: turn clicks"), ("brake", "Driving: brake cue"), ("speed", "Driving: speed limit warning"),
+                 })
+        {
+            var check = CheckButton.NewWithLabel(label);
+            check.SetActive(DrivingCues.Get(name));
+            SpeakOnFocus(check, () => $"{label}, {(check.GetActive() ? "on" : "off")}");
+            check.OnToggled += (_, _) => _speech.Speak(check.GetActive() ? "On" : "Off", true);
+            box.Append(check);
+            driveChecks.Add((name, check));
+        }
+
         box.Append(Label.New("Interface sound volume, percent"));
         var volume = SpinButton.NewWithRange(0, 100, 10);
         volume.SetValue(Math.Round(_settings.UiVolume * 100));
@@ -316,6 +332,7 @@ internal static partial class GtkClientProgram
             NavigationAids.TurnNarration = narration.GetActive();
             NavigationAids.WallBumps = bumps.GetActive();
             NavigationAids.AimAssist = assist.GetActive();
+            foreach (var (name, check) in driveChecks) DrivingCues.Set(name, check.GetActive());
             _settings.Save();
             _session.SendAimAssist();
             _session.Audio.SetOutputDevice(_settings.OutputDevice);
