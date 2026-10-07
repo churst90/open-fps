@@ -5,47 +5,30 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// <summary>
 /// Rain on the surfaces of one patch, as the drops it is made of, at the listener.
 ///
-/// Every drop is an event: a size drawn from the rain's own spread (Rainfall, DropSizeTable), the
-/// speed that size falls at, a place in one of the patch's distance bins, and the surface it lands
-/// on. What it makes depends on the surface (RainSurfaces):
+/// Every drop is an event: a size from the rain's own spread (Rainfall, DropSizeTable), the speed that
+/// size falls at, a place in one of the patch's distance bins, and a surface (RainSurfaces):
 ///
-///   POOL — water. The click of the drop meeting the surface, and for some sizes a bubble that
-///   rings: drops of 0.8-1.1 mm trap the "regular" bubble every time, the 14-16 kHz ring of rain on
-///   a lake (Pumphrey and Crum 1990, Pumphrey and Elmore 1990; Prosperetti and Oguz 1993 for why that
-///   window); drops over 2.2 mm make a large irregular "type II" bubble at 2-10 kHz, lower for a
-///   bigger drop (Medwin et al. 1992, J. Acoust. Soc. Am. 92, 1613). The same physics, and the same
-///   two fitted constants, as the fountain (FallingWaterSynth): how loud a bubble is for its size, and
-///   how loud a drop's click is for its size and speed.
+///   Pool: the click, and for some sizes a ringing bubble. Drops of 0.8-1.1 mm trap the "regular"
+///   bubble, the 14-16 kHz ring of rain on a lake (Pumphrey and Crum 1990, Pumphrey and Elmore 1990;
+///   Prosperetti and Oguz 1993 for the window); drops over 2.2 mm a "type II" bubble at 2-10 kHz
+///   (Medwin et al. 1992, J. Acoust. Soc. Am. 92, 1613). The fountain's physics and its two fitted
+///   constants (FallingWaterSynth).
+///   Hard: a road or a slab. The drop splashes flat on a thin film and traps nothing: a click (see
+///   Click). A share of the area is puddle (RainSurfaces.PuddleShare), heard as a pool.
+///   Plate: sheet metal, glass, a car. The click on its top face, and the sheet (RainPlate): sparse
+///   low modes ring at their own notes (a car roof's drumming), above their overlap octave bands of
+///   noise that jump with each blow and decay at the loss factor, and the struck spot's thud,
+///   ρ0 F(t) / (2π m″ r). From below (the roof over you) only the sheet and the thud come through.
+///   Soft: grass, soil, gravel. The blow lasts longer and the click is lower and softer
+///   (RainSurfaces.ContactStretch).
+///   Canopy: a crown catches most of the rain (RainSurfaces.CanopyCatch) on leaves that yield like soft
+///   ground, and lets it go as 4-6 mm drips, the slow "plop" under a tree.
 ///
-///   HARD — a road, a pavement, a slab. The drop lands on a film of water far thinner than itself,
-///   splashes flat and traps nothing: a click, the rate of change of its force as it stops, on the
-///   drop's own time scale (see Click). A share of the area is puddle (RainSurfaces.PuddleShare) and
-///   behaves as a pool.
-///
-///   PLATE — sheet metal, glass, a car. The click on its top face, and the sheet itself: the blow
-///   puts energy into its bending field through its point mobility, the field rings and radiates
-///   (RainPlate). A bay's sparse low modes ring at their own notes — the drumming of a car roof or
-///   a pane — and above where the modes overlap the field is noise in octave bands whose energy jumps
-///   with each blow and decays at the sheet's loss factor. And the struck spot's own thud, ρ0 F(t) /
-///   (2π m″ r). Heard from below (the roof over you) only the sheet and the thud come through.
-///
-///   SOFT — grass, soil, gravel. The ground yields, the blow lasts longer, and its click is lower
-///   and softer (RainSurfaces.ContactStretch).
-///
-///   CANOPY — leaves. A crown catches most of the rain (RainSurfaces.CanopyCatch): each caught drop
-///   strikes a leaf, which yields like soft ground. What it catches leaves again as drips of 4-6 mm
-///   that fall from the crown to what is beneath it — the heavy, slow "plop" under a tree. What it
-///   does not catch falls straight through.
-///
-/// HOW MANY. Thousands of drops land on a few square metres a second. Each bin renders, in each size
-/// class, at most a few of its drops in a block (<see cref="PerClass"/>) and lets each stand for
-/// √(real / rendered) of them, so the energy is kept while the cost is bounded — the fountain's rule,
-/// taken a size class at a time so the rare big drops, which carry most of the sound, are each
-/// rendered. The near bins have few drops a block and are rendered drop for drop; the far ones are a
-/// wash, which is what they are.
-///
-/// Every sound is placed by the direction its surface faces the listener (RainLayer.Aim) and its
-/// distance; the patch's voice is then placed at the patch's reference distance by the mixer.
+/// Each bin renders at most a few drops of each size class a block (<see cref="PerClass"/>), each
+/// standing for √(real / rendered) of them: the energy is kept, the cost bounded, and the rare big
+/// drops that carry most of the sound are each rendered. Every sound is weighted by how its surface
+/// faces the listener (RainLayer.Aim) and its distance; the mixer places the voice at the patch's
+/// reference distance.
 /// </summary>
 public sealed class RainSynth
 {
@@ -54,10 +37,10 @@ public sealed class RainSynth
     /// <summary>How fast a click's force arrives, s: first contact. The fountain's figure.</summary>
     public const float ImpactRise = 16e-6f;
 
-    /// <summary>On a hard surface the drop stops in its own length and splashes flat, and its click
-    /// is this much stronger than into a pool: the fountain's two figures (FallingWaterSynth). The
-    /// hard click is what the street and roof rain were fitted with and is held; the pool's was
-    /// refitted lower on 2026-10-06 (texture round 1), so the ratio grew from 1.2 to 5.7.</summary>
+    /// <summary>How much stronger a drop's click is on a hard surface (it stops in its own length and
+    /// splashes flat) than into a pool: the fountain's two figures (FallingWaterSynth). The street and
+    /// roof rain were fitted with the hard click; the pool's was refitted lower on 2026-10-06, so the
+    /// ratio is 5.7.</summary>
     public const float HardClickGain = FallingWaterSynth.HardImpactPascals / FallingWaterSynth.ImpactPascals;
 
     /// <summary>The share of drops of 0.8-1.1 mm that trap the regular bubble (Pumphrey and Elmore
@@ -72,8 +55,8 @@ public sealed class RainSynth
     /// <summary>The smallest bubble worth ringing, mm: under it the note is over 20 kHz.</summary>
     private const float SmallestBubbleMm = 0.16f;
 
-    /// <summary>The most drops of one bin rendered in a block (see the summary): of the drips, and of
-    /// each size class of the rain (<see cref="PerClass"/>).</summary>
+    /// <summary>The most drips of one bin rendered in a block; the rain's drops are capped per size
+    /// class (<see cref="PerClass"/>).</summary>
     public const int MaxPerBin = 3;
 
     /// <summary>The most drops of each size class (DropSizeTable.ClassEdgesMm) of one bin rendered in
@@ -110,8 +93,8 @@ public sealed class RainSynth
         set => Falling = Falling with { RateMmPerHour = value };
     }
 
-    /// <summary>The bins whose biggest drops are played one by one elsewhere (RainPatch.DiscreteFromMm):
-    /// drops of this size and over are not rendered here.</summary>
+    /// <summary>The size from which the bin's drops are played one by one elsewhere
+    /// (RainLayer.DiscreteFrom, NearDrops): drops of this size and over are not rendered here.</summary>
     private float _skipFromMm = float.MaxValue;
 
     /// <summary>Each part's share, for the lab to take the sound apart by muting: the drops' clicks,
@@ -125,18 +108,13 @@ public sealed class RainSynth
     /// <summary>
     /// How much more or less rain than its mean is arriving now, a factor about one.
     ///
-    /// Raindrops do not arrive as a Poisson stream at a fixed rate. Counted over a few square metres,
-    /// drops of one size come in clusters: their counts over seconds are far more variable than
-    /// Poisson's, the excess growing with the counting time (Kostinski and Jameson 1997, J. Atmos. Sci.
-    /// 54, "Fluctuation properties of precipitation. Part I"; Jameson and Kostinski 1999-2002, Parts
-    /// II-VI: the pair-correlation of drop arrivals is positive out to seconds and metres). That is the
-    /// slow swell a rain recording has and the model, fed one steady rate, did not: its band envelopes'
-    /// modulation power at 0.5-2 Hz was 1.5 per cent of their variance, the recordings' 2.6-19
-    /// (texture round 1, 2026-10-06).
-    ///
-    /// A lognormal factor on the flux, its log a smooth noise with knots every 0.6, 2.4 and 9.6
-    /// seconds, the same for every patch at one moment. Its spread, <see cref="ClusterSigma"/>, is
-    /// fitted to the recordings' slow modulation; the scales are Kostinski and Jameson's seconds.
+    /// Drops arrive in clusters, their counts over seconds far more variable than Poisson's (Kostinski
+    /// and Jameson 1997, J. Atmos. Sci. 54, "Fluctuation properties of precipitation. Part I"; Parts
+    /// II-VI, 1999-2002: arrivals correlate out to seconds and metres). That is the slow swell of a rain
+    /// recording: at one steady rate the band envelopes' 0.5-2 Hz modulation was 1.5 % of their
+    /// variance, the recordings' 2.6-19 % (texture round 1, 2026-10-06). A lognormal factor on the flux,
+    /// its log a smooth noise with knots every 0.6, 2.4 and 9.6 s, the same for every patch at one
+    /// moment; its spread <see cref="ClusterSigma"/> fitted to the recordings.
     /// </summary>
     public static float Intermittency(double seconds)
     {
@@ -149,8 +127,7 @@ public sealed class RainSynth
             float s = 0.5f - 0.5f * MathF.Cos(MathF.PI * f);
             g += (Knot(i, k) * (1f - s) + Knot(i + 1, k) * s);
         }
-        // Each scale's knots have unit variance; the cosine glide between two independent knots keeps
-        // three quarters of it on average.
+        // The cosine glide between two independent unit-variance knots keeps three quarters of it.
         g /= MathF.Sqrt(0.75f * ClusterScales.Length);
         float sigma = ClusterSigma;
         return MathF.Exp(sigma * g - 0.5f * sigma * sigma);
@@ -214,8 +191,6 @@ public sealed class RainSynth
         Clock += dt;
         if (patch != null && falling.Falling)
         {
-            // Rain does not fall at a steady rate onto a few square metres: it comes in clusters over
-            // seconds (see Intermittency), all the patches round a listener together.
             float clustered = Intermittency(Clock);
             // The main particles: the rain (the rain hail falls in, for hail), the sleet, the snow.
             var mainKind = falling.Kind == PrecipitationKind.Hail ? PrecipitationKind.Rain : falling.Kind;
@@ -297,7 +272,7 @@ public sealed class RainSynth
         Array.Clear(_layerPlate);
         foreach (var p in _plates) p.Keep = false;
         if (patch == null) { foreach (var p in _plates) p.Active = false; return; }
-        // First the plates still in the patch keep their state...
+        // The plates still in the patch keep their state first...
         for (int l = 0; l < patch.Layers.Length && l < _layerPlate.Length; l++)
         {
             var layer = patch.Layers[l];
@@ -348,7 +323,6 @@ public sealed class RainSynth
         Patch = new RainPatch { Layers = new[] { layer }, ReferenceDistance = 1f };
         Falling = Precipitation.None;
         var out_ = new float[samples];
-        // Bind the plate, then strike once at the start of the first block.
         _untilBlock = 0;
         Bind(Patch);
         _untilBlock = Block;
@@ -377,8 +351,8 @@ public sealed class RainSynth
                        PlateState? plate, bool fromBelow)
     {
         if (mean <= 0f) return;
-        // One size class at a time (ParticleSpectrum): the big drops, few and loud, are rendered every
-        // one; only the swarm of small ones is stood for by a few.
+        // A size class at a time (ParticleSpectrum): the few loud big drops are each rendered, and only
+        // the swarm of small ones is stood for by a few.
         for (int c = 0; c < ParticleSpectrum.Classes; c++)
         {
             if (_spec.ClassFloorMm(c) >= _skipFromMm) break;      // played one by one, elsewhere
@@ -478,10 +452,9 @@ public sealed class RainSynth
     /// struck spot's thud, ρ0 F(t) / (2π m″ r), the shape of the blow itself.</summary>
     private void Strike(int at, PlateState plate, float impulse, float blow, float weight, float atEar, float kineticJoules)
     {
-        // The infinite plate's mobility hands a sheet more energy than a hard enough blow ever had: a
-        // golf-ball hailstone on 0.7 mm steel would put in forty times its own kinetic energy. What
-        // the stone loses is all there is, and the sheet takes no more than half of it (the rest is
-        // the dent, the heat and the stone's own break-up).
+        // The infinite plate's mobility would hand a golf-ball hailstone's blow on 0.7 mm steel forty
+        // times its own kinetic energy. The sheet takes at most half of what the stone loses (the rest
+        // is the dent, the heat and the stone's break-up).
         float peak = impulse / (blow * RainPlate.BlowShapeArea);
         float energy = plate.Plate.Mobility * peak * peak * blow * RainPlate.BlowShapeEnergy;
         float cap = MaxPlateShare * kineticJoules;
@@ -506,18 +479,12 @@ public sealed class RainSynth
     /// A particle that is not a drop: an ice pellet or a hailstone, which strikes and bounces, or a
     /// snowflake, which crushes.
     ///
-    /// Ice is a hard sphere, and the air hears it stop: the acceleration noise of a rigid body, the
-    /// dipole of its own deceleration, p ≈ 3 ρ0 V Δv / (4π c r τ²) at its peak with the ground's image
-    /// doubling it (Koss and Alfredson 1973, J. Sound Vib. 27, 59-75, for spheres in collision), over
-    /// the Hertz contact time τ against whatever it hits (Hydrometeors.HertzSeconds) — tens of
-    /// microseconds on a road, so a sharp, bright tick, where a drop of the same size splats over a
-    /// millimetre of time. It keeps some of its speed (Hydrometeors.Restitution) and lands again: a
-    /// bounce, as hail does, heard when it comes down within the half second this can look ahead.
-    /// Into water it is a plunge: a click and the bubble its cavity closes on. On leaves and grass the
-    /// contact is soft and long: a thud.
-    ///
-    /// A snowflake is mostly air: it stops over its own size at a metre a second, and its dipole is
-    /// thousands of times weaker. Snow falling is nearly silent, as it is.
+    /// The air hears ice stop: the dipole of its deceleration, p ≈ 3 ρ0 V Δv / (4π c r τ²) at its peak,
+    /// the ground's image doubling it (Koss and Alfredson 1973, J. Sound Vib. 27, 59-75), over the
+    /// Hertz contact time (Hydrometeors.HertzSeconds): tens of microseconds on a road, a sharp tick.
+    /// It bounces (Hydrometeors.Restitution), heard if it lands within the look-ahead. Into water it
+    /// is a click and the bubble its cavity closes on; on leaves and grass a thud. A snowflake stops
+    /// over its own size at a metre a second, its dipole thousands of times weaker: nearly silent.
     /// </summary>
     private void Solid(int at, float d, float v, float weight, float atEar, RainSurfaceKind kind, float stretch,
                        PlateState? plate, bool fromBelow)
@@ -571,27 +538,14 @@ public sealed class RainSynth
     }
 
     /// <summary>
-    /// A drop's click on something solid, at the listener.
-    ///
-    /// The air hears the rate of change of the drop's push on it: a dipole at a rigid boundary
-    /// radiates dF/dt. It has the blow's peak and fall (RainPlate.BlowShape), but rises smoothly
-    /// (sin², texture round 2: on a wet surface the drop meets the film first; the dry wall's √t had
-    /// an infinite slope at first contact, a one-sample spike), and not the blow's length. What moves the air is the drop's water going from a falling sphere
-    /// to a sheet spreading over the wet ground, and that takes the spreading time, about 8/3 D / v
-    /// (RainSurfaces.SplashSeconds) — two and a half times the time the drop takes to stop. So the
-    /// click rises to a broad top near 1 / (2π · 0.2 · 8/3 D / v), 0.5-1.5 kHz for the drops that carry
-    /// the energy, and falls gently above. Two earlier time scales were measured against recordings of
-    /// rain on streets, a garden and a wood (the lab's --rain levels and compare=): the fountain's pool
-    /// click, a 16 µs spike, was 15 dB too bright above 4 kHz; the drop's stopping time, D / v, still
-    /// 8-13 dB too bright there and 7-20 dB short at 250-500 Hz, and its 10 ms windows 2.4 dB too
-    /// peaky (the "grain" figure). The spreading time brings both within a few dB.
-    ///
-    /// Its ENERGY is the fountain's, which was fitted against measured falling water (Watts et al.
-    /// 2009): the energy of the spike that law gives a drop of that size and speed. Only where in the
-    /// spectrum it sits is the drop's own.
-    ///
-    /// On soft ground the same momentum is handed over <paramref name="stretch"/> times more slowly:
-    /// dF/dt falls as its square, so the energy as its cube, and the click is that much lower.
+    /// A drop's click on something solid, at the listener: dF/dt, the dipole of a rigid boundary, with
+    /// the blow's peak and fall (RainPlate.BlowShape), a smooth sin² rise (a one-sample spike was heard
+    /// as "crunchy") and the time scale of the water spreading over the wet ground, about 8/3 D / v
+    /// (RainSurfaces.SplashSeconds): a broad top at 0.5-1.5 kHz. Measured against recorded rain, the
+    /// fountain's 16 µs spike was 15 dB too bright above 4 kHz and the stopping time D / v 8-13 dB; the
+    /// spreading time is within a few dB. The energy is the fountain's (fitted to Watts et al. 2009).
+    /// On soft ground the momentum is handed over <paramref name="stretch"/> times more slowly, so the
+    /// energy falls as its cube. See docs/CLIENT_NOTES.md, "Rain: a drop's click and its spray".
     /// </summary>
     private void Click(int at, float d, float v, float spikePascals, float stretch)
     {
@@ -602,30 +556,12 @@ public sealed class RainSynth
     }
 
     // ── The spray (texture round 2, 2026-10-06) ──────────────────────────────────────────────────
-    //
-    // Rain round 1's street measured right on its band envelopes but wrong INSIDE them: its 4-16 kHz
-    // waveform had a kurtosis of 9-10 in 10 ms windows (moderate) where every recording of rain is
-    // 3.0-4.4, a few needle-sharp clicks in each window, which Cody heard as "low bit rate, crunchy".
-    // The click was the force on a dry wall, F ∝ √t to its peak, whose slope is infinite at first
-    // contact: a single-sample spike carrying the whole top end. Two things a wet surface does
-    // instead:
-    //   * The drop meets the water film first, and the force on the ground builds as the film is
-    //     driven out from under it, over a good part of the time to its peak (Gordillo, Sun and Cheng
-    //     2018, J. Fluid Mech. 840, 190-214 and Mitchell et al. 2019, J. Fluid Mech. 867, 300-322: the
-    //     force peaks near 0.2 D / v and its rise is set by the spreading sheet, not a point). So the
-    //     click's force rises smoothly (ClickShape) and its spectrum falls 12 dB an octave above a few
-    //     kilohertz.
-    //   * What a listener hears above that is the splash: a crown off the film that throws secondary
-    //     droplets, which land round it over the next milliseconds, and the micro-bubbles of the film
-    //     bursting (Cossali, Coghe and Marengo 1997; Okawa, Shiraishi and Mori 2006: the ejected
-    //     droplets are a tenth of the drop and smaller, tens to hundreds of them). Each is a tiny
-    //     event; together, per drop, a short burst of noise in the top octaves. Rendered as one noise
-    //     per voice whose power follows the sum of every drop's spray: a burst rising over a
-    //     millisecond and dying over a few.
-    //
-    // FITTED 2026-10-06 against the rain recordings (both the 10 ms waveform and the envelope
-    // statistics, and the octave balance round 1 matched): the spray's share of a drop's impact
-    // energy, its band, and how long it lasts.
+    // Above the smooth click a listener hears the splash: secondary droplets thrown off the film's
+    // crown and its micro-bubbles bursting (Cossali, Coghe and Marengo 1997; Okawa, Shiraishi and Mori
+    // 2006), a short burst of top-octave noise per drop. One noise per voice, its power the sum of the
+    // drops' sprays. Without it the 10 ms kurtosis of the street's 4-16 kHz band was 9-10, every
+    // recording 3.0-4.4 (Cody: "low bit rate, crunchy"). Share, band and length FITTED 2026-10-06.
+    // See docs/CLIENT_NOTES.md, "Rain: a drop's click and its spray".
 
     /// <summary>The share of a drop's impact energy heard as its spray rather than its click. Fitted on
     /// the street at 5 mm/h: with none, the smooth click alone is already a wash in 10 ms (kurtosis 3.6)
@@ -730,8 +666,7 @@ public sealed class RainSynth
             _clicks[(int)((start + i) & (ClickRing - 1))] += gain * shape[i];
     }
 
-    // The click's shape depends only on its time scale, so the shapes are made once, a ninth of an
-    // octave apart, and a click is a scaled copy of the nearest.
+    // Shapes are made once, a ninth of an octave apart; a click is a scaled copy of the nearest.
     private const float ShapeStepsPerOctave = 9f, ShapeMinSamples = 2f;
     private readonly float[]?[] _shapes = new float[]?[96];
 
@@ -743,26 +678,23 @@ public sealed class RainSynth
         if (_shapes[index] is { } made) return made;
         float tau = ShapeMinSamples * MathF.Pow(2f, index / ShapeStepsPerOctave);
         int length = Math.Min(MaxShape - 2 * OnsetHalf, (int)((RainPlate.BlowPeakAt + 7f * RainPlate.BlowFall) * tau) + 2);
-        // The blow's sample-to-sample steps (see Click).
+        // The blow's sample-to-sample steps: dF/dt (see Click).
         var raw = new float[length];
         float prev = 0f;
         float peakAt = RainPlate.BlowPeakAt * tau;
         for (int i = 0; i < length; i++)
         {
             float t = i + 1;
-            // The force builds smoothly to its peak (sin², no corner at either end) rather than as the
-            // dry-wall √t, whose slope is infinite at first contact: see Click.
+            // sin², no corner at either end: the dry wall's √t had an infinite slope at first contact.
             float s = MathF.Sin(0.5f * MathF.PI * MathF.Min(1f, t / peakAt));
             float g = t < peakAt ? s * s : MathF.Exp(-(t - peakAt) / (RainPlate.BlowFall * tau));
             raw[i] = g - prev;
             prev = g;
         }
-        // The √t rise has no bottom to it: taken literally its first step is a single sample, which
-        // is energy flat to the top of hearing. A real first contact is not a point: the air under the
-        // drop is squeezed out and a thin disc of it trapped (Thoroddsen et al. 2005, J. Fluid Mech.
-        // 545, 203-212; Mandre, Mani and Brenner 2009, Phys. Rev. Lett. 102, 134502), and the contact
-        // spreads over the drop's tip in some microseconds. So the onset is smoothed over the
-        // fountain's own first-contact time, ImpactRise.
+        // A first contact is not a point: the air under the drop is trapped as a thin disc
+        // (Thoroddsen et al. 2005, J. Fluid Mech. 545, 203-212; Mandre, Mani and Brenner 2009, Phys.
+        // Rev. Lett. 102, 134502) and the contact spreads in microseconds, so the onset is smoothed
+        // over the fountain's first-contact time, ImpactRise.
         var kernel = OnsetKernel(_rate);
         var y = new float[length + 2 * OnsetHalf];
         double e = 0;
@@ -871,8 +803,7 @@ public sealed class RainSynth
                 {
                     float hz = plate.ModeHz(m, n);
                     if (hz < 30f || hz >= overlap || hz > 0.45f * rate) continue;
-                    // Insert in order, keeping the lowest MaxModes.
-                    int at = count;
+                    int at = count;   // in order, keeping the lowest MaxModes
                     while (at > 0 && _hz[at - 1] > hz) at--;
                     if (at >= MaxModes) continue;
                     int last = Math.Min(count, MaxModes - 1);

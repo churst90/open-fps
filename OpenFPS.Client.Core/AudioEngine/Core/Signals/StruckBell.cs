@@ -7,32 +7,16 @@ namespace OpenFPS.Client.AudioEngine.Core.Signals;
 /// <summary>
 /// A struck bell: a crossing gong, a locomotive bell, a tram's foot gong.
 ///
-/// What makes a bell a bell rather than a drum is that a shell's modes are not harmonic, and what
-/// decides HOW inharmonic is the curvature. A flat disc has one family of modes, spaced by the
-/// plate law — they go as the thickness over the square of the radius, which is why halving a
-/// casting's diameter raises it two octaves. Curving the disc adds a second, membrane stiffness that
-/// pushes the modes up; but it only pushes the ones that have to stretch the metal to move. The
-/// modes with several nodal diameters can flex inextensionally, and barely notice. So the low modes
-/// climb, the high ones stay, the spacing closes up, and a plate becomes a bell. Flatten the dome
-/// and it goes back to being a cymbal.
+/// A flat disc's modes go as thickness over radius squared. Curving it adds membrane stiffness that
+/// raises only the modes that must stretch the metal; those with several nodal diameters flex
+/// inextensionally. So the low modes climb, the spacing closes and a plate becomes a bell.
 ///
-/// Everything else here is that same argument applied to the rest of the object:
-///
-///   HOW LONG IT RINGS is not a decay time, it is a loss. Each mode loses to the metal's internal
-///   friction (bronze about 5e-5, which is nothing; cast iron twenty times more), to the air it
-///   pushes (which rises with frequency, so the top goes first and a bell gets rounder as it dies),
-///   and to the mast it is bolted to (which grips the modes that move at the crown and cannot touch
-///   the ones with a node there). Two and a half seconds for a crossing gong comes out of those
-///   three numbers; nothing declares it.
-///
-///   HOW BRIGHT IT IS is the clapper's contact time. Steel on bronze at a couple of metres a second
-///   is in contact for about a tenth of a millisecond, which puts a corner in the force spectrum at
-///   four kilohertz — so everything up to there gets struck and everything above it does not. Hang
-///   a heavier, softer clapper on it and the top of the bell goes away, because it is never asked.
-///
-///   WHICH MODES ANSWER is where it is struck. A mode with m nodal diameters has hardly any motion
-///   near the middle, so a bell struck at its crown is a thud and the same bell struck at the rim is
-///   a bell.
+/// How long it rings is a loss, not a declared decay: the metal's friction (bronze about 5e-5, cast
+/// iron twenty times more), the air (rising with frequency, so a bell rounds as it dies) and the
+/// mounting (gripping the modes that move at the crown); a crossing gong's 2.5 s comes out of those.
+/// How bright it is is the clapper's Hertz contact time, about a tenth of a millisecond for steel on
+/// bronze, a corner at four kilohertz. Which modes answer is where it is struck: (r/a)^m, a thud at
+/// the crown and a bell at the rim.
 /// </summary>
 public sealed class StruckBell
 {
@@ -72,15 +56,14 @@ public sealed class StruckBell
         float rhoH = spec.DensityKgM3 * h;
         float plateK = MathF.Sqrt(d / rhoH) / (MathF.Tau * a * a);
         float cL = spec.PlateWaveSpeed;
-        // The dome: its radius of curvature, and the ring frequency that goes with it. A full
-        // sphere of that radius breathes at c_L / 2 pi R, and that is the ceiling the curvature
-        // pushes the low modes toward.
+        // A sphere of the dome's radius breathes at c_L / 2πR: where the curvature pushes the low
+        // modes.
         float rise = MathF.Max(1e-4f, spec.RiseMetres);
         float rCurv = (a * a + rise * rise) / (2f * rise);
         float fRing = cL / (MathF.Tau * rCurv);
-        // Above the critical frequency a plate radiates as well as a piston; below it the front and
-        // back short-circuit each other. The floor stands for the curvature, which lets a shell
-        // radiate a great deal better than a flat plate of the same thickness.
+        // Below the critical frequency front and back short-circuit; the floor on the radiation
+        // efficiency below stands for the curvature, which lets a shell radiate far better than a
+        // flat plate.
         float fCrit = 343f * 343f / (1.8f * cL * h);
 
         int n = Plate.Length;
@@ -109,8 +92,7 @@ public sealed class StruckBell
             _weight[i] = MathF.Max(0f, shape) * sigma;
         }
 
-        // Hertzian contact, steel clapper on bronze: how long the two are touching, which is the
-        // corner in the force spectrum and so the brightness of the blow.
+        // Hertzian contact, steel clapper on bronze: its length is the brightness of the blow.
         float eStar = 1f / ((1f - 0.09f) / 210e9f + (1f - nu * nu) / spec.YoungsPa);
         float rBall = 0.012f + 0.02f * spec.ClapperKg;
         float kHertz = 4f / 3f * eStar * MathF.Sqrt(rBall);
@@ -122,14 +104,9 @@ public sealed class StruckBell
     }
 
     /// <summary>
-    /// Ring it continuously, in silence, and set the gain that makes its RMS equal the anchor.
-    ///
-    /// RMS and not peak, because that is what a bell's published level IS: "eighty decibels at a
-    /// hundred feet" is a sound level meter reading of a bell that is ringing, not the height of one
-    /// blow. Anchoring the peak instead puts the bell about twenty-five decibels under where it
-    /// belongs — a struck bell spends most of its time decaying, so its crest factor is enormous —
-    /// and the symptom is a locomotive bell that cannot be heard at all under the train it is bolted
-    /// to. (It could not. That is why this comment is here.)
+    /// Rings it in silence and sets the gain that makes its RMS the anchor. RMS, not peak: a bell's
+    /// published level is a meter reading of it ringing. Anchored by the peak it sat about 25 dB low,
+    /// and the locomotive bell could not be heard under its own train.
     /// </summary>
     private void Calibrate()
     {
@@ -150,9 +127,9 @@ public sealed class StruckBell
         _strikeT = 0;
         _strikeAmp = MathF.Max(0.02f, force);
         _sinceStrike = 0;
-        // While the clapper is on the bell it is extra mass and extra loss, and the ring is held
-        // back; it comes off in a few milliseconds and the bell opens up. That is the difference
-        // between a gong and a gong with the hammer left resting on it.
+        // While the clapper is on the bell it is extra loss, and the ring is held back until it
+        // comes off.
+        // TODO: the end of the contact (Step's Multiply(1f)) already restores the damping, so the hold lasts the contact, not the 12 ms Step allows.
         for (int i = 0; i < _modes.Length; i++) _modes[i].Multiply(1f + 40f * _spec.ClapperDamping);
     }
 
@@ -164,7 +141,7 @@ public sealed class StruckBell
             Strike(0.92f + 0.16f * (float)_rng.NextDouble());
         _sinceStrike += dt;
 
-        // The blow: a half sine as long as the contact lasts, and nothing after it.
+        // The blow: a half sine as long as the contact.
         float f = 0f;
         if (_strikeT >= 0)
         {

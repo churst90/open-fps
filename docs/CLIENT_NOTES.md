@@ -159,3 +159,46 @@ from standing still. Until one is measured, a voice has none (WorldAudioPlayer.H
   footstep that landed there took over a car's reflection or a distant car's voice, heard as a car going
   quiet or a bike's reflection standing still and repeating. The id was also shared by a sound and its own
   reflection, and under one id the last written won: a grandstand was heard only as its echo.
+
+## Rain: a drop's click and its spray
+
+From RainSynth (Click, the spray section), 2026-10-06, texture rounds 1 and 2.
+
+The air hears the rate of change of the drop's push on a solid surface: a dipole at a rigid boundary
+radiates dF/dt. It has the blow's peak and fall (RainPlate.BlowShape) but not the blow's length. What
+moves the air is the drop's water going from a falling sphere to a sheet spreading over the wet ground,
+and that takes the spreading time, about 8/3 D / v (RainSurfaces.SplashSeconds), two and a half times the
+time the drop takes to stop. So the click rises to a broad top near 1 / (2π · 0.2 · 8/3 D / v), 0.5-1.5 kHz
+for the drops that carry the energy, and falls gently above.
+
+Two earlier time scales were measured against recordings of rain on streets, a garden and a wood (the
+lab's `--rain levels` and `compare=`): the fountain's pool click, a 16 µs spike, was 15 dB too bright above
+4 kHz; the drop's stopping time, D / v, still 8-13 dB too bright there and 7-20 dB short at 250-500 Hz,
+and its 10 ms windows 2.4 dB too peaky (the "grain" figure). The spreading time brings both within a few
+dB. The click's energy is the fountain's, fitted against measured falling water (Watts et al. 2009); only
+where in the spectrum it sits is the drop's own.
+
+Rain round 1's street measured right on its band envelopes but wrong inside them: its 4-16 kHz waveform
+had a kurtosis of 9-10 in 10 ms windows (moderate rain) where every recording of rain is 3.0-4.4, a few
+needle-sharp clicks in each window, which Cody heard as "low bit rate, crunchy". The click was the force
+on a dry wall, F ∝ √t to its peak, whose slope is infinite at first contact: a single-sample spike
+carrying the whole top end. A wet surface does two things instead:
+
+- The drop meets the water film first, and the force on the ground builds as the film is driven out
+  from under it, over a good part of the time to its peak (Gordillo, Sun and Cheng 2018, J. Fluid Mech.
+  840, 190-214; Mitchell et al. 2019, J. Fluid Mech. 867, 300-322: the force peaks near 0.2 D / v and its
+  rise is set by the spreading sheet, not a point). So the click's force rises smoothly (sin²,
+  ClickShape) and its spectrum falls 12 dB an octave above a few kilohertz.
+- What a listener hears above that is the splash: a crown off the film that throws secondary droplets,
+  which land round it over the next milliseconds, and the micro-bubbles of the film bursting (Cossali,
+  Coghe and Marengo 1997; Okawa, Shiraishi and Mori 2006: the ejected droplets are a tenth of the drop
+  and smaller, tens to hundreds of them). Together, per drop, a short burst of noise in the top octaves,
+  rendered as one noise per voice whose power follows the sum of every drop's spray: rising over a
+  millisecond and dying over a few.
+
+The spray's share of the impact energy, its band and how long it lasts were fitted on 2026-10-06 against
+the rain recordings (the 10 ms waveform, the envelope statistics, and the octave balance round 1
+matched). Even the smoothed onset is not a point: the air under the drop is squeezed out and a thin disc
+of it trapped (Thoroddsen et al. 2005, J. Fluid Mech. 545, 203-212; Mandre, Mani and Brenner 2009, Phys.
+Rev. Lett. 102, 134502), and the contact spreads over the drop's tip in some microseconds, so the onset is
+smoothed over the fountain's own first-contact time, ImpactRise.

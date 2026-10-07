@@ -8,39 +8,20 @@ namespace OpenFPS.Client.AudioEngine.Core.Signals;
 /// <summary>
 /// An electric car horn, as the self-interrupting buzzer it is.
 ///
-/// A coil around an iron pole; an armature riveted to the middle of a steel diaphragm, a millimetre
-/// or so off the pole; and a pair of contact points in series with the coil that the armature pushes
-/// open as it moves. Close the relay and the current rises through the coil's inductance (about a
-/// millisecond), the pole pulls the armature in, the points open, the current collapses, the
-/// diaphragm springs back past rest, the points close, and it goes again — four or five hundred times
-/// a second, near the diaphragm's own resonance.
+/// A coil round an iron pole, an armature riveted to a steel diaphragm a millimetre or so off it, and
+/// contact points in series with the coil that the armature knocks open: the current rises, the pole
+/// pulls, the points open, the diaphragm springs back, and again, four or five hundred times a second.
 ///
-/// Three things in it are what the ear uses, and they are each a part:
+/// The armature hits the pole every cycle, steel on steel, and the acceleration spike is a buzz with
+/// every harmonic. The stop is a stiff lossy spring (~0.25 ms contact, restitution ~0.3), whose
+/// duration rolls the buzz off before it is a hiss: at 0.12 ms the centroid sat at 3.4 kHz, a buzz
+/// saw. The pull goes as current² / gap², the snap that drives it home. What radiates is the
+/// acceleration: a disc horn's tone disc rings at 2-4 kHz on each hit (the brassy formant); a trumpet
+/// horn's coiled column passes only n·c/2L above its flare cutoff, rounder and louder.
 ///
-///   THE STRIKE. The points are set so the armature does not stop short of the pole: it HITS it,
-///   steel on steel, every cycle, with almost no bounce. A velocity reversed in a tenth of a
-///   millisecond is an acceleration spike, and a spike every cycle is a buzz with every harmonic in
-///   it. The stop is a very stiff, lossy spring (contact lasting ~0.25 ms, restitution ~0.3) rather
-///   than an instantaneous reflection, because a real contact has a duration and that duration is
-///   what rolls the buzz off before it becomes a hiss. (At 0.12 ms the 4-8 kHz band sat 7 dB below
-///   the total and the centroid at 3.4 kHz — a buzz saw, measured before it was ever played.)
-///
-///   THE PULL. Magnetic force goes as the current squared over the gap squared, so the pull
-///   snatches harder the closer the armature gets — the snap that drives it into the pole.
-///
-///   THE RADIATOR. Sound is the ACCELERATION of what moves. A disc horn has a flat tone disc on the
-///   armature that rings at its own mode (2-4 kHz) every time the armature hits: the brassy, nasal
-///   formant. A trumpet horn couples the diaphragm into a coiled exponential column that passes only
-///   what lies near n·c/2L and nothing below its flare cutoff: rounder and louder.
-///
-/// Onset is quick but not a step: the supply comes up through a relay and a harness over a few
-/// milliseconds, and the diaphragm swings short of the pole for its first few cycles until the pull
-/// can throw it all the way — a swell of a couple of dozen milliseconds. Release is the same in
-/// reverse: the relay lets go slowly, the buzzer strikes softer and then stops striking as the pull
-/// fades, and the diaphragm and the tone disc ring down, a few tens of milliseconds to silence. (It
-/// used to start in 2 ms and stop in 10, and the verdict was "perfect, but staccato".) No bend up and
-/// no bend down: the note is the adjusting screw's at every level, and that is half of why an
-/// electric horn sounds electric and an air horn does not.
+/// Onset and release come through the relay and harness over tens of milliseconds, the strikes
+/// growing and fading with the pull: at 2 ms on and 10 off it was "perfect, but staccato". No bend:
+/// the note is the adjusting screw's at every level, half of why an electric horn sounds electric.
 /// </summary>
 public sealed class ElectricHorn
 {
@@ -67,8 +48,7 @@ public sealed class ElectricHorn
         _spec = spec; _rate = rate; _seed = seed;
         _units = new Unit[spec.Units.Length];
         for (int i = 0; i < _units.Length; i++) _units[i] = new Unit(spec, spec.Units[i], rate, seed + i * 7);
-        // Each unit is calibrated to unit RMS on its own; the anchor is the whole set, so divide by
-        // what they add up to (different notes: their powers add).
+        // Each unit is unit RMS on its own; the anchor is the whole set (different notes: powers add).
         float sum = 0f;
         foreach (var u in spec.Units) sum += MathF.Pow(10f, u.LevelTrimDb / 10f);
         _refAmp = 20e-6f * MathF.Pow(10f, spec.ReferenceDb / 20f) / MathF.Sqrt(MathF.Max(1e-3f, sum));
@@ -80,9 +60,8 @@ public sealed class ElectricHorn
     }
 
     /// <summary>
-    /// Where the listener is in the horn's frame: +z out of the grille, +y up. A 90 mm diaphragm or
-    /// an 80 mm trumpet mouth is barely directional at its note and noticeably so by the tone disc's
-    /// formant — so mild, and more so in the top.
+    /// Where the listener is in the horn's frame: +z out of the grille, +y up. A 90 mm diaphragm or an
+    /// 80 mm trumpet mouth is barely directional at its note and noticeably so by the formant.
     /// </summary>
     public void SetListener(Vector3 hornFrame)
     {
@@ -97,8 +76,8 @@ public sealed class ElectricHorn
     public void Step()
     {
         bool blow = Blowing;
-        // The relay closes and the contact clock starts from the top of a cycle; the supply behind
-        // it comes up through the relay and the harness, and goes down through them when let go.
+        // The contact clock starts from the top of a cycle; the supply rises and falls through the
+        // relay and the harness.
         if (blow && !_wasBlowing && _drive < 1e-3f) foreach (var u in _units) u.Press();
         _wasBlowing = blow;
         float target = blow ? 1f : 0f;
@@ -148,15 +127,10 @@ public sealed class ElectricHorn
     }
 
     /// <summary>
-    /// The note in a buffer, by autocorrelation: the SHORTEST lag whose normalised correlation is
-    /// within a few per cent of the best, refined between samples with a parabola.
-    ///
-    /// Not the longest-best lag, which is what ChimeHorn's measure takes. A car horn's waveform is a
-    /// spike a cycle, and when its period is not a whole number of samples (410 Hz at 44.1 kHz is
-    /// 107.56 of them) the spike lines up with itself better two cycles on than one — 215.12 is
-    /// nearer a whole number — and a longest-best search reports the note an octave low. It did, for
-    /// three of the six horns, while the impact speeds printed strike by strike showed no period
-    /// doubling at all: the measurement was wrong, not the horn.
+    /// The note in a buffer, by autocorrelation: the shortest lag whose normalised correlation is
+    /// within a few per cent of the best, refined with a parabola. A spike a cycle with a fractional
+    /// period (410 Hz at 44.1 kHz is 107.56 samples) lines up better two cycles on, and the best-lag
+    /// search ChimeHorn uses read three of six horns an octave low.
     /// </summary>
     internal static float NoteHz(float[] x, float rate, float expect)
     {
@@ -227,21 +201,14 @@ public sealed class ElectricHorn
     /// <summary>
     /// One buzzer: coil, armature on a diaphragm, contact points, and whatever it radiates through.
     ///
-    /// The contact points CLOSE on a clock locked to the declared note, rather than when the
-    /// diaphragm's return lets them. (They still OPEN where the armature knocks them open, 70% of
-    /// the way to the pole, so the current is cut by the motion, as in the real thing.) A real
-    /// horn's loop settles near the diaphragm's resonance wherever the adjusting screw puts it; this
-    /// model takes the note the screw was set to as a fact and restarts the pull on a clock at that
-    /// note. It is a deliberate
-    /// simplification, marked as one, for the same reason as the air horn's lock: a self-timed
-    /// relay oscillator can stall, double-strike or chatter at a subharmonic depending on the
-    /// integration step, and none of that is anything a car horn does. Everything the ear uses — the
-    /// strike, the snap of the pull, the rounded current, the disc's ring, the column's filtering,
-    /// the ring-down — is still the parts.
+    /// The points close on a clock locked to the declared note (they still open where the armature
+    /// knocks them, 70 % of the way to the pole). A deliberate simplification, as the air horn's lock:
+    /// a self-timed relay oscillator stalled, double-struck or chattered at a subharmonic with the
+    /// integration step. The strike, the pull, the current, the disc and the column are still parts.
     /// </summary>
     internal sealed class Unit
     {
-        private const int Over = 4;                  // the strike is ~0.12 ms; resolve it
+        private const int Over = 4;                  // oversampled to resolve the ~0.25 ms contact
         private const float Gap = 1f;                // displacement is in units of the air gap
         private const float PullAtRest = 1.8f;       // static pull at full current, in gaps: it WILL reach the pole
         private const float Zeta = 0.18f;            // diaphragm damping: air load and the rim gasket. Below
@@ -250,7 +217,7 @@ public sealed class ElectricHorn
         private const float ReboundTarget = 0.3f;    // steel on steel, a hardened pole: little bounce
         private const float BreakAt = 0.7f;          // where on its travel the armature knocks the points open
 
-                private readonly ElectricHornSpec _spec;
+        private readonly ElectricHornSpec _spec;
         private readonly ElectricHornUnitSpec _u;
         private readonly float _rate, _dt, _trim;
         private readonly float _w0sq, _damp, _pull, _kc, _cc, _riseK, _fallK, _duty;
@@ -275,9 +242,9 @@ public sealed class ElectricHorn
         public float StrikesPerCycle { get; private set; }
         /// <summary>Measured coefficient of restitution at the pole: outgoing over incoming speed.</summary>
         public float Restitution { get; private set; }
-        /// <summary>How much the impact speed varies from strike to strike, (max − min)/mean. An
-        /// impact oscillator can period-double — a hard hit, a soft hit, a hard hit — and the ear
-        /// hears that as a note an octave down. A working horn reads a few per cent.</summary>
+        /// <summary>How much the impact speed varies from strike to strike, (max − min)/mean. A
+        /// period-doubling impact oscillator (hard, soft, hard) is heard an octave down; a working
+        /// horn reads a few per cent.</summary>
         public float StrikeSpread { get; private set; }
         public float FlareCutoffHz { get; }
 
@@ -288,9 +255,8 @@ public sealed class ElectricHorn
             _trim = MathF.Pow(10f, u.LevelTrimDb / 20f);
             _duty = Math.Clamp(spec.ContactDuty, 0.2f, 0.8f);
 
-            // The diaphragm and armature are tuned to the note: that is what the adjusting screw is
-            // for. (Tuned 25% above it, the loop period-doubles — a hard strike, a soft one — and
-            // plays an octave low with a growl; the strike spread in Describe() is what shows it.)
+            // Tuned to the note, as the adjusting screw does. Tuned 25 % above it the loop
+            // period-doubled and played an octave low with a growl (StrikeSpread shows it).
             float w0 = MathF.Tau * u.Hz;
             _w0sq = w0 * w0;
             _damp = 2f * Zeta * w0;
@@ -325,18 +291,16 @@ public sealed class ElectricHorn
         {
             if (_spec.Kind == ElectricHornKind.Disc)
             {
-                // Centre-clamped, free rim: the first ringing mode and the next axisymmetric one,
-                // ~6.3x up. Only axisymmetric modes: the armature drives the disc at its centre, and a
-                // centred push cannot excite a mode with a nodal line through the centre.
+                // Centre-clamped, free rim: the first mode and the next axisymmetric one, ~6.3x up.
+                // A centred push cannot excite a mode with a nodal line through the centre.
                 var list = new List<Mode> { new Mode(_u.ToneDiscHz, 28f, _rate) };
                 if (_u.ToneDiscHz * 6.27f < 0.45f * _rate) list.Add(new Mode(_u.ToneDiscHz * 6.27f, 40f, _rate));
                 _disc = list.ToArray();
             }
             else
             {
-                // The column: n·c/2L with the end correction, cut to the note, so its modes sit on the
-                // note's harmonics. Low Q — a horn's whole purpose is to let go of what is in it —
-                // and falling with order, as the wall and the mouth take more of the higher ones.
+                // The column, cut to the note so its modes sit on its harmonics. Low Q (a horn lets go
+                // of what is in it), falling with order as the wall and the mouth take more.
                 int n = Math.Max(1, (int)MathF.Min(14f, 0.45f * _rate / _u.Hz));
                 _column = new Mode[n]; _columnGain = new float[n];
                 for (int k = 0; k < n; k++)
@@ -376,8 +340,8 @@ public sealed class ElectricHorn
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public float Step(bool blowing, float drive = 1f)
         {
-            // The loop wanders a little: the points wear, the voltage sags. It is what makes a pair
-            // of horns a third apart roll against each other instead of standing still.
+            // The loop wanders a little (the points wear, the voltage sags): a pair of horns a third
+            // apart roll against each other instead of standing still.
             _jitter += _jitterStep * ((float)_rng.NextDouble() * 2f - 1f - 0.02f * _jitter);
             float f = _u.Hz * (1f + 0.0015f * Math.Clamp(_jitter, -1f, 1f));
 
@@ -389,13 +353,11 @@ public sealed class ElectricHorn
                     _phase += f * _dt;
                     if (_phase >= 1.0) { _phase -= 1.0; _open = false; }
                 }
-                // The moving contact rides on the armature: the points close on the clock at the
-                // top of each cycle and are knocked open when the armature has travelled far enough
-                // toward the pole (or, at the latest, when the clock says so).
+                // Closed on the clock at the top of each cycle, knocked open by the armature (or at
+                // the latest by the clock).
                 if (_x > BreakAt || _phase >= _duty) _open = true;
                 bool closed = blowing && !_open;
-                // The current rises toward what the supply will push through the coil, not toward
-                // a full amp regardless: a relay still seating delivers less, and so pulls less.
+                // Toward what the supply pushes through the coil: a relay still seating pulls less.
                 _i += closed ? _riseK * (drive - _i) : -_fallK * _i;
 
                 float gap = 1.25f * Gap - MathF.Min(_x, Gap);
@@ -419,8 +381,6 @@ public sealed class ElectricHorn
             float y;
             if (_spec.Kind == ElectricHornKind.Disc)
             {
-                // The diaphragm and the disc move with the armature and radiate its acceleration;
-                // the disc also rings at its own mode each time the armature hits.
                 float ring = 0f;
                 for (int k = 0; k < _disc.Length; k++) ring += _disc[k].Process(acc) * (k == 0 ? 1f : 0.4f);
                 y = acc + _discCouple * ring;
@@ -430,8 +390,7 @@ public sealed class ElectricHorn
                 y = 0f;
                 for (int k = 0; k < _column.Length; k++) y += _column[k].Process(acc) * _columnGain[k];
             }
-            // Below the flare (trumpet), or below where a 9 cm piston stops radiating anything at all
-            // (disc), nothing leaves.
+            // Below the flare (trumpet), or where a 9 cm piston stops radiating (disc), nothing leaves.
             _hp1 += _hpA * (y - _hp1);
             _hp2 += _hpA * (_hp1 - _hp2);
             return (y - _hp2) * _trim * _gain;

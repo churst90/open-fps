@@ -7,29 +7,20 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// <summary>
 /// A source that is metres across, heard as metres across: a tree's crown, a fire's bed.
 ///
-/// WHY. A crown is thousands of leaves striking over a volume eight metres wide, and each ear hears its
-/// own mix of them. Played as one synth at one point through the HRTF, both ears got the same noise,
-/// filtered and delayed: interaural coherence 1.00 in every band (docs/AUDIO_QUALITY_2026-10-06.md
-/// item 8). Identical noise at both ears is heard as narrow and inside the head, and in the high bands
-/// as harsh (Blauert 1997, "Spatial Hearing", 3.3; apparent source width and IACC: Hidaka, Beranek and
-/// Okano 1995). A real crown at a few metres measures nothing like it.
+/// One synth at one point gave both ears the same noise, interaural coherence 1.00 in every band
+/// (docs/AUDIO_QUALITY_2026-10-06.md item 8), heard as narrow, inside the head and harsh (Blauert
+/// 1997, "Spatial Hearing", 3.3; Hidaka, Beranek and Okano 1995 on IACC and width). So the synth
+/// renders into several places, each its own voice at its own point: every event goes to exactly one
+/// place and every continuous part has its own noise at each. They are independent streams, not
+/// copies (copies of one signal from two points comb), and their powers add to the source's at any
+/// split.
 ///
-/// WHAT. The synth renders its events into several PLACES, each its own output and its own voice at
-/// its own point on the source: every event (a leaf strike, a crackle) goes to exactly one place, and
-/// every continuous part (the air past the twigs, the flames' roar, the fizz) has its own noise at
-/// each place. So the places are independent streams, not copies of one stream: copies of one signal
-/// from two points comb (coherent-copies-sound-inside-out), independent streams do not. And because an
-/// event goes to one place and the noise's power is split, the places' powers add to the source's, at
-/// any split.
+/// Place 0 is the middle (the map's emitter). How much goes to the others is the spread, from the
+/// angle they subtend: none under <see cref="PointDegrees"/> (one voice, one cost), all over
+/// <see cref="FullDegrees"/>, slewed at <see cref="SlewPerSecond"/> so walking up to a tree widens it
+/// with no step in level. Merged, the outer places' voices are let go.
 ///
-/// HOW MANY. Place 0 is the source's middle (the map's emitter). The others are spread over it. How
-/// much of the source goes to them is the SPREAD, from the angle the places subtend from the listener:
-/// none under <see cref="PointDegrees"/> (the places would be closer together than the ear can tell
-/// apart, so they are one voice and cost one), all of it over <see cref="FullDegrees"/>, and it slews
-/// at <see cref="SlewPerSecond"/>, so walking up to a tree widens it over a second or so, with no step
-/// in level. Merged, the outer places' voices are let go.
-///
-/// OPENFPS_WIDE_SOURCES=0 plays every one from one point, the game before 2026-10-06.
+/// OPENFPS_WIDE_SOURCES=0 plays every one from one point, as before 2026-10-06.
 /// </summary>
 public static class ExtendedSources
 {
@@ -207,12 +198,10 @@ public static class ExtendedSources
     }
 
     /// <summary>
-    /// The one gain every place's voice is given so that together they are as loud as the source played
-    /// from its middle, at this listener: the places are at their own distances, and the mixer's law
-    /// (Loudness.RenderedGain, applied per voice) makes the near ones louder. That is right for where the
-    /// sound comes from and wrong for how much of it there is, which the source's declared level and its
-    /// extent already say. So the powers the voices will render are summed and the total is set to what
-    /// the middle would render alone. One for a merged source, and inside the extent, where the law is flat.
+    /// The one gain for every place's voice so that together they are as loud as the source played from
+    /// its middle. The mixer's law (Loudness.RenderedGain, per voice) makes the near places louder, which
+    /// is right for where the sound comes from but not for how much of it there is: the declared level
+    /// and extent already say that. One for a merged source, and inside the extent, where the law is flat.
     /// </summary>
     public static float Balance(Vector3 listener, Vector3 middle, ReadOnlySpan<Vector3> places, ReadOnlySpan<float> shares,
                                 float referenceMetres, float rangeMetres)

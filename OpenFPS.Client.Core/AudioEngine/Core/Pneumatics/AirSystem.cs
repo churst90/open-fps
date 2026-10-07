@@ -8,21 +8,12 @@ namespace OpenFPS.Client.AudioEngine.Core.Pneumatics;
 /// <summary>
 /// One port letting air out: the whole of an air brake sound in one object.
 ///
-/// The vessel behind the hole holds a pressure. While the ratio across the hole is past 1.893 the
-/// flow is CHOKED — sonic at the throat, and the mass leaving depends only on the upstream pressure,
-/// so the vessel empties exponentially with a time constant of its volume over the effective area
-/// over a constant. That is the fat part of the hiss, and it is why a trailer takes three seconds
-/// and a bus door takes half of one.
-///
-/// The jet that comes out is underexpanded and goes supersonic — about Mach 1.6 at 120 psi — so on
-/// top of ordinary mixing noise there is broadband SHOCK-ASSOCIATED noise from the train of cells
-/// standing in it, which is the rasp in the middle of a hard release. When the pressure ratio falls
-/// under 1.893 the cells vanish, the jet goes subsonic, and Lighthill's eighth power takes it away
-/// in a hurry: that knee is why the sound has a distinct end rather than fading out.
-///
-/// The muffler screwed into the port is the only reason any of it is bearable. An eight millimetre
-/// hole peaks at fifteen kilohertz; the muffler is what makes it a hiss instead of a shriek, and
-/// changing it is the difference between a truck and a train.
+/// While the pressure ratio is past 1.893 the flow is choked and the vessel empties exponentially,
+/// volume over effective area over a constant: a trailer in three seconds, a bus door in half of one.
+/// The underexpanded jet goes supersonic (about Mach 1.6 at 120 psi) and its shock cells add the
+/// rasp in the middle of a hard release; under 1.893 they vanish and Lighthill's eighth power ends
+/// the sound distinctly. An eight millimetre hole peaks at fifteen kilohertz, and the muffler in the
+/// port makes it a hiss instead of a shriek.
 /// </summary>
 public sealed class AirPort
 {
@@ -60,26 +51,23 @@ public sealed class AirPort
     /// <summary>Open the port. Everything else follows.</summary>
     public void Vent(float fromKPaGauge)
     {
-        // From the pressure it is given: what the braking put in the chambers, or what the springs
-        // and bags hold. It was the larger of that and whatever the vessel had, and every vessel is
-        // charged to reservoir pressure when a voice is made — so the first release of every
-        // vehicle that came into earshot was a full fourteen-litre dump, whatever the stop.
-        // Only a port still venting keeps the higher pressure it has.
+        // From the pressure it is given, not the larger of that and the vessel's: every vessel is
+        // charged when a voice is made, and each vehicle's first release was a full dump whatever
+        // the stop. Only a port still venting keeps its higher pressure.
         _pressure = Venting ? MathF.Max(_pressure, fromKPaGauge) : MathF.Max(0f, fromKPaGauge);
         Opened++;
         _open = true;
-        // The valve moving, before the air has said anything. Two milliseconds ahead of the hiss and
-        // it is what makes a release sound MECHANICAL rather than like a tap being turned on.
+        // The valve moving, before the air: what makes a release sound mechanical, not a tap.
         _clackRing = _clackAmp * (0.75f + 0.5f * (float)_rng.NextDouble());
     }
 
     public void Close() => _open = false;
 
-    /// <summary>How many times this valve has opened. For tests and instruments.</summary>
+    /// <summary>How many times this valve has opened.</summary>
     public int Opened { get; private set; }
 
-    /// <summary>How long this port takes to empty from full, seconds — volume over area over the
-    /// choked-flow constant. Printed because it is the shape of the sound.</summary>
+    /// <summary>How long this port takes to empty from full, seconds: volume over area over the
+    /// choked-flow constant.</summary>
     public float BlowdownSeconds => _volumeM3 / MathF.Max(1e-9f, _areaM2 * 198.5f);
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -109,9 +97,8 @@ public sealed class AirPort
             _mix1 += a * (n - _mix1); _mix2 += a * (_mix1 - _mix2);
             jet = (_mix1 - _mix2) / JetNoise.BandNormaliser(a) * amp;
 
-            // Shock cells, only while it is actually supersonic. Their spacing is 1.31 D
-            // sqrt(M^2-1), and what they radiate is a band an octave or so wide around the speed
-            // they convect past at — the rasp in the middle of a hard release.
+            // Shock cells while supersonic, spaced 1.31 D √(M²−1), radiating a band an octave or so
+            // wide at the rate they convect past.
             if (mach > 1.02f)
             {
                 float beta = MathF.Sqrt(mach * mach - 1f);
@@ -123,7 +110,6 @@ public sealed class AirPort
                 jet += (_shock1 - _shock2) / JetNoise.BandNormaliser(sa) * amp * 0.55f * MathF.Min(1f, beta);
             }
 
-            // The muffler in the port: a straightforward loss of the top.
             float ma = OnePole.AlphaFor(_p.MufflerCornerHz, _rate);
             _muff1 += ma * (jet - _muff1); _muff2 += ma * (_muff1 - _muff2);
             jet = jet * (1f - _p.MufflerAbsorption) + _muff2 * _p.MufflerAbsorption * 1.6f;
@@ -151,13 +137,9 @@ public sealed class AirPort
 
 /// <summary>
 /// A vehicle's whole air system: the reservoir, the governor and the compressor that keeps it up,
-/// and every port that lets it out again.
-///
-/// The governor is worth having because it is the reason a parked truck makes a noise every couple
-/// of minutes for no visible reason: the compressor is geared to the engine and runs whenever the
-/// engine does, so the governor loads and unloads it between a hundred and a hundred and twenty
-/// pounds, and every time it unloads, the air dryer blows its accumulated water out through a hole.
-/// Bang, then a sigh. Nobody tells it to; it is a pressure switch.
+/// and every port that lets it out again. The governor loads and unloads the engine-geared
+/// compressor between a hundred and a hundred and twenty psi, and each unload purges the air dryer:
+/// why a parked truck bangs and sighs every couple of minutes.
 /// </summary>
 public sealed class AirSystem
 {
@@ -205,8 +187,7 @@ public sealed class AirSystem
         _reservoir = s.CutOutKPa;
         int i = 0;
         foreach (var p in s.Ports) _ports[p.Name] = new AirPort(p, s.JetTrimDb, rate, seed + 10 * ++i);
-        // Charged as a vehicle on the move holds them: the spring-brake chambers, the door engines
-        // and the suspension bags full; the service chambers EMPTY, because nobody is braking.
+        // Charged as on the move: spring brakes, door engines and bags full, service chambers empty.
         foreach (var p in _ports.Values)
             p.Charge(string.Equals(p.Spec.Name, "service_release", StringComparison.OrdinalIgnoreCase) ? 0f : _reservoir);
         _comp = new Mode(320f, 6f, rate);
@@ -225,9 +206,8 @@ public sealed class AirSystem
     public void Close(string port) { if (_ports.TryGetValue(port, out var p)) p.Close(); }
 
     /// <summary>
-    /// A service application: air goes INTO the chambers, so what you hear is a shorter, quieter
-    /// version of the same thing from the treadle valve rather than the loud exhaust. The loud one
-    /// is the RELEASE, which is the opposite of what most people assume.
+    /// A service application: air goes into the chambers, so it is a shorter, quieter sound from the
+    /// treadle valve. The loud one is the release.
     /// </summary>
     public void Apply() => Vent("service_release", 0.28f);
     public void Release() => Vent("service_release");
@@ -235,8 +215,6 @@ public sealed class AirSystem
     /// <summary>Sum of every port, pascals at one metre, plus the compressor.</summary>
     public float Step()
     {
-        // The governor. Loaded, the compressor fills the reservoir; at cut-out it unloads, and the
-        // dryer blows down.
         float rpm = MathF.Max(0f, EngineRpm);
         if (rpm > 200f)
         {
@@ -264,9 +242,8 @@ public sealed class AirSystem
             if (_atFront.Contains(p)) front += p.Out;
         }
 
-        // The compressor: a little two-cylinder pump knocking away at twice the speed it is geared
-        // to. Only while it is LOADED — when the governor unloads it, it goes quiet, and that change
-        // is audible from across a car park.
+        // The compressor knocks only while loaded: the change when it unloads is audible across a
+        // car park.
         if (_loaded && rpm > 200f)
         {
             double f = rpm / 60.0 * _s.CompressorOrder;

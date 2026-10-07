@@ -8,35 +8,18 @@ namespace OpenFPS.Client.AudioEngine.Core.Signals;
 /// <summary>
 /// An air horn, as the reed-and-column instrument it is.
 ///
-/// A Nathan or Leslie chime is a steel diaphragm lying over a port with a tapered pipe screwed to
-/// it. Main reservoir air lifts the diaphragm off its seat; the air that rushes through drops the
-/// pressure behind it and the diaphragm slams back down; the column of air in the pipe pushes back
-/// on the next cycle, and within a few milliseconds the diaphragm has stopped doing what the
-/// diaphragm wants and started doing what the PIPE wants. That is why one horn body with five bells
-/// screwed into it plays five notes on five identical reeds, and why the note is c/2L rather than
-/// anything about steel.
+/// A Nathan or Leslie chime is a steel diaphragm over a port with a tapered pipe screwed to it.
+/// Reservoir air lifts the diaphragm, the rush drops the pressure behind it and it slams back, and
+/// within a few milliseconds the column decides the note: five bells on five identical reeds play
+/// five notes, each c/2L. The reed beats on its seat, and a valve shut for part of each cycle makes
+/// a pulse with every harmonic in it. The column is bandpass modes at n·c/2L, all the harmonics (a
+/// flaring horn behaves like a full cone), because a pipe's input impedance is resistive at its
+/// resonances. The reed is locked to the column's note (see Bell).
 ///
-/// So this is a coupled oscillator and not a sawtooth with a filter on it. The column is a bank of
-/// modes at n·c/2L — ALL the harmonics, because a flaring horn behaves like a full cone and not
-/// like a cylinder with a lid on it — and they are BANDPASS sections, because a pipe's input
-/// impedance is resistive at its resonances. The reed is a mass on a spring tuned BELOW the column
-/// and therefore driven above its own resonance, which is the only way an outward-striking valve
-/// pumps energy into a pipe instead of damping it (and is why a brass player's lips buzz below the
-/// note). It BEATS on its seat, and that clip at zero is where the harmonics come from: a valve that
-/// shuts completely for part of each cycle makes a pulse, and a pulse has everything in it.
-///
-/// Three things fall out without being asked for:
-///
-///   THE ATTACK BENDS UP, slightly, because while the supply is still building the reed is driven
-///   weakly and the loop settles flat. Letting go does it in reverse. The bend is kept under 1%
-///   (see ChimeHornSpec.PitchBend): any more and the harmonics leave the column's resonances.
-///
-///   THE BELLS DO NOT START TOGETHER. They are spread along a manifold and the air reaches them in
-///   order, so a five-chime swells into its chord instead of arriving in it.
-///
-///   IT IS BRIGHT COMING AND DULL GOING, because a horn mouth is a directional radiator: at the
-///   fundamental it is barely directional and by the fourth harmonic it is a searchlight. That is
-///   the "opening up" people hear from an approaching horn before Doppler has done anything at all.
+/// The attack bends up slightly as the supply builds, and back down at the end; kept under 1 %
+/// (ChimeHornSpec.PitchBend), or the harmonics leave the column's resonances. The bells start in
+/// order along the manifold, so a five-chime swells into its chord. The mouth beams its upper
+/// harmonics, so it is bright coming and dull going, before Doppler has done anything.
 /// </summary>
 public sealed class ChimeHorn
 {
@@ -59,8 +42,7 @@ public sealed class ChimeHorn
         _spec = spec; _rate = rate;
         _bells = new Bell[spec.Bells.Length];
         for (int i = 0; i < _bells.Length; i++) _bells[i] = new Bell(spec, spec.Bells[i], rate, seed + i * 7);
-        // Each bell is calibrated to unit RMS on its own, so a bank of them would be louder for
-        // being many. The anchor is the whole horn, so divide by what they add up to.
+        // Each bell is unit RMS on its own; the anchor is the whole horn.
         float sum = 0f;
         foreach (var b in spec.Bells) sum += MathF.Pow(10f, b.LevelTrimDb / 10f);
         _refAmp = 20e-6f * MathF.Pow(10f, spec.ReferenceDb / 20f) / MathF.Sqrt(MathF.Max(1e-3f, sum));
@@ -107,20 +89,12 @@ public sealed class ChimeHorn
     /// <summary>
     /// One bell: a beating reed, locked to the column it is screwed to.
     ///
-    /// A real diaphragm finds the column's note for itself — it is an outward-striking valve driven
-    /// above its own resonance, and within a few cycles it is doing what the pipe wants rather than
-    /// what the steel wants. This model LOCKS it there instead of letting it find it, and that is a
-    /// deliberate simplification, marked as one. Entrainment is a fact about air horns, not a
-    /// discovery to be made every time one is blown; modelling it as a fact costs nothing anybody
-    /// can hear and buys an oscillator that cannot fail to start, cannot jump to the third harmonic
-    /// when the supply is high, and cannot sit in a small-signal regime making a sine instead of a
-    /// blast. (All three of those happened here first, which is why the note, the crest factor and
-    /// the shut fraction are measured and printed.)
-    ///
-    /// Everything the ear actually uses is still a consequence of the parts: the NOTE is c/2L of
-    /// this bell, the HARMONICS are a beating valve's pulse train through the column's resonances,
-    /// the MISSING FUNDAMENTAL is the flare's cutoff, the BEND at each end is the pressure moving,
-    /// and the CHORD is five lengths of brass.
+    /// A real diaphragm (an outward-striking valve driven above its own resonance) finds the column's
+    /// note for itself; this one is locked there, a deliberate simplification. A free oscillator here
+    /// failed to start, jumped to the third harmonic at high supply, or sat making a sine: that is why
+    /// the note, the crest factor and the shut fraction are measured and printed. The note, the
+    /// harmonics, the missing fundamental (the flare's cutoff), the bend and the chord still come
+    /// from the parts.
     /// </summary>
     internal sealed class Bell
     {
@@ -160,16 +134,14 @@ public sealed class ChimeHorn
         {
             _b = b; _rate = rate; _dt = 1f / rate; _rng = new Random(seed); _jitterStep = At44k.Step(0.002f, rate);
             _startDelay = b.StartDelaySeconds;
-            // The raggedness at low pressure is the same reed failing to lift cleanly, so it scales
-            // with the bend: 8 at a bend of 6.5%.
+            // The raggedness at low pressure is the same reed failing to lift cleanly: it scales with
+            // the bend, 8 at a bend of 6.5 %.
             _bend = Math.Clamp(spec.PitchBend, 0f, 0.2f);
             _ragged = 8f * (_bend / 0.065f);
             // The chime's reed (0.46 open at full blow) is the reference the duty law was measured on.
             _openScale = Math.Clamp(spec.ReedOpenFraction, 0.05f, 0.95f) / 0.46f;
-            // Air gets past a reed even while it is "shut" — it never quite seals on its seat — and
-            // that leak is a share of how far the reed lifts. A stiff reed that lifts a third as far
-            // leaks a third as much; holding the chime's leak constant under a shorter pulse would
-            // add five decibels of air to a horn for no reason but the arithmetic.
+            // A shut reed never quite seals, and its leak is a share of how far it lifts: the chime's
+            // leak held constant under a shorter pulse added five decibels of air.
             _leak = 0.25f * (1f - MathF.Cos(MathF.PI * 0.46f * _openScale)) / (1f - MathF.Cos(MathF.PI * 0.46f));
             _trim = MathF.Pow(10f, b.LevelTrimDb / 20f);
             _hpA = OnePole.AlphaFor(CutoffHz(b), rate);
@@ -178,11 +150,9 @@ public sealed class ChimeHorn
         }
 
         /// <summary>
-        /// The column: every harmonic of c/2L, because a flaring horn behaves like a full cone and
-        /// not like a cylinder with a lid on it. Bandpass sections, because a pipe's input impedance
-        /// is resistive at its resonances. The higher peaks are lower and broader — the wall takes
-        /// more out of them and the mouth lets more of them go — and that falling envelope is the
-        /// difference between a horn and a buzzer.
+        /// The column: bandpass sections at every harmonic of c/2L. The higher peaks are lower and
+        /// broader (the wall takes more and the mouth lets more go): the difference between a horn
+        /// and a buzzer.
         /// </summary>
         private void Build()
         {
@@ -216,9 +186,8 @@ public sealed class ChimeHorn
         }
 
         /// <summary>
-        /// The frequency the horn actually settled on, by autocorrelation around the expected note.
-        /// Counting zero crossings measures the noise in a signal and not the note in it, which is
-        /// how the first version of this horn reported fourteen kilohertz while sounding like a hiss.
+        /// The frequency the horn settled on, by autocorrelation round the expected note. Zero crossings
+        /// count the noise, not the note: they once read fourteen kilohertz off a horn that hissed.
         /// </summary>
         internal static float DominantHz(float[] x, float rate, float expect)
         {
@@ -235,10 +204,8 @@ public sealed class ChimeHorn
         }
 
         /// <summary>
-        /// How far the reed is off its seat at this point in the cycle. It rests SHUT — the spring
-        /// holds it down and the supply has to lift it — so it is open for rather less than half the
-        /// cycle, and harder blowing holds it open longer. That is the pulse, and the pulse is where
-        /// every harmonic above the first comes from.
+        /// How far the reed is off its seat at this point in the cycle. It rests shut, so it is open
+        /// for rather less than half the cycle, and harder blowing holds it open longer: the pulse.
         /// </summary>
         private static float Opening(float phase, float supply, float openScale)
         {
@@ -250,18 +217,15 @@ public sealed class ChimeHorn
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public float Step(float valve)
         {
-            // The delay is from when the air reached the manifold, so it restarts whenever the
-            // manifold empties: every blast swells into its chord, not only the first one. With no
-            // air the reed is back on its seat, so the next blast starts it from rest.
+            // The start delay restarts whenever the manifold empties, so every blast swells into its
+            // chord, and the reed starts each from rest.
             if (valve < 1e-3f) { _t = 0.0; _phase = 0.0; _jitter = 0f; }
             else _t += _dt;
             float supply = _t < _startDelay ? 0f : valve;
             if (supply < 1e-3f) return RingOut();
 
-            // The note rides the pressure. A reed's stiffness is what the air has to overcome, so a
-            // horn on a line that has not come up yet plays flat and climbs into pitch — the bend at
-            // the start of every blast, and its mirror at the end, where it also goes ragged because
-            // the swing can no longer lift the reed cleanly off its seat.
+            // The note rides the pressure: flat until the line comes up, and flat and ragged again at
+            // the end, where the swing can no longer lift the reed cleanly.
             float f = _b.Hz * ((1f - _bend) + _bend * supply);
             _jitter += _jitterStep * ((float)_rng.NextDouble() * 2f - 1f - _jitter);
             f *= 1f + _jitter * (supply < 0.5f ? _ragged * (0.5f - supply) : 0.2f);
@@ -272,8 +236,7 @@ public sealed class ChimeHorn
             float x = Opening((float)_phase, supply, _openScale);
             // Flow through the slit: the open area times the root of the pressure across it.
             float u = x * MathF.Sqrt(supply);
-            // ...and the air tearing itself apart going through it. Most of the first few
-            // milliseconds of a horn is this and nothing else.
+            // ...and the turbulence in it: most of a horn's first few milliseconds.
             float hiss = (float)(_rng.NextDouble() * 2 - 1) * 0.09f * MathF.Sqrt(supply) * (_leak + x);
 
             float p = 0f;
@@ -287,11 +250,9 @@ public sealed class ChimeHorn
         }
 
         /// <summary>
-        /// The air has stopped but the pipe has not: the column rings down on its own resonances, a
-        /// few tens of milliseconds at these Qs. Cutting the output to nothing the moment the supply
-        /// ran out stopped the horn dead about 35 dB down, which is heard as the sound cutting out
-        /// at the end of the fade. Once it has been below a millionth of full scale for a whole
-        /// cycle it is left alone.
+        /// The air has stopped but the column rings down on its resonances, a few tens of milliseconds.
+        /// Cut off when the supply ran out, the horn stopped dead 35 dB down, heard as a cut. Left
+        /// alone once under a millionth of full scale for a whole cycle.
         /// </summary>
         private float RingOut()
         {

@@ -7,49 +7,26 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// <summary>
 /// A fire of any size, from what is going on in it (docs/FIRE.md).
 ///
-/// THE FLAMES. Burning gas whose heat release is unsteady radiates as a monopole: the air round a flame
-/// is pushed out when it burns faster and drawn in when it burns slower, p = (γ − 1) / (4π r c²) dQ/dt
-/// (Strahle 1971; Hurle et al. 1968). A fire is a buoyant plume, and a buoyant plume does not burn
-/// steadily: it necks near its base and sheds a puff at a rate set by its width alone, f ≈ 1.5 / √D
-/// (Cetegen and Ahmed 1993), from a candle to a pool fire tens of metres across. So the roar is a low
-/// noise that swells and falls with the puffs, and the bigger the body of fire the lower and the
-/// louder: its dQ/dt goes as the heat release times the puffing rate.
+/// The flames radiate as a monopole, p = (γ − 1) / (4π r c²) dQ/dt (Strahle 1971; Hurle et al. 1968),
+/// and a buoyant plume puffs at f ≈ 1.5 / √D (Cetegen and Ahmed 1993): the roar is a low noise swelling
+/// with the puffs, lower and louder the bigger the body of fire. A fire wider than one body is many
+/// cells side by side, each puffing in its own time and heard from the places near it
+/// (ExtendedSources), so a long front is heard as long, its parts independent.
 ///
-/// MANY BODIES. A fire wider than one body of flame is many of them side by side (a house's rooms, a
-/// group of trees, a crown fire's front), each puffing in its own time, its heat release its own share.
-/// They are CELLS here, laid over the burning area; each is heard from the places (ExtendedSources)
-/// near it, so a front three hundred metres long is heard as three hundred metres long and its parts
-/// are independent: each place's roar is its own noise, its power the sum of its cells' powers (the
-/// sum of independent noises of one spectrum is one noise of the summed power), and each event goes to
-/// one place.
+/// The fuel's water and resin burst its cells as crackles, on a power law of sizes, in clusters; the
+/// big ones throw an ember. A crowd too dense to draw is a noise of the same power, and only its loud
+/// tail is drawn one by one (as the surf's bubbles are, ShoreSynth). Under them is the fizz of gas and
+/// steam through the char. Each <see cref="FireFuel"/> adds its own events: steam jets and settling
+/// logs, torching and falling branches, windows, collapses, a car's struts and tyres. Falls go through
+/// the game's impact law (ImpactAcoustics); glass is GlassFracture's, rendered off the audio threads.
 ///
-/// THE FUEL. Fuel is cells, and the cells hold water and, in softwood and needles, resin. As the fire
-/// heats it the water boils inside closed cells and the resin gasifies; the pressure climbs until a wall
-/// gives, and the pocket bursts — a crackle. They are of every size at once, on a power law, in clusters;
-/// the big ones throw an ember. A small fire's crackles are separate pops; a big one's are thousands a
-/// second, and a crowd that dense is a noise of the same power whose loudness follows the rate (as the
-/// surf's bubbles are, ShoreSynth): the loudest tail of the law is still drawn one by one. Under them is
-/// the fizz: gas and steam let out through the checks in the char all the time.
-///
-/// WHAT EACH FUEL ADDS (<see cref="FireFuel"/>): logs' steam jets, settling and embers; trees' and the
-/// crown's torching flares and falling branches; a building's windows cracking and falling out, its
-/// rooms flaring and its ceilings and roof coming down; a car's struts and tyres bursting and its side
-/// windows dicing. Falls strike through the impact law the rest of the game uses (ImpactAcoustics);
-/// glass is the glass model's own (GlassFracture), rendered off the audio threads.
-///
-/// THE WIND (WindField, read at each place): more air, more burning and more turbulence; a crown fire's
-/// heat release follows its rate of spread, which follows the wind (Cruz et al. 2005).
-///
-/// ITS LIFE. Lit at a known moment (<see cref="Age"/>), a fire grows as t² to its full heat release, the
-/// cells catching one after another, burns, dies down and smoulders. A map's fire is always burning.
-///
-/// WHAT IS FITTED: the roar's share of dQ/dt and its spectrum's fall, the smallest crackle, the fizz,
-/// each fuel's crackle rate (docs/FIRE.md section 8). Everything else is the fire's own numbers.
+/// The wind (WindField, read at each place) fans the flames, and a crown fire's heat release follows
+/// it (Cruz et al. 2005). Lit at a known moment (<see cref="Age"/>) a fire grows as t², burns, dies
+/// down and smoulders; a map's fire is always burning. Fitted: the roar's share of dQ/dt and its fall,
+/// the smallest crackle, the fizz and each fuel's crackle rate (docs/FIRE.md section 8).
 /// </summary>
 public sealed class FireSynth
 {
-    // ── The fitted constants ─────────────────────────────────────────────────────────────────────
-
     /// <summary>
     /// How far a body of fire's heat release swings with its puffing, a share of it: its dQ/dt at a metre
     /// is (γ − 1) / (4π c²) 2π f_puff PuffSwing Q (docs/FIRE.md 1.2). The spectrum of that peaks at the
@@ -90,8 +67,6 @@ public sealed class FireSynth
 
     /// <summary>The middle of the fizz's band, Hz: gas through cracks a fraction of a millimetre wide.</summary>
     private const float FizzHz = 5000f;
-
-    // ── The fire's laws ──────────────────────────────────────────────────────────────────────────
 
     /// <summary>The power law of crackle sizes: the chance a crackle is over a is a^−(α−1).</summary>
     private const float CrackleExponent = 2.2f;
@@ -456,8 +431,8 @@ public sealed class FireSynth
 
     /// <summary>
     /// Where a fire's places are, m from its middle (x across, y up, z along), place 0 the middle: along a
-    /// long front, every place a stretch of it; round anything else, a ring at three-quarters of its
-    /// half-widths (where a hearth's logs' ends and a house's outer rooms are).
+    /// long front, every place a stretch of it; round anything else, an ellipse that spreads as the
+    /// area does.
     /// </summary>
     public static Vector3[] Layout(FireSpec spec)
     {
@@ -477,12 +452,10 @@ public sealed class FireSynth
             }
             return places;
         }
-        // Round the middle, on an ellipse whose places, each an equal share, spread as the area itself does:
-        // a uniform w x d area has a variance of w²/12 across and d²/12 along, and the middle and m places
-        // on a ring of half-axes k w and k d have m k² w² / 2(m + 1), so k = √((m + 1) / 6m). The ring sits
-        // at 0.87-0.94 of the half-widths. At 0.75 (round 1) the places spread less than the fire: the
-        // ears were 0.1-0.2 more alike at 1-4 kHz than the area they stood for would make them
-        // (docs/FIRE.md 7.2).
+        // An ellipse whose places spread as the area does: a uniform w x d area has variance w²/12 and
+        // d²/12, and the middle and m places on half-axes k w, k d have m k² w² / 2(m + 1), so
+        // k = √((m + 1) / 6m), 0.87-0.94 of the half-widths. At 0.75 the ears were 0.1-0.2 more alike
+        // at 1-4 kHz than the area makes them (docs/FIRE.md 7.2).
         float spreadK = MathF.Sqrt((outer + 1f) / (6f * outer));
         for (int j = 0; j < outer; j++)
         {
@@ -512,10 +485,9 @@ public sealed class FireSynth
     /// <summary>The same for a crown fire's front. FITTED (section 8).</summary>
     public static float CrownCrackle = 0.03f;
     /// <summary>
-    /// How a body of fire's crackles grow with its heat release: as (Q / 80 kW)^β, so the fire pit is as it
-    /// was fitted. FITTED (section 8): a bigger body's crackles are fewer per kW than its heat release
-    /// says (heard crackles come from the fuel's outer layer, where a big pile's or a crown's fuel is a
-    /// smaller share of what burns).
+    /// How a body of fire's crackles grow with its heat release: as (Q / 80 kW)^β, which leaves the fire
+    /// pit as fitted. FITTED (section 8): heard crackles come from the fuel's outer layer, a smaller
+    /// share of what burns in a big pile or a crown.
     /// </summary>
     public static float CrackleHeatExponent = 0.5f;
     /// <summary>Crackles per kW of a burning building's timber, over seasoned logs'. FITTED (section 8).</summary>
@@ -644,7 +616,6 @@ public sealed class FireSynth
         HeatNowKw = total;
         for (int p = 0; p < places; p++)
         {
-
             // The share of this place's crackles too many to draw is its crackle noise.
             float rate = _crackleRateAt[p];
             float cut = DrawnFrom(rate);

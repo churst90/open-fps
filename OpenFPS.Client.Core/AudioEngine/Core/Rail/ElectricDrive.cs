@@ -5,28 +5,16 @@ using OpenFPS.Client.AudioEngine.Core.Engine;
 namespace OpenFPS.Client.AudioEngine.Core.Rail;
 
 /// <summary>
-/// The traction package of an electric train: a motor, the gears between it and the axle, and the
-/// inverter feeding it. Three sounds, and all three are counts of teeth and poles.
+/// The traction package of an electric train: a motor, the gears to the axle, and the inverter
+/// feeding it. All three sounds are counts of teeth and poles.
 ///
-/// THE GEARS. A pinion of a few teeth drives a wheel of many, and every tooth entering mesh is a
-/// little step in the torque. So there is a tone at the pinion's tooth count times the motor's
-/// revolutions a second — a couple of kilohertz at speed — sliding smoothly up and down with the
-/// train, with sidebands a shaft-rate apart because no gear is perfectly round. That whine is the
-/// single most recognisable thing about an electric train and it is one integer.
-///
-/// THE MOTOR. The magnetic pull across the air gap does not care which way round the field is, so it
-/// pulses at TWICE the electrical frequency: a four-pole motor at 3,000 rpm hums at 200 Hz. On top
-/// of that the rotor's teeth sweep past the stator's slots, which is a much higher and thinner tone.
-///
-/// THE INVERTER, which is the modern part and the strange one. A drive switching at a fixed carrier
-/// makes tones at that carrier and at sidebands a couple of output-frequencies away: a standing
-/// train at a platform whistling on one steady note is switching asynchronously. As the train speeds
-/// up, holding a fixed carrier would mean more and more switchings per output cycle and more and
-/// more heat, so the drive LOCKS the carrier to a whole number of pulses per cycle and steps that
-/// number down — 27, 15, 9, 5, 3, 1 — as the frequency climbs. Inside each mode the tone rises with
-/// the train; at each change it drops. That staircase is not a sound effect anybody designed, it is
-/// an engineer keeping switching losses down, and it comes out of this model because the model
-/// chooses the pulse count the way the drive does.
+/// The gear whine is the pinion's tooth count times the motor's revolutions (a couple of kilohertz at
+/// speed), with sidebands a shaft rate apart because no gear is round. The motor's magnetic pull
+/// pulses at twice the electrical frequency (a four-pole motor at 3,000 rpm hums at 200 Hz), with a
+/// thinner slot tone above. The inverter switches at a fixed carrier (the steady note of a train at a
+/// platform), then locks the carrier to a whole number of pulses per cycle and steps it down
+/// (27, 15, 9, 5, 3, 1) as the frequency climbs, to keep switching losses down: within a mode the
+/// tone rises, at each change it drops.
 /// </summary>
 internal sealed class ElectricDrive
 {
@@ -79,8 +67,7 @@ internal sealed class ElectricDrive
 
         // ── the gears ───────────────────────────────────────────────────────────────────────────
         _shaftPhase += motorHz * _dt; if (_shaftPhase > 1) _shaftPhase -= 1;
-        // No gear is round and no shaft runs true: a slow wobble at the shaft rate, which is what
-        // puts the sidebands either side of the mesh tone and stops it being a test signal.
+        // A wobble at the shaft rate puts the sidebands either side of the mesh tone.
         _gearWobble = 0.18f * MathF.Sin(MathF.Tau * (float)_shaftPhase);
         _meshPhase += MeshHz * _dt; if (_meshPhase > 1) _meshPhase -= 1;
         float gear = (MathF.Sin(MathF.Tau * (float)_meshPhase)
@@ -101,16 +88,13 @@ internal sealed class ElectricDrive
         {
             if (fe < _s.SyncFromHz || _s.CarrierHz <= 0f)
             {
-                // Asynchronous: a fixed carrier, whatever the motor is doing. This is the steady
-                // note a train sits on at a platform.
+                // Asynchronous: a fixed carrier, whatever the motor is doing.
                 _carrierNow = _s.CarrierHz;
                 _pulses = 0;
             }
             else
             {
-                // Synchronous: the largest whole number of pulses per output cycle that keeps the
-                // switching frequency at or under the carrier. As the train speeds up the drive runs
-                // out of room and steps down, and the tone drops.
+                // Synchronous: the largest pulse count that keeps the switching at or under the carrier.
                 _pulses = _s.PulseModes[^1];
                 foreach (int n in _s.PulseModes)
                     if (n * fe <= _s.CarrierHz * 1.15f) { _pulses = n; break; }

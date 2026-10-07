@@ -4,13 +4,9 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 
 /// <summary>
 /// One kind of surface inside a patch of rain: what it is, how much of it there is, and how far it
-/// is from the listener. The drops landing on it are rendered as the listener hears them, each at its
-/// own distance, so a near drop stands out of a far wash the way it does in the street.
-///
-/// The area is held in distance bins rather than one figure: rain is a source spread over the whole
-/// ground, and the ground a metre away is heard drop by drop while the ground twenty metres away is a
-/// hiss, at about the same total level (every doubling of distance doubles the area and halves the
-/// intensity). One bin per ring of the survey.
+/// is from the listener. The area is held in distance bins, one per ring of the survey, because the
+/// ground a metre away is heard drop by drop and the ground twenty metres away as a hiss at about the
+/// same total level (every doubling of distance doubles the area and halves the intensity).
 /// </summary>
 public sealed class RainLayer
 {
@@ -38,14 +34,12 @@ public sealed class RainLayer
     public readonly float[] Distance = new float[MaxBins];
 
     /// <summary>
-    /// How squarely the surface in each bin faces the listener: the cosine of the angle between its
-    /// normal (up) and the line to the ear, as an rms over the bin. A drop's click is the force it
-    /// puts on a rigid surface, and a force at a rigid boundary radiates as a dipole along the normal
-    /// (its image doubles it): straight up it is heard whole, along the ground hardly at all. So the
-    /// ground a metre or two round you is heard drop by drop and the far street is a quiet wash —
-    /// summed over a whole plane, cos²θ / r² comes to π whatever the height, where an omnidirectional
-    /// source's sum grows without end as the plane does. Plates and leaves are not this: a plate's
-    /// ringing has its own radiation efficiency, and leaves face every way.
+    /// How squarely the surface in each bin faces the listener: the rms cosine between its normal (up)
+    /// and the line to the ear. A drop's click is a force on a rigid boundary, which radiates as a
+    /// dipole along the normal: heard whole straight up, hardly at all along the ground. Summed over a
+    /// plane, cos²θ / r² comes to π whatever the height, where an omnidirectional source's sum grows
+    /// without end. Plates and leaves are not this: a plate rings with its own radiation efficiency, and
+    /// leaves face every way.
     /// </summary>
     public readonly float[] Aim = new float[MaxBins];
 

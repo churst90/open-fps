@@ -22,7 +22,6 @@ public sealed class Thermostat
     /// <summary>Whether it is calling for the compressor, after the last <see cref="Step"/>.</summary>
     public bool Calling { get; private set; }
 
-
     public Thermostat(ThermostatSpec spec, int seed)
     {
         Spec = spec;
