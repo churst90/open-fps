@@ -321,3 +321,74 @@ It replaced a fixed-ish 0.1-1.2 ms FMOD echo with 45 % feedback: the wrong delay
 8.7 ms, seven times longer), the wrong topology (feedback makes a resonator ringing on one pitch, not a
 single reflection tracking the geometry), and every direction collapsed into one scalar, so a ceiling
 and a wall behind you sounded the same.
+
+## Gain staging and the master makeup
+
+Every source is rendered at its true level relative to every other: Loudness.Place turns a source's dB SPL
+at a metre into a gain and a reference distance, and the engine attenuates with 1/r. That must not be
+fiddled with per sound: it is how a listener tells a rifle at two hundred metres from a pistol at twenty.
+
+The cost is that the mix sits low, by design: the law plays a sound as loud as it is at a playback where
+0 dBFS is 100.8 dB SPL (Loudness.DesignFullScaleDb), so a normal voice a metre away (62.35 dB) is about
+-38 dBFS RMS and an outdoor scene spends another 30 dB on distance. Nothing is lost on the way: a
+synthesised voice's 16 dB of headroom over its RMS is given back by the law in loudness units
+(Timbre.DigitalRmsDb), the HRTF is level over the sphere (+-0.4 dB; 1.4 dB down straight ahead and up at
+the sides, as a head is), and the binaural stage takes each voice at its own level (SteamAudioDsp).
+
+That range is taken back once, on the master, for everything: not by making sounds louder (which
+destroys the relative levels) and not per map (nobody knows what a map will carry). The makeup lifts the
+whole mix and the look-ahead true-peak limiter catches what goes over, so adding a hundred sources
+changes what you hear and never how loud the master is.
+
+The makeup is six dB: the loudness chosen by meter and by ear in September 2026 (ten for the speedway at
+-19 to -23 LUFS short-term; three back for the ground's energy; a two-decibel trim for the street), less
+the 3.01 dB the binaural stage was losing on every voice and no longer does. Every voice through the HRTF
+plays as loud as before; the wind at the ears and the interface, which never passed through it, play
+3 dB quieter, level with the voices again. A player who calibrates (ListeningCalibration) sets their
+volume 6 dB lower, so 0 dBFS at the output is 94.8 dB SPL.
+
+## Traced reverb everywhere
+
+Reverb is not an effect added on top: it falls out of the geometry. Every reverb bus gets a traced stage
+right after its SFXREVERB unit. The SFXREVERB passes its input through dry and is kept only as the point
+the stage is inserted at; the stage convolves its input with a traced impulse response
+(SteamAudio.TracedReverb): the listener's own, traced from where they stand, for the room they are in;
+each other audible room's own, traced from its middle, so a sound through a doorway rings with the room
+it is in. The materials of every surface are in the trace, so carpet, concrete and tile tell themselves
+apart, and the reverb is the late part of what comes back. There is no parametric room algorithm: no
+SFXREVERB tail, no Sabine or enclosure estimate, no wet-level loop, no room-equation send.
+
+One rule for every place: a one-off sound's first 80 ms are placed voices mirrored through the surfaces
+round it (WorldAudioPlayer.QueueEarlyEchoes and the steps' SubmitRoomStepEchoes); the listener's traced
+stage plays only the late tail (TailOnly, as a diffuse field); and every reflected path (placed copies,
+tails, traced echoes) sits at one trim against the direct sound (TailDb and CopiesDb). Nothing decides by
+"indoors" except where physics does: past the window a room's copies are dense and are the tail; a
+street's are sparse and stay separate events (QueueHigherOrderEchoes).
+
+Traced echoes: mirror-image echoes of a moving source jump from facade to facade as it passes, so the
+loudest few sustained sources at the ear are traced from their own positions (TracedEchoes), every order
+of reflection, crossfaded as they move. They are chosen by the level they render at, which a passing car
+reaches as it comes close and loses as it goes, so only sources loud enough to be heard reflecting pay
+for a trace.
+
+## The reflections trim
+
+Every trimmed path is a copy of the source arriving a few tens of milliseconds late. What the ear does
+with those in life (fuse them, suppress them) it does less of through a generic HRTF in headphones, where
+a copy at its physical level is heard as an event. The room's identity (its decay, its colour, where its
+walls are) survives the trim; only its weight against the direct sound is set for the listener.
+
+Two numbers, because the two kinds are heard differently. TailDb is everything traced: the listener's and
+other rooms' stages and the far sources' traced echoes, convolved through the traced response and so
+already reflections, not copies (`/tail <dB>`, OPENFPS_TAIL_DB). CopiesDb is everything placed as a copy
+of the source: early echoes, facade and higher-order echoes, your own steps' echoes, the master-bus
+boundary copies (`/copies <dB>`, OPENFPS_COPIES_DB). `/reflections <dB>` sets both. Zero is the traced and
+image-source level, physical to within a couple of decibels wherever measured (--clap-room,
+--traced-reverb).
+
+Both are -6, set by ear in a flat, a tunnel and a street (settled 2026-09-30). A trim further down was
+hiding faults, not setting a level: with the tail parametric it was 14-20 dB too loud in the tunnel; with
+the tail spread evenly it was "centralised"; with sample-identical copies the ear heard separate events.
+If the tail sounds like a wash at a level near 0, look for something non-physical before trimming. One is
+known: the trace rings as long at 4 kHz as at 250 Hz (0.79 s, where Sabine from the same materials says
+0.52), so the top hangs on.
