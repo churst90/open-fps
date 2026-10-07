@@ -28,8 +28,11 @@ public static class MixerQuality
     /// the lab can make one of each in a single run.</summary>
     public static DSP_RESAMPLER Resampler => Parse(Environment.GetEnvironmentVariable("OPENFPS_RESAMPLER"));
 
-    /// <summary>Captures (OPENFPS_AUDIO_CAPTURE, _PRE) in 32-bit float rather than 16-bit PCM.</summary>
-    public static bool CaptureFloat => Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT") == "1";
+    /// <summary>Captures (OPENFPS_AUDIO_CAPTURE, _PRE) in 32-bit float, unless OPENFPS_AUDIO_CAPTURE_FLOAT=0
+    /// asks for 16-bit PCM. Float by default since 2026-10-07: the 16-bit capture truncated every sample
+    /// with no dither, so a quiet render (an airliner at 60 m, -47 dBFS) was sent for listening with
+    /// truncation distortion and sixteen-bit steps the game itself never makes.</summary>
+    public static bool CaptureFloat => Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT") != "0";
 
     /// <summary>The default when nothing is asked for.</summary>
     public const DSP_RESAMPLER Default = DSP_RESAMPLER.SPLINE;
