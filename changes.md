@@ -11,7 +11,7 @@ Recent work, newest first. `git log` has the rest.
   One core (a Zen 5c at 3.3 GHz), one stretch or source: surf 29.4 % to 5.8 %, shingle 37.9 % to 7.2 %,
   harbour wall 4.1 % to 2.5 %, lake beach 3.1 % to 1.0 %, pond bank 2.0 % to 1.1 %, creek 9.9 % to
   1.9 %, the gutters, drains, downpipes and sinks about half. Only the bubbles are not bit-identical:
-  every place of every preset differs from before by 90-118 dB under the signal (AudioLab
+  every place of every preset differs from before by 90-125 dB under the signal (AudioLab
   `--water-cost null`); through the game every scene of the approving rounds measures the same within
   what two takes of one build differ by. The render fingerprints of rain on asphalt and in a puddle
   were regenerated for it (-159 and -132 dB). Renders: inbox/water-perf-2026-10-07. AudioLab
