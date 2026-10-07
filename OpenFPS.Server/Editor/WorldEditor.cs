@@ -24,6 +24,9 @@ public sealed partial class WorldEditor
     public const string Refusal = "The world editor is for this map's owner, the people they ask to edit it, and developers.";
     public const int MaxUndo = 200;
     public const float DefaultStep = 0.5f;
+    /// <summary>How far from the middle of the map, along any axis, the editor puts a thing: twice the
+    /// largest map's reach. Past it the server's tile and grid arithmetic stops meaning anything.</summary>
+    public const float MaxDistanceMetres = 20_000f;
     /// <summary>The body a solid thing must keep clear of: a player's cylinder, feet to head.</summary>
     private const float FootPadding = 0.15f;
 
@@ -101,6 +104,39 @@ public sealed partial class WorldEditor
         + "/edit find WORDS, /edit preview PREFAB, /edit prefabs [CATEGORY], /edit group NAME, /edit spawn here, /edit step METRES, "
         + "/edit info, /edit map settings, /edit map set weather|time|ground|beacon CATEGORY VALUE, "
         + "/edit model show|set|up|down|versions|where|use|pin|unpin|new|copy|replace|retire|restore|remove KIND ID ..., /edit undo, /edit redo.";
+
+    /// <summary>
+    /// What an /edit command costs against the editor's rate limit (MessageLimits.Edits): nothing for
+    /// what only looks (menus, selecting, finding, the settings said), one for a change, more for a change
+    /// of many things at once (a row by its length, a group, a replacement). docs/SERVER_SECURITY.md.
+    /// </summary>
+    public static double EditCost(string[] args)
+    {
+        if (args.Length == 0) return 0;
+        string Word(int i) => args.Length > i ? args[i].ToLowerInvariant() : "";
+        switch (Word(0))
+        {
+            case "menu": case "info": case "selected": case "settings": case "fields": case "prefabs":
+            case "find": case "search": case "select": case "hold": case "step":
+                return 0;
+            case "map":
+                return Word(1) == "set" ? 1 : 0;
+            case "model":
+                return Word(1) switch
+                {
+                    "show" or "versions" or "where" or "" => 0,
+                    "replace" => args.Any(a => a.Equals("everywhere", StringComparison.OrdinalIgnoreCase)) ? 10 : 5,
+                    _ => 1,
+                };
+            case "row":
+                return int.TryParse(Word(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)
+                    ? 1 + Math.Clamp(n, 0, MaxRow) / 10.0 : 1;
+            case "place":
+                return Word(1) switch { "mode" => 0, "group" => 5, _ => 1 };
+            default:
+                return 1;
+        }
+    }
 
     /// <summary>Everything /edit does. The caller has checked the player may edit here.</summary>
     public void Handle(UserSession s, string[] args, Action<IMessage> reply)

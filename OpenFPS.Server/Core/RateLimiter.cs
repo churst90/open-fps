@@ -55,8 +55,16 @@ public sealed class RateLimiter
     public int Count => _buckets.Count;
 
     /// <summary>Takes one token for <paramref name="key"/>. False means the caller is over its limit.</summary>
-    public bool TryConsume(string key)
+    public bool TryConsume(string key) => TryConsume(key, 1.0);
+
+    /// <summary>
+    /// Takes <paramref name="cost"/> tokens for <paramref name="key"/>: an attempt that costs more than one
+    /// (a row of fifty things is more work than one nudge). False, and nothing taken, if there are not that
+    /// many; a cost above the burst is charged as the whole burst, so it is never refused for ever.
+    /// </summary>
+    public bool TryConsume(string key, double cost)
     {
+        cost = Math.Clamp(cost, 0.0, _capacity);
         long now = _nowMs();
         Prune(now);
 
@@ -75,8 +83,8 @@ public sealed class RateLimiter
             bucket.Tokens = Refilled(bucket, now);
             bucket.LastRefillMs = now;
 
-            if (bucket.Tokens < 1.0) return false;
-            bucket.Tokens -= 1.0;
+            if (bucket.Tokens < cost) return false;
+            bucket.Tokens -= cost;
         }
         return true;
     }

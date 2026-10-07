@@ -1217,6 +1217,12 @@ public class GameServer
     private void HandleMapDataRequest(NetPeer peer, MapDataRequest request)
     {
         if (!_sessions.TryGetSession(peer.Id, out var session)) return;
+        MapDataAsked(session, request);
+    }
+
+    /// <summary>A client asking for the map's data, as it does once after each manifest.</summary>
+    internal void MapDataAsked(UserSession session, MapDataRequest request)
+    {
         SendMapData(session, request);
     }
 

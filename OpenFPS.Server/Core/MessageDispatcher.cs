@@ -22,6 +22,25 @@ public class MessageDispatcher : IMessageDispatcher
     /// </summary>
     public Func<int, bool>? IsAuthenticated { get; set; }
 
+    /// <summary>How often each account may do each thing (docs/SERVER_SECURITY.md). Tests give it a clock.</summary>
+    public MessageLimits Limits { get; set; } = new();
+
+    /// <summary>What a connection's limits are counted under: its account once logged in, so that
+    /// reconnecting does not refill them. Null, or a null answer, counts by connection.</summary>
+    public Func<int, string?>? KeyOf { get; set; }
+
+    /// <summary>
+    /// Every message a client sends. Anything else arriving from the network is one of the server's own
+    /// messages sent back at it, and is dropped before it is read (NetworkService.IsClientMessage).
+    /// </summary>
+    public static readonly IReadOnlyList<Type> SentByClients = new[]
+    {
+        typeof(ClientInputUpdate), typeof(ChatMessage), typeof(LoginRequest), typeof(TextCommand),
+        typeof(InteractRequest), typeof(VoiceData), typeof(RegisterRequest), typeof(LogoutRequest),
+        typeof(MapDataRequest), typeof(PlayerListRequest), typeof(FriendListRequest), typeof(MapListRequest),
+        typeof(ScopedShot), typeof(InventoryRequest),
+    };
+
     /// <summary>What a connection may send before it has logged in.</summary>
     public static readonly IReadOnlySet<Type> AllowedBeforeLogin = new HashSet<Type>
     {

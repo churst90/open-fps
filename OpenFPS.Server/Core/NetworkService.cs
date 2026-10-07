@@ -221,16 +221,35 @@ public class NetworkService : INetEventListener
                     reader.AvailableBytes, peer.Id, peer.Address, MaxMessageBytes);
             return;
         }
+        if (!TryDecode(reader.GetRemainingBytes(), out var msg, out string? problem))
+        {
+            if (problem != null && _logLimiter.TryConsume("bad:" + RateLimiter.AddressKey(peer.Address)))
+                Log.Warning("Packet from peer {Id} ({EndPoint}) discarded: {Error}", peer.Id, peer.Address, problem);
+            return;
+        }
+        if (HandleNow?.Invoke(peer, msg!) != true) _incomingMessages.Enqueue((peer, msg!));
+    }
+
+    /// <summary>Whether a message's first byte (its union tag) is one of the messages a client sends.</summary>
+    public static bool IsClientMessage(byte tag) => true;
+
+    /// <summary>
+    /// One message as a client sent it, read; or why not. Never throws: whatever arrives, the network
+    /// thread carries on.
+    /// </summary>
+    public static bool TryDecode(byte[] bytes, out IMessage? message, out string? problem)
+    {
+        message = null; problem = null;
         try
         {
-            var msg = MemoryPackSerializer.Deserialize<IMessage>(reader.GetRemainingBytes());
-            if (msg != null && HandleNow?.Invoke(peer, msg) != true) _incomingMessages.Enqueue((peer, msg));
+            message = MemoryPackSerializer.Deserialize<IMessage>(bytes);
+            if (message == null) { problem = "empty"; return false; }
+            return true;
         }
         catch (Exception ex)
         {
-            if (_logLimiter.TryConsume("bad:" + RateLimiter.AddressKey(peer.Address)))
-                Log.Warning("Malformed packet from peer {Id} ({EndPoint}) discarded: {Error}",
-                    peer.Id, peer.Address, ex.Message);
+            problem = ex.Message;
+            return false;
         }
     }
 

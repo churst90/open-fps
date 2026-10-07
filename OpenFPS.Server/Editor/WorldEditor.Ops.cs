@@ -774,12 +774,15 @@ public sealed partial class WorldEditor
     /// held to it: a city is theirs to build.</summary>
     public const int MaxPlacedByOwners = 5000;
 
+    /// <summary>The cap in force: <see cref="MaxPlacedByOwners"/>, lower in a test.</summary>
+    public int PlacedCap { get; set; } = MaxPlacedByOwners;
+
     /// <summary>Whether placing <paramref name="adding"/> more would take an owner's map past the cap.</summary>
     private bool Full(UserSession s, int adding, out string refusal)
     {
         refusal = "";
-        if (s.Can(Permissions.Edit) || Overlays.Get(s.CurrentMapId).Added.Count + adding <= MaxPlacedByOwners) return false;
-        refusal = $"This map has {MaxPlacedByOwners} things placed with the editor, the most a player's map may have.";
+        if (s.Can(Permissions.Edit) || Overlays.Get(s.CurrentMapId).Added.Count + adding <= PlacedCap) return false;
+        refusal = $"This map has {PlacedCap} things placed with the editor, the most a player's map may have.";
         return true;
     }
 

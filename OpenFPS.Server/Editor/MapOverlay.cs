@@ -150,11 +150,15 @@ public sealed class MapOverlayStore
         }
     }
 
+    /// <summary>Overlay files written, for the tests.</summary>
+    public int Writes { get; private set; }
+
     /// <summary>Writes a map's overlay now: a temporary file, then a rename.</summary>
     public void Save(string mapId)
     {
         string? path = PathFor(mapId);
         if (path == null || !_overlays.TryGetValue(mapId, out var o)) return;
+        Writes++;
         try
         {
             System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
