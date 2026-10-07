@@ -12,21 +12,13 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The DSP callbacks themselves: the read and process functions FMOD calls on its mixer thread, run
-/// here without FMOD through a stand-in for the callback's own function table (<see cref="FakeDsp"/>),
-/// which is the only thing the callbacks ask FMOD for (their state, DspCallback.UserData; the channel
-/// clock, DspCallback.Clock).
-///
-/// Before these, every callback was at 0 % (docs/COVERAGE_2026-09-24.md): the voice states behind them
-/// were tested, and the glue that copies their samples to the mixer was not. Four of the past crashes
-/// were in that glue. For each one, what a mixer callback owes the mix: finite samples, nothing
-/// allocated on the mixer thread, silence where nothing is playing, and the level its own law states —
-/// a voice's callback is its ring at unity in every channel, the ear stage's shelves are the shelves it
-/// was given, the dither is one sixteen-bit step of triangular noise.
-///
-/// What needs the native Steam Audio library (the binaural, decode and convolution effects) cannot run
-/// here; for those stages the managed paths are tested: the bail-outs to silence, the non-finite guard,
-/// the capture.
+/// The DSP callbacks FMOD calls on its mixer thread, run without FMOD through a stand-in for the
+/// callback's function table (<see cref="FakeDsp"/>), which answers the two things they ask of it: their
+/// state (DspCallback.UserData) and the channel clock (DspCallback.Clock). Four past crashes were in this
+/// glue (docs/COVERAGE_2026-09-24.md). What each callback owes the mix: finite samples, nothing allocated
+/// on the mixer thread, silence where nothing plays, and the level its own law states. Stages that need
+/// the native Steam Audio library are tested on their managed paths only: the bail-outs to silence, the
+/// non-finite guard, the capture.
 /// </summary>
 public class DspCallbackTests
 {

@@ -8,20 +8,11 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for step 6 of the engineering audit — "profile, then cut the hot paths".
-///
-/// The theme is repeated work: the same answer computed several times over, because nothing remembered it
-/// and nothing enforced how often it was allowed to be asked for. A frame built three to six identical
-/// copies of the world. The audio system ran at whatever rate the network poll happened to spin at, three
-/// times faster than anything it produces can be heard. The server probed for the floor once per input
-/// rather than once per position. Every grid query walked its cells twice and handed back a wall spanning
-/// four cells four times over. Every per-voice audio call scanned the whole list of playing voices.
-///
-/// What is tested here is each of those rules, at the level the rule lives at. Two things are verified by
-/// inspection rather than by test: the FMOD active-voice index (which cannot be built without the native
-/// library) and the measured Steam Audio ray budget (which needs a real simulation run). The arithmetic
-/// under both — an id-keyed index, and a timing report — is straightforward; what could not be checked
-/// mechanically is called out here rather than left implied.
+/// The rules against repeated work from step 6 of the engineering audit ("profile, then cut the hot
+/// paths"): one world snapshot per version (a frame built three to six copies), one walk and one copy of
+/// each item per grid query, a ground probe per position rather than per input, and the audio update
+/// capped at what can be heard. The FMOD active-voice index and the Steam Audio ray budget need the
+/// native library and a real run, so they are checked by inspection, not here.
 /// </summary>
 public class HotPathTests
 {
@@ -37,9 +28,8 @@ public class HotPathTests
         var second = world.GetSnapshot();
         var third = world.GetSnapshot();
 
-        // Not merely equal — the SAME object. Prediction, the shelter raycast, the proximity scan and the
-        // audio system all read the world within one frame; each of those was a full copy of every
-        // definition and transform in the map.
+        // The same object, not an equal one: prediction, the shelter raycast, the proximity scan and the
+        // audio system each read the world within one frame.
         Assert.Same(first, second);
         Assert.Same(second, third);
         Assert.Equal(1, world.SnapshotBuilds - before);
@@ -162,8 +152,7 @@ public class HotPathTests
     [Fact]
     public void OcclusionStillSeesAWallThatSpansSeveralCells()
     {
-        // The candidate query was rewritten; the thing it exists to answer must not have changed. A long
-        // wall between the listener and the source still blocks.
+        // Fewer candidates, the same answer: a long wall between the listener and the source blocks.
         var world = new ClientWorldState();
         world.Clear(new Vector3(100, 20, 100));
         world.RegisterDefinition(new EntityDefinition

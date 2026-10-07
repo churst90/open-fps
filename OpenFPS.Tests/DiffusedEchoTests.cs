@@ -4,11 +4,9 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The echo of a one-off sound is a wash, not a copy. Every echo of a gunshot, a clap or a door used
-/// to be the sound itself placed at the mirror point — a second, clean gunshot off a brick wall.
-/// Asked for: "reflections shouldn't be a mirror image of the sound, it should just be a smeared wash
-/// of sound." A rough surface hands the sound back through the same all-pass smear the engine echoes
-/// use, so the energy is kept and the shape is not.
+/// The echo of a one-off sound off a rough surface is a wash, not a copy ("reflections shouldn't be a
+/// mirror image of the sound, it should just be a smeared wash of sound"): it goes through the same
+/// all-pass smear the engine echoes use, keeping the energy and not the shape.
 /// </summary>
 public class DiffusedEchoTests
 {

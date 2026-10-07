@@ -12,13 +12,10 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Every round is flown, from the hip as through the scope, and what it meets is what is in its way.
-///
-/// Cody, 2026-10-04: "if I'm on the second floor of the apartment build and I shoot, why do i hit
-/// pedestrians? I should be hitting the wall and things in between." / "when I shoot sometimes it says
-/// 'hit audience'... why?" / "there's no delay time between when i shoot and hear the hit or kill and
-/// it seems to stop after so far ... if the bullet lands on the ground or roof, maybe I should know
-/// about that too?" / "yes i do want the bullet whizzing and cracking sound, make it realistic."
+/// Every round is flown, from the hip as through the scope, and what it meets is what is in its way
+/// (docs/GUNFIRE.md, "Rounds are flown"). From Cody's reports of 2026-10-04: shots from upstairs hitting
+/// pedestrians through the wall, "hit audience", no delay before a far hit, no word where a round
+/// landed, and the whizz and crack wanted.
 /// </summary>
 public class BulletFlightTests : IDisposable
 {
@@ -203,10 +200,8 @@ public class BulletFlightTests : IDisposable
         g.Fire(a);
         g.Run(0.2);
         Assert.Equal("Hit the ground at 4 metres.", Assert.Single(g.Said(a)));
-        // ...and at 10 degrees a round skips off concrete: the airport's apron. (This shot used to be
-        // made at the west edge too, where the loader once laid a concrete foundation flush under the
-        // map's own dirt, and the server met the concrete. The loader lays nothing under a map with its
-        // own ground now, and lays dirt where it does: docs/GEOMETRY.md.)
+        // ...and at 10 degrees a round skips off concrete: the airport's apron. Not the west edge, which
+        // has no concrete under its dirt (docs/GEOMETRY.md, the loader's foundation).
         var skip = g.Player("skip", new Vector3(258f, 0.08f, 40f));
         skip.AimAssist = false;
         g.Arm(skip, "akm");

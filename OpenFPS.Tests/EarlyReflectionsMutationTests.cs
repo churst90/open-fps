@@ -18,8 +18,8 @@ public class EarlyReflectionsMutationTests
     private static readonly Quaternion Q = Quaternion.Identity;
     private readonly List<EarlyReflections.Arrival> _found = new();
 
-    // Concrete keeps 1 - absorption per band: 0.99 low, 0.98 mid, 0.98 high.
-    // Amplitudes, from the material's energy absorption of 0.01 and 0.02 (EarlyReflections.Keep).
+    // Concrete keeps 1 - absorption of the energy per band (0.99 low, 0.98 mid and high); the
+    // amplitudes are their square roots (EarlyReflections.Keep).
     private static readonly float KeepLow = MathF.Sqrt(0.99f), KeepMid = MathF.Sqrt(0.98f);
 
     private static EarlyReflections.Solid Box(Vector3 centre, Vector3 size, string material = "Concrete")
@@ -47,7 +47,7 @@ public class EarlyReflectionsMutationTests
     /// <summary>
     /// A copy that has travelled forty times as far as the direct sound arrives at 2.5 % of it, under
     /// <see cref="EarlyReflections.MinRelativeAmplitude"/>, and is not reported. The same wall with the
-    /// pair four times further apart gives a 10 % copy, which is, at keep × direct/path in each band.
+    /// pair four times further apart gives a 10 % copy, which is reported, at keep × direct/path in each band.
     /// </summary>
     [Fact]
     public void ACopyUnderTheAudibilityFloorIsNotReported()
@@ -131,16 +131,14 @@ public class EarlyReflectionsMutationTests
     }
 
     /// <summary>
-    /// A copy of a copy that has gone past <see cref="EarlyReflections.RangeMetres"/> is not reported
-    /// even when it would be loud enough: walls 110 m apart and a listener 30 m down the street give
-    /// first-order paths of 114 m and second-order ones of 222 m.
+    /// A copy of a copy past <see cref="EarlyReflections.RangeMetres"/>, which counts the extra path over
+    /// the direct sound, is not reported even when loud enough: walls 220 m apart and a listener 30 m down
+    /// the street put the first-order copies 192 m further than the direct sound (kept) and the copy of a
+    /// copy 411 m further.
     /// </summary>
     [Fact]
     public void ACopyOfACopyPastTheSearchRangeIsNotReported()
     {
-        // The range counts the EXTRA path over the direct sound (2026-09-28): walls 220 m apart, so the
-        // first-order copies run 192 m further than the 30 m direct sound (kept) and the copy of a
-        // copy 411 m further (past the 200 m range).
         var a = Box(new Vector3(-110.5f, 0, 15f), new Vector3(1f, 20f, 400f));
         var b = Box(new Vector3(110.5f, 0, 15f), new Vector3(1f, 20f, 400f));
         var listener = new Vector3(0, 0, 30f);

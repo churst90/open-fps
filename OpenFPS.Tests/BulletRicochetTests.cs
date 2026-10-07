@@ -12,12 +12,9 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Round two of the bullets. Cody, 2026-10-04, after the first renders: "for the bullets, I just hear
-/// the double crack and for the last 2 pistol it sounds like a quick laser or something, is that
-/// supposed to be the bullet whizzing by? I guess i expected to hear the ricochet sound when a bullet
-/// bounces off something". The whizz is broadband wake noise now, a round skips off a hard face below
-/// its critical angle and flies on tumbling, and a round striking something is its own event per
-/// material.
+/// The bullets, round two (Cody, 2026-10-04: a pistol's whizz was "a quick laser", and he expected a
+/// ricochet): the whizz is broadband wake noise, a round skips off a hard face below its critical angle
+/// and flies on tumbling, and a round striking something is its own event per material.
 /// </summary>
 public class BulletRicochetTests : IDisposable
 {

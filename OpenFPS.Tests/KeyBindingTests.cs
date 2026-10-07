@@ -4,13 +4,8 @@ using OpenFPS.Client.Core.Platform;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Shift-F5 is a different key from F5, and the brackets still work with shift held.
-///
-/// Both halves matter. Without the first there is nowhere to put "the players HERE" next to "the
-/// players everywhere". Without the second, adding modifiers would silently break every key that
-/// reads its own modifier — the chat brackets decide between stepping messages and stepping buffers
-/// by asking about shift themselves, and a table that refused to fire them under shift would have
-/// taken that away without a word.
+/// Shift-F5 is a different key from F5 ("the players here" beside "the players everywhere"), and the
+/// brackets still fire with shift held: they read shift themselves to step buffers rather than messages.
 /// </summary>
 public class KeyBindingTests
 {

@@ -9,17 +9,11 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Where a door's sound comes from (Cody, 2026-10-05: "most of the time I just couldn't hear the sound
-/// of the doors, like the front doors"; "should the sound not follow the direction of the opening door?").
-///
-/// A knob door's sound was placed on the leaf's latch edge, which laps the jamb by 50 mm: inside the
-/// brick, and inside the leaf. Measured with --path-probe at 58 Alder Street's front door from three
-/// metres in plain view, the simulator heard it through both, −30/−46/−83 dB. A patio door's whole run
-/// was placed at the middle of its own glass leaf, where it started, and stayed there while the leaf
-/// slid a metre.
-///
-/// Now every door sound is at the handle — the backset in from the free edge, never in the jamb — with
-/// the leaf's faces to be heard from, and a slider's run travels with its handle.
+/// Where a door's sound comes from (Cody, 2026-10-05: front doors often unheard; "should the sound not
+/// follow the direction of the opening door?"). Every door sound is at the handle, the backset in from the
+/// free edge, never in the jamb, with the leaf's faces to be heard from; a slider's run travels with its
+/// handle. On the latch edge, 50 mm into the brick and the leaf, a knob door was heard through both
+/// (−30/−46/−83 dB at 3 m in plain view, --path-probe at 58 Alder Street's front door).
 /// </summary>
 public class DoorSoundPlacementTests : IDisposable
 {

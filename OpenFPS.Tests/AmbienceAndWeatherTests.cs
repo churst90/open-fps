@@ -9,30 +9,19 @@ using Arch.Core;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for the ambience bed reaching the client, and for the weather staying put when asked.
-///
-/// The ambience half exists because `AmbienceId` was a dead field for the whole life of the project: it
-/// was in the prefab spec, the validator accepted it, the repository wrote it into the component and the
-/// server serialized it — and no client code ever read it. Every one of those steps looked correct on
-/// its own. So the test walks the value the whole way rather than checking any single link.
+/// An ambience id reaching the client, and the weather staying put when asked. `AmbienceId` was once a
+/// dead field (in the spec, the component and the wire, and read by no client), so the value is walked
+/// the whole way rather than checked at any one link.
 /// </summary>
 public class AmbienceAndWeatherTests
 {
     private static string MapDirectory => System.IO.Path.Combine(AppContext.BaseDirectory, "maps");
 
     /// <summary>
-    /// No shipped map lays a recorded loop over the world.
-    ///
-    /// This test used to assert the opposite, and the opposite was a decision rather than a fact. Judged
-    /// by ear on the rooms map, 2026-09-18: "all I hear is the outdoors ambiance loop which is loud and
-    /// needs to come out, it doesn't add anything". A bed is the one sound in this engine that is not
-    /// made by anything — no source, no distance, no geometry — so it cannot be occluded, cannot be
-    /// walked around, and tells a listener nothing about where they are, while sitting over everything
-    /// that would. The speedway has never had one.
-    ///
-    /// The MACHINERY stays, and the test below still walks it end to end: a REGION may name an ambience
-    /// (a hum, a machine room, running water) because that is a sound with a place in it. What is
-    /// refused here is the map-wide bed.
+    /// No shipped map lays a recorded loop over the world (Cody, 2026-09-18: the outdoor loop "needs to
+    /// come out, it doesn't add anything"; docs/SOUND_INVENTORY.md, "Not wanted"). A bed is made by
+    /// nothing, so it cannot be occluded or walked round and says nothing about where you are. A region
+    /// may still name an ambience: that is a sound with a place in it.
     /// </summary>
     [Fact]
     public void NoShippedMapLaysARecordedBedOverTheWorld()
@@ -63,7 +52,7 @@ public class AmbienceAndWeatherTests
             // On the component...
             Assert.Equal("AMBIENCE/machine_hum", world.Get<RegionComponent>(entity).AmbienceId);
 
-            // ...and on the wire, which is the step that was missing.
+            // ...and on the wire.
             var defs = EntityDefinitionFactory.StaticDefinitions(world);
             Assert.Contains(defs, d => d.Region.AmbienceId == "AMBIENCE/machine_hum");
         }
