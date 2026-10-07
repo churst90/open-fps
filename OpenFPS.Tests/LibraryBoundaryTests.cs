@@ -284,6 +284,32 @@ public class LibraryBoundaryTests
         return counts;
     }
 
+    /// <summary>
+    /// Each library project, by an assembly of it, and what it may reference besides the runtime: the
+    /// packages decided for it (docs/SOUND_LIBRARY_BOUNDARY.md, section 11) and lower library projects.
+    /// The compiler refuses a type from an assembly that is not referenced; this refuses the reference
+    /// itself, which is what someone would add to make that error go away.
+    /// </summary>
+    public static IEnumerable<object[]> LibraryAssemblies() => new[]
+    {
+        // FMOD's wrapper and the Steam Audio bindings. Serilog: BackgroundPriority logs (decision 5).
+        new object[] { typeof(FMOD.System).Assembly.GetName().Name!, new[] { "Serilog" } },
+    };
+
+    [Theory]
+    [MemberData(nameof(LibraryAssemblies))]
+    public void LibraryReferencesOnlyLibrary(string assembly, string[] allowed)
+    {
+        var asm = System.Reflection.Assembly.Load(assembly);
+        var wrong = asm.GetReferencedAssemblies()
+            .Select(r => r.Name!)
+            .Where(n => !(n == "System" || n.StartsWith("System.", StringComparison.Ordinal) || n is "netstandard" or "mscorlib"
+                          || n.StartsWith("Microsoft.Win32.", StringComparison.Ordinal) || allowed.Contains(n)))
+            .ToList();
+        Assert.True(wrong.Count == 0, $"{assembly} references {string.Join(", ", wrong)}: a library project references only "
+            + "the runtime, its decided packages and lower library projects.");
+    }
+
     [Fact]
     public void CrossingsCountReferencesNotCommentsOrStrings()
     {

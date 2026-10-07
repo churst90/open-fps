@@ -24,6 +24,7 @@ library that open-fps and Resonance both reference. Step 1 of
 11. Decisions for Cody
 12. Appendices: every type by file, every crossing line, every static, every file read
 13. Stage 0 as built: the guards, and how to regenerate them
+14. Stage 1 as built: OpenFPS.Native
 
 ---
 
@@ -729,6 +730,7 @@ A session here is one working session of an agent, as in docs/GEOMETRY.md.
 - The native libraries are copied from `lib/` by the executables' projects (`OpenFPS.Client`,
   `OpenFPS.Client.Gtk`, `OpenFPS.AudioLab`), not by Client.Core, so the move does not touch them.
   Resonance ships its own copies.
+- As built: section 14.
 
 ### Stage 2: `OpenFPS.Geometry` (1 session)
 
@@ -1602,7 +1604,7 @@ They run with the rest of the suite on GitHub Actions; none needs FMOD or Steam 
   that binds to a host type or a member of one, `var` included, exactly as the survey's reader does.
   Each (file, host type) count must equal its line in `allowed.tsv`: over is a new crossing, under is a
   fix whose allowance was not lowered in the same commit.
-- `LibraryReferencesOnlyLibrary` (added with stage 1, 14.3): each library assembly references only the
+- `LibraryReferencesOnlyLibrary` (added with stage 1, 14.2): each library assembly references only the
   runtime, its allowed packages and lower library projects.
 - Both lists come from the survey: `tools/sound_boundary/run.sh` now writes `files.tsv` and
   `allowed.tsv` beside `crossings.tsv`. At e814ed20 the test's counts equal `crossings.tsv` line for
@@ -1712,6 +1714,49 @@ split out of a file, a static made an instance: none of them may change any of t
 The maths probe is stored with the fingerprints and the streams. Regenerate them where they were made
 (glibc 2.43 here) or with the same maths: written anywhere else, they hold that machine's probe, and
 here every later run falls back to the tolerant comparison.
+
+## 14. Stage 1 as built (2026-10-07): `OpenFPS.Native`
+
+### 14.1 What moved
+
+By `git mv`, namespaces unchanged:
+
+| From | To |
+|---|---|
+| `OpenFPS.Client.Core/FmodNative/fmod.cs`, `fmod_dsp.cs`, `fmod_errors.cs`, `fmod_studio.cs` | `OpenFPS.Native/FmodNative/` |
+| `OpenFPS.Client.Core/AudioEngine/SteamAudio/Phonon.cs`, `PhononSim.cs`, `PhononAmbisonics.cs` | `OpenFPS.Native/SteamAudio/` |
+| `OpenFPS.Client.Core/Platform/NativeAudioLibraries.cs`, `BackgroundPriority.cs` | `OpenFPS.Native/Platform/` |
+
+- `OpenFPS.Native` references no project and one package, Serilog (`BackgroundPriority` logs a thread
+  it could not lower). `AllowUnsafeBlocks` as Client.Core had.
+- `OpenFPS.Client.Core` references it. Nothing else does directly: the Windows and GTK clients, the lab
+  and the tests get it through Client.Core. The server does not.
+- `InternalsVisibleTo` on Native: `OpenFPS.Client.Core`, `OpenFPS.Tests`, `OpenFPS.AudioLab` (`Phonon`
+  is internal). `OpenFPS.Audio` is added when that project exists (stage 6), not before: a grant to an
+  assembly that does not exist is one anybody can claim by the name. Client.Core keeps its own two
+  grants for its own internals.
+- The native libraries are copied from `lib/` by the executables, as before; the `DllImport`s resolve
+  next to the executable whichever assembly declares them, so nothing about loading changed. Checked:
+  `OpenFPS.Native.dll` lands beside `fmod.dll` and the rest in the Windows client's output, and in the
+  GTK client's and the lab's.
+
+### 14.2 Checks
+
+- Every project builds: the tests, the GTK client, the lab, the Windows client (compiled on Linux as
+  always, `EnableWindowsTargeting`), the server.
+- The render fingerprint and the emitter stream are the same bits as before the move; the ratchet's
+  allowance is unchanged (no crossings in these files; `files.tsv` changed only by the paths).
+- `LibraryBoundaryTests.LibraryReferencesOnlyLibrary`: OpenFPS.Native references only the runtime and
+  Serilog.
+- `tools/sound_boundary` reads the new project (Program.cs: its own compilation, its
+  `InternalsVisibleTo`; classify.py: a rule per library project folder).
+- CI: `.github/workflows/tests.yml` builds `OpenFPS.Tests`, which brings the new project in through
+  Client.Core; `tools/ci/shard_tests.py` deals out test classes, which did not change. Nothing to edit.
+
+### 14.3 Wire hash and door fingerprint
+
+Not touched: none of these files is in OpenFPS.Common, so `WireContract.Hash` and
+`DoorModelFingerprint` are computed over exactly the files they were.
 
 ---
 

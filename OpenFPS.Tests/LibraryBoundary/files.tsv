@@ -101,9 +101,6 @@ OpenFPS.Client.Core/AudioEngine/SteamAudio/EarlyCopies.cs	lib	Audio
 OpenFPS.Client.Core/AudioEngine/SteamAudio/HrtfBands.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/LateField.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/LateTail.cs	lib	Audio	
-OpenFPS.Client.Core/AudioEngine/SteamAudio/Phonon.cs	lib	Native	
-OpenFPS.Client.Core/AudioEngine/SteamAudio/PhononAmbisonics.cs	lib	Native	
-OpenFPS.Client.Core/AudioEngine/SteamAudio/PhononSim.cs	lib	Native	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/SmoothTail.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioDsp.cs	lib	Audio	
 OpenFPS.Client.Core/AudioEngine/SteamAudio/SteamAudioScene.cs	lib	Audio	
@@ -123,10 +120,6 @@ OpenFPS.Client.Core/ClientWorldState.cs	host
 OpenFPS.Client.Core/DiagnosticSwitches.cs	host		
 OpenFPS.Client.Core/DrivingAids.cs	host		
 OpenFPS.Client.Core/DrivingCueSounds.cs	host		
-OpenFPS.Client.Core/FmodNative/fmod.cs	lib	Native	
-OpenFPS.Client.Core/FmodNative/fmod_dsp.cs	lib	Native	
-OpenFPS.Client.Core/FmodNative/fmod_errors.cs	lib	Native	
-OpenFPS.Client.Core/FmodNative/fmod_studio.cs	lib	Native	
 OpenFPS.Client.Core/Input/InputCommandMapper.cs	host		
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	host		
 OpenFPS.Client.Core/ListMenu.cs	host		
@@ -138,13 +131,11 @@ OpenFPS.Client.Core/NamedPlaces.cs	host
 OpenFPS.Client.Core/NearDrops.cs	lib	Audio	
 OpenFPS.Client.Core/OtherBodies.cs	host		
 OpenFPS.Client.Core/PickUp.cs	host		
-OpenFPS.Client.Core/Platform/BackgroundPriority.cs	lib	Native	
 OpenFPS.Client.Core/Platform/FmodMicrophoneCapture.cs	host		
 OpenFPS.Client.Core/Platform/GameKey.cs	host		
 OpenFPS.Client.Core/Platform/IClientShell.cs	host		
 OpenFPS.Client.Core/Platform/IMicrophoneCapture.cs	host		
 OpenFPS.Client.Core/Platform/ISpeechOutput.cs	host		
-OpenFPS.Client.Core/Platform/NativeAudioLibraries.cs	lib	Native	
 OpenFPS.Client.Core/Platform/SpeechDispatcherOutput.cs	host		
 OpenFPS.Client.Core/Platform/SpeechLog.cs	host		
 OpenFPS.Client.Core/Platform/TimerResolution.cs	host		
@@ -304,3 +295,12 @@ OpenFPS.Common/Wind.cs	lib	Sound
 OpenFPS.Common/WindModel.cs	lib	Sound	
 OpenFPS.Common/WoodChorus.cs	lib	Sound	
 OpenFPS.Common/WorldSnapshot.cs	host		
+OpenFPS.Native/FmodNative/fmod.cs	lib	Native	
+OpenFPS.Native/FmodNative/fmod_dsp.cs	lib	Native	
+OpenFPS.Native/FmodNative/fmod_errors.cs	lib	Native	
+OpenFPS.Native/FmodNative/fmod_studio.cs	lib	Native	
+OpenFPS.Native/Platform/BackgroundPriority.cs	lib	Native	
+OpenFPS.Native/Platform/NativeAudioLibraries.cs	lib	Native	
+OpenFPS.Native/SteamAudio/Phonon.cs	lib	Native	
+OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	lib	Native	
+OpenFPS.Native/SteamAudio/PhononSim.cs	lib	Native	

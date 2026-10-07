@@ -13,6 +13,9 @@ Recent work, newest first. `git log` has the rest.
   makes on the mixer with a stored stream. The stored data changes only in a commit that changes a sound
   on purpose, which says why (13.4). On other maths (CI's glibc) the renders and streams are compared by
   level and to a part in a thousand instead of to the bit.
+- Sound library, stage 1: FMOD's C# wrapper, the Steam Audio bindings, the native library list and
+  the thread-priority helper are a project of their own, `OpenFPS.Native`, which Client.Core references
+  (docs/SOUND_LIBRARY_BOUNDARY.md, section 14). Moved, not changed: the same renders and stream.
 - Near rain drops are the same in every client: their renders were seeded from `string.GetHashCode`,
   which .NET randomises per process. No change to how they sound.
 - Tests no longer write the player's door render cache (`~/.local/share/OpenFPS/rendercache`) or prune

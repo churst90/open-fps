@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The sound library's native bindings (docs/SOUND_LIBRARY_BOUNDARY.md, stage 1): FMOD's own C#
+       wrapper, the Steam Audio P/Invoke surface (Phonon), the list of native libraries the audio needs,
+       and the thread-priority helper. It references no other project, and nothing of the game.
+
+       The native libraries themselves are not here: the executables (OpenFPS.Client, OpenFPS.Client.Gtk,
+       OpenFPS.AudioLab) copy them from lib/ beside themselves, and the runtime finds them there. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- BackgroundPriority logs a thread it could not lower (decision 5: Serilog's static Log stays). -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Phonon is internal: nothing outside the audio engine should call Steam Audio directly. The engine
+         (Client.Core today, OpenFPS.Audio from stage 6), the tests and the lab's spikes do. -->
+    <InternalsVisibleTo Include="OpenFPS.Client.Core" />
+    <InternalsVisibleTo Include="OpenFPS.Tests" />
+    <InternalsVisibleTo Include="OpenFPS.AudioLab" />
+  </ItemGroup>
+
+</Project>

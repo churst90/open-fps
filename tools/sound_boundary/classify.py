@@ -48,13 +48,6 @@ FILE_RULES = [
     ('OpenFPS.Sound/', 'a', 'Sound', ''),
     ('OpenFPS.Native/', 'a', 'Native', ''),
     ('OpenFPS.Audio/', 'a', 'Audio', ''),
-    # Native bindings
-    (CC + 'FmodNative/', 'a', 'Native', 'FMOD bindings'),
-    (CC + 'AudioEngine/SteamAudio/Phonon.cs', 'a', 'Native', 'Steam Audio bindings'),
-    (CC + 'AudioEngine/SteamAudio/PhononSim.cs', 'a', 'Native', 'Steam Audio bindings'),
-    (CC + 'AudioEngine/SteamAudio/PhononAmbisonics.cs', 'a', 'Native', 'Steam Audio bindings'),
-    (CC + 'Platform/NativeAudioLibraries.cs', 'a', 'Native', 'finds libfmod/libphonon'),
-    (CC + 'Platform/BackgroundPriority.cs', 'a', 'Native', 'thread priority (libc)'),
     # The real-time runtime: FMOD DSPs, voices, Steam Audio, the acoustic worker
     (CC + 'AudioEngine/Data/', 'c', 'Audio', 'the source description the host fills'),
     (CC + 'AudioEngine/Fmod/', 'a', 'Audio', ''),
