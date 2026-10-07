@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace OpenFPS.Client.AudioEngine.Core.Nature;
 
@@ -125,28 +126,38 @@ public sealed class EventSum
         int length = Math.Min(Horizon - offset, (int)(4.6f / decay * _rate));
         float perSample = MathF.Exp(-decay / _rate);
         float sigma = rise * decay;                                // relative climb per second
-        long at = _now + offset;
+        int start = (int)((_now + offset) & Mask);
         float re = 1f, im = 0f, env = pascals;
         float onset = 1f / MathF.Max(1f, _rate / hz);              // one cycle to full
-        float w = MathF.Tau * hz / _rate;
-        float cw = MathF.Cos(w), sw = MathF.Sin(w);
-        for (int i = 0; i < length; i++)
+        ref float ring = ref MemoryMarshal.GetArrayDataReference(_ring);
+        // The hottest loop in the water models (a surf beach writes 50 million bubble samples a second).
+        // It must stay bit for bit what it was: retuned every sixteen samples, and past the onset the
+        // ramp of exactly 1 is left out, which changes no bit.
+        for (int i0 = 0; i0 < length; i0 += 16)
         {
-            if ((i & 15) == 0)
+            float f = hz * (1f + sigma * i0 / _rate);
+            if (f > 0.45f * _rate) break;
+            float w = MathF.Tau * f / _rate;
+            var (sw, cw) = MathF.SinCos(w);
+            float mag = 1f / MathF.Sqrt(re * re + im * im);
+            re *= mag; im *= mag;
+            int end = Math.Min(length, i0 + 16), i = i0;
+            for (; i < end && i * onset < 1f; i++)
             {
-                float f = hz * (1f + sigma * i / _rate);
-                if (f > 0.45f * _rate) break;
-                w = MathF.Tau * f / _rate;
-                cw = MathF.Cos(w); sw = MathF.Sin(w);
-                float mag = 1f / MathF.Sqrt(re * re + im * im);
-                re *= mag; im *= mag;
+                Unsafe.Add(ref ring, (start + i) & Mask) += env * (i * onset) * im;
+                float nr = re * cw - im * sw;
+                im = re * sw + im * cw;
+                re = nr;
+                env *= perSample;
             }
-            float a = i * onset < 1f ? i * onset : 1f;
-            _ring[(int)((at + i) & Mask)] += env * a * im;
-            float nr = re * cw - im * sw;
-            im = re * sw + im * cw;
-            re = nr;
-            env *= perSample;
+            for (; i < end; i++)
+            {
+                Unsafe.Add(ref ring, (start + i) & Mask) += env * im;
+                float nr = re * cw - im * sw;
+                im = re * sw + im * cw;
+                re = nr;
+                env *= perSample;
+            }
         }
     }
 
