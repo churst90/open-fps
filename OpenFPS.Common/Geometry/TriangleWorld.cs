@@ -261,6 +261,53 @@ public sealed class TriangleWorld
         return planes.Length;
     }
 
+    /// <summary>How many convex pieces a solid that is not convex has (stairs, an arch); 0 for a convex
+    /// solid, which is its own one piece (<see cref="TrianglesOf"/>, <see cref="PlanesOf"/>).</summary>
+    public int PartCountOf(SolidRef s) => _instances[s.Instance].Piece.Solids[s.Solid].PartCount;
+
+    /// <summary>How many triangles convex piece <paramref name="part"/> of a solid has.</summary>
+    public int PartTriangleCountOf(SolidRef s, int part)
+    {
+        var piece = _instances[s.Instance].Piece;
+        return piece.Parts[piece.Solids[s.Solid].PartStart + part].TriCount;
+    }
+
+    /// <summary>Convex piece <paramref name="part"/>'s triangles relative to <paramref name="relativeTo"/>,
+    /// as <see cref="TrianglesOf"/>.</summary>
+    public int PartTrianglesOf(SolidRef s, int part, Vector3 relativeTo, Span<Vector3> into)
+    {
+        ref readonly var inst = ref _instances[s.Instance];
+        var piece = inst.Piece;
+        ref readonly var p = ref piece.Parts[piece.Solids[s.Solid].PartStart + part];
+        var shift = inst.Position - relativeTo;
+        for (int k = 0; k < p.TriCount; k++)
+        {
+            ref readonly var tr = ref piece.PartTris[p.TriStart + k];
+            Vector3 a = tr.V0, b = tr.V0 + tr.E1, c = tr.V0 + tr.E2;
+            if (inst.Rotated) { a = Vector3.Transform(a, inst.Rotation); b = Vector3.Transform(b, inst.Rotation); c = Vector3.Transform(c, inst.Rotation); }
+            into[3 * k] = shift + a; into[3 * k + 1] = shift + b; into[3 * k + 2] = shift + c;
+        }
+        return p.TriCount;
+    }
+
+    /// <summary>Convex piece <paramref name="part"/>'s face planes relative to <paramref name="relativeTo"/>,
+    /// as <see cref="PlanesOf"/>.</summary>
+    public int PartPlanesOf(SolidRef s, int part, Vector3 relativeTo, Span<Vector4> into)
+    {
+        ref readonly var inst = ref _instances[s.Instance];
+        var piece = inst.Piece;
+        ref readonly var p = ref piece.Parts[piece.Solids[s.Solid].PartStart + part];
+        var shift = inst.Position - relativeTo;
+        for (int k = 0; k < p.PlaneCount; k++)
+        {
+            var q = piece.Planes[p.PlaneStart + k];
+            var n = new Vector3(q.X, q.Y, q.Z);
+            if (inst.Rotated) n = Vector3.Transform(n, inst.Rotation);
+            into[k] = new Vector4(n, q.W + Vector3.Dot(n, shift));
+        }
+        return p.PlaneCount;
+    }
+
     /// <summary>The outward unit normal of a triangle a ray met, in the world.</summary>
     public Vector3 NormalOf(SolidRef s, int triangle)
     {
@@ -581,15 +628,27 @@ public sealed class TriangleWorld
     // ═══ The ground ═══════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// The highest counted upward face under five points (the centre and four at <paramref name="radius"/>
+    /// The highest counted floor under five points (the centre and four at <paramref name="radius"/>
     /// east, west, north and south of it) no higher than <paramref name="pos"/>.Y + <paramref name="step"/>:
     /// the floor a body standing at <paramref name="pos"/> stands on, as PhysicsUtils.GetGroundHeight asks
-    /// it. Returns -1000 when there is none. Of two floors at the same height, the lower owner.
+    /// it. Returns -1000 when there is none. Of two floors at the same height, the smaller patch, then the
+    /// lower owner (<see cref="Ties"/>).
     /// </summary>
     public float Ground<F>(Vector3 pos, float radius, float step, GeometryLayers layers, ref F filter, out SolidRef solid, out int owner)
         where F : IGeometryFilter
+        => Ground(pos, radius, step, layers, ref filter, out solid, out owner, out _);
+
+    /// <summary>
+    /// The same, and the floor's outward normal. A floor is a face no steeper than the walkable slope
+    /// (<see cref="SolidContact.WalkableCos"/>, 45 degrees): a steeper one is a wall, and a probe that
+    /// meets it goes on down past it to whatever is under it, so a body cannot stand on a bank too steep
+    /// to walk and slides down it instead (docs/GEOMETRY.md 3.2). A box's top is level, so on a map of
+    /// boxes this is the probe stage 1 had.
+    /// </summary>
+    public float Ground<F>(Vector3 pos, float radius, float step, GeometryLayers layers, ref F filter, out SolidRef solid, out int owner,
+                           out Vector3 normal) where F : IGeometryFilter
     {
-        solid = default; owner = -1;
+        solid = default; owner = -1; normal = Vector3.UnitY;
         float bestY = -1000f;
         if (_instances.Length == 0) return bestY;
         float top = pos.Y + step;
@@ -599,27 +658,41 @@ public sealed class TriangleWorld
         probes[2] = pos + new Vector3(-radius, 0, 0);
         probes[3] = pos + new Vector3(0, 0, radius);
         probes[4] = pos + new Vector3(0, 0, -radius);
-        var down = -Vector3.UnitY;
         for (int k = 0; k < 5; k++)
         {
-            var from = new Vector3(probes[k].X, top, probes[k].Z);
-            // A face exactly at the top is counted and one a hair above it is not, as the box test did:
-            // the height is read exactly off the face's plane, and a face the ray found that is in fact
-            // over the top is stepped past.
-            float tFrom = -InsideSlack;
-            for (int attempt = 0; attempt < 4; attempt++)
+            float y = FloorAt(probes[k].X, probes[k].Z, top, layers, ref filter, out var hit);
+            if (y <= -1000f) continue;
+            if (y > bestY || (y == bestY && owner >= 0 && new Ties(FootprintOf(solid), owner).Beats(FootprintOf(hit.Solid), hit.Owner)))
             {
-                if (!Closest(from, down, GroundReach, layers, RayFaces.Front, ref filter, out var hit, tFrom)) break;
-                float y = HeightOn(hit, from.X, from.Z);
-                if (y > top) { tFrom = MathF.Max(hit.T, tFrom) + 1e-6f; continue; }
-                if (y > bestY || (y == bestY && owner >= 0 && new Ties(FootprintOf(solid), owner).Beats(FootprintOf(hit.Solid), hit.Owner)))
-                {
-                    bestY = y; solid = hit.Solid; owner = hit.Owner;
-                }
-                break;
+                bestY = y; solid = hit.Solid; owner = hit.Owner; normal = hit.Normal;
             }
         }
         return bestY;
+    }
+
+    /// <summary>
+    /// The highest counted floor under one point (x, z) no higher than <paramref name="top"/>: its height
+    /// read exactly off the face's plane, and the face as a ray down met it. -1000 when there is none.
+    /// </summary>
+    public float FloorAt<F>(float x, float z, float top, GeometryLayers layers, ref F filter, out GeometryHit hit)
+        where F : IGeometryFilter
+    {
+        hit = default;
+        if (_instances.Length == 0) return -1000f;
+        var from = new Vector3(x, top, z);
+        var down = -Vector3.UnitY;
+        // A face exactly at the top is counted and one a hair above it is not, as the box test did: the
+        // height is read exactly off the face's plane, and a face the ray found that is in fact over the
+        // top is stepped past. So is a face too steep to stand on.
+        float tFrom = -InsideSlack;
+        for (int attempt = 0; attempt < 8; attempt++)
+        {
+            if (!Closest(from, down, GroundReach, layers, RayFaces.Front, ref filter, out hit, tFrom)) return -1000f;
+            float y = HeightOn(hit, x, z);
+            if (y > top || hit.Normal.Y < SolidContact.WalkableCos) { tFrom = MathF.Max(hit.T, tFrom) + 1e-6f; continue; }
+            return y;
+        }
+        return -1000f;
     }
 
     /// <summary>How far down the ground is looked for, metres (the box test's footprint was 40 km tall).</summary>

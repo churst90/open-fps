@@ -174,6 +174,9 @@ public class ClientPhysicsSystem
             if (triangles)
             {
                 var filter = new OwnAndStale { Own = OwnEntityId, Stale = snapshot.GeometryStale };
+                // As the server: the capsule on triangles, and the grade of the floor along the way.
+                ctx.Body = OpenFPS.Common.Geometry.BodyShape.Capsule;
+                ctx.Grade = SharedMovementEngine.GradeAlong(snapshot.Geometry!, ref filter, _state.Position, inputDir);
                 SharedMovementEngine.GatherSolids(ctx, snapshot.Geometry!, ref filter, solids);
                 obstacles = new SharedMovementEngine.Obstacles(collidersSlice, snapshot.Geometry,
                     System.Runtime.InteropServices.CollectionsMarshal.AsSpan(solids));

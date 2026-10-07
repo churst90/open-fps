@@ -40,6 +40,12 @@ public static class SharedMovementEngine
         public bool IsJumpRequested;
         public Vector3 MapMin;
         public Vector3 MapMax;
+        /// <summary>What the body is: the cylinder of the box path and stage 1, or stage 2's capsule
+        /// (docs/GEOMETRY.md 3.1). The triangle path walks a capsule; the box path a cylinder.</summary>
+        public OpenFPS.Common.Geometry.BodyShape Body;
+        /// <summary>The slope of the ground along the way the body is going, rise over run (positive up);
+        /// 0 on the level. See <see cref="GradeAlong"/> and <see cref="GradeSpeed"/>.</summary>
+        public float Grade;
     }
 
     /// <summary>
@@ -133,6 +139,78 @@ public static class SharedMovementEngine
             var r = OpenFPS.Common.Geometry.SolidContact.CylinderOverlap(World!, Solids[j - Boxes.Length], centre, radius, height);
             return r.IsColliding ? r.Penetration : 0f;
         }
+
+        /// <summary>How a capsule body with its feet at <paramref name="feet"/> overlaps obstacle
+        /// <paramref name="j"/>, and the way out (SolidContact.CapsuleOverlap): a floor lifts the feet by
+        /// the penetration itself.</summary>
+        public GeometryUtils.CollisionResult CapsuleOverlap(int j, Vector3 feet, in OpenFPS.Common.Geometry.SolidContact.Capsule body, bool airborne,
+                                                           out float depth)
+        {
+            if (j < Boxes.Length)
+            {
+                var col = Boxes[j];
+                var hit = OpenFPS.Common.Geometry.SolidContact.CapsuleOverlapBox(col.Position, col.Size, col.Rotation, feet, body, airborne, out depth);
+                if (hit.IsColliding) hit.Material = col.Material;
+                return hit;
+            }
+            var solid = Solids[j - Boxes.Length];
+            var r = OpenFPS.Common.Geometry.SolidContact.CapsuleOverlap(World!, solid, feet, body, airborne, out depth);
+            if (r.IsColliding) r.Material = World!.SurfaceOf(solid).Material;
+            return r;
+        }
+
+        /// <summary>How deep a capsule body is in obstacle <paramref name="j"/> (0 when clear of it).</summary>
+        public float CapsuleDepth(int j, Vector3 feet, in OpenFPS.Common.Geometry.SolidContact.Capsule body)
+        {
+            if (j < Boxes.Length)
+            {
+                var col = Boxes[j];
+                OpenFPS.Common.Geometry.SolidContact.CapsuleOverlapBox(col.Position, col.Size, col.Rotation, feet, body, airborne: true, out float depth);
+                return depth;
+            }
+            return OpenFPS.Common.Geometry.SolidContact.CapsuleDepth(World!, Solids[j - Boxes.Length], feet, body);
+        }
+    }
+
+    /// <summary>
+    /// The slope of the ground along <paramref name="direction"/> (horizontal), rise over run: the floors
+    /// under the feet and a body's radius ahead and behind, and the gentler of the two halves when both
+    /// climb or both fall, nothing when they disagree. On a ramp both halves are its slope; on a flight
+    /// of stairs each is a riser over a going, the flight's pitch; at a lone kerb one half is level, and a
+    /// kerb is stepped, not climbed. Static floors only, the same on the server and every client.
+    /// </summary>
+    public static float GradeAlong<F>(OpenFPS.Common.Geometry.TriangleWorld world, ref F filter, Vector3 feet, Vector3 direction,
+                                      float reach = PlayerRadius) where F : OpenFPS.Common.Geometry.IGeometryFilter
+    {
+        var d = new Vector3(direction.X, 0f, direction.Z);
+        float len = d.Length();
+        if (len < 1e-4f) return 0f;
+        d /= len;
+        float top = feet.Y + StepHeight;
+        var layers = OpenFPS.Common.Geometry.GeometryLayers.Ground;
+        float here = world.FloorAt(feet.X, feet.Z, top, layers, ref filter, out _);
+        float ahead = world.FloorAt(feet.X + d.X * reach, feet.Z + d.Z * reach, top, layers, ref filter, out _);
+        float behind = world.FloorAt(feet.X - d.X * reach, feet.Z - d.Z * reach, top + StepHeight, layers, ref filter, out _);
+        if (here <= -1000f || ahead <= -1000f || behind <= -1000f) return 0f;
+        float up = (ahead - here) / reach, before = (here - behind) / reach;
+        if (up > 0f && before > 0f) return MathF.Min(up, before);
+        if (up < 0f && before < 0f) return MathF.Max(up, before);
+        return 0f;
+    }
+
+    /// <summary>
+    /// How fast a body walks on a grade against the level, for a grade of rise over run along its way.
+    /// Up: 1 / (1 + 2g), so a ramp of 1 in 12 is 0.86 and a stair's pitch (about 0.6) 0.45. Down: a
+    /// little faster on a gentle slope, 1.05 at a tenth, then slower, 1.05 / (1 + 1.2 (|g| - 0.1)), so a
+    /// stair down is 0.65. People measured on stairs go up at a little under half their level speed and
+    /// down at about two thirds of it (Fruin, Pedestrian Planning and Design, 1971); Tobler's hiking law
+    /// puts the fastest walk on a slight downhill. Not past the walkable slope: steeper is a wall.
+    /// </summary>
+    public static float GradeSpeed(float grade)
+    {
+        if (grade >= 0f) return 1f / (1f + 2f * MathF.Min(grade, 1f));
+        float a = MathF.Min(-grade, 1f);
+        return a <= 0.1f ? 1f + 0.5f * a : 1.05f / (1f + 1.2f * (a - 0.1f));
     }
 
     /// <summary>
@@ -209,7 +287,17 @@ public static class SharedMovementEngine
         // Only for a body that is NOT already going up or down: one that has jumped, or is genuinely
         // falling, keeps the old tolerance, so walking off a roof is still walking off a roof.
         float stepDown = vel.Y > -0.01f && vel.Y < 0.01f ? MathF.Max(0.1f, ctx.StepHeight) : 0.1f;
-        if (pos.Y <= ctx.GroundHeight + stepDown && vel.Y <= 0.1f)
+        // ── A falling capsule is not lifted onto a ledge beside it ──────────────────────────────
+        //
+        // The probe looks a body's radius out on every side, which is the cylinder's footprint: the
+        // cylinder was kept that far from any wall it fell past, so whatever a probe found under it
+        // was under its feet. The capsule's rounded bottom lets a falling body come within a few
+        // centimetres of a ledge just above its feet, a probe finds the ledge, and the body was put
+        // up on it, over and over, all the way along a building's wall (RoofEdgeFallTests). A body on
+        // its way down stands on something above its feet only if it comes down on it, which its own
+        // contact with it says (SolidContact.CapsuleOverlap's floor).
+        bool falling = ctx.Body == OpenFPS.Common.Geometry.BodyShape.Capsule && vel.Y < -0.01f && ctx.GroundHeight > pos.Y;
+        if (pos.Y <= ctx.GroundHeight + stepDown && vel.Y <= 0.1f && !falling)
         {
             if (ctx.GroundHeight > DefaultGroundCheckLimit) // Valid ground check
             {
@@ -252,7 +340,11 @@ public static class SharedMovementEngine
         }
 
         // --- 2. HORIZONTAL MOVEMENT ---
-        Vector3 horizontalVel = ctx.InputDirection * ctx.Speed;
+        // Slower up a slope or a flight, a little faster down a gentle one (GradeSpeed). Only on the
+        // ground: a body in the air keeps the speed it has.
+        float speed = ctx.Speed;
+        if (isGrounded && ctx.Grade != 0f) speed *= GradeSpeed(ctx.Grade);
+        Vector3 horizontalVel = ctx.InputDirection * speed;
         vel.X = horizontalVel.X;
         vel.Z = horizontalVel.Z;
 
@@ -283,21 +375,31 @@ public static class SharedMovementEngine
         // in: no net movement, 4.5 m/s of path length, footsteps that never stopped, and an acoustic
         // region that flipped back and forth at half the tick rate wherever that straddled a doorway.
         bool pushed = false;
+        bool capsule = ctx.Body == OpenFPS.Common.Geometry.BodyShape.Capsule;
+        var body = new OpenFPS.Common.Geometry.SolidContact.Capsule(ctx.PlayerRadius, footPadding, ctx.PlayerHeight);
         for (int i = 0; i < 3; i++)
         {
             Vector3 nextPos = pos + remainingMove;
             GeometryUtils.CollisionResult bestHit = new() { IsColliding = false };
             int bestIndex = -1;
+            float bestDepth = 0f;
 
             for (int j = 0; j < nearbyColliders.Count; j++)
             {
-                var hit = nearbyColliders.Overlap(j, nextPos + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight, canGoDown: !isGrounded);
+                // The deepest contact is resolved first. The cylinder's penetration is its depth; the
+                // capsule's is how far it moves, which for a floor is a lift, so it ranks by depth.
+                float depth = 0f;
+                var hit = capsule
+                    ? nearbyColliders.CapsuleOverlap(j, nextPos, body, airborne: !isGrounded, out depth)
+                    : nearbyColliders.Overlap(j, nextPos + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight, canGoDown: !isGrounded);
+                if (!capsule) depth = hit.Penetration;
                 if (hit.IsColliding)
                 {
-                    if (!bestHit.IsColliding || hit.Penetration > bestHit.Penetration)
+                    if (!bestHit.IsColliding || depth > bestDepth)
                     {
                         bestHit = hit;
                         bestIndex = j;
+                        bestDepth = depth;
                     }
                 }
             }
@@ -318,7 +420,8 @@ public static class SharedMovementEngine
                 bool stepBlocked = false;
                 for (int j = 0; j < nearbyColliders.Count; j++)
                 {
-                    if (nearbyColliders.Intersects(j, stepTarget + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight))
+                    if (capsule ? nearbyColliders.CapsuleDepth(j, stepTarget, body) > 0f
+                                : nearbyColliders.Intersects(j, stepTarget + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight))
                     {
                         stepBlocked = true;
                         break;
@@ -338,8 +441,9 @@ public static class SharedMovementEngine
             {
                 // A FLOOR the body came down into (see GetCylinderAABBOverlap): out the top, onto it.
                 // The cylinder stops footPadding above the feet, so the feet go that much further up
-                // to stand on the surface rather than a hand's breadth inside it.
-                pos = nextPos + bestHit.Normal * (bestHit.Penetration + footPadding);
+                // to stand on the surface rather than a hand's breadth inside it. The capsule's floor
+                // says how far the feet go itself.
+                pos = nextPos + bestHit.Normal * (bestHit.Penetration + (capsule ? 0f : footPadding));
                 remainingMove = Vector3.Zero;
                 if (vel.Y < 0f) vel.Y = 0f;
                 isGrounded = true;
@@ -381,7 +485,8 @@ public static class SharedMovementEngine
         // taken across the ground: it stays where it stood. Something already inside a wall at the
         // start (spawned there, or a leaf swung into it) is still let out the way the passes say.
         if (pushed && (pos.X != ctx.Position.X || pos.Z != ctx.Position.Z)
-            && PushedDeeperIntoAnything(ctx, nearbyColliders, pos, cylinderCenterOffset, collisionHeight))
+            && (capsule ? CapsulePushedDeeper(ctx, nearbyColliders, pos, body)
+                        : PushedDeeperIntoAnything(ctx, nearbyColliders, pos, cylinderCenterOffset, collisionHeight)))
         {
             pos.X = ctx.Position.X;
             pos.Z = ctx.Position.Z;
@@ -403,7 +508,8 @@ public static class SharedMovementEngine
         if (pos.Z > maxZ) { pos.Z = maxZ; vel.Z = 0; }
 
         // --- 5. FINAL POST-STEP GROUND CHECK ---
-        if (ctx.GroundHeight > DefaultGroundCheckLimit && pos.Y < ctx.GroundHeight)
+        // (Not for a capsule falling past a ledge above its feet: see the top of the step.)
+        if (ctx.GroundHeight > DefaultGroundCheckLimit && pos.Y < ctx.GroundHeight && !falling)
         {
             pos.Y = ctx.GroundHeight;
             if (vel.Y < 0) vel.Y = 0;
@@ -429,6 +535,20 @@ public static class SharedMovementEngine
             float there = colliders.Depth(j, end + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight);
             if (there <= DeeperTolerance) continue;
             float before = colliders.Depth(j, ctx.Position + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight);
+            if (there > before + DeeperTolerance) return true;
+        }
+        return false;
+    }
+
+    /// <summary><see cref="PushedDeeperIntoAnything"/> for the capsule.</summary>
+    private static bool CapsulePushedDeeper(in MovementContext ctx, Obstacles colliders, Vector3 end,
+                                            in OpenFPS.Common.Geometry.SolidContact.Capsule body)
+    {
+        for (int j = 0; j < colliders.Count; j++)
+        {
+            float there = colliders.CapsuleDepth(j, end, body);
+            if (there <= DeeperTolerance) continue;
+            float before = colliders.CapsuleDepth(j, ctx.Position, body);
             if (there > before + DeeperTolerance) return true;
         }
         return false;

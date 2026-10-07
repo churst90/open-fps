@@ -231,6 +231,10 @@ public static class MovementSystem
                     if (geometry != null)
                     {
                         var self = new OpenFPS.Common.Geometry.ExceptOwners(e.Id);
+                        // On triangles the body is the capsule, and the ground has a grade (docs/GEOMETRY.md
+                        // stage 2); the box path keeps the cylinder on the level.
+                        ctx.Body = OpenFPS.Common.Geometry.BodyShape.Capsule;
+                        ctx.Grade = SharedMovementEngine.GradeAlong(geometry, ref self, transform.Position, inputDir);
                         SharedMovementEngine.GatherSolids(ctx, geometry, ref self, _solidScratch);
                         obstacles = new SharedMovementEngine.Obstacles(collidersSlice, geometry,
                             System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_solidScratch));
