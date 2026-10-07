@@ -18,7 +18,7 @@ namespace OpenFPS.Common;
 /// </summary>
 public static class RunningGear
 {
-    /// <summary>The steering lock every vehicle had before any was published for it, radians.</summary>
+    /// <summary>The steering lock where no turning circle is published, radians.</summary>
     public const float UnpublishedLock = 0.61f;
 
     private static AxleSpec Front(string tyre, float track, bool driven, BrakeKind brake) => new()
