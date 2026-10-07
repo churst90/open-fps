@@ -392,3 +392,15 @@ the tail spread evenly it was "centralised"; with sample-identical copies the ea
 If the tail sounds like a wash at a level near 0, look for something non-physical before trimming. One is
 known: the trace rings as long at 4 kHz as at 250 Hz (0.79 s, where Sabine from the same materials says
 0.52), so the top hangs on.
+
+## Screen reader keys are not game keys
+
+No gameplay action may be bound to a key a screen reader owns. Control is how a screen reader user
+silences speech (every reader stops talking when it is pressed) and Alt belongs to the window manager; a
+blind player presses both dozens of times a minute as punctuation, so a game action on one of them is a
+key that fires by itself. Control was the trigger. The cost is on record: five sessions chasing a report
+of "random banging... bang, wait a few seconds, bang, like someone closing a cabinet, I have no clue what
+the noise is", through the reverb model, the room equation, the movement engine and the reflection
+machinery, and the answer was twenty-six rifle shots at 159 dB the player had fired himself by shutting
+his screen reader up. It was found in an audio trace, not by reading the bindings, so ScreenReaderKeyTests
+asserts the bindings.
