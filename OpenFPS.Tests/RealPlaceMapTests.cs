@@ -207,6 +207,66 @@ public class RealPlaceMapTests : IClassFixture<RealPlaceMapTests.Loaded>
         Assert.True(bad.Count <= rooms / 100, $"{bad.Count} rooms under named places, of {rooms}");
     }
 
+    /// <summary>
+    /// A building is tagged whole with one tile, the one its middle is in. Cut by a 250 m tile edge, a
+    /// loader streaming by the generator's "Tile" got half a house: a room whose doorway was in the next
+    /// tile, walls on one side and not the other. Resonance counted 104 such on Magnolia (2026-10-06);
+    /// gen_osm.py counts 156 there and 138 on Albany by where each part's own centre stands.
+    ///
+    /// Held two ways: every group of rooms joined by doors and doorways (a house, as MapTiles groups
+    /// one) carries one tile, and so does every wall, roof, floor and door named for a building whose
+    /// name no other group shares.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Places))]
+    public void A_building_is_tagged_whole_with_one_tile(string id)
+    {
+        var data = _maps.Get(id).Data;
+        var byId = data.Entities.ToDictionary(e => e.EntityId);
+        var parent = new Dictionary<int, int>();
+        int Find(int x) { while (parent[x] != x) x = parent[x] = parent[parent[x]]; return x; }
+        void Union(int a, int b) { parent.TryAdd(a, a); parent.TryAdd(b, b); int ra = Find(a), rb = Find(b); if (ra != rb) parent[ra] = rb; }
+        foreach (var e in data.Entities)
+        {
+            if (e.RegionAId is not int a || e.RegionBId is not int b || a == b) continue;
+            foreach (int r in new[] { a, b })
+                if (byId.TryGetValue(r, out var room) && room.Layer == "rooms") Union(e.EntityId, r);
+        }
+        var groups = parent.Keys.GroupBy(Find).Select(g => g.Select(i => byId[i]).ToList()).ToList();
+        Assert.NotEmpty(groups);
+
+        var split = groups.Where(g => g.Select(e => e.Tile).Distinct().Count() > 1).ToList();
+        foreach (var g in split.Take(5))
+            _o.WriteLine($"split: {g.First(e => e.Layer == "rooms").Name} over {string.Join(" ", g.Select(e => e.Tile).Distinct())}");
+
+        // The parts named for each building: "<name> north wall", "<name> roof", "<name> front door".
+        string Building(string room) => room.LastIndexOf(", ", StringComparison.Ordinal) is int c and > 0 ? room[..c] : room;
+        var names = groups.Select(g => (Group: g, Names: g.Where(e => e.Layer == "rooms" && e.Name != null)
+                                                          .Select(e => Building(e.Name!)).Distinct().ToList()))
+                          .Where(x => x.Names.Count == 1).ToList();
+        // Addresses only: "Shed off Service road" names every shed down that road, rooms or none.
+        var unique = names.GroupBy(x => x.Names[0]).Where(n => n.Count() == 1 && char.IsDigit(n.Key[0]))
+                          .ToDictionary(n => n.Key, n => n.Single().Group);
+        var parts = data.Entities.Where(e => e.Name != null && e.Layer is "structure" or "interiors").ToList();
+        int checkedParts = 0, strayParts = 0;
+        foreach (var e in parts)
+        {
+            // The building's name is everything before the part's own words; try each cut.
+            for (int at = e.Name!.LastIndexOf(' '); at > 0; at = e.Name.LastIndexOf(' ', at - 1))
+            {
+                if (!unique.TryGetValue(e.Name[..at], out var g)) continue;
+                checkedParts++;
+                if (e.Tile != g[0].Tile) { strayParts++; if (strayParts <= 5) _o.WriteLine($"stray: {e.Name} in {e.Tile}, its rooms in {g[0].Tile}"); }
+                break;
+            }
+        }
+        _o.WriteLine($"{id}: {groups.Count} houses by their rooms and doorways, {split.Count} over more than one tile; "
+                   + $"{checkedParts} named parts checked, {strayParts} in another tile than their rooms");
+        Assert.True(checkedParts > groups.Count, $"only {checkedParts} parts were found by name");
+        Assert.Empty(split);
+        Assert.Equal(0, strayParts);
+    }
+
     /// <summary>Anybody can rebuild the map from the inputs in tools/places: the generator writes the
     /// shipped file byte for byte.</summary>
     [Theory]
