@@ -43,6 +43,12 @@ Recent work, newest first. `git log` has the rest.
     were squared off by up to 5 dB. In the game at 5 m the tram gong's sharper blows push the master
     limiter (10 dB of gain reduction, 5 before), so its average comes out 4.5 dB lower. Unheard; renders
     in inbox/probable-bugs-2026-10-07/5-bell.
+  - Not a bug: `SetSimulatedReverbDecay` ignores its high and low decay ratios, and a room's colour still
+    reaches the reverb. The tail is the traced response (no parametric unit is left), coloured by the
+    materials it is traced with. Measured through the whole mixer (`--probable-bugs scene=rooms`), a clap's
+    tail per octave: the carpeted flat decays 0.6 to 0.8 s, the tiled stairwell 1.35 to 2.2 s, its top
+    octaves shorter than its middle (air and the tiles). The TODO is now a comment saying so. Renders
+    in inbox/probable-bugs-2026-10-07/4-reverb-colour.
 - Housekeeping (docs/HOUSEKEEPING.md) of OpenFPS.Client.Core, all but the seven Nature files being
   optimised elsewhere (ShoreSynth, RunningWaterSynth, EventSum, PowerLawNoise, Resonator,
   FallingWaterSynth). No behaviour, sound or wire change: the render fingerprints and the emitter stream
