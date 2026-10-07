@@ -13,9 +13,8 @@ public class WeaponSystemTests
     [Fact]
     public void EveryWeaponSoundsLikeItselfAndNotLikeAnother()
     {
-        // Five weapons must be five sounds. When the blast came from a table of three profiles keyed
-        // by name, the Glock and the .45 rendered byte-identical — and a 9 mm and a .45 are about as
-        // different as two handguns get.
+        // Five weapons, five sounds: from a table of three profiles the Glock and the .45 rendered
+        // byte-identical.
         var rendered = WeaponRegistry.All
             .ToDictionary(w => w.Id, w => WeaponSynth.MuzzleBlast(WeaponProfile.From(w)));
 
@@ -33,14 +32,10 @@ public class WeaponSystemTests
     }
 
     /// <summary>
-    /// The reports are what the recordings say they are, and the shotgun is the biggest.
-    ///
-    /// Updated 2026-10-02. This held the positive phase to 0.35-0.56 ms and the corner to 2.5-3.5 kHz,
-    /// the values of the one-pole model; the bubble model (WeaponSynth.MuzzleBlast) sets its note from
-    /// the shock's own zero crossing, 0.20-0.28 ms for the five measured guns, which renders at 0.26-0.32
-    /// ms after 20-40 m (against 0.2-0.5 in the recordings), and its corner is the gas's alone. The band
-    /// balance itself is held against the recordings in GunfireSpecTests. The shotgun, never recorded,
-    /// is the largest bore and charge: the longest pulse, and the darkest render by spectral centroid.
+    /// The reports are what the recordings say, and the shotgun is the biggest. WeaponSynth.MuzzleBlast's
+    /// positive phase is 0.20-0.28 ms for the five measured guns, 0.26-0.32 ms after 20-40 m (recordings
+    /// 0.2-0.5); band balance is in GunfireSpecTests. The shotgun, never recorded, is the largest bore and
+    /// charge: the longest pulse and the darkest render by spectral centroid.
     /// </summary>
     [Fact]
     public void TheReportsAreTheMeasuredOnesAndTheShotgunIsTheBiggest()
@@ -59,10 +54,9 @@ public class WeaponSystemTests
     }
 
     /// <summary>
-    /// The report is as short as a real one. At 20 m a real rifle's report falls 20 dB within 2.5-3.5
-    /// ms of its peak and 30 dB within 4-7; the synthesis before this one took 18-26 ms to fall 20 dB,
-    /// which was most of why it did not sound like a gun. Measured at the source here, in 0.25 ms
-    /// windows: down 20 dB inside 5 ms, 30 dB inside 9, for every weapon.
+    /// The report is as short as a real one: at 20 m a rifle's falls 20 dB within 2.5-3.5 ms of its peak
+    /// and 30 dB within 4-7 (an older synthesis took 18-26 ms). At the source, in 0.25 ms windows: 20 dB
+    /// inside 5 ms, 30 inside 9, for every weapon.
     /// </summary>
     [Fact]
     public void AReportIsAsShortAsARealOne()

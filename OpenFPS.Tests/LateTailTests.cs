@@ -59,8 +59,8 @@ public class LateTailTests
     [Fact]
     public void ASilentLatePartIsOneEmptyPartition()
     {
-        // Outdoors a trace has nothing late; convolving the longest IR of zeros every block costs the
-        // mixer the whole budget for silence.
+        // Outdoors a trace has nothing late; convolving a long IR of zeros every block would spend the
+        // mixer's budget on silence.
         var ir = LateTailIr.FromWindowed(new float[Rate * 2], Block, 64);
         Assert.Equal(1, ir.Partitions);
         Assert.Equal(0.0, ir.Energy, 12);

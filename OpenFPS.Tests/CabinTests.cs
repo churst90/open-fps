@@ -5,12 +5,9 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The inside of a car: the same machine, heard through the body.
-///
-/// Nothing is synthesised for the interior that the outside does not already have; what changes is
-/// the path. So what these hold is the path's three facts — a steel body stops the top end far more
-/// than the bottom (the mass law), the seals let a little of everything in, and the cabin booms —
-/// and the one source that is new from in here, the wind, which rises steeply with speed.
+/// The inside of a car: the same machine through a different path. A steel body stops the top end far
+/// more than the bottom (the mass law), the seals let a little of everything in, the cabin booms, and
+/// the wind, the one new source, rises steeply with speed.
 /// </summary>
 public class CabinTests
 {
@@ -49,8 +46,8 @@ public class CabinTests
     }
 
     /// <summary>
-    /// A voice made while the car is parked, engine off, and then the key is turned: it must crank,
-    /// catch and RUN. "I press T to start and the car doesn't sound like it's running."
+    /// A voice made while the car is parked, engine off, then the key turned: it cranks, catches and runs
+    /// ("I press T to start and the car doesn't sound like it's running").
     /// </summary>
     [Fact]
     public void AVoiceStartedWithTheEngineOffStartsWhenTheKeyIsTurned()
@@ -81,10 +78,8 @@ public class CabinTests
     }
 
     /// <summary>
-    /// The loudness law, applied to what the engine is doing NOW. The mix compresses a source's
-    /// declared level by 0.45, and a car is declared at full load; idling 25 dB under that it was
-    /// placed uncompressed, and came out under a window air conditioner. Live, the deficit is lifted
-    /// by the same law: idle ends up 0.45 of the way down, not all the way.
+    /// The loudness law applies to what the engine is doing now: a car is declared at full load, and
+    /// idling 25 dB under it went uncompressed, under a window air conditioner. Idle lands 0.45 of the way down.
     /// </summary>
     [Fact]
     public void AnIdlingEngineIsLiftedByTheLoudnessLaw()
@@ -124,13 +119,9 @@ public class CabinTests
     }
 
     /// <summary>
-    /// A small car inside, measured UNWEIGHTED — which is not the figure usually quoted. The quoted
-    /// ones are A-weighted (40-50 dBA idling, 65-70 at 110 km/h) and A-weighting throws away most of
-    /// what a cabin is: its boom sits under 100 Hz, where A takes off twenty decibels and more.
-    /// Unweighted, a small car is around 60 idling and the mid-seventies at motorway speed, and the
-    /// rise with speed is smaller than the A-weighted one for the same reason: the wind and the tyres
-    /// that grow fastest are the mid-band sources A keeps. Wide bands — this catches a path out by a
-    /// factor of ten, not a tuning.
+    /// A small car inside, unweighted: about 60 dB idling and the mid-seventies at motorway speed. Quoted
+    /// figures are A-weighted (40-50 dBA, 65-70 at 110 km/h), and A takes 20 dB off the boom under 100 Hz.
+    /// Wide bands: this catches a path out by a factor of ten, not a tuning.
     /// </summary>
     [Fact]
     public void AHatchbackInsideIsAsLoudAsOne()

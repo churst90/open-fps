@@ -3,15 +3,13 @@ using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 namespace OpenFPS.Tests;
 
-/// <summary>Unit tests for the pure Steam Audio mapping logic added in Phase 4 (no native libs needed).</summary>
+/// <summary>The pure Steam Audio mapping logic, without the native libraries.</summary>
 public class SteamAudioMappingTests
 {
     // --- Pathing SH -> world arrival direction (convention measured from the simulator) ---
-    // Raw order-1 SH (ACN): [0]=W, [1]=m-1, [2]=m0, [3]=m+1. Signs below are the measured calibration data,
-    // taken when the scene was handed to Steam Audio in the game's frame. Since 2026-09-29 the scene and
-    // every source go through Phonon.World, which negates z (Steam Audio's forward is -z), so an arrival
-    // from the game's +z is Steam Audio's -z and its m+1 coefficient has the other sign. The x rows are
-    // untouched by the mirror.
+    // Raw order-1 SH (ACN): [0]=W, [1]=m-1, [2]=m0, [3]=m+1; the signs are measured calibration data.
+    // Phonon.World negates z (Steam Audio's forward is -z), so an arrival from the game's +z has the
+    // other sign of m+1; the x rows are untouched.
     [Theory]
     [InlineData(0f, 0f, 0.081f, 0f, 0f, 1f)]    // +z arrival (game): m+1 positive in the mirrored world
     [InlineData(0f, 0f, -0.081f, 0f, 0f, -1f)]  // -z arrival

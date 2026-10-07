@@ -48,8 +48,8 @@ public class StarterTests
             var v = make();
             var r = KeyOn(v);
             _out.WriteLine($"{key,-22} off {r.OffDb,7:F1} dB  crank {r.CrankDb,7:F1} dB for {r.CrankSeconds:F2} s  idle {r.IdleDb,7:F1} dB");
-            // Long enough to be heard as a start, and it does start. The key is held until the driver
-            // hears it catch: it was let go on the first firing, 0.34 s in, and nobody heard a starter.
+            // The key is held until the driver hears it catch: let go on the first firing, 0.34 s in,
+            // nobody heard a starter.
             Assert.True(r.CrankSeconds >= 0.5f, $"{key} cranked for only {r.CrankSeconds:F2} s");
             Assert.True(r.CrankSeconds <= 3f, $"{key} was still cranking after {r.CrankSeconds:F2} s");
         }
@@ -140,8 +140,7 @@ public class BusChimeProbe
             {
                 if (b == 300) voice.ServingStop = true;
                 voice.Render(buf);
-                // Above about a kilohertz, where the ear compares a beeper with a diesel: two
-                // first-order high-passes at 1 kHz.
+                // Above 1 kHz, where the ear compares a beeper with a diesel: two first-order high-passes.
                 for (int i = 0; i < buf.Length; i++)
                 {
                     float x = buf[i];

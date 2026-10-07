@@ -9,15 +9,10 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The barrier search (OpeningRoutes.BarrierPathDifference) as a car drives past: the answer may only
-/// change as fast as the geometry along the way does.
-///
-/// "Now and then I hear sounds like a siren pop through for an instant" (Cody, 2026-10-02). From the
-/// Main Street pavement the game's [POP] lines were cars 150-300 m off whose mid band went from -80 dB
-/// to -20 and back in a third of a second. --pop-hunt found it: the route over the thing in the way was
-/// believed only when no other box touched it, so it came and went with whatever the route happened
-/// to brush past — a pier on a park wall, the next storey of a building — and while it was gone the
-/// answer was what comes THROUGH every wall on the line.
+/// The barrier search (OpeningRoutes.BarrierPathDifference) as a car drives past: the answer changes only
+/// as fast as the geometry does. Guards "a siren pop through for an instant" (Cody, 2026-10-02): cars
+/// 150-300 m off went -80 to -20 dB and back in a third of a second, because the route over an obstacle
+/// was believed only when no other box touched it (a pier, the next storey), leaving only what came through.
 /// </summary>
 public class OpeningRoutesBarrierTests
 {
@@ -56,11 +51,9 @@ public class OpeningRoutesBarrierTests
     }
 
     /// <summary>
-    /// A park's 1.1 m wall with a 0.5 m pier every 7.5 m along its top, as the city's are; the listener
-    /// 70 m in front of it, a car driving past 80 m behind, the line between them grazing the wall top.
-    /// Over the wall is a few millimetres out of the way wherever the car is. Before, the route was
-    /// thrown out whenever its leg to the ear crossed the wall at a pier, and the car went from -7 dB to
-    /// "not verified" (the worker then charged it the wall's full transmission, -61) and back.
+    /// A park's 1.1 m wall with a 0.5 m pier every 7.5 m, the listener 70 m in front, a car passing 80 m
+    /// behind, the line grazing the wall top. A route crossing at a pier was thrown out, and the car went
+    /// from -7 dB to the wall's full transmission, -61, and back.
     /// </summary>
     [Fact]
     public void A_pier_on_a_wall_the_sound_goes_over_does_not_take_the_route_away()
@@ -89,18 +82,15 @@ public class OpeningRoutesBarrierTests
         }
         _o.WriteLine($"{steps} positions, {unverified} without a route; largest step between neighbours {worstStep:F2} dB");
         Assert.Equal(0, unverified);
-        // Within 3 dB: where the line meets a pier the string goes over the pier (a few centimetres, 8 dB)
-        // rather than round its side (grazing, 5), which the search cannot find against the wall it stands on.
+        // Within 3 dB: at a pier the string goes over it (8 dB) rather than round its side (5), which the
+        // search cannot find against the wall the pier stands on.
         Assert.True(worstStep < 3.5f, $"the mid band stepped {worstStep:F2} dB between positions 10 cm apart");
     }
 
     /// <summary>
-    /// A six-storey building built as the city builds them — a wall box per side per storey, a slab
-    /// over each — between a listener in the street and a car driving past behind it. No route round one
-    /// box is clear of the rest (over a wall's top is into the slab above, round its end is into the
-    /// next wall), and before, that left only what comes through the building: the car at -80 dB until
-    /// some position let a route through, then back. Over the roof is always there; it is the string
-    /// pulled tight over every storey in the vertical plane through the two (ISO 9613-2, CNOSSOS-EU).
+    /// A six-storey building as the city builds them (a wall box per side per storey, a slab over each)
+    /// between a listener and a passing car. No route round one box clears the rest; over the roof is
+    /// always there, the string pulled tight over every storey in the vertical plane (ISO 9613-2, CNOSSOS-EU).
     /// </summary>
     [Fact]
     public void Over_a_building_of_many_boxes_there_is_always_a_way()
@@ -141,10 +131,7 @@ public class OpeningRoutesBarrierTests
         Assert.True(quietest < -20f, $"over the roof came out at {quietest:F1} dB");
     }
 
-    /// <summary>
-    /// The same string over the top does not exist when an end has a roof over it: from inside a room,
-    /// the way out is through its openings or its walls, never up through the ceiling.
-    /// </summary>
+    /// <summary>From inside a room there is no string over the top: the way out is through its openings or walls.</summary>
     [Fact]
     public void No_way_over_the_top_from_under_a_roof()
     {

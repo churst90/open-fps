@@ -87,9 +87,8 @@ public class WeatherWindTests
     }
 
     /// <summary>
-    /// Two clients that got the same broadcasts hear the same wind, though their packets landed at
-    /// different moments: once the ramps are over they agree exactly, which is what makes a gust reach
-    /// the same tree at the same time for everybody.
+    /// Two clients that got the same broadcasts at different moments agree exactly once the ramps are
+    /// over, so a gust reaches the same tree at the same time for everybody.
     /// </summary>
     [Fact]
     public void TwoClientsHearTheSameWind()
@@ -110,9 +109,9 @@ public class WeatherWindTests
     }
 
     /// <summary>
-    /// The wind veers and strengthens without the gusts racing. The eddy pattern is carried by how far
-    /// the air has travelled; one fixed to a direction would swing round the map's origin as the wind
-    /// turned, and a tree two kilometres out would hear minutes of gusts in seconds.
+    /// The wind veers and strengthens without the gusts racing: the eddy pattern is carried by how far the
+    /// air has travelled. Fixed to a direction, it swung round the map's origin as the wind turned, and a
+    /// tree 2 km out heard minutes of gusts in seconds.
     /// </summary>
     [Fact]
     public void AVeeringWindDoesNotRaceTheGustsFarFromTheOrigin()
@@ -143,8 +142,7 @@ public class WeatherWindTests
         double steady = Busy(e => e.PinWind(new Vector3(0f, 0f, -10f), 0.4f), null);
         double veering = Busy(e => e.PinWind(new Vector3(0f, 0f, -10f), 0.4f), e => e.PinWind(new Vector3(-20f, 0f, 0f), 0.4f));
         _o.WriteLine($"gust rate of change 2 km out: steady {steady:F3}/s, veering and doubling {veering:F3}/s");
-        // The gusts come faster in a stronger wind, as they should (twice the speed, twice the rate),
-        // and no faster than that.
+        // Twice the wind speed, twice the gust rate, and no faster.
         Assert.True(veering < steady * 2.5, $"the gusts raced: {veering:F3}/s against {steady:F3}/s steady");
     }
 
@@ -296,7 +294,7 @@ public class WeatherWindTests
         var gale = EarWind.Ears(25f, new Vector2(-25f, 0f), 0f);
         float l = EarWind.RenderedDb(gale.DeclaredDb, gale.LeftDb), r = EarWind.RenderedDb(gale.DeclaredDb, gale.RightDb);
         Assert.True(EarWind.HeldDb(EarWind.PlacedDb(gale.DeclaredDb)) < EarWind.CeilingDb);
-        // ...and side-on its two ears are still nine and a half decibels apart.
+        // Side-on its two ears are still 9.5 dB apart.
         Assert.Equal(9.5f, l - r, 2);
         // Below the knee the ceiling does nothing.
         Assert.Equal(-40f, EarWind.HeldDb(-40f), 4);

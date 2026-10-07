@@ -10,16 +10,8 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The stand is full of people and you cannot hear them.
-///
-/// Three separate things had to be true at once for that, and only the last one is about the crowd:
-///   * a transient's range was capped at 250 m, and the mixer fades a voice to nothing over the last
-///     quarter of its range — so everything past 187 m was on its way out for being far away, and the
-///     grandstand is 219 m from where you land;
-///   * a crowd was placed as a POINT, with the reference distance of a firework, while the cars beside
-///     it are placed at their own size — so the two were not being compared on the same terms;
-///   * and every reaction rendered a new three-second buffer and registered a new sound with the
-///     mixer, ninety a minute, because nothing quantised the key.
+/// A full stand is heard: placed at its own size, not faded for its distance, against the cars in front
+/// of it. Why it was once silent: docs/TEST_NOTES.md, "The silent grandstand".
 /// </summary>
 public class CrowdAudibilityTests
 {
@@ -38,7 +30,7 @@ public class CrowdAudibilityTests
         Assert.True(manager.TryGetMap("speedway", out World world, out _, out _, out var lookup));
         var data = manager.GetAllMaps().First(kv => kv.Key == "speedway").Value.data;
 
-        // Sixty seconds of the real race, so the crowd is reacting to real cars at real speeds.
+        // Sixty seconds of the real race: the crowd reacts to real cars at real speeds.
         CrowdSystem.Reset();
         float dt = 1f / 30f;
         for (int tick = 0; tick < 30 * 60; tick++) vehicles.Update("speedway", world, dt);
@@ -53,7 +45,7 @@ public class CrowdAudibilityTests
         return got;
     }
 
-    /// <summary>The crowd reacts to the field that is actually on the track — nobody had ever checked.</summary>
+    /// <summary>The crowd reacts to the field that is actually on the track.</summary>
     [Fact]
     public void TheCrowdReactsToTheRealField()
     {
@@ -80,28 +72,21 @@ public class CrowdAudibilityTests
         Assert.Equal(here.Count, there.Count);
     }
 
-    /// <summary>
-    /// A crowd carries its own size, and it is the size of the patch the people fill.
-    /// </summary>
+    /// <summary>A crowd's size is the size of the patch its people fill.</summary>
     [Fact]
     public void ACrowdIsNotAPoint()
     {
         // 400 people at half a square metre each fill 200 m²: a patch about eight metres across.
         float radius = Applause.SpreadRadiusMetres(400);
         Assert.InRange(radius, 6f, 10f);
-        // And it grows with the square root of the head count, not with the head count.
+        // It grows with the square root of the head count.
         Assert.InRange(Applause.SpreadRadiusMetres(1600) / radius, 1.9f, 2.1f);
     }
 
     /// <summary>
-    /// The one that matters: a full stand across the infield is heard at about the level it really has
-    /// relative to the cars in front of it.
-    ///
-    /// Both sides are worked out the way the mixer works them out — <see cref="Loudness.RenderedGain"/>
-    /// is the law the provider applies — and compared against the physics, which is just the inverse
-    /// square law from each source's own level. Before this, the crowd came out sixteen decibels under
-    /// where the physics puts it, which is the difference between "there is a crowd over there" and
-    /// nothing at all.
+    /// A full stand across the infield is heard at about its real level relative to the cars in front of
+    /// it: both placed through <see cref="Loudness.RenderedGain"/>, as the provider does, against the
+    /// inverse square law from each source's own level. It came out 16 dB under.
     /// </summary>
     [Fact]
     public void AStandAcrossTheInfieldIsHeardAgainstTheCars()
@@ -121,11 +106,9 @@ public class CrowdAudibilityTests
         float crowdRendered = Loudness.RenderedGain(crowdPlaced.Gain, crowdPlaced.ReferenceDistance,
                                                     Loudness.AudibleRange(crowdLevel), crowdDist);
 
-        // A car on the track in front of you, placed the way ClientAudioSystem places one: its own
-        // measured level, and its own size as the reference distance. One of the speedway's own field,
-        // at about the stand's level, because the mix's compression holds relative levels only between
-        // sources of like level: this used to be the sports bike, which passed while it was an open-
-        // piped 118 dB and failed when it got a stock silencer (107) for reasons that were not the crowd's.
+        // A car placed as ClientAudioSystem places one: its measured level, its size as the reference
+        // distance. One at about the stand's level: the mix's compression holds relative levels only
+        // between sources of like level (docs/TEST_NOTES.md, "The silent grandstand").
         var bike = VehicleProfile.ByName("v8_bigcam");
         float bikeDist = 60f;
         var bikePlaced = Loudness.Place(bike.SourceLevelDb);
@@ -148,8 +131,8 @@ public class CrowdAudibilityTests
     }
 
     /// <summary>
-    /// A stand at the far side of a map must not be faded out for being far away. The mixer fades a
-    /// voice over the last quarter of its range, so the range has to be what the level can carry.
+    /// A stand at the far side of a map is not faded for being far away: the mixer fades a voice over the
+    /// last quarter of its range, so the range must be what the level can carry.
     /// </summary>
     [Fact]
     public void ACrowdIsNotFadedOutForBeingAcrossTheTrack()
@@ -163,18 +146,8 @@ public class CrowdAudibilityTests
     }
 
     /// <summary>
-    /// A rendered crowd is a cached buffer, so two crowds that differ by a person are one sound.
-    ///
-    /// What this is NOT is a dramatic saving. The first version of this test counted distinct keys
-    /// over a minute of racing and asserted they were few — which they are, quantised or not, because
-    /// the intensity is built from two SATURATING terms and a steady race lands on the same handful of
-    /// values either way. Measured: about fifteen distinct keys in a minute with the quantiser, and
-    /// twenty-two across the whole (cars nearby, fastest car) grid without it. The claim that every
-    /// reaction rendered a fresh buffer was wrong, and the test that was supposed to protect it passed
-    /// whatever the quantiser did.
-    ///
-    /// So it asserts the property instead: two crowds a person apart are the same buffer, and a crowd
-    /// twice the size is not.
+    /// Two crowds a person apart are the same cached buffer, and a crowd twice the size is not. Why it
+    /// asserts the property rather than a count of keys: docs/TEST_NOTES.md, "The silent grandstand".
     /// </summary>
     [Fact]
     public void TwoCrowdsThatDifferByAPersonAreOneSound()
@@ -190,14 +163,9 @@ public class CrowdAudibilityTests
 }
 
 /// <summary>
-/// The stand answers the people sitting on it.
-///
-/// "A cheer arriving off the deck a beat after the direct sound is most of what makes a stand sound
-/// occupied" has been in the todo since the crowd was written, and the reason it never happened is
-/// that reflections lived inside the ENGINE echo system and a crowd is not an engine. It is the same
-/// geometry either way — a wall does not care what made the sound — so the image-source search that
-/// answers a car now answers anything the world reports, and a transient's echo is simply the same
-/// sound queued again for the moment it arrives.
+/// The stand answers the people sitting on it: the image-source search that answers a car answers any
+/// sound, and a transient's echo is the same sound queued for when it arrives
+/// (docs/TEST_NOTES.md, "The stand answers the people on it").
 /// </summary>
 public class CrowdReflectionTests
 {
@@ -214,7 +182,7 @@ public class CrowdReflectionTests
         Assert.True(manager.TryGetMap("speedway", out World world, out _, out _, out _));
         var data = manager.GetAllMaps().First(kv => kv.Key == "speedway").Value.data;
 
-        // The reflecting faces of the map, built the way EngineReflections builds them.
+        // The map's reflecting faces, built as EngineReflections builds them.
         var surfaces = new List<ReflectingSurface>();
         var six = new ReflectingSurface[6];
         int id = 1;
@@ -258,9 +226,8 @@ public class CrowdReflectionTests
             if (echoes[i].BouncePoint.Z < crowd.Z && echoes[i].Gain >= ImageSource.EchoAudibleRatio) offTheBack = true;
         Assert.True(offTheBack, "no reflection comes off the wall BEHIND the seats, which is the one that matters.");
 
-        // And your own footsteps, standing in the same place, get nothing — because the echo of a
-        // sound a metre away off a wall fifty metres away is forty decibels down, and forty decibels
-        // down is not an echo, it is an artefact. Same rule, same geometry, opposite answer.
+        // Your own footsteps in the same place get nothing: the echo of a sound a metre away off a wall
+        // fifty metres away is 40 dB down, an artefact rather than an echo.
         Vector3 underfoot = listener - new Vector3(0, 1.7f, 0);
         Span<Reflection> steps = stackalloc Reflection[4];
         int stepEchoes = ImageSource.FirstOrder(surfaces.ToArray(), underfoot, listener,
@@ -277,13 +244,9 @@ public class CrowdReflectionTests
 }
 
 /// <summary>
-/// A surface that scatters answers with a wash, not a copy.
-///
-/// The grandstand was a flat concrete slab, so the applause came back off it as an exact copy of
-/// itself at nearly the level of the direct sound — "the clapping reflections are crisp and they
-/// shouldn't be". What a grandstand actually presents to a racetrack is tiered seating with people
-/// in it: the most absorbent and the most scattering thing in ordinary acoustics. That is a MATERIAL,
-/// so the retaining wall beside the track is unaffected and still slaps.
+/// A surface that scatters answers with a wash, not a copy: the stand is seating full of people, a
+/// material, while the retaining wall still slaps ("the clapping reflections are crisp and they
+/// shouldn't be"; docs/TEST_NOTES.md, "The stand answers the people on it").
 /// </summary>
 public class ScatteringTests
 {
@@ -303,8 +266,8 @@ public class ScatteringTests
     [Fact]
     public void ASlabMirrorsAndAStandFullOfPeopleScatters()
     {
-        // In front of the wall and low enough that the mirror image lands on it — otherwise the slab
-        // has no specular path either and the comparison measures nothing.
+        // Low enough that the mirror image lands on the wall, or the slab has no specular path either
+        // and the comparison measures nothing.
         var source = new Vector3(0, 6f, -10f);
         var listener = new Vector3(0, 1.7f, 300f);     // across the circuit
         Span<Reflection> got = stackalloc Reflection[6];
@@ -321,20 +284,18 @@ public class ScatteringTests
         for (int i = 0; i < nStand; i++)
             if (got[i].IsDiffuse) standDiffuse += got[i].Gain * got[i].Gain; else standSpecular += got[i].Gain * got[i].Gain;
 
-        // Energies: the taps and the image are separate arrivals, and separate arrivals add as power.
-        // Summed as amplitudes, the scattered share counted too much once gains became pressures
-        // (EarlyReflections.Keep, sqrt(s) for the taps).
+        // Energies: separate arrivals add as power. Summed as amplitudes the scattered share counts too
+        // much, since gains are pressures (EarlyReflections.Keep, sqrt(s) for the taps).
         _o.WriteLine($"concrete slab: specular {slabSpecular:F3}, scattered {slabDiffuse:F3}");
         _o.WriteLine($"full stand:    specular {standSpecular:F3}, scattered {standDiffuse:F3}");
 
         // A slab is a mirror: nearly all of what it returns is the image.
         Assert.True(slabSpecular > slabDiffuse * 2f);
-        // A stand is not: of what little it returns, far more comes back scattered. Not MORE scattered
-        // than mirrored at a listener 300 m off, though: scattered energy spreads over a hemisphere and
-        // the mirror's does not, so the fair comparison is the share, stand against slab.
+        // A stand returns far more of its little scattered. Not more scattered than mirrored at 300 m:
+        // scattered energy spreads over a hemisphere, so the fair comparison is the share against the slab.
         Assert.True(standDiffuse / standSpecular > 10f * (slabDiffuse / slabSpecular),
             $"stand scattered/mirrored {standDiffuse / standSpecular:F3}, slab {slabDiffuse / slabSpecular:F3}");
-        // And it returns much less of it either way.
+        // And it returns much less either way.
         Assert.True(standSpecular < slabSpecular * 0.25f,
             $"a stand full of people reflected {standSpecular:F3} where a slab reflected {slabSpecular:F3}.");
     }
@@ -345,8 +306,8 @@ public class ScatteringTests
     {
         var wall = Wall("Audience", 20f, 4f, -20f);
         var source = new Vector3(0, 13.5f, -10f);
-        // Off the wall's axis of symmetry, or the two taps are the same distance away and the spread
-        // that makes a wash is genuinely zero — which is correct, and measures nothing.
+        // Off the wall's axis of symmetry: on it the two taps are equidistant and the spread is
+        // rightly zero, which measures nothing.
         var listener = new Vector3(90f, 1.7f, 300f);
         Span<Reflection> got = stackalloc Reflection[6];
         int n = ImageSource.FirstOrder(new[] { wall }, source, listener, 343f, got, null, 2);
@@ -363,7 +324,7 @@ public class ScatteringTests
                 $"a scattered arrival is at {got[i].ApparentPosition}, which is not on the surface.");
         }
         Assert.Equal(2, diffuse);
-        // Two taps across the face arrive at different times — that spread is what makes it a wash.
+        // Two taps across the face arrive at different times: that spread makes it a wash.
         Assert.NotEqual(arrivalTimes[0], arrivalTimes[1]);
         _o.WriteLine($"two taps arrive {MathF.Abs(arrivalTimes[0] - arrivalTimes[1]) * 1000f:F1} ms apart");
     }

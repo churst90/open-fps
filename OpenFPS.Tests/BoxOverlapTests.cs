@@ -4,10 +4,9 @@ using OpenFPS.Common;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Whether an axis-aligned box and an oriented one share volume, and what the acoustic grid makes of
-/// it — a cell inside a wall, straddling it, crossed by it, or clear. The grid is what occlusion
-/// reads, so this is every wall's say in what you hear. Written for the survivors of the 2026-09-24
-/// mutation run over GeometryUtils.
+/// Whether an axis-aligned box and an oriented one share volume, and what the acoustic grid (which
+/// occlusion reads) makes of it: a cell inside a wall, across it, or clear. Written for the survivors of
+/// the 2026-09-24 mutation run over GeometryUtils.
 /// </summary>
 public class BoxOverlapTests
 {
@@ -34,7 +33,7 @@ public class BoxOverlapTests
     {
         Assert.False(GeometryUtils.ObbIntersectsAabb(Vector3.Zero, Unit2, new Vector3(2.2f, 0, 2.2f), Unit2, Yaw(45)));
         Assert.True(GeometryUtils.ObbIntersectsAabb(Vector3.Zero, Unit2, new Vector3(1.6f, 0, 1.6f), Unit2, Yaw(45)));
-        // ...and the same against a box that is itself the long one.
+        // The same against a box that is itself the long one.
         var longSize = new Vector3(20f, 2f, 2f);
         // Its long axis passes 0.87 m from the cube's centre at 80 degrees (2.5 m at 60, a miss).
         Assert.True(GeometryUtils.ObbIntersectsAabb(Vector3.Zero, Unit2, new Vector3(0, 0, 5f), longSize, Yaw(80)));

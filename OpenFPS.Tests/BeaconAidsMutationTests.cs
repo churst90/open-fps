@@ -210,9 +210,7 @@ public class BeaconAidsMutationTests
         for (int i = 1; i < 4; i++) Assert.Contains(blips, e => From(e, at[i]));
     }
 
-    /// <summary>
-    /// A door is heard out to twelve metres, and not past it; a vehicle out to twenty-five.
-    /// </summary>
+    /// <summary>A door is heard out to 12 m, and not past it; a vehicle out to 25 m.</summary>
     [Fact]
     public void EachKindIsHeardOutToItsOwnRange()
     {
@@ -265,10 +263,7 @@ public class BeaconAidsMutationTests
         Assert.False(BeaconAids.TryVehicleSide(doors, 2, Ear, out _));
     }
 
-    /// <summary>
-    /// A thing found twice — in the static grid and among the moving things — is one beacon, and
-    /// does not take two of the three places.
-    /// </summary>
+    /// <summary>A thing in the static grid and among the moving things is one beacon, not two of the three places.</summary>
     [Fact]
     public void AThingFoundTwiceIsOneBeacon()
     {
@@ -298,8 +293,8 @@ public class BeaconAidsMutationTests
     // ── What reaches the mixer ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// A blip is a one-off sound in the world, with reverb, and with no acoustics to ask it goes
-    /// straight: from where the thing is, at its real distance, unblocked, in no particular region.
+    /// A blip is a one-off sound in the world, with reverb; with no acoustics to ask it goes straight
+    /// from the thing, at its real distance, unblocked, in no particular region.
     /// </summary>
     [Fact]
     public void ABlipIsAOneOffInTheWorld()
@@ -324,9 +319,8 @@ public class BeaconAidsMutationTests
     }
 
     /// <summary>
-    /// Blips take their voices from a pool of their own: twenty-four ids, counting down from the
-    /// first, and round again — so a blip never takes over another sound's voice, and they never
-    /// run out.
+    /// Blips take their voices from a pool of their own, 24 ids counting down and round again, so a blip
+    /// never takes another sound's voice and they never run out.
     /// </summary>
     [Fact]
     public void BlipsCycleThroughAPoolOfTwentyFourVoices()
@@ -346,8 +340,8 @@ public class BeaconAidsMutationTests
     }
 
     /// <summary>
-    /// The five sounds are made once, not every frame; and if the mixer will not take one of them,
-    /// no beacon is heard until it does — they are asked for again on a later frame.
+    /// The five sounds are made once, not every frame; if the mixer refuses one, no beacon is heard and
+    /// they are offered again on a later frame.
     /// </summary>
     [Fact]
     public void TheSoundsAreMadeOnceAndAskedForAgainIfRefused()
@@ -372,11 +366,9 @@ public class BeaconAidsMutationTests
     // ── Through walls, and round corners ────────────────────────────────────────────────────
 
     /// <summary>
-    /// A door set into a wall, seen from off to one side: the straight line to its middle clips the
-    /// wall beside it, so the path model calls it well over half blocked — but its face is in plain
-    /// view, and it blips. Posts stand a little further out from the face than the sight line starts,
-    /// so a sight line started from anywhere else than just off the face is blocked. Built three times,
-    /// with the door's thin side along each axis.
+    /// A door in a wall seen from one side: the line to its middle clips the wall, so the path model
+    /// calls it over half blocked, but its face is in view and it blips. The posts block any sight line
+    /// not started just off the face. Built with the door's thin side along each axis.
     /// </summary>
     [Theory]
     [InlineData('z')]
@@ -398,7 +390,7 @@ public class BeaconAidsMutationTests
         };
         foreach (float d in new[] { 0.85f, 1.35f, 2.5f })   // posts out from the face
             things.Add(Thing(20 + things.Count, P(new Vector3(0f, 1.5f, d)), P(new Vector3(0.2f, 3f, 0.2f))));
-        // ...and a wall close behind the listener, 3 cm past where the sight line would end at the ear.
+        // A wall 3 cm past where the sight line would end at the ear.
         things.Add(Thing(40, P(new Vector3(4.53f, 1.5f, 1f)), P(new Vector3(1f, 3f, 4f))));
         var world = Fixed(things.ToArray());
         var acoustics = new SpatialAcoustics(new SpatialService());
@@ -437,10 +429,7 @@ public class BeaconAidsMutationTests
         Assert.Empty(rig.Run(moving, ear, 10, 4));
     }
 
-    /// <summary>
-    /// A blip that reaches you partly blocked carries what the path found — its occlusion and what
-    /// bleeds through — to the mixer, rather than being played as if nothing were there.
-    /// </summary>
+    /// <summary>A blip that reaches you partly blocked carries the path's occlusion and bleed to the mixer.</summary>
     [Fact]
     public void ABlipCarriesItsPathToTheMixer()
     {
@@ -545,7 +534,6 @@ public class BeaconAidsMutationTests
 
     // ── What the player says ────────────────────────────────────────────────────────────────
 
-    /// <summary>/beacons lists every category, whether it is on, and why when the map decided.</summary>
     /// <summary>"/beacons louder" and "quieter", 2 dB a step from +4, and every blip placed by it.</summary>
     [Fact]
     public void BeaconsLouderAndQuieterMoveEveryBlip()
@@ -566,6 +554,7 @@ public class BeaconAidsMutationTests
         Assert.True(loud[0].Volume > soft[0].Volume, $"+4 dB {loud[0].Volume:F3}, -6 dB {soft[0].Volume:F3}");
     }
 
+    /// <summary>/beacons lists every category, whether it is on, and why when the map decided.</summary>
     [Fact]
     public void BeaconsListsEveryCategoryAndWhy()
     {

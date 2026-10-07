@@ -101,8 +101,8 @@ public class RainTests
     [Fact]
     public void RainSetByHandIsRainInWinter()
     {
-        // Deep winter on a map with no warmth of its own: the Rain front turns to snow, unless rain
-        // was asked for by hand.
+        // Deep winter on a map with no warmth of its own: the Rain front turns to snow unless rain was
+        // asked for by hand.
         var env = new WorldEnvironmentSystem(new Random(3)) { FrontProbabilityPerTick = 0 };
         env.SetDate(4f, 1);
         env.PinRain(Rainfall.HeavyRate);

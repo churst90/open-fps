@@ -90,8 +90,7 @@ public class SmoothTailTests
             }
             prev = t;
         }
-        // A single trace swings up to 2.3 dB here (0.8 to 1.3 in level); the average moves at most
-        // a quarter of that in energy, under one decibel from one trace to the next.
+        // A single trace swings up to 2.3 dB here (0.8 to 1.3); the average moves under 1 dB a trace.
         Assert.True(maxStep < 1.0, $"the average stepped {maxStep:F2} dB");
         Assert.Equal(1, s.Resets);
 
@@ -140,8 +139,7 @@ public class SmoothTailTests
         AddOmni(d, a, Vector3.Zero, scene: true);
         Assert.Equal(SmoothTail.SceneWeight, d.LastWeight, 6);
 
-        // Six decibels louder at the same spot is somewhere else (a backstop for a room change the
-        // region does not show).
+        // 6 dB louder at the same spot is somewhere else: a backstop for a room change the region misses.
         var j = Make();
         AddOmni(j, a, Vector3.Zero);
         AddOmni(j, Tail(20, 2.2f), Vector3.Zero);
@@ -166,8 +164,8 @@ public class SmoothTailTests
                 double want = 0, have = 0;
                 for (int f = g; f < g + group; f++) { want += s.OmniEnergy(b, f); have += got[b, f]; }
                 totalWant += want; totalGot += have;
-                // Noise in a band B wide over T seconds has its energy known to about 4.3/sqrt(BT) dB;
-                // three of those, and never tighter than 1 dB.
+                // Band noise B wide over T seconds has its energy known to about 4.3/sqrt(BT) dB; three of
+                // those, never tighter than 1 dB.
                 double lo = b == 0 ? 0 : SmoothTail.EdgesHz[b - 1], hi = b < SmoothTail.EdgesHz.Length ? SmoothTail.EdgesHz[b] : Rate / 2.0;
                 double tol = Math.Max(1.0, 3 * 4.34 / Math.Sqrt((hi - lo) * group * SmoothTail.Frame / (double)Rate));
                 double d = 10 * Math.Log10(have / want);
@@ -216,8 +214,8 @@ public class SmoothTailTests
             }
             Assert.InRange(10 * Math.Log10(have / want), -0.6, 0.6);
         }
-        // Below 355 Hz every direction gets the same. (Not the nearest: everything above 355 Hz went
-        // that way, and the band split's skirts would count some of it here.)
+        // Below 355 Hz every direction gets the same. The nearest is left out: everything above 355 Hz
+        // went its way, and the band split's skirts would count some of that here.
         var low = eParts.Where((_, d) => d != nearest)
                         .Select(e => { double t = 0; for (int f = f0; f < e.GetLength(1); f++) t += e[2, f]; return t; }).ToArray();
         double mean = low.Average();
@@ -245,8 +243,7 @@ public class SmoothTailTests
             if (d1.PerDirection[d] is { } p) Assert.Equal(p.Re, d2.PerDirection[d]!.Re);
         }
 
-        // And a trace that measures a little louder changes the response by that gain, not its noise:
-        // the new response is the old one scaled, sample for sample.
+        // A trace a little louder scales the response by that gain, sample for sample, not its noise.
         var e = Make();
         AddOmni(e, w, Vector3.Zero);
         var before = e.LateWindowed(false);

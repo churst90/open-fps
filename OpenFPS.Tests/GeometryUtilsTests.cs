@@ -3,14 +3,9 @@ using OpenFPS.Common;
 
 namespace OpenFPS.Tests;
 
-/// <summary>
-/// Unit tests for GeometryUtils — the collision detection and ray-cast primitives
-/// used throughout the physics, audio occlusion, and acoustic pathfinding systems.
-/// </summary>
+/// <summary>GeometryUtils' collision and ray primitives, used by physics, occlusion and acoustic paths.</summary>
 public class GeometryUtilsTests
 {
-    // ─── AABB vs AABB ─────────────────────────────────────────────────────────────
-
     // ─── Point in OBB ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -193,8 +188,6 @@ public class GeometryUtilsTests
         Assert.True(entry >= 0);
         Assert.True(exit > entry);
     }
-
-    // ─── Point in Cylinder ────────────────────────────────────────────────────────
 
     // ─── BoxContainment ───────────────────────────────────────────────────────────
 

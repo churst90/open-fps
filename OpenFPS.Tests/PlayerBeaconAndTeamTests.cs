@@ -347,7 +347,7 @@ public class PlayerBeaconTests
         Assert.InRange(Fundamental(mate, sr, split + sr / 50, end), 326f, 333f);
 
         double Rms(float[] x) => Math.Sqrt(x.Sum(v => (double)v * v) / x.Length);
-        // As loud, or as near as the 0.9 peak every beacon has allows.
+        // As loud, as near as every beacon's 0.9 peak allows.
         double louder = 20 * Math.Log10(Rms(mate) / Rms(player));
         Assert.InRange(louder, -2.0, 0.1);
 
