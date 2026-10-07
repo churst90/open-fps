@@ -9,7 +9,7 @@ Recent work, newest first. `git log` has the rest.
   - Seven fires: campfire, the garden fire pit (unchanged except its roar), bonfire, a burning car, a
     house fully alight, a stand of burning trees, a crown fire's front 300 m long.
   - A fire wider than one body of flame is many bodies side by side, each puffing in its own time
-    (1.5 / sqrt(D) Hz). It is heard from up to seven places across it, independent streams, so a
+    (1.5 / sqrt(D) Hz). It is heard from nine places across it, independent streams, so a
     300 m front is heard 300 m wide.
   - The roar is the flames' unsteady burning, p = (γ − 1) / (4π r c²) dQ/dt. Its spectrum falls as
     f^-2.5 from 20 Hz up, and its level comes from the heat release swinging 35 % with the puffs (fitted;
@@ -35,6 +35,17 @@ Recent work, newest first. `git log` has the rest.
   - The fire pit's declared level is now 67 dB (was 59.5): the new roar is 9 dB more unweighted, nearly
     all under 125 Hz, and 3 dB more A-weighted.
   - Renders and measurements: inbox/fire-2026-10-06 with a README. AudioLab `--fire levels|render|game`.
+  - Round 2 (how wide it sounds): round 1's renders measured close to mono. The places were independent
+    already (any two correlate under 0.03 in every band), and 1.00 at 125-500 Hz is what a head gives a
+    fire in front of it. But the places sat at three-quarters of the fire's half-widths and spread less
+    than the fire. There are now nine, on a ring whose spread is the burning area's (w²/12 across,
+    d²/12 along), and a single hearth is heard from all of them alike. The renders now agree with each
+    scene's geometry on the game's own head within 0.05 in most bands. The car is side-on, the house is
+    also heard at 12 m, and the walk goes to 10 m. inbox/fire-2026-10-06/round2; docs/FIRE.md 7.2;
+    AudioLab `--fire hrtf`.
+- Each extended source now has twelve voice ids for its places. With eight, a surf beach's ninth and
+  tenth places took the next stretch's first two. A layout with more than twelve is heard from its
+  middle.
 - Tile scenes fixed and on again (`OPENFPS_TILE_SCENES=0` turns them off). After the first door swung
   near you, every wall stopped occluding and the traced reverb and echoes lost their walls (traffic
   heard inside Selby House, reflections mono). Steam Audio puts each instance of a tile in its top

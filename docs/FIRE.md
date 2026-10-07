@@ -347,15 +347,50 @@ The model:
 
 ### 7.2 Places
 
-- The fire is heard from up to eight places (`ExtendedSources`).
+- The fire is heard from nine places (`ExtendedSources`; a source may have up to twelve).
 - Along a front (width over 2.5 times depth): the middle and pairs out to either side, evenly.
-- Round anything else: a ring at three-quarters of its half-widths.
-- Each body is heard from the places near it, weighted by a Gaussian of the places' spacing. A single body
-  (a fire pit) is heard from all of its places at once, as before.
+- Round anything else: the middle and a ring placed so that the places, each an equal share, spread as
+  the area does.
+  - A uniform w × d area has a variance of w²/12 across and d²/12 along.
+  - The middle and m places on a ring of half-axes k w and k d have m k² w² / (2 (m + 1)) across.
+  - So k = √((m + 1) / 6m): the ring at 0.87 of the half-widths for nine places, 0.94 for four.
+- A single body of fire (a hearth, a pile) burns all over its bed and is heard from every place alike.
+  A fire of many bodies hears each body from the places near it, weighted by a Gaussian of the places'
+  spacing.
 - Each place has its own roar noise, its own fizz and its own crackle noise. Their powers are the sums of
   its bodies' shares. Each crackle, fall, crack and burst goes to one place.
 - Merged (the source too narrow at the listener), everything is heard from the middle. In between, a share
   of each body's power moves to the middle by the spread.
+
+#### How wide it sounds (round 2, 2026-10-07)
+
+Round 1's renders measured close to mono: the ears' correlation (IACC, best |r| within ±1 ms) was 1.00 at
+125-500 Hz everywhere and 0.7-0.9 at 1-4 kHz in most. What was found:
+
+- The places are independent at every frequency. The largest correlation between two places of the dry
+  render is 0.003-0.03 in every band.
+- Through the game, standing among a crown fire's front with its places to either side, the ears measure
+  0.74 / 0.13 / 0.07 (125-500 Hz / 1-4 kHz / 4-12 kHz). Collapsing the house's places onto its middle
+  gives 1.00 / 0.85 / 0.88, the same as one voice. Spread, the house measures 1.00 / 0.74 / 0.46.
+- 125-500 Hz near 1 is right for a fire in front of the listener. On the game's own head (Steam Audio's
+  HRTF, independent noises, nothing else; AudioLab `--fire hrtf`):
+  - one source ahead 0.98
+  - plus and minus 30 degrees 0.69
+  - a ring round the head 0.44
+  A rigid-sphere head gives the same.
+- What was wrong: the places spread less than the fire. The ring sat at three-quarters of the
+  half-widths, about 70 % of the fire's angle.
+  - On a rigid-sphere head the places were 0.1-0.2 more alike at 1-4 kHz than a continuous area of the
+    same size: campfire at 2 m 0.80 against 0.57, house at 30 m 0.72 against 0.60.
+  - Nine places on the matched ring come within 0.03 of the area at 1-4 kHz (0.60, 0.63).
+  - At 4-12 kHz a few discrete places always leave about their largest share's worth of correlation
+    (0.1-0.25). The head itself leaves 0.35 for a house's places at 30 m.
+- Round 1's scenes were narrow fires straight ahead, the car end-on, and the walk's first 15 s at a single
+  point 140 m off. The ears are nearly alike for those by nature.
+- Round 2's renders against each render's geometry on the game's head agree within 0.05 in most bands
+  (inbox/fire-2026-10-06/round2/README.txt). Where they are more alike, it is at 4-12 kHz on fires whose
+  top is a few loud events (a tree torching, a car's struts and windows): each is one point, as it is in a
+  real fire.
 
 ### 7.3 Parts
 

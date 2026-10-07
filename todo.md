@@ -261,7 +261,7 @@ either skip in CI or get the library from a private store.
 
 ### Fire at any size
 Built 2026-10-06 (docs/FIRE.md, inbox/fire-2026-10-06, unheard): bodies of fire over the burning area,
-heard from up to seven places; the roar as dQ/dt's turbulent tail; crowds of crackles; torching, falls,
+heard from nine places spread as the burning area is; the roar as dQ/dt's turbulent tail; crowds of crackles; torching, falls,
 windows, collapses, a car's bursts; a life from lighting to smoulder; seven presets from a campfire to a
 crown fire; /spawn fire. Open:
 - the crown fire against a real crown-fire recording (none found);
