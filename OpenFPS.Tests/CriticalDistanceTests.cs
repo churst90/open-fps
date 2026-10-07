@@ -5,8 +5,8 @@ namespace OpenFPS.Tests;
 /// <summary>
 /// The diffuse field has a level relative to the direct sound, and it depends on how far the source
 /// is — the room equation, with the room's surface and absorption replaced by what the rays measured
-/// (Enclosure.ReverberantToDirectPower). Before this, one constant send for every source at every
-/// distance put a footstep's reverberation over the step itself.
+/// (Enclosure.ReverberantToDirectPower). One constant send at every distance put a footstep's
+/// reverberation over the step itself.
 /// </summary>
 public class CriticalDistanceTests
 {

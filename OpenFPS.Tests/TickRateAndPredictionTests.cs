@@ -69,9 +69,8 @@ public class TickRateAndPredictionTests
 
         float travelled = world.Get<Transform>(player).Position.Z;
 
-        // The client predicts WalkSpeed by construction (SharedMovementEngine integrates
-        // Speed * dt), so the server matching WalkSpeed IS the parity assertion. Before the
-        // rates were unified the server produced WalkSpeed * 20/30 = 3.0 m here.
+        // The client predicts WalkSpeed by construction (Speed * dt), so the server matching it is the
+        // parity check; with two tick rates the server made WalkSpeed * 20/30 = 3.0 m here.
         Assert.InRange(travelled, WalkSpeed * 0.97f, WalkSpeed * 1.03f);
         World.Destroy(world);
     }
@@ -113,7 +112,7 @@ public class TickRateAndPredictionTests
         long seq = 0;
         for (int tick = 0; tick < TickRate; tick++)
         {
-            // Ten inputs per tick instead of one — a 10x speed hack under the old drain-everything loop.
+            // Ten inputs per tick instead of one: a 10x speed hack if the tick drained them all.
             for (int i = 0; i < 10; i++) session.InputQueue.Enqueue(Forward(++seq, FixedDeltaTime));
             RunServerTick(world, grid, sessions);
         }
@@ -265,7 +264,7 @@ public class TickRateAndPredictionTests
     {
         var (_, _, rec, snap) = BuildClient();
 
-        // The server never acknowledges anything — the old code grew this list forever.
+        // The server never acknowledges anything.
         for (int i = 0; i < MaxInputHistory * 3; i++)
             rec.Step(Forward(i + 1, FixedDeltaTime), snap, FixedDeltaTime);
 

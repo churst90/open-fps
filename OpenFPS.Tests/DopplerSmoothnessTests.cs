@@ -4,17 +4,10 @@ using OpenFPS.Client.AudioEngine.Core;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A car passing CLOSE must glide in pitch, not step.
-///
-/// Doppler is applied as a channel pitch, and a channel pitch changes the instant it is set. The
-/// attribute loop runs at 250 Hz precisely so a pass-by is a glide — but the SOURCE POSITION it
-/// computes from only changes when the game thread resubmits the emitter, measured at 22 ms. So the
-/// pitch was a 45 Hz staircase written 250 times a second.
-///
-/// The size of each step goes as v^2/d, so this is a near-field fault and nothing else: a car at
-/// fifty metres steps under a per cent, and the same car at five metres steps by nearly eight —
-/// well over a semitone, forty-five times a second. Reported as the cars "doing that weird auto-tune
-/// thing, high pitch, low pitch", and only for the close ones.
+/// A car passing close glides in pitch, not steps. Doppler is a channel pitch, set at once; the 250 Hz
+/// attribute loop computed it from a position the game thread resubmits every 22 ms, a 45 Hz staircase.
+/// Steps go as v²/d: under 1 % at 50 m, nearly 8 % at 5 m, heard as "that weird auto-tune thing, high
+/// pitch, low pitch" on close cars only.
 /// </summary>
 public class DopplerSmoothnessTests
 {
@@ -64,8 +57,7 @@ public class DopplerSmoothnessTests
         float nearAfter  = WorstStep(5f, speed, updateHz, deadReckon: true);
         float farBefore  = WorstStep(50f, speed, updateHz, deadReckon: false);
 
-        // The fault is near-field: far cars were always fine, which is why only the close ones were
-        // reported. If this stops being true the test is measuring the wrong thing.
+        // The fault is near-field: far cars were always fine.
         Assert.True(farBefore < 0.015f, $"a car at 50 m stepped {farBefore:P1} — the premise is wrong");
         Assert.True(nearBefore > 0.04f, $"a car at 5 m only stepped {nearBefore:P1} — no fault to fix");
 

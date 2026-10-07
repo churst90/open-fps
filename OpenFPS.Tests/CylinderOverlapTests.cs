@@ -49,11 +49,10 @@ public class CylinderOverlapTests
         Assert.Equal(0f, hit.Normal.Y);
     }
 
-    /// <summary>A body whose centre has got inside the box leaves by the NEAREST edge, all the way
-    /// out — the edge's distance plus its radius — and along +X from the very middle, where no edge
-    /// is nearer. It used to be pushed away from the box's centre by its radius alone, which for a
-    /// roof slab over a house was the wrong way and not far enough, again and again, until it came
-    /// out through a wall (64 Alder Street, 2026-09-28).</summary>
+    /// <summary>A body whose centre is inside the box leaves by the nearest edge, all the way out (the
+    /// edge's distance plus its radius), and along +X from the very middle. Pushed from the box's centre
+    /// by its radius alone, a body in a roof slab came out through a wall (64 Alder Street,
+    /// 2026-09-28).</summary>
     [Fact]
     public void FromInsideItLeavesByTheNearestEdge()
     {

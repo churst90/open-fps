@@ -4,13 +4,8 @@ using OpenFPS.Common;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for the two things that turn geometry into sound a player can navigate by: a facade that
-/// answers a shot, and a window that falls to the ground after you break it.
-///
-/// Both encode a distance in a DELAY, which is the pattern this whole engine keeps returning to — the
-/// crack-to-report gap, the reflection's extra path, the time glass takes to fall. Each is a real
-/// physical quantity that a sighted game throws away and a blind player can read directly. So these
-/// hold the timings to the physics rather than to anyone's taste.
+/// A facade answering a shot, and a broken window's glass falling to the ground: both encode a distance
+/// in a delay a player can read, so these hold the timings to the physics.
 /// </summary>
 public class ReflectionAndGlassTests
 {
@@ -30,9 +25,8 @@ public class ReflectionAndGlassTests
     [Fact]
     public void AReflectionArrivesLateAndFromTheMirroredDirection()
     {
-        // Ten metres off the wall, not five: at five the reflected path is only 3.6 m longer than the
-        // direct one, which is 10.6 ms — inside MinDelaySeconds, where the ear fuses the two. The
-        // solver is right to drop it and the first version of this test was wrong to expect it.
+        // Ten metres off the wall: at five the extra path is 3.6 m, 10.6 ms, inside MinDelaySeconds where
+        // the ear fuses the two, and the solver rightly drops it.
         var surfaces = new[] { Wall() };
         var source = new Vector3(10f, 0f, -6f);
         var listener = new Vector3(10f, 0f, 6f);
@@ -44,7 +38,7 @@ public class ReflectionAndGlassTests
         // The image is the source mirrored through the wall: same y and z, x negated about the plane.
         Assert.Equal(-10f, into[0].ApparentPosition.X, 3);
         Assert.Equal(source.Z, into[0].ApparentPosition.Z, 3);
-        // It bounced ON the wall, and the path is longer than the direct one, so it arrives later.
+        // It bounced on the wall, and the longer path arrives later.
         Assert.Equal(0f, into[0].BouncePoint.X, 3);
         Assert.True(into[0].PathLength > Vector3.Distance(source, listener));
         Assert.True(into[0].DelaySeconds > 0f);
@@ -57,10 +51,8 @@ public class ReflectionAndGlassTests
     [Fact]
     public void AGapInTheWallRemovesItsAnswer()
     {
-        // The bounce point has to be somewhere the wall ISN'T. Placed symmetrically the bounce lands
-        // dead centre, so shrinking the wall about its centre never moves off it — which is what the
-        // first version of this test did, and it proved nothing. Offsetting the source puts the bounce
-        // at z = -7, so a wall spanning +/-10 contains it and one spanning +/-3 does not.
+        // The source is offset so the bounce lands at z = -7: a wall spanning +/-10 contains it and one
+        // spanning +/-3 does not (placed symmetrically, shrinking the wall never moves off the bounce).
         var listener = new Vector3(10f, 0f, 6f);
         var source = new Vector3(10f, 0f, -20f);
 
@@ -69,16 +61,14 @@ public class ReflectionAndGlassTests
         Assert.Equal(1, wide);
         Assert.InRange(into[0].BouncePoint.Z, -9f, -5f);
 
-        // Same wall, same shot, a gap where the bounce would have been: silence rather than a quieter
-        // reflection. That absence is what a side street sounds like.
+        // A gap where the bounce would have been is silence, not a quieter reflection: a side street.
         Assert.Equal(0, ImageSource.FirstOrder(new[] { Wall(half: 3f) }, source, listener, C, into));
     }
 
     [Fact]
     public void NothingReflectsOffTheBackOfAWall()
     {
-        // A listener behind the wall is not hearing a reflection off it; mirroring through a face
-        // neither party can see invents an arrival out of nothing.
+        // A listener behind the wall hears no reflection off its face.
         var surfaces = new[] { Wall() };
         Span<Reflection> into = stackalloc Reflection[4];
         Assert.Equal(0, ImageSource.FirstOrder(surfaces, new Vector3(10f, 0f, -6f),
@@ -88,9 +78,8 @@ public class ReflectionAndGlassTests
     [Fact]
     public void CoincidentReflectionsDoNotGetTheirOwnVoice()
     {
-        // The ground under a long shot: a path a few centimetres longer than the direct one. The ear
-        // fuses that with the direct sound rather than hearing an echo, and rendering it separately
-        // just doubles the level and comb-filters it.
+        // The ground under a long shot is a few centimetres longer than the direct path: the ear fuses
+        // it, and rendering it separately doubles the level and comb-filters it.
         var ground = new ReflectingSurface(
             Centre: new Vector3(0, 0, 0), Normal: Vector3.UnitY,
             HalfU: new Vector3(400, 0, 0), HalfV: new Vector3(0, 0, 400),
@@ -105,8 +94,8 @@ public class ReflectionAndGlassTests
     [Fact]
     public void TwoParallelWallsFlutter()
     {
-        // The sound of a street. One bounce off each wall gives two arrivals; the wall-to-wall paths
-        // give the repeating slap that a reverb decay cannot, because each of these has a direction.
+        // A street: one bounce off each wall gives two arrivals, and the wall-to-wall paths the
+        // repeating slap, each with a direction.
         var left = new ReflectingSurface(new Vector3(-12, 0, 0), Vector3.UnitX,
                                          new Vector3(0, 13, 0), new Vector3(0, 0, 60), 0.02f, 1);
         var right = new ReflectingSurface(new Vector3(12, 0, 0), -Vector3.UnitX,
@@ -156,8 +145,7 @@ public class ReflectionAndGlassTests
     [Fact]
     public void TheFallDelayEncodesTheHeightItFellFrom()
     {
-        // The whole reason to model this: the gap between the break and the glass landing is a direct
-        // readout of which floor the window was on.
+        // The gap between the break and the glass landing says which floor the window was on.
         foreach (float h in new[] { 3f, 9f, 15f, 24f })
         {
             float t = GlassBreak.FallSeconds(h);
@@ -181,7 +169,7 @@ public class ReflectionAndGlassTests
         {
             if (events[i].Kind != GlassEventKind.Landing) continue;
             sawLanding = true;
-            // Down at the pavement, not up at the window: that height difference is the cue.
+            // Down at the pavement, not up at the window.
             Assert.True(events[i].Position.Y < pane.Centre.Y - 10f,
                         $"landing at y={events[i].Position.Y:F1}, window at {pane.Centre.Y:F1}");
             Assert.True(events[i].DelaySeconds >= GlassBreak.FallSeconds(15f));
@@ -192,9 +180,8 @@ public class ReflectionAndGlassTests
     [Fact]
     public void TemperedAlwaysGoesLaminatedNeverDoes()
     {
-        // Not a balance decision — it is what the materials do. Tempered glass is held in compression
-        // and fails entirely once breached; laminated is bonded to a plastic layer and keeps its
-        // pieces. A player can learn to tell a car window from a windscreen by whether glass arrives.
+        // Tempered glass is held in compression and fails entirely once breached; laminated is bonded
+        // to a plastic layer and keeps its pieces: a car window drops glass, a windscreen does not.
         Assert.True(GlassBreak.Shatters(GlassType.Tempered, WeaponRegistry.Ar15));
         Assert.True(GlassBreak.Shatters(GlassType.Tempered, WeaponRegistry.Glock));
         Assert.False(GlassBreak.Shatters(GlassType.Laminated, WeaponRegistry.Shotgun));
@@ -214,7 +201,7 @@ public class ReflectionAndGlassTests
 
         Assert.Equal(1, n);
         Assert.Equal(GlassEventKind.Puncture, events[0].Kind);
-        // The SILENCE where a listener expected glass to arrive is the information.
+        // No glass arriving is the information.
         for (int i = 0; i < n; i++) Assert.NotEqual(GlassEventKind.Landing, events[i].Kind);
     }
 
@@ -254,11 +241,8 @@ public class ReflectionAndGlassTests
         for (int i = 0; i < na; i++) Assert.Equal(a[i], b[i]);
     }
 
-    /// <summary>
-    /// A long wall authored as overlapping segments must not answer twice. Both segments' faces
-    /// contain the bounce point at the join, so without the duplicate check the same arrival takes
-    /// two voices and reads six decibels louder than the wall is.
-    /// </summary>
+    /// <summary>A long wall authored as overlapping segments answers once: both faces contain the bounce
+    /// point at the join, and twice reads 6 dB louder than the wall is.</summary>
     [Fact]
     public void OverlappingSegmentsOfOneWallAnswerOnce()
     {

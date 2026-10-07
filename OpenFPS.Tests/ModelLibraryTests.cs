@@ -10,14 +10,9 @@ using Xunit.Abstractions;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// The models are data, and this is the proof.
-///
-/// The claim `ModelLibrary` makes is that a train, a horn, a whistle, a bell and an air system can
-/// leave C# and live in a file an author writes — so the test is the round trip: every built-in
-/// model must survive being written out and read back with not one number changed. If a spec ever
-/// grows a field the serializer cannot carry (a computed property, an interface, a tuple), this is
-/// what catches it, and it catches it for every model at once rather than for the one somebody
-/// happened to try.
+/// The models are data: every built-in model survives being written out and read back with not one
+/// number changed, so a spec field the serializer cannot carry (an interface, a tuple) fails here for
+/// every model at once. Authored models override built-ins, and a broken one breaks only itself.
 /// </summary>
 public class ModelLibraryTests : IDisposable
 {
@@ -61,10 +56,9 @@ public class ModelLibraryTests : IDisposable
                 }
                 Assert.True(ok, $"{kind}:{id} did not survive being written out and read back");
 
-                // The text agreeing is not enough: a field the writer skips is missing from both
-                // sides of it. What the model READ BACK reports must be what the library's does,
-                // every property, the ones worked out from the others included.
-                // An engine's "worked out from the rest" is NaN, which JSON writes as a named literal.
+                // Compared by the model read back, every property including derived ones: a field the
+                // writer skips is missing from both texts. An engine's "derive it" is NaN, a named
+                // literal in JSON.
                 var back = JsonSerializer.Deserialize(before, spec.GetType(),
                     new JsonSerializerOptions { NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals, Converters = { new OpenFPS.Common.Networking.Vector3Converter() } })!;
                 var lost = Readings(spec).Except(Readings(back)).ToList();
@@ -77,10 +71,8 @@ public class ModelLibraryTests : IDisposable
         Assert.True(checked_ >= 25, $"only {checked_} models — did a family stop being registered?");
     }
 
-    /// <summary>
-    /// Every public property of a model, as "path=value" lines, down through its records and lists.
-    /// Computed properties too: they are what the synthesis reads, so they are what has to survive.
-    /// </summary>
+    /// <summary>Every public property of a model as "path=value" lines, down through its records and lists,
+    /// computed ones included: they are what the synthesis reads.</summary>
     private static IEnumerable<string> Readings(object? o, string path = "", int depth = 0)
     {
         if (o == null) { yield return path + "=null"; yield break; }
@@ -108,8 +100,7 @@ public class ModelLibraryTests : IDisposable
     [Fact]
     public void AnAuthoredModelOverridesTheBuiltInOfTheSameName()
     {
-        // The whole point of the library: a map replaces the crossing bell without editing the
-        // library, and everything that asks for "crossing_gong" gets the author's.
+        // An authored "crossing_gong" replaces the built-in for everything that asks for it.
         var stock = ModelLibrary.Bell("crossing_gong");
         var mine = stock with { Name = "a much bigger gong", DiameterMetres = 0.40f, StrikesPerSecond = 1.4f };
         ModelLibrary.Add(ModelLibrary.Kinds.Bell, "crossing_gong", mine);
@@ -119,17 +110,14 @@ public class ModelLibraryTests : IDisposable
         Assert.Equal("a much bigger gong", got.Name);
         _o.WriteLine($"stock {stock.DiameterMetres * 1000f:F0} mm -> authored {got.DiameterMetres * 1000f:F0} mm");
 
-        // And it is still listed once, not twice.
+        // And it is listed once.
         Assert.Single(ModelLibrary.Ids(ModelLibrary.Kinds.Bell).Where(
             i => i.Equals("crossing_gong", StringComparison.OrdinalIgnoreCase)));
     }
 
-    /// <summary>
-    /// A road vehicle's air horn comes from the library, as a train's does: a horn an author writes
-    /// is the one a bus or a lorry blows, at its own level. Both looked air horns up among the
-    /// built-in presets only, so an authored horn never reached the road: its honk was 110 dB, the
-    /// level for a horn nobody knows, and its voice could not be made at all.
-    /// </summary>
+    /// <summary>A road vehicle's air horn comes from the library, as a train's does, at its own level.
+    /// Looked up among built-ins only, an authored horn honked at the unknown-horn 110 dB and its voice
+    /// could not be made.</summary>
     [Fact]
     public void AnAuthoredHornReachesARoadVehicle()
     {
@@ -155,7 +143,7 @@ public class ModelLibraryTests : IDisposable
         Directory.CreateDirectory(dir);
         try
         {
-            // Three lines of a horn, by hand — not an export, not a copy of the library.
+            // A horn written by hand, not an export.
             File.WriteAllText(Path.Combine(dir, "k1.json"), """
             {
               "kind": "horn",
@@ -172,7 +160,7 @@ public class ModelLibraryTests : IDisposable
 
             var horn = ModelLibrary.Horn("single_chime");
             Assert.Single(horn.Bells);
-            // The note was never written down: it is c/2L of what the author DID write.
+            // The note is derived, c/2L of the length the author wrote.
             float expect = 343f / (2f * (0.62f + 0.6f * 0.06f));
             _o.WriteLine($"620 mm bell -> {horn.Bells[0].Hz:F0} Hz (c/2L says {expect:F0})");
             Assert.InRange(horn.Bells[0].Hz, expect * 0.99f, expect * 1.01f);
@@ -185,7 +173,7 @@ public class ModelLibraryTests : IDisposable
     [Fact]
     public void ABadFileIsNamedAndSteppedOverRatherThanFatal()
     {
-        // One broken model in an author's folder must not take the rest of the map's sounds with it.
+        // One broken model in an author's folder does not take the other models with it.
         string dir = Path.Combine(Path.GetTempPath(), "openfps-models-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -217,8 +205,7 @@ public class ModelLibraryTests : IDisposable
             _o.WriteLine($"exported {written} models to {dir}");
             Assert.True(written >= 25);
 
-            // And the export reads back as itself — which is the only way an author can trust it as
-            // something to copy from.
+            // And the export reads back as itself, so an author can copy from it.
             ModelLibrary.Clear();
             int loaded = ModelLibrary.Load(dir);
             Assert.Equal(written, loaded);
@@ -235,8 +222,7 @@ public class ModelLibraryTests : IDisposable
     [Fact]
     public void AConsistIsWritableByHand()
     {
-        // It used to be an array of tuples, which serializes to a row of empty objects, so a train
-        // was the one model an author could not write. A named pair fixes that and costs nothing.
+        // A named pair, not a tuple: an array of tuples serializes as empty objects.
         var amtrak = TrainProfile.AmtrakDiesel;
         var (vehicle, count) = amtrak.Consist[1];
         Assert.Equal(6, count);

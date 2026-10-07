@@ -10,17 +10,9 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Typing a command and being told what happened.
-///
-/// Reported as "the / key to open the command box doesn't seem to move my player to the specified
-/// cords". The move itself was fine. What was broken was every ANSWER: a server reply is a System
-/// message, System messages are filed in the Server buffer, and the Server buffer is not the one a
-/// player starts in — so it was never spoken. "Moved to 40, 0, 120", "Cannot move there: area is
-/// solid" and "You do not have permission" were all delivered into silence, and from the player's
-/// side a command simply did nothing with no way to tell which of those had happened.
-///
-/// For a game played entirely by ear that is not a chat-routing detail, it is the difference between
-/// a feature and a feature you cannot use.
+/// A command's reply is spoken. Reported as "the / key ... doesn't seem to move my player": the move
+/// worked, but replies are System messages filed in the Server buffer, which is not the one a player
+/// starts in, so every answer went unspoken.
 /// </summary>
 public class CommandFeedbackTests
 {
@@ -55,10 +47,7 @@ public class CommandFeedbackTests
         Assert.True(tts.Said("over here"));
     }
 
-    /// <summary>
-    /// ...and other people talking is still gated, because that is what a buffer is FOR. If this
-    /// stops being true the fix above has turned into "speak everything", which is its own problem.
-    /// </summary>
+    /// <summary>Other people's talk is still gated by buffer: replies are spoken, not everything.</summary>
     [Fact]
     public void AmbientChatterStillObeysTheBuffer()
     {
@@ -106,8 +95,7 @@ public class CommandFeedbackTests
         Assert.True(maps.TryGetMap("default", out var world, out _, out _, out _));
         var before = world.Get<Transform>(session.Entity).Position;
 
-        // A solid block put where we are about to try to stand, so the test does not depend on
-        // knowing where the shipped map happens to have a wall.
+        // A solid block of our own, not a wall of the shipped map.
         var block = world.Create(
             new Transform { Position = new Vector3(20, 2, 20), Rotation = Quaternion.Identity },
             new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(4, 4, 4), IsSolid = true },

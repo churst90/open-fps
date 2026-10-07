@@ -4,23 +4,9 @@ using OpenFPS.Client.AudioEngine.Core;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// A breath is turbulence, and turbulence is broadband.
-///
-/// `Breathing`'s own note says it: *"a breath is turbulent air through a narrow aperture, which is a
-/// HISS"*. The renderer did not do that. It was noise through ONE resonator at Q 0.9 with an attack a
-/// twelfth of its own length — a resonance rather than a flow, and a transient rather than a swell —
-/// and what came out was a 300 ms thump.
-///
-/// It cost six sessions. Reported as *"random banging... bang, wait a few seconds, bang"*, chased
-/// through the reverb model, the room equation, the movement engine, the landing code and the
-/// reflection machinery, and finally identified by the listener himself: *"it is 2 different bangs so
-/// it makes me think it's breathing in and out... I don't hear the breathing either"*. Both halves of
-/// that are one fault. Two bangs, because an inhale and an exhale sit at different frequencies; no
-/// breathing, because neither of them sounded like breathing.
-///
-/// So the shape is asserted, not left to the ear. These are the bands, and they are the same rule the
-/// footsteps and the clap carry: measure the spectrum BEFORE anybody listens, because "that does not
-/// sound like X" is a question about the spectrum and the ear is slow at answering it.
+/// A breath is turbulence, and turbulence is broadband: a resonated, sharp-attacked breath was the
+/// "random banging" Cody chased for six sessions (docs/CLIENT_NOTES.md, "A breath is turbulence"). The
+/// bands are asserted before anybody listens.
 /// </summary>
 public class BreathTests
 {
@@ -33,10 +19,8 @@ public class BreathTests
         Character = SoundCharacter.Hiss, LevelDb = 50f, Hz = hz, DecaySeconds = seconds, Noisiness = 1f,
     }, seed: 7);
 
-    /// <summary>
-    /// The top of the band is where a breath lives. It was 23 and 32 dB down at 2-4 and 4-8 kHz — the
-    /// two bands that carry "air" — which is why it read as a thump.
-    /// </summary>
+    /// <summary>The top of the band is where a breath lives: 2-4 and 4-8 kHz were 23 and 32 dB down,
+    /// which read as a thump.</summary>
     [Fact]
     public void AnExhaleHasItsEnergyWhereAirDoes()
     {
@@ -51,15 +35,13 @@ public class BreathTests
         Assert.True(bands[b2k] > loudest - 8f, $"2-4 kHz is {loudest - bands[b2k]:F1} dB under the peak");
         Assert.True(bands[b4k] > loudest - 12f, $"4-8 kHz is {loudest - bands[b4k]:F1} dB under the peak");
 
-        // ...and it is not a rumble. A breath has nothing below a hundred hertz.
+        // And not a rumble: a breath has nothing below 100 Hz.
         Assert.True(bands[0] < loudest - 25f, "there is bass in a breath");
         Assert.True(bands[1] < loudest - 12f, "there is too much low end in a breath");
     }
 
-    /// <summary>
-    /// An inhale is drawn through a narrower opening, so it is brighter — and that has to fall out of
-    /// its own frequency rather than being a second sound. It is the other of the "2 different bangs".
-    /// </summary>
+    /// <summary>An inhale, drawn through a narrower opening, is brighter, from its own frequency and not a
+    /// second sound.</summary>
     [Fact]
     public void AnInhaleIsBrighterThanAnExhale()
     {
@@ -71,11 +53,8 @@ public class BreathTests
             $"an inhale at 830 Hz came out no brighter than an exhale at 500 ({Top(inhale):F1} against {Top(exhale):F1})");
     }
 
-    /// <summary>
-    /// A breath SWELLS. It has no onset: the loudest part is well inside it, not at the very front,
-    /// and that is the difference between air and a knock. A twelfth-of-its-length attack put the
-    /// peak in the first few per cent, which is a transient however smooth the rest is.
-    /// </summary>
+    /// <summary>A breath swells: its loudest part is well inside it, not at the front, the difference
+    /// between air and a knock.</summary>
     [Fact]
     public void ABreathHasNoOnset()
     {
@@ -94,17 +73,15 @@ public class BreathTests
         float at = bestAt / (float)b.Length;
         Assert.InRange(at, 0.12f, 0.6f);
 
-        // And the first instant is well under the peak — nothing arrives at full level.
+        // And the first instant is well under the peak.
         float head = 0f;
         for (int i = 0; i < window; i++) head += b[i] * b[i];
         Assert.True(head < best * 0.25f,
             $"a breath started at {MathF.Sqrt(head / best):P0} of its own peak — that is an onset");
     }
 
-    /// <summary>
-    /// And the model that drives it: breathing outlasts the running, which is the whole reason it is
-    /// information. It is also why breaths arrive "seconds after I've stopped moving".
-    /// </summary>
+    /// <summary>Breathing outlasts the running that caused it (breaths came "seconds after I've stopped
+    /// moving").</summary>
     [Fact]
     public void BreathingOutlastsTheRunning()
     {

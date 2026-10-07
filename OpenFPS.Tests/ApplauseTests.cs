@@ -9,17 +9,13 @@ public class ApplauseTests
 {
     private const int Sr = 44100;
 
-    /// <summary>
-    /// Density is a parameter, not a crossfade between two samples. Polite clapping and an ovation
-    /// are one sound at two arrival rates, and everything in between exists.
-    /// </summary>
+    /// <summary>Density is a parameter: polite clapping and an ovation are one sound at two arrival
+    /// rates.</summary>
     [Fact]
     public void AnOvationIsDenserThanPoliteClapping()
     {
-        // Crest factor: the peak against the RMS. A handful of separate claps is spiky — long
-        // stretches of nothing with events sticking out of it — while a roar approaches noise, whose
-        // crest is fixed and low. It is the same statistic that says whether you can pick individual
-        // people out, which is exactly the difference being asserted.
+        // Crest factor: a handful of separate claps is spiky, a roar approaches noise's fixed low crest;
+        // it says whether individual people can be picked out.
         float Crest(float intensity)
         {
             var buf = Applause.Render(new CrowdApplause(200, intensity, 3f), Sr, 7);
@@ -32,10 +28,7 @@ public class ApplauseTests
             "polite clapping should be spikier than an ovation, because you can still hear the claps");
     }
 
-    /// <summary>
-    /// A crowd twice the size is three decibels louder, not twice as loud. Independent sources have
-    /// unrelated phases, so they add in POWER — which is why a stadium is loud and not deafening.
-    /// </summary>
+    /// <summary>A crowd twice the size is 3 dB louder: independent sources add in power.</summary>
     [Fact]
     public void TwiceTheCrowdIsThreeDecibelsAndNotSixty()
     {
@@ -44,8 +37,7 @@ public class ApplauseTests
         Assert.InRange(ten - five, 2.5f, 3.5f);
     }
 
-    /// <summary>It never repeats. The same crowd at the same intensity rendered twice with different
-    /// seeds is two different sounds, which is the whole reason not to use a loop.</summary>
+    /// <summary>The same crowd rendered with two seeds is two different sounds.</summary>
     [Fact]
     public void TwoRendersAreNotTheSameSound()
     {
@@ -56,8 +48,7 @@ public class ApplauseTests
         Assert.True(same < a.Length / 10, "two seeds produced substantially the same buffer");
     }
 
-    /// <summary>...but the same seed is the same sound, so two players standing together hear one
-    /// crowd rather than two.</summary>
+    /// <summary>The same seed is the same sound, so two players standing together hear one crowd.</summary>
     [Fact]
     public void TheSameSeedIsTheSameSound()
     {
@@ -88,11 +79,8 @@ public class ApplauseTests
         var buf = Applause.Render(new CrowdApplause(300, 0.7f, 2f), Sr, 5);
         var bands = VehicleBody.Bands(buf, Sr);
 
-        // The threshold moved once, deliberately, and it is worth saying why rather than quietly
-        // widening it. The clap's cavity was first estimated at 2,200 Hz and settled by ear at 800 —
-        // hands are bigger and softer than they sound like they are — so a third of the energy now
-        // sits under 200 Hz and that is correct. What this still catches is the failure it was
-        // written for: a crowd that is MOSTLY rumble, with no hands in it at all.
+        // A clap has real weight under 200 Hz (ClapTests holds the measured balance); this catches a
+        // crowd that is mostly rumble.
         Assert.True(bands.Low < 0.45f, $"{bands.Low:P0} of a crowd's energy was below 200 Hz");
         Assert.True(bands.Mid + bands.High > 0.5f, "a clap lives between a few hundred hertz and a few kilohertz");
     }

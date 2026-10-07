@@ -13,10 +13,8 @@ namespace OpenFPS.Tests;
 /// Walking into things and turning to face them (Cody, 2026-10-04): "when you run into walls, we need
 /// a bump sound and I need to hear what I ran into ... ground doesn't need to be announced, that's
 /// what z is for ... maybe an auto narration so as i turn my head i know what is in front of me".
-///
-/// The bumps are driven through the client's own prediction — ClientPhysicsSystem over the shared
-/// movement engine, through the reconciler, a tick at a time — so a contact is whatever the real step
-/// reports, and the walls are the prefabs' own sizes: two-metre plasterboard panels 12 cm thick.
+/// Bumps are driven through the client's own prediction a tick at a time, against the prefabs' own
+/// 2 m plasterboard panels, 12 cm thick.
 /// </summary>
 public class WallBumpAndNarrationTests
 {
@@ -201,11 +199,8 @@ public class WallBumpAndNarrationTests
         Assert.True(highest > 1.7f, $"the body did not climb the flight: highest feet {highest:F2}");
     }
 
-    /// <summary>
-    /// Off the edge of a roof and down onto the ground, walking: a fall that ends on a floor is pushed
-    /// out of its top (the engine's landing), and that is never a bump — nor is the roof slab's edge
-    /// brushed on the way down.
-    /// </summary>
+    /// <summary>Walking off a roof onto the ground: the landing (pushed out of the floor's top) is never a
+    /// bump, nor is the roof slab's edge brushed on the way down.</summary>
     [Fact]
     public void FallingOffARoofOntoTheGroundNeverBumps()
     {
@@ -219,7 +214,7 @@ public class WallBumpAndNarrationTests
         }
         Assert.InRange(lowest, -0.01f, 0.01f);
         Assert.Empty(w.Bumps);
-        // ...and dropped straight onto it from four metres, standing still.
+        // Dropped straight onto it from four metres, standing still.
         var drop = new Walker(World(Floor()), new Vector3(0, 4f, 0));
         drop.Walk(Vector3.Zero, 60);
         drop.Walk(Forward, 10);
@@ -249,11 +244,10 @@ public class WallBumpAndNarrationTests
     // ── Bumping into somebody ───────────────────────────────────────────────────────────────────
     //
     // "When I bump into someone it says 'something' and am I made of concrete too?" (Cody, 2026-10-05).
-    // A player's definition carried no name, so the bump fell through to "something"; and their
-    // material was "Generic" — five gigapascals, ringing — or, once they had moved, the floor under them.
+    // A player's definition carried no name, and their material was Generic or the floor under them.
 
-    /// <summary>Somebody as the server now sends them: their name, a body's material, upright, and
-    /// looking wherever they happen to be looking.</summary>
+    /// <summary>Somebody as the server sends them: a name, a body's material, upright, looking
+    /// anywhere.</summary>
     private static EntitySnapshot Person(int id, Vector3 feet, string name, EntityType type = EntityType.Player,
                                          string material = PhysicsConstants.PersonMaterial)
         => new()
@@ -287,14 +281,12 @@ public class WallBumpAndNarrationTests
         Assert.Equal("Pedestrian", Sightline.NameOf(Person(51, Vector3.Zero, "Pedestrian, Main Street, west side 14", EntityType.NPC)));
         Assert.Equal("someone", Sightline.NameOf(Person(52, Vector3.Zero, "", EntityType.NPC)));
         Assert.Equal("someone", Sightline.NameOf(Person(53, Vector3.Zero, "")));
-        // ...and an unnamed wall is still a thing made of something.
+        // An unnamed wall is still named by its material.
         Assert.Equal("something brick", Sightline.NameOf(Box(54, Vector3.Zero, new Vector3(2, 3, 0.2f), "", "Brick")));
     }
 
-    /// <summary>A body against a body: one soft, low thud with nothing ringing after it. (The knock
-    /// was soft before as well — the hand is the softer of the two and decides it — so what made Sean
-    /// "concrete" was the client calling him "something concrete", his definition having carried the
-    /// floor he stood on as his material.)</summary>
+    /// <summary>A body against a body: one soft, low thud with nothing ringing after it. ("Concrete" was
+    /// the name, not the knock: his definition carried the floor he stood on as his material.)</summary>
     [Fact]
     public void BumpingIntoSomebodyIsASoftBodyContact()
     {

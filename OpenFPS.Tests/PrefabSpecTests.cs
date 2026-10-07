@@ -10,15 +10,11 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for the one prefab spec: <see cref="PrefabTemplate"/> is the format, `prefab-schema.json`
-/// describes exactly it, every shipped prefab satisfies it, and a prefab the engine cannot honour is
-/// rejected at load with the reason named rather than spawned with the offending part missing.
-///
-/// This exists because the three descriptions of the format disagreed. The schema documented a nested
-/// `Collider` / `SoundEmitter` / `Acoustics` shape and an integer `Type`; the map standard documented a
-/// third; the loader read neither. An author following either document produced a file that deserialized
-/// into all-defaults and spawned an invisible, silent, materialless cube — and nothing said a word,
-/// because System.Text.Json drops an unrecognised key without comment.
+/// One prefab spec: <see cref="PrefabTemplate"/> is the format, `prefab-schema.json` describes exactly
+/// it, every shipped prefab satisfies it, and a prefab the engine cannot honour is rejected at load with
+/// the reason named. The schema, the map standard and the loader once described three formats, and a
+/// file following either document loaded as an invisible, silent cube: System.Text.Json drops unknown
+/// keys without a word.
 /// </summary>
 public class PrefabSpecTests
 {
@@ -116,7 +112,7 @@ public class PrefabSpecTests
     [Fact]
     public void UnknownField_IsRejectedByName()
     {
-        // The whole class of bug this catches: a field the loader will drop without a word.
+        // A field the loader would drop without a word.
         Rejects(Valid(), "'ColiderSize'", new[] { "Id", "Name", "ColiderSize" });
     }
 
@@ -308,8 +304,7 @@ public class PrefabSpecTests
         Directory.CreateDirectory(dir);
         try
         {
-            // Emitter settings with the emitter switched off: the old loader accepted this and spawned
-            // an object that was permanently silent.
+            // Emitter settings with the emitter switched off: an object that would be silent for good.
             File.WriteAllText(Path.Combine(dir, "broken.json"),
                 """{ "Id": "broken", "Name": "Broken", "SoundId": "BEACONS/siren", "Range": 20 }""");
 
@@ -446,8 +441,7 @@ public class PrefabSpecTests
     [Fact]
     public void DefaultMap_UsesOnlyFieldsTheLoaderReads()
     {
-        // The map equivalent of the unknown-prefab-field rule. A key the loader does not know is dropped
-        // in silence, so the authored setting simply never happens.
+        // The map's unknown-key rule: a key the loader does not know is dropped in silence.
         var mapFields = typeof(MapData).GetProperties().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var entityFields = typeof(OpenFPS.Server.Repositories.EntityData).GetProperties().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
 

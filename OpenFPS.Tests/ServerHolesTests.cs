@@ -13,17 +13,10 @@ using OpenFPS.Server.Repositories;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Cover for step 4 of the engineering audit — "close the server's structural holes".
-///
-/// The theme is state that only ever grew. The protocol could add an entity to a client and never remove
-/// one, so a disconnected player stayed forever as a ghost that still collided and still made noise. The
-/// loop banked unbounded elapsed time. Registration always reported success. Commands mutated the ECS
-/// world from whichever thread happened to call them — and the guard that prevented that race worked by
-/// throwing every MUD command away. /spawn created objects nothing could see, hear or touch.
-///
-/// Two things here are not unit-testable and are verified by inspection: the Ctrl-C / SIGTERM handlers in
-/// <c>Program.Main</c>, and the socket-level delivery of <see cref="EntityRemoved"/>. What is tested is
-/// every decision those paths depend on.
+/// The server's structural holes (engineering audit, step 4): entities removed from clients, the tick
+/// accumulator clamped, registration that tells the truth, commands on one thread from both transports,
+/// one spawn path, finite movement input. The Ctrl-C / SIGTERM handlers in <c>Program.Main</c> and the
+/// socket delivery of <see cref="EntityRemoved"/> are checked by inspection only.
 /// </summary>
 public class ServerHolesTests
 {
@@ -125,7 +118,7 @@ public class ServerHolesTests
     [Fact]
     public void ALongStallIsCappedAndReported()
     {
-        // Five seconds banked — a GC pause or a laptop lid. Unclamped that is 150 catch-up ticks.
+        // Five seconds banked (a GC pause, a laptop lid): unclamped, 150 catch-up ticks.
         double kept = GameServer.ClampAccumulatorMs(5000.0, out int dropped);
 
         Assert.Equal(PhysicsConstants.MaxCatchUpSeconds * 1000.0, kept);
@@ -178,8 +171,7 @@ public class ServerHolesTests
         var repo = new SqliteUserRepository(db.Options);
 
         Assert.True(repo.AddUser("newcomer", "hunter2", UserRole.Player));
-        // Previously this returned nothing and the server replied Success = true regardless — the player
-        // was told the account existed and then could not log into it.
+        // The server used to reply Success regardless, and the player could not log in.
         Assert.False(repo.AddUser("newcomer", "different-password", UserRole.Player));
 
         // And the original password still works, so the second attempt did not overwrite it.
@@ -214,9 +206,8 @@ public class ServerHolesTests
             EntityType.StaticObject));
 
         Assert.NotEqual(Entity.Null, spawned);
-        // The three things a bare world.Create left out, each of which made the object unreachable in a
-        // different subsystem: /scan and interaction (lookup), collision and broadcast (grid), and the
-        // client's first sight of it (the dirty flag).
+        // What a bare world.Create left out: the lookup (/scan, interaction), the grid (collision,
+        // broadcast) and the dirty flag (the client's first sight of it).
         Assert.True(lookup.ContainsKey(spawned.Id), "spawned entity is missing from the map's id lookup");
         Assert.Contains(spawned, grid.GetItemsInRadius(position, 2f));
         Assert.True(world.Get<Transform>(spawned).IsDirty, "spawned entity was not flagged for broadcast");
@@ -255,8 +246,8 @@ public class ServerHolesTests
         commands.HandleTextCommand(session.ConnectionId,
             new TextCommand { Command = "spawn", Args = new[] { "Box", "Metal", "1", "1", "1" } }, replies.Add);
 
-        // The MUD gateway calls this from its own TCP task. Mutating the Arch world there would race the
-        // simulation, which is what the old (command-dropping) peer guard was really protecting against.
+        // The MUD gateway calls this from its own TCP task: the command must be queued for the tick, not
+        // run against the Arch world there.
         Assert.Empty(replies);
         Assert.Equal(before, lookup.Count);
 
@@ -270,8 +261,8 @@ public class ServerHolesTests
     public void ATextClientConnectionIdIsNoLongerSilentlyDropped()
     {
         var (server, commands, maps, sessions) = BuildCommandStack();
-        // MUD connection ids start at 10000 and have no LiteNetLib peer; every gameplay handler used to
-        // begin with a peer lookup and return, so scan, move, spawn and chat all did nothing at all.
+        // MUD connection ids start at 10000 and have no LiteNetLib peer; handlers that began with a peer
+        // lookup did nothing for them.
         var session = SpawnTestPlayer(maps, sessions, connectionId: 10001, UserRole.Player);
         session.IsTextClient = true;
 
@@ -318,12 +309,9 @@ public class ServerHolesTests
 
     // ── Movement input is finite ────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A client's numbers reach the simulation only if they are numbers. The gate normalised a move
-    /// direction only when its length was over one, and NaN is not over anything, so a NaN or
-    /// infinite direction walked straight through to the player's position and from there into the
-    /// spatial grid. A NaN look turned the player's yaw to NaN for good, and Math.Clamp passes NaN.
-    /// </summary>
+    /// <summary>A client's move and look reach the simulation only if finite: a NaN direction is not
+    /// "over one" so it skipped normalising into the position and grid, and Math.Clamp passes NaN, which
+    /// left the yaw NaN for good.</summary>
     [Theory]
     [InlineData(float.NaN)]
     [InlineData(float.PositiveInfinity)]
@@ -355,8 +343,8 @@ public class ServerHolesTests
         ClientInputUpdate? seen = null;
         dispatcher.RegisterHandler<ClientInputUpdate>((_, input, _) => seen = input);
 
-        // A coarse turn is forty-five degrees in one tick, which is a LookDelta far over one: a look
-        // is a rate the client chose, not a stick position, and the gate must leave it alone.
+        // A coarse turn is 45 degrees in one tick, a LookDelta far over one: the gate leaves a finite
+        // look alone.
         var look = new Vector2(15.7f, -0.2f);
         dispatcher.Dispatch(1, new ClientInputUpdate
         {
@@ -384,8 +372,7 @@ public class ServerHolesTests
     {
         var maps = LoadShippedMaps();
         var sessions = new SessionManager();
-        // Never Start()ed: no socket is bound, so the command buffer and the reply callback are all that
-        // are exercised — which is exactly the surface under test.
+        // Never started: no socket is bound, only the command buffer and the reply callback run.
         var server = new GameServer(new StubUserRepository());
         return (server, new CommandHandler(sessions, maps, server), maps, sessions);
     }

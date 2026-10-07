@@ -31,9 +31,8 @@ public class CeilingJumpTests
         Box(-5.5f, 5.5f, 2.6f, 2.8f, -4.25f, 4.25f),   // roof
     };
 
-    /// <summary>A jump that rises 0.83 m — the game's jump when this was written, and enough to put
-    /// the head into this roof. Today's half-metre jump does not reach it, and the question here is
-    /// what a ceiling does to a head that does.</summary>
+    /// <summary>A jump that rises 0.83 m, enough to put the head into this roof (the game's half-metre
+    /// jump does not reach it).</summary>
     private static readonly float HighJump = MathF.Sqrt(2f * PhysicsConstants.Gravity * 0.83f);
 
     private static MovementContext Ctx(Vector3 pos, Vector3 vel, Vector3 input, bool jump) => new()
