@@ -295,6 +295,48 @@ public class GeometryStage2Tests : IDisposable
         Assert.InRange(onWood, 5, 10);
     }
 
+    /// <summary>
+    /// A car's four wheel rays: on a ramp of one in twelve it pitches nose up by its slope; with its right
+    /// wheels up a 12 cm kerb it rolls right side up; on the level it sits level; and each wheel reads the
+    /// surface under it.
+    /// </summary>
+    [Fact]
+    public void FourWheelRaysPitchAndRollACar()
+    {
+        var kerbSurface = EntityGeometry.SurfaceOf("Concrete", new Vector3(4, 0.12f, 20), 0, 0, false, 0, 0, false, false, false, null);
+        var grass = EntityGeometry.SurfaceOf("Grass", new Vector3(20, 0.02f, 20), 0, 0, false, 0, 0, false, false, false, null);
+        var world = WorldOf(
+            Shaped(7, new Vector3(0, 0.5f, 6f), new Vector3(4f, 1f, 12f), new ShapeSpec { Kind = ShapeKind.Wedge }),   // 1 in 12, rising toward +Z
+            new SolidSpec(8, new Vector3(22f, 0.06f, 0f), Quaternion.Identity, new Vector3(4f, 0.12f, 20f), kerbSurface),
+            new SolidSpec(9, new Vector3(-30f, -0.01f, 0f), Quaternion.Identity, new Vector3(20f, 0.02f, 20f), grass));
+        var all = new AcceptAll();
+        float[] along = { 1.3f, 1.3f, -1.3f, -1.3f }, across = { 0.8f, -0.8f, 0.8f, -0.8f };
+        (float H, float Pitch, float Roll, WheelContact[] C) Sit(Vector3 middle)
+        {
+            var at = new Vector3[4];
+            for (int i = 0; i < 4; i++) at[i] = middle + new Vector3(across[i], 0, along[i]);
+            var c = new WheelContact[4];
+            WheelRays.Contacts(world, ref all, at, 0.4f, c);
+            var (h, p, r) = WheelRays.Rest(c, along, across);
+            return (h, p, r, c);
+        }
+        var level = Sit(new Vector3(-50f, 0f, -50f));
+        Assert.Equal(0f, level.Pitch); Assert.Equal(0f, level.Roll);
+        var ramp = Sit(new Vector3(0f, 0.5f, 6f));
+        Assert.Equal(MathF.Atan(1f / 12f), ramp.Pitch, 4);
+        Assert.Equal(0f, ramp.Roll, 4);
+        Assert.Equal(0.5f, ramp.H, 3);
+        // Right wheels on the kerb (it starts at x 20), left wheels on the road.
+        var kerb = Sit(new Vector3(19.5f, 0f, 0f));
+        Assert.Equal(MathF.Atan(0.12f / 1.6f), kerb.Roll, 4);
+        Assert.Equal("Concrete", kerb.C[0].Material);
+        Assert.Equal("Concrete", kerb.C[1].Material);   // the ground under the left wheels is the world's own
+        // Left wheels on the grass patch, right ones on the ground beside it.
+        var verge = Sit(new Vector3(-20.5f, 0f, 0f));
+        Assert.Equal("Grass", verge.C[1].Material);
+        Assert.NotEqual("Grass", verge.C[0].Material);
+    }
+
     /// <summary>A bank too steep to walk is a wall: walked at, it is not climbed.</summary>
     [Fact]
     public void ABankTooSteepToWalkIsNotClimbed()
