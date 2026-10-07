@@ -287,7 +287,7 @@ public class WorldStreamingTests
         var alice = new UserSession { ConnectionId = 1, Username = "alice", Entity = body, CurrentMapId = id, Welcomed = true };
         sessions.AddSession(1, alice);
 
-        // The join: the tiles round the spawn, a TileStreamUpdate, then MapLoadComplete.
+        // The join: the tiles round the spawn, a TileStreamUpdate, the map's roads, then MapLoadComplete.
         var sent = new List<IMessage>();
         long joinBytes = 0;
         server.Sent = (s, m) => { sent.Add(m); joinBytes += MemoryPackSerializer.Serialize(m).Length; };
@@ -295,7 +295,8 @@ public class WorldStreamingTests
         server.SendMapData(alice, new MapDataRequest { MapName = id });
         double joinMs = clock.Elapsed.TotalMilliseconds;
         Assert.IsType<MapLoadComplete>(sent[^1]);
-        var joinTiles = Assert.IsType<TileStreamUpdate>(sent[^2]);
+        Assert.IsType<MapRoads>(sent[^2]);
+        var joinTiles = Assert.Single(sent.OfType<TileStreamUpdate>());
         int joinDefs = Defs(sent).Count();
         Assert.Equal(joinDefs, joinTiles.Definitions);
         Assert.Equal(alice.Tiles.Levels.Count, joinTiles.Tiles.Count);
