@@ -14,21 +14,16 @@ public sealed record DriverSteering
     public float SoftSpeed { get; init; } = 1f;
     /// <summary>Seconds of steer per rad/s of yaw rate the body is short of the line's: damping.</summary>
     public float YawDamping { get; init; } = 0.05f;
-    /// <summary>Seconds for a pair of hands to wind the wheel from straight to full lock — the
-    /// figure the player's own car uses.</summary>
+    /// <summary>Seconds for hands to wind the wheel from straight to full lock, as the player's car.</summary>
     public float SecondsToLock { get; init; } = 0.7f;
 
     public static DriverSteering Default { get; } = new();
 
     /// <summary>
-    /// The side friction an ordinary driver takes a bend at, against speed: the lateral acceleration,
-    /// in g, at which drivers start to feel uncomfortable and ease off. Speeds in m/s.
-    ///
-    /// AASHTO, A Policy on Geometric Design of Highways and Streets (the Green Book), 2011, section
-    /// 3.3: for low-speed urban streets the side friction factor is set at the point of driver
-    /// discomfort, measured with ball-bank indicators (figure 3-6): 0.38 at 10 mph, 0.26 at 20 mph,
-    /// 0.20 at 30 mph, 0.17 at 40 mph; for high-speed design 0.14 at 50 mph, 0.12 at 60 mph and
-    /// 0.08 at 80 mph. Held flat outside the table.
+    /// The side friction, g, at which ordinary drivers start to feel uncomfortable in a bend, against
+    /// speed in m/s. AASHTO, A Policy on Geometric Design of Highways and Streets (the Green Book), 2011,
+    /// section 3.3, from ball-bank indicators (figure 3-6): 0.38 at 10 mph, 0.26 at 20, 0.20 at 30, 0.17
+    /// at 40; for high-speed design 0.14 at 50, 0.12 at 60, 0.08 at 80. Held flat outside the table.
     /// </summary>
     public static readonly (float Speed, float SideFriction)[] ComfortTable =
     {
@@ -50,11 +45,8 @@ public sealed record DriverSteering
         return t[^1].SideFriction;
     }
 
-    /// <summary>
-    /// The speed an ordinary driver takes a steady bend of this curvature (1/m, either sign) at: the
-    /// speed where v^2 |k| reaches the comfortable side friction at that speed, m/s. The friction
-    /// falls as the speed rises, so v^2 |k| - f(v) g rises with v and is found by halving.
-    /// </summary>
+    /// <summary>The speed an ordinary driver takes a steady bend of this curvature at, m/s: where
+    /// v^2 |k| reaches the comfortable side friction, found by halving (it rises with v).</summary>
     public static float ComfortTurnSpeed(float curvature)
     {
         float k = MathF.Abs(curvature);
@@ -70,12 +62,9 @@ public sealed record DriverSteering
 }
 
 /// <summary>
-/// A vehicle driven along a <see cref="RaceLine"/> by a driver who steers it.
-///
-/// The body moves under its tyres (<see cref="WheelDynamics"/>); where it is is kept relative to the
-/// line, as a distance along it, an offset to its right and a heading error. Distance along the
-/// line is what the traffic logic runs on (stops, junctions, following), so it is unchanged in
-/// meaning: it is the point on the line beside the body.
+/// A vehicle driven along a <see cref="RaceLine"/> by a driver who steers it. The body moves under its
+/// tyres (<see cref="WheelDynamics"/>) and is kept relative to the line: a distance along it (the point
+/// beside the body, which the traffic logic runs on), an offset to its right and a heading error.
 ///
 /// The steering law is Stanley's (Thrun et al., "Stanley: the robot that won the DARPA Grand
 /// Challenge", Journal of Field Robotics 23(9), 2006; Hoffmann, Tomlin, Montemerlo and Thrun,
@@ -110,10 +99,8 @@ public sealed class LineFollower
         Driver = driver ?? DriverSteering.Default;
     }
 
-    /// <summary>
-    /// One step: steer for the line, ask the tyres for the speed, move. Returns the distance gained
-    /// along the line.
-    /// </summary>
+    /// <summary>One step: steer for the line, ask the tyres for the speed, move. Returns the distance
+    /// gained along the line.</summary>
     /// <param name="at">Distance along the line now.</param>
     /// <param name="targetSpeed">The speed the driver wants to be doing at the end of the step.</param>
     /// <param name="targetOffset">Where the driver wants to be, metres right of the line.</param>
@@ -127,10 +114,9 @@ public sealed class LineFollower
         line.Sample(at + lf, out _, out float pathAhead, out _);
         line.Sample(at, out _, out float pathHere, out _);
         float bodyHeading = pathHere + HeadingError;
-        // Against the heading it should have, which is not the line's: a body cornering steadily runs
-        // at a sideslip angle, and steering its nose onto the line would hold it wide (Hoffmann et
-        // al. 2007 take the same steady-state yaw out). The heading it actually has, not the way it
-        // is moving, so a sliding tail is caught.
+        // Against the heading it should have, less the steady turn's sideslip, or its nose onto the line
+        // holds it wide (Hoffmann et al. 2007). Its actual heading, not its motion, so a sliding tail is
+        // caught.
         float k = line.CurvatureAt(at + lf);
         float speed = MathF.Max(0f, v);
         float headingError = MathF.IEEERemainder(bodyHeading + body.SteadySideslip(speed, k) - pathAhead, 2f * MathF.PI);
@@ -139,9 +125,8 @@ public sealed class LineFollower
         float want = feedForward - headingError
                    - MathF.Atan(Driver.CrossTrackGain * frontError / (Driver.SoftSpeed + speed))
                    + Driver.YawDamping * (speed * line.CurvatureAt(at) - body.YawRate);
-        // No further past the way the front axle is going than the tyres' peak slip angle: turned
-        // further, a tyre gives less, not more, and the car only ploughs on wider. (At walking pace
-        // the body follows its wheels and the lock is the only limit.)
+        // No further past the front axle's course than the tyres' peak slip angle: further, a tyre gives
+        // less and the car ploughs wider. At walking pace the lock is the only limit.
         if (speed > WheelDynamics.KinematicBelow)
         {
             float course = MathF.Atan2(body.Vy + body.YawRate * body.A, speed);
@@ -156,9 +141,8 @@ public sealed class LineFollower
         // ── Moving ──
         body.Step(dt, _steer, (targetSpeed - v) / MathF.Max(1e-3f, dt));
 
-        // Where that put it, relative to the line: the ground covered, turned into the world by the
-        // heading it had, and read against the line's frame halfway along, which is exact to second
-        // order on a curve (a chord is square to the radius through its middle).
+        // The ground covered, read against the line's frame halfway along: exact to second order on a
+        // curve (a chord is square to the radius through its middle).
         float sinH = MathF.Sin(bodyHeading), cosH = MathF.Cos(bodyHeading);
         var forward = new Vector2(sinH, cosH);
         var right = new Vector2(cosH, -sinH);

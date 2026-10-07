@@ -2,14 +2,9 @@ using System.Numerics;
 
 namespace OpenFPS.Common;
 
-// ── Roads as data ───────────────────────────────────────────────────────────────────────────────
-//
-// A road is a centreline, a type, and a list of lanes; a junction is a point where roads meet. What
-// the map declares stops there. Which lanes run between which junctions, which way each goes, and
-// which lanes a vehicle can turn into are worked out from it, the same rule the level crossings
-// follow: declare the point, derive the rest, so the two cannot drift apart.
-//
-// See docs/NEXT_BODIES_WHEELS_ROADS.md, stage 1.
+// Roads as data (docs/NEXT_BODIES_WHEELS_ROADS.md, stage 1). A map declares a road's centreline, type
+// and lanes, and a junction's point; the lane segments between junctions and the turns between them
+// are derived, so the two cannot drift apart.
 
 /// <summary>One road, as the map declares it.</summary>
 public class RoadData
@@ -169,8 +164,7 @@ public sealed class RoadNetwork
         var marks = new List<(float Along, JunctionData? J)> { (0f, null) };
         foreach (var (j, along) in stops)
         {
-            // A road that starts or ends within a junction's reach starts or ends IN it: the lanes
-            // begin at its edge, and the few metres of carriageway beyond are the junction's.
+            // A road that ends within a junction's reach ends in it: its lanes stop at the edge.
             if (along <= j.RadiusMetres) marks[0] = (0f, j);
             else if (along >= length - j.RadiusMetres) { marks.Add((length, j)); continue; }
             else marks.Add((along, j));
@@ -201,13 +195,10 @@ public sealed class RoadNetwork
     }
 
     /// <summary>
-    /// At each junction, every lane that arrives can go into every lane that leaves on another road, or
-    /// straight on along its own; not back the way it came.
-    ///
-    /// No lane rules (right turns from the kerb lane, left from the inner one) until vehicles can change
-    /// lanes along a block: without that, a car in the kerb lane could never reach the inner lane it
-    /// needed for a left turn, and tours ran into dead ends (tried 2026-09-27). Two cars side by side
-    /// on one approach are kept apart at the junction instead: the one further back gives way.
+    /// At each junction, every arriving lane can go into every leaving lane except back the way it came.
+    /// No lane rules (right from the kerb lane, left from the inner) until vehicles change lanes along a
+    /// block: tried 2026-09-27, tours ran into dead ends. Two cars side by side at a junction are kept
+    /// apart instead: the one further back gives way.
     /// </summary>
     private void Connect()
     {

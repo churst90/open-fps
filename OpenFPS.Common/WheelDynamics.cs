@@ -163,11 +163,8 @@ public sealed class WheelDynamics
     /// <summary>Never rolls backwards: traffic, whose speed logic has no reverse.</summary>
     public bool ForwardOnly { get; set; }
 
-    /// <summary>
-    /// Driven by somebody who feels the car: the throttle and brake are eased so no wheel is asked
-    /// for more than its friction circle leaves. Traffic. A player's car is not: a player who stands
-    /// on the brakes in a corner gets what that gets.
-    /// </summary>
+    /// <summary>Driven by somebody who feels the car (traffic): throttle and brake are eased so no wheel
+    /// is asked for more than its friction circle leaves. Never a player's car.</summary>
     public bool Modulated { get; set; }
 
     /// <summary>
@@ -324,11 +321,8 @@ public sealed class WheelDynamics
     /// a wet road is read off it by <see cref="WetGripShare"/>.</summary>
     private bool _dryTable;
 
-    /// <summary>
-    /// Every wheel's share of its dry grip with the water under it, at the body's speed now. Called at
-    /// the start of every step: the speed changes little over one, and the aquaplaning law is too dear
-    /// to work out in every sub-step of every wheel.
-    /// </summary>
+    /// <summary>Every wheel's share of its dry grip with the water under it, once a step: the aquaplaning
+    /// law is too dear for every sub-step of every wheel, and the speed changes little over one.</summary>
     private void Wet()
     {
         for (int i = 0; i < Wheels.Length; i++)
@@ -366,7 +360,7 @@ public sealed class WheelDynamics
         }
     }
 
-    /// <summary>Sets the surface under one wheel (the ground under each wheel, geometry stage 2).</summary>
+    /// <summary>Sets the surface under one wheel.</summary>
     public void SetSurface(int wheel, byte surface)
     {
         Wheels[wheel].Surface = surface;
@@ -583,10 +577,8 @@ public sealed class WheelDynamics
         }
     }
 
-    /// <summary>
-    /// The slip angle at which the steered wheels make their most force, radians, at their present
-    /// loads: as far past the way the front axle is moving as a driver can usefully turn the wheel.
-    /// </summary>
+    /// <summary>The slip angle at which the steered wheels make their most force at their present loads,
+    /// radians: as far past the front axle's motion as a driver can usefully turn the wheel.</summary>
     public float SteeredPeakSlip()
         => SteeredPeakSlipAt();
 

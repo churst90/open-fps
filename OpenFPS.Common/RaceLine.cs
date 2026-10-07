@@ -5,21 +5,10 @@ namespace OpenFPS.Common;
 
 /// <summary>
 /// A driveable line round a closed circuit, and the fastest a given car can take every metre of it.
-///
-/// The centreline arrives as a handful of waypoints. This resamples it at a fixed spacing so
-/// curvature can be measured consistently, offsets it sideways onto the line this particular car is
-/// using, and then computes a speed limit at every node from two things and nothing else:
-///
-///   * the local radius of the bend, which caps the speed at sqrt(g * 9.81 * R) — the point at which
-///     the tyres run out of lateral grip;
-///   * the brakes, applied BACKWARDS round the loop, so a node's limit also cannot exceed what can
-///     still be shed before the slower node after it (v^2 = u^2 + 2 a s, solved for the entry speed).
-///
-/// That second pass is what makes a car start braking a hundred metres before the corner instead of
-/// arriving at it and stopping dead, and it is why the engine note drops on the approach. It runs
-/// round the loop twice because the profile is circular: the limit at the last node feeds the first.
-///
-/// Nothing here knows about racing, ovals or engines. It is geometry and two equations of motion.
+/// The waypoints are resampled evenly, offset onto this car's lane, and each node's limit is the
+/// lower of the bend's grip limit, sqrt(g 9.81 R), and what the brakes can still shed before the
+/// slower node after it (v^2 = u^2 + 2 a s, worked backwards, twice round because the loop is
+/// closed). The backward pass is why a car brakes before a corner (docs/ENGINE_SYNTHESIS.md).
 /// </summary>
 public sealed class RaceLine
 {
@@ -28,42 +17,22 @@ public sealed class RaceLine
     public const float NodeSpacing = 4f;
 
     /// <summary>
-    /// How many nodes either side the radius is measured across.
-    ///
-    /// Not a smoothing fudge — a correction for what a polyline IS. A map draws its turns as a few
-    /// dozen waypoints, so resampling them gives a run of straight chords meeting at corners: measure
-    /// the radius across three ADJACENT nodes and almost every triple is dead straight (infinite
-    /// radius, no limit at all) while the few that straddle a join are a hairpin. The first field
-    /// built this way had stock cars limited to 113 km/h round a turn they should have taken at 235,
-    /// because one kink anywhere in the turn drags the whole braking profile down to it.
-    ///
-    /// Measuring across a baseline longer than the join spacing puts the joins INSIDE the arc being
-    /// fitted, where they belong, and what comes back is the radius of the turn rather than the
-    /// radius of the draughtsman's corner. It is also what a car does: a wheelbase cannot follow a
-    /// kink either.
+    /// How many nodes either side the radius is measured across: longer than the waypoint spacing, so
+    /// the joins between chords fall inside the arc. Across adjacent nodes the few triples at a join
+    /// read as hairpins, and stock cars lapped at 113 km/h a turn they should take at 235
+    /// (docs/ENGINE_SYNTHESIS.md).
     /// </summary>
     private const int CurvatureSpan = 5;
 
-    /// <summary>
-    /// Passes of three-point smoothing over the resampled line before anything is measured.
-    ///
-    /// A racing line is a curve. Rounding the joins costs a few centimetres of radius on a 150 m
-    /// turn and removes the discontinuity in curvature that a car would otherwise be asked to take
-    /// at three hundred kilometres an hour.
-    /// </summary>
+    /// <summary>Passes of three-point smoothing before anything is measured: a few centimetres of radius
+    /// on a 150 m turn, and no step in curvature to take at 300 km/h.</summary>
     private const int SmoothingPasses = 3;
 
     private readonly Vector3[] _points;        // the line itself, evenly spaced, closed
     private readonly float[] _limit;           // m/s allowed at each node
-    /// <summary>The GRIP-limited speed at each node, uncapped by the car's top speed and untouched by
-    /// the braking pass — infinite on a straight, where nothing but drag holds the car back.
-    ///
-    /// Kept apart from <see cref="_limit"/> because they answer different questions and conflating
-    /// them put every car on the circuit permanently on the edge of a slide. `_limit` is "how fast
-    /// may this car go here", which on a straight is its top speed and into a corner is whatever the
-    /// braking pass allows. This is "how fast could its TYRES hold it here", which is the only one of
-    /// the two that says anything about the tyres. A car flat out on a straight is using none of its
-    /// cornering grip, and a formula that cannot tell those apart reports it as sliding.</summary>
+    /// <summary>The grip-limited speed at each node, infinite on a straight: how fast the tyres could
+    /// hold the car, not how fast it may go (<see cref="_limit"/>). Read as one, every car flat out on
+    /// a straight was reported on the edge of a slide.</summary>
     private readonly float[] _corner;
     private readonly float[] _heading;         // radians, the way the line points at each node
     /// <summary>Signed curvature at each node, 1/m, positive turning right (the way heading rises):
@@ -71,25 +40,10 @@ public sealed class RaceLine
     private readonly float[] _curvature;
 
     /// <summary>
-    /// Arc length from node 0 to each node, with the closing segment as the last entry, so
-    /// <c>_arc[n] == Length</c>.
-    ///
-    /// The nodes are NOT evenly spaced, which is what this exists to face. Two things move them
-    /// after <see cref="Resample"/> has laid them out evenly along the centreline: <see cref="Smooth"/>
-    /// pulls every point a quarter of the way toward the mean of its neighbours, which shortens the
-    /// loop wherever it curves, and the lateral offset onto a car's own line then lengthens the turns
-    /// for an outside lane and shortens them for an inside one, in proportion to offset over radius.
-    /// Neither touches a straight. So the spacing this line actually has varies round the lap and
-    /// differs per lane, while the centreline's nominal spacing does not.
-    ///
-    /// Indexing by division on that nominal spacing was therefore wrong in a way that concentrated all
-    /// of its error at one place. `s` wraps on the TRUE perimeter but was divided by the NOMINAL one,
-    /// so on an outside lane `s / _spacing` ran past the last node and the clamp pinned it there: the
-    /// car STOPPED DEAD at one fixed point on the track and stayed there until the lap wrapped. On the
-    /// St Louis egg that is about forty metres of lane, which is the best part of a second for a stock
-    /// car and about half of one for a formula car — reported as "the car will stop in front of me,
-    /// the Doppler change in place, and then the car keeps going". An inside lane had the mirror of it,
-    /// teleporting forward across the seam. The speed was never wrong; only where the car was.
+    /// Arc length from node 0 to each node; <c>_arc[n] == Length</c>. The nodes are not evenly spaced:
+    /// smoothing shortens the curves, and the lane offset lengthens an outside lane's turns and
+    /// shortens an inside one's. Dividing by the nominal spacing stopped a car dead at one point of
+    /// every lap (docs/COMMON_NOTES.md, The racing line's arc length).
     /// </summary>
     private readonly float[] _arc;
 
@@ -113,8 +67,8 @@ public sealed class RaceLine
     {
         if (centreline == null || centreline.Count < 3)
             throw new ArgumentException("A circuit needs at least three waypoints.", nameof(centreline));
-        // A NaN or infinite waypoint makes the perimeter infinite, and the resampled line asks for an
-        // array the size of the address space. Say which point is wrong instead.
+        // A non-finite waypoint makes the perimeter infinite and the resampled array the size of the
+        // address space.
         for (int i = 0; i < centreline.Count; i++)
             if (!float.IsFinite(centreline[i].X) || !float.IsFinite(centreline[i].Y) || !float.IsFinite(centreline[i].Z))
                 throw new ArgumentException($"Waypoint {i} of the circuit is not a finite position.", nameof(centreline));
@@ -129,8 +83,7 @@ public sealed class RaceLine
         _curvature = new float[n];
         BankingDegrees = bankingDegrees;
 
-        // Offset sideways onto this car's line. The normal is the tangent turned 90 degrees in the
-        // ground plane, so a positive offset is to the car's right.
+        // A positive offset is to the car's right.
         for (int i = 0; i < n; i++)
         {
             Vector3 tangent = Tangent(resampled, i);
@@ -147,13 +100,9 @@ public sealed class RaceLine
             Vector3 d = _points[(i + 1) % n] - _points[i];
             _heading[i] = MathF.Atan2(d.X, d.Z);
 
-            // Menger curvature of three points spanning this one: the radius of the circle through
-            // them. A straight gives an infinite radius and therefore no limit at all.
+            // A straight's radius is infinite: no cornering limit at all, not the top speed (see _corner).
             int span = Math.Clamp(CurvatureSpan, 1, Math.Max(1, n / 3));
             float radius = Radius(_points[(i - span + n) % n], _points[i], _points[(i + span) % n]);
-            // A straight has no cornering limit at all — not "the top speed", which is what it used
-            // to be recorded as and which made a car doing its top speed in a straight line read as
-            // though it were at the limit of its grip.
             _corner[i] = float.IsInfinity(radius) ? float.PositiveInfinity
                                                   : CorneringSpeed(radius, corneringG, bankingDegrees);
             _limit[i] = MathF.Min(topSpeed, float.IsInfinity(radius) ? topSpeed : _corner[i]);
@@ -168,7 +117,7 @@ public sealed class RaceLine
             _curvature[i] = span > 1e-4f ? turn / span : 0f;
         }
 
-        // Braking, backwards, twice round — the second lap carries the wrap-around back to the start.
+        // Braking, backwards, twice round: the second lap carries the wrap-around back to the start.
         for (int pass = 0; pass < 2; pass++)
         {
             for (int k = n - 1; k >= 0; k--)
@@ -201,13 +150,9 @@ public sealed class RaceLine
     }
 
     /// <summary>
-    /// As <see cref="Sample(float, out Vector3, out float, out float)"/>, and also how fast this car's
-    /// TYRES could hold it here — which is not the same question as how fast it may go.
-    ///
-    /// Infinite on a straight. The ratio of the actual speed to this is what says how hard the tyres
-    /// are working laterally, and it is exact rather than approximate: the cornering limit is where
-    /// lateral acceleration equals available grip, and acceleration is v²/R either way, so the ratio
-    /// of accelerations is the square of the ratio of speeds.
+    /// As <see cref="Sample(float, out Vector3, out float, out float)"/>, and how fast the tyres could
+    /// hold the car here (infinite on a straight). The square of speed over this is exactly how hard
+    /// the tyres work laterally, since acceleration is v²/R either way.
     /// </summary>
     public void Sample(float distance, out Vector3 position, out float heading, out float speedLimit,
                        out float corneringLimit)
@@ -219,8 +164,7 @@ public sealed class RaceLine
         Locate(s, out int i, out float f);
         int j = (i + 1) % _points.Length;
 
-        // Straights are infinite, so interpolating between a finite node and an infinite one has to
-        // take the finite answer rather than produce a NaN.
+        // Between a finite node and an infinite one, the finite answer, not a NaN.
         float a = _corner[i], b = _corner[j];
         corneringLimit = float.IsInfinity(a) ? b : float.IsInfinity(b) ? a : a + (b - a) * f;
     }
@@ -232,38 +176,28 @@ public sealed class RaceLine
         if (s < 0f) s += Length;
         Locate(s, out int i, out float f);
         int j = (i + 1) % _points.Length;
-        // A node's curvature belongs to the joint at it; between joints the line is straight, so
-        // spread each joint's turn over the segments either side.
+        // A node's curvature belongs to the joint at it; each joint's turn is spread over the segments
+        // either side.
         return _curvature[i] + (_curvature[j] - _curvature[i]) * f;
     }
 
     /// <summary>
-    /// The fastest a car may be going now to take every bend in the next <paramref name="span"/>
-    /// metres with no more than <paramref name="corneringG"/> on its tyres, braking at up to
-    /// <paramref name="brake"/> to reach each, from the line's own curvature node by node.
-    ///
-    /// The g is a budget for braking and cornering together — the friction circle a driver keeps
-    /// inside, as a racing line's speed profile is built (Milliken and Milliken, Race Car Vehicle
-    /// Dynamics, 1995, chapter 2): v_c = sqrt(mu g / |k|) at each node, and coming back from the
-    /// furthest node toward the car the speed may rise by the braking the circle leaves beside the
-    /// cornering there, sqrt((mu g)^2 - (v^2 k)^2), no more than the brake. So the braking is done
-    /// before the bend, not in it.
-    ///
-    /// Not the same as the speed profile. That measures each corner's radius across a long baseline
-    /// (<see cref="CurvatureSpan"/>) so a coarsely drawn circuit is not read as a string of kinks, and
-    /// on a circuit that is right; but a junction turn on a town street is a few metres of radius, and
-    /// a forty-metre baseline reads it as a gentle bend. A car held to the line never noticed. A car
-    /// steering itself round it on its own tyres has to take the bend the line actually makes.
+    /// The fastest a car may be going now to take every bend in the next <paramref name="span"/> metres
+    /// with no more than <paramref name="corneringG"/> on its tyres, braking at up to
+    /// <paramref name="brake"/>, from the line's own curvature node by node. The g is one budget for
+    /// braking and cornering (the friction circle, Milliken and Milliken, Race Car Vehicle Dynamics,
+    /// 1995, chapter 2): v_c = sqrt(mu g / |k|) at each node, and back toward the car the speed may rise
+    /// by the braking the circle leaves, sqrt((mu g)^2 - (v^2 k)^2), so the braking is done before the
+    /// bend. Not the speed profile: its long <see cref="CurvatureSpan"/> reads a few-metre junction
+    /// turn as a gentle bend, and a car steering on its own tyres must take the bend the line makes.
     /// </summary>
     /// <param name="cornerSpeed">The vehicle's own fastest speed round a steady turn of a curvature,
     /// if it knows it (WheelDynamics.SteadyTurnSpeed); the lower of that and the cornering budget
     /// holds at each node.</param>
-    /// <param name="comfortG">The side friction a driver finds comfortable at a speed, g
-    /// (DriverSteering.ComfortSideFriction), if the driver is an ordinary one. Braking and cornering
-    /// then share an ellipse with the brake on one axis and the comfortable side friction on the
-    /// other (the friction ellipse of Milliken and Milliken 1995, chapter 2, at a driver's comfort
-    /// rather than the tyre's limit), so in a bend taken at the comfortable side friction there is no
-    /// braking left over, and the slowing is done on the way in.</param>
+    /// <param name="comfortG">The side friction an ordinary driver finds comfortable at a speed, g
+    /// (DriverSteering.ComfortSideFriction). Braking and cornering then share an ellipse of the brake
+    /// and that side friction (Milliken and Milliken 1995, chapter 2, at comfort rather than the
+    /// limit), so the slowing is done on the way in.</param>
     public float BendSpeedWithin(float distance, float span, float corneringG, float brake, Func<float, float>? cornerSpeed = null,
                                  Func<float, float>? comfortG = null)
     {
@@ -286,13 +220,9 @@ public sealed class RaceLine
             ahead += _arc[after] - _arc[node];
         }
 
-        // Backwards from the furthest: each node's limit, and what can still be shed before it,
-        // ending at the car (distance nought, the curvature of the node it is past).
-        //
-        // The curvature runs linearly between nodes, so over a segment the cornering is greatest at
-        // its tighter end; the braking room is what the circle leaves there. Read at the nearer end,
-        // a bend whose curvature climbs over a few nodes would be entered braking at the full brake
-        // while the cornering built up under it, the two together past the circle.
+        // Backwards from the furthest node to the car. The braking room over a segment is what the
+        // circle leaves at its tighter end: read at the nearer end, a tightening bend was entered on
+        // the full brake while the cornering built up, the two together past the circle.
         float v = float.PositiveInfinity, beyond = 0f, beyondCurve = 0f;
         for (int c = count - 1; c >= -1; c--)
         {
@@ -305,8 +235,7 @@ public sealed class RaceLine
                 float room = MathF.Min(brake, MathF.Sqrt(MathF.Max(0f, muG * muG - lateral * lateral)));
                 if (comfortG != null)
                 {
-                    // The comfortable ellipse: the brake on a straight, the comfortable side friction
-                    // in a steady bend, and between them (b_x / brake)^2 + (a_y / side)^2 = 1.
+                    // (b_x / brake)^2 + (a_y / side)^2 = 1.
                     float side = MathF.Min(muG, MathF.Max(0.01f, comfortG(v)) * 9.81f);
                     float used = lateral / side;
                     room *= MathF.Sqrt(MathF.Max(0f, 1f - used * used));
@@ -325,14 +254,10 @@ public sealed class RaceLine
     }
 
     /// <summary>
-    /// The lowest speed limit anywhere from <paramref name="distance"/> to <paramref name="span"/>
-    /// metres further on: every node in between and both ends.
-    ///
-    /// What a driver looking down the road reads. Sampling only the far end let the look-ahead point
-    /// pass over the tightest part of a bend while the car was still short of it: the far point read
-    /// the faster exit, the car accelerated, and braked again when the tight part came under it — on
-    /// the city's corners +2.2 then -2.2 m/s^2 within half a second, heard on the diesel pickups as
-    /// flooring it, lifting, and flooring it again.
+    /// The lowest speed limit from <paramref name="distance"/> to <paramref name="span"/> metres on,
+    /// every node and both ends. The far end alone read a bend's faster exit past its tightest part:
+    /// +2.2 then -2.2 m/s^2 within half a second on the city's corners, a diesel pickup flooring it,
+    /// lifting and flooring it again.
     /// </summary>
     public float SlowestWithin(float distance, float span)
     {
@@ -356,13 +281,8 @@ public sealed class RaceLine
         return slowest;
     }
 
-    /// <summary>
-    /// Which segment a distance round the lap falls in, and how far along it.
-    ///
-    /// A binary search over the arc-length table rather than a division, because the nodes are not
-    /// evenly spaced — see <see cref="_arc"/>. Nine comparisons for a five-hundred-node circuit, once
-    /// per car per tick, and it is exact everywhere including across the closing segment.
-    /// </summary>
+    /// <summary>Which segment a distance round the lap falls in, and how far along it: a binary search
+    /// of <see cref="_arc"/>, because the nodes are not evenly spaced.</summary>
     private void Locate(float s, out int index, out float fraction)
     {
         int n = _points.Length;
@@ -377,8 +297,8 @@ public sealed class RaceLine
         fraction = seg > 1e-6f ? Math.Clamp((s - _arc[index]) / seg, 0f, 1f) : 0f;
     }
 
-    /// <summary>Rounds the joins out of a closed polyline: each point moved a quarter of the way
-    /// toward the average of its neighbours, which leaves a circle a circle and a corner an arc.</summary>
+    /// <summary>Rounds the joins out of a closed polyline: each point moved half way toward the average
+    /// of its neighbours, which leaves a circle a circle and a corner an arc.</summary>
     private static void Smooth(List<Vector3> loop, int passes)
     {
         int n = loop.Count;
@@ -419,18 +339,14 @@ public sealed class RaceLine
         return a + d * f;
     }
 
-    /// <summary>
-    /// Walks the closed polyline laying down evenly spaced points, so curvature is measured over a
-    /// consistent baseline however the map was authored.
-    ///
-    /// The spacing is rounded to divide the perimeter a whole number of times rather than being
-    /// taken literally, so the loop closes EXACTLY — the last node is one step from the first, with
-    /// no short segment at the join. That is what lets Sample find a node by dividing instead of
-    /// walking, and it removes the one place a lap could gain or lose a few centimetres a lap.
-    /// </summary>
     /// <summary>Longer than any map will be (the city is 10 km across); a bound on what Resample allocates.</summary>
     private const float MaxPerimeterMetres = 1_000_000f;
 
+    /// <summary>
+    /// Evenly spaced points along the closed polyline, so curvature has a consistent baseline however
+    /// the map was drawn. The spacing divides the perimeter a whole number of times, so the loop closes
+    /// with no short segment at the join.
+    /// </summary>
     private static List<Vector3> Resample(IReadOnlyList<Vector3> loop, float wanted, out float spacing)
     {
         int n = loop.Count;
@@ -462,26 +378,10 @@ public sealed class RaceLine
     }
 
     /// <summary>
-    /// The fastest a car can go round a bend of this radius — WITH THE BANKING, which is the whole
-    /// difference between a road course and a superspeedway.
-    ///
-    /// On the flat, all that holds a car in is friction: v = sqrt(mu*g*R). Bank the surface by theta
-    /// and a component of the car's own weight points into the turn, so the tyres are asked for less
-    /// and can be asked for more at once:
-    ///
-    ///     v^2 = R * g * (mu + tan(theta)) / (1 - mu * tan(theta))
-    ///
-    /// Past mu*tan(theta) = 1 the denominator goes to zero and then negative, which is not a
-    /// singularity to guard against so much as the physical answer: the banking alone holds the car,
-    /// and there is no cornering speed limit at all — it is limited by power, like a straight.
-    /// A car on a steep enough bank does not lift.
-    ///
-    /// This was missing, and it was audible. The speedway's geometry HAS its banking — the generator
-    /// raises the turns seven metres and the centreline carries it — but the racing line read the
-    /// curvature and ignored the elevation, so it worked out the corner speed for a flat track. The
-    /// cars therefore lifted 16-23 % twice a lap, which is three to four and a half SEMITONES of rev
-    /// drop, for every car, right in front of the grandstand. Heard, correctly, as "the cars sound
-    /// like they are slowing down" — because they were.
+    /// The fastest a car can go round a bend of this radius, with the banking:
+    /// v^2 = R g (mu + tan theta) / (1 - mu tan theta). Past mu tan theta = 1 the bank alone holds the
+    /// car and only power limits it, like a straight. Without the banking every car lifted 16-23 %
+    /// twice a lap at the speedway (docs/AUDIO_LOAD_DROPOUTS.md, session 5, third pass).
     /// </summary>
     private static float CorneringSpeed(float radius, float corneringG, float bankingDegrees)
     {

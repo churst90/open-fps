@@ -3,31 +3,16 @@ using OpenFPS.Common.Editing;
 
 namespace OpenFPS.Common;
 
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
-//  Compressed air, and everything it does on its way out.
+// Compressed air on its way out. Every sound of a vehicle's air system (brake release, dryer purge,
+// kneeling, parking brake) is one event, a vessel at pressure emptying through a hole; only the
+// volume and the hole change.
 //
-//  A lorry, a bus, a tram and a train all run their brakes and their doors on air, and every sound
-//  the system makes is the same event: A VESSEL AT PRESSURE EMPTYING THROUGH A HOLE. Get that one
-//  thing right and the hiss when the driver lifts off the brake, the bang and sigh of a truck's air
-//  dryer purging in a car park, the long sigh of a bus kneeling and the crack of a parking brake
-//  popping out are all the same model with two numbers changed: how big the vessel is and how big
-//  the hole is.
-//
-//  WHY IT IS SO LOUD AND SO BRIGHT. At a hundred and twenty pounds to the square inch the pressure
-//  ratio across the hole is about nine, which is far past the 1.89 it takes to choke. So the flow at
-//  the throat is sonic, the jet leaves underexpanded and accelerates to about Mach 1.6, and a
-//  supersonic jet is not just a loud jet — it also has SHOCK CELLS in it, a train of diamonds that
-//  radiate a rasp of their own. And because the noise of a jet peaks at a Strouhal number of about
-//  0.2 on the size of the hole, an eight-millimetre orifice peaks somewhere around fifteen kilohertz:
-//  it is pure top end. What brings it back down to something you would recognise is the MUFFLER
-//  screwed into the exhaust port, which is doing exactly what a muffler on an engine does.
-//
-//  WHY IT DIES AWAY THE WAY IT DOES. The vessel empties exponentially while the flow is choked, with
-//  a time constant of the volume over the effective area over the speed of sound — a few tenths of a
-//  second for a door valve, several seconds for a trailer's reservoir. Then the pressure ratio falls
-//  below 1.89, the jet goes subsonic, and Lighthill's eighth power takes the level away very fast
-//  indeed. That knee is the shape of the sound: a hard crack, a fat hiss, and a thin tail.
-// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// At 120 psi the pressure ratio is about nine, far past the 1.89 that chokes the hole: the jet leaves
+// underexpanded at about Mach 1.6, with shock cells that rasp, and peaks at Strouhal 0.2 on the hole,
+// about 15 kHz for 8 mm. The muffler in the port brings it down. The vessel empties exponentially while
+// choked (time constant volume / effective area / speed of sound: tenths of a second for a door valve,
+// seconds for a trailer); below 1.89 the jet goes subsonic and Lighthill's eighth power takes the level
+// away fast. That knee is the sound: a crack, a fat hiss, a thin tail.
 
 /// <summary>Something that lets air out.</summary>
 public sealed record AirPortSpec
@@ -37,8 +22,8 @@ public sealed record AirPortSpec
     /// behind it, how long the sound lasts.</summary>
     [Tunable("m", 0.001, 0.05, "Diameter of the hole the air leaves by. A bigger hole is lower in pitch and empties the volume faster.", Label = "orifice diameter", Step = 0.0005)]
     public required float OrificeMetres { get; init; }
-    /// <summary>What is behind the hole, litres. A quick-release valve on a tractor is emptying two
-    /// brake chambers; a parking brake is emptying the spring brake side of the whole unit.</summary>
+    /// <summary>What is behind the hole, litres: two brake chambers for a tractor's quick-release
+    /// valve, the whole spring brake side for a parking brake.</summary>
     [Tunable("L", 0.1, 2000, "Volume of air behind the hole. More volume makes the release last longer.", Label = "volume behind it", Step = 0.5)]
     public required float VolumeLitres { get; init; }
     /// <summary>Discharge coefficient of the port. A sharp-edged hole is 0.6, a nozzle 0.9.</summary>
@@ -50,9 +35,7 @@ public sealed record AirPortSpec
     public float MufflerAbsorption { get; init; } = 0.55f;
     [Tunable("Hz", 500, 10000, "Where the muffler starts to roll the top off.", Label = "muffler corner", Step = 100)]
     public float MufflerCornerHz { get; init; } = 2600f;
-    /// <summary>Where it is on the vehicle: metres back from the front, out to the right, and up.
-    /// A trailer's brake valves are at the back and at the axles; a bus's door valve is at the
-    /// front step, which is why it goes off next to your head.</summary>
+    /// <summary>Where it is on the vehicle: metres back from the front, out to the right, and up.</summary>
     [Tunable("m", 0, 40, "How far back from the front of the vehicle the port is.", Label = "distance back from the front", Step = 0.1)]
     public float AlongMetres { get; init; }
     [Tunable("m", -2, 2, "How far right of the centre line the port is. Negative is to the left.", Label = "distance to the right", Step = 0.05)]
@@ -71,25 +54,22 @@ public sealed record AirSystemSpec
     public required string Name { get; init; }
     [Tunable("L", 10, 2000, "Volume of the main reservoir.", Label = "reservoir volume", Step = 5)]
     public float ReservoirLitres { get; init; } = 60f;
-    /// <summary>The governor: the compressor loads at the low figure and unloads at the high one.
-    /// 100 and 120 psi is the American standard, and the unloading is the "pop" you hear from a
-    /// parked truck every couple of minutes.</summary>
+    /// <summary>The governor: the compressor loads at the low figure and unloads at the high one, 100
+    /// and 120 psi in the American standard. The unloading is a parked truck's pop every few minutes.</summary>
     [Tunable("kPa", 300, 1100, "Pressure, gauge, at which the governor sets the compressor pumping again.", Label = "governor cut-in pressure", Step = 10, Source = "American standard governor settings, 100 and 120 psi")]
     public float CutInKPa { get; init; } = 690f;
     [Tunable("kPa", 300, 1200, "Pressure, gauge, at which the governor unloads the compressor: the pop from a parked truck.", Label = "governor cut-out pressure", Step = 10, Source = "American standard governor settings, 100 and 120 psi")]
     public float CutOutKPa { get; init; } = 827f;
     public required AirPortSpec[] Ports { get; init; }
-    /// <summary>The compressor itself: a little two-cylinder pump geared off the engine. It is a
-    /// knocking, not a hiss, and it is at twice the crank order it is geared to.</summary>
+    /// <summary>The compressor, a two-cylinder pump geared off the engine: a knocking at twice the
+    /// order it is geared to.</summary>
     [Tunable("dB", 50, 110, "Level at one metre of the compressor's knocking while it pumps.", Label = "compressor level", Step = 1)]
     public float CompressorDb { get; init; } = 76f;
     [Tunable("", 0.5, 8, "Compressor knocks per engine revolution. A two-cylinder pump geared at engine speed is 2.", Label = "compressor order", Step = 0.5)]
     public float CompressorOrder { get; init; } = 2f;
-    /// <summary>Where a jet of this kind sits against Lighthill's law with K = 1e-4, dB. The same
-    /// anchor, and the same sign, as the aircraft's jets: the law's one-metre figure is a near-field
-    /// fiction for a source whose mixing region is many diameters long, and what is real is the
-    /// balance, which is what this pins. A brake release comes out near 100 dB at a metre with it,
-    /// which is what one measures.</summary>
+    /// <summary>Where this jet sits against Lighthill's law with K = 1e-4, dB, as the aircraft's jets
+    /// do: the law's one-metre figure is a near-field fiction, the balance is real. A brake release
+    /// comes out near the 100 dB at a metre one measures.</summary>
     public float JetTrimDb { get; init; } = -15f;
 
     public AirPortSpec Port(string name)
@@ -100,13 +80,9 @@ public sealed record AirSystemSpec
 
     // ── Presets ─────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// A tractor unit and a loaded trailer. Big reservoirs, long lines, and a lot of volume behind
-    /// every valve — which is why a truck's air sounds SLOW where a bus's sounds quick. The service
-    /// release comes out of the trailer's relay valve at the back; the parking brakes dump the whole
-    /// spring brake side at once and are the loudest thing on it; and the air dryer purge is the
-    /// bang-and-sigh from a truck that has been standing for two minutes with nobody in it.
-    /// </summary>
+    /// <summary>A tractor unit and a loaded trailer: large volumes behind every valve, so its air is
+    /// slow where a bus's is quick. The parking brakes are the loudest; the dryer purge is the
+    /// bang-and-sigh of a standing truck.</summary>
     public static AirSystemSpec TractorTrailer => new()
     {
         Name = "tractor unit and trailer",
@@ -141,12 +117,8 @@ public sealed record AirSystemSpec
         },
     };
 
-    /// <summary>
-    /// A city bus. Smaller volumes and smaller holes than a truck, so everything is quicker and
-    /// higher; but the door valve and the kneeling valve are both at the front door, a metre from
-    /// whoever is waiting to get on, which is why a bus is the vehicle most people have actually
-    /// stood next to while it let its air go.
-    /// </summary>
+    /// <summary>A city bus: smaller volumes and holes than a truck, so quicker and higher. The door
+    /// and kneeling valves are at the front door, a metre from whoever is boarding.</summary>
     public static AirSystemSpec TransitBus => new()
     {
         Name = "transit bus",
@@ -187,11 +159,8 @@ public sealed record AirSystemSpec
         },
     };
 
-    /// <summary>
-    /// A locomotive's air. Enormous volumes — the brake pipe runs the length of the train — so the
-    /// sounds are long and low, and an emergency application dumps a kilometre of pipe through a
-    /// hole the size of a thumb and can be heard from the next street.
-    /// </summary>
+    /// <summary>A locomotive's air: the brake pipe runs the length of the train, so its sounds are long
+    /// and low; an emergency application dumps a kilometre of pipe through a thumb-sized hole.</summary>
     public static AirSystemSpec Locomotive => new()
     {
         Name = "locomotive and train line",

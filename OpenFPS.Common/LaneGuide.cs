@@ -4,30 +4,19 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// Where the painted lines are, from the driver's seat.
-///
-/// A sighted driver keeps a lane by watching two things: the line beside them, which says how far
-/// off centre they are, and the dashes going past, which say how fast. Both are GEOMETRY — a width, a
-/// lane count, a paint pattern — and neither needs a picture to be useful. This works them out from
-/// the carriageway the car is on, so the client can make them audible: the dashes as ticks from the
-/// side they are on, and the two edges that matter as tones that rise as you close on them.
-///
-/// The road is the ASPHALT BOX the car is standing on, and its long axis is the way the road runs.
-/// That is what a city map is made of today. When roads become data (docs/ROADS_BEACONS_AND_SCALE.md)
-/// the lanes will come from the road's own declaration instead, and everything downstream of
-/// <see cref="Locate"/> stays as it is.
+/// Where the painted lines are, from the driver's seat: the line beside the car (how far off centre)
+/// and the dashes going past (how fast), worked out from the carriageway so the client can make them
+/// audible. The road is the asphalt box the car stands on, its long axis the way the road runs.
 /// </summary>
+// TODO: take the lanes from the road's own data once roads are data (docs/ROADS_BEACONS_AND_SCALE.md); nothing after Locate changes.
 public static class LaneGuide
 {
-    /// <summary>A lane, metres. Three is a city lane; a highway's is three and a half and a
-    /// residential street's often less, which the lane count absorbs by rounding.</summary>
+    /// <summary>A city lane, metres; the lane count's rounding absorbs a highway's 3.5 or a residential
+    /// street's less.</summary>
     public const float LaneWidth = 3.0f;
 
-    /// <summary>
-    /// One dash and one gap, metres: ten feet of paint and thirty of road, which is the US standard
-    /// for a broken lane line. At fifty kilometres an hour that is a tick a little over once a
-    /// second, and at a hundred, twice — the rate IS the speedometer.
-    /// </summary>
+    /// <summary>One dash and one gap, metres: the US standard broken line, ten feet of paint and thirty
+    /// of road. A tick a little over once a second at 50 km/h, twice at 100: the rate is the speedometer.</summary>
     public const float DashPeriod = 12.19f;
 
     public enum Line { Kerb, Centre, Lane }
@@ -81,11 +70,8 @@ public static class LaneGuide
         return lines;
     }
 
-    /// <summary>
-    /// The nearest line on each side of the car, as the DRIVER has them: the gap from the car's side
-    /// to the line (negative once the car is over it), what it is, and how far to the driver's left
-    /// or right it is from the middle of the car.
-    /// </summary>
+    /// <summary>The nearest line on each side as the driver has them: the gap from the car's side
+    /// (negative once over it), what it is, and its offset from the middle of the car.</summary>
     public static ((float Gap, Line Kind, float Offset) Left, (float Gap, Line Kind, float Offset) Right)
         Sides(Position p, float carHalfWidth)
     {
@@ -93,8 +79,7 @@ public static class LaneGuide
         float nearestLeft = float.MaxValue, nearestRight = float.MaxValue;
         foreach (var (at, kind) in Lines(p))
         {
-            // Across the road to the driver's right is +x; facing the other way, the road's right is
-            // the driver's left.
+            // Facing against the road's direction, its right is the driver's left.
             float x = (at - p.Across) * p.Facing;
             float gap = MathF.Abs(x) - carHalfWidth;
             if (x < 0f && -x < nearestLeft) { nearestLeft = -x; left = (gap, kind, x); }

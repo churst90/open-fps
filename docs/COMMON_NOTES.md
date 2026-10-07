@@ -55,3 +55,78 @@ sounds the best, use that"), and every window uses it. The other three, as `Char
 - new: 45, 0.42, 0.36, 3.0, 0.40, 0.36, 6e-6, 3e-6
 - standard: 50, 0.48, 0.40, 3.5, 0.50, 0.42, 9e-6, 4e-6
 - worn: 55, 0.55, 0.44, 4.5, 0.85, 0.55, 12e-6, 5e-6
+
+## Walking
+
+The traps each of SharedMovementEngine's rules guards against:
+
+- Stepping down off a kerb. A body walking off a kerb steps down by the same StepHeight it steps up
+  by. With only the 0.1 m landing window, a 12 cm lip put the body in the air for two ticks and then
+  landed it, and a landing is a heavy sound (it plays the footstep bank). Where made ground sits proud
+  of the dirt beside it, that fired wherever a pavement ended; standing on the boundary, the five-point
+  ground probe straddled it and flickered, so it fired again every half second. Reported as "walk a few
+  steps, stop, and for like 10 seconds, periodic bangs". A body already jumping or falling keeps the
+  0.1 m tolerance: walking off a roof is still walking off a roof.
+- A fall ends on the floor, not inside it. The landing only caught a body that started a tick within a
+  tenth of a metre of the floor. Falling faster than about 3 m/s at 30 Hz (any drop over about half a
+  metre) it crossed that window between ticks and arrived a tick's fall deep in the floor; collision met
+  the floor box from inside and pushed the body out sideways to the box's nearest edge. Sean walked off
+  the west side of Brandt Court (2026-10-04), fell eighteen metres and was put 489 m west, at the map's
+  edge, in one tick; Cody's drop onto the same roof was put 0.85 m south. GroundHeight is the highest
+  top below the body, so a fall that would pass through it stops on it.
+- The push is applied after the move. It used to be applied to the position before the move, with a
+  penetration measured after it: pressing into a wall shoved the body backwards most of a step every
+  tick and the next tick walked it back in. No net movement, 4.5 m/s of path length, footsteps that
+  never stopped, and an acoustic region flipping at half the tick rate where that straddled a doorway.
+- A push never ends deeper in something else. The three passes each lift the body out of the deepest
+  thing it is in; when two things disagree an odd number of passes ends inside the second. Sean,
+  standing still against Kestrel House's north parapet (2026-10-05), was pushed half a metre into it by
+  the player beside him every other tick, for minutes; and a push that carries the centre past the
+  middle of a 35 cm wall comes out of its far side, off the roof, eighteen metres onto the dirt.
+- Step-up is asked of the cylinder. The capsule's rounded bottom fits past an edge up to 0.85 m high
+  when not right against it, and the ground probe then stood it on top: a body walked up a 56 cm ledge
+  the cylinder could not (the parity harness, Kestrel Street's steps).
+- A person's collider stands upright. Movement once took a player's whole orientation for their box,
+  look pitch included: looking down at 45 degrees tipped a 1.8 m box over sideways through whoever stood
+  beside them, and turning on the spot swung its corners round. The one standing still was shoved half
+  a metre a tick with no input (Kestrel House roof, 2026-10-05).
+- The solid gather keeps the old grid's reach (every 10 m cell within CollisionSearchRadius, at every
+  height): a push out of something big carries the body metres, PushedDeeperIntoAnything can see only
+  what is gathered, and every past fix was heard with that reach.
+
+## The racing line's arc length
+
+RaceLine's nodes are not evenly spaced once built: Resample lays them out
+evenly along the centreline, Smooth then pulls each point half way toward the average of its neighbours
+(shortening the loop wherever it curves), and the lateral offset onto a car's lane lengthens an outside
+lane's turns and shortens an inside one's, in proportion to offset over radius. Neither touches a
+straight.
+
+Indexing by division on the nominal spacing concentrated all its error in one place: the distance wraps
+on the true perimeter but was divided by the nominal one, so on an outside lane `s / spacing` ran past
+the last node and the clamp pinned it there. The car stopped dead at one fixed point of the track until
+the lap wrapped: about forty metres of lane on the St Louis egg, most of a second for a stock car, half
+of one for a formula car. Reported as "the car will stop in front of me, the Doppler change in place,
+and then the car keeps going". An inside lane had the mirror of it, teleporting forward across the seam.
+The speed was never wrong, only the position. Locate now binary-searches the arc-length table: nine
+comparisons for a five-hundred-node circuit, exact across the closing segment.
+
+## Machines as parts
+
+Why machines are data (Machines.cs):
+
+- MachineModels is a vocabulary of strings, not a type hierarchy, because the list grows (a rotor, a
+  turbine, a fountain's jet) and each is "a model, a profile for it, and where it sits"; a map author
+  names the model in data and nothing in C# is recompiled.
+- MachinePart has the same shape for a tailpipe, a rotor and a fountain, which lets a helicopter, a bus
+  and a tree be one kind of thing. An absent setting means "whatever the profile said", which is what
+  lets a definition say "a school bus, but with open pipes" in three lines.
+- MachineDefinition exists because VehicleProfile.Presets is a dictionary of factory functions: a map
+  could say "nascar_v8" but not "that engine, in that body, with the pipes out of the side". Base lets
+  an author's machine lean on the built-in library instead of copying it.
+- Authored machines are found before built-ins so a map can replace a car without editing the library,
+  and the library can move out of C# a machine at a time.
+- Air horns are a part, not a train fitting: a lorry, a bus, a locomotive and a ship all have one.
+- MachinePart.ExtentMetres: a 40 m airliner and a tailpipe are not the same thing at ten metres. Nothing
+  reads it yet; replacing ClientAudioSystem's car-sized MathF.Max(reference, 3f) with it is the step,
+  with extent and audibility ranking done together (left as a TODO in the code).

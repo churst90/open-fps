@@ -6,8 +6,8 @@ using static OpenFPS.Common.PhysicsConstants;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A state-less, purely mathematical movement engine that calculates physics steps.
-/// Ensures 100% deterministic parity between Client prediction and Server authority.
+/// One movement step, stateless, so the client's prediction and the server's authority agree exactly.
+/// The traps each rule below guards against are in docs/COMMON_NOTES.md, Walking.
 /// </summary>
 public static class SharedMovementEngine
 {
@@ -48,11 +48,9 @@ public static class SharedMovementEngine
     }
 
     /// <summary>
-    /// What held the body back this step, if anything: the collider it pushed into and was stopped
-    /// by (not one it climbed as a step), the surface's outward normal, and how fast the attempted
-    /// horizontal motion was going INTO it. A body sliding along a wall has a small
-    /// <see cref="IntoSpeed"/>; one walking straight at it has all of its speed there. The client's
-    /// wall bump reads it; nothing in the step depends on it.
+    /// What held the body back this step, if anything (not a step it climbed): the collider, its outward
+    /// normal, and how fast the attempted horizontal motion went into it, small for a body sliding along
+    /// a wall. The client's wall bump reads it; nothing in the step depends on it.
     /// </summary>
     public struct Contact
     {
@@ -97,15 +95,12 @@ public static class SharedMovementEngine
             if (j < Boxes.Length)
             {
                 var col = Boxes[j];
-                // Create a robust World-to-Local matrix
                 Matrix4x4 worldToLocal = Matrix4x4.CreateTranslation(-col.Position) *
                                          Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(col.Rotation));
-                // Transform current cylinder center to local space
                 Vector3 localPos = Vector3.Transform(centre, worldToLocal);
                 var hit = GeometryUtils.GetCylinderAABBOverlap(-col.Size / 2f, col.Size / 2f, localPos, radius, height, canGoDown);
                 if (hit.IsColliding)
                 {
-                    // Transform normal back to world space
                     hit.Normal = Vector3.TransformNormal(hit.Normal, Matrix4x4.CreateFromQuaternion(col.Rotation));
                     hit.Material = col.Material;
                 }
@@ -172,11 +167,10 @@ public static class SharedMovementEngine
     }
 
     /// <summary>
-    /// The slope of the ground along <paramref name="direction"/> (horizontal), rise over run: the floors
-    /// under the feet and a body's radius ahead and behind, and the gentler of the two halves when both
-    /// climb or both fall, nothing when they disagree. On a ramp both halves are its slope; on a flight
-    /// of stairs each is a riser over a going, the flight's pitch; at a lone kerb one half is level, and a
-    /// kerb is stepped, not climbed. Static floors only, the same on the server and every client.
+    /// The slope of the ground along <paramref name="direction"/>, rise over run, from the floors under
+    /// the feet and a body's radius ahead and behind: the gentler half when both climb or both fall, else
+    /// nothing, so a ramp or a flight reads its pitch and a lone kerb is stepped, not climbed. Static
+    /// floors only, the same on the server and every client.
     /// </summary>
     public static float GradeAlong<F>(OpenFPS.Common.Geometry.TriangleWorld world, ref F filter, Vector3 feet, Vector3 direction,
                                       float reach = PlayerRadius) where F : OpenFPS.Common.Geometry.IGeometryFilter
@@ -198,12 +192,11 @@ public static class SharedMovementEngine
     }
 
     /// <summary>
-    /// How fast a body walks on a grade against the level, for a grade of rise over run along its way.
-    /// Up: 1 / (1 + 2g), so a ramp of 1 in 12 is 0.86 and a stair's pitch (about 0.6) 0.45. Down: a
-    /// little faster on a gentle slope, 1.05 at a tenth, then slower, 1.05 / (1 + 1.2 (|g| - 0.1)), so a
-    /// stair down is 0.65. People measured on stairs go up at a little under half their level speed and
-    /// down at about two thirds of it (Fruin, Pedestrian Planning and Design, 1971); Tobler's hiking law
-    /// puts the fastest walk on a slight downhill. Not past the walkable slope: steeper is a wall.
+    /// Walking speed on a grade against the level. Up 1 / (1 + 2g): 0.86 on a 1-in-12 ramp, 0.45 on a
+    /// stair's pitch (about 0.6). Down 1.05 at a tenth, then 1.05 / (1 + 1.2 (|g| - 0.1)): 0.65 down a
+    /// stair. People on stairs go up at a little under half their level speed and down at about two
+    /// thirds (Fruin, Pedestrian Planning and Design, 1971); Tobler's hiking law puts the fastest walk on
+    /// a slight downhill.
     /// </summary>
     public static float GradeSpeed(float grade)
     {
@@ -212,20 +205,16 @@ public static class SharedMovementEngine
         return a <= 0.1f ? 1f + 0.5f * a : 1.05f / (1f + 1.2f * (a - 0.1f));
     }
 
-    /// <summary>
-    /// The solids of <paramref name="world"/> that a body at <paramref name="ctx"/>'s position could meet
-    /// this step, sorted by owner so the server and a client meet them in the same order: everything whose
-    /// bounds come within reach of the body over the step, in the movement layer.
-    /// </summary>
+    /// <summary>The solids in the movement layer a body could meet this step, sorted by owner so the
+    /// server and a client meet them in the same order.</summary>
     public static void GatherSolids<F>(in MovementContext ctx, OpenFPS.Common.Geometry.TriangleWorld world, ref F filter,
                                        List<OpenFPS.Common.Geometry.SolidRef> into)
         where F : OpenFPS.Common.Geometry.IGeometryFilter
     {
         into.Clear();
-        // Exactly the reach the grid gather had: every cell of 10 m within CollisionSearchRadius of the
-        // body's cell, at every height. A push out of the middle of something big carries the body
-        // metres, and the guard against ending deeper in anything (PushedDeeperIntoAnything) can only see
-        // what is in this list; the grid's reach is what every past fix was heard with.
+        // The old grid gather's reach: every 10 m cell within CollisionSearchRadius, at every height. A
+        // push out of something big carries the body metres, and PushedDeeperIntoAnything sees only this
+        // list; every past fix was heard with this reach.
         int cells = (int)MathF.Ceiling(CollisionSearchRadius / GatherCell);
         float cx = MathF.Floor(ctx.Position.X / GatherCell), cz = MathF.Floor(ctx.Position.Z / GatherCell);
         var min = new Vector3((cx - cells) * GatherCell, float.MinValue, (cz - cells) * GatherCell);
@@ -268,23 +257,13 @@ public static class SharedMovementEngine
         float dt = ctx.DeltaTime;
 
         // --- 1. VERTICAL PHYSICS & GROUNDING ---
-        // Only snap to ground if we are close to it and moving downwards or stationary.
-        // This prevents the "Void Snap" where a player is teleported to map bottom if ground is missing.
+        // Snap to ground only when close to it and not rising: a missing floor must not teleport the
+        // player to the map's bottom.
         bool isGrounded = false;
 
-        // ── How far BELOW you the floor may be and still be the floor you are walking on ─────────
-        //
-        // A body walking off a kerb does not leave the ground. It steps down — which is the same
-        // StepHeight the collision code already uses to step UP, and the asymmetry was a bug: a lip
-        // of twelve centimetres put the body in the air for two ticks and then LANDED it, and a
-        // landing is a heavy sound. On a map where the made ground sits proud of the dirt beside it,
-        // that fires wherever a pavement ends — and, once you are standing on the boundary, the
-        // five-point ground probe straddles it and flickers, so it fires again every half second for
-        // as long as you stand there. Reported as "walk a few steps, stop, and for like 10 seconds,
-        // periodic bangs", and heard as footsteps because a landing plays the footstep bank.
-        //
-        // Only for a body that is NOT already going up or down: one that has jumped, or is genuinely
-        // falling, keeps the old tolerance, so walking off a roof is still walking off a roof.
+        // A body walking off a kerb steps down by StepHeight, as it steps up; with only 0.1 m a 12 cm lip
+        // landed it, a heavy sound, every half second while standing on the edge. Not for a body already
+        // jumping or falling: walking off a roof is still walking off a roof.
         float stepDown = vel.Y > -0.01f && vel.Y < 0.01f ? MathF.Max(0.1f, ctx.StepHeight) : 0.1f;
         if (pos.Y <= ctx.GroundHeight + stepDown && vel.Y <= 0.1f)
         {
@@ -307,19 +286,9 @@ public static class SharedMovementEngine
             vel.Y -= ctx.Gravity * dt;
         }
 
-        // ── A fall ends ON the floor, not inside it ──────────────────────────────────────────────
-        //
-        // The landing above only catches a body that STARTS a tick within a tenth of a metre of the
-        // floor. A body falling faster than that — three metres per second at 30 Hz, which is any
-        // drop of more than about half a metre — crosses the window between two ticks and arrives a
-        // whole tick's fall deep in the floor. Collision then met the floor box from inside it, centre
-        // within its footprint, and pushed the body out sideways to the box's NEAREST EDGE: the end of
-        // the roof slab, or of the ground box the whole city stands on. Sean walked off the west side
-        // of Brandt Court (2026-10-04), fell eighteen metres, and on landing was put 489 m west at the
-        // edge of the map in one tick; Cody's drop onto the same roof was put 0.85 m south.
-        //
-        // The floor under the body is known (GroundHeight is the highest top below it), so a fall
-        // that would pass through it this tick stops on it this tick.
+        // A fall that would pass through the floor this tick stops on it. Faster than 3 m/s (a drop of
+        // about half a metre) a body arrived a tick deep in the floor, and collision pushed it out
+        // sideways to the slab's nearest edge: 489 m in one tick off Brandt Court's roof (2026-10-04).
         Vector3 moveDelta;
         bool landed = false;
         if (!isGrounded && vel.Y < 0f && ctx.GroundHeight > DefaultGroundCheckLimit
@@ -329,8 +298,7 @@ public static class SharedMovementEngine
         }
 
         // --- 2. HORIZONTAL MOVEMENT ---
-        // Slower up a slope or a flight, a little faster down a gentle one (GradeSpeed). Only on the
-        // ground: a body in the air keeps the speed it has.
+        // The grade's speed only on the ground: a body in the air keeps the speed it has.
         float speed = ctx.Speed;
         if (isGrounded && ctx.Grade != 0f) speed *= GradeSpeed(ctx.Grade);
         Vector3 horizontalVel = ctx.InputDirection * speed;
@@ -352,17 +320,10 @@ public static class SharedMovementEngine
         float collisionHeight = ctx.PlayerHeight - footPadding;
         Vector3 cylinderCenterOffset = new Vector3(0, footPadding + (collisionHeight / 2f), 0);
 
-        // Collide and slide. Each pass moves by whatever is left of this frame's motion and then lifts
-        // the player back out of the deepest surface they ended up inside. Removing the normal component
-        // that way IS the slide — the tangential part of the move survives it — so the remainder is spent
-        // and later passes start from a standstill; they exist to depenetrate a second collider that the
-        // first push moved us into, and to lift a player who was already overlapping something.
-        //
-        // The push used to be applied to `pos` — the position BEFORE the move — using a penetration
-        // measured at the position after it. The player was outside the wall to begin with, so pressing
-        // into one shoved them BACKWARDS by most of a step every tick and the next tick walked them back
-        // in: no net movement, 4.5 m/s of path length, footsteps that never stopped, and an acoustic
-        // region that flipped back and forth at half the tick rate wherever that straddled a doorway.
+        // Collide and slide: each pass takes the move, then lifts the body out of the deepest surface
+        // it ended up in, along the normal; what survives is the slide. Later passes only depenetrate.
+        // The push is applied to the position after the move, where its depth was measured: applied to
+        // the one before, it shoved a body against a wall backwards a step every tick.
         bool pushed = false;
         bool capsule = ctx.Body == OpenFPS.Common.Geometry.BodyShape.Capsule;
         var body = new OpenFPS.Common.Geometry.SolidContact.Capsule(ctx.PlayerRadius, footPadding, ctx.PlayerHeight);
@@ -407,11 +368,9 @@ public static class SharedMovementEngine
             {
                 Vector3 stepTarget = nextPos + new Vector3(0, ctx.StepHeight, 0);
                 bool stepBlocked = false;
-                // Whether the body fits up there is asked of the cylinder, whatever the body: its flat
-                // bottom a hand's breadth over the lifted feet is what makes StepHeight the most a body
-                // climbs. The capsule's rounded bottom fits past an edge up to 0.85 m high when it is not
-                // right against it, and the ground probe then stood it on top: a body walked up a 56 cm
-                // ledge the cylinder could not (the parity harness, the city's Kestrel Street steps).
+                // Whether the body fits up there is asked of the cylinder, whatever the body: the
+                // capsule's rounded bottom fits past an edge up to 0.85 m high and walked up a 56 cm ledge
+                // (the parity harness, Kestrel Street's steps).
                 for (int j = 0; j < nearbyColliders.Count; j++)
                 {
                     if (nearbyColliders.Intersects(j, stepTarget + cylinderCenterOffset, ctx.PlayerRadius, collisionHeight))
@@ -432,10 +391,8 @@ public static class SharedMovementEngine
             if (!stepped) pushed = true;
             if (!stepped && bestHit.Normal.Y > 0.5f)
             {
-                // A FLOOR the body came down into (see GetCylinderAABBOverlap): out the top, onto it.
-                // The cylinder stops footPadding above the feet, so the feet go that much further up
-                // to stand on the surface rather than a hand's breadth inside it. The capsule's floor
-                // says how far the feet go itself.
+                // A floor the body came down into: out the top. The cylinder stops footPadding above the
+                // feet, so they go that much further up; the capsule's floor says how far itself.
                 pos = nextPos + bestHit.Normal * (bestHit.Penetration + (capsule ? 0f : footPadding));
                 remainingMove = Vector3.Zero;
                 if (vel.Y < 0f) vel.Y = 0f;
@@ -443,8 +400,6 @@ public static class SharedMovementEngine
             }
             else if (!stepped)
             {
-                // Take the move, then come back out along the surface normal by the depth measured
-                // THERE, plus a skin width so the next test starts clear of it.
                 pos = nextPos + bestHit.Normal * (bestHit.Penetration + CollisionSkinWidth);
                 remainingMove = Vector3.Zero; // spent: the slide is what survived the push-out
 
@@ -464,19 +419,10 @@ public static class SharedMovementEngine
             }
         }
 
-        // ── A push never ends inside something else ─────────────────────────────────────────────
-        //
-        // The passes above each lift the body out of the DEEPEST thing it is in, and three of them are
-        // not always enough when two things disagree: one pushes the body into the other, the other
-        // pushes it back, and an odd number of passes ends the step inside the second. Sean, standing
-        // still against Kestrel House's north parapet (2026-10-05), was pushed half a metre into it by
-        // the player beside him every other tick and out again on the ticks between, for minutes; and
-        // a push that carries the centre past the middle of a 35 cm wall comes out of its FAR side —
-        // off the roof, eighteen metres onto the dirt.
-        //
-        // So a step whose pushing leaves the body deeper in anything than it began this step is not
-        // taken across the ground: it stays where it stood. Something already inside a wall at the
-        // start (spawned there, or a leaf swung into it) is still let out the way the passes say.
+        // A step whose pushing leaves the body deeper in anything than it began stays where it stood:
+        // two things pushing in turn ended odd passes inside the second, and past the middle of a 35 cm
+        // parapet a push comes out of its far side, off the roof (Kestrel House, 2026-10-05). A body
+        // already inside a wall at the start is still let out the way the passes say.
         if (pushed && (pos.X != ctx.Position.X || pos.Z != ctx.Position.Z)
             && (capsule ? CapsulePushedDeeper(ctx, nearbyColliders, pos, body)
                         : PushedDeeperIntoAnything(ctx, nearbyColliders, pos, cylinderCenterOffset, collisionHeight)))
@@ -488,8 +434,7 @@ public static class SharedMovementEngine
         }
 
         // --- 4. MAP BOUNDARY CLAMPING ---
-        // Treat map edges as solid planes. 
-        // We use PlayerRadius to ensure the character's volume doesn't clip out.
+        // The map's edges are solid planes, a body's radius in.
         float minX = ctx.MapMin.X + ctx.PlayerRadius;
         float maxX = ctx.MapMax.X - ctx.PlayerRadius;
         float minZ = ctx.MapMin.Z + ctx.PlayerRadius;
@@ -554,13 +499,9 @@ public static class SharedMovementEngine
     }
 
     /// <summary>
-    /// How a collider stands for a walking body to meet. A cylinder — a person — stands upright
-    /// whatever way its owner faces: everything else in the game (rays, bullets, sight) already
-    /// treats it so. Movement used to take a player's whole orientation for their box, LOOK PITCH
-    /// included, so somebody looking down at forty-five degrees tipped a 1.8 m box over sideways and
-    /// swept it through whoever stood beside them, and turning on the spot swung its corners round.
-    /// The one standing still was shoved half a metre a tick with no input of their own (Kestrel
-    /// House roof, 2026-10-05).
+    /// How a collider stands for a walking body to meet: a cylinder (a person) upright whatever way its
+    /// owner faces, as rays, bullets and sight treat it. With the look pitch in it, a player looking
+    /// down tipped a 1.8 m box through whoever stood beside them (Kestrel House roof, 2026-10-05).
     /// </summary>
     public static Quaternion StandingRotation(ColliderShape shape, Quaternion rotation)
         => shape is ColliderShape.Cylinder or ColliderShape.Cone ? Quaternion.Identity : rotation;

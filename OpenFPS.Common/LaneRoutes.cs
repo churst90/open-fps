@@ -4,12 +4,8 @@ namespace OpenFPS.Common;
 
 /// <summary>
 /// A vehicle's way round a road network: a closed tour of lane segments, joined through each junction
-/// by the curve a car actually drives from one lane into the next.
-///
-/// Closed on purpose. Everything that drives a vehicle round (RaceLine's speed from curvature and
-/// braking, stops by distance round the lap, parking spots, the look-ahead for people in the road)
-/// already works on a loop, so a tour through the city is a loop too. What changes is where the loop
-/// comes from: the lanes, not a hand-drawn line down the middle of a road.
+/// by a curve. Closed because everything that drives a vehicle (RaceLine, stops and parking by
+/// distance round the lap, the look-ahead) works on a loop.
 /// </summary>
 public sealed class LaneRoute
 {
@@ -63,10 +59,9 @@ public static class LaneRoutes
     }
 
     /// <summary>
-    /// A wandering tour from a lane: turns chosen at random (seeded, so the map is the same every
-    /// time), straight on twice as often as a turn, and once it has gone far enough the shortest way
-    /// back to where it began. Only lanes it can always get back from are taken, so it never runs into
-    /// a dead end.
+    /// A wandering tour from a lane: seeded random turns, straight on twice as often as a turn, then
+    /// the shortest way home once it has gone far enough. Only lanes it can get back from are taken,
+    /// so it never meets a dead end.
     /// </summary>
     public static LaneRoute? Random(RoadNetwork net, RoadNetwork.LaneSegment start, int seed,
                                     float wanderMetres = 900f)
@@ -220,8 +215,8 @@ public static class LaneRoutes
 
     /// <summary>
     /// The way through a junction from the end of one lane to the start of the next: a quadratic curve
-    /// whose middle control point is where the two lanes' lines would meet, which is the curve a car
-    /// turning from one into the other follows. Straight on, it is the straight line.
+    /// whose middle control point is where the two lanes' lines meet. At a city junction's near corner
+    /// it is tighter than a car can turn (see <see cref="DrivingCuePlanner.TurnCurve"/>).
     /// </summary>
     public static List<Vector3> Connector(IReadOnlyList<Vector3> inPath, IReadOnlyList<Vector3> outPath)
     {
@@ -241,8 +236,8 @@ public static class LaneRoutes
             control.Y = 0.5f * (a.Y + b.Y);
         }
         float len = Vector3.Distance(a, control) + Vector3.Distance(control, b);
-        // Two lanes only just short of parallel meet a long way off, and the curve through that point
-        // would be kilometres of points. A real junction's curve is a few times the gap it crosses.
+        // Lanes nearly parallel meet a long way off: kilometres of points. A real junction's curve is a
+        // few times the gap it crosses.
         float gap = Vector3.Distance(a, b);
         if (!float.IsFinite(len) || len > 4f * gap + 10f)
         {

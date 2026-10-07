@@ -4,11 +4,9 @@ using System.Numerics;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A vehicle's body and cabin as boxes, in its own frame (x right, y up from the road, z forward from
-/// the middle of the body), from nothing but its profile. The server builds the shell you sit in from
-/// this (VehicleShell); the client traces the same cabin for its reverberation, so the inside of a
-/// bus sounds like the bus you are sitting in — its size, its steel and glass — and nothing is said
-/// twice.
+/// A vehicle's body and cabin as boxes from its profile alone, in its own frame (x right, y up from the
+/// road, z forward from the middle). The server builds the shell you sit in from it (VehicleShell) and
+/// the client traces the same cabin for its reverberation.
 /// </summary>
 public static class VehicleCabin
 {
@@ -52,17 +50,15 @@ public static class VehicleCabin
         if (body.CabinLengthM <= 0f || body.CabinWidthM <= 0f || body.CabinHeightM <= 0f) return null;
         float L = v.LengthMetres, W = v.WidthMetres, H = v.HeightMetres;
 
-        // The cabin inside the body. Never longer or wider than the body that holds it — a school bus
-        // declares an eleven-metre cabin in a ten-point-nine-metre body, because the cabin was sized
-        // for its acoustics and the body for its bumpers.
+        // Never bigger than the body: the school bus declares an 11 m cabin (sized for its acoustics) in
+        // a 10.9 m body.
         float Lc = MathF.Min(body.CabinLengthM, L - 0.4f);
         float Wc = MathF.Min(body.CabinWidthM, W - 2f * Skin);
         float Hc = MathF.Min(body.CabinHeightM, H - 0.2f);
-        // The floor is wherever the roof leaves room for the cabin: a quarter of a metre up in a car,
-        // over a metre in a bus, which is why you climb steps to get into one.
+        // The floor is where the roof leaves room for the cabin: a quarter metre up in a car, over a
+        // metre in a bus.
         float floorTop = MathF.Max(0.2f, H - Hc - Skin);
-        // Most of what is not cabin is in front of it: the engine is at the front of nearly everything
-        // on this map, and the boot is the shorter end.
+        // Most of the rest is in front: the engine is at the front of nearly everything here.
         float spare = L - Lc;
         float frontLen = spare * 0.6f, rearLen = spare - frontLen;
         float cz = L * 0.5f - frontLen - Lc * 0.5f;
@@ -74,12 +70,10 @@ public static class VehicleCabin
     {
         var body = v.Body ?? VehicleBody.Saloon;
         var parts = new List<(string, Vector3, Vector3)>();
-        // Whether the inside is soft. Seats, carpet and a headliner in a car; a bus or a van is
-        // hard plastic and steel, which is exactly what CabinAbsorption already says.
+        // Soft inside (a car's seats and carpet) or hard (a bus or van), as CabinAbsorption says.
         string lining = body.CabinAbsorption >= 0.25f ? Carpet : Steel;
 
-        // Underneath, from just off the road to the floor. Not open space: a player must not walk
-        // under a bus, and a bus's floor is over a metre up.
+        // Underneath, solid to the floor: a player must not walk under a bus.
         if (g.FloorTop - Skin - ChassisBottom > 0.02f)
             parts.Add((Steel, new Vector3(0f, (ChassisBottom + g.FloorTop - Skin) * 0.5f, g.Cz),
                        new Vector3(g.Wc, g.FloorTop - Skin - ChassisBottom, g.Lc)));

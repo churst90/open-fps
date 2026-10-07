@@ -71,16 +71,11 @@ public sealed class DrivingCuePlan
 }
 
 /// <summary>
-/// The line ahead of a car on a road network, and how hard it will have to brake to take it.
-///
-/// No audio and no client: the same roads the traffic drives (<see cref="RoadNetwork"/>), a turn from
-/// one lane into the next that a car can make (<see cref="TurnCurve"/>), the same comfortable
-/// cornering speed traffic slows to (<see cref="DriverSteering.ComfortTurnSpeed"/>). What it adds is the
-/// question a driver who can see answers by looking: at the speed I am doing, how soon and how hard do I
-/// need to brake for what is coming — a turn, a give-way line, a closed level crossing, the end of the road.
-///
-/// It keeps a little memory between updates: the lane the car was last on (so a car in a junction knows
-/// which turn it is making) and the indicator.
+/// The line ahead of a car on a road network, and how hard it will have to brake to take it: what a
+/// sighted driver answers by looking, for a turn, a give-way line, a closed level crossing or the end
+/// of the road. The traffic's roads (<see cref="RoadNetwork"/>) and comfortable cornering speed
+/// (<see cref="DriverSteering.ComfortTurnSpeed"/>); no audio. It remembers the last lane (so a car in a
+/// junction knows which turn it is making) and the indicator.
 /// </summary>
 public sealed class DrivingCuePlanner
 {
@@ -98,10 +93,8 @@ public sealed class DrivingCuePlanner
     /// car's length if somebody is coming, which is what giving way asks.</summary>
     public const float GiveWaySpeed = 4.2f;
 
-    /// <summary>
-    /// How far before the nearest rail a car stops for a closed crossing, metres: the stop line is no
-    /// nearer than 15 feet (MUTCD 2009, section 8B.28).
-    /// </summary>
+    /// <summary>How far before the nearest rail a car stops for a closed crossing, metres: no nearer
+    /// than 15 feet (MUTCD 2009, section 8B.28).</summary>
     public const float StopLineFromRail = 4.6f;
 
     /// <summary>Stop this far short of the end of a road, metres.</summary>
@@ -132,11 +125,9 @@ public sealed class DrivingCuePlanner
     public static float GuideDistance(float speed) => Math.Clamp(8f + speed * 0.8f, 8f, 30f);
 
     /// <summary>
-    /// How far along the line the guide sits: <see cref="GuideDistance"/> on the straight, and closer
-    /// round a tight turn, no more than 0.7 of the tightest radius within that reach. Steering for a
-    /// point a long way round a corner cuts it: twelve metres ahead on a six-metre turn put a car's wheels
-    /// five metres over the kerb inside (DrivingCueDrillTests); at 0.7 of the radius the cut is a
-    /// third of a metre.
+    /// How far along the line the guide sits: <see cref="GuideDistance"/>, but no more than 0.7 of the
+    /// tightest radius within it. Twelve metres ahead on a six-metre turn put the wheels five metres over
+    /// the inside kerb (DrivingCueDrillTests); at 0.7 of the radius the cut is a third of a metre.
     /// </summary>
     public static float GuideReach(IReadOnlyList<Vector3> path, float speed)
     {
@@ -488,11 +479,7 @@ public sealed class DrivingCuePlanner
         }
     }
 
-    /// <summary>
-    /// The steadiest braking that reaches every target in time: the largest (v^2 - vt^2) / 2d. A target
-    /// the car is already on top of (inside half a second) is not something to brake for any more; how
-    /// hard its turn is working the tyres is (<see cref="DrivingCuePlan.LateralRatio"/>).
-    /// </summary>
+    /// <summary>The steadiest braking that reaches every target in time: the largest (v^2 - vt^2) / 2d.</summary>
     private static void Brake(DrivingCuePlan plan, float v, List<(float At, float Speed, CueHazard Kind)> targets)
     {
         float near = MathF.Max(1f, v * 0.5f);
@@ -500,8 +487,8 @@ public sealed class DrivingCuePlanner
         {
             if (d < near)
             {
-                // A bend already under the car is not something to brake for any more; what it asks of
-                // the tyres is the car's own turning (LateralRatio, from the yaw rate).
+                // Inside half a second a bend is not something to brake for: what it asks of the tyres
+                // is the car's own turning (LateralRatio).
                 if (kind is CueHazard.Stop or CueHazard.Crossing or CueHazard.RoadEnd && v > 0.5f)
                 {
                     float a = v * v / (2f * MathF.Max(0.3f, d));
@@ -534,23 +521,16 @@ public sealed class DrivingCuePlanner
 
     // ── The turn a car can make ─────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The tightest a car takes a junction turn, metres (the path of its middle): a car's kerb-to-kerb
-    /// turning circle is about 11 m across, and nobody drives a junction at full lock. A bigger vehicle
-    /// sets its own (DrivingAids, from the chassis).
-    /// </summary>
+    /// <summary>The tightest radius a car takes a junction turn at, metres: its kerb-to-kerb circle is
+    /// about 11 m across, and nobody drives a junction at full lock. A bigger vehicle sets its own.</summary>
     public float MinTurnRadius { get; set; } = 6f;
 
     /// <summary>
-    /// The line a car drives from one lane into the next: an arc tangent to both lanes' lines.
-    ///
-    /// Where the lanes leave room, it is the widest arc that starts and ends inside the junction. Where
-    /// they do not — a kerb lane turning into the kerb lane round the near corner, whose lines meet a few
-    /// metres from the lane ends — it is no tighter than <see cref="MinTurnRadius"/>, starting that much
-    /// before the lane ends (<paramref name="trimIn"/>, metres to cut off the end of the lane) and joining
-    /// the next lane that far along it (<paramref name="skipOut"/>). (Traffic drives the quadratic curve
-    /// between the lane ends, LaneRoutes.Connector; at the near corner of a city junction that curve is
-    /// a metre or two of radius, a turn no car can make.) Straight on, the straight line.
+    /// The line a car drives from one lane into the next: the widest arc tangent to both that fits in
+    /// the junction, and never tighter than <see cref="MinTurnRadius"/>. A tighter corner (kerb lane into
+    /// kerb lane round the near corner) starts <paramref name="trimIn"/> metres before the lane ends and
+    /// joins the next lane <paramref name="skipOut"/> along it. Not traffic's LaneRoutes.Connector: at a
+    /// city junction's near corner that curve is a metre or two of radius, which no car can make.
     /// </summary>
     public List<Vector3> TurnCurve(IReadOnlyList<Vector3> inPath, IReadOnlyList<Vector3> outPath, out float trimIn, out float skipOut)
     {

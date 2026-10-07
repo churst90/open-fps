@@ -4,10 +4,9 @@ using System.Text.Json;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// What a driver's client is told about a map's roads (the MapRoads message): the roads and junctions
-/// as the map declares them, the level crossings with the line of their rails, and the tracks a
-/// vehicle can drive round. The client builds the same <see cref="RoadNetwork"/> the server's traffic
-/// runs on from it, so the driving cues and the traffic read one description of the road.
+/// What a driver's client is told about a map's roads (the MapRoads message): roads, junctions, level
+/// crossings and drivable tracks. The client builds the same <see cref="RoadNetwork"/> the server's
+/// traffic runs on, so the driving cues and the traffic read one description.
 /// </summary>
 public sealed class RoadMapData
 {
@@ -51,13 +50,11 @@ public sealed class CrossingRails
     /// metres: the road's half-width and a little.</summary>
     public float HalfLengthMetres { get; set; } = 8f;
 
-    /// <summary>
-    /// Standard gauge (1435 mm between the inside faces of the rail heads) plus one 72 mm head: the
-    /// distance from the middle of one rail head to the middle of the other.
-    /// </summary>
+    /// <summary>Rail head centre to rail head centre: standard gauge (1435 mm between the inside faces)
+    /// plus one 72 mm head.</summary>
     public const float StandardRailCentres = 1.435f + 0.072f;
 
-    /// <summary>The two rails' lines across the road: a point on each, and the direction they run.</summary>
+    /// <summary>A point on each rail's line where it crosses the road; the lines run <see cref="Along"/>.</summary>
     public (Vector3 Left, Vector3 Right) RailPoints()
     {
         var across = new Vector3(Along.Z, 0f, -Along.X);

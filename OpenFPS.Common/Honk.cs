@@ -3,16 +3,10 @@ using System.Globalization;
 namespace OpenFPS.Common;
 
 /// <summary>
-/// A horn being sounded: WHICH horn, and the rhythm of the hand on it.
-///
-/// It travels as a <see cref="TransientSound.SynthKey"/> on the one channel every short sound in the
-/// world already uses, with the vehicle as the event's source. The rhythm is sent rather than a
-/// sound because the client plays it ON the vehicle — a one-second blast from a car doing fifty is
-/// fourteen metres of road, and a sound left behind where the button was pressed is a horn in the
-/// wrong place. So the server decides that somebody honked and how; the vehicle's own horn does the
-/// rest, and it Dopplers, occludes and moves with the car like everything else on it.
-///
-/// The pattern is alternating seconds: on, off, on, off... A tap is one number.
+/// A horn being sounded: which horn, and the rhythm of the hand on it, as a
+/// <see cref="TransientSound.SynthKey"/> with the vehicle as source. The rhythm is sent, not a sound,
+/// so the client plays it on the moving vehicle: a one-second blast at 50 km/h is fourteen metres of
+/// road. The pattern is alternating seconds on, off, on...; a tap is one number.
 /// </summary>
 public static class Honk
 {
@@ -27,11 +21,8 @@ public static class Honk
     /// hand is on it, which only the voice's Running flag knows.</summary>
     public const string HoldWord = "hold";
 
-    /// <summary>
-    /// The key for a horn a driver is holding down. Its pattern is one blast that never ends; the voice
-    /// blows while it is told to run and lets go when it is not, so the horn's own valve or relay ends
-    /// the note (<see cref="Held"/>).
-    /// </summary>
+    /// <summary>The key for a horn held down: one endless blast (<see cref="Held"/>); the voice lets go
+    /// when it is told to stop, so the horn's own valve or relay ends the note.</summary>
     public static string HoldKey(string horn) => Prefix + horn + ":" + HoldWord;
 
     /// <summary>The pattern a held horn parses to: one blast with no end.</summary>
@@ -58,17 +49,14 @@ public static class Honk
             values[i] = Math.Clamp(values[i], 0f, 20f);
         }
         if (values.Length == 0) return false;
-        // Filled in only on success: a key with a good horn and a bad rhythm must not leave the
-        // horn behind for a caller that forgot to check.
+        // Only on success: a bad rhythm must not leave the horn set for a caller that did not check.
         horn = body[..cut];
         pattern = values;
         return true;
     }
 
-    /// <summary>
-    /// How loud a horn is at one metre while it is blowing, dB SPL — from its own model's declared
-    /// level, so the server's earshot and the client's voice agree on it.
-    /// </summary>
+    /// <summary>A horn's level at one metre while blowing, dB SPL, from its model, so the server's
+    /// earshot and the client's voice agree.</summary>
     public static float LevelDb(string horn)
     {
         int colon = horn.IndexOf(':');
@@ -102,10 +90,8 @@ public static class Honk
         return false;
     }
 
-    /// <summary>
-    /// What an ordinary driver does with a horn, most often to least. A tap — somebody saying hello,
-    /// or "the light is green". Two quick ones. And now and then a proper lean on it.
-    /// </summary>
+    /// <summary>What an ordinary driver does with a horn, most often to least: a tap, two quick ones,
+    /// now and then a lean on it.</summary>
     public static float[] Everyday(Random rng)
     {
         double r = rng.NextDouble();
@@ -115,20 +101,14 @@ public static class Honk
         return new[] { 0.6f + 0.8f * (float)rng.NextDouble() };
     }
 
-    /// <summary>
-    /// What a driver does after somebody made them stand on the brakes: a long one, or a long one
-    /// with a short one after it for emphasis. Never a polite tap.
-    /// </summary>
+    /// <summary>After somebody made the driver stand on the brakes: a long one, or a long and a short.</summary>
     public static float[] Startled(Random rng)
         => rng.NextDouble() < 0.6
             ? new[] { 0.8f + 0.7f * (float)rng.NextDouble() }
             : new[] { 0.5f + 0.3f * (float)rng.NextDouble(), 0.15f, 0.25f };
 
-    /// <summary>
-    /// A train approaching a level crossing: long, long, short, long (FRA 49 CFR 222.21), the last
-    /// held until the crossing is reached. Durations in seconds; the last is extended by the caller
-    /// to reach the crossing.
-    /// </summary>
+    /// <summary>A train approaching a level crossing: long, long, short, long (FRA 49 CFR 222.21),
+    /// seconds; the caller stretches the last to reach the crossing.</summary>
     public static float[] Crossing(float lastLongSeconds)
         => new[] { 3.0f, 1.0f, 3.0f, 1.0f, 1.0f, 1.0f, Math.Max(3f, lastLongSeconds) };
 }
